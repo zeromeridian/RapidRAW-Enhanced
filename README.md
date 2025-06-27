@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/github_assets/editor.png" alt="RapidRAW Editor">
+</p>
+
+<br>
+
 <div align="center">
 
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -8,26 +14,23 @@
 
 </div>
 
-<br>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/github_assets/editor.png" alt="RapidRAW Editor">
-</p>
-
 # RapidRAW
 
-> A blazingly-fast, non-destructive, and GPU-accelerated RAW image editor built with performance in mind.
+> A beautiful, non-destructive, and GPU-accelerated RAW image editor built with performance in mind.
 
-RapidRAW is a feature-rich image manipulation program, similar to Adobe Lightroom, designed from the ground up for maximum performance. By leveraging a **Rust** backend with a **WGPU-based** processing pipeline and a modern **React** frontend inside a **Tauri** shell, it offers a responsive and efficient editing experience for photographers and enthusiasts. Thanks to Tauri, it's a lightweight, cross-platform application available for **Windows, macOS, and Linux**.
+RapidRAW is a feature-rich, beautiful image manipulation program, similar to Adobe Lightroom, designed from the ground up for maximum performance and a modern layout. Thanks to Tauri, it's a lightweight, cross-platform application available for **Windows, macOS, and Linux**.
 
-This project was developed by me, [Timon Käch](https://github.com/CyberTimon), as a personal challenge in just two weeks at the age of 18.
+I developed this project as a personal challenge over the course of two weeks at the age of 18. My goal was to deepen my understanding of both React and Rust, with the support from Google Gemini 2.5.
+
+Have fun!
 
 **Table of Contents**
 - [Key Features](#key-features)
 - [Demo & Screenshots](#demo--screenshots)
-- [The Story](#the-story)
+- [The Idea](#the-idea)
 - [Development Timeline](#development-timeline)
 - [Getting Started](#getting-started)
+- [Current Priorities](#current-priorities)
 - [Contributing](#contributing)
 - [Support the Project](#support-the-project)
 - [License](#license)
@@ -42,10 +45,10 @@ This project was developed by me, [Timon Käch](https://github.com/CyberTimon), 
       <h4>Core Editing Engine</h4>
       <ul>
         <li><strong>GPU-Accelerated Processing:</strong> All image adjustments are processed on the GPU using a custom WGSL shader for real-time feedback.</li>
-        <li><strong>Full RAW Support:</strong> Leverages the <code>rawloader</code> crate to support a wide range of camera formats, featuring two advanced demosaicing algorithms (including Menon2007).</li>
+        <li><strong>Full RAW Support:</strong> Supports a wide range of RAW camera formats, featuring two demosaicing algorithms.</li>
         <li><strong>Non-Destructive Workflow:</strong> All edits are stored in a <code>.rrdata</code> sidecar file, leaving your original images untouched.</li>
-        <li><strong>Advanced Masking:</strong> Local adjustments with Brush, Linear, and Radial masks. The mask system is bitmap-based for future extensibility.</li>
-        <li><strong>32-bit Floating-Point Precision:</strong> Ensures high-quality adjustments without banding or data loss.</li>
+        <li><strong>Masking:</strong> Local adjustments with Brush, Linear, and Radial masks. The mask system is bitmap-based.</li>
+        <li><strong>32-bit Precision:</strong> Ensures high-quality adjustments without banding or data loss.</li>
       </ul>
       <h4>Professional Grade Adjustments</h4>
       <ul>
@@ -60,7 +63,7 @@ This project was developed by me, [Timon Käch](https://github.com/CyberTimon), 
     <td valign="top" width="50%">
       <h4>Library & Workflow</h4>
       <ul>
-        <li><strong>Complete Image Library:</strong> Sort, rate, and manage your photos efficiently.</li>
+        <li><strong>Image Library:</strong> Sort, rate, and manage your photos efficiently.</li>
         <li><strong>Folder Management:</strong> Integrated folder tree, create, rename, and delete folders directly within the app.</li>
         <li><strong>File Operations:</strong> Copy, move, and duplicate images and their associated edits.</li>
         <li><strong>Filmstrip View:</strong> Quickly navigate between images in your current folder while editing.</li>
@@ -73,7 +76,7 @@ This project was developed by me, [Timon Käch](https://github.com/CyberTimon), 
         <li><strong>Copy & Paste Settings:</strong> Quickly transfer adjustments between images.</li>
         <li><strong>Undo/Redo History:</strong> A robust history system for every edit.</li>
         <li><strong>Customizable UI:</strong> Resizable panels and multiple beautiful UI themes with smooth animations.</li>
-        <li><strong>Advanced Exporting:</strong> Control file format (JPEG, PNG, TIFF), quality, and resizing options on export.</li>
+        <li><strong>Exporting:</strong> Control file format (JPEG, PNG, TIFF), quality, and resizing options on export.</li>
       </ul>
     </td>
   </tr>
@@ -83,44 +86,44 @@ This project was developed by me, [Timon Käch](https://github.com/CyberTimon), 
 
 Here's RapidRAW in action.
 
-<!--
-  PLACEHOLDER: Replace these placeholder images with actual screenshots or GIFs of your application.
-  This is the most important part to make your project look impressive!
--->
 <p align="center">
-  <img src="https://via.placeholder.com/800x450/1A1D1B/FFFFFF?text=Main+Editor+View" alt="Editor View" style="max-width: 100%;"><br>
-  <em>The main editor interface with all adjustment panels.</em>
+  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/github_assets/editor.png" alt="Editor View" style="max-width: 100%;"><br>
+  <em>The main editor interface.</em>
 </p>
 <br>
 <table width="100%">
   <tr>
-    <td width="50%" align="center">
-      <img src="https://via.placeholder.com/400x225/1A1D1B/FFFFFF?text=Library+View" alt="Library View" style="max-width: 100%;"><br>
+    <td width="33%" align="center">
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/github_assets/library.png" alt="Library View" style="max-width: 100%;"><br>
       <em>Full-featured image library.</em>
     </td>
-    <td width="50%" align="center">
-      <img src="https://via.placeholder.com/400x225/1A1D1B/FFFFFF?text=Masking+Tools" alt="Masking Tools" style="max-width: 100%;"><br>
+    <td width="33%" align="center">
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/github_assets/masks.png" alt="Masking Tools" style="max-width: 100%;"><br>
       <em>Powerful local adjustments with masks.</em>
+    </td>
+    <td width="33%" align="center">
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/github_assets/themes.png" alt="Themes" style="max-width: 100%;"><br>
+      <em>Many unique themes to style the editor.</em>
     </td>
   </tr>
 </table>
 
-## The Story
+## The Idea
 
 #### The Motivation
 As a photography enthusiast, I often found existing software to be sluggish and resource-heavy on my machine. Born from the desire for a more responsive and streamlined photo editing experience, I set out to build my own. The goal was to create a tool that was not only fast but also helped me learn the intricate details of digital image processing and camera technology.
 
 #### The Challenge
-I gave myself a strict deadline of **two weeks** to go from an empty folder to a functional, feature-rich application. This personal challenge pushed me to learn quickly, make pragmatic decisions, and focus intensely on the core architecture and user experience.
+I gave myself a deadline of **two weeks** to go from an empty folder to a functional, feature-rich application. This personal challenge pushed me to learn quickly and focus intensely on the core architecture and user experience.
 
 #### The Process
 The foundation is built on Rust for its safety and performance, and Tauri for its ability to create lightweight, cross-platform desktop apps with a web frontend. The entire image processing pipeline is offloaded to the GPU via WGPU and a custom WGSL shader, ensuring that even on complex edits with multiple masks, the UI remains fluid.
 
-I am immensely grateful for Google's Gemini suite of AI models. As an 18-year-old without a formal background in advanced mathematics or image science, the AI Studio's free tier was an invaluable assistant, helping me research and implement complex concepts like the Menon demosaicing algorithm.
+I am **immensely grateful for Google's Gemini suite of AI models.** As an 18-year-old without a formal background in advanced mathematics or image science, the AI Studio's free tier was an invaluable assistant, helping me research and implement concepts like the Menon demosaicing algorithm.
 
 ## Development Timeline
 
-This project was built in an intense two-week sprint. Here's a summary of the progress:
+This project was built in an two-week sprint. Here's a summary of the progress:
 
 <details>
 <summary><strong>Click to expand the day-by-day development log</strong></summary>
@@ -138,7 +141,7 @@ This project was built in an intense two-week sprint. Here's a summary of the pr
 *   **Day 11: June 23rd** - Added full undo/redo functionality integrated with a custom history hook. Improved context menus and completed the settings panel.
 *   **Day 12: June 24th** - Implemented image rotation and fixed all mask scaling/alignment issues related to cropping and rotation.
 *   **Day 13: June 25th** - Rewrote the mask system to be bitmap-based. Implemented brush and linear gradient tools, with semi-transparent visualization.
-*   **Day 14: June 26th-27th** - Final polish. Added universal keyboard shortcuts, full adjustment support for masks, theme management, and final UI/UX improvements.
+*   **Day 14: June 26th-27th** - Final polish. Added universal keyboard shortcuts, full adjustment support for masks, theme management, and final UI/UX improvements. This ReadMe.
 
 </details>
 
@@ -162,9 +165,19 @@ cd RapidRAW
 # 2. Install frontend dependencies
 npm install
 
-# 3. Build and run the application
-npm run tauri dev
+# 3. Build and run the application with release optimizations
+npx tauri dev --release
 ```
+
+## Current Priorities
+
+While the core functionality is in place, I'm actively working on improving several key areas. Here's a transparent look at the current focus:
+
+*   **[ ] Finding a Better Demosaicing Algorithm:** I'm actively testing alternative demosaicing algorithms to improve the initial quality and detail rendering from RAW files.
+*   **[ ] Refactoring the Frontend:** The React component tree has become complex, leading to too many props being passed down ("prop drilling").
+*   **[ ] Improving the Dehaze Tool:** The current dehaze algorithm doesn't produce ideal results yet. I plan to rework it for a more effective and natural-looking effect.
+*   **[ ] Find a better way to send images to the frontend:** Currently it sends the image to the frontend using Base64, which is inefficient.
+
 
 ## Contributing
 
@@ -174,11 +187,11 @@ Contributions are welcome and highly appreciated! Whether it's reporting a bug, 
 
 As an 18-year-old developer balancing this project with an apprenticeship, your support means the world. If you find RapidRAW useful or exciting, please consider donating to help me dedicate more time to its development and cover any associated costs.
 
-<!-- PLACEHOLDER: Add your Ko-fi or other donation links here -->
--   **Ko-fi:** [Donate on Ko-fi](https://ko-fi.com/your-username)
+-   **Ko-fi:** [Donate on Ko-fi](https://ko-fi.com/cybertimon)
 -   **Crypto:**
-    -   BTC: `your_btc_address_here`
-    -   ETH: `your_eth_address_here`
+    -   BTC: `36yHjo2dkBwQ63p3YwtqoYAohoZhhUTkCJ` (min. 0.0001 because of broker)
+    -   ETH: `0x597e6bdb97f3d0f1602b5efc8f3b7beb21eaf74a` (min. 0.005 because of broker)
+    -   SOL: `CkXM3C777S8iJX9h3MGSfwGxb85Yx7GHmynQUFSbZXUL` (min. 0.01 because of broker)
 
 ## License
 
