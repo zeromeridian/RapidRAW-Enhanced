@@ -1,0 +1,54 @@
+name: 'Release: Build & Package App'
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build-and-package:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build Tauri App
+        run: npm run tauri -- build --bundles ${{ matrix.platform == 'macos-latest' && 'app' || 'nsis' }}
+
+      - name: Package for macOS
+        if: matrix.platform == 'macos-latest'
+        run: |
+          cd src-tauri/target/release/bundle/macos
+          zip -r ../../../../../rapidraw-macOS.zip ./rapidraw.app
+          cd ../../../../../
+      
+      - name: Package for Windows
+        if: matrix.platform == 'windows-latest'
+        run: |
+          Compress-Archive -Path src-tauri/target/release/bundle/nsis/* -DestinationPath rapidraw-Windows.zip
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./rapidraw-${{ matrix.platform == 'macos-latest' && 'macOS' || 'Windows' }}.zip
+          asset_name: rapidraw-${{ matrix.platform == 'macos-latest' && 'macOS' || 'Windows' }}.zip
+          asset_content_type: application/zip
