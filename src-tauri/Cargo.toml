@@ -1,8 +1,8 @@
 [package]
 name = "RapidRAW"
-version = "1.0.7"
+version = "1.0.8"
 description = "A blazingly-fast, non-destructive, and GPU-accelerated RAW image editor built with performance in mind."
-authors = ["you"]
+authors = ["Timon Käch"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

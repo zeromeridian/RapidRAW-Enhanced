@@ -268,7 +268,7 @@ export default function MainLibrary({
                   </div>
                 </div>
               </div>
-              <p className="absolute bottom-8 left-8 lg:left-16 text-xs text-text-secondary">Version 1.0.7 - Images by Timon Käch (@timonkaech.photography)</p>
+              <p className="absolute bottom-8 left-8 lg:left-16 text-xs text-text-secondary">Version 1.0.8 - Images by Timon Käch (@timonkaech.photography)</p>
             </>
           )}
         </div>

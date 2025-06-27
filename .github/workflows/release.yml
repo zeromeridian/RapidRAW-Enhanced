@@ -6,6 +6,8 @@ on:
 
 jobs:
   build-and-package:
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:

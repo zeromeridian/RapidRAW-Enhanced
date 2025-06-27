@@ -18,7 +18,7 @@
 
 > A beautiful, non-destructive, and GPU-accelerated RAW image editor built with performance in mind.
 
-RapidRAW is a feature-rich, beautiful image manipulation program, similar to Adobe Lightroom, designed from the ground up for maximum performance and a modern layout. Thanks to Tauri, it's a lightweight, cross-platform application available for **Windows, macOS, and Linux**.
+RapidRAW is a modern, high-performance alternative to Adobe Lightroom. It delivers a feature-rich, beautiful editing experience in a lightweight package (under 13MB) for Windows, macOS, and Linux.
 
 I developed this project as a personal challenge over the course of two weeks at the age of 18. My goal was to deepen my understanding of both React and Rust, with the support from Google Gemini 2.5.
 
@@ -33,7 +33,7 @@ Have fun!
 - [Current Priorities](#current-priorities)
 - [Contributing](#contributing)
 - [Support the Project](#support-the-project)
-- [License](#license)
+- [License & Philosophy](#license--philosophy)
 
 ---
 
@@ -165,7 +165,8 @@ cd RapidRAW
 # 2. Install frontend dependencies
 npm install
 
-# 3. Build and run the application with release optimizations
+# 3. Build and run the application in development mode
+# Use --release for a build that runs much faster (image loading etc.)
 npx tauri dev --release
 ```
 
@@ -176,7 +177,7 @@ While the core functionality is in place, I'm actively working on improving seve
 *   **[ ] Finding a Better Demosaicing Algorithm:** I'm actively testing alternative demosaicing algorithms to improve the initial quality and detail rendering from RAW files.
 *   **[ ] Refactoring the Frontend:** The React component tree has become complex, leading to too many props being passed down ("prop drilling").
 *   **[ ] Improving the Dehaze Tool:** The current dehaze algorithm doesn't produce ideal results yet. I plan to rework it for a more effective and natural-looking effect.
-*   **[ ] Find a better way to send images to the frontend:** Currently it sends the image to the frontend using Base64, which is inefficient.
+*   **[ ] Optimize Image Transport:** Replace the current Base64 image transport layer with a more efficient method to improve performance and reduce memory usage.
 
 
 ## Contributing
@@ -193,7 +194,7 @@ As an 18-year-old developer balancing this project with an apprenticeship, your 
     -   ETH: `0x597e6bdb97f3d0f1602b5efc8f3b7beb21eaf74a` (min. 0.005 because of broker)
     -   SOL: `CkXM3C777S8iJX9h3MGSfwGxb85Yx7GHmynQUFSbZXUL` (min. 0.01 because of broker)
 
-## License
+## License & Philosophy
 
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. I chose this license to ensure that RapidRAW and any of its derivatives will always remain open-source and free for the community. It protects the project from being used in closed-source commercial software, ensuring that improvements benefit everyone.
 
