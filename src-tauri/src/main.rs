@@ -563,7 +563,10 @@ fn generate_mask_overlay(
     scale: f32,
     crop_offset: (f32, f32),
 ) -> Result<String, String> {
-    if let Some(gray_mask) = generate_mask_bitmap(&mask_def, width, height, scale, crop_offset) {
+
+    let scaled_crop_offset = (crop_offset.0 * scale, crop_offset.1 * scale);
+
+    if let Some(gray_mask) = generate_mask_bitmap(&mask_def, width, height, scale, scaled_crop_offset) {
         let mut rgba_mask = RgbaImage::new(width, height);
         for (x, y, pixel) in gray_mask.enumerate_pixels() {
             let intensity = pixel[0];

@@ -148,8 +148,8 @@ fn generate_radial_bitmap(
     let params: RadialMaskParameters = serde_json::from_value(params_value.clone()).unwrap_or_default();
     let mut mask = GrayImage::new(width, height);
 
-    let center_x = ((params.center_x as f32 - crop_offset.0) * scale) as i32;
-    let center_y = ((params.center_y as f32 - crop_offset.1) * scale) as i32;
+    let center_x = (params.center_x as f32 * scale - crop_offset.0) as i32;
+    let center_y = (params.center_y as f32 * scale - crop_offset.1) as i32;
     let radius_x = params.radius_x as f32 * scale;
     let radius_y = params.radius_y as f32 * scale;
     let rotation_rad = params.rotation * PI / 180.0;
@@ -191,10 +191,10 @@ fn generate_linear_bitmap(
     let params: LinearMaskParameters = serde_json::from_value(params_value.clone()).unwrap_or_default();
     let mut mask = GrayImage::new(width, height);
 
-    let start_x = (params.start_x as f32 - crop_offset.0) * scale;
-    let start_y = (params.start_y as f32 - crop_offset.1) * scale;
-    let end_x = (params.end_x as f32 - crop_offset.0) * scale;
-    let end_y = (params.end_y as f32 - crop_offset.1) * scale;
+    let start_x = params.start_x as f32 * scale - crop_offset.0;
+    let start_y = params.start_y as f32 * scale - crop_offset.1;
+    let end_x = params.end_x as f32 * scale - crop_offset.0;
+    let end_y = params.end_y as f32 * scale - crop_offset.1;
     let range = params.range * scale;
 
     let line_vec_x = end_x - start_x;
@@ -257,10 +257,10 @@ fn generate_brush_bitmap(
                 let p1 = &points_pair[0];
                 let p2 = &points_pair[1];
 
-                let x1_f = (p1.x as f32 - crop_offset.0) * scale;
-                let y1_f = (p1.y as f32 - crop_offset.1) * scale;
-                let x2_f = (p2.x as f32 - crop_offset.0) * scale;
-                let y2_f = (p2.y as f32 - crop_offset.1) * scale;
+                let x1_f = p1.x as f32 * scale - crop_offset.0;
+                let y1_f = p1.y as f32 * scale - crop_offset.1;
+                let x2_f = p2.x as f32 * scale - crop_offset.0;
+                let y2_f = p2.y as f32 * scale - crop_offset.1;
 
                 let dist = ((x2_f - x1_f).powi(2) + (y2_f - y1_f).powi(2)).sqrt();
                 let step_size = (radius * (1.0 - feather) / 2.0).max(1.0);
@@ -280,8 +280,8 @@ fn generate_brush_bitmap(
             }
         } else {
             let p1 = &line.points[0];
-            let x1 = ((p1.x as f32 - crop_offset.0) * scale) as i32;
-            let y1 = ((p1.y as f32 - crop_offset.1) * scale) as i32;
+            let x1 = (p1.x as f32 * scale - crop_offset.0) as i32;
+            let y1 = (p1.y as f32 * scale - crop_offset.1) as i32;
             draw_feathered_ellipse_mut(&mut mask, (x1, y1), radius, feather, color_value, is_eraser);
         }
     }

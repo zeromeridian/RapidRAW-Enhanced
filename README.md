@@ -111,7 +111,7 @@ Here's RapidRAW in action.
 ## The Idea
 
 #### The Motivation
-As a photography enthusiast, I often found existing software to be sluggish and resource-heavy on my machine. Born from the desire for a more responsive and streamlined photo editing experience, I set out to build my own. The goal was to create a tool that was not only fast but also helped me learn the intricate details of digital image processing and camera technology.
+As a photography enthusiast, I often found existing software to be sluggish and resource-heavy on my machine. Born from the desire for a more responsive and streamlined photo editing experience, I set out to build my own. The goal was to create a tool that was not only fast but also helped me learn the details of digital image processing and camera technology.
 
 #### The Challenge
 I gave myself a deadline of **two weeks** to go from an empty folder to a functional, feature-rich application. This personal challenge pushed me to learn quickly and focus intensely on the core architecture and user experience.
