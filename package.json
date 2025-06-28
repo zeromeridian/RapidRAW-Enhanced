@@ -1,10 +1,12 @@
 {
   "name": "rapidraw",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "author": "Timon Käch",
   "private": true,
   "scripts": {
+    "predev": "node ./src/sync-version.js",
     "dev": "vite",
+    "prebuild": "node ./src/sync-version.js",
     "build": "vite build",
     "tauri": "tauri"
   },

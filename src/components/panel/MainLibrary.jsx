@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { getVersion } from '@tauri-apps/api/app'; 
 import { 
   Folder, 
   Image as ImageIcon, 
@@ -176,12 +177,19 @@ export default function MainLibrary({
   theme,
 }) {
   const [showSettings, setShowSettings] = useState(false);
+  const [appVersion, setAppVersion] = useState('');
   const prevFolderPathRef = useRef();
   const isNewFolder = currentFolderPath !== prevFolderPathRef.current;
 
   useEffect(() => {
     prevFolderPathRef.current = currentFolderPath;
   }, [currentFolderPath]);
+
+  useEffect(() => {
+    getVersion().then(version => {
+      setAppVersion(version);
+    });
+  }, []);
 
   if (!rootPath) {
     if (!appSettings) {
@@ -268,7 +276,9 @@ export default function MainLibrary({
                   </div>
                 </div>
               </div>
-              <p className="absolute bottom-8 left-8 lg:left-16 text-xs text-text-secondary">Version 1.0.8 - Images by Timon Käch (@timonkaech.photography)</p>
+              <p className="absolute bottom-8 left-8 lg:left-16 text-xs text-text-secondary">
+                {appVersion && `Version ${appVersion} - `}Images by Timon Käch (@timonkaech.photography)
+              </p>
             </>
           )}
         </div>
