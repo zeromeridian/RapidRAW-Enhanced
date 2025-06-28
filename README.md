@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/github_assets/editor.png" alt="RapidRAW Editor">
+  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.png" alt="RapidRAW Editor">
 </p>
 
 <br>
@@ -87,22 +87,22 @@ Have fun!
 Here's RapidRAW in action.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/github_assets/editor.png" alt="Editor View" style="max-width: 100%;"><br>
+  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.png" alt="Editor View" style="max-width: 100%;"><br>
   <em>The main editor interface.</em>
 </p>
 <br>
 <table width="100%">
   <tr>
     <td width="33%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/github_assets/library.png" alt="Library View" style="max-width: 100%;"><br>
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/library.png" alt="Library View" style="max-width: 100%;"><br>
       <em>Full-featured image library.</em>
     </td>
     <td width="33%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/github_assets/masks.png" alt="Masking Tools" style="max-width: 100%;"><br>
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/masks.png" alt="Masking Tools" style="max-width: 100%;"><br>
       <em>Powerful local adjustments with masks.</em>
     </td>
     <td width="33%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/github_assets/themes.png" alt="Themes" style="max-width: 100%;"><br>
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/themes.png" alt="Themes" style="max-width: 100%;"><br>
       <em>Many unique themes to style the editor.</em>
     </td>
   </tr>
