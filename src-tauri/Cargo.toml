@@ -43,6 +43,9 @@ imageproc = "0.25.0"
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }
 
+[patch.crates-io]
+rawloader = { git = "https://github.com/CyberTimon/rawloader.git" } # cargo update -p rawloader
+
 [profile.dev]
 opt-level = 3
 debug = true

@@ -6743,3 +6743,8 @@ dependencies = [
  "syn 2.0.103",
  "winnow 0.7.11",
 ]
+
+[[patch.unused]]
+name = "rawloader"
+version = "0.37.1"
+source = "git+https://github.com/CyberTimon/rawloader.git#2232e0cdb5451a55178fbdc4b548eb53cb194adf"
