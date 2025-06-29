@@ -198,6 +198,7 @@ function App() {
   const [isRenameFolderModalOpen, setIsRenameFolderModalOpen] = useState(false);
   const [folderActionTarget, setFolderActionTarget] = useState(null);
   const [confirmModalState, setConfirmModalState] = useState({ isOpen: false });
+  const [customEscapeHandler, setCustomEscapeHandler] = useState(null);
   const { showContextMenu } = useContextMenu();
   const imagePathList = useMemo(() => imageList.map(f => f.path), [imageList]);
   const { thumbnails } = useThumbnails(imagePathList);
@@ -564,7 +565,19 @@ function App() {
       const key = event.key.toLowerCase();
 
       if (selectedImage) {
-        if (key === 'escape') { event.preventDefault(); if (isFullScreen) handleToggleFullScreen(); else handleBackToLibrary(); return; }
+        if (key === 'escape') {
+          event.preventDefault();
+          if (customEscapeHandler) {
+            customEscapeHandler();
+          } else if (activeMaskId) {
+            setActiveMaskId(null);
+          } else if (isFullScreen) {
+            handleToggleFullScreen();
+          } else {
+            handleBackToLibrary();
+          }
+          return;
+        }
         if (key === 'f' && !isCtrl) { event.preventDefault(); handleToggleFullScreen(); }
         if (key === 'b' && !isCtrl) { event.preventDefault(); setShowOriginal(prev => !prev); }
         if (key === 'r' && !isCtrl) { event.preventDefault(); handleRightPanelSelect('crop'); }
@@ -998,7 +1011,7 @@ function App() {
                 {renderedRightPanel === 'adjustments' && <Controls theme={theme} adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} histogram={histogram} collapsibleState={collapsibleSectionsState} setCollapsibleState={setCollapsibleSectionsState} copiedSectionAdjustments={copiedSectionAdjustments} setCopiedSectionAdjustments={setCopiedSectionAdjustments} />}
                 {renderedRightPanel === 'metadata' && <MetadataPanel selectedImage={selectedImage} />}
                 {renderedRightPanel === 'crop' && <CropPanel selectedImage={selectedImage} adjustments={adjustments} setAdjustments={setAdjustments} />}
-                {renderedRightPanel === 'masks' && <MasksPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} onSelectMask={setActiveMaskId} activeMaskId={activeMaskId} brushSettings={brushSettings} setBrushSettings={setBrushSettings} copiedMask={copiedMask} setCopiedMask={setCopiedMask} histogram={histogram} />}
+                {renderedRightPanel === 'masks' && <MasksPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} onSelectMask={setActiveMaskId} activeMaskId={activeMaskId} brushSettings={brushSettings} setBrushSettings={setBrushSettings} copiedMask={copiedMask} setCopiedMask={setCopiedMask} setCustomEscapeHandler={setCustomEscapeHandler} histogram={histogram} />}
                 {renderedRightPanel === 'presets' && <PresetsPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} activePanel={activeRightPanel} />}
                 {renderedRightPanel === 'export' && <ExportPanel selectedImage={selectedImage} adjustments={adjustments} multiSelectedPaths={multiSelectedPaths} />}
                 {renderedRightPanel === 'ai' && <AIPanel selectedImage={selectedImage} />}

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -33,13 +33,31 @@ const itemVariants = {
 
 export default function MasksPanel({
   adjustments, setAdjustments, selectedImage, onSelectMask, activeMaskId,
-  brushSettings, setBrushSettings, copiedMask, setCopiedMask, histogram
+  brushSettings, setBrushSettings, copiedMask, setCopiedMask, histogram,
+  setCustomEscapeHandler
 }) {
   const [editingMaskId, setEditingMaskId] = useState(null);
   const [deletingMaskId, setDeletingMaskId] = useState(null);
   const { showContextMenu } = useContextMenu();
 
   const isInitialRender = useRef(true);
+
+  const handleBackToList = useCallback(() => {
+    setEditingMaskId(null);
+    onSelectMask(null);
+  }, [onSelectMask]);
+
+  useEffect(() => {
+    if (editingMaskId) {
+      setCustomEscapeHandler(() => handleBackToList);
+    } else {
+      setCustomEscapeHandler(null);
+    }
+
+    return () => {
+      setCustomEscapeHandler(null);
+    };
+  }, [editingMaskId, handleBackToList, setCustomEscapeHandler]);
 
   useEffect(() => {
     isInitialRender.current = false;
@@ -162,11 +180,6 @@ export default function MasksPanel({
   const handleSelectMaskForEditing = (id) => {
     setEditingMaskId(id);
     onSelectMask(id);
-  };
-
-  const handleBackToList = () => {
-    setEditingMaskId(null);
-    onSelectMask(null);
   };
 
   const handleDeselect = () => {
