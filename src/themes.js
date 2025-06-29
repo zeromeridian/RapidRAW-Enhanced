@@ -38,6 +38,25 @@ export const THEMES = [
       }
     },
     {
+      id: 'grey',
+      name: 'Grey',
+      splashImage: '/splash-grey.jpg',
+      cssVariables: {
+        '--color-bg-primary-rgb': '80, 80, 80',
+        '--opacity-bg-primary': '0.7',
+        '--color-bg-secondary-rgb': '90, 90, 90',
+        '--opacity-bg-secondary': '0.8',
+        '--color-surface': '80 80 80',
+        '--color-card-active': '105 105 105',
+        '--color-button-text': '80 80 80',
+        '--color-text-primary': '225 225 225',
+        '--color-text-secondary': '160 160 160',
+        '--color-accent': '210 210 210',
+        '--color-border-color': '110 110 110',
+        '--color-hover-color': '210 210 210',
+      }
+    },
+    {
       id: 'muted-green',
       name: 'Muted Green',
       splashImage: '/splash-green.jpg',
