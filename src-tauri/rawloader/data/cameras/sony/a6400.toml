@@ -1,0 +1,9 @@
+make = "SONY"
+model = "ILCE-6400"
+clean_make = "Sony"
+clean_model = "a6400"
+blackpoint = 512
+whitepoint = 15200
+color_matrix = [ 7138, -2138, -663, -4701, 12328, 2616, -921, 1831, 5938 ]
+color_pattern = "RGGB"
+crops = [0, 0, 28, 0]

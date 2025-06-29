@@ -1,6 +1,6 @@
 use anyhow::Result;
 use image::{DynamicImage, ImageBuffer, Rgb, RgbImage};
-use rawloader::RawImageData;
+use rawloader::{Orientation, RawImageData};
 use rayon::prelude::*;
 use std::io::Cursor;
 
@@ -28,7 +28,7 @@ enum Axis {
 const K_B: [f32; 3] = [0.5, 0.0, 0.5];
 
 // #############################################################################
-// FAST PREVIEW / THUMBNAIL HELPERS
+// HELPER FUNCTIONS
 // #############################################################################
 
 fn downscale_and_demosaic_2x2(
@@ -133,6 +133,20 @@ fn downscale_and_demosaic_4x4(
     out_buffer
 }
 
+/// Applies the EXIF orientation to a DynamicImage.
+fn apply_orientation(image: DynamicImage, orientation: Orientation) -> DynamicImage {
+    match orientation {
+        Orientation::Normal | Orientation::Unknown => image,
+        Orientation::HorizontalFlip => image.fliph(),
+        Orientation::Rotate180 => image.rotate180(),
+        Orientation::VerticalFlip => image.flipv(),
+        Orientation::Transpose => image.rotate90().fliph(),
+        Orientation::Rotate90 => image.rotate90(),
+        Orientation::Transverse => image.rotate90().flipv(),
+        Orientation::Rotate270 => image.rotate270(),
+    }
+}
+
 // #############################################################################
 // PUBLIC API FUNCTIONS
 // #############################################################################
@@ -140,6 +154,8 @@ fn downscale_and_demosaic_4x4(
 pub fn develop_raw_thumbnail(file_bytes: &[u8]) -> Result<DynamicImage> {
     let raw_image = rawloader::decode(&mut Cursor::new(file_bytes))?;
 
+    // --- Extract metadata ---
+    let orientation = raw_image.orientation;
     let raw_width = raw_image.width as u32;
     let raw_height = raw_image.height as u32;
     let crops = raw_image.crops;
@@ -197,13 +213,18 @@ pub fn develop_raw_thumbnail(file_bytes: &[u8]) -> Result<DynamicImage> {
         final_image_buffer.put_pixel(x, y, Rgb([r, g, b]));
     }
 
-    Ok(DynamicImage::ImageRgb8(final_image_buffer))
+    // --- Apply orientation and return ---
+    let dynamic_image = DynamicImage::ImageRgb8(final_image_buffer);
+    let oriented_image = apply_orientation(dynamic_image, orientation);
+
+    Ok(oriented_image)
 }
 
 pub fn develop_raw_fast_preview(file_bytes: &[u8]) -> Result<DynamicImage> {
-    // --- Load and Extract Metadata ---
     let raw_image = rawloader::decode(&mut Cursor::new(file_bytes))?;
 
+    // --- Extract metadata ---
+    let orientation = raw_image.orientation;
     let raw_width = raw_image.width as u32;
     let raw_height = raw_image.height as u32;
     let crops = raw_image.crops;
@@ -244,13 +265,11 @@ pub fn develop_raw_fast_preview(file_bytes: &[u8]) -> Result<DynamicImage> {
         }
     }
 
-    // --- Now, move the data vector out of the struct ---
     let data = match raw_image.data {
         RawImageData::Integer(d) => d,
         _ => return Err(anyhow::anyhow!("Only integer-based RAW data is supported.")),
     };
 
-    // --- Demosaic and Post-Process ---
     let fast_preview_buffer = downscale_and_demosaic_2x2(&data, raw_width, crop_left, crop_top, final_width, final_height, bayer_pattern);
     let (new_width, new_height) = fast_preview_buffer.dimensions();
     let mut final_image_buffer = ImageBuffer::<Rgb<u8>, Vec<u8>>::new(new_width, new_height);
@@ -263,7 +282,10 @@ pub fn develop_raw_fast_preview(file_bytes: &[u8]) -> Result<DynamicImage> {
         final_image_buffer.put_pixel(x, y, Rgb([r, g, b]));
     }
 
-    Ok(DynamicImage::ImageRgb8(final_image_buffer))
+    let dynamic_image = DynamicImage::ImageRgb8(final_image_buffer);
+    let oriented_image = apply_orientation(dynamic_image, orientation);
+
+    Ok(oriented_image)
 }
 
 pub fn develop_raw_image(
@@ -275,6 +297,8 @@ pub fn develop_raw_image(
     let raw_image = rawloader::decode(&mut Cursor::new(file_bytes))
         .map_err(|e| format!("Failed to decode RAW file: {}", e))?;
 
+    // --- Extract metadata ---
+    let orientation = raw_image.orientation;
     let raw_width = raw_image.width as u32;
     let raw_height = raw_image.height as u32;
     let crops = raw_image.crops;
@@ -367,7 +391,10 @@ pub fn develop_raw_image(
         }
     }
 
-    Ok(DynamicImage::ImageRgb8(img_buffer))
+    let dynamic_image = DynamicImage::ImageRgb8(img_buffer);
+    let oriented_image = apply_orientation(dynamic_image, orientation);
+
+    Ok(oriented_image)
 }
 
 // #############################################################################

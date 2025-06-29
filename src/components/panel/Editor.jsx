@@ -6,7 +6,6 @@ import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import debounce from 'lodash.debounce';
 
-import { useKeydown } from '../../hooks/useKeydown';
 import { useImageRenderSize } from '../../hooks/useImageRenderSize';
 
 import FullScreenViewer from './editor/FullScreenViewer';
@@ -34,6 +33,7 @@ export default function Editor({
   const [isMaskHovered, setIsMaskHovered] = useState(false);
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
   const [maskOverlayUrl, setMaskOverlayUrl] = useState(null);
+  const [transformState, setTransformState] = useState({ scale: 1, positionX: 0, positionY: 0 });
   const imageContainerRef = useRef(null);
   const isInitialMount = useRef(true);
 
@@ -180,9 +180,15 @@ export default function Editor({
 
   return (
     <>
-      {isFullScreen && (
-        <FullScreenViewer key={selectedImage.path} url={fullScreenUrl} isLoading={isFullScreenLoading} onClose={onToggleFullScreen} />
-      )}
+      <FullScreenViewer
+        isOpen={isFullScreen}
+        url={fullScreenUrl}
+        onClose={onToggleFullScreen}
+        thumbnailUrl={selectedImage.thumbnailUrl}
+        transformState={transformState}
+        onTransformChange={setTransformState}
+      />
+
       <div className="flex-1 bg-bg-secondary rounded-lg flex flex-col relative overflow-hidden p-2 gap-2 min-h-0">
         <EditorToolbar
           onBackToLibrary={onBackToLibrary}

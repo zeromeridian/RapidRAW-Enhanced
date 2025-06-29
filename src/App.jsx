@@ -432,25 +432,35 @@ function App() {
     });
   }, [multiSelectedPaths, executeDelete]);
 
-  const handleToggleFullScreen = useCallback(async () => {
+  const handleToggleFullScreen = useCallback(() => {
     if (isFullScreen) {
       setIsFullScreen(false);
       setFullScreenUrl(null);
     } else {
       if (!selectedImage) return;
+      setIsFullScreen(true);
+    }
+  }, [isFullScreen, selectedImage]);
+
+  useEffect(() => {
+    if (!isFullScreen || !selectedImage?.isReady) {
+      return;
+    }
+
+    const generate = async () => {
       setIsFullScreenLoading(true);
       try {
         const url = await invoke('generate_fullscreen_preview', { jsAdjustments: adjustments });
         setFullScreenUrl(url);
-        setIsFullScreen(true);
       } catch (e) {
         console.error("Failed to generate fullscreen preview:", e);
         setError("Failed to generate full screen preview.");
       } finally {
         setIsFullScreenLoading(false);
       }
-    }
-  }, [isFullScreen, adjustments, selectedImage]);
+    };
+    generate();
+  }, [isFullScreen, selectedImage?.path, selectedImage?.isReady, adjustments]);
 
   const handleCopyAdjustments = useCallback(() => {
     const sourceAdjustments = selectedImage ? adjustments : libraryActiveAdjustments;
@@ -536,6 +546,7 @@ function App() {
     setHistogram(null);
     setFinalPreviewUrl(null);
     setUncroppedAdjustedPreviewUrl(null);
+    setFullScreenUrl(null);
     setLiveAdjustments(INITIAL_ADJUSTMENTS);
     resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
     setShowOriginal(false);
@@ -563,6 +574,7 @@ function App() {
       }
 
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+        if (isViewLoading) { event.preventDefault(); return; }
         event.preventDefault();
         const isNext = key === 'arrowright' || key === 'arrowdown';
         const activePath = selectedImage ? selectedImage.path : libraryActivePath;
