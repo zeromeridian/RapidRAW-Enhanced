@@ -204,8 +204,8 @@ fn apply_curve(val: f32, points: array<Point, 16>, count: u32) -> f32 {
 fn apply_tonal_adjustments(color: vec3<f32>, exp: f32, con: f32, hi: f32, sh: f32, wh: f32, bl: f32) -> vec3<f32> {
     var rgb = color;
     rgb *= pow(2.0, exp);
-    let black_point = bl;
-    let white_point = 1.0 + wh;
+    let black_point = -bl;
+    let white_point = 1.0 - wh;
     rgb = (rgb - black_point) / max(white_point - black_point, 0.001);
     let luma = dot(rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
     let shadow_mix = 1.0 - smoothstep(0.0, 0.5, luma);

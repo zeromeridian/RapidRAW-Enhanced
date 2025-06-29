@@ -210,13 +210,16 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
                 <KeybindItem keys={['Ctrl/Cmd', '+', 'A']} description="Select all images" />
                 <KeybindItem keys={['Delete']} description="Delete selected file(s)" />
                 <KeybindItem keys={['0-5']} description="Set rating for selected image(s)" />
-                <KeybindItem keys={['←', '→']} description="Navigate between images" />
+                <KeybindItem keys={['↑', '↓', '←', '→']} description="Navigate images in library" />
               </div>
               <div className="pt-2">
                 <h3 className="text-lg font-semibold pt-3 pb-2 text-accent">Editor</h3>
                 <KeybindItem keys={['Esc']} description="Exit editor / fullscreen" />
                 <KeybindItem keys={['Ctrl/Cmd', '+', 'Z']} description="Undo adjustment" />
                 <KeybindItem keys={['Ctrl/Cmd', '+', 'Y']} description="Redo adjustment" />
+                <KeybindItem keys={['Space']} description="Toggle 200% zoom" />
+                <KeybindItem keys={['←', '→']} description="Previous / Next image" />
+                <KeybindItem keys={['↑', '↓']} description="Zoom out / Zoom in" />
                 <KeybindItem keys={['F']} description="Toggle fullscreen" />
                 <KeybindItem keys={['B']} description="Show original (before/after)" />
                 <KeybindItem keys={['R']} description="Toggle Crop panel" />

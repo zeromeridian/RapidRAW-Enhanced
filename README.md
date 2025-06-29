@@ -33,6 +33,7 @@ Have fun!
 - [Getting Started](#getting-started)
 - [Current Priorities](#current-priorities)
 - [Contributing](#contributing)
+- [Special Thanks](#special-thanks)
 - [Support the Project](#support-the-project)
 - [License & Philosophy](#license--philosophy)
 
@@ -201,6 +202,13 @@ While the core functionality is in place, I'm actively working on improving seve
 ## Contributing
 
 Contributions are welcome and highly appreciated! Whether it's reporting a bug, suggesting a feature, or submitting a pull request, your help makes this project better. Please feel free to open an issue to discuss your ideas.
+
+## Special Thanks
+
+A huge thank you to the following projects and tools that were very important in the development of RapidRAW:
+
+*   **[Google AI Studio](aistudio.google.com):** For providing amazing assistance in researching, implementing image processing algorithms and giving an overall speed boost.
+*   **[rawloader](https://github.com/pedrocr/rawloader):** For the excellent Rust crate that provides the foundation for RAW file decoding in this project.
 
 ## Support the Project
 
