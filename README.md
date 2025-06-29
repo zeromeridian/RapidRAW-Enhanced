@@ -100,7 +100,7 @@ Here's RapidRAW in action.
       <em>Powerful batch operations and export.</em>
     </td>
     <td width="50%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.gif" alt="Customizable editor layout and panels" style="max-width: 100%;">
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/customization.gif" alt="Customizable editor layout and panels" style="max-width: 100%;">
       <br>
       <em>Customizable editor layout and panels.</em>
     </td>
