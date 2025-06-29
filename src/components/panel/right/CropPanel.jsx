@@ -6,6 +6,7 @@ const PRESETS = [
   { name: 'Free', value: null },
   { name: 'Original', value: 'original' },
   { name: '1:1', value: 1 },
+  { name: '5:4', value: 5 / 4 },
   { name: '4:3', value: 4 / 3 },
   { name: '3:2', value: 3 / 2 },
   { name: '16:9', value: 16 / 9 },

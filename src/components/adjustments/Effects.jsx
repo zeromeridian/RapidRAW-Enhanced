@@ -44,7 +44,7 @@ export default function EffectsPanel({ adjustments, setAdjustments, isForMask = 
               label="Midpoint"
               value={adjustments.vignetteMidpoint}
               onChange={(e) => handleAdjustmentChange('vignetteMidpoint', e.target.value)}
-              min="0" max="100" step="1"
+              min="0" max="100" step="1" defaultValue="50"
             />
             <Slider
               label="Roundness"
@@ -56,7 +56,7 @@ export default function EffectsPanel({ adjustments, setAdjustments, isForMask = 
               label="Feather"
               value={adjustments.vignetteFeather}
               onChange={(e) => handleAdjustmentChange('vignetteFeather', e.target.value)}
-              min="0" max="100" step="1"
+              min="0" max="100" step="1" defaultValue="50"
             />
           </div>
 
@@ -72,13 +72,13 @@ export default function EffectsPanel({ adjustments, setAdjustments, isForMask = 
               label="Size"
               value={adjustments.grainSize}
               onChange={(e) => handleAdjustmentChange('grainSize', e.target.value)}
-              min="0" max="100" step="1"
+              min="0" max="100" step="1" defaultValue="25"
             />
             <Slider
               label="Roughness"
               value={adjustments.grainRoughness}
               onChange={(e) => handleAdjustmentChange('grainRoughness', e.target.value)}
-              min="0" max="100" step="1"
+              min="0" max="100" step="1" defaultValue="50"
             />
           </div>
         </>

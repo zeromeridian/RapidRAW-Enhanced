@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 /**
- * A reusable slider component with a double-click-to-reset feature and an interactive handle.
+ * A reusable slider component with a clickable reset icon and an interactive handle.
  * The slider's thumb animates with an "ease-in-out" effect when the value is set programmatically.
  *
  * @param {string} label - The text label for the slider.
@@ -12,7 +12,7 @@ import React, { useState, useEffect, useRef } from 'react';
  * @param {number|string} min - The minimum value of the slider.
  * @param {number|string} max - The maximum value of the slider.
  * @param {number|string} step - The increment step of the slider.
- * @param {number} [defaultValue=0] - The value to reset to on double-click. Defaults to 0.
+ * @param {number} [defaultValue=0] - The value to reset to on icon click. Defaults to 0.
  */
 const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0 }) => {
   const [displayValue, setDisplayValue] = useState(Number(value));
@@ -87,13 +87,40 @@ const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0 }) =>
   const handleDragStart = () => setIsDragging(true);
   const handleDragEnd = () => setIsDragging(false);
 
+  // Reset icon SVG component
+  const ResetIcon = () => (
+    <svg 
+      width="14" 
+      height="14" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+      className="text-text-secondary hover:text-text-primary transition-colors duration-150"
+    >
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+      <path d="M3 21v-5h5" />
+    </svg>
+  );
+
   return (
-    <div className="mb-2">
-      <div 
-        className="flex justify-between items-center mb-1 cursor-pointer" 
-        onDoubleClick={handleReset}
-      >
-        <label className="text-sm font-medium text-text-secondary select-none">{label}</label>
+    <div className="mb-2 group">
+      <div className="flex justify-between items-center mb-1">
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-text-secondary select-none">{label}</label>
+          <button
+            onClick={handleReset}
+            className="p-0.5 rounded hover:bg-card-active transition-all duration-200 cursor-pointer opacity-0 group-hover:opacity-100 active:scale-95"
+            title={`Reset to ${defaultValue}`}
+            type="button"
+          >
+            <ResetIcon />
+          </button>
+        </div>
         <span className="text-sm text-text-primary w-12 text-right select-none">
           {numericValue.toFixed(decimalPlaces)}
         </span>
