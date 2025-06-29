@@ -18,7 +18,7 @@
 
 > A beautiful, non-destructive, and GPU-accelerated RAW image editor built with performance in mind.
 
-RapidRAW is a modern, high-performance alternative to Adobe Lightroom. It delivers a feature-rich, beautiful editing experience in a lightweight package (under 13MB) for Windows, macOS, and Linux.
+RapidRAW is a modern, high-performance alternative to Adobe Lightroom. It delivers a feature-rich, beautiful editing experience in a lightweight package (under 14MB) for Windows, macOS, and Linux.
 
 I developed this project as a personal challenge over the course of two weeks at the age of 18. My goal was to deepen my understanding of both React and Rust, with the support from Google Gemini 2.5.
 
@@ -45,7 +45,7 @@ Have fun!
     <td valign="top" width="50%">
       <h4>Core Editing Engine</h4>
       <ul>
-        <li><strong>GPU-Accelerated Processing:</strong> All image adjustments are processed on the GPU using a custom WGSL shader for real-time feedback.</li>
+        <li><strong>GPU-Accelerated Processing:</strong> All image adjustments are processed on the GPU using a custom WGSL shader for rapid feedback.</li>
         <li><strong>Full RAW Support:</strong> Supports a wide range of RAW camera formats, featuring two demosaicing algorithms.</li>
         <li><strong>Non-Destructive Workflow:</strong> All edits are stored in a <code>.rrdata</code> sidecar file, leaving your original images untouched.</li>
         <li><strong>Masking:</strong> Local adjustments with Brush, Linear, and Radial masks. The mask system is bitmap-based.</li>
