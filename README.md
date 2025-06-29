@@ -88,28 +88,32 @@ Have fun!
 Here's RapidRAW in action.
 
 <p align="center">
-  <video src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.mp4" controls style="max-width: 100%;"></video><br>
+  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.mp4" alt="The main editor interface in action"></img><br>
   <em>The main editor interface in action.</em>
 </p>
 <br>
 <table width="100%">
   <tr>
     <td width="50%" align="center">
-      <video src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/batch.mp4" controls style="max-width: 100%;"></video><br>
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/batch.gif" alt="Powerful batch operations and export" style="max-width: 100%;">
+      <br>
       <em>Powerful batch operations and export.</em>
     </td>
     <td width="50%" align="center">
-      <video src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.mp4" controls style="max-width: 100%;"></video><br>
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.gif" alt="Customizable editor layout and panels" style="max-width: 100%;">
+      <br>
       <em>Customizable editor layout and panels.</em>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <video src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/library.mp4" controls style="max-width: 100%;"></video><br>
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/library.gif" alt="Library navigation and folder management" style="max-width: 100%;">
+      <br>
       <em>Library navigation and folder management.</em>
     </td>
     <td width="50%" align="center">
-      <video src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/themes.mp4" controls style="max-width: 100%;"></video><br>
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/themes.gif" alt="Beautiful themes and UI customization" style="max-width: 100%;">
+      <br>
       <em>Beautiful themes and UI customization.</em>
     </td>
   </tr>
