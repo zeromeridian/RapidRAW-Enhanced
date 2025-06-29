@@ -29,6 +29,7 @@ Have fun!
 - [Demo & Screenshots](#demo--screenshots)
 - [The Idea](#the-idea)
 - [Development Timeline](#development-timeline)
+- [Latest Updates](#latest-updates)
 - [Getting Started](#getting-started)
 - [Current Priorities](#current-priorities)
 - [Contributing](#contributing)
@@ -144,6 +145,11 @@ This project was built in an two-week sprint. Here's a summary of the progress:
 *   **Day 14: June 26th-27th** - Final polish. Added universal keyboard shortcuts, full adjustment support for masks, theme management, and final UI/UX improvements. This ReadMe.
 
 </details>
+
+## Latest Updates
+
+*   **Expanded Camera Support:** Added RAW support for the Sony A6100, DJI Mavic 4 Pro, and DJI Mavic 3 Pro (ljpeg Predictor 6).
+*   **UI Improvements:** The full-screen image viewer has been enhanced for a smoother experience.
 
 ## Getting Started
 
