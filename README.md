@@ -88,7 +88,7 @@ Have fun!
 Here's RapidRAW in action.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.mp4" alt="The main editor interface in action"></img><br>
+  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.gif" alt="The main editor interface in action"></img><br>
   <em>The main editor interface in action.</em>
 </p>
 <br>
