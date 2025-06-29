@@ -119,7 +119,7 @@ Here's RapidRAW in action.
   </tr>
 </table>
 
-> If you like my the theme images and want to see more of my own images, checkout my instagram: [**@timonkaech.photography**](https://www.instagram.com/timonkaech.photography/)
+> If you like the theme images and want to see more of my own images, checkout my Instagram: [**@timonkaech.photography**](https://www.instagram.com/timonkaech.photography/)
 
 ## The Idea
 
