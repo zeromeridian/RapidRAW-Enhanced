@@ -88,23 +88,29 @@ Have fun!
 Here's RapidRAW in action.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.png" alt="Editor View" style="max-width: 100%;"><br>
-  <em>The main editor interface.</em>
+  <video src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.mp4" controls style="max-width: 100%;"></video><br>
+  <em>The main editor interface in action.</em>
 </p>
 <br>
 <table width="100%">
   <tr>
-    <td width="33%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/library.png" alt="Library View" style="max-width: 100%;"><br>
-      <em>Full-featured image library.</em>
+    <td width="50%" align="center">
+      <video src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/batch.mp4" controls style="max-width: 100%;"></video><br>
+      <em>Powerful batch operations and export.</em>
     </td>
-    <td width="33%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/masks.png" alt="Masking Tools" style="max-width: 100%;"><br>
-      <em>Powerful local adjustments with masks.</em>
+    <td width="50%" align="center">
+      <video src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.mp4" controls style="max-width: 100%;"></video><br>
+      <em>Customizable editor layout and panels.</em>
     </td>
-    <td width="33%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/themes.png" alt="Themes" style="max-width: 100%;"><br>
-      <em>Many unique themes to style the editor.</em>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <video src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/library.mp4" controls style="max-width: 100%;"></video><br>
+      <em>Library navigation and folder management.</em>
+    </td>
+    <td width="50%" align="center">
+      <video src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/themes.mp4" controls style="max-width: 100%;"></video><br>
+      <em>Beautiful themes and UI customization.</em>
     </td>
   </tr>
 </table>
