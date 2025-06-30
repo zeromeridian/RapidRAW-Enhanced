@@ -134,21 +134,21 @@ The foundation is built on Rust for its safety and performance, and Tauri for it
 
 I am **immensely grateful for Google's Gemini suite of AI models.** As an 18-year-old without a formal background in advanced mathematics or image science, the AI Studio's free tier was an invaluable assistant, helping me research and implement concepts like the Menon demosaicing algorithm.
 
-## Current Priorities
+## Updated Priorities
 
 While the core functionality is in place, I'm actively working on improving several key areas. Here's a transparent look at the current focus:
 
-| Task                                                                                         | Priority | Status |
-|----------------------------------------------------------------------------------------------|----------|--------|
-| Finding a better demosaicing algorithm                                                       | 1        | [ ]    |
-| Refactoring the frontend (reduce prop drilling in React components)                         | 2        | [ ]    |
-| Improving the dehaze tool for more natural results                                           | 1        | [ ]    |
-| Optimize image transport (replace Base64 for better performance)                            | 1        | [ ]    |
-| Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | 2        | [ ]    |
-| Sign macOS builds using a registered developer account                                       | 3        | [ ]    |
-| Switch to a better rawloader (e.g. rawler)                                                   | 3        | [ ]    |
-| Improve speed on older systems (e.g. Pascal GPUs)                                            | 2        | [ ]    |
-| Auto white balance detection and exposure correction                                         | 1        | [ ]    |
+| Task                                                                                         | Priority | Difficulty | Status |
+|----------------------------------------------------------------------------------------------|----------|------------|--------|
+| Finding a better demosaicing algorithm                                                       | Low     | High       | [ ]    |
+| Refactoring the frontend (reduce prop drilling in React components)                         | Medium   | Medium     | [ ]    |
+| Improving the dehaze tool for more natural results                                           | Low     | Medium     | [ ]    |
+| Optimize image transport (replace Base64 for better performance)                            | Low     | Medium     | [ ]    |
+| Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High   | Medium       | [ ]    |
+| Sign macOS builds using a registered developer account                                       | High      | Low     | [ ]    |
+| Switch to a better rawloader (e.g. rawler)                                                   | Medium      | Medium     | [ ]    |
+| Improve speed on older systems (e.g. Pascal GPUs)                                            | Medium   | High       | [ ]    |
+| Auto white balance detection and exposure correction                                         | Medium     | Medium     | [ ]    |
 
 ## Development Timeline
 
