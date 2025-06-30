@@ -28,10 +28,9 @@ Have fun!
 - [Key Features](#key-features)
 - [Demo & Screenshots](#demo--screenshots)
 - [The Idea](#the-idea)
-- [Development Timeline](#development-timeline)
-- [Latest Updates](#latest-updates)
-- [Getting Started](#getting-started)
 - [Current Priorities](#current-priorities)
+- [Development Timeline](#development-timeline)
+- [Getting Started](#getting-started)
 - [Contributing](#contributing)
 - [Special Thanks](#special-thanks)
 - [Support the Project](#support-the-project)
@@ -135,6 +134,22 @@ The foundation is built on Rust for its safety and performance, and Tauri for it
 
 I am **immensely grateful for Google's Gemini suite of AI models.** As an 18-year-old without a formal background in advanced mathematics or image science, the AI Studio's free tier was an invaluable assistant, helping me research and implement concepts like the Menon demosaicing algorithm.
 
+## Current Priorities
+
+While the core functionality is in place, I'm actively working on improving several key areas. Here's a transparent look at the current focus:
+
+| Task                                                                                         | Priority | Status |
+|----------------------------------------------------------------------------------------------|----------|--------|
+| Finding a better demosaicing algorithm                                                       | 1        | [ ]    |
+| Refactoring the frontend (reduce prop drilling in React components)                         | 2        | [ ]    |
+| Improving the dehaze tool for more natural results                                           | 1        | [ ]    |
+| Optimize image transport (replace Base64 for better performance)                            | 1        | [ ]    |
+| Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | 2        | [ ]    |
+| Sign macOS builds using a registered developer account                                       | 3        | [ ]    |
+| Switch to a better rawloader (e.g. rawler)                                                   | 3        | [ ]    |
+| Improve speed on older systems (e.g. Pascal GPUs)                                            | 2        | [ ]    |
+| Auto white balance detection and exposure correction                                         | 1        | [ ]    |
+
 ## Development Timeline
 
 This project was built in an two-week sprint. Here's a summary of the progress:
@@ -158,11 +173,6 @@ This project was built in an two-week sprint. Here's a summary of the progress:
 *   **Day 14: June 26th-27th** - Final polish. Added universal keyboard shortcuts, full adjustment support for masks, theme management, and final UI/UX improvements. This ReadMe.
 
 </details>
-
-## Latest Updates
-
-*   **Expanded Camera Support:** Added RAW support for the Sony A6100, DJI Mavic 4 Pro, and DJI Mavic 3 Pro (ljpeg Predictor 6).
-*   **UI Improvements:** The full-screen image viewer has been enhanced for a smoother experience.
 
 ## Getting Started
 
@@ -188,16 +198,6 @@ npm install
 # Use --release for a build that runs much faster (image loading etc.)
 npx tauri dev --release
 ```
-
-## Current Priorities
-
-While the core functionality is in place, I'm actively working on improving several key areas. Here's a transparent look at the current focus:
-
-*   **[ ] Finding a Better Demosaicing Algorithm:** I'm actively testing alternative demosaicing algorithms to improve the initial quality and detail rendering from RAW files.
-*   **[ ] Refactoring the Frontend:** The React component tree has become complex, leading to too many props being passed down ("prop drilling").
-*   **[ ] Improving the Dehaze Tool:** The current dehaze algorithm doesn't produce ideal results yet. I plan to rework it for a more effective and natural-looking effect.
-*   **[ ] Optimize Image Transport:** Replace the current Base64 image transport layer with a more efficient method to improve performance and reduce memory usage.
-
 
 ## Contributing
 
