@@ -29,7 +29,7 @@ use crate::image_processing::{
     get_all_adjustments_from_json, get_or_init_gpu_context, GpuContext,
     ImageMetadata, process_and_get_dynamic_image, Crop, apply_crop, apply_rotation,
 };
-use crate::file_management::{get_sidecar_path};
+use crate::file_management::get_sidecar_path;
 use crate::raw_processing::DemosaicAlgorithm;
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::sam_processing::{SamState, get_or_init_sam_models, generate_image_embeddings, run_sam_decoder, AiSubjectMaskParameters};

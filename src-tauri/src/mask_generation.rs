@@ -1,4 +1,4 @@
-use image::{GenericImageView, GrayImage, Luma, Rgba, RgbaImage};
+use image::{GrayImage, Luma};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::f32::consts::PI;
