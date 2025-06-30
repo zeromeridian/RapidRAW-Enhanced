@@ -48,7 +48,7 @@ Have fun!
         <li><strong>GPU-Accelerated Processing:</strong> All image adjustments are processed on the GPU using a custom WGSL shader for rapid feedback.</li>
         <li><strong>Full RAW Support:</strong> Supports a wide range of RAW camera formats, featuring two demosaicing algorithms.</li>
         <li><strong>Non-Destructive Workflow:</strong> All edits are stored in a <code>.rrdata</code> sidecar file, leaving your original images untouched.</li>
-        <li><strong>Masking:</strong> Local adjustments with Brush, Linear, and Radial masks. The mask system is bitmap-based.</li>
+        <li><strong>Masking:</strong> Local adjustments with AI object detection, Brush, Linear, and Radial masks. The mask system is bitmap-based.</li>
         <li><strong>32-bit Precision:</strong> Ensures high-quality adjustments without banding or data loss.</li>
       </ul>
       <h4>Professional Grade Adjustments</h4>
@@ -145,7 +145,7 @@ While the core functionality is in place, I'm actively working on improving seve
 | Allow 45°+ rotation for images (e.g. predefined 90° clockwise )                             | Medium   | Low       | [ ]    |
 | Improving the dehaze tool for more natural results                                           | Low     | Medium     | [ ]    |
 | Optimize image transport (replace Base64 for better performance)                            | Low     | Medium     | [ ]    |
-| Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High   | Medium       | [ ]    |
+| Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High   | Medium       | [x]    |
 | Sign macOS builds using a registered developer account                                       | High      | Low     | [ ]    |
 | Switch to a better rawloader (e.g. rawler)                                                   | Medium      | Medium     | [ ]    |
 | Improve speed on older systems (e.g. Pascal GPUs)                                            | Medium   | High       | [ ]    |
