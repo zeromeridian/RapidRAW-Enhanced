@@ -5,7 +5,6 @@ import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'r
 import clsx from 'clsx';
 
 function linesIntersect(eraserLine, drawnLine) {
-  // This is a simplified intersection check. For more accuracy, you might need a more complex algorithm.
   const threshold = (eraserLine.brushSize / 2) + (drawnLine.brushSize / 2);
   for (const p1 of eraserLine.points) {
     for (const p2 of drawnLine.points) {
@@ -143,7 +142,6 @@ const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskM
 
   if (mask.type === 'ai-subject') {
     const { startX, startY, endX, endY } = mask.parameters;
-    // Only show the bounding box if it has been defined and the mask is selected
     if (isSelected && endX > startX && endY > startY) {
       return (
         <Rect
@@ -157,7 +155,7 @@ const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskM
         />
       );
     }
-    return null; // Don't show anything if not selected or not yet generated
+    return null;
   }
 
   if (mask.type === 'brush') {

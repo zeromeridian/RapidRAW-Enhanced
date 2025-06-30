@@ -151,7 +151,7 @@ pub fn get_sidecar_path(image_path: &str) -> PathBuf {
     path.with_file_name(new_filename)
 }
 
-fn generate_thumbnail_data(
+pub fn generate_thumbnail_data(
     path_str: &str,
     gpu_context: Option<&GpuContext>,
 ) -> Result<DynamicImage> {
@@ -192,7 +192,7 @@ fn generate_thumbnail_data(
                     let scale = if full_w > 0 { base.width() as f32 / full_w as f32 } else { 1.0 };
                     (base, scale)
                 } else {
-                    (base_image, 1.0)
+                    (base_image.clone(), 1.0)
                 };
 
             let rotation_degrees = meta.adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
@@ -235,7 +235,6 @@ fn generate_thumbnail_data(
 
     Ok(base_image)
 }
-
 
 fn encode_thumbnail(image: &DynamicImage) -> Result<Vec<u8>> {
     let thumbnail = image.thumbnail(THUMBNAIL_WIDTH, THUMBNAIL_WIDTH);

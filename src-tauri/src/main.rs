@@ -29,7 +29,7 @@ use crate::image_processing::{
     get_all_adjustments_from_json, get_or_init_gpu_context, GpuContext,
     ImageMetadata, process_and_get_dynamic_image, Crop, apply_crop, apply_rotation,
 };
-use crate::file_management::get_sidecar_path;
+use crate::file_management::{get_sidecar_path};
 use crate::raw_processing::DemosaicAlgorithm;
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::sam_processing::{SamState, get_or_init_sam_models, generate_image_embeddings, run_sam_decoder, AiSubjectMaskParameters};
@@ -625,6 +625,7 @@ async fn generate_ai_subject_mask(
     path: String,
     start_point: (f64, f64),
     end_point: (f64, f64),
+    rotation: f32,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiSubjectMaskParameters, String> {
@@ -674,7 +675,40 @@ async fn generate_ai_subject_mask(
         }
     };
 
-    let mask_bitmap = run_sam_decoder(&models.decoder, &embeddings, start_point, end_point).map_err(|e| e.to_string())?;
+    let (img_w, img_h) = embeddings.original_size;
+    let center = (img_w as f64 / 2.0, img_h as f64 / 2.0);
+
+    let p1 = start_point;
+    let p2 = (start_point.0, end_point.1);
+    let p3 = end_point;
+    let p4 = (end_point.0, start_point.1);
+
+    let angle_rad = (rotation as f64).to_radians();
+    let cos_a = angle_rad.cos();
+    let sin_a = angle_rad.sin();
+
+    let unrotate = |p: (f64, f64)| {
+        let px = p.0 - center.0;
+        let py = p.1 - center.1;
+        let new_px = px * cos_a + py * sin_a + center.0;
+        let new_py = -px * sin_a + py * cos_a + center.1;
+        (new_px, new_py)
+    };
+
+    let up1 = unrotate(p1);
+    let up2 = unrotate(p2);
+    let up3 = unrotate(p3);
+    let up4 = unrotate(p4);
+
+    let min_x = up1.0.min(up2.0).min(up3.0).min(up4.0);
+    let min_y = up1.1.min(up2.1).min(up3.1).min(up4.1);
+    let max_x = up1.0.max(up2.0).max(up3.0).max(up4.0);
+    let max_y = up1.1.max(up2.1).max(up3.1).max(up4.1);
+
+    let unrotated_start_point = (min_x, min_y);
+    let unrotated_end_point = (max_x, max_y);
+
+    let mask_bitmap = run_sam_decoder(&models.decoder, &embeddings, unrotated_start_point, unrotated_end_point).map_err(|e| e.to_string())?;
     let base64_data = encode_to_base64_png(&mask_bitmap)?;
 
     Ok(AiSubjectMaskParameters {
@@ -683,6 +717,7 @@ async fn generate_ai_subject_mask(
         end_x: end_point.0,
         end_y: end_point.1,
         mask_data_base64: Some(base64_data),
+        rotation: Some(rotation),
     })
 }
 

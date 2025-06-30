@@ -169,8 +169,7 @@ pub fn run_sam_decoder(
     let gray_mask = GrayImage::from_raw(mask_width as u32, mask_height as u32, mask_data)
         .ok_or_else(|| anyhow::anyhow!("Failed to create mask image from raw data"))?;
 
-    // A slight blur helps smooth the edges of the mask
-    let feathered_mask = image::imageops::blur(&gray_mask, 2.0);
+    let feathered_mask = image::imageops::blur(&gray_mask, 3.0);
     
     Ok(feathered_mask)
 }
@@ -184,4 +183,6 @@ pub struct AiSubjectMaskParameters {
     pub end_y: f64,
     #[serde(default)]
     pub mask_data_base64: Option<String>,
+    #[serde(default)]
+    pub rotation: Option<f32>,
 }

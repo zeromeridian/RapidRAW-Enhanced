@@ -1,4 +1,4 @@
-use image::{GenericImageView, GrayImage, Luma};
+use image::{GenericImageView, GrayImage, Luma, Rgba, RgbaImage};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::f32::consts::PI;
@@ -296,6 +296,7 @@ fn generate_ai_subject_bitmap(
 ) -> Option<GrayImage> {
     let params: AiSubjectMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
     let data_url = params.mask_data_base64?;
+    let rotation = params.rotation.unwrap_or(0.0);
 
     let b64_data = if let Some(idx) = data_url.find(',') {
         &data_url[idx + 1..]
@@ -304,45 +305,44 @@ fn generate_ai_subject_bitmap(
     };
     
     let decoded_bytes = general_purpose::STANDARD.decode(b64_data).ok()?;
-    let full_mask_image = image::load_from_memory(&decoded_bytes).ok()?;
+    let full_mask_image = image::load_from_memory(&decoded_bytes).ok()?.to_luma8();
 
     let (full_mask_w, full_mask_h) = full_mask_image.dimensions();
-    let resized_mask_w = (full_mask_w as f32 * scale).round() as u32;
-    let resized_mask_h = (full_mask_h as f32 * scale).round() as u32;
-
-    if resized_mask_w == 0 || resized_mask_h == 0 {
-        return Some(GrayImage::new(width, height));
-    }
-
-    let resized_mask = full_mask_image.resize_exact(
-        resized_mask_w,
-        resized_mask_h,
-        image::imageops::FilterType::Triangle,
-    );
-
-    let crop_x = crop_offset.0.round() as u32;
-    let crop_y = crop_offset.1.round() as u32;
-
-    if crop_x >= resized_mask_w || crop_y >= resized_mask_h {
-        return Some(GrayImage::new(width, height));
-    }
-
-    let crop_w = (crop_x + width).min(resized_mask_w) - crop_x;
-    let crop_h = (crop_y + height).min(resized_mask_h) - crop_y;
-
-    if crop_w == 0 || crop_h == 0 {
-        return Some(GrayImage::new(width, height));
-    }
-
-    let cropped_sub_image = resized_mask.crop_imm(
-        crop_x,
-        crop_y,
-        crop_w,
-        crop_h,
-    );
-
     let mut final_mask = GrayImage::new(width, height);
-    image::imageops::overlay(&mut final_mask, &cropped_sub_image.to_luma8(), 0, 0);
+
+    let angle_rad = -rotation.to_radians();
+    let cos_a = angle_rad.cos();
+    let sin_a = angle_rad.sin();
+
+    let center_x = (full_mask_w as f32 * scale) / 2.0;
+    let center_y = (full_mask_h as f32 * scale) / 2.0;
+
+    for y_out in 0..height {
+        for x_out in 0..width {
+            let x_crop = x_out as f32;
+            let y_crop = y_out as f32;
+
+            let x_uncrop = x_crop + crop_offset.0;
+            let y_uncrop = y_crop + crop_offset.1;
+
+            let x_centered = x_uncrop - center_x;
+            let y_centered = y_uncrop - center_y;
+
+            let x_rot = x_centered * cos_a - y_centered * sin_a;
+            let y_rot = x_centered * sin_a + y_centered * cos_a;
+
+            let x_unrotated = x_rot + center_x;
+            let y_unrotated = y_rot + center_y;
+
+            let x_src = x_unrotated / scale;
+            let y_src = y_unrotated / scale;
+
+            if x_src >= 0.0 && x_src < full_mask_w as f32 && y_src >= 0.0 && y_src < full_mask_h as f32 {
+                let pixel = full_mask_image.get_pixel(x_src as u32, y_src as u32);
+                final_mask.put_pixel(x_out, y_out, *pixel);
+            }
+        }
+    }
 
     Some(final_mask)
 }

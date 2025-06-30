@@ -201,7 +201,7 @@ function App() {
   const [folderActionTarget, setFolderActionTarget] = useState(null);
   const [confirmModalState, setConfirmModalState] = useState({ isOpen: false });
   const [customEscapeHandler, setCustomEscapeHandler] = useState(null);
-  const [isGeneratingAiMask, setIsGeneratingAiMask] = useState(false); // <-- ADDED
+  const [isGeneratingAiMask, setIsGeneratingAiMask] = useState(false);
   const { showContextMenu } = useContextMenu();
   const imagePathList = useMemo(() => imageList.map(f => f.path), [imageList]);
   const { thumbnails } = useThumbnails(imagePathList);
@@ -230,6 +230,7 @@ function App() {
 
   const handleGenerateAiMask = async (maskId, startPoint, endPoint) => {
     if (!selectedImage?.path) {
+      console.error("Cannot generate AI mask: No image selected.");
       return;
     }
     setIsGeneratingAiMask(true);
@@ -238,6 +239,7 @@ function App() {
         path: selectedImage.path,
         startPoint: [startPoint.x, startPoint.y],
         endPoint: [endPoint.x, endPoint.y],
+        rotation: adjustments.rotation,
       });
       setAdjustments(prev => ({
         ...prev,
@@ -247,7 +249,7 @@ function App() {
       }));
     } catch (error) {
       console.error("Failed to generate AI subject mask:", error);
-      setError(`Failed to generate AI subject mask: ${error}`);
+      setError(`AI Mask Failed: ${error}`);
     } finally {
       setIsGeneratingAiMask(false);
     }
@@ -1050,7 +1052,7 @@ function App() {
               canUndo={canUndo}
               canRedo={canRedo}
               brushSettings={brushSettings}
-              onGenerateAiMask={handleGenerateAiMask} // <-- ADDED PROP
+              onGenerateAiMask={handleGenerateAiMask}
             />
             <Resizer onMouseDown={createResizeHandler(setBottomPanelHeight, bottomPanelHeight)} direction="horizontal" />
             <BottomBar
