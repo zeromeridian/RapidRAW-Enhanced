@@ -1,0 +1,24 @@
+name: 'CI'
+
+concurrency:
+  group: ci-${{ github.run_id }}
+  cancel-in-progress: true
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize]
+  push:
+    branches:
+      - main
+
+jobs:
+  ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, windows-latest, 'ubuntu-22.04']
+    uses: ./.github/workflows/build.yml
+    with:
+      platform: ${{ matrix.platform }}
+      build-args: ${{ matrix.platform == 'windows-latest' && '--bundles nsis' || '' }}
+    secrets: inherit
