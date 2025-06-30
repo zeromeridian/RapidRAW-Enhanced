@@ -64,6 +64,8 @@ jobs:
 
       - name: Build with tauri-action
         uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: ${{ inputs.build-args }}
           releaseId: ${{ inputs.release-id }}
