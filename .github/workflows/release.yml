@@ -11,29 +11,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, windows-latest]
-
-    runs-on: ${{ matrix.platform }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install frontend dependencies
-        run: npm install
-
-      - name: Build and release with tauri-action
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          releaseId: ${{ github.event.release.id }}
-          args: ${{ matrix.platform == 'windows-latest' && '--bundles nsis' || '' }}
+        platform: [macos-latest, windows-latest, 'ubuntu-22.04']
+    uses: ./.github/workflows/build.yml
+    with:
+      platform: ${{ matrix.platform }}
+      build-args: ${{ matrix.platform == 'windows-latest' && '--bundles nsis' || '' }}
+      release-id: ${{ github.event.release.id }}
+    secrets: inherit
