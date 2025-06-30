@@ -6,8 +6,6 @@ on:
 
 jobs:
   release:
-    permissions:
-      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -18,3 +16,5 @@ jobs:
       build-args: ${{ matrix.platform == 'windows-latest' && '--bundles nsis' || '' }}
       release-id: ${{ github.event.release.id }}
     secrets: inherit
+    permissions:
+      contents: write
