@@ -10,12 +10,12 @@ import { INITIAL_MASK_ADJUSTMENTS } from '../../../App';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 
 const MASK_TYPES = [
-  { id: 'ai-subject', name: 'Subject', icon: Sparkles, type: 'ai-subject' },
-  { id: 'brush', name: 'Brush', icon: Brush, type: 'brush' },
-  { id: 'linear', name: 'Linear', icon: Waves, type: 'linear' },
-  { id: 'radial', name: 'Radial', icon: Circle, type: 'radial' },
-  { id: 'color', name: 'Color', icon: Droplet, type: 'color' },
-  { id: 'luminance', name: 'Luminance', icon: Sun, type: 'luminance' },
+  { id: 'ai-subject', name: 'Subject', icon: Sparkles, type: 'ai-subject', disabled: false },
+  { id: 'brush', name: 'Brush', icon: Brush, type: 'brush', disabled: false },
+  { id: 'linear', name: 'Linear', icon: Waves, type: 'linear', disabled: false },
+  { id: 'radial', name: 'Radial', icon: Circle, type: 'radial', disabled: false },
+  { id: 'color', name: 'Color', icon: Droplet, type: 'color', disabled: true },
+  { id: 'luminance', name: 'Luminance', icon: Sun, type: 'luminance', disabled: true },
 ];
 
 const itemVariants = {
@@ -286,8 +286,13 @@ export default function MasksPanel({
               <button
                 key={maskType.id}
                 onClick={() => handleAddMask(maskType.type)}
-                className="bg-surface hover:bg-card-active text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors"
-                title={`Add ${maskType.name} Mask`}
+                disabled={maskType.disabled}
+                className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors ${
+                  maskType.disabled
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-card-active'
+                }`}
+                title={maskType.disabled ? `${maskType.name} (Coming Soon)` : `Add ${maskType.name} Mask`}
               >
                 <maskType.icon size={24} />
                 <span className="text-xs">{maskType.name}</span>

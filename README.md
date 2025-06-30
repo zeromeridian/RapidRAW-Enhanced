@@ -142,6 +142,7 @@ While the core functionality is in place, I'm actively working on improving seve
 |----------------------------------------------------------------------------------------------|----------|------------|--------|
 | Finding a better demosaicing algorithm                                                       | Low     | High       | [ ]    |
 | Refactoring the frontend (reduce prop drilling in React components)                         | Medium   | Medium     | [ ]    |
+| Allow 45°+ rotation for images (e.g. predefined 90° clockwise )                             | Medium   | Low       | [ ]    |
 | Improving the dehaze tool for more natural results                                           | Low     | Medium     | [ ]    |
 | Optimize image transport (replace Base64 for better performance)                            | Low     | Medium     | [ ]    |
 | Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High   | Medium       | [ ]    |
