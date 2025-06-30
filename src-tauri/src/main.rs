@@ -5,16 +5,17 @@ mod file_management;
 mod gpu_processing;
 mod raw_processing;
 mod mask_generation;
+mod sam_processing;
 
 use std::io::Cursor;
-use std::sync::Mutex;
+use std::sync::{Mutex};
 use std::thread;
 use std::fs;
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 
-use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba, RgbaImage, ImageFormat};
+use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba, RgbaImage, ImageFormat, GrayImage};
 use image::codecs::jpeg::JpegEncoder;
 use tauri::{Manager, Emitter};
 use base64::{Engine as _, engine::general_purpose};
@@ -31,6 +32,7 @@ use crate::image_processing::{
 use crate::file_management::get_sidecar_path;
 use crate::raw_processing::DemosaicAlgorithm;
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
+use crate::sam_processing::{SamState, get_or_init_sam_models, generate_image_embeddings, run_sam_decoder, AiSubjectMaskParameters};
 
 #[derive(Clone)]
 pub struct LoadedImage {
@@ -43,6 +45,7 @@ pub struct AppState {
     original_image: Mutex<Option<LoadedImage>>,
     raw_file_bytes: Mutex<Option<Vec<u8>>>,
     gpu_context: Mutex<Option<GpuContext>>,
+    sam_state: Mutex<Option<SamState>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -110,8 +113,24 @@ fn is_raw_file(path: &str) -> bool {
     let lower_path = path.to_lowercase();
     matches!(
         lower_path.split('.').last(),
-        Some("arw") | Some("cr2") | Some("cr3") | Some("nef") | Some("dng") |
-        Some("raf") | Some("orf") | Some("pef") | Some("rw2")
+        Some("ari") | // ARRI
+        Some("arw") | Some("srf") | Some("sr2") | // Sony
+        Some("cr2") | Some("crw") | // Canon
+        Some("cr3") | // Canon newer RAW (not yet working until I switch to rawler or similar)
+        Some("nef") | Some("nrw") | // Nikon
+        Some("dng") | // Adobe DNG
+        Some("raf") | // Fuji
+        Some("rw2") | // Panasonic / Leica
+        Some("orf") | // Olympus
+        Some("mef") | // Mamiya
+        Some("mrw") | // Minolta
+        Some("srw") | // Samsung
+        Some("erf") | // Epson
+        Some("kdc") | Some("dcs") | Some("dcr") | // Kodak
+        Some("pef") | // Pentax
+        Some("iiq") | // Leaf IIQ
+        Some("mos") | // Leaf MOS
+        Some("3fr") // Hasselblad
     )
 }
 
@@ -124,6 +143,13 @@ fn encode_to_base64(image: &DynamicImage, quality: u8) -> Result<String, String>
     
     let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
     Ok(format!("data:image/jpeg;base64,{}", base64_str))
+}
+
+fn encode_to_base64_png(image: &GrayImage) -> Result<String, String> {
+    let mut buf = Cursor::new(Vec::new());
+    image.write_to(&mut buf, ImageFormat::Png).map_err(|e| e.to_string())?;
+    let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
+    Ok(format!("data:image/png;base64,{}", base64_str))
 }
 
 fn read_exif_data(file_bytes: &[u8]) -> HashMap<String, String> {
@@ -584,6 +610,82 @@ fn generate_mask_overlay(
     }
 }
 
+fn get_full_image_for_processing(state: &tauri::State<AppState>) -> Result<DynamicImage, String> {
+    let raw_bytes_lock = state.raw_file_bytes.lock().unwrap();
+    if let Some(bytes) = &*raw_bytes_lock {
+        raw_processing::develop_raw_image(bytes, DemosaicAlgorithm::Linear)
+    } else {
+        let original_image_lock = state.original_image.lock().unwrap();
+        Ok(original_image_lock.as_ref().ok_or("No original image loaded")?.image.clone())
+    }
+}
+
+#[tauri::command]
+async fn generate_ai_subject_mask(
+    path: String,
+    start_point: (f64, f64),
+    end_point: (f64, f64),
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<AiSubjectMaskParameters, String> {
+    let models = state.sam_state.lock().unwrap().as_ref().map(|s| s.models.clone());
+
+    let models = if let Some(models) = models {
+        models
+    } else {
+        drop(models);
+        let new_models = get_or_init_sam_models(&app_handle).await.map_err(|e| e.to_string())?;
+        let mut sam_state_lock = state.sam_state.lock().unwrap();
+        if let Some(sam_state) = &mut *sam_state_lock {
+            sam_state.models.clone()
+        } else {
+            *sam_state_lock = Some(SamState {
+                models: new_models.clone(),
+                embeddings: None,
+            });
+            new_models
+        }
+    };
+
+    let embeddings = {
+        let mut sam_state_lock = state.sam_state.lock().unwrap();
+        let sam_state = sam_state_lock.as_mut().unwrap();
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(path.as_bytes());
+        let path_hash = hasher.finalize().to_hex().to_string();
+
+        if let Some(cached_embeddings) = &sam_state.embeddings {
+            if cached_embeddings.path_hash == path_hash {
+                cached_embeddings.clone()
+            } else {
+                let full_image = get_full_image_for_processing(&state)?;
+                let mut new_embeddings = generate_image_embeddings(&full_image, &models.encoder).map_err(|e| e.to_string())?;
+                new_embeddings.path_hash = path_hash;
+                sam_state.embeddings = Some(new_embeddings.clone());
+                new_embeddings
+            }
+        } else {
+            let full_image = get_full_image_for_processing(&state)?;
+            let mut new_embeddings = generate_image_embeddings(&full_image, &models.encoder).map_err(|e| e.to_string())?;
+            new_embeddings.path_hash = path_hash;
+            sam_state.embeddings = Some(new_embeddings.clone());
+            new_embeddings
+        }
+    };
+
+    let mask_bitmap = run_sam_decoder(&models.decoder, &embeddings, start_point, end_point).map_err(|e| e.to_string())?;
+    let base64_data = encode_to_base64_png(&mask_bitmap)?;
+
+    Ok(AiSubjectMaskParameters {
+        start_x: start_point.0,
+        start_y: start_point.1,
+        end_x: end_point.0,
+        end_y: end_point.1,
+        mask_data_base64: Some(base64_data),
+    })
+}
+
 #[tauri::command]
 fn save_metadata_and_update_thumbnail(
     path: String,
@@ -997,6 +1099,7 @@ fn main() {
             original_image: Mutex::new(None),
             raw_file_bytes: Mutex::new(None),
             gpu_context: Mutex::new(None),
+            sam_state: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             show_in_finder,
@@ -1025,6 +1128,7 @@ fn main() {
             generate_preset_preview,
             generate_uncropped_preview,
             generate_mask_overlay,
+            generate_ai_subject_mask,
             load_settings,
             save_settings,
             reset_adjustments_for_paths,

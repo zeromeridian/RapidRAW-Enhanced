@@ -34,11 +34,14 @@ anyhow = "1.0.98"
 kamadak-exif = "0.6.1"
 rawloader = { path = "rawloader" }
 serde_bytes = "0.11.17"
-tokio = "1.45.1"
+tokio = { version = "1", features = ["full"] }
 uuid = { version = "1.6", features = ["v4", "serde"] }
 walkdir = "2.5.0"
 trash = "5.2.2"
 imageproc = "0.25.0"
+ort = "1.15.2"
+ndarray = "0.15.6"
+reqwest = { version = "0.11", features = ["json", "stream"] }
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }

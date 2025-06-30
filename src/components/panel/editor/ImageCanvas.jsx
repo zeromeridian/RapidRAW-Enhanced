@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
-import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle } from 'react-konva';
+import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'react-konva';
 import clsx from 'clsx';
 
 function linesIntersect(eraserLine, drawnLine) {
+  // This is a simplified intersection check. For more accuracy, you might need a more complex algorithm.
   const threshold = (eraserLine.brushSize / 2) + (drawnLine.brushSize / 2);
   for (const p1 of eraserLine.points) {
     for (const p2 of drawnLine.points) {
@@ -139,6 +140,25 @@ const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskM
     dash: [4, 4],
     opacity: isSelected ? 1 : 0.7,
   };
+
+  if (mask.type === 'ai-subject') {
+    const { startX, startY, endX, endY } = mask.parameters;
+    // Only show the bounding box if it has been defined and the mask is selected
+    if (isSelected && endX > startX && endY > startY) {
+      return (
+        <Rect
+          x={(startX - cropX) * scale}
+          y={(startY - cropY) * scale}
+          width={(endX - startX) * scale}
+          height={(endY - startY) * scale}
+          onMouseEnter={onMaskMouseEnter}
+          onMouseLeave={onMaskMouseLeave}
+          {...commonProps}
+        />
+      );
+    }
+    return null; // Don't show anything if not selected or not yet generated
+  }
 
   if (mask.type === 'brush') {
     const { lines = [] } = mask.parameters;
@@ -303,7 +323,7 @@ const ImageCanvas = memo(({
   isMasking, imageRenderSize, showOriginal, finalPreviewUrl, isAdjusting,
   uncroppedAdjustedPreviewUrl, maskOverlayUrl,
   onSelectMask, activeMaskId, handleUpdateMask, setIsMaskHovered,
-  brushSettings
+  brushSettings, onGenerateAiMask
 }) => {
   const [isCropViewVisible, setIsCropViewVisible] = useState(false);
   const imagePathRef = useRef(null);
@@ -318,6 +338,7 @@ const ImageCanvas = memo(({
 
   const activeMask = useMemo(() => adjustments.masks.find(m => m.id === activeMaskId), [adjustments.masks, activeMaskId]);
   const isBrushActive = isMasking && activeMask?.type === 'brush';
+  const isAiSubjectActive = isMasking && activeMask?.type === 'ai-subject';
 
   const sortedMasks = useMemo(() => {
     if (!activeMaskId) {
@@ -398,15 +419,17 @@ const ImageCanvas = memo(({
   }, [isCropping]);
 
   const handleMouseDown = useCallback((e) => {
-    if (isBrushActive) {
+    if (isBrushActive || isAiSubjectActive) {
+      e.evt.preventDefault();
+      
       isDrawing.current = true;
       const stage = e.target.getStage();
       const pos = stage.getPointerPosition();
       if (!pos) return;
 
       const newLine = {
-        tool: brushSettings.tool,
-        brushSize: brushSettings.size,
+        tool: isBrushActive ? brushSettings.tool : 'ai-selector',
+        brushSize: isBrushActive ? brushSettings.size : 2,
         points: [pos]
       };
       currentLine.current = newLine;
@@ -416,10 +439,10 @@ const ImageCanvas = memo(({
         onSelectMask(null);
       }
     }
-  }, [isBrushActive, brushSettings, onSelectMask]);
+  }, [isBrushActive, isAiSubjectActive, brushSettings, onSelectMask]);
 
   const handleMouseMove = useCallback((e) => {
-    if (isBrushActive) {
+    if (isBrushActive || isAiSubjectActive) {
       const stage = e.target.getStage();
       const pos = stage.getPointerPosition();
       if (pos) {
@@ -429,7 +452,7 @@ const ImageCanvas = memo(({
       }
     }
 
-    if (!isDrawing.current || !isBrushActive) return;
+    if (!isDrawing.current || !(isBrushActive || isAiSubjectActive)) return;
     
     const stage = e.target.getStage();
     const pos = stage.getPointerPosition();
@@ -441,58 +464,103 @@ const ImageCanvas = memo(({
     };
     currentLine.current = updatedLine;
     setPreviewLine(updatedLine);
-  }, [isBrushActive]);
+  }, [isBrushActive, isAiSubjectActive]);
 
   const handleMouseUp = useCallback(() => {
-    if (!isDrawing.current || !isBrushActive || !currentLine.current) return;
+    if (!isDrawing.current || !currentLine.current) return;
+    
+    const wasDrawing = isDrawing.current;
     isDrawing.current = false;
+    const line = currentLine.current;
+    currentLine.current = null;
+    setPreviewLine(null);
+
+    if (!wasDrawing || !line) return;
 
     const { scale } = imageRenderSize;
     const cropX = adjustments.crop?.x || 0;
     const cropY = adjustments.crop?.y || 0;
 
-    const imageSpaceLine = {
-      tool: currentLine.current.tool,
-      brushSize: currentLine.current.brushSize / scale,
-      points: currentLine.current.points.map(p => ({
-        x: p.x / scale + cropX,
-        y: p.y / scale + cropY,
-      }))
-    };
+    if (isAiSubjectActive) {
+      console.log("[ImageCanvas] AI Subject mask tool is active. Processing drawn shape.");
+      const points = line.points;
+      if (points.length > 1) {
+        const xs = points.map(p => p.x);
+        const ys = points.map(p => p.y);
+        const minX = Math.min(...xs);
+        const minY = Math.min(...ys);
+        const maxX = Math.max(...xs);
+        const maxY = Math.max(...ys);
 
-    const existingLines = activeMask.parameters.lines || [];
+        const startPoint = {
+          x: minX / scale + cropX,
+          y: minY / scale + cropY,
+        };
+        const endPoint = {
+          x: maxX / scale + cropX,
+          y: maxY / scale + cropY,
+        };
+        
+        console.log("[ImageCanvas] Calculated bounding box for AI mask:", {
+          maskId: activeMaskId,
+          start: startPoint,
+          end: endPoint,
+        });
 
-    if (brushSettings.tool === 'eraser') {
-      const remainingLines = existingLines.filter(
-        drawnLine => !linesIntersect(imageSpaceLine, drawnLine)
-      );
-      if (remainingLines.length !== existingLines.length) {
+        if (onGenerateAiMask) {
+            console.log("[ImageCanvas] Calling onGenerateAiMask prop to trigger backend...");
+            onGenerateAiMask(activeMaskId, startPoint, endPoint);
+        } else {
+            console.error("[ImageCanvas] ERROR: onGenerateAiMask prop is not defined!");
+        }
+
+      } else {
+        console.log("[ImageCanvas] AI Subject mask draw was too short. Not generating mask.");
+      }
+    } else if (isBrushActive) {
+      const imageSpaceLine = {
+        tool: line.tool,
+        brushSize: line.brushSize / scale,
+        feather: brushSettings.feather,
+        points: line.points.map(p => ({
+          x: p.x / scale + cropX,
+          y: p.y / scale + cropY,
+        }))
+      };
+
+      const existingLines = activeMask.parameters.lines || [];
+
+      if (brushSettings.tool === 'eraser') {
+        const remainingLines = existingLines.filter(
+          drawnLine => !linesIntersect(imageSpaceLine, drawnLine)
+        );
+        if (remainingLines.length !== existingLines.length) {
+          handleUpdateMask(activeMaskId, {
+            parameters: { ...activeMask.parameters, lines: remainingLines }
+          });
+        }
+      } else {
         handleUpdateMask(activeMaskId, {
-          parameters: { ...activeMask.parameters, lines: remainingLines }
+          parameters: {
+            ...activeMask.parameters,
+            lines: [...existingLines, imageSpaceLine]
+          }
         });
       }
-    } else {
-      handleUpdateMask(activeMaskId, {
-        parameters: {
-          ...activeMask.parameters,
-          lines: [...existingLines, imageSpaceLine]
-        }
-      });
     }
-
-    currentLine.current = null;
-    setPreviewLine(null);
-  }, [isBrushActive, activeMask, activeMaskId, handleUpdateMask, adjustments.crop, imageRenderSize.scale, brushSettings]);
+  }, [isBrushActive, isAiSubjectActive, activeMask, activeMaskId, handleUpdateMask, adjustments.crop, imageRenderSize.scale, brushSettings, onGenerateAiMask]);
 
   const handleMouseEnter = useCallback(() => {
-    if (isBrushActive) {
+    if (isBrushActive || isAiSubjectActive) {
       setCursorPreview(p => ({ ...p, visible: true }));
     }
-  }, [isBrushActive]);
+  }, [isBrushActive, isAiSubjectActive]);
 
   const handleMouseLeave = useCallback(() => {
     setCursorPreview(p => ({ ...p, visible: false }));
-    handleMouseUp();
+    if (isDrawing.current) {
+      handleMouseUp();
+    }
   }, [handleMouseUp]);
 
   const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.originalUrl;
@@ -563,7 +631,7 @@ const ImageCanvas = memo(({
               zIndex: 4,
               opacity: showOriginal ? 0 : 1,
               pointerEvents: showOriginal ? 'none' : 'auto',
-              cursor: isBrushActive ? 'crosshair' : 'default',
+              cursor: (isBrushActive || isAiSubjectActive) ? 'crosshair' : 'default',
             }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -580,8 +648,8 @@ const ImageCanvas = memo(({
                   onUpdate={handleUpdateMask}
                   isSelected={mask.id === activeMaskId}
                   onSelect={() => onSelectMask(mask.id)}
-                  onMaskMouseEnter={() => !isBrushActive && setIsMaskHovered(true)}
-                  onMaskMouseLeave={() => !isBrushActive && setIsMaskHovered(false)}
+                  onMaskMouseEnter={() => !(isBrushActive || isAiSubjectActive) && setIsMaskHovered(true)}
+                  onMaskMouseLeave={() => !(isBrushActive || isAiSubjectActive) && setIsMaskHovered(false)}
                   adjustments={adjustments}
                 />
               ))}
@@ -589,12 +657,13 @@ const ImageCanvas = memo(({
                 <Line
                   points={previewLine.points.flatMap(p => [p.x, p.y])}
                   stroke={previewLine.tool === 'eraser' ? '#f43f5e' : '#0ea5e9'}
-                  strokeWidth={previewLine.brushSize}
+                  strokeWidth={previewLine.tool === 'ai-selector' ? 2 : previewLine.brushSize}
                   tension={0.5}
                   lineCap="round"
                   lineJoin="round"
                   opacity={0.8}
                   listening={false}
+                  dash={previewLine.tool === 'ai-selector' ? [4, 4] : undefined}
                 />
               )}
               {isBrushActive && cursorPreview.visible && (

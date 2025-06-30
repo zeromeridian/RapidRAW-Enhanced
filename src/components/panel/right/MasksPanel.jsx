@@ -34,7 +34,8 @@ const itemVariants = {
 export default function MasksPanel({
   adjustments, setAdjustments, selectedImage, onSelectMask, activeMaskId,
   brushSettings, setBrushSettings, copiedMask, setCopiedMask, histogram,
-  setCustomEscapeHandler
+  setCustomEscapeHandler,
+  isGeneratingAiMask // <-- RECEIVE LOADING STATE AS PROP
 }) {
   const [editingMaskId, setEditingMaskId] = useState(null);
   const [deletingMaskId, setDeletingMaskId] = useState(null);
@@ -107,9 +108,11 @@ export default function MasksPanel({
       case 'brush':
         newMask = { ...common, parameters: { lines: [] } };
         break;
+      case 'ai-subject':
+        newMask = { ...common, parameters: { startX: 0, startY: 0, endX: 0, endY: 0, maskDataBase64: null } };
+        break;
       case 'color':
       case 'luminance':
-      case 'ai-subject':
         newMask = { ...common, parameters: {} };
         break;
       default:
@@ -190,7 +193,7 @@ export default function MasksPanel({
     setAdjustments(prev => ({
       ...prev,
       masks: (prev.masks || []).map(mask =>
-        mask.id === maskId ? updatedMaskData : mask
+        mask.id === maskId ? { ...mask, ...updatedMaskData } : mask
       ),
     }));
   };
@@ -199,7 +202,7 @@ export default function MasksPanel({
     if (!editingMaskId) return;
     const maskToUpdate = masks.find(m => m.id === editingMaskId);
     if (maskToUpdate) {
-      updateMask(editingMaskId, { ...maskToUpdate, adjustments: { ...INITIAL_MASK_ADJUSTMENTS } });
+      updateMask(editingMaskId, { adjustments: { ...INITIAL_MASK_ADJUSTMENTS } });
     }
   };
 
@@ -255,6 +258,7 @@ export default function MasksPanel({
           brushSettings={brushSettings}
           setBrushSettings={setBrushSettings}
           histogram={histogram}
+          isGeneratingAiMask={isGeneratingAiMask}
         />
       </div>
     );
@@ -286,9 +290,9 @@ export default function MasksPanel({
               <button
                 key={maskType.id}
                 onClick={() => handleAddMask(maskType.type)}
-                disabled={maskType.disabled}
+                disabled={maskType.disabled || isGeneratingAiMask}
                 className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors ${
-                  maskType.disabled
+                  maskType.disabled || isGeneratingAiMask
                     ? 'opacity-50 cursor-not-allowed'
                     : 'hover:bg-card-active'
                 }`}

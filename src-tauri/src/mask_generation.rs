@@ -1,7 +1,9 @@
-use image::{GrayImage, Luma};
+use image::{GenericImageView, GrayImage, Luma};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::f32::consts::PI;
+use base64::{Engine as _, engine::general_purpose};
+use crate::sam_processing::AiSubjectMaskParameters;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -71,7 +73,7 @@ struct BrushLine {
 }
 
 fn default_brush_feather() -> f32 {
-    0.5 // Default feather of 50%
+    0.5
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -116,7 +118,6 @@ fn draw_feathered_ellipse_mut(
                 let intensity = if dist <= inner_radius {
                     1.0
                 } else {
-                    // Linear falloff
                     1.0 - (dist - inner_radius) / (radius - inner_radius).max(0.01)
                 };
                 
@@ -125,10 +126,8 @@ fn draw_feathered_ellipse_mut(
                 let current_pixel = mask.get_pixel_mut(x as u32, y as u32);
                 
                 if is_eraser {
-                    // For eraser, subtract the intensity value from the current pixel value.
                     current_pixel[0] = current_pixel[0].saturating_sub(final_value);
                 } else {
-                    // For brush, take the maximum of the current and new value.
                     if final_value > current_pixel[0] {
                         current_pixel[0] = final_value;
                     }
@@ -288,6 +287,66 @@ fn generate_brush_bitmap(
     mask
 }
 
+fn generate_ai_subject_bitmap(
+    params_value: &Value,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+) -> Option<GrayImage> {
+    let params: AiSubjectMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    let data_url = params.mask_data_base64?;
+
+    let b64_data = if let Some(idx) = data_url.find(',') {
+        &data_url[idx + 1..]
+    } else {
+        &data_url
+    };
+    
+    let decoded_bytes = general_purpose::STANDARD.decode(b64_data).ok()?;
+    let full_mask_image = image::load_from_memory(&decoded_bytes).ok()?;
+
+    let (full_mask_w, full_mask_h) = full_mask_image.dimensions();
+    let resized_mask_w = (full_mask_w as f32 * scale).round() as u32;
+    let resized_mask_h = (full_mask_h as f32 * scale).round() as u32;
+
+    if resized_mask_w == 0 || resized_mask_h == 0 {
+        return Some(GrayImage::new(width, height));
+    }
+
+    let resized_mask = full_mask_image.resize_exact(
+        resized_mask_w,
+        resized_mask_h,
+        image::imageops::FilterType::Triangle,
+    );
+
+    let crop_x = crop_offset.0.round() as u32;
+    let crop_y = crop_offset.1.round() as u32;
+
+    if crop_x >= resized_mask_w || crop_y >= resized_mask_h {
+        return Some(GrayImage::new(width, height));
+    }
+
+    let crop_w = (crop_x + width).min(resized_mask_w) - crop_x;
+    let crop_h = (crop_y + height).min(resized_mask_h) - crop_y;
+
+    if crop_w == 0 || crop_h == 0 {
+        return Some(GrayImage::new(width, height));
+    }
+
+    let cropped_sub_image = resized_mask.crop_imm(
+        crop_x,
+        crop_y,
+        crop_w,
+        crop_h,
+    );
+
+    let mut final_mask = GrayImage::new(width, height);
+    image::imageops::overlay(&mut final_mask, &cropped_sub_image.to_luma8(), 0, 0);
+
+    Some(final_mask)
+}
+
 pub fn generate_mask_bitmap(
     mask_def: &MaskDefinition,
     width: u32,
@@ -303,6 +362,7 @@ pub fn generate_mask_bitmap(
         "radial" => Some(generate_radial_bitmap(&mask_def.parameters, width, height, scale, crop_offset)),
         "linear" => Some(generate_linear_bitmap(&mask_def.parameters, width, height, scale, crop_offset)),
         "brush" => Some(generate_brush_bitmap(&mask_def.parameters, width, height, scale, crop_offset)),
+        "ai-subject" => generate_ai_subject_bitmap(&mask_def.parameters, width, height, scale, crop_offset),
         _ => None,
     };
 
