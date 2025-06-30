@@ -22,3 +22,5 @@ jobs:
       platform: ${{ matrix.platform }}
       build-args: ${{ matrix.platform == 'windows-latest' && '--bundles nsis' || '' }}
     secrets: inherit
+    permissions:
+      contents: write
