@@ -39,7 +39,7 @@ uuid = { version = "1.6", features = ["v4", "serde"] }
 walkdir = "2.5.0"
 trash = "5.2.2"
 imageproc = "0.25.0"
-ort = "1.15.2"
+ort = { version = "1.15.2", features = ["load-dynamic"] }
 ndarray = "0.15.6"
 reqwest = { version = "0.11", features = ["json", "stream"] }
 

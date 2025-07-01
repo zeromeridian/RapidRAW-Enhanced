@@ -1098,6 +1098,24 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            let app_handle = app.handle().clone();
+            let resource_path = app_handle.path()
+                .resolve("resources", tauri::path::BaseDirectory::Resource)
+                .expect("failed to resolve resource directory");
+
+            let ort_library_name = {
+                #[cfg(target_os = "windows")]
+                { "onnxruntime.dll" }
+                #[cfg(target_os = "linux")]
+                { "libonnxruntime.so" }
+                #[cfg(target_os = "macos")]
+                { "libonnxruntime.dylib" }
+            };
+
+            let ort_library_path = resource_path.join(ort_library_name);
+            std::env::set_var("ORT_DYLIB_PATH", &ort_library_path);
+            println!("Set ORT_DYLIB_PATH to: {}", ort_library_path.display());
+
             let window = app.get_webview_window("main").unwrap();
             let app_handle = app.handle().clone();
 

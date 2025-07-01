@@ -3387,6 +3387,7 @@ dependencies = [
  "half",
  "lazy_static",
  "libc",
+ "libloading 0.7.4",
  "ndarray",
  "tar",
  "thiserror 1.0.69",

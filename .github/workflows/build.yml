@@ -37,7 +37,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Install additional system dependencies
+      - name: Install additional system dependencies (Linux)
         if: startsWith(inputs.platform, 'ubuntu')
         run: |-
           sudo apt-get update
@@ -47,17 +47,9 @@ jobs:
             curl \
             wget \
             file \
-            libxdo-dev \
             libssl-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev \
-            librust-pango-dev \
-            libatk1.0-dev \
-            librust-atk-dev \
-            librust-atk-sys-dev \
-            libgtk-3-dev \
-            librust-gtk-sys-dev \
-            libjavascriptcoregtk-4.1-dev
+            librsvg2-dev
 
       - name: Install frontend dependencies
         run: npm install
@@ -66,6 +58,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NO_STRIP: ${{ startsWith(inputs.platform, 'ubuntu') }}
         with:
           args: ${{ inputs.build-args }}
           releaseId: ${{ inputs.release-id }}
