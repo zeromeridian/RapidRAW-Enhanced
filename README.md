@@ -39,6 +39,7 @@ Have fun!
 - [Demo & Screenshots](#demo--screenshots)
 - [The Idea](#the-idea)
 - [Current Priorities](#current-priorities)
+- [AI Roadmap](#ai-roadmap)
 - [Development Timeline](#development-timeline)
 - [Getting Started](#getting-started)
 - [Contributing](#contributing)
@@ -144,22 +145,40 @@ The foundation is built on Rust for its safety and performance, and Tauri for it
 
 I am **immensely grateful for Google's Gemini suite of AI models.** As an 18-year-old without a formal background in advanced mathematics or image science, the AI Studio's free tier was an invaluable assistant, helping me research and implement concepts like the Menon demosaicing algorithm.
 
-## Updated Priorities
+## Current Priorities
 
 While the core functionality is in place, I'm actively working on improving several key areas. Here's a transparent look at the current focus:
 
 | Task                                                                                         | Priority | Difficulty | Status |
 |----------------------------------------------------------------------------------------------|----------|------------|--------|
-| Finding a better demosaicing algorithm (need help)                                                   | Low     | Very High       | [ ]    |
+| Finding a better demosaicing algorithm (need help)                                          | Low     | Very High       | [ ]    |
 | Refactoring the frontend (reduce prop drilling in React components)                         | Medium   | Medium     | [ ]    |
 | Allow 45°+ rotation for images (e.g. predefined 90° clockwise )                             | Medium   | Low       | [ ]    |
 | Improving the dehaze tool for more natural results                                           | Low     | Medium     | [ ]    |
 | Optimize image transport (replace Base64 for better performance)                            | Low     | Medium     | [ ]    |
-| Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High   | Medium       | [x]    |
+| Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High | Medium    | [x]    |
+| Implement a simple MVP of the ComfyUI based AI Roadmap                                        | Low   | High       | []    |
 | Sign macOS builds using a registered developer account                                       | Medium      | Low     | [ ]    |
 | Switch to a better rawloader (e.g. rawler)                                                   | High      | Medium     | [ ]    |
 | Improve speed on older systems (e.g. Pascal GPUs)                                            | Medium   | High       | [ ]    |
 | Auto white balance detection and exposure correction                                         | Medium     | Medium     | [ ]    |
+
+## AI Roadmap
+
+Building on the AI-powered subject masking, the next major step for RapidRAW is to integrate powerful generative editing capabilities without bloating the core application.
+
+A key design philosophy of RapidRAW is to remain a lightweight and fast application. To honor this, the generative AI features will be implemented as an **optional, separate module**.
+
+### **The Plan:**
+An official Docker container will be provided which runs a pre-configured [ComfyUI](https://github.com/comfyanonymous/ComfyUI) server. This server will act as the Stable Diffusion inference engine.
+
+### **How it will work:**
+1.  Users who want generative features can run the optional Docker container.
+2.  RapidRAW will detect the local server and enable the AI tools in the UI.
+3.  The app will send the image and a specific ComfyUI workflow (e.g., for inpainting or outpainting) to the container.
+4.  The Docker container handles the heavy processing and sends the resulting image back to RapidRAW.
+
+This modular approach ensures that RapidRAW's core experience remains fast for everyone, while providing a clear path for cutting-edge, optional features like AI object removal, generative fill, and style transfer.
 
 ## Development Timeline
 
