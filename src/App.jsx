@@ -191,6 +191,7 @@ function App() {
   const [isResizing, setIsResizing] = useState(false);
   const [copiedAdjustments, setCopiedAdjustments] = useState(null);
   const [copiedFilePaths, setCopiedFilePaths] = useState([]);
+  const [samModelDownloadStatus, setSamModelDownloadStatus] = useState(null);
   const [copiedSectionAdjustments, setCopiedSectionAdjustments] = useState(null);
   const [copiedMask, setCopiedMask] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
@@ -683,7 +684,8 @@ function App() {
             if (key === 'arrowup' || key === 'arrowdown') {
                 const zoomStep = 0.25;
                 const newZoom = key === 'arrowup' ? zoom + zoomStep : zoom - zoomStep;
-                handleZoomChange(Math.max(0.7, Math.min(newZoom, 10)));
+                const minZoom = activeRightPanel === 'crop' ? 0.4 : 0.7;
+                handleZoomChange(Math.max(minZoom, Math.min(newZoom, 10)));
                 setSpaceZoomActive(false);
             } else {
                 const isNext = key === 'arrowright';
@@ -738,7 +740,9 @@ function App() {
       listen('histogram-update', (event) => { if (isEffectActive) setHistogram(event.payload); }),
       listen('thumbnail-generated', (event) => { if (isEffectActive) { const { path, rating } = event.payload; if (rating !== undefined) setImageRatings(prev => ({ ...prev, [path]: rating })); } }),
       listen('export-failed', (event) => { if (isEffectActive) setError(`Export failed: ${event.payload}`); }),
-      listen('export-successful', (event) => { if (isEffectActive) console.log(`Export successful to ${event.payload}`); })
+      listen('export-successful', (event) => { if (isEffectActive) console.log(`Export successful to ${event.payload}`); }),
+      listen('sam-model-download-start', (event) => { if (isEffectActive) setSamModelDownloadStatus(event.payload); }),
+      listen('sam-model-download-finish', () => { if (isEffectActive) setSamModelDownloadStatus(null); }),
     ];
     return () => { isEffectActive = false; listeners.forEach(p => p.then(unlisten => unlisten())); if (loaderTimeoutRef.current) clearTimeout(loaderTimeoutRef.current); };
   }, []);
@@ -1067,7 +1071,7 @@ function App() {
               isPasteDisabled={copiedAdjustments === null}
               zoom={zoom}
               onZoomChange={handleZoomChange}
-              minZoom={0.7}
+              minZoom={activeRightPanel === 'crop' ? 0.4 : 0.7}
               maxZoom={10}
               imageList={sortedImageList}
               selectedImage={selectedImage}
@@ -1095,7 +1099,7 @@ function App() {
                 {renderedRightPanel === 'adjustments' && <Controls theme={theme} adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} histogram={histogram} collapsibleState={collapsibleSectionsState} setCollapsibleState={setCollapsibleSectionsState} copiedSectionAdjustments={copiedSectionAdjustments} setCopiedSectionAdjustments={setCopiedSectionAdjustments} />}
                 {renderedRightPanel === 'metadata' && <MetadataPanel selectedImage={selectedImage} />}
                 {renderedRightPanel === 'crop' && <CropPanel selectedImage={selectedImage} adjustments={adjustments} setAdjustments={setAdjustments} />}
-                {renderedRightPanel === 'masks' && <MasksPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} onSelectMask={setActiveMaskId} activeMaskId={activeMaskId} brushSettings={brushSettings} setBrushSettings={setBrushSettings} copiedMask={copiedMask} setCopiedMask={setCopiedMask} setCustomEscapeHandler={setCustomEscapeHandler} histogram={histogram} isGeneratingAiMask={isGeneratingAiMask} />}
+                {renderedRightPanel === 'masks' && <MasksPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} onSelectMask={setActiveMaskId} activeMaskId={activeMaskId} brushSettings={brushSettings} setBrushSettings={setBrushSettings} copiedMask={copiedMask} setCopiedMask={setCopiedMask} setCustomEscapeHandler={setCustomEscapeHandler} histogram={histogram} isGeneratingAiMask={isGeneratingAiMask} samModelDownloadStatus={samModelDownloadStatus} />}
                 {renderedRightPanel === 'presets' && <PresetsPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} activePanel={activeRightPanel} />}
                 {renderedRightPanel === 'export' && <ExportPanel selectedImage={selectedImage} adjustments={adjustments} multiSelectedPaths={multiSelectedPaths} />}
                 {renderedRightPanel === 'ai' && <AIPanel selectedImage={selectedImage} />}

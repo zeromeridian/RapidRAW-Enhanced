@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Circle, Waves, Brush, Droplet, Sun, Sparkles,
+  Circle, TriangleRight, Brush, Droplet, Sun, Sparkles,
   Trash2, RotateCcw, ArrowLeft, Eye, EyeOff, Edit, Copy, ClipboardPaste, PlusSquare
 } from 'lucide-react';
 import MaskControls from './MaskControls';
@@ -12,7 +12,7 @@ import { useContextMenu } from '../../../context/ContextMenuContext';
 const MASK_TYPES = [
   { id: 'ai-subject', name: 'Subject', icon: Sparkles, type: 'ai-subject', disabled: false },
   { id: 'brush', name: 'Brush', icon: Brush, type: 'brush', disabled: false },
-  { id: 'linear', name: 'Linear', icon: Waves, type: 'linear', disabled: false },
+  { id: 'linear', name: 'Linear', icon: TriangleRight, type: 'linear', disabled: false },
   { id: 'radial', name: 'Radial', icon: Circle, type: 'radial', disabled: false },
   { id: 'color', name: 'Color', icon: Droplet, type: 'color', disabled: true },
   { id: 'luminance', name: 'Luminance', icon: Sun, type: 'luminance', disabled: true },
@@ -31,11 +31,17 @@ const itemVariants = {
   exit: { opacity: 0, x: -15, transition: { duration: 0.2 } },
 };
 
+function formatMaskTypeName(type) {
+  if (type === 'ai-subject') {
+    return 'AI Subject';
+  }
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
 export default function MasksPanel({
   adjustments, setAdjustments, selectedImage, onSelectMask, activeMaskId,
   brushSettings, setBrushSettings, copiedMask, setCopiedMask, histogram,
-  setCustomEscapeHandler,
-  isGeneratingAiMask // <-- RECEIVE LOADING STATE AS PROP
+  setCustomEscapeHandler, isGeneratingAiMask, samModelDownloadStatus 
 }) {
   const [editingMaskId, setEditingMaskId] = useState(null);
   const [deletingMaskId, setDeletingMaskId] = useState(null);
@@ -72,7 +78,7 @@ export default function MasksPanel({
     let newMask;
     const common = {
       id: uuidv4(),
-      name: `${type.charAt(0).toUpperCase() + type.slice(1)} Mask`,
+      name: `${formatMaskTypeName(type)} Mask`,
       type,
       visible: true,
       invert: false,
@@ -245,8 +251,8 @@ export default function MasksPanel({
           <button onClick={handleBackToList} className="p-2 rounded-full hover:bg-surface transition-colors" title="Back to Mask List">
             <ArrowLeft size={18} />
           </button>
-          <h2 className="text-lg font-bold text-primary text-shadow-shiny truncate capitalize p-4">
-            Edit {editingMask.type} Mask
+          <h2 className="text-lg font-bold text-primary text-shadow-shiny truncate p-4">
+            Edit {formatMaskTypeName(editingMask.type)} Mask
           </h2>
           <button onClick={resetCurrentMaskAdjustments} className="p-2 rounded-full hover:bg-surface transition-colors" title="Reset Mask Adjustments">
             <RotateCcw size={18} />
@@ -259,6 +265,7 @@ export default function MasksPanel({
           setBrushSettings={setBrushSettings}
           histogram={histogram}
           isGeneratingAiMask={isGeneratingAiMask}
+          samModelDownloadStatus={samModelDownloadStatus}
         />
       </div>
     );

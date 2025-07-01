@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { RotateCcw, Copy, ClipboardPaste } from 'lucide-react';
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import Switch from '../../ui/Switch';
@@ -37,7 +37,7 @@ const BrushTools = ({ settings, onSettingsChange }) => (
   </div>
 );
 
-export default function MaskControls({ editingMask, updateMask, brushSettings, setBrushSettings, histogram }) {
+export default function MaskControls({ editingMask, updateMask, brushSettings, setBrushSettings, histogram, isGeneratingAiMask, samModelDownloadStatus }) {
   const { showContextMenu } = useContextMenu();
   const [isSettingsSectionOpen, setSettingsSectionOpen] = useState(true);
   const [copiedSectionAdjustments, setCopiedSectionAdjustments] = useState(null);
@@ -48,6 +48,27 @@ export default function MaskControls({ editingMask, updateMask, brushSettings, s
     details: false,
     effects: false,
   });
+  const [showAnalyzingMessage, setShowAnalyzingMessage] = useState(false);
+  const analyzingTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (isGeneratingAiMask) {
+      analyzingTimeoutRef.current = setTimeout(() => {
+        setShowAnalyzingMessage(true);
+      }, 1000);
+    } else {
+      if (analyzingTimeoutRef.current) {
+        clearTimeout(analyzingTimeoutRef.current);
+      }
+      setShowAnalyzingMessage(false);
+    }
+
+    return () => {
+      if (analyzingTimeoutRef.current) {
+        clearTimeout(analyzingTimeoutRef.current);
+      }
+    };
+  }, [isGeneratingAiMask]);
 
   if (!editingMask) return null;
 
@@ -117,7 +138,21 @@ export default function MaskControls({ editingMask, updateMask, brushSettings, s
   return (
     <div className="flex-grow overflow-y-auto p-4 flex flex-col gap-2">
       <CollapsibleSection title="Mask Settings" isOpen={isSettingsSectionOpen} onToggle={() => setSettingsSectionOpen(prev => !prev)}>
-        <div className="space-y-2">
+        <div className="space-y-4">
+          {editingMask.type === 'ai-subject' && (
+            <>
+              {samModelDownloadStatus && (
+                <div className="text-sm text-text-secondary p-2 bg-surface rounded-md text-center">
+                  Downloading AI Model ({samModelDownloadStatus})...
+                </div>
+              )}
+              {showAnalyzingMessage && !samModelDownloadStatus && (
+                <div className="text-sm text-text-secondary p-2 bg-surface rounded-md text-center animate-pulse">
+                  Analyzing Image...
+                </div>
+              )}
+            </>
+          )}
           <Switch label="Invert Mask" checked={!!editingMask.invert} onChange={(checked) => handleMaskPropertyChange('invert', checked)} />
           {maskConfig.parameters?.map(param => (
             <Slider key={param.key} label={param.label} value={(editingMask.parameters[param.key] || 0) * (param.multiplier || 1)} onChange={(e) => handleParameterChange(param.key, parseFloat(e.target.value) / (param.multiplier || 1))} min={param.min} max={param.max} step={param.step} />

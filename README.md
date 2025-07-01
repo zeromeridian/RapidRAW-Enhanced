@@ -24,6 +24,16 @@ I developed this project as a personal challenge over the course of two weeks at
 
 Have fun!
 
+<details>
+<summary><strong>Recent Changes</strong></summary>
+
+*   Added: AI-powered subject masking
+*   Added: Precompiled Linux builds
+*   Fixed: Various small bugs
+
+</details>
+<br>
+
 **Table of Contents**
 - [Key Features](#key-features)
 - [Demo & Screenshots](#demo--screenshots)
@@ -140,14 +150,14 @@ While the core functionality is in place, I'm actively working on improving seve
 
 | Task                                                                                         | Priority | Difficulty | Status |
 |----------------------------------------------------------------------------------------------|----------|------------|--------|
-| Finding a better demosaicing algorithm                                                       | Low     | High       | [ ]    |
+| Finding a better demosaicing algorithm (need help)                                                   | Low     | Very High       | [ ]    |
 | Refactoring the frontend (reduce prop drilling in React components)                         | Medium   | Medium     | [ ]    |
 | Allow 45°+ rotation for images (e.g. predefined 90° clockwise )                             | Medium   | Low       | [ ]    |
 | Improving the dehaze tool for more natural results                                           | Low     | Medium     | [ ]    |
 | Optimize image transport (replace Base64 for better performance)                            | Low     | Medium     | [ ]    |
 | Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High   | Medium       | [x]    |
-| Sign macOS builds using a registered developer account                                       | High      | Low     | [ ]    |
-| Switch to a better rawloader (e.g. rawler)                                                   | Medium      | Medium     | [ ]    |
+| Sign macOS builds using a registered developer account                                       | Medium      | Low     | [ ]    |
+| Switch to a better rawloader (e.g. rawler)                                                   | High      | Medium     | [ ]    |
 | Improve speed on older systems (e.g. Pascal GPUs)                                            | Medium   | High       | [ ]    |
 | Auto white balance detection and exposure correction                                         | Medium     | Medium     | [ ]    |
 

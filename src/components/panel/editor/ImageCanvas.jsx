@@ -333,6 +333,7 @@ const ImageCanvas = memo(({
   const currentLine = useRef(null);
   const [previewLine, setPreviewLine] = useState(null);
   const [cursorPreview, setCursorPreview] = useState({ x: 0, y: 0, visible: false });
+  const [isMouseOverCanvas, setIsMouseOverCanvas] = useState(false);
 
   const activeMask = useMemo(() => adjustments.masks.find(m => m.id === activeMaskId), [adjustments.masks, activeMaskId]);
   const isBrushActive = isMasking && activeMask?.type === 'brush';
@@ -549,12 +550,14 @@ const ImageCanvas = memo(({
   }, [isBrushActive, isAiSubjectActive, activeMask, activeMaskId, handleUpdateMask, adjustments.crop, imageRenderSize.scale, brushSettings, onGenerateAiMask]);
 
   const handleMouseEnter = useCallback(() => {
+    setIsMouseOverCanvas(true);
     if (isBrushActive || isAiSubjectActive) {
       setCursorPreview(p => ({ ...p, visible: true }));
     }
   }, [isBrushActive, isAiSubjectActive]);
 
   const handleMouseLeave = useCallback(() => {
+    setIsMouseOverCanvas(false);
     setCursorPreview(p => ({ ...p, visible: false }));
     if (isDrawing.current) {
       handleMouseUp();
@@ -609,7 +612,7 @@ const ImageCanvas = memo(({
                   height: `${imageRenderSize.height}px`,
                   left: `${imageRenderSize.offsetX}px`,
                   top: `${imageRenderSize.offsetY}px`,
-                  opacity: showOriginal ? 0 : 1,
+                  opacity: (showOriginal || !isMouseOverCanvas) ? 0 : 1,
                   transition: 'opacity 150ms ease-in-out',
                 }}
               />
