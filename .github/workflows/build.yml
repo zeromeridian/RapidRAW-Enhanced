@@ -33,6 +33,8 @@ jobs:
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
