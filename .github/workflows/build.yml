@@ -73,12 +73,9 @@ jobs:
           releaseId: ${{ inputs.release-id }}
 
       - name: Setup gh actions artifact client
-        # if: startsWith(inputs.platform, 'ubuntu')
         uses: lhotari/gh-actions-artifact-client@v2
 
-      # - name: Upload Linux binaries
       - name: Upload binaries
-        # if: startsWith(inputs.platform, 'ubuntu')
         shell: bash
         run: |
           find src-tauri/target/release/bundle -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" | while read -r file; do
@@ -87,19 +84,3 @@ jobs:
             echo "Uploading $name, file: $file"
             gh-actions-artifact-client.js upload "$patched_name" --retentionDays=7 < "$file"
           done
-
-#       - name: Upload MacOS binaries
-#         uses: actions/upload-artifact@v4
-#         if: startsWith(inputs.platform, 'macos')
-#         with:
-#           name: binaries-macos
-#           path: |
-#             ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.dmg
-
-#       - name: Upload Windows binaries
-#         uses: actions/upload-artifact@v4
-#         if: startsWith(inputs.platform, 'windows')
-#         with:
-#           name: binaries-windows
-#           path: |
-#             ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.exe
