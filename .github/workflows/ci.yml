@@ -16,11 +16,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, windows-latest, 'ubuntu-22.04']
+        platform: [macos-latest, windows-latest, ubuntu-22.04]
     uses: ./.github/workflows/build.yml
     with:
       platform: ${{ matrix.platform }}
-      build-args: ${{ matrix.platform == 'windows-latest' && '--bundles nsis' || '' }}
+      build-args: ${{ startsWith(matrix.platform, 'windows') && '--bundles nsis' || '' }}
       upload-artifacts: true
     secrets: inherit
     permissions:
