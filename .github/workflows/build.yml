@@ -79,11 +79,12 @@ jobs:
         shell: bash
         if: startsWith(inputs.platform, 'windows')
         run: |
-          find src-tauri/target/release/bundle -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" | while read -r file; do
+          find src-tauri/target/release/bundle -name "*.exe" | while read -r file; do
             name=$(basename "$file")
             patched_name=$(echo $name | sed -E 's/[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?/${{ github.sha }}/')
             echo "Uploading $name, file: $file"
-            7z "$file" -so | gh-actions-artifact-client.js upload "$patched_name" --retentionDays=7
+            # TODO zip the file before upload
+            gh-actions-artifact-client.js upload "$patched_name" --retentionDays=7
           done
 
       - name: Upload binaries
