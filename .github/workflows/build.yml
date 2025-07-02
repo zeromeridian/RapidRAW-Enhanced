@@ -73,30 +73,31 @@ jobs:
           releaseId: ${{ inputs.release-id }}
 
       - name: Setup gh actions artifact client
-        if: startsWith(inputs.platform, 'ubuntu')
+        # if: startsWith(inputs.platform, 'ubuntu')
         uses: lhotari/gh-actions-artifact-client@v2
 
-      - name: Upload Linux binaries
-        if: startsWith(inputs.platform, 'ubuntu')
+      # - name: Upload Linux binaries
+      - name: Upload binaries
+        # if: startsWith(inputs.platform, 'ubuntu')
         run: |
-          find ${{ github.workspace }}/src-tauri/target/release/bundle -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" | while read -r file; do
+          find ${{ github.workspace }}/src-tauri/target/release/bundle -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" | while read -r file; do
             name=$(basename "$file")
             echo "Uploading $name, file: $file"
-            zip - "$file" | gh-actions-artifact-client.js upload "$name" --retentionDays=7
+            zip - "$file" | gh-actions-artifact-client.js upload "$name-${{ github.sha }}" --retentionDays=7
           done
 
-      - name: Upload MacOS binaries
-        uses: actions/upload-artifact@v4
-        if: startsWith(inputs.platform, 'macos')
-        with:
-          name: binaries-macos
-          path: |
-            ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.dmg
+#       - name: Upload MacOS binaries
+#         uses: actions/upload-artifact@v4
+#         if: startsWith(inputs.platform, 'macos')
+#         with:
+#           name: binaries-macos
+#           path: |
+#             ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.dmg
 
-      - name: Upload Windows binaries
-        uses: actions/upload-artifact@v4
-        if: startsWith(inputs.platform, 'windows')
-        with:
-          name: binaries-windows
-          path: |
-            ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.exe
+#       - name: Upload Windows binaries
+#         uses: actions/upload-artifact@v4
+#         if: startsWith(inputs.platform, 'windows')
+#         with:
+#           name: binaries-windows
+#           path: |
+#             ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.exe
