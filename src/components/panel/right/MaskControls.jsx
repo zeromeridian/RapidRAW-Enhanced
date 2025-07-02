@@ -24,6 +24,7 @@ const MASK_TYPE_CONFIG = {
   color: { parameters: [] },
   luminance: { parameters: [] },
   'ai-subject': { parameters: [] },
+  'ai-foreground': { parameters: [] },
 };
 
 const BrushTools = ({ settings, onSettingsChange }) => (
@@ -37,7 +38,7 @@ const BrushTools = ({ settings, onSettingsChange }) => (
   </div>
 );
 
-export default function MaskControls({ editingMask, updateMask, brushSettings, setBrushSettings, histogram, isGeneratingAiMask, samModelDownloadStatus }) {
+export default function MaskControls({ editingMask, updateMask, brushSettings, setBrushSettings, histogram, isGeneratingAiMask, aiModelDownloadStatus }) {
   const { showContextMenu } = useContextMenu();
   const [isSettingsSectionOpen, setSettingsSectionOpen] = useState(true);
   const [copiedSectionAdjustments, setCopiedSectionAdjustments] = useState(null);
@@ -135,18 +136,20 @@ export default function MaskControls({ editingMask, updateMask, brushSettings, s
     showContextMenu(event.clientX, event.clientY, options);
   };
 
+  const isAiMask = editingMask.type === 'ai-subject' || editingMask.type === 'ai-foreground';
+
   return (
     <div className="flex-grow overflow-y-auto p-4 flex flex-col gap-2">
       <CollapsibleSection title="Mask Settings" isOpen={isSettingsSectionOpen} onToggle={() => setSettingsSectionOpen(prev => !prev)}>
         <div className="space-y-4">
-          {editingMask.type === 'ai-subject' && (
+          {isAiMask && (
             <>
-              {samModelDownloadStatus && (
+              {aiModelDownloadStatus && (
                 <div className="text-sm text-text-secondary p-2 bg-surface rounded-md text-center">
-                  Downloading AI Model ({samModelDownloadStatus})...
+                  Downloading AI Model ({aiModelDownloadStatus})...
                 </div>
               )}
-              {showAnalyzingMessage && !samModelDownloadStatus && (
+              {showAnalyzingMessage && !aiModelDownloadStatus && (
                 <div className="text-sm text-text-secondary p-2 bg-surface rounded-md text-center animate-pulse">
                   Analyzing Image...
                 </div>

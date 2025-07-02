@@ -5,22 +5,27 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use image::{DynamicImage, GenericImageView, GrayImage};
-use image::imageops::FilterType;
+use image::imageops::{self, FilterType};
 use ndarray::{Array, IxDyn};
 use ort::{Environment, Session, SessionBuilder, Value};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use tauri::Emitter;
 
-const ENCODER_URL: &str = "https://github.com/AndreyGermanov/sam_onnx_rust/blob/main/vit_t_encoder.onnx?raw=true";
-const DECODER_URL: &str = "https://github.com/AndreyGermanov/sam_onnx_rust/blob/main/vit_t_decoder.onnx?raw=true";
+const ENCODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/vit_t_encoder.onnx?download=true";
+const DECODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/vit_t_decoder.onnx?download=true";
 const ENCODER_FILENAME: &str = "vit_t_encoder.onnx";
 const DECODER_FILENAME: &str = "vit_t_decoder.onnx";
 const SAM_INPUT_SIZE: u32 = 1024;
 
-pub struct SamModels {
-    pub encoder: Session,
-    pub decoder: Session,
+const U2NETP_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/u2net.onnx?download=true";
+const U2NETP_FILENAME: &str = "u2net.onnx";
+const U2NETP_INPUT_SIZE: u32 = 320;
+
+pub struct AiModels {
+    pub sam_encoder: Session,
+    pub sam_decoder: Session,
+    pub u2netp: Session,
 }
 
 #[derive(Clone)]
@@ -30,8 +35,8 @@ pub struct ImageEmbeddings {
     pub original_size: (u32, u32),
 }
 
-pub struct SamState {
-    pub models: Arc<SamModels>,
+pub struct AiState {
+    pub models: Arc<AiModels>,
     pub embeddings: Option<ImageEmbeddings>,
 }
 
@@ -54,27 +59,34 @@ async fn download_model(url: &str, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-pub async fn get_or_init_sam_models(app_handle: &tauri::AppHandle) -> Result<Arc<SamModels>> {
+pub async fn get_or_init_ai_models(app_handle: &tauri::AppHandle) -> Result<Arc<AiModels>> {
     let models_dir = get_models_dir(app_handle)?;
     let encoder_path = models_dir.join(ENCODER_FILENAME);
     let decoder_path = models_dir.join(DECODER_FILENAME);
+    let u2netp_path = models_dir.join(U2NETP_FILENAME);
 
     if !encoder_path.exists() {
-        let _ = app_handle.emit("sam-model-download-start", "encoder");
+        let _ = app_handle.emit("ai-model-download-start", "SAM Encoder");
         download_model(ENCODER_URL, &encoder_path).await?;
-        let _ = app_handle.emit("sam-model-download-finish", "encoder");
+        let _ = app_handle.emit("ai-model-download-finish", "SAM Encoder");
     }
     if !decoder_path.exists() {
-        let _ = app_handle.emit("sam-model-download-start", "decoder");
+        let _ = app_handle.emit("ai-model-download-start", "SAM Decoder");
         download_model(DECODER_URL, &decoder_path).await?;
-        let _ = app_handle.emit("sam-model-download-finish", "decoder");
+        let _ = app_handle.emit("ai-model-download-finish", "SAM Decoder");
+    }
+    if !u2netp_path.exists() {
+        let _ = app_handle.emit("ai-model-download-start", "Foreground Model");
+        download_model(U2NETP_URL, &u2netp_path).await?;
+        let _ = app_handle.emit("ai-model-download-finish", "Foreground Model");
     }
 
-    let environment = Arc::new(Environment::builder().with_name("SAM").build()?);
-    let encoder = SessionBuilder::new(&environment)?.with_model_from_file(encoder_path)?;
-    let decoder = SessionBuilder::new(&environment)?.with_model_from_file(decoder_path)?;
+    let environment = Arc::new(Environment::builder().with_name("AI").build()?);
+    let sam_encoder = SessionBuilder::new(&environment)?.with_model_from_file(encoder_path)?;
+    let sam_decoder = SessionBuilder::new(&environment)?.with_model_from_file(decoder_path)?;
+    let u2netp = SessionBuilder::new(&environment)?.with_model_from_file(u2netp_path)?;
 
-    Ok(Arc::new(SamModels { encoder, decoder }))
+    Ok(Arc::new(AiModels { sam_encoder, sam_decoder, u2netp }))
 }
 
 pub fn generate_image_embeddings(
@@ -174,6 +186,71 @@ pub fn run_sam_decoder(
     Ok(feathered_mask)
 }
 
+pub fn run_u2netp_model(
+    image: &DynamicImage,
+    u2netp_session: &Session,
+) -> Result<GrayImage> {
+    let (orig_width, orig_height) = image.dimensions();
+
+    let resized_image = image.resize(U2NETP_INPUT_SIZE, U2NETP_INPUT_SIZE, FilterType::Triangle);
+    let (resized_w, resized_h) = resized_image.dimensions();
+    let resized_rgb = resized_image.to_rgb8();
+
+    let mut square_input_image = image::RgbImage::new(U2NETP_INPUT_SIZE, U2NETP_INPUT_SIZE);
+    let paste_x = (U2NETP_INPUT_SIZE - resized_w) / 2;
+    let paste_y = (U2NETP_INPUT_SIZE - resized_h) / 2;
+    imageops::overlay(&mut square_input_image, &resized_rgb, paste_x.into(), paste_y.into());
+
+    let mut input_tensor: Array<f32, _> = Array::zeros((1, 3, U2NETP_INPUT_SIZE as usize, U2NETP_INPUT_SIZE as usize));
+    let mean = [0.485, 0.456, 0.406];
+    let std = [0.229, 0.224, 0.225];
+
+    for y in 0..U2NETP_INPUT_SIZE {
+        for x in 0..U2NETP_INPUT_SIZE {
+            let pixel = square_input_image.get_pixel(x, y);
+            input_tensor[[0, 0, y as usize, x as usize]] = (pixel[0] as f32 / 255.0 - mean[0]) / std[0];
+            input_tensor[[0, 1, y as usize, x as usize]] = (pixel[1] as f32 / 255.0 - mean[1]) / std[1];
+            input_tensor[[0, 2, y as usize, x as usize]] = (pixel[2] as f32 / 255.0 - mean[2]) / std[2];
+        }
+    }
+    
+    let input_tensor_dyn = input_tensor.into_dyn();
+    let input_values = input_tensor_dyn.as_standard_layout();
+    let inputs = vec![Value::from_array(u2netp_session.allocator(), &input_values)?];
+
+    let outputs = u2netp_session.run(inputs)?;
+    let output_tensor = outputs[0].try_extract::<f32>()?.view().to_owned();
+
+    let (min_val, max_val) = output_tensor.iter().fold((f32::MAX, f32::MIN), |(min, max), &v| (min.min(v), max.max(v)));
+    let range = max_val - min_val;
+
+    let mask_data: Vec<u8> = output_tensor
+        .iter()
+        .map(|&val| {
+            if range > 1e-6 {
+                (((val - min_val) / range) * 255.0) as u8
+            } else {
+                0
+            }
+        })
+        .collect();
+
+    let square_mask = GrayImage::from_raw(U2NETP_INPUT_SIZE, U2NETP_INPUT_SIZE, mask_data)
+        .ok_or_else(|| anyhow::anyhow!("Failed to create mask from U-2-Netp output"))?;
+
+    let cropped_mask = imageops::crop_imm(
+        &square_mask,
+        paste_x,
+        paste_y,
+        resized_w,
+        resized_h,
+    ).to_image();
+
+    let final_mask = imageops::resize(&cropped_mask, orig_width, orig_height, FilterType::Triangle);
+
+    Ok(final_mask)
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AiSubjectMaskParameters {
@@ -181,6 +258,15 @@ pub struct AiSubjectMaskParameters {
     pub start_y: f64,
     pub end_x: f64,
     pub end_y: f64,
+    #[serde(default)]
+    pub mask_data_base64: Option<String>,
+    #[serde(default)]
+    pub rotation: Option<f32>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AiForegroundMaskParameters {
     #[serde(default)]
     pub mask_data_base64: Option<String>,
     #[serde(default)]

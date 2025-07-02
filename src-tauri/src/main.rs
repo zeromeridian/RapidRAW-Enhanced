@@ -5,7 +5,7 @@ mod file_management;
 mod gpu_processing;
 mod raw_processing;
 mod mask_generation;
-mod sam_processing;
+mod ai_processing;
 
 use std::io::Cursor;
 use std::sync::{Mutex};
@@ -32,7 +32,10 @@ use crate::image_processing::{
 use crate::file_management::get_sidecar_path;
 use crate::raw_processing::DemosaicAlgorithm;
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
-use crate::sam_processing::{SamState, get_or_init_sam_models, generate_image_embeddings, run_sam_decoder, AiSubjectMaskParameters};
+use crate::ai_processing::{
+    AiState, get_or_init_ai_models, generate_image_embeddings, run_sam_decoder,
+    AiSubjectMaskParameters, run_u2netp_model, AiForegroundMaskParameters
+};
 
 #[derive(Clone)]
 pub struct LoadedImage {
@@ -45,7 +48,7 @@ pub struct AppState {
     original_image: Mutex<Option<LoadedImage>>,
     raw_file_bytes: Mutex<Option<Vec<u8>>>,
     gpu_context: Mutex<Option<GpuContext>>,
-    sam_state: Mutex<Option<SamState>>,
+    ai_state: Mutex<Option<AiState>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -113,24 +116,24 @@ fn is_raw_file(path: &str) -> bool {
     let lower_path = path.to_lowercase();
     matches!(
         lower_path.split('.').last(),
-        Some("ari") | // ARRI
-        Some("arw") | Some("srf") | Some("sr2") | // Sony
-        Some("cr2") | Some("crw") | // Canon
-        Some("cr3") | // Canon newer RAW (not yet working until I switch to rawler or similar)
-        Some("nef") | Some("nrw") | // Nikon
-        Some("dng") | // Adobe DNG
-        Some("raf") | // Fuji
-        Some("rw2") | // Panasonic / Leica
-        Some("orf") | // Olympus
-        Some("mef") | // Mamiya
-        Some("mrw") | // Minolta
-        Some("srw") | // Samsung
-        Some("erf") | // Epson
-        Some("kdc") | Some("dcs") | Some("dcr") | // Kodak
-        Some("pef") | // Pentax
-        Some("iiq") | // Leaf IIQ
-        Some("mos") | // Leaf MOS
-        Some("3fr") // Hasselblad
+        Some("ari") |
+        Some("arw") | Some("srf") | Some("sr2") |
+        Some("cr2") | Some("crw") |
+        Some("cr3") |
+        Some("nef") | Some("nrw") |
+        Some("dng") |
+        Some("raf") |
+        Some("rw2") |
+        Some("orf") |
+        Some("mef") |
+        Some("mrw") |
+        Some("srw") |
+        Some("erf") |
+        Some("kdc") | Some("dcs") | Some("dcr") |
+        Some("pef") |
+        Some("iiq") |
+        Some("mos") |
+        Some("3fr")
     )
 }
 
@@ -621,6 +624,41 @@ fn get_full_image_for_processing(state: &tauri::State<AppState>) -> Result<Dynam
 }
 
 #[tauri::command]
+async fn generate_ai_foreground_mask(
+    rotation: f32,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<AiForegroundMaskParameters, String> {
+    let models = state.ai_state.lock().unwrap().as_ref().map(|s| s.models.clone());
+
+    let models = if let Some(models) = models {
+        models
+    } else {
+        drop(models);
+        let new_models = get_or_init_ai_models(&app_handle).await.map_err(|e| e.to_string())?;
+        let mut ai_state_lock = state.ai_state.lock().unwrap();
+        if let Some(ai_state) = &mut *ai_state_lock {
+            ai_state.models.clone()
+        } else {
+            *ai_state_lock = Some(AiState {
+                models: new_models.clone(),
+                embeddings: None,
+            });
+            new_models
+        }
+    };
+
+    let full_image = get_full_image_for_processing(&state)?;
+    let full_mask_image = run_u2netp_model(&full_image, &models.u2netp).map_err(|e| e.to_string())?;
+    let base64_data = encode_to_base64_png(&full_mask_image)?;
+
+    Ok(AiForegroundMaskParameters {
+        mask_data_base64: Some(base64_data),
+        rotation: Some(rotation),
+    })
+}
+
+#[tauri::command]
 async fn generate_ai_subject_mask(
     path: String,
     start_point: (f64, f64),
@@ -629,18 +667,18 @@ async fn generate_ai_subject_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiSubjectMaskParameters, String> {
-    let models = state.sam_state.lock().unwrap().as_ref().map(|s| s.models.clone());
+    let models = state.ai_state.lock().unwrap().as_ref().map(|s| s.models.clone());
 
     let models = if let Some(models) = models {
         models
     } else {
         drop(models);
-        let new_models = get_or_init_sam_models(&app_handle).await.map_err(|e| e.to_string())?;
-        let mut sam_state_lock = state.sam_state.lock().unwrap();
-        if let Some(sam_state) = &mut *sam_state_lock {
-            sam_state.models.clone()
+        let new_models = get_or_init_ai_models(&app_handle).await.map_err(|e| e.to_string())?;
+        let mut ai_state_lock = state.ai_state.lock().unwrap();
+        if let Some(ai_state) = &mut *ai_state_lock {
+            ai_state.models.clone()
         } else {
-            *sam_state_lock = Some(SamState {
+            *ai_state_lock = Some(AiState {
                 models: new_models.clone(),
                 embeddings: None,
             });
@@ -649,28 +687,28 @@ async fn generate_ai_subject_mask(
     };
 
     let embeddings = {
-        let mut sam_state_lock = state.sam_state.lock().unwrap();
-        let sam_state = sam_state_lock.as_mut().unwrap();
+        let mut ai_state_lock = state.ai_state.lock().unwrap();
+        let ai_state = ai_state_lock.as_mut().unwrap();
 
         let mut hasher = blake3::Hasher::new();
         hasher.update(path.as_bytes());
         let path_hash = hasher.finalize().to_hex().to_string();
 
-        if let Some(cached_embeddings) = &sam_state.embeddings {
+        if let Some(cached_embeddings) = &ai_state.embeddings {
             if cached_embeddings.path_hash == path_hash {
                 cached_embeddings.clone()
             } else {
                 let full_image = get_full_image_for_processing(&state)?;
-                let mut new_embeddings = generate_image_embeddings(&full_image, &models.encoder).map_err(|e| e.to_string())?;
+                let mut new_embeddings = generate_image_embeddings(&full_image, &models.sam_encoder).map_err(|e| e.to_string())?;
                 new_embeddings.path_hash = path_hash;
-                sam_state.embeddings = Some(new_embeddings.clone());
+                ai_state.embeddings = Some(new_embeddings.clone());
                 new_embeddings
             }
         } else {
             let full_image = get_full_image_for_processing(&state)?;
-            let mut new_embeddings = generate_image_embeddings(&full_image, &models.encoder).map_err(|e| e.to_string())?;
+            let mut new_embeddings = generate_image_embeddings(&full_image, &models.sam_encoder).map_err(|e| e.to_string())?;
             new_embeddings.path_hash = path_hash;
-            sam_state.embeddings = Some(new_embeddings.clone());
+            ai_state.embeddings = Some(new_embeddings.clone());
             new_embeddings
         }
     };
@@ -708,7 +746,7 @@ async fn generate_ai_subject_mask(
     let unrotated_start_point = (min_x, min_y);
     let unrotated_end_point = (max_x, max_y);
 
-    let mask_bitmap = run_sam_decoder(&models.decoder, &embeddings, unrotated_start_point, unrotated_end_point).map_err(|e| e.to_string())?;
+    let mask_bitmap = run_sam_decoder(&models.sam_decoder, &embeddings, unrotated_start_point, unrotated_end_point).map_err(|e| e.to_string())?;
     let base64_data = encode_to_base64_png(&mask_bitmap)?;
 
     Ok(AiSubjectMaskParameters {
@@ -1152,7 +1190,7 @@ fn main() {
             original_image: Mutex::new(None),
             raw_file_bytes: Mutex::new(None),
             gpu_context: Mutex::new(None),
-            sam_state: Mutex::new(None),
+            ai_state: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             show_in_finder,
@@ -1182,6 +1220,7 @@ fn main() {
             generate_uncropped_preview,
             generate_mask_overlay,
             generate_ai_subject_mask,
+            generate_ai_foreground_mask,
             load_settings,
             save_settings,
             reset_adjustments_for_paths,

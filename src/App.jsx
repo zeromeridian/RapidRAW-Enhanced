@@ -191,7 +191,7 @@ function App() {
   const [isResizing, setIsResizing] = useState(false);
   const [copiedAdjustments, setCopiedAdjustments] = useState(null);
   const [copiedFilePaths, setCopiedFilePaths] = useState([]);
-  const [samModelDownloadStatus, setSamModelDownloadStatus] = useState(null);
+  const [aiModelDownloadStatus, setAiModelDownloadStatus] = useState(null);
   const [copiedSectionAdjustments, setCopiedSectionAdjustments] = useState(null);
   const [copiedMask, setCopiedMask] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
@@ -250,6 +250,30 @@ function App() {
       }));
     } catch (error) {
       console.error("Failed to generate AI subject mask:", error);
+      setError(`AI Mask Failed: ${error}`);
+    } finally {
+      setIsGeneratingAiMask(false);
+    }
+  };
+
+  const handleGenerateAiForegroundMask = async (maskId) => {
+    if (!selectedImage?.path) {
+      console.error("Cannot generate AI mask: No image selected.");
+      return;
+    }
+    setIsGeneratingAiMask(true);
+    try {
+      const newParameters = await invoke('generate_ai_foreground_mask', {
+        rotation: adjustments.rotation,
+      });
+      setAdjustments(prev => ({
+        ...prev,
+        masks: prev.masks.map(m =>
+          m.id === maskId ? { ...m, parameters: newParameters } : m
+        )
+      }));
+    } catch (error) {
+      console.error("Failed to generate AI foreground mask:", error);
       setError(`AI Mask Failed: ${error}`);
     } finally {
       setIsGeneratingAiMask(false);
@@ -741,8 +765,8 @@ function App() {
       listen('thumbnail-generated', (event) => { if (isEffectActive) { const { path, rating } = event.payload; if (rating !== undefined) setImageRatings(prev => ({ ...prev, [path]: rating })); } }),
       listen('export-failed', (event) => { if (isEffectActive) setError(`Export failed: ${event.payload}`); }),
       listen('export-successful', (event) => { if (isEffectActive) console.log(`Export successful to ${event.payload}`); }),
-      listen('sam-model-download-start', (event) => { if (isEffectActive) setSamModelDownloadStatus(event.payload); }),
-      listen('sam-model-download-finish', () => { if (isEffectActive) setSamModelDownloadStatus(null); }),
+      listen('ai-model-download-start', (event) => { if (isEffectActive) setAiModelDownloadStatus(event.payload); }),
+      listen('ai-model-download-finish', () => { if (isEffectActive) setAiModelDownloadStatus(null); }),
     ];
     return () => { isEffectActive = false; listeners.forEach(p => p.then(unlisten => unlisten())); if (loaderTimeoutRef.current) clearTimeout(loaderTimeoutRef.current); };
   }, []);
@@ -1099,7 +1123,7 @@ function App() {
                 {renderedRightPanel === 'adjustments' && <Controls theme={theme} adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} histogram={histogram} collapsibleState={collapsibleSectionsState} setCollapsibleState={setCollapsibleSectionsState} copiedSectionAdjustments={copiedSectionAdjustments} setCopiedSectionAdjustments={setCopiedSectionAdjustments} />}
                 {renderedRightPanel === 'metadata' && <MetadataPanel selectedImage={selectedImage} />}
                 {renderedRightPanel === 'crop' && <CropPanel selectedImage={selectedImage} adjustments={adjustments} setAdjustments={setAdjustments} />}
-                {renderedRightPanel === 'masks' && <MasksPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} onSelectMask={setActiveMaskId} activeMaskId={activeMaskId} brushSettings={brushSettings} setBrushSettings={setBrushSettings} copiedMask={copiedMask} setCopiedMask={setCopiedMask} setCustomEscapeHandler={setCustomEscapeHandler} histogram={histogram} isGeneratingAiMask={isGeneratingAiMask} samModelDownloadStatus={samModelDownloadStatus} />}
+                {renderedRightPanel === 'masks' && <MasksPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} onSelectMask={setActiveMaskId} activeMaskId={activeMaskId} brushSettings={brushSettings} setBrushSettings={setBrushSettings} copiedMask={copiedMask} setCopiedMask={setCopiedMask} setCustomEscapeHandler={setCustomEscapeHandler} histogram={histogram} isGeneratingAiMask={isGeneratingAiMask} aiModelDownloadStatus={aiModelDownloadStatus} onGenerateAiForegroundMask={handleGenerateAiForegroundMask} />}
                 {renderedRightPanel === 'presets' && <PresetsPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} activePanel={activeRightPanel} />}
                 {renderedRightPanel === 'export' && <ExportPanel selectedImage={selectedImage} adjustments={adjustments} multiSelectedPaths={multiSelectedPaths} />}
                 {renderedRightPanel === 'ai' && <AIPanel selectedImage={selectedImage} />}

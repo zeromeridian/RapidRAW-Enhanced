@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Circle, TriangleRight, Brush, Droplet, Sun, Sparkles,
+  Circle, TriangleRight, Brush, Droplet, Sun, Sparkles, User,
   Trash2, RotateCcw, ArrowLeft, Eye, EyeOff, Edit, Copy, ClipboardPaste, PlusSquare
 } from 'lucide-react';
 import MaskControls from './MaskControls';
@@ -11,11 +11,12 @@ import { useContextMenu } from '../../../context/ContextMenuContext';
 
 const MASK_TYPES = [
   { id: 'ai-subject', name: 'Subject', icon: Sparkles, type: 'ai-subject', disabled: false },
+  { id: 'ai-foreground', name: 'Foreground', icon: User, type: 'ai-foreground', disabled: false },
   { id: 'brush', name: 'Brush', icon: Brush, type: 'brush', disabled: false },
   { id: 'linear', name: 'Linear', icon: TriangleRight, type: 'linear', disabled: false },
   { id: 'radial', name: 'Radial', icon: Circle, type: 'radial', disabled: false },
   { id: 'color', name: 'Color', icon: Droplet, type: 'color', disabled: true },
-  { id: 'luminance', name: 'Luminance', icon: Sun, type: 'luminance', disabled: true },
+ // { id: 'luminance', name: 'Luminance', icon: Sun, type: 'luminance', disabled: true }, // disabled for now to not mess up the layout
 ];
 
 const itemVariants = {
@@ -35,13 +36,16 @@ function formatMaskTypeName(type) {
   if (type === 'ai-subject') {
     return 'AI Subject';
   }
+  if (type === 'ai-foreground') {
+    return 'AI Foreground';
+  }
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
 export default function MasksPanel({
   adjustments, setAdjustments, selectedImage, onSelectMask, activeMaskId,
   brushSettings, setBrushSettings, copiedMask, setCopiedMask, histogram,
-  setCustomEscapeHandler, isGeneratingAiMask, samModelDownloadStatus 
+  setCustomEscapeHandler, isGeneratingAiMask, aiModelDownloadStatus, onGenerateAiForegroundMask
 }) {
   const [editingMaskId, setEditingMaskId] = useState(null);
   const [deletingMaskId, setDeletingMaskId] = useState(null);
@@ -116,6 +120,10 @@ export default function MasksPanel({
         break;
       case 'ai-subject':
         newMask = { ...common, parameters: { startX: 0, startY: 0, endX: 0, endY: 0, maskDataBase64: null } };
+        break;
+      case 'ai-foreground':
+        newMask = { ...common, parameters: { maskDataBase64: null } };
+        onGenerateAiForegroundMask(newMask.id);
         break;
       case 'color':
       case 'luminance':
@@ -265,7 +273,7 @@ export default function MasksPanel({
           setBrushSettings={setBrushSettings}
           histogram={histogram}
           isGeneratingAiMask={isGeneratingAiMask}
-          samModelDownloadStatus={samModelDownloadStatus}
+          aiModelDownloadStatus={aiModelDownloadStatus}
         />
       </div>
     );
@@ -291,6 +299,11 @@ export default function MasksPanel({
         onContextMenu={handlePanelContextMenu}
       >
         <div onClick={(e) => e.stopPropagation()}>
+          {aiModelDownloadStatus && (
+            <div className="p-2 text-center text-xs text-text-secondary bg-surface rounded-md mb-4">
+              Downloading AI Model: {aiModelDownloadStatus}...
+            </div>
+          )}
           <p className="text-sm mb-3 font-semibold text-text-primary">Create New Mask</p>
           <div className="grid grid-cols-3 gap-2">
             {MASK_TYPES.map(maskType => (

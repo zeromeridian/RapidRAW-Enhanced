@@ -27,6 +27,7 @@ Have fun!
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   Added: AI-powered foreground / background masking
 *   Added: AI-powered subject masking
 *   Added: Precompiled Linux builds
 *   Fixed: Various small bugs

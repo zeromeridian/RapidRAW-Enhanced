@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::f32::consts::PI;
 use base64::{Engine as _, engine::general_purpose};
-use crate::sam_processing::AiSubjectMaskParameters;
+use crate::ai_processing::{AiSubjectMaskParameters, AiForegroundMaskParameters};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -287,6 +287,66 @@ fn generate_brush_bitmap(
     mask
 }
 
+fn generate_ai_foreground_bitmap(
+    params_value: &Value,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+) -> Option<GrayImage> {
+    let params: AiForegroundMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    let data_url = params.mask_data_base64?;
+    let rotation = params.rotation.unwrap_or(0.0);
+
+    let b64_data = if let Some(idx) = data_url.find(',') {
+        &data_url[idx + 1..]
+    } else {
+        &data_url
+    };
+    
+    let decoded_bytes = general_purpose::STANDARD.decode(b64_data).ok()?;
+    let full_mask_image = image::load_from_memory(&decoded_bytes).ok()?.to_luma8();
+
+    let (full_mask_w, full_mask_h) = full_mask_image.dimensions();
+    let mut final_mask = GrayImage::new(width, height);
+
+    let angle_rad = -rotation.to_radians();
+    let cos_a = angle_rad.cos();
+    let sin_a = angle_rad.sin();
+
+    let center_x = (full_mask_w as f32 * scale) / 2.0;
+    let center_y = (full_mask_h as f32 * scale) / 2.0;
+
+    for y_out in 0..height {
+        for x_out in 0..width {
+            let x_crop = x_out as f32;
+            let y_crop = y_out as f32;
+
+            let x_uncrop = x_crop + crop_offset.0;
+            let y_uncrop = y_crop + crop_offset.1;
+
+            let x_centered = x_uncrop - center_x;
+            let y_centered = y_uncrop - center_y;
+
+            let x_rot = x_centered * cos_a - y_centered * sin_a;
+            let y_rot = x_centered * sin_a + y_centered * cos_a;
+
+            let x_unrotated = x_rot + center_x;
+            let y_unrotated = y_rot + center_y;
+
+            let x_src = x_unrotated / scale;
+            let y_src = y_unrotated / scale;
+
+            if x_src >= 0.0 && x_src < full_mask_w as f32 && y_src >= 0.0 && y_src < full_mask_h as f32 {
+                let pixel = full_mask_image.get_pixel(x_src as u32, y_src as u32);
+                final_mask.put_pixel(x_out, y_out, *pixel);
+            }
+        }
+    }
+
+    Some(final_mask)
+}
+
 fn generate_ai_subject_bitmap(
     params_value: &Value,
     width: u32,
@@ -363,6 +423,7 @@ pub fn generate_mask_bitmap(
         "linear" => Some(generate_linear_bitmap(&mask_def.parameters, width, height, scale, crop_offset)),
         "brush" => Some(generate_brush_bitmap(&mask_def.parameters, width, height, scale, crop_offset)),
         "ai-subject" => generate_ai_subject_bitmap(&mask_def.parameters, width, height, scale, crop_offset),
+        "ai-foreground" => generate_ai_foreground_bitmap(&mask_def.parameters, width, height, scale, crop_offset),
         _ => None,
     };
 
