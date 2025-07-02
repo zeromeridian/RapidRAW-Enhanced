@@ -72,15 +72,18 @@ jobs:
           args: ${{ inputs.build-args }}
           releaseId: ${{ inputs.release-id }}
 
-      - name: Upload Linux binaries
-        uses: actions/upload-artifact@v4
+      - name: Setup gh actions artifact client
         if: startsWith(inputs.platform, 'ubuntu')
-        with:
-          name: binaries-linux
-          path: |
-            ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.deb
-            ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.rpm
-            ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.AppImage
+        uses: lhotari/gh-actions-artifact-client@v2
+
+      - name: Upload Linux binaries
+        if: startsWith(inputs.platform, 'ubuntu')
+        run: |
+          find ${{ github.workspace }}/src-tauri/target/release/bundle -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" | while read -r file; do
+            name=$(basename "$file")
+            echo "Uploading $name, file: $file"
+            zip - "$file" | gh-actions-artifact-client.js upload "$name" --retentionDays=7
+          done
 
       - name: Upload MacOS binaries
         uses: actions/upload-artifact@v4
@@ -88,7 +91,7 @@ jobs:
         with:
           name: binaries-macos
           path: |
-            ${{ github.workspace }}/src-tauri/target/universal-apple-darwin/release/bundle/**/*.dmg
+            ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.dmg
 
       - name: Upload Windows binaries
         uses: actions/upload-artifact@v4
