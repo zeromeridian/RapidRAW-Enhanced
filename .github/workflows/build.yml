@@ -15,6 +15,9 @@ on:
       release-id:
         required: false
         type: string
+      upload-artifacts:
+        required: false
+        type: boolean
 
 jobs:
   build:
@@ -59,7 +62,8 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
-      - name: Build with tauri-action
+      - id: tauri-build
+        name: Build with tauri-action
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -67,3 +71,29 @@ jobs:
         with:
           args: ${{ inputs.build-args }}
           releaseId: ${{ inputs.release-id }}
+
+      - name: Upload Linux binaries
+        uses: actions/upload-artifact@v4
+        if: matrix.platform == 'ubuntu-22.04'
+        with:
+          name: binaries-linux
+          path: |
+            ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.deb
+            ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.rpm
+            ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.AppImage
+
+      - name: Upload MacOS binaries
+        uses: actions/upload-artifact@v4
+        if: matrix.platform == 'macos-latest'
+        with:
+          name: binaries-macos
+          path: |
+            ${{ github.workspace }}/src-tauri/target/universal-apple-darwin/release/bundle/**/*.dmg
+
+      - name: Upload Windows binaries
+        uses: actions/upload-artifact@v4
+        if: matrix.platform == 'windows-latest'
+        with:
+          name: binaries-windows
+          path: |
+            ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.exe
