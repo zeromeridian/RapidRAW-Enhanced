@@ -79,6 +79,7 @@ jobs:
       # - name: Upload Linux binaries
       - name: Upload binaries
         # if: startsWith(inputs.platform, 'ubuntu')
+        shell: bash
         run: |
           find ${{ github.workspace }}/src-tauri/target/release/bundle -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" | while read -r file; do
             name=$(basename "$file")
