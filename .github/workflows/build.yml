@@ -62,9 +62,11 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      - name: Patch window transparency (Linux)
+      - name: Apply patches (Linux)
         if: startsWith(inputs.platform, 'ubuntu')
-        run: yq -iP '.app.windows[0].transparent=false' src-tauri/tauri.conf.json
+        run: |-
+          find patches/linux -type f -executable -exec sh {} \;
+          find patches/linux -type f -iname "*.patch" -exec sh -c 'cat {} | patch -p1' \;
 
       - name: Install frontend dependencies
         run: npm install
