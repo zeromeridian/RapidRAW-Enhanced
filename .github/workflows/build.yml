@@ -85,7 +85,7 @@ jobs:
             name=$(basename "$file")
             patched_name=$(echo $name | sed -E 's/[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?/${{ github.sha }}/')
             echo "Uploading $name, file: $file"
-            zip - "$file" | gh-actions-artifact-client.js upload "$patched_name" --retentionDays=7
+            gh-actions-artifact-client.js upload "$patched_name" --retentionDays=7 < "$file"
           done
 
 #       - name: Upload MacOS binaries
