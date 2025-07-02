@@ -74,7 +74,7 @@ jobs:
 
       - name: Upload Linux binaries
         uses: actions/upload-artifact@v4
-        if: matrix.platform == 'ubuntu-22.04'
+        if: startsWith(inputs.platform, 'ubuntu')
         with:
           name: binaries-linux
           path: |
@@ -84,7 +84,7 @@ jobs:
 
       - name: Upload MacOS binaries
         uses: actions/upload-artifact@v4
-        if: matrix.platform == 'macos-latest'
+        if: startsWith(inputs.platform, 'macos')
         with:
           name: binaries-macos
           path: |
@@ -92,7 +92,7 @@ jobs:
 
       - name: Upload Windows binaries
         uses: actions/upload-artifact@v4
-        if: matrix.platform == 'windows-latest'
+        if: startsWith(inputs.platform, 'windows')
         with:
           name: binaries-windows
           path: |
