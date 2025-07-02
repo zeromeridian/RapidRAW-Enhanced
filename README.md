@@ -20,7 +20,7 @@
 
 RapidRAW is a modern, high-performance alternative to Adobe Lightroom. It delivers a feature-rich, beautiful editing experience in a lightweight package (under 30MB) for Windows, macOS, and Linux.
 
-I developed this project as a personal challenge over the course of two weeks at the age of 18. My goal was to deepen my understanding of both React and Rust, with the support from Google Gemini 2.5.
+I developed this project as an personal challenge at the age of 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of both React and Rust, with the support from Google Gemini.
 
 Have fun!
 
@@ -40,7 +40,7 @@ Have fun!
 - [The Idea](#the-idea)
 - [Current Priorities](#current-priorities)
 - [AI Roadmap](#ai-roadmap)
-- [Development Timeline](#development-timeline)
+- [Initial Development Log](#initial-development-log)
 - [Getting Started](#getting-started)
 - [Contributing](#contributing)
 - [Special Thanks](#special-thanks)
@@ -138,7 +138,7 @@ Here's RapidRAW in action.
 As a photography enthusiast, I often found existing software to be sluggish and resource-heavy on my machine. Born from the desire for a more responsive and streamlined photo editing experience, I set out to build my own. The goal was to create a tool that was not only fast but also helped me learn the details of digital image processing and camera technology.
 
 #### The Challenge
-I gave myself a deadline of **two weeks** to go from an empty folder to a functional, feature-rich application. This personal challenge pushed me to learn quickly and focus intensely on the core architecture and user experience.
+I set an ambitious goal to rapidly build a functional, feature-rich application from an empty folder. This personal challenge pushed me to learn quickly and focus intensely on the core architecture and user experience.
 
 #### The Process
 The foundation is built on Rust for its safety and performance, and Tauri for its ability to create lightweight, cross-platform desktop apps with a web frontend. The entire image processing pipeline is offloaded to the GPU via WGPU and a custom WGSL shader, ensuring that even on complex edits with multiple masks, the UI remains fluid.
@@ -180,9 +180,9 @@ An official Docker container will be provided which runs a pre-configured [Comfy
 
 This modular approach ensures that RapidRAW's core experience remains fast for everyone, while providing a clear path for cutting-edge, optional features like AI object removal, generative fill, and style transfer.
 
-## Development Timeline
+## Initial Development Log
 
-This project was built in an two-week sprint. Here's a summary of the progress:
+This project began as an intensive sprint to build the core functionality. Here's a summary of the initial progress and key milestones:
 
 <details>
 <summary><strong>Click to expand the day-by-day development log</strong></summary>
