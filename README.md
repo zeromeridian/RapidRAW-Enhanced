@@ -59,17 +59,17 @@ Have fun!
       <h4>Core Editing Engine</h4>
       <ul>
         <li><strong>GPU-Accelerated Processing:</strong> All image adjustments are processed on the GPU using a custom WGSL shader for rapid feedback.</li>
-        <li><strong>Full RAW Support:</strong> Supports a wide range of RAW camera formats, featuring two demosaicing algorithms.</li>
+        <li><strong>Full RAW Support:</strong> Supports a wide range of RAW camera formats thanks to rawler.</li>
         <li><strong>Non-Destructive Workflow:</strong> All edits are stored in a <code>.rrdata</code> sidecar file, leaving your original images untouched.</li>
-        <li><strong>Masking:</strong> Local adjustments with AI object detection, Brush, Linear, and Radial masks. The mask system is bitmap-based.</li>
+        <li><strong>Masking:</strong> Local adjustments with AI object / foreground detection, Brush, Linear, and Radial masks. The mask system is bitmap-based.</li>
         <li><strong>32-bit Precision:</strong> Ensures high-quality adjustments without banding or data loss.</li>
       </ul>
       <h4>Professional Grade Adjustments</h4>
       <ul>
         <li><strong>Tonal Controls:</strong> Exposure, Contrast, Highlights, Shadows, Whites, and Blacks.</li>
         <li><strong>Tone Curves:</strong> Full control over Luma, Red, Green, and Blue channels.</li>
-        <li><strong>Color Grading:</strong> Temperature, Tint, Vibrance, Saturation, and a full HSL (Hue, Saturation, Luminance) color mixer.</li>
-        <li><strong>Detail Enhancement:</strong> Sharpening, Clarity, Structure, and Noise Reduction (Luminance & Color).</li>
+        <li><strong>Color Grading:</strong> Temperature, Tint, Vibrance, Saturation, and a full HSL color mixer.</li>
+        <li><strong>Detail Enhancement:</strong> Sharpening, Clarity, Structure, and Noise Reduction.</li>
         <li><strong>Effects:</strong> Dehaze, Vignette, and realistic Film Grain simulation.</li>
         <li><strong>Transform Tools:</strong> Crop with aspect ratio locking, Rotate, and Flip.</li>
       </ul>

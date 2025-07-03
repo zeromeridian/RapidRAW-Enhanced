@@ -320,16 +320,7 @@ fn generate_fullscreen_preview(
     state: tauri::State<AppState>,
 ) -> Result<String, String> {
     let context = get_or_init_gpu_context(&state)?;
-
-    let base_image = {
-        let raw_bytes_lock = state.raw_file_bytes.lock().unwrap();
-        if let Some(bytes) = &*raw_bytes_lock {
-            raw_processing::develop_raw_image(bytes, false).map_err(|e| e.to_string())?
-        } else {
-            let original_image_lock = state.original_image.lock().unwrap();
-            original_image_lock.as_ref().ok_or("No original image loaded")?.image.clone()
-        }
-    };
+    let base_image = get_full_image_for_processing(&state)?;
     
     let rotation_degrees = js_adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
     let rotated_image = apply_rotation(&base_image, rotation_degrees);
@@ -361,16 +352,7 @@ fn export_image(
     state: tauri::State<AppState>,
 ) -> Result<(), String> {
     let context = get_or_init_gpu_context(&state)?;
-
-    let base_image = {
-        let raw_bytes_lock = state.raw_file_bytes.lock().unwrap();
-        if let Some(bytes) = &*raw_bytes_lock {
-            raw_processing::develop_raw_image(bytes, false).map_err(|e| e.to_string())?
-        } else {
-            let original_image_lock = state.original_image.lock().unwrap();
-            original_image_lock.as_ref().ok_or("No original image loaded")?.image.clone()
-        }
-    };
+    let base_image = get_full_image_for_processing(&state)?;
 
     let rotation_degrees = js_adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
     let rotated_image = apply_rotation(&base_image, rotation_degrees);
@@ -582,13 +564,9 @@ fn generate_mask_overlay(
 }
 
 fn get_full_image_for_processing(state: &tauri::State<AppState>) -> Result<DynamicImage, String> {
-    let raw_bytes_lock = state.raw_file_bytes.lock().unwrap();
-    if let Some(bytes) = &*raw_bytes_lock {
-        raw_processing::develop_raw_image(bytes, true).map_err(|e| e.to_string())
-    } else {
-        let original_image_lock = state.original_image.lock().unwrap();
-        Ok(original_image_lock.as_ref().ok_or("No original image loaded")?.image.clone())
-    }
+    let original_image_lock = state.original_image.lock().unwrap();
+    let loaded_image = original_image_lock.as_ref().ok_or("No original image loaded")?;
+    Ok(loaded_image.image.clone())
 }
 
 #[tauri::command]
