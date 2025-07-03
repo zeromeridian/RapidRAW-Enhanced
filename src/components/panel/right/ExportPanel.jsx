@@ -224,7 +224,7 @@ export default function ExportPanel({ selectedImage, adjustments, multiSelectedP
                 </div>
               )}
             </Section>
-
+            {/* COMMENTED OUT UNTIL I FIND BETTER DEMOSAICING ALGO'S
             {hasRawFileInSelection && (
               <Section title="RAW Settings">
                 <div className="flex items-center gap-2">
@@ -240,7 +240,7 @@ export default function ExportPanel({ selectedImage, adjustments, multiSelectedP
                   </select>
                 </div>
               </Section>
-            )}
+            )} */}
           </>
         ) : (
           <p className="text-center text-text-tertiary mt-4">No image selected for export.</p>

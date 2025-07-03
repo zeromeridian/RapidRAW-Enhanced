@@ -6,6 +6,7 @@ mod gpu_processing;
 mod raw_processing;
 mod mask_generation;
 mod ai_processing;
+mod formats;
 
 use std::io::Cursor;
 use std::sync::{Mutex};
@@ -30,12 +31,12 @@ use crate::image_processing::{
     ImageMetadata, process_and_get_dynamic_image, Crop, apply_crop, apply_rotation,
 };
 use crate::file_management::get_sidecar_path;
-use crate::raw_processing::DemosaicAlgorithm;
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::ai_processing::{
     AiState, get_or_init_ai_models, generate_image_embeddings, run_sam_decoder,
     AiSubjectMaskParameters, run_u2netp_model, AiForegroundMaskParameters
 };
+use crate::formats::is_raw_file;
 
 #[derive(Clone)]
 pub struct LoadedImage {
@@ -112,31 +113,6 @@ struct ExportSettings {
     resize: Option<ResizeOptions>,
 }
 
-fn is_raw_file(path: &str) -> bool {
-    let lower_path = path.to_lowercase();
-    matches!(
-        lower_path.split('.').last(),
-        Some("ari") |
-        Some("arw") | Some("srf") | Some("sr2") |
-        Some("cr2") | Some("crw") |
-        Some("cr3") |
-        Some("nef") | Some("nrw") |
-        Some("dng") |
-        Some("raf") |
-        Some("rw2") |
-        Some("orf") |
-        Some("mef") |
-        Some("mrw") |
-        Some("srw") |
-        Some("erf") |
-        Some("kdc") | Some("dcs") | Some("dcr") |
-        Some("pef") |
-        Some("iiq") |
-        Some("mos") |
-        Some("3fr")
-    )
-}
-
 fn encode_to_base64(image: &DynamicImage, quality: u8) -> Result<String, String> {
     let rgb_image = image.to_rgb8();
 
@@ -176,17 +152,11 @@ async fn load_image(path: String, state: tauri::State<'_, AppState>) -> Result<L
 
     let (img, full_res_dims) = if is_raw {
         *state.raw_file_bytes.lock().unwrap() = Some(file_bytes.clone());
-        
-        let raw_info = rawloader::decode(&mut Cursor::new(&file_bytes))
+
+        let developed_img = raw_processing::develop_raw_image(&file_bytes, false)
             .map_err(|e| e.to_string())?;
-        
-        let crops = raw_info.crops;
-        let full_width = raw_info.width as u32 - crops[3] as u32 - crops[1] as u32;
-        let full_height = raw_info.height as u32 - crops[0] as u32 - crops[2] as u32;
-        
-        let preview_img = raw_processing::develop_raw_fast_preview(&file_bytes)
-            .map_err(|e| e.to_string())?;
-        (preview_img, (full_width, full_height))
+        let dims = developed_img.dimensions();
+        (developed_img, dims)
     } else {
         *state.raw_file_bytes.lock().unwrap() = None;
         let loaded_img = image::load_from_memory(&file_bytes).map_err(|e| e.to_string())?;
@@ -354,7 +324,7 @@ fn generate_fullscreen_preview(
     let base_image = {
         let raw_bytes_lock = state.raw_file_bytes.lock().unwrap();
         if let Some(bytes) = &*raw_bytes_lock {
-            raw_processing::develop_raw_image(bytes, raw_processing::DemosaicAlgorithm::Linear)?
+            raw_processing::develop_raw_image(bytes, false).map_err(|e| e.to_string())?
         } else {
             let original_image_lock = state.original_image.lock().unwrap();
             original_image_lock.as_ref().ok_or("No original image loaded")?.image.clone()
@@ -387,7 +357,6 @@ fn generate_fullscreen_preview(
 fn export_image(
     path: String,
     js_adjustments: Value,
-    demosaic_quality: Option<DemosaicAlgorithm>,
     export_settings: ExportSettings,
     state: tauri::State<AppState>,
 ) -> Result<(), String> {
@@ -395,8 +364,8 @@ fn export_image(
 
     let base_image = {
         let raw_bytes_lock = state.raw_file_bytes.lock().unwrap();
-        if let (Some(bytes), Some(quality)) = (&*raw_bytes_lock, demosaic_quality) {
-            raw_processing::develop_raw_image(bytes, quality)?
+        if let Some(bytes) = &*raw_bytes_lock {
+            raw_processing::develop_raw_image(bytes, false).map_err(|e| e.to_string())?
         } else {
             let original_image_lock = state.original_image.lock().unwrap();
             original_image_lock.as_ref().ok_or("No original image loaded")?.image.clone()
@@ -477,7 +446,6 @@ fn export_image(
 fn batch_export_images(
     output_folder: String,
     paths: Vec<String>,
-    demosaic_quality: Option<DemosaicAlgorithm>,
     export_settings: ExportSettings,
     output_format: String,
     state: tauri::State<AppState>,
@@ -492,7 +460,7 @@ fn batch_export_images(
         let processing_result: Result<(), String> = (|| {
             let file_bytes = fs::read(image_path_str).map_err(|e| e.to_string())?;
             let base_image = if is_raw_file(image_path_str) {
-                raw_processing::develop_raw_image(&file_bytes, demosaic_quality.clone().unwrap_or(DemosaicAlgorithm::Menon))?
+                raw_processing::develop_raw_image(&file_bytes, false).map_err(|e| e.to_string())?
             } else {
                 image::load_from_memory(&file_bytes).map_err(|e| e.to_string())?
             };
@@ -616,7 +584,7 @@ fn generate_mask_overlay(
 fn get_full_image_for_processing(state: &tauri::State<AppState>) -> Result<DynamicImage, String> {
     let raw_bytes_lock = state.raw_file_bytes.lock().unwrap();
     if let Some(bytes) = &*raw_bytes_lock {
-        raw_processing::develop_raw_image(bytes, DemosaicAlgorithm::Linear)
+        raw_processing::develop_raw_image(bytes, true).map_err(|e| e.to_string())
     } else {
         let original_image_lock = state.original_image.lock().unwrap();
         Ok(original_image_lock.as_ref().ok_or("No original image loaded")?.image.clone())

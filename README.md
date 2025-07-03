@@ -27,6 +27,7 @@ Have fun!
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   Added: Switched from [rawloader](https://github.com/pedrocr/rawloader) to [rawler](https://github.com/dnglab/dnglab/tree/main/rawler) to basically support all RAW formats
 *   Added: AI-powered foreground / background masking
 *   Added: AI-powered subject masking
 *   Added: Precompiled Linux builds
@@ -239,7 +240,7 @@ Contributions are welcome and highly appreciated! Whether it's reporting a bug, 
 A huge thank you to the following projects and tools that were very important in the development of RapidRAW:
 
 *   **[Google AI Studio](aistudio.google.com):** For providing amazing assistance in researching, implementing image processing algorithms and giving an overall speed boost.
-*   **[rawloader](https://github.com/pedrocr/rawloader):** For the excellent Rust crate that provides the foundation for RAW file decoding in this project.
+*   **[rawler](https://github.com/dnglab/dnglab/tree/main/rawler):** For the excellent Rust crate that provides the foundation for RAW file processing in this project.
 
 ## Support the Project
 

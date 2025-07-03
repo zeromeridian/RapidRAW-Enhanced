@@ -20,17 +20,9 @@ use crate::image_processing::{
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::raw_processing;
 use crate::{gpu_processing, AppState};
+use crate::formats::{is_raw_file, is_supported_image_file};
 
 const THUMBNAIL_WIDTH: u32 = 720;
-
-fn is_raw_file(path: &str) -> bool {
-    let lower_path = path.to_lowercase();
-    matches!(
-        lower_path.split('.').last(),
-        Some("arw") | Some("cr2") | Some("cr3") | Some("nef") | Some("dng") |
-        Some("raf") | Some("orf") | Some("pef") | Some("rw2")
-    )
-}
 
 #[derive(Serialize, Debug, Clone)]
 pub struct ImageFile {
@@ -52,12 +44,7 @@ pub fn list_images_in_dir(path: String) -> Result<Vec<ImageFile>, String> {
         })
         .filter(|path| path.is_file())
         .filter(|path| {
-            path.extension()
-                .and_then(|s| s.to_str())
-                .map_or(false, |ext_lower| {
-                    let ext = ext_lower.to_lowercase();
-                    ["jpg", "jpeg", "png", "gif", "bmp", "arw", "cr2", "cr3", "nef", "dng", "raf", "orf", "pef", "rw2"].contains(&ext.as_str())
-                })
+            path.to_str().map_or(false, is_supported_image_file)
         })
         .map(|path| {
             let modified = fs::metadata(&path)
@@ -158,14 +145,9 @@ pub fn generate_thumbnail_data(
     let file_bytes = fs::read(path_str)?;
 
     let (base_image, original_dims): (DynamicImage, (u32, u32)) = if is_raw_file(path_str) {
-        let raw_info = rawloader::decode(&mut Cursor::new(&file_bytes))?;
-        let crops = raw_info.crops;
-        let full_width = raw_info.width as u32 - crops[3] as u32 - crops[1] as u32;
-        let full_height = raw_info.height as u32 - crops[0] as u32 - crops[2] as u32;
-        (
-            raw_processing::develop_raw_thumbnail(&file_bytes)?,
-            (full_width, full_height),
-        )
+        let developed_image = raw_processing::develop_raw_image(&file_bytes, true)?;
+        let dims = developed_image.dimensions();
+        (developed_image, dims)
     } else {
         let img = image::load_from_memory(&file_bytes)?;
         let dims = img.dimensions();

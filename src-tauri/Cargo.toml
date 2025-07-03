@@ -32,7 +32,7 @@ bytemuck = { version = "1.14", features = ["derive"] }
 window-vibrancy = "0.6.0"
 anyhow = "1.0.98"
 kamadak-exif = "0.6.1"
-rawloader = { path = "rawloader" }
+rawler = { path = "rawler" }
 serde_bytes = "0.11.17"
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1.6", features = ["v4", "serde"] }
