@@ -153,7 +153,6 @@ While the core functionality is in place, I'm actively working on improving seve
 
 | Task                                                                                         | Priority | Difficulty | Status |
 |----------------------------------------------------------------------------------------------|----------|------------|--------|
-| Finding a better demosaicing algorithm (need help)                                          | Low     | Very High       | [ ]    |
 | Refactoring the frontend (reduce prop drilling in React components)                         | Medium   | Medium     | [ ]    |
 | Allow 45°+ rotation for images (e.g. predefined 90° clockwise )                             | Medium   | Low       | [ ]    |
 | Improving the dehaze tool for more natural results                                           | Low     | Medium     | [ ]    |
@@ -161,7 +160,7 @@ While the core functionality is in place, I'm actively working on improving seve
 | Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High | Medium    | [x]    |
 | Implement a simple MVP of the ComfyUI based AI Roadmap                                        | Low   | High       | []    |
 | Sign macOS builds using a registered developer account                                       | Medium      | Low     | [ ]    |
-| Switch to a better rawloader (e.g. rawler)                                                   | High      | Medium     | [ ]    |
+| Switch to a better rawloader (e.g. rawler)                                                   | High      | Medium     | [x]    |
 | Improve speed on older systems (e.g. Pascal GPUs)                                            | Medium   | High       | [ ]    |
 | Auto white balance detection and exposure correction                                         | Medium     | Medium     | [ ]    |
 
