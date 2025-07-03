@@ -9,12 +9,18 @@ on:
       platform:
         required: true
         type: string
+      target:
+        required: true
+        type: string
       build-args:
         required: false
         type: string
       release-id:
         required: false
         type: string
+      upload-artifacts:
+        required: false
+        type: boolean
 
 jobs:
   build:
@@ -59,11 +65,41 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
-      - name: Build with tauri-action
+      - name: rustup install target
+        if: ${{ inputs.target != '' }}
+        run: rustup target add ${{ inputs.target }}
+
+      - id: tauri-build
+        name: Build with tauri-action
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NO_STRIP: ${{ startsWith(inputs.platform, 'ubuntu') }}
         with:
-          args: ${{ inputs.build-args }}
+          args: ${{ inputs.build-args }} ${{ inputs.target != '' && '--target' || ''  }} ${{ inputs.target }}
           releaseId: ${{ inputs.release-id }}
+
+      - name: Setup gh actions artifact client
+        uses: lhotari/gh-actions-artifact-client@v2
+
+      - name: Upload binaries (Windows)
+        shell: bash
+        if: startsWith(inputs.platform, 'windows')
+        run: |
+          find src-tauri/target/release/bundle -name "*.exe" | while read -r file; do
+            name=$(basename "$file")
+            patched_name=$(echo $name | sed -E 's/[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?/${{ github.sha }}/')
+            echo "Uploading $name, file: $file"
+            # TODO zip the file before upload
+            gh-actions-artifact-client.js upload "$patched_name" --retentionDays=7 < "$file"
+          done
+
+      - name: Upload binaries
+        if: "!startsWith(inputs.platform, 'windows')"
+        run: |
+          find src-tauri/target/${{ inputs.target || 'release' }} -type f -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" | while read -r file; do
+            name=$(basename "$file")
+            patched_name=$(echo $name | sed -E 's/[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?/${{ github.sha }}/')
+            echo "Uploading $name, file: $file"
+            zip -j - "$file" | gh-actions-artifact-client.js upload "$patched_name" --retentionDays=7
+          done
