@@ -184,7 +184,7 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments }
                     key={preset.name}
                     onClick={() => handlePresetClick(preset)}
                     className={clsx('px-2 py-1.5 text-sm rounded-md transition-colors',
-                      isPresetActive(preset) ? 'bg-surface text-white' : 'bg-surface hover:bg-card-active'
+                      isPresetActive(preset) ? 'bg-surface text-text-primary' : 'bg-surface hover:bg-card-active'
                     )}
                   >
                     {preset.name}

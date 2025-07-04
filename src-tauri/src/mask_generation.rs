@@ -297,6 +297,8 @@ fn generate_ai_foreground_bitmap(
     let params: AiForegroundMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
     let data_url = params.mask_data_base64?;
     let rotation = params.rotation.unwrap_or(0.0);
+    let flip_horizontal = params.flip_horizontal.unwrap_or(false);
+    let flip_vertical = params.flip_vertical.unwrap_or(false);
 
     let b64_data = if let Some(idx) = data_url.find(',') {
         &data_url[idx + 1..]
@@ -314,23 +316,23 @@ fn generate_ai_foreground_bitmap(
     let cos_a = angle_rad.cos();
     let sin_a = angle_rad.sin();
 
-    let center_x = (full_mask_w as f32 * scale) / 2.0;
-    let center_y = (full_mask_h as f32 * scale) / 2.0;
+    let scaled_full_w = full_mask_w as f32 * scale;
+    let scaled_full_h = full_mask_h as f32 * scale;
+    let center_x = scaled_full_w / 2.0;
+    let center_y = scaled_full_h / 2.0;
 
     for y_out in 0..height {
         for x_out in 0..width {
-            let x_crop = x_out as f32;
-            let y_crop = y_out as f32;
+            let x_uncrop = x_out as f32 + crop_offset.0;
+            let y_uncrop = y_out as f32 + crop_offset.1;
 
-            let x_uncrop = x_crop + crop_offset.0;
-            let y_uncrop = y_crop + crop_offset.1;
+            let x_unflipped = if flip_horizontal { scaled_full_w - x_uncrop } else { x_uncrop };
+            let y_unflipped = if flip_vertical { scaled_full_h - y_uncrop } else { y_uncrop };
 
-            let x_centered = x_uncrop - center_x;
-            let y_centered = y_uncrop - center_y;
-
+            let x_centered = x_unflipped - center_x;
+            let y_centered = y_unflipped - center_y;
             let x_rot = x_centered * cos_a - y_centered * sin_a;
             let y_rot = x_centered * sin_a + y_centered * cos_a;
-
             let x_unrotated = x_rot + center_x;
             let y_unrotated = y_rot + center_y;
 
@@ -357,6 +359,8 @@ fn generate_ai_subject_bitmap(
     let params: AiSubjectMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
     let data_url = params.mask_data_base64?;
     let rotation = params.rotation.unwrap_or(0.0);
+    let flip_horizontal = params.flip_horizontal.unwrap_or(false);
+    let flip_vertical = params.flip_vertical.unwrap_or(false);
 
     let b64_data = if let Some(idx) = data_url.find(',') {
         &data_url[idx + 1..]
@@ -374,23 +378,23 @@ fn generate_ai_subject_bitmap(
     let cos_a = angle_rad.cos();
     let sin_a = angle_rad.sin();
 
-    let center_x = (full_mask_w as f32 * scale) / 2.0;
-    let center_y = (full_mask_h as f32 * scale) / 2.0;
+    let scaled_full_w = full_mask_w as f32 * scale;
+    let scaled_full_h = full_mask_h as f32 * scale;
+    let center_x = scaled_full_w / 2.0;
+    let center_y = scaled_full_h / 2.0;
 
     for y_out in 0..height {
         for x_out in 0..width {
-            let x_crop = x_out as f32;
-            let y_crop = y_out as f32;
+            let x_uncrop = x_out as f32 + crop_offset.0;
+            let y_uncrop = y_out as f32 + crop_offset.1;
 
-            let x_uncrop = x_crop + crop_offset.0;
-            let y_uncrop = y_crop + crop_offset.1;
+            let x_unflipped = if flip_horizontal { scaled_full_w - x_uncrop } else { x_uncrop };
+            let y_unflipped = if flip_vertical { scaled_full_h - y_uncrop } else { y_uncrop };
 
-            let x_centered = x_uncrop - center_x;
-            let y_centered = y_uncrop - center_y;
-
+            let x_centered = x_unflipped - center_x;
+            let y_centered = y_unflipped - center_y;
             let x_rot = x_centered * cos_a - y_centered * sin_a;
             let y_rot = x_centered * sin_a + y_centered * cos_a;
-
             let x_unrotated = x_rot + center_x;
             let y_unrotated = y_rot + center_y;
 

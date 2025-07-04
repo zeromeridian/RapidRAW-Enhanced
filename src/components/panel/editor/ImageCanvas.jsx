@@ -567,6 +567,13 @@ const ImageCanvas = memo(({
   const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.originalUrl;
   const isContentReady = layers.length > 0 || selectedImage.thumbnailUrl;
 
+  const cropImageTransforms = useMemo(() => {
+    const transforms = [`rotate(${adjustments.rotation || 0}deg)`];
+    if (adjustments.flipHorizontal) transforms.push('scaleX(-1)');
+    if (adjustments.flipVertical) transforms.push('scaleY(-1)');
+    return transforms.join(' ');
+  }, [adjustments.rotation, adjustments.flipHorizontal, adjustments.flipVertical]);
+
   return (
     <div className="relative" style={{ width: '100%', height: '100%' }}>
       <div
@@ -707,7 +714,7 @@ const ImageCanvas = memo(({
                 maxWidth: '100%', 
                 maxHeight: '100%', 
                 objectFit: 'contain',
-                transform: `rotate(${adjustments.rotation}deg)`,
+                transform: cropImageTransforms,
               }}
             />
           </ReactCrop>

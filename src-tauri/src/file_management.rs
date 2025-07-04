@@ -138,10 +138,22 @@ pub fn get_sidecar_path(image_path: &str) -> PathBuf {
     path.with_file_name(new_filename)
 }
 
+fn apply_flip(image: DynamicImage, horizontal: bool, vertical: bool) -> DynamicImage {
+    let mut img = image;
+    if horizontal {
+        img = img.fliph();
+    }
+    if vertical {
+        img = img.flipv();
+    }
+    img
+}
+
+// This is the fixed function
 pub fn generate_thumbnail_data(
     path_str: &str,
     gpu_context: Option<&GpuContext>,
-) -> Result<DynamicImage> {
+) -> anyhow::Result<DynamicImage> {
     let file_bytes = fs::read(path_str)?;
 
     let (base_image, original_dims): (DynamicImage, (u32, u32)) = if is_raw_file(path_str) {
@@ -178,7 +190,11 @@ pub fn generate_thumbnail_data(
                 };
 
             let rotation_degrees = meta.adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
-            let rotated_image = apply_rotation(&processing_base, rotation_degrees);
+            let flip_horizontal = meta.adjustments["flipHorizontal"].as_bool().unwrap_or(false);
+            let flip_vertical = meta.adjustments["flipVertical"].as_bool().unwrap_or(false);
+
+            let flipped_image = apply_flip(processing_base, flip_horizontal, flip_vertical);
+            let rotated_image = apply_rotation(&flipped_image, rotation_degrees);
 
             let crop_data: Option<Crop> = serde_json::from_value(meta.adjustments["crop"].clone()).ok();
             let scaled_crop_json = if let Some(c) = &crop_data {

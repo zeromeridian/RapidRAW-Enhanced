@@ -241,6 +241,8 @@ function App() {
         startPoint: [startPoint.x, startPoint.y],
         endPoint: [endPoint.x, endPoint.y],
         rotation: adjustments.rotation,
+        flipHorizontal: adjustments.flipHorizontal,
+        flipVertical: adjustments.flipVertical,
       });
       setAdjustments(prev => ({
         ...prev,
@@ -265,6 +267,8 @@ function App() {
     try {
       const newParameters = await invoke('generate_ai_foreground_mask', {
         rotation: adjustments.rotation,
+        flipHorizontal: adjustments.flipHorizontal,
+        flipVertical: adjustments.flipVertical,
       });
       setAdjustments(prev => ({
         ...prev,

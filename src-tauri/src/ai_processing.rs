@@ -262,6 +262,10 @@ pub struct AiSubjectMaskParameters {
     pub mask_data_base64: Option<String>,
     #[serde(default)]
     pub rotation: Option<f32>,
+    #[serde(default)]
+    pub flip_horizontal: Option<bool>,
+    #[serde(default)]
+    pub flip_vertical: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -271,4 +275,8 @@ pub struct AiForegroundMaskParameters {
     pub mask_data_base64: Option<String>,
     #[serde(default)]
     pub rotation: Option<f32>,
+    #[serde(default)]
+    pub flip_horizontal: Option<bool>,
+    #[serde(default)]
+    pub flip_vertical: Option<bool>,
 }

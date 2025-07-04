@@ -113,6 +113,49 @@ struct ExportSettings {
     resize: Option<ResizeOptions>,
 }
 
+fn apply_flip(image: DynamicImage, horizontal: bool, vertical: bool) -> DynamicImage {
+    let mut img = image;
+    if horizontal {
+        img = img.fliph();
+    }
+    if vertical {
+        img = img.flipv();
+    }
+    img
+}
+
+fn apply_all_transformations(
+    image: &DynamicImage,
+    adjustments: &serde_json::Value,
+    scale: f32,
+) -> (DynamicImage, (f32, f32)) {
+    let rotation_degrees = adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
+    let flip_horizontal = adjustments["flipHorizontal"].as_bool().unwrap_or(false);
+    let flip_vertical = adjustments["flipVertical"].as_bool().unwrap_or(false);
+
+    let flipped_image = apply_flip(image.clone(), flip_horizontal, flip_vertical);
+    let rotated_image = apply_rotation(&flipped_image, rotation_degrees);
+
+    let crop_data: Option<Crop> = serde_json::from_value(adjustments["crop"].clone()).ok();
+    
+    let scaled_crop_json = if let Some(c) = &crop_data {
+        serde_json::to_value(Crop {
+            x: c.x * scale as f64,
+            y: c.y * scale as f64,
+            width: c.width * scale as f64,
+            height: c.height * scale as f64,
+        }).unwrap_or(serde_json::Value::Null)
+    } else {
+        serde_json::Value::Null
+    };
+
+    let cropped_image = apply_crop(rotated_image, &scaled_crop_json);
+    
+    let unscaled_crop_offset = crop_data.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
+
+    (cropped_image, unscaled_crop_offset)
+}
+
 fn encode_to_base64(image: &DynamicImage, quality: u8) -> Result<String, String> {
     let rgb_image = image.to_rgb8();
 
@@ -222,25 +265,9 @@ fn apply_adjustments(
                 (original_image.clone(), 1.0)
             };
 
-        let rotation_degrees = adjustments_clone["rotation"].as_f64().unwrap_or(0.0) as f32;
-        let rotated_image = apply_rotation(&processing_base, rotation_degrees);
-
-        let crop_data: Option<Crop> = serde_json::from_value(adjustments_clone["crop"].clone()).ok();
-        let scaled_crop_json = if let Some(c) = &crop_data {
-            serde_json::to_value(Crop {
-                x: c.x * scale_for_gpu as f64,
-                y: c.y * scale_for_gpu as f64,
-                width: c.width * scale_for_gpu as f64,
-                height: c.height * scale_for_gpu as f64,
-            }).unwrap_or(serde_json::Value::Null)
-        } else {
-            serde_json::Value::Null
-        };
-        
-        let final_preview_base = apply_crop(rotated_image, &scaled_crop_json);
+        let (final_preview_base, unscaled_crop_offset) = 
+            apply_all_transformations(&processing_base, &adjustments_clone, scale_for_gpu);
         let (preview_width, preview_height) = final_preview_base.dimensions();
-
-        let unscaled_crop_offset = crop_data.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
 
         let mask_definitions: Vec<MaskDefinition> = js_adjustments.get("masks")
             .and_then(|m| serde_json::from_value(m.clone()).ok())
@@ -322,14 +349,10 @@ fn generate_fullscreen_preview(
     let context = get_or_init_gpu_context(&state)?;
     let base_image = get_full_image_for_processing(&state)?;
     
-    let rotation_degrees = js_adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
-    let rotated_image = apply_rotation(&base_image, rotation_degrees);
-    let cropped_image = apply_crop(rotated_image, &js_adjustments["crop"]);
-    let (img_w, img_h) = cropped_image.dimensions();
+    let (transformed_image, unscaled_crop_offset) = 
+        apply_all_transformations(&base_image, &js_adjustments, 1.0);
+    let (img_w, img_h) = transformed_image.dimensions();
     
-    let crop_data: Option<Crop> = serde_json::from_value(js_adjustments["crop"].clone()).ok();
-    let unscaled_crop_offset = crop_data.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
-
     let mask_definitions: Vec<MaskDefinition> = js_adjustments.get("masks")
         .and_then(|m| serde_json::from_value(m.clone()).ok())
         .unwrap_or_else(Vec::new);
@@ -339,7 +362,7 @@ fn generate_fullscreen_preview(
         .collect();
 
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
-    let final_image = process_and_get_dynamic_image(&context, &cropped_image, all_adjustments, &mask_bitmaps)?;
+    let final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps)?;
     
     encode_to_base64(&final_image, 95)
 }
@@ -354,13 +377,9 @@ fn export_image(
     let context = get_or_init_gpu_context(&state)?;
     let base_image = get_full_image_for_processing(&state)?;
 
-    let rotation_degrees = js_adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
-    let rotated_image = apply_rotation(&base_image, rotation_degrees);
-    let cropped_image = apply_crop(rotated_image, &js_adjustments["crop"]);
-    let (img_w, img_h) = cropped_image.dimensions();
-
-    let crop_data: Option<Crop> = serde_json::from_value(js_adjustments["crop"].clone()).ok();
-    let unscaled_crop_offset = crop_data.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
+    let (transformed_image, unscaled_crop_offset) = 
+        apply_all_transformations(&base_image, &js_adjustments, 1.0);
+    let (img_w, img_h) = transformed_image.dimensions();
 
     let mask_definitions: Vec<MaskDefinition> = js_adjustments.get("masks")
         .and_then(|m| serde_json::from_value(m.clone()).ok())
@@ -371,7 +390,7 @@ fn export_image(
         .collect();
 
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
-    let mut final_image = process_and_get_dynamic_image(&context, &cropped_image, all_adjustments, &mask_bitmaps)?;
+    let mut final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps)?;
 
     if let Some(resize_opts) = export_settings.resize {
         let (current_w, current_h) = final_image.dimensions();
@@ -456,13 +475,9 @@ fn batch_export_images(
             };
             let js_adjustments = metadata.adjustments;
             
-            let rotation_degrees = js_adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
-            let rotated_image = apply_rotation(&base_image, rotation_degrees);
-            let cropped_image = apply_crop(rotated_image, &js_adjustments["crop"]);
-            let (img_w, img_h) = cropped_image.dimensions();
-
-            let crop_data: Option<Crop> = serde_json::from_value(js_adjustments["crop"].clone()).ok();
-            let unscaled_crop_offset = crop_data.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
+            let (transformed_image, unscaled_crop_offset) = 
+                apply_all_transformations(&base_image, &js_adjustments, 1.0);
+            let (img_w, img_h) = transformed_image.dimensions();
 
             let mask_definitions: Vec<MaskDefinition> = js_adjustments.get("masks")
                 .and_then(|m| serde_json::from_value(m.clone()).ok())
@@ -473,7 +488,7 @@ fn batch_export_images(
                 .collect();
 
             let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
-            let mut final_image = process_and_get_dynamic_image(&context, &cropped_image, all_adjustments, &mask_bitmaps)?;
+            let mut final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps)?;
 
             if let Some(resize_opts) = &export_settings.resize {
                 let (current_w, current_h) = final_image.dimensions();
@@ -572,6 +587,8 @@ fn get_full_image_for_processing(state: &tauri::State<AppState>) -> Result<Dynam
 #[tauri::command]
 async fn generate_ai_foreground_mask(
     rotation: f32,
+    flip_horizontal: bool,
+    flip_vertical: bool,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiForegroundMaskParameters, String> {
@@ -601,6 +618,8 @@ async fn generate_ai_foreground_mask(
     Ok(AiForegroundMaskParameters {
         mask_data_base64: Some(base64_data),
         rotation: Some(rotation),
+        flip_horizontal: Some(flip_horizontal),
+        flip_vertical: Some(flip_vertical),
     })
 }
 
@@ -610,6 +629,8 @@ async fn generate_ai_subject_mask(
     start_point: (f64, f64),
     end_point: (f64, f64),
     rotation: f32,
+    flip_horizontal: bool,
+    flip_vertical: bool,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiSubjectMaskParameters, String> {
@@ -684,10 +705,27 @@ async fn generate_ai_subject_mask(
     let up3 = unrotate(p3);
     let up4 = unrotate(p4);
 
-    let min_x = up1.0.min(up2.0).min(up3.0).min(up4.0);
-    let min_y = up1.1.min(up2.1).min(up3.1).min(up4.1);
-    let max_x = up1.0.max(up2.0).max(up3.0).max(up4.0);
-    let max_y = up1.1.max(up2.1).max(up3.1).max(up4.1);
+    let unflip = |p: (f64, f64)| {
+        let mut new_px = p.0;
+        let mut new_py = p.1;
+        if flip_horizontal {
+            new_px = img_w as f64 - p.0;
+        }
+        if flip_vertical {
+            new_py = img_h as f64 - p.1;
+        }
+        (new_px, new_py)
+    };
+
+    let ufp1 = unflip(up1);
+    let ufp2 = unflip(up2);
+    let ufp3 = unflip(up3);
+    let ufp4 = unflip(up4);
+
+    let min_x = ufp1.0.min(ufp2.0).min(ufp3.0).min(ufp4.0);
+    let min_y = ufp1.1.min(ufp2.1).min(ufp3.1).min(ufp4.1);
+    let max_x = ufp1.0.max(ufp2.0).max(ufp3.0).max(ufp4.0);
+    let max_y = ufp1.1.max(ufp2.1).max(ufp3.1).max(ufp4.1);
 
     let unrotated_start_point = (min_x, min_y);
     let unrotated_end_point = (max_x, max_y);
@@ -702,6 +740,8 @@ async fn generate_ai_subject_mask(
         end_y: end_point.1,
         mask_data_base64: Some(base64_data),
         rotation: Some(rotation),
+        flip_horizontal: Some(flip_horizontal),
+        flip_vertical: Some(flip_vertical),
     })
 }
 
@@ -903,13 +943,9 @@ fn generate_preset_preview(
     const PRESET_PREVIEW_DIM: u32 = 200;
     let preview_base = original_image.thumbnail(PRESET_PREVIEW_DIM, PRESET_PREVIEW_DIM);
 
-    let rotation_degrees = js_adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
-    let rotated_image = apply_rotation(&preview_base, rotation_degrees);
-    let cropped_image = apply_crop(rotated_image, &js_adjustments["crop"]);
-    let (img_w, img_h) = cropped_image.dimensions();
-
-    let crop_data: Option<Crop> = serde_json::from_value(js_adjustments["crop"].clone()).ok();
-    let unscaled_crop_offset = crop_data.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
+    let (transformed_image, unscaled_crop_offset) = 
+        apply_all_transformations(&preview_base, &js_adjustments, 1.0);
+    let (img_w, img_h) = transformed_image.dimensions();
 
     let mask_definitions: Vec<MaskDefinition> = js_adjustments.get("masks")
         .and_then(|m| serde_json::from_value(m.clone()).ok())
@@ -921,7 +957,7 @@ fn generate_preset_preview(
 
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
     
-    let processed_image = process_and_get_dynamic_image(&context, &cropped_image, all_adjustments, &mask_bitmaps)?;
+    let processed_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps)?;
     
     encode_to_base64(&processed_image, 50)
 }
