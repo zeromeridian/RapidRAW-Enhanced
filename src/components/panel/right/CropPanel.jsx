@@ -28,7 +28,6 @@ const doesRatioMatchPreset = (ratio, preset, originalImage) => {
   return Math.abs(ratio - presetBaseRatio) < 0.001 || Math.abs(ratio - (1 / presetBaseRatio)) < 0.001;
 };
 
-// A small reusable component for the transform tool buttons
 const ToolButton = ({ icon: Icon, label, onClick, isActive = false }) => (
   <button
     onClick={onClick}

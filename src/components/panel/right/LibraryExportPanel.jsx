@@ -193,7 +193,7 @@ export default function LibraryExportPanel({ multiSelectedPaths, onClose, isVisi
                 </div>
               )}
             </Section>
-
+            {/* COMMENTED OUT UNTIL I FIND BETTER DEMOSAICING ALGO'S
             {hasRawFileInSelection && (
               <Section title="RAW Settings">
                 <div className="flex items-center gap-2">
@@ -209,7 +209,7 @@ export default function LibraryExportPanel({ multiSelectedPaths, onClose, isVisi
                   </select>
                 </div>
               </Section>
-            )}
+            )} */}
           </>
         ) : (
           <p className="text-center text-text-tertiary mt-4">No images selected.</p>
