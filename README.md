@@ -27,6 +27,7 @@ Have fun!
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   Added: High speed and precise cache to significantly accelerate large image editing
 *   Added: Greatly improved shader with better dehaze, more accurate curves etc.
 *   Added: Predefined 90° clockwise rotation and ability to flip images
 *   Added: Switched from [rawloader](https://github.com/pedrocr/rawloader) to [rawler](https://github.com/dnglab/dnglab/tree/main/rawler) to support a wider range of RAW formats

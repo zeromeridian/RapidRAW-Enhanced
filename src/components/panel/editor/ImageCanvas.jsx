@@ -328,6 +328,7 @@ const ImageCanvas = memo(({
   const latestEditedUrlRef = useRef(null);
   const [layers, setLayers] = useState([]);
   const cropImageRef = useRef(null);
+  const prevTransformPropsRef = useRef(null);
 
   const isDrawing = useRef(false);
   const currentLine = useRef(null);
@@ -357,15 +358,21 @@ const ImageCanvas = memo(({
     const { path: currentImagePath, originalUrl, thumbnailUrl } = selectedImage;
     const topLayer = layers[layers.length - 1];
 
-    if (currentImagePath !== imagePathRef.current) {
+    const imageChanged = currentImagePath !== imagePathRef.current;
+
+    const rotationChanged = !imageChanged && prevTransformPropsRef.current && prevTransformPropsRef.current.rotation !== adjustments.rotation;
+    const aspectRatioChanged = !imageChanged && prevTransformPropsRef.current && prevTransformPropsRef.current.aspectRatio !== adjustments.aspectRatio;
+
+    if (imageChanged || rotationChanged || aspectRatioChanged) {
       imagePathRef.current = currentImagePath;
-      const initialUrl = finalPreviewUrl || originalUrl || thumbnailUrl;
-      if (initialUrl) {
-        latestEditedUrlRef.current = initialUrl;
-        setLayers([{ id: initialUrl, url: initialUrl, opacity: 1 }]);
-      } else {
-        setLayers([]);
-      }
+      prevTransformPropsRef.current = {
+        rotation: adjustments.rotation,
+        aspectRatio: adjustments.aspectRatio,
+      };
+
+      setLayers([]);
+
+      latestEditedUrlRef.current = null;
       return;
     }
 
@@ -374,7 +381,10 @@ const ImageCanvas = memo(({
       return;
     }
     if (!showOriginal && topLayer?.id === 'original') {
-      setLayers(prev => [...prev, { id: latestEditedUrlRef.current, url: latestEditedUrlRef.current, opacity: 0 }]);
+      const urlToShow = latestEditedUrlRef.current || finalPreviewUrl || originalUrl || thumbnailUrl;
+      if (urlToShow) {
+          setLayers(prev => [...prev, { id: urlToShow, url: urlToShow, opacity: 0 }]);
+      }
       return;
     }
 
@@ -384,12 +394,24 @@ const ImageCanvas = memo(({
       img.src = finalPreviewUrl;
       img.onload = () => {
         if (img.src === latestEditedUrlRef.current) {
-          setLayers(prev => [...prev, { id: img.src, url: img.src, opacity: 0 }]);
+          if (layers.length === 0) {
+            setLayers([{ id: img.src, url: img.src, opacity: 1 }]);
+          } else {
+            setLayers(prev => [...prev, { id: img.src, url: img.src, opacity: 0 }]);
+          }
         }
       };
       return () => { img.onload = null; };
     }
-  }, [selectedImage, finalPreviewUrl, showOriginal, layers]);
+
+    if (layers.length === 0 && !finalPreviewUrl) {
+        const initialUrl = originalUrl || thumbnailUrl;
+        if (initialUrl && initialUrl !== latestEditedUrlRef.current) {
+            latestEditedUrlRef.current = initialUrl;
+            setLayers([{ id: initialUrl, url: initialUrl, opacity: 1 }]);
+        }
+    }
+  }, [selectedImage, finalPreviewUrl, showOriginal, layers, adjustments.rotation, adjustments.aspectRatio]);
 
   useEffect(() => {
     const layerToFadeIn = layers.find(l => l.opacity === 0);
