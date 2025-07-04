@@ -1,3 +1,5 @@
+// All your structs and other functions remain the same...
+
 struct Point {
     x: f32,
     y: f32,
@@ -214,33 +216,40 @@ fn apply_curve(val: f32, points: array<Point, 16>, count: u32) -> f32 {
 fn apply_tonal_adjustments(color: vec3<f32>, exp: f32, con: f32, hi: f32, sh: f32, wh: f32, bl: f32) -> vec3<f32> {
     var rgb = color * pow(2.0, exp);
 
-    let black_point = bl * 0.5;
-    let white_point = 1.0 - wh * 0.5;
-    rgb = (rgb - black_point) / max(white_point - black_point, 0.001);
-    
-    let original_luma = get_luma(rgb);
-    if (original_luma > 0.001) {
-        let shadow_curve = smoothstep(0.0, 0.5, original_luma);
-        let highlight_compress = -hi * shadow_curve; // Inverted highlights
-        let luma_adjust = -highlight_compress;
-        let adjusted_luma = original_luma + luma_adjust;
-        rgb *= (adjusted_luma / original_luma);
+    let white_level = 1.0 - wh * 0.25;
+    rgb = rgb / max(white_level, 0.01);
+
+    let luma = get_luma(rgb);
+
+    if (luma > 0.001) {
+        let highlight_mix = smoothstep(0.5, 1.0, luma);
+        let highlight_adjust = hi * highlight_mix;
+        let adjusted_luma = luma + highlight_adjust;
+        rgb *= (adjusted_luma / luma);
     }
 
-    // Reverted shadow logic to original additive method
-    let luma = get_luma(rgb);
     let shadow_mix = 1.0 - smoothstep(0.0, 0.5, luma);
     rgb += sh * shadow_mix;
 
-    rgb = 0.5 + (rgb - 0.5) * (1.0 + con);
+    let blacks_mix = 1.0 - smoothstep(0.0, 0.25, luma);
+    rgb += (bl * 0.3) * blacks_mix;
+
+    let pivot = 0.5 - con * 0.05;
+    rgb = pivot + (rgb - pivot) * (1.0 + con);
+
+    rgb += max(0.0, con) * 0.1;
+
     return clamp(rgb, vec3<f32>(-0.1), vec3<f32>(1.5));
 }
 
 fn apply_color_adjustments(color: vec3<f32>, sat: f32, temp: f32, tnt: f32, vib: f32) -> vec3<f32> {
     var rgb = color;
-    let temp_kelvin_mult = vec3<f32>(1.0 + temp * 0.2, 1.0, 1.0 - temp * 0.2);
+    let temp_kelvin_mult = vec3<f32>(1.0 + temp * 0.2, 1.0 + temp * 0.05, 1.0 - temp * 0.2);
     let tint_mult = vec3<f32>(1.0 - tnt * 0.1, 1.0 + tnt * 0.1, 1.0 - tnt * 0.1);
     rgb *= temp_kelvin_mult * tint_mult;
+
+    rgb *= (1.0 + abs(temp) * 0.1);
+
     let luma = get_luma(rgb);
     var sat_rgb = mix(vec3<f32>(luma), rgb, 1.0 + sat);
     if (vib != 0.0) {
@@ -284,61 +293,22 @@ fn apply_local_contrast(processed_color: vec3<f32>, coords_i: vec2<i32>, radius:
     return processed_color + enhanced_detail;
 }
 
-fn get_dark_channel_at(coord: vec2<i32>, max_coords: vec2<i32>, atmospheric_light: vec3<f32>) -> f32 {
-    var local_min = 1.0;
-    for (var y = -1; y <= 1; y = y + 1) {
-        for (var x = -1; x <= 1; x = x + 1) {
-            let sample_coords = clamp(coord + vec2<i32>(x, y), vec2<i32>(0), max_coords);
-            let sample_linear = srgb_to_linear(textureLoad(input_texture, sample_coords, 0).rgb);
-            let normalized = sample_linear / atmospheric_light;
-            local_min = min(local_min, min(normalized.r, min(normalized.g, normalized.b)));
-        }
-    }
-    return local_min;
-}
-
-fn apply_dehaze_advanced(color: vec3<f32>, coords_i: vec2<i32>, amount: f32) -> vec3<f32> {
+fn apply_dehaze(color: vec3<f32>, amount: f32) -> vec3<f32> {
     if (amount == 0.0) { return color; }
-    let max_coords = vec2<i32>(textureDimensions(input_texture) - 1u);
     let atmospheric_light = vec3<f32>(0.95, 0.97, 1.0);
-    let radius = 2;
-    let window_size = f32((2 * radius + 1) * (2 * radius + 1));
-    let epsilon = 0.0001;
-    var mean_I: f32 = 0.0;
-    var mean_p: f32 = 0.0;
-    var cov_Ip: f32 = 0.0;
-    var var_I: f32 = 0.0;
-    for (var y = -radius; y <= radius; y = y + 1) {
-        for (var x = -radius; x <= radius; x = x + 1) {
-            let offset = vec2<i32>(x, y);
-            let sample_coord = clamp(coords_i + offset, vec2<i32>(0), max_coords);
-            let I = get_luma(srgb_to_linear(textureLoad(input_texture, sample_coord, 0).rgb));
-            let dark_channel = get_dark_channel_at(sample_coord, max_coords, atmospheric_light);
-            let p = 1.0 - 0.95 * dark_channel;
-            mean_I += I;
-            mean_p += p;
-            cov_Ip += I * p;
-            var_I += I * I;
-        }
-    }
-    mean_I /= window_size;
-    mean_p /= window_size;
-    cov_Ip = cov_Ip / window_size - mean_I * mean_p;
-    var_I = var_I / window_size - mean_I * mean_I;
-    let a = cov_Ip / (var_I + epsilon);
-    let b = mean_p - a * mean_I;
-    let center_I = get_luma(color);
-    let refined_transmission = clamp(a * center_I + b, 0.1, 1.0);
-    let recovered = (color - atmospheric_light) / refined_transmission + atmospheric_light;
-    var result = mix(color, recovered, abs(amount));
     if (amount > 0.0) {
+        let dark_channel = min(color.r, min(color.g, color.b));
+        let transmission_estimate = 1.0 - dark_channel;
+        let t = 1.0 - amount * transmission_estimate;
+        let recovered = (color - atmospheric_light) / max(t, 0.1) + atmospheric_light;
+        var result = mix(color, recovered, amount);
         result = 0.5 + (result - 0.5) * (1.0 + amount * 0.15);
         let luma = get_luma(result);
         result = mix(vec3<f32>(luma), result, 1.0 + amount * 0.1);
+        return result;
     } else {
-        result = mix(color, atmospheric_light, abs(amount) * 0.5);
+        return mix(color, atmospheric_light, abs(amount) * 0.7);
     }
-    return result;
 }
 
 fn apply_noise_reduction(color: vec3<f32>, coords_i: vec2<i32>, luma_amount: f32, color_amount: f32) -> vec3<f32> {
@@ -374,10 +344,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     var processed_rgb = srgb_to_linear(original_color.rgb);
     let absolute_coord_i = vec2<i32>(id.xy) + vec2<i32>(i32(adjustments.tile_offset_x), i32(adjustments.tile_offset_y));
 
-    // --- Global Adjustments ---
     let g = adjustments.global;
     processed_rgb = apply_noise_reduction(processed_rgb, absolute_coord_i, g.luma_noise_reduction, g.color_noise_reduction);
-    processed_rgb = apply_dehaze_advanced(processed_rgb, absolute_coord_i, g.dehaze);
+    processed_rgb = apply_dehaze(processed_rgb, g.dehaze);
     processed_rgb = apply_tonal_adjustments(processed_rgb, g.exposure, g.contrast, g.highlights, g.shadows, g.whites, g.blacks);
     processed_rgb = apply_color_adjustments(processed_rgb, g.saturation, g.temperature, g.tint, g.vibrance);
     processed_rgb = apply_local_contrast(processed_rgb, absolute_coord_i, 2, g.sharpness);
@@ -402,11 +371,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let srgb_for_curves = linear_to_srgb(processed_rgb);
     let luma_val = get_luma(srgb_for_curves);
     let luma_curved = apply_curve(luma_val, g.luma_curve, g.luma_curve_count);
-    var luma_adjusted_srgb = srgb_for_curves * (luma_curved / max(luma_val, 0.001));
+    let luma_diff = luma_curved - luma_val;
+    let luma_adjusted_srgb = srgb_for_curves + vec3<f32>(luma_diff);
     let curved_srgb = vec3<f32>(apply_curve(luma_adjusted_srgb.r, g.red_curve, g.red_curve_count), apply_curve(luma_adjusted_srgb.g, g.green_curve, g.green_curve_count), apply_curve(luma_adjusted_srgb.b, g.blue_curve, g.blue_curve_count));
     processed_rgb = srgb_to_linear(curved_srgb);
 
-    // --- Local Adjustments (Masks) ---
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let mask_adj = adjustments.mask_adjustments[i];
         let influence = textureLoad(mask_textures, id.xy, i, 0).r;
@@ -414,7 +383,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         if (influence > 0.001) {
             var mask_adjusted_rgb = processed_rgb;
             mask_adjusted_rgb = apply_noise_reduction(mask_adjusted_rgb, absolute_coord_i, mask_adj.luma_noise_reduction, mask_adj.color_noise_reduction);
-            mask_adjusted_rgb = apply_dehaze_advanced(mask_adjusted_rgb, absolute_coord_i, mask_adj.dehaze);
+            mask_adjusted_rgb = apply_dehaze(mask_adjusted_rgb, mask_adj.dehaze);
             mask_adjusted_rgb = apply_tonal_adjustments(mask_adjusted_rgb, mask_adj.exposure, mask_adj.contrast, mask_adj.highlights, mask_adj.shadows, mask_adj.whites, mask_adj.blacks);
             mask_adjusted_rgb = apply_color_adjustments(mask_adjusted_rgb, mask_adj.saturation, mask_adj.temperature, mask_adj.tint, mask_adj.vibrance);
             mask_adjusted_rgb = apply_local_contrast(mask_adjusted_rgb, absolute_coord_i, 2, mask_adj.sharpness);
@@ -439,7 +408,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             let mask_srgb_for_curves = linear_to_srgb(mask_adjusted_rgb);
             let mask_luma_val = get_luma(mask_srgb_for_curves);
             let mask_luma_curved = apply_curve(mask_luma_val, mask_adj.luma_curve, mask_adj.luma_curve_count);
-            var mask_luma_adjusted_srgb = mask_srgb_for_curves * (mask_luma_curved / max(mask_luma_val, 0.001));
+            let mask_luma_diff = mask_luma_curved - mask_luma_val;
+            let mask_luma_adjusted_srgb = mask_srgb_for_curves + vec3<f32>(mask_luma_diff);
             let mask_curved_srgb = vec3<f32>(apply_curve(mask_luma_adjusted_srgb.r, mask_adj.red_curve, mask_adj.red_curve_count), apply_curve(mask_luma_adjusted_srgb.g, mask_adj.green_curve, mask_adj.green_curve_count), apply_curve(mask_luma_adjusted_srgb.b, mask_adj.blue_curve, mask_adj.blue_curve_count));
             mask_adjusted_rgb = srgb_to_linear(mask_curved_srgb);
 
@@ -449,7 +419,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     var final_rgb = linear_to_srgb(processed_rgb);
 
-    // --- Post-processing effects ---
     let out_coord = vec2<f32>(f32(id.x), f32(id.y));
     if (g.vignette_amount != 0.0) {
         let v_amount = g.vignette_amount;
