@@ -27,6 +27,7 @@ Have fun!
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   Added: Predefined 90° clockwise rotation and ability to flip images
 *   Added: Switched from [rawloader](https://github.com/pedrocr/rawloader) to [rawler](https://github.com/dnglab/dnglab/tree/main/rawler) to basically support all RAW formats
 *   Added: AI-powered foreground / background masking
 *   Added: AI-powered subject masking
@@ -154,13 +155,13 @@ While the core functionality is in place, I'm actively working on improving seve
 | Task                                                                                         | Priority | Difficulty | Status |
 |----------------------------------------------------------------------------------------------|----------|------------|--------|
 | Refactoring the frontend (reduce prop drilling in React components)                         | Medium   | Medium     | [ ]    |
-| Allow 45°+ rotation for images (e.g. predefined 90° clockwise )                             | Medium   | Low       | [ ]    |
+| Allow 45°+ rotation for images (e.g. predefined 90° clockwise )                             | Medium   | Low       | [X]    |
 | Improving the dehaze tool for more natural results                                           | Low     | Medium     | [ ]    |
 | Optimize image transport (replace Base64 for better performance)                            | Low     | Medium     | [ ]    |
-| Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High | Medium    | [x]    |
+| Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High | Medium    | [X]    |
 | Implement a simple MVP of the ComfyUI based AI Roadmap                                        | Low   | High       | []    |
 | Sign macOS builds using a registered developer account                                       | Medium      | Low     | [ ]    |
-| Switch to a better rawloader (e.g. rawler)                                                   | High      | Medium     | [x]    |
+| Switch to a better rawloader (e.g. rawler)                                                   | High      | Medium     | [X]    |
 | Improve speed on older systems (e.g. Pascal GPUs)                                            | Medium   | High       | [ ]    |
 | Auto white balance detection and exposure correction                                         | Medium     | Medium     | [ ]    |
 
