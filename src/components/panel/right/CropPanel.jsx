@@ -1,6 +1,7 @@
-import { RotateCcw, X, RectangleHorizontal, RectangleVertical, FlipHorizontal, FlipVertical } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { RotateCcw, X, RectangleHorizontal, RectangleVertical, FlipHorizontal, FlipVertical, RotateCw } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { INITIAL_ADJUSTMENTS } from '../../../App';
+import clsx from 'clsx';
 
 const PRESETS = [
   { name: 'Free', value: null },
@@ -27,6 +28,20 @@ const doesRatioMatchPreset = (ratio, preset, originalImage) => {
   return Math.abs(ratio - presetBaseRatio) < 0.001 || Math.abs(ratio - (1 / presetBaseRatio)) < 0.001;
 };
 
+// A small reusable component for the transform tool buttons
+const ToolButton = ({ icon: Icon, label, onClick, isActive = false }) => (
+  <button
+    onClick={onClick}
+    className={clsx(
+      'flex flex-col items-center justify-center p-3 rounded-lg transition-colors text-text-secondary',
+      'hover:bg-card-active hover:text-text-primary',
+      isActive ? 'bg-surface text-text-primary' : 'bg-surface'
+    )}
+  >
+    <Icon size={20} />
+    <span className="text-xs mt-1.5">{label}</span>
+  </button>
+);
 
 export default function CropPanel({ selectedImage, adjustments, setAdjustments }) {
   const [customW, setCustomW] = useState('');
@@ -110,11 +125,31 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments }
     }));
   };
 
-  const isPresetActive = (preset) => {
-    return preset === activePreset;
+  const isPresetActive = (preset) => preset === activePreset;
+  const isOrientationToggleDisabled = !aspectRatio || aspectRatio === 1;
+
+  const fineRotation = useMemo(() => {
+    const total = rotation || 0;
+    const remainder = total % 90;
+    if (remainder > 45) return remainder - 90;
+    if (remainder < -45) return remainder + 90;
+    return remainder;
+  }, [rotation]);
+
+  const handleFineRotationChange = (e) => {
+    const newFineRotation = parseFloat(e.target.value);
+    const baseRotation = rotation - fineRotation;
+    setAdjustments(prev => ({ ...prev, rotation: baseRotation + newFineRotation }));
   };
 
-  const isOrientationToggleDisabled = !aspectRatio || aspectRatio === 1;
+  const handleStepRotate = (degrees) => {
+    setAdjustments(prev => ({ ...prev, rotation: (prev.rotation || 0) + degrees }));
+  };
+
+  const resetFineRotation = () => {
+    const baseRotation = rotation - fineRotation;
+    setAdjustments(prev => ({ ...prev, rotation: baseRotation }));
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -132,9 +167,9 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments }
       <div className="flex-grow overflow-y-auto p-4 text-text-secondary space-y-6">
         {selectedImage ? (
           <>
-            <div>
-              <div className="flex justify-between items-center mb-3">
-                <p className="text-sm font-semibold text-text-primary">Aspect Ratio</p>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-sm mb-3 font-semibold text-text-primary">Aspect Ratio</p>
                 <button
                   onClick={handleOrientationToggle}
                   className="p-1.5 rounded-md hover:bg-surface disabled:text-text-tertiary disabled:cursor-not-allowed"
@@ -149,11 +184,9 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments }
                   <button
                     key={preset.name}
                     onClick={() => handlePresetClick(preset)}
-                    className={`px-2 py-1.5 text-sm rounded-md transition-colors ${
-                      isPresetActive(preset)
-                        ? 'bg-surface text-text-primary'
-                        : 'bg-surface hover:bg-card-active'
-                    }`}
+                    className={clsx('px-2 py-1.5 text-sm rounded-md transition-colors',
+                      isPresetActive(preset) ? 'bg-surface text-white' : 'bg-surface hover:bg-card-active'
+                    )}
                   >
                     {preset.name}
                   </button>
@@ -166,80 +199,48 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments }
                     const newAspectRatio = orientation === 'vertical' ? 1 / baseRatio : baseRatio;
                     setAdjustments(prev => ({ ...prev, aspectRatio: newAspectRatio, crop: null }))
                   }}
-                  className={`w-full px-2 py-1.5 text-sm rounded-md transition-colors ${
-                    isCustomActive
-                      ? 'bg-surface text-white'
-                      : 'bg-surface hover:bg-card-active'
-                  }`}
+                  className={clsx('w-full px-2 py-1.5 text-sm rounded-md transition-colors',
+                    isCustomActive ? 'bg-accent text-white' : 'bg-surface hover:bg-card-active'
+                  )}
                 >
                   Custom
                 </button>
-                <div className={`mt-2 bg-surface p-2 rounded-md transition-opacity ${isCustomActive ? 'opacity-100' : 'opacity-50'}`}>
+                <div className={clsx('mt-2 bg-surface p-2 rounded-md transition-opacity', isCustomActive ? 'opacity-100' : 'opacity-50 pointer-events-none')}>
                   <div className="flex items-center justify-center gap-2">
-                    <input
-                      type="number"
-                      placeholder="W"
-                      value={customW}
-                      onChange={(e) => handleCustomInputChange(e.target.value, customH)}
-                      className="w-full bg-bg-primary text-center rounded-md p-1 border border-surface focus:border-accent focus:ring-accent disabled:bg-bg-secondary"
-                      min="1"
-                      disabled={!isCustomActive}
-                    />
+                    <input type="number" placeholder="W" value={customW} onChange={(e) => handleCustomInputChange(e.target.value, customH)} className="w-full bg-bg-primary text-center rounded-md p-1 border border-surface focus:border-accent focus:ring-accent" min="1" />
                     <X size={16} className="text-text-tertiary flex-shrink-0" />
-                    <input
-                      type="number"
-                      placeholder="H"
-                      value={customH}
-                      onChange={(e) => handleCustomInputChange(customW, e.target.value)}
-                      className="w-full bg-bg-primary text-center rounded-md p-1 border border-surface focus:border-accent focus:ring-accent disabled:bg-bg-secondary"
-                      min="1"
-                      disabled={!isCustomActive}
-                    />
+                    <input type="number" placeholder="H" value={customH} onChange={(e) => handleCustomInputChange(customW, e.target.value)} className="w-full bg-bg-primary text-center rounded-md p-1 border border-surface focus:border-accent focus:ring-accent" min="1" />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div>
-              <p className="text-sm mb-3 font-semibold text-text-primary">Transform</p>
-              <div className="space-y-4">
-                {/* Rotation Slider */}
-                <div className="flex items-center gap-2">
-                  <label className="text-sm w-20">Rotation</label>
-                  <input
-                    type="range"
-                    min="-45"
-                    max="45"
-                    step="0.1"
-                    value={rotation}
-                    onChange={(e) => setAdjustments(prev => ({ ...prev, rotation: parseFloat(e.target.value) }))}
-                    className="w-full h-1 bg-surface rounded-lg appearance-none cursor-pointer accent-accent"
-                  />
-                  <span className="text-sm font-mono w-12 text-right">{rotation.toFixed(1)}°</span>
-                  <button onClick={() => setAdjustments(prev => ({ ...prev, rotation: 0 }))} title="Reset Rotation">
-                    <RotateCcw size={14} className="hover:text-white" />
-                  </button>
-                </div>
-                {/* Flip Buttons */}
-                <div className="flex items-center gap-2">
-                  <label className="text-sm w-20">Flip</label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setAdjustments(prev => ({ ...prev, flipHorizontal: !prev.flipHorizontal }))}
-                      className={`p-2 rounded-md transition-colors ${flipHorizontal ? 'bg-surface text-white' : 'bg-surface hover:bg-card-active'}`}
-                      title="Flip Horizontal"
-                    >
-                      <FlipHorizontal size={18} />
-                    </button>
-                    <button
-                      onClick={() => setAdjustments(prev => ({ ...prev, flipVertical: !prev.flipVertical }))}
-                      className={`p-2 rounded-md transition-colors ${flipVertical ? 'bg-surface text-white' : 'bg-surface hover:bg-card-active'}`}
-                      title="Flip Vertical"
-                    >
-                      <FlipVertical size={18} />
-                    </button>
-                  </div>
-                </div>
+            <div className="space-y-3">
+              <p className="text-sm mb-3 font-semibold text-text-primary">Rotation</p>
+              <div className="flex justify-between items-center">
+                <span className="font-mono text-lg text-text-primary">{rotation.toFixed(1)}°</span>
+                <button onClick={resetFineRotation} title="Reset Fine Rotation" className="p-1.5 rounded-full hover:bg-surface">
+                  <RotateCcw size={14} />
+                </button>
+              </div>
+              <input
+                type="range"
+                min="-45"
+                max="45"
+                step="0.1"
+                value={fineRotation}
+                onChange={handleFineRotationChange}
+                className="w-full h-2 bg-surface rounded-lg appearance-none cursor-pointer accent-accent"
+              />
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-sm mb-3 font-semibold text-text-primary">Tools</p>
+              <div className="grid grid-cols-2 gap-2">
+                <ToolButton icon={RotateCcw} label="Rotate Left" onClick={() => handleStepRotate(-90)} />
+                <ToolButton icon={RotateCw} label="Rotate Right" onClick={() => handleStepRotate(90)} />
+                <ToolButton icon={FlipHorizontal} label="Flip Horiz" onClick={() => setAdjustments(prev => ({ ...prev, flipHorizontal: !prev.flipHorizontal }))} isActive={flipHorizontal} />
+                <ToolButton icon={FlipVertical} label="Flip Vert" onClick={() => setAdjustments(prev => ({ ...prev, flipVertical: !prev.flipVertical }))} isActive={flipVertical} />
               </div>
             </div>
           </>
