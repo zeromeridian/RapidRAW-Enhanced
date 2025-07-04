@@ -149,7 +149,6 @@ fn apply_flip(image: DynamicImage, horizontal: bool, vertical: bool) -> DynamicI
     img
 }
 
-// This is the fixed function
 pub fn generate_thumbnail_data(
     path_str: &str,
     gpu_context: Option<&GpuContext>,

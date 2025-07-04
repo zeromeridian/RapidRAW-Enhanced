@@ -12,9 +12,10 @@ use std::io::Cursor;
 use std::sync::Mutex;
 use std::thread;
 use std::fs;
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::path::Path;
 use std::process::Command;
+use std::hash::{Hash, Hasher};
 
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba, RgbaImage, ImageFormat, GrayImage};
 use image::codecs::jpeg::JpegEncoder;
@@ -45,8 +46,17 @@ pub struct LoadedImage {
     full_height: u32,
 }
 
+#[derive(Clone)]
+pub struct CachedPreview {
+    image: DynamicImage,
+    transform_hash: u64,
+    scale: f32,
+    unscaled_crop_offset: (f32, f32),
+}
+
 pub struct AppState {
     original_image: Mutex<Option<LoadedImage>>,
+    cached_preview: Mutex<Option<CachedPreview>>,
     raw_file_bytes: Mutex<Option<Vec<u8>>>,
     gpu_context: Mutex<Option<GpuContext>>,
     ai_state: Mutex<Option<AiState>>,
@@ -156,6 +166,53 @@ fn apply_all_transformations(
     (cropped_image, unscaled_crop_offset)
 }
 
+fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    
+    let rotation = adjustments["rotation"].as_f64().unwrap_or(0.0);
+    (rotation.to_bits()).hash(&mut hasher);
+
+    let flip_h = adjustments["flipHorizontal"].as_bool().unwrap_or(false);
+    flip_h.hash(&mut hasher);
+    
+    let flip_v = adjustments["flipVertical"].as_bool().unwrap_or(false);
+    flip_v.hash(&mut hasher);
+
+    if let Some(crop_val) = adjustments.get("crop") {
+        if !crop_val.is_null() {
+            crop_val.to_string().hash(&mut hasher);
+        }
+    }
+    
+    hasher.finish()
+}
+
+fn generate_transformed_preview(
+    loaded_image: &LoadedImage,
+    adjustments: &serde_json::Value,
+    app_handle: &tauri::AppHandle,
+) -> Result<(DynamicImage, f32, (f32, f32)), String> {
+    let original_image = &loaded_image.image;
+    let (full_w, full_h) = (loaded_image.full_width, loaded_image.full_height);
+
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let final_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
+
+    let (processing_base, scale_for_gpu) = 
+        if full_w > final_preview_dim || full_h > final_preview_dim {
+            let base = original_image.thumbnail(final_preview_dim, final_preview_dim);
+            let scale = if full_w > 0 { base.width() as f32 / full_w as f32 } else { 1.0 };
+            (base, scale)
+        } else {
+            (original_image.clone(), 1.0)
+        };
+
+    let (final_preview_base, unscaled_crop_offset) = 
+        apply_all_transformations(&processing_base, adjustments, scale_for_gpu);
+    
+    Ok((final_preview_base, scale_for_gpu, unscaled_crop_offset))
+}
+
 fn encode_to_base64(image: &DynamicImage, quality: u8) -> Result<String, String> {
     let rgb_image = image.to_rgb8();
 
@@ -215,6 +272,7 @@ async fn load_image(path: String, state: tauri::State<'_, AppState>) -> Result<L
     let display_preview = img.thumbnail(DISPLAY_PREVIEW_DIM, DISPLAY_PREVIEW_DIM);
     let original_base64 = encode_to_base64(&display_preview, 85)?;
 
+    *state.cached_preview.lock().unwrap() = None;
     *state.original_image.lock().unwrap() = Some(LoadedImage {
         image: img,
         full_width: orig_width,
@@ -247,34 +305,50 @@ fn apply_adjustments(
 ) -> Result<(), String> {
     let context = get_or_init_gpu_context(&state)?;
     let adjustments_clone = js_adjustments.clone();
+    
     let loaded_image = state.original_image.lock().unwrap().clone().ok_or("No original image loaded")?;
+    let new_transform_hash = calculate_transform_hash(&adjustments_clone);
+
+    let mut cached_preview_lock = state.cached_preview.lock().unwrap();
+    
+    let (final_preview_base, scale_for_gpu, unscaled_crop_offset) = 
+        if let Some(cached) = &*cached_preview_lock {
+            if cached.transform_hash == new_transform_hash {
+                (cached.image.clone(), cached.scale, cached.unscaled_crop_offset)
+            } else {
+                let (base, scale, offset) = generate_transformed_preview(&loaded_image, &adjustments_clone, &app_handle)?;
+                *cached_preview_lock = Some(CachedPreview {
+                    image: base.clone(),
+                    transform_hash: new_transform_hash,
+                    scale,
+                    unscaled_crop_offset: offset,
+                });
+                (base, scale, offset)
+            }
+        } else {
+            let (base, scale, offset) = generate_transformed_preview(&loaded_image, &adjustments_clone, &app_handle)?;
+            *cached_preview_lock = Some(CachedPreview {
+                image: base.clone(),
+                transform_hash: new_transform_hash,
+                scale,
+                unscaled_crop_offset: offset,
+            });
+            (base, scale, offset)
+        };
+    
+    drop(cached_preview_lock);
     
     thread::spawn(move || {
-        let original_image = loaded_image.image;
-        let (full_w, full_h) = (loaded_image.full_width, loaded_image.full_height);
-
-        let settings = load_settings(app_handle.clone()).unwrap_or_default();
-        let final_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
-
-        let (processing_base, scale_for_gpu) = 
-            if full_w > final_preview_dim || full_h > final_preview_dim {
-                let base = original_image.thumbnail(final_preview_dim, final_preview_dim);
-                let scale = if full_w > 0 { base.width() as f32 / full_w as f32 } else { 1.0 };
-                (base, scale)
-            } else {
-                (original_image.clone(), 1.0)
-            };
-
-        let (final_preview_base, unscaled_crop_offset) = 
-            apply_all_transformations(&processing_base, &adjustments_clone, scale_for_gpu);
         let (preview_width, preview_height) = final_preview_base.dimensions();
 
         let mask_definitions: Vec<MaskDefinition> = js_adjustments.get("masks")
             .and_then(|m| serde_json::from_value(m.clone()).ok())
             .unwrap_or_else(Vec::new);
 
+        let scaled_crop_offset = (unscaled_crop_offset.0 * scale_for_gpu, unscaled_crop_offset.1 * scale_for_gpu);
+
         let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions.iter()
-            .filter_map(|def| generate_mask_bitmap(def, preview_width, preview_height, scale_for_gpu, (unscaled_crop_offset.0 * scale_for_gpu, unscaled_crop_offset.1 * scale_for_gpu)))
+            .filter_map(|def| generate_mask_bitmap(def, preview_width, preview_height, scale_for_gpu, scaled_crop_offset))
             .collect();
 
         let final_adjustments = get_all_adjustments_from_json(&adjustments_clone);
@@ -1170,6 +1244,7 @@ fn main() {
         })
         .manage(AppState {
             original_image: Mutex::new(None),
+            cached_preview: Mutex::new(None),
             raw_file_bytes: Mutex::new(None),
             gpu_context: Mutex::new(None),
             ai_state: Mutex::new(None),
