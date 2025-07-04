@@ -182,6 +182,70 @@ pub struct AllAdjustments {
     _pad1: u32,
 }
 
+struct AdjustmentScales {
+    exposure: f32,
+    contrast: f32,
+    highlights: f32,
+    shadows: f32,
+    whites: f32,
+    blacks: f32,
+    saturation: f32,
+    temperature: f32,
+    tint: f32,
+    vibrance: f32,
+    
+    sharpness: f32,
+    luma_noise_reduction: f32,
+    color_noise_reduction: f32,
+    clarity: f32,
+    dehaze: f32,
+    structure: f32,
+
+    vignette_amount: f32,
+    vignette_midpoint: f32,
+    vignette_roundness: f32,
+    vignette_feather: f32,
+    grain_amount: f32,
+    grain_size: f32,
+    grain_roughness: f32,
+
+    hsl_hue_multiplier: f32,
+    hsl_saturation: f32,
+    hsl_luminance: f32,
+}
+
+const SCALES: AdjustmentScales = AdjustmentScales {
+    exposure: 25.0,
+    contrast: 500.0,
+    highlights: 200.0,
+    shadows: 500.0,
+    whites: 200.0,
+    blacks: 800.0,
+    saturation: 100.0,
+    temperature: 200.0,
+    tint: 250.0,
+    vibrance: 100.0,
+    
+    sharpness: 20.0,
+    luma_noise_reduction: 100.0,
+    color_noise_reduction: 100.0,
+    clarity: 200.0,
+    dehaze: 1000.0,
+    structure: 200.0,
+
+    vignette_amount: 100.0,
+    vignette_midpoint: 100.0,
+    vignette_roundness: 100.0,
+    vignette_feather: 100.0,
+    grain_amount: 200.0,
+    grain_size: 50.0,
+    grain_roughness: 100.0,
+
+    hsl_hue_multiplier: 0.3,
+    hsl_saturation: 100.0,
+    hsl_luminance: 100.0,
+};
+
 fn parse_hsl_adjustments(js_hsl: &serde_json::Value) -> [HslColor; 8] {
     let mut hsl_array = [HslColor::default(); 8];
     if let Some(hsl_map) = js_hsl.as_object() {
@@ -192,30 +256,9 @@ fn parse_hsl_adjustments(js_hsl: &serde_json::Value) -> [HslColor; 8] {
         for (name, index) in color_map.iter() {
             if let Some(color_data) = hsl_map.get(*name) {
                 hsl_array[*index] = HslColor {
-                    hue: color_data["hue"].as_f64().unwrap_or(0.0) as f32 * 0.3,
-                    saturation: color_data["saturation"].as_f64().unwrap_or(0.0) as f32 / 100.0,
-                    luminance: color_data["luminance"].as_f64().unwrap_or(0.0) as f32 / 100.0,
-                    _pad: 0.0,
-                };
-            }
-        }
-    }
-    hsl_array
-}
-
-fn parse_hsl_adjustments_for_mask(js_hsl: &serde_json::Value) -> [HslColor; 8] {
-    let mut hsl_array = [HslColor::default(); 8];
-    if let Some(hsl_map) = js_hsl.as_object() {
-        let color_map = [
-            ("reds", 0), ("oranges", 1), ("yellows", 2), ("greens", 3),
-            ("aquas", 4), ("blues", 5), ("purples", 6), ("magentas", 7),
-        ];
-        for (name, index) in color_map.iter() {
-            if let Some(color_data) = hsl_map.get(*name) {
-                hsl_array[*index] = HslColor {
-                    hue: color_data["hue"].as_f64().unwrap_or(0.0) as f32 * 0.15,
-                    saturation: color_data["saturation"].as_f64().unwrap_or(0.0) as f32 / 200.0,
-                    luminance: color_data["luminance"].as_f64().unwrap_or(0.0) as f32 / 200.0,
+                    hue: color_data["hue"].as_f64().unwrap_or(0.0) as f32 * SCALES.hsl_hue_multiplier,
+                    saturation: color_data["saturation"].as_f64().unwrap_or(0.0) as f32 / SCALES.hsl_saturation,
+                    luminance: color_data["luminance"].as_f64().unwrap_or(0.0) as f32 / SCALES.hsl_luminance,
                     _pad: 0.0,
                 };
             }
@@ -245,29 +288,29 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
     let blue_points: Vec<serde_json::Value> = curves_obj["blue"].as_array().cloned().unwrap_or_default();
 
     GlobalAdjustments {
-        exposure: js_adjustments["exposure"].as_f64().unwrap_or(0.0) as f32 / 25.0,
-        contrast: js_adjustments["contrast"].as_f64().unwrap_or(0.0) as f32 / 400.0,
-        highlights: js_adjustments["highlights"].as_f64().unwrap_or(0.0) as f32 / 200.0,
-        shadows: js_adjustments["shadows"].as_f64().unwrap_or(0.0) as f32 / 500.0,
-        whites: js_adjustments["whites"].as_f64().unwrap_or(0.0) as f32 / 200.0,
-        blacks: js_adjustments["blacks"].as_f64().unwrap_or(0.0) as f32 / 500.0,
-        saturation: js_adjustments["saturation"].as_f64().unwrap_or(0.0) as f32 / 100.0,
-        temperature: js_adjustments["temperature"].as_f64().unwrap_or(0.0) as f32 / 200.0,
-        tint: js_adjustments["tint"].as_f64().unwrap_or(0.0) as f32 / 250.0,
-        vibrance: js_adjustments["vibrance"].as_f64().unwrap_or(0.0) as f32 / 100.0,
-        sharpness: js_adjustments["sharpness"].as_f64().unwrap_or(0.0) as f32 / 20.0,
-        luma_noise_reduction: js_adjustments["lumaNoiseReduction"].as_f64().unwrap_or(0.0) as f32 / 100.0,
-        color_noise_reduction: js_adjustments["colorNoiseReduction"].as_f64().unwrap_or(0.0) as f32 / 100.0,
-        clarity: js_adjustments["clarity"].as_f64().unwrap_or(0.0) as f32 / 200.0,
-        dehaze: js_adjustments["dehaze"].as_f64().unwrap_or(0.0) as f32 / 1000.0,
-        structure: js_adjustments["structure"].as_f64().unwrap_or(0.0) as f32 / 200.0,
-        vignette_amount: js_adjustments["vignetteAmount"].as_f64().unwrap_or(0.0) as f32 / 100.0,
-        vignette_midpoint: js_adjustments["vignetteMidpoint"].as_f64().unwrap_or(50.0) as f32 / 100.0,
-        vignette_roundness: js_adjustments["vignetteRoundness"].as_f64().unwrap_or(0.0) as f32 / 100.0,
-        vignette_feather: js_adjustments["vignetteFeather"].as_f64().unwrap_or(50.0) as f32 / 100.0,
-        grain_amount: js_adjustments["grainAmount"].as_f64().unwrap_or(0.0) as f32 / 200.0,
-        grain_size: js_adjustments["grainSize"].as_f64().unwrap_or(50.0) as f32 / 50.0,
-        grain_roughness: js_adjustments["grainRoughness"].as_f64().unwrap_or(50.0) as f32 / 100.0,
+        exposure: js_adjustments["exposure"].as_f64().unwrap_or(0.0) as f32 / SCALES.exposure,
+        contrast: js_adjustments["contrast"].as_f64().unwrap_or(0.0) as f32 / SCALES.contrast,
+        highlights: js_adjustments["highlights"].as_f64().unwrap_or(0.0) as f32 / SCALES.highlights,
+        shadows: js_adjustments["shadows"].as_f64().unwrap_or(0.0) as f32 / SCALES.shadows,
+        whites: js_adjustments["whites"].as_f64().unwrap_or(0.0) as f32 / SCALES.whites,
+        blacks: js_adjustments["blacks"].as_f64().unwrap_or(0.0) as f32 / SCALES.blacks,
+        saturation: js_adjustments["saturation"].as_f64().unwrap_or(0.0) as f32 / SCALES.saturation,
+        temperature: js_adjustments["temperature"].as_f64().unwrap_or(0.0) as f32 / SCALES.temperature,
+        tint: js_adjustments["tint"].as_f64().unwrap_or(0.0) as f32 / SCALES.tint,
+        vibrance: js_adjustments["vibrance"].as_f64().unwrap_or(0.0) as f32 / SCALES.vibrance,
+        sharpness: js_adjustments["sharpness"].as_f64().unwrap_or(0.0) as f32 / SCALES.sharpness,
+        luma_noise_reduction: js_adjustments["lumaNoiseReduction"].as_f64().unwrap_or(0.0) as f32 / SCALES.luma_noise_reduction,
+        color_noise_reduction: js_adjustments["colorNoiseReduction"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_noise_reduction,
+        clarity: js_adjustments["clarity"].as_f64().unwrap_or(0.0) as f32 / SCALES.clarity,
+        dehaze: js_adjustments["dehaze"].as_f64().unwrap_or(0.0) as f32 / SCALES.dehaze,
+        structure: js_adjustments["structure"].as_f64().unwrap_or(0.0) as f32 / SCALES.structure,
+        vignette_amount: js_adjustments["vignetteAmount"].as_f64().unwrap_or(0.0) as f32 / SCALES.vignette_amount,
+        vignette_midpoint: js_adjustments["vignetteMidpoint"].as_f64().unwrap_or(50.0) as f32 / SCALES.vignette_midpoint,
+        vignette_roundness: js_adjustments["vignetteRoundness"].as_f64().unwrap_or(0.0) as f32 / SCALES.vignette_roundness,
+        vignette_feather: js_adjustments["vignetteFeather"].as_f64().unwrap_or(50.0) as f32 / SCALES.vignette_feather,
+        grain_amount: js_adjustments["grainAmount"].as_f64().unwrap_or(0.0) as f32 / SCALES.grain_amount,
+        grain_size: js_adjustments["grainSize"].as_f64().unwrap_or(50.0) as f32 / SCALES.grain_size,
+        grain_roughness: js_adjustments["grainRoughness"].as_f64().unwrap_or(50.0) as f32 / SCALES.grain_roughness,
         _pad1: 0.0,
 
         hsl: parse_hsl_adjustments(&js_adjustments.get("hsl").cloned().unwrap_or_default()),
@@ -300,27 +343,27 @@ pub fn get_all_adjustments_from_json(js_adjustments: &serde_json::Value) -> AllA
         let blue_points: Vec<serde_json::Value> = curves_obj["blue"].as_array().cloned().unwrap_or_default();
 
         mask_adjustments[i] = MaskAdjustments {
-            exposure: adj["exposure"].as_f64().unwrap_or(0.0) as f32 / 100.0,
-            contrast: adj["contrast"].as_f64().unwrap_or(0.0) as f32 / 200.0,
-            highlights: adj["highlights"].as_f64().unwrap_or(0.0) as f32 / 200.0,
-            shadows: adj["shadows"].as_f64().unwrap_or(0.0) as f32 / 200.0,
-            whites: adj["whites"].as_f64().unwrap_or(0.0) as f32 / 300.0,
-            blacks: adj["blacks"].as_f64().unwrap_or(0.0) as f32 / 500.0,
-            saturation: adj["saturation"].as_f64().unwrap_or(0.0) as f32 / 200.0,
-            temperature: adj["temperature"].as_f64().unwrap_or(0.0) as f32 / 250.0,
-            tint: adj["tint"].as_f64().unwrap_or(0.0) as f32 / 250.0,
-            vibrance: adj["vibrance"].as_f64().unwrap_or(0.0) as f32 / 200.0,
+            exposure: adj["exposure"].as_f64().unwrap_or(0.0) as f32 / SCALES.exposure,
+            contrast: adj["contrast"].as_f64().unwrap_or(0.0) as f32 / SCALES.contrast,
+            highlights: adj["highlights"].as_f64().unwrap_or(0.0) as f32 / SCALES.highlights,
+            shadows: adj["shadows"].as_f64().unwrap_or(0.0) as f32 / SCALES.shadows,
+            whites: adj["whites"].as_f64().unwrap_or(0.0) as f32 / SCALES.whites,
+            blacks: adj["blacks"].as_f64().unwrap_or(0.0) as f32 / SCALES.blacks,
+            saturation: adj["saturation"].as_f64().unwrap_or(0.0) as f32 / SCALES.saturation,
+            temperature: adj["temperature"].as_f64().unwrap_or(0.0) as f32 / SCALES.temperature,
+            tint: adj["tint"].as_f64().unwrap_or(0.0) as f32 / SCALES.tint,
+            vibrance: adj["vibrance"].as_f64().unwrap_or(0.0) as f32 / SCALES.vibrance,
             
-            sharpness: adj["sharpness"].as_f64().unwrap_or(0.0) as f32 / 40.0,
-            luma_noise_reduction: adj["lumaNoiseReduction"].as_f64().unwrap_or(0.0) as f32 / 100.0,
-            color_noise_reduction: adj["colorNoiseReduction"].as_f64().unwrap_or(0.0) as f32 / 100.0,
-            clarity: adj["clarity"].as_f64().unwrap_or(0.0) as f32 / 400.0,
-            dehaze: adj["dehaze"].as_f64().unwrap_or(0.0) as f32 / 2000.0,
-            structure: adj["structure"].as_f64().unwrap_or(0.0) as f32 / 400.0,
+            sharpness: adj["sharpness"].as_f64().unwrap_or(0.0) as f32 / SCALES.sharpness,
+            luma_noise_reduction: adj["lumaNoiseReduction"].as_f64().unwrap_or(0.0) as f32 / SCALES.luma_noise_reduction,
+            color_noise_reduction: adj["colorNoiseReduction"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_noise_reduction,
+            clarity: adj["clarity"].as_f64().unwrap_or(0.0) as f32 / SCALES.clarity,
+            dehaze: adj["dehaze"].as_f64().unwrap_or(0.0) as f32 / SCALES.dehaze,
+            structure: adj["structure"].as_f64().unwrap_or(0.0) as f32 / SCALES.structure,
             
             _pad1: 0.0, _pad2: 0.0, _pad3: 0.0, _pad4: 0.0,
 
-            hsl: parse_hsl_adjustments_for_mask(&adj.get("hsl").cloned().unwrap_or_default()),
+            hsl: parse_hsl_adjustments(&adj.get("hsl").cloned().unwrap_or_default()),
             luma_curve: convert_points_to_aligned(luma_points.clone()),
             red_curve: convert_points_to_aligned(red_points.clone()),
             green_curve: convert_points_to_aligned(green_points.clone()),

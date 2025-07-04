@@ -9,7 +9,7 @@ mod ai_processing;
 mod formats;
 
 use std::io::Cursor;
-use std::sync::{Mutex};
+use std::sync::Mutex;
 use std::thread;
 use std::fs;
 use std::collections::HashMap;
