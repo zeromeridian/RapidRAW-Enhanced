@@ -28,7 +28,7 @@ Have fun!
 <summary><strong>Recent Changes</strong></summary>
 
 *   Added: Predefined 90° clockwise rotation and ability to flip images
-*   Added: Switched from [rawloader](https://github.com/pedrocr/rawloader) to [rawler](https://github.com/dnglab/dnglab/tree/main/rawler) to basically support all RAW formats
+*   Added: Switched from [rawloader](https://github.com/pedrocr/rawloader) to [rawler](https://github.com/dnglab/dnglab/tree/main/rawler) to support a wider range of RAW formats
 *   Added: AI-powered foreground / background masking
 *   Added: AI-powered subject masking
 *   Added: Precompiled Linux builds
@@ -159,7 +159,7 @@ While the core functionality is in place, I'm actively working on improving seve
 | Improving the dehaze tool for more natural results                                           | Low     | Medium     | [ ]    |
 | Optimize image transport (replace Base64 for better performance)                            | Low     | Medium     | [ ]    |
 | Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High | Medium    | [X]    |
-| Implement a simple MVP of the ComfyUI based AI Roadmap                                        | Low   | High       | []    |
+| Implement a simple MVP of the ComfyUI based AI Roadmap                                        | Low   | High       | [ ]    |
 | Sign macOS builds using a registered developer account                                       | Medium      | Low     | [ ]    |
 | Switch to a better rawloader (e.g. rawler)                                                   | High      | Medium     | [X]    |
 | Improve speed on older systems (e.g. Pascal GPUs)                                            | Medium   | High       | [ ]    |
@@ -239,7 +239,7 @@ Contributions are welcome and highly appreciated! Whether it's reporting a bug, 
 
 A huge thank you to the following projects and tools that were very important in the development of RapidRAW:
 
-*   **[Google AI Studio](aistudio.google.com):** For providing amazing assistance in researching, implementing image processing algorithms and giving an overall speed boost.
+*   **[Google AI Studio](https://aistudio.google.com):** For providing amazing assistance in researching, implementing image processing algorithms and giving an overall speed boost.
 *   **[rawler](https://github.com/dnglab/dnglab/tree/main/rawler):** For the excellent Rust crate that provides the foundation for RAW file processing in this project.
 
 ## Support the Project
