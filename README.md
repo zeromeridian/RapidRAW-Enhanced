@@ -27,6 +27,7 @@ Have fun!
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   Added: Greatly improved shader with better dehaze, more accurate curves etc.
 *   Added: Predefined 90° clockwise rotation and ability to flip images
 *   Added: Switched from [rawloader](https://github.com/pedrocr/rawloader) to [rawler](https://github.com/dnglab/dnglab/tree/main/rawler) to support a wider range of RAW formats
 *   Added: AI-powered foreground / background masking
@@ -156,7 +157,7 @@ While the core functionality is in place, I'm actively working on improving seve
 |----------------------------------------------------------------------------------------------|----------|------------|--------|
 | Refactoring the frontend (reduce prop drilling in React components)                         | Medium   | Medium     | [ ]    |
 | Allow 45°+ rotation for images (e.g. predefined 90° clockwise )                             | Medium   | Low       | [X]    |
-| Improving the dehaze tool for more natural results                                           | Low     | Medium     | [ ]    |
+| Improving the dehaze tool for more natural results                                           | Low     | Medium     | [X]    |
 | Optimize image transport (replace Base64 for better performance)                            | Low     | Medium     | [ ]    |
 | Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High | Medium    | [X]    |
 | Implement a simple MVP of the ComfyUI based AI Roadmap                                        | Low   | High       | [ ]    |
