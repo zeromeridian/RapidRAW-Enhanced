@@ -53,6 +53,16 @@ export function usePresets(currentAdjustments) {
     savePresetsToBackend(updatedPresets);
   };
 
+  const updatePreset = (id) => {
+    const updatedPresets = presets.map(p => 
+      p.id === id 
+        ? { ...p, adjustments: currentAdjustments } 
+        : p
+    );
+    setPresets(updatedPresets);
+    savePresetsToBackend(updatedPresets);
+  };
+
   const duplicatePreset = useCallback((presetId) => {
     const presetToDuplicate = presets.find(p => p.id === presetId);
     if (!presetToDuplicate) {
@@ -111,6 +121,7 @@ export function usePresets(currentAdjustments) {
     addPreset,
     deletePreset,
     renamePreset,
+    updatePreset,
     duplicatePreset,
     reorderPresets,
     importPresetsFromFile,

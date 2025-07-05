@@ -1,5 +1,3 @@
-// All your structs and other functions remain the same...
-
 struct Point {
     x: f32,
     y: f32,

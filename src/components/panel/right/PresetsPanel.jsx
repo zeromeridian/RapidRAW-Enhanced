@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { usePresets } from '../../../hooks/usePresets';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { Plus, Loader2, FileUp, FileDown, Edit, Trash2, CopyPlus } from 'lucide-react';
+import { Plus, Loader2, FileUp, FileDown, Edit, Trash2, CopyPlus, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AddPresetModal from '../../modals/AddPresetModal';
 import RenamePresetModal from '../../modals/RenamePresetModal';
@@ -29,6 +29,7 @@ export default function PresetsPanel({ adjustments, setAdjustments, selectedImag
     addPreset, 
     deletePreset, 
     renamePreset,
+    updatePreset,
     duplicatePreset,
     importPresetsFromFile,
     exportPresetsToFile,
@@ -157,6 +158,12 @@ export default function PresetsPanel({ adjustments, setAdjustments, selectedImag
     event.stopPropagation();
     
     const options = [
+      {
+        label: 'Overwrite Preset',
+        icon: RefreshCw,
+        onClick: () => updatePreset(preset.id),
+      },
+      { type: 'separator' },
       {
         label: 'Rename Preset',
         icon: Edit,
