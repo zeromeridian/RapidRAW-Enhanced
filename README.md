@@ -27,6 +27,7 @@ Have fun!
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   Added: Ability to overwrite preset with current settings
 *   Added: High speed and precise cache to significantly accelerate large image editing
 *   Added: Greatly improved shader with better dehaze, more accurate curves etc.
 *   Added: Predefined 90° clockwise rotation and ability to flip images
