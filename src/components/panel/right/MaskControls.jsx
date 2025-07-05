@@ -32,8 +32,8 @@ const BrushTools = ({ settings, onSettingsChange }) => (
     <Slider label="Brush Size" value={settings.size} onChange={(e) => onSettingsChange(s => ({ ...s, size: Number(e.target.value) }))} min="1" max="200" step="1" />
     <Slider label="Brush Feather" value={settings.feather} onChange={(e) => onSettingsChange(s => ({ ...s, feather: Number(e.target.value) }))} min="0" max="100" step="1" />
     <div className="grid grid-cols-2 gap-2 pt-2">
-      <button onClick={() => onSettingsChange(s => ({ ...s, tool: 'brush' }))} className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${settings.tool === 'brush' ? 'text-white bg-surface' : 'bg-surface text-text-secondary hover:bg-card-active'}`}>Brush</button>
-      <button onClick={() => onSettingsChange(s => ({ ...s, tool: 'eraser' }))} className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${settings.tool === 'eraser' ? 'text-white bg-surface' : 'bg-surface text-text-secondary hover:bg-card-active'}`}>Eraser</button>
+      <button onClick={() => onSettingsChange(s => ({ ...s, tool: 'brush' }))} className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${settings.tool === 'brush' ? 'text-primary bg-surface' : 'bg-surface text-text-secondary hover:bg-card-active'}`}>Brush</button>
+      <button onClick={() => onSettingsChange(s => ({ ...s, tool: 'eraser' }))} className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${settings.tool === 'eraser' ? 'text-primary bg-surface' : 'bg-surface text-text-secondary hover:bg-card-active'}`}>Eraser</button>
     </div>
   </div>
 );
