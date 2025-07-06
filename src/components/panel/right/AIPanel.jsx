@@ -36,7 +36,7 @@ export default function AIPanel({
   isComfyUiConnected,
   isGeneratingAi,
   onGenerativeErase,
-  onRevertAiEdits,
+  onResetAiEdits,
   aiTool,
   setAiTool,
 }) {
@@ -50,9 +50,16 @@ export default function AIPanel({
     <div className="flex flex-col h-full">
       <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
         <h2 className="text-xl font-bold text-primary text-shadow-shiny flex items-center gap-2">
-          <BrainCircuit size={24} />
           AI Tools
         </h2>
+        <button
+          onClick={onResetAiEdits}
+          className="p-2 rounded-full hover:bg-surface transition-colors"
+          title="Reset All AI Edits"
+          disabled={!hasAiEdits || isGeneratingAi}
+        >
+          <RotateCcw size={18} />
+        </button>
       </div>
 
       <div className="flex-grow overflow-y-auto p-4 text-text-secondary relative">
@@ -74,7 +81,6 @@ export default function AIPanel({
               <div className="space-y-6">
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-                    <Sparkles size={16} className="text-accent" />
                     Generative Tools
                   </h3>
                   <div className="grid grid-cols-2 gap-2">
@@ -91,20 +97,6 @@ export default function AIPanel({
                         Paint over the area you want to remove on the image. The AI process will start automatically.
                      </div>
                   )}
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary mb-3">
-                    Management
-                  </h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    <ToolButton
-                      icon={RotateCcw}
-                      label="Revert Last AI Edit"
-                      onClick={onRevertAiEdits}
-                      disabled={!hasAiEdits || isGeneratingAi}
-                    />
-                  </div>
                 </div>
               </div>
             </div>

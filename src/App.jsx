@@ -273,14 +273,9 @@ function App() {
     }
   }, [selectedImage?.path, isGeneratingAi, adjustments, setAdjustments]);
 
-  const handleRevertAiEdits = useCallback(() => {
+  const handleResetAiEdits = useCallback(() => {
     if (!adjustments?.aiPatches?.length > 0 || isGeneratingAi) return;
-
-    setAdjustments(prev => {
-      const newPatches = [...(prev.aiPatches || [])];
-      newPatches.pop();
-      return { ...prev, aiPatches: newPatches };
-    });
+    setAdjustments(prev => ({ ...prev, aiPatches: [] }));
   }, [adjustments, isGeneratingAi, setAdjustments]);
 
   const handleGenerateAiMask = async (maskId, startPoint, endPoint) => {
@@ -1198,7 +1193,7 @@ function App() {
                 {renderedRightPanel === 'masks' && <MasksPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} onSelectMask={setActiveMaskId} activeMaskId={activeMaskId} brushSettings={brushSettings} setBrushSettings={setBrushSettings} copiedMask={copiedMask} setCopiedMask={setCopiedMask} setCustomEscapeHandler={setCustomEscapeHandler} histogram={histogram} isGeneratingAiMask={isGeneratingAiMask} aiModelDownloadStatus={aiModelDownloadStatus} onGenerateAiForegroundMask={handleGenerateAiForegroundMask} />}
                 {renderedRightPanel === 'presets' && <PresetsPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} activePanel={activeRightPanel} />}
                 {renderedRightPanel === 'export' && <ExportPanel selectedImage={selectedImage} adjustments={adjustments} multiSelectedPaths={multiSelectedPaths} />}
-                {renderedRightPanel === 'ai' && <AIPanel selectedImage={selectedImage} adjustments={adjustments} isComfyUiConnected={isComfyUiConnected} isGeneratingAi={isGeneratingAi} onGenerativeErase={handleGenerativeErase} onRevertAiEdits={handleRevertAiEdits} aiTool={aiTool} setAiTool={setAiTool} />}
+                {renderedRightPanel === 'ai' && <AIPanel selectedImage={selectedImage} adjustments={adjustments} isComfyUiConnected={isComfyUiConnected} isGeneratingAi={isGeneratingAi} onGenerativeErase={handleGenerativeErase} onResetAiEdits={handleResetAiEdits} aiTool={aiTool} setAiTool={setAiTool} />}
               </div>
             </div>
             <div className={clsx('h-full border-l transition-colors', activeRightPanel ? 'border-surface' : 'border-transparent')}>
