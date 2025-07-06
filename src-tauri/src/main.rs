@@ -142,10 +142,17 @@ fn composite_patches_on_image(base_image: &DynamicImage, current_adjustments: &V
     if let Some(patches_val) = current_adjustments.get("aiPatches") {
         if let Some(patches_arr) = patches_val.as_array() {
             for patch_obj in patches_arr {
-                if let Some(b64_data) = patch_obj.get("patchDataBase64").and_then(|v| v.as_str()) {
-                    let png_bytes = general_purpose::STANDARD.decode(b64_data)?;
-                    let patch_layer = image::load_from_memory(&png_bytes)?;
-                    imageops::overlay(&mut composited, &patch_layer, 0, 0);
+                let is_visible = patch_obj
+                    .get("visible")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
+
+                if is_visible {
+                    if let Some(b64_data) = patch_obj.get("patchDataBase64").and_then(|v| v.as_str()) {
+                        let png_bytes = general_purpose::STANDARD.decode(b64_data)?;
+                        let patch_layer = image::load_from_memory(&png_bytes)?;
+                        imageops::overlay(&mut composited, &patch_layer, 0, 0);
+                    }
                 }
             }
         }
@@ -221,6 +228,11 @@ fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
                 if let Some(id) = patch.get("id").and_then(|v| v.as_str()) {
                     id.hash(&mut hasher);
                 }
+                let is_visible = patch.get("visible").and_then(|v| v.as_bool()).unwrap_or(true);
+                is_visible.hash(&mut hasher);
+
+                let data_exists = patch.get("patchDataBase64").is_some();
+                data_exists.hash(&mut hasher);
             }
         }
     }
@@ -1247,9 +1259,10 @@ async fn test_comfyui_connection(address: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn invoke_generative_erase(
+async fn invoke_generative_replace(
     path: String,
     mask_data_base64: String,
+    prompt: String,
     current_adjustments: Value,
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
@@ -1273,16 +1286,17 @@ async fn invoke_generative_erase(
     let workflow_inputs = comfyui_connector::WorkflowInputs {
         source_image_node_id: "11".to_string(),
         mask_image_node_id: Some("148".to_string()),
+        text_prompt_node_id: Some("6".to_string()),
         final_output_node_id: "215".to_string(),
     };
 
     let result_png_bytes = comfyui_connector::execute_workflow(
         &address,
-        "generative_erase",
+        "generative_replace",
         workflow_inputs,
         source_image,
         Some(mask_image),
-        None
+        Some(prompt)
     ).await.map_err(|e| e.to_string())?;
 
     Ok(general_purpose::STANDARD.encode(&result_png_bytes))
@@ -1388,7 +1402,7 @@ fn main() {
             update_window_effect,
             check_comfyui_status,
             test_comfyui_connection,
-            invoke_generative_erase
+            invoke_generative_replace
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

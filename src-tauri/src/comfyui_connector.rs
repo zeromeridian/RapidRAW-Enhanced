@@ -14,6 +14,7 @@ const WORKFLOWS_DIR: &str = "./workflows";
 pub struct WorkflowInputs {
     pub source_image_node_id: String,
     pub mask_image_node_id: Option<String>,
+    pub text_prompt_node_id: Option<String>,
     pub final_output_node_id: String,
 }
 
@@ -123,7 +124,7 @@ pub async fn execute_workflow(
     inputs: WorkflowInputs,
     source_image: DynamicImage,
     mask_image: Option<DynamicImage>,
-    _text_prompt: Option<String>,
+    text_prompt: Option<String>,
 ) -> Result<Vec<u8>> {
     let workflow_path = Path::new(WORKFLOWS_DIR).join(format!("{}.json", workflow_name));
     let workflow_str = fs::read_to_string(&workflow_path)
@@ -143,6 +144,16 @@ pub async fn execute_workflow(
             node["inputs"]["image"] = json!(mask_filename);
         } else {
             return Err(anyhow!("Mask image node ID '{}' not found in workflow.", mask_node_id));
+        }
+    }
+
+    if let (Some(prompt_text), Some(prompt_node_id)) = (text_prompt, &inputs.text_prompt_node_id) {
+        if let Some(node) = workflow.get_mut(prompt_node_id) {
+            if let Some(node_inputs) = node.get_mut("inputs") {
+                node_inputs["text"] = json!(prompt_text);
+            }
+        } else {
+            return Err(anyhow!("Text prompt node ID '{}' not found in workflow.", prompt_node_id));
         }
     }
 

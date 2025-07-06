@@ -322,8 +322,7 @@ const ImageCanvas = memo(({
   isMasking, imageRenderSize, showOriginal, finalPreviewUrl, isAdjusting,
   uncroppedAdjustedPreviewUrl, maskOverlayUrl,
   onSelectMask, activeMaskId, handleUpdateMask, setIsMaskHovered,
-  brushSettings, onGenerateAiMask,
-  aiTool, onAiMaskComplete
+  brushSettings, onGenerateAiMask, aiTool, onAiMaskDrawingComplete
 }) => {
   const [isCropViewVisible, setIsCropViewVisible] = useState(false);
   const imagePathRef = useRef(null);
@@ -341,7 +340,7 @@ const ImageCanvas = memo(({
   const activeMask = useMemo(() => adjustments.masks.find(m => m.id === activeMaskId), [adjustments.masks, activeMaskId]);
   const isBrushActive = isMasking && activeMask?.type === 'brush';
   const isAiSubjectActive = isMasking && activeMask?.type === 'ai-subject';
-  const isAiEraseActive = aiTool === 'generative-erase';
+  const isGenerativeReplaceActive = aiTool === 'generative-replace';
 
   const sortedMasks = useMemo(() => {
     if (!activeMaskId) {
@@ -443,7 +442,7 @@ const ImageCanvas = memo(({
   }, [isCropping]);
 
   const handleMouseDown = useCallback((e) => {
-    const toolActive = isAiEraseActive || isBrushActive || isAiSubjectActive;
+    const toolActive = isGenerativeReplaceActive || isBrushActive || isAiSubjectActive;
     if (toolActive) {
       e.evt.preventDefault();
       isDrawing.current = true;
@@ -452,12 +451,12 @@ const ImageCanvas = memo(({
       if (!pos) return;
 
       let toolType = 'brush';
-      if (isAiEraseActive) toolType = 'generative-erase';
+      if (isGenerativeReplaceActive) toolType = 'generative-replace';
       else if (isAiSubjectActive) toolType = 'ai-selector';
 
       const newLine = {
         tool: toolType,
-        brushSize: isBrushActive ? brushSettings.size : (isAiEraseActive ? 50 : 2),
+        brushSize: isBrushActive ? brushSettings.size : (isGenerativeReplaceActive ? 50 : 2),
         points: [pos]
       };
       currentLine.current = newLine;
@@ -467,10 +466,10 @@ const ImageCanvas = memo(({
         onSelectMask(null);
       }
     }
-  }, [isAiEraseActive, isBrushActive, isAiSubjectActive, brushSettings, onSelectMask]);
+  }, [isGenerativeReplaceActive, isBrushActive, isAiSubjectActive, brushSettings, onSelectMask]);
 
   const handleMouseMove = useCallback((e) => {
-    const toolActive = isAiEraseActive || isBrushActive || isAiSubjectActive;
+    const toolActive = isGenerativeReplaceActive || isBrushActive || isAiSubjectActive;
     if (toolActive) {
       const stage = e.target.getStage();
       const pos = stage.getPointerPosition();
@@ -493,7 +492,7 @@ const ImageCanvas = memo(({
     };
     currentLine.current = updatedLine;
     setPreviewLine(updatedLine);
-  }, [isAiEraseActive, isBrushActive, isAiSubjectActive]);
+  }, [isGenerativeReplaceActive, isBrushActive, isAiSubjectActive]);
 
   const handleMouseUp = useCallback(() => {
     if (!isDrawing.current || !currentLine.current) return;
@@ -510,7 +509,7 @@ const ImageCanvas = memo(({
     const cropX = adjustments.crop?.x || 0;
     const cropY = adjustments.crop?.y || 0;
 
-    if (isAiEraseActive) {
+    if (isGenerativeReplaceActive) {
       if (line.points.length < 2) return;
       const tempStage = new Konva.Stage({ container: document.createElement('div'), width: selectedImage.width, height: selectedImage.height });
       const tempLayer = new Konva.Layer();
@@ -533,9 +532,10 @@ const ImageCanvas = memo(({
       
       const maskDataBase64 = tempLayer.toDataURL({ mimeType: 'image/png' });
       tempStage.destroy();
-      onAiMaskComplete(maskDataBase64);
+      onAiMaskDrawingComplete(maskDataBase64);
       return;
     }
+    
 
     if (isAiSubjectActive) {
       const points = line.points;
@@ -585,14 +585,14 @@ const ImageCanvas = memo(({
         });
       }
     }
-  }, [isAiEraseActive, isBrushActive, isAiSubjectActive, activeMask, activeMaskId, handleUpdateMask, adjustments.crop, imageRenderSize.scale, brushSettings, onGenerateAiMask, onAiMaskComplete, selectedImage.width, selectedImage.height]);
+  }, [isGenerativeReplaceActive, isBrushActive, isAiSubjectActive, activeMask, activeMaskId, handleUpdateMask, adjustments.crop, imageRenderSize.scale, brushSettings, onGenerateAiMask, onAiMaskDrawingComplete, selectedImage.width, selectedImage.height]);
 
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverCanvas(true);
-    if (isAiEraseActive || isBrushActive || isAiSubjectActive) {
+    if (isGenerativeReplaceActive || isBrushActive || isAiSubjectActive) {
       setCursorPreview(p => ({ ...p, visible: true }));
     }
-  }, [isAiEraseActive, isBrushActive, isAiSubjectActive]);
+  }, [isGenerativeReplaceActive, isBrushActive, isAiSubjectActive]);
 
   const handleMouseLeave = useCallback(() => {
     setIsMouseOverCanvas(false);
@@ -676,7 +676,7 @@ const ImageCanvas = memo(({
             zIndex: 4,
             opacity: showOriginal ? 0 : 1,
             pointerEvents: showOriginal ? 'none' : 'auto',
-            cursor: isAiEraseActive ? 'none' : ((isBrushActive || isAiSubjectActive) ? 'crosshair' : 'default'),
+            cursor: isGenerativeReplaceActive ? 'none' : ((isBrushActive || isAiSubjectActive) ? 'crosshair' : 'default'),
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -703,12 +703,12 @@ const ImageCanvas = memo(({
                 points={previewLine.points.flatMap(p => [p.x, p.y])}
                 stroke={
                   previewLine.tool === 'eraser' ? '#f43f5e' :
-                  previewLine.tool === 'generative-erase' ? '#8b5cf6' :
+                  previewLine.tool === 'generative-replace' ? '#8b5cf6' :
                   '#0ea5e9'
                 }
                 strokeWidth={
                   previewLine.tool === 'ai-selector' ? 2 :
-                  previewLine.tool === 'generative-erase' ? 3 :
+                  previewLine.tool === 'generative-replace' ? 3 :
                   previewLine.brushSize
                 }
                 tension={0.5}
@@ -718,22 +718,22 @@ const ImageCanvas = memo(({
                 listening={false}
                 dash={
                   previewLine.tool === 'ai-selector' ? [4, 4] :
-                  previewLine.tool === 'generative-erase' ? [6, 6] :
+                  previewLine.tool === 'generative-replace' ? [6, 6] :
                   undefined
                 }
               />
             )}
-            {(isBrushActive || isAiEraseActive) && cursorPreview.visible && (
+            {(isBrushActive || isGenerativeReplaceActive) && cursorPreview.visible && (
               <Circle
                 x={cursorPreview.x}
                 y={cursorPreview.y}
-                radius={(isAiEraseActive ? 50 : brushSettings.size) / 2}
+                radius={(isGenerativeReplaceActive ? 50 : brushSettings.size) / 2}
                 stroke={
-                  isAiEraseActive ? '#8b5cf6' :
+                  isGenerativeReplaceActive ? '#8b5cf6' :
                   brushSettings.tool === 'eraser' ? '#f43f5e' :
                   '#0ea5e9'
                 }
-                strokeWidth={isAiEraseActive ? 2 : 1}
+                strokeWidth={isGenerativeReplaceActive ? 2 : 1}
                 listening={false}
                 perfectDrawEnabled={false}
               />

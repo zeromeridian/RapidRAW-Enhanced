@@ -27,7 +27,7 @@ export default function Editor({
   adjustments, setAdjustments, activeMaskId, onSelectMask,
   transformWrapperRef, onZoomed, onContextMenu,
   onUndo, onRedo, canUndo, canRedo, brushSettings, 
-  onGenerateAiMask, aiTool, onAiMaskComplete
+  onGenerateAiMask, aiTool, onAiMaskDrawingComplete
 }) {
   const [crop, setCrop] = useState();
   const [isMaskHovered, setIsMaskHovered] = useState(false);
@@ -176,7 +176,7 @@ export default function Editor({
   }
 
   const activeMask = useMemo(() => adjustments.masks.find(m => m.id === activeMaskId), [adjustments.masks, activeMaskId]);
-  const isPanningDisabled = isMaskHovered || isCropping || aiTool === 'generative-erase' || (isMasking && (activeMask?.type === 'brush' || activeMask?.type === 'ai-subject'));
+  const isPanningDisabled = isMaskHovered || isCropping || aiTool === 'generative-replace' || (isMasking && (activeMask?.type === 'brush' || activeMask?.type === 'ai-subject'));
 
   return (
     <>
@@ -252,7 +252,7 @@ export default function Editor({
                 brushSettings={brushSettings}
                 onGenerateAiMask={onGenerateAiMask}
                 aiTool={aiTool}
-                onAiMaskComplete={onAiMaskComplete}
+                onAiMaskDrawingComplete={onAiMaskDrawingComplete}
               />
             </TransformComponent>
           </TransformWrapper>
