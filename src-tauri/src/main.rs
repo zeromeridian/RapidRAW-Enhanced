@@ -1270,7 +1270,7 @@ async fn invoke_generative_replace(
     let address = settings.comfyui_address
         .ok_or_else(|| "ComfyUI address is not configured in settings.".to_string())?;
 
-    let source_image = get_composited_image(&path, &current_adjustments)
+    let mut source_image = get_composited_image(&path, &current_adjustments)
         .map_err(|e| format!("Failed to prepare source image: {}", e))?;
 
     let b64_data = if let Some(idx) = mask_data_base64.find(',') {
@@ -1280,14 +1280,32 @@ async fn invoke_generative_replace(
     };
     let mask_bytes = general_purpose::STANDARD.decode(b64_data)
         .map_err(|e| format!("Failed to decode mask: {}", e))?;
-    let mask_image = image::load_from_memory(&mask_bytes)
+    let mut mask_image = image::load_from_memory(&mask_bytes)
         .map_err(|e| format!("Failed to load mask image: {}", e))?;
+
+    let (original_width, original_height) = source_image.dimensions();
+    let mut was_downscaled = false;
+
+    const MIN_DIM: u32 = 1024;
+    let smallest_dim = original_width.min(original_height);
+
+    if smallest_dim > MIN_DIM {
+        was_downscaled = true;
+        let scale_factor = MIN_DIM as f32 / smallest_dim as f32;
+        let new_width = (original_width as f32 * scale_factor).round() as u32;
+        let new_height = (original_height as f32 * scale_factor).round() as u32;
+
+        let filter = image::imageops::FilterType::Lanczos3;
+
+        source_image = source_image.resize_exact(new_width, new_height, filter);
+        mask_image = mask_image.resize_exact(new_width, new_height, filter);
+    }
 
     let workflow_inputs = comfyui_connector::WorkflowInputs {
         source_image_node_id: "11".to_string(),
         mask_image_node_id: Some("148".to_string()),
         text_prompt_node_id: Some("6".to_string()),
-        final_output_node_id: "215".to_string(),
+        final_output_node_id: "252".to_string(),
     };
 
     let result_png_bytes = comfyui_connector::execute_workflow(
@@ -1299,7 +1317,25 @@ async fn invoke_generative_replace(
         Some(prompt)
     ).await.map_err(|e| e.to_string())?;
 
-    Ok(general_purpose::STANDARD.encode(&result_png_bytes))
+    let final_png_bytes = if was_downscaled {
+        let received_image = image::load_from_memory(&result_png_bytes)
+            .map_err(|e| format!("Failed to decode result image from ComfyUI: {}", e))?;
+
+        let upscaled_image = received_image.resize_exact(
+            original_width,
+            original_height,
+            image::imageops::FilterType::Lanczos3,
+        );
+
+        let mut buf = Cursor::new(Vec::new());
+        upscaled_image.write_to(&mut buf, ImageFormat::Png)
+            .map_err(|e| format!("Failed to re-encode upscaled image: {}", e))?;
+        buf.into_inner()
+    } else {
+        result_png_bytes
+    };
+
+    Ok(general_purpose::STANDARD.encode(&final_png_bytes))
 }
 
 fn main() {
