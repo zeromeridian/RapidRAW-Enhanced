@@ -149,26 +149,40 @@ fn apply_flip(image: DynamicImage, horizontal: bool, vertical: bool) -> DynamicI
     img
 }
 
+fn get_composited_image_for_thumb(path: &str, current_adjustments: &serde_json::Value) -> anyhow::Result<DynamicImage> {
+    let file_bytes = fs::read(path)?;
+    let mut base_image = if is_raw_file(path) {
+        raw_processing::develop_raw_image(&file_bytes, true)?
+    } else {
+        image::load_from_memory(&file_bytes)?
+    };
+
+    if let Some(patches_val) = current_adjustments.get("aiPatches") {
+        if let Some(patches_arr) = patches_val.as_array() {
+            for patch_obj in patches_arr {
+                if let Some(b64_data) = patch_obj.get("patchDataBase64").and_then(|v| v.as_str()) {
+                    let png_bytes = base64::engine::general_purpose::STANDARD.decode(b64_data)?;
+                    let patch_layer = image::load_from_memory(&png_bytes)?;
+                    image::imageops::overlay(&mut base_image, &patch_layer, 0, 0);
+                }
+            }
+        }
+    }
+    Ok(base_image)
+}
+
 pub fn generate_thumbnail_data(
     path_str: &str,
     gpu_context: Option<&GpuContext>,
 ) -> anyhow::Result<DynamicImage> {
-    let file_bytes = fs::read(path_str)?;
-
-    let (base_image, original_dims): (DynamicImage, (u32, u32)) = if is_raw_file(path_str) {
-        let developed_image = raw_processing::develop_raw_image(&file_bytes, true)?;
-        let dims = developed_image.dimensions();
-        (developed_image, dims)
-    } else {
-        let img = image::load_from_memory(&file_bytes)?;
-        let dims = img.dimensions();
-        (img, dims)
-    };
-
     let sidecar_path = get_sidecar_path(path_str);
     let metadata: Option<ImageMetadata> = fs::read_to_string(sidecar_path)
         .ok()
         .and_then(|content| serde_json::from_str(&content).ok());
+
+    let adjustments = metadata.as_ref().map_or(serde_json::Value::Null, |m| m.adjustments.clone());
+    let base_image = get_composited_image_for_thumb(path_str, &adjustments)?;
+    let original_dims = base_image.dimensions();
 
     if let (Some(context), Some(meta)) = (gpu_context, metadata) {
         if !meta.adjustments.is_null() {
@@ -177,11 +191,7 @@ pub fn generate_thumbnail_data(
 
             let (processing_base, scale_for_gpu) =
                 if full_w > THUMBNAIL_PROCESSING_DIM || full_h > THUMBNAIL_PROCESSING_DIM {
-                    let base = if is_raw_file(path_str) {
-                        base_image
-                    } else {
-                        base_image.thumbnail(THUMBNAIL_PROCESSING_DIM, THUMBNAIL_PROCESSING_DIM)
-                    };
+                    let base = base_image.thumbnail(THUMBNAIL_PROCESSING_DIM, THUMBNAIL_PROCESSING_DIM);
                     let scale = if full_w > 0 { base.width() as f32 / full_w as f32 } else { 1.0 };
                     (base, scale)
                 } else {

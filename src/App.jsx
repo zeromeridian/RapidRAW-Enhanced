@@ -27,6 +27,7 @@ import CreateFolderModal from './components/modals/CreateFolderModal';
 import RenameFolderModal from './components/modals/RenameFolderModal';
 import ConfirmModal from './components/modals/ConfirmModal';
 import { THEMES, DEFAULT_THEME_ID } from './themes';
+import { v4 as uuidv4 } from 'uuid';
 
 const DEBUG = false;
 
@@ -65,7 +66,7 @@ export const INITIAL_ADJUSTMENTS = {
     luma: [{ x: 0, y: 0 }, { x: 255, y: 255 }], red: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
     green: [{ x: 0, y: 0 }, { x: 255, y: 255 }], blue: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
   },
-  crop: null, aspectRatio: null, rotation: 0, flipHorizontal: false, flipVertical: false, masks: [],
+  crop: null, aspectRatio: null, rotation: 0, flipHorizontal: false, flipVertical: false, masks: [], aiPatches: [],
 };
 
 const normalizeLoadedAdjustments = (loadedAdjustments) => {
@@ -90,6 +91,7 @@ const normalizeLoadedAdjustments = (loadedAdjustments) => {
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
     curves: { ...INITIAL_ADJUSTMENTS.curves, ...(loadedAdjustments.curves || {}) },
     masks: normalizedMasks,
+    aiPatches: loadedAdjustments.aiPatches || [],
   };
 };
 
@@ -203,6 +205,9 @@ function App() {
   const [confirmModalState, setConfirmModalState] = useState({ isOpen: false });
   const [customEscapeHandler, setCustomEscapeHandler] = useState(null);
   const [isGeneratingAiMask, setIsGeneratingAiMask] = useState(false);
+  const [isComfyUiConnected, setIsComfyUiConnected] = useState(false);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [aiTool, setAiTool] = useState(null);
   const { showContextMenu } = useContextMenu();
   const imagePathList = useMemo(() => imageList.map(f => f.path), [imageList]);
   const { thumbnails } = useThumbnails(imagePathList);
@@ -228,6 +233,55 @@ function App() {
 
   const undo = useCallback(() => { if (canUndo) { undoAdjustments(); debouncedSetHistory.cancel(); } }, [canUndo, undoAdjustments, debouncedSetHistory]);
   const redo = useCallback(() => { if (canRedo) { redoAdjustments(); debouncedSetHistory.cancel(); } }, [canRedo, redoAdjustments, debouncedSetHistory]);
+
+  useEffect(() => {
+    const unlisten = listen('comfyui-status-update', (event) => {
+      setIsComfyUiConnected(event.payload.connected);
+    });
+    invoke('check_comfyui_status');
+    const interval = setInterval(() => invoke('check_comfyui_status'), 3000);
+    return () => {
+      clearInterval(interval);
+      unlisten.then(f => f());
+    };
+  }, []);
+
+  const handleGenerativeErase = useCallback(async (maskDataBase64) => {
+    if (!selectedImage?.path || isGeneratingAi) return;
+
+    setIsGeneratingAi(true);
+    setAiTool(null);
+    try {
+      const newPatchBase64 = await invoke('invoke_generative_erase', {
+        path: selectedImage.path,
+        maskDataBase64,
+        currentAdjustments: adjustments,
+      });
+
+      setAdjustments(prev => ({
+        ...prev,
+        aiPatches: [
+          ...(prev.aiPatches || []),
+          { id: uuidv4(), patchDataBase64: newPatchBase64 }
+        ]
+      }));
+    } catch (err) {
+      console.error("Generative erase failed:", err);
+      setError(`AI Erase Failed: ${err}`);
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  }, [selectedImage?.path, isGeneratingAi, adjustments, setAdjustments]);
+
+  const handleRevertAiEdits = useCallback(() => {
+    if (!adjustments?.aiPatches?.length > 0 || isGeneratingAi) return;
+
+    setAdjustments(prev => {
+      const newPatches = [...(prev.aiPatches || [])];
+      newPatches.pop();
+      return { ...prev, aiPatches: newPatches };
+    });
+  }, [adjustments, isGeneratingAi, setAdjustments]);
 
   const handleGenerateAiMask = async (maskId, startPoint, endPoint) => {
     if (!selectedImage?.path) {
@@ -342,8 +396,16 @@ function App() {
   }, []);
 
   const handleRightPanelSelect = useCallback((panelId) => {
-    if (panelId === activeRightPanel) setActiveRightPanel(null);
-    else { setActiveRightPanel(panelId); setRenderedRightPanel(panelId); }
+    if (panelId === activeRightPanel) {
+      setActiveRightPanel(null);
+      setAiTool(null);
+    } else {
+      setActiveRightPanel(panelId);
+      setRenderedRightPanel(panelId);
+      if (panelId !== 'ai') {
+        setAiTool(null);
+      }
+    }
     setActiveMaskId(null);
   }, [activeRightPanel]);
 
@@ -458,6 +520,7 @@ function App() {
     setUncroppedAdjustedPreviewUrl(null);
     setHistogram(null);
     setActiveMaskId(null);
+    setAiTool(null);
     setLibraryActivePath(lastActivePath);
   }, [selectedImage?.path]);
 
@@ -658,6 +721,7 @@ function App() {
     resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
     setShowOriginal(false);
     setActiveMaskId(null);
+    setAiTool(null);
     if (transformWrapperRef.current) transformWrapperRef.current.resetTransform(0);
     setZoom(1);
     setIsLibraryExportPanelVisible(false);
@@ -675,6 +739,8 @@ function App() {
           event.preventDefault();
           if (customEscapeHandler) {
             customEscapeHandler();
+          } else if (aiTool) {
+            setAiTool(null);
           } else if (activeMaskId) {
             setActiveMaskId(null);
           } else if (isFullScreen) {
@@ -691,7 +757,7 @@ function App() {
                 setSpaceZoomActive(false);
             } else {
                 setZoomBeforeSpace(zoom);
-                handleZoomChange(2); // Zoom to 200%
+                handleZoomChange(2);
                 setSpaceZoomActive(true);
             }
             return;
@@ -758,7 +824,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [ sortedImageList, selectedImage, undo, redo, isFullScreen, handleToggleFullScreen, handleBackToLibrary, handleRightPanelSelect, handleRate, handleDeleteSelected, handleCopyAdjustments, handlePasteAdjustments, multiSelectedPaths, copiedFilePaths, handlePasteFiles, libraryActivePath, handleImageSelect, zoom, spaceZoomActive, zoomBeforeSpace, handleZoomChange, customEscapeHandler, activeMaskId ]);
+  }, [ sortedImageList, selectedImage, undo, redo, isFullScreen, handleToggleFullScreen, handleBackToLibrary, handleRightPanelSelect, handleRate, handleDeleteSelected, handleCopyAdjustments, handlePasteAdjustments, multiSelectedPaths, copiedFilePaths, handlePasteFiles, libraryActivePath, handleImageSelect, zoom, spaceZoomActive, zoomBeforeSpace, handleZoomChange, customEscapeHandler, activeMaskId, aiTool ]);
 
   useEffect(() => {
     let isEffectActive = true;
@@ -919,7 +985,7 @@ function App() {
       { type: 'separator' },
       { label: 'Set Rating', icon: Star, submenu: [0, 1, 2, 3, 4, 5].map(rating => ({ label: rating === 0 ? 'No Rating' : `${rating} Star${rating !== 1 ? 's' : ''}`, onClick: () => handleRate(rating) })) },
       { type: 'separator' },
-      { label: 'Reset Adjustments', icon: RotateCcw, onClick: () => setAdjustments(prev => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating })) },
+      { label: 'Reset Adjustments', icon: RotateCcw, onClick: () => setAdjustments(prev => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating, aiPatches: [] })) },
     ];
     showContextMenu(event.clientX, event.clientY, options);
   };
@@ -965,7 +1031,7 @@ function App() {
           invoke('reset_adjustments_for_paths', { paths: finalSelection })
             .then(() => {
               if (finalSelection.includes(libraryActivePath)) setLibraryActiveAdjustments(prev => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating }));
-              if (selectedImage && finalSelection.includes(selectedImage.path)) setAdjustments(prev => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating }));
+              if (selectedImage && finalSelection.includes(selectedImage.path)) setAdjustments(prev => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating, aiPatches: [] }));
             })
             .catch(err => { console.error("Failed to reset adjustments:", err); setError(`Failed to reset adjustments: ${err}`); });
         },
@@ -1085,6 +1151,8 @@ function App() {
               canRedo={canRedo}
               brushSettings={brushSettings}
               onGenerateAiMask={handleGenerateAiMask}
+              aiTool={aiTool}
+              onAiMaskComplete={handleGenerativeErase}
             />
             <Resizer onMouseDown={createResizeHandler(setBottomPanelHeight, bottomPanelHeight)} direction="horizontal" />
             <BottomBar
@@ -1130,7 +1198,7 @@ function App() {
                 {renderedRightPanel === 'masks' && <MasksPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} onSelectMask={setActiveMaskId} activeMaskId={activeMaskId} brushSettings={brushSettings} setBrushSettings={setBrushSettings} copiedMask={copiedMask} setCopiedMask={setCopiedMask} setCustomEscapeHandler={setCustomEscapeHandler} histogram={histogram} isGeneratingAiMask={isGeneratingAiMask} aiModelDownloadStatus={aiModelDownloadStatus} onGenerateAiForegroundMask={handleGenerateAiForegroundMask} />}
                 {renderedRightPanel === 'presets' && <PresetsPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} activePanel={activeRightPanel} />}
                 {renderedRightPanel === 'export' && <ExportPanel selectedImage={selectedImage} adjustments={adjustments} multiSelectedPaths={multiSelectedPaths} />}
-                {renderedRightPanel === 'ai' && <AIPanel selectedImage={selectedImage} />}
+                {renderedRightPanel === 'ai' && <AIPanel selectedImage={selectedImage} adjustments={adjustments} isComfyUiConnected={isComfyUiConnected} isGeneratingAi={isGeneratingAi} onGenerativeErase={handleGenerativeErase} onRevertAiEdits={handleRevertAiEdits} aiTool={aiTool} setAiTool={setAiTool} />}
               </div>
             </div>
             <div className={clsx('h-full border-l transition-colors', activeRightPanel ? 'border-surface' : 'border-transparent')}>

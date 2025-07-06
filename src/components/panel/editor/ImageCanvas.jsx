@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'react-konva';
+import Konva from 'konva';
 import clsx from 'clsx';
 
 function linesIntersect(eraserLine, drawnLine) {
@@ -321,7 +322,8 @@ const ImageCanvas = memo(({
   isMasking, imageRenderSize, showOriginal, finalPreviewUrl, isAdjusting,
   uncroppedAdjustedPreviewUrl, maskOverlayUrl,
   onSelectMask, activeMaskId, handleUpdateMask, setIsMaskHovered,
-  brushSettings, onGenerateAiMask
+  brushSettings, onGenerateAiMask,
+  aiTool, onAiMaskComplete
 }) => {
   const [isCropViewVisible, setIsCropViewVisible] = useState(false);
   const imagePathRef = useRef(null);
@@ -339,6 +341,7 @@ const ImageCanvas = memo(({
   const activeMask = useMemo(() => adjustments.masks.find(m => m.id === activeMaskId), [adjustments.masks, activeMaskId]);
   const isBrushActive = isMasking && activeMask?.type === 'brush';
   const isAiSubjectActive = isMasking && activeMask?.type === 'ai-subject';
+  const isAiEraseActive = aiTool === 'generative-erase';
 
   const sortedMasks = useMemo(() => {
     if (!activeMaskId) {
@@ -440,17 +443,21 @@ const ImageCanvas = memo(({
   }, [isCropping]);
 
   const handleMouseDown = useCallback((e) => {
-    if (isBrushActive || isAiSubjectActive) {
+    const toolActive = isAiEraseActive || isBrushActive || isAiSubjectActive;
+    if (toolActive) {
       e.evt.preventDefault();
-      
       isDrawing.current = true;
       const stage = e.target.getStage();
       const pos = stage.getPointerPosition();
       if (!pos) return;
 
+      let toolType = 'brush';
+      if (isAiEraseActive) toolType = 'generative-erase';
+      else if (isAiSubjectActive) toolType = 'ai-selector';
+
       const newLine = {
-        tool: isBrushActive ? brushSettings.tool : 'ai-selector',
-        brushSize: isBrushActive ? brushSettings.size : 2,
+        tool: toolType,
+        brushSize: isBrushActive ? brushSettings.size : (isAiEraseActive ? 50 : 2),
         points: [pos]
       };
       currentLine.current = newLine;
@@ -460,10 +467,11 @@ const ImageCanvas = memo(({
         onSelectMask(null);
       }
     }
-  }, [isBrushActive, isAiSubjectActive, brushSettings, onSelectMask]);
+  }, [isAiEraseActive, isBrushActive, isAiSubjectActive, brushSettings, onSelectMask]);
 
   const handleMouseMove = useCallback((e) => {
-    if (isBrushActive || isAiSubjectActive) {
+    const toolActive = isAiEraseActive || isBrushActive || isAiSubjectActive;
+    if (toolActive) {
       const stage = e.target.getStage();
       const pos = stage.getPointerPosition();
       if (pos) {
@@ -473,7 +481,7 @@ const ImageCanvas = memo(({
       }
     }
 
-    if (!isDrawing.current || !(isBrushActive || isAiSubjectActive)) return;
+    if (!isDrawing.current || !toolActive) return;
     
     const stage = e.target.getStage();
     const pos = stage.getPointerPosition();
@@ -485,7 +493,7 @@ const ImageCanvas = memo(({
     };
     currentLine.current = updatedLine;
     setPreviewLine(updatedLine);
-  }, [isBrushActive, isAiSubjectActive]);
+  }, [isAiEraseActive, isBrushActive, isAiSubjectActive]);
 
   const handleMouseUp = useCallback(() => {
     if (!isDrawing.current || !currentLine.current) return;
@@ -502,8 +510,34 @@ const ImageCanvas = memo(({
     const cropX = adjustments.crop?.x || 0;
     const cropY = adjustments.crop?.y || 0;
 
+    if (isAiEraseActive) {
+      if (line.points.length < 2) return;
+      const tempStage = new Konva.Stage({ container: document.createElement('div'), width: selectedImage.width, height: selectedImage.height });
+      const tempLayer = new Konva.Layer();
+      tempStage.add(tempLayer);
+
+      const transformedPoints = line.points.flatMap(p => [
+        (p.x / scale) + cropX,
+        (p.y / scale) + cropY
+      ]);
+
+      tempLayer.add(new Konva.Line({
+        points: transformedPoints,
+        stroke: 'white',
+        strokeWidth: line.brushSize / scale,
+        fill: 'white',
+        lineCap: 'round',
+        lineJoin: 'round',
+        closed: true,
+      }));
+      
+      const maskDataBase64 = tempLayer.toDataURL({ mimeType: 'image/png' });
+      tempStage.destroy();
+      onAiMaskComplete(maskDataBase64);
+      return;
+    }
+
     if (isAiSubjectActive) {
-      console.log("[ImageCanvas] AI Subject mask tool is active. Processing drawn shape.");
       const points = line.points;
       if (points.length > 1) {
         const xs = points.map(p => p.x);
@@ -513,30 +547,12 @@ const ImageCanvas = memo(({
         const maxX = Math.max(...xs);
         const maxY = Math.max(...ys);
 
-        const startPoint = {
-          x: minX / scale + cropX,
-          y: minY / scale + cropY,
-        };
-        const endPoint = {
-          x: maxX / scale + cropX,
-          y: maxY / scale + cropY,
-        };
+        const startPoint = { x: minX / scale + cropX, y: minY / scale + cropY };
+        const endPoint = { x: maxX / scale + cropX, y: maxY / scale + cropY };
         
-        console.log("[ImageCanvas] Calculated bounding box for AI mask:", {
-          maskId: activeMaskId,
-          start: startPoint,
-          end: endPoint,
-        });
-
         if (onGenerateAiMask) {
-            console.log("[ImageCanvas] Calling onGenerateAiMask prop to trigger backend...");
             onGenerateAiMask(activeMaskId, startPoint, endPoint);
-        } else {
-            console.error("[ImageCanvas] ERROR: onGenerateAiMask prop is not defined!");
         }
-
-      } else {
-        console.log("[ImageCanvas] AI Subject mask draw was too short. Not generating mask.");
       }
     } else if (isBrushActive) {
       const imageSpaceLine = {
@@ -569,14 +585,14 @@ const ImageCanvas = memo(({
         });
       }
     }
-  }, [isBrushActive, isAiSubjectActive, activeMask, activeMaskId, handleUpdateMask, adjustments.crop, imageRenderSize.scale, brushSettings, onGenerateAiMask]);
+  }, [isAiEraseActive, isBrushActive, isAiSubjectActive, activeMask, activeMaskId, handleUpdateMask, adjustments.crop, imageRenderSize.scale, brushSettings, onGenerateAiMask, onAiMaskComplete, selectedImage.width, selectedImage.height]);
 
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverCanvas(true);
-    if (isBrushActive || isAiSubjectActive) {
+    if (isAiEraseActive || isBrushActive || isAiSubjectActive) {
       setCursorPreview(p => ({ ...p, visible: true }));
     }
-  }, [isBrushActive, isAiSubjectActive]);
+  }, [isAiEraseActive, isBrushActive, isAiSubjectActive]);
 
   const handleMouseLeave = useCallback(() => {
     setIsMouseOverCanvas(false);
@@ -649,67 +665,81 @@ const ImageCanvas = memo(({
           </div>
         </div>
 
-        {isMasking && imageRenderSize.width > 0 && (
-          <Stage
-            width={imageRenderSize.width}
-            height={imageRenderSize.height}
-            className="transition-opacity duration-300"
-            style={{
-              position: 'absolute',
-              left: `${imageRenderSize.offsetX}px`,
-              top: `${imageRenderSize.offsetY}px`,
-              zIndex: 4,
-              opacity: showOriginal ? 0 : 1,
-              pointerEvents: showOriginal ? 'none' : 'auto',
-              cursor: (isBrushActive || isAiSubjectActive) ? 'crosshair' : 'default',
-            }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-          >
-            <Layer>
-              {sortedMasks.map(mask => (
-                <MaskOverlay
-                  key={mask.id}
-                  mask={mask}
-                  scale={imageRenderSize.scale}
-                  onUpdate={handleUpdateMask}
-                  isSelected={mask.id === activeMaskId}
-                  onSelect={() => onSelectMask(mask.id)}
-                  onMaskMouseEnter={() => !(isBrushActive || isAiSubjectActive) && setIsMaskHovered(true)}
-                  onMaskMouseLeave={() => !(isBrushActive || isAiSubjectActive) && setIsMaskHovered(false)}
-                  adjustments={adjustments}
-                />
-              ))}
-              {previewLine && (
-                <Line
-                  points={previewLine.points.flatMap(p => [p.x, p.y])}
-                  stroke={previewLine.tool === 'eraser' ? '#f43f5e' : '#0ea5e9'}
-                  strokeWidth={previewLine.tool === 'ai-selector' ? 2 : previewLine.brushSize}
-                  tension={0.5}
-                  lineCap="round"
-                  lineJoin="round"
-                  opacity={0.8}
-                  listening={false}
-                  dash={previewLine.tool === 'ai-selector' ? [4, 4] : undefined}
-                />
-              )}
-              {isBrushActive && cursorPreview.visible && (
-                <Circle
-                  x={cursorPreview.x}
-                  y={cursorPreview.y}
-                  radius={brushSettings.size / 2}
-                  stroke={brushSettings.tool === 'eraser' ? '#f43f5e' : '#0ea5e9'}
-                  strokeWidth={1}
-                  listening={false}
-                  perfectDrawEnabled={false}
-                />
-              )}
-            </Layer>
-          </Stage>
-        )}
+        <Stage
+          width={imageRenderSize.width}
+          height={imageRenderSize.height}
+          className="transition-opacity duration-300"
+          style={{
+            position: 'absolute',
+            left: `${imageRenderSize.offsetX}px`,
+            top: `${imageRenderSize.offsetY}px`,
+            zIndex: 4,
+            opacity: showOriginal ? 0 : 1,
+            pointerEvents: showOriginal ? 'none' : 'auto',
+            cursor: isAiEraseActive ? 'none' : ((isBrushActive || isAiSubjectActive) ? 'crosshair' : 'default'),
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          <Layer>
+            {isMasking && sortedMasks.map(mask => (
+              <MaskOverlay
+                key={mask.id}
+                mask={mask}
+                scale={imageRenderSize.scale}
+                onUpdate={handleUpdateMask}
+                isSelected={mask.id === activeMaskId}
+                onSelect={() => onSelectMask(mask.id)}
+                onMaskMouseEnter={() => !(isBrushActive || isAiSubjectActive) && setIsMaskHovered(true)}
+                onMaskMouseLeave={() => !(isBrushActive || isAiSubjectActive) && setIsMaskHovered(false)}
+                adjustments={adjustments}
+              />
+            ))}
+            {previewLine && (
+              <Line
+                points={previewLine.points.flatMap(p => [p.x, p.y])}
+                stroke={
+                  previewLine.tool === 'eraser' ? '#f43f5e' :
+                  previewLine.tool === 'generative-erase' ? '#8b5cf6' :
+                  '#0ea5e9'
+                }
+                strokeWidth={
+                  previewLine.tool === 'ai-selector' ? 2 :
+                  previewLine.tool === 'generative-erase' ? 3 :
+                  previewLine.brushSize
+                }
+                tension={0.5}
+                lineCap="round"
+                lineJoin="round"
+                opacity={0.8}
+                listening={false}
+                dash={
+                  previewLine.tool === 'ai-selector' ? [4, 4] :
+                  previewLine.tool === 'generative-erase' ? [6, 6] :
+                  undefined
+                }
+              />
+            )}
+            {(isBrushActive || isAiEraseActive) && cursorPreview.visible && (
+              <Circle
+                x={cursorPreview.x}
+                y={cursorPreview.y}
+                radius={(isAiEraseActive ? 50 : brushSettings.size) / 2}
+                stroke={
+                  isAiEraseActive ? '#8b5cf6' :
+                  brushSettings.tool === 'eraser' ? '#f43f5e' :
+                  '#0ea5e9'
+                }
+                strokeWidth={isAiEraseActive ? 2 : 1}
+                listening={false}
+                perfectDrawEnabled={false}
+              />
+            )}
+          </Layer>
+        </Stage>
       </div>
 
       <div

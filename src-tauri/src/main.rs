@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod comfyui_connector;
 mod image_processing;
 mod file_management;
 mod gpu_processing;
@@ -17,7 +18,7 @@ use std::path::Path;
 use std::process::Command;
 use std::hash::{Hash, Hasher};
 
-use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba, RgbaImage, ImageFormat, GrayImage};
+use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba, RgbaImage, ImageFormat, GrayImage, imageops};
 use image::codecs::jpeg::JpegEncoder;
 use tauri::{Manager, Emitter};
 use base64::{Engine as _, engine::general_purpose};
@@ -38,6 +39,7 @@ use crate::ai_processing::{
     AiSubjectMaskParameters, run_u2netp_model, AiForegroundMaskParameters
 };
 use crate::formats::is_raw_file;
+use crate::raw_processing::develop_raw_image;
 
 #[derive(Clone)]
 pub struct LoadedImage {
@@ -57,7 +59,6 @@ pub struct CachedPreview {
 pub struct AppState {
     original_image: Mutex<Option<LoadedImage>>,
     cached_preview: Mutex<Option<CachedPreview>>,
-    raw_file_bytes: Mutex<Option<Vec<u8>>>,
     gpu_context: Mutex<Option<GpuContext>>,
     ai_state: Mutex<Option<AiState>>,
 }
@@ -121,6 +122,29 @@ struct ResizeOptions {
 struct ExportSettings {
     jpeg_quality: u8,
     resize: Option<ResizeOptions>,
+}
+
+fn get_composited_image(path: &str, current_adjustments: &Value) -> anyhow::Result<DynamicImage> {
+    let file_bytes = fs::read(path)?;
+    let mut base_image = if is_raw_file(path) {
+        develop_raw_image(&file_bytes, false)?
+    } else {
+        image::load_from_memory(&file_bytes)?
+    };
+
+    if let Some(patches_val) = current_adjustments.get("aiPatches") {
+        if let Some(patches_arr) = patches_val.as_array() {
+            for patch_obj in patches_arr {
+                if let Some(b64_data) = patch_obj.get("patchDataBase64").and_then(|v| v.as_str()) {
+                    let png_bytes = general_purpose::STANDARD.decode(b64_data)?;
+                    let patch_layer = image::load_from_memory(&png_bytes)?;
+                    imageops::overlay(&mut base_image, &patch_layer, 0, 0);
+                }
+            }
+        }
+    }
+
+    Ok(base_image)
 }
 
 fn apply_flip(image: DynamicImage, horizontal: bool, vertical: bool) -> DynamicImage {
@@ -247,26 +271,22 @@ fn read_exif_data(file_bytes: &[u8]) -> HashMap<String, String> {
 
 #[tauri::command]
 async fn load_image(path: String, state: tauri::State<'_, AppState>) -> Result<LoadImageResult, String> {
-    let file_bytes = fs::read(&path).map_err(|e| e.to_string())?;
-    let is_raw = is_raw_file(&path);
-
-    let (img, full_res_dims) = if is_raw {
-        *state.raw_file_bytes.lock().unwrap() = Some(file_bytes.clone());
-
-        let developed_img = raw_processing::develop_raw_image(&file_bytes, false)
-            .map_err(|e| e.to_string())?;
-        let dims = developed_img.dimensions();
-        (developed_img, dims)
+    let sidecar_path = get_sidecar_path(&path);
+    let metadata: ImageMetadata = if sidecar_path.exists() {
+        let file_content = fs::read_to_string(sidecar_path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&file_content).unwrap_or_default()
     } else {
-        *state.raw_file_bytes.lock().unwrap() = None;
-        let loaded_img = image::load_from_memory(&file_bytes).map_err(|e| e.to_string())?;
-        let dims = loaded_img.dimensions();
-        (loaded_img, dims)
+        ImageMetadata::default()
     };
 
-    let (orig_width, orig_height) = full_res_dims;
+    let img = get_composited_image(&path, &metadata.adjustments)
+        .map_err(|e| format!("Failed to load and composite image: {}", e))?;
 
-    let exif_data = read_exif_data(&file_bytes);
+    let (orig_width, orig_height) = img.dimensions();
+    let is_raw = is_raw_file(&path);
+
+    let file_bytes_for_exif = fs::read(&path).map_err(|e| e.to_string())?;
+    let exif_data = read_exif_data(&file_bytes_for_exif);
 
     const DISPLAY_PREVIEW_DIM: u32 = 2160;
     let display_preview = img.thumbnail(DISPLAY_PREVIEW_DIM, DISPLAY_PREVIEW_DIM);
@@ -279,14 +299,6 @@ async fn load_image(path: String, state: tauri::State<'_, AppState>) -> Result<L
         full_height: orig_height,
     });
     
-    let sidecar_path = get_sidecar_path(&path);
-    let metadata = if sidecar_path.exists() {
-        let file_content = std::fs::read_to_string(sidecar_path).map_err(|e| e.to_string())?;
-        serde_json::from_str(&file_content).unwrap_or_default()
-    } else {
-        ImageMetadata::default()
-    };
-
     Ok(LoadImageResult {
         original_base64,
         width: orig_width,
@@ -415,6 +427,12 @@ fn generate_uncropped_preview(
     Ok(())
 }
 
+fn get_full_image_for_processing(state: &tauri::State<AppState>) -> Result<DynamicImage, String> {
+    let original_image_lock = state.original_image.lock().unwrap();
+    let loaded_image = original_image_lock.as_ref().ok_or("No original image loaded")?;
+    Ok(loaded_image.image.clone())
+}
+
 #[tauri::command]
 fn generate_fullscreen_preview(
     js_adjustments: serde_json::Value,
@@ -533,13 +551,6 @@ fn batch_export_images(
         let _ = app_handle.emit("batch-export-progress", serde_json::json!({ "current": i, "total": paths.len(), "path": image_path_str }));
 
         let processing_result: Result<(), String> = (|| {
-            let file_bytes = fs::read(image_path_str).map_err(|e| e.to_string())?;
-            let base_image = if is_raw_file(image_path_str) {
-                raw_processing::develop_raw_image(&file_bytes, false).map_err(|e| e.to_string())?
-            } else {
-                image::load_from_memory(&file_bytes).map_err(|e| e.to_string())?
-            };
-
             let sidecar_path = get_sidecar_path(image_path_str);
             let metadata: ImageMetadata = if sidecar_path.exists() {
                 let file_content = fs::read_to_string(sidecar_path).map_err(|e| e.to_string())?;
@@ -548,6 +559,9 @@ fn batch_export_images(
                 ImageMetadata::default()
             };
             let js_adjustments = metadata.adjustments;
+
+            let base_image = get_composited_image(image_path_str, &js_adjustments)
+                .map_err(|e| e.to_string())?;
             
             let (transformed_image, unscaled_crop_offset) = 
                 apply_all_transformations(&base_image, &js_adjustments, 1.0);
@@ -650,12 +664,6 @@ fn generate_mask_overlay(
     } else {
         Ok("".to_string())
     }
-}
-
-fn get_full_image_for_processing(state: &tauri::State<AppState>) -> Result<DynamicImage, String> {
-    let original_image_lock = state.original_image.lock().unwrap();
-    let loaded_image = original_image_lock.as_ref().ok_or("No original image loaded")?;
-    Ok(loaded_image.image.clone())
 }
 
 #[tauri::command]
@@ -1187,6 +1195,48 @@ fn update_window_effect(theme: String, window: tauri::Window) {
     }
 }
 
+#[tauri::command]
+async fn check_comfyui_status(app_handle: tauri::AppHandle) {
+    let is_connected = comfyui_connector::ping_server().await.is_ok();
+    let _ = app_handle.emit("comfyui-status-update", serde_json::json!({ "connected": is_connected }));
+}
+
+#[tauri::command]
+async fn invoke_generative_erase(
+    path: String,
+    mask_data_base64: String,
+    current_adjustments: Value,
+) -> Result<String, String> {
+    let source_image = get_composited_image(&path, &current_adjustments)
+        .map_err(|e| format!("Failed to prepare source image: {}", e))?;
+
+    let b64_data = if let Some(idx) = mask_data_base64.find(',') {
+        &mask_data_base64[idx + 1..]
+    } else {
+        &mask_data_base64
+    };
+    let mask_bytes = general_purpose::STANDARD.decode(b64_data)
+        .map_err(|e| format!("Failed to decode mask: {}", e))?;
+    let mask_image = image::load_from_memory(&mask_bytes)
+        .map_err(|e| format!("Failed to load mask image: {}", e))?;
+
+    let workflow_inputs = comfyui_connector::WorkflowInputs {
+        source_image_node_id: "11".to_string(),
+        mask_image_node_id: Some("148".to_string()),
+        final_output_node_id: "93".to_string(),
+    };
+
+    let result_png_bytes = comfyui_connector::execute_workflow(
+        "generative_erase",
+        workflow_inputs,
+        source_image,
+        Some(mask_image),
+        None
+    ).await.map_err(|e| e.to_string())?;
+
+    Ok(general_purpose::STANDARD.encode(&result_png_bytes))
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
@@ -1245,7 +1295,6 @@ fn main() {
         .manage(AppState {
             original_image: Mutex::new(None),
             cached_preview: Mutex::new(None),
-            raw_file_bytes: Mutex::new(None),
             gpu_context: Mutex::new(None),
             ai_state: Mutex::new(None),
         })
@@ -1285,7 +1334,9 @@ fn main() {
             handle_export_presets_to_file,
             clear_all_sidecars,
             clear_thumbnail_cache,
-            update_window_effect
+            update_window_effect,
+            check_comfyui_status,
+            invoke_generative_erase
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
