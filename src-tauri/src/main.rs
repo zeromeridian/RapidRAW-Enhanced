@@ -89,6 +89,7 @@ struct AppSettings {
     editor_preview_resolution: Option<u32>,
     sort_criteria: Option<SortCriteria>,
     theme: Option<String>,
+    comfyui_address: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -1229,8 +1230,20 @@ fn update_window_effect(theme: String, window: tauri::Window) {
 
 #[tauri::command]
 async fn check_comfyui_status(app_handle: tauri::AppHandle) {
-    let is_connected = comfyui_connector::ping_server().await.is_ok();
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let is_connected = if let Some(address) = settings.comfyui_address {
+        comfyui_connector::ping_server(&address).await.is_ok()
+    } else {
+        false
+    };
     let _ = app_handle.emit("comfyui-status-update", serde_json::json!({ "connected": is_connected }));
+}
+
+#[tauri::command]
+async fn test_comfyui_connection(address: String) -> Result<(), String> {
+    comfyui_connector::ping_server(&address)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1238,7 +1251,12 @@ async fn invoke_generative_erase(
     path: String,
     mask_data_base64: String,
     current_adjustments: Value,
+    app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
+    let settings = load_settings(app_handle).unwrap_or_default();
+    let address = settings.comfyui_address
+        .ok_or_else(|| "ComfyUI address is not configured in settings.".to_string())?;
+
     let source_image = get_composited_image(&path, &current_adjustments)
         .map_err(|e| format!("Failed to prepare source image: {}", e))?;
 
@@ -1259,6 +1277,7 @@ async fn invoke_generative_erase(
     };
 
     let result_png_bytes = comfyui_connector::execute_workflow(
+        &address,
         "generative_erase",
         workflow_inputs,
         source_image,
@@ -1368,6 +1387,7 @@ fn main() {
             clear_thumbnail_cache,
             update_window_effect,
             check_comfyui_status,
+            test_comfyui_connection,
             invoke_generative_erase
         ])
         .run(tauri::generate_context!())

@@ -9,7 +9,6 @@ use std::fs;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use uuid::Uuid;
 
-const COMFYUI_ADDRESS: &str = "asdf";
 const WORKFLOWS_DIR: &str = "./workflows";
 
 pub struct WorkflowInputs {
@@ -18,7 +17,7 @@ pub struct WorkflowInputs {
     pub final_output_node_id: String,
 }
 
-async fn upload_image(image: DynamicImage, form_name: &str) -> Result<String> {
+async fn upload_image(address: &str, image: DynamicImage, form_name: &str) -> Result<String> {
     let mut image_bytes = Cursor::new(Vec::new());
     image.write_to(&mut image_bytes, ImageFormat::Png)?;
     
@@ -32,7 +31,7 @@ async fn upload_image(image: DynamicImage, form_name: &str) -> Result<String> {
 
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("http://{}/upload/image", COMFYUI_ADDRESS))
+        .post(format!("http://{}/upload/image", address))
         .multipart(form)
         .send()
         .await?;
@@ -52,7 +51,7 @@ async fn upload_image(image: DynamicImage, form_name: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("Failed to get filename from ComfyUI upload response. Full response: {}", response_json))
 }
 
-async fn queue_prompt(prompt: Value, client_id: &str) -> Result<String> {
+async fn queue_prompt(address: &str, prompt: Value, client_id: &str) -> Result<String> {
     let payload = json!({
         "prompt": prompt,
         "client_id": client_id,
@@ -60,7 +59,7 @@ async fn queue_prompt(prompt: Value, client_id: &str) -> Result<String> {
 
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("http://{}/prompt", COMFYUI_ADDRESS))
+        .post(format!("http://{}/prompt", address))
         .json(&payload)
         .send()
         .await?;
@@ -80,8 +79,8 @@ async fn queue_prompt(prompt: Value, client_id: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("Failed to get prompt_id from ComfyUI. Full response: {}", response_json))
 }
 
-async fn get_history(prompt_id: &str) -> Result<Value> {
-    let url = format!("http://{}/history/{}", COMFYUI_ADDRESS, prompt_id);
+async fn get_history(address: &str, prompt_id: &str) -> Result<Value> {
+    let url = format!("http://{}/history/{}", address, prompt_id);
     let response = reqwest::get(&url).await?;
 
     if !response.status().is_success() {
@@ -93,9 +92,9 @@ async fn get_history(prompt_id: &str) -> Result<Value> {
     Ok(response.json::<Value>().await?)
 }
 
-async fn get_image(filename: &str, subfolder: &str, folder_type: &str) -> Result<Vec<u8>> {
+async fn get_image(address: &str, filename: &str, subfolder: &str, folder_type: &str) -> Result<Vec<u8>> {
     let client = reqwest::Client::new();
-    let response = client.get(format!("http://{}/view", COMFYUI_ADDRESS))
+    let response = client.get(format!("http://{}/view", address))
         .query(&[
             ("filename", filename),
             ("subfolder", subfolder),
@@ -113,12 +112,13 @@ async fn get_image(filename: &str, subfolder: &str, folder_type: &str) -> Result
     Ok(response.bytes().await?.to_vec())
 }
 
-pub async fn ping_server() -> Result<()> {
-    reqwest::get(format!("http://{}", COMFYUI_ADDRESS)).await?.error_for_status()?;
+pub async fn ping_server(address: &str) -> Result<()> {
+    reqwest::get(format!("http://{}", address)).await?.error_for_status()?;
     Ok(())
 }
 
 pub async fn execute_workflow(
+    address: &str,
     workflow_name: &str,
     inputs: WorkflowInputs,
     source_image: DynamicImage,
@@ -130,7 +130,7 @@ pub async fn execute_workflow(
         .map_err(|e| anyhow!("Failed to read workflow file at {:?}: {}", workflow_path, e))?;
     let mut workflow: Value = serde_json::from_str(&workflow_str)?;
 
-    let source_filename = upload_image(source_image, "image").await?;
+    let source_filename = upload_image(address, source_image, "image").await?;
     if let Some(node) = workflow.get_mut(&inputs.source_image_node_id) {
         node["inputs"]["image"] = json!(source_filename);
     } else {
@@ -138,7 +138,7 @@ pub async fn execute_workflow(
     }
 
     if let (Some(mask), Some(mask_node_id)) = (mask_image, &inputs.mask_image_node_id) {
-        let mask_filename = upload_image(mask, "image").await?;
+        let mask_filename = upload_image(address, mask, "image").await?;
         if let Some(node) = workflow.get_mut(mask_node_id) {
             node["inputs"]["image"] = json!(mask_filename);
         } else {
@@ -147,11 +147,11 @@ pub async fn execute_workflow(
     }
 
     let client_id = Uuid::new_v4().to_string();
-    let ws_url = format!("ws://{}/ws?clientId={}", COMFYUI_ADDRESS, client_id);
+    let ws_url = format!("ws://{}/ws?clientId={}", address, client_id);
     let (ws_stream, _) = connect_async(&ws_url).await.map_err(|e| anyhow!("Failed to connect to WebSocket at {}: {}", ws_url, e))?;
     let (_write, mut read) = ws_stream.split();
 
-    let prompt_id = queue_prompt(workflow, &client_id).await?;
+    let prompt_id = queue_prompt(address, workflow, &client_id).await?;
 
     loop {
         match read.next().await {
@@ -169,7 +169,7 @@ pub async fn execute_workflow(
         }
     }
 
-    let history = get_history(&prompt_id).await?;
+    let history = get_history(address, &prompt_id).await?;
     let outputs = history.get(&prompt_id)
         .and_then(|h| h.get("outputs"))
         .ok_or_else(|| anyhow!("Could not find outputs for prompt_id {} in history", prompt_id))?;
@@ -188,5 +188,5 @@ pub async fn execute_workflow(
     let subfolder = first_image_info.get("subfolder").and_then(|s| s.as_str()).unwrap_or("");
     let folder_type = first_image_info.get("type").and_then(|t| t.as_str()).ok_or_else(|| anyhow!("Could not get type from output"))?;
 
-    get_image(final_filename, subfolder, folder_type).await
+    get_image(address, final_filename, subfolder, folder_type).await
 }

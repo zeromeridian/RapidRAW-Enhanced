@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Wifi, WifiOff } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import Button from '../ui/Button';
 import ConfirmModal from '../modals/ConfirmModal';
 import Dropdown from '../ui/Dropdown';
+import Input from '../ui/Input';
 import { THEMES, DEFAULT_THEME_ID } from '../../themes';
 
 const resolutions = [
@@ -41,6 +42,12 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
     onConfirm: () => {},
     confirmText: 'Confirm',
     confirmVariant: 'primary',
+  });
+
+  const [testStatus, setTestStatus] = useState({
+    testing: false,
+    message: '',
+    success: null,
   });
 
   const effectiveRootPath = rootPath || appSettings?.lastRootPath;
@@ -103,6 +110,20 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
     });
   };
 
+  const handleTestConnection = async () => {
+    if (!appSettings?.comfyuiAddress) return;
+    setTestStatus({ testing: true, message: 'Testing...', success: null });
+    try {
+      await invoke('test_comfyui_connection', { address: appSettings.comfyuiAddress });
+      setTestStatus({ testing: false, message: 'Connection successful!', success: true });
+    } catch (err) {
+      setTestStatus({ testing: false, message: `Connection failed.`, success: false });
+      console.error("ComfyUI connection test failed:", err);
+    } finally {
+      setTimeout(() => setTestStatus({ testing: false, message: '', success: null }), 3000);
+    }
+  };
+
   const closeConfirmModal = () => {
     setConfirmModalState({ ...confirmModalState, isOpen: false });
   };
@@ -152,6 +173,42 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
                   Higher resolutions provide a sharper preview but may impact performance on less powerful systems.
                 </p>
               </div>
+            </div>
+          </div>
+
+          <div className="p-6 bg-surface rounded-xl shadow-md">
+            <h2 className="text-xl font-semibold mb-4 text-accent">Integrations</h2>
+            <div>
+              <label htmlFor="comfyui-address" className="block text-sm font-medium text-text-secondary mb-2">
+                ComfyUI Address
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="comfyui-address"
+                  type="text"
+                  placeholder="127.0.0.1:8188"
+                  value={appSettings?.comfyuiAddress || ''}
+                  onChange={(e) => onSettingsChange({ ...appSettings, comfyuiAddress: e.target.value })}
+                  className="flex-grow"
+                />
+                <Button
+                  onClick={handleTestConnection}
+                  disabled={testStatus.testing || !appSettings?.comfyuiAddress}
+                  className="w-32"
+                >
+                  {testStatus.testing ? 'Testing...' : 'Test'}
+                </Button>
+              </div>
+              {testStatus.message && (
+                <p className={`text-sm mt-2 flex items-center gap-2 ${testStatus.success ? 'text-green-400' : 'text-red-400'}`}>
+                  {testStatus.success === true && <Wifi size={16} />}
+                  {testStatus.success === false && <WifiOff size={16} />}
+                  {testStatus.message}
+                </p>
+              )}
+              <p className="text-xs text-text-secondary mt-2">
+                Enter the address and port of your running ComfyUI instance. Required for generative AI features.
+              </p>
             </div>
           </div>
 
