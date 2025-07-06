@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import debounce from 'lodash.debounce';
+import { COPYABLE_ADJUSTMENT_KEYS } from '../App';
 
 export function usePresets(currentAdjustments) {
   const [presets, setPresets] = useState([]);
@@ -29,10 +30,17 @@ export function usePresets(currentAdjustments) {
   }, [loadPresets]);
 
   const addPreset = (name) => {
+    const presetAdjustments = {};
+    for (const key of COPYABLE_ADJUSTMENT_KEYS) {
+      if (currentAdjustments.hasOwnProperty(key)) {
+        presetAdjustments[key] = currentAdjustments[key];
+      }
+    }
+
     const newPreset = {
       id: crypto.randomUUID(),
       name,
-      adjustments: currentAdjustments,
+      adjustments: presetAdjustments,
     };
     const updatedPresets = [...presets, newPreset];
     setPresets(updatedPresets);
@@ -54,9 +62,16 @@ export function usePresets(currentAdjustments) {
   };
 
   const updatePreset = (id) => {
+    const presetAdjustments = {};
+    for (const key of COPYABLE_ADJUSTMENT_KEYS) {
+      if (currentAdjustments.hasOwnProperty(key)) {
+        presetAdjustments[key] = currentAdjustments[key];
+      }
+    }
+
     const updatedPresets = presets.map(p => 
       p.id === id 
-        ? { ...p, adjustments: currentAdjustments } 
+        ? { ...p, adjustments: presetAdjustments } 
         : p
     );
     setPresets(updatedPresets);
