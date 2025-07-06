@@ -77,15 +77,8 @@ export default function PresetsPanel({ adjustments, setAdjustments, selectedImag
 
   const handleApplyPreset = (preset) => {
     setAdjustments(prevAdjustments => ({
-      ...INITIAL_ADJUSTMENTS,
+      ...prevAdjustments,
       ...preset.adjustments,
-      rating: prevAdjustments.rating,
-      crop: prevAdjustments.crop,
-      aspectRatio: prevAdjustments.aspectRatio,
-      rotation: prevAdjustments.rotation,
-      flipHorizontal: prevAdjustments.flipHorizontal,
-      flipVertical: prevAdjustments.flipVertical,
-      masks: prevAdjustments.masks,
     }));
   };
 
