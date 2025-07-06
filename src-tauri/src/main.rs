@@ -126,11 +126,17 @@ struct ExportSettings {
 
 fn get_composited_image(path: &str, current_adjustments: &Value) -> anyhow::Result<DynamicImage> {
     let file_bytes = fs::read(path)?;
-    let mut base_image = if is_raw_file(path) {
+    let base_image = if is_raw_file(path) {
         develop_raw_image(&file_bytes, false)?
     } else {
         image::load_from_memory(&file_bytes)?
     };
+
+    composite_patches_on_image(&base_image, current_adjustments)
+}
+
+fn composite_patches_on_image(base_image: &DynamicImage, current_adjustments: &Value) -> anyhow::Result<DynamicImage> {
+    let mut composited = base_image.clone();
 
     if let Some(patches_val) = current_adjustments.get("aiPatches") {
         if let Some(patches_arr) = patches_val.as_array() {
@@ -138,13 +144,13 @@ fn get_composited_image(path: &str, current_adjustments: &Value) -> anyhow::Resu
                 if let Some(b64_data) = patch_obj.get("patchDataBase64").and_then(|v| v.as_str()) {
                     let png_bytes = general_purpose::STANDARD.decode(b64_data)?;
                     let patch_layer = image::load_from_memory(&png_bytes)?;
-                    imageops::overlay(&mut base_image, &patch_layer, 0, 0);
+                    imageops::overlay(&mut composited, &patch_layer, 0, 0);
                 }
             }
         }
     }
 
-    Ok(base_image)
+    Ok(composited)
 }
 
 fn apply_flip(image: DynamicImage, horizontal: bool, vertical: bool) -> DynamicImage {
@@ -208,6 +214,16 @@ fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
         }
     }
     
+    if let Some(patches_val) = adjustments.get("aiPatches") {
+        if let Some(patches_arr) = patches_val.as_array() {
+            for patch in patches_arr {
+                if let Some(id) = patch.get("id").and_then(|v| v.as_str()) {
+                    id.hash(&mut hasher);
+                }
+            }
+        }
+    }
+
     hasher.finish()
 }
 
@@ -216,7 +232,9 @@ fn generate_transformed_preview(
     adjustments: &serde_json::Value,
     app_handle: &tauri::AppHandle,
 ) -> Result<(DynamicImage, f32, (f32, f32)), String> {
-    let original_image = &loaded_image.image;
+    let patched_original_image = composite_patches_on_image(&loaded_image.image, adjustments)
+        .map_err(|e| format!("Failed to composite AI patches: {}", e))?;
+    
     let (full_w, full_h) = (loaded_image.full_width, loaded_image.full_height);
 
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
@@ -224,11 +242,11 @@ fn generate_transformed_preview(
 
     let (processing_base, scale_for_gpu) = 
         if full_w > final_preview_dim || full_h > final_preview_dim {
-            let base = original_image.thumbnail(final_preview_dim, final_preview_dim);
+            let base = patched_original_image.thumbnail(final_preview_dim, final_preview_dim);
             let scale = if full_w > 0 { base.width() as f32 / full_w as f32 } else { 1.0 };
             (base, scale)
         } else {
-            (original_image.clone(), 1.0)
+            (patched_original_image.clone(), 1.0)
         };
 
     let (final_preview_base, unscaled_crop_offset) = 
@@ -279,22 +297,25 @@ async fn load_image(path: String, state: tauri::State<'_, AppState>) -> Result<L
         ImageMetadata::default()
     };
 
-    let img = get_composited_image(&path, &metadata.adjustments)
-        .map_err(|e| format!("Failed to load and composite image: {}", e))?;
+    let file_bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    let pristine_img = if is_raw_file(&path) {
+        develop_raw_image(&file_bytes, false).map_err(|e| e.to_string())?
+    } else {
+        image::load_from_memory(&file_bytes).map_err(|e| e.to_string())?
+    };
 
-    let (orig_width, orig_height) = img.dimensions();
+    let (orig_width, orig_height) = pristine_img.dimensions();
     let is_raw = is_raw_file(&path);
 
-    let file_bytes_for_exif = fs::read(&path).map_err(|e| e.to_string())?;
-    let exif_data = read_exif_data(&file_bytes_for_exif);
+    let exif_data = read_exif_data(&file_bytes);
 
     const DISPLAY_PREVIEW_DIM: u32 = 2160;
-    let display_preview = img.thumbnail(DISPLAY_PREVIEW_DIM, DISPLAY_PREVIEW_DIM);
+    let display_preview = pristine_img.thumbnail(DISPLAY_PREVIEW_DIM, DISPLAY_PREVIEW_DIM);
     let original_base64 = encode_to_base64(&display_preview, 85)?;
 
     *state.cached_preview.lock().unwrap() = None;
     *state.original_image.lock().unwrap() = Some(LoadedImage {
-        image: img,
+        image: pristine_img,
         full_width: orig_width,
         full_height: orig_height,
     });
@@ -390,7 +411,14 @@ fn generate_uncropped_preview(
     let loaded_image = state.original_image.lock().unwrap().clone().ok_or("No original image loaded")?;
 
     thread::spawn(move || {
-        let original_image = loaded_image.image;
+        let patched_image = match composite_patches_on_image(&loaded_image.image, &adjustments_clone) {
+            Ok(img) => img,
+            Err(e) => {
+                eprintln!("Failed to composite patches for uncropped preview: {}", e);
+                loaded_image.image
+            },
+        };
+        
         let (full_w, full_h) = (loaded_image.full_width, loaded_image.full_height);
 
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
@@ -398,11 +426,11 @@ fn generate_uncropped_preview(
 
         let (processing_base, scale_for_gpu) = 
             if full_w > preview_dim || full_h > preview_dim {
-                let base = original_image.thumbnail(preview_dim, preview_dim);
+                let base = patched_image.thumbnail(preview_dim, preview_dim);
                 let scale = if full_w > 0 { base.width() as f32 / full_w as f32 } else { 1.0 };
                 (base, scale)
             } else {
-                (original_image.clone(), 1.0)
+                (patched_image.clone(), 1.0)
             };
         
         let (preview_width, preview_height) = processing_base.dimensions();
@@ -439,7 +467,9 @@ fn generate_fullscreen_preview(
     state: tauri::State<AppState>,
 ) -> Result<String, String> {
     let context = get_or_init_gpu_context(&state)?;
-    let base_image = get_full_image_for_processing(&state)?;
+    let original_image = get_full_image_for_processing(&state)?;
+    let base_image = composite_patches_on_image(&original_image, &js_adjustments)
+        .map_err(|e| format!("Failed to composite AI patches for fullscreen: {}", e))?;
     
     let (transformed_image, unscaled_crop_offset) = 
         apply_all_transformations(&base_image, &js_adjustments, 1.0);
@@ -467,7 +497,9 @@ fn export_image(
     state: tauri::State<AppState>,
 ) -> Result<(), String> {
     let context = get_or_init_gpu_context(&state)?;
-    let base_image = get_full_image_for_processing(&state)?;
+    let original_image = get_full_image_for_processing(&state)?;
+    let base_image = composite_patches_on_image(&original_image, &js_adjustments)
+        .map_err(|e| format!("Failed to composite AI patches for export: {}", e))?;
 
     let (transformed_image, unscaled_crop_offset) = 
         apply_all_transformations(&base_image, &js_adjustments, 1.0);
@@ -1223,7 +1255,7 @@ async fn invoke_generative_erase(
     let workflow_inputs = comfyui_connector::WorkflowInputs {
         source_image_node_id: "11".to_string(),
         mask_image_node_id: Some("148".to_string()),
-        final_output_node_id: "93".to_string(),
+        final_output_node_id: "215".to_string(),
     };
 
     let result_png_bytes = comfyui_connector::execute_workflow(

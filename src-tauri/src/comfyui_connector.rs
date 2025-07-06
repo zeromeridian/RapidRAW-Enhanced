@@ -9,7 +9,7 @@ use std::fs;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use uuid::Uuid;
 
-const COMFYUI_ADDRESS: &str = "your.comfyui.instance:port";
+const COMFYUI_ADDRESS: &str = "asdf";
 const WORKFLOWS_DIR: &str = "./workflows";
 
 pub struct WorkflowInputs {
