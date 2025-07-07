@@ -27,15 +27,19 @@ Have fun!
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
-*   Added: Ability to overwrite preset with current settings
-*   Added: High speed and precise cache to significantly accelerate large image editing
-*   Added: Greatly improved shader with better dehaze, more accurate curves etc.
-*   Added: Predefined 90° clockwise rotation and ability to flip images
-*   Added: Switched from [rawloader](https://github.com/pedrocr/rawloader) to [rawler](https://github.com/dnglab/dnglab/tree/main/rawler) to support a wider range of RAW formats
-*   Added: AI-powered foreground / background masking
-*   Added: AI-powered subject masking
-*   Added: Precompiled Linux builds
-*   Fixed: Various small bugs
+*   **2025-07-06:** Improved generative AI features and updated [AI Roadmap](#ai-roadmap)
+*   **2025-07-06:** Initial generative AI integration with [ComfyUI](https://github.com/comfyanonymous/ComfyUI) - for more details, checkout the [AI Roadmap](#ai-roadmap)
+*   **2025-07-05:** Ability to overwrite preset with current settings
+*   **2025-07-04:** High speed and precise cache to significantly accelerate large image editing
+*   **2025-07-04:** Greatly improved shader with better dehaze, more accurate curves etc.
+*   **2025-07-04:** Predefined 90° clockwise rotation and ability to flip images
+*   **2025-07-03:** Switched from [rawloader](https://github.com/pedrocr/rawloader) to [rawler](https://github.com/dnglab/dnglab/tree/main/rawler) to support a wider range of RAW formats
+*   **2025-07-02:** AI-powered foreground / background masking
+*   **2025-06-30:** AI-powered subject masking
+*   **2025-06-30:** Precompiled Linux builds
+*   **2025-06-28:** New 5:4 aspect ratio, new low contrast grey theme and more cameras support (DJI Mavic lineup)
+*   **2025-06-28:** Release cleanup, CI/CD improvements and minor fixes 
+*   **2025-06-27:** Initial release. For more information about the earlier progress, look at the [Initial Development Log](#initial-development-log)
 
 </details>
 <br>
@@ -63,9 +67,10 @@ Have fun!
       <h4>Core Editing Engine</h4>
       <ul>
         <li><strong>GPU-Accelerated Processing:</strong> All image adjustments are processed on the GPU using a custom WGSL shader for rapid feedback.</li>
+        <li><strong>Masking:</strong> Instantly create precise masks with AI subject and foreground detection. Combine with traditional Brush, Linear, and Radial masks for great control.</li>
+        <li><strong>Generative Edits:</strong> Remove objects or add new elements with text prompts. Each edit creates a non-destructive patch layer, powered by an optional ComfyUI backend.</li>
         <li><strong>Full RAW Support:</strong> Supports a wide range of RAW camera formats thanks to rawler.</li>
         <li><strong>Non-Destructive Workflow:</strong> All edits are stored in a <code>.rrdata</code> sidecar file, leaving your original images untouched.</li>
-        <li><strong>Masking:</strong> Local adjustments with AI object / foreground detection, Brush, Linear, and Radial masks. The mask system is bitmap-based.</li>
         <li><strong>32-bit Precision:</strong> Ensures high-quality adjustments without banding or data loss.</li>
       </ul>
       <h4>Professional Grade Adjustments</h4>
@@ -81,12 +86,12 @@ Have fun!
     <td valign="top" width="50%">
       <h4>Library & Workflow</h4>
       <ul>
-        <li><strong>Image Library:</strong> Sort, rate, and manage your photos efficiently.</li>
+        <li><strong>Image Library:</strong> Effortlessly sort, rate, and manage your entire photo collection for a streamlined and efficient workflow.</li>
         <li><strong>Folder Management:</strong> Integrated folder tree, create, rename, and delete folders directly within the app.</li>
         <li><strong>File Operations:</strong> Copy, move, and duplicate images and their associated edits.</li>
-        <li><strong>Filmstrip View:</strong> Quickly navigate between images in your current folder while editing.</li>
-        <li><strong>Batch Operations:</strong> Apply adjustments or export multiple images at once.</li>
-        <li><strong>EXIF Data Viewer:</strong> Inspect your camera's metadata.</li>
+        <li><strong>Filmstrip View:</strong> Quickly navigate between all the images in your current folder while editing.</li>
+        <li><strong>Batch Operations:</strong> Save significant time by applying a consistent set of adjustments or exporting entire batches of images simultaneously.</li>
+        <li><strong>EXIF Data Viewer:</strong> Gain insights by inspecting the complete metadata from your camera, including shutter speed, aperture, ISO, and lens information.</li>
       </ul>
       <h4>Productivity & UI</h4>
       <ul>
@@ -134,6 +139,18 @@ Here's RapidRAW in action.
       <em>Beautiful themes and UI customization.</em>
     </td>
   </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/masks.gif" alt="Advanced masking to speedup workflow" style="max-width: 100%;">
+      <br>
+      <em>Advanced masking to speedup workflow.</em>
+    </td>
+    <td width="50%" align="center">
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/ai.gif" alt="Experimental generative AI features" style="max-width: 100%;">
+      <br>
+      <em>Experimental generative AI features.</em>
+    </td>
+  </tr>
 </table>
 
 > If you like the theme images and want to see more of my own images, checkout my Instagram: [**@timonkaech.photography**](https://www.instagram.com/timonkaech.photography/)
@@ -170,20 +187,51 @@ While the core functionality is in place, I'm actively working on improving seve
 
 ## AI Roadmap
 
-Building on the AI-powered subject masking, the next major step for RapidRAW is to integrate powerful generative editing capabilities without bloating the core application.
+RapidRAW features a two-tier approach to AI to provide both speed and power. It distinguishes between lightweight, integrated tools and heavy, optional generative features.
 
-A key design philosophy of RapidRAW is to remain a lightweight and fast application. To honor this, the generative AI features will be implemented as an **optional, separate module**.
+1.  **Built-in AI Masking:** The core application includes lightweight, fast and open source AI models (SAM from Meta) for intelligent masking (e.g., Subject and Foreground selection). These tools run locally, are always available, and are designed to accelerate your standard editing workflow.
 
-### **The Plan:**
-An official Docker container will be provided which runs a pre-configured [ComfyUI](https://github.com/comfyanonymous/ComfyUI) server. This server will act as the Stable Diffusion inference engine.
+2.  **Optional Generative AI:** For computationally intensive tasks like inpainting (Generative Replace), RapidRAW connects to an external ComfyUI backend. This keeps the main application small and fast, while offloading heavy processing to a dedicated, user-run server.
 
-### **How it will work:**
-1.  Users who want generative features can run the optional Docker container.
-2.  RapidRAW will detect the local server and enable the AI tools in the UI.
-3.  The app will send the image and a specific ComfyUI workflow (e.g., for inpainting or outpainting) to the container.
-4.  The Docker container handles the heavy processing and sends the resulting image back to RapidRAW.
+### Current Status: Generative AI is in Developer Preview
 
-This modular approach ensures that RapidRAW's core experience remains fast for everyone, while providing a clear path for cutting-edge, optional features like AI object removal, generative fill, and style transfer.
+> The **Built-in AI Masking** is fully functional for all users.
+>
+> The **Optional Generative AI** features, however, currently require a manual setup of a [ComfyUI](https://github.com/comfyanonymous/ComfyUI) backend. The official, easy-to-use Docker container is **not yet provided**.
+>
+> This means the generative tools are considered a **developer preview** and are not ready for general, out-of-the-box use.
+
+<details>
+<summary><strong>Click to see the Generative AI features in action</strong></summary>
+<br>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/ai.gif" alt="Experimental generative AI features" style="max-width: 100%;">
+  <br>
+  <em>Generative Replace powered by a local ComfyUI backend.</em>
+</p>
+</details>
+
+### Foundational Generative Integration
+
+The initial work on generative AI focused on building a connection to the ComfyUI backend and implementing the first key features.
+
+*   **Modular Backend:** RapidRAW connects to a local ComfyUI server, which acts as the inference engine.
+*   **Generative Replace (Inpainting):** Users can paint a mask over an area of the image (or use the AI masking tool to create a precise selection) and provide a text prompt to fill that area with generated content.
+*   **Non-Destructive Patches:** Each generative edit is stored as a separate "patch" layer. These can be toggled, re-ordered, or deleted at any time, consistent with RapidRAW's non-destructive philosophy.
+
+<details>
+<summary><strong>The Technical Approach for Generative AI</strong></summary>
+<br>
+The integration is designed as follows:
+
+1.  **Optional Backend:** Users who want generative features can run an official, pre-configured Docker container which launches a ComfyUI server with all necessary models and custom nodes.
+2.  **Automatic Detection:** RapidRAW automatically detects if the local ComfyUI server is running and enables the generative AI tools in the UI.
+3.  **Workflow-Based Execution:** When a user triggers a generative action (e.g., "Generative Replace"), RapidRAW sends the source image, mask, and text prompt to the ComfyUI server along with a specific, predefined workflow JSON.
+4.  **Backend Processing:** The Docker container handles all the heavy processing on the GPU, executing the Stable Diffusion workflow.
+5.  **Seamless Integration:** The resulting image (the generated patch) is sent back to RapidRAW and composited into the editor as a patch onto the source image.
+
+This approach ensures that RapidRAW's core experience remains fast and lightweight, while providing an extensible path for optional, powerful AI features.
+</details>
 
 ## Initial Development Log
 
