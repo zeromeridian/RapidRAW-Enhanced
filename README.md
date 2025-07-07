@@ -179,7 +179,7 @@ While the core functionality is in place, I'm actively working on improving seve
 | Improving the dehaze tool for more natural results                                           | Low     | Medium     | [X]    |
 | Optimize image transport (replace Base64 for better performance)                            | Low     | Medium     | [ ]    |
 | Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High | Medium    | [X]    |
-| Implement a simple MVP of the ComfyUI based AI Roadmap                                        | Low   | High       | [ ]    |
+| Implement a simple MVP of the ComfyUI based AI Roadmap                                        | Low   | High       | [X]    |
 | Sign macOS builds using a registered developer account                                       | Medium      | Low     | [ ]    |
 | Switch to a better rawloader (e.g. rawler)                                                   | High      | Medium     | [X]    |
 | Improve speed on older systems (e.g. Pascal GPUs)                                            | Medium   | High       | [ ]    |
