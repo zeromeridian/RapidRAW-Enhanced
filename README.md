@@ -129,18 +129,6 @@ Here's RapidRAW in action.
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/library.gif" alt="Library navigation and folder management" style="max-width: 100%;">
-      <br>
-      <em>Library navigation and folder management.</em>
-    </td>
-    <td width="50%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/themes.gif" alt="Beautiful themes and UI customization" style="max-width: 100%;">
-      <br>
-      <em>Beautiful themes and UI customization.</em>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
       <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/masks.gif" alt="Advanced masking to speedup workflow" style="max-width: 100%;">
       <br>
       <em>Advanced masking to speedup workflow.</em>
@@ -149,6 +137,18 @@ Here's RapidRAW in action.
       <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/ai.gif" alt="Experimental generative AI features" style="max-width: 100%;">
       <br>
       <em>Experimental generative AI features.</em>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/library.gif" alt="Library navigation and folder management" style="max-width: 100%;">
+      <br>
+      <em>Library navigation and folder management.</em>
+    </td>
+    <td width="50%" align="center">
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/themes.gif" alt="Beautiful themes and UI customization" style="max-width: 100%;">
+      <br>
+      <em>Beautiful themes and UI customization.</em>
     </td>
   </tr>
 </table>
