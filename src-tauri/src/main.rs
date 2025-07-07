@@ -27,6 +27,7 @@ use walkdir::WalkDir;
 use window_vibrancy::{apply_acrylic, apply_vibrancy, NSVisualEffectMaterial};
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
+use rayon::prelude::*;
 
 use crate::image_processing::{
     get_all_adjustments_from_json, get_or_init_gpu_context, GpuContext,
@@ -137,28 +138,48 @@ fn get_composited_image(path: &str, current_adjustments: &Value) -> anyhow::Resu
 }
 
 fn composite_patches_on_image(base_image: &DynamicImage, current_adjustments: &Value) -> anyhow::Result<DynamicImage> {
-    let mut composited = base_image.clone();
+    let patches_val = match current_adjustments.get("aiPatches") {
+        Some(val) => val,
+        None => return Ok(base_image.clone()),
+    };
 
-    if let Some(patches_val) = current_adjustments.get("aiPatches") {
-        if let Some(patches_arr) = patches_val.as_array() {
-            for patch_obj in patches_arr {
-                let is_visible = patch_obj
-                    .get("visible")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(true);
+    let patches_arr = match patches_val.as_array() {
+        Some(arr) if !arr.is_empty() => arr,
+        _ => return Ok(base_image.clone()),
+    };
 
-                if is_visible {
-                    if let Some(b64_data) = patch_obj.get("patchDataBase64").and_then(|v| v.as_str()) {
-                        let png_bytes = general_purpose::STANDARD.decode(b64_data)?;
-                        let patch_layer = image::load_from_memory(&png_bytes)?;
-                        imageops::overlay(&mut composited, &patch_layer, 0, 0);
-                    }
-                }
+    let visible_patches_b64: Vec<&str> = patches_arr
+        .par_iter()
+        .filter_map(|patch_obj| {
+            let is_visible = patch_obj.get("visible").and_then(|v| v.as_bool()).unwrap_or(true);
+            if is_visible {
+                patch_obj.get("patchDataBase64").and_then(|v| v.as_str())
+            } else {
+                None
             }
-        }
+        })
+        .collect();
+
+    if visible_patches_b64.is_empty() {
+        return Ok(base_image.clone());
     }
 
-    Ok(composited)
+    let patch_layers: anyhow::Result<Vec<RgbaImage>> = visible_patches_b64
+        .par_iter()
+        .map(|&b64_data| {
+            let png_bytes = general_purpose::STANDARD.decode(b64_data)?;
+            let patch_layer = image::load_from_memory(&png_bytes)?;
+            Ok(patch_layer.to_rgba8())
+        })
+        .collect();
+
+    let patch_layers = patch_layers?;
+    let mut composited_rgba = base_image.to_rgba8();
+    for patch_layer in &patch_layers {
+        imageops::overlay(&mut composited_rgba, patch_layer, 0, 0);
+    }
+
+    Ok(DynamicImage::ImageRgba8(composited_rgba))
 }
 
 fn apply_flip(image: DynamicImage, horizontal: bool, vertical: bool) -> DynamicImage {
@@ -903,8 +924,6 @@ fn apply_adjustments_to_paths(
     adjustments: Value,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    use rayon::prelude::*;
-
     paths.par_iter().for_each(|path| {
         let sidecar_path = get_sidecar_path(path);
 
@@ -948,8 +967,6 @@ fn apply_adjustments_to_paths(
 
 #[tauri::command]
 fn reset_adjustments_for_paths(paths: Vec<String>, app_handle: tauri::AppHandle) -> Result<(), String> {
-    use rayon::prelude::*;
-
     paths.par_iter().for_each(|path| {
         let sidecar_path = get_sidecar_path(path);
 
@@ -1260,17 +1277,19 @@ async fn test_comfyui_connection(address: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn invoke_generative_replace(
-    path: String,
+    _path: String,
     mask_data_base64: String,
     prompt: String,
     current_adjustments: Value,
     app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
     let settings = load_settings(app_handle).unwrap_or_default();
     let address = settings.comfyui_address
         .ok_or_else(|| "ComfyUI address is not configured in settings.".to_string())?;
 
-    let mut source_image = get_composited_image(&path, &current_adjustments)
+    let base_image = get_full_image_for_processing(&state)?;
+    let source_image = composite_patches_on_image(&base_image, &current_adjustments)
         .map_err(|e| format!("Failed to prepare source image: {}", e))?;
 
     let b64_data = if let Some(idx) = mask_data_base64.find(',') {
@@ -1280,26 +1299,8 @@ async fn invoke_generative_replace(
     };
     let mask_bytes = general_purpose::STANDARD.decode(b64_data)
         .map_err(|e| format!("Failed to decode mask: {}", e))?;
-    let mut mask_image = image::load_from_memory(&mask_bytes)
+    let mask_image = image::load_from_memory(&mask_bytes)
         .map_err(|e| format!("Failed to load mask image: {}", e))?;
-
-    let (original_width, original_height) = source_image.dimensions();
-    let mut was_downscaled = false;
-
-    const MIN_DIM: u32 = 1024;
-    let smallest_dim = original_width.min(original_height);
-
-    if smallest_dim > MIN_DIM {
-        was_downscaled = true;
-        let scale_factor = MIN_DIM as f32 / smallest_dim as f32;
-        let new_width = (original_width as f32 * scale_factor).round() as u32;
-        let new_height = (original_height as f32 * scale_factor).round() as u32;
-
-        let filter = image::imageops::FilterType::Lanczos3;
-
-        source_image = source_image.resize_exact(new_width, new_height, filter);
-        mask_image = mask_image.resize_exact(new_width, new_height, filter);
-    }
 
     let workflow_inputs = comfyui_connector::WorkflowInputs {
         source_image_node_id: "11".to_string(),
@@ -1317,25 +1318,7 @@ async fn invoke_generative_replace(
         Some(prompt)
     ).await.map_err(|e| e.to_string())?;
 
-    let final_png_bytes = if was_downscaled {
-        let received_image = image::load_from_memory(&result_png_bytes)
-            .map_err(|e| format!("Failed to decode result image from ComfyUI: {}", e))?;
-
-        let upscaled_image = received_image.resize_exact(
-            original_width,
-            original_height,
-            image::imageops::FilterType::Lanczos3,
-        );
-
-        let mut buf = Cursor::new(Vec::new());
-        upscaled_image.write_to(&mut buf, ImageFormat::Png)
-            .map_err(|e| format!("Failed to re-encode upscaled image: {}", e))?;
-        buf.into_inner()
-    } else {
-        result_png_bytes
-    };
-
-    Ok(general_purpose::STANDARD.encode(&final_png_bytes))
+    Ok(general_purpose::STANDARD.encode(&result_png_bytes))
 }
 
 fn main() {
