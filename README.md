@@ -27,7 +27,7 @@ Have fun!
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
-*   **2025-07-06:** Improved generative AI features and updated [AI Roadmap](#ai-roadmap)
+*   **2025-07-07:** Improved generative AI features and updated [AI Roadmap](#ai-roadmap)
 *   **2025-07-06:** Initial generative AI integration with [ComfyUI](https://github.com/comfyanonymous/ComfyUI) - for more details, checkout the [AI Roadmap](#ai-roadmap)
 *   **2025-07-05:** Ability to overwrite preset with current settings
 *   **2025-07-04:** High speed and precise cache to significantly accelerate large image editing
@@ -37,7 +37,7 @@ Have fun!
 *   **2025-07-02:** AI-powered foreground / background masking
 *   **2025-06-30:** AI-powered subject masking
 *   **2025-06-30:** Precompiled Linux builds
-*   **2025-06-28:** New 5:4 aspect ratio, new low contrast grey theme and more cameras support (DJI Mavic lineup)
+*   **2025-06-29:** New 5:4 aspect ratio, new low contrast grey theme and more cameras support (DJI Mavic lineup)
 *   **2025-06-28:** Release cleanup, CI/CD improvements and minor fixes 
 *   **2025-06-27:** Initial release. For more information about the earlier progress, look at the [Initial Development Log](#initial-development-log)
 
