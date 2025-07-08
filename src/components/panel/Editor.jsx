@@ -27,7 +27,8 @@ export default function Editor({
   adjustments, setAdjustments, activeMaskId, onSelectMask,
   transformWrapperRef, onZoomed, onContextMenu,
   onUndo, onRedo, canUndo, canRedo, brushSettings, 
-  onGenerateAiMask, aiTool, onAiMaskDrawingComplete
+  onGenerateAiMask, aiTool, onAiMaskDrawingComplete,
+  targetZoom
 }) {
   const [crop, setCrop] = useState();
   const [isMaskHovered, setIsMaskHovered] = useState(false);
@@ -36,6 +37,32 @@ export default function Editor({
   const [transformState, setTransformState] = useState({ scale: 1, positionX: 0, positionY: 0 });
   const imageContainerRef = useRef(null);
   const isInitialMount = useRef(true);
+  const transformStateRef = useRef(transformState);
+  transformStateRef.current = transformState;
+
+  useEffect(() => {
+    if (!transformWrapperRef.current) {
+      return;
+    }
+
+    const wrapperInstance = transformWrapperRef.current;
+    const { zoomIn, zoomOut } = wrapperInstance;
+    const currentScale = transformStateRef.current.scale;
+
+    if (Math.abs(currentScale - targetZoom) < 0.001) {
+      return;
+    }
+
+    const animationTime = 200;
+    const animationType = 'easeOut';
+    const factor = Math.log(targetZoom / currentScale);
+
+    if (targetZoom > currentScale) {
+      zoomIn(factor, animationTime, animationType);
+    } else {
+      zoomOut(-factor, animationTime, animationType);
+    }
+  }, [targetZoom, transformWrapperRef]);
 
   useEffect(() => {
     if (isInitialMount.current) {
@@ -227,7 +254,10 @@ export default function Editor({
             centerZoomedOut={true}
             doubleClick={{ disabled: true }}
             panning={{ disabled: isPanningDisabled }}
-            onTransformed={(_, state) => onZoomed(state)}
+            onTransformed={(_, state) => {
+              setTransformState(state);
+              onZoomed(state);
+            }}
           >
             <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ImageCanvas

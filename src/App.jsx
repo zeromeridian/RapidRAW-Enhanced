@@ -188,8 +188,6 @@ function App() {
   const [activeRightPanel, setActiveRightPanel] = useState('adjustments');
   const [activeMaskId, setActiveMaskId] = useState(null);
   const [zoom, setZoom] = useState(1);
-  const [spaceZoomActive, setSpaceZoomActive] = useState(false);
-  const [zoomBeforeSpace, setZoomBeforeSpace] = useState(1);
   const [renderedRightPanel, setRenderedRightPanel] = useState(activeRightPanel);
   const [collapsibleSectionsState, setCollapsibleSectionsState] = useState({ basic: true, curves: true, color: false, details: false, effects: false });
   const [isLibraryExportPanelVisible, setIsLibraryExportPanelVisible] = useState(false);
@@ -724,48 +722,16 @@ function App() {
 
   const handleZoomChange = useCallback((newZoomValue) => {
     isProgrammaticZoom.current = true;
-    if (transformWrapperRef.current) {
-      const wrapperInstance = transformWrapperRef.current;
-      const { setTransform, state: currentTransformState, instance: rzpInstance } = wrapperInstance;
-      
-      if (typeof setTransform !== 'function') {
-        console.error("setTransform is not a function on transformWrapperRef.current");
-        return;
-      }
-      
-      const container = rzpInstance?.wrapperComponent;
-      if (container && container.clientWidth > 0 && container.clientHeight > 0 && currentTransformState) {
-        const { clientWidth: viewportWidth, clientHeight: viewportHeight } = container;
-        const { scale: currentScale, positionX: currentPanX, positionY: currentPanY } = currentTransformState;
-
-        if (currentScale === newZoomValue) {
-          setTimeout(() => { isProgrammaticZoom.current = false; }, 150);
-          return;
-        }
-
-        const viewportCenterX = viewportWidth / 2;
-        const viewportCenterY = viewportHeight / 2;
-
-        const scaleRatio = newZoomValue / currentScale;
-
-        const newPanX = viewportCenterX - (viewportCenterX - currentPanX) * scaleRatio;
-        const newPanY = viewportCenterY - (viewportCenterY - currentPanY) * scaleRatio;
-
-        setTransform(newPanX, newPanY, newZoomValue, 100, 'easeOut');
-      } else {
-        const fallbackX = currentTransformState ? currentTransformState.positionX : 0;
-        const fallbackY = currentTransformState ? currentTransformState.positionY : 0;
-        setTransform(fallbackX, fallbackY, newZoomValue, 100, 'easeOut');
-      }
-    }
-    setTimeout(() => { isProgrammaticZoom.current = false; }, 150);
+    setZoom(newZoomValue);
   }, []);
 
   const handleUserTransform = useCallback((transformState) => {
-    setZoom(transformState.scale);
-    if (!isProgrammaticZoom.current) {
-        setSpaceZoomActive(false);
+    if (isProgrammaticZoom.current) {
+      isProgrammaticZoom.current = false;
+      return;
     }
+
+    setZoom(transformState.scale);
   }, []);
 
   const handleImageSelect = useCallback((path) => {
@@ -817,13 +783,10 @@ function App() {
         }
         if (key === ' ' && !isCtrl) {
             event.preventDefault();
-            if (spaceZoomActive) {
-                handleZoomChange(zoomBeforeSpace);
-                setSpaceZoomActive(false);
+            if (Math.abs(zoom - 2) < 0.01) {
+                handleZoomChange(1);
             } else {
-                setZoomBeforeSpace(zoom);
                 handleZoomChange(2);
-                setSpaceZoomActive(true);
             }
             return;
         }
@@ -845,7 +808,6 @@ function App() {
                 const newZoom = key === 'arrowup' ? zoom + zoomStep : zoom - zoomStep;
                 const minZoom = activeRightPanel === 'crop' ? 0.4 : 0.7;
                 handleZoomChange(Math.max(minZoom, Math.min(newZoom, 10)));
-                setSpaceZoomActive(false);
             } else {
                 const isNext = key === 'arrowright';
                 const currentIndex = sortedImageList.findIndex(img => img.path === selectedImage.path);
@@ -888,8 +850,10 @@ function App() {
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [ sortedImageList, selectedImage, undo, redo, isFullScreen, handleToggleFullScreen, handleBackToLibrary, handleRightPanelSelect, handleRate, handleDeleteSelected, handleCopyAdjustments, handlePasteAdjustments, multiSelectedPaths, copiedFilePaths, handlePasteFiles, libraryActivePath, handleImageSelect, zoom, spaceZoomActive, zoomBeforeSpace, handleZoomChange, customEscapeHandler, activeMaskId, aiTool ]);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [ sortedImageList, selectedImage, undo, redo, isFullScreen, handleToggleFullScreen, handleBackToLibrary, handleRightPanelSelect, handleRate, handleDeleteSelected, handleCopyAdjustments, handlePasteAdjustments, multiSelectedPaths, copiedFilePaths, handlePasteFiles, libraryActivePath, handleImageSelect, zoom, handleZoomChange, customEscapeHandler, activeMaskId, aiTool ]);
 
   useEffect(() => {
     let isEffectActive = true;
@@ -1209,6 +1173,7 @@ function App() {
               onSelectMask={setActiveMaskId}
               transformWrapperRef={transformWrapperRef}
               onZoomed={handleUserTransform}
+              targetZoom={zoom}
               onContextMenu={handleEditorContextMenu}
               onUndo={undo}
               onRedo={redo}
