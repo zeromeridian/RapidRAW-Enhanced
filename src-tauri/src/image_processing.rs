@@ -75,6 +75,16 @@ pub fn apply_crop(mut image: DynamicImage, crop_value: &Value) -> DynamicImage {
     image
 }
 
+pub fn apply_flip(image: DynamicImage, horizontal: bool, vertical: bool) -> DynamicImage {
+    let mut img = image;
+    if horizontal {
+        img = img.fliph();
+    }
+    if vertical {
+        img = img.flipv();
+    }
+    img
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
 #[repr(C)]

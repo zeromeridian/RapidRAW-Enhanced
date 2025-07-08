@@ -15,12 +15,11 @@ use serde::Serialize;
 use tauri::{Emitter, Manager};
 
 use crate::image_processing::{
-    apply_crop, get_all_adjustments_from_json, GpuContext, ImageMetadata, Crop, apply_rotation,
+    apply_crop, get_all_adjustments_from_json, GpuContext, ImageMetadata, Crop, apply_rotation, apply_flip,
 };
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
-use crate::raw_processing;
-use crate::{gpu_processing, AppState};
-use crate::formats::{is_raw_file, is_supported_image_file};
+use crate::{gpu_processing, AppState, image_loader};
+use crate::formats::{is_supported_image_file};
 
 const THUMBNAIL_WIDTH: u32 = 720;
 
@@ -138,39 +137,6 @@ pub fn get_sidecar_path(image_path: &str) -> PathBuf {
     path.with_file_name(new_filename)
 }
 
-fn apply_flip(image: DynamicImage, horizontal: bool, vertical: bool) -> DynamicImage {
-    let mut img = image;
-    if horizontal {
-        img = img.fliph();
-    }
-    if vertical {
-        img = img.flipv();
-    }
-    img
-}
-
-fn get_composited_image_for_thumb(path: &str, current_adjustments: &serde_json::Value) -> anyhow::Result<DynamicImage> {
-    let file_bytes = fs::read(path)?;
-    let mut base_image = if is_raw_file(path) {
-        raw_processing::develop_raw_image(&file_bytes, true)?
-    } else {
-        image::load_from_memory(&file_bytes)?
-    };
-
-    if let Some(patches_val) = current_adjustments.get("aiPatches") {
-        if let Some(patches_arr) = patches_val.as_array() {
-            for patch_obj in patches_arr {
-                if let Some(b64_data) = patch_obj.get("patchDataBase64").and_then(|v| v.as_str()) {
-                    let png_bytes = base64::engine::general_purpose::STANDARD.decode(b64_data)?;
-                    let patch_layer = image::load_from_memory(&png_bytes)?;
-                    image::imageops::overlay(&mut base_image, &patch_layer, 0, 0);
-                }
-            }
-        }
-    }
-    Ok(base_image)
-}
-
 pub fn generate_thumbnail_data(
     path_str: &str,
     gpu_context: Option<&GpuContext>,
@@ -181,7 +147,7 @@ pub fn generate_thumbnail_data(
         .and_then(|content| serde_json::from_str(&content).ok());
 
     let adjustments = metadata.as_ref().map_or(serde_json::Value::Null, |m| m.adjustments.clone());
-    let base_image = get_composited_image_for_thumb(path_str, &adjustments)?;
+    let base_image = image_loader::load_and_composite(path_str, &adjustments, true)?;
     let original_dims = base_image.dimensions();
 
     if let (Some(context), Some(meta)) = (gpu_context, metadata) {
