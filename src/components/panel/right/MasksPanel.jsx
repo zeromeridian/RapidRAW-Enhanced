@@ -346,9 +346,9 @@ export default function MasksPanel({
                       onClick={() => onSelectMask(mask.id)}
                       onDoubleClick={() => handleSelectMaskForEditing(mask.id)}
                       onContextMenu={(e) => handleMaskContextMenu(e, mask)}
-                      className={`group p-2 rounded-lg flex items-center justify-between cursor-pointer transition-colors ${
+                      className={`group p-2 rounded-lg flex items-center justify-between cursor-pointer transition-all duration-200 ${
                         activeMaskId === mask.id ? 'bg-accent/20' : 'bg-surface hover:bg-card-active'
-                      }`}
+                      } ${!mask.visible ? 'opacity-60' : 'opacity-100'}`}
                     >
                       <div className="flex items-center gap-3">
                         <MaskIcon size={16} className="text-text-secondary" />
@@ -359,7 +359,9 @@ export default function MasksPanel({
                       <div className="flex items-center gap-1">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleToggleVisibility(mask.id); }}
-                          className="p-1.5 rounded-full text-text-secondary hover:bg-bg-primary opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200"
+                          className={`p-1.5 rounded-full text-text-secondary hover:bg-bg-primary focus:opacity-100 transition-all duration-200 ${
+                            mask.visible ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'
+                          }`}
                           title={mask.visible ? "Hide Mask" : "Show Mask"}
                         >
                           {mask.visible ? <Eye size={16} /> : <EyeOff size={16} />}

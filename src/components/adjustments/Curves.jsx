@@ -118,6 +118,8 @@ export default function CurveGraph({ adjustments, setAdjustments, histogram, the
   };
 
   const handleContainerMouseDown = (e) => {
+    if (e.button !== 0) return;
+
     if (e.target.tagName === 'circle') return;
 
     const { x, y } = getMousePos(e);

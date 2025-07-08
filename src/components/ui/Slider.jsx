@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 /**
  * A reusable slider component with a clickable reset icon and an interactive handle.
  * The slider's thumb animates with an "ease-in-out" effect when the value is set programmatically.
+ * Double-clicking the label, value, or slider track will also reset the value.
  *
  * @param {string} label - The text label for the slider.
  * @param {number|string} value - The current value of the slider.
@@ -12,12 +13,28 @@ import React, { useState, useEffect, useRef } from 'react';
  * @param {number|string} min - The minimum value of the slider.
  * @param {number|string} max - The maximum value of the slider.
  * @param {number|string} step - The increment step of the slider.
- * @param {number} [defaultValue=0] - The value to reset to on icon click. Defaults to 0.
+ * @param {number} [defaultValue=0] - The value to reset to on icon click or double-click. Defaults to 0.
  */
 const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0 }) => {
   const [displayValue, setDisplayValue] = useState(Number(value));
   const [isDragging, setIsDragging] = useState(false);
   const animationFrameRef = useRef();
+
+  useEffect(() => {
+    const handleDragEndGlobal = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener('mouseup', handleDragEndGlobal);
+      window.addEventListener('touchend', handleDragEndGlobal);
+    }
+
+    return () => {
+      window.removeEventListener('mouseup', handleDragEndGlobal);
+      window.removeEventListener('touchend', handleDragEndGlobal);
+    };
+  }, [isDragging]);
 
   useEffect(() => {
     if (isDragging) {
@@ -29,14 +46,9 @@ const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0 }) =>
 
     const startValue = displayValue;
     const endValue = Number(value);
-    const duration = 300; // 0.3s animation
+    const duration = 300;
     let startTime = null;
 
-    /**
-     * An ease-in-out function that starts slow, speeds up, and ends slow.
-     * @param {number} t - A value from 0 to 1 representing animation progress.
-     * @returns {number} The eased value, also from 0 to 1.
-     */
     const easeInOut = (t) => t * t * (3 - 2 * t);
 
     const animate = (timestamp) => {
@@ -44,10 +56,8 @@ const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0 }) =>
       const progress = timestamp - startTime;
       const linearFraction = Math.min(progress / duration, 1);
 
-      // Apply the easing function to the linear progress
       const easedFraction = easeInOut(linearFraction);
 
-      // Use the eased fraction for interpolation
       const currentValue = startValue + (endValue - startValue) * easedFraction;
       setDisplayValue(currentValue);
 
@@ -87,7 +97,6 @@ const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0 }) =>
   const handleDragStart = () => setIsDragging(true);
   const handleDragEnd = () => setIsDragging(false);
 
-  // Reset icon SVG component
   const ResetIcon = () => (
     <svg 
       width="14" 
@@ -110,7 +119,11 @@ const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0 }) =>
   return (
     <div className="mb-2 group">
       <div className="flex justify-between items-center mb-1">
-        <div className="flex items-center gap-2">
+        <div 
+          className="flex items-center gap-2 cursor-pointer"
+          onDoubleClick={handleReset}
+          title={`Double-click to reset ${label.toLowerCase()}`}
+        >
           <label className="text-sm font-medium text-text-secondary select-none">{label}</label>
           <button
             onClick={handleReset}
@@ -121,7 +134,11 @@ const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0 }) =>
             <ResetIcon />
           </button>
         </div>
-        <span className="text-sm text-text-primary w-12 text-right select-none">
+        <span 
+          className="text-sm text-text-primary w-12 text-right select-none cursor-pointer"
+          onDoubleClick={handleReset}
+          title={`Double-click to reset to ${defaultValue}`}
+        >
           {numericValue.toFixed(decimalPlaces)}
         </span>
       </div>
@@ -136,6 +153,7 @@ const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0 }) =>
         onMouseUp={handleDragEnd}
         onTouchStart={handleDragStart}
         onTouchEnd={handleDragEnd}
+        onDoubleClick={handleReset}
         className={`w-full h-1.5 bg-card-active rounded-full appearance-none cursor-pointer slider-input ${isDragging ? 'slider-thumb-active' : ''}`}
       />
     </div>
