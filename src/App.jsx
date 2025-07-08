@@ -973,7 +973,15 @@ function App() {
             return currentSelected;
           });
           
-          let initialAdjusts = INITIAL_ADJUSTMENTS;
+          let initialAdjusts;
+          if (loadImageResult.metadata.adjustments && !loadImageResult.metadata.adjustments.is_null) {
+            initialAdjusts = normalizeLoadedAdjustments(loadImageResult.metadata.adjustments);
+          } else {
+            initialAdjusts = {
+              ...INITIAL_ADJUSTMENTS,
+              aspectRatio: loadImageResult.width / loadImageResult.height,
+            };
+          }
           if (loadImageResult.metadata.adjustments && !loadImageResult.metadata.adjustments.is_null) {
             initialAdjusts = normalizeLoadedAdjustments(loadImageResult.metadata.adjustments);
           }

@@ -114,10 +114,14 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments }
   }, [aspectRatio, setAdjustments]);
 
   const handleReset = () => {
+    const originalAspectRatio = selectedImage?.width && selectedImage?.height
+      ? selectedImage.width / selectedImage.height
+      : null;
+
     setAdjustments(prev => ({
       ...prev,
       crop: INITIAL_ADJUSTMENTS.crop,
-      aspectRatio: INITIAL_ADJUSTMENTS.aspectRatio,
+      aspectRatio: originalAspectRatio,
       rotation: INITIAL_ADJUSTMENTS.rotation || 0,
       flipHorizontal: INITIAL_ADJUSTMENTS.flipHorizontal || false,
       flipVertical: INITIAL_ADJUSTMENTS.flipVertical || false,

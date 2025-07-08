@@ -248,7 +248,7 @@ export default function Editor({
           <TransformWrapper
             key={selectedImage.path}
             ref={transformWrapperRef}
-            minScale={isCropping ? 0.4 : 0.7}
+            minScale={0.7}
             maxScale={10}
             limitToBounds={true}
             centerZoomedOut={true}

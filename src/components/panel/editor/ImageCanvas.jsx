@@ -605,6 +605,36 @@ const ImageCanvas = memo(({
   const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.originalUrl;
   const isContentReady = layers.length > 0 || selectedImage.thumbnailUrl;
 
+  const uncroppedImageRenderSize = useMemo(() => {
+    if (!selectedImage?.width || !selectedImage?.height || !imageRenderSize?.width || !imageRenderSize?.height) {
+      return null;
+    }
+
+    const viewportWidth = imageRenderSize.width + 2 * imageRenderSize.offsetX;
+    const viewportHeight = imageRenderSize.height + 2 * imageRenderSize.offsetY;
+
+    let uncroppedEffectiveWidth = selectedImage.width;
+    let uncroppedEffectiveHeight = selectedImage.height;
+    const rotation = adjustments.rotation || 0;
+    if (rotation === 90 || rotation === 270) {
+        [uncroppedEffectiveWidth, uncroppedEffectiveHeight] = [uncroppedEffectiveHeight, uncroppedEffectiveWidth];
+    }
+
+    if (uncroppedEffectiveWidth <= 0 || uncroppedEffectiveHeight <= 0 || viewportWidth <= 0 || viewportHeight <= 0) {
+        return null;
+    }
+
+    const scale = Math.min(
+        viewportWidth / uncroppedEffectiveWidth,
+        viewportHeight / uncroppedEffectiveHeight
+    );
+
+    const renderWidth = selectedImage.width * scale;
+    const renderHeight = selectedImage.height * scale;
+
+    return { width: renderWidth, height: renderHeight };
+  }, [selectedImage?.width, selectedImage?.height, imageRenderSize, adjustments.rotation]);
+
   const cropImageTransforms = useMemo(() => {
     const transforms = [`rotate(${adjustments.rotation || 0}deg)`];
     if (adjustments.flipHorizontal) transforms.push('scaleX(-1)');
@@ -749,7 +779,7 @@ const ImageCanvas = memo(({
           pointerEvents: isCropViewVisible ? 'auto' : 'none',
         }}
       >
-        {cropPreviewUrl && (
+        {cropPreviewUrl && uncroppedImageRenderSize && (
           <ReactCrop
             crop={crop}
             onChange={(_, percentCrop) => setCrop(percentCrop)}
@@ -763,8 +793,8 @@ const ImageCanvas = memo(({
               src={cropPreviewUrl}
               style={{ 
                 display: 'block', 
-                maxWidth: '100%', 
-                maxHeight: '100%', 
+                width: `${uncroppedImageRenderSize.width}px`,
+                height: `${uncroppedImageRenderSize.height}px`,
                 objectFit: 'contain',
                 transform: cropImageTransforms,
               }}
