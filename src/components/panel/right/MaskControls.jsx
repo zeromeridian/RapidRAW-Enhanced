@@ -52,30 +52,7 @@ export default function MaskControls({ editingMask, updateMask, brushSettings, s
   const [showAnalyzingMessage, setShowAnalyzingMessage] = useState(false);
   const analyzingTimeoutRef = useRef(null);
 
-  const [sectionVisibility, setSectionVisibility] = useState({
-    basic: true,
-    curves: true,
-    color: true,
-    details: true,
-    effects: true,
-  });
-  const [stashedAdjustments, setStashedAdjustments] = useState({});
-  const isInitialMount = useRef(true);
-
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    setSectionVisibility({
-      basic: true,
-      curves: true,
-      color: true,
-      details: true,
-      effects: true,
-    });
-    setStashedAdjustments({});
     setCollapsibleState({
       basic: true,
       curves: false,
@@ -83,7 +60,6 @@ export default function MaskControls({ editingMask, updateMask, brushSettings, s
       details: false,
       effects: false,
     });
-
   }, [editingMask?.id]);
 
   useEffect(() => {
@@ -120,32 +96,16 @@ export default function MaskControls({ editingMask, updateMask, brushSettings, s
   };
 
   const handleToggleVisibility = (sectionName) => {
-    const isCurrentlyVisible = sectionVisibility[sectionName];
-    const sectionKeys = ADJUSTMENT_SECTIONS[sectionName];
-
-    if (isCurrentlyVisible) {
-      const valuesToStash = {};
-      for (const key of sectionKeys) {
-        valuesToStash[key] = JSON.parse(JSON.stringify(editingMask.adjustments[key]));
+    const currentAdjustments = editingMask.adjustments;
+    const currentVisibility = currentAdjustments.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility;
+    const newAdjustments = {
+      ...currentAdjustments,
+      sectionVisibility: {
+        ...currentVisibility,
+        [sectionName]: !currentVisibility[sectionName],
       }
-      setStashedAdjustments(prev => ({ ...prev, [sectionName]: valuesToStash }));
-
-      const resetValues = {};
-      for (const key of sectionKeys) {
-        resetValues[key] = JSON.parse(JSON.stringify(INITIAL_MASK_ADJUSTMENTS[key]));
-      }
-      setMaskAdjustments(prev => ({ ...prev, ...resetValues }));
-
-    } else {
-      if (stashedAdjustments[sectionName]) {
-        setMaskAdjustments(prev => ({ ...prev, ...stashedAdjustments[sectionName] }));
-        const newStash = { ...stashedAdjustments };
-        delete newStash[sectionName];
-        setStashedAdjustments(newStash);
-      }
-    }
-
-    setSectionVisibility(prev => ({ ...prev, [sectionName]: !prev[sectionName] }));
+    };
+    updateMask(editingMask.id, { ...editingMask, adjustments: newAdjustments });
   };
 
   const handleParameterChange = (key, value) => {
@@ -175,10 +135,11 @@ export default function MaskControls({ editingMask, updateMask, brushSettings, s
 
     const handlePaste = () => {
       if (!copiedSectionAdjustments || copiedSectionAdjustments.section !== sectionName) return;
-      setMaskAdjustments(prev => ({ ...prev, ...copiedSectionAdjustments.values }));
-      if (!sectionVisibility[sectionName]) {
-        setSectionVisibility(prev => ({ ...prev, [sectionName]: true }));
-      }
+      setMaskAdjustments(prev => ({
+        ...prev,
+        ...copiedSectionAdjustments.values,
+        sectionVisibility: { ...(prev.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility), [sectionName]: true }
+      }));
     };
 
     const handleReset = () => {
@@ -186,13 +147,11 @@ export default function MaskControls({ editingMask, updateMask, brushSettings, s
       for (const key of sectionKeys) {
         resetValues[key] = JSON.parse(JSON.stringify(INITIAL_MASK_ADJUSTMENTS[key]));
       }
-      setMaskAdjustments(prev => ({ ...prev, ...resetValues }));
-      setSectionVisibility(prev => ({ ...prev, [sectionName]: true }));
-      if (stashedAdjustments[sectionName]) {
-        const newStash = { ...stashedAdjustments };
-        delete newStash[sectionName];
-        setStashedAdjustments(newStash);
-      }
+      setMaskAdjustments(prev => ({
+        ...prev,
+        ...resetValues,
+        sectionVisibility: { ...(prev.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility), [sectionName]: true }
+      }));
     };
 
     const isPasteAllowed = copiedSectionAdjustments && copiedSectionAdjustments.section === sectionName;
@@ -209,6 +168,7 @@ export default function MaskControls({ editingMask, updateMask, brushSettings, s
   };
 
   const isAiMask = editingMask.type === 'ai-subject' || editingMask.type === 'ai-foreground';
+  const sectionVisibility = editingMask.adjustments.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility;
 
   return (
     <div className="flex-grow overflow-y-auto p-4 flex flex-col gap-2">

@@ -26,6 +26,8 @@ Have fun!
 
 <details>
 <summary><strong>Recent Changes</strong></summary>
+
+*   **2025-07-08:** Ability to toggle the visibility of individual adjustments sections
 *   **2025-07-08:** Fixed top-left zoom bug, corrected scale behavior in crop panel, keep default original aspect ratio.
 *   **2025-07-08:** Added image rating filter and redesigned the metadata panel with improved layout, clearer sections, and an embedded GPS map.
 *   **2025-07-07:** Improved generative AI features and updated [AI Roadmap](#ai-roadmap)

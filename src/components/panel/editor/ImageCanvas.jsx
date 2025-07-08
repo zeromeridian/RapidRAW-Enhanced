@@ -366,16 +366,20 @@ const ImageCanvas = memo(({
     const aspectRatioChanged = !imageChanged && prevTransformPropsRef.current && prevTransformPropsRef.current.aspectRatio !== adjustments.aspectRatio;
 
     if (imageChanged || rotationChanged || aspectRatioChanged) {
-      imagePathRef.current = currentImagePath;
-      prevTransformPropsRef.current = {
-        rotation: adjustments.rotation,
-        aspectRatio: adjustments.aspectRatio,
-      };
+        imagePathRef.current = currentImagePath;
+        prevTransformPropsRef.current = {
+            rotation: adjustments.rotation,
+            aspectRatio: adjustments.aspectRatio,
+        };
+        latestEditedUrlRef.current = null;
 
-      setLayers([]);
-
-      latestEditedUrlRef.current = null;
-      return;
+        const initialUrl = thumbnailUrl || originalUrl;
+        if (initialUrl) {
+            setLayers([{ id: initialUrl, url: initialUrl, opacity: 1 }]);
+        } else {
+            setLayers([]);
+        }
+        return;
     }
 
     if (showOriginal && topLayer?.id !== 'original') {

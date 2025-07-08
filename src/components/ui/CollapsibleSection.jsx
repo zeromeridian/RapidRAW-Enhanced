@@ -44,7 +44,7 @@ export default function CollapsibleSection({
     if (!canToggleVisibility) return;
     hoverTimeoutRef.current = setTimeout(() => {
       setIsHovering(true);
-    }, 1000);
+    }, 500);
   };
 
   const handleMouseLeave = () => {

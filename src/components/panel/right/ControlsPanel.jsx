@@ -1,4 +1,3 @@
-import { useState, useEffect, useRef } from 'react';
 import { RotateCcw, Copy, ClipboardPaste } from 'lucide-react';
 import BasicAdjustments from '../../adjustments/Basic';
 import CurveGraph from '../../adjustments/Curves';
@@ -21,73 +20,28 @@ export default function Controls({
   setCopiedSectionAdjustments,
 }) {
   const { showContextMenu } = useContextMenu();
-  const [sectionVisibility, setSectionVisibility] = useState({
-    basic: true,
-    curves: true,
-    color: true,
-    details: true,
-    effects: true,
-  });
-  const [stashedAdjustments, setStashedAdjustments] = useState({});
-
-  const isInitialMount = useRef(true);
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    setSectionVisibility({
-      basic: true,
-      curves: true,
-      color: true,
-      details: true,
-      effects: true,
-    });
-    setStashedAdjustments({});
-
-  }, [selectedImage.path]);
 
   const handleToggleVisibility = (sectionName) => {
-    const isCurrentlyVisible = sectionVisibility[sectionName];
-    const sectionKeys = ADJUSTMENT_SECTIONS[sectionName];
-
-    if (isCurrentlyVisible) {
-      const valuesToStash = {};
-      for (const key of sectionKeys) {
-        valuesToStash[key] = JSON.parse(JSON.stringify(adjustments[key]));
+    setAdjustments(prev => {
+      const currentVisibility = prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
+      return {
+        ...prev,
+        sectionVisibility: {
+          ...currentVisibility,
+          [sectionName]: !currentVisibility[sectionName],
+        }
       }
-      setStashedAdjustments(prev => ({ ...prev, [sectionName]: valuesToStash }));
-
-      const resetValues = {};
-      for (const key of sectionKeys) {
-        resetValues[key] = JSON.parse(JSON.stringify(INITIAL_ADJUSTMENTS[key]));
-      }
-      setAdjustments(prev => ({ ...prev, ...resetValues }));
-
-    } else {
-      if (stashedAdjustments[sectionName]) {
-        setAdjustments(prev => ({ ...prev, ...stashedAdjustments[sectionName] }));
-        const newStash = { ...stashedAdjustments };
-        delete newStash[sectionName];
-        setStashedAdjustments(newStash);
-      }
-    }
-
-    setSectionVisibility(prev => ({ ...prev, [sectionName]: !prev[sectionName] }));
+    });
   };
 
   const handleResetAdjustments = () => {
-    setSectionVisibility({ basic: true, curves: true, color: true, details: true, effects: true });
-    setStashedAdjustments({});
-
     setAdjustments(prev => ({
       ...prev,
       ...Object.keys(ADJUSTMENT_SECTIONS).flatMap(s => ADJUSTMENT_SECTIONS[s]).reduce((acc, key) => {
         acc[key] = INITIAL_ADJUSTMENTS[key];
         return acc;
-      }, {})
+      }, {}),
+      sectionVisibility: { ...INITIAL_ADJUSTMENTS.sectionVisibility },
     }));
   };
 
@@ -114,10 +68,11 @@ export default function Controls({
 
     const handlePaste = () => {
       if (!copiedSectionAdjustments || copiedSectionAdjustments.section !== sectionName) return;
-      setAdjustments(prev => ({ ...prev, ...copiedSectionAdjustments.values }));
-      if (!sectionVisibility[sectionName]) {
-        setSectionVisibility(prev => ({ ...prev, [sectionName]: true }));
-      }
+      setAdjustments(prev => ({
+        ...prev,
+        ...copiedSectionAdjustments.values,
+        sectionVisibility: { ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility), [sectionName]: true }
+      }));
     };
 
     const handleReset = () => {
@@ -125,13 +80,11 @@ export default function Controls({
       for (const key of sectionKeys) {
         resetValues[key] = JSON.parse(JSON.stringify(INITIAL_ADJUSTMENTS[key]));
       }
-      setAdjustments(prev => ({ ...prev, ...resetValues }));
-      setSectionVisibility(prev => ({ ...prev, [sectionName]: true }));
-      if (stashedAdjustments[sectionName]) {
-        const newStash = { ...stashedAdjustments };
-        delete newStash[sectionName];
-        setStashedAdjustments(newStash);
-      }
+      setAdjustments(prev => ({
+        ...prev,
+        ...resetValues,
+        sectionVisibility: { ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility), [sectionName]: true }
+      }));
     };
 
     const isPasteAllowed = copiedSectionAdjustments && copiedSectionAdjustments.section === sectionName;
@@ -171,6 +124,7 @@ export default function Controls({
           }[sectionName];
 
           const title = sectionName.charAt(0).toUpperCase() + sectionName.slice(1);
+          const sectionVisibility = adjustments.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
 
           return (
             <div className="flex-shrink-0" key={sectionName}>

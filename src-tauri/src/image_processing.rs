@@ -291,39 +291,121 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
     if js_adjustments.is_null() {
         return GlobalAdjustments::default();
     }
+
+    let visibility = js_adjustments.get("sectionVisibility");
+    let is_visible = |section: &str| -> bool {
+        visibility
+            .and_then(|v| v.get(section))
+            .and_then(|s| s.as_bool())
+            .unwrap_or(true)
+    };
+    
+    let get_val = |section: &str, key: &str, scale: f32, default: Option<f64>| -> f32 {
+        if is_visible(section) {
+            js_adjustments[key].as_f64().unwrap_or(default.unwrap_or(0.0)) as f32 / scale
+        } else {
+            if let Some(d) = default { d as f32 / scale } else { 0.0 }
+        }
+    };
+
     let curves_obj = js_adjustments.get("curves").cloned().unwrap_or_default();
-    let luma_points: Vec<serde_json::Value> = curves_obj["luma"].as_array().cloned().unwrap_or_default();
-    let red_points: Vec<serde_json::Value> = curves_obj["red"].as_array().cloned().unwrap_or_default();
-    let green_points: Vec<serde_json::Value> = curves_obj["green"].as_array().cloned().unwrap_or_default();
-    let blue_points: Vec<serde_json::Value> = curves_obj["blue"].as_array().cloned().unwrap_or_default();
+    let luma_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["luma"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
+    let red_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["red"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
+    let green_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["green"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
+    let blue_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["blue"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
 
     GlobalAdjustments {
-        exposure: js_adjustments["exposure"].as_f64().unwrap_or(0.0) as f32 / SCALES.exposure,
-        contrast: js_adjustments["contrast"].as_f64().unwrap_or(0.0) as f32 / SCALES.contrast,
-        highlights: js_adjustments["highlights"].as_f64().unwrap_or(0.0) as f32 / SCALES.highlights,
-        shadows: js_adjustments["shadows"].as_f64().unwrap_or(0.0) as f32 / SCALES.shadows,
-        whites: js_adjustments["whites"].as_f64().unwrap_or(0.0) as f32 / SCALES.whites,
-        blacks: js_adjustments["blacks"].as_f64().unwrap_or(0.0) as f32 / SCALES.blacks,
-        saturation: js_adjustments["saturation"].as_f64().unwrap_or(0.0) as f32 / SCALES.saturation,
-        temperature: js_adjustments["temperature"].as_f64().unwrap_or(0.0) as f32 / SCALES.temperature,
-        tint: js_adjustments["tint"].as_f64().unwrap_or(0.0) as f32 / SCALES.tint,
-        vibrance: js_adjustments["vibrance"].as_f64().unwrap_or(0.0) as f32 / SCALES.vibrance,
-        sharpness: js_adjustments["sharpness"].as_f64().unwrap_or(0.0) as f32 / SCALES.sharpness,
-        luma_noise_reduction: js_adjustments["lumaNoiseReduction"].as_f64().unwrap_or(0.0) as f32 / SCALES.luma_noise_reduction,
-        color_noise_reduction: js_adjustments["colorNoiseReduction"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_noise_reduction,
-        clarity: js_adjustments["clarity"].as_f64().unwrap_or(0.0) as f32 / SCALES.clarity,
-        dehaze: js_adjustments["dehaze"].as_f64().unwrap_or(0.0) as f32 / SCALES.dehaze,
-        structure: js_adjustments["structure"].as_f64().unwrap_or(0.0) as f32 / SCALES.structure,
-        vignette_amount: js_adjustments["vignetteAmount"].as_f64().unwrap_or(0.0) as f32 / SCALES.vignette_amount,
-        vignette_midpoint: js_adjustments["vignetteMidpoint"].as_f64().unwrap_or(50.0) as f32 / SCALES.vignette_midpoint,
-        vignette_roundness: js_adjustments["vignetteRoundness"].as_f64().unwrap_or(0.0) as f32 / SCALES.vignette_roundness,
-        vignette_feather: js_adjustments["vignetteFeather"].as_f64().unwrap_or(50.0) as f32 / SCALES.vignette_feather,
-        grain_amount: js_adjustments["grainAmount"].as_f64().unwrap_or(0.0) as f32 / SCALES.grain_amount,
-        grain_size: js_adjustments["grainSize"].as_f64().unwrap_or(50.0) as f32 / SCALES.grain_size,
-        grain_roughness: js_adjustments["grainRoughness"].as_f64().unwrap_or(50.0) as f32 / SCALES.grain_roughness,
+        exposure: get_val("basic", "exposure", SCALES.exposure, None),
+        contrast: get_val("basic", "contrast", SCALES.contrast, None),
+        highlights: get_val("basic", "highlights", SCALES.highlights, None),
+        shadows: get_val("basic", "shadows", SCALES.shadows, None),
+        whites: get_val("basic", "whites", SCALES.whites, None),
+        blacks: get_val("basic", "blacks", SCALES.blacks, None),
+        
+        saturation: get_val("color", "saturation", SCALES.saturation, None),
+        temperature: get_val("color", "temperature", SCALES.temperature, None),
+        tint: get_val("color", "tint", SCALES.tint, None),
+        vibrance: get_val("color", "vibrance", SCALES.vibrance, None),
+        
+        sharpness: get_val("details", "sharpness", SCALES.sharpness, None),
+        luma_noise_reduction: get_val("details", "lumaNoiseReduction", SCALES.luma_noise_reduction, None),
+        color_noise_reduction: get_val("details", "colorNoiseReduction", SCALES.color_noise_reduction, None),
+        
+        clarity: get_val("effects", "clarity", SCALES.clarity, None),
+        dehaze: get_val("effects", "dehaze", SCALES.dehaze, None),
+        structure: get_val("effects", "structure", SCALES.structure, None),
+        vignette_amount: get_val("effects", "vignetteAmount", SCALES.vignette_amount, None),
+        vignette_midpoint: get_val("effects", "vignetteMidpoint", SCALES.vignette_midpoint, Some(50.0)),
+        vignette_roundness: get_val("effects", "vignetteRoundness", SCALES.vignette_roundness, Some(0.0)),
+        vignette_feather: get_val("effects", "vignetteFeather", SCALES.vignette_feather, Some(50.0)),
+        grain_amount: get_val("effects", "grainAmount", SCALES.grain_amount, None),
+        grain_size: get_val("effects", "grainSize", SCALES.grain_size, Some(25.0)),
+        grain_roughness: get_val("effects", "grainRoughness", SCALES.grain_roughness, Some(50.0)),
         _pad1: 0.0,
 
-        hsl: parse_hsl_adjustments(&js_adjustments.get("hsl").cloned().unwrap_or_default()),
+        hsl: if is_visible("color") { parse_hsl_adjustments(&js_adjustments.get("hsl").cloned().unwrap_or_default()) } else { [HslColor::default(); 8] },
+        luma_curve: convert_points_to_aligned(luma_points.clone()),
+        red_curve: convert_points_to_aligned(red_points.clone()),
+        green_curve: convert_points_to_aligned(green_points.clone()),
+        blue_curve: convert_points_to_aligned(blue_points.clone()),
+        luma_curve_count: luma_points.len() as u32,
+        red_curve_count: red_points.len() as u32,
+        green_curve_count: green_points.len() as u32,
+        blue_curve_count: blue_points.len() as u32,
+    }
+}
+
+fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
+    if adj.is_null() {
+        return MaskAdjustments::default();
+    }
+
+    let visibility = adj.get("sectionVisibility");
+    let is_visible = |section: &str| -> bool {
+        visibility
+            .and_then(|v| v.get(section))
+            .and_then(|s| s.as_bool())
+            .unwrap_or(true)
+    };
+    
+    let get_val = |section: &str, key: &str, scale: f32| -> f32 {
+        if is_visible(section) {
+            adj[key].as_f64().unwrap_or(0.0) as f32 / scale
+        } else {
+            0.0
+        }
+    };
+
+    let curves_obj = adj.get("curves").cloned().unwrap_or_default();
+    let luma_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["luma"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
+    let red_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["red"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
+    let green_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["green"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
+    let blue_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["blue"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
+
+    MaskAdjustments {
+        exposure: get_val("basic", "exposure", SCALES.exposure),
+        contrast: get_val("basic", "contrast", SCALES.contrast),
+        highlights: get_val("basic", "highlights", SCALES.highlights),
+        shadows: get_val("basic", "shadows", SCALES.shadows),
+        whites: get_val("basic", "whites", SCALES.whites),
+        blacks: get_val("basic", "blacks", SCALES.blacks),
+        
+        saturation: get_val("color", "saturation", SCALES.saturation),
+        temperature: get_val("color", "temperature", SCALES.temperature),
+        tint: get_val("color", "tint", SCALES.tint),
+        vibrance: get_val("color", "vibrance", SCALES.vibrance),
+        
+        sharpness: get_val("details", "sharpness", SCALES.sharpness),
+        luma_noise_reduction: get_val("details", "lumaNoiseReduction", SCALES.luma_noise_reduction),
+        color_noise_reduction: get_val("details", "colorNoiseReduction", SCALES.color_noise_reduction),
+        
+        clarity: get_val("effects", "clarity", SCALES.clarity),
+        dehaze: get_val("effects", "dehaze", SCALES.dehaze),
+        structure: get_val("effects", "structure", SCALES.structure),
+        
+        _pad1: 0.0, _pad2: 0.0, _pad3: 0.0, _pad4: 0.0,
+
+        hsl: if is_visible("color") { parse_hsl_adjustments(&adj.get("hsl").cloned().unwrap_or_default()) } else { [HslColor::default(); 8] },
         luma_curve: convert_points_to_aligned(luma_points.clone()),
         red_curve: convert_points_to_aligned(red_points.clone()),
         green_curve: convert_points_to_aligned(green_points.clone()),
@@ -345,44 +427,7 @@ pub fn get_all_adjustments_from_json(js_adjustments: &serde_json::Value) -> AllA
         .unwrap_or_else(Vec::new);
 
     for (i, mask_def) in mask_definitions.iter().filter(|m| m.visible).enumerate().take(16) {
-        let adj = &mask_def.adjustments;
-        let curves_obj = adj.get("curves").cloned().unwrap_or_default();
-        let luma_points: Vec<serde_json::Value> = curves_obj["luma"].as_array().cloned().unwrap_or_default();
-        let red_points: Vec<serde_json::Value> = curves_obj["red"].as_array().cloned().unwrap_or_default();
-        let green_points: Vec<serde_json::Value> = curves_obj["green"].as_array().cloned().unwrap_or_default();
-        let blue_points: Vec<serde_json::Value> = curves_obj["blue"].as_array().cloned().unwrap_or_default();
-
-        mask_adjustments[i] = MaskAdjustments {
-            exposure: adj["exposure"].as_f64().unwrap_or(0.0) as f32 / SCALES.exposure,
-            contrast: adj["contrast"].as_f64().unwrap_or(0.0) as f32 / SCALES.contrast,
-            highlights: adj["highlights"].as_f64().unwrap_or(0.0) as f32 / SCALES.highlights,
-            shadows: adj["shadows"].as_f64().unwrap_or(0.0) as f32 / SCALES.shadows,
-            whites: adj["whites"].as_f64().unwrap_or(0.0) as f32 / SCALES.whites,
-            blacks: adj["blacks"].as_f64().unwrap_or(0.0) as f32 / SCALES.blacks,
-            saturation: adj["saturation"].as_f64().unwrap_or(0.0) as f32 / SCALES.saturation,
-            temperature: adj["temperature"].as_f64().unwrap_or(0.0) as f32 / SCALES.temperature,
-            tint: adj["tint"].as_f64().unwrap_or(0.0) as f32 / SCALES.tint,
-            vibrance: adj["vibrance"].as_f64().unwrap_or(0.0) as f32 / SCALES.vibrance,
-            
-            sharpness: adj["sharpness"].as_f64().unwrap_or(0.0) as f32 / SCALES.sharpness,
-            luma_noise_reduction: adj["lumaNoiseReduction"].as_f64().unwrap_or(0.0) as f32 / SCALES.luma_noise_reduction,
-            color_noise_reduction: adj["colorNoiseReduction"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_noise_reduction,
-            clarity: adj["clarity"].as_f64().unwrap_or(0.0) as f32 / SCALES.clarity,
-            dehaze: adj["dehaze"].as_f64().unwrap_or(0.0) as f32 / SCALES.dehaze,
-            structure: adj["structure"].as_f64().unwrap_or(0.0) as f32 / SCALES.structure,
-            
-            _pad1: 0.0, _pad2: 0.0, _pad3: 0.0, _pad4: 0.0,
-
-            hsl: parse_hsl_adjustments(&adj.get("hsl").cloned().unwrap_or_default()),
-            luma_curve: convert_points_to_aligned(luma_points.clone()),
-            red_curve: convert_points_to_aligned(red_points.clone()),
-            green_curve: convert_points_to_aligned(green_points.clone()),
-            blue_curve: convert_points_to_aligned(blue_points.clone()),
-            luma_curve_count: luma_points.len() as u32,
-            red_curve_count: red_points.len() as u32,
-            green_curve_count: green_points.len() as u32,
-            blue_curve_count: blue_points.len() as u32,
-        };
+        mask_adjustments[i] = get_mask_adjustments_from_json(&mask_def.adjustments);
         mask_count += 1;
     }
 
@@ -395,7 +440,6 @@ pub fn get_all_adjustments_from_json(js_adjustments: &serde_json::Value) -> AllA
         _pad1: 0,
     }
 }
-
 
 #[derive(Clone)]
 pub struct GpuContext {

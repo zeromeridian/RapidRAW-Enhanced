@@ -46,6 +46,13 @@ export const INITIAL_MASK_ADJUSTMENTS = {
     luma: [{ x: 0, y: 0 }, { x: 255, y: 255 }], red: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
     green: [{ x: 0, y: 0 }, { x: 255, y: 255 }], blue: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
   },
+  sectionVisibility: {
+    basic: true,
+    curves: true,
+    color: true,
+    details: true,
+    effects: true,
+  },
 };
 
 export const INITIAL_ADJUSTMENTS = {
@@ -67,6 +74,13 @@ export const INITIAL_ADJUSTMENTS = {
     green: [{ x: 0, y: 0 }, { x: 255, y: 255 }], blue: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
   },
   crop: null, aspectRatio: null, rotation: 0, flipHorizontal: false, flipVertical: false, masks: [], aiPatches: [],
+  sectionVisibility: {
+    basic: true,
+    curves: true,
+    color: true,
+    details: true,
+    effects: true,
+  },
 };
 
 const normalizeLoadedAdjustments = (loadedAdjustments) => {
@@ -81,6 +95,10 @@ const normalizeLoadedAdjustments = (loadedAdjustments) => {
         ...maskAdjustments,
         hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...(maskAdjustments.hsl || {}) },
         curves: { ...INITIAL_MASK_ADJUSTMENTS.curves, ...(maskAdjustments.curves || {}) },
+        sectionVisibility: {
+          ...INITIAL_MASK_ADJUSTMENTS.sectionVisibility,
+          ...(maskAdjustments.sectionVisibility || {})
+        },
       }
     };
   });
@@ -97,6 +115,10 @@ const normalizeLoadedAdjustments = (loadedAdjustments) => {
     curves: { ...INITIAL_ADJUSTMENTS.curves, ...(loadedAdjustments.curves || {}) },
     masks: normalizedMasks,
     aiPatches: normalizedAiPatches,
+    sectionVisibility: {
+      ...INITIAL_ADJUSTMENTS.sectionVisibility,
+      ...(loadedAdjustments.sectionVisibility || {})
+    },
   };
 };
 
@@ -108,7 +130,7 @@ export const COPYABLE_ADJUSTMENT_KEYS = [
   'clarity', 'dehaze', 'structure',
   'vignetteAmount', 'vignetteMidpoint', 'vignetteRoundness', 'vignetteFeather',
   'grainAmount', 'grainSize', 'grainRoughness',
-  'hsl', 'curves',
+  'hsl', 'curves', 'sectionVisibility',
 ];
 
 export const ADJUSTMENT_SECTIONS = {
