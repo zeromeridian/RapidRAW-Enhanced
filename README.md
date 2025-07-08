@@ -27,6 +27,7 @@ Have fun!
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-07-08:** Reworked the metadata panel to show the data in a more beautiful way, including a small GPS map and sections
 *   **2025-07-07:** Improved generative AI features and updated [AI Roadmap](#ai-roadmap)
 *   **2025-07-06:** Initial generative AI integration with [ComfyUI](https://github.com/comfyanonymous/ComfyUI) - for more details, checkout the [AI Roadmap](#ai-roadmap)
 *   **2025-07-05:** Ability to overwrite preset with current settings
