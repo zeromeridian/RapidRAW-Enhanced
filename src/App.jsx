@@ -164,6 +164,7 @@ function App() {
   const [imageList, setImageList] = useState([]);
   const [imageRatings, setImageRatings] = useState({});
   const [sortCriteria, setSortCriteria] = useState({ key: 'name', order: 'asc' });
+  const [filterCriteria, setFilterCriteria] = useState({ rating: 0 });
   const [selectedImage, setSelectedImage] = useState(null);
   const [multiSelectedPaths, setMultiSelectedPaths] = useState([]);
   const [libraryActivePath, setLibraryActivePath] = useState(null);
@@ -390,17 +391,28 @@ function App() {
   };
 
   const sortedImageList = useMemo(() => {
-    const list = [...imageList];
+    const filteredList = imageList.filter(image => {
+      if (filterCriteria.rating > 0) {
+        const rating = imageRatings[image.path] || 0;
+        if (filterCriteria.rating === 5) {
+          return rating === 5;
+        }
+        return rating >= filterCriteria.rating;
+      }
+      return true;
+    });
+
+    const list = [...filteredList];
     list.sort((a, b) => {
         const { key, order } = sortCriteria;
         let comparison = 0;
-        if (key === 'date') comparison = a.modified - b.modified; 
+        if (key === 'date') comparison = a.modified - b.modified;
         else if (key === 'rating') comparison = (imageRatings[a.path] || 0) - (imageRatings[b.path] || 0);
         else comparison = a.path.localeCompare(b.path);
         return order === 'asc' ? comparison : -comparison;
     });
     return list;
-  }, [imageList, sortCriteria, imageRatings]);
+  }, [imageList, sortCriteria, imageRatings, filterCriteria]);
 
   const applyAdjustments = useCallback(debounce((currentAdjustments) => {
     if (!selectedImage?.isReady) return;
@@ -1298,6 +1310,8 @@ function App() {
             onClearSelection={handleClearSelection}
             sortCriteria={sortCriteria}
             setSortCriteria={setSortCriteria}
+            filterCriteria={filterCriteria}
+            setFilterCriteria={setFilterCriteria}
             onSettingsChange={handleSettingsChange}
             onLibraryRefresh={handleLibraryRefresh}
             theme={theme}

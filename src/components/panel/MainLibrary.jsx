@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { getVersion } from '@tauri-apps/api/app'; 
-import { 
-  Folder, 
-  Image as ImageIcon, 
-  RefreshCw, 
-  Settings, 
-  Home, 
-  Star, 
+import { getVersion } from '@tauri-apps/api/app';
+import {
+  Folder,
+  Image as ImageIcon,
+  RefreshCw,
+  Settings,
+  Home,
+  Star as StarIcon,
   ArrowUpDown,
-  Check
+  Check,
+  Filter,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
@@ -23,6 +24,97 @@ const sortOptions = [
   { key: 'rating', order: 'desc', label: 'Rating (Highest)' },
   { key: 'rating', order: 'asc', label: 'Rating (Lowest)' },
 ];
+
+const ratingFilterOptions = [
+  { value: 0, label: 'Show All' },
+  { value: 1, label: '1 & up' },
+  { value: 2, label: '2 & up' },
+  { value: 3, label: '3 & up' },
+  { value: 4, label: '4 & up' },
+  { value: 5, label: '5 only' },
+];
+
+function FilterDropdown({ filterCriteria, setFilterCriteria }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleSelect = (option) => {
+    setFilterCriteria({ rating: option.value });
+    setIsOpen(false);
+  };
+
+  const isActive = filterCriteria.rating > 0;
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <Button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center relative ${isActive ? 'text-accent' : ''}`}
+        aria-haspopup="true"
+        aria-expanded={isOpen}
+        title="Filter images"
+      >
+        <Filter className="w-8 h-8" />
+        {isActive && (
+          <div className="absolute -top-1 -right-1 bg-accent text-white rounded-full w-3 h-3 flex items-center justify-center text-xs font-bold"></div>
+        )}
+      </Button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            className="absolute right-0 mt-2 w-56 origin-top-right z-20"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.1, ease: 'easeOut' }}
+          >
+            <div
+              className="bg-surface/90 backdrop-blur-md rounded-lg shadow-xl p-2"
+              role="menu"
+              aria-orientation="vertical"
+            >
+              <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Filter by Rating</div>
+              {ratingFilterOptions.map((option) => {
+                const isSelected = filterCriteria.rating === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => handleSelect(option)}
+                    className={`
+                      w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between
+                      transition-colors duration-150
+                      ${isSelected ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'}
+                    `}
+                    role="menuitem"
+                  >
+                    <span className="flex items-center gap-2">
+                      {option.value > 0 && <StarIcon size={16} className="text-accent fill-accent" />}
+                      <span>{option.label}</span>
+                    </span>
+                    {isSelected && <Check size={16} />}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 function SortDropdown({ sortCriteria, setSortCriteria }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -71,6 +163,7 @@ function SortDropdown({ sortCriteria, setSortCriteria }) {
               role="menu"
               aria-orientation="vertical"
             >
+              <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Sort by</div>
               {sortOptions.map((option) => {
                 const isSelected = sortCriteria.key === option.key && sortCriteria.order === option.order;
                 return (
@@ -143,7 +236,7 @@ function Thumbnail({ path, data, onImageClick, onImageDoubleClick, isSelected, i
       {rating > 0 && (
         <div className="absolute top-1.5 right-1.5 bg-bg-primary/50 rounded-full px-1.5 py-0.5 text-xs text-text-primary flex items-center gap-1 backdrop-blur-sm">
           <span>{rating}</span>
-          <Star size={12} className="text-accent fill-accent" />
+          <StarIcon size={12} className="text-accent fill-accent" />
         </div>
       )}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
@@ -172,6 +265,8 @@ export default function MainLibrary({
   onClearSelection,
   sortCriteria,
   setSortCriteria,
+  filterCriteria,
+  setFilterCriteria,
   onSettingsChange,
   onLibraryRefresh,
   theme,
@@ -264,10 +359,10 @@ export default function MainLibrary({
                       <Folder size={20} className="mr-2" />
                       {hasLastPath ? "Change Folder" : "Open Folder"}
                     </Button>
-                    <Button 
-                      onClick={() => setShowSettings(true)} 
-                      size="lg" 
-                      variant="ghost" 
+                    <Button
+                      onClick={() => setShowSettings(true)}
+                      size="lg"
+                      variant="ghost"
                       className="px-3 bg-surface text-text-primary shadow-none h-11"
                       title="Settings"
                     >
@@ -294,6 +389,10 @@ export default function MainLibrary({
           <p className="text-sm text-text-secondary truncate">{currentFolderPath}</p>
         </div>
         <div className="flex items-center gap-3">
+          <FilterDropdown
+            filterCriteria={filterCriteria}
+            setFilterCriteria={setFilterCriteria}
+          />
           <SortDropdown
             sortCriteria={sortCriteria}
             setSortCriteria={setSortCriteria}
@@ -317,19 +416,19 @@ export default function MainLibrary({
 
 
       {imageList.length === 0 ? (
-        <div 
+        <div
           className="flex-1 flex items-center justify-center text-text-secondary"
           onContextMenu={onEmptyAreaContextMenu}
         >
-          <p>No images found in this folder.</p>
+          <p>No images found that match your filter.</p>
         </div>
       ) : (
-        <div 
+        <div
           className="flex-1 overflow-y-auto p-4"
           onClick={onClearSelection}
           onContextMenu={onEmptyAreaContextMenu}
         >
-          <motion.div 
+          <motion.div
             className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4"
           >
             <AnimatePresence>
