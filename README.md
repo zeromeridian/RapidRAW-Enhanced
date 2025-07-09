@@ -18,12 +18,21 @@
 
 > A beautiful, non-destructive, and GPU-accelerated RAW image editor built with performance in mind.
 
-RapidRAW is a modern, high-performance alternative to Adobe Lightroom. It delivers a feature-rich, beautiful editing experience in a lightweight package (under 30MB) for Windows, macOS, and Linux.
+RapidRAW is a modern, high-performance alternative to Adobe Lightroom®. It delivers a feature-rich, beautiful editing experience in a lightweight package (under 30MB) for Windows, macOS, and Linux.
 
 I developed this project as a personal challenge at the age of 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of both React and Rust, with the support from Google Gemini.
 
 Have fun!
 
+<details>
+<summary><strong>For Who Is This?</strong></summary>
+RapidRAW is for photographers who love to edit their photos in a <strong>clean, fast, and simple workflow</strong>. It prioritizes speed, a beautiful user interface, and powerful tools that let you achieve your creative color vision quickly.
+<br><br>
+It is <strong>not</strong> for users who seek absolute, perfect color accuracy. While the results are great for most purposes, the focus is on a fluid, creative process rather than perfect color precision.
+<br><br>
+RapidRAW is still in active development and isn't yet as feature-rich or polished as mature tools like Darktable, RawTherapee, or Adobe Lightroom®. Right now, the focus is on building a fast, enjoyable core editing experience. You may encounter bugs - if you do, please report them so I can fix them :) Your feedback really helps!
+<br><br>
+</details>
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
@@ -37,6 +46,10 @@ Have fun!
 *   **2025-07-04:** Greatly improved shader with better dehaze, more accurate curves etc.
 *   **2025-07-04:** Predefined 90° clockwise rotation and ability to flip images
 *   **2025-07-03:** Switched from [rawloader](https://github.com/pedrocr/rawloader) to [rawler](https://github.com/dnglab/dnglab/tree/main/rawler) to support a wider range of RAW formats
+
+<details>
+<summary><strong>Expand further</strong></summary>
+
 *   **2025-07-02:** AI-powered foreground / background masking
 *   **2025-06-30:** AI-powered subject masking
 *   **2025-06-30:** Precompiled Linux builds
@@ -44,6 +57,7 @@ Have fun!
 *   **2025-06-28:** Release cleanup, CI/CD improvements and minor fixes 
 *   **2025-06-27:** Initial release. For more information about the earlier progress, look at the [Initial Development Log](#initial-development-log)
 
+</details>
 </details>
 <br>
 
