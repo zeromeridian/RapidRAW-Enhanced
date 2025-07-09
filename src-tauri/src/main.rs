@@ -1281,12 +1281,15 @@ fn main() {
                 let settings: AppSettings = load_settings(app_handle).unwrap_or_default();
 
                 println!("transparent: {:?}", settings.transparent);
+                let window_cfg = handle2.config().app.windows.get(0).unwrap().clone();
+                let mut transparent = window_cfg.transparent;
                 let mut window_builder = tauri::WebviewWindowBuilder::from_config(
                     &handle2,
-                    &handle2.config().app.windows.get(0).unwrap().clone()
+                    &window_cfg
                 )
                     .unwrap();
                 if settings.transparent.is_some() {
+                    transparent = settings.transparent.unwrap();
                     window_builder = window_builder.transparent(settings.transparent.unwrap());
                 }
                 let window = window_builder.build().unwrap();
@@ -1299,9 +1302,11 @@ fn main() {
                     } else {
                         NSVisualEffectMaterial::HudWindow
                     };
-                    apply_vibrancy(&window, material, None, None)
-                        .expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
+                    if transparent {
+                        apply_vibrancy(&window, material, None, None)
+                            .expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
                     }
+                }
 
                 #[cfg(target_os = "windows")]
                 {
@@ -1312,9 +1317,11 @@ fn main() {
                     } else {
                         Some((26, 29, 27, 60))
                     };
-                    apply_acrylic(&window, color)
-                        .expect("Unsupported platform! 'apply_acrylic' is only supported on Windows");
+                    if transparent {
+                        apply_acrylic(&window, color)
+                            .expect("Unsupported platform! 'apply_acrylic' is only supported on Windows");
                     }
+                }
             });
 
             Ok(())
