@@ -91,6 +91,7 @@ struct AppSettings {
     editor_preview_resolution: Option<u32>,
     sort_criteria: Option<SortCriteria>,
     theme: Option<String>,
+    transparent: Option<bool>,
     comfyui_address: Option<String>,
 }
 
@@ -1275,35 +1276,46 @@ fn main() {
             std::env::set_var("ORT_DYLIB_PATH", &ort_library_path);
             println!("Set ORT_DYLIB_PATH to: {}", ort_library_path.display());
 
-            let window = app.get_webview_window("main").unwrap();
-            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                let handle2 = app_handle.clone();
+                let settings: AppSettings = load_settings(app_handle).unwrap_or_default();
 
-            let settings: AppSettings = load_settings(app_handle).unwrap_or_default();
-            let theme = settings.theme.unwrap_or_else(|| "dark".to_string());
+                println!("transparent: {:?}", settings.transparent);
+                let mut window_builder = tauri::WebviewWindowBuilder::from_config(
+                    &handle2,
+                    &handle2.config().app.windows.get(0).unwrap().clone()
+                )
+                    .unwrap();
+                if settings.transparent.is_some() {
+                    window_builder = window_builder.transparent(settings.transparent.unwrap());
+                }
+                let window = window_builder.build().unwrap();
+                let theme = settings.theme.unwrap_or_else(|| "dark".to_string());
 
-            #[cfg(target_os = "macos")]
-            {
-                let material = if theme == "light" {
-                    NSVisualEffectMaterial::ContentBackground
-                } else {
-                    NSVisualEffectMaterial::HudWindow
-                };
-                apply_vibrancy(&window, material, None, None)
-                    .expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
-            }
+                #[cfg(target_os = "macos")]
+                {
+                    let material = if theme == "light" {
+                        NSVisualEffectMaterial::ContentBackground
+                    } else {
+                        NSVisualEffectMaterial::HudWindow
+                    };
+                    apply_vibrancy(&window, material, None, None)
+                        .expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
+                    }
 
-            #[cfg(target_os = "windows")]
-            {
-                let color = if theme == "light" {
-                    Some((250, 250, 250, 150))
-                } else if theme == "muted-green" {
-                    Some((44, 56, 54, 100))
-                } else {
-                    Some((26, 29, 27, 60))
-                };
-                apply_acrylic(&window, color)
-                    .expect("Unsupported platform! 'apply_acrylic' is only supported on Windows");
-            }
+                #[cfg(target_os = "windows")]
+                {
+                    let color = if theme == "light" {
+                        Some((250, 250, 250, 150))
+                    } else if theme == "muted-green" {
+                        Some((44, 56, 54, 100))
+                    } else {
+                        Some((26, 29, 27, 60))
+                    };
+                    apply_acrylic(&window, color)
+                        .expect("Unsupported platform! 'apply_acrylic' is only supported on Windows");
+                    }
+            });
 
             Ok(())
         })

@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import Button from '../ui/Button';
 import ConfirmModal from '../modals/ConfirmModal';
 import Dropdown from '../ui/Dropdown';
+import Switch from '../ui/Switch';
 import Input from '../ui/Input';
 import { THEMES, DEFAULT_THEME_ID } from '../../themes';
 
@@ -158,6 +159,20 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
                 <p className="text-xs text-text-secondary mt-2">
                   Change the look and feel of the application.
                 </p>
+              </div>
+
+              <div>
+                <label htmlFor="theme-select" className="block text-sm font-medium text-text-secondary mb-2">
+                  Window Effects
+                </label>
+                <p className="text-xs text-text-secondary mt-2">
+                  Enable or disable optional window effects. Application restart may be required.
+                </p>
+                <Switch
+                  label="Transparency"
+                  checked={appSettings?.transparent ?? true}
+                  onChange={(value => onSettingsChange({ ...appSettings, transparent: value }))}
+                />
               </div>
 
               <div className="pt-6 mt-6 border-t border-border-color">
