@@ -77,12 +77,6 @@ jobs:
             librsvg2-dev \
             patchelf
 
-      - name: Apply patches (Linux)
-        if: startsWith(inputs.platform, 'ubuntu')
-        run: |-
-          find patches/linux -type f -executable -exec sh {} \;
-          find patches/linux -type f -iname "*.patch" -exec sh -c 'cat {} | patch -p1' \;
-
       - name: Install frontend dependencies
         run: npm install
 
@@ -116,7 +110,7 @@ jobs:
           done
 
       - name: Upload binaries
-        if: "!startsWith(inputs.platform, 'windows')"
+        if: ${{ !startsWith(inputs.platform, 'windows') }}
         run: |
           find src-tauri/target/${{ inputs.target || 'release' }} -type f -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" | while read -r file; do
             name=$(basename "$file")
