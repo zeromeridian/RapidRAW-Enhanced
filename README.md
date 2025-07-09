@@ -30,7 +30,7 @@ RapidRAW is for photographers who love to edit their photos in a <strong>clean, 
 <br><br>
 It is <strong>not</strong> for users who seek absolute, perfect color accuracy. While the results are great for most purposes, the focus is on a fluid, creative process rather than perfect color precision.
 <br><br>
-RapidRAW is still in active development and isn't yet as feature-rich or polished as mature tools like Darktable, RawTherapee, or Adobe Lightroom®. Right now, the focus is on building a fast, enjoyable core editing experience. You may encounter bugs - if you do, please report them so I can fix them :) Your feedback really helps!
+RapidRAW is still in active development and isn't yet as polished as mature tools like Darktable, RawTherapee, or Adobe Lightroom®. Right now, the focus is on building a fast, enjoyable core editing experience. You may encounter bugs - if you do, please report them so I can fix them :) Your feedback really helps!
 <br><br>
 </details>
 <details>
