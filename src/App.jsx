@@ -243,6 +243,12 @@ function App() {
   const isProgrammaticZoom = useRef(false);
   const isInitialMount = useRef(true);
 
+  const [exportState, setExportState] = useState({
+    status: 'idle',
+    progress: { current: 0, total: 0 },
+    errorMessage: '',
+  });
+
   useEffect(() => { if (!isCopied) return; const timer = setTimeout(() => setIsCopied(false), 1000); return () => clearTimeout(timer); }, [isCopied]);
   useEffect(() => { if (!isPasted) return; const timer = setTimeout(() => setIsPasted(false), 1000); return () => clearTimeout(timer); }, [isPasted]);
 
@@ -884,13 +890,44 @@ function App() {
       listen('preview-update-uncropped', (event) => { if (isEffectActive) setUncroppedAdjustedPreviewUrl(event.payload); }),
       listen('histogram-update', (event) => { if (isEffectActive) setHistogram(event.payload); }),
       listen('thumbnail-generated', (event) => { if (isEffectActive) { const { path, rating } = event.payload; if (rating !== undefined) setImageRatings(prev => ({ ...prev, [path]: rating })); } }),
-      listen('export-failed', (event) => { if (isEffectActive) setError(`Export failed: ${event.payload}`); }),
-      listen('export-successful', (event) => { if (isEffectActive) console.log(`Export successful to ${event.payload}`); }),
       listen('ai-model-download-start', (event) => { if (isEffectActive) setAiModelDownloadStatus(event.payload); }),
       listen('ai-model-download-finish', () => { if (isEffectActive) setAiModelDownloadStatus(null); }),
+      listen('batch-export-progress', (event) => {
+        if (isEffectActive) {
+          setExportState(prev => ({ ...prev, progress: event.payload }));
+        }
+      }),
+      listen('export-complete', () => {
+        if (isEffectActive) {
+          setExportState(prev => ({ ...prev, status: 'success' }));
+        }
+      }),
+      listen('export-error', (event) => {
+        if (isEffectActive) {
+          setExportState(prev => ({
+            ...prev,
+            status: 'error',
+            errorMessage: typeof event.payload === 'string' ? event.payload : 'An unknown export error occurred.'
+          }));
+        }
+      }),
+      listen('export-cancelled', () => {
+        if (isEffectActive) {
+          setExportState(prev => ({ ...prev, status: 'cancelled' }));
+        }
+      }),
     ];
     return () => { isEffectActive = false; listeners.forEach(p => p.then(unlisten => unlisten())); if (loaderTimeoutRef.current) clearTimeout(loaderTimeoutRef.current); };
   }, []);
+
+  useEffect(() => {
+    if (['success', 'error', 'cancelled'].includes(exportState.status)) {
+      const timer = setTimeout(() => {
+        setExportState({ status: 'idle', progress: { current: 0, total: 0 }, errorMessage: '' });
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [exportState.status]);
 
   useEffect(() => {
     if (libraryActivePath) {
@@ -1257,7 +1294,7 @@ function App() {
                 {renderedRightPanel === 'crop' && <CropPanel selectedImage={selectedImage} adjustments={adjustments} setAdjustments={setAdjustments} />}
                 {renderedRightPanel === 'masks' && <MasksPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} onSelectMask={setActiveMaskId} activeMaskId={activeMaskId} brushSettings={brushSettings} setBrushSettings={setBrushSettings} copiedMask={copiedMask} setCopiedMask={setCopiedMask} setCustomEscapeHandler={setCustomEscapeHandler} histogram={histogram} isGeneratingAiMask={isGeneratingAiMask} aiModelDownloadStatus={aiModelDownloadStatus} onGenerateAiForegroundMask={handleGenerateAiForegroundMask} />}
                 {renderedRightPanel === 'presets' && <PresetsPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} activePanel={activeRightPanel} />}
-                {renderedRightPanel === 'export' && <ExportPanel selectedImage={selectedImage} adjustments={adjustments} multiSelectedPaths={multiSelectedPaths} />}
+                {renderedRightPanel === 'export' && <ExportPanel selectedImage={selectedImage} adjustments={adjustments} multiSelectedPaths={multiSelectedPaths} exportState={exportState} setExportState={setExportState} />}
                 {renderedRightPanel === 'ai' && <AIPanel 
                   selectedImage={selectedImage} 
                   adjustments={adjustments} 
@@ -1370,6 +1407,8 @@ function App() {
               isVisible={isLibraryExportPanelVisible}
               onClose={() => setIsLibraryExportPanelVisible(false)}
               multiSelectedPaths={multiSelectedPaths}
+              exportState={exportState}
+              setExportState={setExportState}
             />
           </div>
         </div>

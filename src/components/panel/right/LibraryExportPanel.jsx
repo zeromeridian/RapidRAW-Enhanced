@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import { Save, CheckCircle, XCircle, Loader, X } from 'lucide-react';
+import { Save, CheckCircle, XCircle, Loader, X, Ban } from 'lucide-react';
 import Switch from '../../ui/Switch';
 
 const FILE_FORMATS = [
@@ -22,56 +21,36 @@ function Section({ title, children }) {
   );
 }
 
-export default function LibraryExportPanel({ multiSelectedPaths, onClose, isVisible }) {
+export default function LibraryExportPanel({ multiSelectedPaths, onClose, isVisible, exportState, setExportState }) {
   const [fileFormat, setFileFormat] = useState('jpeg');
   const [jpegQuality, setJpegQuality] = useState(90);
   const [enableResize, setEnableResize] = useState(false);
   const [resizeMode, setResizeMode] = useState('longEdge');
   const [resizeValue, setResizeValue] = useState(2048);
   const [dontEnlarge, setDontEnlarge] = useState(true);
-  const [demosaicQuality, setDemosaicQuality] = useState('Menon');
 
-  const [exportStatus, setExportStatus] = useState('idle');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [batchExportProgress, setBatchExportProgress] = useState(null);
+  const { status, progress, errorMessage } = exportState;
+  const isExporting = status === 'exporting';
 
   const numImages = multiSelectedPaths.length;
-  const hasRawFileInSelection = multiSelectedPaths.some(p =>
-    /\.(arw|cr2|cr3|nef|dng|raf|orf|pef|rw2)$/i.test(p)
-  );
 
   useEffect(() => {
-    const unlistenPromise = listen('batch-export-progress', (event) => {
-      setBatchExportProgress(event.payload);
-    });
-    return () => {
-      unlistenPromise.then(unlisten => unlisten());
-    };
-  }, []);
-
-  useEffect(() => {
-    setExportStatus('idle');
-    setErrorMessage('');
-    setBatchExportProgress(null);
-  }, [multiSelectedPaths, isVisible]);
+    if (isVisible && !isExporting) {
+      setExportState({ status: 'idle', progress: { current: 0, total: 0 }, errorMessage: '' });
+    }
+  }, [multiSelectedPaths, isVisible, isExporting, setExportState]);
 
   const handleExport = async () => {
-    if (numImages === 0) return;
+    if (numImages === 0 || isExporting) return;
 
-    setExportStatus('exporting');
-    setErrorMessage('');
-    setBatchExportProgress({ current: 0, total: numImages });
+    setExportState({ status: 'exporting', progress: { current: 0, total: numImages }, errorMessage: '' });
+
+    const exportSettings = {
+      jpegQuality: parseInt(jpegQuality, 10),
+      resize: enableResize ? { mode: resizeMode, value: parseInt(resizeValue, 10), dontEnlarge } : null,
+    };
 
     try {
-      const exportSettings = {
-        jpegQuality: parseInt(jpegQuality, 10),
-        resize: enableResize ? {
-          mode: resizeMode,
-          value: parseInt(resizeValue, 10),
-          dontEnlarge: dontEnlarge,
-        } : null,
-      };
-
       const outputFolder = await open({
         title: `Select Folder to Export ${numImages} Image(s)`,
         directory: true,
@@ -81,37 +60,33 @@ export default function LibraryExportPanel({ multiSelectedPaths, onClose, isVisi
         await invoke('batch_export_images', {
           outputFolder,
           paths: multiSelectedPaths,
-          demosaicQuality: hasRawFileInSelection ? demosaicQuality : null,
           exportSettings,
           outputFormat: FILE_FORMATS.find(f => f.id === fileFormat).extensions[0],
         });
-        setExportStatus('success');
       } else {
-        setExportStatus('idle');
+        setExportState(prev => ({ ...prev, status: 'idle' }));
       }
     } catch (error) {
       console.error('Error exporting images:', error);
-      setErrorMessage(typeof error === 'string' ? error : 'An unknown error occurred.');
-      setExportStatus('error');
-    } finally {
-      setTimeout(() => setBatchExportProgress(null), 4000);
+      setExportState({ status: 'error', progress, errorMessage: typeof error === 'string' ? error : 'Failed to start export.' });
     }
-
-    setTimeout(() => {
-      if (exportStatus !== 'exporting') {
-        setExportStatus('idle');
-      }
-    }, 4000);
   };
 
-  const isExporting = exportStatus === 'exporting';
+  const handleCancel = async () => {
+    try {
+      await invoke('cancel_export');
+    } catch (error) {
+      console.error("Failed to send cancel request:", error);
+    }
+  };
+
   const canExport = numImages > 0;
 
   return (
     <div className="h-full bg-bg-secondary rounded-lg flex flex-col">
       <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
         <h2 className="text-xl font-bold text-primary text-shadow-shiny">
-        Export {numImages > 1 ? `(${numImages})` : ''}
+          Export {numImages > 1 ? `(${numImages})` : ''}
         </h2>
         <button onClick={onClose} className="p-1 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary">
           <X size={20} />
@@ -193,60 +168,54 @@ export default function LibraryExportPanel({ multiSelectedPaths, onClose, isVisi
                 </div>
               )}
             </Section>
-            {/* COMMENTED OUT UNTIL I FIND BETTER DEMOSAICING ALGO'S
-            {hasRawFileInSelection && (
-              <Section title="RAW Settings">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm flex-grow">Demosaic Quality</label>
-                  <select
-                    value={demosaicQuality}
-                    onChange={(e) => setDemosaicQuality(e.target.value)}
-                    disabled={isExporting}
-                    className="w-1/2 bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
-                  >
-                    <option value="Menon">Menon (High Quality)</option>
-                    <option value="Linear">Linear (Fast)</option>
-                  </select>
-                </div>
-              </Section>
-            )} */}
           </>
         ) : (
           <p className="text-center text-text-tertiary mt-4">No images selected.</p>
         )}
       </div>
 
-      <div className="p-4 border-t border-surface flex-shrink-0">
-        <button
-          onClick={handleExport}
-          disabled={!canExport || isExporting}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-surface text-white font-bold rounded-lg hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        >
-          {isExporting ? (
-            <>
-              <Loader size={18} className="animate-spin" />
-              {batchExportProgress
-                ? `Exporting... (${batchExportProgress.current}/${batchExportProgress.total})`
-                : 'Exporting...'
-              }
-            </>
-          ) : (
-            <>
-              <Save size={18} />
-              Export {numImages > 1 ? `${numImages} Images` : 'Image'}
-            </>
-          )}
-        </button>
-        {exportStatus === 'success' && (
+      <div className="p-4 border-t border-surface flex-shrink-0 space-y-3">
+        {isExporting ? (
+          <button
+            onClick={handleCancel}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600/80 text-white font-bold rounded-lg hover:bg-red-600 transition-all"
+          >
+            <Ban size={18} />
+            Cancel Export
+          </button>
+        ) : (
+          <button
+            onClick={handleExport}
+            disabled={!canExport || isExporting}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-surface text-white font-bold rounded-lg hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            <Save size={18} />
+            Export {numImages > 1 ? `${numImages} Images` : 'Image'}
+          </button>
+        )}
+
+        {status === 'exporting' && (
+          <div className="flex items-center gap-2 text-accent mt-3 text-sm justify-center">
+            <Loader size={16} className="animate-spin" />
+            <span>{`Exporting... (${progress.current}/${progress.total})`}</span>
+          </div>
+        )}
+        {status === 'success' && (
           <div className="flex items-center gap-2 text-green-400 mt-3 text-sm justify-center">
             <CheckCircle size={16} />
             <span>Export successful!</span>
           </div>
         )}
-        {exportStatus === 'error' && (
+        {status === 'error' && (
           <div className="flex items-center gap-2 text-red-400 mt-3 text-sm justify-center text-center">
             <XCircle size={16} />
             <span>{errorMessage}</span>
+          </div>
+        )}
+        {status === 'cancelled' && (
+          <div className="flex items-center gap-2 text-yellow-400 mt-3 text-sm justify-center">
+            <Ban size={16} />
+            <span>Export cancelled.</span>
           </div>
         )}
       </div>
