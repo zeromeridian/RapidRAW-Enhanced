@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef } from 'react';
 import { getVersion } from '@tauri-apps/api/app';
 import {
   Folder,
@@ -10,8 +10,11 @@ import {
   ArrowUpDown,
   Check,
   Filter,
+  Grid as GridIcon,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { FixedSizeGrid as Grid } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
 import Button from '../ui/Button';
 import SettingsPanel from './SettingsPanel';
 import { THEMES, DEFAULT_THEME_ID } from '../../themes';
@@ -34,7 +37,19 @@ const ratingFilterOptions = [
   { value: 5, label: '5 only' },
 ];
 
-function FilterDropdown({ filterCriteria, setFilterCriteria }) {
+const thumbnailSizeOptions = [
+  { id: 'small', label: 'Small', size: 160 },
+  { id: 'medium', label: 'Medium', size: 240 },
+  { id: 'large', label: 'Large', size: 320 },
+];
+
+const customOuterElement = forwardRef((props, ref) => (
+  <div ref={ref} {...props} className="custom-scrollbar" />
+));
+customOuterElement.displayName = 'CustomOuterElement';
+
+
+function DropdownMenu({ buttonContent, buttonTitle, children }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -45,97 +60,8 @@ function FilterDropdown({ filterCriteria, setFilterCriteria }) {
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const handleSelect = (option) => {
-    setFilterCriteria({ rating: option.value });
-    setIsOpen(false);
-  };
-
-  const isActive = filterCriteria.rating > 0;
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <Button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center relative ${isActive ? 'text-accent' : ''}`}
-        aria-haspopup="true"
-        aria-expanded={isOpen}
-        title="Filter images"
-      >
-        <Filter className="w-8 h-8" />
-        {isActive && (
-          <div className="absolute -top-1 -right-1 bg-accent text-white rounded-full w-3 h-3 flex items-center justify-center text-xs font-bold"></div>
-        )}
-      </Button>
-
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            className="absolute right-0 mt-2 w-56 origin-top-right z-20"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.1, ease: 'easeOut' }}
-          >
-            <div
-              className="bg-surface/90 backdrop-blur-md rounded-lg shadow-xl p-2"
-              role="menu"
-              aria-orientation="vertical"
-            >
-              <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Filter by Rating</div>
-              {ratingFilterOptions.map((option) => {
-                const isSelected = filterCriteria.rating === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    onClick={() => handleSelect(option)}
-                    className={`
-                      w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between
-                      transition-colors duration-150
-                      ${isSelected ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'}
-                    `}
-                    role="menuitem"
-                  >
-                    <span className="flex items-center gap-2">
-                      {option.value > 0 && <StarIcon size={16} className="text-accent fill-accent" />}
-                      <span>{option.label}</span>
-                    </span>
-                    {isSelected && <Check size={16} />}
-                  </button>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function SortDropdown({ sortCriteria, setSortCriteria }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  const handleSelect = (option) => {
-    setSortCriteria({ key: option.key, order: option.order });
-    setIsOpen(false);
-  };
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -144,11 +70,10 @@ function SortDropdown({ sortCriteria, setSortCriteria }) {
         className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
         aria-haspopup="true"
         aria-expanded={isOpen}
-        title="Sort images"
+        title={buttonTitle}
       >
-        <ArrowUpDown className="w-8 h-8" />
+        {buttonContent}
       </Button>
-
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -162,26 +87,9 @@ function SortDropdown({ sortCriteria, setSortCriteria }) {
               className="bg-surface/90 backdrop-blur-md rounded-lg shadow-xl p-2"
               role="menu"
               aria-orientation="vertical"
+              onClick={() => setIsOpen(false)}
             >
-              <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Sort by</div>
-              {sortOptions.map((option) => {
-                const isSelected = sortCriteria.key === option.key && sortCriteria.order === option.order;
-                return (
-                  <button
-                    key={`${option.key}-${option.order}`}
-                    onClick={() => handleSelect(option)}
-                    className={`
-                      w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between
-                      transition-colors duration-150
-                      ${isSelected ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'}
-                    `}
-                    role="menuitem"
-                  >
-                    <span>{option.label}</span>
-                    {isSelected && <Check size={16} />}
-                  </button>
-                );
-              })}
+              {children}
             </div>
           </motion.div>
         )}
@@ -190,44 +98,103 @@ function SortDropdown({ sortCriteria, setSortCriteria }) {
   );
 }
 
+function ThumbnailSizeDropdown({ selectedSize, onSelectSize }) {
+  return (
+    <DropdownMenu buttonContent={<GridIcon className="w-8 h-8" />} buttonTitle="Thumbnail Size">
+      <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Thumbnail Size</div>
+      {thumbnailSizeOptions.map((option) => {
+        const isSelected = selectedSize === option.id;
+        return (
+          <button
+            key={option.id}
+            onClick={() => onSelectSize(option.id)}
+            className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${isSelected ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'}`}
+            role="menuitem"
+          >
+            <span>{option.label}</span>
+            {isSelected && <Check size={16} />}
+          </button>
+        );
+      })}
+    </DropdownMenu>
+  );
+}
+
+function FilterDropdown({ filterCriteria, setFilterCriteria }) {
+  const isActive = filterCriteria.rating > 0;
+  return (
+    <DropdownMenu
+      buttonContent={
+        <>
+          <Filter className={`w-8 h-8 ${isActive ? 'text-accent' : ''}`} />
+          {isActive && <div className="absolute -top-1 -right-1 bg-accent rounded-full w-3 h-3" />}
+        </>
+      }
+      buttonTitle="Filter images"
+    >
+      <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Filter by Rating</div>
+      {ratingFilterOptions.map((option) => {
+        const isSelected = filterCriteria.rating === option.value;
+        return (
+          <button
+            key={option.value}
+            onClick={() => setFilterCriteria({ rating: option.value })}
+            className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${isSelected ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'}`}
+            role="menuitem"
+          >
+            <span className="flex items-center gap-2">
+              {option.value > 0 && <StarIcon size={16} className="text-accent fill-accent" />}
+              <span>{option.label}</span>
+            </span>
+            {isSelected && <Check size={16} />}
+          </button>
+        );
+      })}
+    </DropdownMenu>
+  );
+}
+
+function SortDropdown({ sortCriteria, setSortCriteria }) {
+  return (
+    <DropdownMenu buttonContent={<ArrowUpDown className="w-8 h-8" />} buttonTitle="Sort images">
+      <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Sort by</div>
+      {sortOptions.map((option) => {
+        const isSelected = sortCriteria.key === option.key && sortCriteria.order === option.order;
+        return (
+          <button
+            key={`${option.key}-${option.order}`}
+            onClick={() => setSortCriteria({ key: option.key, order: option.order })}
+            className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${isSelected ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'}`}
+            role="menuitem"
+          >
+            <span>{option.label}</span>
+            {isSelected && <Check size={16} />}
+          </button>
+        );
+      })}
+    </DropdownMenu>
+  );
+}
+
 function Thumbnail({ path, data, onImageClick, onImageDoubleClick, isSelected, isActive, rating, onContextMenu }) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    if (data) {
-      setIsLoaded(true);
-    }
+    if (data) setIsLoaded(true);
   }, [data]);
 
-  const ringClass = isActive
-    ? 'ring-2 ring-accent'
-    : isSelected
-    ? 'ring-2 ring-gray-400'
-    : 'hover:ring-2 hover:ring-hover-color';
+  const ringClass = isActive ? 'ring-2 ring-accent' : isSelected ? 'ring-2 ring-gray-400' : 'hover:ring-2 hover:ring-hover-color';
 
   return (
     <div
-      onClick={(e) => {
-        e.stopPropagation();
-        onImageClick(path, e);
-      }}
+      onClick={(e) => { e.stopPropagation(); onImageClick(path, e); }}
       onDoubleClick={() => onImageDoubleClick(path)}
       onContextMenu={onContextMenu}
       className={`aspect-square bg-surface rounded-md overflow-hidden cursor-pointer group relative transition-all duration-150 ${ringClass}`}
       title={path.split(/[\\/]/).pop()}
     >
       {data ? (
-        <img
-          src={data}
-          alt={path}
-          className={`
-            w-full h-full object-cover
-            group-hover:scale-[1.02]
-            transition ease-in-out duration-300
-            ${isLoaded ? 'opacity-100' : 'opacity-0'}
-          `}
-          loading="lazy"
-        />
+        <img src={data} alt={path} className={`w-full h-full object-cover group-hover:scale-[1.02] transition ease-in-out duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`} loading="lazy" />
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-surface">
           <ImageIcon className="text-text-secondary animate-pulse" />
@@ -246,45 +213,44 @@ function Thumbnail({ path, data, onImageClick, onImageDoubleClick, isSelected, i
   );
 }
 
+const Cell = ({ columnIndex, rowIndex, style, data }) => {
+  const { imageList, columnCount, thumbnails, imageRatings, onImageClick, onImageDoubleClick, multiSelectedPaths, activePath, onContextMenu } = data;
+  const index = rowIndex * columnCount + columnIndex;
+  if (index >= imageList.length) return null;
+  const imageFile = imageList[index];
+
+  return (
+    <div style={style}>
+      <motion.div
+        key={imageFile.path}
+        initial={{ opacity: 0.5, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className="p-2 h-full"
+      >
+        <Thumbnail
+          path={imageFile.path}
+          data={thumbnails[imageFile.path]}
+          rating={imageRatings?.[imageFile.path] || 0}
+          onImageClick={onImageClick}
+          onImageDoubleClick={onImageDoubleClick}
+          isSelected={multiSelectedPaths.includes(imageFile.path)}
+          isActive={activePath === imageFile.path}
+          onContextMenu={(e) => onContextMenu(e, imageFile.path)}
+        />
+      </motion.div>
+    </div>
+  );
+};
+
 export default function MainLibrary({
-  imageList,
-  onImageClick,
-  onImageDoubleClick,
-  onContextMenu,
-  onEmptyAreaContextMenu,
-  multiSelectedPaths,
-  activePath,
-  rootPath,
-  currentFolderPath,
-  onOpenFolder,
-  thumbnails,
-  imageRatings,
-  appSettings,
-  onContinueSession,
-  onGoHome,
-  onClearSelection,
-  sortCriteria,
-  setSortCriteria,
-  filterCriteria,
-  setFilterCriteria,
-  onSettingsChange,
-  onLibraryRefresh,
-  theme,
+  imageList, onImageClick, onImageDoubleClick, onContextMenu, onEmptyAreaContextMenu, multiSelectedPaths, activePath, rootPath, currentFolderPath, onOpenFolder, thumbnails, imageRatings, appSettings, onContinueSession, onGoHome, onClearSelection, sortCriteria, setSortCriteria, filterCriteria, setFilterCriteria, onSettingsChange, onLibraryRefresh, theme,
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [appVersion, setAppVersion] = useState('');
-  const prevFolderPathRef = useRef();
-  const isNewFolder = currentFolderPath !== prevFolderPathRef.current;
+  const [thumbnailSize, setThumbnailSize] = useState('medium');
 
-  useEffect(() => {
-    prevFolderPathRef.current = currentFolderPath;
-  }, [currentFolderPath]);
-
-  useEffect(() => {
-    getVersion().then(version => {
-      setAppVersion(version);
-    });
-  }, []);
+  useEffect(() => { getVersion().then(setAppVersion); }, []);
 
   if (!rootPath) {
     if (!appSettings) {
@@ -296,84 +262,34 @@ export default function MainLibrary({
         </div>
       );
     }
-
     const hasLastPath = !!appSettings.lastRootPath;
     const currentThemeId = theme || DEFAULT_THEME_ID;
     const selectedTheme = THEMES.find(t => t.id === currentThemeId) || THEMES.find(t => t.id === DEFAULT_THEME_ID);
     const splashImage = selectedTheme.splashImage;
-
     return (
       <div className="flex-1 flex h-full bg-bg-secondary overflow-hidden shadow-lg">
         <div className="w-1/2 hidden md:block relative">
           <AnimatePresence>
-            <motion.img
-              key={splashImage}
-              src={splashImage}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.5, ease: 'easeInOut' }}
-              className="absolute inset-0 w-full h-full object-cover"
-              alt="Splash screen background"
-            />
+            <motion.img key={splashImage} src={splashImage} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5, ease: 'easeInOut' }} className="absolute inset-0 w-full h-full object-cover" alt="Splash screen background" />
           </AnimatePresence>
         </div>
-
         <div className="w-full md:w-1/2 flex flex-col p-8 lg:p-16 relative">
           {showSettings ? (
-            <SettingsPanel
-              onBack={() => setShowSettings(false)}
-              appSettings={appSettings}
-              onSettingsChange={onSettingsChange}
-              rootPath={rootPath}
-              onLibraryRefresh={onLibraryRefresh}
-            />
+            <SettingsPanel onBack={() => setShowSettings(false)} appSettings={appSettings} onSettingsChange={onSettingsChange} rootPath={rootPath} onLibraryRefresh={onLibraryRefresh} />
           ) : (
             <>
               <div className="my-auto text-left">
-                <h1 className="text-5xl font-bold text-text-primary text-shadow-shiny mb-4">
-                  RapidRAW
-                </h1>
-                <p className="text-text-secondary mb-10 max-w-md">
-                  {hasLastPath ? (
-                    <>
-                      Welcome back!<br />
-                      Continue where you left off or start a new session.
-                    </>
-                  ) : (
-                    "A blazingly fast, GPU-accelerated RAW image editor. Open a folder to begin."
-                  )}
-                </p>
+                <h1 className="text-5xl font-bold text-text-primary text-shadow-shiny mb-4">RapidRAW</h1>
+                <p className="text-text-secondary mb-10 max-w-md">{hasLastPath ? <>Welcome back!<br />Continue where you left off or start a new session.</> : "A blazingly fast, GPU-accelerated RAW image editor. Open a folder to begin."}</p>
                 <div className="flex flex-col w-full max-w-xs gap-4">
-                  {hasLastPath && (
-                    <Button onClick={onContinueSession} size="lg" className="rounded-md h-11 w-full flex justify-start items-center">
-                      <RefreshCw size={20} className="mr-2" /> Continue Session
-                    </Button>
-                  )}
+                  {hasLastPath && <Button onClick={onContinueSession} size="lg" className="rounded-md h-11 w-full flex justify-start items-center"><RefreshCw size={20} className="mr-2" /> Continue Session</Button>}
                   <div className="flex items-center gap-2">
-                    <Button
-                      onClick={onOpenFolder}
-                      size="lg"
-                      className={`rounded-md flex-grow flex justify-start items-center h-11 ${hasLastPath ? 'bg-surface text-text-primary shadow-none' : ''}`}
-                    >
-                      <Folder size={20} className="mr-2" />
-                      {hasLastPath ? "Change Folder" : "Open Folder"}
-                    </Button>
-                    <Button
-                      onClick={() => setShowSettings(true)}
-                      size="lg"
-                      variant="ghost"
-                      className="px-3 bg-surface text-text-primary shadow-none h-11"
-                      title="Settings"
-                    >
-                      <Settings size={20} />
-                    </Button>
+                    <Button onClick={onOpenFolder} size="lg" className={`rounded-md flex-grow flex justify-start items-center h-11 ${hasLastPath ? 'bg-surface text-text-primary shadow-none' : ''}`}><Folder size={20} className="mr-2" />{hasLastPath ? "Change Folder" : "Open Folder"}</Button>
+                    <Button onClick={() => setShowSettings(true)} size="lg" variant="ghost" className="px-3 bg-surface text-text-primary shadow-none h-11" title="Settings"><Settings size={20} /></Button>
                   </div>
                 </div>
               </div>
-              <p className="absolute bottom-8 left-8 lg:left-16 text-xs text-text-secondary">
-                {appVersion && `Version ${appVersion} - `}Images by Timon Käch (@timonkaech.photography)
-              </p>
+              <p className="absolute bottom-8 left-8 lg:left-16 text-xs text-text-secondary">{appVersion && `Version ${appVersion} - `}Images by Timon Käch (@timonkaech.photography)</p>
             </>
           )}
         </div>
@@ -389,72 +305,45 @@ export default function MainLibrary({
           <p className="text-sm text-text-secondary truncate">{currentFolderPath}</p>
         </div>
         <div className="flex items-center gap-3">
-          <FilterDropdown
-            filterCriteria={filterCriteria}
-            setFilterCriteria={setFilterCriteria}
-          />
-          <SortDropdown
-            sortCriteria={sortCriteria}
-            setSortCriteria={setSortCriteria}
-          />
-          <Button
-            onClick={onOpenFolder}
-            className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
-            title="Open another folder"
-          >
-            <Folder className="w-8 h-8" />
-          </Button>
-          <Button
-            onClick={onGoHome}
-            className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
-            title="Go to Home Screen"
-          >
-            <Home className="w-8 h-8" />
-          </Button>
+          <ThumbnailSizeDropdown selectedSize={thumbnailSize} onSelectSize={setThumbnailSize} />
+          <FilterDropdown filterCriteria={filterCriteria} setFilterCriteria={setFilterCriteria} />
+          <SortDropdown sortCriteria={sortCriteria} setSortCriteria={setSortCriteria} />
+          <Button onClick={onOpenFolder} className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center" title="Open another folder"><Folder className="w-8 h-8" /></Button>
+          <Button onClick={onGoHome} className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center" title="Go to Home Screen"><Home className="w-8 h-8" /></Button>
         </div>
       </header>
-
-
       {imageList.length === 0 ? (
-        <div
-          className="flex-1 flex items-center justify-center text-text-secondary"
-          onContextMenu={onEmptyAreaContextMenu}
-        >
-          <p>No images found that match your filter.</p>
-        </div>
+        <div className="flex-1 flex items-center justify-center text-text-secondary" onContextMenu={onEmptyAreaContextMenu}><p>No images found that match your filter.</p></div>
       ) : (
-        <div
-          className="flex-1 overflow-y-auto p-4"
-          onClick={onClearSelection}
-          onContextMenu={onEmptyAreaContextMenu}
-        >
-          <motion.div
-            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4"
-          >
-            <AnimatePresence>
-              {imageList.map((imageFile) => (
-                <motion.div
-                  key={imageFile.path}
-                  layout
-                  initial={isNewFolder ? false : { opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
-                >
-                  <Thumbnail
-                    path={imageFile.path}
-                    data={thumbnails[imageFile.path]}
-                    rating={imageRatings?.[imageFile.path] || 0}
-                    onImageClick={onImageClick}
-                    onImageDoubleClick={onImageDoubleClick}
-                    isSelected={multiSelectedPaths.includes(imageFile.path)}
-                    isActive={activePath === imageFile.path}
-                    onContextMenu={(e) => onContextMenu(e, imageFile.path)}
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
+        <div className="flex-1 w-full h-full" onClick={onClearSelection} onContextMenu={onEmptyAreaContextMenu}>
+          <AutoSizer>
+            {({ height, width }) => {
+              const SCROLLBAR_SIZE = 10;
+              const PADDING = 8;
+              const minThumbWidth = thumbnailSizeOptions.find(o => o.id === thumbnailSize)?.size || 240;
+              const columnCount = Math.max(1, Math.floor(width / (minThumbWidth + PADDING * 2)));
+              const rowCount = Math.ceil(imageList.length / columnCount);
+              const preliminaryCellWidth = width / columnCount;
+              const isScrollbarVisible = (rowCount * preliminaryCellWidth) > height;
+              const gridWidth = isScrollbarVisible ? width - SCROLLBAR_SIZE : width;
+              const cellWidth = gridWidth / columnCount;
+              const cellHeight = cellWidth;
+
+              return (
+                <Grid
+                  key={`${sortCriteria.key}-${sortCriteria.order}-${filterCriteria.rating}`}
+                  outerElementType={customOuterElement}
+                  height={height}
+                  width={width}
+                  columnCount={columnCount}
+                  rowCount={rowCount}
+                  columnWidth={cellWidth}
+                  rowHeight={cellHeight}
+                  itemData={{ imageList, columnCount, thumbnails, imageRatings, onImageClick, onImageDoubleClick, multiSelectedPaths, activePath, onContextMenu }}
+                >{Cell}</Grid>
+              );
+            }}
+          </AutoSizer>
         </div>
       )}
     </div>

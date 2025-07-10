@@ -23,6 +23,8 @@
     "react-dom": "^18.3.1",
     "react-image-crop": "^11.0.10",
     "react-konva": "^18.2.10",
+    "react-virtualized-auto-sizer": "^1.0.26",
+    "react-window": "^1.8.11",
     "react-zoom-pan-pinch": "^3.7.0",
     "recharts": "^2.15.3",
     "uuid": "^11.1.0"

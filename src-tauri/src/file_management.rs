@@ -21,7 +21,7 @@ use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::{gpu_processing, AppState, image_loader};
 use crate::formats::{is_supported_image_file};
 
-const THUMBNAIL_WIDTH: u32 = 720;
+const THUMBNAIL_WIDTH: u32 = 640;
 
 #[derive(Serialize, Debug, Clone)]
 pub struct ImageFile {
@@ -218,74 +218,78 @@ fn encode_thumbnail(image: &DynamicImage) -> Result<Vec<u8>> {
 }
 
 #[tauri::command]
-pub fn generate_thumbnails(
+pub async fn generate_thumbnails(
     paths: Vec<String>,
     app_handle: tauri::AppHandle,
 ) -> Result<HashMap<String, String>, String> {
-    let cache_dir = app_handle
-        .path()
-        .app_cache_dir()
-        .map_err(|e| e.to_string())?;
-    let thumb_cache_dir = cache_dir.join("thumbnails");
-    if !thumb_cache_dir.exists() {
-        fs::create_dir_all(&thumb_cache_dir).map_err(|e| e.to_string())?;
-    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let cache_dir = app_handle
+            .path()
+            .app_cache_dir()
+            .map_err(|e| e.to_string())?;
+        let thumb_cache_dir = cache_dir.join("thumbnails");
+        if !thumb_cache_dir.exists() {
+            fs::create_dir_all(&thumb_cache_dir).map_err(|e| e.to_string())?;
+        }
 
-    let state = app_handle.state::<AppState>();
-    let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+        let state = app_handle.state::<AppState>();
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
 
-    let thumbnails: HashMap<String, String> = paths
-        .par_iter()
-        .filter_map(|path_str| {
-            let original_path = Path::new(path_str);
-            let sidecar_path = get_sidecar_path(path_str);
+        let thumbnails: HashMap<String, String> = paths
+            .par_iter()
+            .filter_map(|path_str| {
+                let original_path = Path::new(path_str);
+                let sidecar_path = get_sidecar_path(path_str);
 
-            let img_mod_time = fs::metadata(original_path)
-                .ok()?
-                .modified()
-                .ok()?
-                .duration_since(std::time::UNIX_EPOCH)
-                .ok()?
-                .as_secs();
-            let sidecar_mod_time = fs::metadata(&sidecar_path)
-                .ok()
-                .and_then(|m| m.modified().ok())
-                .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
-                .unwrap_or(0);
+                let img_mod_time = fs::metadata(original_path)
+                    .ok()?
+                    .modified()
+                    .ok()?
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .ok()?
+                    .as_secs();
+                let sidecar_mod_time = fs::metadata(&sidecar_path)
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
+                    .unwrap_or(0);
 
-            let mut hasher = blake3::Hasher::new();
-            hasher.update(path_str.as_bytes());
-            hasher.update(&img_mod_time.to_le_bytes());
-            hasher.update(&sidecar_mod_time.to_le_bytes());
-            let hash = hasher.finalize();
-            let cache_filename = format!("{}.jpg", hash.to_hex());
-            let cache_path = thumb_cache_dir.join(cache_filename);
+                let mut hasher = blake3::Hasher::new();
+                hasher.update(path_str.as_bytes());
+                hasher.update(&img_mod_time.to_le_bytes());
+                hasher.update(&sidecar_mod_time.to_le_bytes());
+                let hash = hasher.finalize();
+                let cache_filename = format!("{}.jpg", hash.to_hex());
+                let cache_path = thumb_cache_dir.join(cache_filename);
 
-            if cache_path.exists() {
-                if let Ok(data) = fs::read(&cache_path) {
-                    let base64_str = general_purpose::STANDARD.encode(&data);
-                    return Some((
-                        path_str.clone(),
-                        format!("data:image/jpeg;base64,{}", base64_str),
-                    ));
+                if cache_path.exists() {
+                    if let Ok(data) = fs::read(&cache_path) {
+                        let base64_str = general_purpose::STANDARD.encode(&data);
+                        return Some((
+                            path_str.clone(),
+                            format!("data:image/jpeg;base64,{}", base64_str),
+                        ));
+                    }
                 }
-            }
 
-            if let Ok(thumb_image) = generate_thumbnail_data(path_str, gpu_context.as_ref()) {
-                if let Ok(thumb_data) = encode_thumbnail(&thumb_image) {
-                    let _ = fs::write(&cache_path, &thumb_data);
-                    let base64_str = general_purpose::STANDARD.encode(&thumb_data);
-                    return Some((
-                        path_str.clone(),
-                        format!("data:image/jpeg;base64,{}", base64_str),
-                    ));
+                if let Ok(thumb_image) = generate_thumbnail_data(path_str, gpu_context.as_ref()) {
+                    if let Ok(thumb_data) = encode_thumbnail(&thumb_image) {
+                        let _ = fs::write(&cache_path, &thumb_data);
+                        let base64_str = general_purpose::STANDARD.encode(&thumb_data);
+                        return Some((
+                            path_str.clone(),
+                            format!("data:image/jpeg;base64,{}", base64_str),
+                        ));
+                    }
                 }
-            }
-            None
-        })
-        .collect();
+                None
+            })
+            .collect();
 
-    Ok(thumbnails)
+        Ok(thumbnails)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

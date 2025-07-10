@@ -182,6 +182,7 @@ function App() {
   const [rootPath, setRootPath] = useState(null);
   const [appSettings, setAppSettings] = useState(null);
   const [currentFolderPath, setCurrentFolderPath] = useState(null);
+  const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [folderTree, setFolderTree] = useState(null);
   const [imageList, setImageList] = useState([]);
   const [imageRatings, setImageRatings] = useState({});
@@ -558,6 +559,31 @@ function App() {
     setIsViewLoading(true);
     try {
       setCurrentFolderPath(path);
+
+      if (rootPath && path !== rootPath) {
+          setExpandedFolders(prev => {
+              const newSet = new Set(prev);
+              let current = path;
+              const separator = current.includes('/') ? '/' : '\\';
+
+              const lastSeparatorIndex = current.lastIndexOf(separator);
+              if (lastSeparatorIndex > -1 && lastSeparatorIndex >= rootPath.length) {
+                  current = current.substring(0, lastSeparatorIndex);
+              } else {
+                  current = null;
+              }
+
+              while (current && current.startsWith(rootPath) && current !== rootPath) {
+                  newSet.add(current);
+                  const parentSeparatorIndex = current.lastIndexOf(separator);
+                  if (parentSeparatorIndex === -1 || parentSeparatorIndex < rootPath.length) break;
+                  current = current.substring(0, parentSeparatorIndex);
+              }
+              newSet.add(rootPath);
+              return newSet;
+          });
+      }
+
       const imageListPromise = invoke('list_images_in_dir', { path });
       if (isNewRoot) {
         setIsTreeLoading(true);
@@ -590,11 +616,38 @@ function App() {
     } finally {
       setIsViewLoading(false);
     }
-  }, [appSettings, handleSettingsChange, selectedImage]);
+  }, [appSettings, handleSettingsChange, selectedImage, rootPath]);
 
   const handleLibraryRefresh = useCallback(() => {
     if (currentFolderPath) handleSelectSubfolder(currentFolderPath, false);
   }, [currentFolderPath, handleSelectSubfolder]);
+
+  const handleToggleFolder = useCallback((path) => {
+    setExpandedFolders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(path)) {
+        newSet.delete(path);
+      } else {
+        newSet.add(path);
+      }
+      return newSet;
+    });
+  }, []);
+
+  useEffect(() => {
+      if (isInitialMount.current || !appSettings || !rootPath) return;
+
+      const newFolderState = {
+          currentFolderPath,
+          expandedFolders: Array.from(expandedFolders),
+      };
+
+      if (JSON.stringify(appSettings.lastFolderState) === JSON.stringify(newFolderState)) {
+          return;
+      }
+
+      handleSettingsChange({ ...appSettings, lastFolderState: newFolderState });
+  }, [currentFolderPath, expandedFolders, rootPath, appSettings, handleSettingsChange]);
 
   useEffect(() => {
     const handleGlobalContextMenu = (event) => { if (!DEBUG) event.preventDefault(); };
@@ -973,11 +1026,47 @@ function App() {
   };
 
   const handleContinueSession = () => {
-    if (appSettings?.lastRootPath) { setRootPath(appSettings.lastRootPath); handleSelectSubfolder(appSettings.lastRootPath, true); }
+    const restore = async () => {
+      if (!appSettings?.lastRootPath) return;
+
+      const root = appSettings.lastRootPath;
+      const folderState = appSettings.lastFolderState;
+      const pathToSelect = folderState?.currentFolderPath && folderState.currentFolderPath.startsWith(root)
+          ? folderState.currentFolderPath
+          : root;
+
+      setRootPath(root);
+
+      if (folderState?.expandedFolders) {
+          const newExpandedFolders = new Set(folderState.expandedFolders);
+          newExpandedFolders.add(root);
+          setExpandedFolders(newExpandedFolders);
+      } else {
+          setExpandedFolders(new Set([root]));
+      }
+
+      setIsTreeLoading(true);
+      try {
+          const treeData = await invoke('get_folder_tree', { path: root });
+          setFolderTree(treeData);
+      } catch (err) {
+          console.error("Failed to load folder tree:", err);
+          setError(`Failed to load folder tree: ${err}.`);
+      } finally {
+          setIsTreeLoading(false);
+      }
+
+      await handleSelectSubfolder(pathToSelect, false);
+    };
+    restore().catch(err => {
+        console.error("Failed to restore session:", err);
+        setError("Failed to restore session.");
+    });
   };
 
   const handleGoHome = () => {
     setRootPath(null); setCurrentFolderPath(null); setImageList([]); setImageRatings({}); setFolderTree(null); setMultiSelectedPaths([]); setLibraryActivePath(null); setIsLibraryExportPanelVisible(false);
+    setExpandedFolders(new Set());
   };
 
   const handleMultiSelectClick = (path, event, options) => {
@@ -1395,6 +1484,8 @@ function App() {
                 style={{ width: isFolderTreeVisible ? `${leftPanelWidth}px` : '32px' }}
                 isResizing={isResizing}
                 onContextMenu={handleFolderTreeContextMenu}
+                expandedFolders={expandedFolders}
+                onToggleFolder={handleToggleFolder}
               />
               <Resizer onMouseDown={createResizeHandler(setLeftPanelWidth, leftPanelWidth)} direction="vertical" />
             </>

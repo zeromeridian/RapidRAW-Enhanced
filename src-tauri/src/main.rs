@@ -88,6 +88,13 @@ struct SortCriteria {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+struct LastFolderState {
+    current_folder_path: String,
+    expanded_folders: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 struct AppSettings {
     last_root_path: Option<String>,
     editor_preview_resolution: Option<u32>,
@@ -95,6 +102,7 @@ struct AppSettings {
     theme: Option<String>,
     transparent: Option<bool>,
     comfyui_address: Option<String>,
+    last_folder_state: Option<LastFolderState>,
 }
 
 #[derive(serde::Serialize)]
@@ -139,6 +147,7 @@ impl Default for AppSettings {
             theme: Some("dark".to_string()),
             transparent: Some(true),
             comfyui_address: None,
+            last_folder_state: None,
         }
     }
 }
