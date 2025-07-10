@@ -11,6 +11,7 @@ import { useImageRenderSize } from '../../hooks/useImageRenderSize';
 import FullScreenViewer from './editor/FullScreenViewer';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
+import Waveform from './editor/Waveform';
 
 function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
   return centerCrop(
@@ -28,7 +29,7 @@ export default function Editor({
   transformWrapperRef, onZoomed, onContextMenu,
   onUndo, onRedo, canUndo, canRedo, brushSettings, 
   onGenerateAiMask, aiTool, onAiMaskDrawingComplete,
-  targetZoom
+  targetZoom, waveform, isWaveformVisible, onCloseWaveform,
 }) {
   const [crop, setCrop] = useState();
   const [isMaskHovered, setIsMaskHovered] = useState(false);
@@ -217,6 +218,7 @@ export default function Editor({
       />
 
       <div className="flex-1 bg-bg-secondary rounded-lg flex flex-col relative overflow-hidden p-2 gap-2 min-h-0">
+        {isWaveformVisible && <Waveform waveformData={waveform} onClose={onCloseWaveform} />}
         <EditorToolbar
           onBackToLibrary={onBackToLibrary}
           selectedImage={selectedImage}

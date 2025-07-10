@@ -201,6 +201,8 @@ function App() {
   const [isViewLoading, setIsViewLoading] = useState(false);
   const [error, setError] = useState(null);
   const [histogram, setHistogram] = useState(null);
+  const [waveform, setWaveform] = useState(null);
+  const [isWaveformVisible, setIsWaveformVisible] = useState(false);
   const [isFilmstripVisible, setIsFilmstripVisible] = useState(true);
   const [isFolderTreeVisible, setIsFolderTreeVisible] = useState(true);
   const [isAdjusting, setIsAdjusting] = useState(false);
@@ -661,6 +663,8 @@ function App() {
     setFinalPreviewUrl(null);
     setUncroppedAdjustedPreviewUrl(null);
     setHistogram(null);
+    setWaveform(null);
+    setIsWaveformVisible(false);
     setActiveMaskId(null);
     setAiTool(null);
     setPendingAiAction(null);
@@ -877,6 +881,7 @@ function App() {
         if (key === 'm' && !isCtrl) { event.preventDefault(); handleRightPanelSelect('masks'); }
         if (key === 'i' && !isCtrl) { event.preventDefault(); handleRightPanelSelect('metadata'); }
         if (key === 'e' && !isCtrl) { event.preventDefault(); handleRightPanelSelect('export'); }
+        if (key === 'w' && !isCtrl) { event.preventDefault(); setIsWaveformVisible(prev => !prev); }
       }
 
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
@@ -942,6 +947,7 @@ function App() {
       listen('preview-update-final', (event) => { if (isEffectActive) { setFinalPreviewUrl(event.payload); setIsAdjusting(false); } }),
       listen('preview-update-uncropped', (event) => { if (isEffectActive) setUncroppedAdjustedPreviewUrl(event.payload); }),
       listen('histogram-update', (event) => { if (isEffectActive) setHistogram(event.payload); }),
+      listen('waveform-update', (event) => { if (isEffectActive) setWaveform(event.payload); }),
       listen('thumbnail-generated', (event) => { if (isEffectActive) { const { path, rating } = event.payload; if (rating !== undefined) setImageRatings(prev => ({ ...prev, [path]: rating })); } }),
       listen('ai-model-download-start', (event) => { if (isEffectActive) setAiModelDownloadStatus(event.payload); }),
       listen('ai-model-download-finish', () => { if (isEffectActive) setAiModelDownloadStatus(null); }),
@@ -1106,6 +1112,14 @@ function App() {
     const inEditor = !!selectedImage;
     handleMultiSelectClick(path, event, { shiftAnchor: inEditor ? selectedImage.path : libraryActivePath, updateLibraryActivePath: !inEditor, onSimpleClick: handleImageSelect });
   };
+
+  useEffect(() => {
+    if (isWaveformVisible && selectedImage?.isReady && !waveform) {
+      invoke('image_processing::generate_waveform')
+        .then(setWaveform)
+        .catch(err => console.error("Failed to generate waveform:", err));
+    }
+  }, [isWaveformVisible, selectedImage?.isReady, waveform]);
 
   useEffect(() => {
     if (selectedImage && !selectedImage.isReady && selectedImage.path) {
@@ -1314,6 +1328,9 @@ function App() {
               showOriginal={showOriginal}
               setShowOriginal={setShowOriginal}
               isAdjusting={isAdjusting}
+              waveform={waveform}
+              isWaveformVisible={isWaveformVisible}
+              onCloseWaveform={() => setIsWaveformVisible(false)}
               onBackToLibrary={handleBackToLibrary}
               isLoading={isViewLoading}
               isFullScreen={isFullScreen}

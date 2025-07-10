@@ -7,7 +7,7 @@ use serde_json::Value;
 use std::f32::consts::PI;
 
 pub use crate::gpu_processing::{get_or_init_gpu_context, process_and_get_dynamic_image};
-use crate::{AppState, mask_generation::MaskDefinition};
+use crate::{AppState, mask_generation::MaskDefinition, load_settings};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ImageMetadata {
@@ -457,23 +457,31 @@ pub struct HistogramData {
 }
 
 #[tauri::command]
-pub fn generate_histogram(state: tauri::State<AppState>) -> Result<HistogramData, String> {
-    let image = state.original_image.lock().unwrap().as_ref()
-        .ok_or("No image loaded to generate histogram")?
-        .image.clone();
+pub fn generate_histogram(state: tauri::State<AppState>, app_handle: tauri::AppHandle) -> Result<HistogramData, String> {
+    let cached_preview_lock = state.cached_preview.lock().unwrap();
 
-    calculate_histogram_from_image(&image)
+    if let Some(cached) = &*cached_preview_lock {
+        calculate_histogram_from_image(&cached.image)
+    } else {
+        drop(cached_preview_lock);
+        let image = state.original_image.lock().unwrap().as_ref()
+            .ok_or("No image loaded to generate histogram")?
+            .image.clone();
+
+        let settings = load_settings(app_handle).unwrap_or_default();
+        let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
+        let preview = image.thumbnail(preview_dim, preview_dim);
+        calculate_histogram_from_image(&preview)
+    }
 }
 
 pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramData, String> {
-    let preview = image.thumbnail(768, 768);
-    
     let mut red = vec![0; 256];
     let mut green = vec![0; 256];
     let mut blue = vec![0; 256];
     let mut luma = vec![0; 256];
 
-    for pixel in preview.to_rgb8().pixels() {
+    for pixel in image.to_rgb8().pixels() {
         let r = pixel[0] as usize;
         let g = pixel[1] as usize;
         let b = pixel[2] as usize;
@@ -523,4 +531,80 @@ fn normalize_histogram_range(histogram: &mut Vec<u32>, max_range: f32) {
             }
         }
     }
+}
+
+#[derive(Serialize, Clone)]
+pub struct WaveformData {
+    red: Vec<u32>,
+    green: Vec<u32>,
+    blue: Vec<u32>,
+    luma: Vec<u32>,
+    width: u32,
+    height: u32,
+}
+
+#[tauri::command]
+pub fn generate_waveform(state: tauri::State<AppState>, app_handle: tauri::AppHandle) -> Result<WaveformData, String> {
+    let cached_preview_lock = state.cached_preview.lock().unwrap();
+
+    if let Some(cached) = &*cached_preview_lock {
+        calculate_waveform_from_image(&cached.image)
+    } else {
+        drop(cached_preview_lock);
+        let image = state.original_image.lock().unwrap().as_ref()
+            .ok_or("No image loaded to generate waveform")?
+            .image.clone();
+
+        let settings = load_settings(app_handle).unwrap_or_default();
+        let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
+        let preview = image.thumbnail(preview_dim, preview_dim);
+        calculate_waveform_from_image(&preview)
+    }
+}
+
+pub fn calculate_waveform_from_image(image: &DynamicImage) -> Result<WaveformData, String> {
+    const WAVEFORM_WIDTH: u32 = 256;
+    const WAVEFORM_HEIGHT: u32 = 256;
+
+    if image.width() == 0 || image.height() == 0 {
+        return Err("Image has zero dimensions.".to_string());
+    }
+    let preview_height = (image.height() as f32 * (WAVEFORM_WIDTH as f32 / image.width() as f32)).round() as u32;
+    if preview_height == 0 {
+        return Err("Image has zero height after scaling for waveform.".to_string());
+    }
+    let preview = image.resize(WAVEFORM_WIDTH, preview_height, image::imageops::FilterType::Triangle);
+    let rgb_image = preview.to_rgb8();
+
+    let mut red = vec![0; (WAVEFORM_WIDTH * WAVEFORM_HEIGHT) as usize];
+    let mut green = vec![0; (WAVEFORM_WIDTH * WAVEFORM_HEIGHT) as usize];
+    let mut blue = vec![0; (WAVEFORM_WIDTH * WAVEFORM_HEIGHT) as usize];
+    let mut luma = vec![0; (WAVEFORM_WIDTH * WAVEFORM_HEIGHT) as usize];
+
+    for (x, _, pixel) in rgb_image.enumerate_pixels() {
+        let r = pixel[0] as usize;
+        let g = pixel[1] as usize;
+        let b = pixel[2] as usize;
+
+        let r_idx = (255 - r) * WAVEFORM_WIDTH as usize + x as usize;
+        let g_idx = (255 - g) * WAVEFORM_WIDTH as usize + x as usize;
+        let b_idx = (255 - b) * WAVEFORM_WIDTH as usize + x as usize;
+
+        red[r_idx] += 1;
+        green[g_idx] += 1;
+        blue[b_idx] += 1;
+
+        let luma_val = (0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32).round() as usize;
+        let luma_idx = (255 - luma_val.min(255)) * WAVEFORM_WIDTH as usize + x as usize;
+        luma[luma_idx] += 1;
+    }
+
+    Ok(WaveformData {
+        red,
+        green,
+        blue,
+        luma,
+        width: WAVEFORM_WIDTH,
+        height: WAVEFORM_HEIGHT,
+    })
 }

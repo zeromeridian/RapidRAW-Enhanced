@@ -281,7 +281,7 @@ fn read_exif_data(file_bytes: &[u8]) -> HashMap<String, String> {
 }
 
 #[tauri::command]
-async fn load_image(path: String, state: tauri::State<'_, AppState>) -> Result<LoadImageResult, String> {
+async fn load_image(path: String, state: tauri::State<'_, AppState>, app_handle: tauri::AppHandle) -> Result<LoadImageResult, String> {
     let sidecar_path = get_sidecar_path(&path);
     let metadata: ImageMetadata = if sidecar_path.exists() {
         let file_content = fs::read_to_string(sidecar_path).map_err(|e| e.to_string())?;
@@ -299,8 +299,9 @@ async fn load_image(path: String, state: tauri::State<'_, AppState>) -> Result<L
 
     let exif_data = read_exif_data(&file_bytes);
 
-    const DISPLAY_PREVIEW_DIM: u32 = 2160;
-    let display_preview = pristine_img.thumbnail(DISPLAY_PREVIEW_DIM, DISPLAY_PREVIEW_DIM);
+    let settings = load_settings(app_handle).unwrap_or_default();
+    let display_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
+    let display_preview = pristine_img.thumbnail(display_preview_dim, display_preview_dim);
     let original_base64 = encode_to_base64(&display_preview, 85)?;
 
     *state.cached_preview.lock().unwrap() = None;
@@ -379,6 +380,10 @@ fn apply_adjustments(
         if let Ok(final_processed_image) = process_and_get_dynamic_image(&context, &final_preview_base, final_adjustments, &mask_bitmaps) {
             if let Ok(histogram_data) = image_processing::calculate_histogram_from_image(&final_processed_image) {
                 let _ = app_handle.emit("histogram-update", histogram_data);
+            }
+
+            if let Ok(waveform_data) = image_processing::calculate_waveform_from_image(&final_processed_image) {
+                let _ = app_handle.emit("waveform-update", waveform_data);
             }
 
             if let Ok(base64_str) = encode_to_base64(&final_processed_image, 88) {
@@ -1411,6 +1416,7 @@ fn main() {
             apply_adjustments_to_paths,
             load_metadata,
             image_processing::generate_histogram,
+            image_processing::generate_waveform,
             file_management::list_images_in_dir,
             file_management::get_folder_tree,
             file_management::generate_thumbnails,

@@ -311,6 +311,7 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
                 <KeybindItem keys={['R']} description="Toggle Crop panel" />
                 <KeybindItem keys={['M']} description="Toggle Masks panel" />
                 <KeybindItem keys={['I']} description="Toggle Metadata panel" />
+                <KeybindItem keys={['W']} description="Toggle Waveform display" />
                 <KeybindItem keys={['E']} description="Toggle Export panel" />
               </div>
             </div>
