@@ -84,13 +84,14 @@ struct SortCriteria {
     order: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 struct AppSettings {
     last_root_path: Option<String>,
     editor_preview_resolution: Option<u32>,
     sort_criteria: Option<SortCriteria>,
     theme: Option<String>,
+    transparent: Option<bool>,
     comfyui_address: Option<String>,
 }
 
@@ -125,6 +126,19 @@ struct ResizeOptions {
 struct ExportSettings {
     jpeg_quality: u8,
     resize: Option<ResizeOptions>,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            last_root_path: None,
+            editor_preview_resolution: Some(1920),
+            sort_criteria: None,
+            theme: Some("dark".to_string()),
+            transparent: Some(true),
+            comfyui_address: None,
+        }
+    }
 }
 
 fn apply_all_transformations(
@@ -1256,53 +1270,62 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
+
             let resource_path = app_handle.path()
                 .resolve("resources", tauri::path::BaseDirectory::Resource)
                 .expect("failed to resolve resource directory");
-
+            
             let ort_library_name = {
-                #[cfg(target_os = "windows")]
-                { "onnxruntime.dll" }
-                #[cfg(target_os = "linux")]
-                { "libonnxruntime.so" }
-                #[cfg(target_os = "macos")]
-                { "libonnxruntime.dylib" }
+                #[cfg(target_os = "windows")] { "onnxruntime.dll" }
+                #[cfg(target_os = "linux")] { "libonnxruntime.so" }
+                #[cfg(target_os = "macos")] { "libonnxruntime.dylib" }
             };
 
             let ort_library_path = resource_path.join(ort_library_name);
             std::env::set_var("ORT_DYLIB_PATH", &ort_library_path);
             println!("Set ORT_DYLIB_PATH to: {}", ort_library_path.display());
 
-            let window = app.get_webview_window("main").unwrap();
-            let app_handle = app.handle().clone();
+            let settings: AppSettings = load_settings(app_handle.clone()).unwrap_or_default();
+            let window_cfg = app.config().app.windows.get(0).unwrap().clone();
+            let transparent = settings.transparent.unwrap_or(window_cfg.transparent);
 
-            let settings: AppSettings = load_settings(app_handle).unwrap_or_default();
-            let theme = settings.theme.unwrap_or_else(|| "dark".to_string());
+            let window = tauri::WebviewWindowBuilder::from_config(app.handle(), &window_cfg)
+                .unwrap()
+                .transparent(transparent)
+                .build()
+                .expect("Failed to build window");
 
-            #[cfg(target_os = "macos")]
-            {
-                let material = if theme == "light" {
-                    NSVisualEffectMaterial::ContentBackground
-                } else {
-                    NSVisualEffectMaterial::HudWindow
-                };
-                apply_vibrancy(&window, material, None, None)
-                    .expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
-            }
+            if transparent {
+                let theme = settings.theme.unwrap_or_else(|| "dark".to_string());
 
-            #[cfg(target_os = "windows")]
-            {
-                let color = if theme == "light" {
-                    Some((250, 250, 250, 150))
-                } else if theme == "muted-green" {
-                    Some((44, 56, 54, 100))
-                } else {
-                    Some((26, 29, 27, 60))
-                };
-                apply_acrylic(&window, color)
-                    .expect("Unsupported platform! 'apply_acrylic' is only supported on Windows");
+                #[cfg(target_os = "macos")]
+                {
+                    let material = if theme == "light" {
+                        NSVisualEffectMaterial::ContentBackground
+                    } else {
+                        NSVisualEffectMaterial::HudWindow
+                    };
+                    apply_vibrancy(&window, material, None, None).expect(
+                        "Unsupported platform! 'apply_vibrancy' is only supported on macOS",
+                    );
+                }
+
+                #[cfg(target_os = "windows")]
+                {
+                    let color = if theme == "light" {
+                        Some((250, 250, 250, 150))
+                    } else if theme == "muted-green" {
+                        Some((44, 56, 54, 100))
+                    } else {
+                        Some((26, 29, 27, 60))
+                    };
+                    apply_acrylic(&window, color).expect(
+                        "Unsupported platform! 'apply_acrylic' is only supported on Windows",
+                    );
+                }
             }
 
             Ok(())
