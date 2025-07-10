@@ -92,7 +92,7 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
     setConfirmModalState({
       isOpen: true,
       title: 'Confirm Window Transparency',
-      message: `Are you sure you want to ${ transparent ? 'enable' : 'disable' } window transparency effects?\n\nThis may reduce application performance. The application will relaunch to make this change.`,
+        message: `Are you sure you want to ${ transparent ? 'enable' : 'disable' } window transparency effects?\n\n${ transparent ? 'These effects may reduce application performance.' : ''}\n\nThe application will relaunch to make this change.`,
       onConfirm: () => executeSetTransparent(transparent),
       confirmText: 'Toggle Transparency',
       confirmVariant: 'primary',
@@ -185,7 +185,7 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
                 <Switch
                   label="Transparency"
                   checked={appSettings?.transparent ?? true}
-                  onChange={v => handleSetTransparent(v)}
+                  onChange={handleSetTransparent}
                 />
               </div>
 
