@@ -1257,6 +1257,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
             let resource_path = app_handle.path()
@@ -1280,18 +1281,14 @@ fn main() {
                 let handle2 = app_handle.clone();
                 let settings: AppSettings = load_settings(app_handle).unwrap_or_default();
 
-                println!("transparent: {:?}", settings.transparent);
                 let window_cfg = handle2.config().app.windows.get(0).unwrap().clone();
                 let mut transparent = window_cfg.transparent;
-                let mut window_builder = tauri::WebviewWindowBuilder::from_config(
-                    &handle2,
-                    &window_cfg
-                )
-                    .unwrap();
+                let mut window_builder =
+                    tauri::WebviewWindowBuilder::from_config(&handle2, &window_cfg).unwrap();
                 if settings.transparent.is_some() {
                     transparent = settings.transparent.unwrap();
-                    window_builder = window_builder.transparent(settings.transparent.unwrap());
                 }
+                window_builder = window_builder.transparent(transparent);
                 let window = window_builder.build().unwrap();
                 let theme = settings.theme.unwrap_or_else(|| "dark".to_string());
 
@@ -1303,8 +1300,9 @@ fn main() {
                         NSVisualEffectMaterial::HudWindow
                     };
                     if transparent {
-                        apply_vibrancy(&window, material, None, None)
-                            .expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
+                        apply_vibrancy(&window, material, None, None).expect(
+                            "Unsupported platform! 'apply_vibrancy' is only supported on macOS",
+                        );
                     }
                 }
 
@@ -1318,8 +1316,9 @@ fn main() {
                         Some((26, 29, 27, 60))
                     };
                     if transparent {
-                        apply_acrylic(&window, color)
-                            .expect("Unsupported platform! 'apply_acrylic' is only supported on Windows");
+                        apply_acrylic(&window, color).expect(
+                            "Unsupported platform! 'apply_acrylic' is only supported on Windows",
+                        );
                     }
                 }
             });

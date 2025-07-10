@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Trash2, Wifi, WifiOff } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import { relaunch } from '@tauri-apps/plugin-process';
 import Button from '../ui/Button';
 import ConfirmModal from '../modals/ConfirmModal';
 import Dropdown from '../ui/Dropdown';
@@ -79,6 +80,22 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
       onConfirm: executeClearSidecars,
       confirmText: 'Delete All Edits',
       confirmVariant: 'destructive',
+    });
+  };
+
+  const executeSetTransparent = async (transparent) => {
+    onSettingsChange({ ...appSettings, transparent });
+    await relaunch();
+  };
+
+  const handleSetTransparent = (transparent) => {
+    setConfirmModalState({
+      isOpen: true,
+      title: 'Confirm Window Transparency',
+      message: `Are you sure you want to ${ transparent ? 'enable' : 'disable' } window transparency effects?\n\nThis may reduce application performance. The application will relaunch to make this change.`,
+      onConfirm: () => executeSetTransparent(transparent),
+      confirmText: 'Toggle Transparency',
+      confirmVariant: 'primary',
     });
   };
 
@@ -165,13 +182,10 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
                 <label htmlFor="theme-select" className="block text-sm font-medium text-text-secondary mb-2">
                   Window Effects
                 </label>
-                <p className="text-xs text-text-secondary mt-2">
-                  Enable or disable optional window effects. Application restart may be required.
-                </p>
                 <Switch
                   label="Transparency"
                   checked={appSettings?.transparent ?? true}
-                  onChange={(value => onSettingsChange({ ...appSettings, transparent: value }))}
+                  onChange={v => handleSetTransparent(v)}
                 />
               </div>
 

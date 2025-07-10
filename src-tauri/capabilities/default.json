@@ -11,5 +11,6 @@
     "core:window:allow-minimize",
     "core:window:allow-close",
     "core:window:allow-toggle-maximize"
+    "process:default"
   ]
 }
