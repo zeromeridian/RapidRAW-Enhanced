@@ -84,7 +84,7 @@ struct SortCriteria {
     order: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 struct AppSettings {
     last_root_path: Option<String>,
@@ -126,6 +126,19 @@ struct ResizeOptions {
 struct ExportSettings {
     jpeg_quality: u8,
     resize: Option<ResizeOptions>,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            last_root_path: None,
+            editor_preview_resolution: Some(1920),
+            sort_criteria: None,
+            theme: Some("dark".to_string()),
+            transparent: Some(true),
+            comfyui_address: None,
+        }
+    }
 }
 
 fn apply_all_transformations(
