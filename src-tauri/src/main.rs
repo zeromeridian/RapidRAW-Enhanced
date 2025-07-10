@@ -1260,36 +1260,32 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
+
             let resource_path = app_handle.path()
                 .resolve("resources", tauri::path::BaseDirectory::Resource)
                 .expect("failed to resolve resource directory");
-
+            
             let ort_library_name = {
-                #[cfg(target_os = "windows")]
-                { "onnxruntime.dll" }
-                #[cfg(target_os = "linux")]
-                { "libonnxruntime.so" }
-                #[cfg(target_os = "macos")]
-                { "libonnxruntime.dylib" }
+                #[cfg(target_os = "windows")] { "onnxruntime.dll" }
+                #[cfg(target_os = "linux")] { "libonnxruntime.so" }
+                #[cfg(target_os = "macos")] { "libonnxruntime.dylib" }
             };
 
             let ort_library_path = resource_path.join(ort_library_name);
             std::env::set_var("ORT_DYLIB_PATH", &ort_library_path);
             println!("Set ORT_DYLIB_PATH to: {}", ort_library_path.display());
 
-            std::thread::spawn(move || {
-                let handle2 = app_handle.clone();
-                let settings: AppSettings = load_settings(app_handle).unwrap_or_default();
+            let settings: AppSettings = load_settings(app_handle.clone()).unwrap_or_default();
+            let window_cfg = app.config().app.windows.get(0).unwrap().clone();
+            let transparent = settings.transparent.unwrap_or(window_cfg.transparent);
 
-                let window_cfg = handle2.config().app.windows.get(0).unwrap().clone();
-                let mut transparent = window_cfg.transparent;
-                let mut window_builder =
-                    tauri::WebviewWindowBuilder::from_config(&handle2, &window_cfg).unwrap();
-                if settings.transparent.is_some() {
-                    transparent = settings.transparent.unwrap();
-                }
-                window_builder = window_builder.transparent(transparent);
-                let window = window_builder.build().unwrap();
+            let window = tauri::WebviewWindowBuilder::from_config(app.handle(), &window_cfg)
+                .unwrap()
+                .transparent(transparent)
+                .build()
+                .expect("Failed to build window");
+
+            if transparent {
                 let theme = settings.theme.unwrap_or_else(|| "dark".to_string());
 
                 #[cfg(target_os = "macos")]
@@ -1299,11 +1295,9 @@ fn main() {
                     } else {
                         NSVisualEffectMaterial::HudWindow
                     };
-                    if transparent {
-                        apply_vibrancy(&window, material, None, None).expect(
-                            "Unsupported platform! 'apply_vibrancy' is only supported on macOS",
-                        );
-                    }
+                    apply_vibrancy(&window, material, None, None).expect(
+                        "Unsupported platform! 'apply_vibrancy' is only supported on macOS",
+                    );
                 }
 
                 #[cfg(target_os = "windows")]
@@ -1315,13 +1309,11 @@ fn main() {
                     } else {
                         Some((26, 29, 27, 60))
                     };
-                    if transparent {
-                        apply_acrylic(&window, color).expect(
-                            "Unsupported platform! 'apply_acrylic' is only supported on Windows",
-                        );
-                    }
+                    apply_acrylic(&window, color).expect(
+                        "Unsupported platform! 'apply_acrylic' is only supported on Windows",
+                    );
                 }
-            });
+            }
 
             Ok(())
         })
