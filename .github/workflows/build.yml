@@ -18,6 +18,9 @@ on:
       release-id:
         required: false
         type: string
+      asset-name-pattern:
+        required: false
+        type: string
       upload-artifacts:
         required: false
         type: boolean
@@ -56,7 +59,7 @@ jobs:
           cache: 'npm'
 
       - name: Install additional system dependencies (Linux)
-        if: startsWith(inputs.platform, 'ubuntu-22')
+        if: ${{ startsWith(inputs.platform, 'ubuntu-22') }}
         run: |-
           sudo apt-get update
           sudo apt-get install -y \
@@ -70,7 +73,7 @@ jobs:
             librsvg2-dev
 
       - name: Install additional system dependencies (Linux)
-        if: startsWith(inputs.platform, 'ubuntu-24')
+        if: ${{ startsWith(inputs.platform, 'ubuntu-24') }}
         run: |-
           sudo apt-get update
           sudo apt-get install -y \
@@ -91,14 +94,26 @@ jobs:
         if: ${{ inputs.target != '' }}
         run: rustup target add ${{ inputs.target }}
 
+      - id: patch-release-name
+        shell: bash
+        if: ${{ inputs.release-id != '' }}
+        run: |
+          platform="${{ inputs.platform }}"
+          replacement="${platform%-*}"
+          replacement="$(echo ${replacement} | sed -E 's/\.//g')"
+          patched_platform=$(echo '${{ inputs.asset-name-pattern }}' | sed -E "s/\[platform\]/${replacement}/")
+          echo "platform=${patched_platform}" >> $GITHUB_OUTPUT
+
       - id: tauri-build
         name: Build with tauri-action
-        uses: tauri-apps/tauri-action@v0
+        # FIXME set this back to a release major version, ex. v0
+        uses: tauri-apps/tauri-action@cf3eb9b18add8548a40584695215c80ab7274f31
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NO_STRIP: ${{ startsWith(inputs.platform, 'ubuntu') }}
         with:
           args: ${{ inputs.build-args }} ${{ inputs.target != '' && '--target' || ''  }} ${{ inputs.target }}
+          assetNamePattern: ${{ steps.patch-release-name.outputs.platform }}
           releaseId: ${{ inputs.release-id }}
 
       - name: Setup gh actions artifact client
@@ -106,7 +121,7 @@ jobs:
 
       - name: Upload binaries (Windows)
         shell: bash
-        if: startsWith(inputs.platform, 'windows')
+        if: ${{ startsWith(inputs.platform, 'windows') && inputs.release-id == '' }}
         run: |
           find src-tauri/target/release/bundle -name "*.exe" | while read -r file; do
             name=$(basename "$file")
@@ -116,7 +131,7 @@ jobs:
           done
 
       - name: Upload binaries
-        if: ${{ !startsWith(inputs.platform, 'windows') }}
+        if: ${{ !startsWith(inputs.platform, 'windows') && inputs.release-id == '' }}
         run: |
           find src-tauri/target/${{ inputs.target || 'release' }} -type f -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" | while read -r file; do
             name=$(basename "$file")
