@@ -36,13 +36,6 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Set application version
-        shell: bash
-        run: |
-          version="${{ inputs.version }}"
-          stripped="$(echo ${version} | sed -E 's/^v//')"
-          npx tauri-version --no-git --no-lock "${stripped}"
-
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         if: startsWith(inputs.platform, 'macos')
@@ -93,6 +86,13 @@ jobs:
       - name: rustup install target
         if: ${{ inputs.target != '' }}
         run: rustup target add ${{ inputs.target }}
+
+      - name: Set application version
+        shell: bash
+        run: |
+          version="${{ inputs.version }}"
+          stripped="$(echo ${version} | sed -E 's/^v//')"
+          npx tauri-version --no-git --no-lock "${stripped}"
 
       - id: patch-release-name
         shell: bash
