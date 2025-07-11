@@ -118,8 +118,8 @@ export default function Waveform({ waveformData, onClose }) {
                 {displayMode === 'blue' && <LumaWaveformDisplay data={blue} width={width} height={height} maxVal={maxVals.blue} color={[0, 0, 255]} />}
               </div>
               <div className="flex justify-center gap-1 mt-2 p-1 bg-surface rounded-lg">
-                <button onClick={() => setDisplayMode('luma')} className={`${baseButtonClass} ${displayMode === 'luma' ? 'bg-accent text-primary' : inactiveButtonClass}`}>Luma</button>
-                <button onClick={() => setDisplayMode('rgb')} className={`${baseButtonClass} ${displayMode === 'rgb' ? 'bg-accent text-primary' : inactiveButtonClass}`}>RGB</button>
+                <button onClick={() => setDisplayMode('luma')} className={`${baseButtonClass} ${displayMode === 'luma' ? 'bg-accent text-black' : inactiveButtonClass}`}>Luma</button>
+                <button onClick={() => setDisplayMode('rgb')} className={`${baseButtonClass} ${displayMode === 'rgb' ? 'bg-accent text-black' : inactiveButtonClass}`}>RGB</button>
                 <button onClick={() => setDisplayMode('red')} className={`${baseButtonClass} ${displayMode === 'red' ? 'bg-red-500 text-white' : inactiveButtonClass}`}>R</button>
                 <button onClick={() => setDisplayMode('green')} className={`${baseButtonClass} ${displayMode === 'green' ? 'bg-green-500 text-white' : inactiveButtonClass}`}>G</button>
                 <button onClick={() => setDisplayMode('blue')} className={`${baseButtonClass} ${displayMode === 'blue' ? 'bg-blue-500 text-white' : inactiveButtonClass}`}>B</button>
