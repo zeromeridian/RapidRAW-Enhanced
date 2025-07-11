@@ -160,8 +160,32 @@ fn get_hsl_influence(hue: f32, center_hue: f32, range_width: f32) -> f32 {
     return 1.0 - smoothstep(0.0, 1.0, normalized_distance);
 }
 
-fn rand(co: vec2<f32>) -> f32 {
-    return fract(sin(dot(co.xy, vec2<f32>(12.9898, 78.233))) * 43758.5453);
+fn hash(p: vec2<f32>) -> f32 {
+    var p_mut = p * mat2x2<f32>(vec2<f32>(127.1, 311.7), vec2<f32>(269.5, 183.3));
+    return fract(sin(p_mut.x + p_mut.y) * 43758.5453123);
+}
+
+fn gradient_noise(p: vec2<f32>) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+
+    let u = f * f * (3.0 - 2.0 * f);
+
+    let grad_00 = (vec2<f32>(hash(i), hash(i + 17.0)) * 2.0 - 1.0);
+    let grad_01 = (vec2<f32>(hash(i + vec2(0.0, 1.0)), hash(i + vec2(0.0, 1.0) + 17.0)) * 2.0 - 1.0);
+    let grad_10 = (vec2<f32>(hash(i + vec2(1.0, 0.0)), hash(i + vec2(1.0, 0.0) + 17.0)) * 2.0 - 1.0);
+    let grad_11 = (vec2<f32>(hash(i + vec2(1.0, 1.0)), hash(i + vec2(1.0, 1.0) + 17.0)) * 2.0 - 1.0);
+
+    let dot_00 = dot(grad_00, f - vec2(0.0, 0.0));
+    let dot_01 = dot(grad_01, f - vec2(0.0, 1.0));
+    let dot_10 = dot(grad_10, f - vec2(1.0, 0.0));
+    let dot_11 = dot(grad_11, f - vec2(1.0, 1.0));
+
+    let bottom_interp = mix(dot_00, dot_10, u.x);
+    let top_interp = mix(dot_01, dot_11, u.x);
+    let final_interp = mix(bottom_interp, top_interp, u.y);
+
+    return final_interp;
 }
 
 fn interpolate_curve_segment(x: f32, p1: Point, p2: Point) -> f32 {
@@ -211,52 +235,99 @@ fn apply_curve(val: f32, points: array<Point, 16>, count: u32) -> f32 {
     return clamp(points[1].y / 255.0, 0.0, 1.0);
 }
 
-fn apply_tonal_adjustments(color: vec3<f32>, exp: f32, con: f32, hi: f32, sh: f32, wh: f32, bl: f32) -> vec3<f32> {
-    var rgb = color * pow(2.0, exp);
-
+fn apply_tonal_adjustments(color: vec3<f32>, con: f32, hi: f32, sh: f32, wh: f32, bl: f32) -> vec3<f32> {
+    var rgb = color;
     let white_level = 1.0 - wh * 0.25;
     rgb = rgb / max(white_level, 0.01);
-
     let luma = get_luma(rgb);
-
-    if (luma > 0.001) {
-        let highlight_mix = smoothstep(0.5, 1.0, luma);
-        let highlight_adjust = hi * highlight_mix;
-        let adjusted_luma = luma + highlight_adjust;
-        rgb *= (adjusted_luma / luma);
+    if (hi != 0.0) {
+        let highlight_range = smoothstep(0.5, 1.0, luma);
+        if (hi < 0.0) {
+            let compression_strength = abs(hi) * 2.0;
+            let compressed = rgb / (rgb + compression_strength);
+            rgb = mix(rgb, compressed, highlight_range);
+        } else {
+            rgb = rgb + (hi * 0.3 * highlight_range * (1.0 - luma));
+        }
     }
-
-    let shadow_mix = 1.0 - smoothstep(0.0, 0.5, luma);
-    rgb += sh * shadow_mix;
-
-    let blacks_mix = 1.0 - smoothstep(0.0, 0.25, luma);
-    rgb += (bl * 0.3) * blacks_mix;
-
+    if (sh != 0.0) {
+        let shadow_range = 1.0 - smoothstep(0.0, 0.4, luma);
+        if (sh > 0.0) {
+            let lift_amount = sh * shadow_range;
+            let shadow_gamma = 1.0 / (1.0 + lift_amount * 2.0);
+            rgb = pow(max(rgb, vec3<f32>(0.0)), vec3<f32>(shadow_gamma));
+        } else {
+            rgb = rgb * (1.0 + sh * shadow_range);
+        }
+    }
+    if (bl != 0.0) {
+        let blacks_range = 1.0 - smoothstep(0.0, 0.15, luma);
+        rgb = rgb + (bl * 0.2 * blacks_range);
+    }
+    let contrast_factor = 1.0 + con * 0.75;
     let pivot = 0.5 - con * 0.05;
-    rgb = pivot + (rgb - pivot) * (1.0 + con);
-
-    rgb += max(0.0, con) * 0.1;
-
+    rgb = pivot + (rgb - pivot) * contrast_factor;
+    rgb += max(0.0, con * 0.75) * 0.05;
     return clamp(rgb, vec3<f32>(-0.1), vec3<f32>(1.5));
 }
 
-fn apply_color_adjustments(color: vec3<f32>, sat: f32, temp: f32, tnt: f32, vib: f32) -> vec3<f32> {
+fn apply_white_balance(color: vec3<f32>, temp: f32, tnt: f32) -> vec3<f32> {
     var rgb = color;
     let temp_kelvin_mult = vec3<f32>(1.0 + temp * 0.2, 1.0 + temp * 0.05, 1.0 - temp * 0.2);
-    let tint_mult = vec3<f32>(1.0 - tnt * 0.1, 1.0 + tnt * 0.1, 1.0 - tnt * 0.1);
+    let tint_mult = vec3<f32>(1.0 - tnt * 0.25, 1.0 + tnt * 0.25, 1.0 - tnt * 0.25);
     rgb *= temp_kelvin_mult * tint_mult;
+    return rgb;
+}
 
-    rgb *= (1.0 + abs(temp) * 0.1);
-
-    let luma = get_luma(rgb);
-    var sat_rgb = mix(vec3<f32>(luma), rgb, 1.0 + sat);
+fn apply_creative_color(color: vec3<f32>, sat: f32, vib: f32) -> vec3<f32> {
+    if (sat == 0.0 && vib == 0.0) { return color; }
+    let luma = get_luma(color);
+    var sat_rgb = mix(vec3<f32>(luma), color, 1.0 + sat);
     if (vib != 0.0) {
-        let original_sat = length(rgb - luma);
-        let vibrance_mask = 1.0 - smoothstep(0.2, 0.6, original_sat);
-        let vibrance_amount = vib * vibrance_mask;
-        sat_rgb = mix(sat_rgb, mix(vec3<f32>(get_luma(sat_rgb)), sat_rgb, 1.0 + vibrance_amount), abs(vibrance_amount));
+        let luma_for_vib = get_luma(sat_rgb);
+        let current_saturation = distance(sat_rgb, vec3<f32>(luma_for_vib));
+        let saturation_mask = 1.0 - smoothstep(0.1, 0.7, current_saturation);
+        let shadow_boost = smoothstep(0.0, 0.2, luma_for_vib);
+        let highlight_protection = 1.0 - smoothstep(0.4, 0.9, luma_for_vib);
+        let luminance_mask = shadow_boost * highlight_protection;
+        let final_mask = saturation_mask * luminance_mask;
+        if (vib > 0.0) {
+            let strength_multiplier = 2.5;
+            let vibrance_amount = vib * final_mask * strength_multiplier;
+            sat_rgb = mix(vec3<f32>(luma_for_vib), sat_rgb, 1.0 + vibrance_amount);
+        } else {
+            let skin_luma_protection = 1.0 - smoothstep(0.3, 0.6, luma_for_vib);
+            let skin_sat_protection = smoothstep(0.1, 0.3, current_saturation);
+            let protection_mask = skin_luma_protection * skin_sat_protection;
+            let vibrance_amount = vib * (1.0 - protection_mask);
+            sat_rgb = mix(vec3<f32>(luma_for_vib), sat_rgb, 1.0 + vibrance_amount);
+        }
     }
     return sat_rgb;
+}
+
+fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>) -> vec3<f32> {
+    var hsv = rgb_to_hsv(color);
+    if (hsv.y < 0.01) { return color; }
+    var total_hue_shift: f32 = 0.0;
+    var total_sat_adjust: f32 = 0.0;
+    var total_lum_adjust: f32 = 0.0;
+    var total_influence: f32 = 0.0;
+    var influence = get_hsl_influence(hsv.x, 0.0, 80.0); if (influence > 0.001) { total_hue_shift += hsl_adjustments[0].hue * influence; total_sat_adjust += hsl_adjustments[0].saturation * influence; total_lum_adjust += hsl_adjustments[0].luminance * influence; total_influence += influence; }
+    influence = get_hsl_influence(hsv.x, 30.0, 70.0); if (influence > 0.001) { total_hue_shift += hsl_adjustments[1].hue * influence; total_sat_adjust += hsl_adjustments[1].saturation * influence; total_lum_adjust += hsl_adjustments[1].luminance * influence; total_influence += influence; }
+    influence = get_hsl_influence(hsv.x, 60.0, 70.0); if (influence > 0.001) { total_hue_shift += hsl_adjustments[2].hue * influence; total_sat_adjust += hsl_adjustments[2].saturation * influence; total_lum_adjust += hsl_adjustments[2].luminance * influence; total_influence += influence; }
+    influence = get_hsl_influence(hsv.x, 120.0, 100.0); if (influence > 0.001) { total_hue_shift += hsl_adjustments[3].hue * influence; total_sat_adjust += hsl_adjustments[3].saturation * influence; total_lum_adjust += hsl_adjustments[3].luminance * influence; total_influence += influence; }
+    influence = get_hsl_influence(hsv.x, 180.0, 80.0); if (influence > 0.001) { total_hue_shift += hsl_adjustments[4].hue * influence; total_sat_adjust += hsl_adjustments[4].saturation * influence; total_lum_adjust += hsl_adjustments[4].luminance * influence; total_influence += influence; }
+    influence = get_hsl_influence(hsv.x, 240.0, 90.0); if (influence > 0.001) { total_hue_shift += hsl_adjustments[5].hue * influence; total_sat_adjust += hsl_adjustments[5].saturation * influence; total_lum_adjust += hsl_adjustments[5].luminance * influence; total_influence += influence; }
+    influence = get_hsl_influence(hsv.x, 285.0, 80.0); if (influence > 0.001) { total_hue_shift += hsl_adjustments[6].hue * influence; total_sat_adjust += hsl_adjustments[6].saturation * influence; total_lum_adjust += hsl_adjustments[6].luminance * influence; total_influence += influence; }
+    influence = get_hsl_influence(hsv.x, 330.0, 80.0); if (influence > 0.001) { total_hue_shift += hsl_adjustments[7].hue * influence; total_sat_adjust += hsl_adjustments[7].saturation * influence; total_lum_adjust += hsl_adjustments[7].luminance * influence; total_influence += influence; }
+    if (total_influence > 0.001) {
+        let norm_factor = 1.0 / total_influence;
+        hsv.x = (hsv.x + total_hue_shift * norm_factor + 360.0) % 360.0;
+        hsv.y = clamp(hsv.y * (1.0 + total_sat_adjust * norm_factor), 0.0, 1.0);
+        hsv.z = clamp(hsv.z * (1.0 + total_lum_adjust * norm_factor), 0.0, 1.5);
+    }
+    return hsv_to_rgb(hsv);
 }
 
 fn apply_local_contrast(processed_color: vec3<f32>, coords_i: vec2<i32>, radius: i32, amount: f32) -> vec3<f32> {
@@ -287,7 +358,8 @@ fn apply_local_contrast(processed_color: vec3<f32>, coords_i: vec2<i32>, radius:
     let shadow_protection = smoothstep(0.0, 0.25, original_luma);
     let highlight_protection = 1.0 - smoothstep(0.75, 1.0, original_luma);
     let midtone_mask = shadow_protection * highlight_protection;
-    let enhanced_detail = detail_linear * amount * midtone_mask;
+    let scaled_amount = amount * 0.8;
+    let enhanced_detail = detail_linear * scaled_amount * midtone_mask;
     return processed_color + enhanced_detail;
 }
 
@@ -333,92 +405,114 @@ fn apply_noise_reduction(color: vec3<f32>, coords_i: vec2<i32>, luma_amount: f32
     return color;
 }
 
+fn apply_all_adjustments(initial_rgb: vec3<f32>, adj: GlobalAdjustments, coords_i: vec2<i32>) -> vec3<f32> {
+    var processed_rgb = initial_rgb;
+    processed_rgb = apply_noise_reduction(processed_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction);
+    processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
+    processed_rgb = processed_rgb * pow(2.0, adj.exposure);
+    processed_rgb = apply_tonal_adjustments(processed_rgb, adj.contrast, adj.highlights, adj.shadows, adj.whites, adj.blacks);
+    processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);
+    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 2, adj.sharpness);
+    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 8, adj.clarity);
+    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20, adj.structure);
+    processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
+    processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl);
+    let srgb_for_curves = linear_to_srgb(processed_rgb);
+    let luma_val = get_luma(srgb_for_curves);
+    let luma_curved = apply_curve(luma_val, adj.luma_curve, adj.luma_curve_count);
+    let luma_diff = luma_curved - luma_val;
+    let luma_adjusted_srgb = srgb_for_curves + vec3<f32>(luma_diff);
+    let curved_srgb = vec3<f32>(
+        apply_curve(luma_adjusted_srgb.r, adj.red_curve, adj.red_curve_count),
+        apply_curve(luma_adjusted_srgb.g, adj.green_curve, adj.green_curve_count),
+        apply_curve(luma_adjusted_srgb.b, adj.blue_curve, adj.blue_curve_count)
+    );
+    processed_rgb = srgb_to_linear(curved_srgb);
+    return processed_rgb;
+}
+
+fn apply_all_mask_adjustments(initial_rgb: vec3<f32>, adj: MaskAdjustments, coords_i: vec2<i32>) -> vec3<f32> {
+    var processed_rgb = initial_rgb;
+    processed_rgb = apply_noise_reduction(processed_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction);
+    processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
+    processed_rgb = processed_rgb * pow(2.0, adj.exposure);
+    processed_rgb = apply_tonal_adjustments(processed_rgb, adj.contrast, adj.highlights, adj.shadows, adj.whites, adj.blacks);
+    processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);
+    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 2, adj.sharpness);
+    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 8, adj.clarity);
+    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20, adj.structure);
+    processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
+    processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl);
+    let srgb_for_curves = linear_to_srgb(processed_rgb);
+    let luma_val = get_luma(srgb_for_curves);
+    let luma_curved = apply_curve(luma_val, adj.luma_curve, adj.luma_curve_count);
+    let luma_diff = luma_curved - luma_val;
+    let luma_adjusted_srgb = srgb_for_curves + vec3<f32>(luma_diff);
+    let curved_srgb = vec3<f32>(
+        apply_curve(luma_adjusted_srgb.r, adj.red_curve, adj.red_curve_count),
+        apply_curve(luma_adjusted_srgb.g, adj.green_curve, adj.green_curve_count),
+        apply_curve(luma_adjusted_srgb.b, adj.blue_curve, adj.blue_curve_count)
+    );
+    processed_rgb = srgb_to_linear(curved_srgb);
+    return processed_rgb;
+}
+
+
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let in_dims = vec2<u32>(textureDimensions(input_texture));
     if (id.x >= in_dims.x || id.y >= in_dims.y) { return; }
 
     let original_color = textureLoad(input_texture, id.xy, 0);
-    var processed_rgb = srgb_to_linear(original_color.rgb);
+    let initial_linear_rgb = srgb_to_linear(original_color.rgb);
     let absolute_coord_i = vec2<i32>(id.xy) + vec2<i32>(i32(adjustments.tile_offset_x), i32(adjustments.tile_offset_y));
 
-    let g = adjustments.global;
-    processed_rgb = apply_noise_reduction(processed_rgb, absolute_coord_i, g.luma_noise_reduction, g.color_noise_reduction);
-    processed_rgb = apply_dehaze(processed_rgb, g.dehaze);
-    processed_rgb = apply_tonal_adjustments(processed_rgb, g.exposure, g.contrast, g.highlights, g.shadows, g.whites, g.blacks);
-    processed_rgb = apply_color_adjustments(processed_rgb, g.saturation, g.temperature, g.tint, g.vibrance);
-    processed_rgb = apply_local_contrast(processed_rgb, absolute_coord_i, 2, g.sharpness);
-    processed_rgb = apply_local_contrast(processed_rgb, absolute_coord_i, 8, g.clarity);
-    processed_rgb = apply_local_contrast(processed_rgb, absolute_coord_i, 20, g.structure);
-
-    var hsv = rgb_to_hsv(processed_rgb);
-    if (hsv.y > 0.01) {
-        var total_hue_shift: f32 = 0.0; var total_sat_adjust: f32 = 0.0; var total_lum_adjust: f32 = 0.0; var total_influence: f32 = 0.0;
-        var influence = get_hsl_influence(hsv.x, 0.0, 80.0); if (influence > 0.001) { total_hue_shift += g.hsl[0].hue * influence; total_sat_adjust += g.hsl[0].saturation * influence; total_lum_adjust += g.hsl[0].luminance * influence; total_influence += influence; }
-        influence = get_hsl_influence(hsv.x, 30.0, 70.0); if (influence > 0.001) { total_hue_shift += g.hsl[1].hue * influence; total_sat_adjust += g.hsl[1].saturation * influence; total_lum_adjust += g.hsl[1].luminance * influence; total_influence += influence; }
-        influence = get_hsl_influence(hsv.x, 60.0, 70.0); if (influence > 0.001) { total_hue_shift += g.hsl[2].hue * influence; total_sat_adjust += g.hsl[2].saturation * influence; total_lum_adjust += g.hsl[2].luminance * influence; total_influence += influence; }
-        influence = get_hsl_influence(hsv.x, 120.0, 100.0); if (influence > 0.001) { total_hue_shift += g.hsl[3].hue * influence; total_sat_adjust += g.hsl[3].saturation * influence; total_lum_adjust += g.hsl[3].luminance * influence; total_influence += influence; }
-        influence = get_hsl_influence(hsv.x, 180.0, 80.0); if (influence > 0.001) { total_hue_shift += g.hsl[4].hue * influence; total_sat_adjust += g.hsl[4].saturation * influence; total_lum_adjust += g.hsl[4].luminance * influence; total_influence += influence; }
-        influence = get_hsl_influence(hsv.x, 240.0, 90.0); if (influence > 0.001) { total_hue_shift += g.hsl[5].hue * influence; total_sat_adjust += g.hsl[5].saturation * influence; total_lum_adjust += g.hsl[5].luminance * influence; total_influence += influence; }
-        influence = get_hsl_influence(hsv.x, 285.0, 80.0); if (influence > 0.001) { total_hue_shift += g.hsl[6].hue * influence; total_sat_adjust += g.hsl[6].saturation * influence; total_lum_adjust += g.hsl[6].luminance * influence; total_influence += influence; }
-        influence = get_hsl_influence(hsv.x, 330.0, 80.0); if (influence > 0.001) { total_hue_shift += g.hsl[7].hue * influence; total_sat_adjust += g.hsl[7].saturation * influence; total_lum_adjust += g.hsl[7].luminance * influence; total_influence += influence; }
-        if (total_influence > 0.001) { let norm_factor = 1.0 / total_influence; hsv.x = (hsv.x + total_hue_shift * norm_factor + 360.0) % 360.0; hsv.y = clamp(hsv.y * (1.0 + total_sat_adjust * norm_factor), 0.0, 1.0); hsv.z = clamp(hsv.z * (1.0 + total_lum_adjust * norm_factor), 0.0, 1.0); }
-    }
-    processed_rgb = hsv_to_rgb(hsv);
-
-    let srgb_for_curves = linear_to_srgb(processed_rgb);
-    let luma_val = get_luma(srgb_for_curves);
-    let luma_curved = apply_curve(luma_val, g.luma_curve, g.luma_curve_count);
-    let luma_diff = luma_curved - luma_val;
-    let luma_adjusted_srgb = srgb_for_curves + vec3<f32>(luma_diff);
-    let curved_srgb = vec3<f32>(apply_curve(luma_adjusted_srgb.r, g.red_curve, g.red_curve_count), apply_curve(luma_adjusted_srgb.g, g.green_curve, g.green_curve_count), apply_curve(luma_adjusted_srgb.b, g.blue_curve, g.blue_curve_count));
-    processed_rgb = srgb_to_linear(curved_srgb);
+    var processed_rgb = apply_all_adjustments(initial_linear_rgb, adjustments.global, absolute_coord_i);
 
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
-        let mask_adj = adjustments.mask_adjustments[i];
         let influence = textureLoad(mask_textures, id.xy, i, 0).r;
-        
         if (influence > 0.001) {
-            var mask_adjusted_rgb = processed_rgb;
-            mask_adjusted_rgb = apply_noise_reduction(mask_adjusted_rgb, absolute_coord_i, mask_adj.luma_noise_reduction, mask_adj.color_noise_reduction);
-            mask_adjusted_rgb = apply_dehaze(mask_adjusted_rgb, mask_adj.dehaze);
-            mask_adjusted_rgb = apply_tonal_adjustments(mask_adjusted_rgb, mask_adj.exposure, mask_adj.contrast, mask_adj.highlights, mask_adj.shadows, mask_adj.whites, mask_adj.blacks);
-            mask_adjusted_rgb = apply_color_adjustments(mask_adjusted_rgb, mask_adj.saturation, mask_adj.temperature, mask_adj.tint, mask_adj.vibrance);
-            mask_adjusted_rgb = apply_local_contrast(mask_adjusted_rgb, absolute_coord_i, 2, mask_adj.sharpness);
-            mask_adjusted_rgb = apply_local_contrast(mask_adjusted_rgb, absolute_coord_i, 8, mask_adj.clarity);
-            mask_adjusted_rgb = apply_local_contrast(mask_adjusted_rgb, absolute_coord_i, 20, mask_adj.structure);
-
-            var mask_hsv = rgb_to_hsv(mask_adjusted_rgb);
-            if (mask_hsv.y > 0.01) {
-                var total_hue_shift: f32 = 0.0; var total_sat_adjust: f32 = 0.0; var total_lum_adjust: f32 = 0.0; var total_influence: f32 = 0.0;
-                var hsl_influence = get_hsl_influence(mask_hsv.x, 0.0, 80.0); if (hsl_influence > 0.001) { total_hue_shift += mask_adj.hsl[0].hue * hsl_influence; total_sat_adjust += mask_adj.hsl[0].saturation * hsl_influence; total_lum_adjust += mask_adj.hsl[0].luminance * hsl_influence; total_influence += hsl_influence; }
-                hsl_influence = get_hsl_influence(mask_hsv.x, 30.0, 70.0); if (hsl_influence > 0.001) { total_hue_shift += mask_adj.hsl[1].hue * hsl_influence; total_sat_adjust += mask_adj.hsl[1].saturation * hsl_influence; total_lum_adjust += mask_adj.hsl[1].luminance * hsl_influence; total_influence += hsl_influence; }
-                hsl_influence = get_hsl_influence(mask_hsv.x, 60.0, 70.0); if (hsl_influence > 0.001) { total_hue_shift += mask_adj.hsl[2].hue * hsl_influence; total_sat_adjust += mask_adj.hsl[2].saturation * hsl_influence; total_lum_adjust += mask_adj.hsl[2].luminance * hsl_influence; total_influence += hsl_influence; }
-                hsl_influence = get_hsl_influence(mask_hsv.x, 120.0, 100.0); if (hsl_influence > 0.001) { total_hue_shift += mask_adj.hsl[3].hue * hsl_influence; total_sat_adjust += mask_adj.hsl[3].saturation * hsl_influence; total_lum_adjust += mask_adj.hsl[3].luminance * hsl_influence; total_influence += hsl_influence; }
-                hsl_influence = get_hsl_influence(mask_hsv.x, 180.0, 80.0); if (hsl_influence > 0.001) { total_hue_shift += mask_adj.hsl[4].hue * hsl_influence; total_sat_adjust += mask_adj.hsl[4].saturation * hsl_influence; total_lum_adjust += mask_adj.hsl[4].luminance * hsl_influence; total_influence += hsl_influence; }
-                hsl_influence = get_hsl_influence(mask_hsv.x, 240.0, 90.0); if (hsl_influence > 0.001) { total_hue_shift += mask_adj.hsl[5].hue * hsl_influence; total_sat_adjust += mask_adj.hsl[5].saturation * hsl_influence; total_lum_adjust += mask_adj.hsl[5].luminance * hsl_influence; total_influence += hsl_influence; }
-                hsl_influence = get_hsl_influence(mask_hsv.x, 285.0, 80.0); if (hsl_influence > 0.001) { total_hue_shift += mask_adj.hsl[6].hue * hsl_influence; total_sat_adjust += mask_adj.hsl[6].saturation * hsl_influence; total_lum_adjust += mask_adj.hsl[6].luminance * hsl_influence; total_influence += hsl_influence; }
-                hsl_influence = get_hsl_influence(mask_hsv.x, 330.0, 80.0); if (hsl_influence > 0.001) { total_hue_shift += mask_adj.hsl[7].hue * hsl_influence; total_sat_adjust += mask_adj.hsl[7].saturation * hsl_influence; total_lum_adjust += mask_adj.hsl[7].luminance * hsl_influence; total_influence += hsl_influence; }
-                if (total_influence > 0.001) { let norm_factor = 1.0 / total_influence; mask_hsv.x = (mask_hsv.x + total_hue_shift * norm_factor + 360.0) % 360.0; mask_hsv.y = clamp(mask_hsv.y * (1.0 + total_sat_adjust * norm_factor), 0.0, 1.0); mask_hsv.z = clamp(mask_hsv.z * (1.0 + total_lum_adjust * norm_factor), 0.0, 1.0); }
-            }
-            mask_adjusted_rgb = hsv_to_rgb(mask_hsv);
-
-            let mask_srgb_for_curves = linear_to_srgb(mask_adjusted_rgb);
-            let mask_luma_val = get_luma(mask_srgb_for_curves);
-            let mask_luma_curved = apply_curve(mask_luma_val, mask_adj.luma_curve, mask_adj.luma_curve_count);
-            let mask_luma_diff = mask_luma_curved - mask_luma_val;
-            let mask_luma_adjusted_srgb = mask_srgb_for_curves + vec3<f32>(mask_luma_diff);
-            let mask_curved_srgb = vec3<f32>(apply_curve(mask_luma_adjusted_srgb.r, mask_adj.red_curve, mask_adj.red_curve_count), apply_curve(mask_luma_adjusted_srgb.g, mask_adj.green_curve, mask_adj.green_curve_count), apply_curve(mask_luma_adjusted_srgb.b, mask_adj.blue_curve, mask_adj.blue_curve_count));
-            mask_adjusted_rgb = srgb_to_linear(mask_curved_srgb);
-
+            let mask_adjusted_rgb = apply_all_mask_adjustments(processed_rgb, adjustments.mask_adjustments[i], absolute_coord_i);
             processed_rgb = mix(processed_rgb, mask_adjusted_rgb, influence);
         }
     }
 
+    if (adjustments.global.grain_amount > 0.0) {
+        let g = adjustments.global;
+        let coord = vec2<f32>(absolute_coord_i);
+
+        let amount = g.grain_amount * 0.5;
+        
+        let scale = 1.0 / max(g.grain_size, 0.1);
+        let roughness = g.grain_roughness;
+
+        let luma = max(0.0, get_luma(processed_rgb));
+        let luma_mask = smoothstep(0.0, 0.15, luma) * (1.0 - smoothstep(0.6, 1.0, luma));
+
+        let base_coord = coord * scale;
+        let rough_coord = coord * scale * 0.6;
+
+        let noise1 = vec3<f32>(
+            gradient_noise(base_coord),
+            gradient_noise(base_coord + 11.3),
+            gradient_noise(base_coord + 23.7)
+        );
+        let noise2 = vec3<f32>(
+            gradient_noise(rough_coord + 35.1),
+            gradient_noise(rough_coord + 43.9),
+            gradient_noise(rough_coord + 57.5)
+        );
+        
+        let noise = mix(noise1, noise2, roughness);
+
+        processed_rgb += noise * amount * luma_mask;
+    }
+
     var final_rgb = linear_to_srgb(processed_rgb);
 
-    let out_coord = vec2<f32>(f32(id.x), f32(id.y));
+    let g = adjustments.global;
     if (g.vignette_amount != 0.0) {
+        let out_coord = vec2<f32>(f32(id.x), f32(id.y));
         let v_amount = g.vignette_amount;
         let v_mid = g.vignette_midpoint;
         let v_round = 1.0 - g.vignette_roundness;
@@ -429,16 +523,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         let d = length(uv_round * vec2<f32>(1.0, aspect)) * 0.5;
         let vignette_mask = smoothstep(v_mid - v_feather, v_mid + v_feather, d);
         if (v_amount < 0.0) { final_rgb *= (1.0 + v_amount * vignette_mask); } else { final_rgb = mix(final_rgb, vec3<f32>(1.0), v_amount * vignette_mask); }
-    }
-
-    if (g.grain_amount > 0.0) {
-        let g_amount = g.grain_amount;
-        let g_size = g.grain_size;
-        let g_rough = g.grain_roughness;
-        let grain_uv = out_coord / g_size;
-        let grain_value = rand(floor(grain_uv) + g_rough * rand(floor(grain_uv)));
-        let grain_luma = (grain_value - 0.5) * g_amount;
-        final_rgb += grain_luma;
     }
 
     textureStore(output_texture, id.xy, vec4<f32>(clamp(final_rgb, vec3<f32>(0.0), vec3<f32>(1.0)), original_color.a));
