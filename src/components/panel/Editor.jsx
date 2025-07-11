@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import debounce from 'lodash.debounce';
+import { AnimatePresence } from 'framer-motion';
 
 import { useImageRenderSize } from '../../hooks/useImageRenderSize';
 
@@ -218,7 +219,9 @@ export default function Editor({
       />
 
       <div className="flex-1 bg-bg-secondary rounded-lg flex flex-col relative overflow-hidden p-2 gap-2 min-h-0">
-        {isWaveformVisible && <Waveform waveformData={waveform} onClose={onCloseWaveform} />}
+        <AnimatePresence>
+          {isWaveformVisible && <Waveform waveformData={waveform} onClose={onCloseWaveform} />}
+        </AnimatePresence>
         <EditorToolbar
           onBackToLibrary={onBackToLibrary}
           selectedImage={selectedImage}

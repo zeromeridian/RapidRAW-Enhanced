@@ -7,10 +7,8 @@ import {
   Settings,
   Home,
   Star as StarIcon,
-  ArrowUpDown,
   Check,
-  Filter,
-  Grid as GridIcon,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FixedSizeGrid as Grid } from 'react-window';
@@ -49,7 +47,7 @@ const customOuterElement = forwardRef((props, ref) => (
 customOuterElement.displayName = 'CustomOuterElement';
 
 
-function DropdownMenu({ buttonContent, buttonTitle, children }) {
+function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName = "w-56" }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -77,17 +75,16 @@ function DropdownMenu({ buttonContent, buttonTitle, children }) {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            className="absolute right-0 mt-2 w-56 origin-top-right z-20"
+            className={`absolute right-0 mt-2 ${contentClassName} origin-top-right z-20`}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.1, ease: 'easeOut' }}
           >
             <div
-              className="bg-surface/90 backdrop-blur-md rounded-lg shadow-xl p-2"
+              className="bg-surface/90 backdrop-blur-md rounded-lg shadow-xl"
               role="menu"
               aria-orientation="vertical"
-              onClick={() => setIsOpen(false)}
             >
               {children}
             </div>
@@ -98,9 +95,9 @@ function DropdownMenu({ buttonContent, buttonTitle, children }) {
   );
 }
 
-function ThumbnailSizeDropdown({ selectedSize, onSelectSize }) {
+function ThumbnailSizeOptions({ selectedSize, onSelectSize }) {
   return (
-    <DropdownMenu buttonContent={<GridIcon className="w-8 h-8" />} buttonTitle="Thumbnail Size">
+    <>
       <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Thumbnail Size</div>
       {thumbnailSizeOptions.map((option) => {
         const isSelected = selectedSize === option.id;
@@ -116,22 +113,13 @@ function ThumbnailSizeDropdown({ selectedSize, onSelectSize }) {
           </button>
         );
       })}
-    </DropdownMenu>
+    </>
   );
 }
 
-function FilterDropdown({ filterCriteria, setFilterCriteria }) {
-  const isActive = filterCriteria.rating > 0;
+function FilterOptions({ filterCriteria, setFilterCriteria }) {
   return (
-    <DropdownMenu
-      buttonContent={
-        <>
-          <Filter className={`w-8 h-8 ${isActive ? 'text-accent' : ''}`} />
-          {isActive && <div className="absolute -top-1 -right-1 bg-accent rounded-full w-3 h-3" />}
-        </>
-      }
-      buttonTitle="Filter images"
-    >
+    <>
       <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Filter by Rating</div>
       {ratingFilterOptions.map((option) => {
         const isSelected = filterCriteria.rating === option.value;
@@ -150,13 +138,13 @@ function FilterDropdown({ filterCriteria, setFilterCriteria }) {
           </button>
         );
       })}
-    </DropdownMenu>
+    </>
   );
 }
 
-function SortDropdown({ sortCriteria, setSortCriteria }) {
+function SortOptions({ sortCriteria, setSortCriteria }) {
   return (
-    <DropdownMenu buttonContent={<ArrowUpDown className="w-8 h-8" />} buttonTitle="Sort images">
+    <>
       <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Sort by</div>
       {sortOptions.map((option) => {
         const isSelected = sortCriteria.key === option.key && sortCriteria.order === option.order;
@@ -172,9 +160,46 @@ function SortDropdown({ sortCriteria, setSortCriteria }) {
           </button>
         );
       })}
+    </>
+  );
+}
+
+function ViewOptionsDropdown({
+  thumbnailSize,
+  onSelectSize,
+  filterCriteria,
+  setFilterCriteria,
+  sortCriteria,
+  setSortCriteria,
+}) {
+  const isFilterActive = filterCriteria.rating > 0;
+
+  return (
+    <DropdownMenu
+      buttonContent={
+        <>
+          <SlidersHorizontal className="w-8 h-8" />
+          {isFilterActive && <div className="absolute -top-1 -right-1 bg-accent rounded-full w-3 h-3" />}
+        </>
+      }
+      buttonTitle="View Options"
+      contentClassName="w-[580px]"
+    >
+      <div className="flex">
+        <div className="flex-1 p-2">
+          <ThumbnailSizeOptions selectedSize={thumbnailSize} onSelectSize={onSelectSize} />
+        </div>
+        <div className="flex-1 p-2 border-l border-r border-border-color">
+          <FilterOptions filterCriteria={filterCriteria} setFilterCriteria={setFilterCriteria} />
+        </div>
+        <div className="flex-1 p-2">
+          <SortOptions sortCriteria={sortCriteria} setSortCriteria={setSortCriteria} />
+        </div>
+      </div>
     </DropdownMenu>
   );
 }
+
 
 function Thumbnail({ path, data, onImageClick, onImageDoubleClick, isSelected, isActive, rating, onContextMenu }) {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -305,9 +330,14 @@ export default function MainLibrary({
           <p className="text-sm text-text-secondary truncate">{currentFolderPath}</p>
         </div>
         <div className="flex items-center gap-3">
-          <ThumbnailSizeDropdown selectedSize={thumbnailSize} onSelectSize={setThumbnailSize} />
-          <FilterDropdown filterCriteria={filterCriteria} setFilterCriteria={setFilterCriteria} />
-          <SortDropdown sortCriteria={sortCriteria} setSortCriteria={setSortCriteria} />
+          <ViewOptionsDropdown
+            thumbnailSize={thumbnailSize}
+            onSelectSize={setThumbnailSize}
+            filterCriteria={filterCriteria}
+            setFilterCriteria={setFilterCriteria}
+            sortCriteria={sortCriteria}
+            setSortCriteria={setSortCriteria}
+          />
           <Button onClick={onOpenFolder} className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center" title="Open another folder"><Folder className="w-8 h-8" /></Button>
           <Button onClick={onGoHome} className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center" title="Go to Home Screen"><Home className="w-8 h-8" /></Button>
         </div>
