@@ -1,6 +1,5 @@
 {
   "name": "rapidraw",
-  "version": "1.2.2",
   "author": "Timon Käch",
   "private": true,
   "scripts": {
@@ -37,5 +36,6 @@
     "postcss": "^8.5.5",
     "tailwindcss": "^3.4.17",
     "vite": "^6.0.3"
-  }
+  },
+  "version": "0.0.0"
 }
