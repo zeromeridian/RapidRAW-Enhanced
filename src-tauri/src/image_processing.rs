@@ -226,7 +226,7 @@ struct AdjustmentScales {
 
 const SCALES: AdjustmentScales = AdjustmentScales {
     exposure: 25.0,
-    contrast: 500.0,
+    contrast: 1000.0,
     highlights: 400.0,
     shadows: 2000.0,
     whites: 30.0,
@@ -450,10 +450,10 @@ pub struct GpuContext {
 
 #[derive(Serialize, Clone)]
 pub struct HistogramData {
-    red: Vec<u32>,
-    green: Vec<u32>,
-    blue: Vec<u32>,
-    luma: Vec<u32>,
+    red: Vec<f32>,
+    green: Vec<f32>,
+    blue: Vec<f32>,
+    luma: Vec<f32>,
 }
 
 #[tauri::command]
@@ -476,59 +476,97 @@ pub fn generate_histogram(state: tauri::State<AppState>, app_handle: tauri::AppH
 }
 
 pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramData, String> {
-    let mut red = vec![0; 256];
-    let mut green = vec![0; 256];
-    let mut blue = vec![0; 256];
-    let mut luma = vec![0; 256];
+    let mut red_counts = vec![0u32; 256];
+    let mut green_counts = vec![0u32; 256];
+    let mut blue_counts = vec![0u32; 256];
+    let mut luma_counts = vec![0u32; 256];
 
     for pixel in image.to_rgb8().pixels() {
         let r = pixel[0] as usize;
         let g = pixel[1] as usize;
         let b = pixel[2] as usize;
-
-        red[r] += 1;
-        green[g] += 1;
-        blue[b] += 1;
-
+        red_counts[r] += 1;
+        green_counts[g] += 1;
+        blue_counts[b] += 1;
         let luma_val = (0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32).round() as usize;
-        let luma_idx = luma_val.min(255);
-        
-        luma[luma_idx] += 1;
+        luma_counts[luma_val.min(255)] += 1;
     }
 
-    apply_light_smoothing(&mut red);
-    apply_light_smoothing(&mut green);
-    apply_light_smoothing(&mut blue);
-    apply_light_smoothing(&mut luma);
+    let mut red: Vec<f32> = red_counts.into_iter().map(|c| c as f32).collect();
+    let mut green: Vec<f32> = green_counts.into_iter().map(|c| c as f32).collect();
+    let mut blue: Vec<f32> = blue_counts.into_iter().map(|c| c as f32).collect();
+    let mut luma: Vec<f32> = luma_counts.into_iter().map(|c| c as f32).collect();
 
-    normalize_histogram_range(&mut red, 0.75);
-    normalize_histogram_range(&mut green, 0.75);
-    normalize_histogram_range(&mut blue, 0.75);
-    normalize_histogram_range(&mut luma, 0.75);
+    let smoothing_sigma = 2.5;
+    apply_gaussian_smoothing(&mut red, smoothing_sigma);
+    apply_gaussian_smoothing(&mut green, smoothing_sigma);
+    apply_gaussian_smoothing(&mut blue, smoothing_sigma);
+    apply_gaussian_smoothing(&mut luma, smoothing_sigma);
+
+    normalize_histogram_range(&mut red, 0.99);
+    normalize_histogram_range(&mut green, 0.99);
+    normalize_histogram_range(&mut blue, 0.99);
+    normalize_histogram_range(&mut luma, 0.99);
 
     Ok(HistogramData { red, green, blue, luma })
 }
 
-fn apply_light_smoothing(histogram: &mut Vec<u32>) {
-    let original = histogram.clone();
+fn apply_gaussian_smoothing(histogram: &mut Vec<f32>, sigma: f32) {
+    if sigma <= 0.0 { return; }
+    
+    let kernel_radius = (sigma * 3.0).ceil() as usize;
+    if kernel_radius == 0 || kernel_radius >= histogram.len() { return; }
 
-    for i in 2..histogram.len() - 2 {
-        let smoothed = (original[i - 2] as f32 * 0.1 + 
-                       original[i - 1] as f32 * 0.2 + 
-                       original[i] as f32 * 0.4 + 
-                       original[i + 1] as f32 * 0.2 + 
-                       original[i + 2] as f32 * 0.1).round() as u32;
-        histogram[i] = smoothed;
+    let kernel_size = 2 * kernel_radius + 1;
+    let mut kernel = vec![0.0; kernel_size];
+    let mut kernel_sum = 0.0;
+
+    let two_sigma_sq = 2.0 * sigma * sigma;
+    for i in 0..kernel_size {
+        let x = (i as i32 - kernel_radius as i32) as f32;
+        let val = (-x * x / two_sigma_sq).exp();
+        kernel[i] = val;
+        kernel_sum += val;
+    }
+
+    if kernel_sum > 0.0 {
+        for val in &mut kernel {
+            *val /= kernel_sum;
+        }
+    }
+
+    let original = histogram.clone();
+    let len = histogram.len();
+
+    for i in 0..len {
+        let mut smoothed_val = 0.0;
+        for k in 0..kernel_size {
+            let offset = k as i32 - kernel_radius as i32;
+            let sample_index = i as i32 + offset;
+            let clamped_index = sample_index.clamp(0, len as i32 - 1) as usize;
+            smoothed_val += original[clamped_index] * kernel[k];
+        }
+        histogram[i] = smoothed_val;
     }
 }
 
-fn normalize_histogram_range(histogram: &mut Vec<u32>, max_range: f32) {
-    if let Some(&max_val) = histogram.iter().max() {
-        if max_val > 0 {
-            let scale_factor = max_range;
-            for value in histogram.iter_mut() {
-                *value = (*value as f32 * scale_factor).round() as u32;
-            }
+fn normalize_histogram_range(histogram: &mut Vec<f32>, percentile_clip: f32) {
+    if histogram.is_empty() { return; }
+
+    let mut sorted_data = histogram.clone();
+    sorted_data.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    
+    let clip_index = ((sorted_data.len() - 1) as f32 * percentile_clip).round() as usize;
+    let max_val = sorted_data[clip_index.min(sorted_data.len() - 1)];
+
+    if max_val > 1e-6 {
+        let scale_factor = 1.0 / max_val;
+        for value in histogram.iter_mut() {
+            *value = (*value * scale_factor).min(1.0);
+        }
+    } else {
+        for value in histogram.iter_mut() {
+            *value = 0.0;
         }
     }
 }
