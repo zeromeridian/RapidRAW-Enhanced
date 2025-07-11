@@ -3,9 +3,7 @@
   "author": "Timon Käch",
   "private": true,
   "scripts": {
-    "predev": "node ./src/sync-version.js",
     "dev": "vite",
-    "prebuild": "node ./src/sync-version.js",
     "build": "vite build",
     "tauri": "tauri"
   },
