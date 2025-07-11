@@ -110,10 +110,9 @@ jobs:
         run: |
           find src-tauri/target/release/bundle -name "*.exe" | while read -r file; do
             name=$(basename "$file")
-            patched_name=$(echo $name | sed -E 's/[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?/${{ github.sha }}/')
             echo "Uploading $name, file: $file"
             # TODO zip the file before upload
-            gh-actions-artifact-client.js upload "$patched_name" --retentionDays=7 < "$file"
+            gh-actions-artifact-client.js upload "${name}" --retentionDays=7 < "$file"
           done
 
       - name: Upload binaries
@@ -121,7 +120,6 @@ jobs:
         run: |
           find src-tauri/target/${{ inputs.target || 'release' }} -type f -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" | while read -r file; do
             name=$(basename "$file")
-            patched_name=$(echo $name | sed -E 's/[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?/${{ github.sha }}/')
             echo "Uploading $name, file: $file"
-            zip -j - "$file" | gh-actions-artifact-client.js upload "$patched_name" --retentionDays=7
+            zip -j - "$file" | gh-actions-artifact-client.js upload "${name}" --retentionDays=7
           done
