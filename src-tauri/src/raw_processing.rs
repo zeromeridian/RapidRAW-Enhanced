@@ -36,7 +36,7 @@ fn develop_internal(file_bytes: &[u8], fast_demosaic: bool) -> Result<(DynamicIm
     Ok((dynamic_image, orientation))
 }
 
-fn apply_orientation(image: DynamicImage, orientation: Orientation) -> DynamicImage {
+pub fn apply_orientation(image: DynamicImage, orientation: Orientation) -> DynamicImage {
     match orientation {
         Orientation::Normal | Orientation::Unknown => image,
         Orientation::HorizontalFlip => image.fliph(),

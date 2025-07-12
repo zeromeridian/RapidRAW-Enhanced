@@ -1,10 +1,14 @@
-use anyhow::Result;
+use anyhow::{Result, Context};
 use base64::{engine::general_purpose, Engine as _};
-use image::{imageops, DynamicImage, RgbaImage, ImageReader};
+use image::{imageops, DynamicImage, ImageReader, RgbaImage};
+use rawler::Orientation;
 use std::io::Cursor;
 use rayon::prelude::*;
 use serde_json::Value;
 use std::fs;
+
+use exif::{Reader as ExifReader, Tag};
+use crate::raw_processing::apply_orientation;
 
 use crate::formats::is_raw_file;
 use crate::raw_processing::develop_raw_image;
@@ -27,13 +31,28 @@ pub fn load_base_image_from_bytes(
     if is_raw_file(path_for_ext_check) {
         develop_raw_image(bytes, use_fast_raw_dev)
     } else {
-        let mut reader = ImageReader::new(Cursor::new(bytes))
-            .with_guessed_format()
-            .map_err(|e| anyhow::anyhow!("Failed to guess image format: {}", e))?;
-
-        reader.no_limits();
-        reader.decode().map_err(Into::into)
+        load_image_with_orientation(bytes)
     }
+}
+
+pub fn load_image_with_orientation(bytes: &[u8]) -> Result<DynamicImage> {
+    let cursor = Cursor::new(bytes);
+    let mut reader = ImageReader::new(cursor.clone())
+        .with_guessed_format()
+        .context("Failed to guess image format")?;
+
+    reader.no_limits();
+    let image = reader.decode().context("Failed to decode image")?;
+
+    let exif_reader = ExifReader::new();
+    if let Ok(exif) = exif_reader.read_from_container(&mut cursor.clone()) {
+        if let Some(orientation) = exif.get_field(Tag::Orientation, exif::In::PRIMARY)
+                                       .and_then(|f| f.value.get_uint(0)) {
+            return Ok(apply_orientation(image, Orientation::from_u16(orientation as u16)));
+        }
+    }
+
+    Ok(image)
 }
 
 pub fn composite_patches_on_image(
