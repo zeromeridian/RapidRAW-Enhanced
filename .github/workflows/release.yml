@@ -34,11 +34,11 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       release-id: ${{ github.event.release.id }}
-      version: ${{ github.event.release.name }}
       platform: ${{ matrix.platform }}
       target: ${{ matrix.target }}
       build-args: ${{ matrix.args }}
       asset-name-pattern: "[name]_v[version]_[platform]_[arch][ext]"
+      ref: ${{ github.ref }}
     secrets: inherit
     permissions:
       contents: write
