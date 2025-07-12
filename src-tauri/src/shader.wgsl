@@ -240,16 +240,20 @@ fn apply_tonal_adjustments(color: vec3<f32>, con: f32, hi: f32, sh: f32, wh: f32
     let white_level = 1.0 - wh * 0.25;
     rgb = rgb / max(white_level, 0.01);
     let luma = get_luma(rgb);
-    if (hi != 0.0) {
-        let highlight_range = smoothstep(0.5, 1.0, luma);
-        if (hi < 0.0) {
-            let compression_strength = abs(hi) * 2.0;
-            let compressed = rgb / (rgb + compression_strength);
-            rgb = mix(rgb, compressed, highlight_range);
-        } else {
-            rgb = rgb + (hi * 0.3 * highlight_range * (1.0 - luma));
+
+    if (hi < 0.0) {
+        let amount = abs(hi);
+        let highlight_mask = smoothstep(0.5, 1.0, luma);
+        if (highlight_mask > 0.001) {
+            let highlight_gamma = 1.0 + amount * 2.5;
+            let recovered_rgb = pow(max(rgb, vec3<f32>(0.0)), vec3<f32>(highlight_gamma));
+            rgb = mix(rgb, recovered_rgb, highlight_mask);
         }
+    } else if (hi > 0.0) {
+        let highlight_range = smoothstep(0.5, 1.0, luma);
+        rgb = rgb + (hi * 0.3 * highlight_range * (1.0 - luma));
     }
+
     if (sh != 0.0) {
         let shadow_range = 1.0 - smoothstep(0.0, 0.4, luma);
         if (sh > 0.0) {
@@ -260,14 +264,32 @@ fn apply_tonal_adjustments(color: vec3<f32>, con: f32, hi: f32, sh: f32, wh: f32
             rgb = rgb * (1.0 + sh * shadow_range);
         }
     }
+
     if (bl != 0.0) {
-        let blacks_range = 1.0 - smoothstep(0.0, 0.15, luma);
-        rgb = rgb + (bl * 0.2 * blacks_range);
+        let blacks_range = 1.0 - smoothstep(0.0, 0.2, luma);
+        if (blacks_range > 0.001) {
+            let safe_rgb = max(rgb, vec3<f32>(0.0));
+            let black_gamma = pow(2.0, -bl * 0.75);
+            let adjusted = pow(safe_rgb, vec3<f32>(black_gamma));
+            rgb = mix(rgb, adjusted, blacks_range);
+        }
     }
-    let contrast_factor = 1.0 + con * 0.75;
-    let pivot = 0.5 - con * 0.05;
-    rgb = pivot + (rgb - pivot) * contrast_factor;
-    rgb += max(0.0, con * 0.75) * 0.05;
+
+    if (con != 0.0) {
+        let safe_rgb = max(rgb, vec3<f32>(0.0));
+        let g = 2.2;
+        let perceptual = pow(safe_rgb, vec3<f32>(1.0 / g));
+        let clamped_perceptual = clamp(perceptual, vec3<f32>(0.0), vec3<f32>(1.0));
+        let strength = pow(2.0, con * 1.25);
+        let condition = clamped_perceptual < vec3<f32>(0.5);
+        let high_part = 1.0 - 0.5 * pow(2.0 * (1.0 - clamped_perceptual), vec3<f32>(strength));
+        let low_part = 0.5 * pow(2.0 * clamped_perceptual, vec3<f32>(strength));
+        let curved_perceptual = select(high_part, low_part, condition);
+        let contrast_adjusted_rgb = pow(curved_perceptual, vec3<f32>(g));
+        let mix_factor = smoothstep(vec3<f32>(1.0), vec3<f32>(1.01), safe_rgb);
+        rgb = mix(contrast_adjusted_rgb, rgb, mix_factor);
+    }
+
     return clamp(rgb, vec3<f32>(-0.1), vec3<f32>(1.5));
 }
 
