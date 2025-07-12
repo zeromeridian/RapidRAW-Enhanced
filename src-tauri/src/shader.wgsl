@@ -188,51 +188,91 @@ fn gradient_noise(p: vec2<f32>) -> f32 {
     return final_interp;
 }
 
-fn interpolate_curve_segment(x: f32, p1: Point, p2: Point) -> f32 {
-    var result_y: f32;
-    if (abs(p1.x - p2.x) < 0.001) {
-        result_y = p1.y;
-    } else {
-        let t = (x - p1.x) / (p2.x - p1.x);
-        result_y = mix(p1.y, p2.y, t);
+fn interpolate_cubic_hermite(x: f32, p1: Point, p2: Point, m1: f32, m2: f32) -> f32 {
+    let dx = p2.x - p1.x;
+    if (dx <= 0.0) {
+        return p1.y;
     }
-    return clamp(result_y / 255.0, 0.0, 1.0);
+    let t = (x - p1.x) / dx;
+    let t2 = t * t;
+    let t3 = t2 * t;
+
+    let h00 = 2.0 * t3 - 3.0 * t2 + 1.0;
+    let h10 = t3 - 2.0 * t2 + t;
+    let h01 = -2.0 * t3 + 3.0 * t2;
+    let h11 = t3 - t2;
+
+    return h00 * p1.y + h10 * m1 * dx + h01 * p2.y + h11 * m2 * dx;
 }
 
 fn apply_curve(val: f32, points: array<Point, 16>, count: u32) -> f32 {
     if (count < 2u) { return val; }
+
+    var local_points = points;
     let x = val * 255.0;
-    if (x <= points[0].x) { return clamp(points[0].y / 255.0, 0.0, 1.0); }
-    if (count >= 2u && x <= points[1].x) { return interpolate_curve_segment(x, points[0], points[1]); }
-    if (count >= 3u && x <= points[2].x) { return interpolate_curve_segment(x, points[1], points[2]); }
-    if (count >= 4u && x <= points[3].x) { return interpolate_curve_segment(x, points[2], points[3]); }
-    if (count >= 5u && x <= points[4].x) { return interpolate_curve_segment(x, points[3], points[4]); }
-    if (count >= 6u && x <= points[5].x) { return interpolate_curve_segment(x, points[4], points[5]); }
-    if (count >= 7u && x <= points[6].x) { return interpolate_curve_segment(x, points[5], points[6]); }
-    if (count >= 8u && x <= points[7].x) { return interpolate_curve_segment(x, points[6], points[7]); }
-    if (count >= 9u && x <= points[8].x) { return interpolate_curve_segment(x, points[7], points[8]); }
-    if (count >= 10u && x <= points[9].x) { return interpolate_curve_segment(x, points[8], points[9]); }
-    if (count >= 11u && x <= points[10].x) { return interpolate_curve_segment(x, points[9], points[10]); }
-    if (count >= 12u && x <= points[11].x) { return interpolate_curve_segment(x, points[10], points[11]); }
-    if (count >= 13u && x <= points[12].x) { return interpolate_curve_segment(x, points[11], points[12]); }
-    if (count >= 14u && x <= points[13].x) { return interpolate_curve_segment(x, points[12], points[13]); }
-    if (count >= 15u && x <= points[14].x) { return interpolate_curve_segment(x, points[13], points[14]); }
-    if (count >= 16u && x <= points[15].x) { return interpolate_curve_segment(x, points[14], points[15]); }
-    if (count >= 16u) { return clamp(points[15].y / 255.0, 0.0, 1.0); }
-    if (count >= 15u) { return clamp(points[14].y / 255.0, 0.0, 1.0); }
-    if (count >= 14u) { return clamp(points[13].y / 255.0, 0.0, 1.0); }
-    if (count >= 13u) { return clamp(points[12].y / 255.0, 0.0, 1.0); }
-    if (count >= 12u) { return clamp(points[11].y / 255.0, 0.0, 1.0); }
-    if (count >= 11u) { return clamp(points[10].y / 255.0, 0.0, 1.0); }
-    if (count >= 10u) { return clamp(points[9].y / 255.0, 0.0, 1.0); }
-    if (count >= 9u) { return clamp(points[8].y / 255.0, 0.0, 1.0); }
-    if (count >= 8u) { return clamp(points[7].y / 255.0, 0.0, 1.0); }
-    if (count >= 7u) { return clamp(points[6].y / 255.0, 0.0, 1.0); }
-    if (count >= 6u) { return clamp(points[5].y / 255.0, 0.0, 1.0); }
-    if (count >= 5u) { return clamp(points[4].y / 255.0, 0.0, 1.0); }
-    if (count >= 4u) { return clamp(points[3].y / 255.0, 0.0, 1.0); }
-    if (count >= 3u) { return clamp(points[2].y / 255.0, 0.0, 1.0); }
-    return clamp(points[1].y / 255.0, 0.0, 1.0);
+
+    if (x <= local_points[0].x) {
+        return local_points[0].y / 255.0;
+    }
+    if (x >= local_points[count - 1u].x) {
+        return local_points[count - 1u].y / 255.0;
+    }
+
+    for (var i = 0u; i < 15u; i = i + 1u) {
+        if (i >= count - 1u) {
+            break;
+        }
+
+        let p1 = local_points[i];
+        let p2 = local_points[i + 1u];
+
+        if (x <= p2.x) {
+            let p0 = local_points[max(0u, i - 1u)];
+            let p3 = local_points[min(count - 1u, i + 2u)];
+
+            let delta_before = (p1.y - p0.y) / max(0.001, p1.x - p0.x);
+            let delta_current = (p2.y - p1.y) / max(0.001, p2.x - p1.x);
+            let delta_after = (p3.y - p2.y) / max(0.001, p3.x - p2.x);
+
+            var tangent_at_p1: f32;
+            var tangent_at_p2: f32;
+
+            if (i == 0u) {
+                tangent_at_p1 = delta_current;
+            } else {
+                if (delta_before * delta_current <= 0.0) {
+                    tangent_at_p1 = 0.0;
+                } else {
+                    tangent_at_p1 = (delta_before + delta_current) / 2.0;
+                }
+            }
+
+            if (i + 1u == count - 1u) {
+                tangent_at_p2 = delta_current;
+            } else {
+                if (delta_current * delta_after <= 0.0) {
+                    tangent_at_p2 = 0.0;
+                } else {
+                    tangent_at_p2 = (delta_current + delta_after) / 2.0;
+                }
+            }
+
+            if (delta_current != 0.0) {
+                let alpha = tangent_at_p1 / delta_current;
+                let beta = tangent_at_p2 / delta_current;
+                if (alpha * alpha + beta * beta > 9.0) {
+                    let tau = 3.0 / sqrt(alpha * alpha + beta * beta);
+                    tangent_at_p1 = tangent_at_p1 * tau;
+                    tangent_at_p2 = tangent_at_p2 * tau;
+                }
+            }
+
+            let result_y = interpolate_cubic_hermite(x, p1, p2, tangent_at_p1, tangent_at_p2);
+            return clamp(result_y / 255.0, 0.0, 1.0);
+        }
+    }
+
+    return local_points[count - 1u].y / 255.0;
 }
 
 fn apply_tonal_adjustments(color: vec3<f32>, con: f32, hi: f32, sh: f32, wh: f32, bl: f32) -> vec3<f32> {
@@ -240,16 +280,20 @@ fn apply_tonal_adjustments(color: vec3<f32>, con: f32, hi: f32, sh: f32, wh: f32
     let white_level = 1.0 - wh * 0.25;
     rgb = rgb / max(white_level, 0.01);
     let luma = get_luma(rgb);
-    if (hi != 0.0) {
-        let highlight_range = smoothstep(0.5, 1.0, luma);
-        if (hi < 0.0) {
-            let compression_strength = abs(hi) * 2.0;
-            let compressed = rgb / (rgb + compression_strength);
-            rgb = mix(rgb, compressed, highlight_range);
-        } else {
-            rgb = rgb + (hi * 0.3 * highlight_range * (1.0 - luma));
+
+    if (hi < 0.0) {
+        let amount = abs(hi);
+        let highlight_mask = smoothstep(0.5, 1.0, luma);
+        if (highlight_mask > 0.001) {
+            let highlight_gamma = 1.0 + amount * 2.5;
+            let recovered_rgb = pow(max(rgb, vec3<f32>(0.0)), vec3<f32>(highlight_gamma));
+            rgb = mix(rgb, recovered_rgb, highlight_mask);
         }
+    } else if (hi > 0.0) {
+        let highlight_range = smoothstep(0.5, 1.0, luma);
+        rgb = rgb + (hi * 0.3 * highlight_range * (1.0 - luma));
     }
+
     if (sh != 0.0) {
         let shadow_range = 1.0 - smoothstep(0.0, 0.4, luma);
         if (sh > 0.0) {
@@ -260,14 +304,32 @@ fn apply_tonal_adjustments(color: vec3<f32>, con: f32, hi: f32, sh: f32, wh: f32
             rgb = rgb * (1.0 + sh * shadow_range);
         }
     }
+
     if (bl != 0.0) {
-        let blacks_range = 1.0 - smoothstep(0.0, 0.15, luma);
-        rgb = rgb + (bl * 0.2 * blacks_range);
+        let blacks_range = 1.0 - smoothstep(0.0, 0.2, luma);
+        if (blacks_range > 0.001) {
+            let safe_rgb = max(rgb, vec3<f32>(0.0));
+            let black_gamma = pow(2.0, -bl * 0.75);
+            let adjusted = pow(safe_rgb, vec3<f32>(black_gamma));
+            rgb = mix(rgb, adjusted, blacks_range);
+        }
     }
-    let contrast_factor = 1.0 + con * 0.75;
-    let pivot = 0.5 - con * 0.05;
-    rgb = pivot + (rgb - pivot) * contrast_factor;
-    rgb += max(0.0, con * 0.75) * 0.05;
+
+    if (con != 0.0) {
+        let safe_rgb = max(rgb, vec3<f32>(0.0));
+        let g = 2.2;
+        let perceptual = pow(safe_rgb, vec3<f32>(1.0 / g));
+        let clamped_perceptual = clamp(perceptual, vec3<f32>(0.0), vec3<f32>(1.0));
+        let strength = pow(2.0, con * 1.25);
+        let condition = clamped_perceptual < vec3<f32>(0.5);
+        let high_part = 1.0 - 0.5 * pow(2.0 * (1.0 - clamped_perceptual), vec3<f32>(strength));
+        let low_part = 0.5 * pow(2.0 * clamped_perceptual, vec3<f32>(strength));
+        let curved_perceptual = select(high_part, low_part, condition);
+        let contrast_adjusted_rgb = pow(curved_perceptual, vec3<f32>(g));
+        let mix_factor = smoothstep(vec3<f32>(1.0), vec3<f32>(1.01), safe_rgb);
+        rgb = mix(contrast_adjusted_rgb, rgb, mix_factor);
+    }
+
     return clamp(rgb, vec3<f32>(-0.1), vec3<f32>(1.5));
 }
 
@@ -417,11 +479,18 @@ fn apply_all_adjustments(initial_rgb: vec3<f32>, adj: GlobalAdjustments, coords_
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20, adj.structure);
     processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
     processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl);
+
     let srgb_for_curves = linear_to_srgb(processed_rgb);
     let luma_val = get_luma(srgb_for_curves);
     let luma_curved = apply_curve(luma_val, adj.luma_curve, adj.luma_curve_count);
-    let luma_diff = luma_curved - luma_val;
-    let luma_adjusted_srgb = srgb_for_curves + vec3<f32>(luma_diff);
+    var luma_adjusted_srgb: vec3<f32>;
+    if (luma_val > 0.001) {
+        let ratio = luma_curved / luma_val;
+        luma_adjusted_srgb = srgb_for_curves * ratio;
+    } else {
+        luma_adjusted_srgb = vec3<f32>(luma_curved);
+    }
+
     let curved_srgb = vec3<f32>(
         apply_curve(luma_adjusted_srgb.r, adj.red_curve, adj.red_curve_count),
         apply_curve(luma_adjusted_srgb.g, adj.green_curve, adj.green_curve_count),
@@ -443,11 +512,18 @@ fn apply_all_mask_adjustments(initial_rgb: vec3<f32>, adj: MaskAdjustments, coor
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20, adj.structure);
     processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
     processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl);
+
     let srgb_for_curves = linear_to_srgb(processed_rgb);
     let luma_val = get_luma(srgb_for_curves);
     let luma_curved = apply_curve(luma_val, adj.luma_curve, adj.luma_curve_count);
-    let luma_diff = luma_curved - luma_val;
-    let luma_adjusted_srgb = srgb_for_curves + vec3<f32>(luma_diff);
+    var luma_adjusted_srgb: vec3<f32>;
+    if (luma_val > 0.001) {
+        let ratio = luma_curved / luma_val;
+        luma_adjusted_srgb = srgb_for_curves * ratio;
+    } else {
+        luma_adjusted_srgb = vec3<f32>(luma_curved);
+    }
+
     let curved_srgb = vec3<f32>(
         apply_curve(luma_adjusted_srgb.r, adj.red_curve, adj.red_curve_count),
         apply_curve(luma_adjusted_srgb.g, adj.green_curve, adj.green_curve_count),
@@ -456,7 +532,6 @@ fn apply_all_mask_adjustments(initial_rgb: vec3<f32>, adj: MaskAdjustments, coor
     processed_rgb = srgb_to_linear(curved_srgb);
     return processed_rgb;
 }
-
 
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
