@@ -8,7 +8,8 @@
     "dev": "vite",
     "prebuild": "node ./src/sync-version.js",
     "build": "vite build",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "start": "tauri dev"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.5.0",
