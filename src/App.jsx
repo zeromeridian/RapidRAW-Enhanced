@@ -562,7 +562,9 @@ function App() {
     try {
       setCurrentFolderPath(path);
 
-      if (rootPath && path !== rootPath) {
+      if (isNewRoot) {
+        setExpandedFolders(new Set([path]));
+      } else if (rootPath && path !== rootPath) {
           setExpandedFolders(prev => {
               const newSet = new Set(prev);
               let current = path;

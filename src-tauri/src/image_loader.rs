@@ -1,6 +1,7 @@
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
-use image::{imageops, DynamicImage, RgbaImage};
+use image::{imageops, DynamicImage, RgbaImage, ImageReader};
+use std::io::Cursor;
 use rayon::prelude::*;
 use serde_json::Value;
 use std::fs;
@@ -26,7 +27,12 @@ pub fn load_base_image_from_bytes(
     if is_raw_file(path_for_ext_check) {
         develop_raw_image(bytes, use_fast_raw_dev)
     } else {
-        image::load_from_memory(bytes).map_err(Into::into)
+        let mut reader = ImageReader::new(Cursor::new(bytes))
+            .with_guessed_format()
+            .map_err(|e| anyhow::anyhow!("Failed to guess image format: {}", e))?;
+
+        reader.no_limits();
+        reader.decode().map_err(Into::into)
     }
 }
 
