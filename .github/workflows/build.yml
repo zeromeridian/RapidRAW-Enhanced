@@ -92,7 +92,7 @@ jobs:
         if: ${{ inputs.release-id != '' }}
         run: |
           platform="${{ inputs.platform }}"
-          replacement="$(echo ${replacement} | sed -E 's/-latest//g')"
+          replacement="$(echo ${platform} | sed -E 's/-latest//')"
           patched_platform=$(echo '${{ inputs.asset-name-pattern }}' | sed -E "s/\[platform\]/${replacement}/")
           echo "platform=${patched_platform}" >> $GITHUB_OUTPUT
 
