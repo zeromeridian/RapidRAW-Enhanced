@@ -5,6 +5,7 @@ use rawler::{
     imgop::develop::{DemosaicAlgorithm, RawDevelop},
     rawsource::RawSource,
 };
+use crate::image_processing::apply_orientation;
 
 pub fn develop_raw_image(file_bytes: &[u8], fast_demosaic: bool) -> Result<DynamicImage> {
     let (developed_image, orientation) = develop_internal(file_bytes, fast_demosaic)?;
@@ -34,19 +35,6 @@ fn develop_internal(file_bytes: &[u8], fast_demosaic: bool) -> Result<(DynamicIm
         .ok_or_else(|| anyhow::anyhow!("Failed to convert developed image to DynamicImage"))?;
 
     Ok((dynamic_image, orientation))
-}
-
-pub fn apply_orientation(image: DynamicImage, orientation: Orientation) -> DynamicImage {
-    match orientation {
-        Orientation::Normal | Orientation::Unknown => image,
-        Orientation::HorizontalFlip => image.fliph(),
-        Orientation::Rotate180 => image.rotate180(),
-        Orientation::VerticalFlip => image.flipv(),
-        Orientation::Transpose => image.rotate90().flipv(),
-        Orientation::Rotate90 => image.rotate90(),
-        Orientation::Transverse => image.rotate90().fliph(),
-        Orientation::Rotate270 => image.rotate270(),
-    }
 }
 
 // Yes, I researched and implemented large and complex demosaicing algorithms to later find out that the new rawler library already provides them internally. Ha ha ha.

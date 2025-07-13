@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::fs;
 
 use exif::{Reader as ExifReader, Tag};
-use crate::raw_processing::apply_orientation;
+use crate::image_processing::apply_orientation;
 
 use crate::formats::is_raw_file;
 use crate::raw_processing::develop_raw_image;
