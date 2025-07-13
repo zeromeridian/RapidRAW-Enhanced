@@ -55,6 +55,14 @@ export const INITIAL_MASK_ADJUSTMENTS = {
   },
 };
 
+export const INITIAL_MASK_CONTAINER = {
+  name: 'New Mask',
+  visible: true,
+  invert: false,
+  adjustments: INITIAL_MASK_ADJUSTMENTS,
+  subMasks: [],
+};
+
 export const INITIAL_ADJUSTMENTS = {
   rating: 0,
   exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
@@ -73,7 +81,9 @@ export const INITIAL_ADJUSTMENTS = {
     luma: [{ x: 0, y: 0 }, { x: 255, y: 255 }], red: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
     green: [{ x: 0, y: 0 }, { x: 255, y: 255 }], blue: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
   },
-  crop: null, aspectRatio: null, rotation: 0, flipHorizontal: false, flipVertical: false, masks: [], aiPatches: [],
+  crop: null, aspectRatio: null, rotation: 0, flipHorizontal: false, flipVertical: false, 
+  masks: [],
+  aiPatches: [],
   sectionVisibility: {
     basic: true,
     curves: true,
@@ -86,20 +96,29 @@ export const INITIAL_ADJUSTMENTS = {
 const normalizeLoadedAdjustments = (loadedAdjustments) => {
   if (!loadedAdjustments) return INITIAL_ADJUSTMENTS;
 
-  const normalizedMasks = (loadedAdjustments.masks || []).map(mask => {
-    const maskAdjustments = mask.adjustments || {};
+  const normalizedMasks = (loadedAdjustments.masks || []).map(maskContainer => {
+    const containerAdjustments = maskContainer.adjustments || {};
+    const normalizedSubMasks = (maskContainer.subMasks || []).map(subMask => ({
+      visible: true,
+      mode: 'additive',
+      ...subMask,
+    }));
+
     return {
-      ...mask,
+      ...INITIAL_MASK_CONTAINER,
+      id: maskContainer.id || uuidv4(),
+      ...maskContainer,
       adjustments: {
         ...INITIAL_MASK_ADJUSTMENTS,
-        ...maskAdjustments,
-        hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...(maskAdjustments.hsl || {}) },
-        curves: { ...INITIAL_MASK_ADJUSTMENTS.curves, ...(maskAdjustments.curves || {}) },
+        ...containerAdjustments,
+        hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...(containerAdjustments.hsl || {}) },
+        curves: { ...INITIAL_MASK_ADJUSTMENTS.curves, ...(containerAdjustments.curves || {}) },
         sectionVisibility: {
           ...INITIAL_MASK_ADJUSTMENTS.sectionVisibility,
-          ...(maskAdjustments.sectionVisibility || {})
+          ...(containerAdjustments.sectionVisibility || {})
         },
-      }
+      },
+      subMasks: normalizedSubMasks,
     };
   });
 
@@ -211,6 +230,7 @@ function App() {
   const [fullScreenUrl, setFullScreenUrl] = useState(null);
   const [theme, setTheme] = useState(DEFAULT_THEME_ID);
   const [activeRightPanel, setActiveRightPanel] = useState('adjustments');
+  const [activeMaskContainerId, setActiveMaskContainerId] = useState(null);
   const [activeMaskId, setActiveMaskId] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [renderedRightPanel, setRenderedRightPanel] = useState(activeRightPanel);
@@ -289,6 +309,16 @@ function App() {
     setAiTool(null);
   }, []);
 
+  const updateSubMask = (subMaskId, updatedData) => {
+    setAdjustments(prev => ({
+      ...prev,
+      masks: prev.masks.map(c => ({
+        ...c,
+        subMasks: c.subMasks.map(sm => sm.id === subMaskId ? { ...sm, ...updatedData } : sm)
+      }))
+    }));
+  };
+
   const handleGenerativeReplace = useCallback(async ({ maskDataBase64, prompt }) => {
     if (!selectedImage?.path || isGeneratingAi) return;
 
@@ -364,7 +394,7 @@ function App() {
     }));
   }, [setAdjustments]);
 
-  const handleGenerateAiMask = async (maskId, startPoint, endPoint) => {
+  const handleGenerateAiMask = async (subMaskId, startPoint, endPoint) => {
     if (!selectedImage?.path) {
       console.error("Cannot generate AI mask: No image selected.");
       return;
@@ -379,12 +409,19 @@ function App() {
         flipHorizontal: adjustments.flipHorizontal,
         flipVertical: adjustments.flipVertical,
       });
+
       setAdjustments(prev => ({
         ...prev,
-        masks: prev.masks.map(m =>
-          m.id === maskId ? { ...m, parameters: newParameters } : m
-        )
+        masks: prev.masks.map(container => ({
+          ...container,
+          subMasks: container.subMasks.map(sm =>
+            sm.id === subMaskId
+              ? { ...sm, parameters: newParameters }
+              : sm
+          )
+        }))
       }));
+
     } catch (error) {
       console.error("Failed to generate AI subject mask:", error);
       setError(`AI Mask Failed: ${error}`);
@@ -393,7 +430,7 @@ function App() {
     }
   };
 
-  const handleGenerateAiForegroundMask = async (maskId) => {
+  const handleGenerateAiForegroundMask = async (subMaskId) => {
     if (!selectedImage?.path) {
       console.error("Cannot generate AI mask: No image selected.");
       return;
@@ -405,12 +442,19 @@ function App() {
         flipHorizontal: adjustments.flipHorizontal,
         flipVertical: adjustments.flipVertical,
       });
+
       setAdjustments(prev => ({
         ...prev,
-        masks: prev.masks.map(m =>
-          m.id === maskId ? { ...m, parameters: newParameters } : m
-        )
+        masks: prev.masks.map(container => ({
+          ...container,
+          subMasks: container.subMasks.map(sm =>
+            sm.id === subMaskId
+              ? { ...sm, parameters: newParameters }
+              : sm
+          )
+        }))
       }));
+
     } catch (error) {
       console.error("Failed to generate AI foreground mask:", error);
       setError(`AI Mask Failed: ${error}`);
@@ -668,6 +712,7 @@ function App() {
     setWaveform(null);
     setIsWaveformVisible(false);
     setActiveMaskId(null);
+    setActiveMaskContainerId(null);
     setAiTool(null);
     setPendingAiAction(null);
     setLibraryActivePath(lastActivePath);
@@ -838,6 +883,7 @@ function App() {
     resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
     setShowOriginal(false);
     setActiveMaskId(null);
+    setActiveMaskContainerId(null);
     setAiTool(null);
     setPendingAiAction(null);
     if (transformWrapperRef.current) transformWrapperRef.current.resetTransform(0);
@@ -1345,7 +1391,9 @@ function App() {
               setAdjustments={setAdjustments}
               thumbnails={thumbnails}
               activeMaskId={activeMaskId}
+              activeMaskContainerId={activeMaskContainerId}
               onSelectMask={setActiveMaskId}
+              updateSubMask={updateSubMask}
               transformWrapperRef={transformWrapperRef}
               onZoomed={handleUserTransform}
               targetZoom={zoom}
@@ -1400,7 +1448,24 @@ function App() {
                 {renderedRightPanel === 'adjustments' && <Controls theme={theme} adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} histogram={histogram} collapsibleState={collapsibleSectionsState} setCollapsibleState={setCollapsibleSectionsState} copiedSectionAdjustments={copiedSectionAdjustments} setCopiedSectionAdjustments={setCopiedSectionAdjustments} />}
                 {renderedRightPanel === 'metadata' && <MetadataPanel selectedImage={selectedImage} />}
                 {renderedRightPanel === 'crop' && <CropPanel selectedImage={selectedImage} adjustments={adjustments} setAdjustments={setAdjustments} />}
-                {renderedRightPanel === 'masks' && <MasksPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} onSelectMask={setActiveMaskId} activeMaskId={activeMaskId} brushSettings={brushSettings} setBrushSettings={setBrushSettings} copiedMask={copiedMask} setCopiedMask={setCopiedMask} setCustomEscapeHandler={setCustomEscapeHandler} histogram={histogram} isGeneratingAiMask={isGeneratingAiMask} aiModelDownloadStatus={aiModelDownloadStatus} onGenerateAiForegroundMask={handleGenerateAiForegroundMask} />}
+                {renderedRightPanel === 'masks' && <MasksPanel 
+                  adjustments={adjustments} 
+                  setAdjustments={setAdjustments} 
+                  selectedImage={selectedImage} 
+                  onSelectMask={setActiveMaskId} 
+                  activeMaskId={activeMaskId}
+                  activeMaskContainerId={activeMaskContainerId}
+                  onSelectContainer={setActiveMaskContainerId}
+                  brushSettings={brushSettings} 
+                  setBrushSettings={setBrushSettings} 
+                  copiedMask={copiedMask} 
+                  setCopiedMask={setCopiedMask} 
+                  setCustomEscapeHandler={setCustomEscapeHandler} 
+                  histogram={histogram} 
+                  isGeneratingAiMask={isGeneratingAiMask} 
+                  aiModelDownloadStatus={aiModelDownloadStatus} 
+                  onGenerateAiForegroundMask={handleGenerateAiForegroundMask} 
+                />}
                 {renderedRightPanel === 'presets' && <PresetsPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} activePanel={activeRightPanel} />}
                 {renderedRightPanel === 'export' && <ExportPanel selectedImage={selectedImage} adjustments={adjustments} multiSelectedPaths={multiSelectedPaths} exportState={exportState} setExportState={setExportState} />}
                 {renderedRightPanel === 'ai' && <AIPanel 
