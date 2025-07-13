@@ -5,6 +5,7 @@ use imageproc::geometric_transformations::{rotate_about_center, Interpolation};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::f32::consts::PI;
+use rawler::decoders::Orientation;
 
 pub use crate::gpu_processing::{get_or_init_gpu_context, process_and_get_dynamic_image};
 use crate::{AppState, mask_generation::MaskDefinition, load_settings};
@@ -32,6 +33,19 @@ pub struct Crop {
     pub y: f64,
     pub width: f64,
     pub height: f64,
+}
+
+pub fn apply_orientation(image: DynamicImage, orientation: Orientation) -> DynamicImage {
+    match orientation {
+        Orientation::Normal | Orientation::Unknown => image,
+        Orientation::HorizontalFlip => image.fliph(),
+        Orientation::Rotate180 => image.rotate180(),
+        Orientation::VerticalFlip => image.flipv(),
+        Orientation::Transpose => image.rotate90().flipv(),
+        Orientation::Rotate90 => image.rotate90(),
+        Orientation::Transverse => image.rotate90().fliph(),
+        Orientation::Rotate270 => image.rotate270(),
+    }
 }
 
 pub fn apply_rotation(image: &DynamicImage, rotation_degrees: f32) -> DynamicImage {

@@ -1,9 +1,10 @@
-import { Folder, FolderOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Folder, FolderOpen, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function TreeNode({ node, onFolderSelect, selectedPath, isExpanded, onToggle, onContextMenu, expandedFolders }) {
   const hasChildren = node.children && node.children.length > 0;
+  const childFolders = node.children && node.children.map(item => item.is_dir).length > 0;
   const isSelected = node.path === selectedPath;
 
   const handleFolderIconClick = (e) => {
@@ -49,6 +50,7 @@ function TreeNode({ node, onFolderSelect, selectedPath, isExpanded, onToggle, on
           'bg-card-active': isSelected,
           'hover:bg-surface': !isSelected,
         })}
+        onClick={handleNameClick}
       >
         <div
           onClick={handleFolderIconClick}
@@ -67,12 +69,32 @@ function TreeNode({ node, onFolderSelect, selectedPath, isExpanded, onToggle, on
           )}
         </div>
         <span 
-          onClick={handleNameClick}
           onDoubleClick={handleNameDoubleClick}
           className="truncate select-none cursor-pointer flex-1"
         >
           {node.name}
         </span>
+        <div
+          onClick={handleFolderIconClick}
+        >
+        <div
+          onClick={handleFolderIconClick}
+          className={clsx('p-0.5 rounded hover:bg-surface', {
+            'cursor-pointer': childFolders,
+            'cursor-default': !childFolders,
+          })}
+        >
+          {childFolders ? (
+            isExpanded ? (
+              <ChevronUp size={16} className="text-text-secondary flex-shrink-0" />
+            ) : (
+              <ChevronDown size={16} className="text-text-secondary flex-shrink-0" />
+            )
+          ) : (
+            <span className="w-4 h-4 inline-block" />
+          )}
+        </div>
+        </div>
       </div>
 
       <AnimatePresence initial={false}>

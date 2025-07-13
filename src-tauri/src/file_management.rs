@@ -31,7 +31,7 @@ pub struct ImageFile {
 
 #[tauri::command]
 pub fn list_images_in_dir(path: String) -> Result<Vec<ImageFile>, String> {
-    let entries = fs::read_dir(path)
+    let entries: Vec<ImageFile> = fs::read_dir(path)
         .map_err(|e| e.to_string())?
         .filter_map(std::result::Result::ok)
         .map(|entry| entry.path())
@@ -66,6 +66,7 @@ pub struct FolderNode {
     pub name: String,
     pub path: String,
     pub children: Vec<FolderNode>,
+    pub is_dir: bool,
 }
 
 fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
@@ -96,6 +97,7 @@ fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
                     .into_owned(),
                 path: current_path.to_string_lossy().into_owned(),
                 children: sub_children,
+                is_dir: current_path.is_dir()
             });
         }
     }
@@ -116,8 +118,9 @@ fn get_folder_tree_sync(path: String) -> Result<FolderNode, String> {
     let children = scan_dir_recursive(root_path).map_err(|e| e.to_string())?;
     Ok(FolderNode {
         name,
-        path,
+        path: path.clone(),
         children,
+        is_dir: root_path.is_dir()
     })
 }
 
