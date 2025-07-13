@@ -77,17 +77,23 @@ function TreeNode({ node, onFolderSelect, selectedPath, isExpanded, onToggle, on
         <div
           onClick={handleFolderIconClick}
         >
+        <div
+          onClick={handleFolderIconClick}
+          className={clsx('p-0.5 rounded hover:bg-surface', {
+            'cursor-pointer': childFolders,
+            'cursor-default': !childFolders,
+          })}
+        >
           {childFolders ? (
             isExpanded ? (
-              <ChevronUp size={16} className="text-text-secondary flex-shrink-0"/>
-            ): (
-              <ChevronDown size={16} className="text-text-secondary flex-shrink-0"/>
-            ) ) :
-            (
-
-              <span></span>
+              <ChevronUp size={16} className="text-text-secondary flex-shrink-0" />
+            ) : (
+              <ChevronDown size={16} className="text-text-secondary flex-shrink-0" />
             )
-          }
+          ) : (
+            <span className="w-4 h-4 inline-block" />
+          )}
+        </div>
         </div>
       </div>
 
