@@ -467,6 +467,38 @@ fn apply_noise_reduction(color: vec3<f32>, coords_i: vec2<i32>, luma_amount: f32
     return color;
 }
 
+fn apply_all_curves(
+    color_srgb: vec3<f32>, 
+    luma_curve: array<Point, 16>, luma_curve_count: u32,
+    red_curve: array<Point, 16>, red_curve_count: u32,
+    green_curve: array<Point, 16>, green_curve_count: u32,
+    blue_curve: array<Point, 16>, blue_curve_count: u32
+) -> vec3<f32> {
+    let luma_val = get_luma(color_srgb);
+    let luma_curved = apply_curve(luma_val, luma_curve, luma_curve_count);
+    
+    var luma_adjusted_srgb: vec3<f32>;
+    if (luma_val > 0.001) {
+        let ratio = luma_curved / luma_val;
+        luma_adjusted_srgb = color_srgb * ratio;
+    } else {
+        luma_adjusted_srgb = vec3<f32>(luma_curved);
+    }
+
+    let max_component = max(luma_adjusted_srgb.r, max(luma_adjusted_srgb.g, luma_adjusted_srgb.b));
+    if (max_component > 1.0) {
+        luma_adjusted_srgb = luma_adjusted_srgb / max_component;
+    }
+
+    let curved_srgb = vec3<f32>(
+        apply_curve(luma_adjusted_srgb.r, red_curve, red_curve_count),
+        apply_curve(luma_adjusted_srgb.g, green_curve, green_curve_count),
+        apply_curve(luma_adjusted_srgb.b, blue_curve, blue_curve_count)
+    );
+
+    return curved_srgb;
+}
+
 fn apply_all_adjustments(initial_rgb: vec3<f32>, adj: GlobalAdjustments, coords_i: vec2<i32>) -> vec3<f32> {
     var processed_rgb = initial_rgb;
     processed_rgb = apply_noise_reduction(processed_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction);
@@ -481,20 +513,11 @@ fn apply_all_adjustments(initial_rgb: vec3<f32>, adj: GlobalAdjustments, coords_
     processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl);
 
     let srgb_for_curves = linear_to_srgb(processed_rgb);
-    let luma_val = get_luma(srgb_for_curves);
-    let luma_curved = apply_curve(luma_val, adj.luma_curve, adj.luma_curve_count);
-    var luma_adjusted_srgb: vec3<f32>;
-    if (luma_val > 0.001) {
-        let ratio = luma_curved / luma_val;
-        luma_adjusted_srgb = srgb_for_curves * ratio;
-    } else {
-        luma_adjusted_srgb = vec3<f32>(luma_curved);
-    }
-
-    let curved_srgb = vec3<f32>(
-        apply_curve(luma_adjusted_srgb.r, adj.red_curve, adj.red_curve_count),
-        apply_curve(luma_adjusted_srgb.g, adj.green_curve, adj.green_curve_count),
-        apply_curve(luma_adjusted_srgb.b, adj.blue_curve, adj.blue_curve_count)
+    let curved_srgb = apply_all_curves(srgb_for_curves,
+        adj.luma_curve, adj.luma_curve_count,
+        adj.red_curve, adj.red_curve_count,
+        adj.green_curve, adj.green_curve_count,
+        adj.blue_curve, adj.blue_curve_count
     );
     processed_rgb = srgb_to_linear(curved_srgb);
     return processed_rgb;
@@ -514,20 +537,11 @@ fn apply_all_mask_adjustments(initial_rgb: vec3<f32>, adj: MaskAdjustments, coor
     processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl);
 
     let srgb_for_curves = linear_to_srgb(processed_rgb);
-    let luma_val = get_luma(srgb_for_curves);
-    let luma_curved = apply_curve(luma_val, adj.luma_curve, adj.luma_curve_count);
-    var luma_adjusted_srgb: vec3<f32>;
-    if (luma_val > 0.001) {
-        let ratio = luma_curved / luma_val;
-        luma_adjusted_srgb = srgb_for_curves * ratio;
-    } else {
-        luma_adjusted_srgb = vec3<f32>(luma_curved);
-    }
-
-    let curved_srgb = vec3<f32>(
-        apply_curve(luma_adjusted_srgb.r, adj.red_curve, adj.red_curve_count),
-        apply_curve(luma_adjusted_srgb.g, adj.green_curve, adj.green_curve_count),
-        apply_curve(luma_adjusted_srgb.b, adj.blue_curve, adj.blue_curve_count)
+    let curved_srgb = apply_all_curves(srgb_for_curves,
+        adj.luma_curve, adj.luma_curve_count,
+        adj.red_curve, adj.red_curve_count,
+        adj.green_curve, adj.green_curve_count,
+        adj.blue_curve, adj.blue_curve_count
     );
     processed_rgb = srgb_to_linear(curved_srgb);
     return processed_rgb;

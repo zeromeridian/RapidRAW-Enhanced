@@ -2,8 +2,6 @@
   <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.png" alt="RapidRAW Editor">
 </p>
 
-<br>
-
 <div align="center">
 
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -18,7 +16,7 @@
 
 > A beautiful, non-destructive, and GPU-accelerated RAW image editor built with performance in mind.
 
-RapidRAW is a modern, high-performance alternative to Adobe Lightroom®. It delivers a feature-rich, beautiful editing experience in a lightweight package (under 30MB) for Windows, macOS, and Linux.
+RapidRAW is a modern, high-performance alternative to Adobe Lightroom®. It delivers a simple, beautiful editing experience in a lightweight package (under 30MB) for Windows, macOS, and Linux.
 
 I developed this project as a personal challenge at the age of 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of both React and Rust, with the support from Google Gemini.
 
