@@ -37,27 +37,23 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Extract version from tag
-        id: extract-version
+      - name: Determine Version
+        id: determine-version
         shell: bash
         run: |
-          if [[ "${{ inputs.ref }}" == refs/tags/* ]]; then
-            tag_name="${{ inputs.ref }}"
-            version="${tag_name#refs/tags/}"
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            version="${{ github.ref_name }}"
+          APP_VERSION=""
+          REF="${{ inputs.ref }}"
+
+          if [[ "$REF" == refs/tags/v* ]]; then
+            APP_VERSION="${REF#refs/tags/v}"
+            echo "Release version determined from tag: $APP_VERSION"
           else
-            echo "Error: Not running on a tag. Current ref: ${{ github.ref }}"
-            exit 1
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            APP_VERSION="0.0.0-ci.${SHORT_SHA}"
+            echo "CI version determined from commit: $APP_VERSION"
           fi
           
-          # Strip 'v' prefix for semver (v1.2.4 -> 1.2.4)
-          semver="${version#v}"
-          
-          echo "Tag: ${version}"
-          echo "Semver: ${semver}"
-          echo "VERSION=${semver}" >> $GITHUB_ENV
-          echo "version=${semver}" >> $GITHUB_OUTPUT
+          echo "version=${APP_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -74,7 +70,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Install additional system dependencies (Linux)
+      - name: Install additional system dependencies (Linux ubuntu-22)
         if: ${{ startsWith(inputs.platform, 'ubuntu-22') }}
         run: |-
           sudo apt-get update
@@ -88,7 +84,7 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      - name: Install additional system dependencies (Linux)
+      - name: Install additional system dependencies (Linux ubuntu-24)
         if: ${{ startsWith(inputs.platform, 'ubuntu-24') }}
         run: |-
           sudo apt-get update
@@ -113,8 +109,8 @@ jobs:
       - name: Set application version
         shell: bash
         run: |
-          echo "Setting version to: ${{ steps.extract-version.outputs.version }}"
-          npx tauri-version --no-git --no-lock "${{ steps.extract-version.outputs.version }}"
+          echo "Setting version to: ${{ steps.determine-version.outputs.version }}"
+          npx tauri-version --no-git --no-lock "${{ steps.determine-version.outputs.version }}"
 
       - id: patch-release-name
         shell: bash
@@ -139,6 +135,7 @@ jobs:
           releaseId: ${{ inputs.release-id }}
 
       - name: Setup gh actions artifact client
+        if: ${{ inputs.release-id == '' }}
         uses: lhotari/gh-actions-artifact-client@v2
 
       - name: Upload binaries (Windows)
@@ -152,7 +149,7 @@ jobs:
             gh-actions-artifact-client.js upload "${name}" --retentionDays=7 < "$file"
           done
 
-      - name: Upload binaries
+      - name: Upload binaries (Linux/macOS)
         if: ${{ !startsWith(inputs.platform, 'windows') && inputs.release-id == '' }}
         run: |
           find src-tauri/target/${{ inputs.target || 'release' }} -type f -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" | while read -r file; do
