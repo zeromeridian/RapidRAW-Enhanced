@@ -29,7 +29,7 @@ import ConfirmModal from './components/modals/ConfirmModal';
 import { THEMES, DEFAULT_THEME_ID } from './themes';
 import { v4 as uuidv4 } from 'uuid';
 
-const DEBUG = true;
+const DEBUG = false;
 
 export const INITIAL_MASK_ADJUSTMENTS = {
   exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
