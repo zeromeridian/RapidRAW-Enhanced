@@ -34,6 +34,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-07-13:** Native looking titlebar and ability to input precise number into sliders
 *   **2025-07-13:** Huge update to masks: You can now add multiple masks to a mask containers, subtract / add / combine masks etc.
 *   **2025-07-12:** Improved curves tool, more shader improvements, improved handling of very large files
 *   **2025-07-11:** More accurate shader, reorganized main library preferences dropdown, smoother histogram, more realistic film grain
@@ -43,11 +44,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-07-08:** Ability to toggle the visibility of individual adjustments sections
 *   **2025-07-08:** Fixed top-left zoom bug, corrected scale behavior in crop panel, keep default original aspect ratio
 *   **2025-07-08:** Added image rating filter and redesigned the metadata panel with improved layout, clearer sections, and an embedded GPS map
-*   **2025-07-07:** Improved generative AI features and updated [AI Roadmap](#ai-roadmap)
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-07-07:** Improved generative AI features and updated [AI Roadmap](#ai-roadmap)
 *   **2025-07-06:** Initial generative AI integration with [ComfyUI](https://github.com/comfyanonymous/ComfyUI) - for more details, checkout the [AI Roadmap](#ai-roadmap)
 *   **2025-07-05:** Ability to overwrite preset with current settings
 *   **2025-07-04:** High speed and precise cache to significantly accelerate large image editing
