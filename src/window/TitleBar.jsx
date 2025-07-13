@@ -39,7 +39,7 @@ export default function TitleBar() {
     >
       <div className="flex items-center h-full">
         {isMac && (
-          <div className="flex items-center h-full px-3 space-x-2">
+          <div className="flex items-center h-full px-4 space-x-2">
             <button 
               onClick={handleClose}
               className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors duration-150"
@@ -58,7 +58,7 @@ export default function TitleBar() {
           </div>
         )}
         
-        <div data-tauri-drag-region className="flex items-center h-full px-4">
+        <div data-tauri-drag-region className="flex items-center h-full">
           <p className="text-sm font-semibold text-text-secondary">RapidRAW</p>
         </div>
       </div>
