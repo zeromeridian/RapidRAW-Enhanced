@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { WindowControls } from 'tauri-controls';
 import { platform } from '@tauri-apps/plugin-os';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, Square, X } from 'lucide-react';
@@ -9,8 +8,13 @@ export default function TitleBar() {
 
   useEffect(() => {
     const getPlatform = async () => {
-      const p = await platform();
-      setOsPlatform(p === 'darwin' ? 'macos' : p);
+      try {
+        const p = platform();
+        setOsPlatform(p === 'darwin' ? 'macos' : p);
+      } catch (error) {
+        console.error('Failed to get platform:', error);
+        setOsPlatform('windows');
+      }
     };
     getPlatform();
   }, []);
@@ -21,7 +25,8 @@ export default function TitleBar() {
   const handleClose = () => appWindow.close();
 
   const isMac = osPlatform === 'macos';
-  const isWindows = osPlatform === 'win32';
+  const isWindows = osPlatform === 'windows';
+  const isLinux = osPlatform === 'linux';
 
   if (!osPlatform) {
     return <div className="h-10 fixed top-0 left-0 right-0 z-50" data-tauri-drag-region />;
@@ -33,14 +38,33 @@ export default function TitleBar() {
       className="h-10 bg-bg-primary/95 backdrop-blur-sm border-b border-white/5 flex justify-between items-center select-none fixed top-0 left-0 right-0 z-50"
     >
       <div className="flex items-center h-full">
-        {isMac && <WindowControls platform="macos" />}
+        {isMac && (
+          <div className="flex items-center h-full px-3 space-x-2">
+            <button 
+              onClick={handleClose}
+              className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors duration-150"
+              aria-label="Close window"
+            />
+            <button 
+              onClick={handleMinimize}
+              className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-colors duration-150"
+              aria-label="Minimize window"
+            />
+            <button 
+              onClick={handleMaximize}
+              className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600 transition-colors duration-150"
+              aria-label="Maximize window"
+            />
+          </div>
+        )}
+        
         <div data-tauri-drag-region className="flex items-center h-full px-4">
           <p className="text-sm font-semibold text-text-secondary">RapidRAW</p>
         </div>
       </div>
 
       <div className="flex items-center h-full">
-        {isWindows && (
+        {(isWindows || isLinux) && (
           <>
             <button 
               onClick={handleMinimize}
@@ -65,8 +89,6 @@ export default function TitleBar() {
             </button>
           </>
         )}
-
-        {!isMac && !isWindows && <WindowControls platform={osPlatform} />}
       </div>
     </div>
   );
