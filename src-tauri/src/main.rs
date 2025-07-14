@@ -158,13 +158,20 @@ struct ExportSettings {
 
 impl Default for AppSettings {
     fn default() -> Self {
+        let os_info = os_info::get();
         Self {
             last_root_path: None,
             editor_preview_resolution: Some(1920),
             sort_criteria: None,
             filter_criteria: None,
             theme: Some("dark".to_string()),
+
+            #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+            transparent: Some(false),
+            #[cfg(target_os = "macos")]
             transparent: Some(true),
+            #[cfg(target_os = "windows")]
+            transparent: Some(os_info.version().to_string().starts_with("11.")),
 
             #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
             decorations: Some(true),
