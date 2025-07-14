@@ -1284,8 +1284,11 @@ fn update_window_effect(theme: String, window: tauri::Window) {
         } else {
             Some((26, 29, 27, 60))
         };
-        window_vibrancy::apply_acrylic(&window, color)
-            .expect("Unsupported platform! 'apply_acrylic' is only supported on Windows");
+
+        if os_info::get().version().to_string().starts_with("11.") {
+            window_vibrancy::apply_acrylic(&window, color)
+                .expect("Unsupported platform! 'apply_acrylic' is only supported on Windows");
+        }
     }
 
     #[cfg(target_os = "macos")]
@@ -1427,16 +1430,17 @@ fn main() {
 
                 #[cfg(target_os = "windows")]
                 {
-                    let color = if theme == "light" {
-                        Some((250, 250, 250, 150))
-                    } else if theme == "muted-green" {
-                        Some((44, 56, 54, 100))
-                    } else {
-                        Some((26, 29, 27, 60))
+                    let color = match theme.as_str() {
+                        "light" => Some((250, 250, 250, 150)),
+                        "muted-green" => Some((44, 56, 54, 100)),
+                        _ => Some((26, 29, 27, 60))
                     };
-                    apply_acrylic(&window, color).expect(
-                        "Unsupported platform! 'apply_acrylic' is only supported on Windows",
-                    );
+                    let os = os_info::get();
+                    if os.version().to_string().starts_with("11.") {
+                        apply_acrylic(&window, color).expect(
+                            "Unsupported platform! 'apply_acrylic' is only supported on Windows",
+                        );
+                    }
                 }
             }
 
