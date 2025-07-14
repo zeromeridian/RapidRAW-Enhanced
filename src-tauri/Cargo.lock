@@ -17,7 +17,6 @@ dependencies = [
  "kamadak-exif",
  "ndarray",
  "ort",
- "os_info",
  "palette",
  "pollster",
  "rawler",
