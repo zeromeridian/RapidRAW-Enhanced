@@ -17,7 +17,7 @@ export default function TitleBar() {
       }
     };
     getPlatform();
-  }, [platform, setOsPlatform]);
+  }, []);
 
   const appWindow = getCurrentWindow();
   const handleMinimize = () => appWindow.minimize();
