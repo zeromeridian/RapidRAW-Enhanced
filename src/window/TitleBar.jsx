@@ -17,7 +17,7 @@ export default function TitleBar() {
       }
     };
     getPlatform();
-  }, []);
+  }, [platform, setOsPlatform]);
 
   const appWindow = getCurrentWindow();
   const handleMinimize = () => appWindow.minimize();
@@ -26,7 +26,6 @@ export default function TitleBar() {
 
   const isMac = osPlatform === 'macos';
   const isWindows = osPlatform === 'windows';
-  const isLinux = osPlatform === 'linux';
 
   if (!osPlatform) {
     return <div className="h-10 fixed top-0 left-0 right-0 z-50" data-tauri-drag-region />;
@@ -62,7 +61,7 @@ export default function TitleBar() {
         </div>
       </div>
       <div className="flex items-center h-full">
-        {(isWindows || isLinux) && (
+        {isWindows && (
           <>
             <button
               onClick={handleMinimize}
