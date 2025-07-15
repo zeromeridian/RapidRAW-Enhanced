@@ -148,7 +148,7 @@ jobs:
         if: ${{ !startsWith(inputs.platform, 'windows') && inputs.release-id == '' }}
         run: |
           find src-tauri/target/${{ inputs.target || 'release' }} -type f -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" | while read -r file; do
-            name=$(basename "$file")
+            name="${{ inputs.asset-prefix }}_${{ inputs.platform }}_$(basename "$file")"
             echo "Uploading $name, file: $file"
             zip -j - "$file" | gh-actions-artifact-client.js upload "${name}" --retentionDays=7
           done
