@@ -127,6 +127,7 @@ jobs:
           args: ${{ inputs.build-args }} ${{ inputs.target != '' && '--target' || ''  }} ${{ inputs.target }}
           assetNamePattern: ${{ steps.patch-release-name.outputs.platform }}
           releaseId: ${{ inputs.release-id }}
+          retryAttempts: 3
 
       - name: Setup gh actions artifact client
         if: ${{ inputs.release-id == '' }}
