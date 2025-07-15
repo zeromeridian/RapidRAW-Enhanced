@@ -88,6 +88,26 @@ struct SortCriteria {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+struct FilterCriteria {
+    rating: u8,
+    file_types: Vec<String>,
+    show_raw_only: bool,
+    show_edited_only: bool,
+}
+
+impl Default for FilterCriteria {
+    fn default() -> Self {
+        Self {
+            rating: 0,
+            file_types: Vec::new(),
+            show_raw_only: false,
+            show_edited_only: false,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 struct LastFolderState {
     current_folder_path: String,
     expanded_folders: Vec<String>,
@@ -99,6 +119,7 @@ struct AppSettings {
     last_root_path: Option<String>,
     editor_preview_resolution: Option<u32>,
     sort_criteria: Option<SortCriteria>,
+    filter_criteria: Option<FilterCriteria>,
     theme: Option<String>,
     transparent: Option<bool>,
     comfyui_address: Option<String>,
@@ -144,6 +165,7 @@ impl Default for AppSettings {
             last_root_path: None,
             editor_preview_resolution: Some(1920),
             sort_criteria: None,
+            filter_criteria: None,
             theme: Some("dark".to_string()),
             transparent: Some(true),
             comfyui_address: None,
@@ -1332,6 +1354,17 @@ async fn invoke_generative_replace(
     Ok(general_purpose::STANDARD.encode(&result_png_bytes))
 }
 
+#[tauri::command]
+fn get_supported_file_types() -> Result<serde_json::Value, String> {
+    let raw_extensions: Vec<&str> = crate::formats::RAW_EXTENSIONS.iter().map(|(ext, _)| *ext).collect();
+    let non_raw_extensions: Vec<&str> = crate::formats::NON_RAW_EXTENSIONS.to_vec();
+    
+    Ok(serde_json::json!({
+        "raw": raw_extensions,
+        "nonRaw": non_raw_extensions
+    }))
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_os::init())
@@ -1445,7 +1478,8 @@ fn main() {
             update_window_effect,
             check_comfyui_status,
             test_comfyui_connection,
-            invoke_generative_replace
+            invoke_generative_replace,
+            get_supported_file_types
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

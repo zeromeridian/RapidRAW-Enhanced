@@ -27,6 +27,20 @@ const THUMBNAIL_WIDTH: u32 = 640;
 pub struct ImageFile {
     path: String,
     modified: u64,
+    is_edited: bool,
+}
+
+fn has_sidecar_adjustments(image_path: &str) -> bool {
+    let sidecar_path = get_sidecar_path(image_path);
+    
+    // Use file size as a fast heuristic:
+    // - Rating-only files are typically ~150-250 bytes  
+    // - Files with actual edits are much larger (500+ bytes)
+    if let Ok(metadata) = fs::metadata(&sidecar_path) {
+        metadata.len() > 400  // Threshold chosen to exclude rating-only files
+    } else {
+        false  // File doesn't exist = no edits
+    }
 }
 
 #[tauri::command]
@@ -52,9 +66,11 @@ pub fn list_images_in_dir(path: String) -> Result<Vec<ImageFile>, String> {
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
+            let is_edited = has_sidecar_adjustments(&path.to_string_lossy().into_owned());
             ImageFile {
                 path: path.to_string_lossy().into_owned(),
                 modified,
+                is_edited,
             }
         })
         .collect();
