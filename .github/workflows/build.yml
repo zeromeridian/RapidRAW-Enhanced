@@ -48,8 +48,9 @@ jobs:
             APP_VERSION="${REF#refs/tags/v}"
             echo "Release version determined from tag: $APP_VERSION"
           else
-            APP_VERSION="0.0.0-${{ github.run_number }}"
-            echo "CI version determined from run number: $APP_VERSION"
+            DESCRIBE="$(git describe --tags --always)"
+            APP_VERSION="${DESCRIBE#v}"
+            echo "CI version determined from 'git describe': $APP_VERSION"
           fi
           
           echo "version=${APP_VERSION}" >> "$GITHUB_OUTPUT"
