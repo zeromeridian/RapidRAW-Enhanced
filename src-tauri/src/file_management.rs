@@ -32,15 +32,19 @@ pub struct ImageFile {
 
 fn has_sidecar_adjustments(image_path: &str) -> bool {
     let sidecar_path = get_sidecar_path(image_path);
-    
-    // Use file size as a fast heuristic:
-    // - Rating-only files are typically ~150-250 bytes  
-    // - Files with actual edits are much larger (500+ bytes)
-    if let Ok(metadata) = fs::metadata(&sidecar_path) {
-        metadata.len() > 400  // Threshold chosen to exclude rating-only files
-    } else {
-        false  // File doesn't exist = no edits
+    if !sidecar_path.exists() {
+        return false;
     }
+
+    if let Ok(content) = fs::read_to_string(sidecar_path) {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(adjustments) = value.get("adjustments").and_then(|a| a.as_object()) {
+                return adjustments.keys().len() > 1 || (adjustments.keys().len() == 1 && !adjustments.contains_key("rating"));
+            }
+        }
+    }
+
+    false
 }
 
 #[tauri::command]

@@ -208,8 +208,7 @@ function App() {
   const [sortCriteria, setSortCriteria] = useState({ key: 'name', order: 'asc' });
   const [filterCriteria, setFilterCriteria] = useState({ 
     rating: 0, 
-    fileType: 'all', 
-    showEditedOnly: false,
+    rawStatus: 'all'
   });
   const [supportedTypes, setSupportedTypes] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -470,7 +469,6 @@ function App() {
 
   const sortedImageList = useMemo(() => {
     const filteredList = imageList.filter(image => {
-      // Rating filter
       if (filterCriteria.rating > 0) {
         const rating = imageRatings[image.path] || 0;
         if (filterCriteria.rating === 5) {
@@ -480,26 +478,14 @@ function App() {
         }
       }
 
-      // File type filter
-      if (filterCriteria.fileType && filterCriteria.fileType !== 'all' && supportedTypes) {
+      if (filterCriteria.rawStatus && filterCriteria.rawStatus !== 'all' && supportedTypes) {
         const extension = image.path.split('.').pop()?.toLowerCase() || '';
+        const isRaw = supportedTypes.raw.includes(extension);
         
-        const fileTypeMap = {
-          'raw': supportedTypes.raw || [],
-          'jpeg': ['jpg', 'jpeg'],
-          'png': ['png'],
-          'tiff': ['tiff', 'tif'],
-        };
-
-        const allowedExtensions = fileTypeMap[filterCriteria.fileType];
-        if (allowedExtensions && !allowedExtensions.includes(extension)) {
+        if (filterCriteria.rawStatus === 'rawOnly' && !isRaw) {
           return false;
         }
-      }
-
-      // Edited only filter (check if there's a sidecar file with adjustments)
-      if (filterCriteria.showEditedOnly) {
-        if (!image.is_edited) {
+        if (filterCriteria.rawStatus === 'nonRawOnly' && isRaw) {
           return false;
         }
       }
@@ -590,7 +576,13 @@ function App() {
       .then(settings => {
         setAppSettings(settings);
         if (settings?.sortCriteria) setSortCriteria(settings.sortCriteria);
-        if (settings?.filterCriteria) setFilterCriteria(settings.filterCriteria);
+        if (settings?.filterCriteria) {
+          setFilterCriteria(prev => ({
+            ...prev,
+            ...settings.filterCriteria,
+            rawStatus: settings.filterCriteria.rawStatus || 'all'
+          }));
+        }
         if (settings?.theme) {
           setTheme(settings.theme);
         }

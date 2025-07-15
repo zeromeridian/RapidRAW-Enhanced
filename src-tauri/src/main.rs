@@ -90,18 +90,14 @@ struct SortCriteria {
 #[serde(rename_all = "camelCase")]
 struct FilterCriteria {
     rating: u8,
-    file_types: Vec<String>,
-    show_raw_only: bool,
-    show_edited_only: bool,
+    raw_status: String
 }
 
 impl Default for FilterCriteria {
     fn default() -> Self {
         Self {
             rating: 0,
-            file_types: Vec::new(),
-            show_raw_only: false,
-            show_edited_only: false,
+            raw_status: "all".to_string()
         }
     }
 }

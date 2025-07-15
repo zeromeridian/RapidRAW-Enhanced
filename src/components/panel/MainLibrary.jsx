@@ -36,19 +36,11 @@ const ratingFilterOptions = [
   { value: 5, label: '5 only' },
 ];
 
-const getFileTypeOptions = (supportedTypes) => {
-  if (!supportedTypes) {
-    return [{ key: 'all', label: 'All Types', extensions: [] }];
-  }
-  
-  return [
-    { key: 'all', label: 'All Types', extensions: [] },
-    { key: 'raw', label: 'RAW Files', extensions: supportedTypes.raw || [] },
-    { key: 'jpeg', label: 'JPEG', extensions: ['jpg', 'jpeg'] },
-    { key: 'png', label: 'PNG', extensions: ['png'] },
-    { key: 'tiff', label: 'TIFF', extensions: ['tiff', 'tif'] },
-  ];
-};
+const rawStatusOptions = [
+  { key: 'all', label: 'All Types' },
+  { key: 'rawOnly', label: 'RAW Only' },
+  { key: 'nonRawOnly', label: 'Non-RAW Only' },
+];
 
 const thumbnailSizeOptions = [
   { id: 'small', label: 'Small', size: 160 },
@@ -132,24 +124,17 @@ function ThumbnailSizeOptions({ selectedSize, onSelectSize }) {
   );
 }
 
-function FilterOptions({ filterCriteria, setFilterCriteria, supportedTypes }) {
-  const fileTypeOptions = getFileTypeOptions(supportedTypes);
-
+function FilterOptions({ filterCriteria, setFilterCriteria }) {
   const handleRatingFilterChange = (rating) => {
     setFilterCriteria(prev => ({ ...prev, rating }));
   };
 
-  const handleFileTypeChange = (fileType) => {
-    setFilterCriteria(prev => ({ ...prev, fileType }));
-  };
-
-  const handleToggleEditedOnly = () => {
-    setFilterCriteria(prev => ({ ...prev, showEditedOnly: !prev.showEditedOnly }));
+  const handleRawStatusChange = (rawStatus) => {
+    setFilterCriteria(prev => ({ ...prev, rawStatus }));
   };
 
   return (
     <div className="space-y-4">
-      {/* Rating Filter */}
       <div>
         <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Filter by Rating</div>
         {ratingFilterOptions.map((option) => {
@@ -171,15 +156,14 @@ function FilterOptions({ filterCriteria, setFilterCriteria, supportedTypes }) {
         })}
       </div>
 
-      {/* File Type Filter */}
       <div>
         <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Filter by File Type</div>
-        {fileTypeOptions.map((option) => {
-          const isSelected = (filterCriteria.fileType || 'all') === option.key;
+        {rawStatusOptions.map((option) => {
+          const isSelected = (filterCriteria.rawStatus || 'all') === option.key;
           return (
             <button
               key={option.key}
-              onClick={() => handleFileTypeChange(option.key)}
+              onClick={() => handleRawStatusChange(option.key)}
               className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${isSelected ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'}`}
               role="menuitem"
             >
@@ -188,19 +172,6 @@ function FilterOptions({ filterCriteria, setFilterCriteria, supportedTypes }) {
             </button>
           );
         })}
-      </div>
-
-      {/* Status Filters */}
-      <div>
-        <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Status Filters</div>
-        <button
-          onClick={handleToggleEditedOnly}
-          className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${filterCriteria.showEditedOnly ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'}`}
-          role="menuitem"
-        >
-          <span>Edited Only</span>
-          {filterCriteria.showEditedOnly && <Check size={16} />}
-        </button>
       </div>
     </div>
   );
@@ -235,11 +206,9 @@ function ViewOptionsDropdown({
   setFilterCriteria,
   sortCriteria,
   setSortCriteria,
-  supportedTypes,
 }) {
   const isFilterActive = filterCriteria.rating > 0 || 
-                        (filterCriteria.fileType && filterCriteria.fileType !== 'all') ||
-                        filterCriteria.showEditedOnly;
+                        (filterCriteria.rawStatus && filterCriteria.rawStatus !== 'all')
 
   return (
     <DropdownMenu
@@ -257,7 +226,7 @@ function ViewOptionsDropdown({
           <ThumbnailSizeOptions selectedSize={thumbnailSize} onSelectSize={onSelectSize} />
         </div>
         <div className="w-2/4 p-2 border-r border-border-color">
-          <FilterOptions filterCriteria={filterCriteria} setFilterCriteria={setFilterCriteria} supportedTypes={supportedTypes} />
+          <FilterOptions filterCriteria={filterCriteria} setFilterCriteria={setFilterCriteria} />
         </div>
         <div className="w-1/4 p-2">
           <SortOptions sortCriteria={sortCriteria} setSortCriteria={setSortCriteria} />
@@ -346,7 +315,6 @@ export default function MainLibrary({
   useEffect(() => { getVersion().then(setAppVersion); }, []);
 
   useEffect(() => {
-    // Load supported file types from backend
     invoke('get_supported_file_types')
       .then(types => setSupportedTypes(types))
       .catch(err => console.error('Failed to load supported file types:', err));
@@ -412,7 +380,6 @@ export default function MainLibrary({
             setFilterCriteria={setFilterCriteria}
             sortCriteria={sortCriteria}
             setSortCriteria={setSortCriteria}
-            supportedTypes={supportedTypes}
           />
           <Button onClick={onOpenFolder} className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center" title="Open another folder"><Folder className="w-8 h-8" /></Button>
           <Button onClick={onGoHome} className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center" title="Go to Home Screen"><Home className="w-8 h-8" /></Button>
@@ -437,7 +404,7 @@ export default function MainLibrary({
 
               return (
                 <Grid
-                  key={`${sortCriteria.key}-${sortCriteria.order}-${filterCriteria.rating}-${filterCriteria.fileType || 'all'}-${filterCriteria.showEditedOnly}`}
+                  key={`${sortCriteria.key}-${sortCriteria.order}-${filterCriteria.rating}-${filterCriteria.rawStatus || 'all'}`}
                   outerElementType={customOuterElement}
                   height={height}
                   width={width}
