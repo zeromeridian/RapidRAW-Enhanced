@@ -209,7 +209,6 @@ function App() {
   const [filterCriteria, setFilterCriteria] = useState({ 
     rating: 0, 
     fileType: 'all', 
-    showRawOnly: false, 
     showEditedOnly: false,
   });
   const [supportedTypes, setSupportedTypes] = useState(null);
@@ -494,15 +493,6 @@ function App() {
 
         const allowedExtensions = fileTypeMap[filterCriteria.fileType];
         if (allowedExtensions && !allowedExtensions.includes(extension)) {
-          return false;
-        }
-      }
-
-      // RAW only filter
-      if (filterCriteria.showRawOnly && supportedTypes) {
-        const extension = image.path.split('.').pop()?.toLowerCase() || '';
-        const rawExtensions = supportedTypes.raw || [];
-        if (!rawExtensions.includes(extension)) {
           return false;
         }
       }

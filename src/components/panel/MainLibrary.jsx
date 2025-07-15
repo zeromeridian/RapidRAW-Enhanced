@@ -143,10 +143,6 @@ function FilterOptions({ filterCriteria, setFilterCriteria, supportedTypes }) {
     setFilterCriteria(prev => ({ ...prev, fileType }));
   };
 
-  const handleToggleRawOnly = () => {
-    setFilterCriteria(prev => ({ ...prev, showRawOnly: !prev.showRawOnly }));
-  };
-
   const handleToggleEditedOnly = () => {
     setFilterCriteria(prev => ({ ...prev, showEditedOnly: !prev.showEditedOnly }));
   };
@@ -198,14 +194,6 @@ function FilterOptions({ filterCriteria, setFilterCriteria, supportedTypes }) {
       <div>
         <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Status Filters</div>
         <button
-          onClick={handleToggleRawOnly}
-          className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${filterCriteria.showRawOnly ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'}`}
-          role="menuitem"
-        >
-          <span>RAW Files Only</span>
-          {filterCriteria.showRawOnly && <Check size={16} />}
-        </button>
-        <button
           onClick={handleToggleEditedOnly}
           className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${filterCriteria.showEditedOnly ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'}`}
           role="menuitem"
@@ -251,7 +239,6 @@ function ViewOptionsDropdown({
 }) {
   const isFilterActive = filterCriteria.rating > 0 || 
                         (filterCriteria.fileType && filterCriteria.fileType !== 'all') ||
-                        filterCriteria.showRawOnly ||
                         filterCriteria.showEditedOnly;
 
   return (
@@ -450,7 +437,7 @@ export default function MainLibrary({
 
               return (
                 <Grid
-                  key={`${sortCriteria.key}-${sortCriteria.order}-${filterCriteria.rating}-${filterCriteria.fileType || 'all'}-${filterCriteria.showRawOnly}-${filterCriteria.showEditedOnly}`}
+                  key={`${sortCriteria.key}-${sortCriteria.order}-${filterCriteria.rating}-${filterCriteria.fileType || 'all'}-${filterCriteria.showEditedOnly}`}
                   outerElementType={customOuterElement}
                   height={height}
                   width={width}
