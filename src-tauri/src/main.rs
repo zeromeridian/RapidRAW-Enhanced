@@ -26,6 +26,7 @@ use base64::{Engine as _, engine::general_purpose};
 use serde_json::Value;
 use tokio::task::JoinHandle;
 use walkdir::WalkDir;
+use window_vibrancy::{apply_acrylic, apply_vibrancy, NSVisualEffectMaterial};
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use rayon::prelude::*;
