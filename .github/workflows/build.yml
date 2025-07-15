@@ -106,6 +106,7 @@ jobs:
 
       - id: patch-release-name
         shell: bash
+        if: ${{ inputs.release-id != '' }}
         run: |
           platform="${{ inputs.platform }}"
           replacement="$(echo ${platform} | sed -E 's/-latest//')"
