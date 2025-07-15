@@ -206,7 +206,11 @@ function App() {
   const [imageList, setImageList] = useState([]);
   const [imageRatings, setImageRatings] = useState({});
   const [sortCriteria, setSortCriteria] = useState({ key: 'name', order: 'asc' });
-  const [filterCriteria, setFilterCriteria] = useState({ rating: 0 });
+  const [filterCriteria, setFilterCriteria] = useState({ 
+    rating: 0, 
+    rawStatus: 'all'
+  });
+  const [supportedTypes, setSupportedTypes] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [multiSelectedPaths, setMultiSelectedPaths] = useState([]);
   const [libraryActivePath, setLibraryActivePath] = useState(null);
@@ -468,10 +472,24 @@ function App() {
       if (filterCriteria.rating > 0) {
         const rating = imageRatings[image.path] || 0;
         if (filterCriteria.rating === 5) {
-          return rating === 5;
+          if (rating !== 5) return false;
+        } else {
+          if (rating < filterCriteria.rating) return false;
         }
-        return rating >= filterCriteria.rating;
       }
+
+      if (filterCriteria.rawStatus && filterCriteria.rawStatus !== 'all' && supportedTypes) {
+        const extension = image.path.split('.').pop()?.toLowerCase() || '';
+        const isRaw = supportedTypes.raw.includes(extension);
+        
+        if (filterCriteria.rawStatus === 'rawOnly' && !isRaw) {
+          return false;
+        }
+        if (filterCriteria.rawStatus === 'nonRawOnly' && isRaw) {
+          return false;
+        }
+      }
+
       return true;
     });
 
@@ -485,7 +503,7 @@ function App() {
         return order === 'asc' ? comparison : -comparison;
     });
     return list;
-  }, [imageList, sortCriteria, imageRatings, filterCriteria]);
+  }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes]);
 
   const applyAdjustments = useCallback(debounce((currentAdjustments) => {
     if (!selectedImage?.isReady) return;
@@ -558,6 +576,13 @@ function App() {
       .then(settings => {
         setAppSettings(settings);
         if (settings?.sortCriteria) setSortCriteria(settings.sortCriteria);
+        if (settings?.filterCriteria) {
+          setFilterCriteria(prev => ({
+            ...prev,
+            ...settings.filterCriteria,
+            rawStatus: settings.filterCriteria.rawStatus || 'all'
+          }));
+        }
         if (settings?.theme) {
           setTheme(settings.theme);
         }
@@ -568,6 +593,26 @@ function App() {
       })
       .finally(() => { isInitialMount.current = false; });
   }, []);
+
+  useEffect(() => {
+    invoke('get_supported_file_types')
+      .then(types => setSupportedTypes(types))
+      .catch(err => console.error('Failed to load supported file types:', err));
+  }, []);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) return;
+    if (JSON.stringify(appSettings.sortCriteria) !== JSON.stringify(sortCriteria)) {
+        handleSettingsChange({ ...appSettings, sortCriteria });
+    }
+  }, [sortCriteria, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) return;
+    if (JSON.stringify(appSettings.filterCriteria) !== JSON.stringify(filterCriteria)) {
+        handleSettingsChange({ ...appSettings, filterCriteria });
+    }
+  }, [filterCriteria, appSettings, handleSettingsChange]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -582,13 +627,6 @@ function App() {
       invoke('update_window_effect', { theme: newThemeId });
     }
   }, [theme]);
-
-  useEffect(() => {
-    if (isInitialMount.current || !appSettings) return;
-    if (JSON.stringify(appSettings.sortCriteria) !== JSON.stringify(sortCriteria)) {
-        handleSettingsChange({ ...appSettings, sortCriteria });
-    }
-  }, [sortCriteria, appSettings, handleSettingsChange]);
 
   const handleRefreshFolderTree = useCallback(async () => {
     if (!rootPath) return;

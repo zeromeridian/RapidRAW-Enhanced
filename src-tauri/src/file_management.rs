@@ -27,6 +27,24 @@ const THUMBNAIL_WIDTH: u32 = 640;
 pub struct ImageFile {
     path: String,
     modified: u64,
+    is_edited: bool,
+}
+
+fn has_sidecar_adjustments(image_path: &str) -> bool {
+    let sidecar_path = get_sidecar_path(image_path);
+    if !sidecar_path.exists() {
+        return false;
+    }
+
+    if let Ok(content) = fs::read_to_string(sidecar_path) {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(adjustments) = value.get("adjustments").and_then(|a| a.as_object()) {
+                return adjustments.keys().len() > 1 || (adjustments.keys().len() == 1 && !adjustments.contains_key("rating"));
+            }
+        }
+    }
+
+    false
 }
 
 #[tauri::command]
@@ -52,9 +70,11 @@ pub fn list_images_in_dir(path: String) -> Result<Vec<ImageFile>, String> {
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
+            let is_edited = has_sidecar_adjustments(&path.to_string_lossy().into_owned());
             ImageFile {
                 path: path.to_string_lossy().into_owned(),
                 modified,
+                is_edited,
             }
         })
         .collect();
