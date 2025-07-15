@@ -40,7 +40,6 @@ jobs:
       platform: ${{ matrix.platform }}
       target: ${{ matrix.target }}
       build-args: ${{ matrix.args }}
-      ref: ${{ github.ref }}
     secrets: inherit
     permissions:
       contents: write
