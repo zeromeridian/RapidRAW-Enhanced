@@ -6,7 +6,7 @@ import { homeDir } from '@tauri-apps/api/path';
 import debounce from 'lodash.debounce';
 import { centerCrop, makeAspectCrop } from 'react-image-crop';
 import clsx from 'clsx';
-import { Copy, ClipboardPaste, RotateCcw, Star, Trash2, Folder, Edit, Check, X, Undo, Redo, FolderPlus, FileEdit, CopyPlus } from 'lucide-react';
+import { Copy, ClipboardPaste, RotateCcw, Star, Trash2, Folder, Edit, Check, X, Undo, Redo, FolderPlus, FileEdit, CopyPlus, Aperture } from 'lucide-react';
 import TitleBar from './window/TitleBar';
 import MainLibrary from './components/panel/MainLibrary';
 import FolderTree from './components/panel/FolderTree';
@@ -843,6 +843,25 @@ function App() {
     setIsPasted(true);
   }, [copiedAdjustments, multiSelectedPaths, selectedImage, setAdjustments]);
 
+  const handleAutoAdjustments = async () => {
+    if (!selectedImage) return;
+    try {
+      const autoAdjustments = await invoke('calculate_auto_adjustments');
+      setAdjustments(prev => {
+        const newAdjustments = { ...prev, ...autoAdjustments };
+        newAdjustments.sectionVisibility = {
+          ...prev.sectionVisibility,
+          ...autoAdjustments.sectionVisibility,
+        };
+
+        return newAdjustments;
+      });
+    } catch (err) {
+      console.error("Failed to calculate auto adjustments:", err);
+      setError(`Failed to apply auto adjustments: ${err}`);
+    }
+  };
+
   const handleRate = useCallback((newRating) => {
     const pathsToRate = multiSelectedPaths.length > 0 ? multiSelectedPaths : (selectedImage ? [selectedImage.path] : []);
     if (pathsToRate.length === 0) return;
@@ -1268,6 +1287,7 @@ function App() {
       { label: 'Copy Adjustments', icon: Copy, onClick: handleCopyAdjustments },
       { label: 'Paste Adjustments', icon: ClipboardPaste, onClick: handlePasteAdjustments, disabled: copiedAdjustments === null },
       { type: 'separator' },
+      { label: 'Auto Adjust', icon: Aperture, onClick: handleAutoAdjustments },
       { label: 'Set Rating', icon: Star, submenu: [0, 1, 2, 3, 4, 5].map(rating => ({ label: rating === 0 ? 'No Rating' : `${rating} Star${rating !== 1 ? 's' : ''}`, onClick: () => handleRate(rating) })) },
       { type: 'separator' },
       { label: 'Reset Adjustments', icon: RotateCcw, onClick: () => setAdjustments(prev => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating, aiPatches: [] })) },
@@ -1291,6 +1311,36 @@ function App() {
     const resetLabel = isSingleSelection ? 'Reset Adjustments' : `Reset Adjustments on ${selectionCount} Images`;
     const deleteLabel = isSingleSelection ? 'Delete Image' : `Delete ${selectionCount} Images`;
     const copyLabel = isSingleSelection ? 'Copy Image' : `Copy ${selectionCount} Images`;
+    const autoAdjustLabel = isSingleSelection ? 'Auto Adjust Image' : `Auto Adjust ${selectionCount} Images`;
+
+    const handleApplyAutoAdjustmentsToSelection = () => {
+      if (finalSelection.length === 0) return;
+
+      invoke('apply_auto_adjustments_to_paths', { paths: finalSelection })
+        .then(() => {
+          if (selectedImage && finalSelection.includes(selectedImage.path)) {
+            invoke('load_metadata', { path: selectedImage.path })
+              .then(metadata => {
+                if (metadata.adjustments && !metadata.adjustments.is_null) {
+                  const normalized = normalizeLoadedAdjustments(metadata.adjustments);
+                  setLiveAdjustments(normalized);
+                  resetAdjustmentsHistory(normalized);
+                }
+              });
+          }
+          if (libraryActivePath && finalSelection.includes(libraryActivePath)) {
+            invoke('load_metadata', { path: libraryActivePath })
+              .then(metadata => {
+                if (metadata.adjustments && !metadata.adjustments.is_null) {
+                  const normalized = normalizeLoadedAdjustments(metadata.adjustments);
+                  setLibraryActiveAdjustments(normalized);
+                }
+              });
+          }
+        })
+        .catch(err => { console.error("Failed to apply auto adjustments to paths:", err); setError(`Failed to apply auto adjustments: ${err}`); });
+    };
+
     const options = [
       ...(!isEditingThisImage ? [{ label: 'Edit Photo', icon: Edit, disabled: !isSingleSelection, onClick: () => handleImageSelect(finalSelection[0]) }, { type: 'separator' }] : []),
       { label: 'Copy Adjustments', icon: Copy, disabled: !isSingleSelection, onClick: async () => {
@@ -1304,6 +1354,7 @@ function App() {
         },
       },
       { label: pasteLabel, icon: ClipboardPaste, disabled: copiedAdjustments === null, onClick: handlePasteAdjustments },
+      { label: autoAdjustLabel, icon: Aperture, onClick: handleApplyAutoAdjustmentsToSelection },
       { type: 'separator' },
       { label: copyLabel, icon: Copy, onClick: () => { setCopiedFilePaths(finalSelection); setIsCopied(true); } },
       { label: 'Duplicate Image', icon: CopyPlus, disabled: !isSingleSelection, onClick: async () => { try { await invoke('duplicate_file', { path: finalSelection[0] }); handleLibraryRefresh(); } catch (err) { console.error("Failed to duplicate file:", err); setError(`Failed to duplicate file: ${err}`); } } },
@@ -1483,7 +1534,7 @@ function App() {
               style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
             >
               <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
-                {renderedRightPanel === 'adjustments' && <Controls theme={theme} adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} histogram={histogram} collapsibleState={collapsibleSectionsState} setCollapsibleState={setCollapsibleSectionsState} copiedSectionAdjustments={copiedSectionAdjustments} setCopiedSectionAdjustments={setCopiedSectionAdjustments} />}
+                {renderedRightPanel === 'adjustments' && <Controls theme={theme} adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} histogram={histogram} collapsibleState={collapsibleSectionsState} setCollapsibleState={setCollapsibleSectionsState} copiedSectionAdjustments={copiedSectionAdjustments} setCopiedSectionAdjustments={setCopiedSectionAdjustments} handleAutoAdjustments={handleAutoAdjustments} />}
                 {renderedRightPanel === 'metadata' && <MetadataPanel selectedImage={selectedImage} />}
                 {renderedRightPanel === 'crop' && <CropPanel selectedImage={selectedImage} adjustments={adjustments} setAdjustments={setAdjustments} />}
                 {renderedRightPanel === 'masks' && <MasksPanel 

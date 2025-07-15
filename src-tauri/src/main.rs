@@ -32,6 +32,7 @@ use uuid::Uuid;
 use rayon::prelude::*;
 
 use crate::image_processing::{
+    perform_auto_analysis, auto_results_to_json,
     get_all_adjustments_from_json, get_or_init_gpu_context, GpuContext,
     ImageMetadata, process_and_get_dynamic_image, Crop, apply_crop, apply_rotation, apply_flip,
 };
@@ -1038,6 +1039,59 @@ fn reset_adjustments_for_paths(paths: Vec<String>, app_handle: tauri::AppHandle)
 }
 
 #[tauri::command]
+fn apply_auto_adjustments_to_paths(paths: Vec<String>, app_handle: tauri::AppHandle) -> Result<(), String> {
+    paths.par_iter().for_each(|path| {
+        let result: Result<(), String> = (|| {
+            let file_bytes = fs::read(path).map_err(|e| e.to_string())?;
+            let image = load_base_image_from_bytes(&file_bytes, path, false)
+                .map_err(|e| e.to_string())?;
+
+            let auto_results = perform_auto_analysis(&image);
+            let auto_adjustments_json = auto_results_to_json(&auto_results);
+
+            let sidecar_path = get_sidecar_path(path);
+            let mut existing_metadata: ImageMetadata = if sidecar_path.exists() {
+                fs::read_to_string(&sidecar_path)
+                    .ok()
+                    .and_then(|content| serde_json::from_str(&content).ok())
+                    .unwrap_or_default()
+            } else {
+                ImageMetadata::default()
+            };
+
+            if existing_metadata.adjustments.is_null() {
+                existing_metadata.adjustments = serde_json::json!({});
+            }
+            
+            if let (Some(existing_map), Some(auto_map)) = (existing_metadata.adjustments.as_object_mut(), auto_adjustments_json.as_object()) {
+                for (k, v) in auto_map {
+                    if k == "sectionVisibility" {
+                        if let Some(existing_vis_val) = existing_map.get_mut(k) {
+                            if let (Some(existing_vis), Some(auto_vis)) = (existing_vis_val.as_object_mut(), v.as_object()) {
+                                for (vis_k, vis_v) in auto_vis {
+                                    existing_vis.insert(vis_k.clone(), vis_v.clone());
+                                }
+                            }
+                        } else {
+                            existing_map.insert(k.clone(), v.clone());
+                        }
+                    } else {
+                        existing_map.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+
+            let metadata = ImageMetadata { version: 1, rating: existing_metadata.rating, adjustments: existing_metadata.adjustments };
+            if let Ok(json_string) = serde_json::to_string_pretty(&metadata) { let _ = std::fs::write(sidecar_path, json_string); }
+            Ok(())
+        })();
+        if let Err(e) = result { eprintln!("Failed to apply auto adjustments to {}: {}", path, e); }
+    });
+    thread::spawn(move || { let _ = file_management::generate_thumbnails_progressive(paths, app_handle); });
+    Ok(())
+}
+
+#[tauri::command]
 fn load_metadata(path: String) -> Result<ImageMetadata, String> {
     let sidecar_path = get_sidecar_path(&path);
     if sidecar_path.exists() {
@@ -1456,6 +1510,7 @@ fn main() {
             load_metadata,
             image_processing::generate_histogram,
             image_processing::generate_waveform,
+            image_processing::calculate_auto_adjustments,
             file_management::list_images_in_dir,
             file_management::get_folder_tree,
             file_management::generate_thumbnails,
@@ -1476,6 +1531,7 @@ fn main() {
             load_settings,
             save_settings,
             reset_adjustments_for_paths,
+            apply_auto_adjustments_to_paths,
             handle_import_presets_from_file,
             handle_export_presets_to_file,
             clear_all_sidecars,

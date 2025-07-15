@@ -34,6 +34,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-07-15:** Auto Adjustment Feature, more Library Filters, Double Click Zoom, Native Linux Taskbar
 *   **2025-07-13:** Native looking titlebar and ability to input precise number into sliders
 *   **2025-07-13:** Huge update to masks: You can now add multiple masks to a mask containers, subtract / add / combine masks etc.
 *   **2025-07-12:** Improved curves tool, more shader improvements, improved handling of very large files
@@ -205,7 +206,7 @@ While the core functionality is in place, I'm actively working on improving seve
 | Sign macOS builds using a registered developer account                                       | Medium      | Low     | [ ]    |
 | Switch to a better rawloader (e.g. rawler)                                                   | High      | Medium     | [X]    |
 | Improve speed on older systems (e.g. Pascal GPUs)                                            | Medium   | High       | [ ]    |
-| Auto white balance detection and exposure correction                                         | Medium     | Medium     | [ ]    |
+| Auto white balance detection and exposure correction                                         | Medium     | Medium     | [X]    |
 
 ## AI Roadmap
 
