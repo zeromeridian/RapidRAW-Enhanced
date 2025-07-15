@@ -52,6 +52,7 @@ jobs:
             APP_VERSION="${REF#refs/tags/v}"
             echo "Release version determined from tag: $APP_VERSION"
           else
+            git fetch origin 'refs/tags/*:refs/tags/*'
             DESCRIBE="$(git describe --tags --always)"
             APP_VERSION="${DESCRIBE#v}"
             echo "CI version determined from 'git describe': $APP_VERSION"
