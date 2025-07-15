@@ -1587,7 +1587,7 @@ function App() {
         "flex-1 flex flex-col min-h-0",
         [
           rootPath && "p-2 gap-2",
-          !appSettings?.decorations && "pt-12",
+          !appSettings?.decorations && rootPath && "pt-12",
         ]
       )}>
         {error && (
