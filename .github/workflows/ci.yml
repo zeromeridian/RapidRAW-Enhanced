@@ -40,6 +40,7 @@ jobs:
       platform: ${{ matrix.platform }}
       target: ${{ matrix.target }}
       build-args: ${{ matrix.args }}
+      asset-prefix: ${{ matrix.asset-prefix }}
     secrets: inherit
     permissions:
       contents: write
