@@ -54,9 +54,15 @@ jobs:
             APP_VERSION="${REF#refs/tags/v}"
             echo "Release version determined from tag: $APP_VERSION"
           else
-            DESCRIBE="$(git describe --tags --always)"
-            APP_VERSION="${DESCRIBE#v}"
-            echo "CI version determined from 'git describe': $APP_VERSION"
+            if [[ "${{ inputs.platform }}" == windows* ]]; then
+              DESCRIBE="$(git describe --tags --always --abbrev=0)"
+              APP_VERSION="${DESCRIBE#v}"
+              echo "CI version determined from 'git describe': $APP_VERSION"
+            else
+              DESCRIBE="$(git describe --tags --always)"
+              APP_VERSION="${DESCRIBE#v}"
+              echo "CI version determined from 'git describe': $APP_VERSION"
+            fi
           fi
           
           echo "version=${APP_VERSION}" >> "$GITHUB_OUTPUT"
