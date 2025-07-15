@@ -15,6 +15,9 @@ on:
       release-id:
         required: false
         type: string
+      asset-prefix:
+        required: false
+        type: string
       asset-name-pattern:
         required: false
         type: string
@@ -105,6 +108,9 @@ jobs:
           platform="${{ inputs.platform }}"
           replacement="$(echo ${platform} | sed -E 's/-latest//')"
           patched_platform=$(echo '${{ inputs.asset-name-pattern }}' | sed -E "s/\[platform\]/${replacement}/")
+          if [[ -n "${{ inputs.asset-prefix }}" ]]; then
+            patched_platform="${{ inputs.asset-prefix }}_${patched_platform}"
+          fi
           echo "platform=${patched_platform}" >> $GITHUB_OUTPUT
 
       - id: tauri-build
