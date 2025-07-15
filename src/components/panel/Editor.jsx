@@ -26,7 +26,8 @@ export default function Editor({
   selectedImage, finalPreviewUrl, uncroppedAdjustedPreviewUrl,
   showOriginal, setShowOriginal, isAdjusting, onBackToLibrary, isLoading, isFullScreen,
   isFullScreenLoading, fullScreenUrl, onToggleFullScreen, activeRightPanel,
-  adjustments, setAdjustments, activeMaskId, onSelectMask,
+  adjustments, setAdjustments, activeMaskId, activeMaskContainerId,
+  onSelectMask, updateSubMask,
   transformWrapperRef, onZoomed, onContextMenu,
   onUndo, onRedo, canUndo, canRedo, brushSettings, 
   onGenerateAiMask, aiTool, onAiMaskDrawingComplete,
@@ -120,11 +121,14 @@ export default function Editor({
   }, 100), [adjustments.crop]);
 
   useEffect(() => {
-    const activeMask = adjustments.masks.find(m => m.id === activeMaskId);
-    debouncedGenerateMaskOverlay(activeMask, imageRenderSize);
+    const activeContainer = activeMaskContainerId
+      ? adjustments.masks.find(c => c.id === activeMaskContainerId)
+      : null;
+
+    debouncedGenerateMaskOverlay(activeContainer, imageRenderSize);
     
     return () => debouncedGenerateMaskOverlay.cancel();
-  }, [activeMaskId, adjustments.masks, imageRenderSize, debouncedGenerateMaskOverlay]);
+  }, [activeMaskContainerId, adjustments.masks, imageRenderSize, debouncedGenerateMaskOverlay]);
 
 
   useEffect(() => {
@@ -187,14 +191,20 @@ export default function Editor({
     }
   }, [selectedImage, adjustments.crop, adjustments.rotation, setAdjustments]);
 
-  const handleUpdateMask = useCallback((id, newProps) => {
-    setAdjustments(prev => ({
-      ...prev,
-      masks: prev.masks.map(m => m.id === id ? { ...m, ...newProps } : m),
-    }));
-  }, [setAdjustments]);
-
   const toggleShowOriginal = useCallback(() => setShowOriginal(prev => !prev), [setShowOriginal]);
+
+  const doubleClickProps = useMemo(() => {
+    if (isCropping || isMasking) {
+      return { 
+        disabled: true,
+      };
+    }
+    return {
+      mode: transformState.scale >= 2 ? 'reset' : 'zoomIn',
+      animationTime: 200,
+      animationType: 'easeOut',
+    };
+  }, [isCropping, isMasking, transformState.scale]);  
 
   if (!selectedImage) {
     return (
@@ -204,8 +214,13 @@ export default function Editor({
     );
   }
 
-  const activeMask = useMemo(() => adjustments.masks.find(m => m.id === activeMaskId), [adjustments.masks, activeMaskId]);
-  const isPanningDisabled = isMaskHovered || isCropping || aiTool === 'generative-replace' || (isMasking && (activeMask?.type === 'brush' || activeMask?.type === 'ai-subject'));
+  const activeSubMask = useMemo(() => {
+    if (!activeMaskId) return null;
+    const container = adjustments.masks.find(c => c.subMasks.some(sm => sm.id === activeMaskId));
+    return container?.subMasks.find(sm => sm.id === activeMaskId);
+  }, [adjustments.masks, activeMaskId]);
+
+  const isPanningDisabled = isMaskHovered || isCropping || aiTool === 'generative-replace' || (isMasking && (activeSubMask?.type === 'brush' || activeSubMask?.type === 'ai-subject'));
 
   return (
     <>
@@ -257,7 +272,7 @@ export default function Editor({
             maxScale={10}
             limitToBounds={true}
             centerZoomedOut={true}
-            doubleClick={{ disabled: true }}
+            doubleClick={doubleClickProps}
             panning={{ disabled: isPanningDisabled }}
             onTransformed={(_, state) => {
               setTransformState(state);
@@ -281,7 +296,8 @@ export default function Editor({
                 maskOverlayUrl={maskOverlayUrl}
                 onSelectMask={onSelectMask}
                 activeMaskId={activeMaskId}
-                handleUpdateMask={handleUpdateMask}
+                activeMaskContainerId={activeMaskContainerId}
+                updateSubMask={updateSubMask}
                 isMaskHovered={isMaskHovered}
                 setIsMaskHovered={setIsMaskHovered}
                 brushSettings={brushSettings}

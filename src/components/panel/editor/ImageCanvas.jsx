@@ -16,7 +16,7 @@ function linesIntersect(eraserLine, drawnLine) {
   return false;
 }
 
-const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskMouseEnter, onMaskMouseLeave, adjustments }) => {
+const MaskOverlay = memo(({ subMask, scale, onUpdate, isSelected, onSelect, onMaskMouseEnter, onMaskMouseLeave, adjustments }) => {
   const shapeRef = useRef();
   const trRef = useRef();
 
@@ -32,22 +32,22 @@ const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskM
   }, [isSelected]);
 
   const handleRadialDrag = useCallback((e) => {
-    onUpdate(mask.id, {
+    onUpdate(subMask.id, {
       parameters: { 
-        ...mask.parameters, 
+        ...subMask.parameters, 
         centerX: (e.target.x() / scale) + cropX, 
         centerY: (e.target.y() / scale) + cropY 
       },
     });
-  }, [mask.id, mask.parameters, onUpdate, scale, cropX, cropY]);
+  }, [subMask.id, subMask.parameters, onUpdate, scale, cropX, cropY]);
 
   const handleRadialTransform = useCallback(() => {
     const node = shapeRef.current;
     if (!node) return;
 
-    onUpdate(mask.id, {
+    onUpdate(subMask.id, {
       parameters: {
-        ...mask.parameters,
+        ...subMask.parameters,
         centerX: (node.x() / scale) + cropX,
         centerY: (node.y() / scale) + cropY,
         radiusX: (node.radiusX() * node.scaleX()) / scale,
@@ -55,7 +55,7 @@ const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskM
         rotation: node.rotation(),
       },
     });
-  }, [mask.id, mask.parameters, onUpdate, scale, cropX, cropY]);
+  }, [subMask.id, subMask.parameters, onUpdate, scale, cropX, cropY]);
 
   const handleRadialTransformEnd = useCallback(() => {
     const node = shapeRef.current;
@@ -67,9 +67,9 @@ const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskM
     node.scaleX(1);
     node.scaleY(1);
 
-    onUpdate(mask.id, {
+    onUpdate(subMask.id, {
       parameters: {
-        ...mask.parameters,
+        ...subMask.parameters,
         centerX: (node.x() / scale) + cropX,
         centerY: (node.y() / scale) + cropY,
         radiusX: (node.radiusX() * scaleX) / scale,
@@ -77,11 +77,11 @@ const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskM
         rotation: node.rotation(),
       },
     });
-  }, [mask.id, mask.parameters, onUpdate, scale, cropX, cropY]);
+  }, [subMask.id, subMask.parameters, onUpdate, scale, cropX, cropY]);
 
   const handleGroupDragEnd = (e) => {
     const group = e.target;
-    const { startX, startY, endX, endY } = mask.parameters;
+    const { startX, startY, endX, endY } = subMask.parameters;
     const dx = endX - startX;
     const dy = endY - startY;
     const centerX = startX + dx / 2;
@@ -90,9 +90,9 @@ const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskM
     const groupY = (centerY - cropY) * scale;
     const moveX = group.x() - groupX;
     const moveY = group.y() - groupY;
-    onUpdate(mask.id, {
+    onUpdate(subMask.id, {
       parameters: {
-        ...mask.parameters,
+        ...subMask.parameters,
         startX: startX + moveX / scale,
         startY: startY + moveY / scale,
         endX: endX + moveX / scale,
@@ -109,7 +109,7 @@ const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskM
     const newX = (pointerPos.x / scale) + cropX;
     const newY = (pointerPos.y / scale) + cropY;
 
-    const newParams = { ...mask.parameters };
+    const newParams = { ...subMask.parameters };
     if (point === 'start') {
       newParams.startX = newX;
       newParams.startY = newY;
@@ -117,33 +117,33 @@ const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskM
       newParams.endX = newX;
       newParams.endY = newY;
     }
-    onUpdate(mask.id, { parameters: newParams });
+    onUpdate(subMask.id, { parameters: newParams });
   };
   
   const handleRangeDrag = (e) => {
     const newRange = Math.abs(e.target.y() / scale);
-    onUpdate(mask.id, {
-      parameters: { ...mask.parameters, range: newRange }
+    onUpdate(subMask.id, {
+      parameters: { ...subMask.parameters, range: newRange }
     });
   };
 
-  if (!mask.visible) {
+  if (!subMask.visible) {
     return null;
   }
 
   const commonProps = {
     onClick: onSelect,
     onTap: onSelect,
-    stroke: isSelected ? '#0ea5e9' : 'white',
+    stroke: isSelected ? '#0ea5e9' : (subMask.mode === 'subtractive' ? '#f43f5e' : 'white'),
     strokeWidth: isSelected ? 3 : 2,
     strokeScaleEnabled: false,
     dash: [4, 4],
     opacity: isSelected ? 1 : 0.7,
   };
 
-  if (mask.type === 'ai-subject') {
-    const { startX, startY, endX, endY } = mask.parameters;
-    if (isSelected && endX > startX && endY > startY) {
+  if (subMask.type === 'ai-subject') {
+    const { startX, startY, endX, endY } = subMask.parameters;
+    if (endX > startX && endY > startY) {
       return (
         <Rect
           x={(startX - cropX) * scale}
@@ -159,18 +159,18 @@ const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskM
     return null;
   }
 
-  if (mask.type === 'brush') {
-    const { lines = [] } = mask.parameters;
+  if (subMask.type === 'brush') {
+    const { lines = [] } = subMask.parameters;
     return (
       <Group onClick={onSelect} onTap={onSelect}>
         {lines.map((line, i) => (
           <Line
             key={i}
             points={line.points.flatMap(p => [(p.x - cropX) * scale, (p.y - cropY) * scale])}
-            stroke={isSelected ? 'transparent' : 'white'}
-            strokeWidth={2}
+            stroke={isSelected ? '#0ea5e9' : (subMask.mode === 'subtractive' ? '#f43f5e' : 'white')}
+            strokeWidth={isSelected ? 3 : 2}
             dash={[4, 4]}
-            opacity={isSelected ? 0 : 0.7}
+            opacity={isSelected ? 1 : 0.7}
             hitStrokeWidth={line.brushSize * scale}
             strokeScaleEnabled={false}
             tension={0.5}
@@ -182,8 +182,8 @@ const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskM
     );
   }
 
-  if (mask.type === 'radial') {
-    const { centerX, centerY, radiusX, radiusY, rotation } = mask.parameters;
+  if (subMask.type === 'radial') {
+    const { centerX, centerY, radiusX, radiusY, rotation } = subMask.parameters;
     return (
       <>
         <Ellipse
@@ -209,8 +209,8 @@ const MaskOverlay = memo(({ mask, scale, onUpdate, isSelected, onSelect, onMaskM
     );
   }
 
-  if (mask.type === 'linear') {
-    const { startX, startY, endX, endY, range = 50 } = mask.parameters;
+  if (subMask.type === 'linear') {
+    const { startX, startY, endX, endY, range = 50 } = subMask.parameters;
     const dx = endX - startX;
     const dy = endY - startY;
     const len = Math.sqrt(dx * dx + dy * dy);
@@ -321,7 +321,8 @@ const ImageCanvas = memo(({
   isCropping, crop, setCrop, handleCropComplete, adjustments, selectedImage,
   isMasking, imageRenderSize, showOriginal, finalPreviewUrl, isAdjusting,
   uncroppedAdjustedPreviewUrl, maskOverlayUrl,
-  onSelectMask, activeMaskId, handleUpdateMask, setIsMaskHovered,
+  onSelectMask, activeMaskId, activeMaskContainerId,
+  updateSubMask, setIsMaskHovered,
   brushSettings, onGenerateAiMask, aiTool, onAiMaskDrawingComplete
 }) => {
   const [isCropViewVisible, setIsCropViewVisible] = useState(false);
@@ -337,24 +338,27 @@ const ImageCanvas = memo(({
   const [cursorPreview, setCursorPreview] = useState({ x: 0, y: 0, visible: false });
   const [isMouseOverCanvas, setIsMouseOverCanvas] = useState(false);
 
-  const activeMask = useMemo(() => adjustments.masks.find(m => m.id === activeMaskId), [adjustments.masks, activeMaskId]);
-  const isBrushActive = isMasking && activeMask?.type === 'brush';
-  const isAiSubjectActive = isMasking && activeMask?.type === 'ai-subject';
+  const activeContainer = useMemo(() => 
+    adjustments.masks.find(c => c.id === activeMaskContainerId), 
+    [adjustments.masks, activeMaskContainerId]
+  );
+  
+  const activeSubMask = useMemo(() => 
+    activeContainer?.subMasks.find(m => m.id === activeMaskId), 
+    [activeContainer, activeMaskId]
+  );
+
+  const isBrushActive = isMasking && activeSubMask?.type === 'brush';
+  const isAiSubjectActive = isMasking && activeSubMask?.type === 'ai-subject';
+
   const isGenerativeReplaceActive = aiTool === 'generative-replace';
 
-  const sortedMasks = useMemo(() => {
-    if (!activeMaskId) {
-      return adjustments.masks;
-    }
-    const selectedMask = adjustments.masks.find(m => m.id === activeMaskId);
-    const otherMasks = adjustments.masks.filter(m => m.id !== activeMaskId);
-    
-    if (!selectedMask) {
-      return adjustments.masks;
-    }
-
-    return [...otherMasks, selectedMask];
-  }, [adjustments.masks, activeMaskId]);
+  const sortedSubMasks = useMemo(() => {
+    if (!activeContainer) return [];
+    const selectedMask = activeContainer.subMasks.find(m => m.id === activeMaskId);
+    const otherMasks = activeContainer.subMasks.filter(m => m.id !== activeMaskId);
+    return selectedMask ? [...otherMasks, selectedMask] : activeContainer.subMasks;
+  }, [activeContainer, activeMaskId]);
 
   useEffect(() => {
     const { path: currentImagePath, originalUrl, thumbnailUrl } = selectedImage;
@@ -560,36 +564,36 @@ const ImageCanvas = memo(({
       }
     } else if (isBrushActive) {
       const imageSpaceLine = {
-        tool: line.tool,
-        brushSize: line.brushSize / scale,
-        feather: brushSettings.feather,
+        tool: brushSettings.tool,
+        brushSize: brushSettings.size,
+        feather: brushSettings.feather / 100,
         points: line.points.map(p => ({
           x: p.x / scale + cropX,
           y: p.y / scale + cropY,
         }))
       };
 
-      const existingLines = activeMask.parameters.lines || [];
+      const existingLines = activeSubMask.parameters.lines || [];
 
       if (brushSettings.tool === 'eraser') {
         const remainingLines = existingLines.filter(
           drawnLine => !linesIntersect(imageSpaceLine, drawnLine)
         );
         if (remainingLines.length !== existingLines.length) {
-          handleUpdateMask(activeMaskId, {
-            parameters: { ...activeMask.parameters, lines: remainingLines }
+          updateSubMask(activeMaskId, {
+            parameters: { ...activeSubMask.parameters, lines: remainingLines }
           });
         }
       } else {
-        handleUpdateMask(activeMaskId, {
+        updateSubMask(activeMaskId, {
           parameters: {
-            ...activeMask.parameters,
+            ...activeSubMask.parameters,
             lines: [...existingLines, imageSpaceLine]
           }
         });
       }
     }
-  }, [isGenerativeReplaceActive, isBrushActive, isAiSubjectActive, activeMask, activeMaskId, handleUpdateMask, adjustments.crop, imageRenderSize.scale, brushSettings, onGenerateAiMask, onAiMaskDrawingComplete, selectedImage.width, selectedImage.height]);
+  }, [isGenerativeReplaceActive, isBrushActive, isAiSubjectActive, activeSubMask, activeMaskId, updateSubMask, adjustments.crop, imageRenderSize.scale, brushSettings, onGenerateAiMask, onAiMaskDrawingComplete, selectedImage.width, selectedImage.height]);
 
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverCanvas(true);
@@ -719,14 +723,14 @@ const ImageCanvas = memo(({
           onMouseLeave={handleMouseLeave}
         >
           <Layer>
-            {isMasking && sortedMasks.map(mask => (
+            {isMasking && activeContainer && sortedSubMasks.map(subMask => (
               <MaskOverlay
-                key={mask.id}
-                mask={mask}
+                key={subMask.id}
+                subMask={subMask}
                 scale={imageRenderSize.scale}
-                onUpdate={handleUpdateMask}
-                isSelected={mask.id === activeMaskId}
-                onSelect={() => onSelectMask(mask.id)}
+                onUpdate={updateSubMask}
+                isSelected={subMask.id === activeMaskId}
+                onSelect={() => onSelectMask(subMask.id)}
                 onMaskMouseEnter={() => !(isBrushActive || isAiSubjectActive) && setIsMaskHovered(true)}
                 onMaskMouseLeave={() => !(isBrushActive || isAiSubjectActive) && setIsMaskHovered(false)}
                 adjustments={adjustments}

@@ -27,11 +27,29 @@ const THUMBNAIL_WIDTH: u32 = 640;
 pub struct ImageFile {
     path: String,
     modified: u64,
+    is_edited: bool,
+}
+
+fn has_sidecar_adjustments(image_path: &str) -> bool {
+    let sidecar_path = get_sidecar_path(image_path);
+    if !sidecar_path.exists() {
+        return false;
+    }
+
+    if let Ok(content) = fs::read_to_string(sidecar_path) {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(adjustments) = value.get("adjustments").and_then(|a| a.as_object()) {
+                return adjustments.keys().len() > 1 || (adjustments.keys().len() == 1 && !adjustments.contains_key("rating"));
+            }
+        }
+    }
+
+    false
 }
 
 #[tauri::command]
 pub fn list_images_in_dir(path: String) -> Result<Vec<ImageFile>, String> {
-    let entries = fs::read_dir(path)
+    let entries: Vec<ImageFile> = fs::read_dir(path)
         .map_err(|e| e.to_string())?
         .filter_map(std::result::Result::ok)
         .map(|entry| entry.path())
@@ -52,9 +70,11 @@ pub fn list_images_in_dir(path: String) -> Result<Vec<ImageFile>, String> {
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
+            let is_edited = has_sidecar_adjustments(&path.to_string_lossy().into_owned());
             ImageFile {
                 path: path.to_string_lossy().into_owned(),
                 modified,
+                is_edited,
             }
         })
         .collect();
@@ -66,6 +86,7 @@ pub struct FolderNode {
     pub name: String,
     pub path: String,
     pub children: Vec<FolderNode>,
+    pub is_dir: bool,
 }
 
 fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
@@ -96,6 +117,7 @@ fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
                     .into_owned(),
                 path: current_path.to_string_lossy().into_owned(),
                 children: sub_children,
+                is_dir: current_path.is_dir()
             });
         }
     }
@@ -116,8 +138,9 @@ fn get_folder_tree_sync(path: String) -> Result<FolderNode, String> {
     let children = scan_dir_recursive(root_path).map_err(|e| e.to_string())?;
     Ok(FolderNode {
         name,
-        path,
+        path: path.clone(),
         children,
+        is_dir: root_path.is_dir()
     })
 }
 

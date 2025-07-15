@@ -88,6 +88,22 @@ struct SortCriteria {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+struct FilterCriteria {
+    rating: u8,
+    raw_status: String
+}
+
+impl Default for FilterCriteria {
+    fn default() -> Self {
+        Self {
+            rating: 0,
+            raw_status: "all".to_string()
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 struct LastFolderState {
     current_folder_path: String,
     expanded_folders: Vec<String>,
@@ -99,8 +115,10 @@ struct AppSettings {
     last_root_path: Option<String>,
     editor_preview_resolution: Option<u32>,
     sort_criteria: Option<SortCriteria>,
+    filter_criteria: Option<FilterCriteria>,
     theme: Option<String>,
     transparent: Option<bool>,
+    decorations: Option<bool>,
     comfyui_address: Option<String>,
     last_folder_state: Option<LastFolderState>,
 }
@@ -144,8 +162,15 @@ impl Default for AppSettings {
             last_root_path: None,
             editor_preview_resolution: Some(1920),
             sort_criteria: None,
+            filter_criteria: None,
             theme: Some("dark".to_string()),
             transparent: Some(true),
+
+            #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+            decorations: Some(true),
+            #[cfg(any(target_os = "windows", target_os = "macos"))]
+            decorations: Some(false),
+
             comfyui_address: None,
             last_folder_state: None,
         }
@@ -1332,8 +1357,20 @@ async fn invoke_generative_replace(
     Ok(general_purpose::STANDARD.encode(&result_png_bytes))
 }
 
+#[tauri::command]
+fn get_supported_file_types() -> Result<serde_json::Value, String> {
+    let raw_extensions: Vec<&str> = crate::formats::RAW_EXTENSIONS.iter().map(|(ext, _)| *ext).collect();
+    let non_raw_extensions: Vec<&str> = crate::formats::NON_RAW_EXTENSIONS.to_vec();
+    
+    Ok(serde_json::json!({
+        "raw": raw_extensions,
+        "nonRaw": non_raw_extensions
+    }))
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
@@ -1357,10 +1394,12 @@ fn main() {
             let settings: AppSettings = load_settings(app_handle.clone()).unwrap_or_default();
             let window_cfg = app.config().app.windows.get(0).unwrap().clone();
             let transparent = settings.transparent.unwrap_or(window_cfg.transparent);
+            let decorations = settings.decorations.unwrap_or(window_cfg.decorations);
 
             let window = tauri::WebviewWindowBuilder::from_config(app.handle(), &window_cfg)
                 .unwrap()
                 .transparent(transparent)
+                .decorations(decorations)
                 .build()
                 .expect("Failed to build window");
 
@@ -1444,7 +1483,8 @@ fn main() {
             update_window_effect,
             check_comfyui_status,
             test_comfyui_connection,
-            invoke_generative_replace
+            invoke_generative_replace,
+            get_supported_file_types
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

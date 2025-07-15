@@ -1,20 +1,20 @@
 {
   "name": "rapidraw",
-  "version": "1.2.3",
   "author": "Timon Käch",
   "private": true,
   "scripts": {
-    "predev": "node ./src/sync-version.js",
     "dev": "vite",
-    "prebuild": "node ./src/sync-version.js",
     "build": "vite build",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "start": "tauri dev"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.5.0",
     "@tauri-apps/plugin-dialog": "^2.2.2",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-os": "^2.3.0",
     "@tauri-apps/plugin-process": "^2.3.0",
+    "clsx": "^2.1.1",
     "framer-motion": "^12.18.1",
     "konva": "^9.3.20",
     "lodash.debounce": "^4.0.8",
@@ -28,6 +28,8 @@
     "react-window": "^1.8.11",
     "react-zoom-pan-pinch": "^3.7.0",
     "recharts": "^2.15.3",
+    "tailwind-merge": "^1.14.0",
+    "tauri-controls": "^0.4.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
@@ -36,6 +38,8 @@
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.5",
     "tailwindcss": "^3.4.17",
+    "tauri-version": "^1.0.0-beta.2",
     "vite": "^6.0.3"
-  }
+  },
+  "version": "0.0.0"
 }

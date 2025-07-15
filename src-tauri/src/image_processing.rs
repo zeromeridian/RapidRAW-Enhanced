@@ -5,6 +5,7 @@ use imageproc::geometric_transformations::{rotate_about_center, Interpolation};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::f32::consts::PI;
+use rawler::decoders::Orientation;
 
 pub use crate::gpu_processing::{get_or_init_gpu_context, process_and_get_dynamic_image};
 use crate::{AppState, mask_generation::MaskDefinition, load_settings};
@@ -32,6 +33,19 @@ pub struct Crop {
     pub y: f64,
     pub width: f64,
     pub height: f64,
+}
+
+pub fn apply_orientation(image: DynamicImage, orientation: Orientation) -> DynamicImage {
+    match orientation {
+        Orientation::Normal | Orientation::Unknown => image,
+        Orientation::HorizontalFlip => image.fliph(),
+        Orientation::Rotate180 => image.rotate180(),
+        Orientation::VerticalFlip => image.flipv(),
+        Orientation::Transpose => image.rotate90().flipv(),
+        Orientation::Rotate90 => image.rotate90(),
+        Orientation::Transverse => image.rotate90().fliph(),
+        Orientation::Rotate270 => image.rotate270(),
+    }
 }
 
 pub fn apply_rotation(image: &DynamicImage, rotation_degrees: f32) -> DynamicImage {
@@ -226,22 +240,22 @@ struct AdjustmentScales {
 
 const SCALES: AdjustmentScales = AdjustmentScales {
     exposure: 25.0,
-    contrast: 1000.0,
-    highlights: 400.0,
-    shadows: 2000.0,
+    contrast: 100.0,
+    highlights: 100.0,
+    shadows: 500.0,
     whites: 30.0,
-    blacks: 800.0,
-    saturation: 100.0,
-    temperature: 50.0,
-    tint: 250.0,
-    vibrance: 100.0,
+    blacks: 50.0,
+    saturation: 80.0,
+    temperature: 30.0,
+    tint: 200.0,
+    vibrance: 80.0,
     
-    sharpness: 20.0,
+    sharpness: 40.0,
     luma_noise_reduction: 100.0,
     color_noise_reduction: 100.0,
-    clarity: 200.0,
-    dehaze: 1000.0,
-    structure: 200.0,
+    clarity: 100.0,
+    dehaze: 750.0,
+    structure: 100.0,
 
     vignette_amount: 100.0,
     vignette_midpoint: 100.0,

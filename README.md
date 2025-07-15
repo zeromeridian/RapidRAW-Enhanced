@@ -2,8 +2,6 @@
   <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/editor.png" alt="RapidRAW Editor">
 </p>
 
-<br>
-
 <div align="center">
 
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -18,7 +16,7 @@
 
 > A beautiful, non-destructive, and GPU-accelerated RAW image editor built with performance in mind.
 
-RapidRAW is a modern, high-performance alternative to Adobe Lightroom®. It delivers a feature-rich, beautiful editing experience in a lightweight package (under 30MB) for Windows, macOS, and Linux.
+RapidRAW is a modern, high-performance alternative to Adobe Lightroom®. It delivers a simple, beautiful editing experience in a lightweight package (under 30MB) for Windows, macOS, and Linux.
 
 I developed this project as a personal challenge at the age of 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of both React and Rust, with the support from Google Gemini.
 
@@ -36,20 +34,23 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
-*   **2025-07-10:** More accurate shader, reorganized main library preferences dropdown, smoother histogram, more realistic film grain
-*   **2025-07-10:** Added a HUD-like waveform overlay toggle to display specific channel waveforms (w-key)
+*   **2025-07-13:** Native looking titlebar and ability to input precise number into sliders
+*   **2025-07-13:** Huge update to masks: You can now add multiple masks to a mask containers, subtract / add / combine masks etc.
+*   **2025-07-12:** Improved curves tool, more shader improvements, improved handling of very large files
+*   **2025-07-11:** More accurate shader, reorganized main library preferences dropdown, smoother histogram, more realistic film grain
+*   **2025-07-11:** Added a HUD-like waveform overlay toggle to display specific channel waveforms (w-key)
 *   **2025-07-10:** Rewritten batch export system and async thumbnail generation (makes the loading of large folders a lot more fluid)
 *   **2025-07-10:** Window transparency can now be toggled in the settings, thanks to @andrewazores
 *   **2025-07-08:** Ability to toggle the visibility of individual adjustments sections
 *   **2025-07-08:** Fixed top-left zoom bug, corrected scale behavior in crop panel, keep default original aspect ratio
 *   **2025-07-08:** Added image rating filter and redesigned the metadata panel with improved layout, clearer sections, and an embedded GPS map
-*   **2025-07-07:** Improved generative AI features and updated [AI Roadmap](#ai-roadmap)
-*   **2025-07-06:** Initial generative AI integration with [ComfyUI](https://github.com/comfyanonymous/ComfyUI) - for more details, checkout the [AI Roadmap](#ai-roadmap)
-*   **2025-07-05:** Ability to overwrite preset with current settings
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-07-07:** Improved generative AI features and updated [AI Roadmap](#ai-roadmap)
+*   **2025-07-06:** Initial generative AI integration with [ComfyUI](https://github.com/comfyanonymous/ComfyUI) - for more details, checkout the [AI Roadmap](#ai-roadmap)
+*   **2025-07-05:** Ability to overwrite preset with current settings
 *   **2025-07-04:** High speed and precise cache to significantly accelerate large image editing
 *   **2025-07-04:** Greatly improved shader with better dehaze, more accurate curves etc
 *   **2025-07-04:** Predefined 90° clockwise rotation and ability to flip images
@@ -88,7 +89,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
       <h4>Core Editing Engine</h4>
       <ul>
         <li><strong>GPU-Accelerated Processing:</strong> All image adjustments are processed on the GPU using a custom WGSL shader for rapid feedback.</li>
-        <li><strong>Masking:</strong> Instantly create masks with AI subject and foreground detection. Combine with traditional Brush, Linear, and Radial masks for great control.</li>
+        <li><strong>Masking:</strong> Create masks with AI subject and foreground detection. Combine with traditional Brush, Linear, and Radial masks for great control.</li>
         <li><strong>Generative Edits:</strong> Remove objects or add new elements with text prompts. Each edit creates a non-destructive patch layer, powered by an optional ComfyUI backend.</li>
         <li><strong>Full RAW Support:</strong> Supports a wide range of RAW camera formats thanks to rawler.</li>
         <li><strong>Non-Destructive Workflow:</strong> All edits are stored in a <code>.rrdata</code> sidecar file, leaving your original images untouched.</li>

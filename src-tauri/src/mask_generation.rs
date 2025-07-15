@@ -5,17 +5,33 @@ use std::f32::consts::PI;
 use base64::{Engine as _, engine::general_purpose};
 use crate::ai_processing::{AiSubjectMaskParameters, AiForegroundMaskParameters};
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum SubMaskMode {
+    Additive,
+    Subtractive,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SubMask {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub mask_type: String,
+    pub visible: bool,
+    pub mode: SubMaskMode,
+    pub parameters: Value,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MaskDefinition {
     pub id: String,
     pub name: String,
-    #[serde(rename = "type")]
-    pub mask_type: String,
     pub visible: bool,
     pub invert: bool,
     pub adjustments: Value,
-    pub parameters: Value,
+    pub sub_masks: Vec<SubMask>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -287,28 +303,16 @@ fn generate_brush_bitmap(
     mask
 }
 
-fn generate_ai_foreground_bitmap(
-    params_value: &Value,
+fn generate_ai_bitmap_from_full_mask(
+    full_mask_image: &GrayImage,
+    rotation: f32,
+    flip_horizontal: bool,
+    flip_vertical: bool,
     width: u32,
     height: u32,
     scale: f32,
     crop_offset: (f32, f32),
-) -> Option<GrayImage> {
-    let params: AiForegroundMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
-    let data_url = params.mask_data_base64?;
-    let rotation = params.rotation.unwrap_or(0.0);
-    let flip_horizontal = params.flip_horizontal.unwrap_or(false);
-    let flip_vertical = params.flip_vertical.unwrap_or(false);
-
-    let b64_data = if let Some(idx) = data_url.find(',') {
-        &data_url[idx + 1..]
-    } else {
-        &data_url
-    };
-    
-    let decoded_bytes = general_purpose::STANDARD.decode(b64_data).ok()?;
-    let full_mask_image = image::load_from_memory(&decoded_bytes).ok()?.to_luma8();
-
+) -> GrayImage {
     let (full_mask_w, full_mask_h) = full_mask_image.dimensions();
     let mut final_mask = GrayImage::new(width, height);
 
@@ -346,7 +350,57 @@ fn generate_ai_foreground_bitmap(
         }
     }
 
-    Some(final_mask)
+    final_mask
+}
+
+fn generate_ai_bitmap_from_base64(
+    data_url: &str,
+    rotation: f32,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+) -> Option<GrayImage> {
+    let b64_data = if let Some(idx) = data_url.find(',') {
+        &data_url[idx + 1..]
+    } else {
+        data_url
+    };
+    
+    let decoded_bytes = general_purpose::STANDARD.decode(b64_data).ok()?;
+    let full_mask_image = image::load_from_memory(&decoded_bytes).ok()?.to_luma8();
+
+    Some(generate_ai_bitmap_from_full_mask(
+        &full_mask_image,
+        rotation,
+        flip_horizontal,
+        flip_vertical,
+        width,
+        height,
+        scale,
+        crop_offset,
+    ))
+}
+
+fn generate_ai_foreground_bitmap(
+    params_value: &Value,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+) -> Option<GrayImage> {
+    let params: AiForegroundMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    let data_url = params.mask_data_base64?;
+    
+    generate_ai_bitmap_from_base64(
+        &data_url,
+        params.rotation.unwrap_or(0.0),
+        params.flip_horizontal.unwrap_or(false),
+        params.flip_vertical.unwrap_or(false),
+        width, height, scale, crop_offset
+    )
 }
 
 fn generate_ai_subject_bitmap(
@@ -358,57 +412,35 @@ fn generate_ai_subject_bitmap(
 ) -> Option<GrayImage> {
     let params: AiSubjectMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
     let data_url = params.mask_data_base64?;
-    let rotation = params.rotation.unwrap_or(0.0);
-    let flip_horizontal = params.flip_horizontal.unwrap_or(false);
-    let flip_vertical = params.flip_vertical.unwrap_or(false);
 
-    let b64_data = if let Some(idx) = data_url.find(',') {
-        &data_url[idx + 1..]
-    } else {
-        &data_url
-    };
-    
-    let decoded_bytes = general_purpose::STANDARD.decode(b64_data).ok()?;
-    let full_mask_image = image::load_from_memory(&decoded_bytes).ok()?.to_luma8();
+    generate_ai_bitmap_from_base64(
+        &data_url,
+        params.rotation.unwrap_or(0.0),
+        params.flip_horizontal.unwrap_or(false),
+        params.flip_vertical.unwrap_or(false),
+        width, height, scale, crop_offset
+    )
+}
 
-    let (full_mask_w, full_mask_h) = full_mask_image.dimensions();
-    let mut final_mask = GrayImage::new(width, height);
-
-    let angle_rad = -rotation.to_radians();
-    let cos_a = angle_rad.cos();
-    let sin_a = angle_rad.sin();
-
-    let scaled_full_w = full_mask_w as f32 * scale;
-    let scaled_full_h = full_mask_h as f32 * scale;
-    let center_x = scaled_full_w / 2.0;
-    let center_y = scaled_full_h / 2.0;
-
-    for y_out in 0..height {
-        for x_out in 0..width {
-            let x_uncrop = x_out as f32 + crop_offset.0;
-            let y_uncrop = y_out as f32 + crop_offset.1;
-
-            let x_unflipped = if flip_horizontal { scaled_full_w - x_uncrop } else { x_uncrop };
-            let y_unflipped = if flip_vertical { scaled_full_h - y_uncrop } else { y_uncrop };
-
-            let x_centered = x_unflipped - center_x;
-            let y_centered = y_unflipped - center_y;
-            let x_rot = x_centered * cos_a - y_centered * sin_a;
-            let y_rot = x_centered * sin_a + y_centered * cos_a;
-            let x_unrotated = x_rot + center_x;
-            let y_unrotated = y_rot + center_y;
-
-            let x_src = x_unrotated / scale;
-            let y_src = y_unrotated / scale;
-
-            if x_src >= 0.0 && x_src < full_mask_w as f32 && y_src >= 0.0 && y_src < full_mask_h as f32 {
-                let pixel = full_mask_image.get_pixel(x_src as u32, y_src as u32);
-                final_mask.put_pixel(x_out, y_out, *pixel);
-            }
-        }
+fn generate_sub_mask_bitmap(
+    sub_mask: &SubMask,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+) -> Option<GrayImage> {
+    if !sub_mask.visible {
+        return None;
     }
 
-    Some(final_mask)
+    match sub_mask.mask_type.as_str() {
+        "radial" => Some(generate_radial_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)),
+        "linear" => Some(generate_linear_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)),
+        "brush" => Some(generate_brush_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)),
+        "ai-subject" => generate_ai_subject_bitmap(&sub_mask.parameters, width, height, scale, crop_offset),
+        "ai-foreground" => generate_ai_foreground_bitmap(&sub_mask.parameters, width, height, scale, crop_offset),
+        _ => None,
+    }
 }
 
 pub fn generate_mask_bitmap(
@@ -418,26 +450,42 @@ pub fn generate_mask_bitmap(
     scale: f32,
     crop_offset: (f32, f32),
 ) -> Option<GrayImage> {
-    if !mask_def.visible {
+    if !mask_def.visible || mask_def.sub_masks.is_empty() {
         return None;
     }
 
-    let mut base_mask = match mask_def.mask_type.as_str() {
-        "radial" => Some(generate_radial_bitmap(&mask_def.parameters, width, height, scale, crop_offset)),
-        "linear" => Some(generate_linear_bitmap(&mask_def.parameters, width, height, scale, crop_offset)),
-        "brush" => Some(generate_brush_bitmap(&mask_def.parameters, width, height, scale, crop_offset)),
-        "ai-subject" => generate_ai_subject_bitmap(&mask_def.parameters, width, height, scale, crop_offset),
-        "ai-foreground" => generate_ai_foreground_bitmap(&mask_def.parameters, width, height, scale, crop_offset),
-        _ => None,
-    };
+    let mut additive_canvas = GrayImage::new(width, height);
+    let mut subtractive_canvas = GrayImage::new(width, height);
 
-    if let Some(mask) = &mut base_mask {
-        if mask_def.invert {
-            for pixel in mask.pixels_mut() {
-                pixel[0] = 255 - pixel[0];
+    for sub_mask in &mask_def.sub_masks {
+        if let Some(sub_bitmap) = generate_sub_mask_bitmap(sub_mask, width, height, scale, crop_offset) {
+            match sub_mask.mode {
+                SubMaskMode::Additive => {
+                    for (x, y, pixel) in additive_canvas.enumerate_pixels_mut() {
+                        let sub_pixel = sub_bitmap.get_pixel(x, y);
+                        pixel[0] = pixel[0].max(sub_pixel[0]);
+                    }
+                }
+                SubMaskMode::Subtractive => {
+                    for (x, y, pixel) in subtractive_canvas.enumerate_pixels_mut() {
+                        let sub_pixel = sub_bitmap.get_pixel(x, y);
+                        pixel[0] = pixel[0].max(sub_pixel[0]);
+                    }
+                }
             }
         }
     }
 
-    base_mask
+    for (x, y, final_pixel) in additive_canvas.enumerate_pixels_mut() {
+        let subtractive_pixel = subtractive_canvas.get_pixel(x, y);
+        final_pixel[0] = final_pixel[0].saturating_sub(subtractive_pixel[0]);
+    }
+
+    if mask_def.invert {
+        for pixel in additive_canvas.pixels_mut() {
+            pixel[0] = 255 - pixel[0];
+        }
+    }
+
+    Some(additive_canvas)
 }

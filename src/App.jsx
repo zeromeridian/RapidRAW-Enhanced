@@ -55,6 +55,14 @@ export const INITIAL_MASK_ADJUSTMENTS = {
   },
 };
 
+export const INITIAL_MASK_CONTAINER = {
+  name: 'New Mask',
+  visible: true,
+  invert: false,
+  adjustments: INITIAL_MASK_ADJUSTMENTS,
+  subMasks: [],
+};
+
 export const INITIAL_ADJUSTMENTS = {
   rating: 0,
   exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
@@ -73,7 +81,9 @@ export const INITIAL_ADJUSTMENTS = {
     luma: [{ x: 0, y: 0 }, { x: 255, y: 255 }], red: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
     green: [{ x: 0, y: 0 }, { x: 255, y: 255 }], blue: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
   },
-  crop: null, aspectRatio: null, rotation: 0, flipHorizontal: false, flipVertical: false, masks: [], aiPatches: [],
+  crop: null, aspectRatio: null, rotation: 0, flipHorizontal: false, flipVertical: false, 
+  masks: [],
+  aiPatches: [],
   sectionVisibility: {
     basic: true,
     curves: true,
@@ -86,20 +96,29 @@ export const INITIAL_ADJUSTMENTS = {
 const normalizeLoadedAdjustments = (loadedAdjustments) => {
   if (!loadedAdjustments) return INITIAL_ADJUSTMENTS;
 
-  const normalizedMasks = (loadedAdjustments.masks || []).map(mask => {
-    const maskAdjustments = mask.adjustments || {};
+  const normalizedMasks = (loadedAdjustments.masks || []).map(maskContainer => {
+    const containerAdjustments = maskContainer.adjustments || {};
+    const normalizedSubMasks = (maskContainer.subMasks || []).map(subMask => ({
+      visible: true,
+      mode: 'additive',
+      ...subMask,
+    }));
+
     return {
-      ...mask,
+      ...INITIAL_MASK_CONTAINER,
+      id: maskContainer.id || uuidv4(),
+      ...maskContainer,
       adjustments: {
         ...INITIAL_MASK_ADJUSTMENTS,
-        ...maskAdjustments,
-        hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...(maskAdjustments.hsl || {}) },
-        curves: { ...INITIAL_MASK_ADJUSTMENTS.curves, ...(maskAdjustments.curves || {}) },
+        ...containerAdjustments,
+        hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...(containerAdjustments.hsl || {}) },
+        curves: { ...INITIAL_MASK_ADJUSTMENTS.curves, ...(containerAdjustments.curves || {}) },
         sectionVisibility: {
           ...INITIAL_MASK_ADJUSTMENTS.sectionVisibility,
-          ...(maskAdjustments.sectionVisibility || {})
+          ...(containerAdjustments.sectionVisibility || {})
         },
-      }
+      },
+      subMasks: normalizedSubMasks,
     };
   });
 
@@ -187,7 +206,11 @@ function App() {
   const [imageList, setImageList] = useState([]);
   const [imageRatings, setImageRatings] = useState({});
   const [sortCriteria, setSortCriteria] = useState({ key: 'name', order: 'asc' });
-  const [filterCriteria, setFilterCriteria] = useState({ rating: 0 });
+  const [filterCriteria, setFilterCriteria] = useState({ 
+    rating: 0, 
+    rawStatus: 'all'
+  });
+  const [supportedTypes, setSupportedTypes] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [multiSelectedPaths, setMultiSelectedPaths] = useState([]);
   const [libraryActivePath, setLibraryActivePath] = useState(null);
@@ -211,6 +234,7 @@ function App() {
   const [fullScreenUrl, setFullScreenUrl] = useState(null);
   const [theme, setTheme] = useState(DEFAULT_THEME_ID);
   const [activeRightPanel, setActiveRightPanel] = useState('adjustments');
+  const [activeMaskContainerId, setActiveMaskContainerId] = useState(null);
   const [activeMaskId, setActiveMaskId] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [renderedRightPanel, setRenderedRightPanel] = useState(activeRightPanel);
@@ -289,6 +313,16 @@ function App() {
     setAiTool(null);
   }, []);
 
+  const updateSubMask = (subMaskId, updatedData) => {
+    setAdjustments(prev => ({
+      ...prev,
+      masks: prev.masks.map(c => ({
+        ...c,
+        subMasks: c.subMasks.map(sm => sm.id === subMaskId ? { ...sm, ...updatedData } : sm)
+      }))
+    }));
+  };
+
   const handleGenerativeReplace = useCallback(async ({ maskDataBase64, prompt }) => {
     if (!selectedImage?.path || isGeneratingAi) return;
 
@@ -364,7 +398,7 @@ function App() {
     }));
   }, [setAdjustments]);
 
-  const handleGenerateAiMask = async (maskId, startPoint, endPoint) => {
+  const handleGenerateAiMask = async (subMaskId, startPoint, endPoint) => {
     if (!selectedImage?.path) {
       console.error("Cannot generate AI mask: No image selected.");
       return;
@@ -379,12 +413,19 @@ function App() {
         flipHorizontal: adjustments.flipHorizontal,
         flipVertical: adjustments.flipVertical,
       });
+
       setAdjustments(prev => ({
         ...prev,
-        masks: prev.masks.map(m =>
-          m.id === maskId ? { ...m, parameters: newParameters } : m
-        )
+        masks: prev.masks.map(container => ({
+          ...container,
+          subMasks: container.subMasks.map(sm =>
+            sm.id === subMaskId
+              ? { ...sm, parameters: newParameters }
+              : sm
+          )
+        }))
       }));
+
     } catch (error) {
       console.error("Failed to generate AI subject mask:", error);
       setError(`AI Mask Failed: ${error}`);
@@ -393,7 +434,7 @@ function App() {
     }
   };
 
-  const handleGenerateAiForegroundMask = async (maskId) => {
+  const handleGenerateAiForegroundMask = async (subMaskId) => {
     if (!selectedImage?.path) {
       console.error("Cannot generate AI mask: No image selected.");
       return;
@@ -405,12 +446,19 @@ function App() {
         flipHorizontal: adjustments.flipHorizontal,
         flipVertical: adjustments.flipVertical,
       });
+
       setAdjustments(prev => ({
         ...prev,
-        masks: prev.masks.map(m =>
-          m.id === maskId ? { ...m, parameters: newParameters } : m
-        )
+        masks: prev.masks.map(container => ({
+          ...container,
+          subMasks: container.subMasks.map(sm =>
+            sm.id === subMaskId
+              ? { ...sm, parameters: newParameters }
+              : sm
+          )
+        }))
       }));
+
     } catch (error) {
       console.error("Failed to generate AI foreground mask:", error);
       setError(`AI Mask Failed: ${error}`);
@@ -424,10 +472,24 @@ function App() {
       if (filterCriteria.rating > 0) {
         const rating = imageRatings[image.path] || 0;
         if (filterCriteria.rating === 5) {
-          return rating === 5;
+          if (rating !== 5) return false;
+        } else {
+          if (rating < filterCriteria.rating) return false;
         }
-        return rating >= filterCriteria.rating;
       }
+
+      if (filterCriteria.rawStatus && filterCriteria.rawStatus !== 'all' && supportedTypes) {
+        const extension = image.path.split('.').pop()?.toLowerCase() || '';
+        const isRaw = supportedTypes.raw.includes(extension);
+        
+        if (filterCriteria.rawStatus === 'rawOnly' && !isRaw) {
+          return false;
+        }
+        if (filterCriteria.rawStatus === 'nonRawOnly' && isRaw) {
+          return false;
+        }
+      }
+
       return true;
     });
 
@@ -441,7 +503,7 @@ function App() {
         return order === 'asc' ? comparison : -comparison;
     });
     return list;
-  }, [imageList, sortCriteria, imageRatings, filterCriteria]);
+  }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes]);
 
   const applyAdjustments = useCallback(debounce((currentAdjustments) => {
     if (!selectedImage?.isReady) return;
@@ -514,6 +576,13 @@ function App() {
       .then(settings => {
         setAppSettings(settings);
         if (settings?.sortCriteria) setSortCriteria(settings.sortCriteria);
+        if (settings?.filterCriteria) {
+          setFilterCriteria(prev => ({
+            ...prev,
+            ...settings.filterCriteria,
+            rawStatus: settings.filterCriteria.rawStatus || 'all'
+          }));
+        }
         if (settings?.theme) {
           setTheme(settings.theme);
         }
@@ -524,6 +593,26 @@ function App() {
       })
       .finally(() => { isInitialMount.current = false; });
   }, []);
+
+  useEffect(() => {
+    invoke('get_supported_file_types')
+      .then(types => setSupportedTypes(types))
+      .catch(err => console.error('Failed to load supported file types:', err));
+  }, []);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) return;
+    if (JSON.stringify(appSettings.sortCriteria) !== JSON.stringify(sortCriteria)) {
+        handleSettingsChange({ ...appSettings, sortCriteria });
+    }
+  }, [sortCriteria, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) return;
+    if (JSON.stringify(appSettings.filterCriteria) !== JSON.stringify(filterCriteria)) {
+        handleSettingsChange({ ...appSettings, filterCriteria });
+    }
+  }, [filterCriteria, appSettings, handleSettingsChange]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -538,13 +627,6 @@ function App() {
       invoke('update_window_effect', { theme: newThemeId });
     }
   }, [theme]);
-
-  useEffect(() => {
-    if (isInitialMount.current || !appSettings) return;
-    if (JSON.stringify(appSettings.sortCriteria) !== JSON.stringify(sortCriteria)) {
-        handleSettingsChange({ ...appSettings, sortCriteria });
-    }
-  }, [sortCriteria, appSettings, handleSettingsChange]);
 
   const handleRefreshFolderTree = useCallback(async () => {
     if (!rootPath) return;
@@ -562,7 +644,9 @@ function App() {
     try {
       setCurrentFolderPath(path);
 
-      if (rootPath && path !== rootPath) {
+      if (isNewRoot) {
+        setExpandedFolders(new Set([path]));
+      } else if (rootPath && path !== rootPath) {
           setExpandedFolders(prev => {
               const newSet = new Set(prev);
               let current = path;
@@ -666,6 +750,7 @@ function App() {
     setWaveform(null);
     setIsWaveformVisible(false);
     setActiveMaskId(null);
+    setActiveMaskContainerId(null);
     setAiTool(null);
     setPendingAiAction(null);
     setLibraryActivePath(lastActivePath);
@@ -836,6 +921,7 @@ function App() {
     resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
     setShowOriginal(false);
     setActiveMaskId(null);
+    setActiveMaskContainerId(null);
     setAiTool(null);
     setPendingAiAction(null);
     if (transformWrapperRef.current) transformWrapperRef.current.resetTransform(0);
@@ -1343,7 +1429,9 @@ function App() {
               setAdjustments={setAdjustments}
               thumbnails={thumbnails}
               activeMaskId={activeMaskId}
+              activeMaskContainerId={activeMaskContainerId}
               onSelectMask={setActiveMaskId}
+              updateSubMask={updateSubMask}
               transformWrapperRef={transformWrapperRef}
               onZoomed={handleUserTransform}
               targetZoom={zoom}
@@ -1398,7 +1486,24 @@ function App() {
                 {renderedRightPanel === 'adjustments' && <Controls theme={theme} adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} histogram={histogram} collapsibleState={collapsibleSectionsState} setCollapsibleState={setCollapsibleSectionsState} copiedSectionAdjustments={copiedSectionAdjustments} setCopiedSectionAdjustments={setCopiedSectionAdjustments} />}
                 {renderedRightPanel === 'metadata' && <MetadataPanel selectedImage={selectedImage} />}
                 {renderedRightPanel === 'crop' && <CropPanel selectedImage={selectedImage} adjustments={adjustments} setAdjustments={setAdjustments} />}
-                {renderedRightPanel === 'masks' && <MasksPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} onSelectMask={setActiveMaskId} activeMaskId={activeMaskId} brushSettings={brushSettings} setBrushSettings={setBrushSettings} copiedMask={copiedMask} setCopiedMask={setCopiedMask} setCustomEscapeHandler={setCustomEscapeHandler} histogram={histogram} isGeneratingAiMask={isGeneratingAiMask} aiModelDownloadStatus={aiModelDownloadStatus} onGenerateAiForegroundMask={handleGenerateAiForegroundMask} />}
+                {renderedRightPanel === 'masks' && <MasksPanel 
+                  adjustments={adjustments} 
+                  setAdjustments={setAdjustments} 
+                  selectedImage={selectedImage} 
+                  onSelectMask={setActiveMaskId} 
+                  activeMaskId={activeMaskId}
+                  activeMaskContainerId={activeMaskContainerId}
+                  onSelectContainer={setActiveMaskContainerId}
+                  brushSettings={brushSettings} 
+                  setBrushSettings={setBrushSettings} 
+                  copiedMask={copiedMask} 
+                  setCopiedMask={setCopiedMask} 
+                  setCustomEscapeHandler={setCustomEscapeHandler} 
+                  histogram={histogram} 
+                  isGeneratingAiMask={isGeneratingAiMask} 
+                  aiModelDownloadStatus={aiModelDownloadStatus} 
+                  onGenerateAiForegroundMask={handleGenerateAiForegroundMask} 
+                />}
                 {renderedRightPanel === 'presets' && <PresetsPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} activePanel={activeRightPanel} />}
                 {renderedRightPanel === 'export' && <ExportPanel selectedImage={selectedImage} adjustments={adjustments} multiSelectedPaths={multiSelectedPaths} exportState={exportState} setExportState={setExportState} />}
                 {renderedRightPanel === 'ai' && <AIPanel 
@@ -1477,10 +1582,13 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-bg-primary font-sans text-text-primary overflow-hidden select-none">
-      <TitleBar />
+      { appSettings?.decorations || <TitleBar /> }
       <div className={clsx(
         "flex-1 flex flex-col min-h-0",
-        rootPath ? "pt-12 p-2 gap-2" : "pt-10"
+        [
+          rootPath && "p-2 gap-2",
+          !appSettings?.decorations && rootPath && "pt-12",
+        ]
       )}>
         {error && (
           <div className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded-lg z-50">

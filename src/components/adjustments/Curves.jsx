@@ -1,21 +1,67 @@
 import { useState, useRef, useEffect } from 'react';
 
-function getCurvePath(points, tension = 0.5) {
+function getCurvePath(points) {
   if (points.length < 2) return '';
-  let path = `M ${points[0].x} ${255 - points[0].y}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = i > 0 ? points[i - 1] : points[i];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = i < points.length - 2 ? points[i + 2] : p2;
 
-    const cp1x = p1.x + (p2.x - p0.x) / 6 * tension;
-    const cp1y = p1.y + (p2.y - p0.y) / 6 * tension;
-    const cp2x = p2.x - (p3.x - p1.x) / 6 * tension;
-    const cp2y = p2.y - (p3.y - p1.y) / 6 * tension;
+  const n = points.length;
+  const deltas = [];
+  const ms = [];
 
-    path += ` C ${cp1x} ${255 - cp1y}, ${cp2x} ${255 - cp2y}, ${p2.x} ${255 - p2.y}`;
+  for (let i = 0; i < n - 1; i++) {
+    const dx = points[i + 1].x - points[i].x;
+    const dy = points[i + 1].y - points[i].y;
+    if (dx === 0) {
+      deltas.push(dy > 0 ? 1e6 : (dy < 0 ? -1e6 : 0));
+    } else {
+      deltas.push(dy / dx);
+    }
   }
+
+  ms.push(deltas[0]);
+
+  for (let i = 1; i < n - 1; i++) {
+    if (deltas[i - 1] * deltas[i] <= 0) {
+      ms.push(0);
+    } else {
+      ms.push((deltas[i - 1] + deltas[i]) / 2);
+    }
+  }
+  
+  ms.push(deltas[n - 2]);
+
+  for (let i = 0; i < n - 1; i++) {
+    if (deltas[i] === 0) {
+      ms[i] = 0;
+      ms[i + 1] = 0;
+    } else {
+      const alpha = ms[i] / deltas[i];
+      const beta = ms[i + 1] / deltas[i];
+      
+      const tau = alpha * alpha + beta * beta;
+      if (tau > 9) {
+        const scale = 3.0 / Math.sqrt(tau);
+        ms[i] = scale * alpha * deltas[i];
+        ms[i + 1] = scale * beta * deltas[i];
+      }
+    }
+  }
+
+  let path = `M ${points[0].x} ${255 - points[0].y}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    const m0 = ms[i];
+    const m1 = ms[i + 1];
+    const dx = p1.x - p0.x;
+
+    const cp1x = p0.x + dx / 3.0;
+    const cp1y = p0.y + (m0 * dx) / 3.0;
+    const cp2x = p1.x - dx / 3.0;
+    const cp2y = p1.y - (m1 * dx) / 3.0;
+
+    path += ` C ${cp1x.toFixed(2)} ${255 - cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${255 - cp2y.toFixed(2)}, ${p1.x} ${255 - p1.y}`;
+  }
+
   return path;
 }
 
@@ -100,7 +146,7 @@ export default function CurveGraph({ adjustments, setAdjustments, histogram, the
     } else {
       const prevX = points[draggingPointIndex - 1].x;
       const nextX = points[draggingPointIndex + 1].x;
-      x = Math.max(prevX + 1, Math.min(nextX - 1, x));
+      x = Math.max(prevX + 0.01, Math.min(nextX - 0.01, x));
     }
 
     newPoints[draggingPointIndex] = { x, y };
@@ -119,7 +165,6 @@ export default function CurveGraph({ adjustments, setAdjustments, histogram, the
 
   const handleContainerMouseDown = (e) => {
     if (e.button !== 0) return;
-
     if (e.target.tagName === 'circle') return;
 
     const { x, y } = getMousePos(e);
@@ -138,19 +183,6 @@ export default function CurveGraph({ adjustments, setAdjustments, histogram, the
     setDraggingPointIndex(newPointIndex);
   };
 
-  const handlePointContextMenu = (e, index) => {
-    e.preventDefault();
-    if (index === 0 || index === points.length - 1) return;
-
-    const newPoints = points.filter((_, i) => i !== index);
-
-    setLocalPoints(newPoints);
-    setAdjustments(prev => ({
-      ...prev,
-      curves: { ...prev.curves, [activeChannel]: newPoints }
-    }));
-  };
-
   const handleDoubleClick = () => {
     const defaultPoints = [{ x: 0, y: 0 }, { x: 255, y: 255 }];
 
@@ -162,11 +194,17 @@ export default function CurveGraph({ adjustments, setAdjustments, histogram, the
   };
 
   useEffect(() => {
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    const moveHandler = (e) => handleMouseMove(e);
+    const upHandler = () => handleMouseUp();
+
+    if (draggingPointIndex !== null) {
+        window.addEventListener('mousemove', moveHandler);
+        window.addEventListener('mouseup', upHandler);
+    }
+    
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousemove', moveHandler);
+      window.removeEventListener('mouseup', upHandler);
     };
   }, [draggingPointIndex, points, activeChannel, setAdjustments]);
 
@@ -214,7 +252,6 @@ export default function CurveGraph({ adjustments, setAdjustments, histogram, the
               strokeWidth="2"
               className="cursor-pointer"
               onMouseDown={(e) => handlePointMouseDown(e, i)}
-              onContextMenu={(e) => handlePointContextMenu(e, i)}
             />
           ))}
         </svg>
