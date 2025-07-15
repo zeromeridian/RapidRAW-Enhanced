@@ -474,29 +474,42 @@ fn apply_all_curves(
     green_curve: array<Point, 16>, green_curve_count: u32,
     blue_curve: array<Point, 16>, blue_curve_count: u32
 ) -> vec3<f32> {
-    let luma_val = get_luma(color_srgb);
-    let luma_curved = apply_curve(luma_val, luma_curve, luma_curve_count);
-    
-    var luma_adjusted_srgb: vec3<f32>;
-    if (luma_val > 0.001) {
-        let ratio = luma_curved / luma_val;
-        luma_adjusted_srgb = color_srgb * ratio;
+    let rgb_curves_are_active = red_curve_count > 2u || green_curve_count > 2u || blue_curve_count > 2u;
+
+    if (rgb_curves_are_active) {
+        let color_graded = vec3<f32>(
+            apply_curve(color_srgb.r, red_curve, red_curve_count),
+            apply_curve(color_srgb.g, green_curve, green_curve_count),
+            apply_curve(color_srgb.b, blue_curve, blue_curve_count)
+        );
+
+        let luma_initial = get_luma(color_srgb);
+        let luma_target = apply_curve(luma_initial, luma_curve, luma_curve_count);
+
+        let luma_graded = get_luma(color_graded);
+        var final_color: vec3<f32>;
+        if (luma_graded > 0.001) {
+            let ratio = luma_target / luma_graded;
+            final_color = color_graded * ratio;
+        } else {
+            final_color = vec3<f32>(luma_target);
+        }
+
+        let max_comp = max(final_color.r, max(final_color.g, final_color.b));
+        if (max_comp > 1.0) {
+            final_color = final_color / max_comp;
+        }
+        return max(final_color, vec3<f32>(0.0));
+
     } else {
-        luma_adjusted_srgb = vec3<f32>(luma_curved);
+        let curved_srgb = vec3<f32>(
+            apply_curve(color_srgb.r, luma_curve, luma_curve_count),
+            apply_curve(color_srgb.g, luma_curve, luma_curve_count),
+            apply_curve(color_srgb.b, luma_curve, luma_curve_count)
+        );
+
+        return curved_srgb;
     }
-
-    let max_component = max(luma_adjusted_srgb.r, max(luma_adjusted_srgb.g, luma_adjusted_srgb.b));
-    if (max_component > 1.0) {
-        luma_adjusted_srgb = luma_adjusted_srgb / max_component;
-    }
-
-    let curved_srgb = vec3<f32>(
-        apply_curve(luma_adjusted_srgb.r, red_curve, red_curve_count),
-        apply_curve(luma_adjusted_srgb.g, green_curve, green_curve_count),
-        apply_curve(luma_adjusted_srgb.b, blue_curve, blue_curve_count)
-    );
-
-    return curved_srgb;
 }
 
 fn apply_all_adjustments(initial_rgb: vec3<f32>, adj: GlobalAdjustments, coords_i: vec2<i32>) -> vec3<f32> {
