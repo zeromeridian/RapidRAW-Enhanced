@@ -1582,10 +1582,13 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-bg-primary font-sans text-text-primary overflow-hidden select-none">
-      <TitleBar />
+      { appSettings?.decorations || <TitleBar /> }
       <div className={clsx(
         "flex-1 flex flex-col min-h-0",
-        rootPath ? "pt-12 p-2 gap-2" : "pt-10"
+        [
+          rootPath && "p-2 gap-2",
+          !appSettings?.decorations && rootPath && "pt-12",
+        ]
       )}>
         {error && (
           <div className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded-lg z-50">

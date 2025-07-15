@@ -117,6 +117,7 @@ struct AppSettings {
     filter_criteria: Option<FilterCriteria>,
     theme: Option<String>,
     transparent: Option<bool>,
+    decorations: Option<bool>,
     comfyui_address: Option<String>,
     last_folder_state: Option<LastFolderState>,
 }
@@ -163,6 +164,12 @@ impl Default for AppSettings {
             filter_criteria: None,
             theme: Some("dark".to_string()),
             transparent: Some(true),
+
+            #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+            decorations: Some(true),
+            #[cfg(any(target_os = "windows", target_os = "macos"))]
+            decorations: Some(false),
+
             comfyui_address: None,
             last_folder_state: None,
         }
@@ -1399,10 +1406,12 @@ fn main() {
             let settings: AppSettings = load_settings(app_handle.clone()).unwrap_or_default();
             let window_cfg = app.config().app.windows.get(0).unwrap().clone();
             let transparent = settings.transparent.unwrap_or(window_cfg.transparent);
+            let decorations = settings.decorations.unwrap_or(window_cfg.decorations);
 
             let window = tauri::WebviewWindowBuilder::from_config(app.handle(), &window_cfg)
                 .unwrap()
                 .transparent(transparent)
+                .decorations(decorations)
                 .build()
                 .expect("Failed to build window");
 
