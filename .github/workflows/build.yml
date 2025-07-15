@@ -144,7 +144,7 @@ jobs:
         if: ${{ startsWith(inputs.platform, 'windows') && inputs.release-id == '' }}
         run: |
           find src-tauri/target/release/bundle -name "*.exe" | while read -r file; do
-            name=$(basename "$file")
+            name="${{ inputs.asset-prefix }}_${{ inputs.platform }}_$(basename "$file")"
             echo "Uploading $name, file: $file"
             # TODO zip the file before upload
             gh-actions-artifact-client.js upload "${name}" --retentionDays=7 < "$file"
