@@ -193,6 +193,19 @@ export default function Editor({
 
   const toggleShowOriginal = useCallback(() => setShowOriginal(prev => !prev), [setShowOriginal]);
 
+  const doubleClickProps = useMemo(() => {
+    if (isCropping || isMasking) {
+      return { 
+        disabled: true,
+      };
+    }
+    return {
+      mode: transformState.scale >= 2 ? 'reset' : 'zoomIn',
+      animationTime: 200,
+      animationType: 'easeOut',
+    };
+  }, [isCropping, isMasking, transformState.scale]);  
+
   if (!selectedImage) {
     return (
       <div className="flex-1 bg-bg-secondary rounded-lg flex items-center justify-center text-text-secondary">
@@ -259,7 +272,7 @@ export default function Editor({
             maxScale={10}
             limitToBounds={true}
             centerZoomedOut={true}
-            doubleClick={{ disabled: true }}
+            doubleClick={doubleClickProps}
             panning={{ disabled: isPanningDisabled }}
             onTransformed={(_, state) => {
               setTransformState(state);
