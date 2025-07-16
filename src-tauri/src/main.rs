@@ -1274,14 +1274,20 @@ fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowH
             "muted-green" => Some((44, 56, 54, 100)),
             _ => Some((26, 29, 27, 60)),
         };
-        let os_info = os_info::get();
-        let version = os_info.version();
-        if version >= &os_info::Version::Semantic(11, 0, 0) {
+
+        let info = os_info::get();
+
+        let is_win11_or_newer = match info.version() {
+            os_info::Version::Semantic(major, _, build) => *major == 10 && *build >= 22000,
+            _ => false,
+        };
+
+        if is_win11_or_newer {
             window_vibrancy::apply_acrylic(&window, color)
-                .expect("Unsupported platform! 'apply_acrylic' is only supported on Windows");
-        } else { // Windows 10 or older
+                .expect("Failed to apply acrylic effect on Windows 11");
+        } else {
             window_vibrancy::apply_blur(&window, color)
-                .expect("Unsupported platform! 'apply_blur' is only supported on Windows");
+                .expect("Failed to apply blur effect on Windows 10 or older");
         }
     }
 
