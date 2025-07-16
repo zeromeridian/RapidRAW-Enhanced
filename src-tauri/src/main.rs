@@ -1320,31 +1320,50 @@ fn delete_files_from_disk(paths: Vec<String>) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-fn update_window_effect(theme: String, window: tauri::Window) {
+fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowHandle) {
     #[cfg(target_os = "windows")]
     {
-        let color = if theme == "light" {
-            Some((250, 250, 250, 150))
-        } else if theme == "muted-green" {
-            Some((44, 56, 54, 100))
-        } else {
-            Some((26, 29, 27, 60))
+        let color = match theme.as_str() {
+            "light" => Some((250, 250, 250, 150)),
+            "muted-green" => Some((44, 56, 54, 100)),
+            _ => Some((26, 29, 27, 60)),
         };
-        window_vibrancy::apply_acrylic(&window, color)
-            .expect("Unsupported platform! 'apply_acrylic' is only supported on Windows");
+
+        let info = os_info::get();
+
+        let is_win11_or_newer = match info.version() {
+            os_info::Version::Semantic(major, _, build) => *major == 10 && *build >= 22000,
+            _ => false,
+        };
+
+        if is_win11_or_newer {
+            window_vibrancy::apply_acrylic(&window, color)
+                .expect("Failed to apply acrylic effect on Windows 11");
+        } else {
+            window_vibrancy::apply_blur(&window, color)
+                .expect("Failed to apply blur effect on Windows 10 or older");
+        }
     }
 
     #[cfg(target_os = "macos")]
     {
-        let material = if theme == "light" {
-            window_vibrancy::NSVisualEffectMaterial::ContentBackground
-        } else {
-            window_vibrancy::NSVisualEffectMaterial::HudWindow
+        let material = match theme.as_str() {
+            "light" => window_vibrancy::NSVisualEffectMaterial::ContentBackground,
+            _ => window_vibrancy::NSVisualEffectMaterial::HudWindow,
         };
         window_vibrancy::apply_vibrancy(&window, material, None, None)
             .expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
     }
+
+    #[cfg(target_os = "linux")]
+    {
+        // no effects to apply
+    }
+}
+
+#[tauri::command]
+fn update_window_effect(theme: String, window: tauri::Window) {
+    apply_window_effect(theme, window);
 }
 
 #[tauri::command]
@@ -1458,33 +1477,8 @@ fn main() {
                 .expect("Failed to build window");
 
             if transparent {
-                let theme = settings.theme.unwrap_or_else(|| "dark".to_string());
-
-                #[cfg(target_os = "macos")]
-                {
-                    let material = if theme == "light" {
-                        NSVisualEffectMaterial::ContentBackground
-                    } else {
-                        NSVisualEffectMaterial::HudWindow
-                    };
-                    apply_vibrancy(&window, material, None, None).expect(
-                        "Unsupported platform! 'apply_vibrancy' is only supported on macOS",
-                    );
-                }
-
-                #[cfg(target_os = "windows")]
-                {
-                    let color = if theme == "light" {
-                        Some((250, 250, 250, 150))
-                    } else if theme == "muted-green" {
-                        Some((44, 56, 54, 100))
-                    } else {
-                        Some((26, 29, 27, 60))
-                    };
-                    apply_acrylic(&window, color).expect(
-                        "Unsupported platform! 'apply_acrylic' is only supported on Windows",
-                    );
-                }
+                let theme = settings.theme.unwrap_or("dark".to_string());
+                apply_window_effect(theme, &window);
             }
 
             Ok(())
