@@ -22,6 +22,8 @@ I developed this project as a personal challenge at the age of 18. My goal was t
 
 Have fun!
 
+**[💾 Download the Latest Version](https://github.com/CyberTimon/RapidRAW/releases/latest)**
+
 <details>
 <summary><strong>For Who Is This?</strong></summary>
 RapidRAW is for photographers who love to edit their photos in a <strong>clean, fast, and simple workflow</strong>. It prioritizes speed, a beautiful user interface, and powerful tools that let you achieve your creative color vision quickly.
@@ -75,6 +77,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 - [AI Roadmap](#ai-roadmap)
 - [Initial Development Log](#initial-development-log)
 - [Getting Started](#getting-started)
+- [System Requirements](#system-requirements)
 - [Contributing](#contributing)
 - [Special Thanks](#special-thanks)
 - [Support the Project](#support-the-project)
@@ -304,6 +307,14 @@ npm install
 # Use --release for a build that runs much faster (image loading etc.)
 npx tauri dev --release
 ```
+
+## System Requirements
+
+RapidRAW is built to be lightweight and cross-platform. The minimum (tested) requirements are:
+
+*   **Windows:** Windows 10 or newer
+*   **macOS:** macOS 15 (Sequoia) or newer
+*   **Linux:** Ubuntu 22.04+ or a compatible modern distribution
 
 ## Contributing
 
