@@ -27,10 +27,9 @@ export default function Editor({
   showOriginal, setShowOriginal, isAdjusting, onBackToLibrary, isLoading, isFullScreen,
   isFullScreenLoading, fullScreenUrl, onToggleFullScreen, activeRightPanel,
   adjustments, setAdjustments, activeMaskId, activeMaskContainerId,
-  onSelectMask, updateSubMask,
-  transformWrapperRef, onZoomed, onContextMenu,
+  onSelectMask, updateSubMask, transformWrapperRef, onZoomed, onContextMenu,
   onUndo, onRedo, canUndo, canRedo, brushSettings, 
-  onGenerateAiMask, aiTool, onAiMaskDrawingComplete,
+  onGenerateAiMask, aiTool, onAiMaskDrawingComplete, isMaskControlHovered,
   targetZoom, waveform, isWaveformVisible, onCloseWaveform,
 }) {
   const [crop, setCrop] = useState();
@@ -304,6 +303,7 @@ export default function Editor({
                 onGenerateAiMask={onGenerateAiMask}
                 aiTool={aiTool}
                 onAiMaskDrawingComplete={onAiMaskDrawingComplete}
+                isMaskControlHovered={isMaskControlHovered}
               />
             </TransformComponent>
           </TransformWrapper>

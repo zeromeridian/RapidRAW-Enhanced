@@ -100,6 +100,7 @@ function App() {
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [aiTool, setAiTool] = useState(null);
   const [pendingAiAction, setPendingAiAction] = useState(null);
+  const [isMaskControlHovered, setIsMaskControlHovered] = useState(false);
   const { showContextMenu } = useContextMenu();
   const imagePathList = useMemo(() => imageList.map(f => f.path), [imageList]);
   const { thumbnails } = useThumbnails(imagePathList);
@@ -128,6 +129,12 @@ function App() {
   }, [debouncedSetHistory]);
 
   useEffect(() => { setLiveAdjustments(historyAdjustments); }, [historyAdjustments]);
+
+  useEffect(() => {
+    if (activeRightPanel !== 'masks' || !activeMaskContainerId) {
+      setIsMaskControlHovered(false);
+    }
+  }, [activeRightPanel, activeMaskContainerId]);
 
   const undo = useCallback(() => { if (canUndo) { undoAdjustments(); debouncedSetHistory.cancel(); } }, [canUndo, undoAdjustments, debouncedSetHistory]);
   const redo = useCallback(() => { if (canRedo) { redoAdjustments(); debouncedSetHistory.cancel(); } }, [canRedo, redoAdjustments, debouncedSetHistory]);
@@ -1283,6 +1290,7 @@ function App() {
               onGenerateAiMask={handleGenerateAiMask}
               aiTool={aiTool}
               onAiMaskDrawingComplete={handleAiMaskDrawingComplete}
+              isMaskControlHovered={isMaskControlHovered}
             />
             <Resizer onMouseDown={createResizeHandler(setBottomPanelHeight, bottomPanelHeight)} direction="horizontal" />
             <BottomBar
@@ -1342,6 +1350,7 @@ function App() {
                   isGeneratingAiMask={isGeneratingAiMask} 
                   aiModelDownloadStatus={aiModelDownloadStatus} 
                   onGenerateAiForegroundMask={handleGenerateAiForegroundMask} 
+                  setIsMaskControlHovered={setIsMaskControlHovered}
                 />}
                 {renderedRightPanel === 'presets' && <PresetsPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} activePanel={activeRightPanel} />}
                 {renderedRightPanel === 'export' && <ExportPanel selectedImage={selectedImage} adjustments={adjustments} multiSelectedPaths={multiSelectedPaths} exportState={exportState} setExportState={setExportState} />}

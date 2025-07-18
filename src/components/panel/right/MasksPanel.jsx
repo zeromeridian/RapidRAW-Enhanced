@@ -30,7 +30,7 @@ const itemVariants = {
 
 export default function MasksPanel({
   adjustments, setAdjustments, selectedImage, onSelectMask, activeMaskId,
-  activeMaskContainerId, onSelectContainer,
+  activeMaskContainerId, onSelectContainer, setIsMaskControlHovered,
   brushSettings, setBrushSettings, copiedMask, setCopiedMask, histogram,
   setCustomEscapeHandler, isGeneratingAiMask, aiModelDownloadStatus, onGenerateAiForegroundMask
 }) {
@@ -271,6 +271,7 @@ export default function MasksPanel({
             onSelectMask={onSelectMask}
             activeMaskId={activeMaskId}
             onGenerateAiForegroundMask={onGenerateAiForegroundMask}
+            setIsMaskControlHovered={setIsMaskControlHovered}
           />
         </div>
       </div>
