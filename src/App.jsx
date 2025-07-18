@@ -1297,7 +1297,7 @@ function App() {
               isPasteDisabled={copiedAdjustments === null}
               zoom={zoom}
               onZoomChange={handleZoomChange}
-              minZoom={activeRightPanel === 'crop' ? 0.4 : 0.7}
+              minZoom={0.7}
               maxZoom={10}
               imageList={sortedImageList}
               selectedImage={selectedImage}
