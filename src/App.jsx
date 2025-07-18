@@ -29,6 +29,7 @@ import ConfirmModal from './components/modals/ConfirmModal';
 import { useHistoryState } from './hooks/useHistoryState';
 import Resizer from './components/ui/Resizer';
 import { INITIAL_ADJUSTMENTS, COPYABLE_ADJUSTMENT_KEYS, normalizeLoadedAdjustments } from './utils/adjustments';
+import { generatePaletteFromImage } from './utils/palette';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { THEMES, DEFAULT_THEME_ID } from './themes';
 import { v4 as uuidv4 } from 'uuid';
@@ -71,6 +72,7 @@ function App() {
   const [isFullScreenLoading, setIsFullScreenLoading] = useState(false);
   const [fullScreenUrl, setFullScreenUrl] = useState(null);
   const [theme, setTheme] = useState(DEFAULT_THEME_ID);
+  const [adaptivePalette, setAdaptivePalette] = useState(null);
   const [activeRightPanel, setActiveRightPanel] = useState('adjustments');
   const [activeMaskContainerId, setActiveMaskContainerId] = useState(null);
   const [activeMaskId, setActiveMaskId] = useState(null);
@@ -460,18 +462,42 @@ function App() {
   }, [filterCriteria, appSettings, handleSettingsChange]);
 
   useEffect(() => {
-    const root = document.documentElement;
-    const newThemeId = theme || DEFAULT_THEME_ID;
-    const selectedTheme = THEMES.find(t => t.id === newThemeId) || THEMES.find(t => t.id === DEFAULT_THEME_ID);
-
-    if (selectedTheme) {
-      Object.entries(selectedTheme.cssVariables).forEach(([key, value]) => {
-        root.style.setProperty(key, value);
-      });
-      
-      invoke('update_window_effect', { theme: newThemeId });
+    if (appSettings?.adaptiveEditorTheme && selectedImage && finalPreviewUrl) {
+      generatePaletteFromImage(finalPreviewUrl)
+        .then(setAdaptivePalette)
+        .catch(err => {
+          const darkTheme = THEMES.find(t => t.id === 'dark');
+          setAdaptivePalette(darkTheme ? darkTheme.cssVariables : null);
+        });
+    } else {
+      setAdaptivePalette(null);
     }
-  }, [theme]);
+  }, [appSettings?.adaptiveEditorTheme, selectedImage, finalPreviewUrl]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const currentThemeId = theme || DEFAULT_THEME_ID;
+    
+    const baseTheme = THEMES.find(t => t.id === currentThemeId) || THEMES.find(t => t.id === DEFAULT_THEME_ID);
+    if (!baseTheme) return;
+
+    let finalCssVariables = { ...baseTheme.cssVariables };
+    let effectThemeForWindow = baseTheme.id;
+
+    if (adaptivePalette) {
+        const darkTheme = THEMES.find(t => t.id === 'dark');
+        finalCssVariables = { ...(darkTheme ? darkTheme.cssVariables : baseTheme.cssVariables), ...adaptivePalette };
+        effectThemeForWindow = 'dark';
+    }
+
+    Object.entries(finalCssVariables).forEach(([key, value]) => {
+        root.style.setProperty(key, value);
+    });
+
+    const isLight = ['light', 'snow', 'arctic'].includes(effectThemeForWindow);
+    invoke('update_window_effect', { theme: isLight ? 'light' : 'dark' });
+
+  }, [theme, adaptivePalette]);
 
   const handleRefreshFolderTree = useCallback(async () => {
     if (!rootPath) return;

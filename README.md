@@ -36,6 +36,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-07-18:** Smooth zoom slider, new adaptive editor theme setting
 *   **2025-07-18:** New export functionality: Export with metadata, GPS metadata remover, batch export file naming scheme using tags
 *   **2025-07-18:** Ability to delete the associated RAW/JPEG in right click delete operations
 *   **2025-07-17:** Small bug fixes

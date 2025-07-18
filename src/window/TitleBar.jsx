@@ -34,7 +34,7 @@ export default function TitleBar() {
   return (
     <div
       data-tauri-drag-region
-      className="h-10 bg-bg-secondary border-b border-white/5 flex justify-between items-center select-none fixed top-0 left-0 right-0 z-50"
+      className="h-10 bg-bg-secondary border-white/5 flex justify-between items-center select-none fixed top-0 left-0 right-0 z-50"
     >
       <div className="flex items-center h-full">
         {isMac && (
