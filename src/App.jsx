@@ -756,12 +756,14 @@ function App() {
     setLibraryActivePath(lastActivePath);
   }, [selectedImage?.path]);
 
-  const executeDelete = useCallback(async (pathsToDelete) => {
+  const executeDelete = useCallback(async (pathsToDelete, options = { includeAssociated: false }) => {
     if (!pathsToDelete || pathsToDelete.length === 0) return;
     try {
-        await invoke('delete_files_from_disk', { paths: pathsToDelete });
+        const command = options.includeAssociated ? 'delete_files_with_associated' : 'delete_files_from_disk';
+        await invoke(command, { paths: pathsToDelete });
+
         handleLibraryRefresh();
-        if (selectedImage && pathsToDelete.includes(selectedImage.path)) {
+        if (selectedImage && pathsToDelete.some(p => selectedImage.path.startsWith(p.substring(0, p.lastIndexOf('.'))))) {
             handleBackToLibrary();
         }
         setMultiSelectedPaths([]);
@@ -780,11 +782,11 @@ function App() {
     const isSingle = pathsToDelete.length === 1;
     setConfirmModalState({
         isOpen: true,
-        title: 'Confirm',
-        message: `Are you sure you want to permanently delete ${isSingle ? 'this image' : `${pathsToDelete.length} images`} from your disk? This action cannot be undone.`,
-        confirmText: 'Delete',
+        title: 'Confirm Delete',
+        message: `Are you sure you want to permanently delete ${isSingle ? 'this image' : `${pathsToDelete.length} images`}? This action cannot be undone. Right-click for more options (e.g., deleting associated RAW/JPEG files).`,
+        confirmText: 'Delete Selected Only',
         confirmVariant: 'destructive',
-        onConfirm: () => executeDelete(pathsToDelete)
+        onConfirm: () => executeDelete(pathsToDelete, { includeAssociated: false })
     });
   }, [multiSelectedPaths, executeDelete]);
 
@@ -1374,13 +1376,23 @@ function App() {
       },
       { label: deleteLabel, icon: Trash2, isDestructive: true, submenu: [
           { label: 'Cancel', icon: X, onClick: () => {} },
-          { label: `Delete ${isSingleSelection ? '' : `${selectionCount} Images`}`, icon: Check, isDestructive: true, onClick: () => executeDelete(finalSelection) },
+          {
+            label: 'Delete Selected Only',
+            icon: Check,
+            isDestructive: true,
+            onClick: () => executeDelete(finalSelection, { includeAssociated: false }),
+          },
+          {
+            label: 'Delete + Associated (RAW/JPEG)',
+            icon: Check,
+            isDestructive: true,
+            onClick: () => executeDelete(finalSelection, { includeAssociated: true }),
+          },
         ],
       },
     ];
     showContextMenu(event.clientX, event.clientY, options);
   };
-
   const handleCreateFolder = async (folderName) => {
     if (folderName && folderName.trim() !== '' && folderActionTarget) {
       try { await invoke('create_folder', { path: `${folderActionTarget}/${folderName.trim()}` }); handleRefreshFolderTree(); }

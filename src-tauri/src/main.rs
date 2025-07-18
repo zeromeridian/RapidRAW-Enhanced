@@ -42,7 +42,7 @@ use crate::ai_processing::{
     AiState, get_or_init_ai_models, generate_image_embeddings, run_sam_decoder,
     AiSubjectMaskParameters, run_u2netp_model, AiForegroundMaskParameters
 };
-use crate::formats::is_raw_file;
+use crate::formats::{is_raw_file, is_supported_image_file};
 use crate::image_loader::{load_base_image_from_bytes, composite_patches_on_image, load_and_composite};
 
 #[derive(Clone)]
@@ -1320,6 +1320,52 @@ fn delete_files_from_disk(paths: Vec<String>) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn delete_files_with_associated(paths: Vec<String>) -> Result<(), String> {
+    let mut files_to_delete = std::collections::HashSet::new();
+
+    for path_str in &paths {
+        let path = Path::new(path_str);
+        
+        if let (Some(parent), Some(stem_os)) = (path.parent(), path.file_stem()) {
+            let stem = stem_os.to_string_lossy();
+            if let Ok(entries) = fs::read_dir(parent) {
+                for entry in entries.filter_map(Result::ok) {
+                    let entry_path = entry.path();
+                    if entry_path.is_file() {
+                        if let Some(entry_stem_os) = entry_path.file_stem() {
+                            let entry_path_str = entry_path.to_string_lossy();
+                            if entry_stem_os.to_string_lossy() == stem && is_supported_image_file(&entry_path_str) {
+                                files_to_delete.insert(entry_path_str.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            if is_supported_image_file(path_str) {
+                files_to_delete.insert(path_str.clone());
+            }
+        }
+    }
+
+    let final_paths_to_delete: Vec<String> = files_to_delete.into_iter().collect();
+    if final_paths_to_delete.is_empty() {
+        return Ok(());
+    }
+
+    trash::delete_all(&final_paths_to_delete).map_err(|e| e.to_string())?;
+
+    for path in final_paths_to_delete {
+        let sidecar_path = get_sidecar_path(&path);
+        if sidecar_path.exists() {
+            let _ = trash::delete(&sidecar_path);
+        }
+    }
+
+    Ok(())
+}
+
 fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowHandle) {
     #[cfg(target_os = "windows")]
     {
@@ -1493,6 +1539,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             show_in_finder,
             delete_files_from_disk,
+            delete_files_with_associated,
             load_image,
             apply_adjustments,
             export_image,
