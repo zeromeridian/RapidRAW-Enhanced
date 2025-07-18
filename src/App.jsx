@@ -26,176 +26,14 @@ import { ContextMenuProvider, useContextMenu } from './context/ContextMenuContex
 import CreateFolderModal from './components/modals/CreateFolderModal';
 import RenameFolderModal from './components/modals/RenameFolderModal';
 import ConfirmModal from './components/modals/ConfirmModal';
+import { useHistoryState } from './hooks/useHistoryState';
+import Resizer from './components/ui/Resizer';
+import { INITIAL_ADJUSTMENTS, COPYABLE_ADJUSTMENT_KEYS, normalizeLoadedAdjustments } from './utils/adjustments';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { THEMES, DEFAULT_THEME_ID } from './themes';
 import { v4 as uuidv4 } from 'uuid';
 
 const DEBUG = false;
-
-export const INITIAL_MASK_ADJUSTMENTS = {
-  exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
-  saturation: 0, temperature: 0, tint: 0, vibrance: 0,
-  sharpness: 0, lumaNoiseReduction: 0, colorNoiseReduction: 0,
-  clarity: 0, dehaze: 0, structure: 0,
-  hsl: {
-    reds: { hue: 0, saturation: 0, luminance: 0 }, oranges: { hue: 0, saturation: 0, luminance: 0 },
-    yellows: { hue: 0, saturation: 0, luminance: 0 }, greens: { hue: 0, saturation: 0, luminance: 0 },
-    aquas: { hue: 0, saturation: 0, luminance: 0 }, blues: { hue: 0, saturation: 0, luminance: 0 },
-    purples: { hue: 0, saturation: 0, luminance: 0 }, magentas: { hue: 0, saturation: 0, luminance: 0 },
-  },
-  curves: {
-    luma: [{ x: 0, y: 0 }, { x: 255, y: 255 }], red: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
-    green: [{ x: 0, y: 0 }, { x: 255, y: 255 }], blue: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
-  },
-  sectionVisibility: {
-    basic: true,
-    curves: true,
-    color: true,
-    details: true,
-    effects: true,
-  },
-};
-
-export const INITIAL_MASK_CONTAINER = {
-  name: 'New Mask',
-  visible: true,
-  invert: false,
-  adjustments: INITIAL_MASK_ADJUSTMENTS,
-  subMasks: [],
-};
-
-export const INITIAL_ADJUSTMENTS = {
-  rating: 0,
-  exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
-  saturation: 0, temperature: 0, tint: 0, vibrance: 0,
-  sharpness: 0, lumaNoiseReduction: 0, colorNoiseReduction: 0,
-  clarity: 0, dehaze: 0, structure: 0,
-  vignetteAmount: 0, vignetteMidpoint: 50, vignetteRoundness: 0, vignetteFeather: 50,
-  grainAmount: 0, grainSize: 25, grainRoughness: 50,
-  hsl: {
-    reds: { hue: 0, saturation: 0, luminance: 0 }, oranges: { hue: 0, saturation: 0, luminance: 0 },
-    yellows: { hue: 0, saturation: 0, luminance: 0 }, greens: { hue: 0, saturation: 0, luminance: 0 },
-    aquas: { hue: 0, saturation: 0, luminance: 0 }, blues: { hue: 0, saturation: 0, luminance: 0 },
-    purples: { hue: 0, saturation: 0, luminance: 0 }, magentas: { hue: 0, saturation: 0, luminance: 0 },
-  },
-  curves: {
-    luma: [{ x: 0, y: 0 }, { x: 255, y: 255 }], red: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
-    green: [{ x: 0, y: 0 }, { x: 255, y: 255 }], blue: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
-  },
-  crop: null, aspectRatio: null, rotation: 0, flipHorizontal: false, flipVertical: false, 
-  masks: [],
-  aiPatches: [],
-  sectionVisibility: {
-    basic: true,
-    curves: true,
-    color: true,
-    details: true,
-    effects: true,
-  },
-};
-
-const normalizeLoadedAdjustments = (loadedAdjustments) => {
-  if (!loadedAdjustments) return INITIAL_ADJUSTMENTS;
-
-  const normalizedMasks = (loadedAdjustments.masks || []).map(maskContainer => {
-    const containerAdjustments = maskContainer.adjustments || {};
-    const normalizedSubMasks = (maskContainer.subMasks || []).map(subMask => ({
-      visible: true,
-      mode: 'additive',
-      ...subMask,
-    }));
-
-    return {
-      ...INITIAL_MASK_CONTAINER,
-      id: maskContainer.id || uuidv4(),
-      ...maskContainer,
-      adjustments: {
-        ...INITIAL_MASK_ADJUSTMENTS,
-        ...containerAdjustments,
-        hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...(containerAdjustments.hsl || {}) },
-        curves: { ...INITIAL_MASK_ADJUSTMENTS.curves, ...(containerAdjustments.curves || {}) },
-        sectionVisibility: {
-          ...INITIAL_MASK_ADJUSTMENTS.sectionVisibility,
-          ...(containerAdjustments.sectionVisibility || {})
-        },
-      },
-      subMasks: normalizedSubMasks,
-    };
-  });
-
-  const normalizedAiPatches = (loadedAdjustments.aiPatches || []).map(patch => ({
-    visible: true,
-    ...patch,
-  }));
-
-  return {
-    ...INITIAL_ADJUSTMENTS,
-    ...loadedAdjustments,
-    hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
-    curves: { ...INITIAL_ADJUSTMENTS.curves, ...(loadedAdjustments.curves || {}) },
-    masks: normalizedMasks,
-    aiPatches: normalizedAiPatches,
-    sectionVisibility: {
-      ...INITIAL_ADJUSTMENTS.sectionVisibility,
-      ...(loadedAdjustments.sectionVisibility || {})
-    },
-  };
-};
-
-
-export const COPYABLE_ADJUSTMENT_KEYS = [
-  'exposure', 'contrast', 'highlights', 'shadows', 'whites', 'blacks',
-  'saturation', 'temperature', 'tint', 'vibrance',
-  'sharpness', 'lumaNoiseReduction', 'colorNoiseReduction',
-  'clarity', 'dehaze', 'structure',
-  'vignetteAmount', 'vignetteMidpoint', 'vignetteRoundness', 'vignetteFeather',
-  'grainAmount', 'grainSize', 'grainRoughness',
-  'hsl', 'curves', 'sectionVisibility',
-];
-
-export const ADJUSTMENT_SECTIONS = {
-  basic: ['exposure', 'contrast', 'highlights', 'shadows', 'whites', 'blacks'],
-  curves: ['curves'],
-  color: ['saturation', 'temperature', 'tint', 'vibrance', 'hsl'],
-  details: ['sharpness', 'lumaNoiseReduction', 'colorNoiseReduction'],
-  effects: [
-    'clarity', 'dehaze', 'structure',
-    'vignetteAmount', 'vignetteMidpoint', 'vignetteRoundness', 'vignetteFeather',
-    'grainAmount', 'grainSize', 'grainRoughness'
-  ],
-};
-
-const useHistoryState = (initialState) => {
-  const [history, setHistory] = useState([initialState]);
-  const [index, setIndex] = useState(0);
-  const state = useMemo(() => history[index], [history, index]);
-
-  const setState = useCallback((newState) => {
-    const resolvedState = typeof newState === 'function' ? newState(history[index]) : newState;
-    if (JSON.stringify(resolvedState) === JSON.stringify(history[index])) return;
-    const newHistory = history.slice(0, index + 1);
-    newHistory.push(resolvedState);
-    setHistory(newHistory);
-    setIndex(newHistory.length - 1);
-  }, [history, index]);
-
-  const undo = useCallback(() => { if (index > 0) setIndex(index - 1); }, [index]);
-  const redo = useCallback(() => { if (index < history.length - 1) setIndex(index + 1); }, [index, history.length]);
-  const resetHistory = useCallback((newInitialState) => { setHistory([newInitialState]); setIndex(0); }, []);
-  const canUndo = index > 0;
-  const canRedo = index < history.length - 1;
-
-  return { state, setState, undo, redo, canUndo, canRedo, resetHistory };
-};
-
-const Resizer = ({ onMouseDown, direction }) => (
-  <div
-    onMouseDown={onMouseDown}
-    className={clsx(
-      'flex-shrink-0 bg-transparent z-10',
-      { 'w-2 cursor-col-resize': direction === 'vertical', 'h-2 cursor-row-resize': direction === 'horizontal' }
-    )}
-  />
-);
 
 function App() {
   const [rootPath, setRootPath] = useState(null);
@@ -950,103 +788,41 @@ function App() {
     setIsLibraryExportPanelVisible(false);
   }, [selectedImage?.path, applyAdjustments, debouncedSave, thumbnails, resetAdjustmentsHistory]);
 
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      const isInputFocused = document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA';
-      if (isInputFocused) return;
-      const isCtrl = event.ctrlKey || event.metaKey;
-      const key = event.key.toLowerCase();
-
-      if (selectedImage) {
-        if (key === 'escape') {
-          event.preventDefault();
-          if (customEscapeHandler) {
-            customEscapeHandler();
-          } else if (aiTool) {
-            setAiTool(null);
-          } else if (activeMaskId) {
-            setActiveMaskId(null);
-          } else if (isFullScreen) {
-            handleToggleFullScreen();
-          } else {
-            handleBackToLibrary();
-          }
-          return;
-        }
-        if (key === ' ' && !isCtrl) {
-            event.preventDefault();
-            if (Math.abs(zoom - 2) < 0.01) {
-                handleZoomChange(1);
-            } else {
-                handleZoomChange(2);
-            }
-            return;
-        }
-        if (key === 'f' && !isCtrl) { event.preventDefault(); handleToggleFullScreen(); }
-        if (key === 'b' && !isCtrl) { event.preventDefault(); setShowOriginal(prev => !prev); }
-        if (key === 'r' && !isCtrl) { event.preventDefault(); handleRightPanelSelect('crop'); }
-        if (key === 'm' && !isCtrl) { event.preventDefault(); handleRightPanelSelect('masks'); }
-        if (key === 'i' && !isCtrl) { event.preventDefault(); handleRightPanelSelect('metadata'); }
-        if (key === 'e' && !isCtrl) { event.preventDefault(); handleRightPanelSelect('export'); }
-        if (key === 'w' && !isCtrl) { event.preventDefault(); setIsWaveformVisible(prev => !prev); }
-      }
-
-      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
-        if (isViewLoading) { event.preventDefault(); return; }
-        event.preventDefault();
-
-        if (selectedImage) {
-            if (key === 'arrowup' || key === 'arrowdown') {
-                const zoomStep = 0.25;
-                const newZoom = key === 'arrowup' ? zoom + zoomStep : zoom - zoomStep;
-                const minZoom = activeRightPanel === 'crop' ? 0.4 : 0.7;
-                handleZoomChange(Math.max(minZoom, Math.min(newZoom, 10)));
-            } else {
-                const isNext = key === 'arrowright';
-                const currentIndex = sortedImageList.findIndex(img => img.path === selectedImage.path);
-                if (currentIndex === -1) return;
-                let nextIndex = isNext ? currentIndex + 1 : currentIndex - 1;
-                if (nextIndex >= sortedImageList.length) nextIndex = 0;
-                if (nextIndex < 0) nextIndex = sortedImageList.length - 1;
-                const nextImage = sortedImageList[nextIndex];
-                if (nextImage) handleImageSelect(nextImage.path);
-            }
-        } else {
-            const isNext = key === 'arrowright' || key === 'arrowdown';
-            const activePath = libraryActivePath;
-            if (!activePath || sortedImageList.length === 0) return;
-            const currentIndex = sortedImageList.findIndex(img => img.path === activePath);
-            if (currentIndex === -1) return;
-            let nextIndex = isNext ? currentIndex + 1 : currentIndex - 1;
-            if (nextIndex >= sortedImageList.length) nextIndex = 0;
-            if (nextIndex < 0) nextIndex = sortedImageList.length - 1;
-            const nextImage = sortedImageList[nextIndex];
-            if (nextImage) {
-                setLibraryActivePath(nextImage.path);
-                setMultiSelectedPaths([nextImage.path]);
-            }
-        }
-      }
-
-      if (['0', '1', '2', '3', '4', '5'].includes(key) && !isCtrl) { event.preventDefault(); handleRate(parseInt(key, 10)); }
-      if (key === 'delete') { event.preventDefault(); handleDeleteSelected(); }
-
-      if (isCtrl) {
-        switch (key) {
-          case 'c': event.preventDefault(); if (event.shiftKey) { if (multiSelectedPaths.length > 0) { setCopiedFilePaths(multiSelectedPaths); setIsCopied(true); } } else handleCopyAdjustments(); break;
-          case 'v': event.preventDefault(); if (event.shiftKey) handlePasteFiles('copy'); else handlePasteAdjustments(); break;
-          case 'a': event.preventDefault(); if (sortedImageList.length > 0) { setMultiSelectedPaths(sortedImageList.map(f => f.path)); if (!selectedImage) setLibraryActivePath(sortedImageList[sortedImageList.length - 1].path); } break;
-          case 'z': if (selectedImage) { event.preventDefault(); undo(); } break;
-          case 'y': if (selectedImage) { event.preventDefault(); redo(); } break;
-          default: break;
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [ sortedImageList, selectedImage, undo, redo, isFullScreen, handleToggleFullScreen, handleBackToLibrary, handleRightPanelSelect, handleRate, handleDeleteSelected, handleCopyAdjustments, handlePasteAdjustments, multiSelectedPaths, copiedFilePaths, handlePasteFiles, libraryActivePath, handleImageSelect, zoom, handleZoomChange, customEscapeHandler, activeMaskId, aiTool ]);
+  useKeyboardShortcuts({
+    selectedImage,
+    isViewLoading,
+    sortedImageList,
+    multiSelectedPaths,
+    libraryActivePath,
+    zoom,
+    canUndo,
+    canRedo,
+    activeRightPanel,
+    isFullScreen,
+    aiTool,
+    activeMaskId,
+    customEscapeHandler,
+    copiedFilePaths,
+    handleImageSelect,
+    setLibraryActivePath,
+    setMultiSelectedPaths,
+    handleRate,
+    handleDeleteSelected,
+    handleCopyAdjustments,
+    handlePasteAdjustments,
+    handlePasteFiles,
+    setCopiedFilePaths,
+    undo,
+    redo,
+    handleBackToLibrary,
+    handleToggleFullScreen,
+    setShowOriginal,
+    handleRightPanelSelect,
+    setIsWaveformVisible,
+    handleZoomChange,
+    setAiTool,
+    setActiveMaskId,
+  });
 
   useEffect(() => {
     let isEffectActive = true;

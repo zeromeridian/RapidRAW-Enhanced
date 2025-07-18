@@ -6,7 +6,7 @@ import {
   ChevronsRight, FileEdit, Sparkles, User, Brush, TriangleRight, Circle, Droplet
 } from 'lucide-react';
 import MaskControls from './MaskControls';
-import { INITIAL_MASK_ADJUSTMENTS, INITIAL_MASK_CONTAINER } from '../../../App';
+import { INITIAL_MASK_ADJUSTMENTS, INITIAL_MASK_CONTAINER } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 
 const MASK_TYPES = [
