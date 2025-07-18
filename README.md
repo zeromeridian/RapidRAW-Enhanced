@@ -36,6 +36,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-07-18:** New export functionality: Export with metadata, GPS metadata remover, batch export file naming scheme using tags
 *   **2025-07-18:** Ability to delete the associated RAW/JPEG in right click delete operations
 *   **2025-07-17:** Small bug fixes
 *   **2025-07-13:** Native looking titlebar and ability to input precise number into sliders
@@ -45,11 +46,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-07-11:** Added a HUD-like waveform overlay toggle to display specific channel waveforms (w-key)
 *   **2025-07-10:** Rewritten batch export system and async thumbnail generation (makes the loading of large folders a lot more fluid)
 *   **2025-07-10:** Window transparency can now be toggled in the settings, thanks to @andrewazores
-*   **2025-07-08:** Ability to toggle the visibility of individual adjustments sections
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-07-08:** Ability to toggle the visibility of individual adjustments sections
 *   **2025-07-08:** Fixed top-left zoom bug, corrected scale behavior in crop panel, keep default original aspect ratio
 *   **2025-07-08:** Added image rating filter and redesigned the metadata panel with improved layout, clearer sections, and an embedded GPS map
 *   **2025-07-07:** Improved generative AI features and updated [AI Roadmap](#ai-roadmap)
@@ -126,7 +127,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
         <li><strong>Copy & Paste Settings:</strong> Quickly transfer adjustments between images.</li>
         <li><strong>Undo/Redo History:</strong> A robust history system for every edit.</li>
         <li><strong>Customizable UI:</strong> Resizable panels and multiple beautiful UI themes with smooth animations.</li>
-        <li><strong>Exporting:</strong> Control file format (JPEG, PNG, TIFF), quality, and resizing options on export.</li>
+        <li><strong>Exporting:</strong> Control file format, quality, naming scheme, metadata, resizing options on export.</li>
       </ul>
     </td>
   </tr>

@@ -1457,7 +1457,13 @@ function App() {
           <div className="flex-1 flex flex-col min-w-0">
             {renderMainView()}
           </div>
-          <div className={clsx('flex-shrink-0 overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out', isLibraryExportPanelVisible ? 'w-80 ml-2' : 'w-0')}>
+          {!selectedImage && isLibraryExportPanelVisible && (
+            <Resizer onMouseDown={createResizeHandler(setRightPanelWidth, rightPanelWidth)} direction="vertical" />
+          )}
+          <div 
+            className={clsx('flex-shrink-0 overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}
+            style={{ width: isLibraryExportPanelVisible ? `${rightPanelWidth}px` : '0px' }}
+          >
             <LibraryExportPanel
               isVisible={isLibraryExportPanelVisible}
               onClose={() => setIsLibraryExportPanelVisible(false)}

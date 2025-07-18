@@ -10,7 +10,7 @@ mod ai_processing;
 mod formats;
 mod image_loader;
 
-use std::io::{Cursor, BufWriter};
+use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::fs;
@@ -25,9 +25,13 @@ use serde_json::Value;
 use tokio::task::JoinHandle;
 use window_vibrancy::{apply_acrylic, apply_vibrancy, NSVisualEffectMaterial};
 use serde::{Serialize, Deserialize};
+use chrono::Local;
+use little_exif::metadata::Metadata;
+use little_exif::exif_tag::ExifTag;
+use little_exif::filetype::FileExtension;
+use little_exif::rational::uR64;
 
 use crate::image_processing::{
-    perform_auto_analysis, auto_results_to_json,
     get_all_adjustments_from_json, get_or_init_gpu_context, GpuContext,
     ImageMetadata, process_and_get_dynamic_image, Crop, apply_crop, apply_rotation, apply_flip,
 };
@@ -94,6 +98,9 @@ struct ResizeOptions {
 struct ExportSettings {
     jpeg_quality: u8,
     resize: Option<ResizeOptions>,
+    keep_metadata: bool,
+    strip_gps: bool,
+    filename_template: Option<String>,
 }
 
 fn apply_all_transformations(
@@ -430,7 +437,8 @@ fn generate_fullscreen_preview(
 
 #[tauri::command]
 async fn export_image(
-    path: String,
+    original_path: String,
+    output_path: String,
     js_adjustments: Value,
     export_settings: ExportSettings,
     state: tauri::State<'_, AppState>,
@@ -441,12 +449,12 @@ async fn export_image(
     }
 
     let context = get_or_init_gpu_context(&state)?;
-    let original_image = get_full_image_for_processing(&state)?;
+    let original_image_data = get_full_image_for_processing(&state)?;
     let context = Arc::new(context);
 
     let task = tokio::spawn(async move {
         let processing_result: Result<(), String> = (|| {
-            let base_image = composite_patches_on_image(&original_image, &js_adjustments)
+            let base_image = composite_patches_on_image(&original_image_data, &js_adjustments)
                 .map_err(|e| format!("Failed to composite AI patches for export: {}", e))?;
 
             let (transformed_image, unscaled_crop_offset) = 
@@ -490,24 +498,37 @@ async fn export_image(
                 }
             }
 
-            let output_path = std::path::Path::new(&path);
-            let extension = output_path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+            let output_path_obj = std::path::Path::new(&output_path);
+            let extension = output_path_obj.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+            
+            let mut image_bytes = Vec::new();
+            let mut cursor = Cursor::new(&mut image_bytes);
 
-            let mut file = BufWriter::new(fs::File::create(&path).map_err(|e| e.to_string())?);
             match extension.as_str() {
                 "jpg" | "jpeg" => {
                     let rgb_image = final_image.to_rgb8();
-                    let encoder = JpegEncoder::new_with_quality(&mut file, export_settings.jpeg_quality);
+                    let encoder = JpegEncoder::new_with_quality(&mut cursor, export_settings.jpeg_quality);
                     rgb_image.write_with_encoder(encoder).map_err(|e| e.to_string())?;
                 }
                 "png" => {
-                    final_image.write_to(&mut file, image::ImageFormat::Png).map_err(|e| e.to_string())?;
+                    final_image.write_to(&mut cursor, image::ImageFormat::Png).map_err(|e| e.to_string())?;
                 }
                 "tiff" => {
-                    final_image.write_to(&mut file, image::ImageFormat::Tiff).map_err(|e| e.to_string())?;
+                    final_image.write_to(&mut cursor, image::ImageFormat::Tiff).map_err(|e| e.to_string())?;
                 }
                 _ => return Err(format!("Unsupported file extension: {}", extension)),
             };
+
+            write_image_with_metadata(
+                &mut image_bytes,
+                &original_path,
+                &extension,
+                export_settings.keep_metadata,
+                export_settings.strip_gps,
+            )?;
+
+            fs::write(&output_path, image_bytes).map_err(|e| e.to_string())?;
+
             Ok(())
         })();
 
@@ -608,25 +629,39 @@ async fn batch_export_images(
                 }
 
                 let original_path = std::path::Path::new(image_path_str);
-                let original_stem = original_path.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
-                let new_filename = format!("{}_edited.{}", original_stem, output_format);
+                let filename_template = export_settings.filename_template.as_deref().unwrap_or("{original_filename}_edited");
+                let new_stem = generate_filename_from_template(filename_template, original_path, i + 1, total_paths);
+                let new_filename = format!("{}.{}", new_stem, output_format);
                 let output_path = output_folder_path.join(new_filename);
 
-                let mut file = BufWriter::new(fs::File::create(&output_path).map_err(|e| e.to_string())?);
+                let mut image_bytes = Vec::new();
+                let mut cursor = Cursor::new(&mut image_bytes);
+
                 match output_format.as_str() {
                     "jpg" | "jpeg" => {
                         let rgb_image = final_image.to_rgb8();
-                        let encoder = JpegEncoder::new_with_quality(&mut file, export_settings.jpeg_quality);
+                        let encoder = JpegEncoder::new_with_quality(&mut cursor, export_settings.jpeg_quality);
                         rgb_image.write_with_encoder(encoder).map_err(|e| e.to_string())?;
                     }
                     "png" => {
-                        final_image.write_to(&mut file, image::ImageFormat::Png).map_err(|e| e.to_string())?;
+                        final_image.write_to(&mut cursor, image::ImageFormat::Png).map_err(|e| e.to_string())?;
                     }
                     "tiff" => {
-                        final_image.write_to(&mut file, image::ImageFormat::Tiff).map_err(|e| e.to_string())?;
+                        final_image.write_to(&mut cursor, image::ImageFormat::Tiff).map_err(|e| e.to_string())?;
                     }
                     _ => return Err(format!("Unsupported file format: {}", output_format)),
                 };
+
+                write_image_with_metadata(
+                    &mut image_bytes,
+                    image_path_str,
+                    &output_format,
+                    export_settings.keep_metadata,
+                    export_settings.strip_gps,
+                )?;
+
+                fs::write(&output_path, image_bytes).map_err(|e| e.to_string())?;
+
                 Ok(())
             })();
 
@@ -655,6 +690,104 @@ fn cancel_export(state: tauri::State<AppState>) -> Result<(), String> {
     } else {
         return Err("No export task is currently running.".to_string());
     }
+    Ok(())
+}
+
+fn generate_filename_from_template(
+    template: &str,
+    original_path: &std::path::Path,
+    sequence: usize,
+    total: usize,
+) -> String {
+    let now = Local::now();
+    let stem = original_path.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
+    let sequence_str = format!("{:0width$}", sequence, width = total.to_string().len().max(1));
+
+    let mut result = template.to_string();
+    result = result.replace("{original_filename}", stem);
+    result = result.replace("{sequence}", &sequence_str);
+    result = result.replace("{YYYY}", &now.format("%Y").to_string());
+    result = result.replace("{MM}", &now.format("%m").to_string());
+    result = result.replace("{DD}", &now.format("%d").to_string());
+    result = result.replace("{hh}", &now.format("%H").to_string());
+    result = result.replace("{mm}", &now.format("%M").to_string());
+
+    result
+}
+
+fn write_image_with_metadata(
+    image_bytes: &mut Vec<u8>,
+    original_path_str: &str,
+    output_format: &str,
+    keep_metadata: bool,
+    strip_gps: bool,
+) -> Result<(), String> {
+    if !keep_metadata || output_format.to_lowercase() == "tiff" { // FIXME: temporary solution until I find a way to write metadata to TIFF
+        return Ok(());
+    }
+
+    let file_type = match output_format.to_lowercase().as_str() {
+        "jpg" | "jpeg" => FileExtension::JPEG,
+        "png" => FileExtension::PNG { as_zTXt_chunk: true },
+        "tiff" => FileExtension::TIFF,
+        _ => return Ok(()),
+    };
+
+    let original_path = std::path::Path::new(original_path_str);
+    if !original_path.exists() {
+        eprintln!("Original file not found, cannot copy metadata: {}", original_path_str);
+        return Ok(());
+    }
+
+    if let Ok(mut metadata) = Metadata::new_from_path(original_path) {
+        if strip_gps {
+            let dummy_rational = uR64 { nominator: 0, denominator: 1 };
+            let dummy_rational_vec1 = vec![dummy_rational.clone()];
+            let dummy_rational_vec3 = vec![dummy_rational.clone(), dummy_rational.clone(), dummy_rational.clone()];
+
+            metadata.remove_tag(ExifTag::GPSVersionID([0,0,0,0].to_vec()));
+            metadata.remove_tag(ExifTag::GPSLatitudeRef("".to_string()));
+            metadata.remove_tag(ExifTag::GPSLatitude(dummy_rational_vec3.clone()));
+            metadata.remove_tag(ExifTag::GPSLongitudeRef("".to_string()));
+            metadata.remove_tag(ExifTag::GPSLongitude(dummy_rational_vec3.clone()));
+            metadata.remove_tag(ExifTag::GPSAltitudeRef(vec![0]));
+            metadata.remove_tag(ExifTag::GPSAltitude(dummy_rational_vec1.clone()));
+            metadata.remove_tag(ExifTag::GPSTimeStamp(dummy_rational_vec3.clone()));
+            metadata.remove_tag(ExifTag::GPSSatellites("".to_string()));
+            metadata.remove_tag(ExifTag::GPSStatus("".to_string()));
+            metadata.remove_tag(ExifTag::GPSMeasureMode("".to_string()));
+            metadata.remove_tag(ExifTag::GPSDOP(dummy_rational_vec1.clone()));
+            metadata.remove_tag(ExifTag::GPSSpeedRef("".to_string()));
+            metadata.remove_tag(ExifTag::GPSSpeed(dummy_rational_vec1.clone()));
+            metadata.remove_tag(ExifTag::GPSTrackRef("".to_string()));
+            metadata.remove_tag(ExifTag::GPSTrack(dummy_rational_vec1.clone()));
+            metadata.remove_tag(ExifTag::GPSImgDirectionRef("".to_string()));
+            metadata.remove_tag(ExifTag::GPSImgDirection(dummy_rational_vec1.clone()));
+            metadata.remove_tag(ExifTag::GPSMapDatum("".to_string()));
+            metadata.remove_tag(ExifTag::GPSDestLatitudeRef("".to_string()));
+            metadata.remove_tag(ExifTag::GPSDestLatitude(dummy_rational_vec3.clone()));
+            metadata.remove_tag(ExifTag::GPSDestLongitudeRef("".to_string()));
+            metadata.remove_tag(ExifTag::GPSDestLongitude(dummy_rational_vec3.clone()));
+            metadata.remove_tag(ExifTag::GPSDestBearingRef("".to_string()));
+            metadata.remove_tag(ExifTag::GPSDestBearing(dummy_rational_vec1.clone()));
+            metadata.remove_tag(ExifTag::GPSDestDistanceRef("".to_string()));
+            metadata.remove_tag(ExifTag::GPSDestDistance(dummy_rational_vec1.clone()));
+            metadata.remove_tag(ExifTag::GPSProcessingMethod(vec![]));
+            metadata.remove_tag(ExifTag::GPSAreaInformation(vec![]));
+            metadata.remove_tag(ExifTag::GPSDateStamp("".to_string()));
+            metadata.remove_tag(ExifTag::GPSDifferential(vec![0u16]));
+            metadata.remove_tag(ExifTag::GPSHPositioningError(dummy_rational_vec1.clone()));
+        }
+
+        metadata.set_tag(ExifTag::Orientation(vec![1u16]));
+
+        if metadata.write_to_vec(image_bytes, file_type).is_err() {
+            eprintln!("Failed to write metadata to image vector for {}", original_path_str);
+        }
+    } else {
+        eprintln!("Failed to read metadata from original file: {}", original_path_str);
+    }
+
     Ok(())
 }
 
