@@ -253,10 +253,10 @@ struct AdjustmentScales {
 }
 
 const SCALES: AdjustmentScales = AdjustmentScales {
-    exposure: 25.0,
-    contrast: 100.0,
+    exposure: 20.0,
+    contrast: 80.0,
     highlights: 100.0,
-    shadows: 500.0,
+    shadows: 200.0,
     whites: 30.0,
     blacks: 50.0,
     saturation: 80.0,

@@ -36,6 +36,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-07-19:** Fixed banding on RAW images & better color noise reduction
 *   **2025-07-18:** Smooth zoom slider, new adaptive editor theme setting
 *   **2025-07-18:** New export functionality: Export with metadata, GPS metadata remover, batch export file naming scheme using tags
 *   **2025-07-18:** Ability to delete the associated RAW/JPEG in right click delete operations
@@ -46,11 +47,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-07-11:** More accurate shader, reorganized main library preferences dropdown, smoother histogram, more realistic film grain
 *   **2025-07-11:** Added a HUD-like waveform overlay toggle to display specific channel waveforms (w-key)
 *   **2025-07-10:** Rewritten batch export system and async thumbnail generation (makes the loading of large folders a lot more fluid)
-*   **2025-07-10:** Window transparency can now be toggled in the settings, thanks to @andrewazores
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-07-10:** Window transparency can now be toggled in the settings, thanks to @andrewazores
 *   **2025-07-08:** Ability to toggle the visibility of individual adjustments sections
 *   **2025-07-08:** Fixed top-left zoom bug, corrected scale behavior in crop panel, keep default original aspect ratio
 *   **2025-07-08:** Added image rating filter and redesigned the metadata panel with improved layout, clearer sections, and an embedded GPS map
