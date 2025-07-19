@@ -168,7 +168,16 @@ pub struct GlobalAdjustments {
     pub grain_amount: f32,
     pub grain_size: f32,
     pub grain_roughness: f32,
-    _pad1: f32,
+
+    pub enable_negative_conversion: u32,
+    pub film_base_r: f32,
+    pub film_base_g: f32,
+    pub film_base_b: f32,
+    pub negative_red_balance: f32,
+    pub negative_green_balance: f32,
+    pub negative_blue_balance: f32,
+    _pad_neg1: f32,
+    _pad_neg2: f32,
 
     pub color_grading_shadows: ColorGradeSettings,
     pub color_grading_midtones: ColorGradeSettings,
@@ -290,8 +299,8 @@ const SCALES: AdjustmentScales = AdjustmentScales {
     whites: 30.0,
     blacks: 60.0,
     saturation: 80.0,
-    temperature: 30.0,
-    tint: 200.0,
+    temperature: 25.0,
+    tint: 100.0,
     vibrance: 80.0,
     
     sharpness: 40.0,
@@ -391,6 +400,17 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
 
     let cg_obj = js_adjustments.get("colorGrading").cloned().unwrap_or_default();
 
+    let neg_conv_enabled = js_adjustments["enableNegativeConversion"].as_bool().unwrap_or(false);
+    let film_base_hex = js_adjustments["filmBaseColor"].as_str().unwrap_or("#ff8800");
+    let film_base_rgb = if film_base_hex.starts_with('#') && film_base_hex.len() == 7 {
+        let r = u8::from_str_radix(&film_base_hex[1..3], 16).unwrap_or(255) as f32 / 255.0;
+        let g = u8::from_str_radix(&film_base_hex[3..5], 16).unwrap_or(136) as f32 / 255.0;
+        let b = u8::from_str_radix(&film_base_hex[5..7], 16).unwrap_or(0) as f32 / 255.0;
+        [r, g, b]
+    } else {
+        [1.0, 0.53, 0.0] // Default orange
+    };
+
     GlobalAdjustments {
         exposure: get_val("basic", "exposure", SCALES.exposure, None),
         contrast: get_val("basic", "contrast", SCALES.contrast, None),
@@ -418,7 +438,16 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
         grain_amount: get_val("effects", "grainAmount", SCALES.grain_amount, None),
         grain_size: get_val("effects", "grainSize", SCALES.grain_size, Some(25.0)),
         grain_roughness: get_val("effects", "grainRoughness", SCALES.grain_roughness, Some(50.0)),
-        _pad1: 0.0,
+        
+        enable_negative_conversion: if neg_conv_enabled { 1 } else { 0 },
+        film_base_r: film_base_rgb[0],
+        film_base_g: film_base_rgb[1],
+        film_base_b: film_base_rgb[2],
+        negative_red_balance: js_adjustments["negativeRedBalance"].as_f64().unwrap_or(0.0) as f32 / 100.0,
+        negative_green_balance: js_adjustments["negativeGreenBalance"].as_f64().unwrap_or(0.0) as f32 / 100.0,
+        negative_blue_balance: js_adjustments["negativeBlueBalance"].as_f64().unwrap_or(0.0) as f32 / 100.0,
+        _pad_neg1: 0.0,
+        _pad_neg2: 0.0,
 
         color_grading_shadows: if is_visible("color") { parse_color_grade_settings(&cg_obj["shadows"]) } else { ColorGradeSettings::default() },
         color_grading_midtones: if is_visible("color") { parse_color_grade_settings(&cg_obj["midtones"]) } else { ColorGradeSettings::default() },

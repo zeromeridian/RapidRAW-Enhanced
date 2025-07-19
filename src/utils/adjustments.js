@@ -1,4 +1,3 @@
-// src/utils/adjustments.js
 import { v4 as uuidv4 } from 'uuid';
 
 const INITIAL_COLOR_GRADING = {
@@ -50,6 +49,11 @@ export const INITIAL_ADJUSTMENTS = {
   clarity: 0, dehaze: 0, structure: 0,
   vignetteAmount: 0, vignetteMidpoint: 50, vignetteRoundness: 0, vignetteFeather: 50,
   grainAmount: 0, grainSize: 25, grainRoughness: 50,
+  enableNegativeConversion: false,
+  filmBaseColor: '#ff8800',
+  negativeRedBalance: 0,
+  negativeGreenBalance: 0,
+  negativeBlueBalance: 0,
   colorGrading: { ...INITIAL_COLOR_GRADING },
   hsl: {
     reds: { hue: 0, saturation: 0, luminance: 0 }, oranges: { hue: 0, saturation: 0, luminance: 0 },
@@ -130,6 +134,7 @@ export const COPYABLE_ADJUSTMENT_KEYS = [
   'clarity', 'dehaze', 'structure',
   'vignetteAmount', 'vignetteMidpoint', 'vignetteRoundness', 'vignetteFeather',
   'grainAmount', 'grainSize', 'grainRoughness',
+  'enableNegativeConversion', 'filmBaseColor', 'negativeRedBalance', 'negativeGreenBalance', 'negativeBlueBalance',
   'hsl', 'curves', 'colorGrading', 'sectionVisibility',
 ];
 
@@ -141,6 +146,7 @@ export const ADJUSTMENT_SECTIONS = {
   effects: [
     'clarity', 'dehaze', 'structure',
     'vignetteAmount', 'vignetteMidpoint', 'vignetteRoundness', 'vignetteFeather',
-    'grainAmount', 'grainSize', 'grainRoughness'
+    'grainAmount', 'grainSize', 'grainRoughness',
+    'enableNegativeConversion', 'filmBaseColor', 'negativeRedBalance', 'negativeGreenBalance', 'negativeBlueBalance'
   ],
 };
