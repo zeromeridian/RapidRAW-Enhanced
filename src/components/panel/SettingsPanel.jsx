@@ -7,7 +7,7 @@ import ConfirmModal from '../modals/ConfirmModal';
 import Dropdown from '../ui/Dropdown';
 import Switch from '../ui/Switch';
 import Input from '../ui/Input';
-import { THEMES, DEFAULT_THEME_ID } from '../../themes';
+import { THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 
 const resolutions = [
   { value: 720, label: '720px' },

@@ -31,7 +31,7 @@ import Resizer from './components/ui/Resizer';
 import { INITIAL_ADJUSTMENTS, COPYABLE_ADJUSTMENT_KEYS, normalizeLoadedAdjustments } from './utils/adjustments';
 import { generatePaletteFromImage } from './utils/palette';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { THEMES, DEFAULT_THEME_ID } from './themes';
+import { THEMES, DEFAULT_THEME_ID } from './utils/themes';
 import { v4 as uuidv4 } from 'uuid';
 
 const DEBUG = false;
@@ -469,7 +469,7 @@ function App() {
           const darkTheme = THEMES.find(t => t.id === 'dark');
           setAdaptivePalette(darkTheme ? darkTheme.cssVariables : null);
         });
-    } else {
+    } else if (!appSettings?.adaptiveEditorTheme || !selectedImage) {
       setAdaptivePalette(null);
     }
   }, [appSettings?.adaptiveEditorTheme, selectedImage, finalPreviewUrl]);
@@ -485,9 +485,7 @@ function App() {
     let effectThemeForWindow = baseTheme.id;
 
     if (adaptivePalette) {
-        const darkTheme = THEMES.find(t => t.id === 'dark');
-        finalCssVariables = { ...(darkTheme ? darkTheme.cssVariables : baseTheme.cssVariables), ...adaptivePalette };
-        effectThemeForWindow = 'dark';
+        finalCssVariables = { ...finalCssVariables, ...adaptivePalette };
     }
 
     Object.entries(finalCssVariables).forEach(([key, value]) => {

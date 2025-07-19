@@ -16,7 +16,7 @@ import { FixedSizeGrid as Grid } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import Button from '../ui/Button';
 import SettingsPanel from './SettingsPanel';
-import { THEMES, DEFAULT_THEME_ID } from '../../themes';
+import { THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 
 const sortOptions = [
   { key: 'name', order: 'asc', label: 'File Name (A-Z)' },
