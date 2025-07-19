@@ -174,7 +174,7 @@ const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0 }) =>
         <div 
           className="flex items-center gap-2 cursor-pointer"
           onDoubleClick={handleReset}
-          title={`Double-click to reset ${label.toLowerCase()}`}
+          title={typeof label === 'string' && label ? `Double-click to reset ${label.toLowerCase()}` : 'Double-click to reset'}
         >
           <label className="text-sm font-medium text-text-secondary select-none">{label}</label>
           <button

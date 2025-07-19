@@ -12,6 +12,13 @@ struct HslColor {
     _pad: f32,
 }
 
+struct ColorGradeSettings {
+    hue: f32,
+    saturation: f32,
+    luminance: f32,
+    _pad: f32,
+}
+
 struct GlobalAdjustments {
     exposure: f32,
     contrast: f32,
@@ -38,6 +45,14 @@ struct GlobalAdjustments {
     grain_size: f32,
     grain_roughness: f32,
     _pad1: f32,
+
+    color_grading_shadows: ColorGradeSettings,
+    color_grading_midtones: ColorGradeSettings,
+    color_grading_highlights: ColorGradeSettings,
+    color_grading_blending: f32,
+    color_grading_balance: f32,
+    _pad2: f32,
+    _pad3: f32,
 
     hsl: array<HslColor, 8>,
     luma_curve: array<Point, 16>,
@@ -73,6 +88,14 @@ struct MaskAdjustments {
     _pad2: f32,
     _pad3: f32,
     _pad4: f32,
+
+    color_grading_shadows: ColorGradeSettings,
+    color_grading_midtones: ColorGradeSettings,
+    color_grading_highlights: ColorGradeSettings,
+    color_grading_blending: f32,
+    color_grading_balance: f32,
+    _pad5: f32,
+    _pad6: f32,
 
     hsl: array<HslColor, 8>,
     luma_curve: array<Point, 16>,
@@ -393,6 +416,60 @@ fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>) -> vec
     return hsv_to_rgb(hsv);
 }
 
+fn apply_color_grading(
+    color: vec3<f32>, 
+    shadows: ColorGradeSettings,
+    midtones: ColorGradeSettings,
+    highlights: ColorGradeSettings,
+    blending: f32,
+    balance: f32
+) -> vec3<f32> {
+    let luma = get_luma(max(vec3(0.0), color));
+    let base_shadow_crossover = 0.1;
+    let base_highlight_crossover = 0.5;
+    let balance_range = 0.5;
+    let shadow_crossover = base_shadow_crossover + max(0.0, -balance) * balance_range;
+    let highlight_crossover = base_highlight_crossover - max(0.0, balance) * balance_range;
+
+    let feather = 0.2 * blending;
+    let final_shadow_crossover = min(shadow_crossover, highlight_crossover - 0.01);
+
+    let shadow_mask = 1.0 - smoothstep(final_shadow_crossover - feather, final_shadow_crossover + feather, luma);
+    let highlight_mask = smoothstep(highlight_crossover - feather, highlight_crossover + feather, luma);
+    let midtone_mask = max(0.0, 1.0 - shadow_mask - highlight_mask);
+
+    var graded_color = color;
+
+    let shadow_sat_strength = 0.3;
+    let shadow_lum_strength = 0.5;
+
+    let midtone_sat_strength = 0.6;
+    let midtone_lum_strength = 0.8;
+
+    let highlight_sat_strength = 0.8;
+    let highlight_lum_strength = 1.0;
+
+    if (shadows.saturation > 0.001) {
+        let tint_rgb = hsv_to_rgb(vec3<f32>(shadows.hue, 1.0, 1.0));
+        graded_color += (tint_rgb - 0.5) * shadows.saturation * shadow_mask * shadow_sat_strength;
+    }
+    graded_color += shadows.luminance * shadow_mask * shadow_lum_strength;
+
+    if (midtones.saturation > 0.001) {
+        let tint_rgb = hsv_to_rgb(vec3<f32>(midtones.hue, 1.0, 1.0));
+        graded_color += (tint_rgb - 0.5) * midtones.saturation * midtone_mask * midtone_sat_strength;
+    }
+    graded_color += midtones.luminance * midtone_mask * midtone_lum_strength;
+
+    if (highlights.saturation > 0.001) {
+        let tint_rgb = hsv_to_rgb(vec3<f32>(highlights.hue, 1.0, 1.0));
+        graded_color += (tint_rgb - 0.5) * highlights.saturation * highlight_mask * highlight_sat_strength;
+    }
+    graded_color += highlights.luminance * highlight_mask * highlight_lum_strength;
+
+    return graded_color;
+}
+
 fn apply_local_contrast(processed_color: vec3<f32>, coords_i: vec2<i32>, radius: i32, amount: f32) -> vec3<f32> {
     if (amount == 0.0) { return processed_color; }
     let max_coords = vec2<i32>(textureDimensions(input_texture) - 1u);
@@ -534,6 +611,14 @@ fn apply_all_adjustments(initial_rgb: vec3<f32>, adj: GlobalAdjustments, coords_
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20, adj.structure);
     processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
     processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl);
+    processed_rgb = apply_color_grading(
+        processed_rgb,
+        adj.color_grading_shadows,
+        adj.color_grading_midtones,
+        adj.color_grading_highlights,
+        adj.color_grading_blending,
+        adj.color_grading_balance
+    );
 
     let srgb_for_curves = linear_to_srgb(processed_rgb);
     let curved_srgb = apply_all_curves(srgb_for_curves,
@@ -557,6 +642,14 @@ fn apply_all_mask_adjustments(initial_rgb: vec3<f32>, adj: MaskAdjustments, coor
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20, adj.structure);
     processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
     processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl);
+    processed_rgb = apply_color_grading(
+        processed_rgb,
+        adj.color_grading_shadows,
+        adj.color_grading_midtones,
+        adj.color_grading_highlights,
+        adj.color_grading_blending,
+        adj.color_grading_balance
+    );
 
     let srgb_for_curves = linear_to_srgb(processed_rgb);
     let curved_srgb = apply_all_curves(srgb_for_curves,

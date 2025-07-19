@@ -65,8 +65,10 @@ function App() {
   const [histogram, setHistogram] = useState(null);
   const [waveform, setWaveform] = useState(null);
   const [isWaveformVisible, setIsWaveformVisible] = useState(false);
-  const [isFilmstripVisible, setIsFilmstripVisible] = useState(true);
-  const [isFolderTreeVisible, setIsFolderTreeVisible] = useState(true);
+  const [uiVisibility, setUiVisibility] = useState({
+    folderTree: true,
+    filmstrip: true,
+  });
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isFullScreenLoading, setIsFullScreenLoading] = useState(false);
@@ -411,11 +413,17 @@ function App() {
   }, [activeRightPanel]);
 
   const handleSettingsChange = useCallback((newSettings) => {
-    if (newSettings.theme && newSettings.theme !== theme) {
-      setTheme(newSettings.theme);
-    }
-    setAppSettings(newSettings);
-    invoke('save_settings', { settings: newSettings }).catch(err => console.error("Failed to save settings:", err));
+      if (!newSettings) {
+        console.error("handleSettingsChange was called with null settings. Aborting save operation.");
+        return;
+      }
+      if (newSettings.theme && newSettings.theme !== theme) {
+        setTheme(newSettings.theme);
+      }
+      setAppSettings(newSettings);
+      invoke('save_settings', { settings: newSettings }).catch(err => {
+          console.error("Failed to save settings:", err)
+      });
   }, [theme]);
 
   useEffect(() => {
@@ -433,6 +441,9 @@ function App() {
         if (settings?.theme) {
           setTheme(settings.theme);
         }
+        if (settings?.uiVisibility) {
+          setUiVisibility(prev => ({ ...prev, ...settings.uiVisibility }));
+        }
       })
       .catch(err => {
         console.error("Failed to load settings:", err);
@@ -440,6 +451,13 @@ function App() {
       })
       .finally(() => { isInitialMount.current = false; });
   }, []);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) return;
+    if (JSON.stringify(appSettings.uiVisibility) !== JSON.stringify(uiVisibility)) {
+        handleSettingsChange({ ...appSettings, uiVisibility });
+    }
+  }, [uiVisibility, appSettings, handleSettingsChange]);
 
   useEffect(() => {
     invoke('get_supported_file_types')
@@ -1338,8 +1356,8 @@ function App() {
               multiSelectedPaths={multiSelectedPaths}
               thumbnails={thumbnails}
               imageRatings={imageRatings}
-              isFilmstripVisible={isFilmstripVisible}
-              setIsFilmstripVisible={setIsFilmstripVisible}
+              isFilmstripVisible={uiVisibility.filmstrip}
+              setIsFilmstripVisible={(value) => setUiVisibility(prev => ({ ...prev, filmstrip: value }))}
               isLoading={isViewLoading}
               onClearSelection={handleClearSelection}
               filmstripHeight={bottomPanelHeight}
@@ -1476,9 +1494,9 @@ function App() {
                 onFolderSelect={handleSelectSubfolder}
                 selectedPath={currentFolderPath}
                 isLoading={isTreeLoading}
-                isVisible={isFolderTreeVisible}
-                setIsVisible={setIsFolderTreeVisible}
-                style={{ width: isFolderTreeVisible ? `${leftPanelWidth}px` : '32px' }}
+                isVisible={uiVisibility.folderTree}
+                setIsVisible={(value) => setUiVisibility(prev => ({ ...prev, folderTree: value }))}
+                style={{ width: uiVisibility.folderTree ? `${leftPanelWidth}px` : '32px' }}
                 isResizing={isResizing}
                 onContextMenu={handleFolderTreeContextMenu}
                 expandedFolders={expandedFolders}

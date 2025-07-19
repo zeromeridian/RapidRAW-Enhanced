@@ -86,6 +86,7 @@ pub struct AppSettings {
     pub comfyui_address: Option<String>,
     pub last_folder_state: Option<LastFolderState>,
     pub adaptive_editor_theme: Option<bool>,
+    pub ui_visibility: Option<Value>,
 }
 
 impl Default for AppSettings {
@@ -104,6 +105,7 @@ impl Default for AppSettings {
             comfyui_address: None,
             last_folder_state: None,
             adaptive_editor_theme: Some(false),
+            ui_visibility: None,
         }
     }
 }
