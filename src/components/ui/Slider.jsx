@@ -207,7 +207,7 @@ const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0 }) =>
               onDoubleClick={handleReset}
               title={`Click to edit, double-click to reset to ${defaultValue}`}
             >
-              {numericValue.toFixed(decimalPlaces)}
+              {label === 'Exposure' && numericValue === 0 ? '0' : numericValue.toFixed(decimalPlaces)}
             </span>
           )}
         </div>

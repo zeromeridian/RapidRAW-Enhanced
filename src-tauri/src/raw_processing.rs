@@ -13,17 +13,14 @@ pub fn develop_raw_image(file_bytes: &[u8], fast_demosaic: bool) -> Result<Dynam
     Ok(apply_orientation(developed_image, orientation))
 }
 
-fn process_and_rescale_pixel_channel(value_from_rawler: f32, rescale_factor: f32) -> f32 {
-    let linear_val = (value_from_rawler * rescale_factor).max(0.0);
-
-    let x = linear_val;
+fn apply_tonemap_and_gamma(linear_val: f32) -> f32 {
+    let x = linear_val.max(0.0);
     let a = 2.51;
     let b = 0.03;
     let c = 2.43;
     let d = 0.59;
     let e = 0.14;
-    let tonemapped = (x * (a * x + b)) / (x * (c * x + d) + e);
-    let tonemapped = tonemapped.max(0.0);
+    let tonemapped = ((x * (a * x + b)) / (x * (c * x + d) + e)).max(0.0).min(1.0);
 
     if tonemapped <= 0.0031308 {
         tonemapped * 12.92
@@ -58,28 +55,64 @@ fn develop_internal(file_bytes: &[u8], fast_demosaic: bool) -> Result<(DynamicIm
     }
     developer.steps.retain(|&step| step != ProcessingStep::SRgb);
 
-    let mut dark_intermediate = developer.develop_intermediate(&raw_image)?;
+    let mut developed_intermediate = developer.develop_intermediate(&raw_image)?;
 
     let denominator = (original_white_level - original_black_level).max(1.0);
     let rescale_factor = (headroom_white_level - original_black_level) / denominator;
 
-    match &mut dark_intermediate {
+    const HIGHLIGHT_COMPRESSION_POINT: f32 = 3.0; // FIXME: This is not a good solution yet
+
+    match &mut developed_intermediate {
         Intermediate::Monochrome(pixels) => {
-            pixels.data.iter_mut().for_each(|p| *p = process_and_rescale_pixel_channel(*p, rescale_factor));
+            pixels.data.iter_mut().for_each(|p| {
+                let linear_val = *p * rescale_factor;
+                *p = apply_tonemap_and_gamma(linear_val);
+            });
         }
         Intermediate::ThreeColor(pixels) => {
             pixels.data.iter_mut().for_each(|p| {
-                p.iter_mut().for_each(|c| *c = process_and_rescale_pixel_channel(*c, rescale_factor));
+                let r = (p[0] * rescale_factor).max(0.0);
+                let g = (p[1] * rescale_factor).max(0.0);
+                let b = (p[2] * rescale_factor).max(0.0);
+
+                let max_c = r.max(g).max(b);
+
+                let (final_r, final_g, final_b) = if max_c > 1.0 {
+                    let min_c = r.min(g).min(b);
+                    let compression_factor = (1.0 - (max_c - 1.0) / (HIGHLIGHT_COMPRESSION_POINT - 1.0))
+                        .max(0.0)
+                        .min(1.0);
+                    let compressed_r = min_c + (r - min_c) * compression_factor;
+                    let compressed_g = min_c + (g - min_c) * compression_factor;
+                    let compressed_b = min_c + (b - min_c) * compression_factor;
+                    let compressed_max = compressed_r.max(compressed_g).max(compressed_b);
+
+                    if compressed_max > 1e-6 {
+                        let rescale = max_c / compressed_max;
+                        (compressed_r * rescale, compressed_g * rescale, compressed_b * rescale)
+                    } else {
+                        (max_c, max_c, max_c)
+                    }
+                } else {
+                    (r, g, b)
+                };
+
+                p[0] = apply_tonemap_and_gamma(final_r);
+                p[1] = apply_tonemap_and_gamma(final_g);
+                p[2] = apply_tonemap_and_gamma(final_b);
             });
         }
         Intermediate::FourColor(pixels) => {
             pixels.data.iter_mut().for_each(|p| {
-                p.iter_mut().for_each(|c| *c = process_and_rescale_pixel_channel(*c, rescale_factor));
+                p.iter_mut().for_each(|c| {
+                    let linear_val = *c * rescale_factor;
+                    *c = apply_tonemap_and_gamma(linear_val);
+                });
             });
         }
     }
 
-    let dynamic_image = dark_intermediate
+    let dynamic_image = developed_intermediate
         .to_dynamic_image()
         .ok_or_else(|| anyhow::anyhow!("Failed to convert developed image to DynamicImage"))?;
 

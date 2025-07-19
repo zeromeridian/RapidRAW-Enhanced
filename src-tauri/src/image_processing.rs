@@ -253,12 +253,12 @@ struct AdjustmentScales {
 }
 
 const SCALES: AdjustmentScales = AdjustmentScales {
-    exposure: 20.0,
-    contrast: 80.0,
+    exposure: 1.0,
+    contrast: 100.0,
     highlights: 100.0,
     shadows: 200.0,
     whites: 30.0,
-    blacks: 50.0,
+    blacks: 60.0,
     saturation: 80.0,
     temperature: 30.0,
     tint: 200.0,
@@ -828,7 +828,7 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
     println!("Vignette: center_luma={:.3}, edge_luma={:.3}", avg_center_luma, avg_edge_luma);
     println!("---------------------------------");
     println!("Calculated Values (pre-clamp):");
-    println!("  Exposure: {:.2}, Contrast: {:.2}", exposure, contrast);
+    println!("  Exposure: {:.2}, Contrast: {:.2}", exposure / 20.0, contrast);
     println!("  Highlights: {:.2}, Shadows: {:.2}", highlights, shadows);
     println!("  Temperature: {:.2}, Tint: {:.2}", temperature, tint);
     println!("  Vibrance: {:.2}, Dehaze: {:.2}", vibrancy, dehaze);
@@ -836,7 +836,7 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
     println!("---------------------------------\n");
 
     AutoAdjustmentResults {
-        exposure: exposure.clamp(-100.0, 100.0),
+        exposure: (exposure / 20.0).clamp(-5.0, 5.0),
         contrast: contrast.clamp(0.0, 100.0),
         highlights: highlights.clamp(-100.0, 0.0),
         shadows: shadows.clamp(0.0, 100.0),
