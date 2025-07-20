@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { DndContext, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/core';
+import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { usePresets } from '../../../hooks/usePresets';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { Plus, Loader2, FileUp, FileDown, Edit, Trash2, CopyPlus, RefreshCw, FolderPlus, Folder as FolderIcon, FolderOpen } from 'lucide-react';
@@ -39,6 +39,7 @@ function DraggablePresetItem({ preset, onApply, onContextMenu, previewUrl, isGen
 
   const style = {
     opacity: isDragging ? 0.4 : 1,
+    touchAction: 'none',
   };
 
   return (
@@ -129,6 +130,14 @@ export default function PresetsPanel({ adjustments, setAdjustments, selectedImag
   const [deletingItemId, setDeletingItemId] = useState(null);
   const previewsRef = useRef(previews);
   previewsRef.current = previews;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 10,
+      },
+    })
+  );
 
   const { setNodeRef: setRootNodeRef, isOver: isRootOver } = useDroppable({ id: 'root' });
 
@@ -486,7 +495,7 @@ export default function PresetsPanel({ adjustments, setAdjustments, selectedImag
   const folders = sortedItems.filter(item => item.folder);
 
   return (
-    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex flex-col h-full">
         <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
           <h2 className="text-xl font-bold text-primary text-shadow-shiny">Presets</h2>
