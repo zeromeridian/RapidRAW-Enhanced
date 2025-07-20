@@ -27,6 +27,12 @@ const ColorWheel = ({ label, value, onChange, defaultValue = { h: 0, s: 0, lum: 
     const { h, s, lum } = value;
     const sizerRef = useRef(null);
     const [wheelSize, setWheelSize] = useState(0);
+    const containerRef = useRef(null);
+    const [isHovered, setIsHovered] = useState(false);
+    const [isWheelDragging, setIsWheelDragging] = useState(false);
+    const [isSliderDragging, setIsSliderDragging] = useState(false);
+
+    const isDragging = isWheelDragging || isSliderDragging;
 
     useEffect(() => {
         const observer = new ResizeObserver(entries => {
@@ -49,6 +55,25 @@ const ColorWheel = ({ label, value, onChange, defaultValue = { h: 0, s: 0, lum: 
             }
         };
     }, []);
+
+    useEffect(() => {
+        const handleInteractionEnd = () => {
+            setIsWheelDragging(false);
+            if (containerRef.current && !containerRef.current.matches(':hover')) {
+                setIsHovered(false);
+            }
+        };
+
+        if (isWheelDragging) {
+            window.addEventListener('mouseup', handleInteractionEnd);
+            window.addEventListener('touchend', handleInteractionEnd);
+        }
+
+        return () => {
+            window.removeEventListener('mouseup', handleInteractionEnd);
+            window.removeEventListener('touchend', handleInteractionEnd);
+        };
+    }, [isWheelDragging]);
   
     const handleWheelChange = (color) => {
       onChange({ ...value, h: color.hsva.h, s: color.hsva.s });
@@ -66,22 +91,31 @@ const ColorWheel = ({ label, value, onChange, defaultValue = { h: 0, s: 0, lum: 
     const hexColor = hsvaToHex(hsva);
   
     return (
-      <div className="flex flex-col items-center gap-2 group">
+      <div 
+        ref={containerRef}
+        className="relative flex flex-col items-center gap-2"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => {
+            if (!isDragging) {
+                setIsHovered(false);
+            }
+        }}
+      >
         <div 
-            className="flex items-center justify-center gap-2 cursor-pointer"
+            className="flex items-center justify-center cursor-pointer"
             onDoubleClick={handleReset}
             title={`Double-click to reset ${label.toLowerCase()}`}
         >
             <p className="text-sm font-medium text-text-secondary select-none">{label}</p>
-            <button
-                onClick={handleReset}
-                className="p-0.5 rounded hover:bg-card-active transition-all duration-200 cursor-pointer opacity-0 group-hover:opacity-100 active:scale-95"
-                title={`Reset ${label.toLowerCase()}`}
-                type="button"
-            >
-                <ResetIcon />
-            </button>
         </div>
+        <button
+            onClick={handleReset}
+            className={`absolute top-0 right-0 p-0.5 rounded hover:bg-card-active transition-all duration-200 cursor-pointer active:scale-95 ${isHovered && !isDragging ? 'opacity-100' : 'opacity-0'}`}
+            title={`Reset ${label.toLowerCase()}`}
+            type="button"
+        >
+            <ResetIcon />
+        </button>
 
         <div ref={sizerRef} className="relative w-full aspect-square">
             {wheelSize > 0 && (
@@ -89,6 +123,8 @@ const ColorWheel = ({ label, value, onChange, defaultValue = { h: 0, s: 0, lum: 
                     className="absolute inset-0 cursor-pointer"
                     onDoubleClick={handleReset}
                     title="Double-click to reset"
+                    onMouseDown={() => setIsWheelDragging(true)}
+                    onTouchStart={() => setIsWheelDragging(true)}
                 >
                     <Wheel
                         color={hsva}
@@ -124,6 +160,7 @@ const ColorWheel = ({ label, value, onChange, defaultValue = { h: 0, s: 0, lum: 
             max="100"
             step="1"
             defaultValue={defaultValue.lum}
+            onDragStateChange={setIsSliderDragging}
           />
         </div>
       </div>
