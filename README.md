@@ -20,7 +20,20 @@ RapidRAW is a modern, high-performance alternative to Adobe Lightroom®. It deli
 
 I developed this project as a personal challenge at the age of 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of both React and Rust, with the support from Google Gemini.
 
-**[Download the Latest Version](https://github.com/CyberTimon/RapidRAW/releases/latest)**
+<table width="100%">
+  <tr>
+    <td width="50%" valign="top" align="center">
+      <h3>Download RapidRAW</h3>
+      <p>Get the latest release for Windows, macOS, and Linux. Packaged and ready to run.</p>
+      <strong><a href="https://github.com/CyberTimon/RapidRAW/releases/latest">Download Latest Version →</a></strong>
+    </td>
+    <td width="50%" valign="top" align="center">
+      <h3>Read the Docs</h3>
+      <p>Learn how to use RapidRAW with step-by-step tutorials, from adjustments to masking.</p>
+      <strong><a href="https://github.com/CyberTimon/RapidRAW-Docs">View Tutorials & Examples →</a></strong>
+    </td>
+  </tr>
+</table>
 
 Have fun!
 
