@@ -26,11 +26,13 @@ I developed this project as a personal challenge at the age of 18. My goal was t
       <h3>Download RapidRAW</h3>
       <p>Get the latest release for Windows, macOS, and Linux. Packaged and ready to run.</p>
       <strong><a href="https://github.com/CyberTimon/RapidRAW/releases/latest">Download Latest Version →</a></strong>
+      <br>
     </td>
     <td width="50%" valign="top" align="center">
       <h3>Read the Docs</h3>
       <p>Learn how to use RapidRAW with step-by-step tutorials, from adjustments to masking.</p>
       <strong><a href="https://github.com/CyberTimon/RapidRAW-Docs">View Tutorials & Examples →</a></strong>
+      <br>
     </td>
   </tr>
 </table>
@@ -49,6 +51,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-07-20:** Tutorials on how to use RapidRAW
 *   **2025-07-19:** Initial color negative conversion implementation, shader improvements
 *   **2025-07-19:** New color wheels, persistent collapsed / expanded state for UI elements 
 *   **2025-07-19:** Fixed banding & purple artefacts on RAW images, better color noise reduction, show exposure in stops
@@ -59,11 +62,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-07-13:** Native looking titlebar and ability to input precise number into sliders
 *   **2025-07-13:** Huge update to masks: You can now add multiple masks to a mask containers, subtract / add / combine masks etc.
 *   **2025-07-12:** Improved curves tool, more shader improvements, improved handling of very large files
-*   **2025-07-11:** More accurate shader, reorganized main library preferences dropdown, smoother histogram, more realistic film grain
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-07-11:** More accurate shader, reorganized main library preferences dropdown, smoother histogram, more realistic film grain
 *   **2025-07-11:** Added a HUD-like waveform overlay toggle to display specific channel waveforms (w-key)
 *   **2025-07-10:** Rewritten batch export system and async thumbnail generation (makes the loading of large folders a lot more fluid)
 *   **2025-07-10:** Window transparency can now be toggled in the settings, thanks to @andrewazores
