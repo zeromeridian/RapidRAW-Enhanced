@@ -461,12 +461,12 @@ export default function PresetsPanel({ adjustments, setAdjustments, selectedImag
     event.preventDefault();
     const options = [
       {
-        label: 'New Preset...',
+        label: 'New Preset',
         icon: Plus,
         onClick: () => setIsAddModalOpen(true),
       },
       {
-        label: 'New Folder...',
+        label: 'New Folder',
         icon: FolderPlus,
         onClick: () => setIsAddFolderModalOpen(true),
       },
