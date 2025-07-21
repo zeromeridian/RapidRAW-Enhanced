@@ -112,6 +112,7 @@ function App() {
   const transformWrapperRef = useRef(null);
   const isProgrammaticZoom = useRef(false);
   const isInitialMount = useRef(true);
+  const [libraryScrollOffset, setLibraryScrollOffset] = useState(0);
 
   const [exportState, setExportState] = useState({
     status: 'idle',
@@ -123,6 +124,10 @@ function App() {
   useEffect(() => { if (!isPasted) return; const timer = setTimeout(() => setIsPasted(false), 1000); return () => clearTimeout(timer); }, [isPasted]);
 
   const debouncedSetHistory = useCallback(debounce((newAdjustments) => setHistoryAdjustments(newAdjustments), 300), [setHistoryAdjustments]);
+
+  const handleLibraryScroll = useCallback(({ scrollTop }) => {
+      setLibraryScrollOffset(scrollTop);
+  }, []);
 
   const setAdjustments = useCallback((value) => {
     setLiveAdjustments(prevAdjustments => {
@@ -528,6 +533,7 @@ function App() {
 
   const handleSelectSubfolder = useCallback(async (path, isNewRoot = false) => {
     setIsViewLoading(true);
+    setLibraryScrollOffset(0);
     try {
       setCurrentFolderPath(path);
 
@@ -1448,6 +1454,8 @@ function App() {
             onSettingsChange={handleSettingsChange}
             onLibraryRefresh={handleLibraryRefresh}
             theme={theme}
+            initialScrollOffset={libraryScrollOffset}
+            onScroll={handleLibraryScroll}
           />
           {rootPath && <BottomBar
             isLibraryView={true}
