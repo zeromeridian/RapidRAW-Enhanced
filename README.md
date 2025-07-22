@@ -51,6 +51,8 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-07-22:** Significant improvements to the shader: More accurate exposure slider, better tone mapper (simplified ACES)
+*   **2025-07-21:** Remember scroll position when going into the editing section
 *   **2025-07-20:** Ability to add presets to folders, export preset folders etc, preset _animations_
 *   **2025-07-20:** Tutorials on how to use RapidRAW
 *   **2025-07-19:** Initial color negative conversion implementation, shader improvements
@@ -60,12 +62,12 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-07-18:** New export functionality: Export with metadata, GPS metadata remover, batch export file naming scheme using tags
 *   **2025-07-18:** Ability to delete the associated RAW/JPEG in right click delete operations
 *   **2025-07-17:** Small bug fixes
-*   **2025-07-13:** Native looking titlebar and ability to input precise number into sliders
-*   **2025-07-13:** Huge update to masks: You can now add multiple masks to a mask containers, subtract / add / combine masks etc.
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-07-13:** Native looking titlebar and ability to input precise number into sliders
+*   **2025-07-13:** Huge update to masks: You can now add multiple masks to a mask containers, subtract / add / combine masks etc.
 *   **2025-07-12:** Improved curves tool, more shader improvements, improved handling of very large files
 *   **2025-07-11:** More accurate shader, reorganized main library preferences dropdown, smoother histogram, more realistic film grain
 *   **2025-07-11:** Added a HUD-like waveform overlay toggle to display specific channel waveforms (w-key)
