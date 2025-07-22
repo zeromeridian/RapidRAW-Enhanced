@@ -366,9 +366,9 @@ fn parse_color_grade_settings(js_cg: &serde_json::Value) -> ColorGradeSettings {
         return ColorGradeSettings::default();
     }
     ColorGradeSettings {
-        hue: js_cg["h"].as_f64().unwrap_or(0.0) as f32,
-        saturation: js_cg["s"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_grading_saturation,
-        luminance: js_cg["lum"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_grading_luminance,
+        hue: js_cg["hue"].as_f64().unwrap_or(0.0) as f32,
+        saturation: js_cg["saturation"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_grading_saturation,
+        luminance: js_cg["luminance"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_grading_luminance,
         _pad: 0.0,
     }
 }
