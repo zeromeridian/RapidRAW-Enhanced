@@ -498,14 +498,7 @@ fn apply_noise_reduction(color: vec3<f32>, coords_i: vec2<i32>, luma_amount: f32
 }
 
 fn aces_fitted(c: vec3<f32>) -> vec3<f32> {
-    let a = 2.51;
-    let b = 0.03;
-    let c_ = 2.43;
-    let d = 0.59;
-    let e = 0.14;
-    let numerator = c * (a * c + b);
-    let denominator = c * (c_ * c + d) + e;
-    return numerator / denominator;
+    return c; // FIXME: Maybe with a setting? Most people probably don't like this hardcoded ACES, so removed temporarly.
 }
 
 fn apply_all_curves(color: vec3<f32>, luma_curve: array<Point, 16>, luma_curve_count: u32, red_curve: array<Point, 16>, red_curve_count: u32, green_curve: array<Point, 16>, green_curve_count: u32, blue_curve: array<Point, 16>, blue_curve_count: u32) -> vec3<f32> {
