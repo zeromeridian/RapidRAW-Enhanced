@@ -787,8 +787,8 @@ const ImageCanvas = memo(({
         {cropPreviewUrl && uncroppedImageRenderSize && (
           <ReactCrop
             crop={crop}
-            onChange={(_, percentCrop) => setCrop(percentCrop)}
-            onComplete={(c, pc) => handleCropComplete(c, pc, cropImageRef.current)}
+            onChange={setCrop}
+            onComplete={handleCropComplete}
             aspect={adjustments.aspectRatio}
             ruleOfThirds
           >
