@@ -4,7 +4,7 @@ import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialo
 import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { usePresets } from '../../../hooks/usePresets';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { Plus, Loader2, FileUp, FileDown, Edit, Trash2, CopyPlus, RefreshCw, FolderPlus, Folder as FolderIcon, FolderOpen } from 'lucide-react';
+import { Plus, Loader2, FileUp, FileDown, Edit, Trash2, CopyPlus, RefreshCw, FolderPlus, Folder as FolderIcon, FolderOpen, SortAsc } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AddPresetModal from '../../modals/AddPresetModal';
 import RenamePresetModal from '../../modals/RenamePresetModal';
@@ -31,10 +31,65 @@ function PresetItemDisplay({ preset, previewUrl, isGeneratingPreviews }) {
   );
 }
 
+function FolderItemDisplay({ folder }) {
+  return (
+    <div className="flex items-center gap-2 p-2 rounded-lg bg-surface cursor-grabbing w-full">
+      <div className="p-1">
+        <FolderIcon size={18} />
+      </div>
+      <p className="font-normal flex-grow truncate select-none">{folder.name}</p>
+      <span className="text-text-secondary text-sm ml-auto pr-1">{folder.children?.length || 0}</span>
+    </div>
+  );
+}
+
 function DraggablePresetItem({ preset, onApply, onContextMenu, previewUrl, isGeneratingPreviews }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef: setDraggableNodeRef, isDragging } = useDraggable({
     id: preset.id,
     data: { type: 'preset', preset },
+  });
+
+  const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
+    id: preset.id,
+    data: { type: 'preset', preset },
+  });
+
+  const setCombinedRef = useCallback(node => {
+    setDraggableNodeRef(node);
+    setDroppableNodeRef(node);
+  }, [setDraggableNodeRef, setDroppableNodeRef]);
+
+  const style = {
+    opacity: isDragging ? 0.4 : 1,
+    touchAction: 'none',
+    outline: isOver ? '2px solid var(--color-primary)' : '2px solid transparent',
+    outlineOffset: '-2px',
+    borderRadius: '10px',
+  };
+
+  return (
+    <div
+      ref={setCombinedRef}
+      style={style}
+      onClick={() => onApply(preset)}
+      onContextMenu={(e) => onContextMenu(e, { preset })}
+    >
+      <div {...listeners} {...attributes} className="cursor-grab">
+        <PresetItemDisplay preset={preset} previewUrl={previewUrl} isGeneratingPreviews={isGeneratingPreviews} />
+      </div>
+    </div>
+  );
+}
+
+function DroppableFolderItem({ folder, onContextMenu, children, onToggle, isExpanded }) {
+  const { attributes, listeners, setNodeRef: setDraggableNodeRef, isDragging } = useDraggable({
+    id: folder.id,
+    data: { type: 'folder', folder },
+  });
+
+  const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
+    id: folder.id,
+    data: { type: 'folder', folder },
   });
 
   const style = {
@@ -42,47 +97,35 @@ function DraggablePresetItem({ preset, onApply, onContextMenu, previewUrl, isGen
     touchAction: 'none',
   };
 
+  const hasChildren = folder.children && folder.children.length > 0;
+
   return (
     <div
-      ref={setNodeRef}
+      ref={setDroppableNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
-      onClick={() => onApply(preset)}
-      onContextMenu={(e) => onContextMenu(e, { preset })}
+      className={`rounded-lg transition-colors ${isOver ? 'bg-surface-hover' : ''}`}
     >
-      <PresetItemDisplay preset={preset} previewUrl={previewUrl} isGeneratingPreviews={isGeneratingPreviews} />
-    </div>
-  );
-}
-
-function DroppableFolderItem({ folder, onContextMenu, children, onToggle, isExpanded }) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: folder.id,
-    data: { type: 'folder', folder },
-  });
-
-  return (
-    <div className="space-y-1">
       <div
-        ref={setNodeRef}
-        onClick={() => onToggle(folder.id)}
         onContextMenu={(e) => onContextMenu(e, { folder })}
-        className={`flex items-center gap-2 p-2 rounded-lg transition-colors cursor-pointer ${isOver ? 'bg-card-active' : 'bg-surface'}`}
+        className="flex items-center gap-2 p-2 rounded-lg bg-surface cursor-pointer"
       >
-        <div className="p-1">
-          {isExpanded ? <FolderOpen size={18} /> : <FolderIcon size={18} />}
+        <div className="p-1 cursor-grab" {...listeners} {...attributes}>
+          {isExpanded ? (
+            <FolderOpen size={18} onClick={(e) => { e.stopPropagation(); onToggle(folder.id); }} className="text-primary" />
+          ) : (
+            <FolderIcon size={18} onClick={(e) => { e.stopPropagation(); onToggle(folder.id); }} className="text-text-secondary" />
+          )}
         </div>
-        <p className="font-normal flex-grow truncate select-none">{folder.name}</p>
+        <p className="font-normal flex-grow truncate select-none" onClick={() => onToggle(folder.id)}>{folder.name}</p>
         <span className="text-text-secondary text-sm ml-auto pr-1">{folder.children?.length || 0}</span>
       </div>
       <AnimatePresence>
-        {isExpanded && (
+        {isExpanded && hasChildren && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="pl-6 space-y-2 overflow-hidden"
+            className="pl-6 space-y-2 overflow-hidden pt-2"
           >
             {children}
           </motion.div>
@@ -113,6 +156,8 @@ export default function PresetsPanel({ adjustments, setAdjustments, selectedImag
     updatePreset,
     duplicatePreset,
     movePreset,
+    reorderItems,
+    sortAllPresetsAlphabetically,
     importPresetsFromFile,
     exportPresetsToFile,
   } = usePresets(adjustments);
@@ -125,7 +170,7 @@ export default function PresetsPanel({ adjustments, setAdjustments, selectedImag
   const [renamePresetState, setRenamePresetState] = useState({ isOpen: false, preset: null });
   const [renameFolderState, setRenameFolderState] = useState({ isOpen: false, folder: null });
   const [expandedFolders, setExpandedFolders] = useState(new Set());
-  const [activeId, setActiveId] = useState(null);
+  const [activeItem, setActiveItem] = useState(null);
   const [folderPreviewsGenerated, setFolderPreviewsGenerated] = useState(new Set());
   const [deletingItemId, setDeletingItemId] = useState(null);
   const previewsRef = useRef(previews);
@@ -141,13 +186,27 @@ export default function PresetsPanel({ adjustments, setAdjustments, selectedImag
 
   const { setNodeRef: setRootNodeRef, isOver: isRootOver } = useDroppable({ id: 'root' });
 
-  const allPresetsMap = useMemo(() => {
+  const allItemsMap = useMemo(() => {
     const map = new Map();
     presets.forEach(item => {
       if (item.preset) {
-        map.set(item.preset.id, item.preset);
+        map.set(item.preset.id, { type: 'preset', data: item.preset });
       } else if (item.folder) {
-        item.folder.children.forEach(p => map.set(p.id, p));
+        map.set(item.folder.id, { type: 'folder', data: item.folder });
+        item.folder.children.forEach(p => map.set(p.id, { type: 'preset', data: p }));
+      }
+    });
+    return map;
+  }, [presets]);
+
+  const itemParentMap = useMemo(() => {
+    const map = new Map();
+    presets.forEach(item => {
+      if (item.preset) {
+        map.set(item.preset.id, null);
+      } else if (item.folder) {
+        map.set(item.folder.id, null);
+        item.folder.children.forEach(p => map.set(p.id, item.folder.id));
       }
     });
     return map;
@@ -310,27 +369,55 @@ export default function PresetsPanel({ adjustments, setAdjustments, selectedImag
   };
 
   const handleDragStart = (event) => {
-    setActiveId(event.active.id);
+    setActiveItem(allItemsMap.get(event.active.id) || null);
   };
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
-    setActiveId(null);
+    setActiveItem(null);
 
-    if (active.data.current?.type === 'preset') {
-      const presetId = active.id;
-      
-      if (over === null || over.id === 'root' || over.data.current?.type === 'folder') {
-        const targetFolderId = (over && over.id !== 'root') ? over.id : null;
-        movePreset(presetId, targetFolderId);
+    const activeId = active.id;
+    const activeParentId = itemParentMap.get(activeId);
+    const activeType = active.data.current?.type;
 
-        if (targetFolderId) {
-          setExpandedFolders(prev => new Set(prev).add(targetFolderId));
-          if (!folderPreviewsGenerated.has(targetFolderId)) {
-            generateFolderPreviews(targetFolderId);
-          }
-        }
+    if (!over) {
+      if (activeParentId !== null) {
+        movePreset(activeId, null, null);
       }
+      return;
+    }
+
+    if (active.id === over.id) {
+      return;
+    }
+
+    const overId = over.id;
+    const overParentId = itemParentMap.get(overId);
+    const overType = over.data.current?.type;
+
+    const targetFolderId = overType === 'folder' ? overId : overParentId;
+
+    if (activeType === 'preset' && targetFolderId) {
+      if (activeParentId !== targetFolderId) {
+        movePreset(activeId, targetFolderId);
+        setExpandedFolders(prev => new Set(prev).add(targetFolderId));
+        if (!folderPreviewsGenerated.has(targetFolderId)) {
+          generateFolderPreviews(targetFolderId);
+        }
+      } else {
+        reorderItems(activeId, overId);
+      }
+      return;
+    }
+
+    if (activeParentId !== null && !targetFolderId) {
+      movePreset(activeId, null, overId);
+      return;
+    }
+
+    if (activeParentId === null && !targetFolderId) {
+      reorderItems(activeId, overId);
+      return;
     }
   };
 
@@ -479,20 +566,22 @@ export default function PresetsPanel({ adjustments, setAdjustments, selectedImag
         icon: FolderPlus,
         onClick: () => setIsAddFolderModalOpen(true),
       },
+      { type: 'separator' },
+      {
+        label: 'Sort All Alphabetically',
+        icon: SortAsc,
+        onClick: sortAllPresetsAlphabetically,
+        disabled: presets.length === 0,
+      },
     ];
     showContextMenu(event.clientX, event.clientY, options);
   };
 
-  const sortedItems = useMemo(() => {
-    return [...presets].sort((a, b) => {
-      const nameA = a.preset?.name || a.folder?.name;
-      const nameB = b.preset?.name || b.folder?.name;
-      return nameA.toLowerCase().localeCompare(nameB.toLowerCase());
-    });
-  }, [presets]);
-
-  const rootPresets = sortedItems.filter(item => item.preset);
-  const folders = sortedItems.filter(item => item.folder);
+  const folders = useMemo(() => 
+    presets.filter(item => item.folder), 
+    [presets]
+  );
+  const rootPresets = useMemo(() => presets.filter(item => item.preset), [presets]);
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -542,70 +631,73 @@ export default function PresetsPanel({ adjustments, setAdjustments, selectedImag
               No presets saved yet. Right-click to create a preset or folder, or import from a file.
             </div>
           ) : (
-            <AnimatePresence>
-              {folders
-                .filter(item => item.folder.id !== deletingItemId)
-                .map((item, index) => (
-                  <motion.div
-                    key={item.folder.id}
-                    layout
-                    variants={itemVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                    custom={index}
-                  >
-                    <DroppableFolderItem
-                      folder={item.folder}
-                      onContextMenu={(e) => handleContextMenu(e, item)}
-                      onToggle={toggleFolder}
-                      isExpanded={expandedFolders.has(item.folder.id)}
+            <>
+              <AnimatePresence>
+                {folders
+                  .filter(item => item.folder.id !== deletingItemId)
+                  .map((item, index) => (
+                    <motion.div
+                      key={item.folder.id}
+                      layout="position"
+                      variants={itemVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                      custom={index}
                     >
-                      <AnimatePresence>
-                        {item.folder.children
-                          .filter(preset => preset.id !== deletingItemId)
-                          .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
-                          .map(preset => (
-                            <motion.div
-                              key={preset.id}
-                              layout="position"
-                              exit={{ opacity: 0, x: -15, transition: { duration: 0.2 } }}
-                            >
-                              <DraggablePresetItem
-                                preset={preset}
-                                onApply={handleApplyPreset}
-                                onContextMenu={(e) => handleContextMenu(e, { preset })}
-                                previewUrl={previews[preset.id]}
-                                isGeneratingPreviews={isGeneratingPreviews}
-                              />
-                            </motion.div>
-                          ))}
-                      </AnimatePresence>
-                    </DroppableFolderItem>
-                  </motion.div>
-              ))}
-              {rootPresets
-                .filter(item => item.preset.id !== deletingItemId)
-                .map((item, index) => (
-                  <motion.div
-                    key={item.preset.id}
-                    layout
-                    variants={itemVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                    custom={folders.length + index}
-                  >
-                    <DraggablePresetItem
-                      preset={item.preset}
-                      onApply={handleApplyPreset}
-                      onContextMenu={(e) => handleContextMenu(e, item)}
-                      previewUrl={previews[item.preset.id]}
-                      isGeneratingPreviews={isGeneratingPreviews}
-                    />
-                  </motion.div>
-              ))}
-            </AnimatePresence>
+                      <DroppableFolderItem
+                        folder={item.folder}
+                        onContextMenu={(e) => handleContextMenu(e, item)}
+                        onToggle={toggleFolder}
+                        isExpanded={expandedFolders.has(item.folder.id)}
+                      >
+                        <AnimatePresence>
+                          {item.folder.children
+                            .filter(preset => preset.id !== deletingItemId)
+                            .map(preset => (
+                              <motion.div
+                                key={preset.id}
+                                layout="position"
+                                exit={{ opacity: 0, x: -15, transition: { duration: 0.2 } }}
+                              >
+                                <DraggablePresetItem
+                                  preset={preset}
+                                  onApply={handleApplyPreset}
+                                  onContextMenu={(e) => handleContextMenu(e, { preset })}
+                                  previewUrl={previews[preset.id]}
+                                  isGeneratingPreviews={isGeneratingPreviews}
+                                />
+                              </motion.div>
+                            ))}
+                        </AnimatePresence>
+                      </DroppableFolderItem>
+                    </motion.div>
+                ))}
+              </AnimatePresence>
+              <AnimatePresence>
+                {rootPresets
+                  .filter(item => item.preset.id !== deletingItemId)
+                  .map((item, index) => (
+                    <motion.div
+                      key={item.preset.id}
+                      layout="position"
+                      variants={itemVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                      custom={folders.length + index}
+                    >
+                      <DraggablePresetItem
+                        preset={item.preset}
+                        onApply={handleApplyPreset}
+                        onContextMenu={(e) => handleContextMenu(e, item)}
+                        previewUrl={previews[item.preset.id]}
+                        isGeneratingPreviews={isGeneratingPreviews}
+                      />
+                    </motion.div>
+                ))}
+              </AnimatePresence>
+            </>
           )}
         </div>
         
@@ -633,12 +725,16 @@ export default function PresetsPanel({ adjustments, setAdjustments, selectedImag
         />
       </div>
       <DragOverlay>
-        {activeId && allPresetsMap.has(activeId) ? (
-          <PresetItemDisplay
-            preset={allPresetsMap.get(activeId)}
-            previewUrl={previews[activeId]}
-            isGeneratingPreviews={false}
-          />
+        {activeItem ? (
+          activeItem.type === 'preset' ? (
+            <PresetItemDisplay
+              preset={activeItem.data}
+              previewUrl={previews[activeItem.data.id]}
+              isGeneratingPreviews={false}
+            />
+          ) : (
+            <FolderItemDisplay folder={activeItem.data} />
+          )
         ) : null}
       </DragOverlay>
     </DndContext>
