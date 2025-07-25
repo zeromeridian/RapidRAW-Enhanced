@@ -17,9 +17,9 @@ export default function Editor({
   selectedImage, finalPreviewUrl, uncroppedAdjustedPreviewUrl,
   showOriginal, setShowOriginal, isAdjusting, onBackToLibrary, isLoading, isFullScreen,
   isFullScreenLoading, fullScreenUrl, onToggleFullScreen, activeRightPanel,
-  adjustments, setAdjustments, activeMaskId, activeMaskContainerId,
+  adjustments, setAdjustments, thumbnails, activeMaskId, activeMaskContainerId,
   onSelectMask, updateSubMask, transformWrapperRef, onZoomed, onContextMenu,
-  onUndo, onRedo, canUndo, canRedo, brushSettings, 
+  onUndo, onRedo, canUndo, canRedo, brushSettings,
   onGenerateAiMask, aiTool, onAiMaskDrawingComplete, isMaskControlHovered,
   targetZoom, waveform, isWaveformVisible, onCloseWaveform,
 }) {
@@ -258,7 +258,7 @@ export default function Editor({
         isOpen={isFullScreen}
         url={fullScreenUrl}
         onClose={onToggleFullScreen}
-        thumbnailUrl={selectedImage.thumbnailUrl}
+        thumbnailUrl={thumbnails[selectedImage.path] || selectedImage.thumbnailUrl}
         transformState={transformState}
         onTransformChange={setTransformState}
       />
