@@ -257,11 +257,13 @@ impl RawDevelop {
     }
 
     if self.steps.contains(&ProcessingStep::CropDefault) {
-      if let Some(mut crop) = rawimage.crop_area.or(rawimage.active_area) {
+      if let Some(mut crop) = rawimage.crop_area {
         if self.steps.contains(&ProcessingStep::Demosaic) && self.steps.contains(&ProcessingStep::CropActiveArea) {
-          crop = crop.adapt(&rawimage.active_area.unwrap_or(crop));
+          if let Some(active_area) = rawimage.active_area {
+            let intersection = crop.intersection(&active_area);
+            crop = intersection.adapt(&active_area);
+          }
         }
-
         let original_width = rawimage.active_area.map(|area| area.d.w).unwrap_or(rawimage.dim().w);
         if original_width > 0 {
             let scale_factor = intermediate.dim().w as f32 / original_width as f32;
@@ -269,8 +271,7 @@ impl RawDevelop {
                 crop.scale(scale_factor);
             }
         }
-
-        if crop.d != intermediate.dim() {
+        if !crop.is_empty() && crop.d != intermediate.dim() {
           println!("DEBUG: crop: {:?}, intermediate dim: {:?}, rawimage: {:?}", crop, intermediate.dim(), rawimage.dim());
           intermediate = match intermediate {
             Intermediate::Monochrome(pixels) => Intermediate::Monochrome(pixels.crop(crop)),
