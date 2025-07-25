@@ -1,10 +1,7 @@
 {
   "bundle": {
     "macOS": {
-      "minimumSystemVersion": "15.0",
-      "frameworks": [
-        "Foundation"
-      ]
+      "minimumSystemVersion": "15.0"
     }
   }
 }
