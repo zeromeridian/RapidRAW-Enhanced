@@ -46,6 +46,7 @@ use crate::image_loader::{load_base_image_from_bytes, composite_patches_on_image
 
 #[derive(Clone)]
 pub struct LoadedImage {
+    path: String,
     image: DynamicImage,
     full_width: u32,
     full_height: u32,
@@ -257,6 +258,7 @@ async fn load_image(path: String, state: tauri::State<'_, AppState>, app_handle:
 
     *state.cached_preview.lock().unwrap() = None;
     *state.original_image.lock().unwrap() = Some(LoadedImage {
+        path: path.clone(),
         image: pristine_img,
         full_width: orig_width,
         full_height: orig_height,

@@ -263,6 +263,7 @@ pub fn get_sidecar_path(image_path: &str) -> PathBuf {
 pub fn generate_thumbnail_data(
     path_str: &str,
     gpu_context: Option<&GpuContext>,
+    preloaded_image: Option<&DynamicImage>,
 ) -> anyhow::Result<DynamicImage> {
     let sidecar_path = get_sidecar_path(path_str);
     let metadata: Option<ImageMetadata> = fs::read_to_string(sidecar_path)
@@ -272,7 +273,12 @@ pub fn generate_thumbnail_data(
     let adjustments = metadata
         .as_ref()
         .map_or(serde_json::Value::Null, |m| m.adjustments.clone());
-    let base_image = image_loader::load_and_composite(path_str, &adjustments, true)?;
+
+    let base_image = if let Some(img) = preloaded_image {
+        image_loader::composite_patches_on_image(img, &adjustments)?
+    } else {
+        image_loader::load_and_composite(path_str, &adjustments, true)?
+    };
     let original_dims = base_image.dimensions();
 
     if let (Some(context), Some(meta)) = (gpu_context, metadata) {
@@ -370,6 +376,65 @@ fn encode_thumbnail(image: &DynamicImage) -> Result<Vec<u8>> {
     Ok(buf.into_inner())
 }
 
+fn generate_single_thumbnail_and_cache(
+    path_str: &str,
+    thumb_cache_dir: &Path,
+    gpu_context: Option<&GpuContext>,
+    preloaded_image: Option<&DynamicImage>,
+    force_regenerate: bool,
+) -> Option<(String, u8)> {
+    let original_path = Path::new(path_str);
+    let sidecar_path = get_sidecar_path(path_str);
+
+    let img_mod_time = fs::metadata(original_path)
+        .ok()?
+        .modified()
+        .ok()?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs();
+
+    let (sidecar_mod_time, rating) = if let Ok(content) = fs::read_to_string(&sidecar_path) {
+        let mod_time = fs::metadata(&sidecar_path)
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let rating_val = serde_json::from_str::<ImageMetadata>(&content)
+            .ok()
+            .map(|m| m.rating)
+            .unwrap_or(0);
+        (mod_time, rating_val)
+    } else {
+        (0, 0)
+    };
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(path_str.as_bytes());
+    hasher.update(&img_mod_time.to_le_bytes());
+    hasher.update(&sidecar_mod_time.to_le_bytes());
+    let hash = hasher.finalize();
+    let cache_filename = format!("{}.jpg", hash.to_hex());
+    let cache_path = thumb_cache_dir.join(cache_filename);
+
+    if !force_regenerate && cache_path.exists() {
+        if let Ok(data) = fs::read(&cache_path) {
+            let base64_str = general_purpose::STANDARD.encode(&data);
+            return Some((format!("data:image/jpeg;base64,{}", base64_str), rating));
+        }
+    }
+
+    if let Ok(thumb_image) = generate_thumbnail_data(path_str, gpu_context, preloaded_image) {
+        if let Ok(thumb_data) = encode_thumbnail(&thumb_image) {
+            let _ = fs::write(&cache_path, &thumb_data);
+            let base64_str = general_purpose::STANDARD.encode(&thumb_data);
+            return Some((format!("data:image/jpeg;base64,{}", base64_str), rating));
+        }
+    }
+    None
+}
+
 #[tauri::command]
 pub async fn generate_thumbnails(
     paths: Vec<String>,
@@ -391,51 +456,14 @@ pub async fn generate_thumbnails(
         let thumbnails: HashMap<String, String> = paths
             .par_iter()
             .filter_map(|path_str| {
-                let original_path = Path::new(path_str);
-                let sidecar_path = get_sidecar_path(path_str);
-
-                let img_mod_time = fs::metadata(original_path)
-                    .ok()?
-                    .modified()
-                    .ok()?
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .ok()?
-                    .as_secs();
-                let sidecar_mod_time = fs::metadata(&sidecar_path)
-                    .ok()
-                    .and_then(|m| m.modified().ok())
-                    .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
-                    .unwrap_or(0);
-
-                let mut hasher = blake3::Hasher::new();
-                hasher.update(path_str.as_bytes());
-                hasher.update(&img_mod_time.to_le_bytes());
-                hasher.update(&sidecar_mod_time.to_le_bytes());
-                let hash = hasher.finalize();
-                let cache_filename = format!("{}.jpg", hash.to_hex());
-                let cache_path = thumb_cache_dir.join(cache_filename);
-
-                if cache_path.exists() {
-                    if let Ok(data) = fs::read(&cache_path) {
-                        let base64_str = general_purpose::STANDARD.encode(&data);
-                        return Some((
-                            path_str.clone(),
-                            format!("data:image/jpeg;base64,{}", base64_str),
-                        ));
-                    }
-                }
-
-                if let Ok(thumb_image) = generate_thumbnail_data(path_str, gpu_context.as_ref()) {
-                    if let Ok(thumb_data) = encode_thumbnail(&thumb_image) {
-                        let _ = fs::write(&cache_path, &thumb_data);
-                        let base64_str = general_purpose::STANDARD.encode(&thumb_data);
-                        return Some((
-                            path_str.clone(),
-                            format!("data:image/jpeg;base64,{}", base64_str),
-                        ));
-                    }
-                }
-                None
+                generate_single_thumbnail_and_cache(
+                    path_str,
+                    &thumb_cache_dir,
+                    gpu_context.as_ref(),
+                    None,
+                    false,
+                )
+                .map(|(data, _rating)| (path_str.clone(), data))
             })
             .collect();
 
@@ -468,59 +496,13 @@ pub fn generate_thumbnails_progressive(
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
 
         paths.par_iter().for_each(|path_str| {
-            let result = (|| -> Option<(String, u8)> {
-                let original_path = Path::new(path_str);
-                let sidecar_path = get_sidecar_path(path_str);
-
-                let img_mod_time = fs::metadata(original_path)
-                    .ok()?
-                    .modified()
-                    .ok()?
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .ok()?
-                    .as_secs();
-
-                let (sidecar_mod_time, rating) =
-                    if let Ok(content) = fs::read_to_string(&sidecar_path) {
-                        let mod_time = fs::metadata(&sidecar_path)
-                            .ok()
-                            .and_then(|m| m.modified().ok())
-                            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                            .map(|d| d.as_secs())
-                            .unwrap_or(0);
-                        let rating_val = serde_json::from_str::<ImageMetadata>(&content)
-                            .ok()
-                            .map(|m| m.rating)
-                            .unwrap_or(0);
-                        (mod_time, rating_val)
-                    } else {
-                        (0, 0)
-                    };
-
-                let mut hasher = blake3::Hasher::new();
-                hasher.update(path_str.as_bytes());
-                hasher.update(&img_mod_time.to_le_bytes());
-                hasher.update(&sidecar_mod_time.to_le_bytes());
-                let hash = hasher.finalize();
-                let cache_filename = format!("{}.jpg", hash.to_hex());
-                let cache_path = thumb_cache_dir.join(cache_filename);
-
-                if cache_path.exists() {
-                    if let Ok(data) = fs::read(&cache_path) {
-                        let base64_str = general_purpose::STANDARD.encode(&data);
-                        return Some((format!("data:image/jpeg;base64,{}", base64_str), rating));
-                    }
-                }
-
-                if let Ok(thumb_image) = generate_thumbnail_data(path_str, gpu_context.as_ref()) {
-                    if let Ok(thumb_data) = encode_thumbnail(&thumb_image) {
-                        let _ = fs::write(&cache_path, &thumb_data);
-                        let base64_str = general_purpose::STANDARD.encode(&thumb_data);
-                        return Some((format!("data:image/jpeg;base64,{}", base64_str), rating));
-                    }
-                }
-                None
-            })();
+            let result = generate_single_thumbnail_and_cache(
+                path_str,
+                &thumb_cache_dir,
+                gpu_context.as_ref(),
+                None,
+                false,
+            );
 
             if let Some((thumbnail_data, rating)) = result {
                 let _ = app_handle_clone.emit(
@@ -723,6 +705,7 @@ pub fn save_metadata_and_update_thumbnail(
     path: String,
     adjustments: Value,
     app_handle: AppHandle,
+    state: tauri::State<AppState>,
 ) -> Result<(), String> {
     let sidecar_path = get_sidecar_path(&path);
 
@@ -735,12 +718,54 @@ pub fn save_metadata_and_update_thumbnail(
     let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
     std::fs::write(sidecar_path, json_string).map_err(|e| e.to_string())?;
 
+    let loaded_image_lock = state.original_image.lock().unwrap();
+    let preloaded_image_option = if let Some(loaded_image) = loaded_image_lock.as_ref() {
+        if loaded_image.path == path {
+            Some(loaded_image.image.clone())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    drop(loaded_image_lock);
+
+    let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+    let app_handle_clone = app_handle.clone();
+    let path_clone = path.clone();
+
     thread::spawn(move || {
-        let _ = app_handle.emit(
+        let _ = app_handle_clone.emit(
             "thumbnail-progress",
             serde_json::json!({ "completed": 0, "total": 1 }),
         );
-        let _ = generate_thumbnails_progressive(vec![path], app_handle);
+
+        let cache_dir = app_handle_clone.path().app_cache_dir().unwrap();
+        let thumb_cache_dir = cache_dir.join("thumbnails");
+        if !thumb_cache_dir.exists() {
+            fs::create_dir_all(&thumb_cache_dir).unwrap();
+        }
+
+        let result = generate_single_thumbnail_and_cache(
+            &path_clone,
+            &thumb_cache_dir,
+            gpu_context.as_ref(),
+            preloaded_image_option.as_ref(),
+            true,
+        );
+
+        if let Some((thumbnail_data, rating)) = result {
+            let _ = app_handle_clone.emit(
+                "thumbnail-generated",
+                serde_json::json!({ "path": path_clone, "data": thumbnail_data, "rating": rating }),
+            );
+        }
+
+        let _ = app_handle_clone.emit(
+            "thumbnail-progress",
+            serde_json::json!({ "completed": 1, "total": 1 }),
+        );
+        let _ = app_handle_clone.emit("thumbnail-generation-complete", true);
     });
 
     Ok(())

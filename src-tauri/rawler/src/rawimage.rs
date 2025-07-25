@@ -602,7 +602,6 @@ impl RawImage {
   /// Returns the CFA pattern after the crop has been applied (and thus the pattern
   /// potentially shifted)
   pub fn cropped_cfa(&self) -> CFA {
-    // This function was previously a todo!().
     // We implement it to use the active_area, which is the most common use case.
     // This fixes a major source of bugs for consumers of the rawler library.
     if let Some(crop) = self.active_area {
