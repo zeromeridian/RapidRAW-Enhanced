@@ -340,7 +340,7 @@ npx tauri dev --release
 RapidRAW is built to be lightweight and cross-platform. The minimum (tested) requirements are:
 
 *   **Windows:** Windows 10 or newer
-*   **macOS:** macOS 15 (Sequoia) or newer
+*   **macOS:** macOS 13 (Ventura) or newer
 *   **Linux:** Ubuntu 22.04+ or a compatible modern distribution
 
 ## Contributing
