@@ -37,6 +37,9 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
   const [isClearingCache, setIsClearingCache] = useState(false);
   const [cacheClearMessage, setCacheClearMessage] = useState('');
 
+  const [isClearingTags, setIsClearingTags] = useState(false);
+  const [tagsClearMessage, setTagsClearMessage] = useState('');
+
   const [confirmModalState, setConfirmModalState] = useState({
     isOpen: false,
     title: '',
@@ -79,6 +82,35 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
       message: 'Are you sure you want to delete all sidecar files?\n\nThis will permanently remove all your edits for all images inside the current root folder and its subfolders.',
       onConfirm: executeClearSidecars,
       confirmText: 'Delete All Edits',
+      confirmVariant: 'destructive',
+    });
+  };
+
+  const executeClearTags = async () => {
+    setIsClearingTags(true);
+    setTagsClearMessage('Clearing AI tags from all sidecar files...');
+    try {
+      const count = await invoke('clear_all_tags', { rootPath: effectiveRootPath });
+      setTagsClearMessage(`${count} files updated. Tags removed.`);
+      onLibraryRefresh();
+    } catch (err) {
+      console.error("Failed to clear tags:", err);
+      setTagsClearMessage(`Error: ${err}`);
+    } finally {
+      setTimeout(() => {
+        setIsClearingTags(false);
+        setTagsClearMessage('');
+      }, 3000);
+    }
+  };
+
+  const handleClearTags = () => {
+    setConfirmModalState({
+      isOpen: true,
+      title: 'Confirm AI Tag Deletion',
+      message: 'Are you sure you want to remove all AI-generated tags from all images in the current root folder?\n\nThis action cannot be undone.',
+      onConfirm: executeClearTags,
+      confirmText: 'Clear All Tags',
       confirmVariant: 'destructive',
     });
   };
@@ -255,6 +287,45 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
                 Enter the address and port of your running ComfyUI instance. Required for generative AI features.
               </p>
             </div>
+            <div className="pt-4 mt-4 border-t border-border-color">
+              <label htmlFor="ai-tagging-toggle" className="block text-sm font-medium text-text-primary mb-2">
+                AI Tagging
+              </label>
+              <Switch
+                id="ai-tagging-toggle"
+                label="Enable Automatic AI Tagging"
+                checked={appSettings?.enableAiTagging ?? false}
+                onChange={(checked) => onSettingsChange({ ...appSettings, enableAiTagging: checked })}
+              />
+              <p className="text-xs text-text-secondary mt-2">
+                Enables automatic image tagging using an AI (CLIP) model. This will download an additional model file (~600MB). Tags are used for searching a folder.
+              </p>
+            </div>
+            <div className="pt-4 mt-4 border-t border-border-color">
+              <label htmlFor="tagging-thread-count" className="block text-sm font-medium text-text-primary mb-2">
+                AI Tagging Concurrency
+              </label>
+              <Input
+                id="tagging-thread-count"
+                type="number"
+                min="1"
+                max="10"
+                placeholder="3"
+                value={appSettings?.taggingThreadCount || 3}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value, 10);
+                  if (!isNaN(value) && value >= 1) {
+                    onSettingsChange({ ...appSettings, taggingThreadCount: value });
+                  } else if (e.target.value === "") {
+                    onSettingsChange({ ...appSettings, taggingThreadCount: undefined });
+                  }
+                }}
+                className="w-24"
+              />
+              <p className="text-xs text-text-secondary mt-2">
+                Number of images to process concurrently for AI tagging. Adjust based on your CPU.
+              </p>
+            </div>
           </div>
 
           <div className="p-6 bg-surface rounded-xl shadow-md">
@@ -280,6 +351,25 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
                   <p className="text-sm text-accent mt-3">{clearMessage}</p>
                 )}
               </div>
+
+              <div className="pt-4">
+                <h3 className="font-medium text-text-primary">Clear All Tags</h3>
+                <p className="text-xs text-text-secondary mt-1 mb-3">
+                  This will remove all AI-generated tags from your `.rrdata` files in the current root folder.
+                </p>
+                <Button
+                  variant="destructive"
+                  onClick={handleClearTags}
+                  disabled={isClearingTags || !effectiveRootPath}
+                >
+                  <Trash2 size={16} className="mr-2" />
+                  {isClearingTags ? 'Clearing...' : 'Clear All Tags'}
+                </Button>
+                {tagsClearMessage && (
+                  <p className="text-sm text-accent mt-3">{tagsClearMessage}</p>
+                )}
+              </div>
+
               <div className="pt-6 border-t border-border-color">
                 <h3 className="font-medium text-text-primary">Clear Thumbnail Cache</h3>
                 <p className="text-xs text-text-secondary mt-1 mb-3">

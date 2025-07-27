@@ -102,6 +102,8 @@ pub struct AppSettings {
     pub last_folder_state: Option<LastFolderState>,
     pub adaptive_editor_theme: Option<bool>,
     pub ui_visibility: Option<Value>,
+    pub enable_ai_tagging: Option<bool>,
+    pub tagging_thread_count: Option<u32>,
 }
 
 impl Default for AppSettings {
@@ -121,33 +123,19 @@ impl Default for AppSettings {
             last_folder_state: None,
             adaptive_editor_theme: Some(false),
             ui_visibility: None,
+            enable_ai_tagging: Some(false),
+            tagging_thread_count: Some(3),
         }
     }
 }
+
 
 #[derive(Serialize, Debug, Clone)]
 pub struct ImageFile {
     path: String,
     modified: u64,
     is_edited: bool,
-}
-
-fn has_sidecar_adjustments(image_path: &str) -> bool {
-    let sidecar_path = get_sidecar_path(image_path);
-    if !sidecar_path.exists() {
-        return false;
-    }
-
-    if let Ok(content) = fs::read_to_string(sidecar_path) {
-        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&content) {
-            if let Some(adjustments) = value.get("adjustments").and_then(|a| a.as_object()) {
-                return adjustments.keys().len() > 1
-                    || (adjustments.keys().len() == 1 && !adjustments.contains_key("rating"));
-            }
-        }
-    }
-
-    false
+    tags: Option<Vec<String>>,
 }
 
 #[tauri::command]
@@ -165,17 +153,31 @@ pub fn list_images_in_dir(path: String) -> Result<Vec<ImageFile>, String> {
         .filter(|path| path.is_file())
         .filter(|path| path.to_str().map_or(false, is_supported_image_file))
         .map(|path| {
+            let path_str = path.to_string_lossy().into_owned();
             let modified = fs::metadata(&path)
                 .ok()
                 .and_then(|m| m.modified().ok())
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
-            let is_edited = has_sidecar_adjustments(&path.to_string_lossy().into_owned());
+            
+            let sidecar_path = get_sidecar_path(&path_str);
+            let (is_edited, tags) = if sidecar_path.exists() {
+                if let Ok(content) = fs::read_to_string(sidecar_path) {
+                    if let Ok(metadata) = serde_json::from_str::<ImageMetadata>(&content) {
+                        let edited = metadata.adjustments.as_object().map_or(false, |a| {
+                            a.keys().len() > 1 || (a.keys().len() == 1 && !a.contains_key("rating"))
+                        });
+                        (edited, metadata.tags)
+                    } else { (false, None) }
+                } else { (false, None) }
+            } else { (false, None) };
+
             ImageFile {
-                path: path.to_string_lossy().into_owned(),
+                path: path_str,
                 modified,
                 is_edited,
+                tags,
             }
         })
         .collect();
@@ -709,11 +711,17 @@ pub fn save_metadata_and_update_thumbnail(
 ) -> Result<(), String> {
     let sidecar_path = get_sidecar_path(&path);
 
-    let metadata = ImageMetadata {
-        version: 1,
-        rating: adjustments["rating"].as_u64().unwrap_or(0) as u8,
-        adjustments,
+    let mut metadata: ImageMetadata = if sidecar_path.exists() {
+        fs::read_to_string(&sidecar_path)
+            .ok()
+            .and_then(|content| serde_json::from_str(&content).ok())
+            .unwrap_or_default()
+    } else {
+        ImageMetadata::default()
     };
+
+    metadata.rating = adjustments["rating"].as_u64().unwrap_or(0) as u8;
+    metadata.adjustments = adjustments;
 
     let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
     std::fs::write(sidecar_path, json_string).map_err(|e| e.to_string())?;
@@ -780,7 +788,7 @@ pub fn apply_adjustments_to_paths(
     paths.par_iter().for_each(|path| {
         let sidecar_path = get_sidecar_path(path);
 
-        let existing_metadata: ImageMetadata = if sidecar_path.exists() {
+        let mut existing_metadata: ImageMetadata = if sidecar_path.exists() {
             fs::read_to_string(&sidecar_path)
                 .ok()
                 .and_then(|content| serde_json::from_str(&content).ok())
@@ -802,13 +810,10 @@ pub fn apply_adjustments_to_paths(
             }
         }
 
-        let metadata = ImageMetadata {
-            version: 1,
-            rating: new_adjustments["rating"].as_u64().unwrap_or(0) as u8,
-            adjustments: new_adjustments,
-        };
+        existing_metadata.rating = new_adjustments["rating"].as_u64().unwrap_or(0) as u8;
+        existing_metadata.adjustments = new_adjustments;
 
-        if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
+        if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
             let _ = std::fs::write(sidecar_path, json_string);
         }
     });
@@ -828,7 +833,7 @@ pub fn reset_adjustments_for_paths(
     paths.par_iter().for_each(|path| {
         let sidecar_path = get_sidecar_path(path);
 
-        let existing_metadata: ImageMetadata = if sidecar_path.exists() {
+        let mut existing_metadata: ImageMetadata = if sidecar_path.exists() {
             fs::read_to_string(&sidecar_path)
                 .ok()
                 .and_then(|content| serde_json::from_str(&content).ok())
@@ -841,13 +846,9 @@ pub fn reset_adjustments_for_paths(
             "rating": existing_metadata.rating
         });
 
-        let metadata = ImageMetadata {
-            version: 1,
-            rating: existing_metadata.rating,
-            adjustments: new_adjustments,
-        };
+        existing_metadata.adjustments = new_adjustments;
 
-        if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
+        if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
             let _ = std::fs::write(sidecar_path, json_string);
         }
     });
@@ -911,12 +912,9 @@ pub fn apply_auto_adjustments_to_paths(
                 }
             }
 
-            let metadata = ImageMetadata {
-                version: 1,
-                rating: existing_metadata.rating,
-                adjustments: existing_metadata.adjustments,
-            };
-            if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
+            existing_metadata.rating = existing_metadata.adjustments["rating"].as_u64().unwrap_or(0) as u8;
+
+            if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
                 let _ = std::fs::write(sidecar_path, json_string);
             }
             Ok(())
@@ -1209,4 +1207,75 @@ pub fn delete_files_with_associated(paths: Vec<String>) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+pub fn get_thumb_cache_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
+    let cache_dir = app_handle
+        .path()
+        .app_cache_dir()
+        .map_err(|e| e.to_string())?;
+    let thumb_cache_dir = cache_dir.join("thumbnails");
+    if !thumb_cache_dir.exists() {
+        fs::create_dir_all(&thumb_cache_dir).map_err(|e| e.to_string())?;
+    }
+    Ok(thumb_cache_dir)
+}
+
+pub fn get_cache_key_hash(path_str: &str) -> Option<String> {
+    let original_path = Path::new(path_str);
+    let sidecar_path = get_sidecar_path(path_str);
+
+    let img_mod_time = fs::metadata(original_path)
+        .ok()?
+        .modified()
+        .ok()?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs();
+
+    let sidecar_mod_time = if let Ok(meta) = fs::metadata(&sidecar_path) {
+        meta.modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    } else {
+        0
+    };
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(path_str.as_bytes());
+    hasher.update(&img_mod_time.to_le_bytes());
+    hasher.update(&sidecar_mod_time.to_le_bytes());
+    let hash = hasher.finalize();
+    Some(hash.to_hex().to_string())
+}
+
+pub fn get_cached_or_generate_thumbnail_image(
+    path_str: &str,
+    app_handle: &AppHandle,
+    gpu_context: Option<&GpuContext>,
+) -> Result<DynamicImage> {
+    let thumb_cache_dir = get_thumb_cache_dir(app_handle)
+        .map_err(|e| anyhow::anyhow!(e))?;
+
+    if let Some(cache_hash) = get_cache_key_hash(path_str) {
+        let cache_filename = format!("{}.jpg", cache_hash);
+        let cache_path = thumb_cache_dir.join(cache_filename);
+
+        if cache_path.exists() {
+            if let Ok(image) = image::open(&cache_path) {
+                return Ok(image);
+            }
+            eprintln!("Could not open cached thumbnail, regenerating: {:?}", cache_path);
+        }
+
+        let thumb_image = generate_thumbnail_data(path_str, gpu_context, None)?;
+        let thumb_data = encode_thumbnail(&thumb_image)?;
+        fs::write(&cache_path, &thumb_data)?;
+
+        Ok(thumb_image)
+    } else {
+        generate_thumbnail_data(path_str, gpu_context, None)
+    }
 }

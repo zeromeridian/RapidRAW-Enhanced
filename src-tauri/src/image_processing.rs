@@ -16,6 +16,8 @@ pub struct ImageMetadata {
     pub version: u32,
     pub rating: u8,
     pub adjustments: Value,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
 }
 
 impl Default for ImageMetadata {
@@ -24,6 +26,7 @@ impl Default for ImageMetadata {
             version: 1,
             rating: 0,
             adjustments: Value::Null,
+            tags: None,
         }
     }
 }

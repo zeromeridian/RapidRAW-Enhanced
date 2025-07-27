@@ -93,6 +93,8 @@ function App() {
   const [copiedMask, setCopiedMask] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
   const [isPasted, setIsPasted] = useState(false);
+  const [isIndexing, setIsIndexing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [brushSettings, setBrushSettings] = useState({ size: 50, feather: 50, tool: 'brush' });
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [isRenameFolderModalOpen, setIsRenameFolderModalOpen] = useState(false);
@@ -106,12 +108,16 @@ function App() {
   const [pendingAiAction, setPendingAiAction] = useState(null);
   const [isMaskControlHovered, setIsMaskControlHovered] = useState(false);
   const { showContextMenu } = useContextMenu();
-  const imagePathList = useMemo(() => imageList.map(f => f.path), [imageList]);
-  const { thumbnails } = useThumbnails(imagePathList);
+  const [thumbnails, setThumbnails] = useState({});
+  useThumbnails(imageList, setThumbnails);
   const loaderTimeoutRef = useRef(null);
   const transformWrapperRef = useRef(null);
   const isProgrammaticZoom = useRef(false);
   const isInitialMount = useRef(true);
+  const currentFolderPathRef = useRef(currentFolderPath);
+  useEffect(() => {
+    currentFolderPathRef.current = currentFolderPath;
+  }, [currentFolderPath]);
   const [libraryScrollOffset, setLibraryScrollOffset] = useState(0);
 
   const [exportState, setExportState] = useState({
@@ -347,7 +353,13 @@ function App() {
       return true;
     });
 
-    const list = [...filteredList];
+    const filteredBySearch = searchQuery.trim() === ''
+      ? filteredList
+      : filteredList.filter(image => 
+          image.tags && image.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+
+    const list = [...filteredBySearch];
     list.sort((a, b) => {
         const { key, order } = sortCriteria;
         let comparison = 0;
@@ -357,7 +369,7 @@ function App() {
         return order === 'asc' ? comparison : -comparison;
     });
     return list;
-  }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes]);
+  }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchQuery]);
 
   const applyAdjustments = useCallback(debounce((currentAdjustments) => {
     if (!selectedImage?.isReady) return;
@@ -533,6 +545,7 @@ function App() {
 
   const handleSelectSubfolder = useCallback(async (path, isNewRoot = false) => {
     setIsViewLoading(true);
+    setSearchQuery('');
     setLibraryScrollOffset(0);
     try {
       setCurrentFolderPath(path);
@@ -588,6 +601,9 @@ function App() {
         setUncroppedAdjustedPreviewUrl(null);
         setHistogram(null);
       }
+      invoke('start_background_indexing', { folderPath: path }).catch(err => {
+        console.error("Failed to start background indexing:", err);
+      });
     } catch (err) {
       console.error("Failed to load folder contents:", err);
       setError("Failed to load images from the selected folder.");
@@ -886,9 +902,30 @@ function App() {
       listen('preview-update-uncropped', (event) => { if (isEffectActive) setUncroppedAdjustedPreviewUrl(event.payload); }),
       listen('histogram-update', (event) => { if (isEffectActive) setHistogram(event.payload); }),
       listen('waveform-update', (event) => { if (isEffectActive) setWaveform(event.payload); }),
-      listen('thumbnail-generated', (event) => { if (isEffectActive) { const { path, rating } = event.payload; if (rating !== undefined) setImageRatings(prev => ({ ...prev, [path]: rating })); } }),
+      listen('thumbnail-generated', (event) => {
+        if (isEffectActive) {
+          const { path, data, rating } = event.payload;
+          if (data) {
+            setThumbnails(prev => ({ ...prev, [path]: data }));
+          }
+          if (rating !== undefined) {
+            setImageRatings(prev => ({ ...prev, [path]: rating }));
+          }
+        }
+      }),
       listen('ai-model-download-start', (event) => { if (isEffectActive) setAiModelDownloadStatus(event.payload); }),
       listen('ai-model-download-finish', () => { if (isEffectActive) setAiModelDownloadStatus(null); }),
+      listen('indexing-started', () => { if (isEffectActive) setIsIndexing(true); }),
+      listen('indexing-finished', () => {
+        if (isEffectActive) {
+          setIsIndexing(false);
+          if (currentFolderPathRef.current) {
+            invoke('list_images_in_dir', { path: currentFolderPathRef.current })
+              .then(setImageList)
+              .catch(err => console.error("Failed to refresh after indexing:", err));
+          }
+        }
+      }),
       listen('batch-export-progress', (event) => {
         if (isEffectActive) {
           setExportState(prev => ({ ...prev, progress: event.payload }));
@@ -1452,10 +1489,14 @@ function App() {
             filterCriteria={filterCriteria}
             setFilterCriteria={setFilterCriteria}
             onSettingsChange={handleSettingsChange}
+            isIndexing={isIndexing}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
             onLibraryRefresh={handleLibraryRefresh}
             theme={theme}
             initialScrollOffset={libraryScrollOffset}
             onScroll={handleLibraryScroll}
+            aiModelDownloadStatus={aiModelDownloadStatus}
           />
           {rootPath && <BottomBar
             isLibraryView={true}

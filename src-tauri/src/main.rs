@@ -9,6 +9,9 @@ mod mask_generation;
 mod ai_processing;
 mod formats;
 mod image_loader;
+mod tagging;
+mod tag_candidates;
+mod tag_hierarchy;
 
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
@@ -22,6 +25,7 @@ use image::codecs::jpeg::JpegEncoder;
 use tauri::{Manager, Emitter};
 use base64::{Engine as _, engine::general_purpose};
 use serde_json::Value;
+use tokio::sync::Mutex as TokioMutex;
 use tokio::task::JoinHandle;
 use window_vibrancy::{apply_acrylic, apply_vibrancy, NSVisualEffectMaterial};
 use serde::{Serialize, Deserialize};
@@ -65,7 +69,9 @@ pub struct AppState {
     cached_preview: Mutex<Option<CachedPreview>>,
     gpu_context: Mutex<Option<GpuContext>>,
     ai_state: Mutex<Option<AiState>>,
+    ai_init_lock: TokioMutex<()>,
     export_task_handle: Mutex<Option<JoinHandle<()>>>,
+    indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
 }
 
 #[derive(serde::Serialize)]
@@ -830,24 +836,9 @@ async fn generate_ai_foreground_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiForegroundMaskParameters, String> {
-    let models = state.ai_state.lock().unwrap().as_ref().map(|s| s.models.clone());
-
-    let models = if let Some(models) = models {
-        models
-    } else {
-        drop(models);
-        let new_models = get_or_init_ai_models(&app_handle).await.map_err(|e| e.to_string())?;
-        let mut ai_state_lock = state.ai_state.lock().unwrap();
-        if let Some(ai_state) = &mut *ai_state_lock {
-            ai_state.models.clone()
-        } else {
-            *ai_state_lock = Some(AiState {
-                models: new_models.clone(),
-                embeddings: None,
-            });
-            new_models
-        }
-    };
+    let models = get_or_init_ai_models(&app_handle, &state.ai_state, &state.ai_init_lock)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let full_image = get_full_image_for_processing(&state)?;
     let full_mask_image = run_u2netp_model(&full_image, &models.u2netp).map_err(|e| e.to_string())?;
@@ -872,24 +863,9 @@ async fn generate_ai_subject_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiSubjectMaskParameters, String> {
-    let models = state.ai_state.lock().unwrap().as_ref().map(|s| s.models.clone());
-
-    let models = if let Some(models) = models {
-        models
-    } else {
-        drop(models);
-        let new_models = get_or_init_ai_models(&app_handle).await.map_err(|e| e.to_string())?;
-        let mut ai_state_lock = state.ai_state.lock().unwrap();
-        if let Some(ai_state) = &mut *ai_state_lock {
-            ai_state.models.clone()
-        } else {
-            *ai_state_lock = Some(AiState {
-                models: new_models.clone(),
-                embeddings: None,
-            });
-            new_models
-        }
-    };
+    let models = get_or_init_ai_models(&app_handle, &state.ai_state, &state.ai_init_lock)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let embeddings = {
         let mut ai_state_lock = state.ai_state.lock().unwrap();
@@ -1183,7 +1159,9 @@ fn main() {
             cached_preview: Mutex::new(None),
             gpu_context: Mutex::new(None),
             ai_state: Mutex::new(None),
+            ai_init_lock: TokioMutex::new(()),
             export_task_handle: Mutex::new(None),
+            indexing_task_handle: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             load_image,
@@ -1230,7 +1208,9 @@ fn main() {
             file_management::handle_import_presets_from_file,
             file_management::handle_export_presets_to_file,
             file_management::clear_all_sidecars,
-            file_management::clear_thumbnail_cache
+            file_management::clear_thumbnail_cache,
+            tagging::start_background_indexing,
+            tagging::clear_all_tags
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
