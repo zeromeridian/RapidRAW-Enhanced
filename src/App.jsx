@@ -94,6 +94,7 @@ function App() {
   const [isCopied, setIsCopied] = useState(false);
   const [isPasted, setIsPasted] = useState(false);
   const [isIndexing, setIsIndexing] = useState(false);
+  const [indexingProgress, setIndexingProgress] = useState({ current: 0, total: 0 });
   const [searchQuery, setSearchQuery] = useState('');
   const [brushSettings, setBrushSettings] = useState({ size: 50, feather: 50, tool: 'brush' });
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
@@ -915,10 +916,21 @@ function App() {
       }),
       listen('ai-model-download-start', (event) => { if (isEffectActive) setAiModelDownloadStatus(event.payload); }),
       listen('ai-model-download-finish', () => { if (isEffectActive) setAiModelDownloadStatus(null); }),
-      listen('indexing-started', () => { if (isEffectActive) setIsIndexing(true); }),
+      listen('indexing-started', () => { 
+        if (isEffectActive) { 
+          setIsIndexing(true); 
+          setIndexingProgress({ current: 0, total: 0 });
+        } 
+      }),
+      listen('indexing-progress', (event) => {
+        if (isEffectActive) {
+          setIndexingProgress(event.payload);
+        }
+      }),
       listen('indexing-finished', () => {
         if (isEffectActive) {
           setIsIndexing(false);
+          setIndexingProgress({ current: 0, total: 0 });
           if (currentFolderPathRef.current) {
             invoke('list_images_in_dir', { path: currentFolderPathRef.current })
               .then(setImageList)
@@ -1490,6 +1502,7 @@ function App() {
             setFilterCriteria={setFilterCriteria}
             onSettingsChange={handleSettingsChange}
             isIndexing={isIndexing}
+            indexingProgress={indexingProgress}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             onLibraryRefresh={handleLibraryRefresh}

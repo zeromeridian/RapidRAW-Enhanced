@@ -307,7 +307,7 @@ const Cell = ({ columnIndex, rowIndex, style, data }) => {
 };
 
 export default function MainLibrary({
-  imageList, onImageClick, onImageDoubleClick, onContextMenu, onEmptyAreaContextMenu, multiSelectedPaths, activePath, rootPath, currentFolderPath, onOpenFolder, thumbnails, imageRatings, appSettings, onContinueSession, onGoHome, onClearSelection, sortCriteria, setSortCriteria, filterCriteria, setFilterCriteria, onSettingsChange, onLibraryRefresh, theme, initialScrollOffset, onScroll, isIndexing, searchQuery, setSearchQuery, aiModelDownloadStatus,
+  imageList, onImageClick, onImageDoubleClick, onContextMenu, onEmptyAreaContextMenu, multiSelectedPaths, activePath, rootPath, currentFolderPath, onOpenFolder, thumbnails, imageRatings, appSettings, onContinueSession, onGoHome, onClearSelection, sortCriteria, setSortCriteria, filterCriteria, setFilterCriteria, onSettingsChange, onLibraryRefresh, theme, initialScrollOffset, onScroll, isIndexing, indexingProgress, searchQuery, setSearchQuery, aiModelDownloadStatus,
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [appVersion, setAppVersion] = useState('');
@@ -379,7 +379,7 @@ export default function MainLibrary({
           <div className="relative w-full max-w-xs">
             <input
               type="text"
-              placeholder={isIndexing ? "Indexing images..." : "Search by tags..."}
+              placeholder={isIndexing && indexingProgress.total > 0 ? `Indexing... (${indexingProgress.current}/${indexingProgress.total})` : isIndexing ? "Indexing images..." : "Search by tags..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               disabled={isIndexing}
@@ -413,12 +413,19 @@ export default function MainLibrary({
         <div className="flex-1 flex flex-col items-center justify-center text-text-secondary" onContextMenu={onEmptyAreaContextMenu}>
           <Loader2 className="h-12 w-12 text-secondary animate-spin mb-4" />
           <p className="text-lg font-semibold">
-            {aiModelDownloadStatus ? `Downloading ${aiModelDownloadStatus}...` : "Indexing images..."}
+            {aiModelDownloadStatus ? `Downloading ${aiModelDownloadStatus}...` 
+             : (isIndexing && indexingProgress.total > 0) 
+               ? `Indexing images... (${indexingProgress.current}/${indexingProgress.total})`
+               : "Indexing images..."
+            }
           </p>
           <p className="text-sm mt-2">This may take a moment.</p>
         </div>
       ) : imageList.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center text-text-secondary" onContextMenu={onEmptyAreaContextMenu}><p>No images found that match your filter.</p></div>
+        <div className="flex-1 flex flex-col items-center justify-center text-text-secondary" onContextMenu={onEmptyAreaContextMenu}>
+          <SlidersHorizontal className="h-12 w-12 text-secondary mb-4 text-text-secondary" />
+          <p className="text-text-secondary">No images found that match your filter.</p>
+        </div>
       ) : (
         <div className="flex-1 w-full h-full" onClick={onClearSelection} onContextMenu={onEmptyAreaContextMenu}>
           <AutoSizer>

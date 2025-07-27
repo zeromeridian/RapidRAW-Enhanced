@@ -11,6 +11,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::task::JoinHandle;
 use tokenizers::Tokenizer;
 use walkdir::WalkDir;
+use std::sync::{Arc, Mutex};
 
 use crate::formats::is_supported_image_file;
 use crate::image_processing::ImageMetadata;
@@ -222,7 +223,7 @@ pub async fn start_background_indexing(folder_path: String, app_handle: AppHandl
         return Ok(());
     }
 
-    let max_concurrent_tasks = settings.tagging_thread_count.unwrap_or(3).max(1) as usize; 
+    let max_concurrent_tasks = settings.tagging_thread_count.unwrap_or(3).max(1) as usize;
 
     let models = crate::ai_processing::get_or_init_ai_models(
         &app_handle,
@@ -259,12 +260,15 @@ pub async fn start_background_indexing(folder_path: String, app_handle: AppHandl
         };
 
         println!("Found {} images to process in {}", image_paths.len(), folder_path);
+        let total_images = image_paths.len();
+        let processed_count = Arc::new(Mutex::new(0));
 
         stream::iter(image_paths)
             .for_each_concurrent(max_concurrent_tasks, |path| {
                 let app_handle_inner = app_handle_clone.clone();
                 let models_inner = models.clone();
                 let gpu_context_inner = gpu_context.clone();
+                let processed_count_inner = Arc::clone(&processed_count);
 
                 async move {
                     let path_str = path.to_string_lossy().to_string();
@@ -280,8 +284,6 @@ pub async fn start_background_indexing(folder_path: String, app_handle: AppHandl
                     };
 
                     if metadata.tags.is_none() {
-                        println!("Tagging image: {}", path_str);
-
                         match file_management::get_cached_or_generate_thumbnail_image(
                             &path_str,
                             &app_handle_inner,
@@ -307,6 +309,13 @@ pub async fn start_background_indexing(folder_path: String, app_handle: AppHandl
                             }
                         }
                     }
+
+                    let mut count = processed_count_inner.lock().unwrap();
+                    *count += 1;
+                    let _ = app_handle_inner.emit("indexing-progress", serde_json::json!({
+                        "current": *count,
+                        "total": total_images
+                    }));
                 }
             })
             .await;
