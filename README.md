@@ -51,7 +51,8 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
-*   **2025-07-24:** Fuji RAF X-Trans sensor support (new x-trans demosaicing algo)
+*   **2025-07-27:** Automatic AI image tagging, overall mask transparency setting per mask
+*   **2025-07-25:** Fuji RAF X-Trans sensor support (new x-trans demosaicing algo)
 *   **2025-07-24:** Auto crop when cropping an image (to prevent black borders), added drag & drop sort abilty to presets panel
 *   **2025-07-22:** Significant improvements to the shader: More accurate exposure slider, better tone mapper (simplified ACES)
 *   **2025-07-21:** Remember scroll position when going into the editing section
@@ -62,11 +63,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-07-19:** Fixed banding & purple artefacts on RAW images, better color noise reduction, show exposure in stops
 *   **2025-07-18:** Smooth zoom slider, new adaptive editor theme setting
 *   **2025-07-18:** New export functionality: Export with metadata, GPS metadata remover, batch export file naming scheme using tags
-*   **2025-07-18:** Ability to delete the associated RAW/JPEG in right click delete operations
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-07-18:** Ability to delete the associated RAW/JPEG in right click delete operations
 *   **2025-07-17:** Small bug fixes
 *   **2025-07-13:** Native looking titlebar and ability to input precise number into sliders
 *   **2025-07-13:** Huge update to masks: You can now add multiple masks to a mask containers, subtract / add / combine masks etc.
@@ -139,7 +140,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
     <td valign="top" width="50%">
       <h4>Library & Workflow</h4>
       <ul>
-        <li><strong>Image Library:</strong> Effortlessly sort, rate, and manage your entire photo collection for a streamlined and efficient workflow.</li>
+        <li><strong>Image Library:</strong> Effortlessly sort, rate, tag, and manage your entire photo collection for a streamlined and efficient workflow.</li>
         <li><strong>Folder Management:</strong> Integrated folder tree, create, rename, and delete folders directly within the app.</li>
         <li><strong>File Operations:</strong> Copy, move, and duplicate images and their associated edits.</li>
         <li><strong>Filmstrip View:</strong> Quickly navigate between all the images in your current folder while editing.</li>
