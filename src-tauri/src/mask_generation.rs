@@ -23,6 +23,10 @@ pub struct SubMask {
     pub parameters: Value,
 }
 
+fn default_opacity() -> f32 {
+    100.0
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MaskDefinition {
@@ -30,6 +34,8 @@ pub struct MaskDefinition {
     pub name: String,
     pub visible: bool,
     pub invert: bool,
+    #[serde(default = "default_opacity")]
+    pub opacity: f32,
     pub adjustments: Value,
     pub sub_masks: Vec<SubMask>,
 }
@@ -484,6 +490,13 @@ pub fn generate_mask_bitmap(
     if mask_def.invert {
         for pixel in additive_canvas.pixels_mut() {
             pixel[0] = 255 - pixel[0];
+        }
+    }
+
+    let opacity_multiplier = (mask_def.opacity / 100.0).clamp(0.0, 1.0);
+    if opacity_multiplier < 1.0 {
+        for pixel in additive_canvas.pixels_mut() {
+            pixel[0] = (pixel[0] as f32 * opacity_multiplier) as u8;
         }
     }
 
