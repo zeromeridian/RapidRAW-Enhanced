@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir } from '@tauri-apps/api/path';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import debounce from 'lodash.debounce';
 import { centerCrop, makeAspectCrop } from 'react-image-crop';
 import clsx from 'clsx';
@@ -39,6 +40,7 @@ const DEBUG = false;
 function App() {
   const [rootPath, setRootPath] = useState(null);
   const [appSettings, setAppSettings] = useState(null);
+  const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
   const [currentFolderPath, setCurrentFolderPath] = useState(null);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [folderTree, setFolderTree] = useState(null);
@@ -414,6 +416,20 @@ function App() {
     document.documentElement.style.cursor = setter === setBottomPanelHeight ? 'row-resize' : 'col-resize';
     window.addEventListener('mousemove', doDrag);
     window.addEventListener('mouseup', stopDrag);
+  }, []);
+
+  useEffect(() => {
+    const appWindow = getCurrentWindow();
+    const checkFullscreen = async () => {
+      setIsWindowFullScreen(await appWindow.isFullscreen());
+    };
+    checkFullscreen();
+
+    const unlistenPromise = appWindow.onResized(checkFullscreen);
+
+    return () => {
+      unlistenPromise.then(unlisten => unlisten());
+    };
   }, []);
 
   const handleRightPanelSelect = useCallback((panelId) => {
@@ -1534,12 +1550,12 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-bg-primary font-sans text-text-primary overflow-hidden select-none">
-      { appSettings?.decorations || <TitleBar /> }
+      { appSettings?.decorations || (!isWindowFullScreen && <TitleBar />) }
       <div className={clsx(
         "flex-1 flex flex-col min-h-0",
         [
           rootPath && "p-2 gap-2",
-          !appSettings?.decorations && rootPath && "pt-12",
+          !appSettings?.decorations && rootPath && !isWindowFullScreen && "pt-12",
         ]
       )}>
         {error && (
