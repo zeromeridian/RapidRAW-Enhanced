@@ -34,7 +34,6 @@ jobs:
             target: ''
             asset-prefix: '03'
     uses: ./.github/workflows/build.yml
-    needs: [checkout-branch]
     with:
       platform: ${{ matrix.platform }}
       target: ${{ matrix.target }}
