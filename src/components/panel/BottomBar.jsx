@@ -105,6 +105,17 @@ export default function BottomBar({
     }, 300);
   };
 
+  const handleZoomKeyDown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && ['z', 'y'].includes(e.key.toLowerCase())) {
+      e.target.blur();
+      return;
+    }
+    const globalKeys = [' ', 'ArrowUp', 'ArrowDown', 'f'];
+    if (globalKeys.includes(e.key)) {
+      e.target.blur();
+    }
+  };
+
   return (
     <div className="flex-shrink-0 bg-bg-secondary rounded-lg flex flex-col">
       {!isLibraryView && (
@@ -198,6 +209,7 @@ export default function BottomBar({
                 onChange={handleSliderChange}
                 onMouseDown={handleMouseDown}
                 onMouseUp={handleMouseUp}
+                onKeyDown={handleZoomKeyDown}
                 className="w-full h-1 bg-surface rounded-lg appearance-none cursor-pointer accent-accent"
               />
               <span className="text-xs text-text-secondary w-10 text-right">{(sliderValue * 100).toFixed(0)}%</span>
