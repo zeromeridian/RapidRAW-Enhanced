@@ -125,7 +125,8 @@ jobs:
 
       - id: tauri-build
         name: Build with tauri-action
-        # FIXME set this back to a release major version, ex. v0
+        # FIXME set this back to a release major version, ex. v0 . This is a commit from the `dev` branch which includes PR
+        # https://github.com/tauri-apps/tauri-action/pull/1099 , adding the assetNamePattern feature.
         uses: tauri-apps/tauri-action@cf3eb9b18add8548a40584695215c80ab7274f31
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
