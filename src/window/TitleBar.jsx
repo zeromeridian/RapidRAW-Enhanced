@@ -21,7 +21,16 @@ export default function TitleBar() {
 
   const appWindow = getCurrentWindow();
   const handleMinimize = () => appWindow.minimize();
-  const handleMaximize = () => appWindow.toggleMaximize();
+  const handleMaximize = React.useCallback(() => {
+    switch (osPlatform) {
+      case 'macos':
+        appWindow.setFullscreen(true);
+        break;
+      default:
+        appWindow.toggleMaximize();
+        break;
+    }
+  }, [osPlatform]);
   const handleClose = () => appWindow.close();
 
   const isMac = osPlatform === 'macos';
