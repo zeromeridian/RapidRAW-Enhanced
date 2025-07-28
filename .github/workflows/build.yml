@@ -24,6 +24,9 @@ on:
       upload-artifacts:
         required: false
         type: boolean
+      repository:
+        required: false
+        type: string
       ref:
         required: false
         type: string
@@ -38,6 +41,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.repository }}
           ref: ${{ inputs.ref }}
           fetch-depth: 0
           filter: tree:0
