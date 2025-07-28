@@ -344,6 +344,29 @@ RapidRAW is built to be lightweight and cross-platform. The minimum (tested) req
 *   **macOS:** macOS 13 (Ventura) or newer
 *   **Linux:** Ubuntu 22.04+ or a compatible modern distribution
 
+### Common Problems
+<details>
+<summary>Texture Binding Array Error</summary>
+If you see an error like `unsupported feature requested: Features (TEXTURE_BINDING_ARRAY)`, your GPU likely lacks support for required OpenGL features. This typically affects older or integrated graphics.  
+Support for legacy hardware is not a current priority.
+</details>
+
+<details>
+<summary>Linux Wayland/WebKit Crash</summary>
+
+If RapidRAW crashes on Wayland (e.g. GNOME + NVIDIA), try launching it with:
+
+```bash
+WEBKIT_DISABLE_DMABUF_RENDERER=1 RapidRAW
+```
+or
+```bash
+WEBKIT_DISABLE_COMPOSITING_MODE=1 RapidRAW
+```
+
+This issue is related to **WebKit** and **NVIDIA drivers**, not RapidRAW directly. Switching to **X11** or using **AMD / Intel GPUs** may also help.
+</details>
+
 ## Contributing
 
 Contributions are welcome and highly appreciated! Whether it's reporting a bug, suggesting a feature, or submitting a pull request, your help makes this project better. Please feel free to open an issue to discuss your ideas.
