@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-  pull_request_target:
 
 jobs:
   build:
@@ -34,7 +33,6 @@ jobs:
           - platform: 'ubuntu-24.04-arm'
             target: ''
             asset-prefix: '03'
-
     uses: ./.github/workflows/build.yml
     with:
       platform: ${{ matrix.platform }}
