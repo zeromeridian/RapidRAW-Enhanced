@@ -57,6 +57,7 @@ sha2 = "0.10"
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }
+sha2 = "0.10"
 
 [profile.dev]
 opt-level = 3
