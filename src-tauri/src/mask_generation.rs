@@ -40,6 +40,20 @@ pub struct MaskDefinition {
     pub sub_masks: Vec<SubMask>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AiPatchDefinition {
+    pub id: String,
+    pub name: String,
+    pub visible: bool,
+    pub invert: bool,
+    pub prompt: String,
+    #[serde(default = "default_opacity")]
+    pub opacity: f32,
+    pub sub_masks: Vec<SubMask>,
+}
+
+
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 struct RadialMaskParameters {

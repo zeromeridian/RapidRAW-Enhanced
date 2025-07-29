@@ -40,7 +40,7 @@ use crate::image_processing::{
     ImageMetadata, process_and_get_dynamic_image, Crop, apply_crop, apply_rotation, apply_flip,
 };
 use crate::file_management::{get_sidecar_path, load_settings, AppSettings};
-use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
+use crate::mask_generation::{MaskDefinition, generate_mask_bitmap, AiPatchDefinition};
 use crate::ai_processing::{
     AiState, get_or_init_ai_models, generate_image_embeddings, run_sam_decoder,
     AiSubjectMaskParameters, run_u2netp_model, AiForegroundMaskParameters
@@ -162,15 +162,31 @@ fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
     
     if let Some(patches_val) = adjustments.get("aiPatches") {
         if let Some(patches_arr) = patches_val.as_array() {
+            // Hash the number of patches to catch additions/removals
+            patches_arr.len().hash(&mut hasher);
+
             for patch in patches_arr {
+                // Hash unique ID
                 if let Some(id) = patch.get("id").and_then(|v| v.as_str()) {
                     id.hash(&mut hasher);
                 }
+                // Hash visibility
                 let is_visible = patch.get("visible").and_then(|v| v.as_bool()).unwrap_or(true);
                 is_visible.hash(&mut hasher);
 
-                let data_exists = patch.get("patchDataBase64").is_some();
-                data_exists.hash(&mut hasher);
+                // Hash the length of the patch data. This detects when it's added.
+                let data_len = patch.get("patchDataBase64").and_then(|v| v.as_str()).unwrap_or("").len();
+                data_len.hash(&mut hasher);
+
+                // Hash the entire subMasks structure by converting it to a string.
+                // This is crucial for detecting changes in the selection mask.
+                if let Some(sub_masks_val) = patch.get("subMasks") {
+                    sub_masks_val.to_string().hash(&mut hasher);
+                }
+
+                // Also hash other properties that define the mask's appearance
+                let invert = patch.get("invert").and_then(|v| v.as_bool()).unwrap_or(false);
+                invert.hash(&mut hasher);
             }
         }
     }
@@ -992,6 +1008,95 @@ fn generate_preset_preview(
     encode_to_base64(&processed_image, 50)
 }
 
+#[tauri::command]
+fn update_window_effect(theme: String, window: tauri::Window) {
+    apply_window_effect(theme, window);
+}
+
+#[tauri::command]
+async fn check_comfyui_status(app_handle: tauri::AppHandle) {
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let is_connected = if let Some(address) = settings.comfyui_address {
+        comfyui_connector::ping_server(&address).await.is_ok()
+    } else {
+        false
+    };
+    let _ = app_handle.emit("comfyui-status-update", serde_json::json!({ "connected": is_connected }));
+}
+
+#[tauri::command]
+async fn test_comfyui_connection(address: String) -> Result<(), String> {
+    comfyui_connector::ping_server(&address)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn invoke_generative_replace_with_mask_def(
+    _path: String,
+    patch_definition: AiPatchDefinition,
+    current_adjustments: Value,
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let settings = load_settings(app_handle).unwrap_or_default();
+    let address = settings.comfyui_address
+        .ok_or_else(|| "ComfyUI address is not configured in settings.".to_string())?;
+
+    let mut source_image_adjustments = current_adjustments.clone();
+    if let Some(patches) = source_image_adjustments.get_mut("aiPatches").and_then(|v| v.as_array_mut()) {
+        patches.retain(|p| p.get("id").and_then(|id| id.as_str()) != Some(&patch_definition.id));
+    }
+
+    let base_image = get_full_image_for_processing(&state)?;
+    let source_image = composite_patches_on_image(&base_image, &source_image_adjustments)
+        .map_err(|e| format!("Failed to prepare source image: {}", e))?;
+
+    let (img_w, img_h) = source_image.dimensions();
+    let mask_def_for_generation = MaskDefinition {
+        id: patch_definition.id.clone(),
+        name: patch_definition.name.clone(),
+        visible: patch_definition.visible,
+        invert: patch_definition.invert,
+        opacity: 100.0, // Opacity is for preview, generation mask should be full
+        adjustments: serde_json::Value::Null, // Not needed for mask generation
+        sub_masks: patch_definition.sub_masks,
+    };
+
+    let mask_bitmap = generate_mask_bitmap(&mask_def_for_generation, img_w, img_h, 1.0, (0.0, 0.0))
+        .ok_or("Failed to generate mask bitmap for AI replace")?;
+    let mask_image = DynamicImage::ImageLuma8(mask_bitmap);
+
+    let workflow_inputs = comfyui_connector::WorkflowInputs {
+        source_image_node_id: "11".to_string(),
+        mask_image_node_id: Some("148".to_string()),
+        text_prompt_node_id: Some("6".to_string()),
+        final_output_node_id: "252".to_string(),
+    };
+
+    let result_png_bytes = comfyui_connector::execute_workflow(
+        &address,
+        "generative_replace",
+        workflow_inputs,
+        source_image,
+        Some(mask_image),
+        Some(patch_definition.prompt)
+    ).await.map_err(|e| e.to_string())?;
+
+    Ok(general_purpose::STANDARD.encode(&result_png_bytes))
+}
+
+#[tauri::command]
+fn get_supported_file_types() -> Result<serde_json::Value, String> {
+    let raw_extensions: Vec<&str> = crate::formats::RAW_EXTENSIONS.iter().map(|(ext, _)| *ext).collect();
+    let non_raw_extensions: Vec<&str> = crate::formats::NON_RAW_EXTENSIONS.to_vec();
+    
+    Ok(serde_json::json!({
+        "raw": raw_extensions,
+        "nonRaw": non_raw_extensions
+    }))
+}
+
 fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowHandle) {
     #[cfg(target_os = "windows")]
     {
@@ -1030,86 +1135,6 @@ fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowH
     #[cfg(target_os = "linux")]
     {
     }
-}
-
-#[tauri::command]
-fn update_window_effect(theme: String, window: tauri::Window) {
-    apply_window_effect(theme, window);
-}
-
-#[tauri::command]
-async fn check_comfyui_status(app_handle: tauri::AppHandle) {
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let is_connected = if let Some(address) = settings.comfyui_address {
-        comfyui_connector::ping_server(&address).await.is_ok()
-    } else {
-        false
-    };
-    let _ = app_handle.emit("comfyui-status-update", serde_json::json!({ "connected": is_connected }));
-}
-
-#[tauri::command]
-async fn test_comfyui_connection(address: String) -> Result<(), String> {
-    comfyui_connector::ping_server(&address)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn invoke_generative_replace(
-    _path: String,
-    mask_data_base64: String,
-    prompt: String,
-    current_adjustments: Value,
-    app_handle: tauri::AppHandle,
-    state: tauri::State<'_, AppState>,
-) -> Result<String, String> {
-    let settings = load_settings(app_handle).unwrap_or_default();
-    let address = settings.comfyui_address
-        .ok_or_else(|| "ComfyUI address is not configured in settings.".to_string())?;
-
-    let base_image = get_full_image_for_processing(&state)?;
-    let source_image = composite_patches_on_image(&base_image, &current_adjustments)
-        .map_err(|e| format!("Failed to prepare source image: {}", e))?;
-
-    let b64_data = if let Some(idx) = mask_data_base64.find(',') {
-        &mask_data_base64[idx + 1..]
-    } else {
-        &mask_data_base64
-    };
-    let mask_bytes = general_purpose::STANDARD.decode(b64_data)
-        .map_err(|e| format!("Failed to decode mask: {}", e))?;
-    let mask_image = image::load_from_memory(&mask_bytes)
-        .map_err(|e| format!("Failed to load mask image: {}", e))?;
-
-    let workflow_inputs = comfyui_connector::WorkflowInputs {
-        source_image_node_id: "11".to_string(),
-        mask_image_node_id: Some("148".to_string()),
-        text_prompt_node_id: Some("6".to_string()),
-        final_output_node_id: "252".to_string(),
-    };
-
-    let result_png_bytes = comfyui_connector::execute_workflow(
-        &address,
-        "generative_replace",
-        workflow_inputs,
-        source_image,
-        Some(mask_image),
-        Some(prompt)
-    ).await.map_err(|e| e.to_string())?;
-
-    Ok(general_purpose::STANDARD.encode(&result_png_bytes))
-}
-
-#[tauri::command]
-fn get_supported_file_types() -> Result<serde_json::Value, String> {
-    let raw_extensions: Vec<&str> = crate::formats::RAW_EXTENSIONS.iter().map(|(ext, _)| *ext).collect();
-    let non_raw_extensions: Vec<&str> = crate::formats::NON_RAW_EXTENSIONS.to_vec();
-    
-    Ok(serde_json::json!({
-        "raw": raw_extensions,
-        "nonRaw": non_raw_extensions
-    }))
 }
 
 fn main() {
@@ -1178,7 +1203,7 @@ fn main() {
             update_window_effect,
             check_comfyui_status,
             test_comfyui_connection,
-            invoke_generative_replace,
+            invoke_generative_replace_with_mask_def,
             get_supported_file_types,
             image_processing::generate_histogram,
             image_processing::generate_waveform,

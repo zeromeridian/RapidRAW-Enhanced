@@ -80,6 +80,8 @@ function App() {
   const [activeRightPanel, setActiveRightPanel] = useState('adjustments');
   const [activeMaskContainerId, setActiveMaskContainerId] = useState(null);
   const [activeMaskId, setActiveMaskId] = useState(null);
+  const [activeAiPatchContainerId, setActiveAiPatchContainerId] = useState(null);
+  const [activeAiSubMaskId, setActiveAiSubMaskId] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [renderedRightPanel, setRenderedRightPanel] = useState(activeRightPanel);
   const [collapsibleSectionsState, setCollapsibleSectionsState] = useState({ basic: true, curves: true, color: false, details: false, effects: false });
@@ -107,8 +109,6 @@ function App() {
   const [isGeneratingAiMask, setIsGeneratingAiMask] = useState(false);
   const [isComfyUiConnected, setIsComfyUiConnected] = useState(false);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
-  const [aiTool, setAiTool] = useState(null);
-  const [pendingAiAction, setPendingAiAction] = useState(null);
   const [isMaskControlHovered, setIsMaskControlHovered] = useState(false);
   const { showContextMenu } = useContextMenu();
   const [thumbnails, setThumbnails] = useState({});
@@ -150,9 +150,11 @@ function App() {
 
   useEffect(() => {
     if (activeRightPanel !== 'masks' || !activeMaskContainerId) {
-      setIsMaskControlHovered(false);
+      if (activeRightPanel !== 'ai' || !activeAiPatchContainerId) {
+        setIsMaskControlHovered(false);
+      }
     }
-  }, [activeRightPanel, activeMaskContainerId]);
+  }, [activeRightPanel, activeMaskContainerId, activeAiPatchContainerId]);
 
   const undo = useCallback(() => { if (canUndo) { undoAdjustments(); debouncedSetHistory.cancel(); } }, [canUndo, undoAdjustments, debouncedSetHistory]);
   const redo = useCallback(() => { if (canRedo) { redoAdjustments(); debouncedSetHistory.cancel(); } }, [canRedo, redoAdjustments, debouncedSetHistory]);
@@ -169,60 +171,49 @@ function App() {
     };
   }, []);
 
-  const handleAiMaskDrawingComplete = useCallback((maskDataBase64) => {
-    setPendingAiAction({ maskDataBase64 });
-    setActiveRightPanel('ai');
-    setRenderedRightPanel('ai');
-    setAiTool(null);
-  }, []);
-
   const updateSubMask = (subMaskId, updatedData) => {
     setAdjustments(prev => ({
       ...prev,
       masks: prev.masks.map(c => ({
         ...c,
         subMasks: c.subMasks.map(sm => sm.id === subMaskId ? { ...sm, ...updatedData } : sm)
+      })),
+      aiPatches: (prev.aiPatches || []).map(p => ({
+        ...p,
+        subMasks: p.subMasks.map(sm => sm.id === subMaskId ? { ...sm, ...updatedData } : sm)
       }))
     }));
   };
 
-  const handleGenerativeReplace = useCallback(async ({ maskDataBase64, prompt }) => {
+  const handleGenerativeReplace = useCallback(async (patchId) => {
     if (!selectedImage?.path || isGeneratingAi) return;
 
-    const tempId = uuidv4();
+    const patch = adjustments.aiPatches.find(p => p.id === patchId);
+    if (!patch) {
+      console.error("Could not find AI patch to generate for:", patchId);
+      return;
+    }
 
     setAdjustments(prev => ({
       ...prev,
-      aiPatches: [
-        ...(prev.aiPatches || []),
-        { 
-          id: tempId, 
-          prompt,
-          visible: true,
-          isLoading: true,
-        }
-      ]
+      aiPatches: prev.aiPatches.map(p => p.id === patchId ? { ...p, isLoading: true } : p)
     }));
-
     setIsGeneratingAi(true);
-    setPendingAiAction(null);
 
     try {
-      const newPatchBase64 = await invoke('invoke_generative_replace', {
+      const newPatchBase64 = await invoke('invoke_generative_replace_with_mask_def', {
         path: selectedImage.path,
-        maskDataBase64,
-        prompt,
+        patchDefinition: patch,
         currentAdjustments: adjustments,
       });
 
       setAdjustments(prev => ({
         ...prev,
         aiPatches: prev.aiPatches.map(p => 
-          p.id === tempId 
+          p.id === patchId 
             ? { 
                 ...p, 
                 patchDataBase64: newPatchBase64,
-                maskDataBase64,
                 isLoading: false,
               } 
             : p
@@ -233,7 +224,7 @@ function App() {
       setError(`AI Replace Failed: ${err}`);
       setAdjustments(prev => ({
         ...prev,
-        aiPatches: (prev.aiPatches || []).filter(p => p.id !== tempId)
+        aiPatches: prev.aiPatches.map(p => p.id === patchId ? { ...p, isLoading: false } : p)
       }));
     } finally {
       setIsGeneratingAi(false);
@@ -250,7 +241,11 @@ function App() {
       ...prev,
       aiPatches: (prev.aiPatches || []).filter(p => p.id !== patchId)
     }));
-  }, [setAdjustments]);
+    if (activeAiPatchContainerId === patchId) {
+      setActiveAiPatchContainerId(null);
+      setActiveAiSubMaskId(null);
+    }
+  }, [setAdjustments, activeAiPatchContainerId]);
 
   const handleToggleAiPatchVisibility = useCallback((patchId) => {
     setAdjustments(prev => ({
@@ -277,17 +272,7 @@ function App() {
         flipVertical: adjustments.flipVertical,
       });
 
-      setAdjustments(prev => ({
-        ...prev,
-        masks: prev.masks.map(container => ({
-          ...container,
-          subMasks: container.subMasks.map(sm =>
-            sm.id === subMaskId
-              ? { ...sm, parameters: newParameters }
-              : sm
-          )
-        }))
-      }));
+      updateSubMask(subMaskId, { parameters: newParameters });
 
     } catch (error) {
       console.error("Failed to generate AI subject mask:", error);
@@ -310,17 +295,7 @@ function App() {
         flipVertical: adjustments.flipVertical,
       });
 
-      setAdjustments(prev => ({
-        ...prev,
-        masks: prev.masks.map(container => ({
-          ...container,
-          subMasks: container.subMasks.map(sm =>
-            sm.id === subMaskId
-              ? { ...sm, parameters: newParameters }
-              : sm
-          )
-        }))
-      }));
+      updateSubMask(subMaskId, { parameters: newParameters });
 
     } catch (error) {
       console.error("Failed to generate AI foreground mask:", error);
@@ -435,15 +410,12 @@ function App() {
   const handleRightPanelSelect = useCallback((panelId) => {
     if (panelId === activeRightPanel) {
       setActiveRightPanel(null);
-      setAiTool(null);
     } else {
       setActiveRightPanel(panelId);
       setRenderedRightPanel(panelId);
-      if (panelId !== 'ai') {
-        setAiTool(null);
-      }
     }
     setActiveMaskId(null);
+    setActiveAiSubMaskId(null);
   }, [activeRightPanel]);
 
   const handleSettingsChange = useCallback((newSettings) => {
@@ -677,8 +649,8 @@ function App() {
     setIsWaveformVisible(false);
     setActiveMaskId(null);
     setActiveMaskContainerId(null);
-    setAiTool(null);
-    setPendingAiAction(null);
+    setActiveAiPatchContainerId(null);
+    setActiveAiSubMaskId(null);
     setLibraryActivePath(lastActivePath);
   }, [selectedImage?.path]);
 
@@ -869,8 +841,8 @@ function App() {
     setShowOriginal(false);
     setActiveMaskId(null);
     setActiveMaskContainerId(null);
-    setAiTool(null);
-    setPendingAiAction(null);
+    setActiveAiPatchContainerId(null);
+    setActiveAiSubMaskId(null);
     if (transformWrapperRef.current) transformWrapperRef.current.resetTransform(0);
     setZoom(1);
     setIsLibraryExportPanelVisible(false);
@@ -887,7 +859,6 @@ function App() {
     canRedo,
     activeRightPanel,
     isFullScreen,
-    aiTool,
     activeMaskId,
     customEscapeHandler,
     copiedFilePaths,
@@ -908,8 +879,9 @@ function App() {
     handleRightPanelSelect,
     setIsWaveformVisible,
     handleZoomChange,
-    setAiTool,
     setActiveMaskId,
+    activeAiSubMaskId,
+    setActiveAiSubMaskId,
   });
 
   useEffect(() => {
@@ -1390,6 +1362,9 @@ function App() {
               activeMaskId={activeMaskId}
               activeMaskContainerId={activeMaskContainerId}
               onSelectMask={setActiveMaskId}
+              activeAiPatchContainerId={activeAiPatchContainerId}
+              activeAiSubMaskId={activeAiSubMaskId}
+              onSelectAiSubMask={setActiveAiSubMaskId}
               updateSubMask={updateSubMask}
               transformWrapperRef={transformWrapperRef}
               onZoomed={handleUserTransform}
@@ -1401,8 +1376,6 @@ function App() {
               canRedo={canRedo}
               brushSettings={brushSettings}
               onGenerateAiMask={handleGenerateAiMask}
-              aiTool={aiTool}
-              onAiMaskDrawingComplete={handleAiMaskDrawingComplete}
               isMaskControlHovered={isMaskControlHovered}
             />
             <Resizer onMouseDown={createResizeHandler(setBottomPanelHeight, bottomPanelHeight)} direction="horizontal" />
@@ -1468,18 +1441,25 @@ function App() {
                 {renderedRightPanel === 'presets' && <PresetsPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} activePanel={activeRightPanel} />}
                 {renderedRightPanel === 'export' && <ExportPanel selectedImage={selectedImage} adjustments={adjustments} multiSelectedPaths={multiSelectedPaths} exportState={exportState} setExportState={setExportState} />}
                 {renderedRightPanel === 'ai' && <AIPanel 
-                  selectedImage={selectedImage} 
-                  adjustments={adjustments} 
-                  isComfyUiConnected={isComfyUiConnected} 
-                  isGeneratingAi={isGeneratingAi} 
-                  onGenerativeReplace={handleGenerativeReplace} 
-                  onResetAiEdits={handleResetAiEdits} 
-                  aiTool={aiTool} 
-                  setAiTool={setAiTool}
-                  pendingAiAction={pendingAiAction}
-                  setPendingAiAction={setPendingAiAction}
+                  adjustments={adjustments}
+                  setAdjustments={setAdjustments}
+                  selectedImage={selectedImage}
+                  isComfyUiConnected={isComfyUiConnected}
+                  isGeneratingAi={isGeneratingAi}
+                  onGenerativeReplace={handleGenerativeReplace}
+                  onResetAiEdits={handleResetAiEdits}
                   onDeletePatch={handleDeleteAiPatch}
                   onTogglePatchVisibility={handleToggleAiPatchVisibility}
+                  activePatchContainerId={activeAiPatchContainerId}
+                  onSelectPatchContainer={setActiveAiPatchContainerId}
+                  activeSubMaskId={activeAiSubMaskId}
+                  onSelectSubMask={setActiveAiSubMaskId}
+                  brushSettings={brushSettings}
+                  setBrushSettings={setBrushSettings}
+                  isGeneratingAiMask={isGeneratingAiMask}
+                  aiModelDownloadStatus={aiModelDownloadStatus}
+                  onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
+                  setCustomEscapeHandler={setCustomEscapeHandler}
                 />}
               </div>
             </div>
