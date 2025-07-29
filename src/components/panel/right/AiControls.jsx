@@ -46,7 +46,7 @@ const BrushTools = ({ settings, onSettingsChange }) => (
   </div>
 );
 
-export default function AiControls({
+export default function AIControls({
   editingPatch,
   activeSubMask,
   updatePatch,

@@ -6,7 +6,7 @@ import {
   TriangleRight, Circle, Wand2, Loader2
 } from 'lucide-react';
 import clsx from 'clsx';
-import AiControls from './AiControls';
+import AIControls from './AIControls';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import Input from '../../ui/Input';
 import Button from '../../ui/Button';
@@ -252,7 +252,7 @@ export default function AIPanel({
           </button>
         </div>
         <div className="flex-grow overflow-y-auto">
-          <AiControls
+          <AIControls
             editingPatch={editingPatch}
             activeSubMask={activeSubMask}
             updatePatch={updatePatch}
