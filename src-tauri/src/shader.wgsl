@@ -330,28 +330,34 @@ fn apply_white_balance(color: vec3<f32>, temp: f32, tnt: f32) -> vec3<f32> {
 
 fn apply_creative_color(color: vec3<f32>, sat: f32, vib: f32) -> vec3<f32> {
     if (sat == 0.0 && vib == 0.0) { return color; }
-    let luma = get_luma(color);
-    var sat_rgb = mix(vec3<f32>(luma), color, 1.0 + sat);
+    
+    var processed_color = color;
+
     if (vib != 0.0) {
-        let luma_for_vib = get_luma(sat_rgb);
-        let current_saturation = distance(sat_rgb, vec3<f32>(luma_for_vib));
-        let saturation_mask = 1.0 - smoothstep(0.1, 0.7, current_saturation);
-        let shadow_boost = smoothstep(0.0, 0.2, luma_for_vib);
-        let highlight_protection = 1.0 - smoothstep(0.4, 0.9, luma_for_vib);
-        let luminance_mask = shadow_boost * highlight_protection;
-        let final_mask = saturation_mask * luminance_mask;
+        let luma_for_vib = get_luma(processed_color);
+        let current_saturation = distance(processed_color, vec3<f32>(luma_for_vib));
+        
         if (vib > 0.0) {
+            let saturation_mask = 1.0 - smoothstep(0.1, 0.7, current_saturation);
+            let shadow_boost = smoothstep(0.0, 0.2, luma_for_vib);
+            let highlight_protection = 1.0 - smoothstep(0.4, 0.9, luma_for_vib);
+            let luminance_mask = shadow_boost * highlight_protection;
+            let final_mask = saturation_mask * luminance_mask;
             let strength_multiplier = 2.5;
             let vibrance_amount = vib * final_mask * strength_multiplier;
-            sat_rgb = mix(vec3<f32>(luma_for_vib), sat_rgb, 1.0 + vibrance_amount);
+            processed_color = mix(vec3<f32>(luma_for_vib), processed_color, 1.0 + vibrance_amount);
         } else {
             let skin_luma_protection = 1.0 - smoothstep(0.3, 0.6, luma_for_vib);
             let skin_sat_protection = smoothstep(0.1, 0.3, current_saturation);
             let protection_mask = skin_luma_protection * skin_sat_protection;
             let vibrance_amount = vib * (1.0 - protection_mask);
-            sat_rgb = mix(vec3<f32>(luma_for_vib), sat_rgb, 1.0 + vibrance_amount);
+            processed_color = mix(vec3<f32>(luma_for_vib), processed_color, 1.0 + vibrance_amount);
         }
     }
+
+    let final_luma = get_luma(processed_color);
+    let sat_rgb = mix(vec3<f32>(final_luma), processed_color, 1.0 + sat);
+
     return sat_rgb;
 }
 
@@ -523,13 +529,13 @@ fn apply_all_adjustments(initial_rgb: vec3<f32>, adj: GlobalAdjustments, coords_
     processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
     processed_rgb = processed_rgb * pow(2.0, adj.exposure);
     processed_rgb = apply_tonal_adjustments(processed_rgb, adj.contrast, adj.highlights, adj.shadows, adj.whites, adj.blacks);
+    processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
+    processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_blending, adj.color_grading_balance);
+    processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
     processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 2, adj.sharpness);
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 8, adj.clarity);
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20, adj.structure);
-    processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
-    processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
-    processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_blending, adj.color_grading_balance);
     return processed_rgb;
 }
 
@@ -538,13 +544,13 @@ fn apply_all_mask_adjustments(initial_rgb: vec3<f32>, adj: MaskAdjustments, coor
     processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
     processed_rgb = processed_rgb * pow(2.0, adj.exposure);
     processed_rgb = apply_tonal_adjustments(processed_rgb, adj.contrast, adj.highlights, adj.shadows, adj.whites, adj.blacks);
+    processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
+    processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_blending, adj.color_grading_balance);
+    processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
     processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 2, adj.sharpness);
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 8, adj.clarity);
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20, adj.structure);
-    processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
-    processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
-    processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_blending, adj.color_grading_balance);
     return processed_rgb;
 }
 

@@ -301,10 +301,10 @@ const SCALES: AdjustmentScales = AdjustmentScales {
     shadows: 200.0,
     whites: 30.0,
     blacks: 60.0,
-    saturation: 80.0,
+    saturation: 100.0,
     temperature: 25.0,
     tint: 100.0,
-    vibrance: 80.0,
+    vibrance: 100.0,
     
     sharpness: 40.0,
     luma_noise_reduction: 100.0,
