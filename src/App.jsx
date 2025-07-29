@@ -18,7 +18,7 @@ import RightPanelSwitcher from './components/panel/right/RightPanelSwitcher';
 import MetadataPanel from './components/panel/right/MetadataPanel';
 import CropPanel from './components/panel/right/CropPanel';
 import PresetsPanel from './components/panel/right/PresetsPanel';
-import AIPanel from './components/panel/right/AIPanel';
+import AIPanel from './components/panel/right/AiPanel';
 import ExportPanel from './components/panel/right/ExportPanel';
 import LibraryExportPanel from './components/panel/right/LibraryExportPanel';
 import MasksPanel from './components/panel/right/MasksPanel';
@@ -33,7 +33,6 @@ import { INITIAL_ADJUSTMENTS, COPYABLE_ADJUSTMENT_KEYS, normalizeLoadedAdjustmen
 import { generatePaletteFromImage } from './utils/palette';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { THEMES, DEFAULT_THEME_ID } from './utils/themes';
-import { v4 as uuidv4 } from 'uuid';
 
 const DEBUG = false;
 
@@ -185,7 +184,7 @@ function App() {
     }));
   };
 
-  const handleGenerativeReplace = useCallback(async (patchId) => {
+  const handleGenerativeReplace = useCallback(async (patchId, prompt) => {
     if (!selectedImage?.path || isGeneratingAi) return;
 
     const patch = adjustments.aiPatches.find(p => p.id === patchId);
@@ -194,31 +193,37 @@ function App() {
       return;
     }
 
+    const patchDefinition = { ...patch, prompt };
+
     setAdjustments(prev => ({
       ...prev,
-      aiPatches: prev.aiPatches.map(p => p.id === patchId ? { ...p, isLoading: true } : p)
+      aiPatches: prev.aiPatches.map(p => p.id === patchId ? { ...p, isLoading: true, prompt } : p)
     }));
     setIsGeneratingAi(true);
 
     try {
       const newPatchBase64 = await invoke('invoke_generative_replace_with_mask_def', {
         path: selectedImage.path,
-        patchDefinition: patch,
+        patchDefinition: patchDefinition,
         currentAdjustments: adjustments,
       });
 
       setAdjustments(prev => ({
         ...prev,
-        aiPatches: prev.aiPatches.map(p => 
-          p.id === patchId 
-            ? { 
-                ...p, 
+        aiPatches: prev.aiPatches.map(p =>
+          p.id === patchId
+            ? {
+                ...p,
                 patchDataBase64: newPatchBase64,
                 isLoading: false,
-              } 
+                name: (prompt && prompt.trim()) ? prompt.trim() : p.name,
+              }
             : p
         )
       }));
+      setActiveAiPatchContainerId(null);
+      setActiveAiSubMaskId(null);
+
     } catch (err) {
       console.error("Generative replace failed:", err);
       setError(`AI Replace Failed: ${err}`);
@@ -229,12 +234,7 @@ function App() {
     } finally {
       setIsGeneratingAi(false);
     }
-  }, [selectedImage?.path, isGeneratingAi, adjustments, setAdjustments]);
-
-  const handleResetAiEdits = useCallback(() => {
-    if (!adjustments?.aiPatches?.length > 0 || isGeneratingAi) return;
-    setAdjustments(prev => ({ ...prev, aiPatches: [] }));
-  }, [adjustments, isGeneratingAi, setAdjustments]);
+  }, [selectedImage?.path, isGeneratingAi, adjustments, setAdjustments, setActiveAiPatchContainerId, setActiveAiSubMaskId]);
 
   const handleDeleteAiPatch = useCallback((patchId) => {
     setAdjustments(prev => ({
@@ -1447,7 +1447,6 @@ function App() {
                   isComfyUiConnected={isComfyUiConnected}
                   isGeneratingAi={isGeneratingAi}
                   onGenerativeReplace={handleGenerativeReplace}
-                  onResetAiEdits={handleResetAiEdits}
                   onDeletePatch={handleDeleteAiPatch}
                   onTogglePatchVisibility={handleToggleAiPatchVisibility}
                   activePatchContainerId={activeAiPatchContainerId}

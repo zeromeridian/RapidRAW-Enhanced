@@ -142,8 +142,7 @@ export default function AiControls({
   };
 
   const handleGenerateClick = () => {
-    updatePatch(editingPatch.id, { prompt });
-    onGenerativeReplace(editingPatch.id);
+    onGenerativeReplace(editingPatch.id, prompt);
   };
 
   if (!editingPatch) return null;

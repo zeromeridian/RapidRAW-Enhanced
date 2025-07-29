@@ -2,8 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Trash2, RotateCcw, ArrowLeft, Eye, EyeOff, Edit, Copy, ClipboardPaste, PlusSquare,
-  ChevronsRight, FileEdit, Sparkles, User, Brush, TriangleRight, Circle, Wand2, Loader2
+  Trash2, RotateCcw, ArrowLeft, Eye, EyeOff, Edit, FileEdit, Sparkles, User, Brush,
+  TriangleRight, Circle, Wand2, Loader2
 } from 'lucide-react';
 import clsx from 'clsx';
 import AiControls from './AiControls';
@@ -48,7 +48,6 @@ export default function AIPanel({
   isComfyUiConnected,
   isGeneratingAi,
   onGenerativeReplace,
-  onResetAiEdits,
   onDeletePatch,
   onTogglePatchVisibility,
   onStyleShift,
@@ -69,8 +68,14 @@ export default function AIPanel({
   const [tempName, setTempName] = useState('');
   const { showContextMenu } = useContextMenu();
   const isInitialRender = useRef(true);
-  const [copiedPatch, setCopiedPatch] = useState(null);
   const [styleShiftPrompt, setStyleShiftPrompt] = useState('');
+
+  const handleResetAllAiEdits = () => {
+    if (isGeneratingAi) return;
+    onSelectPatchContainer(null);
+    onSelectSubMask(null);
+    setAdjustments(prev => ({ ...prev, aiPatches: [] }));
+  };
 
   const handleBackToList = useCallback(() => {
     onSelectPatchContainer(null);
@@ -194,46 +199,14 @@ export default function AIPanel({
     }
   };
 
-  const handleDuplicateContainer = (containerToDuplicate) => {
-    const newContainer = JSON.parse(JSON.stringify(containerToDuplicate));
-    newContainer.id = uuidv4();
-    newContainer.name = `${containerToDuplicate.name} Copy`;
-    newContainer.subMasks = newContainer.subMasks.map(sm => ({ ...sm, id: uuidv4() }));
-    newContainer.patchDataBase64 = null;
-    newContainer.isLoading = false;
-    setAdjustments(prev => ({ ...prev, aiPatches: [...(prev.aiPatches || []), newContainer] }));
-  };
-
-  const handlePasteContainer = () => {
-    if (!copiedPatch) return;
-    const newContainer = JSON.parse(JSON.stringify(copiedPatch));
-    newContainer.id = uuidv4();
-    newContainer.subMasks = newContainer.subMasks.map(sm => ({ ...sm, id: uuidv4() }));
-    newContainer.patchDataBase64 = null;
-    newContainer.isLoading = false;
-    setAdjustments(prev => ({ ...prev, aiPatches: [...(prev.aiPatches || []), newContainer] }));
-  };
-
   const handleContainerContextMenu = (event, container) => {
     event.preventDefault();
     event.stopPropagation();
     showContextMenu(event.clientX, event.clientY, [
       { label: 'Edit AI Selection', icon: Edit, onClick: () => handleOpenContainerForEditing(container) },
       { label: 'Rename', icon: FileEdit, onClick: () => handleStartRename(container) },
-      { label: 'Duplicate', icon: PlusSquare, onClick: () => handleDuplicateContainer(container) },
-      { type: 'separator' },
-      { label: 'Copy', icon: Copy, onClick: () => setCopiedPatch(container) },
       { type: 'separator' },
       { label: 'Delete', icon: Trash2, isDestructive: true, onClick: () => handleDeleteContainer(container.id) },
-    ]);
-  };
-
-  const handlePanelContextMenu = (event) => {
-    if (event.target !== event.currentTarget) return;
-    event.preventDefault();
-    event.stopPropagation();
-    showContextMenu(event.clientX, event.clientY, [
-      { label: 'Paste AI Edit', icon: ClipboardPaste, disabled: !copiedPatch, onClick: handlePasteContainer },
     ]);
   };
 
@@ -242,7 +215,7 @@ export default function AIPanel({
     onStyleShift(styleShiftPrompt);
   };
 
-  const editingPatch = adjustments.aiPatches.find(p => p.id === activePatchContainerId);
+  const editingPatch = adjustments.aiPatches?.find(p => p.id === activePatchContainerId);
 
   if (editingPatch) {
     const activeSubMask = editingPatch.subMasks.find(sm => sm.id === activeSubMaskId);
@@ -309,7 +282,7 @@ export default function AIPanel({
       <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface h-[69px]">
         <h2 className="text-xl font-bold text-primary text-shadow-shiny">AI Tools</h2>
         <button
-          onClick={onResetAiEdits}
+          onClick={handleResetAllAiEdits}
           className="p-2 rounded-full hover:bg-surface transition-colors"
           title="Reset All AI Edits"
           disabled={!hasAiEdits || isGeneratingAi}
@@ -318,7 +291,7 @@ export default function AIPanel({
         </button>
       </div>
 
-      <div className="flex-grow overflow-y-auto p-4 text-text-secondary space-y-6" onClick={handleDeselect} onContextMenu={handlePanelContextMenu}>
+      <div className="flex-grow overflow-y-auto p-4 text-text-secondary space-y-6" onClick={handleDeselect}>
         {!selectedImage ? (
           <p className="text-center text-text-tertiary mt-4">No image selected.</p>
         ) : (
@@ -363,7 +336,21 @@ export default function AIPanel({
                             ) : (
                                 <Wand2 size={16} className="text-text-secondary" />
                             )}
-                            <span className="font-medium text-sm text-text-primary truncate">{patch.name}</span>
+                            {renamingContainerId === patch.id ? (
+                              <input
+                                type="text"
+                                value={tempName}
+                                onChange={(e) => setTempName(e.target.value)}
+                                onBlur={handleFinishRename}
+                                onKeyDown={handleRenameKeyDown}
+                                onClick={(e) => e.stopPropagation()}
+                                onContextMenu={(e) => e.stopPropagation()}
+                                className="bg-transparent w-full text-sm font-medium text-text-primary focus:outline-none focus:ring-1 focus:ring-accent rounded px-1 -mx-1"
+                                autoFocus
+                              />
+                            ) : (
+                              <span className="font-medium text-sm text-text-primary truncate">{patch.name}</span>
+                            )}
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <button onClick={(e) => { e.stopPropagation(); handleToggleContainerVisibility(patch.id); }} className="p-1.5 rounded-full text-text-secondary hover:bg-bg-primary" title={patch.visible ? "Hide Edit" : "Show Edit"}>

@@ -22,6 +22,8 @@ use std::hash::{Hash, Hasher};
 
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba, RgbaImage, ImageFormat, GrayImage};
 use image::codecs::jpeg::JpegEncoder;
+use imageproc::morphology::dilate;
+use imageproc::distance_transform::Norm as DilationNorm;
 use tauri::{Manager, Emitter};
 use base64::{Engine as _, engine::general_purpose};
 use serde_json::Value;
@@ -1058,14 +1060,24 @@ async fn invoke_generative_replace_with_mask_def(
         name: patch_definition.name.clone(),
         visible: patch_definition.visible,
         invert: patch_definition.invert,
-        opacity: 100.0, // Opacity is for preview, generation mask should be full
-        adjustments: serde_json::Value::Null, // Not needed for mask generation
+        opacity: 100.0,
+        adjustments: serde_json::Value::Null,
         sub_masks: patch_definition.sub_masks,
     };
 
     let mask_bitmap = generate_mask_bitmap(&mask_def_for_generation, img_w, img_h, 1.0, (0.0, 0.0))
         .ok_or("Failed to generate mask bitmap for AI replace")?;
-    let mask_image = DynamicImage::ImageLuma8(mask_bitmap);
+
+    let dilation_amount_u32 = ((img_w.min(img_h) as f32 * 0.01).round() as u32).max(1);
+    let dilation_amount_u8 = std::cmp::min(dilation_amount_u32, 255) as u8;
+    let enlarged_mask_bitmap = dilate(&mask_bitmap, DilationNorm::LInf, dilation_amount_u8);
+
+    let mut rgba_mask = RgbaImage::new(img_w, img_h);
+    for (x, y, luma_pixel) in enlarged_mask_bitmap.enumerate_pixels() {
+        let intensity = luma_pixel[0];
+        rgba_mask.put_pixel(x, y, Rgba([255, 255, 255, intensity]));
+    }
+    let mask_image = DynamicImage::ImageRgba8(rgba_mask);
 
     let workflow_inputs = comfyui_connector::WorkflowInputs {
         source_image_node_id: "11".to_string(),
