@@ -123,13 +123,29 @@ struct AllAdjustments {
     mask_count: u32,
     tile_offset_x: u32,
     tile_offset_y: u32,
-    _pad1: u32,
+    mask_atlas_cols: u32,
 }
 
 @group(0) @binding(0) var input_texture: texture_2d<f32>;
 @group(0) @binding(1) var output_texture: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(2) var<uniform> adjustments: AllAdjustments;
-@group(0) @binding(3) var mask_textures: texture_2d_array<f32>;
+
+@group(0) @binding(3) var mask0: texture_2d<f32>;
+@group(0) @binding(4) var mask1: texture_2d<f32>;
+@group(0) @binding(5) var mask2: texture_2d<f32>;
+@group(0) @binding(6) var mask3: texture_2d<f32>;
+@group(0) @binding(7) var mask4: texture_2d<f32>;
+@group(0) @binding(8) var mask5: texture_2d<f32>;
+@group(0) @binding(9) var mask6: texture_2d<f32>;
+@group(0) @binding(10) var mask7: texture_2d<f32>;
+@group(0) @binding(11) var mask8: texture_2d<f32>;
+@group(0) @binding(12) var mask9: texture_2d<f32>;
+@group(0) @binding(13) var mask10: texture_2d<f32>;
+@group(0) @binding(14) var mask11: texture_2d<f32>;
+@group(0) @binding(15) var mask12: texture_2d<f32>;
+@group(0) @binding(16) var mask13: texture_2d<f32>;
+@group(0) @binding(17) var mask14: texture_2d<f32>;
+@group(0) @binding(18) var mask15: texture_2d<f32>;
 
 const LUMA_COEFF = vec3<f32>(0.2126, 0.7152, 0.0722);
 
@@ -504,7 +520,7 @@ fn apply_noise_reduction(color: vec3<f32>, coords_i: vec2<i32>, luma_amount: f32
 }
 
 fn aces_fitted(c: vec3<f32>) -> vec3<f32> {
-    return c; // FIXME: Maybe with a setting? Most people probably don't like this hardcoded ACES, so removed temporarly.
+    return c;
 }
 
 fn apply_all_curves(color: vec3<f32>, luma_curve: array<Point, 16>, luma_curve_count: u32, red_curve: array<Point, 16>, red_curve_count: u32, green_curve: array<Point, 16>, green_curve_count: u32, blue_curve: array<Point, 16>, blue_curve_count: u32) -> vec3<f32> {
@@ -554,12 +570,37 @@ fn apply_all_mask_adjustments(initial_rgb: vec3<f32>, adj: MaskAdjustments, coor
     return processed_rgb;
 }
 
+fn get_mask_influence(mask_index: u32, coords: vec2<u32>) -> f32 {
+    switch (mask_index) {
+        case 0u: { return textureLoad(mask0, coords, 0).r; }
+        case 1u: { return textureLoad(mask1, coords, 0).r; }
+        case 2u: { return textureLoad(mask2, coords, 0).r; }
+        case 3u: { return textureLoad(mask3, coords, 0).r; }
+        case 4u: { return textureLoad(mask4, coords, 0).r; }
+        case 5u: { return textureLoad(mask5, coords, 0).r; }
+        case 6u: { return textureLoad(mask6, coords, 0).r; }
+        case 7u: { return textureLoad(mask7, coords, 0).r; }
+        case 8u: { return textureLoad(mask8, coords, 0).r; }
+        case 9u: { return textureLoad(mask9, coords, 0).r; }
+        case 10u: { return textureLoad(mask10, coords, 0).r; }
+        case 11u: { return textureLoad(mask11, coords, 0).r; }
+        case 12u: { return textureLoad(mask12, coords, 0).r; }
+        case 13u: { return textureLoad(mask13, coords, 0).r; }
+        case 14u: { return textureLoad(mask14, coords, 0).r; }
+        case 15u: { return textureLoad(mask15, coords, 0).r; }
+        default: { return 0.0; }
+    }
+}
+
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-    let in_dims = vec2<u32>(textureDimensions(input_texture));
-    if (id.x >= in_dims.x || id.y >= in_dims.y) { return; }
+    let out_dims = vec2<u32>(textureDimensions(output_texture));
+    if (id.x >= out_dims.x || id.y >= out_dims.y) { return; }
 
-    let original_color = textureLoad(input_texture, id.xy, 0);
+    let absolute_coord = id.xy + vec2<u32>(adjustments.tile_offset_x, adjustments.tile_offset_y);
+    let absolute_coord_i = vec2<i32>(absolute_coord);
+
+    let original_color = textureLoad(input_texture, absolute_coord, 0);
     var initial_linear_rgb = srgb_to_linear(original_color.rgb);
 
     if (adjustments.global.enable_negative_conversion == 1u) {
@@ -570,8 +611,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         initial_linear_rgb *= balance_mult;
         initial_linear_rgb = max(initial_linear_rgb, vec3<f32>(0.0));
     }
-
-    let absolute_coord_i = vec2<i32>(id.xy) + vec2<i32>(i32(adjustments.tile_offset_x), i32(adjustments.tile_offset_y));
 
     var processed_rgb_linear = apply_all_adjustments(initial_linear_rgb, adjustments.global, absolute_coord_i);
 
@@ -585,7 +624,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     );
 
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
-        let influence = textureLoad(mask_textures, id.xy, i, 0).r;
+        let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
             let mask_adjusted_linear = apply_all_mask_adjustments(processed_rgb_linear, adjustments.mask_adjustments[i], absolute_coord_i);
             let mask_base_srgb = linear_to_srgb(aces_fitted(mask_adjusted_linear));
@@ -617,13 +656,14 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     let g = adjustments.global;
     if (g.vignette_amount != 0.0) {
-        let out_coord = vec2<f32>(f32(id.x), f32(id.y));
+        let full_dims_f = vec2<f32>(textureDimensions(input_texture));
+        let coord_f = vec2<f32>(absolute_coord);
         let v_amount = g.vignette_amount;
         let v_mid = g.vignette_midpoint;
         let v_round = 1.0 - g.vignette_roundness;
         let v_feather = g.vignette_feather * 0.5;
-        let aspect = f32(in_dims.y) / f32(in_dims.x);
-        let uv_centered = (out_coord / vec2<f32>(in_dims) - 0.5) * 2.0;
+        let aspect = full_dims_f.y / full_dims_f.x;
+        let uv_centered = (coord_f / full_dims_f - 0.5) * 2.0;
         let uv_round = sign(uv_centered) * pow(abs(uv_centered), vec2<f32>(v_round, v_round));
         let d = length(uv_round * vec2<f32>(1.0, aspect)) * 0.5;
         let vignette_mask = smoothstep(v_mid - v_feather, v_mid + v_feather, d);

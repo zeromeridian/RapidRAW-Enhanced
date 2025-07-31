@@ -51,6 +51,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-07-31:** Reimplemented the functionality of GPU processing (GPU cropping, etc.) -> No longer dependent on TEXTURE_BINDING_ARRAY
 *   **2025-07-29:** Refactored generative AI foundation, many small fixes
 *   **2025-07-27:** Automatic AI image tagging, overall mask transparency setting per mask
 *   **2025-07-25:** Fuji RAF X-Trans sensor support (new x-trans demosaicing algo)
@@ -62,11 +63,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-07-19:** Initial color negative conversion implementation, shader improvements
 *   **2025-07-19:** New color wheels, persistent collapsed / expanded state for UI elements 
 *   **2025-07-19:** Fixed banding & purple artefacts on RAW images, better color noise reduction, show exposure in stops
-*   **2025-07-18:** Smooth zoom slider, new adaptive editor theme setting
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-07-18:** Smooth zoom slider, new adaptive editor theme setting
 *   **2025-07-18:** New export functionality: Export with metadata, GPS metadata remover, batch export file naming scheme using tags
 *   **2025-07-18:** Ability to delete the associated RAW/JPEG in right click delete operations
 *   **2025-07-17:** Small bug fixes

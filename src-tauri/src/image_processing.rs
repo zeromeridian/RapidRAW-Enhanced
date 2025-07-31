@@ -254,7 +254,7 @@ pub struct AllAdjustments {
     pub mask_count: u32,
     pub tile_offset_x: u32,
     pub tile_offset_y: u32,
-    _pad1: u32,
+    pub mask_atlas_cols: u32,
 }
 
 struct AdjustmentScales {
@@ -563,7 +563,7 @@ pub fn get_all_adjustments_from_json(js_adjustments: &serde_json::Value) -> AllA
         mask_count,
         tile_offset_x: 0,
         tile_offset_y: 0,
-        _pad1: 0,
+        mask_atlas_cols: 1,
     }
 }
 
