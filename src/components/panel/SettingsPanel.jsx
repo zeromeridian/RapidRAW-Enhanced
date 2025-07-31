@@ -385,7 +385,8 @@ export default function SettingsPanel({ onBack, appSettings, onSettingsChange, r
                   <KeybindItem keys={['Ctrl/Cmd', '+', 'Shift', '+', 'V']} description="Paste file(s) to current folder" />
                   <KeybindItem keys={['Ctrl/Cmd', '+', 'A']} description="Select all images" />
                   <KeybindItem keys={['Delete']} description="Delete selected file(s)" />
-                  <KeybindItem keys={['0-5']} description="Set rating for selected image(s)" />
+                  <KeybindItem keys={['0-5']} description="Set star rating for selected image(s)" />
+                  <KeybindItem keys={['Shift', '+', '0-5']} description="Set color label for selected image(s)" />
                   <KeybindItem keys={['↑', '↓', '←', '→']} description="Navigate images in library" />
                 </div>
               </div>

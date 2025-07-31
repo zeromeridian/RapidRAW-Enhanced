@@ -7,7 +7,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import debounce from 'lodash.debounce';
 import { centerCrop, makeAspectCrop } from 'react-image-crop';
 import clsx from 'clsx';
-import { Copy, ClipboardPaste, RotateCcw, Star, Trash2, Folder, Edit, Check, X, Undo, Redo, FolderPlus, FileEdit, CopyPlus, Aperture } from 'lucide-react';
+import { Copy, ClipboardPaste, RotateCcw, Star, Trash2, Folder, Edit, Check, X, Undo, Redo, FolderPlus, FileEdit, CopyPlus, Aperture, Tag } from 'lucide-react';
 import TitleBar from './window/TitleBar';
 import MainLibrary from './components/panel/MainLibrary';
 import FolderTree from './components/panel/FolderTree';
@@ -36,6 +36,14 @@ import { THEMES, DEFAULT_THEME_ID } from './utils/themes';
 
 const DEBUG = false;
 
+const COLOR_LABELS = [
+  { name: 'red', color: '#ef4444' },
+  { name: 'yellow', color: '#facc15' },
+  { name: 'green', color: '#4ade80' },
+  { name: 'blue', color: '#60a5fa' },
+  { name: 'purple', color: '#a78bfa' },
+];
+
 function App() {
   const [rootPath, setRootPath] = useState(null);
   const [appSettings, setAppSettings] = useState(null);
@@ -48,7 +56,8 @@ function App() {
   const [sortCriteria, setSortCriteria] = useState({ key: 'name', order: 'asc' });
   const [filterCriteria, setFilterCriteria] = useState({ 
     rating: 0, 
-    rawStatus: 'all'
+    rawStatus: 'all',
+    colors: [],
   });
   const [supportedTypes, setSupportedTypes] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -328,6 +337,19 @@ function App() {
         }
       }
 
+      if (filterCriteria.colors && filterCriteria.colors.length > 0) {
+        const imageColor = (image.tags || [])
+          .find(tag => tag.startsWith('color:'))
+          ?.substring(6);
+
+        const hasMatchingColor = imageColor && filterCriteria.colors.includes(imageColor);
+        const matchesNone = !imageColor && filterCriteria.colors.includes('none');
+
+        if (!hasMatchingColor && !matchesNone) {
+          return false;
+        }
+      }
+
       return true;
     });
 
@@ -441,7 +463,8 @@ function App() {
           setFilterCriteria(prev => ({
             ...prev,
             ...settings.filterCriteria,
-            rawStatus: settings.filterCriteria.rawStatus || 'all'
+            rawStatus: settings.filterCriteria.rawStatus || 'all',
+            colors: settings.filterCriteria.colors || [],
           }));
         }
         if (settings?.theme) {
@@ -728,20 +751,23 @@ function App() {
     setIsCopied(true);
   }, [selectedImage, adjustments, libraryActiveAdjustments]);
 
-  const handlePasteAdjustments = useCallback(() => {
+  const handlePasteAdjustments = useCallback((paths) => {
     if (!copiedAdjustments) return;
-    const pathsToUpdate = multiSelectedPaths.length > 0 ? multiSelectedPaths : (selectedImage ? [selectedImage.path] : []);
+    const pathsToUpdate = paths || (multiSelectedPaths.length > 0 ? multiSelectedPaths : (selectedImage ? [selectedImage.path] : []));
     if (pathsToUpdate.length === 0) return;
+    
     if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
-      setAdjustments(prev => ({ ...prev, ...copiedAdjustments }));
+      const newAdjustments = { ...adjustments, ...copiedAdjustments };
+      setAdjustments(newAdjustments);
     }
+
     invoke('apply_adjustments_to_paths', { paths: pathsToUpdate, adjustments: copiedAdjustments })
       .catch(err => {
         console.error("Failed to paste adjustments to multiple images:", err);
         setError(`Failed to paste adjustments: ${err}`);
       });
     setIsPasted(true);
-  }, [copiedAdjustments, multiSelectedPaths, selectedImage, setAdjustments]);
+  }, [copiedAdjustments, multiSelectedPaths, selectedImage, adjustments, setAdjustments]);
 
   const handleAutoAdjustments = async () => {
     if (!selectedImage) return;
@@ -762,8 +788,8 @@ function App() {
     }
   };
 
-  const handleRate = useCallback((newRating) => {
-    const pathsToRate = multiSelectedPaths.length > 0 ? multiSelectedPaths : (selectedImage ? [selectedImage.path] : []);
+  const handleRate = useCallback((newRating, paths) => {
+    const pathsToRate = paths || (multiSelectedPaths.length > 0 ? multiSelectedPaths : (selectedImage ? [selectedImage.path] : []));
     if (pathsToRate.length === 0) return;
 
     let currentRating = 0;
@@ -795,6 +821,36 @@ function App() {
         setError(`Failed to apply rating: ${err}`);
       });
   }, [multiSelectedPaths, selectedImage, libraryActivePath, adjustments.rating, libraryActiveAdjustments.rating, setAdjustments]);
+
+const handleSetColorLabel = useCallback(async (color, paths) => {
+    const pathsToUpdate = paths || (multiSelectedPaths.length > 0 ? multiSelectedPaths : (selectedImage ? [selectedImage.path] : []));
+    if (pathsToUpdate.length === 0) return;
+    const primaryPath = selectedImage?.path || libraryActivePath;
+    const primaryImage = imageList.find(img => img.path === primaryPath);
+    let currentColor = null;
+    if (primaryImage && primaryImage.tags) {
+      const colorTag = primaryImage.tags.find(tag => tag.startsWith('color:'));
+      if (colorTag) {
+        currentColor = colorTag.substring(6);
+      }
+    }
+    const finalColor = color !== null && color === currentColor ? null : color;
+    try {
+      await invoke('set_color_label_for_paths', { paths: pathsToUpdate, color: finalColor });
+      
+      setImageList(prevList => prevList.map(image => {
+        if (pathsToUpdate.includes(image.path)) {
+          const otherTags = (image.tags || []).filter(t => !t.startsWith('color:'));
+          const newTags = finalColor ? [...otherTags, `color:${finalColor}`] : otherTags;
+          return { ...image, tags: newTags };
+        }
+        return image;
+      }));
+    } catch (err) {
+      console.error("Failed to set color label:", err);
+      setError(`Failed to set color label: ${err}`);
+    }
+  }, [multiSelectedPaths, selectedImage, libraryActivePath, imageList]);
 
   const closeConfirmModal = () => setConfirmModalState({ ...confirmModalState, isOpen: false });
 
@@ -866,6 +922,7 @@ function App() {
     setLibraryActivePath,
     setMultiSelectedPaths,
     handleRate,
+    handleSetColorLabel,
     handleDeleteSelected,
     handleCopyAdjustments,
     handlePasteAdjustments,
@@ -1141,12 +1198,24 @@ function App() {
     else { setMultiSelectedPaths([]); setLibraryActivePath(null); }
   };
 
-  const handleResetAdjustments = () => {
-    if (multiSelectedPaths.length === 0) return;
-    invoke('reset_adjustments_for_paths', { paths: multiSelectedPaths })
-      .then(() => { if (multiSelectedPaths.includes(libraryActivePath)) setLibraryActiveAdjustments(prev => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating })); })
-      .catch(err => { console.error("Failed to reset adjustments:", err); setError(`Failed to reset adjustments: ${err}`); });
-  };
+  const handleResetAdjustments = useCallback((paths) => {
+    const pathsToReset = paths || multiSelectedPaths;
+    if (pathsToReset.length === 0) return;
+    
+    invoke('reset_adjustments_for_paths', { paths: pathsToReset })
+      .then(() => { 
+        if (pathsToReset.includes(libraryActivePath)) {
+          setLibraryActiveAdjustments(prev => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating }));
+        }
+        if (selectedImage && pathsToReset.includes(selectedImage.path)) {
+          setAdjustments(prev => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating, aiPatches: [] }));
+        }
+      })
+      .catch(err => { 
+        console.error("Failed to reset adjustments:", err); 
+        setError(`Failed to reset adjustments: ${err}`); 
+      });
+  }, [multiSelectedPaths, libraryActivePath, selectedImage, setAdjustments]);
 
   const handleEditorContextMenu = (event) => {
     event.preventDefault(); event.stopPropagation();
@@ -1155,10 +1224,22 @@ function App() {
       { label: 'Redo', icon: Redo, onClick: redo, disabled: !canRedo },
       { type: 'separator' },
       { label: 'Copy Adjustments', icon: Copy, onClick: handleCopyAdjustments },
-      { label: 'Paste Adjustments', icon: ClipboardPaste, onClick: handlePasteAdjustments, disabled: copiedAdjustments === null },
+      { label: 'Paste Adjustments', icon: ClipboardPaste, onClick: () => handlePasteAdjustments(), disabled: copiedAdjustments === null },
       { type: 'separator' },
       { label: 'Auto Adjust', icon: Aperture, onClick: handleAutoAdjustments },
       { label: 'Set Rating', icon: Star, submenu: [0, 1, 2, 3, 4, 5].map(rating => ({ label: rating === 0 ? 'No Rating' : `${rating} Star${rating !== 1 ? 's' : ''}`, onClick: () => handleRate(rating) })) },
+      { 
+        label: 'Set Color Label', 
+        icon: Tag, 
+        submenu: [
+          { label: 'No Label', onClick: () => handleSetColorLabel(null) },
+          ...COLOR_LABELS.map(label => ({
+            label: label.name.charAt(0).toUpperCase() + label.name.slice(1),
+            color: label.color,
+            onClick: () => handleSetColorLabel(label.name)
+          }))
+        ]
+      },
       { type: 'separator' },
       { label: 'Reset Adjustments', icon: RotateCcw, onClick: () => setAdjustments(prev => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating, aiPatches: [] })) },
     ];
@@ -1166,14 +1247,22 @@ function App() {
   };
 
   const handleThumbnailContextMenu = (event, path) => {
-    event.preventDefault(); event.stopPropagation();
+    event.preventDefault();
+    event.stopPropagation();
+
     const isTargetInSelection = multiSelectedPaths.includes(path);
-    let finalSelection = [];
+    let finalSelection;
+
     if (!isTargetInSelection) {
       finalSelection = [path];
       setMultiSelectedPaths([path]);
-      if (!selectedImage) setLibraryActivePath(path);
-    } else finalSelection = multiSelectedPaths;
+      if (!selectedImage) {
+        setLibraryActivePath(path);
+      }
+    } else {
+      finalSelection = multiSelectedPaths;
+    }
+
     const selectionCount = finalSelection.length;
     const isSingleSelection = selectionCount === 1;
     const isEditingThisImage = selectedImage?.path === path;
@@ -1223,25 +1312,28 @@ function App() {
           } catch (err) { console.error("Failed to load metadata for copy:", err); setError(`Failed to copy adjustments: ${err}`); }
         },
       },
-      { label: pasteLabel, icon: ClipboardPaste, disabled: copiedAdjustments === null, onClick: handlePasteAdjustments },
+      { label: pasteLabel, icon: ClipboardPaste, disabled: copiedAdjustments === null, onClick: () => handlePasteAdjustments(finalSelection) },
       { label: autoAdjustLabel, icon: Aperture, onClick: handleApplyAutoAdjustmentsToSelection },
       { type: 'separator' },
       { label: copyLabel, icon: Copy, onClick: () => { setCopiedFilePaths(finalSelection); setIsCopied(true); } },
       { label: 'Duplicate Image', icon: CopyPlus, disabled: !isSingleSelection, onClick: async () => { try { await invoke('duplicate_file', { path: finalSelection[0] }); handleLibraryRefresh(); } catch (err) { console.error("Failed to duplicate file:", err); setError(`Failed to duplicate file: ${err}`); } } },
       { type: 'separator' },
-      { label: 'Set Rating', icon: Star, submenu: [0, 1, 2, 3, 4, 5].map(rating => ({ label: rating === 0 ? 'No Rating' : `${rating} Star${rating !== 1 ? 's' : ''}`, onClick: () => handleRate(rating) })) },
+      { label: 'Set Rating', icon: Star, submenu: [0, 1, 2, 3, 4, 5].map(rating => ({ label: rating === 0 ? 'No Rating' : `${rating} Star${rating !== 1 ? 's' : ''}`, onClick: () => handleRate(rating, finalSelection) })) },
+      { 
+        label: 'Set Color Label', 
+        icon: Tag, 
+        submenu: [
+          { label: 'No Label', onClick: () => handleSetColorLabel(null, finalSelection) },
+          ...COLOR_LABELS.map(label => ({
+            label: label.name.charAt(0).toUpperCase() + label.name.slice(1),
+            color: label.color,
+            onClick: () => handleSetColorLabel(label.name, finalSelection)
+          }))
+        ]
+      },
       { type: 'separator' },
       { label: 'Show in File Explorer', icon: Folder, disabled: !isSingleSelection, onClick: () => { invoke('show_in_finder', { path: finalSelection[0] }).catch(err => setError(`Could not show file in explorer: ${err}`)); } },
-      { label: resetLabel, icon: RotateCcw, onClick: () => {
-          if (finalSelection.length === 0) return;
-          invoke('reset_adjustments_for_paths', { paths: finalSelection })
-            .then(() => {
-              if (finalSelection.includes(libraryActivePath)) setLibraryActiveAdjustments(prev => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating }));
-              if (selectedImage && finalSelection.includes(selectedImage.path)) setAdjustments(prev => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating, aiPatches: [] }));
-            })
-            .catch(err => { console.error("Failed to reset adjustments:", err); setError(`Failed to reset adjustments: ${err}`); });
-        },
-      },
+      { label: resetLabel, icon: RotateCcw, onClick: () => handleResetAdjustments(finalSelection) },
       { label: deleteLabel, icon: Trash2, isDestructive: true, submenu: [
           { label: 'Cancel', icon: X, onClick: () => {} },
           {
@@ -1385,7 +1477,7 @@ function App() {
               isRatingDisabled={!selectedImage}
               onCopy={handleCopyAdjustments}
               isCopyDisabled={!selectedImage}
-              onPaste={handlePasteAdjustments}
+              onPaste={() => handlePasteAdjustments()}
               isCopied={isCopied}
               isPasted={isPasted}
               isPasteDisabled={copiedAdjustments === null}
@@ -1513,11 +1605,11 @@ function App() {
             isRatingDisabled={multiSelectedPaths.length === 0}
             onCopy={handleCopyAdjustments}
             isCopyDisabled={multiSelectedPaths.length !== 1}
-            onPaste={handlePasteAdjustments}
+            onPaste={() => handlePasteAdjustments()}
             isCopied={isCopied}
             isPasted={isPasted}
             isPasteDisabled={copiedAdjustments === null || multiSelectedPaths.length === 0}
-            onReset={handleResetAdjustments}
+            onReset={() => handleResetAdjustments()}
             isResetDisabled={multiSelectedPaths.length === 0}
             onExportClick={() => setIsLibraryExportPanelVisible(prev => !prev)}
             isExportDisabled={multiSelectedPaths.length === 0}

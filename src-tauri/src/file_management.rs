@@ -26,6 +26,7 @@ use crate::image_processing::{
     apply_crop, apply_flip, apply_rotation, auto_results_to_json, get_all_adjustments_from_json,
     perform_auto_analysis, Crop, ImageMetadata,
 };
+use crate::tagging::COLOR_TAG_PREFIX;
 use crate::mask_generation::{generate_mask_bitmap, MaskDefinition};
 use crate::AppState;
 
@@ -926,6 +927,46 @@ pub fn apply_auto_adjustments_to_paths(
     thread::spawn(move || {
         let _ = generate_thumbnails_progressive(paths, app_handle);
     });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_color_label_for_paths(
+    paths: Vec<String>,
+    color: Option<String>,
+) -> Result<(), String> {
+    paths.par_iter().for_each(|path| {
+        let sidecar_path = get_sidecar_path(path);
+
+        let mut metadata: ImageMetadata = if sidecar_path.exists() {
+            fs::read_to_string(&sidecar_path)
+                .ok()
+                .and_then(|content| serde_json::from_str(&content).ok())
+                .unwrap_or_default()
+        } else {
+            ImageMetadata::default()
+        };
+
+        let mut tags = metadata.tags.unwrap_or_else(Vec::new);
+        tags.retain(|tag| !tag.starts_with(COLOR_TAG_PREFIX));
+
+        if let Some(c) = &color {
+            if !c.is_empty() {
+                tags.push(format!("{}{}", COLOR_TAG_PREFIX, c));
+            }
+        }
+
+        if tags.is_empty() {
+            metadata.tags = None;
+        } else {
+            metadata.tags = Some(tags);
+        }
+
+        if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
+            let _ = std::fs::write(sidecar_path, json_string);
+        }
+    });
+
     Ok(())
 }
 
