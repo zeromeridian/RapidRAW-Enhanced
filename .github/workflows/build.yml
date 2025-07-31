@@ -53,22 +53,28 @@ jobs:
         run: |
           APP_VERSION=""
           REF="${{ inputs.ref }}"
+          EVENT_NAME="${{ github.event_name }}"
 
           if [[ "$REF" == refs/tags/v* ]]; then
             APP_VERSION="${REF#refs/tags/v}"
             echo "Release version determined from tag: $APP_VERSION"
           else
-            if [[ "${{ inputs.platform }}" == windows* ]]; then
-              DESCRIBE="$(git describe --tags --always --abbrev=0)"
-              APP_VERSION="${DESCRIBE#v}"
-              echo "CI version determined from 'git describe': $APP_VERSION"
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            BASE_VERSION="${LATEST_TAG#v}"
+            SHORT_SHA=$(git rev-parse --short HEAD)
+
+            if [[ "$EVENT_NAME" == "pull_request" || "$EVENT_NAME" == "pull_request_target" ]]; then
+              PR_NUMBER="${{ github.event.pull_request.number }}"
+              APP_VERSION="${BASE_VERSION}-pr.${PR_NUMBER}.${SHORT_SHA}"
+              echo "PR pre-release version generated: $APP_VERSION"
+
             else
-              DESCRIBE="$(git describe --tags --always)"
-              APP_VERSION="${DESCRIBE#v}"
-              echo "CI version determined from 'git describe': $APP_VERSION"
+              BRANCH_NAME="${{ github.ref_name }}"
+              APP_VERSION="${BASE_VERSION}-ci.${BRANCH_NAME}.${SHORT_SHA}"
+              echo "CI pre-release version generated: $APP_VERSION"
             fi
           fi
-          
+
           echo "version=${APP_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Install Rust
