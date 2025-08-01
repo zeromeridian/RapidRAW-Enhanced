@@ -385,7 +385,7 @@ function App() {
   const debouncedGenerateUncroppedPreview = useCallback(debounce((currentAdjustments) => {
     if (!selectedImage?.isReady) return;
     invoke('generate_uncropped_preview', { jsAdjustments: currentAdjustments }).catch(err => console.error("Failed to generate uncropped preview:", err));
-  }, 100), [selectedImage?.isReady]);
+  }, 50), [selectedImage?.isReady]);
 
   const debouncedSave = useCallback(debounce((path, adjustmentsToSave) => {
     invoke('save_metadata_and_update_thumbnail', { path, adjustments: adjustmentsToSave }).catch(err => {

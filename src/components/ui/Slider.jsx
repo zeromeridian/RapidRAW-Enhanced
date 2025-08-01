@@ -173,18 +173,14 @@ const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0, onDr
     >
       <div className="flex justify-between items-center mb-1">
         <div
-          className="relative flex items-center cursor-pointer"
+          className="flex-1 cursor-pointer"
           onMouseEnter={() => typeof label === 'string' && setIsLabelHovered(true)}
           onMouseLeave={() => typeof label === 'string' && setIsLabelHovered(false)}
           onClick={typeof label === 'string' ? handleReset : undefined}
           onDoubleClick={typeof label === 'string' ? handleReset : undefined}
           title={typeof label === 'string' && label ? `Click or double-click to reset ${label.toLowerCase()} to ${defaultValue}` : ''}
         >
-          <span className="text-sm font-medium text-text-secondary select-none opacity-0 pointer-events-none">
-            {label}
-          </span>
-
-          <span className="absolute left-0 top-0 text-sm font-medium text-text-secondary select-none transition-colors hover:text-text-primary">
+          <span className="text-sm font-medium text-text-secondary select-none transition-colors hover:text-text-primary">
             {isLabelHovered && typeof label === 'string' && label ? 'Reset' : label}
           </span>
         </div>
