@@ -151,11 +151,18 @@ jobs:
         shell: bash
         if: ${{ startsWith(inputs.platform, 'windows') && inputs.release-id == '' }}
         run: |
-          find src-tauri/target/${{ inputs.target || 'release' }}/bundle src-tauri/target/${{ inputs.target || 'release' }}/release/bundle -name "*.exe" | while read -r file; do
-            name="${{ inputs.asset-prefix }}_${{ inputs.platform }}_$(basename "$file")"
-            echo "Uploading $name, file: $file"
-            # TODO zip the file before upload
-            gh-actions-artifact-client.js upload "${name}" --retentionDays=7 < "$file"
+          for d in src-tauri/target/${{ inputs.target || 'release' }}/bundle src-tauri/target/${{ inputs.target || 'release' }}/release/bundle ; do
+            echo "Scanning ${d} for artifacts to upload..."
+            if [ ! -d "${d}" ]; then
+              echo "${d} doesn't exist, skipping"
+              continue
+            fi
+            find "${d}" -name "*.exe" | while read -r file; do
+              name="${{ inputs.asset-prefix }}_${{ inputs.platform }}_$(basename "$file")"
+              echo "Uploading ${name}, file: ${file}"
+              # TODO zip the file before upload
+              gh-actions-artifact-client.js upload "${name}" --retentionDays=7 < "$file"
+            done
           done
 
       - name: Upload binaries (Linux/macOS)
