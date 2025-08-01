@@ -173,16 +173,28 @@ const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0, onDr
     >
       <div className="flex justify-between items-center mb-1">
         <div
-          className="flex-1 cursor-pointer"
-          onMouseEnter={() => typeof label === 'string' && setIsLabelHovered(true)}
-          onMouseLeave={() => typeof label === 'string' && setIsLabelHovered(false)}
+          className={`grid ${typeof label === 'string' ? 'cursor-pointer' : ''}`}
+          onMouseEnter={typeof label === 'string' ? () => setIsLabelHovered(true) : undefined}
+          onMouseLeave={typeof label === 'string' ? () => setIsLabelHovered(false) : undefined}
           onClick={typeof label === 'string' ? handleReset : undefined}
           onDoubleClick={typeof label === 'string' ? handleReset : undefined}
           title={typeof label === 'string' && label ? `Click or double-click to reset ${label.toLowerCase()} to ${defaultValue}` : ''}
         >
-          <span className="text-sm font-medium text-text-secondary select-none transition-colors hover:text-text-primary">
-            {isLabelHovered && typeof label === 'string' && label ? 'Reset' : label}
+          <span
+            className={`col-start-1 row-start-1 text-sm font-medium text-text-secondary select-none transition-opacity duration-200 ease-in-out ${isLabelHovered && typeof label === 'string' ? 'opacity-0' : 'opacity-100'}`}
+            aria-hidden={isLabelHovered && typeof label === 'string'}
+          >
+            {label}
           </span>
+
+          {typeof label === 'string' && (
+            <span
+              className={`col-start-1 row-start-1 text-sm font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none ${isLabelHovered ? 'opacity-100' : 'opacity-0'}`}
+              aria-hidden={!isLabelHovered}
+            >
+              Reset
+            </span>
+          )}
         </div>
         <div className="w-12 text-right">
           {isEditing ? (
