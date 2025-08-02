@@ -51,6 +51,8 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-08-02:** Added an image straightening tool and improved crop & rotation functionality (especially on portrait images)
+*   **2025-08-02:** A new dedicated image importer, ability to rename and batch rename files, improved dark theme, and other fixes
 *   **2025-07-31:** Ability to tag & filter images by color labels, refactored image right clicking
 *   **2025-07-31:** Reimplemented the functionality of GPU processing (GPU cropping, etc.) -> No longer dependent on TEXTURE_BINDING_ARRAY
 *   **2025-07-29:** Refactored generative AI foundation, many small fixes
@@ -60,12 +62,12 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-07-22:** Significant improvements to the shader: More accurate exposure slider, better tone mapper (simplified ACES)
 *   **2025-07-21:** Remember scroll position when going into the editing section
 *   **2025-07-20:** Ability to add presets to folders, export preset folders etc, preset _animations_
-*   **2025-07-20:** Tutorials on how to use RapidRAW
-*   **2025-07-19:** Initial color negative conversion implementation, shader improvements
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-07-20:** Tutorials on how to use RapidRAW
+*   **2025-07-19:** Initial color negative conversion implementation, shader improvements
 *   **2025-07-19:** New color wheels, persistent collapsed / expanded state for UI elements 
 *   **2025-07-19:** Fixed banding & purple artefacts on RAW images, better color noise reduction, show exposure in stops
 *   **2025-07-18:** Smooth zoom slider, new adaptive editor theme setting
@@ -145,7 +147,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
       <ul>
         <li><strong>Image Library:</strong> Effortlessly sort, rate, tag, and manage your entire photo collection for a streamlined and efficient workflow.</li>
         <li><strong>Folder Management:</strong> Integrated folder tree, create, rename, and delete folders directly within the app.</li>
-        <li><strong>File Operations:</strong> Copy, move, and duplicate images and their associated edits.</li>
+        <li><strong>File Operations:</strong> Import, copy, move, rename, and duplicate images and their associated edits.</li>
         <li><strong>Filmstrip View:</strong> Quickly navigate between all the images in your current folder while editing.</li>
         <li><strong>Batch Operations:</strong> Save significant time by applying a consistent set of adjustments or exporting entire batches of images simultaneously.</li>
         <li><strong>EXIF Data Viewer:</strong> Gain insights by inspecting the complete metadata from your camera, including shutter speed, aperture, ISO, and lens information.</li>
