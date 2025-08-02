@@ -13,39 +13,6 @@ const PRESETS = [
   { name: '16:9', value: 16 / 9 },
 ];
 
-const ToolButton = ({ icon: Icon, label, onClick, isActive = false, activeLabel, activeIcon: ActiveIcon }) => (
-  <button
-    onClick={onClick}
-    className={clsx(
-      'flex flex-col items-center justify-center p-3 rounded-lg transition-colors group',
-      isActive
-        ? 'bg-accent text-button-text hover:bg-red-500'
-        : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary'
-    )}
-  >
-    <div className="relative w-5 h-5 flex items-center justify-center">
-      <div className={clsx(
-        "transition-opacity duration-200",
-        isActive ? 'opacity-100 group-hover:opacity-0' : 'opacity-100'
-      )}>
-        <Icon size={20} />
-      </div>
-      {ActiveIcon && (
-        <div className={clsx(
-          "absolute transition-opacity duration-200",
-          isActive ? 'opacity-0 group-hover:opacity-100' : 'opacity-0'
-        )}>
-          <ActiveIcon size={20} />
-        </div>
-      )}
-    </div>
-    <span className="text-xs mt-1.5 relative">
-      <span className={clsx("transition-opacity duration-200", isActive && 'group-hover:opacity-0')}>{label}</span>
-      {activeLabel && <span className={clsx("absolute left-0 right-0 mx-auto transition-opacity duration-200", isActive ? 'opacity-0 group-hover:opacity-100' : 'opacity-0')}>{activeLabel}</span>}
-    </span>
-  </button>
-);
-
 export default function CropPanel({ selectedImage, adjustments, setAdjustments, isStraightenActive, setIsStraightenActive }) {
   const [customW, setCustomW] = useState('');
   const [customH, setCustomH] = useState('');
@@ -293,13 +260,23 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments, 
             <div className="space-y-4">
               <p className="text-sm mb-3 font-semibold text-text-primary">Tools</p>
               <div className="grid grid-cols-2 gap-2">
-                <ToolButton icon={RotateCcw} label="Rotate Left" onClick={() => handleStepRotate(-90)} />
-                <ToolButton icon={RotateCw} label="Rotate Right" onClick={() => handleStepRotate(90)} />
-                <ToolButton icon={FlipHorizontal} label="Flip Horiz" onClick={() => setAdjustments(prev => ({ ...prev, flipHorizontal: !prev.flipHorizontal, crop: null }))} isActive={flipHorizontal} />
-                <ToolButton icon={FlipVertical} label="Flip Vert" onClick={() => setAdjustments(prev => ({ ...prev, flipVertical: !prev.flipVertical }))} isActive={flipVertical} />
-                <ToolButton
-                  icon={Ruler}
-                  label="Straighten"
+                <button onClick={() => handleStepRotate(-90)} className="flex flex-col items-center justify-center p-3 rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary">
+                  <RotateCcw size={20} className="transition-none" />
+                  <span className="text-xs mt-1.5 transition-none">Rotate Left</span>
+                </button>
+                <button onClick={() => handleStepRotate(90)} className="flex flex-col items-center justify-center p-3 rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary">
+                  <RotateCw size={20} className="transition-none" />
+                  <span className="text-xs mt-1.5 transition-none">Rotate Right</span>
+                </button>
+                <button onClick={() => setAdjustments(prev => ({ ...prev, flipHorizontal: !prev.flipHorizontal, crop: null }))} className={clsx('flex flex-col items-center justify-center p-3 rounded-lg transition-colors', flipHorizontal ? 'bg-accent text-button-text' : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary')}>
+                  <FlipHorizontal size={20} className="transition-none" />
+                  <span className="text-xs mt-1.5 transition-none">Flip Horiz</span>
+                </button>
+                <button onClick={() => setAdjustments(prev => ({ ...prev, flipVertical: !prev.flipVertical }))} className={clsx('flex flex-col items-center justify-center p-3 rounded-lg transition-colors', flipVertical ? 'bg-accent text-button-text' : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary')}>
+                  <FlipVertical size={20} className="transition-none" />
+                  <span className="text-xs mt-1.5 transition-none">Flip Vert</span>
+                </button>
+                <button
                   onClick={() => {
                     setIsStraightenActive(s => {
                       const willBeActive = !s;
@@ -309,10 +286,23 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments, 
                       return willBeActive;
                     });
                   }}
-                  isActive={isStraightenActive}
-                  activeLabel="Cancel"
-                  activeIcon={X}
-                />
+                  className={clsx(
+                    'flex flex-col items-center justify-center p-3 rounded-lg transition-colors group',
+                    isStraightenActive
+                      ? 'bg-accent text-button-text hover:bg-red-500'
+                      : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary'
+                  )}
+                >
+                  <Ruler size={20} className="transition-none" />
+                  <span className="relative text-xs mt-1.5 h-4 flex items-center justify-center transition-none">
+                    <span className={clsx('transition-none', isStraightenActive && 'group-hover:opacity-0')}>
+                      Straighten
+                    </span>
+                    <span className={clsx('absolute left-0 right-0 text-center opacity-0 transition-none', isStraightenActive && 'group-hover:opacity-100')}>
+                      Cancel
+                    </span>
+                  </span>
+                </button>
               </div>
             </div>
           </>
