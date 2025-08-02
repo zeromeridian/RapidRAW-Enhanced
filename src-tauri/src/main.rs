@@ -856,6 +856,7 @@ async fn generate_ai_foreground_mask(
     rotation: f32,
     flip_horizontal: bool,
     flip_vertical: bool,
+    orientation_steps: u8,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiForegroundMaskParameters, String> {
@@ -872,6 +873,7 @@ async fn generate_ai_foreground_mask(
         rotation: Some(rotation),
         flip_horizontal: Some(flip_horizontal),
         flip_vertical: Some(flip_vertical),
+        orientation_steps: Some(orientation_steps),
     })
 }
 
@@ -883,6 +885,7 @@ async fn generate_ai_subject_mask(
     rotation: f32,
     flip_horizontal: bool,
     flip_vertical: bool,
+    orientation_steps: u8,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiSubjectMaskParameters, String> {
@@ -918,7 +921,14 @@ async fn generate_ai_subject_mask(
     };
 
     let (img_w, img_h) = embeddings.original_size;
-    let center = (img_w as f64 / 2.0, img_h as f64 / 2.0);
+
+    let (coarse_rotated_w, coarse_rotated_h) = if orientation_steps % 2 == 1 {
+        (img_h as f64, img_w as f64)
+    } else {
+        (img_w as f64, img_h as f64)
+    };
+
+    let center = (coarse_rotated_w / 2.0, coarse_rotated_h / 2.0);
 
     let p1 = start_point;
     let p2 = (start_point.0, end_point.1);
@@ -946,10 +956,10 @@ async fn generate_ai_subject_mask(
         let mut new_px = p.0;
         let mut new_py = p.1;
         if flip_horizontal {
-            new_px = img_w as f64 - p.0;
+            new_px = coarse_rotated_w - p.0;
         }
         if flip_vertical {
-            new_py = img_h as f64 - p.1;
+            new_py = coarse_rotated_h - p.1;
         }
         (new_px, new_py)
     };
@@ -959,10 +969,25 @@ async fn generate_ai_subject_mask(
     let ufp3 = unflip(up3);
     let ufp4 = unflip(up4);
 
-    let min_x = ufp1.0.min(ufp2.0).min(ufp3.0).min(ufp4.0);
-    let min_y = ufp1.1.min(ufp2.1).min(ufp3.1).min(ufp4.1);
-    let max_x = ufp1.0.max(ufp2.0).max(ufp3.0).max(ufp4.0);
-    let max_y = ufp1.1.max(ufp2.1).max(ufp3.1).max(ufp4.1);
+    let un_coarse_rotate = |p: (f64, f64)| -> (f64, f64) {
+        match orientation_steps {
+            0 => p,
+            1 => (p.1, img_h as f64 - p.0),
+            2 => (img_w as f64 - p.0, img_h as f64 - p.1),
+            3 => (img_w as f64 - p.1, p.0),
+            _ => p,
+        }
+    };
+
+    let ucrp1 = un_coarse_rotate(ufp1);
+    let ucrp2 = un_coarse_rotate(ufp2);
+    let ucrp3 = un_coarse_rotate(ufp3);
+    let ucrp4 = un_coarse_rotate(ufp4);
+
+    let min_x = ucrp1.0.min(ucrp2.0).min(ucrp3.0).min(ucrp4.0);
+    let min_y = ucrp1.1.min(ucrp2.1).min(ucrp3.1).min(ucrp4.1);
+    let max_x = ucrp1.0.max(ucrp2.0).max(ucrp3.0).max(ucrp4.0);
+    let max_y = ucrp1.1.max(ucrp2.1).max(ucrp3.1).max(ucrp4.1);
 
     let unrotated_start_point = (min_x, min_y);
     let unrotated_end_point = (max_x, max_y);
@@ -979,6 +1004,7 @@ async fn generate_ai_subject_mask(
         rotation: Some(rotation),
         flip_horizontal: Some(flip_horizontal),
         flip_vertical: Some(flip_vertical),
+        orientation_steps: Some(orientation_steps),
     })
 }
 

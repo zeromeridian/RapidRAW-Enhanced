@@ -294,6 +294,7 @@ function App() {
         rotation: adjustments.rotation,
         flipHorizontal: adjustments.flipHorizontal,
         flipVertical: adjustments.flipVertical,
+        orientationSteps: adjustments.orientationSteps,
       });
 
       updateSubMask(subMaskId, { parameters: newParameters });
@@ -317,6 +318,7 @@ function App() {
         rotation: adjustments.rotation,
         flipHorizontal: adjustments.flipHorizontal,
         flipVertical: adjustments.flipVertical,
+        orientationSteps: adjustments.orientationSteps,
       });
 
       updateSubMask(subMaskId, { parameters: newParameters });
