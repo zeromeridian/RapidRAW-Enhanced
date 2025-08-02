@@ -401,11 +401,10 @@ const Cell = ({ columnIndex, rowIndex, style, data }) => {
 
 export default function MainLibrary({
   imageList, onImageClick, onImageDoubleClick, onContextMenu, onEmptyAreaContextMenu, multiSelectedPaths, activePath, rootPath, currentFolderPath, onOpenFolder, thumbnails, imageRatings, appSettings, onContinueSession, onGoHome, onClearSelection, sortCriteria, setSortCriteria, filterCriteria, setFilterCriteria, onSettingsChange, onLibraryRefresh, theme, initialScrollOffset, onScroll, isIndexing, indexingProgress, searchQuery, setSearchQuery, aiModelDownloadStatus,
-  importState,
+  importState, thumbnailSize, onThumbnailSizeChange,
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [appVersion, setAppVersion] = useState('');
-  const [thumbnailSize, setThumbnailSize] = useState('medium');
   const [supportedTypes, setSupportedTypes] = useState(null);
 
   useEffect(() => { getVersion().then(setAppVersion); }, []);
@@ -508,7 +507,7 @@ export default function MainLibrary({
           </div>
           <ViewOptionsDropdown
             thumbnailSize={thumbnailSize}
-            onSelectSize={setThumbnailSize}
+            onSelectSize={onThumbnailSizeChange}
             filterCriteria={filterCriteria}
             setFilterCriteria={setFilterCriteria}
             sortCriteria={sortCriteria}

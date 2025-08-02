@@ -4,7 +4,7 @@ export const THEMES = [
       name: 'Dark',
       splashImage: '/splash-dark.jpg',
       cssVariables: {
-        '--color-bg-primary-rgb': '30, 30, 30',
+        '--color-bg-primary-rgb': '38, 38, 38', 
         '--opacity-bg-primary': '0.6',
         '--color-bg-secondary-rgb': '34, 34, 34',
         '--opacity-bg-secondary': '0.75',

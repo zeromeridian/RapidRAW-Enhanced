@@ -28,6 +28,7 @@ import CreateFolderModal from './components/modals/CreateFolderModal';
 import RenameFolderModal from './components/modals/RenameFolderModal';
 import ConfirmModal from './components/modals/ConfirmModal';
 import ImportSettingsModal from './components/modals/ImportSettingsModal';
+import RenameFileModal from './components/modals/RenameFileModal';
 import { useHistoryState } from './hooks/useHistoryState';
 import Resizer from './components/ui/Resizer';
 import { INITIAL_ADJUSTMENTS, COPYABLE_ADJUSTMENT_KEYS, normalizeLoadedAdjustments } from './utils/adjustments';
@@ -99,6 +100,7 @@ function App() {
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(144);
   const [isResizing, setIsResizing] = useState(false);
+  const [thumbnailSize, setThumbnailSize] = useState('medium');
   const [copiedAdjustments, setCopiedAdjustments] = useState(null);
   const [copiedFilePaths, setCopiedFilePaths] = useState([]);
   const [aiModelDownloadStatus, setAiModelDownloadStatus] = useState(null);
@@ -112,6 +114,8 @@ function App() {
   const [brushSettings, setBrushSettings] = useState({ size: 50, feather: 50, tool: 'brush' });
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [isRenameFolderModalOpen, setIsRenameFolderModalOpen] = useState(false);
+  const [isRenameFileModalOpen, setIsRenameFileModalOpen] = useState(false);
+  const [renameTargetPaths, setRenameTargetPaths] = useState([]);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importTargetFolder, setImportTargetFolder] = useState(null);
   const [importSourcePaths, setImportSourcePaths] = useState([]);
@@ -484,6 +488,9 @@ function App() {
         if (settings?.uiVisibility) {
           setUiVisibility(prev => ({ ...prev, ...settings.uiVisibility }));
         }
+        if (settings?.thumbnailSize) {
+          setThumbnailSize(settings.thumbnailSize);
+        }
       })
       .catch(err => {
         console.error("Failed to load settings:", err);
@@ -498,6 +505,13 @@ function App() {
         handleSettingsChange({ ...appSettings, uiVisibility });
     }
   }, [uiVisibility, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) return;
+    if (appSettings.thumbnailSize !== thumbnailSize) {
+        handleSettingsChange({ ...appSettings, thumbnailSize });
+    }
+  }, [thumbnailSize, appSettings, handleSettingsChange]);
 
   useEffect(() => {
     invoke('get_supported_file_types')
@@ -1246,6 +1260,61 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
     else { setMultiSelectedPaths([]); setLibraryActivePath(null); }
   };
 
+  const handleRenameFiles = useCallback(async (paths) => {
+    if (paths && paths.length > 0) {
+      setRenameTargetPaths(paths);
+      setIsRenameFileModalOpen(true);
+    }
+  }, []);
+
+  const handleSaveRename = useCallback(async (nameTemplate) => {
+    if (renameTargetPaths.length > 0 && nameTemplate) {
+      try {
+        const newPaths = await invoke('rename_files', {
+          paths: renameTargetPaths,
+          nameTemplate,
+        });
+
+        handleLibraryRefresh();
+
+        if (selectedImage && renameTargetPaths.includes(selectedImage.path)) {
+          const oldPathIndex = renameTargetPaths.indexOf(selectedImage.path);
+          if (newPaths[oldPathIndex]) {
+            handleImageSelect(newPaths[oldPathIndex]);
+          } else {
+            handleBackToLibrary();
+          }
+        }
+        if (libraryActivePath && renameTargetPaths.includes(libraryActivePath)) {
+          const oldPathIndex = renameTargetPaths.indexOf(libraryActivePath);
+          if (newPaths[oldPathIndex]) {
+            setLibraryActivePath(newPaths[oldPathIndex]);
+          } else {
+            setLibraryActivePath(null);
+          }
+        }
+        setMultiSelectedPaths(newPaths);
+
+      } catch (err) {
+        setError(`Failed to rename files: ${err}`);
+      }
+    }
+    setRenameTargetPaths([]);
+  }, [renameTargetPaths, handleLibraryRefresh, selectedImage, libraryActivePath, handleImageSelect, handleBackToLibrary]);
+
+  const handleStartImport = async (settings) => {
+    if (importSourcePaths.length > 0 && importTargetFolder) {
+      invoke('import_files', {
+        sourcePaths: importSourcePaths,
+        destinationFolder: importTargetFolder,
+        settings: settings,
+      }).catch(err => {
+        console.error("Failed to start import:", err);
+        setImportState({ status: 'error', errorMessage: `Failed to start import: ${err}` });
+      });
+    }
+  };
+
   const handleResetAdjustments = useCallback((paths) => {
     const pathsToReset = paths || multiSelectedPaths;
     if (pathsToReset.length === 0) return;
@@ -1355,6 +1424,7 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
     const deleteLabel = isSingleSelection ? 'Delete Image' : `Delete ${selectionCount} Images`;
     const copyLabel = isSingleSelection ? 'Copy Image' : `Copy ${selectionCount} Images`;
     const autoAdjustLabel = isSingleSelection ? 'Auto Adjust Image' : `Auto Adjust ${selectionCount} Images`;
+    const renameLabel = isSingleSelection ? 'Rename File' : `Rename ${selectionCount} Files`;
 
     const handleApplyAutoAdjustmentsToSelection = () => {
       if (finalSelection.length === 0) return;
@@ -1401,6 +1471,7 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
       { type: 'separator' },
       { label: copyLabel, icon: Copy, onClick: () => { setCopiedFilePaths(finalSelection); setIsCopied(true); } },
       { label: 'Duplicate Image', icon: CopyPlus, disabled: !isSingleSelection, onClick: async () => { try { await invoke('duplicate_file', { path: finalSelection[0] }); handleLibraryRefresh(); } catch (err) { console.error("Failed to duplicate file:", err); setError(`Failed to duplicate file: ${err}`); } } },
+      { label: renameLabel, icon: FileEdit, onClick: () => handleRenameFiles(finalSelection) },
       { type: 'separator' },
       { label: 'Set Rating', icon: Star, submenu: [0, 1, 2, 3, 4, 5].map(rating => ({ label: rating === 0 ? 'No Rating' : `${rating} Star${rating !== 1 ? 's' : ''}`, onClick: () => handleRate(rating, finalSelection) })) },
       { 
@@ -1437,6 +1508,7 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
     ];
     showContextMenu(event.clientX, event.clientY, options);
   };
+
   const handleCreateFolder = async (folderName) => {
     if (folderName && folderName.trim() !== '' && folderActionTarget) {
       try { await invoke('create_folder', { path: `${folderActionTarget}/${folderName.trim()}` }); handleRefreshFolderTree(); }
@@ -1686,6 +1758,8 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
             onScroll={handleLibraryScroll}
             aiModelDownloadStatus={aiModelDownloadStatus}
             importState={importState}
+            thumbnailSize={thumbnailSize}
+            onThumbnailSizeChange={setThumbnailSize}
           />
           {rootPath && <BottomBar
             isLibraryView={true}
@@ -1706,19 +1780,6 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
         </div>
       </div>
     );
-  };
-
-  const handleStartImport = async (settings) => {
-    if (importSourcePaths.length > 0 && importTargetFolder) {
-      invoke('import_files', {
-        sourcePaths: importSourcePaths,
-        destinationFolder: importTargetFolder,
-        settings: settings,
-      }).catch(err => {
-        console.error("Failed to start import:", err);
-        setImportState({ status: 'error', errorMessage: `Failed to start import: ${err}` });
-      });
-    }
   };
 
   return (
@@ -1786,6 +1847,12 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
         onClose={() => setIsRenameFolderModalOpen(false)}
         onSave={handleRenameFolder}
         currentName={folderActionTarget ? folderActionTarget.split(/[\\/]/).pop() : ''}
+      />
+      <RenameFileModal
+        isOpen={isRenameFileModalOpen}
+        onClose={() => setIsRenameFileModalOpen(false)}
+        onSave={handleSaveRename}
+        filesToRename={renameTargetPaths}
       />
       <ConfirmModal
         {...confirmModalState}

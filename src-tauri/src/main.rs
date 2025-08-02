@@ -35,6 +35,7 @@ use little_exif::metadata::Metadata;
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::rational::uR64;
+use chrono::{DateTime, Utc};
 
 use crate::image_processing::{
     get_all_adjustments_from_json, get_or_init_gpu_context, GpuContext,
@@ -654,8 +655,33 @@ async fn batch_export_images(
                 }
 
                 let original_path = std::path::Path::new(image_path_str);
+                
+                let file_date: DateTime<Utc> = Metadata::new_from_path(original_path)
+                    .ok()
+                    .and_then(|metadata| {
+                        metadata
+                            .get_tag(&ExifTag::DateTimeOriginal("".to_string()))
+                            .next()
+                            .and_then(|tag| {
+                                if let &ExifTag::DateTimeOriginal(ref dt_str) = tag {
+                                    chrono::NaiveDateTime::parse_from_str(dt_str, "%Y:%m:%d %H:%M:%S")
+                                        .ok()
+                                        .map(|dt| DateTime::from_naive_utc_and_offset(dt, Utc))
+                                } else {
+                                    None
+                                }
+                            })
+                    })
+                    .unwrap_or_else(|| {
+                        fs::metadata(original_path)
+                            .ok()
+                            .and_then(|m| m.created().ok())
+                            .map(DateTime::<Utc>::from)
+                            .unwrap_or_else(Utc::now)
+                    });
+
                 let filename_template = export_settings.filename_template.as_deref().unwrap_or("{original_filename}_edited");
-                let new_stem = crate::file_management::generate_filename_from_template(filename_template, original_path, i + 1, total_paths);
+                let new_stem = crate::file_management::generate_filename_from_template(filename_template, original_path, i + 1, total_paths, &file_date);
                 let new_filename = format!("{}.{}", new_stem, output_format);
                 let output_path = output_folder_path.join(new_filename);
 
@@ -1206,6 +1232,7 @@ fn main() {
             file_management::copy_files,
             file_management::move_files,
             file_management::rename_folder,
+            file_management::rename_files,
             file_management::duplicate_file,
             file_management::show_in_finder,
             file_management::delete_files_from_disk,
