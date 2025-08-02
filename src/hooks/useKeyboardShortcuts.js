@@ -16,6 +16,8 @@ export const useKeyboardShortcuts = ({
   activeAiPatchContainerId,
   customEscapeHandler,
   copiedFilePaths,
+  isStraightenActive,
+  setIsStraightenActive,
   handleImageSelect,
   setLibraryActivePath,
   setMultiSelectedPaths,
@@ -50,7 +52,9 @@ export const useKeyboardShortcuts = ({
       if (selectedImage) {
         if (key === 'escape') {
           event.preventDefault();
-          if (customEscapeHandler) {
+          if (isStraightenActive) {
+            setIsStraightenActive(false);
+          } else if (customEscapeHandler) {
             customEscapeHandler();
           } else if (activeAiSubMaskId) {
             setActiveAiSubMaskId(null);
@@ -156,5 +160,5 @@ export const useKeyboardShortcuts = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [ sortedImageList, selectedImage, undo, redo, isFullScreen, handleToggleFullScreen, handleBackToLibrary, handleRightPanelSelect, handleRate, handleSetColorLabel, handleDeleteSelected, handleCopyAdjustments, handlePasteAdjustments, multiSelectedPaths, copiedFilePaths, handlePasteFiles, libraryActivePath, handleImageSelect, zoom, handleZoomChange, customEscapeHandler, activeMaskId, activeAiSubMaskId, activeAiPatchContainerId, isViewLoading, activeRightPanel, canRedo, canUndo, setActiveMaskId, setActiveAiSubMaskId, onSelectPatchContainer, setCopiedFilePaths, setIsWaveformVisible, setLibraryActivePath, setMultiSelectedPaths, setShowOriginal ]);
+  }, [ sortedImageList, selectedImage, undo, redo, isFullScreen, handleToggleFullScreen, handleBackToLibrary, handleRightPanelSelect, handleRate, handleSetColorLabel, handleDeleteSelected, handleCopyAdjustments, handlePasteAdjustments, multiSelectedPaths, copiedFilePaths, handlePasteFiles, libraryActivePath, handleImageSelect, zoom, handleZoomChange, customEscapeHandler, activeMaskId, activeAiSubMaskId, activeAiPatchContainerId, isViewLoading, activeRightPanel, canRedo, canUndo, isStraightenActive, setIsStraightenActive, setActiveMaskId, setActiveAiSubMaskId, onSelectPatchContainer, setCopiedFilePaths, setIsWaveformVisible, setLibraryActivePath, setMultiSelectedPaths, setShowOriginal ]);
 };

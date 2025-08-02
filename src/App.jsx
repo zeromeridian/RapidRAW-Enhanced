@@ -102,6 +102,7 @@ function App() {
   const [isResizing, setIsResizing] = useState(false);
   const [thumbnailSize, setThumbnailSize] = useState('medium');
   const [copiedAdjustments, setCopiedAdjustments] = useState(null);
+  const [isStraightenActive, setIsStraightenActive] = useState(false);
   const [copiedFilePaths, setCopiedFilePaths] = useState([]);
   const [aiModelDownloadStatus, setAiModelDownloadStatus] = useState(null);
   const [copiedSectionAdjustments, setCopiedSectionAdjustments] = useState(null);
@@ -168,6 +169,14 @@ function App() {
       return newAdjustments;
     });
   }, [debouncedSetHistory]);
+
+  const handleStraighten = useCallback((angleCorrection) => {
+    setAdjustments(prev => {
+      const newRotation = (prev.rotation || 0) + angleCorrection;
+      return { ...prev, rotation: newRotation, crop: null };
+    });
+    setIsStraightenActive(false);
+  }, [setAdjustments]);
 
   useEffect(() => { setLiveAdjustments(historyAdjustments); }, [historyAdjustments]);
 
@@ -946,6 +955,8 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
     customEscapeHandler,
     copiedFilePaths,
     handleImageSelect,
+    isStraightenActive,
+    setIsStraightenActive,
     setLibraryActivePath,
     setMultiSelectedPaths,
     handleRate,
@@ -1619,6 +1630,8 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
               onRedo={redo}
               canUndo={canUndo}
               canRedo={canRedo}
+              isStraightenActive={isStraightenActive}
+              onStraighten={handleStraighten}
               brushSettings={brushSettings}
               onGenerateAiMask={handleGenerateAiMask}
               isMaskControlHovered={isMaskControlHovered}
@@ -1663,7 +1676,7 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
               <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
                 {renderedRightPanel === 'adjustments' && <Controls theme={theme} adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} histogram={histogram} collapsibleState={collapsibleSectionsState} setCollapsibleState={setCollapsibleSectionsState} copiedSectionAdjustments={copiedSectionAdjustments} setCopiedSectionAdjustments={setCopiedSectionAdjustments} handleAutoAdjustments={handleAutoAdjustments} />}
                 {renderedRightPanel === 'metadata' && <MetadataPanel selectedImage={selectedImage} />}
-                {renderedRightPanel === 'crop' && <CropPanel selectedImage={selectedImage} adjustments={adjustments} setAdjustments={setAdjustments} />}
+                {renderedRightPanel === 'crop' && <CropPanel selectedImage={selectedImage} adjustments={adjustments} setAdjustments={setAdjustments} isStraightenActive={isStraightenActive} setIsStraightenActive={setIsStraightenActive} />}
                 {renderedRightPanel === 'masks' && <MasksPanel 
                   adjustments={adjustments} 
                   setAdjustments={setAdjustments} 

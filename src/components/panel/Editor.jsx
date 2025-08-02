@@ -22,7 +22,7 @@ export default function Editor({
   onSelectMask, onSelectAiSubMask, updateSubMask, transformWrapperRef, onZoomed, onContextMenu,
   onUndo, onRedo, canUndo, canRedo, brushSettings,
   onGenerateAiMask, isMaskControlHovered,
-  targetZoom, waveform, isWaveformVisible, onCloseWaveform,
+  targetZoom, waveform, isWaveformVisible, onCloseWaveform, isStraightenActive, onStraighten,
 }) {
   const [crop, setCrop] = useState();
   const prevCropParams = useRef(null);
@@ -357,6 +357,8 @@ export default function Editor({
                 activeAiPatchContainerId={activeAiPatchContainerId}
                 activeAiSubMaskId={activeAiSubMaskId}
                 onSelectAiSubMask={onSelectAiSubMask}
+                isStraightenActive={isStraightenActive}
+                onStraighten={onStraighten}
               />
             </TransformComponent>
           </TransformWrapper>

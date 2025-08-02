@@ -1,4 +1,4 @@
-import { RotateCcw, X, RectangleHorizontal, RectangleVertical, FlipHorizontal, FlipVertical, RotateCw } from 'lucide-react';
+import { RotateCcw, X, RectangleHorizontal, RectangleVertical, FlipHorizontal, FlipVertical, RotateCw, Ruler } from 'lucide-react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import clsx from 'clsx';
@@ -13,21 +13,40 @@ const PRESETS = [
   { name: '16:9', value: 16 / 9 },
 ];
 
-const ToolButton = ({ icon: Icon, label, onClick, isActive = false }) => (
+const ToolButton = ({ icon: Icon, label, onClick, isActive = false, activeLabel, activeIcon: ActiveIcon }) => (
   <button
     onClick={onClick}
     className={clsx(
-      'flex flex-col items-center justify-center p-3 rounded-lg transition-colors text-text-secondary',
-      'hover:bg-card-active hover:text-text-primary',
-      isActive ? 'bg-surface text-text-primary' : 'bg-surface'
+      'flex flex-col items-center justify-center p-3 rounded-lg transition-colors group',
+      isActive
+        ? 'bg-accent text-button-text hover:bg-red-500'
+        : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary'
     )}
   >
-    <Icon size={20} />
-    <span className="text-xs mt-1.5">{label}</span>
+    <div className="relative w-5 h-5 flex items-center justify-center">
+      <div className={clsx(
+        "transition-opacity duration-200",
+        isActive ? 'opacity-100 group-hover:opacity-0' : 'opacity-100'
+      )}>
+        <Icon size={20} />
+      </div>
+      {ActiveIcon && (
+        <div className={clsx(
+          "absolute transition-opacity duration-200",
+          isActive ? 'opacity-0 group-hover:opacity-100' : 'opacity-0'
+        )}>
+          <ActiveIcon size={20} />
+        </div>
+      )}
+    </div>
+    <span className="text-xs mt-1.5 relative">
+      <span className={clsx("transition-opacity duration-200", isActive && 'group-hover:opacity-0')}>{label}</span>
+      {activeLabel && <span className={clsx("absolute left-0 right-0 mx-auto transition-opacity duration-200", isActive ? 'opacity-0 group-hover:opacity-100' : 'opacity-0')}>{activeLabel}</span>}
+    </span>
   </button>
 );
 
-export default function CropPanel({ selectedImage, adjustments, setAdjustments }) {
+export default function CropPanel({ selectedImage, adjustments, setAdjustments, isStraightenActive, setIsStraightenActive }) {
   const [customW, setCustomW] = useState('');
   const [customH, setCustomH] = useState('');
 
@@ -276,8 +295,24 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments }
               <div className="grid grid-cols-2 gap-2">
                 <ToolButton icon={RotateCcw} label="Rotate Left" onClick={() => handleStepRotate(-90)} />
                 <ToolButton icon={RotateCw} label="Rotate Right" onClick={() => handleStepRotate(90)} />
-                <ToolButton icon={FlipHorizontal} label="Flip Horiz" onClick={() => setAdjustments(prev => ({ ...prev, flipHorizontal: !prev.flipHorizontal }))} isActive={flipHorizontal} />
+                <ToolButton icon={FlipHorizontal} label="Flip Horiz" onClick={() => setAdjustments(prev => ({ ...prev, flipHorizontal: !prev.flipHorizontal, crop: null }))} isActive={flipHorizontal} />
                 <ToolButton icon={FlipVertical} label="Flip Vert" onClick={() => setAdjustments(prev => ({ ...prev, flipVertical: !prev.flipVertical }))} isActive={flipVertical} />
+                <ToolButton
+                  icon={Ruler}
+                  label="Straighten"
+                  onClick={() => {
+                    setIsStraightenActive(s => {
+                      const willBeActive = !s;
+                      if (willBeActive) {
+                        setAdjustments(prev => ({ ...prev, rotation: 0 }));
+                      }
+                      return willBeActive;
+                    });
+                  }}
+                  isActive={isStraightenActive}
+                  activeLabel="Cancel"
+                  activeIcon={X}
+                />
               </div>
             </div>
           </>
