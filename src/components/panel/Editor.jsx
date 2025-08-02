@@ -149,41 +149,42 @@ export default function Editor({
     if (!isCropping || !selectedImage?.width) {
       return;
     }
-
-    const { rotation = 0, aspectRatio, orientationSteps = 0 } = adjustments;
-    
-    const hasChanged = prevCropParams.current?.rotation !== rotation || 
-                       prevCropParams.current?.aspectRatio !== aspectRatio ||
-                       prevCropParams.current?.orientationSteps !== orientationSteps;
-
-    if (hasChanged) {
+  
+    const { rotation = 0, aspectRatio, orientationSteps = 0, crop } = adjustments;
+    const needsRecalc = crop === null ||
+      prevCropParams.current?.rotation !== rotation ||
+      prevCropParams.current?.aspectRatio !== aspectRatio ||
+      prevCropParams.current?.orientationSteps !== orientationSteps;
+  
+    if (needsRecalc) {
       const { width: imgWidth, height: imgHeight } = selectedImage;
       const isSwapped = orientationSteps === 1 || orientationSteps === 3;
       const W = isSwapped ? imgHeight : imgWidth;
       const H = isSwapped ? imgWidth : imgHeight;
       const A = aspectRatio || W / H;
-      if (isNaN(A)) return;
-
+      if (isNaN(A) || A <= 0) return;
+  
       const angle = Math.abs(rotation);
       const rad = (angle % 180) * Math.PI / 180;
       const sin = Math.sin(rad);
       const cos = Math.cos(rad);
-
+  
       const h_c = Math.min(H / (A * sin + cos), W / (A * cos + sin));
       const w_c = A * h_c;
-
+  
       const maxPixelCrop = {
         x: Math.round((W - w_c) / 2),
         y: Math.round((H - h_c) / 2),
         width: Math.round(w_c),
         height: Math.round(h_c),
       };
-      
+  
       prevCropParams.current = { rotation, aspectRatio, orientationSteps };
-      setAdjustments(prev => ({ ...prev, crop: maxPixelCrop }));
+      if (JSON.stringify(crop) !== JSON.stringify(maxPixelCrop)) {
+        setAdjustments(prev => ({ ...prev, crop: maxPixelCrop }));
+      }
     }
-  }, [isCropping, adjustments.rotation, adjustments.aspectRatio, adjustments.orientationSteps, selectedImage?.width, selectedImage?.height, setAdjustments]);
-
+  }, [isCropping, adjustments.rotation, adjustments.aspectRatio, adjustments.orientationSteps, adjustments.crop, selectedImage, setAdjustments]);
 
   useEffect(() => {
     if (!isCropping || !selectedImage?.width) {
@@ -206,8 +207,6 @@ export default function Editor({
         width: (pixelCrop.width / cropBaseWidth) * 100,
         height: (pixelCrop.height / cropBaseHeight) * 100,
       });
-    } else {
-      setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
     }
   }, [isCropping, adjustments.crop, adjustments.orientationSteps, selectedImage]);
 

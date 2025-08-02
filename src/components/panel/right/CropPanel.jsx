@@ -41,15 +41,22 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments }
     return W > 0 && H > 0 ? W / H : null;
   }, [selectedImage, orientationSteps]);
 
-  const activePreset = useMemo(() => PRESETS.find(p => {
-    if (p.value === null && aspectRatio === null) return true;
-    let presetBaseRatio = p.value;
-    if (p.value === 'original') {
-      presetBaseRatio = getEffectiveOriginalRatio();
+  const activePreset = useMemo(() => {
+    if (aspectRatio === null) return PRESETS.find(p => p.value === null);
+
+    const numericPresetMatch = PRESETS.find(p =>
+      typeof p.value === 'number' &&
+      (Math.abs(aspectRatio - p.value) < 0.001 || Math.abs(aspectRatio - (1 / p.value)) < 0.001)
+    );
+    if (numericPresetMatch) return numericPresetMatch;
+
+    const originalRatio = getEffectiveOriginalRatio();
+    if (originalRatio && Math.abs(aspectRatio - originalRatio) < 0.001) {
+      return PRESETS.find(p => p.value === 'original');
     }
-    if (!presetBaseRatio || !aspectRatio) return presetBaseRatio === aspectRatio;
-    return Math.abs(aspectRatio - presetBaseRatio) < 0.001 || Math.abs(aspectRatio - (1 / presetBaseRatio)) < 0.001;
-  }), [aspectRatio, getEffectiveOriginalRatio]);
+
+    return null;
+  }, [aspectRatio, getEffectiveOriginalRatio]);
 
   let orientation = 'horizontal';
   if (activePreset && activePreset.value && activePreset.value !== 1) {
@@ -99,14 +106,27 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments }
   };
 
   const handlePresetClick = (preset) => {
-    let baseRatio = preset.value;
     if (preset.value === 'original') {
-      baseRatio = getEffectiveOriginalRatio();
+      setAdjustments(prev => ({ ...prev, aspectRatio: getEffectiveOriginalRatio(), crop: null }));
+      return;
     }
 
-    let newAspectRatio = baseRatio;
-    if (baseRatio && baseRatio !== 1 && orientation === 'vertical') {
-      newAspectRatio = 1 / baseRatio;
+    let targetRatio = preset.value;
+
+    if (activePreset === preset && targetRatio && targetRatio !== 1) {
+      setAdjustments(prev => ({
+        ...prev,
+        aspectRatio: 1 / prev.aspectRatio,
+        crop: null,
+      }));
+      return;
+    }
+
+    const imageRatio = getEffectiveOriginalRatio();
+    let newAspectRatio = targetRatio;
+
+    if (targetRatio && imageRatio && imageRatio < 1 && targetRatio > 1) {
+      newAspectRatio = 1 / targetRatio;
     }
 
     setAdjustments(prev => ({ ...prev, aspectRatio: newAspectRatio, crop: null }));
@@ -139,7 +159,7 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments }
   };
 
   const isPresetActive = (preset) => preset === activePreset;
-  const isOrientationToggleDisabled = !aspectRatio || aspectRatio === 1;
+  const isOrientationToggleDisabled = !aspectRatio || aspectRatio === 1 || activePreset?.value === 'original';
 
   const fineRotation = useMemo(() => {
     return rotation || 0;
@@ -152,12 +172,16 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments }
 
   const handleStepRotate = (degrees) => {
     const increment = degrees > 0 ? 1 : 3;
-    setAdjustments(prev => ({
-      ...prev,
-      orientationSteps: ((prev.orientationSteps || 0) + increment) % 4,
-      rotation: 0,
-      crop: null,
-    }));
+    setAdjustments(prev => {
+      const newAspectRatio = (prev.aspectRatio && prev.aspectRatio !== 0) ? 1 / prev.aspectRatio : null;
+      return {
+        ...prev,
+        aspectRatio: newAspectRatio,
+        orientationSteps: ((prev.orientationSteps || 0) + increment) % 4,
+        rotation: 0,
+        crop: null,
+      };
+    });
   };
 
   const resetFineRotation = () => {

@@ -1111,15 +1111,6 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
     return () => debouncedGenerateUncroppedPreview.cancel();
   }, [adjustments, activeRightPanel, selectedImage?.isReady, debouncedGenerateUncroppedPreview]);
 
-  useEffect(() => {
-    if (adjustments.aspectRatio !== null && adjustments.crop === null && selectedImage?.width && selectedImage?.height) {
-      const { width: imgWidth, height: imgHeight } = selectedImage;
-      const newPercentCrop = centerCrop(makeAspectCrop({ unit: '%', width: 100 }, adjustments.aspectRatio, imgWidth, imgHeight), imgWidth, imgHeight);
-      const newPixelCrop = { x: Math.round((newPercentCrop.x / 100) * imgWidth), y: Math.round((newPercentCrop.y / 100) * imgHeight), width: Math.round((newPercentCrop.width / 100) * imgWidth), height: Math.round((newPercentCrop.height / 100) * imgHeight) };
-      setAdjustments(prev => ({ ...prev, crop: newPixelCrop }));
-    }
-  }, [adjustments.aspectRatio, adjustments.crop, selectedImage?.width, selectedImage?.height, setAdjustments]);
-
   const handleOpenFolder = async () => {
     try {
       const selected = await open({ directory: true, multiple: false, defaultPath: await homeDir() });
