@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   Loader2,
   AlertTriangle,
+  FolderInput,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FixedSizeGrid as Grid } from 'react-window';
@@ -400,6 +401,7 @@ const Cell = ({ columnIndex, rowIndex, style, data }) => {
 
 export default function MainLibrary({
   imageList, onImageClick, onImageDoubleClick, onContextMenu, onEmptyAreaContextMenu, multiSelectedPaths, activePath, rootPath, currentFolderPath, onOpenFolder, thumbnails, imageRatings, appSettings, onContinueSession, onGoHome, onClearSelection, sortCriteria, setSortCriteria, filterCriteria, setFilterCriteria, onSettingsChange, onLibraryRefresh, theme, initialScrollOffset, onScroll, isIndexing, indexingProgress, searchQuery, setSearchQuery, aiModelDownloadStatus,
+  importState,
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [appVersion, setAppVersion] = useState('');
@@ -468,6 +470,27 @@ export default function MainLibrary({
         </div>
 
         <div className="flex items-center gap-3">
+          {importState.status === 'importing' && (
+            <div className="flex items-center gap-2 text-sm text-accent animate-pulse">
+              <FolderInput size={16} />
+              <span>
+                Importing... ({importState.progress.current}/{importState.progress.total})
+              </span>
+            </div>
+          )}
+          {importState.status === 'success' && (
+            <div className="flex items-center gap-2 text-sm text-green-400">
+              <Check size={16} />
+              <span>Import Complete!</span>
+            </div>
+          )}
+          {importState.status === 'error' && (
+            <div className="flex items-center gap-2 text-sm text-red-400">
+              <AlertTriangle size={16} />
+              <span>Import Failed!</span>
+            </div>
+          )}
+
           <div className="relative w-full max-w-xs">
             <input
               type="text"
@@ -501,14 +524,16 @@ export default function MainLibrary({
           <p className="text-lg font-semibold">Tagging Disabled</p>
           <p className="text-sm mt-2">Enable automatic tagging in Settings to use search.</p>
         </div>
-      ) : imageList.length === 0 && (isIndexing || aiModelDownloadStatus) ? (
+      ) : imageList.length === 0 && (isIndexing || aiModelDownloadStatus || importState.status === 'importing') ? (
         <div className="flex-1 flex flex-col items-center justify-center text-text-secondary" onContextMenu={onEmptyAreaContextMenu}>
           <Loader2 className="h-12 w-12 text-secondary animate-spin mb-4" />
           <p className="text-lg font-semibold">
             {aiModelDownloadStatus ? `Downloading ${aiModelDownloadStatus}...` 
              : (isIndexing && indexingProgress.total > 0) 
                ? `Indexing images... (${indexingProgress.current}/${indexingProgress.total})`
-               : "Indexing images..."
+               : (importState.status === 'importing' && importState.progress.total > 0)
+                 ? `Importing images... (${importState.progress.current}/${importState.progress.total})`
+                 : "Processing images..."
             }
           </p>
           <p className="text-sm mt-2">This may take a moment.</p>

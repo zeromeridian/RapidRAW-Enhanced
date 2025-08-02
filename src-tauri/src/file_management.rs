@@ -17,6 +17,9 @@ use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
 use uuid::Uuid;
 use walkdir::WalkDir;
+use chrono::{DateTime, Utc};
+use little_exif::exif_tag::ExifTag;
+use little_exif::metadata::Metadata;
 
 use crate::gpu_processing;
 use crate::formats::is_supported_image_file;
@@ -131,12 +134,21 @@ impl Default for AppSettings {
 }
 
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ImageFile {
     path: String,
     modified: u64,
     is_edited: bool,
     tags: Option<Vec<String>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportSettings {
+    pub filename_template: String,
+    pub organize_by_date: bool,
+    pub date_folder_format: String,
+    pub delete_after_import: bool,
 }
 
 #[tauri::command]
@@ -1243,7 +1255,9 @@ pub fn delete_files_with_associated(paths: Vec<String>) -> Result<(), String> {
     for path in final_paths_to_delete {
         let sidecar_path = get_sidecar_path(&path);
         if sidecar_path.exists() {
-            let _ = trash::delete(&sidecar_path);
+            if let Err(e) = trash::delete(&sidecar_path) {
+                eprintln!("Failed to delete sidecar {}: {}", sidecar_path.display(), e);
+            }
         }
     }
 
@@ -1319,4 +1333,133 @@ pub fn get_cached_or_generate_thumbnail_image(
     } else {
         generate_thumbnail_data(path_str, gpu_context, None)
     }
+}
+
+#[tauri::command]
+pub async fn import_files(
+    source_paths: Vec<String>,
+    destination_folder: String,
+    settings: ImportSettings,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let total_files = source_paths.len();
+    let _ = app_handle.emit(
+        "import-start",
+        serde_json::json!({ "total": total_files }),
+    );
+
+    tokio::spawn(async move {
+        for (i, source_path_str) in source_paths.iter().enumerate() {
+            let _ = app_handle.emit(
+                "import-progress",
+                serde_json::json!({ "current": i, "total": total_files, "path": source_path_str }),
+            );
+
+            let import_result: Result<(), String> = (|| {
+                let source_path = Path::new(source_path_str);
+                if !source_path.exists() {
+                    return Err(format!("Source file not found: {}", source_path_str));
+                }
+
+                let file_date: DateTime<Utc> = Metadata::new_from_path(source_path)
+                    .ok()
+                    .and_then(|metadata| {
+                        metadata
+                            .get_tag(&ExifTag::DateTimeOriginal("".to_string()))
+                            .next()
+                            .and_then(|tag| {
+                                if let &ExifTag::DateTimeOriginal(ref dt_str) = tag {
+                                    chrono::NaiveDateTime::parse_from_str(dt_str, "%Y:%m:%d %H:%M:%S")
+                                        .ok()
+                                        .map(|dt| DateTime::from_naive_utc_and_offset(dt, Utc))
+                                } else {
+                                    None
+                                }
+                            })
+                    })
+                    .unwrap_or_else(|| {
+                        fs::metadata(source_path)
+                            .ok()
+                            .and_then(|m| m.created().ok())
+                            .map(DateTime::<Utc>::from)
+                            .unwrap_or_else(Utc::now)
+                    });
+
+                let mut final_dest_folder = PathBuf::from(&destination_folder);
+                if settings.organize_by_date {
+                    let date_format_str = settings.date_folder_format
+                        .replace("YYYY", "%Y")
+                        .replace("MM", "%m")
+                        .replace("DD", "%d");
+                    let subfolder = file_date.format(&date_format_str).to_string();
+                    final_dest_folder.push(subfolder);
+                }
+
+                fs::create_dir_all(&final_dest_folder).map_err(|e| format!("Failed to create destination folder: {}", e))?;
+
+                let new_stem = generate_filename_from_template(&settings.filename_template, source_path, i + 1, total_files);
+                let extension = source_path.extension().and_then(|s| s.to_str()).unwrap_or("");
+                let new_filename = format!("{}.{}", new_stem, extension);
+                let dest_file_path = final_dest_folder.join(new_filename);
+
+                if dest_file_path.exists() {
+                    return Err(format!("File already exists at destination: {}", dest_file_path.display()));
+                }
+
+                fs::copy(source_path, &dest_file_path).map_err(|e| e.to_string())?;
+                let source_sidecar = get_sidecar_path(source_path_str);
+                if source_sidecar.exists() {
+                    if let Some(dest_str) = dest_file_path.to_str() {
+                        let dest_sidecar = get_sidecar_path(dest_str);
+                        fs::copy(&source_sidecar, &dest_sidecar).map_err(|e| e.to_string())?;
+                    }
+                }
+
+                if settings.delete_after_import {
+                    trash::delete(source_path).map_err(|e| e.to_string())?;
+                    if source_sidecar.exists() {
+                        trash::delete(source_sidecar).map_err(|e| e.to_string())?;
+                    }
+                }
+
+                Ok(())
+            })();
+
+            if let Err(e) = import_result {
+                eprintln!("Failed to import {}: {}", source_path_str, e);
+                let _ = app_handle.emit("import-error", e);
+                return;
+            }
+        }
+
+        let _ = app_handle.emit(
+            "import-progress",
+            serde_json::json!({ "current": total_files, "total": total_files, "path": "" }),
+        );
+        let _ = app_handle.emit("import-complete", ());
+    });
+
+    Ok(())
+}
+
+pub fn generate_filename_from_template(
+    template: &str,
+    original_path: &std::path::Path,
+    sequence: usize,
+    total: usize,
+) -> String {
+    let now = chrono::Local::now();
+    let stem = original_path.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
+    let sequence_str = format!("{:0width$}", sequence, width = total.to_string().len().max(1));
+
+    let mut result = template.to_string();
+    result = result.replace("{original_filename}", stem);
+    result = result.replace("{sequence}", &sequence_str);
+    result = result.replace("{YYYY}", &now.format("%Y").to_string());
+    result = result.replace("{MM}", &now.format("%m").to_string());
+    result = result.replace("{DD}", &now.format("%d").to_string());
+    result = result.replace("{hh}", &now.format("%H").to_string());
+    result = result.replace("{mm}", &now.format("%M").to_string());
+
+    result
 }

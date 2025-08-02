@@ -31,7 +31,6 @@ use tokio::sync::Mutex as TokioMutex;
 use tokio::task::JoinHandle;
 use window_vibrancy::{apply_acrylic, apply_vibrancy, NSVisualEffectMaterial};
 use serde::{Serialize, Deserialize};
-use chrono::Local;
 use little_exif::metadata::Metadata;
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
@@ -656,7 +655,7 @@ async fn batch_export_images(
 
                 let original_path = std::path::Path::new(image_path_str);
                 let filename_template = export_settings.filename_template.as_deref().unwrap_or("{original_filename}_edited");
-                let new_stem = generate_filename_from_template(filename_template, original_path, i + 1, total_paths);
+                let new_stem = crate::file_management::generate_filename_from_template(filename_template, original_path, i + 1, total_paths);
                 let new_filename = format!("{}.{}", new_stem, output_format);
                 let output_path = output_folder_path.join(new_filename);
 
@@ -717,28 +716,6 @@ fn cancel_export(state: tauri::State<AppState>) -> Result<(), String> {
         return Err("No export task is currently running.".to_string());
     }
     Ok(())
-}
-
-fn generate_filename_from_template(
-    template: &str,
-    original_path: &std::path::Path,
-    sequence: usize,
-    total: usize,
-) -> String {
-    let now = Local::now();
-    let stem = original_path.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
-    let sequence_str = format!("{:0width$}", sequence, width = total.to_string().len().max(1));
-
-    let mut result = template.to_string();
-    result = result.replace("{original_filename}", stem);
-    result = result.replace("{sequence}", &sequence_str);
-    result = result.replace("{YYYY}", &now.format("%Y").to_string());
-    result = result.replace("{MM}", &now.format("%m").to_string());
-    result = result.replace("{DD}", &now.format("%d").to_string());
-    result = result.replace("{hh}", &now.format("%H").to_string());
-    result = result.replace("{mm}", &now.format("%M").to_string());
-
-    result
 }
 
 fn write_image_with_metadata(
@@ -1247,6 +1224,7 @@ fn main() {
             file_management::clear_all_sidecars,
             file_management::clear_thumbnail_cache,
             file_management::set_color_label_for_paths,
+            file_management::import_files,
             tagging::start_background_indexing,
             tagging::clear_all_tags
         ])

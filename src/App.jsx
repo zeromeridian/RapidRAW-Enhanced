@@ -7,7 +7,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import debounce from 'lodash.debounce';
 import { centerCrop, makeAspectCrop } from 'react-image-crop';
 import clsx from 'clsx';
-import { Copy, ClipboardPaste, RotateCcw, Star, Trash2, Folder, Edit, Check, X, Undo, Redo, FolderPlus, FileEdit, CopyPlus, Aperture, Tag } from 'lucide-react';
+import { Copy, ClipboardPaste, RotateCcw, Star, Trash2, Folder, Edit, Check, X, Undo, Redo, FolderPlus, FileEdit, CopyPlus, Aperture, Tag, FolderInput } from 'lucide-react';
 import TitleBar from './window/TitleBar';
 import MainLibrary from './components/panel/MainLibrary';
 import FolderTree from './components/panel/FolderTree';
@@ -27,6 +27,7 @@ import { ContextMenuProvider, useContextMenu } from './context/ContextMenuContex
 import CreateFolderModal from './components/modals/CreateFolderModal';
 import RenameFolderModal from './components/modals/RenameFolderModal';
 import ConfirmModal from './components/modals/ConfirmModal';
+import ImportSettingsModal from './components/modals/ImportSettingsModal';
 import { useHistoryState } from './hooks/useHistoryState';
 import Resizer from './components/ui/Resizer';
 import { INITIAL_ADJUSTMENTS, COPYABLE_ADJUSTMENT_KEYS, normalizeLoadedAdjustments } from './utils/adjustments';
@@ -111,6 +112,9 @@ function App() {
   const [brushSettings, setBrushSettings] = useState({ size: 50, feather: 50, tool: 'brush' });
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [isRenameFolderModalOpen, setIsRenameFolderModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importTargetFolder, setImportTargetFolder] = useState(null);
+  const [importSourcePaths, setImportSourcePaths] = useState([]);
   const [folderActionTarget, setFolderActionTarget] = useState(null);
   const [confirmModalState, setConfirmModalState] = useState({ isOpen: false });
   const [customEscapeHandler, setCustomEscapeHandler] = useState(null);
@@ -134,6 +138,13 @@ function App() {
   const [exportState, setExportState] = useState({
     status: 'idle',
     progress: { current: 0, total: 0 },
+    errorMessage: '',
+  });
+
+  const [importState, setImportState] = useState({
+    status: 'idle',
+    progress: { current: 0, total: 0 },
+    path: '',
     errorMessage: '',
   });
 
@@ -1007,6 +1018,34 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
           setExportState(prev => ({ ...prev, status: 'cancelled' }));
         }
       }),
+      listen('import-start', (event) => {
+        if (isEffectActive) {
+          setImportState({ status: 'importing', progress: { current: 0, total: event.payload.total }, path: '', errorMessage: '' });
+        }
+      }),
+      listen('import-progress', (event) => {
+        if (isEffectActive) {
+          setImportState(prev => ({ ...prev, progress: { current: event.payload.current, total: event.payload.total }, path: event.payload.path }));
+        }
+      }),
+      listen('import-complete', () => {
+        if (isEffectActive) {
+          setImportState(prev => ({ ...prev, status: 'success' }));
+          handleRefreshFolderTree();
+          if (currentFolderPathRef.current) {
+            handleSelectSubfolder(currentFolderPathRef.current, false);
+          }
+        }
+      }),
+      listen('import-error', (event) => {
+        if (isEffectActive) {
+          setImportState(prev => ({
+            ...prev,
+            status: 'error',
+            errorMessage: typeof event.payload === 'string' ? event.payload : 'An unknown import error occurred.'
+          }));
+        }
+      }),
     ];
     return () => { isEffectActive = false; listeners.forEach(p => p.then(unlisten => unlisten())); if (loaderTimeoutRef.current) clearTimeout(loaderTimeoutRef.current); };
   }, []);
@@ -1019,6 +1058,15 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
       return () => clearTimeout(timer);
     }
   }, [exportState.status]);
+
+  useEffect(() => {
+    if (['success', 'error'].includes(importState.status)) {
+      const timer = setTimeout(() => {
+        setImportState({ status: 'idle', progress: { current: 0, total: 0 }, path: '', errorMessage: '' });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [importState.status]);
 
   useEffect(() => {
     if (libraryActivePath) {
@@ -1217,6 +1265,42 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
       });
   }, [multiSelectedPaths, libraryActivePath, selectedImage, setAdjustments]);
 
+  const handleImportClick = useCallback(async (targetPath) => {
+
+    try {
+      const allImageExtensions = [...supportedTypes.nonRaw, ...supportedTypes.raw];
+      const selected = await open({
+        multiple: true,
+        title: 'Select files to import',
+        filters: [
+          {
+            name: 'All Supported Images',
+            extensions: allImageExtensions,
+          },
+          {
+            name: 'RAW Images',
+            extensions: supportedTypes.raw,
+          },
+          {
+            name: 'Standard Images (JPEG, PNG, etc.)',
+            extensions: supportedTypes.nonRaw,
+          },
+          {
+            name: 'All Files',
+            extensions: ['*']
+          }
+        ]
+      });
+      if (Array.isArray(selected) && selected.length > 0) {
+        setImportSourcePaths(selected);
+        setImportTargetFolder(targetPath);
+        setIsImportModalOpen(true);
+      }
+    } catch (err) {
+      console.error("Failed to open file dialog for import:", err);
+    }
+  }, [supportedTypes]);
+
   const handleEditorContextMenu = (event) => {
     event.preventDefault(); event.stopPropagation();
     const options = [
@@ -1386,6 +1470,7 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
     const numCopied = copiedFilePaths.length;
     const copyPastedLabel = numCopied === 1 ? 'Copy image here' : `Copy ${numCopied} images here`;
     const movePastedLabel = numCopied === 1 ? 'Move image here' : `Move ${numCopied} images here`;
+
     const options = [
       { label: 'New Folder', icon: FolderPlus, onClick: () => { setFolderActionTarget(targetPath); setIsCreateFolderModalOpen(true); } },
       { label: 'Rename Folder', icon: FileEdit, disabled: isRoot, onClick: () => { setFolderActionTarget(targetPath); setIsRenameFolderModalOpen(true); } },
@@ -1395,6 +1480,7 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
           { label: movePastedLabel, onClick: async () => { try { await invoke('move_files', { sourcePaths: copiedFilePaths, destinationFolder: targetPath }); setCopiedFilePaths([]); setMultiSelectedPaths([]); handleRefreshFolderTree(); handleLibraryRefresh(); } catch (err) { setError(`Failed to move files: ${err}`); } } },
         ],
       },
+      { label: 'Import Images', icon: FolderInput, onClick: () => handleImportClick(targetPath) },
       { type: 'separator' },
       { label: 'Show in File Explorer', icon: Folder, onClick: () => invoke('show_in_finder', { path: targetPath }).catch(err => setError(`Could not show folder: ${err}`)) },
       ...(path ? [{ label: 'Delete Folder', icon: Trash2, isDestructive: true, disabled: isRoot, submenu: [
@@ -1415,12 +1501,14 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
     const numCopied = copiedFilePaths.length;
     const copyPastedLabel = numCopied === 1 ? 'Copy image here' : `Copy ${numCopied} images here`;
     const movePastedLabel = numCopied === 1 ? 'Move image here' : `Move ${numCopied} images here`;
+
     const options = [
       { label: 'Paste', icon: ClipboardPaste, disabled: copiedFilePaths.length === 0, submenu: [
           { label: copyPastedLabel, onClick: async () => { try { await invoke('copy_files', { sourcePaths: copiedFilePaths, destinationFolder: currentFolderPath }); handleLibraryRefresh(); } catch (err) { setError(`Failed to copy files: ${err}`); } } },
           { label: movePastedLabel, onClick: async () => { try { await invoke('move_files', { sourcePaths: copiedFilePaths, destinationFolder: currentFolderPath }); setCopiedFilePaths([]); setMultiSelectedPaths([]); handleRefreshFolderTree(); handleLibraryRefresh(); } catch (err) { setError(`Failed to move files: ${err}`); } } },
         ],
       },
+      { label: 'Import Images', icon: FolderInput, onClick: () => handleImportClick(currentFolderPath) },
     ];
     showContextMenu(event.clientX, event.clientY, options);
   };
@@ -1597,6 +1685,7 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
             initialScrollOffset={libraryScrollOffset}
             onScroll={handleLibraryScroll}
             aiModelDownloadStatus={aiModelDownloadStatus}
+            importState={importState}
           />
           {rootPath && <BottomBar
             isLibraryView={true}
@@ -1617,6 +1706,19 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
         </div>
       </div>
     );
+  };
+
+  const handleStartImport = async (settings) => {
+    if (importSourcePaths.length > 0 && importTargetFolder) {
+      invoke('import_files', {
+        sourcePaths: importSourcePaths,
+        destinationFolder: importTargetFolder,
+        settings: settings,
+      }).catch(err => {
+        console.error("Failed to start import:", err);
+        setImportState({ status: 'error', errorMessage: `Failed to start import: ${err}` });
+      });
+    }
   };
 
   return (
@@ -1688,6 +1790,12 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
       <ConfirmModal
         {...confirmModalState}
         onClose={closeConfirmModal}
+      />
+      <ImportSettingsModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSave={handleStartImport}
+        fileCount={importSourcePaths.length}
       />
     </div>
   );
