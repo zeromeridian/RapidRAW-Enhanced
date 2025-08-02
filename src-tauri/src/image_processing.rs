@@ -52,6 +52,15 @@ pub fn apply_orientation(image: DynamicImage, orientation: Orientation) -> Dynam
     }
 }
 
+pub fn apply_coarse_rotation(image: DynamicImage, orientation_steps: u8) -> DynamicImage {
+    match orientation_steps {
+        1 => image.rotate90(),
+        2 => image.rotate180(),
+        3 => image.rotate270(),
+        _ => image,
+    }
+}
+
 pub fn apply_rotation(image: &DynamicImage, rotation_degrees: f32) -> DynamicImage {
     if rotation_degrees % 360.0 == 0.0 {
         return image.clone();

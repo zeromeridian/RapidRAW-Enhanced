@@ -42,7 +42,7 @@ export const THEMES = [
       name: 'Grey',
       splashImage: '/splash-grey.jpg',
       cssVariables: {
-        '--color-bg-primary-rgb': '80, 80, 80',
+        '--color-bg-primary-rgb': '88, 88, 88',
         '--opacity-bg-primary': '0.7',
         '--color-bg-secondary-rgb': '90, 90, 90',
         '--opacity-bg-secondary': '0.8',

@@ -27,7 +27,7 @@ use crate::image_processing::GpuContext;
 use crate::image_loader;
 use crate::image_processing::{
     apply_crop, apply_flip, apply_rotation, auto_results_to_json, get_all_adjustments_from_json,
-    perform_auto_analysis, Crop, ImageMetadata,
+    perform_auto_analysis, Crop, ImageMetadata, apply_coarse_rotation,
 };
 use crate::tagging::COLOR_TAG_PREFIX;
 use crate::mask_generation::{generate_mask_bitmap, MaskDefinition};
@@ -299,17 +299,18 @@ pub fn generate_thumbnail_data(
     } else {
         image_loader::load_and_composite(path_str, &adjustments, true)?
     };
-    let original_dims = base_image.dimensions();
 
     if let (Some(context), Some(meta)) = (gpu_context, metadata) {
         if !meta.adjustments.is_null() {
             const THUMBNAIL_PROCESSING_DIM: u32 = 1280;
-            let (full_w, full_h) = original_dims;
+            let orientation_steps = meta.adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
+            let coarse_rotated_image = apply_coarse_rotation(base_image, orientation_steps);
+            let (full_w, full_h) = coarse_rotated_image.dimensions();
 
             let (processing_base, scale_for_gpu) =
                 if full_w > THUMBNAIL_PROCESSING_DIM || full_h > THUMBNAIL_PROCESSING_DIM {
                     let base =
-                        base_image.thumbnail(THUMBNAIL_PROCESSING_DIM, THUMBNAIL_PROCESSING_DIM);
+                        coarse_rotated_image.thumbnail(THUMBNAIL_PROCESSING_DIM, THUMBNAIL_PROCESSING_DIM);
                     let scale = if full_w > 0 {
                         base.width() as f32 / full_w as f32
                     } else {
@@ -317,7 +318,7 @@ pub fn generate_thumbnail_data(
                     };
                     (base, scale)
                 } else {
-                    (base_image.clone(), 1.0)
+                    (coarse_rotated_image.clone(), 1.0)
                 };
 
             let rotation_degrees = meta.adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
@@ -385,7 +386,8 @@ pub fn generate_thumbnail_data(
         }
     }
 
-    Ok(base_image)
+    let fallback_orientation_steps = adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
+    Ok(apply_coarse_rotation(base_image, fallback_orientation_steps))
 }
 
 fn encode_thumbnail(image: &DynamicImage) -> Result<Vec<u8>> {

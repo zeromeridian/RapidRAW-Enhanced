@@ -39,7 +39,7 @@ use chrono::{DateTime, Utc};
 
 use crate::image_processing::{
     get_all_adjustments_from_json, get_or_init_gpu_context, GpuContext,
-    ImageMetadata, process_and_get_dynamic_image, Crop, apply_crop, apply_rotation, apply_flip,
+    ImageMetadata, process_and_get_dynamic_image, Crop, apply_crop, apply_rotation, apply_flip, apply_coarse_rotation,
 };
 use crate::file_management::{get_sidecar_path, load_settings, AppSettings};
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap, AiPatchDefinition};
@@ -117,11 +117,13 @@ fn apply_all_transformations(
     adjustments: &serde_json::Value,
     scale: f32,
 ) -> (DynamicImage, (f32, f32)) {
+    let orientation_steps = adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
     let rotation_degrees = adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
     let flip_horizontal = adjustments["flipHorizontal"].as_bool().unwrap_or(false);
     let flip_vertical = adjustments["flipVertical"].as_bool().unwrap_or(false);
 
-    let flipped_image = apply_flip(image.clone(), flip_horizontal, flip_vertical);
+    let coarse_rotated_image = apply_coarse_rotation(image.clone(), orientation_steps);
+    let flipped_image = apply_flip(coarse_rotated_image, flip_horizontal, flip_vertical);
     let rotated_image = apply_rotation(&flipped_image, rotation_degrees);
 
     let crop_data: Option<Crop> = serde_json::from_value(adjustments["crop"].clone()).ok();
@@ -147,6 +149,9 @@ fn apply_all_transformations(
 fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
     
+    let orientation_steps = adjustments["orientationSteps"].as_u64().unwrap_or(0);
+    orientation_steps.hash(&mut hasher);
+
     let rotation = adjustments["rotation"].as_f64().unwrap_or(0.0);
     (rotation.to_bits()).hash(&mut hasher);
 
@@ -164,29 +169,23 @@ fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
     
     if let Some(patches_val) = adjustments.get("aiPatches") {
         if let Some(patches_arr) = patches_val.as_array() {
-            // Hash the number of patches to catch additions/removals
             patches_arr.len().hash(&mut hasher);
 
             for patch in patches_arr {
-                // Hash unique ID
                 if let Some(id) = patch.get("id").and_then(|v| v.as_str()) {
                     id.hash(&mut hasher);
                 }
-                // Hash visibility
+
                 let is_visible = patch.get("visible").and_then(|v| v.as_bool()).unwrap_or(true);
                 is_visible.hash(&mut hasher);
 
-                // Hash the length of the patch data. This detects when it's added.
                 let data_len = patch.get("patchDataBase64").and_then(|v| v.as_str()).unwrap_or("").len();
                 data_len.hash(&mut hasher);
 
-                // Hash the entire subMasks structure by converting it to a string.
-                // This is crucial for detecting changes in the selection mask.
                 if let Some(sub_masks_val) = patch.get("subMasks") {
                     sub_masks_val.to_string().hash(&mut hasher);
                 }
 
-                // Also hash other properties that define the mask's appearance
                 let invert = patch.get("invert").and_then(|v| v.as_bool()).unwrap_or(false);
                 invert.hash(&mut hasher);
             }
@@ -391,18 +390,21 @@ fn generate_uncropped_preview(
             },
         };
         
-        let (full_w, full_h) = (loaded_image.full_width, loaded_image.full_height);
+        let orientation_steps = adjustments_clone["orientationSteps"].as_u64().unwrap_or(0) as u8;
+        let coarse_rotated_image = apply_coarse_rotation(patched_image, orientation_steps);
 
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
         let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
 
+        let (rotated_w, rotated_h) = coarse_rotated_image.dimensions();
+
         let (processing_base, scale_for_gpu) = 
-            if full_w > preview_dim || full_h > preview_dim {
-                let base = patched_image.thumbnail(preview_dim, preview_dim);
-                let scale = if full_w > 0 { base.width() as f32 / full_w as f32 } else { 1.0 };
+            if rotated_w > preview_dim || rotated_h > preview_dim {
+                let base = coarse_rotated_image.thumbnail(preview_dim, preview_dim);
+                let scale = if rotated_w > 0 { base.width() as f32 / rotated_w as f32 } else { 1.0 };
                 (base, scale)
             } else {
-                (patched_image.clone(), 1.0)
+                (coarse_rotated_image.clone(), 1.0)
             };
         
         let (preview_width, preview_height) = processing_base.dimensions();
