@@ -444,37 +444,61 @@ fn apply_color_grading(color: vec3<f32>, shadows: ColorGradeSettings, midtones: 
     return graded_color;
 }
 
-fn apply_local_contrast(processed_color: vec3<f32>, coords_i: vec2<i32>, radius: i32, amount: f32) -> vec3<f32> {
-    if (amount == 0.0) { return processed_color; }
-    let max_coords = vec2<i32>(textureDimensions(input_texture) - 1u);
-    let original_luma = get_luma(processed_color);
-    var blurred_linear = vec3<f32>(0.0);
+fn apply_local_contrast(
+    processed_color_linear: vec3<f32>, 
+    coords_i: vec2<i32>, 
+    radius: i32, 
+    amount: f32
+) -> vec3<f32> {
+    if (amount == 0.0) { 
+        return processed_color_linear; 
+    }
+    let center_luma = get_luma(processed_color_linear);
+    let shadow_protection = smoothstep(0.0, 0.25, center_luma);
+    let highlight_protection = 1.0 - smoothstep(0.75, 1.0, center_luma);
+    let midtone_mask = shadow_protection * highlight_protection;
+    if (midtone_mask < 0.001) {
+        return processed_color_linear;
+    }
+    var blurred_luma = 0.0;
     var total_weight = 0.0;
+    let max_coords = vec2<i32>(textureDimensions(input_texture) - 1u);
     let spatial_sigma = f32(radius);
-    let range_sigma = 0.25;
+    let range_sigma = 0.2;
     for (var y = -radius; y <= radius; y += 1) {
         for (var x = -radius; x <= radius; x += 1) {
             let offset = vec2<i32>(x, y);
             let sample_coords = clamp(coords_i + offset, vec2<i32>(0), max_coords);
+            
             let sample_linear = srgb_to_linear(textureLoad(input_texture, sample_coords, 0).rgb);
             let sample_luma = get_luma(sample_linear);
+
             let spatial_dist_sq = f32(x * x + y * y);
-            let luma_dist = sample_luma - original_luma;
+            let luma_dist_sq = (sample_luma - center_luma) * (sample_luma - center_luma);
+
             let spatial_weight = exp(-spatial_dist_sq / (2.0 * spatial_sigma * spatial_sigma));
-            let range_weight = exp(-(luma_dist * luma_dist) / (2.0 * range_sigma * range_sigma));
+            let range_weight = exp(-luma_dist_sq / (2.0 * range_sigma * range_sigma));
             let weight = spatial_weight * range_weight;
-            blurred_linear += sample_linear * weight;
+
+            blurred_luma += sample_luma * weight;
             total_weight += weight;
         }
     }
-    if (total_weight > 0.0) { blurred_linear /= total_weight; } else { blurred_linear = processed_color; }
-    let detail_linear = processed_color - blurred_linear;
-    let shadow_protection = smoothstep(0.0, 0.25, original_luma);
-    let highlight_protection = 1.0 - smoothstep(0.75, 1.0, original_luma);
-    let midtone_mask = shadow_protection * highlight_protection;
-    let scaled_amount = amount * 0.8;
-    let enhanced_detail = detail_linear * scaled_amount * midtone_mask;
-    return processed_color + enhanced_detail;
+    if (total_weight > 0.0) {
+        blurred_luma /= total_weight;
+    } else {
+        return processed_color_linear;
+    }
+    let safe_center_luma = max(center_luma, 0.0001);
+    let blurred_color = processed_color_linear * (blurred_luma / safe_center_luma);
+    var final_color: vec3<f32>;
+    if (amount < 0.0) {
+        final_color = mix(processed_color_linear, blurred_color, -amount);
+    } else {
+        let detail_vector = processed_color_linear - blurred_color;
+        final_color = processed_color_linear + detail_vector * amount * 1.5;
+    }
+    return mix(processed_color_linear, final_color, midtone_mask);
 }
 
 fn apply_dehaze(color: vec3<f32>, amount: f32) -> vec3<f32> {
@@ -542,31 +566,39 @@ fn apply_all_curves(color: vec3<f32>, luma_curve: array<Point, 16>, luma_curve_c
 
 fn apply_all_adjustments(initial_rgb: vec3<f32>, adj: GlobalAdjustments, coords_i: vec2<i32>) -> vec3<f32> {
     var processed_rgb = apply_noise_reduction(initial_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction);
+
     processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
     processed_rgb = processed_rgb * pow(2.0, adj.exposure);
     processed_rgb = apply_tonal_adjustments(processed_rgb, adj.contrast, adj.highlights, adj.shadows, adj.whites, adj.blacks);
-    processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
-    processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_blending, adj.color_grading_balance);
-    processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
+
     processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 2, adj.sharpness);
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 8, adj.clarity);
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20, adj.structure);
+
+    processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
+    processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_blending, adj.color_grading_balance);
+    processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
+
     return processed_rgb;
 }
 
 fn apply_all_mask_adjustments(initial_rgb: vec3<f32>, adj: MaskAdjustments, coords_i: vec2<i32>) -> vec3<f32> {
     var processed_rgb = apply_noise_reduction(initial_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction);
+
     processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
     processed_rgb = processed_rgb * pow(2.0, adj.exposure);
     processed_rgb = apply_tonal_adjustments(processed_rgb, adj.contrast, adj.highlights, adj.shadows, adj.whites, adj.blacks);
-    processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
-    processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_blending, adj.color_grading_balance);
-    processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
+
     processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 2, adj.sharpness);
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 8, adj.clarity);
     processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20, adj.structure);
+
+    processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
+    processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_blending, adj.color_grading_balance);
+    processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
+    
     return processed_rgb;
 }
 
