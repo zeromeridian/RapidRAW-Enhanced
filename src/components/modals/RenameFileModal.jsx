@@ -93,7 +93,7 @@ export default function RenameFileModal({ isOpen, onClose, onSave, filesToRename
         onKeyDown={handleKeyDown}
       >
         <h3 className="text-lg font-semibold text-text-primary mb-6">
-          {isSingleFile ? 'Rename File' : `Rename ${fileCount} Files`}
+          {isSingleFile ? 'Rename Image' : `Rename ${fileCount} Images`}
         </h3>
         
         <div className="space-y-6 text-sm">
