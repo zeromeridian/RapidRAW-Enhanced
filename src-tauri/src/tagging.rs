@@ -17,8 +17,8 @@ use crate::formats::is_supported_image_file;
 use crate::image_processing::ImageMetadata;
 use crate::file_management::{self, get_sidecar_path};
 use crate::AppState;
-use crate::tag_candidates::TAG_CANDIDATES;
-use crate::tag_hierarchy::TAG_HIERARCHY;
+use crate::candidates::TAG_CANDIDATES;
+use crate::hierarchy::TAG_HIERARCHY;
 
 pub const COLOR_TAG_PREFIX: &str = "color:";
 

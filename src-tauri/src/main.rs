@@ -10,8 +10,9 @@ mod ai_processing;
 mod formats;
 mod image_loader;
 mod tagging;
-mod tag_candidates;
-mod tag_hierarchy;
+mod tagging_utils;
+mod panorama_stitching;
+mod panorama_utils;
 
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
@@ -19,8 +20,9 @@ use std::thread;
 use std::fs;
 use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
+use std::path::Path;
 
-use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba, RgbaImage, ImageFormat, GrayImage};
+use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba, RgbaImage, ImageFormat, GrayImage, RgbImage};
 use image::codecs::jpeg::JpegEncoder;
 use imageproc::morphology::dilate;
 use imageproc::distance_transform::Norm as DilationNorm;
@@ -49,6 +51,7 @@ use crate::ai_processing::{
 };
 use crate::formats::{is_raw_file};
 use crate::image_loader::{load_base_image_from_bytes, composite_patches_on_image, load_and_composite};
+use tagging_utils::{candidates, hierarchy};
 
 #[derive(Clone)]
 pub struct LoadedImage {
@@ -73,6 +76,7 @@ pub struct AppState {
     ai_state: Mutex<Option<AiState>>,
     ai_init_lock: TokioMutex<()>,
     export_task_handle: Mutex<Option<JoinHandle<()>>>,
+    panorama_result: Arc<Mutex<Option<RgbImage>>>,
     indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
 }
 
@@ -1140,6 +1144,89 @@ fn get_supported_file_types() -> Result<serde_json::Value, String> {
     }))
 }
 
+#[tauri::command]
+async fn stitch_panorama(
+    paths: Vec<String>,
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    if paths.len() < 2 {
+        return Err("Please select at least two images to stitch.".to_string());
+    }
+
+    let panorama_result_handle = state.panorama_result.clone();
+
+    let task = tokio::task::spawn_blocking(move || {
+        let panorama_result = panorama_stitching::stitch_images(paths, app_handle.clone());
+
+        match panorama_result {
+            Ok(panorama_image) => {
+                let _ = app_handle.emit("panorama-progress", "Creating preview...");
+
+                let (w, h) = panorama_image.dimensions();
+                let (new_w, new_h) = if w > h {
+                    (800, (800.0 * h as f32 / w as f32).round() as u32)
+                } else {
+                    ((800.0 * w as f32 / h as f32).round() as u32, 800)
+                };
+                let preview_image = image::imageops::resize(
+                    &panorama_image,
+                    new_w,
+                    new_h,
+                    image::imageops::FilterType::Triangle,
+                );
+                
+                let mut buf = Cursor::new(Vec::new());
+                
+                if let Err(e) = preview_image.write_to(&mut buf, ImageFormat::Png) {
+                    return Err(format!("Failed to encode panorama preview: {}", e));
+                }
+                
+                let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
+                let final_base64 = format!("data:image/png;base64,{}", base64_str);
+
+                *panorama_result_handle.lock().unwrap() = Some(panorama_image);
+
+                let _ = app_handle.emit("panorama-complete", serde_json::json!({
+                    "base64": final_base64,
+                }));
+                Ok(())
+            }
+            Err(e) => {
+                let _ = app_handle.emit("panorama-error", e.clone());
+                Err(e)
+            }
+        }
+    });
+
+    match task.await {
+        Ok(Ok(_)) => Ok(()),
+        Ok(Err(e)) => Err(e),
+        Err(join_err) => Err(format!("Panorama task failed: {}", join_err)),
+    }
+}
+
+#[tauri::command]
+async fn save_panorama(
+    first_path_str: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let panorama_image = state.panorama_result.lock().unwrap().take()
+        .ok_or_else(|| "No panorama image found in memory to save. It might have already been saved.".to_string())?;
+
+    let first_path = Path::new(&first_path_str);
+    let parent_dir = first_path.parent().ok_or_else(|| "Could not determine parent directory of the first image.".to_string())?;
+    let stem = first_path.file_stem().and_then(|s| s.to_str()).unwrap_or("panorama");
+
+    let output_filename = format!("{}_Pano.png", stem);
+    let output_path = parent_dir.join(output_filename);
+
+    panorama_image.save(&output_path)
+        .map_err(|e| format!("Failed to save panorama image: {}", e))?;
+
+    Ok(output_path.to_string_lossy().to_string())
+}
+
 fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowHandle) {
     #[cfg(target_os = "windows")]
     {
@@ -1229,6 +1316,7 @@ fn main() {
             ai_state: Mutex::new(None),
             ai_init_lock: TokioMutex::new(()),
             export_task_handle: Mutex::new(None),
+            panorama_result: Arc::new(Mutex::new(None)),
             indexing_task_handle: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
@@ -1248,6 +1336,8 @@ fn main() {
             test_comfyui_connection,
             invoke_generative_replace_with_mask_def,
             get_supported_file_types,
+            stitch_panorama,
+            save_panorama,
             image_processing::generate_histogram,
             image_processing::generate_waveform,
             image_processing::calculate_auto_adjustments,

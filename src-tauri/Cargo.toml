@@ -54,6 +54,8 @@ tokenizers = "0.19.1"
 once_cell = "1.19"
 futures = "0.3.31"
 sha2 = "0.10"
+nalgebra = "0.34.0"
+rand = "0.8"
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }

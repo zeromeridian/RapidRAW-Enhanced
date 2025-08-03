@@ -5,9 +5,8 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir } from '@tauri-apps/api/path';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import debounce from 'lodash.debounce';
-import { centerCrop, makeAspectCrop } from 'react-image-crop';
 import clsx from 'clsx';
-import { Copy, ClipboardPaste, RotateCcw, Star, Trash2, Folder, Edit, Check, X, Undo, Redo, FolderPlus, FileEdit, CopyPlus, Aperture, Tag, FolderInput } from 'lucide-react';
+import { Copy, ClipboardPaste, RotateCcw, Star, Trash2, Folder, Edit, Check, X, Undo, Redo, FolderPlus, FileEdit, CopyPlus, Aperture, Tag, FolderInput, Images} from 'lucide-react';
 import TitleBar from './window/TitleBar';
 import MainLibrary from './components/panel/MainLibrary';
 import FolderTree from './components/panel/FolderTree';
@@ -29,6 +28,7 @@ import RenameFolderModal from './components/modals/RenameFolderModal';
 import ConfirmModal from './components/modals/ConfirmModal';
 import ImportSettingsModal from './components/modals/ImportSettingsModal';
 import RenameFileModal from './components/modals/RenameFileModal';
+import PanoramaModal from './components/modals/PanoramaModal';
 import { useHistoryState } from './hooks/useHistoryState';
 import Resizer from './components/ui/Resizer';
 import { INITIAL_ADJUSTMENTS, COPYABLE_ADJUSTMENT_KEYS, normalizeLoadedAdjustments } from './utils/adjustments';
@@ -122,6 +122,13 @@ function App() {
   const [importSourcePaths, setImportSourcePaths] = useState([]);
   const [folderActionTarget, setFolderActionTarget] = useState(null);
   const [confirmModalState, setConfirmModalState] = useState({ isOpen: false });
+  const [panoramaModalState, setPanoramaModalState] = useState({
+    isOpen: false,
+    progressMessage: '',
+    finalImageBase64: null,
+    error: null,
+    stitchingSourcePaths: [],
+  });
   const [customEscapeHandler, setCustomEscapeHandler] = useState(null);
   const [isGeneratingAiMask, setIsGeneratingAiMask] = useState(false);
   const [isComfyUiConnected, setIsComfyUiConnected] = useState(false);
@@ -1113,6 +1120,50 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
   }, [libraryActivePath]);
 
   useEffect(() => {
+    let isEffectActive = true;
+    const unlistenProgress = listen('panorama-progress', (event) => {
+      if (isEffectActive) {
+        setPanoramaModalState(prev => ({ ...prev, isOpen: true, progressMessage: event.payload, error: null, finalImageBase64: null }));
+      }
+    });
+    const unlistenComplete = listen('panorama-complete', (event) => {
+      if (isEffectActive) {
+        const { base64 } = event.payload;
+        setPanoramaModalState(prev => ({ ...prev, progressMessage: 'Panorama Ready', finalImageBase64: base64, error: null }));
+      }
+    });
+    const unlistenError = listen('panorama-error', (event) => {
+      if (isEffectActive) {
+        setPanoramaModalState(prev => ({ ...prev, progressMessage: 'An error occurred.', error: String(event.payload), finalImageBase64: null }));
+      }
+    });
+
+    return () => {
+      isEffectActive = false;
+      unlistenProgress.then(f => f());
+      unlistenComplete.then(f => f());
+      unlistenError.then(f => f());
+    };
+  }, []);
+
+  const handleSavePanorama = async () => {
+    if (panoramaModalState.stitchingSourcePaths.length === 0) {
+      const err = "Source paths for panorama not found.";
+      setPanoramaModalState(prev => ({ ...prev, error: err }));
+      throw new Error(err);
+    }
+    try {
+      const savedPath = await invoke('save_panorama', { firstPathStr: panoramaModalState.stitchingSourcePaths[0] });
+      handleLibraryRefresh();
+      return savedPath;
+    } catch (err) {
+      console.error("Failed to save panorama:", err);
+      setPanoramaModalState(prev => ({ ...prev, error: String(err) }));
+      throw err;
+    }
+  };
+
+  useEffect(() => {
     if (selectedImage?.isReady) { applyAdjustments(adjustments); debouncedSave(selectedImage.path, adjustments); }
     return () => { applyAdjustments.cancel(); debouncedSave.cancel(); }
   }, [adjustments, selectedImage?.path, selectedImage?.isReady, applyAdjustments, debouncedSave]);
@@ -1428,7 +1479,7 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
     const deleteLabel = isSingleSelection ? 'Delete Image' : `Delete ${selectionCount} Images`;
     const copyLabel = isSingleSelection ? 'Copy Image' : `Copy ${selectionCount} Images`;
     const autoAdjustLabel = isSingleSelection ? 'Auto Adjust Image' : `Auto Adjust ${selectionCount} Images`;
-    const renameLabel = isSingleSelection ? 'Rename File' : `Rename ${selectionCount} Files`;
+    const renameLabel = isSingleSelection ? 'Rename Image' : `Rename ${selectionCount} Images`;
 
     const handleApplyAutoAdjustmentsToSelection = () => {
       if (finalSelection.length === 0) return;
@@ -1472,6 +1523,24 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
       },
       { label: pasteLabel, icon: ClipboardPaste, disabled: copiedAdjustments === null, onClick: () => handlePasteAdjustments(finalSelection) },
       { label: autoAdjustLabel, icon: Aperture, onClick: handleApplyAutoAdjustmentsToSelection },
+      {
+        label: isSingleSelection ? 'Stitch Image' : `Stitch ${selectionCount} Images`,
+        icon: Images,
+        disabled: selectionCount < 2,
+        onClick: () => {
+          setPanoramaModalState({ 
+            isOpen: true, 
+            progressMessage: 'Starting panorama process...', 
+            finalImageBase64: null, 
+            error: null,
+            stitchingSourcePaths: finalSelection,
+          });
+          invoke('stitch_panorama', { paths: finalSelection })
+            .catch(err => {
+              setPanoramaModalState(prev => ({ ...prev, isOpen: true, progressMessage: 'Failed to start.', error: String(err) }));
+            });
+        }
+      },
       { type: 'separator' },
       { label: copyLabel, icon: Copy, onClick: () => { setCopiedFilePaths(finalSelection); setIsCopied(true); } },
       { label: 'Duplicate Image', icon: CopyPlus, disabled: !isSingleSelection, onClick: async () => { try { await invoke('duplicate_file', { path: finalSelection[0] }); handleLibraryRefresh(); } catch (err) { console.error("Failed to duplicate file:", err); setError(`Failed to duplicate file: ${err}`); } } },
@@ -1843,6 +1912,17 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
           </div>
         </div>
       </div>
+      <PanoramaModal
+        isOpen={panoramaModalState.isOpen}
+        onClose={() => setPanoramaModalState({ isOpen: false, progressMessage: '', finalImageBase64: null, error: null, stitchingSourcePaths: [] })}
+        progressMessage={panoramaModalState.progressMessage}
+        finalImageBase64={panoramaModalState.finalImageBase64}
+        error={panoramaModalState.error}
+        onSave={handleSavePanorama}
+        onOpenFile={(path) => {
+          handleImageSelect(path);
+        }}
+      />
       <CreateFolderModal
         isOpen={isCreateFolderModalOpen}
         onClose={() => setIsCreateFolderModalOpen(false)}
