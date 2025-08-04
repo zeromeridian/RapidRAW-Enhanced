@@ -44,8 +44,6 @@ jobs:
           repository: ${{ inputs.repository }}
           ref: ${{ inputs.ref }}
           fetch-depth: 0
-          filter: tree:0
-          fetch-tags: true
 
       - name: Determine Version
         id: determine-version
@@ -59,13 +57,13 @@ jobs:
             echo "Release version determined from tag: $APP_VERSION"
           else
             if [[ "${{ inputs.platform }}" == windows* ]]; then
-              DESCRIBE="$(git describe --tags --always --abbrev=0)"
+              DESCRIBE=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
               APP_VERSION="${DESCRIBE#v}"
-              echo "CI version determined from 'git describe': $APP_VERSION"
+              echo "CI version for Windows determined from latest tag: $APP_VERSION"
             else
               DESCRIBE="$(git describe --tags --always)"
               APP_VERSION="${DESCRIBE#v}"
-              echo "CI version determined from 'git describe': $APP_VERSION"
+              echo "CI version for non-Windows determined from 'git describe': $APP_VERSION"
             fi
           fi
           
