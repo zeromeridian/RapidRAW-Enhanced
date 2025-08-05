@@ -56,15 +56,9 @@ jobs:
             APP_VERSION="${REF#refs/tags/v}"
             echo "Release version determined from tag: $APP_VERSION"
           else
-            if [[ "${{ inputs.platform }}" == windows* ]]; then
-              DESCRIBE=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-              APP_VERSION="${DESCRIBE#v}"
-              echo "CI version for Windows determined from latest tag: $APP_VERSION"
-            else
-              DESCRIBE="$(git describe --tags --always)"
-              APP_VERSION="${DESCRIBE#v}"
-              echo "CI version for non-Windows determined from 'git describe': $APP_VERSION"
-            fi
+            DESCRIBE=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            APP_VERSION="${DESCRIBE#v}"
+            echo "CI version determined from latest tag or fallback: $APP_VERSION"
           fi
           
           echo "version=${APP_VERSION}" >> "$GITHUB_OUTPUT"

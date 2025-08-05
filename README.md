@@ -51,6 +51,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-08-05:** Improved HSL cascading, UI & animation improvements, ability to grow & shrink / feather AI masks
 *   **2025-08-03:** New high performance, seamless image panorama stitcher (without any dependencies on OpenCV)
 *   **2025-08-02:** Added an image straightening tool and improved crop & rotation functionality (especially on portrait images)
 *   **2025-08-02:** A new dedicated image importer, ability to rename and batch rename files, improved dark theme, and other fixes
@@ -61,11 +62,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-07-25:** Fuji RAF X-Trans sensor support (new x-trans demosaicing algo)
 *   **2025-07-24:** Auto crop when cropping an image (to prevent black borders), added drag & drop sort abilty to presets panel
 *   **2025-07-22:** Significant improvements to the shader: More accurate exposure slider, better tone mapper (simplified ACES)
-*   **2025-07-21:** Remember scroll position when going into the editing section
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-07-21:** Remember scroll position when going into the editing section
 *   **2025-07-20:** Ability to add presets to folders, export preset folders etc, preset _animations_
 *   **2025-07-20:** Tutorials on how to use RapidRAW
 *   **2025-07-19:** Initial color negative conversion implementation, shader improvements

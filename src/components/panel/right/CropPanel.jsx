@@ -11,6 +11,8 @@ const PRESETS = [
   { name: '4:3', value: 4 / 3 },
   { name: '3:2', value: 3 / 2 },
   { name: '16:9', value: 16 / 9 },
+  { name: '21:9', value: 21 / 9 },
+  { name: '32:9', value: 32 / 9 },
 ];
 
 export default function CropPanel({ selectedImage, adjustments, setAdjustments, isStraightenActive, setIsStraightenActive }) {
@@ -58,6 +60,21 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments, 
   const isCustomActive = aspectRatio !== null && !activePreset;
 
   useEffect(() => {
+    if (isCustomActive && aspectRatio) {
+      const currentInputRatio = parseFloat(customW) / parseFloat(customH);
+      if (isNaN(currentInputRatio) || Math.abs(currentInputRatio - aspectRatio) > 0.001) {
+        const h = 100;
+        const w = aspectRatio * h;
+        setCustomW(w.toFixed(1).replace(/\.0$/, ''));
+        setCustomH(h.toString());
+      }
+    } else if (!isCustomActive) {
+      setCustomW('');
+      setCustomH('');
+    }
+  }, [isCustomActive, aspectRatio]);
+
+  useEffect(() => {
     if (activePreset?.value === 'original') {
       const newOriginalRatio = getEffectiveOriginalRatio();
       if (newOriginalRatio !== null && Math.abs(aspectRatio - newOriginalRatio) > 0.001) {
@@ -66,28 +83,32 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments, 
     }
   }, [orientationSteps, activePreset, aspectRatio, getEffectiveOriginalRatio, setAdjustments]);
 
-  useEffect(() => {
-    if (isCustomActive && aspectRatio) {
-      const w = Math.abs(aspectRatio * 100).toFixed(1);
-      const h = (100).toFixed(1);
-      setCustomW(w);
-      setCustomH(h);
-    } else {
-      setCustomW('');
-      setCustomH('');
+  const handleCustomInputChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'customW') {
+      setCustomW(value);
+    } else if (name === 'customH') {
+      setCustomH(value);
     }
-  }, [isCustomActive, aspectRatio]);
+  };
 
-  const handleCustomInputChange = (w, h) => {
-    setCustomW(w);
-    setCustomH(h);
-    const numW = parseFloat(w);
-    const numH = parseFloat(h);
+  const handleApplyCustomRatio = () => {
+    const numW = parseFloat(customW);
+    const numH = parseFloat(customH);
+
     if (numW > 0 && numH > 0) {
       const newAspectRatio = numW / numH;
-      if (aspectRatio !== newAspectRatio) {
+      if (Math.abs(adjustments.aspectRatio - newAspectRatio) > 0.001) {
         setAdjustments(prev => ({ ...prev, aspectRatio: newAspectRatio, crop: null }));
       }
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleApplyCustomRatio();
+      e.target.blur();
     }
   };
 
@@ -219,20 +240,44 @@ export default function CropPanel({ selectedImage, adjustments, setAdjustments, 
                 <button
                   onClick={() => {
                     const baseRatio = 1.618;
-                    const newAspectRatio = orientation === 'vertical' ? 1 / baseRatio : baseRatio;
+                    const imageRatio = getEffectiveOriginalRatio();
+                    let newAspectRatio = baseRatio;
+                    if (imageRatio && imageRatio < 1) {
+                      newAspectRatio = 1 / baseRatio;
+                    }
                     setAdjustments(prev => ({ ...prev, aspectRatio: newAspectRatio, crop: null }))
                   }}
                   className={clsx('w-full px-2 py-1.5 text-sm rounded-md transition-colors',
-                    isCustomActive ? 'bg-accent text-white' : 'bg-surface hover:bg-card-active'
+                    isCustomActive ? 'bg-accent text-button-text' : 'bg-surface hover:bg-card-active'
                   )}
                 >
                   Custom
                 </button>
                 <div className={clsx('mt-2 bg-surface p-2 rounded-md transition-opacity', isCustomActive ? 'opacity-100' : 'opacity-50 pointer-events-none')}>
                   <div className="flex items-center justify-center gap-2">
-                    <input type="number" placeholder="W" value={customW} onChange={(e) => handleCustomInputChange(e.target.value, customH)} className="w-full bg-bg-primary text-center rounded-md p-1 border border-surface focus:border-accent focus:ring-accent" min="1" />
+                    <input
+                      type="number"
+                      name="customW"
+                      placeholder="W"
+                      value={customW}
+                      onChange={handleCustomInputChange}
+                      onBlur={handleApplyCustomRatio}
+                      onKeyDown={handleKeyDown}
+                      className="w-full bg-bg-primary text-center rounded-md p-1 border border-surface focus:border-accent focus:ring-accent"
+                      min="0"
+                    />
                     <X size={16} className="text-text-tertiary flex-shrink-0" />
-                    <input type="number" placeholder="H" value={customH} onChange={(e) => handleCustomInputChange(customW, e.target.value)} className="w-full bg-bg-primary text-center rounded-md p-1 border border-surface focus:border-accent focus:ring-accent" min="1" />
+                    <input
+                      type="number"
+                      name="customH"
+                      placeholder="H"
+                      value={customH}
+                      onChange={handleCustomInputChange}
+                      onBlur={handleApplyCustomRatio}
+                      onKeyDown={handleKeyDown}
+                      className="w-full bg-bg-primary text-center rounded-md p-1 border border-surface focus:border-accent focus:ring-accent"
+                      min="0"
+                    />
                   </div>
                 </div>
               </div>
