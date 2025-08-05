@@ -13,6 +13,7 @@ import {
   Loader2,
   AlertTriangle,
   FolderInput,
+  Search, // Added Search icon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FixedSizeGrid as Grid } from 'react-window';
@@ -63,6 +64,92 @@ const customOuterElement = forwardRef((props, ref) => (
   <div ref={ref} {...props} className="custom-scrollbar" />
 ));
 customOuterElement.displayName = 'CustomOuterElement';
+
+function SearchInput({
+  searchQuery,
+  setSearchQuery,
+  isIndexing,
+  indexingProgress,
+}) {
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const inputRef = useRef(null);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (isSearchActive) {
+      inputRef.current?.focus();
+    }
+  }, [isSearchActive]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target) &&
+        !searchQuery
+      ) {
+        setIsSearchActive(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [searchQuery]);
+
+  const isActive = isSearchActive || !!searchQuery;
+  const placeholderText = isIndexing && indexingProgress.total > 0
+    ? `Indexing... (${indexingProgress.current}/${indexingProgress.total})`
+    : isIndexing
+    ? "Indexing Images..."
+    : "Search Images";
+
+  return (
+    <motion.div
+      ref={containerRef}
+      initial={false}
+      className="relative flex items-center bg-surface rounded-md h-12"
+      animate={{ width: isActive ? '14rem' : '3rem' }}
+      transition={{ duration: 0.3, ease: 'easeInOut' }}
+      layout
+    >
+      <button
+        className="absolute left-0 top-0 h-12 w-12 flex items-center justify-center text-text-primary z-10"
+        onClick={() => {
+          if (!isActive) {
+            setIsSearchActive(true);
+          } else {
+            inputRef.current?.focus();
+          }
+        }}
+        title="Search Tags"
+      >
+        <Search className="w-5 h-5" />
+      </button>
+      <input
+        ref={inputRef}
+        type="text"
+        placeholder={placeholderText}
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onFocus={() => setIsSearchActive(true)}
+        onBlur={() => {
+          if (!searchQuery) {
+            setIsSearchActive(false);
+          }
+        }}
+        disabled={isIndexing}
+        className="w-full h-full pl-12 pr-10 bg-transparent text-text-primary placeholder-text-secondary border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-accent transition-opacity"
+        style={{ opacity: isActive ? 1 : 0, pointerEvents: isActive ? 'auto' : 'none' }}
+      />
+      {isIndexing && isActive && (
+        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+          <Loader2 className="h-5 w-5 text-text-secondary animate-spin" />
+        </div>
+      )}
+    </motion.div>
+  );
+}
 
 function ColorFilterOptions({ filterCriteria, setFilterCriteria }) {
   const [lastClickedColor, setLastClickedColor] = useState(null);
@@ -490,21 +577,13 @@ export default function MainLibrary({
             </div>
           )}
 
-          <div className="relative w-full max-w-xs">
-            <input
-              type="text"
-              placeholder={isIndexing && indexingProgress.total > 0 ? `Indexing... (${indexingProgress.current}/${indexingProgress.total})` : isIndexing ? "Indexing images..." : "Search by tags..."}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              disabled={isIndexing}
-              className="w-full h-12 pl-4 pr-10 bg-surface text-text-primary placeholder-text-secondary border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
-            />
-            {isIndexing && (
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                <Loader2 className="h-5 w-5 text-text-secondary animate-spin" />
-              </div>
-            )}
-          </div>
+          <SearchInput
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            isIndexing={isIndexing}
+            indexingProgress={indexingProgress}
+          />
+
           <ViewOptionsDropdown
             thumbnailSize={thumbnailSize}
             onSelectSize={onThumbnailSizeChange}
@@ -517,32 +596,7 @@ export default function MainLibrary({
           <Button onClick={onGoHome} className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center" title="Go to Home Screen"><Home className="w-8 h-8" /></Button>
         </div>
       </header>
-      {searchQuery && !appSettings?.enableAiTagging ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-text-secondary" onContextMenu={onEmptyAreaContextMenu}>
-          <AlertTriangle className="h-12 w-12 text-secondary mb-4" />
-          <p className="text-lg font-semibold">Tagging Disabled</p>
-          <p className="text-sm mt-2">Enable automatic tagging in Settings to use search.</p>
-        </div>
-      ) : imageList.length === 0 && (isIndexing || aiModelDownloadStatus || importState.status === 'importing') ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-text-secondary" onContextMenu={onEmptyAreaContextMenu}>
-          <Loader2 className="h-12 w-12 text-secondary animate-spin mb-4" />
-          <p className="text-lg font-semibold">
-            {aiModelDownloadStatus ? `Downloading ${aiModelDownloadStatus}...` 
-             : (isIndexing && indexingProgress.total > 0) 
-               ? `Indexing images... (${indexingProgress.current}/${indexingProgress.total})`
-               : (importState.status === 'importing' && importState.progress.total > 0)
-                 ? `Importing images... (${importState.progress.current}/${importState.progress.total})`
-                 : "Processing images..."
-            }
-          </p>
-          <p className="text-sm mt-2">This may take a moment.</p>
-        </div>
-      ) : imageList.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-text-secondary" onContextMenu={onEmptyAreaContextMenu}>
-          <SlidersHorizontal className="h-12 w-12 text-secondary mb-4 text-text-secondary" />
-          <p className="text-text-secondary">No images found that match your filter.</p>
-        </div>
-      ) : (
+      {imageList.length > 0 ? (
         <div className="flex-1 w-full h-full" onClick={onClearSelection} onContextMenu={onEmptyAreaContextMenu}>
           <AutoSizer>
             {({ height, width }) => {
@@ -574,6 +628,42 @@ export default function MainLibrary({
               );
             }}
           </AutoSizer>
+        </div>
+      ) : (isIndexing || aiModelDownloadStatus || importState.status === 'importing') ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-text-secondary" onContextMenu={onEmptyAreaContextMenu}>
+          <Loader2 className="h-12 w-12 text-secondary animate-spin mb-4" />
+          <p className="text-lg font-semibold">
+            {aiModelDownloadStatus ? `Downloading ${aiModelDownloadStatus}...` 
+             : (isIndexing && indexingProgress.total > 0) 
+               ? `Indexing images... (${indexingProgress.current}/${indexingProgress.total})`
+               : (importState.status === 'importing' && importState.progress.total > 0)
+                 ? `Importing images... (${importState.progress.current}/${importState.progress.total})`
+                 : "Processing images..."
+            }
+          </p>
+          <p className="text-sm mt-2">This may take a moment.</p>
+        </div>
+      ) : searchQuery ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-text-secondary text-center" onContextMenu={onEmptyAreaContextMenu}>
+          <Search className="h-12 w-12 text-secondary mb-4" />
+          {appSettings?.enableAiTagging ? (
+            <>
+              <p className="text-lg font-semibold">No Results Found</p>
+              <p className="text-sm mt-2">Could not find an image based on filename or AI tags.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-semibold">No Results Found</p>
+              <p className="text-sm mt-2 max-w-sm">
+                Filename not found. For more accurate general search, please enable automatic tagging in Settings.
+              </p>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center text-text-secondary" onContextMenu={onEmptyAreaContextMenu}>
+          <SlidersHorizontal className="h-12 w-12 text-secondary mb-4 text-text-secondary" />
+          <p className="text-text-secondary">No images found that match your filter.</p>
         </div>
       )}
     </div>

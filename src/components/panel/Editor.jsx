@@ -22,7 +22,7 @@ export default function Editor({
   onSelectMask, onSelectAiSubMask, updateSubMask, transformWrapperRef, onZoomed, onContextMenu,
   onUndo, onRedo, canUndo, canRedo, brushSettings,
   onGenerateAiMask, isMaskControlHovered,
-  targetZoom, waveform, isWaveformVisible, onCloseWaveform, isStraightenActive, onStraighten,
+  targetZoom, waveform, isWaveformVisible, onCloseWaveform, onToggleWaveform, isStraightenActive, onStraighten,
 }) {
   const [crop, setCrop] = useState();
   const prevCropParams = useRef(null);
@@ -299,6 +299,8 @@ export default function Editor({
           onRedo={onRedo}
           canUndo={canUndo}
           canRedo={canRedo}
+          isWaveformVisible={isWaveformVisible}
+          onToggleWaveform={onToggleWaveform}
         />
 
         <div 

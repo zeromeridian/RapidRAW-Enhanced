@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -388,9 +389,22 @@ function App() {
 
     const filteredBySearch = searchQuery.trim() === ''
       ? filteredList
-      : filteredList.filter(image => 
-          image.tags && image.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
+      : filteredList.filter(image => {
+          const query = searchQuery.toLowerCase();
+          const filename = image.path.split(/[\\/]/).pop().toLowerCase();
+
+          if (filename.includes(query)) {
+            return true;
+          }
+
+          if (appSettings?.enableAiTagging) {
+            if (image.tags && image.tags.some(tag => tag.toLowerCase().includes(query))) {
+              return true;
+            }
+          }
+          
+          return false;
+        });
 
     const list = [...filteredBySearch];
     list.sort((a, b) => {
@@ -402,7 +416,7 @@ function App() {
         return order === 'asc' ? comparison : -comparison;
     });
     return list;
-  }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchQuery]);
+  }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchQuery, appSettings]);
 
   const applyAdjustments = useCallback(debounce((currentAdjustments) => {
     if (!selectedImage?.isReady) return;
@@ -543,6 +557,10 @@ function App() {
         handleSettingsChange({ ...appSettings, sortCriteria });
     }
   }, [sortCriteria, appSettings, handleSettingsChange]);
+
+  const handleToggleWaveform = useCallback(() => {
+    setIsWaveformVisible(prev => !prev);
+  }, []);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;
@@ -1659,6 +1677,12 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
   };
 
   const renderMainView = () => {
+    const panelVariants = {
+      initial: { opacity: 0.4, y: 20 },
+      animate: { opacity: 1, y: 0, transition: { duration: 0.2, ease: "circOut" } },
+      exit: { opacity: 0.4, y: -20, transition: { duration: 0.1, ease: "circIn" } },
+    };
+
     if (selectedImage) {
       return (
         <div className="flex flex-row flex-grow h-full min-h-0">
@@ -1673,6 +1697,7 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
               waveform={waveform}
               isWaveformVisible={isWaveformVisible}
               onCloseWaveform={() => setIsWaveformVisible(false)}
+              onToggleWaveform={handleToggleWaveform}
               onBackToLibrary={handleBackToLibrary}
               isLoading={isViewLoading}
               isFullScreen={isFullScreen}
@@ -1743,50 +1768,31 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
               style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
             >
               <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
-                {renderedRightPanel === 'adjustments' && <Controls theme={theme} adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} histogram={histogram} collapsibleState={collapsibleSectionsState} setCollapsibleState={setCollapsibleSectionsState} copiedSectionAdjustments={copiedSectionAdjustments} setCopiedSectionAdjustments={setCopiedSectionAdjustments} handleAutoAdjustments={handleAutoAdjustments} />}
-                {renderedRightPanel === 'metadata' && <MetadataPanel selectedImage={selectedImage} />}
-                {renderedRightPanel === 'crop' && <CropPanel selectedImage={selectedImage} adjustments={adjustments} setAdjustments={setAdjustments} isStraightenActive={isStraightenActive} setIsStraightenActive={setIsStraightenActive} />}
-                {renderedRightPanel === 'masks' && <MasksPanel 
-                  adjustments={adjustments} 
-                  setAdjustments={setAdjustments} 
-                  selectedImage={selectedImage} 
-                  onSelectMask={setActiveMaskId} 
-                  activeMaskId={activeMaskId}
-                  activeMaskContainerId={activeMaskContainerId}
-                  onSelectContainer={setActiveMaskContainerId}
-                  brushSettings={brushSettings} 
-                  setBrushSettings={setBrushSettings} 
-                  copiedMask={copiedMask} 
-                  setCopiedMask={setCopiedMask} 
-                  setCustomEscapeHandler={setCustomEscapeHandler} 
-                  histogram={histogram} 
-                  isGeneratingAiMask={isGeneratingAiMask} 
-                  aiModelDownloadStatus={aiModelDownloadStatus} 
-                  onGenerateAiForegroundMask={handleGenerateAiForegroundMask} 
-                  setIsMaskControlHovered={setIsMaskControlHovered}
-                />}
-                {renderedRightPanel === 'presets' && <PresetsPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} activePanel={activeRightPanel} />}
-                {renderedRightPanel === 'export' && <ExportPanel selectedImage={selectedImage} adjustments={adjustments} multiSelectedPaths={multiSelectedPaths} exportState={exportState} setExportState={setExportState} />}
-                {renderedRightPanel === 'ai' && <AIPanel 
-                  adjustments={adjustments}
-                  setAdjustments={setAdjustments}
-                  selectedImage={selectedImage}
-                  isComfyUiConnected={isComfyUiConnected}
-                  isGeneratingAi={isGeneratingAi}
-                  onGenerativeReplace={handleGenerativeReplace}
-                  onDeletePatch={handleDeleteAiPatch}
-                  onTogglePatchVisibility={handleToggleAiPatchVisibility}
-                  activePatchContainerId={activeAiPatchContainerId}
-                  onSelectPatchContainer={setActiveAiPatchContainerId}
-                  activeSubMaskId={activeAiSubMaskId}
-                  onSelectSubMask={setActiveAiSubMaskId}
-                  brushSettings={brushSettings}
-                  setBrushSettings={setBrushSettings}
-                  isGeneratingAiMask={isGeneratingAiMask}
-                  aiModelDownloadStatus={aiModelDownloadStatus}
-                  onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
-                  setCustomEscapeHandler={setCustomEscapeHandler}
-                />}
+                {/* --- MODIFICATION START --- */}
+                <AnimatePresence mode="wait">
+                  {/* The condition is based on activeRightPanel to control visibility */}
+                  {activeRightPanel && (
+                    <motion.div
+                      // The key is crucial for AnimatePresence to detect changes
+                      key={renderedRightPanel}
+                      variants={panelVariants}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                      className="h-full w-full"
+                    >
+                      {/* The content is still determined by renderedRightPanel */}
+                      {renderedRightPanel === 'adjustments' && <Controls theme={theme} adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} histogram={histogram} collapsibleState={collapsibleSectionsState} setCollapsibleState={setCollapsibleSectionsState} copiedSectionAdjustments={copiedSectionAdjustments} setCopiedSectionAdjustments={setCopiedSectionAdjustments} handleAutoAdjustments={handleAutoAdjustments} />}
+                      {renderedRightPanel === 'metadata' && <MetadataPanel selectedImage={selectedImage} />}
+                      {renderedRightPanel === 'crop' && <CropPanel selectedImage={selectedImage} adjustments={adjustments} setAdjustments={setAdjustments} isStraightenActive={isStraightenActive} setIsStraightenActive={setIsStraightenActive} />}
+                      {renderedRightPanel === 'masks' && <MasksPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} onSelectMask={setActiveMaskId} activeMaskId={activeMaskId} activeMaskContainerId={activeMaskContainerId} onSelectContainer={setActiveMaskContainerId} brushSettings={brushSettings} setBrushSettings={setBrushSettings} copiedMask={copiedMask} setCopiedMask={setCopiedMask} setCustomEscapeHandler={setCustomEscapeHandler} histogram={histogram} isGeneratingAiMask={isGeneratingAiMask} aiModelDownloadStatus={aiModelDownloadStatus} onGenerateAiForegroundMask={handleGenerateAiForegroundMask} setIsMaskControlHovered={setIsMaskControlHovered} />}
+                      {renderedRightPanel === 'presets' && <PresetsPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} activePanel={activeRightPanel} />}
+                      {renderedRightPanel === 'export' && <ExportPanel selectedImage={selectedImage} adjustments={adjustments} multiSelectedPaths={multiSelectedPaths} exportState={exportState} setExportState={setExportState} />}
+                      {renderedRightPanel === 'ai' && <AIPanel adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} isComfyUiConnected={isComfyUiConnected} isGeneratingAi={isGeneratingAi} onGenerativeReplace={handleGenerativeReplace} onDeletePatch={handleDeleteAiPatch} onTogglePatchVisibility={handleToggleAiPatchVisibility} activePatchContainerId={activeAiPatchContainerId} onSelectPatchContainer={setActiveAiPatchContainerId} activeSubMaskId={activeAiSubMaskId} onSelectSubMask={setActiveAiSubMaskId} brushSettings={brushSettings} setBrushSettings={setBrushSettings} isGeneratingAiMask={isGeneratingAiMask} aiModelDownloadStatus={aiModelDownloadStatus} onGenerateAiForegroundMask={handleGenerateAiForegroundMask} setCustomEscapeHandler={setCustomEscapeHandler} />}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                {/* --- MODIFICATION END --- */}
               </div>
             </div>
             <div className={clsx('h-full border-l transition-colors', activeRightPanel ? 'border-surface' : 'border-transparent')}>
@@ -1796,6 +1802,7 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
         </div>
       );
     }
+    // The rest of the function remains unchanged
     return (
       <div className="flex flex-row flex-grow h-full min-h-0">
         <div className="flex-1 flex flex-col min-w-0 gap-2">

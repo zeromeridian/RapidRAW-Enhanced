@@ -154,7 +154,7 @@ const Slider = ({ label, value, onChange, min, max, step, defaultValue = 0, onDr
       return;
     }
 
-    const globalKeys = [' ', 'ArrowUp', 'ArrowDown', 'f'];
+    const globalKeys = [' ', 'ArrowUp', 'ArrowDown', 'f', 'b', 'w'];
 
     if (globalKeys.includes(e.key)) {
       e.target.blur();
