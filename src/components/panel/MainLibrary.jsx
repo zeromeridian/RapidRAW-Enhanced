@@ -124,7 +124,7 @@ function SearchInput({
         }}
         title="Search Tags"
       >
-        <Search className="w-5 h-5" />
+        <Search className="w-4 h-4" />
       </button>
       <input
         ref={inputRef}
@@ -493,6 +493,7 @@ export default function MainLibrary({
   const [showSettings, setShowSettings] = useState(false);
   const [appVersion, setAppVersion] = useState('');
   const [supportedTypes, setSupportedTypes] = useState(null);
+  const libraryContainerRef = useRef(null);
 
   useEffect(() => { getVersion().then(setAppVersion); }, []);
 
@@ -501,6 +502,39 @@ export default function MainLibrary({
       .then(types => setSupportedTypes(types))
       .catch(err => console.error('Failed to load supported file types:', err));
   }, []);
+
+  useEffect(() => {
+    const handleWheel = (event) => {
+      const container = libraryContainerRef.current;
+      if (!container || !container.contains(event.target)) {
+        return;
+      }
+
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+
+        const currentIndex = thumbnailSizeOptions.findIndex(o => o.id === thumbnailSize);
+        if (currentIndex === -1) return;
+
+        let nextIndex;
+        if (event.deltaY < 0) {
+          nextIndex = Math.min(currentIndex + 1, thumbnailSizeOptions.length - 1);
+        } else {
+          nextIndex = Math.max(currentIndex - 1, 0);
+        }
+
+        if (nextIndex !== currentIndex) {
+          onThumbnailSizeChange(thumbnailSizeOptions[nextIndex].id);
+        }
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+    };
+  }, [thumbnailSize, onThumbnailSizeChange]);
 
   if (!rootPath) {
     if (!appSettings) {
@@ -548,7 +582,7 @@ export default function MainLibrary({
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden">
+    <div ref={libraryContainerRef} className="flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden">
       <header className="p-4 flex-shrink-0 flex justify-between items-center border-b border-border-color">
         <div>
           <h2 className="text-2xl font-bold text-primary">Library</h2>
