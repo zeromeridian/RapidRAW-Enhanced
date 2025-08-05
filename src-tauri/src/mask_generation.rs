@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::f32::consts::PI;
 use base64::{Engine as _, engine::general_purpose};
+use imageproc::morphology::{dilate, erode};
+use imageproc::distance_transform::Norm as DilationNorm;
 use crate::ai_processing::{AiSubjectMaskParameters, AiForegroundMaskParameters};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +53,15 @@ pub struct AiPatchDefinition {
     #[serde(default = "default_opacity")]
     pub opacity: f32,
     pub sub_masks: Vec<SubMask>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+struct GrowFeatherParameters {
+    #[serde(default)]
+    grow: f32,
+    #[serde(default)]
+    feather: f32,
 }
 
 
@@ -117,6 +128,42 @@ fn default_brush_feather() -> f32 {
 struct BrushMaskParameters {
     #[serde(default)]
     lines: Vec<BrushLine>,
+}
+
+fn apply_grow_and_feather(
+    mask: &mut GrayImage,
+    grow: f32,
+    feather: f32,
+) {
+    const GROW_SENSITIVITY_FACTOR: f32 = 0.2;
+    let scaled_grow = grow * GROW_SENSITIVITY_FACTOR;
+
+    if scaled_grow.abs() > 0.1 {
+        let mut binary_mask = mask.clone();
+        for p in binary_mask.pixels_mut() {
+            if p[0] > 128 {
+                p[0] = 255;
+            } else {
+                p[0] = 0;
+            }
+        }
+
+        let amount = scaled_grow.abs().round() as u8;
+        if amount > 0 {
+            if scaled_grow > 0.0 {
+                *mask = dilate(&binary_mask, DilationNorm::LInf, amount);
+            } else {
+                *mask = erode(&binary_mask, DilationNorm::LInf, amount);
+            }
+        }
+    }
+
+    if feather > 0.0 {
+        let sigma = feather.max(0.0) * 0.1;
+        if sigma > 0.01 {
+            *mask = imageproc::filter::gaussian_blur_f32(mask, sigma);
+        }
+    }
 }
 
 fn draw_feathered_ellipse_mut(
@@ -430,16 +477,21 @@ fn generate_ai_foreground_bitmap(
     crop_offset: (f32, f32),
 ) -> Option<GrayImage> {
     let params: AiForegroundMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    let grow_feather: GrowFeatherParameters = serde_json::from_value(params_value.clone()).unwrap_or_default();
     let data_url = params.mask_data_base64?;
-    
-    generate_ai_bitmap_from_base64(
+
+    let mut mask = generate_ai_bitmap_from_base64(
         &data_url,
         params.rotation.unwrap_or(0.0),
         params.flip_horizontal.unwrap_or(false),
         params.flip_vertical.unwrap_or(false),
         params.orientation_steps.unwrap_or(0),
         width, height, scale, crop_offset
-    )
+    )?;
+
+    apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather);
+
+    Some(mask)
 }
 
 fn generate_ai_subject_bitmap(
@@ -450,16 +502,21 @@ fn generate_ai_subject_bitmap(
     crop_offset: (f32, f32),
 ) -> Option<GrayImage> {
     let params: AiSubjectMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    let grow_feather: GrowFeatherParameters = serde_json::from_value(params_value.clone()).unwrap_or_default();
     let data_url = params.mask_data_base64?;
 
-    generate_ai_bitmap_from_base64(
+    let mut mask = generate_ai_bitmap_from_base64(
         &data_url,
         params.rotation.unwrap_or(0.0),
         params.flip_horizontal.unwrap_or(false),
         params.flip_vertical.unwrap_or(false),
         params.orientation_steps.unwrap_or(0),
         width, height, scale, crop_offset
-    )
+    )?;
+
+    apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather);
+
+    Some(mask)
 }
 
 fn generate_sub_mask_bitmap(

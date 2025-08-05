@@ -39,8 +39,18 @@ const SUB_MASK_CONFIG = {
   linear: { parameters: [] },
   color: { parameters: [] },
   luminance: { parameters: [] },
-  'ai-subject': { parameters: [] },
-  'ai-foreground': { parameters: [] },
+  'ai-subject': {
+    parameters: [
+      { key: 'grow', label: 'Grow', min: -100, max: 100, step: 1, defaultValue: 0 },
+      { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 0 },
+    ]
+  },
+  'ai-foreground': {
+    parameters: [
+      { key: 'grow', label: 'Grow', min: -100, max: 100, step: 1, defaultValue: 0 },
+      { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 0 },
+    ]
+  },
 };
 
 const BrushTools = ({ settings, onSettingsChange }) => (
@@ -89,8 +99,8 @@ export default function MaskControls({
       case 'radial': return { ...common, parameters: { centerX: width / 2, centerY: height / 2, radiusX: width / 4, radiusY: width / 4, rotation: 0, feather: 0.5 } };
       case 'linear': return { ...common, parameters: { startX: width * 0.25, startY: height / 2, endX: width * 0.75, endY: height / 2, range: 50 } };
       case 'brush': return { ...common, parameters: { lines: [] } };
-      case 'ai-subject': return { ...common, parameters: { startX: 0, startY: 0, endX: 0, endY: 0, maskDataBase64: null } };
-      case 'ai-foreground': return { ...common, parameters: { maskDataBase64: null } };
+      case 'ai-subject': return { ...common, parameters: { startX: 0, startY: 0, endX: 0, endY: 0, maskDataBase64: null, grow: 0, feather: 0 } };
+      case 'ai-foreground': return { ...common, parameters: { maskDataBase64: null, grow: 0, feather: 0 } };
       default: return { ...common, parameters: {} };
     }
   };
