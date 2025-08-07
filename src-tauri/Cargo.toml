@@ -40,7 +40,7 @@ uuid = { version = "1.8", features = ["v4", "serde"] }
 walkdir = "2.5.0"
 trash = "5.2.2"
 imageproc = "0.25.0"
-ort = { version = "1.16.3", features = ["download-binaries"] }
+ort = { version = "1.16.3", features = ["load-dynamic"] }
 ndarray = "0.15.6"
 reqwest = { version = "0.12", features = ["json", "multipart"] }
 tokio-tungstenite = { version = "0.23", features = ["native-tls"] }
@@ -61,6 +61,8 @@ rand = "0.8"
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }
 sha2 = "0.10"
+reqwest = { version = "0.12", features = ["blocking"] }
+hex = "0.4"
 
 [profile.dev]
 opt-level = 3
