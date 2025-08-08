@@ -73,6 +73,7 @@ export default function AIControls({
   activeSubMaskId,
   onGenerateAiForegroundMask,
   onGenerativeReplace,
+  isComfyUiConnected,
 }) {
   const { showContextMenu } = useContextMenu();
   const [isSettingsSectionOpen, setSettingsSectionOpen] = useState(true);
@@ -80,10 +81,17 @@ export default function AIControls({
   const analyzingTimeoutRef = useRef(null);
   const [deletingItemId, setDeletingItemId] = useState(null);
   const [prompt, setPrompt] = useState(editingPatch?.prompt || '');
+  const [useFastInpaint, setUseFastInpaint] = useState(!isComfyUiConnected);
 
   useEffect(() => {
     setPrompt(editingPatch?.prompt || '');
   }, [editingPatch?.id, editingPatch?.prompt]);
+
+  useEffect(() => {
+    if (!isComfyUiConnected) {
+      setUseFastInpaint(true);
+    }
+  }, [isComfyUiConnected]);
 
   useEffect(() => {
     if (isGeneratingAiMask) {
@@ -140,7 +148,7 @@ export default function AIControls({
   };
 
   const handleGenerateClick = () => {
-    onGenerativeReplace(editingPatch.id, prompt);
+    onGenerativeReplace(editingPatch.id, prompt, useFastInpaint);
   };
 
   if (!editingPatch) return null;
@@ -223,20 +231,55 @@ export default function AIControls({
       <div className="p-4 flex flex-col gap-4 border-t border-surface mt-auto">
         <div className="space-y-3">
             <h3 className="text-sm font-semibold text-text-primary">Generative Replace</h3>
-            <p className="text-xs text-text-secondary -mt-2">Describe what you want to generate in the selected area.</p>
-            <div className="flex items-center gap-2">
-                <Input
-                    type="text"
-                    placeholder="e.g., a field of flowers"
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    className="flex-grow"
-                    disabled={isGeneratingAi}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleGenerateClick(); }}
-                />
-                <Button onClick={handleGenerateClick} disabled={isGeneratingAi || editingPatch.subMasks.length === 0} size="icon">
-                    {isGeneratingAi ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                </Button>
+            <p className="text-xs text-text-secondary -mt-2">
+              {useFastInpaint ? 'Fill selection based on surrounding pixels.' : 'Describe what you want to generate in the selected area.'}
+            </p>
+            
+            <div className="pt-1">
+              <Switch 
+                label="Use fast inpainting"
+                checked={useFastInpaint}
+                onChange={setUseFastInpaint}
+                disabled={!isComfyUiConnected}
+                tooltip={!isComfyUiConnected ? "ComfyUI not connected, fast inpainting is required." : "Fast inpainting is quicker but not generative. Uncheck to use ComfyUI with a text prompt."}
+              />
+            </div>
+
+            <AnimatePresence>
+              {!useFastInpaint && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                  animate={{ opacity: 1, height: 'auto', marginTop: '0.75rem' }}
+                  exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex items-center gap-2">
+                      <Input
+                          type="text"
+                          placeholder="e.g., a field of flowers"
+                          value={prompt}
+                          onChange={(e) => setPrompt(e.target.value)}
+                          className="flex-grow"
+                          disabled={isGeneratingAi}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleGenerateClick(); }}
+                      />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="pt-2">
+              <Button 
+                onClick={handleGenerateClick} 
+                disabled={isGeneratingAi || editingPatch.subMasks.length === 0} 
+                className="w-full"
+              >
+                {isGeneratingAi ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                <span className="ml-2">
+                  {isGeneratingAi ? 'Generating...' : (useFastInpaint ? 'Inpaint Selection' : 'Generate with AI')}
+                </span>
+              </Button>
             </div>
         </div>
 

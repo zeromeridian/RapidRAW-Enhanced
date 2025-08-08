@@ -8,8 +8,6 @@ import {
 import clsx from 'clsx';
 import AIControls from './AIControls';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import Input from '../../ui/Input';
-import Button from '../../ui/Button';
 import { createSubMask } from '../../../utils/maskUtils';
 
 const MASK_TYPES = [
@@ -51,8 +49,6 @@ export default function AIPanel({
   onGenerativeReplace,
   onDeletePatch,
   onTogglePatchVisibility,
-  onStyleShift,
-  onUpscale,
   activePatchContainerId,
   onSelectPatchContainer,
   activeSubMaskId,
@@ -198,11 +194,6 @@ export default function AIPanel({
     ]);
   };
 
-  const handleApplyStyleShift = () => {
-    if (!styleShiftPrompt || !onStyleShift) return;
-    onStyleShift(styleShiftPrompt);
-  };
-
   const editingPatch = adjustments.aiPatches?.find(p => p.id === activePatchContainerId);
 
   if (editingPatch) {
@@ -256,6 +247,7 @@ export default function AIPanel({
             activeSubMaskId={activeSubMaskId}
             onGenerateAiForegroundMask={onGenerateAiForegroundMask}
             onGenerativeReplace={onGenerativeReplace}
+            isComfyUiConnected={isComfyUiConnected}
           />
         </div>
       </div>
@@ -286,10 +278,10 @@ export default function AIPanel({
           <>
             <ConnectionStatus isConnected={isComfyUiConnected} />
 
-            <div className={clsx("space-y-6", !isComfyUiConnected && 'opacity-40 pointer-events-none')} onClick={(e) => e.stopPropagation()}>
+            <div onClick={(e) => e.stopPropagation()}>
               <div>
                 {aiModelDownloadStatus && <div className="p-2 text-center text-xs text-text-secondary bg-surface rounded-md mb-4">Downloading AI Model: {aiModelDownloadStatus}</div>}
-                <p className="text-sm mb-3 font-semibold text-text-primary">Create New Generative Edit</p>
+                <p className="text-sm mb-3 font-semibold text-text-primary">Create New Edit</p>
                 <div className="grid grid-cols-3 gap-2">
                   {MASK_TYPES.map(maskType => (
                     <button key={maskType.id} onClick={() => handleAddAiPatchContainer(maskType.type)} disabled={maskType.disabled || isGeneratingAiMask || isGeneratingAi} className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors ${maskType.disabled || isGeneratingAiMask || isGeneratingAi ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active'}`} title={maskType.disabled ? `${maskType.name} (Coming Soon)` : `Add ${maskType.name} Edit`}>
@@ -301,8 +293,8 @@ export default function AIPanel({
               </div>
 
               {hasAiEdits && (
-                <div>
-                  <p className="text-sm mb-3 font-semibold text-text-primary">Generative Edits ({aiPatches.length})</p>
+                <div className="pt-4">
+                  <p className="text-sm mb-3 font-semibold text-text-primary">Edits ({aiPatches.length})</p>
                   <div className="flex flex-col gap-2">
                     <AnimatePresence>
                       {aiPatches.filter(p => p.id !== deletingItemId).map((patch, index) => (
@@ -354,36 +346,6 @@ export default function AIPanel({
                   </div>
                 </div>
               )}
-
-              <div className="border-t border-surface pt-4 space-y-6">
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-text-primary">Style Shift</h3>
-                  <p className="text-xs text-text-secondary -mt-2">Transform the entire image with a new artistic style.</p>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="text"
-                      placeholder="e.g., cinematic, Van Gogh painting"
-                      value={styleShiftPrompt}
-                      onChange={(e) => setStyleShiftPrompt(e.target.value)}
-                      disabled={isGeneratingAi}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleApplyStyleShift(); }}
-                    />
-                    <Button onClick={handleApplyStyleShift} disabled={!styleShiftPrompt || isGeneratingAi}>
-                      Apply
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-text-primary">Upscale</h3>
-                  <p className="text-xs text-text-secondary -mt-2">Increase the image resolution using AI.</p>
-                  <div className="grid grid-cols-3 gap-2">
-                      <Button variant="secondary" onClick={() => onUpscale && onUpscale(2)} disabled={isGeneratingAi}>2x</Button>
-                      <Button variant="secondary" onClick={() => onUpscale && onUpscale(3)} disabled={isGeneratingAi}>3x</Button>
-                      <Button variant="secondary" onClick={() => onUpscale && onUpscale(4)} disabled={isGeneratingAi}>4x</Button>
-                  </div>
-                </div>
-              </div>
             </div>
           </>
         )}

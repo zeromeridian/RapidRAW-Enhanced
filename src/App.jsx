@@ -225,7 +225,7 @@ function App() {
     }));
   };
 
-  const handleGenerativeReplace = useCallback(async (patchId, prompt) => {
+  const handleGenerativeReplace = useCallback(async (patchId, prompt, useFastInpaint) => {
     if (!selectedImage?.path || isGeneratingAi) return;
 
     const patch = adjustments.aiPatches.find(p => p.id === patchId);
@@ -243,11 +243,14 @@ function App() {
     setIsGeneratingAi(true);
 
     try {
-      const newPatchBase64 = await invoke('invoke_generative_replace_with_mask_def', {
+      const newPatchDataJson = await invoke('invoke_generative_replace_with_mask_def', {
         path: selectedImage.path,
         patchDefinition: patchDefinition,
         currentAdjustments: adjustments,
+        useFastInpaint: useFastInpaint,
       });
+
+      const newPatchData = JSON.parse(newPatchDataJson);
 
       setAdjustments(prev => ({
         ...prev,
@@ -255,9 +258,9 @@ function App() {
           p.id === patchId
             ? {
                 ...p,
-                patchDataBase64: newPatchBase64,
+                patchData: newPatchData, 
                 isLoading: false,
-                name: (prompt && prompt.trim()) ? prompt.trim() : p.name,
+                name: useFastInpaint ? 'Inpaint' : ((prompt && prompt.trim()) ? prompt.trim() : p.name),
               }
             : p
         )
@@ -1768,12 +1771,9 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
               style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
             >
               <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
-                {/* --- MODIFICATION START --- */}
                 <AnimatePresence mode="wait">
-                  {/* The condition is based on activeRightPanel to control visibility */}
                   {activeRightPanel && (
                     <motion.div
-                      // The key is crucial for AnimatePresence to detect changes
                       key={renderedRightPanel}
                       variants={panelVariants}
                       initial="initial"
@@ -1781,7 +1781,6 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
                       exit="exit"
                       className="h-full w-full"
                     >
-                      {/* The content is still determined by renderedRightPanel */}
                       {renderedRightPanel === 'adjustments' && <Controls theme={theme} adjustments={adjustments} setAdjustments={setAdjustments} selectedImage={selectedImage} histogram={histogram} collapsibleState={collapsibleSectionsState} setCollapsibleState={setCollapsibleSectionsState} copiedSectionAdjustments={copiedSectionAdjustments} setCopiedSectionAdjustments={setCopiedSectionAdjustments} handleAutoAdjustments={handleAutoAdjustments} />}
                       {renderedRightPanel === 'metadata' && <MetadataPanel selectedImage={selectedImage} />}
                       {renderedRightPanel === 'crop' && <CropPanel selectedImage={selectedImage} adjustments={adjustments} setAdjustments={setAdjustments} isStraightenActive={isStraightenActive} setIsStraightenActive={setIsStraightenActive} />}
@@ -1792,7 +1791,6 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
                     </motion.div>
                   )}
                 </AnimatePresence>
-                {/* --- MODIFICATION END --- */}
               </div>
             </div>
             <div className={clsx('h-full border-l transition-colors', activeRightPanel ? 'border-surface' : 'border-transparent')}>
@@ -1802,7 +1800,6 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
         </div>
       );
     }
-    // The rest of the function remains unchanged
     return (
       <div className="flex flex-row flex-grow h-full min-h-0">
         <div className="flex-1 flex flex-col min-w-0 gap-2">

@@ -44,12 +44,21 @@ pub struct MaskDefinition {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct PatchData {
+    pub color: String,
+    pub mask: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct AiPatchDefinition {
     pub id: String,
     pub name: String,
     pub visible: bool,
     pub invert: bool,
     pub prompt: String,
+    #[serde(default)]
+    pub patch_data: Option<PatchData>,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
     pub sub_masks: Vec<SubMask>,
