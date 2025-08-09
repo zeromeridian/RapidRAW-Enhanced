@@ -357,12 +357,6 @@ RapidRAW is built to be lightweight and cross-platform. The minimum (tested) req
 
 ### Common Problems
 <details>
-<summary>Texture Binding Array Error</summary>
-If you see an error like `unsupported feature requested: Features (TEXTURE_BINDING_ARRAY)`, your GPU likely lacks support for required OpenGL features. This typically affects older or integrated graphics.  
-Support for legacy hardware is not a current priority.
-</details>
-
-<details>
 <summary>Linux Wayland/WebKit Crash</summary>
 
 If RapidRAW crashes on Wayland (e.g. GNOME + NVIDIA), try launching it with:
