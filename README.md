@@ -51,6 +51,9 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-08-09:** Local inpainting without the need for ComfyUI
+*   **2025-08-09:** Frontend refactored to Type Script thanks to @varjolintu
+*   **2025-08-08:** New onnxruntime download strategy & the base for local inpainting
 *   **2025-08-05:** Improved HSL cascading, UI & animation improvements, ability to grow & shrink / feather AI masks
 *   **2025-08-03:** New high performance, seamless image panorama stitcher (without any dependencies on OpenCV)
 *   **2025-08-02:** Added an image straightening tool and improved crop & rotation functionality (especially on portrait images)
@@ -59,13 +62,13 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-07-31:** Reimplemented the functionality of GPU processing (GPU cropping, etc.) -> No longer dependent on TEXTURE_BINDING_ARRAY
 *   **2025-07-29:** Refactored generative AI foundation, many small fixes
 *   **2025-07-27:** Automatic AI image tagging, overall mask transparency setting per mask
-*   **2025-07-25:** Fuji RAF X-Trans sensor support (new x-trans demosaicing algo)
-*   **2025-07-24:** Auto crop when cropping an image (to prevent black borders), added drag & drop sort abilty to presets panel
-*   **2025-07-22:** Significant improvements to the shader: More accurate exposure slider, better tone mapper (simplified ACES)
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-07-25:** Fuji RAF X-Trans sensor support (new x-trans demosaicing algo)
+*   **2025-07-24:** Auto crop when cropping an image (to prevent black borders), added drag & drop sort abilty to presets panel
+*   **2025-07-22:** Significant improvements to the shader: More accurate exposure slider, better tone mapper (simplified ACES)
 *   **2025-07-21:** Remember scroll position when going into the editing section
 *   **2025-07-20:** Ability to add presets to folders, export preset folders etc, preset _animations_
 *   **2025-07-20:** Tutorials on how to use RapidRAW

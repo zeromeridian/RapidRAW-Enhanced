@@ -1938,17 +1938,16 @@ function App() {
         return;
       }
 
+      debouncedSetHistory.cancel();
+
       invoke(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset })
         .then(() => {
           if (libraryActivePath && pathsToReset.includes(libraryActivePath)) {
             setLibraryActiveAdjustments((prev: Adjustments) => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating }));
           }
           if (selectedImage && pathsToReset.includes(selectedImage.path)) {
-            setAdjustments((prev: Partial<Adjustments>) => ({
-              ...INITIAL_ADJUSTMENTS,
-              rating: prev.rating,
-              aiPatches: [],
-            }));
+            const currentRating = adjustments.rating;
+            resetAdjustmentsHistory({ ...INITIAL_ADJUSTMENTS, rating: currentRating, aiPatches: [] });
           }
         })
         .catch((err) => {
@@ -1956,7 +1955,7 @@ function App() {
           setError(`Failed to reset adjustments: ${err}`);
         });
     },
-    [multiSelectedPaths, libraryActivePath, selectedImage, setAdjustments],
+    [multiSelectedPaths, libraryActivePath, selectedImage, adjustments.rating, resetAdjustmentsHistory, debouncedSetHistory],
   );
 
   const handleImportClick = useCallback(
@@ -2041,8 +2040,11 @@ function App() {
       {
         label: 'Reset Adjustments',
         icon: RotateCcw,
-        onClick: () =>
-          setAdjustments((prev: Adjustments) => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating, aiPatches: [] })),
+        onClick: () => {
+          debouncedSetHistory.cancel();
+          const currentRating = adjustments.rating;
+          resetAdjustmentsHistory({ ...INITIAL_ADJUSTMENTS, rating: currentRating, aiPatches: [] });
+        },
       },
     ];
     showContextMenu(event.clientX, event.clientY, options);
