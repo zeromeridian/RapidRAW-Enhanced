@@ -23,6 +23,7 @@ export default function Editor({
   onUndo, onRedo, canUndo, canRedo, brushSettings,
   onGenerateAiMask, isMaskControlHovered,
   targetZoom, waveform, isWaveformVisible, onCloseWaveform, onToggleWaveform, isStraightenActive, onStraighten,
+  onQuickErase,
 }) {
   const [crop, setCrop] = useState();
   const prevCropParams = useRef(null);
@@ -270,7 +271,7 @@ export default function Editor({
     return null;
   }, [adjustments.masks, adjustments.aiPatches, activeMaskId, activeAiSubMaskId, isMasking, isAiEditing]);
 
-  const isPanningDisabled = isMaskHovered || isCropping || (isMasking && (activeSubMask?.type === 'brush' || activeSubMask?.type === 'ai-subject')) || (isAiEditing && (activeSubMask?.type === 'brush' || activeSubMask?.type === 'ai-subject'));
+  const isPanningDisabled = isMaskHovered || isCropping || (isMasking && (activeSubMask?.type === 'brush' || activeSubMask?.type === 'ai-subject')) || (isAiEditing && (activeSubMask?.type === 'brush' || activeSubMask?.type === 'ai-subject' || activeSubMask?.type === 'quick-eraser'));
 
   return (
     <>
@@ -354,6 +355,7 @@ export default function Editor({
                 setIsMaskHovered={setIsMaskHovered}
                 brushSettings={brushSettings}
                 onGenerateAiMask={onGenerateAiMask}
+                onQuickErase={onQuickErase}
                 isMaskControlHovered={isMaskControlHovered}
                 isAiEditing={isAiEditing}
                 activeAiPatchContainerId={activeAiPatchContainerId}

@@ -3,14 +3,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Trash2, RotateCcw, ArrowLeft, Eye, EyeOff, Edit, FileEdit, Sparkles, User, Brush,
-  TriangleRight, Circle, Wand2, Loader2
+  TriangleRight, Circle, Wand2, Loader2, Eraser
 } from 'lucide-react';
-import clsx from 'clsx';
 import AIControls from './AIControls';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { createSubMask } from '../../../utils/maskUtils';
 
 const MASK_TYPES = [
+  { id: 'quick-eraser', name: 'Quick Erase', icon: Eraser, type: 'quick-eraser', disabled: false },
   { id: 'ai-subject', name: 'Subject', icon: Sparkles, type: 'ai-subject', disabled: false },
   { id: 'ai-foreground', name: 'Foreground', icon: User, type: 'ai-foreground', disabled: false },
   { id: 'brush', name: 'Brush', icon: Brush, type: 'brush', disabled: false },
@@ -28,17 +28,58 @@ const itemVariants = {
   exit: { opacity: 0, x: -15, transition: { duration: 0.2 } },
 };
 
-const ConnectionStatus = ({ isConnected }) => (
-    <div className="flex items-center gap-2 px-4 py-2 bg-surface rounded-lg mb-4">
-      <div className={clsx('w-2.5 h-2.5 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500')} />
-      <span className="text-sm font-medium text-text-secondary">
-        ComfyUI Backend:
-      </span>
-      <span className={clsx('text-sm font-bold', isConnected ? 'text-green-400' : 'text-red-400')}>
-        {isConnected ? 'Connected' : 'Not Detected'}
-      </span>
+const ConnectionStatus = ({ isConnected }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  if (isConnected) {
+    return (
+      <div className="flex items-center gap-2 px-4 py-2 bg-surface rounded-lg mb-4">
+        <div className={'w-2.5 h-2.5 rounded-full bg-green-500'} />
+        <span className="text-sm font-medium text-text-secondary">
+          ComfyUI Backend:
+        </span>
+        <span className={'text-sm font-bold text-green-400'}>
+          Connected
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="bg-surface rounded-lg mb-4"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="flex items-center gap-2 px-4 pt-2">
+        <div className={'w-2.5 h-2.5 rounded-full bg-red-500'} />
+        <span className="text-sm font-medium text-text-secondary">
+          ComfyUI Backend:
+        </span>
+        <span className={'text-sm font-bold text-red-400'}>
+          Not Detected
+        </span>
+      </div>
+      <div className="px-4 pb-2">
+        <motion.div
+          className="overflow-hidden"
+          initial={{ height: 0, opacity: 0, marginTop: 0 }}
+          animate={{
+            height: isHovered ? 'auto' : 0,
+            opacity: isHovered ? 1 : 0,
+            marginTop: isHovered ? '2px' : 0,
+          }}
+          transition={{ duration: 0.2, ease: 'easeInOut' }}
+        >
+          <p className="text-xs text-text-secondary">
+            Only simple inpainting is available.
+            Connect to the backend for generative AI features.
+          </p>
+        </motion.div>
+      </div>
     </div>
-);
+  );
+};
 
 export default function AIPanel({
   adjustments,
@@ -128,14 +169,23 @@ export default function AIPanel({
 
   const handleAddAiPatchContainer = (type) => {
     const subMask = createSubMask(type, selectedImage); 
+    
+    let name;
+    if (type === 'quick-eraser') {
+      const count = (adjustments.aiPatches || []).filter(p => p.subMasks.some(sm => sm.type === 'quick-eraser')).length + 1;
+      name = `Quick Erase ${count}`;
+    } else {
+      name = `AI Edit ${adjustments.aiPatches.length + 1}`;
+    }
+
     const newContainer = {
       id: uuidv4(),
-      name: `AI Edit ${adjustments.aiPatches.length + 1}`,
+      name: name,
       visible: true,
       invert: false,
       prompt: '',
       isLoading: false,
-      patchDataBase64: null,
+      patchData: null,
       subMasks: [subMask],
     };
     setAdjustments(prev => ({ ...prev, aiPatches: [...(prev.aiPatches || []), newContainer] }));

@@ -89,33 +89,38 @@ pub fn composite_patches_on_image(
 
     let patch_layers: Result<Vec<RgbaImage>> = visible_patches
         .par_iter()
-        .map(|patch_obj| {
-            let patch_data = patch_obj.get("patchData").context("Missing patchData object")?;
+        .filter_map(|patch_obj| {
+            let patch_data = patch_obj.get("patchData")?;
             
-            let color_b64 = patch_data.get("color").and_then(|v| v.as_str()).context("Missing color data")?;
-            let color_bytes = general_purpose::STANDARD.decode(color_b64)?;
-            let color_image = image::load_from_memory(&color_bytes)?.to_rgb8();
+            let color_b64 = patch_data.get("color").and_then(|v| v.as_str())?;
+            let mask_b64 = patch_data.get("mask").and_then(|v| v.as_str())?;
 
-            let mask_b64 = patch_data.get("mask").and_then(|v| v.as_str()).context("Missing mask data")?;
-            let mask_bytes = general_purpose::STANDARD.decode(mask_b64)?;
-            let mask_image = image::load_from_memory(&mask_bytes)?.to_luma8();
+            let result: Result<RgbaImage> = (|| {
+                let color_bytes = general_purpose::STANDARD.decode(color_b64)?;
+                let color_image = image::load_from_memory(&color_bytes)?.to_rgb8();
 
-            let (width, height) = color_image.dimensions();
-            let mut patch_rgba = RgbaImage::new(width, height);
+                let mask_bytes = general_purpose::STANDARD.decode(mask_b64)?;
+                let mask_image = image::load_from_memory(&mask_bytes)?.to_luma8();
 
-            for y in 0..height {
-                for x in 0..width {
-                    let color_pixel = color_image.get_pixel(x, y);
-                    let mask_pixel = mask_image.get_pixel(x, y);
-                    patch_rgba.put_pixel(x, y, Rgba([
-                        color_pixel[0],
-                        color_pixel[1],
-                        color_pixel[2],
-                        mask_pixel[0],
-                    ]));
+                let (width, height) = color_image.dimensions();
+                let mut patch_rgba = RgbaImage::new(width, height);
+
+                for y in 0..height {
+                    for x in 0..width {
+                        let color_pixel = color_image.get_pixel(x, y);
+                        let mask_pixel = mask_image.get_pixel(x, y);
+                        patch_rgba.put_pixel(x, y, Rgba([
+                            color_pixel[0],
+                            color_pixel[1],
+                            color_pixel[2],
+                            mask_pixel[0],
+                        ]));
+                    }
                 }
-            }
-            Ok(patch_rgba)
+                Ok(patch_rgba)
+            })();
+
+            Some(result)
         })
         .collect();
 

@@ -15,6 +15,8 @@ export const createSubMask = (type, imageDimensions) => {
       return { ...common, parameters: { maskDataBase64: null, grow: 0, feather: 0 } };
     case 'ai-foreground':
       return { ...common, parameters: { maskDataBase64: null, grow: 0, feather: 0 } };
+    case 'quick-eraser':
+      return { ...common, parameters: { maskDataBase64: null, grow: 50, feather: 50 } };
     default:
       return { ...common, parameters: {} };
   }

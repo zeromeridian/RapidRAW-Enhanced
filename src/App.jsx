@@ -280,6 +280,89 @@ function App() {
     }
   }, [selectedImage?.path, isGeneratingAi, adjustments, setAdjustments, setActiveAiPatchContainerId, setActiveAiSubMaskId]);
 
+  const handleQuickErase = useCallback(async (subMaskId, startPoint, endPoint) => {
+    if (!selectedImage?.path || isGeneratingAi) return;
+
+    const patchId = adjustments.aiPatches.find(p => p.subMasks.some(sm => sm.id === subMaskId))?.id;
+    if (!patchId) {
+      console.error("Could not find AI patch container for Quick Erase.");
+      return;
+    }
+
+    setIsGeneratingAi(true);
+    setAdjustments(prev => ({
+      ...prev,
+      aiPatches: prev.aiPatches.map(p => p.id === patchId ? { ...p, isLoading: true } : p)
+    }));
+
+    try {
+      const newMaskParams = await invoke('generate_ai_subject_mask', {
+        path: selectedImage.path,
+        startPoint: [startPoint.x, startPoint.y],
+        endPoint: [endPoint.x, endPoint.y],
+        rotation: adjustments.rotation,
+        flipHorizontal: adjustments.flipHorizontal,
+        flipVertical: adjustments.flipVertical,
+        orientationSteps: adjustments.orientationSteps,
+      });
+
+      const subMaskToUpdate = adjustments.aiPatches.find(p => p.id === patchId).subMasks.find(sm => sm.id === subMaskId);
+      const finalSubMaskParams = { ...subMaskToUpdate.parameters, ...newMaskParams };
+      
+      const updatedAdjustmentsForBackend = {
+        ...adjustments,
+        aiPatches: adjustments.aiPatches.map(p =>
+          p.id === patchId
+            ? { ...p, subMasks: p.subMasks.map(sm => sm.id === subMaskId ? { ...sm, parameters: finalSubMaskParams } : sm) }
+            : p
+        ),
+      };
+      const patchDefinitionForBackend = updatedAdjustmentsForBackend.aiPatches.find(p => p.id === patchId);
+
+      const newPatchDataJson = await invoke('invoke_generative_replace_with_mask_def', {
+        path: selectedImage.path,
+        patchDefinition: { ...patchDefinitionForBackend, prompt: '' },
+        currentAdjustments: updatedAdjustmentsForBackend,
+        useFastInpaint: true,
+      });
+
+      const newPatchData = JSON.parse(newPatchDataJson);
+      if (!newPatchData?.color || !newPatchData?.mask) {
+        throw new Error("Inpainting failed to return a valid result.");
+      }
+
+      setAdjustments(prev => ({
+        ...prev,
+        aiPatches: prev.aiPatches.map(p =>
+          p.id === patchId
+            ? {
+                ...p,
+                patchData: newPatchData,
+                isLoading: false,
+                name: 'Inpaint',
+                subMasks: p.subMasks.map(sm =>
+                  sm.id === subMaskId ? { ...sm, parameters: finalSubMaskParams } : sm
+                ),
+              }
+            : p
+        )
+      }));
+
+      setActiveAiPatchContainerId(null);
+      setActiveAiSubMaskId(null);
+
+    } catch (err) {
+      console.error("Quick Erase failed:", err);
+      setError(`Quick Erase Failed: ${err.message || String(err)}`);
+      setAdjustments(prev => ({
+        ...prev,
+        aiPatches: prev.aiPatches.map(p => p.id === patchId ? { ...p, isLoading: false } : p)
+      }));
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  }, [selectedImage?.path, isGeneratingAi, adjustments, setAdjustments, setActiveAiPatchContainerId, setActiveAiSubMaskId]);
+
   const handleDeleteAiPatch = useCallback((patchId) => {
     setAdjustments(prev => ({
       ...prev,
@@ -1731,6 +1814,7 @@ const handleSetColorLabel = useCallback(async (color, paths) => {
               onStraighten={handleStraighten}
               brushSettings={brushSettings}
               onGenerateAiMask={handleGenerateAiMask}
+              onQuickErase={handleQuickErase}
               isMaskControlHovered={isMaskControlHovered}
             />
             <Resizer onMouseDown={createResizeHandler(setBottomPanelHeight, bottomPanelHeight)} direction="horizontal" />

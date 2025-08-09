@@ -545,6 +545,7 @@ fn generate_sub_mask_bitmap(
         "brush" => Some(generate_brush_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)),
         "ai-subject" => generate_ai_subject_bitmap(&sub_mask.parameters, width, height, scale, crop_offset),
         "ai-foreground" => generate_ai_foreground_bitmap(&sub_mask.parameters, width, height, scale, crop_offset),
+        "quick-eraser" => generate_ai_subject_bitmap(&sub_mask.parameters, width, height, scale, crop_offset),
         _ => None,
     }
 }

@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   RotateCcw, Circle, TriangleRight, Brush, Sparkles, User,
-  Trash2, Eye, EyeOff, Plus, Minus, Loader2, Send
+  Trash2, Eye, EyeOff, Plus, Minus, Loader2, Send, Eraser
 } from 'lucide-react';
 
 import CollapsibleSection from '../../ui/CollapsibleSection';
@@ -44,6 +44,12 @@ const SUB_MASK_CONFIG = {
       { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 0 },
     ]
   },
+  'quick-eraser': {
+    parameters: [
+      { key: 'grow', label: 'Grow', min: -100, max: 100, step: 1, defaultValue: 50 },
+      { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 50 },
+    ]
+  },
 };
 
 const BrushTools = ({ settings, onSettingsChange }) => (
@@ -81,7 +87,7 @@ export default function AIControls({
   const analyzingTimeoutRef = useRef(null);
   const [deletingItemId, setDeletingItemId] = useState(null);
   const [prompt, setPrompt] = useState(editingPatch?.prompt || '');
-  const [useFastInpaint, setUseFastInpaint] = useState(!isComfyUiConnected);
+  const [useFastInpaint, setUseFastInpaint] = useState(true);
 
   useEffect(() => {
     setPrompt(editingPatch?.prompt || '');
