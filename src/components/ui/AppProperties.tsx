@@ -90,6 +90,11 @@ export enum Theme {
   Snow = 'snow',
 }
 
+export enum ThumbnailAspectRatio {
+  Cover = 'cover',
+  Contain = 'contain',
+}
+
 export interface AppSettings {
   adaptiveEditorTheme?: Theme;
   decorations?: any;
@@ -100,6 +105,7 @@ export interface AppSettings {
   sortCriteria?: SortCriteria;
   theme: Theme;
   thumbnailSize?: ThumbnailSize;
+  thumbnailAspectRatio?: ThumbnailAspectRatio;
   uiVisibility?: UiVisibility;
 }
 
@@ -183,7 +189,7 @@ export interface SupportedTypes {
 
 export enum ThumbnailSize {
   Large = 'large',
-  Medium = 'mediuma',
+  Medium = 'medium',
   Small = 'small',
 }
 

@@ -32,6 +32,7 @@ import {
   SortDirection,
   SupportedTypes,
   ThumbnailSize,
+  ThumbnailAspectRatio,
 } from '../ui/AppProperties';
 import { Color, COLOR_LABELS } from '../../utils/adjustments';
 import { ImportState, Status } from './right/ExportImportProperties';
@@ -86,6 +87,7 @@ interface MainLibraryProps {
   onOpenFolder(): void;
   onSettingsChange(settings: AppSettings): void;
   onThumbnailSizeChange(size: ThumbnailSize): void;
+  onThumbnailAspectRatioChange(aspectRatio: ThumbnailAspectRatio): void;
   rootPath: string | null;
   searchQuery: string;
   setFilterCriteria(criteria: FilterCriteria): void;
@@ -95,6 +97,7 @@ interface MainLibraryProps {
   theme: string;
   thumbnails: Record<string, string>;
   thumbnailSize: ThumbnailSize;
+  thumbnailAspectRatio: ThumbnailAspectRatio;
 }
 
 interface SearchInputProps {
@@ -119,6 +122,7 @@ interface ThumbnailProps {
   path: string;
   rating: number;
   tags: Array<string>;
+  aspectRatio: ThumbnailAspectRatio;
 }
 
 interface ThumbnailSizeOption {
@@ -132,13 +136,25 @@ interface ThumbnailSizeProps {
   selectedSize: ThumbnailSize;
 }
 
+interface ThumbnailAspectRatioOption {
+  id: ThumbnailAspectRatio;
+  label: string;
+}
+
+interface ThumbnailAspectRatioProps {
+  onSelectAspectRatio(aspectRatio: ThumbnailAspectRatio): void;
+  selectedAspectRatio: ThumbnailAspectRatio;
+}
+
 interface ViewOptionsProps {
   filterCriteria: FilterCriteria;
   onSelectSize(size: ThumbnailSize): any;
+  onSelectAspectRatio(aspectRatio: ThumbnailAspectRatio): any;
   setFilterCriteria(criteria: Partial<FilterCriteria>): void;
   setSortCriteria(criteria: SortCriteria): void;
   sortCriteria: SortCriteria;
   thumbnailSize: ThumbnailSize;
+  thumbnailAspectRatio: ThumbnailAspectRatio;
 }
 
 const sortOptions: Array<SortCriteria> = [
@@ -169,6 +185,11 @@ const thumbnailSizeOptions: Array<ThumbnailSizeOption> = [
   { id: ThumbnailSize.Small, label: 'Small', size: 160 },
   { id: ThumbnailSize.Medium, label: 'Medium', size: 240 },
   { id: ThumbnailSize.Large, label: 'Large', size: 320 },
+];
+
+const thumbnailAspectRatioOptions: Array<ThumbnailAspectRatioOption> = [
+  { id: ThumbnailAspectRatio.Cover, label: 'Fill Square' },
+  { id: ThumbnailAspectRatio.Contain, label: 'Original Ratio' },
 ];
 
 const customOuterElement = forwardRef((props: any, ref: any) => (
@@ -389,6 +410,30 @@ function ThumbnailSizeOptions({ selectedSize, onSelectSize }: ThumbnailSizeProps
   );
 }
 
+function ThumbnailAspectRatioOptions({ selectedAspectRatio, onSelectAspectRatio }: ThumbnailAspectRatioProps) {
+  return (
+    <>
+      <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Thumbnail Fit</div>
+      {thumbnailAspectRatioOptions.map((option: ThumbnailAspectRatioOption) => {
+        const isSelected = selectedAspectRatio === option.id;
+        return (
+          <button
+            className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${
+              isSelected ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'
+            }`}
+            key={option.id}
+            onClick={() => onSelectAspectRatio(option.id)}
+            role="menuitem"
+          >
+            <span>{option.label}</span>
+            {isSelected && <Check size={16} />}
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
 function FilterOptions({ filterCriteria, setFilterCriteria }: FilterOptionProps) {
   const handleRatingFilterChange = (rating: number | undefined) => {
     setFilterCriteria((prev: Partial<FilterCriteria>) => ({ ...prev, rating }));
@@ -481,10 +526,12 @@ function SortOptions({ sortCriteria, setSortCriteria }: SortOptionsProps) {
 function ViewOptionsDropdown({
   filterCriteria,
   onSelectSize,
+  onSelectAspectRatio,
   setFilterCriteria,
   setSortCriteria,
   sortCriteria,
   thumbnailSize,
+  thumbnailAspectRatio,
 }: ViewOptionsProps) {
   const isFilterActive =
     filterCriteria.rating > 0 ||
@@ -505,6 +552,12 @@ function ViewOptionsDropdown({
       <div className="flex">
         <div className="w-1/4 p-2 border-r border-border-color">
           <ThumbnailSizeOptions selectedSize={thumbnailSize} onSelectSize={onSelectSize} />
+          <div className="pt-2">
+            <ThumbnailAspectRatioOptions
+              selectedAspectRatio={thumbnailAspectRatio}
+              onSelectAspectRatio={onSelectAspectRatio}
+            />
+          </div>
         </div>
         <div className="w-2/4 p-2 border-r border-border-color">
           <FilterOptions filterCriteria={filterCriteria} setFilterCriteria={setFilterCriteria} />
@@ -527,6 +580,7 @@ function Thumbnail({
   path,
   rating,
   tags,
+  aspectRatio,
 }: ThumbnailProps) {
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -544,6 +598,10 @@ function Thumbnail({
   const colorTag = tags?.find((t: string) => t.startsWith('color:'))?.substring(6);
   const colorLabel = COLOR_LABELS.find((c: Color) => c.name === colorTag);
 
+  const imageClasses = `w-full h-full group-hover:scale-[1.02] transition ease-in-out duration-300 ${
+    isLoaded ? 'opacity-100' : 'opacity-0'
+  }`;
+
   return (
     <div
       className={`aspect-square bg-surface rounded-md overflow-hidden cursor-pointer group relative transition-all duration-150 ${ringClass}`}
@@ -556,14 +614,23 @@ function Thumbnail({
       title={path.split(/[\\/]/).pop()}
     >
       {data ? (
-        <img
-          alt={path}
-          className={`w-full h-full object-cover group-hover:scale-[1.02] transition ease-in-out duration-300 ${
-            isLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
-          loading="lazy"
-          src={data}
-        />
+        <>
+          {aspectRatio === ThumbnailAspectRatio.Contain && (
+            <img
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover blur-md scale-110"
+              src={data}
+            />
+          )}
+          <img
+            alt={path}
+            className={`${imageClasses} ${
+              aspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
+            } relative`}
+            loading="lazy"
+            src={data}
+          />
+        </>
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-surface">
           <ImageIcon className="text-text-secondary animate-pulse" />
@@ -604,6 +671,7 @@ const Cell = ({ columnIndex, rowIndex, style, data }: CellProps) => {
     onImageClick,
     onImageDoubleClick,
     thumbnails,
+    thumbnailAspectRatio,
   } = data;
   const index = rowIndex * columnCount + columnIndex;
   if (index >= imageList.length) {
@@ -631,6 +699,7 @@ const Cell = ({ columnIndex, rowIndex, style, data }: CellProps) => {
           path={imageFile.path}
           rating={imageRatings?.[imageFile.path] || 0}
           tags={imageFile.tags}
+          aspectRatio={thumbnailAspectRatio}
         />
       </motion.div>
     </div>
@@ -660,6 +729,7 @@ export default function MainLibrary({
   onOpenFolder,
   onSettingsChange,
   onThumbnailSizeChange,
+  onThumbnailAspectRatioChange,
   rootPath,
   searchQuery,
   setFilterCriteria,
@@ -669,6 +739,7 @@ export default function MainLibrary({
   theme,
   thumbnails,
   thumbnailSize,
+  thumbnailAspectRatio,
 }: MainLibraryProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [appVersion, setAppVersion] = useState('');
@@ -854,10 +925,12 @@ export default function MainLibrary({
           <ViewOptionsDropdown
             filterCriteria={filterCriteria}
             onSelectSize={onThumbnailSizeChange}
+            onSelectAspectRatio={onThumbnailAspectRatioChange}
             setFilterCriteria={setFilterCriteria}
             setSortCriteria={setSortCriteria}
             sortCriteria={sortCriteria}
             thumbnailSize={thumbnailSize}
+            thumbnailAspectRatio={thumbnailAspectRatio}
           />
           <Button
             className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
@@ -905,6 +978,7 @@ export default function MainLibrary({
                     onImageClick,
                     onImageDoubleClick,
                     thumbnails,
+                    thumbnailAspectRatio,
                   }}
                   key={`${sortCriteria.key}-${sortCriteria.order}-${filterCriteria.rating}-${
                     filterCriteria.rawStatus || RawStatus.All

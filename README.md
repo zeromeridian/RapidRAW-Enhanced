@@ -51,7 +51,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
-*   **2025-08-09:** Local inpainting without the need for ComfyUI
+*   **2025-08-09:** Local inpainting without the need for ComfyUI, ability to change thumbnail aspect ratio
 *   **2025-08-09:** Frontend refactored to Type Script thanks to @varjolintu
 *   **2025-08-08:** New onnxruntime download strategy & the base for local inpainting
 *   **2025-08-05:** Improved HSL cascading, UI & animation improvements, ability to grow & shrink / feather AI masks
@@ -61,11 +61,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-07-31:** Ability to tag & filter images by color labels, refactored image right clicking
 *   **2025-07-31:** Reimplemented the functionality of GPU processing (GPU cropping, etc.) -> No longer dependent on TEXTURE_BINDING_ARRAY
 *   **2025-07-29:** Refactored generative AI foundation, many small fixes
-*   **2025-07-27:** Automatic AI image tagging, overall mask transparency setting per mask
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-07-27:** Automatic AI image tagging, overall mask transparency setting per mask
 *   **2025-07-25:** Fuji RAF X-Trans sensor support (new x-trans demosaicing algo)
 *   **2025-07-24:** Auto crop when cropping an image (to prevent black borders), added drag & drop sort abilty to presets panel
 *   **2025-07-22:** Significant improvements to the shader: More accurate exposure slider, better tone mapper (simplified ACES)
@@ -163,6 +163,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
         <li><strong>Copy & Paste Settings:</strong> Quickly transfer adjustments between images.</li>
         <li><strong>Undo/Redo History:</strong> A robust history system for every edit.</li>
         <li><strong>Customizable UI:</strong> Resizable panels and multiple beautiful UI themes with smooth animations.</li>
+        <li><strong>Panorama Stitcher:</strong> Seamlessly combine multiple images into a wide panorama.</li>
         <li><strong>Exporting:</strong> Control file format, quality, naming scheme, metadata, resizing options on export.</li>
       </ul>
     </td>

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Star, Copy, ClipboardPaste, RotateCcw, ChevronUp, ChevronDown, Check, Save } from 'lucide-react';
 import clsx from 'clsx';
 import Filmstrip from './Filmstrip';
-import { GLOBAL_KEYS, ImageFile, SelectedImage } from '../ui/AppProperties';
+import { GLOBAL_KEYS, ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
 
 interface BottomBarProps {
   filmstripHeight?: number;
@@ -35,6 +35,7 @@ interface BottomBarProps {
   selectedImage?: SelectedImage;
   setIsFilmstripVisible?(isVisible: boolean): void;
   thumbnails?: Record<string, string>;
+  thumbnailAspectRatio: ThumbnailAspectRatio;
   zoom?: number;
 }
 
@@ -106,6 +107,7 @@ export default function BottomBar({
   selectedImage,
   setIsFilmstripVisible,
   thumbnails,
+  thumbnailAspectRatio,
   zoom = 0,
 }: BottomBarProps) {
   const [sliderValue, setSliderValue] = useState(zoom);
@@ -185,6 +187,7 @@ export default function BottomBar({
             onImageSelect={onImageSelect}
             selectedImage={selectedImage}
             thumbnails={thumbnails}
+            thumbnailAspectRatio={thumbnailAspectRatio}
           />
         </div>
       )}

@@ -94,6 +94,7 @@ import {
   WaveformData,
   Orientation,
   ThumbnailSize,
+  ThumbnailAspectRatio,
 } from './components/ui/AppProperties';
 import { ChannelConfig } from './components/adjustments/Curves';
 
@@ -206,6 +207,7 @@ function App() {
   const [bottomPanelHeight, setBottomPanelHeight] = useState<number>(144);
   const [isResizing, setIsResizing] = useState(false);
   const [thumbnailSize, setThumbnailSize] = useState(ThumbnailSize.Medium);
+  const [thumbnailAspectRatio, setThumbnailAspectRatio] = useState(ThumbnailAspectRatio.Cover);
   const [copiedAdjustments, setCopiedAdjustments] = useState<Adjustments | null>(null);
   const [isStraightenActive, setIsStraightenActive] = useState(false);
   const [copiedFilePaths, setCopiedFilePaths] = useState<Array<string>>([]);
@@ -810,6 +812,9 @@ function App() {
         if (settings?.thumbnailSize) {
           setThumbnailSize(settings.thumbnailSize);
         }
+        if (settings?.thumbnailAspectRatio) {
+          setThumbnailAspectRatio(settings.thumbnailAspectRatio);
+        }
       })
       .catch((err) => {
         console.error('Failed to load settings:', err);
@@ -841,6 +846,15 @@ function App() {
       handleSettingsChange({ ...appSettings, thumbnailSize });
     }
   }, [thumbnailSize, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) {
+      return;
+    }
+    if (appSettings.thumbnailAspectRatio !== thumbnailAspectRatio) {
+      handleSettingsChange({ ...appSettings, thumbnailAspectRatio });
+    }
+  }, [thumbnailAspectRatio, appSettings, handleSettingsChange]);
 
   useEffect(() => {
     invoke(Invokes.GetSupportedFileTypes)
@@ -2517,6 +2531,7 @@ function App() {
               setIsFilmstripVisible={(value: boolean) =>
                 setUiVisibility((prev: UiVisibility) => ({ ...prev, filmstrip: value }))
               }
+              thumbnailAspectRatio={thumbnailAspectRatio}
               thumbnails={thumbnails}
               zoom={zoom}
             />
@@ -2533,10 +2548,8 @@ function App() {
             >
               <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
                 <AnimatePresence mode="wait">
-                  {/* The condition is based on activeRightPanel to control visibility */}
                   {activeRightPanel && (
                     <motion.div
-                      // The key is crucial for AnimatePresence to detect changes
                       animate="animate"
                       className="h-full w-full"
                       exit="exit"
@@ -2544,7 +2557,6 @@ function App() {
                       key={renderedRightPanel}
                       variants={panelVariants}
                     >
-                      {/* The content is still determined by renderedRightPanel */}
                       {renderedRightPanel === Panel.Adjustments && (
                         <Controls
                           adjustments={adjustments}
@@ -2674,6 +2686,7 @@ function App() {
             onOpenFolder={handleOpenFolder}
             onSettingsChange={handleSettingsChange}
             onThumbnailSizeChange={setThumbnailSize}
+            onThumbnailAspectRatioChange={setThumbnailAspectRatio}
             rootPath={rootPath}
             searchQuery={searchQuery}
             setFilterCriteria={setFilterCriteria}
@@ -2683,6 +2696,7 @@ function App() {
             theme={theme}
             thumbnails={thumbnails}
             thumbnailSize={thumbnailSize}
+            thumbnailAspectRatio={thumbnailAspectRatio}
           />
           {rootPath && (
             <BottomBar
@@ -2700,6 +2714,7 @@ function App() {
               onRate={handleRate}
               onReset={() => handleResetAdjustments()}
               rating={libraryActiveAdjustments.rating || 0}
+              thumbnailAspectRatio={thumbnailAspectRatio}
             />
           )}
         </div>
