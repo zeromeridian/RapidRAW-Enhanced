@@ -202,7 +202,7 @@ export default function ExportPanel({
                     disabled={isExporting}
                     max="100"
                     min="1"
-                    onChange={(e: any) => setJpegQuality(e.target.value)}
+                    onChange={(e: any) => setJpegQuality(parseInt(e?.target?.value))}
                     type="range"
                     value={jpegQuality}
                   />
