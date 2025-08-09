@@ -391,6 +391,7 @@ function App() {
           currentAdjustments: adjustments,
           patchDefinition: patchDefinition,
           path: selectedImage.path,
+          useFastInpaint: useFastInpaint,
         });
 
         const newPatchData = JSON.parse(newPatchDataJson);
@@ -400,7 +401,7 @@ function App() {
             p.id === patchId
               ? {
                   ...p,
-                  patchDataBase64: newPatchData,
+                  patchData: newPatchData,
                   isLoading: false,
                   name: useFastInpaint ? 'Inpaint' : prompt && prompt.trim() ? prompt.trim() : p.name,
                 }

@@ -118,6 +118,7 @@ export interface AiPatch {
   id: string;
   isLoading: boolean;
   name: string;
+  patchData: any | null;
   prompt: string;
   subMasks: Array<SubMask>;
   visible: boolean;

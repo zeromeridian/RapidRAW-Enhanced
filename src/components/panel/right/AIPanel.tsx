@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Edit, Eye, EyeOff, FileEdit, Loader2, RotateCcw, Trash2, Wand2 } from 'lucide-react';
-import AIControls from './AiControls';
+import AIControls from './AIControls';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { Mask, MASK_TYPES, MaskType, SubMask } from './Masks';
 import { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
