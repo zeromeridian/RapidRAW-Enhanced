@@ -1077,6 +1077,16 @@ async fn test_comfyui_connection(address: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+fn calculate_dynamic_patch_radius(width: u32, height: u32) -> u32 {
+    const MIN_RADIUS: u32 = 2;
+    const MAX_RADIUS: u32 = 32;
+    const BASE_DIMENSION: f32 = 192.0;
+
+    let min_dim = width.min(height) as f32;
+    let scaled_radius = (min_dim / BASE_DIMENSION).round() as u32;
+    scaled_radius.clamp(MIN_RADIUS, MAX_RADIUS)
+}
+
 #[tauri::command]
 async fn invoke_generative_replace_with_mask_def(
     _path: String,
@@ -1117,7 +1127,8 @@ async fn invoke_generative_replace_with_mask_def(
         .ok_or("Failed to generate mask bitmap for AI replace")?;
 
     let patch_rgba = if use_fast_inpaint {
-        inpainting::perform_fast_inpaint(&source_image, &mask_bitmap)?
+        let patch_radius = calculate_dynamic_patch_radius(img_w, img_h);
+        inpainting::perform_fast_inpaint(&source_image, &mask_bitmap, patch_radius)?
     } else {
         let comfy_address = address.unwrap();
 
@@ -1153,17 +1164,14 @@ async fn invoke_generative_replace_with_mask_def(
 
     let (width, height) = patch_rgba.dimensions();
     let mut color_image = RgbImage::new(width, height);
-    let mut mask_image = GrayImage::new(width, height);
+    let mask_image = mask_bitmap;
 
     for y in 0..height {
         for x in 0..width {
-            let pixel = patch_rgba.get_pixel(x, y);
-            let alpha = pixel[3];
-
-            if alpha > 0 {
-                color_image.put_pixel(x, y, Rgb([pixel[0], pixel[1], pixel[2]]));
+            if mask_image.get_pixel(x, y)[0] > 0 {
+                let patch_pixel = patch_rgba.get_pixel(x, y);
+                color_image.put_pixel(x, y, Rgb([patch_pixel[0], patch_pixel[1], patch_pixel[2]]));
             }
-            mask_image.put_pixel(x, y, Luma([alpha]));
         }
     }
 
