@@ -44,15 +44,15 @@ export default function ExportPanel({
   selectedImage,
   setExportState,
 }: ExportPanelProps) {
-  const [fileFormat, setFileFormat] = useState('jpeg');
-  const [jpegQuality, setJpegQuality] = useState(90);
-  const [enableResize, setEnableResize] = useState(false);
-  const [resizeMode, setResizeMode] = useState('longEdge');
-  const [resizeValue, setResizeValue] = useState(2048);
-  const [dontEnlarge, setDontEnlarge] = useState(true);
-  const [keepMetadata, setKeepMetadata] = useState(true);
-  const [stripGps, setStripGps] = useState(true);
-  const [filenameTemplate, setFilenameTemplate] = useState('{original_filename}_edited');
+  const [fileFormat, setFileFormat] = useState<string>('jpeg');
+  const [jpegQuality, setJpegQuality] = useState<number>(90);
+  const [enableResize, setEnableResize] = useState<boolean>(false);
+  const [resizeMode, setResizeMode] = useState<string>('longEdge');
+  const [resizeValue, setResizeValue] = useState<number>(2048);
+  const [dontEnlarge, setDontEnlarge] = useState<boolean>(true);
+  const [keepMetadata, setKeepMetadata] = useState<boolean>(true);
+  const [stripGps, setStripGps] = useState<boolean>(true);
+  const [filenameTemplate, setFilenameTemplate] = useState<string>('{original_filename}_edited');
   const filenameInputRef = useRef<HTMLInputElement>(null);
 
   const { status, progress, errorMessage } = exportState;
@@ -202,7 +202,7 @@ export default function ExportPanel({
                     disabled={isExporting}
                     max="100"
                     min="1"
-                    onChange={(e: any) => setJpegQuality(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setJpegQuality(parseInt(e?.target?.value))}
                     type="range"
                     value={jpegQuality}
                   />
@@ -216,7 +216,7 @@ export default function ExportPanel({
                 <input
                   className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
                   disabled={isExporting}
-                  onChange={(e: any) => setFilenameTemplate(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilenameTemplate(e.target.value)}
                   ref={filenameInputRef}
                   type="text"
                   value={filenameTemplate}
@@ -244,7 +244,7 @@ export default function ExportPanel({
                     <select
                       className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
                       disabled={isExporting}
-                      onChange={(e: any) => setResizeMode(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setResizeMode(e?.target?.value)}
                       value={resizeMode}
                     >
                       <option value="longEdge">Long Edge</option>
@@ -255,7 +255,7 @@ export default function ExportPanel({
                       className="w-24 bg-bg-primary text-center rounded-md p-2 border border-surface focus:border-accent focus:ring-accent"
                       disabled={isExporting}
                       min="1"
-                      onChange={(e: any) => setResizeValue(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResizeValue(parseInt(e?.target?.value))}
                       type="number"
                       value={resizeValue}
                     />
