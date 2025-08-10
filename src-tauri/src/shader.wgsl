@@ -407,7 +407,7 @@ fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>, coords
     }
     let original_hsv = rgb_to_hsv(color);
     let original_luma = get_luma(color);
-    let saturation_mask = smoothstep(0.15, 0.40, original_hsv.y);
+    let saturation_mask = smoothstep(0.15, 0.5, original_hsv.y);
     if (saturation_mask < 0.001) {
         return color;
     }
@@ -454,13 +454,16 @@ fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>, coords
     hsv.y = clamp(hsv.y * (1.0 + hsl_adjustments[7].saturation * influence), 0.0, 1.0);
     total_lum_adjust += hsl_adjustments[7].luminance * influence;
 
-    let hs_shifted_color_temp = hsv_to_rgb(hsv);
-    let new_luma = get_luma(hs_shifted_color_temp);
-    if (new_luma > 0.001) {
-        hsv.z *= (original_luma / new_luma);
+    let hs_shifted_rgb = hsv_to_rgb(vec3<f32>(hsv.x, hsv.y, original_hsv.z));
+    let new_luma = get_luma(hs_shifted_rgb);
+    let target_luma = original_luma * (1.0 + total_lum_adjust);
+
+    if (new_luma < 0.0001) {
+        return vec3<f32>(max(0.0, target_luma));
     }
-    hsv.z = clamp(hsv.z * (1.0 + total_lum_adjust), 0.0, 1.5);
-    return hsv_to_rgb(hsv);
+
+    let final_color = hs_shifted_rgb * (target_luma / new_luma);
+    return final_color;
 }
 
 fn apply_color_grading(color: vec3<f32>, shadows: ColorGradeSettings, midtones: ColorGradeSettings, highlights: ColorGradeSettings, blending: f32, balance: f32) -> vec3<f32> {

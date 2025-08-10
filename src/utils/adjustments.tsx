@@ -207,8 +207,8 @@ export interface MaskContainer {
 export interface Sections {
   [index: string]: Array<string>;
   basic: Array<string>;
-  color: Array<string>;
   curves: Array<string>;
+  color: Array<string>;
   details: Array<string>;
   effects: Array<string>;
 }
@@ -216,8 +216,8 @@ export interface Sections {
 export interface SectionVisibility {
   [index: string]: boolean;
   basic: boolean;
-  color: boolean;
   curves: boolean;
+  color: boolean;
   details: boolean;
   effects: boolean;
 }
@@ -472,6 +472,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     BasicAdjustment.Shadows,
     BasicAdjustment.Whites,
   ],
+  curves: ['curves'],
   color: [
     ColorAdjustment.Saturation,
     ColorAdjustment.Temperature,
@@ -480,7 +481,6 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     ColorAdjustment.Hsl,
     ColorAdjustment.ColorGrading,
   ],
-  curves: ['curves'],
   details: [DetailsAdjustment.Sharpness, DetailsAdjustment.LumaNoiseReduction, DetailsAdjustment.ColorNoiseReduction],
   effects: [
     Effect.Clarity,
