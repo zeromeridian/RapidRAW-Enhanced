@@ -10,6 +10,7 @@ import {
   Status,
   ExportSettings,
   ExportState,
+  FileFormats,
 } from './ExportImportProperties';
 import { Invokes } from '../../ui/AppProperties';
 
@@ -176,7 +177,7 @@ export default function LibraryExportPanel({
                   </button>
                 ))}
               </div>
-              {fileFormat === 'jpeg' && (
+              {fileFormat === FileFormats.Jpeg && (
                 <div className="flex items-center gap-2">
                   <label className="text-sm w-20">Quality</label>
                   <input
@@ -184,7 +185,7 @@ export default function LibraryExportPanel({
                     disabled={isExporting}
                     max="100"
                     min="1"
-                    onChange={(e: any) => setJpegQuality(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setJpegQuality(parseInt(e?.target?.value))}
                     type="range"
                     value={jpegQuality}
                   />
@@ -197,7 +198,7 @@ export default function LibraryExportPanel({
               <input
                 className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
                 disabled={isExporting}
-                onChange={(e: any) => setFilenameTemplate(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilenameTemplate(e.target.value)}
                 ref={filenameInputRef}
                 type="text"
                 value={filenameTemplate}
@@ -224,7 +225,7 @@ export default function LibraryExportPanel({
                     <select
                       className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
                       disabled={isExporting}
-                      onChange={(e: any) => setResizeMode(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setResizeMode(e?.target?.value)}
                       value={resizeMode}
                     >
                       <option value="longEdge">Long Edge</option>
@@ -235,7 +236,7 @@ export default function LibraryExportPanel({
                       className="w-24 bg-bg-primary text-center rounded-md p-2 border border-surface focus:border-accent focus:ring-accent"
                       disabled={isExporting}
                       min="1"
-                      onChange={(e: any) => setResizeValue(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResizeValue(parseInt(e?.target?.value))}
                       type="number"
                       value={resizeValue}
                     />
