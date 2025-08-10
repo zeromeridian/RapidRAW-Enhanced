@@ -56,15 +56,19 @@ const ColorGradingPanel = ({ adjustments, setAdjustments }: ColorPanelProps) => 
     }));
   };
 
-  const handleGlobalChange = (grading: ColorGrading, value: HueSatLum) => {
+  // --- FIX IS HERE ---
+  // The `value` parameter is now correctly typed as a string.
+  const handleGlobalChange = (grading: ColorGrading, value: string) => {
     setAdjustments((prev: Partial<Adjustments>) => ({
       ...prev,
       colorGrading: {
         ...(prev.colorGrading || INITIAL_ADJUSTMENTS.colorGrading),
-        [grading]: Number(value),
+        // Use parseFloat for safe conversion from string to number.
+        [grading]: parseFloat(value),
       },
     }));
   };
+  // --- END FIX ---
 
   return (
     <div>

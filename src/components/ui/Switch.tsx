@@ -42,11 +42,11 @@ const Switch = ({ checked, className = '', disabled = false, label, onChange, to
           onChange={(e: any) => !disabled && onChange(e.target.checked)}
           type="checkbox"
         />
-        <div className="w-10 h-5 bg-surface rounded-full shadow-inner"></div>
+        <div className="w-10 h-5 bg-bg-primary rounded-full shadow-inner"></div>
         <div
           className={clsx(
             'absolute left-0.5 top-0.5 bg-text-secondary w-4 h-4 rounded-full transition-colors',
-            'peer-checked:translate-x-5 peer-checked:bg-white',
+            'peer-checked:translate-x-5 peer-checked:bg-accent',
           )}
         ></div>
       </div>

@@ -148,9 +148,10 @@ function MenuItem({ option, index, isSubmenuItem = false, hideContextMenu }: Men
         role="menuitem"
       >
         <div className="flex items-center gap-3">
+          {/* Change is here: Moved color swatch to the beginning of the div */}
+          {option.color && <div className="w-3 h-3 rounded-full" style={{ backgroundColor: option.color }}></div>}
           {option.icon && <option.icon size={16} />}
           <span>{option.label}</span>
-          {option.color && <div className="w-3 h-3 rounded-full" style={{ backgroundColor: option.color }}></div>}
         </div>
         {option.submenu && <ChevronRight size={16} />}
       </button>

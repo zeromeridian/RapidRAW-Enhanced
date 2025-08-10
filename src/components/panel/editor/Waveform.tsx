@@ -40,33 +40,34 @@ const LumaWaveformDisplay = ({ data, width, height, maxVal, color }: LumaWavefor
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (!data || !canvasRef.current) {
+    if (!data || !canvasRef.current || !width || !height) {
       return;
     }
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    ctx?.clearRect(0, 0, width, height);
+    if (!ctx) {
+      return;
+    }
+    ctx.clearRect(0, 0, width, height);
 
-    const imageData = ctx?.createImageData(width, height);
-    const pixels = imageData?.data;
+    const imageData = ctx.createImageData(width, height);
+    const pixels = imageData.data;
 
     const scale = maxVal > 0 ? 255 / Math.log(1 + maxVal) : 0;
 
-    if (pixels && imageData) {
-      for (let i = 0; i < data.length; i++) {
-        if (data[i] > 0) {
-          const intensity = Math.log(1 + data[i]) * scale;
-          const pixelIndex = i * 4;
+    for (let i = 0; i < data.length; i++) {
+      if (data[i] > 0) {
+        const intensity = Math.log(1 + data[i]) * scale;
+        const pixelIndex = i * 4;
 
-          pixels[pixelIndex] = color[0];
-          pixels[pixelIndex + 1] = color[1];
-          pixels[pixelIndex + 2] = color[2];
-          pixels[pixelIndex + 3] = intensity;
-        }
+        pixels[pixelIndex] = color[0];
+        pixels[pixelIndex + 1] = color[1];
+        pixels[pixelIndex + 2] = color[2];
+        pixels[pixelIndex + 3] = intensity;
       }
-      ctx?.putImageData(imageData, 0, 0);
     }
+    ctx.putImageData(imageData, 0, 0);
   }, [data, width, height, maxVal, color]);
 
   return <canvas ref={canvasRef} width={width} height={height} className="absolute inset-0" />;
@@ -76,35 +77,36 @@ const RgbWaveformDisplay = ({ redData, greenData, blueData, width, height, maxVa
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (!redData || !canvasRef.current) {
+    if (!redData || !canvasRef.current || !width || !height) {
       return;
     }
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    ctx?.clearRect(0, 0, width, height);
+    if (!ctx) {
+      return;
+    }
+    ctx.clearRect(0, 0, width, height);
 
-    const imageData = ctx?.createImageData(width, height);
-    const pixels = imageData?.data;
+    const imageData = ctx.createImageData(width, height);
+    const pixels = imageData.data;
 
     const scaleR = maxVals.red > 0 ? 255 / Math.log(1 + maxVals.red) : 0;
     const scaleG = maxVals.green > 0 ? 255 / Math.log(1 + maxVals.green) : 0;
     const scaleB = maxVals.blue > 0 ? 255 / Math.log(1 + maxVals.blue) : 0;
 
-    if (pixels && imageData) {
-      for (let i = 0; i < redData.length; i++) {
-        const pixelIndex = i * 4;
-        const r = redData[i] > 0 ? Math.log(1 + redData[i]) * scaleR : 0;
-        const g = greenData[i] > 0 ? Math.log(1 + greenData[i]) * scaleG : 0;
-        const b = blueData[i] > 0 ? Math.log(1 + blueData[i]) * scaleB : 0;
+    for (let i = 0; i < redData.length; i++) {
+      const pixelIndex = i * 4;
+      const r = redData[i] > 0 ? Math.log(1 + redData[i]) * scaleR : 0;
+      const g = greenData[i] > 0 ? Math.log(1 + greenData[i]) * scaleG : 0;
+      const b = blueData[i] > 0 ? Math.log(1 + blueData[i]) * scaleB : 0;
 
-        pixels[pixelIndex] = r;
-        pixels[pixelIndex + 1] = g;
-        pixels[pixelIndex + 2] = b;
-        pixels[pixelIndex + 3] = Math.max(r, g, b);
-      }
-      ctx?.putImageData(imageData, 0, 0);
+      pixels[pixelIndex] = r;
+      pixels[pixelIndex + 1] = g;
+      pixels[pixelIndex + 2] = b;
+      pixels[pixelIndex + 3] = Math.max(r, g, b);
     }
+    ctx.putImageData(imageData, 0, 0);
   }, [redData, greenData, blueData, width, height, maxVals]);
 
   return <canvas ref={canvasRef} width={width} height={height} className="absolute inset-0" />;
@@ -118,10 +120,10 @@ export default function Waveform({ waveformData, onClose }: WaveformProps) {
 
   const maxVals: any = waveformData
     ? {
-        luma: Math.max(...luma),
-        red: Math.max(...red),
-        green: Math.max(...green),
-        blue: Math.max(...blue),
+        luma: Math.max(...(luma || [])),
+        red: Math.max(...(red || [])),
+        green: Math.max(...(green || [])),
+        blue: Math.max(...(blue || [])),
       }
     : {};
 

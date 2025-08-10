@@ -89,7 +89,7 @@ export const THEMES: Array<ThemeProps> = [
     name: 'Blue',
     splashImage: '/splash-blue.jpg',
     cssVariables: {
-      '--color-bg-primary-rgb': '35, 38, 41',
+      '--color-bg-primary-rgb': '32, 36, 37',
       '--opacity-bg-primary': '0.7',
       '--color-bg-secondary-rgb': '42, 46, 50',
       '--opacity-bg-secondary': '0.85',

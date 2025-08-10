@@ -38,7 +38,7 @@ const PRESETS: Array<CropPreset> = [
   { name: '3:2', value: 3 / 2 },
   { name: '16:9', value: 16 / 9 },
   { name: '21:9', value: 21 / 9 },
-  { name: '32:9', value: 32 / 9 },
+  { name: '65:24', value: 65 / 24 },
 ];
 
 export default function CropPanel({

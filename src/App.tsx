@@ -249,7 +249,6 @@ function App() {
   const imagePathList = useMemo(() => imageList.map((f: ImageFile) => f.path), [imageList]);
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   useThumbnails(imageList, setThumbnails);
-  const loaderTimeoutRef = useRef<any>(null);
   const transformWrapperRef = useRef<any>(null);
   const isProgrammaticZoom = useRef(false);
   const isInitialMount = useRef(true);
@@ -287,8 +286,8 @@ function App() {
     return () => clearTimeout(timer);
   }, [isPasted]);
 
-  const debouncedSetHistory = useCallback(
-    debounce((newAdjustments) => setHistoryAdjustments(newAdjustments), 300),
+  const debouncedSetHistory = useMemo(
+    () => debounce((newAdjustments) => setHistoryAdjustments(newAdjustments), 300),
     [setHistoryAdjustments],
   );
 
@@ -421,14 +420,7 @@ function App() {
         setIsGeneratingAi(false);
       }
     },
-    [
-      selectedImage?.path,
-      isGeneratingAi,
-      adjustments,
-      setAdjustments,
-      setActiveAiPatchContainerId,
-      setActiveAiSubMaskId,
-    ],
+    [selectedImage?.path, isGeneratingAi, adjustments, setAdjustments],
   );
 
   const handleQuickErase = useCallback(
@@ -717,33 +709,30 @@ function App() {
     [],
   );
 
-  const createResizeHandler = useCallback(
-    (setter: any, startSize: number) => (e: any) => {
-      e.preventDefault();
-      setIsResizing(true);
-      const startX = e.clientX;
-      const startY = e.clientY;
-      const doDrag = (moveEvent: any) => {
-        if (setter === setLeftPanelWidth) {
-          setter(Math.max(200, Math.min(startSize + (moveEvent.clientX - startX), 500)));
-        } else if (setter === setRightPanelWidth) {
-          setter(Math.max(280, Math.min(startSize - (moveEvent.clientX - startX), 600)));
-        } else if (setter === setBottomPanelHeight) {
-          setter(Math.max(100, Math.min(startSize - (moveEvent.clientY - startY), 400)));
-        }
-      };
-      const stopDrag = () => {
-        document.documentElement.style.cursor = '';
-        window.removeEventListener('mousemove', doDrag);
-        window.removeEventListener('mouseup', stopDrag);
-        setIsResizing(false);
-      };
-      document.documentElement.style.cursor = setter === setBottomPanelHeight ? 'row-resize' : 'col-resize';
-      window.addEventListener('mousemove', doDrag);
-      window.addEventListener('mouseup', stopDrag);
-    },
-    [],
-  );
+  const createResizeHandler = (setter: any, startSize: number) => (e: any) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const doDrag = (moveEvent: any) => {
+      if (setter === setLeftPanelWidth) {
+        setter(Math.max(200, Math.min(startSize + (moveEvent.clientX - startX), 500)));
+      } else if (setter === setRightPanelWidth) {
+        setter(Math.max(280, Math.min(startSize - (moveEvent.clientX - startX), 600)));
+      } else if (setter === setBottomPanelHeight) {
+        setter(Math.max(100, Math.min(startSize - (moveEvent.clientY - startY), 400)));
+      }
+    };
+    const stopDrag = () => {
+      document.documentElement.style.cursor = '';
+      window.removeEventListener('mousemove', doDrag);
+      window.removeEventListener('mouseup', stopDrag);
+      setIsResizing(false);
+    };
+    document.documentElement.style.cursor = setter === setBottomPanelHeight ? 'row-resize' : 'col-resize';
+    window.addEventListener('mousemove', doDrag);
+    window.addEventListener('mouseup', stopDrag);
+  };
 
   useEffect(() => {
     const appWindow = getCurrentWindow();
@@ -1461,12 +1450,17 @@ function App() {
           setIsIndexing(false);
           setIndexingProgress({ current: 0, total: 0 });
           if (currentFolderPathRef.current) {
-            const list: any = invoke(Invokes.ListImagesInDir, { path: currentFolderPathRef.current }).catch((err) =>
-              console.error('Failed to refresh after indexing:', err),
-            );
-            if (list) {
-              setImageList(list);
-            }
+            const refreshImageList = async () => {
+              try {
+                const list: ImageFile[] = await invoke(Invokes.ListImagesInDir, { path: currentFolderPathRef.current });
+                if (Array.isArray(list)) {
+                  setImageList(list);
+                }
+              } catch (err) {
+                console.error('Failed to refresh after indexing:', err);
+              }
+            };
+            refreshImageList();
           }
         }
       }),
@@ -1535,9 +1529,8 @@ function App() {
     return () => {
       isEffectActive = false;
       listeners.forEach((p) => p.then((unlisten) => unlisten()));
-      if (loaderTimeoutRef.current) clearTimeout(loaderTimeoutRef.current);
     };
-  }, []);
+  }, [handleRefreshFolderTree, handleSelectSubfolder]);
 
   useEffect(() => {
     if ([Status.Success, Status.Error, Status.Cancelled].includes(exportState.status)) {
