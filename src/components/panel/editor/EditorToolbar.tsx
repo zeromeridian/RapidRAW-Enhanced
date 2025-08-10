@@ -9,6 +9,7 @@ interface EditorToolbarProps {
   isFullScreenLoading: boolean;
   isWaveformVisible: boolean;
   isLoading: boolean;
+  isLoadingFullRes?: boolean;
   onBackToLibrary(): void;
   onRedo(): void;
   onToggleFullScreen(): void;
@@ -25,6 +26,7 @@ const EditorToolbar = memo(
     canUndo,
     isFullScreenLoading,
     isLoading,
+    isLoadingFullRes,
     isWaveformVisible,
     onBackToLibrary,
     onRedo,
@@ -48,6 +50,7 @@ const EditorToolbar = memo(
         <span className="font-medium text-text-primary truncate">{selectedImage.path.split(/[\/\\]/).pop()}</span>
         {isLoading && <Loader2 size={12} className="animate-spin" />}
         {selectedImage.width > 0 && ` - ${selectedImage.width} × ${selectedImage.height}`}
+        {isLoadingFullRes && <Loader2 size={12} className="animate-spin text-accent" />}
       </div>
 
       <div className="flex items-center gap-2">

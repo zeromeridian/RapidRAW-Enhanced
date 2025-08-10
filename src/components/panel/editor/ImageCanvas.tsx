@@ -51,6 +51,9 @@ interface ImageCanvasProps {
   showOriginal: boolean;
   uncroppedAdjustedPreviewUrl: string | null;
   updateSubMask(id: string | null, subMask: Partial<SubMask>): void;
+  fullResolutionUrl?: string | null;
+  isFullResolution?: boolean;
+  isLoadingFullRes?: boolean;
 }
 
 interface ImageLayer {
@@ -481,6 +484,9 @@ const ImageCanvas = memo(
     showOriginal,
     uncroppedAdjustedPreviewUrl,
     updateSubMask,
+    fullResolutionUrl,
+    isFullResolution,
+    isLoadingFullRes,
   }: ImageCanvasProps) => {
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
     const imagePathRef = useRef<string>(null);
@@ -573,44 +579,63 @@ const ImageCanvas = memo(
         return;
       }
 
-      if (showOriginal && topLayer?.id !== ORIGINAL_LAYER) {
-        setLayers((prev: Array<ImageLayer>) => [...prev, { id: ORIGINAL_LAYER, url: originalUrl, opacity: 0 }]);
+      if (showOriginal) {
+        if (topLayer?.id !== ORIGINAL_LAYER) {
+          setLayers((prev: Array<ImageLayer>) => [...prev, { id: ORIGINAL_LAYER, url: originalUrl, opacity: 0 }]);
+        }
         return;
-      }
-      if (!showOriginal && topLayer?.id === ORIGINAL_LAYER) {
-        const urlToShow = latestEditedUrlRef.current || finalPreviewUrl || originalUrl || thumbnailUrl;
+      } else if (!showOriginal && topLayer?.id === ORIGINAL_LAYER) {
+        const urlToShow = (isFullResolution && fullResolutionUrl) 
+          ? fullResolutionUrl 
+          : (latestEditedUrlRef.current || finalPreviewUrl || originalUrl || thumbnailUrl);
         if (urlToShow) {
-          setLayers((prev: Array<ImageLayer>) => [...prev, { id: urlToShow, url: urlToShow, opacity: 0 }]);
+            setLayers((prev: Array<ImageLayer>) => [...prev, { id: urlToShow, url: urlToShow, opacity: 0 }]);
         }
         return;
       }
 
-      if (finalPreviewUrl && finalPreviewUrl !== latestEditedUrlRef.current) {
-        latestEditedUrlRef.current = finalPreviewUrl;
-        const img = new Image();
-        img.src = finalPreviewUrl;
-        img.onload = () => {
-          if (img.src === latestEditedUrlRef.current) {
-            if (layers.length === 0) {
-              setLayers([{ id: img.src, url: img.src, opacity: 1 }]);
-            } else {
-              setLayers((prev: Array<ImageLayer>) => [...prev, { id: img.src, url: img.src, opacity: 0 }]);
+      if (!showOriginal) {
+        if (isFullResolution && fullResolutionUrl && fullResolutionUrl !== latestEditedUrlRef.current) {
+          latestEditedUrlRef.current = fullResolutionUrl;
+          const img = new Image();
+          img.src = fullResolutionUrl;
+          img.onload = () => {
+            if (img.src === latestEditedUrlRef.current && !showOriginal) {
+              if (layers.length === 0) {
+                setLayers([{ id: img.src, url: img.src, opacity: 1 }]);
+              } else {
+                setLayers((prev: Array<ImageLayer>) => [...prev, { id: img.src, url: img.src, opacity: 0 }]);
+              }
             }
-          }
-        };
-        return () => {
-          img.onload = null;
-        };
+          };
+          return () => { img.onload = null; };
+        }
+
+        if (!isFullResolution && !fullResolutionUrl && finalPreviewUrl && finalPreviewUrl !== latestEditedUrlRef.current) {
+          latestEditedUrlRef.current = finalPreviewUrl;
+          const img = new Image();
+          img.src = finalPreviewUrl;
+          img.onload = () => {
+            if (img.src === latestEditedUrlRef.current && !showOriginal) {
+              if (layers.length === 0) {
+                setLayers([{ id: img.src, url: img.src, opacity: 1 }]);
+              } else {
+                setLayers((prev: Array<ImageLayer>) => [...prev, { id: img.src, url: img.src, opacity: 0 }]);
+              }
+            }
+          };
+          return () => { img.onload = null; };
+        }
       }
 
-      if (layers.length === 0 && !finalPreviewUrl) {
+      if (layers.length === 0 && !finalPreviewUrl && !fullResolutionUrl) {
         const initialUrl = originalUrl || thumbnailUrl;
         if (initialUrl && initialUrl !== latestEditedUrlRef.current) {
           latestEditedUrlRef.current = initialUrl;
           setLayers([{ id: initialUrl, url: initialUrl, opacity: 1 }]);
         }
       }
-    }, [selectedImage, finalPreviewUrl, showOriginal, layers, adjustments.rotation, adjustments.aspectRatio]);
+    }, [selectedImage, finalPreviewUrl, fullResolutionUrl, isFullResolution, showOriginal, layers, adjustments.rotation, adjustments.aspectRatio]);
 
     useEffect(() => {
       const layerToFadeIn = layers.find((l: ImageLayer) => l.opacity === 0);
@@ -968,6 +993,10 @@ const ImageCanvas = memo(
                   style={{
                     opacity: layer.opacity,
                     transition: 'opacity 150ms ease-in-out',
+                    imageRendering: 'high-quality',
+                    WebkitImageRendering: 'high-quality',
+                    transform: 'translateZ(0)',
+                    backfaceVisibility: 'hidden',
                   }}
                 />
               ))}
