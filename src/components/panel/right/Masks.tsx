@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brush, Circle, Eraser, Sparkles, TriangleRight, User } from 'lucide-react';
+import { Brush, Circle, Droplet, Eraser, Sparkles, TriangleRight, User } from 'lucide-react';
 
 export enum Mask {
   AiForeground = 'ai-foreground',
@@ -41,13 +41,96 @@ export interface SubMask {
   visible: boolean;
 }
 
-export const MASK_TYPES: Array<MaskType> = [
+export const MASK_ICON_MAP: Record<Mask, any> = {
+  [Mask.AiForeground]: User,
+  [Mask.AiSubject]: Sparkles,
+  [Mask.Brush]: Brush,
+  [Mask.Color]: Droplet,
+  [Mask.Linear]: TriangleRight,
+  [Mask.Luminance]: Sparkles,
+  [Mask.QuickEraser]: Eraser,
+  [Mask.Radial]: Circle,
+};
+
+export const MASK_PANEL_CREATION_TYPES: Array<MaskType> = [
+  {
+    disabled: false,
+    icon: Sparkles,
+    name: 'Subject',
+    type: Mask.AiSubject,
+  },
+  {
+    disabled: false,
+    icon: User,
+    name: 'Foreground',
+    type: Mask.AiForeground,
+  },
+  {
+    disabled: false,
+    icon: Brush,
+    name: 'Brush',
+    type: Mask.Brush,
+  },
+  {
+    disabled: false,
+    icon: TriangleRight,
+    name: 'Linear',
+    type: Mask.Linear,
+  },
+  {
+    disabled: false,
+    icon: Circle,
+    name: 'Radial',
+    type: Mask.Radial,
+  },
+  {
+    disabled: true,
+    icon: Droplet,
+    name: 'Color',
+    type: Mask.Color,
+  },
+];
+
+export const AI_PANEL_CREATION_TYPES: Array<MaskType> = [
   {
     disabled: false,
     icon: Eraser,
     name: 'Quick Erase',
     type: Mask.QuickEraser,
-},
+  },
+  {
+    disabled: false,
+    icon: Sparkles,
+    name: 'Subject',
+    type: Mask.AiSubject,
+  },
+  {
+    disabled: false,
+    icon: User,
+    name: 'Foreground',
+    type: Mask.AiForeground,
+  },
+  {
+    disabled: false,
+    icon: Brush,
+    name: 'Brush',
+    type: Mask.Brush,
+  },
+  {
+    disabled: false,
+    icon: TriangleRight,
+    name: 'Linear',
+    type: Mask.Linear,
+  },
+  {
+    disabled: false,
+    icon: Circle,
+    name: 'Radial',
+    type: Mask.Radial,
+  },
+];
+
+export const SUB_MASK_COMPONENT_TYPES: Array<MaskType> = [
   {
     disabled: false,
     icon: Sparkles,

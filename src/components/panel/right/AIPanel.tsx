@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Edit, Eye, EyeOff, FileEdit, Loader2, RotateCcw, Trash2, Wand2 } from 'lucide-react';
 import AIControls from './AIControls';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { Mask, MASK_TYPES, MaskType, SubMask } from './Masks';
+import { Mask, AI_PANEL_CREATION_TYPES, MaskType, SubMask } from './Masks';
 import { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
 import { BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
@@ -359,7 +359,7 @@ export default function AIPanel({
                 )}
                 <p className="text-sm mb-3 font-semibold text-text-primary">Create New Generative Edit</p>
                 <div className="grid grid-cols-3 gap-2">
-                  {MASK_TYPES.map((maskType: MaskType) => (
+                  {AI_PANEL_CREATION_TYPES.map((maskType: MaskType) => (
                     <button
                       className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors ${
                         maskType.disabled || isGeneratingAiMask || isGeneratingAi
@@ -367,7 +367,7 @@ export default function AIPanel({
                           : 'hover:bg-card-active'
                       }`}
                       disabled={maskType.disabled || isGeneratingAiMask || isGeneratingAi}
-                      key={maskType.id}
+                      key={maskType.type}
                       onClick={() => handleAddAiPatchContainer(maskType.type)}
                       title={maskType.disabled ? `${maskType.name} (Coming Soon)` : `Add ${maskType.name} Edit`}
                     >

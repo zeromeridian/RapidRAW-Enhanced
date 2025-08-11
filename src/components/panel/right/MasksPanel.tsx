@@ -28,7 +28,7 @@ import {
   MaskContainer,
 } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { Mask, MaskType, SubMask } from './Masks';
+import { Mask, MaskType, SubMask, MASK_PANEL_CREATION_TYPES } from './Masks';
 import { BrushSettings, OPTION_SEPARATOR, SelectedImage } from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
 
@@ -61,45 +61,6 @@ const itemVariants = {
   }),
   exit: { opacity: 0, x: -15, transition: { duration: 0.2 } },
 };
-
-export const MASK_PANEL_TYPES: Array<MaskType> = [
-  {
-    disabled: false,
-    icon: Sparkles,
-    name: 'Subject',
-    type: Mask.AiSubject,
-  },
-  {
-    disabled: false,
-    icon: User,
-    name: 'Foreground',
-    type: Mask.AiForeground,
-  },
-  {
-    disabled: false,
-    icon: Brush,
-    name: 'Brush',
-    type: Mask.Brush,
-  },
-  {
-    disabled: false,
-    icon: TriangleRight,
-    name: 'Linear',
-    type: Mask.Linear,
-  },
-  {
-    disabled: false,
-    icon: Circle,
-    name: 'Radial',
-    type: Mask.Radial,
-  },
-  {
-    disabled: true,
-    icon: Droplet,
-    name: 'Color',
-    type: Mask.Color,
-  },
-];
 
 export default function MasksPanel({
   activeMaskContainerId,
@@ -280,8 +241,8 @@ export default function MasksPanel({
     showContextMenu(event.clientX, event.clientY, [
       { label: 'Edit Mask', icon: Edit, onClick: () => handleOpenContainerForEditing(container) },
       { label: 'Rename Mask', icon: FileEdit, onClick: () => handleStartRename(container) },
-      { label: 'Duplicate Mask', icon: PlusSquare, onClick: () => handleDuplicateContainer(container) },
       { type: OPTION_SEPARATOR },
+      { label: 'Duplicate Mask', icon: PlusSquare, onClick: () => handleDuplicateContainer(container) },
       { label: 'Copy Mask', icon: Copy, onClick: () => setCopiedMask(container) },
       {
         label: 'Paste Adjustments',
@@ -398,7 +359,7 @@ export default function MasksPanel({
           )}
           <p className="text-sm mb-3 font-semibold text-text-primary">Create New Mask</p>
           <div className="grid grid-cols-3 gap-2">
-            {MASK_PANEL_TYPES.map((maskType: MaskType) => (
+            {MASK_PANEL_CREATION_TYPES.map((maskType: MaskType) => (
               <button
                 className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors ${
                   maskType.disabled || isGeneratingAiMask ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active'

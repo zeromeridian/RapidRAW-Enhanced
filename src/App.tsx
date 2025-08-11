@@ -493,7 +493,6 @@ function App() {
                   ...p,
                   patchData: newPatchData,
                   isLoading: false,
-                  name: 'Inpaint',
                   subMasks: p.subMasks.map((sm: SubMask) =>
                     sm.id === subMaskId ? { ...sm, parameters: finalSubMaskParams } : sm,
                   ),

@@ -483,14 +483,13 @@ const ImageCanvas = memo(
     updateSubMask,
   }: ImageCanvasProps) => {
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
-    const imagePathRef = useRef<string>(null);
-    const latestEditedUrlRef = useRef<string>(null);
+    const imagePathRef = useRef<string | null>(null);
+    const latestEditedUrlRef = useRef<string | null>(null);
     const [layers, setLayers] = useState<Array<ImageLayer>>([]);
     const cropImageRef = useRef<HTMLImageElement>(null);
-    const prevTransformPropsRef = useRef<any>(null);
 
     const isDrawing = useRef(false);
-    const currentLine = useRef<DrawnLine>(null);
+    const currentLine = useRef<DrawnLine | null>(null);
     const [previewLine, setPreviewLine] = useState<DrawnLine | null>(null);
     const [cursorPreview, setCursorPreview] = useState<CursorPreview>({ x: 0, y: 0, visible: false });
     const [straightenLine, setStraightenLine] = useState<any>(null);
@@ -547,21 +546,8 @@ const ImageCanvas = memo(
       const topLayer = layers[layers.length - 1];
       const imageChanged = currentImagePath !== imagePathRef.current;
 
-      const rotationChanged =
-        !imageChanged &&
-        prevTransformPropsRef.current &&
-        prevTransformPropsRef.current.rotation !== adjustments.rotation;
-      const aspectRatioChanged =
-        !imageChanged &&
-        prevTransformPropsRef.current &&
-        prevTransformPropsRef.current.aspectRatio !== adjustments.aspectRatio;
-
-      if (imageChanged || rotationChanged || aspectRatioChanged) {
+      if (imageChanged) {
         imagePathRef.current = currentImagePath;
-        prevTransformPropsRef.current = {
-          rotation: adjustments.rotation,
-          aspectRatio: adjustments.aspectRatio,
-        };
         latestEditedUrlRef.current = null;
 
         const initialUrl = thumbnailUrl || originalUrl;
@@ -574,13 +560,13 @@ const ImageCanvas = memo(
       }
 
       if (showOriginal && topLayer?.id !== ORIGINAL_LAYER) {
-        setLayers((prev: Array<ImageLayer>) => [...prev, { id: ORIGINAL_LAYER, url: originalUrl, opacity: 0 }]);
+        setLayers((prev) => [...prev, { id: ORIGINAL_LAYER, url: originalUrl, opacity: 0 }]);
         return;
       }
       if (!showOriginal && topLayer?.id === ORIGINAL_LAYER) {
         const urlToShow = latestEditedUrlRef.current || finalPreviewUrl || originalUrl || thumbnailUrl;
         if (urlToShow) {
-          setLayers((prev: Array<ImageLayer>) => [...prev, { id: urlToShow, url: urlToShow, opacity: 0 }]);
+          setLayers((prev) => [...prev, { id: urlToShow, url: urlToShow, opacity: 0 }]);
         }
         return;
       }
@@ -594,7 +580,7 @@ const ImageCanvas = memo(
             if (layers.length === 0) {
               setLayers([{ id: img.src, url: img.src, opacity: 1 }]);
             } else {
-              setLayers((prev: Array<ImageLayer>) => [...prev, { id: img.src, url: img.src, opacity: 0 }]);
+              setLayers((prev) => [...prev, { id: img.src, url: img.src, opacity: 0 }]);
             }
           }
         };
@@ -610,7 +596,7 @@ const ImageCanvas = memo(
           setLayers([{ id: initialUrl, url: initialUrl, opacity: 1 }]);
         }
       }
-    }, [selectedImage, finalPreviewUrl, showOriginal, layers, adjustments.rotation, adjustments.aspectRatio]);
+    }, [selectedImage, finalPreviewUrl, showOriginal, layers]);
 
     useEffect(() => {
       const layerToFadeIn = layers.find((l: ImageLayer) => l.opacity === 0);
@@ -744,7 +730,7 @@ const ImageCanvas = memo(
 
           if (activeSubMask.type === Mask.QuickEraser && onQuickErase) {
             onQuickErase(activeId, startPoint, endPoint);
-          } else if (activeSubMask.type === Mask.QuickEraser && onGenerateAiMask) {
+          } else if (activeSubMask.type === Mask.AiSubject && onGenerateAiMask) {
             onGenerateAiMask(activeId, startPoint, endPoint);
           }
         }
@@ -787,7 +773,6 @@ const ImageCanvas = memo(
       brushSettings,
       imageRenderSize.scale,
       isAiEditing,
-      isAiSubjectActive,
       isBrushActive,
       isMasking,
       onGenerateAiMask,
