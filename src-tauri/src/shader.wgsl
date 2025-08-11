@@ -597,8 +597,21 @@ fn aces_fitted(c: vec3<f32>) -> vec3<f32> {
     return c;
 }
 
+fn is_default_curve(points: array<Point, 16>, count: u32) -> bool {
+    if (count != 2u) {
+        return false;
+    }
+    let p0 = points[0];
+    let p1 = points[1];
+    return abs(p0.y - 0.0) < 0.1 && abs(p1.y - 255.0) < 0.1;
+}
+
 fn apply_all_curves(color: vec3<f32>, luma_curve: array<Point, 16>, luma_curve_count: u32, red_curve: array<Point, 16>, red_curve_count: u32, green_curve: array<Point, 16>, green_curve_count: u32, blue_curve: array<Point, 16>, blue_curve_count: u32) -> vec3<f32> {
-    let rgb_curves_are_active = red_curve_count > 2u || green_curve_count > 2u || blue_curve_count > 2u;
+    let red_is_default = is_default_curve(red_curve, red_curve_count);
+    let green_is_default = is_default_curve(green_curve, green_curve_count);
+    let blue_is_default = is_default_curve(blue_curve, blue_curve_count);
+    let rgb_curves_are_active = !red_is_default || !green_is_default || !blue_is_default;
+
     if (rgb_curves_are_active) {
         let color_graded = vec3<f32>(apply_curve(color.r, red_curve, red_curve_count), apply_curve(color.g, green_curve, green_curve_count), apply_curve(color.b, blue_curve, blue_curve_count));
         let luma_initial = get_luma(color);
