@@ -28,7 +28,7 @@ interface BottomBarProps {
   onPaste(): void;
   onRate(rate: number): void;
   onReset?(): void;
-  onZoomChange?(zoom: number | string): void;
+  onZoomChange?(zoomValue: number, fitToWindow?: boolean): void;
   rating: number;
   selectedImage?: SelectedImage;
   setIsFilmstripVisible?(isVisible: boolean): void;
@@ -182,7 +182,7 @@ export default function BottomBar({
 
   const handleResetZoom = () => {
     if (onZoomChange) {
-      onZoomChange('fit-to-window');
+      onZoomChange(0, true);
     }
   };
 
@@ -337,7 +337,7 @@ export default function BottomBar({
                         ref={percentInputRef}
                         type="text"
                         value={percentInputValue}
-                        onChange={(e) => setPercentInputValue(e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPercentInputValue(e.target.value)}
                         onKeyDown={handlePercentKeyDown}
                         onBlur={handlePercentBlur}
                         className="w-full text-xs text-text-primary bg-bg-primary border border-border-color rounded px-1 text-right"

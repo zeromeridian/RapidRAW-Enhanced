@@ -20,7 +20,7 @@ interface KeyboardShortcutsProps {
   handleRightPanelSelect(panel: Panel): void;
   handleSetColorLabel(label: string | null): void;
   handleToggleFullScreen(): void;
-  handleZoomChange(zoom: number | string): void;
+  handleZoomChange(zoomValue: number, fitToWindow?: boolean): void;
   isFullScreen: boolean;
   isStraightenActive: boolean;
   isViewLoading: boolean;
@@ -148,7 +148,7 @@ export const useKeyboardShortcuts = ({
           } else if (Math.abs(currentPercent - 100) < 5) {
             handleZoomChange(2.0);
           } else {
-            handleZoomChange('fit-to-window');
+            handleZoomChange(0, true);
           }
           return;
         }

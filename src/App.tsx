@@ -193,17 +193,17 @@ function App() {
   const [activeAiPatchContainerId, setActiveAiPatchContainerId] = useState<string | null>(null);
   const [activeAiSubMaskId, setActiveAiSubMaskId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
-  const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 });
-  const [baseRenderSize, setBaseRenderSize] = useState({ width: 0, height: 0 });
-  const [originalSize, setOriginalSize] = useState({ width: 0, height: 0 });
+  const [displaySize, setDisplaySize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [previewSize, setPreviewSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [baseRenderSize, setBaseRenderSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [originalSize, setOriginalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const [isFullResolution, setIsFullResolution] = useState(false);
   const [fullResolutionUrl, setFullResolutionUrl] = useState<string | null>(null);
   const [isLoadingFullRes, setIsLoadingFullRes] = useState(false);
   const fullResRequestRef = useRef<any>(null);
 
   // Track display size changes for zoom calculations
-  const handleDisplaySizeChange = useCallback((size: any) => {
+  const handleDisplaySizeChange = useCallback((size: { width: number; height: number; scale?: number }) => {
     setDisplaySize({ width: size.width, height: size.height });
     
     if (size.scale) {
@@ -1351,7 +1351,7 @@ function App() {
       const request = { cancelled: false };
       fullResRequestRef.current = request;
       
-      invoke('generate_fullscreen_preview', {
+      invoke(Invokes.GenerateFullscreenPreview, {
         jsAdjustments: currentAdjustments
       }).then((fullResUrl: string) => {
         if (!request.cancelled) {
@@ -1380,44 +1380,9 @@ function App() {
     }
   }, [adjustments, isFullResolution, selectedImage?.path, requestFullResolution]);
 
-  // Handle zoom changes with percentage relative to original image size
-  const handleZoomChange = useCallback((input: number | string) => {
-    let targetZoomPercent = input;
-    
-    if (input === 'fit-to-window') {
-      if (originalSize.width > 0 && originalSize.height > 0 && baseRenderSize.width > 0 && baseRenderSize.height > 0) {
-        const originalAspect = originalSize.width / originalSize.height;
-        const baseAspect = baseRenderSize.width / baseRenderSize.height;
-        
-        if (originalAspect > baseAspect) {
-          targetZoomPercent = baseRenderSize.width / originalSize.width;
-        } else {
-          targetZoomPercent = baseRenderSize.height / originalSize.height;
-        }
-      } else {
-        targetZoomPercent = 1.0;
-      }
-    }
-    
-    targetZoomPercent = Math.max(0.1, Math.min(2.0, Number(targetZoomPercent)));
-    
-    let transformZoom = 1.0;
-    if (originalSize.width > 0 && originalSize.height > 0 && baseRenderSize.width > 0 && baseRenderSize.height > 0) {
-      const originalAspect = originalSize.width / originalSize.height;
-      const baseAspect = baseRenderSize.width / baseRenderSize.height;
-      
-      if (originalAspect > baseAspect) {
-        transformZoom = (targetZoomPercent * originalSize.width) / baseRenderSize.width;
-      } else {
-        transformZoom = (targetZoomPercent * originalSize.height) / baseRenderSize.height;
-      }
-    }
-    
-    isProgrammaticZoom.current = true;
-    setZoom(transformZoom);
-    
+  // Helper function to handle full resolution logic
+  const handleFullResolutionLogic = useCallback((targetZoomPercent: number, currentDisplayWidth: number) => {
     const needsFullRes = targetZoomPercent > 0.5;
-    const currentDisplayWidth = baseRenderSize.width * transformZoom;
     const shouldUsePreview = previewSize.width > 0 && currentDisplayWidth <= previewSize.width;
     
     if (needsFullRes && !isFullResolution && !shouldUsePreview) {
@@ -1440,7 +1405,49 @@ function App() {
         setIsLoadingFullRes(false);
       }
     }
-  }, [originalSize, baseRenderSize, previewSize, isFullResolution, isLoadingFullRes, requestFullResolution, adjustments]);
+  }, [previewSize, isFullResolution, isLoadingFullRes, requestFullResolution, adjustments]);
+
+  // Handle zoom changes with percentage relative to original image size
+  const handleZoomChange = useCallback((zoomValue: number, fitToWindow: boolean = false) => {
+    let targetZoomPercent: number;
+    
+    if (fitToWindow) {
+      if (originalSize.width > 0 && originalSize.height > 0 && baseRenderSize.width > 0 && baseRenderSize.height > 0) {
+        const originalAspect = originalSize.width / originalSize.height;
+        const baseAspect = baseRenderSize.width / baseRenderSize.height;
+        
+        if (originalAspect > baseAspect) {
+          targetZoomPercent = baseRenderSize.width / originalSize.width;
+        } else {
+          targetZoomPercent = baseRenderSize.height / originalSize.height;
+        }
+      } else {
+        targetZoomPercent = 1.0;
+      }
+    } else {
+      targetZoomPercent = zoomValue;
+    }
+    
+    targetZoomPercent = Math.max(0.1, Math.min(2.0, targetZoomPercent));
+    
+    let transformZoom = 1.0;
+    if (originalSize.width > 0 && originalSize.height > 0 && baseRenderSize.width > 0 && baseRenderSize.height > 0) {
+      const originalAspect = originalSize.width / originalSize.height;
+      const baseAspect = baseRenderSize.width / baseRenderSize.height;
+      
+      if (originalAspect > baseAspect) {
+        transformZoom = (targetZoomPercent * originalSize.width) / baseRenderSize.width;
+      } else {
+        transformZoom = (targetZoomPercent * originalSize.height) / baseRenderSize.height;
+      }
+    }
+    
+    isProgrammaticZoom.current = true;
+    setZoom(transformZoom);
+    
+    const currentDisplayWidth = baseRenderSize.width * transformZoom;
+    handleFullResolutionLogic(targetZoomPercent, currentDisplayWidth);
+  }, [originalSize, baseRenderSize, handleFullResolutionLogic]);
 
   // Handle manual zoom via mouse/trackpad
   const handleUserTransform = useCallback((transformState: TransformState) => {
@@ -1454,31 +1461,9 @@ function App() {
     if (originalSize.width > 0 && baseRenderSize.width > 0) {
       const targetZoomPercent = (baseRenderSize.width * transformState.scale) / originalSize.width;
       const currentDisplayWidth = baseRenderSize.width * transformState.scale;
-      const shouldUsePreview = previewSize.width > 0 && currentDisplayWidth <= previewSize.width;
-      const needsFullRes = targetZoomPercent > 0.5;
-      
-      if (needsFullRes && !isFullResolution && !shouldUsePreview) {
-        if (!isLoadingFullRes) {
-          setIsLoadingFullRes(true);
-          requestFullResolution(adjustments);
-        }
-      } else if ((!needsFullRes || shouldUsePreview)) {
-        if (fullResRequestRef.current) {
-          fullResRequestRef.current.cancelled = true;
-        }
-        if (requestFullResolution.cancel) {
-          requestFullResolution.cancel();
-        }
-        if (isFullResolution) {
-          setIsFullResolution(false);
-          setFullResolutionUrl(null);
-        }
-        if (isLoadingFullRes) {
-          setIsLoadingFullRes(false);
-        }
-      }
+      handleFullResolutionLogic(targetZoomPercent, currentDisplayWidth);
     }
-  }, [originalSize, baseRenderSize, previewSize, isFullResolution, isLoadingFullRes, requestFullResolution, adjustments]);
+  }, [originalSize, baseRenderSize, handleFullResolutionLogic]);
 
   const handleImageSelect = useCallback(
     (path: string) => {

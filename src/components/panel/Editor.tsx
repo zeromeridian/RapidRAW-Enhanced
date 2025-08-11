@@ -60,9 +60,9 @@ interface EditorProps {
   waveform: WaveformData | null;
   onDisplaySizeChange?(size: any): void;
   onInitialFitScale?(scale: number): void;
-  onZoomChange?(zoom: number | string): void;
-  originalSize?: { width: number; height: number };
-  baseRenderSize?: { width: number; height: number };
+  onZoomChange?(zoomValue: number, fitToWindow?: boolean): void;
+  originalSize?: ImageDimensions;
+  baseRenderSize?: ImageDimensions;
   isFullResolution?: boolean;
   fullResolutionUrl?: string | null;
   isLoadingFullRes?: boolean;
@@ -425,7 +425,7 @@ export default function Editor({
       } else if (Math.abs(currentPercent - 100) < 5) {
         onZoomChange(2.0);
       } else {
-        onZoomChange('fit-to-window');
+        onZoomChange(0, true);
       }
     }
   }, [isCropping, isMasking, isAiEditing, transformState.scale, originalSize, imageRenderSize, baseRenderSize, onZoomChange]);
