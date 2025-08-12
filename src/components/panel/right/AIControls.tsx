@@ -7,7 +7,15 @@ import Slider from '../../ui/Slider';
 import Input from '../../ui/Input';
 import Button from '../../ui/Button';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { MASK_TYPES, Mask, MaskType, SubMask, SubMaskMode, ToolType } from './Masks';
+import {
+  SUB_MASK_COMPONENT_TYPES,
+  Mask,
+  MaskType,
+  SubMask,
+  SubMaskMode,
+  ToolType,
+  MASK_ICON_MAP,
+} from './Masks';
 import { Adjustments, AiPatch } from '../../../utils/adjustments';
 import { BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
@@ -237,9 +245,9 @@ export default function AIControls({
   return (
     <>
       <div className="p-4 border-b border-surface">
-        <p className="text-sm mb-3 font-semibold text-text-primary">Add Component to Selection</p>
+        <p className="text-sm mb-3 font-semibold text-text-primary">Add to Selection</p>
         <div className="grid grid-cols-3 gap-2">
-          {MASK_TYPES.map((maskType: MaskType) => (
+          {SUB_MASK_COMPONENT_TYPES.map((maskType: MaskType) => (
             <button
               className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors ${
                 maskType.disabled || isGeneratingAiMask || isGeneratingAi
@@ -247,7 +255,7 @@ export default function AIControls({
                   : 'hover:bg-card-active'
               }`}
               disabled={maskType.disabled || isGeneratingAiMask || isGeneratingAi}
-              key={maskType.id}
+              key={maskType.type}
               onClick={() => handleAddSubMask(editingPatch.id, maskType.type)}
               title={`Add ${maskType.name} component`}
             >
@@ -270,7 +278,7 @@ export default function AIControls({
             {editingPatch.subMasks
               .filter((sm: SubMask) => sm.id !== deletingItemId)
               .map((subMask: SubMask) => {
-                const MaskIcon = MASK_TYPES.find((mt: MaskType) => mt.type === subMask.type)?.icon || Circle;
+                const MaskIcon = MASK_ICON_MAP[subMask.type] || Circle;
                 return (
                   <motion.div
                     className={`group p-2 rounded-lg flex items-center justify-between cursor-pointer transition-all duration-200 ${

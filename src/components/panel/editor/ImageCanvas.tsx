@@ -489,14 +489,13 @@ const ImageCanvas = memo(
     isLoadingFullRes,
   }: ImageCanvasProps) => {
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
-    const imagePathRef = useRef<string>(null);
-    const latestEditedUrlRef = useRef<string>(null);
+    const imagePathRef = useRef<string | null>(null);
+    const latestEditedUrlRef = useRef<string | null>(null);
     const [layers, setLayers] = useState<Array<ImageLayer>>([]);
     const cropImageRef = useRef<HTMLImageElement>(null);
-    const prevTransformPropsRef = useRef<any>(null);
 
     const isDrawing = useRef(false);
-    const currentLine = useRef<DrawnLine>(null);
+    const currentLine = useRef<DrawnLine | null>(null);
     const [previewLine, setPreviewLine] = useState<DrawnLine | null>(null);
     const [cursorPreview, setCursorPreview] = useState<CursorPreview>({ x: 0, y: 0, visible: false });
     const [straightenLine, setStraightenLine] = useState<any>(null);
@@ -553,21 +552,8 @@ const ImageCanvas = memo(
       const topLayer = layers[layers.length - 1];
       const imageChanged = currentImagePath !== imagePathRef.current;
 
-      const rotationChanged =
-        !imageChanged &&
-        prevTransformPropsRef.current &&
-        prevTransformPropsRef.current.rotation !== adjustments.rotation;
-      const aspectRatioChanged =
-        !imageChanged &&
-        prevTransformPropsRef.current &&
-        prevTransformPropsRef.current.aspectRatio !== adjustments.aspectRatio;
-
-      if (imageChanged || rotationChanged || aspectRatioChanged) {
+      if (imageChanged) {
         imagePathRef.current = currentImagePath;
-        prevTransformPropsRef.current = {
-          rotation: adjustments.rotation,
-          aspectRatio: adjustments.aspectRatio,
-        };
         latestEditedUrlRef.current = null;
 
         const initialUrl = thumbnailUrl || originalUrl;
@@ -579,17 +565,15 @@ const ImageCanvas = memo(
         return;
       }
 
-      if (showOriginal) {
-        if (topLayer?.id !== ORIGINAL_LAYER) {
-          setLayers((prev: Array<ImageLayer>) => [...prev, { id: ORIGINAL_LAYER, url: originalUrl, opacity: 0 }]);
-        }
+      if (showOriginal && topLayer?.id !== ORIGINAL_LAYER) {
+        setLayers((prev: Array<ImageLayer>) => [...prev, { id: ORIGINAL_LAYER, url: originalUrl, opacity: 0 }]);
         return;
       } else if (!showOriginal && topLayer?.id === ORIGINAL_LAYER) {
         const urlToShow = (isFullResolution && fullResolutionUrl) 
           ? fullResolutionUrl 
           : (latestEditedUrlRef.current || finalPreviewUrl || originalUrl || thumbnailUrl);
         if (urlToShow) {
-            setLayers((prev: Array<ImageLayer>) => [...prev, { id: urlToShow, url: urlToShow, opacity: 0 }]);
+          setLayers((prev: Array<ImageLayer>) => [...prev, { id: urlToShow, url: urlToShow, opacity: 0 }]);
         }
         return;
       }
@@ -769,7 +753,7 @@ const ImageCanvas = memo(
 
           if (activeSubMask.type === Mask.QuickEraser && onQuickErase) {
             onQuickErase(activeId, startPoint, endPoint);
-          } else if (activeSubMask.type === Mask.QuickEraser && onGenerateAiMask) {
+          } else if (activeSubMask.type === Mask.AiSubject && onGenerateAiMask) {
             onGenerateAiMask(activeId, startPoint, endPoint);
           }
         }
@@ -812,7 +796,6 @@ const ImageCanvas = memo(
       brushSettings,
       imageRenderSize.scale,
       isAiEditing,
-      isAiSubjectActive,
       isBrushActive,
       isMasking,
       onGenerateAiMask,

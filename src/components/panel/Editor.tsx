@@ -368,7 +368,7 @@ export default function Editor({
 
   const handleCropComplete = useCallback(
     (_: any, pc: PercentCrop) => {
-      if (!pc.x || !pc.y || !pc.width || !pc.height || !selectedImage?.width) {
+      if (!pc.width || !pc.height || !selectedImage?.width) {
         return;
       }
 
@@ -385,11 +385,14 @@ export default function Editor({
         y: Math.round((pc.y / 100) * cropBaseHeight),
       };
 
-      if (JSON.stringify(newPixelCrop) !== JSON.stringify(adjustments.crop)) {
-        setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, crop: newPixelCrop }));
-      }
+      setAdjustments((prev: Partial<Adjustments>) => {
+        if (JSON.stringify(newPixelCrop) !== JSON.stringify(prev.crop)) {
+          return { ...prev, crop: newPixelCrop };
+        }
+        return prev;
+      });
     },
-    [selectedImage, adjustments.crop, adjustments.rotation, setAdjustments],
+    [selectedImage, adjustments.orientationSteps, setAdjustments],
   );
 
   const toggleShowOriginal = useCallback(() => setShowOriginal((prev: boolean) => !prev), [setShowOriginal]);

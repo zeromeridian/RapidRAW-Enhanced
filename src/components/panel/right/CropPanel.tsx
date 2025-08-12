@@ -385,7 +385,6 @@ export default function CropPanel({
                   onClick={() =>
                     setAdjustments((prev: Partial<Adjustments>) => ({
                       ...prev,
-                      crop: null,
                       flipHorizontal: !prev.flipHorizontal,
                     }))
                   }
