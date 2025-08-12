@@ -736,7 +736,7 @@ const ImageCanvas = memo(
         }
       } else if (isBrushActive) {
         const imageSpaceLine: DrawnLine = {
-          brushSize: brushSettings?.size ?? 0,
+          brushSize: (brushSettings?.size ?? 0) / scale,
           feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
           points: line.points.map((p: Coord) => ({
             x: p.x / scale + cropX,
