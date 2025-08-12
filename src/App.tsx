@@ -245,6 +245,7 @@ function App() {
   const [isComfyUiConnected, setIsComfyUiConnected] = useState(false);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [isMaskControlHovered, setIsMaskControlHovered] = useState(false);
+  const [libraryScrollTop, setLibraryScrollTop] = useState<number>(0);
   const { showContextMenu } = useContextMenu();
   const imagePathList = useMemo(() => imageList.map((f: ImageFile) => f.path), [imageList]);
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
@@ -2666,6 +2667,7 @@ function App() {
             isIndexing={isIndexing}
             isLoading={isViewLoading}
             isTreeLoading={isTreeLoading}
+            libraryScrollTop={libraryScrollTop}
             multiSelectedPaths={multiSelectedPaths}
             onClearSelection={handleClearSelection}
             onContextMenu={handleThumbnailContextMenu}
@@ -2677,18 +2679,19 @@ function App() {
             onLibraryRefresh={handleLibraryRefresh}
             onOpenFolder={handleOpenFolder}
             onSettingsChange={handleSettingsChange}
-            onThumbnailSizeChange={setThumbnailSize}
             onThumbnailAspectRatioChange={setThumbnailAspectRatio}
+            onThumbnailSizeChange={setThumbnailSize}
             rootPath={rootPath}
             searchQuery={searchQuery}
             setFilterCriteria={setFilterCriteria}
+            setLibraryScrollTop={setLibraryScrollTop}
             setSearchQuery={setSearchQuery}
             setSortCriteria={setSortCriteria}
             sortCriteria={sortCriteria}
             theme={theme}
+            thumbnailAspectRatio={thumbnailAspectRatio}
             thumbnails={thumbnails}
             thumbnailSize={thumbnailSize}
-            thumbnailAspectRatio={thumbnailAspectRatio}
           />
           {rootPath && (
             <BottomBar

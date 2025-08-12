@@ -75,6 +75,7 @@ interface MainLibraryProps {
   isLoading: boolean;
   isIndexing: boolean;
   isTreeLoading: boolean;
+  libraryScrollTop: number;
   multiSelectedPaths: Array<string>;
   onClearSelection(): void;
   onContextMenu(event: any, path: string): void;
@@ -86,18 +87,19 @@ interface MainLibraryProps {
   onLibraryRefresh(): void;
   onOpenFolder(): void;
   onSettingsChange(settings: AppSettings): void;
-  onThumbnailSizeChange(size: ThumbnailSize): void;
   onThumbnailAspectRatioChange(aspectRatio: ThumbnailAspectRatio): void;
+  onThumbnailSizeChange(size: ThumbnailSize): void;
   rootPath: string | null;
   searchQuery: string;
   setFilterCriteria(criteria: FilterCriteria): void;
+  setLibraryScrollTop(scrollTop: number): void;
   setSearchQuery(query: string): void;
   setSortCriteria(criteria: SortCriteria): void;
   sortCriteria: SortCriteria;
   theme: string;
+  thumbnailAspectRatio: ThumbnailAspectRatio;
   thumbnails: Record<string, string>;
   thumbnailSize: ThumbnailSize;
-  thumbnailAspectRatio: ThumbnailAspectRatio;
 }
 
 interface SearchInputProps {
@@ -717,6 +719,8 @@ export default function MainLibrary({
   importState,
   indexingProgress,
   isIndexing,
+  isTreeLoading,
+  libraryScrollTop,
   multiSelectedPaths,
   onClearSelection,
   onContextMenu,
@@ -728,18 +732,19 @@ export default function MainLibrary({
   onLibraryRefresh,
   onOpenFolder,
   onSettingsChange,
-  onThumbnailSizeChange,
   onThumbnailAspectRatioChange,
+  onThumbnailSizeChange,
   rootPath,
   searchQuery,
   setFilterCriteria,
+  setLibraryScrollTop,
   setSearchQuery,
   setSortCriteria,
   sortCriteria,
   theme,
+  thumbnailAspectRatio,
   thumbnails,
   thumbnailSize,
-  thumbnailAspectRatio,
 }: MainLibraryProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [appVersion, setAppVersion] = useState('');
@@ -968,6 +973,7 @@ export default function MainLibrary({
                   columnCount={columnCount}
                   columnWidth={cellWidth}
                   height={height}
+                  initialScrollTop={libraryScrollTop}
                   itemData={{
                     activePath,
                     columnCount,
@@ -983,6 +989,7 @@ export default function MainLibrary({
                   key={`${sortCriteria.key}-${sortCriteria.order}-${filterCriteria.rating}-${
                     filterCriteria.rawStatus || RawStatus.All
                   }`}
+                  onScroll={({ scrollTop }) => setLibraryScrollTop(scrollTop)}
                   outerElementType={customOuterElement}
                   rowCount={rowCount}
                   rowHeight={cellHeight}
