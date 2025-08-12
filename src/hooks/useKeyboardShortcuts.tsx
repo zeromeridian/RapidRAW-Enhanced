@@ -128,7 +128,7 @@ export const useKeyboardShortcuts = ({
             ? Math.round((displaySize.width / originalSize.width) * 100)
             : 100;
           
-          // Toggle between fit-to-window, 100%, and 200%
+          // Toggle between fit-to-window, 2x fit-to-window (if < 100%), and 100%
           let fitPercent = 100;
           if (originalSize && originalSize.width > 0 && originalSize.height > 0 && baseRenderSize && baseRenderSize.width > 0 && baseRenderSize.height > 0) {
             const originalAspect = originalSize.width / originalSize.height;
@@ -142,12 +142,16 @@ export const useKeyboardShortcuts = ({
               fitPercent = Math.round((baseRenderSize.height / originalSize.height) * 100);
             }
           }
-          
+
+          const doubleFitPercent = fitPercent * 2;
           if (Math.abs(currentPercent - fitPercent) < 5) {
+            // Zoom 2x FitToWindows
+            handleZoomChange(doubleFitPercent < 100 ? doubleFitPercent / 100 : 1.0);
+          } else if (Math.abs(currentPercent - doubleFitPercent) < 5 && doubleFitPercent < 100) {
+            // Zoom 100%
             handleZoomChange(1.0);
-          } else if (Math.abs(currentPercent - 100) < 5) {
-            handleZoomChange(2.0);
           } else {
+            // Zoom FitToWindows
             handleZoomChange(0, true);
           }
           return;

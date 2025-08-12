@@ -422,12 +422,17 @@ export default function Editor({
       }
     }
     
+    const doubleFitPercent = fitPercent * 2;
+    
     if (onZoomChange) {
       if (Math.abs(currentPercent - fitPercent) < 5) {
+        // Zoom 2x FitToWindows
+        onZoomChange(doubleFitPercent < 100 ? doubleFitPercent / 100 : 1.0);
+      } else if (Math.abs(currentPercent - doubleFitPercent) < 5 && doubleFitPercent < 100) {
+        // Zoom 100%
         onZoomChange(1.0);
-      } else if (Math.abs(currentPercent - 100) < 5) {
-        onZoomChange(2.0);
       } else {
+        // Zoom FitToWindows
         onZoomChange(0, true);
       }
     }
