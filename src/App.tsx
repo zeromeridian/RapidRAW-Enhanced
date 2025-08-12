@@ -1534,9 +1534,11 @@ function App() {
 
   useEffect(() => {
     if ([Status.Success, Status.Error, Status.Cancelled].includes(exportState.status)) {
+      const timeoutDuration = exportState.status === Status.Success ? 5000 : 3000;
+
       const timer = setTimeout(() => {
         setExportState({ status: Status.Idle, progress: { current: 0, total: 0 }, errorMessage: '' });
-      }, EXPORT_TIMEOUT);
+      }, timeoutDuration);
       return () => clearTimeout(timer);
     }
   }, [exportState.status]);

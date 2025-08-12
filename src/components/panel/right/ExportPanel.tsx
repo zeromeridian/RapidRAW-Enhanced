@@ -69,12 +69,6 @@ export default function ExportPanel({
   const numImages = pathsToExport.length;
   const isBatchMode = numImages > 1;
 
-  useEffect(() => {
-    if (!isExporting) {
-      setExportState({ status: Status.Idle, progress: { current: 0, total: 0 }, errorMessage: '' });
-    }
-  }, [selectedImage, multiSelectedPaths, isExporting, setExportState]);
-
   const handleVariableClick = (variable: string) => {
     if (!filenameInputRef.current) {
       return;
@@ -301,7 +295,7 @@ export default function ExportPanel({
           </button>
         ) : (
           <button
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-surface text-white font-bold rounded-lg hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent text-button-text font-bold rounded-lg hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             disabled={!canExport || isExporting}
             onClick={handleExport}
           >

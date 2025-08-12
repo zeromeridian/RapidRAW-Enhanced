@@ -59,12 +59,6 @@ export default function LibraryExportPanel({
 
   const numImages = multiSelectedPaths.length;
 
-  useEffect(() => {
-    if (isVisible && !isExporting) {
-      setExportState({ status: Status.Idle, progress: { current: 0, total: 0 }, errorMessage: '' });
-    }
-  }, [multiSelectedPaths, isVisible, isExporting, setExportState]);
-
   const handleVariableClick = (variable: string) => {
     if (!filenameInputRef.current) {
       return;
@@ -282,7 +276,7 @@ export default function LibraryExportPanel({
           </button>
         ) : (
           <button
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-surface text-white font-bold rounded-lg hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent text-button-text font-bold rounded-lg hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             disabled={!canExport || isExporting}
             onClick={handleExport}
           >
