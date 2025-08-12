@@ -33,6 +33,7 @@ import FolderTree from './components/panel/FolderTree';
 import Editor from './components/panel/Editor';
 import Controls from './components/panel/right/ControlsPanel';
 import { useThumbnails } from './hooks/useThumbnails';
+import { ImageDimensions } from './hooks/useImageRenderSize';
 import RightPanelSwitcher from './components/panel/right/RightPanelSwitcher';
 import MetadataPanel from './components/panel/right/MetadataPanel';
 import CropPanel from './components/panel/right/CropPanel';
@@ -193,17 +194,17 @@ function App() {
   const [activeAiPatchContainerId, setActiveAiPatchContainerId] = useState<string | null>(null);
   const [activeAiSubMaskId, setActiveAiSubMaskId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [displaySize, setDisplaySize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  const [previewSize, setPreviewSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  const [baseRenderSize, setBaseRenderSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  const [originalSize, setOriginalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [displaySize, setDisplaySize] = useState<ImageDimensions>({ width: 0, height: 0 });
+  const [previewSize, setPreviewSize] = useState<ImageDimensions>({ width: 0, height: 0 });
+  const [baseRenderSize, setBaseRenderSize] = useState<ImageDimensions>({ width: 0, height: 0 });
+  const [originalSize, setOriginalSize] = useState<ImageDimensions>({ width: 0, height: 0 });
   const [isFullResolution, setIsFullResolution] = useState(false);
   const [fullResolutionUrl, setFullResolutionUrl] = useState<string | null>(null);
   const [isLoadingFullRes, setIsLoadingFullRes] = useState(false);
   const fullResRequestRef = useRef<any>(null);
 
   // Track display size changes for zoom calculations
-  const handleDisplaySizeChange = useCallback((size: { width: number; height: number; scale?: number }) => {
+  const handleDisplaySizeChange = useCallback((size: ImageDimensions & { scale?: number }) => {
     setDisplaySize({ width: size.width, height: size.height });
     
     if (size.scale) {
