@@ -51,19 +51,22 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-08-15:** Show full resolution image when zooming in
+*   **2025-08-15:** Implement Tauri's IPC as a replacement for the slow Base64 image transfer
+*   **2025-08-12:** Relative zoom indicator
 *   **2025-08-11:** TypeScript cleanup & many bug fixes
 *   **2025-08-09:** Local inpainting without the need for ComfyUI, ability to change thumbnail aspect ratio
 *   **2025-08-09:** Frontend refactored to TypeScript thanks to @varjolintu
 *   **2025-08-08:** New onnxruntime download strategy & the base for local inpainting
 *   **2025-08-05:** Improved HSL cascading, UI & animation improvements, ability to grow & shrink / feather AI masks
 *   **2025-08-03:** New high performance, seamless image panorama stitcher (without any dependencies on OpenCV)
-*   **2025-08-02:** Added an image straightening tool and improved crop & rotation functionality (especially on portrait images)
-*   **2025-08-02:** A new dedicated image importer, ability to rename and batch rename files, improved dark theme, and other fixes
-*   **2025-07-31:** Ability to tag & filter images by color labels, refactored image right clicking
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-08-02:** Added an image straightening tool and improved crop & rotation functionality (especially on portrait images)
+*   **2025-08-02:** A new dedicated image importer, ability to rename and batch rename files, improved dark theme, and other fixes
+*   **2025-07-31:** Ability to tag & filter images by color labels, refactored image right clicking
 *   **2025-07-31:** Reimplemented the functionality of GPU processing (GPU cropping, etc.) -> No longer dependent on TEXTURE_BINDING_ARRAY
 *   **2025-07-29:** Refactored generative AI foundation, many small fixes
 *   **2025-07-27:** Automatic AI image tagging, overall mask transparency setting per mask
@@ -241,7 +244,7 @@ While the core functionality is in place, I'm actively working on improving seve
 | Task                                                                                         | Priority | Difficulty | Status |
 |----------------------------------------------------------------------------------------------|----------|------------|--------|
 | Refactoring the frontend (reduce prop drilling in React components)                         | Medium   | Medium     | [ ]    |
-| Optimize image transport (replace Base64 for better performance)                            | Low     | Medium     | [ ]    |
+| Optimize image transport (replace Base64 for better performance)                            | Low     | Medium     | [X]    |
 | Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High | Medium    | [X]    |
 | Implement a simple MVP of the ComfyUI based AI Roadmap                                        | Low   | High       | [X]    |
 | Centralize Coordinate Transformation Logic - See [#245](https://github.com/CyberTimon/RapidRAW/issues/245) | Medium      | Medium     | [ ]    |
