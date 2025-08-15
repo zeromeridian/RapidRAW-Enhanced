@@ -88,6 +88,7 @@ const FilmstripThumbnail = ({
               thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
             } relative`}
             loading="lazy"
+            decoding="async"
             src={thumbData}
           />
         </>

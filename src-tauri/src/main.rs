@@ -862,7 +862,7 @@ fn generate_mask_overlay(
     height: u32,
     scale: f32,
     crop_offset: (f32, f32),
-) -> Result<Response, String> {
+) -> Result<String, String> {
 
     let scaled_crop_offset = (crop_offset.0 * scale, crop_offset.1 * scale);
 
@@ -876,10 +876,13 @@ fn generate_mask_overlay(
 
         let mut buf = Cursor::new(Vec::new());
         rgba_mask.write_to(&mut buf, ImageFormat::Png).map_err(|e| e.to_string())?;
+
+        let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
+        let data_url = format!("data:image/png;base64,{}", base64_str);
         
-        Ok(Response::new(buf.into_inner()))
+        Ok(data_url)
     } else {
-        Ok(Response::new(Vec::new()))
+        Ok("".to_string())
     }
 }
 

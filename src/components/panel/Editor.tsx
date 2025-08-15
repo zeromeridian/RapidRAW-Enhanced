@@ -239,17 +239,15 @@ export default function Editor({
       }
       try {
         const cropOffset = [adjustments.crop?.x || 0, adjustments.crop?.y || 0];
-        const imageData: Uint8Array = await invoke(Invokes.GenerateMaskOverlay, {
+        const dataUrl: string = await invoke(Invokes.GenerateMaskOverlay, {
           cropOffset,
           height: Math.round(renderSize.height),
           maskDef,
           scale: renderSize.scale,
           width: Math.round(renderSize.width),
         });
-        if (imageData.length > 0) {
-          const blob = new Blob([imageData], { type: 'image/png' });
-          const url = URL.createObjectURL(blob);
-          setMaskOverlayUrl(url);
+        if (dataUrl) {
+          setMaskOverlayUrl(dataUrl);
         } else {
           setMaskOverlayUrl(null);
         }
@@ -568,7 +566,6 @@ export default function Editor({
           )}
 
           <TransformWrapper
-            key={selectedImage.path}
             ref={transformWrapperRef}
             minScale={transformConfig.minScale}
             maxScale={transformConfig.maxScale}

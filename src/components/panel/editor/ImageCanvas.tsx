@@ -493,6 +493,8 @@ const ImageCanvas = memo(
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
     const [layers, setLayers] = useState<Array<ImageLayer>>([]);
     const cropImageRef = useRef<HTMLImageElement>(null);
+    const imagePathRef = useRef<string | null>(null);
+    const latestEditedUrlRef = useRef<string | null>(null);
 
     const isDrawing = useRef(false);
     const currentLine = useRef<DrawnLine | null>(null);
@@ -547,49 +549,69 @@ const ImageCanvas = memo(
       return selectedMask ? [...otherMasks, selectedMask] : activeContainer.subMasks;
     }, [activeContainer, activeMaskId, activeAiSubMaskId, isMasking, isAiEditing]);
 
-    const targetUrl = useMemo(() => {
-      if (showOriginal) return transformedOriginalUrl;
-      if (isFullResolution) return fullResolutionUrl;
-      if (finalPreviewUrl) return finalPreviewUrl;
-      return selectedImage.thumbnailUrl || selectedImage.originalUrl;
-    }, [
-      showOriginal,
-      transformedOriginalUrl,
-      isFullResolution,
-      fullResolutionUrl,
-      finalPreviewUrl,
-      selectedImage.thumbnailUrl,
-      selectedImage.originalUrl,
-    ]);
-
     useEffect(() => {
-      const topLayer = layers[layers.length - 1];
-      if (targetUrl && topLayer?.url !== targetUrl) {
-        const newLayer: ImageLayer = {
-          id: targetUrl,
-          url: targetUrl,
-          opacity: 0,
-        };
-        setLayers((prev) => [...prev, newLayer]);
+      const { path: currentImagePath, originalUrl, thumbnailUrl } = selectedImage;
+      const imageChanged = currentImagePath !== imagePathRef.current;
+
+      const currentPreviewUrl = showOriginal
+        ? transformedOriginalUrl
+        : fullResolutionUrl || finalPreviewUrl;
+
+      if (imageChanged) {
+        imagePathRef.current = currentImagePath;
+        latestEditedUrlRef.current = null;
+        const initialUrl = thumbnailUrl || originalUrl;
+        if (initialUrl) {
+          setLayers([{ id: initialUrl, url: initialUrl, opacity: 1 }]);
+        } else {
+          setLayers([]);
+        }
+        return;
       }
-    }, [targetUrl, layers]);
+
+      if (currentPreviewUrl && currentPreviewUrl !== latestEditedUrlRef.current) {
+        latestEditedUrlRef.current = currentPreviewUrl;
+        const img = new Image();
+        img.src = currentPreviewUrl;
+        img.onload = () => {
+          if (img.src === latestEditedUrlRef.current) {
+            setLayers((prev) => [...prev, { id: img.src, url: img.src, opacity: 0 }]);
+          }
+        };
+        return () => {
+          img.onload = null;
+        };
+      }
+
+      if (layers.length === 0 && !currentPreviewUrl) {
+        const initialUrl = originalUrl || thumbnailUrl;
+        if (initialUrl && initialUrl !== latestEditedUrlRef.current) {
+          latestEditedUrlRef.current = initialUrl;
+          setLayers([{ id: initialUrl, url: initialUrl, opacity: 1 }]);
+        }
+      }
+    }, [selectedImage, finalPreviewUrl, fullResolutionUrl, transformedOriginalUrl, showOriginal, layers]);
 
     useEffect(() => {
-      const layerToFadeIn = layers.find((l) => l.opacity === 0);
+      const layerToFadeIn = layers.find((l: ImageLayer) => l.opacity === 0);
       if (layerToFadeIn) {
         const timer = setTimeout(() => {
-          setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
+          setLayers((prev: Array<ImageLayer>) =>
+            prev.map((l: ImageLayer) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)),
+          );
         }, 10);
+
         return () => clearTimeout(timer);
       }
     }, [layers]);
 
     const handleTransitionEnd = useCallback((finishedId: string) => {
-      setLayers((prevLayers) => {
-        if (prevLayers.length > 1 && prevLayers[prevLayers.length - 1].id === finishedId) {
-          return [prevLayers[prevLayers.length - 1]];
+      setLayers((prev: Array<ImageLayer>) => {
+        if (prev.length > 1) {
+          const finalLayer = prev.find((l) => l.id === finishedId);
+          return finalLayer ? [finalLayer] : prev;
         }
-        return prevLayers;
+        return prev;
       });
     }, []);
 
@@ -941,6 +963,7 @@ const ImageCanvas = memo(
                   alt="Mask Overlay"
                   className="absolute object-contain pointer-events-none"
                   src={maskOverlayUrl}
+                  decoding="async"
                   style={{
                     height: `${imageRenderSize.height}px`,
                     left: `${imageRenderSize.offsetX}px`,
