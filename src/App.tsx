@@ -138,7 +138,7 @@ interface PanoramaModalState {
 }
 
 const DEBUG = false;
-const REVOCATION_DELAY = 5000; // 5 seconds
+const REVOCATION_DELAY = 5000;
 
 const useDelayedRevokeBlobUrl = (url: string | null | undefined) => {
   const previousUrlRef = useRef<string | null | undefined>(null);
@@ -229,6 +229,7 @@ function App() {
   const [isLoadingFullRes, setIsLoadingFullRes] = useState(false);
   const [transformedOriginalUrl, setTransformedOriginalUrl] = useState<string | null>(null);
   const fullResRequestRef = useRef<any>(null);
+  const fullResCacheKeyRef = useRef<string | null>(null);
 
   useDelayedRevokeBlobUrl(finalPreviewUrl);
   useDelayedRevokeBlobUrl(uncroppedAdjustedPreviewUrl);
@@ -267,6 +268,7 @@ function App() {
 
       setIsFullResolution(false);
       setFullResolutionUrl(null);
+      fullResCacheKeyRef.current = null;
     } else {
       setPreviewSize({ width: 0, height: 0 });
       setOriginalSize({ width: 0, height: 0 });
@@ -408,6 +410,24 @@ function App() {
     }
   }, [activeRightPanel, activeMaskContainerId, activeAiPatchContainerId]);
 
+  const geometricAdjustmentsKey = useMemo(() => {
+    if (!adjustments) return '';
+    const { crop, rotation, flipHorizontal, flipVertical, orientationSteps } = adjustments;
+    return JSON.stringify({ crop, rotation, flipHorizontal, flipVertical, orientationSteps });
+  }, [
+    adjustments?.crop,
+    adjustments?.rotation,
+    adjustments?.flipHorizontal,
+    adjustments?.flipVertical,
+    adjustments?.orientationSteps,
+  ]);
+
+  const visualAdjustmentsKey = useMemo(() => {
+    if (!adjustments) return '';
+    const { rating, sectionVisibility, ...visualAdjustments } = adjustments;
+    return JSON.stringify(visualAdjustments);
+  }, [adjustments]);
+
   const undo = useCallback(() => {
     if (canUndo) {
       undoAdjustments();
@@ -420,18 +440,6 @@ function App() {
       debouncedSetHistory.cancel();
     }
   }, [canRedo, redoAdjustments, debouncedSetHistory]);
-
-  const geometricAdjustmentsKey = useMemo(() => {
-    if (!adjustments) return '';
-    const { crop, rotation, flipHorizontal, flipVertical, orientationSteps } = adjustments;
-    return JSON.stringify({ crop, rotation, flipHorizontal, flipVertical, orientationSteps });
-  }, [
-    adjustments?.crop,
-    adjustments?.rotation,
-    adjustments?.flipHorizontal,
-    adjustments?.flipVertical,
-    adjustments?.orientationSteps,
-  ]);
 
   useEffect(() => {
     setTransformedOriginalUrl(null);
@@ -1423,7 +1431,7 @@ function App() {
   );
 
   const requestFullResolution = useCallback(
-    debounce((currentAdjustments: any) => {
+    debounce((currentAdjustments: any, key: string) => {
       if (!selectedImage?.path) return;
 
       if (fullResRequestRef.current) {
@@ -1441,6 +1449,7 @@ function App() {
             const blob = new Blob([imageData], { type: 'image/jpeg' });
             const url = URL.createObjectURL(blob);
             setFullResolutionUrl(url);
+            fullResCacheKeyRef.current = key;
             setIsFullResolution(true);
             setIsLoadingFullRes(false);
           }
@@ -1450,6 +1459,7 @@ function App() {
             console.error('Failed to generate full resolution preview:', error);
             setIsFullResolution(false);
             setFullResolutionUrl(null);
+            fullResCacheKeyRef.current = null;
             setIsLoadingFullRes(false);
           }
         });
@@ -1459,11 +1469,12 @@ function App() {
 
   useEffect(() => {
     if (isFullResolution && selectedImage?.path) {
-      setFullResolutionUrl(null);
-      setIsLoadingFullRes(true);
-      requestFullResolution(adjustments);
+      if (fullResCacheKeyRef.current !== visualAdjustmentsKey) {
+        setIsLoadingFullRes(true);
+        requestFullResolution(adjustments, visualAdjustmentsKey);
+      }
     }
-  }, [adjustments, isFullResolution, selectedImage?.path, requestFullResolution]);
+  }, [adjustments, isFullResolution, selectedImage?.path, requestFullResolution, visualAdjustmentsKey]);
 
   const handleFullResolutionLogic = useCallback(
     (targetZoomPercent: number, currentDisplayWidth: number) => {
@@ -1471,9 +1482,14 @@ function App() {
       const shouldUsePreview = previewSize.width > 0 && currentDisplayWidth <= previewSize.width;
 
       if (needsFullRes && !isFullResolution && !shouldUsePreview) {
+        if (fullResolutionUrl && fullResCacheKeyRef.current === visualAdjustmentsKey) {
+          setIsFullResolution(true);
+          return;
+        }
+
         if (!isLoadingFullRes) {
           setIsLoadingFullRes(true);
-          requestFullResolution(adjustments);
+          requestFullResolution(adjustments, visualAdjustmentsKey);
         }
       } else if (!needsFullRes || shouldUsePreview) {
         if (fullResRequestRef.current) {
@@ -1484,14 +1500,21 @@ function App() {
         }
         if (isFullResolution) {
           setIsFullResolution(false);
-          setFullResolutionUrl(null);
         }
         if (isLoadingFullRes) {
           setIsLoadingFullRes(false);
         }
       }
     },
-    [previewSize, isFullResolution, isLoadingFullRes, requestFullResolution, adjustments],
+    [
+      previewSize,
+      isFullResolution,
+      isLoadingFullRes,
+      requestFullResolution,
+      adjustments,
+      fullResolutionUrl,
+      visualAdjustmentsKey,
+    ],
   );
 
   const handleZoomChange = useCallback(
@@ -1602,6 +1625,8 @@ function App() {
       setFinalPreviewUrl(null);
       setUncroppedAdjustedPreviewUrl(null);
       setFullScreenUrl(null);
+      setFullResolutionUrl(null);
+      setTransformedOriginalUrl(null);
       setLiveAdjustments(INITIAL_ADJUSTMENTS);
       resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
       setShowOriginal(false);

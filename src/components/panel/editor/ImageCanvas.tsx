@@ -555,7 +555,9 @@ const ImageCanvas = memo(
 
       const currentPreviewUrl = showOriginal
         ? transformedOriginalUrl
-        : fullResolutionUrl || finalPreviewUrl;
+        : isFullResolution && !isLoadingFullRes && fullResolutionUrl
+        ? fullResolutionUrl
+        : finalPreviewUrl;
 
       if (imageChanged) {
         imagePathRef.current = currentImagePath;
@@ -590,7 +592,16 @@ const ImageCanvas = memo(
           setLayers([{ id: initialUrl, url: initialUrl, opacity: 1 }]);
         }
       }
-    }, [selectedImage, finalPreviewUrl, fullResolutionUrl, transformedOriginalUrl, showOriginal, layers]);
+    }, [
+      selectedImage,
+      finalPreviewUrl,
+      fullResolutionUrl,
+      transformedOriginalUrl,
+      showOriginal,
+      layers,
+      isFullResolution,
+      isLoadingFullRes,
+    ]);
 
     useEffect(() => {
       const layerToFadeIn = layers.find((l: ImageLayer) => l.opacity === 0);
@@ -689,7 +700,7 @@ const ImageCanvas = memo(
           setPreviewLine(updatedLine);
         }
       },
-      [isBrushActive, isAiSubjectActive],
+      [isToolActive],
     );
 
     const handleMouseUp = useCallback(() => {
@@ -782,7 +793,7 @@ const ImageCanvas = memo(
       if (isToolActive) {
         setCursorPreview((p: CursorPreview) => ({ ...p, visible: true }));
       }
-    }, [isBrushActive, isAiSubjectActive]);
+    }, [isToolActive]);
 
     const handleMouseLeave = useCallback(() => {
       setCursorPreview((p: CursorPreview) => ({ ...p, visible: false }));
