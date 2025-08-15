@@ -27,7 +27,7 @@ use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgb, Rgba, RgbaIm
 use image::codecs::jpeg::JpegEncoder;
 use imageproc::morphology::dilate;
 use imageproc::distance_transform::Norm as DilationNorm;
-use tauri::{Manager, Emitter};
+use tauri::{Manager, Emitter, ipc::Response};
 use base64::{Engine as _, engine::general_purpose};
 use serde_json::Value;
 use tokio::sync::Mutex as TokioMutex;
@@ -83,7 +83,8 @@ pub struct AppState {
 
 #[derive(serde::Serialize)]
 struct LoadImageResult {
-    original_base64: String,
+    #[serde(with = "serde_bytes")]
+    original_image_bytes: Vec<u8>,
     width: u32,
     height: u32,
     metadata: ImageMetadata,
@@ -236,17 +237,6 @@ fn generate_transformed_preview(
     Ok((final_preview_base, scale_for_gpu, unscaled_crop_offset))
 }
 
-fn encode_to_base64(image: &DynamicImage, quality: u8) -> Result<String, String> {
-    let rgb_image = image.to_rgb8();
-
-    let mut buf = Cursor::new(Vec::new());
-    let encoder = JpegEncoder::new_with_quality(&mut buf, quality);
-    rgb_image.write_with_encoder(encoder).map_err(|e| e.to_string())?;
-    
-    let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
-    Ok(format!("data:image/jpeg;base64,{}", base64_str))
-}
-
 fn encode_to_base64_png(image: &GrayImage) -> Result<String, String> {
     let mut buf = Cursor::new(Vec::new());
     image.write_to(&mut buf, ImageFormat::Png).map_err(|e| e.to_string())?;
@@ -290,7 +280,10 @@ async fn load_image(path: String, state: tauri::State<'_, AppState>, app_handle:
     let settings = load_settings(app_handle).unwrap_or_default();
     let display_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
     let display_preview = pristine_img.thumbnail(display_preview_dim, display_preview_dim);
-    let original_base64 = encode_to_base64(&display_preview, 85)?;
+    
+    let mut buf = Cursor::new(Vec::new());
+    display_preview.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80)).map_err(|e| e.to_string())?;
+    let original_image_bytes = buf.into_inner();
 
     *state.cached_preview.lock().unwrap() = None;
     *state.original_image.lock().unwrap() = Some(LoadedImage {
@@ -301,7 +294,7 @@ async fn load_image(path: String, state: tauri::State<'_, AppState>, app_handle:
     });
     
     Ok(LoadImageResult {
-        original_base64,
+        original_image_bytes,
         width: orig_width,
         height: orig_height,
         metadata,
@@ -375,8 +368,9 @@ fn apply_adjustments(
                 let _ = app_handle.emit("waveform-update", waveform_data);
             }
 
-            if let Ok(base64_str) = encode_to_base64(&final_processed_image, 88) {
-                let _ = app_handle.emit("preview-update-final", base64_str);
+            let mut buf = Cursor::new(Vec::new());
+            if final_processed_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80)).is_ok() {
+                let _ = app_handle.emit("preview-update-final", buf.get_ref());
             }
         }
     });
@@ -433,13 +427,36 @@ fn generate_uncropped_preview(
         let uncropped_adjustments = get_all_adjustments_from_json(&adjustments_clone);
 
         if let Ok(processed_image) = process_and_get_dynamic_image(&context, &processing_base, uncropped_adjustments, &mask_bitmaps) {
-            if let Ok(base64_str) = encode_to_base64(&processed_image, 85) {
-                let _ = app_handle.emit("preview-update-uncropped", base64_str);
+            let mut buf = Cursor::new(Vec::new());
+            if processed_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80)).is_ok() {
+                let _ = app_handle.emit("preview-update-uncropped", buf.get_ref());
             }
         }
     });
 
     Ok(())
+}
+
+#[tauri::command]
+fn generate_original_transformed_preview(
+    js_adjustments: serde_json::Value,
+    state: tauri::State<AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<Response, String> {
+    let loaded_image = state.original_image.lock().unwrap().clone().ok_or("No original image loaded")?;
+    
+    let settings = load_settings(app_handle).unwrap_or_default();
+    let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
+    let preview_base = loaded_image.image.thumbnail(preview_dim, preview_dim);
+    let scale = if loaded_image.full_width > 0 { preview_base.width() as f32 / loaded_image.full_width as f32 } else { 1.0 };
+
+    let (transformed_image, _unscaled_crop_offset) = 
+        apply_all_transformations(&preview_base, &js_adjustments, scale);
+
+    let mut buf = Cursor::new(Vec::new());
+    transformed_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80)).map_err(|e| e.to_string())?;
+    
+    Ok(Response::new(buf.into_inner()))
 }
 
 fn get_full_image_for_processing(state: &tauri::State<AppState>) -> Result<DynamicImage, String> {
@@ -452,7 +469,7 @@ fn get_full_image_for_processing(state: &tauri::State<AppState>) -> Result<Dynam
 fn generate_fullscreen_preview(
     js_adjustments: serde_json::Value,
     state: tauri::State<AppState>,
-) -> Result<String, String> {
+) -> Result<Response, String> {
     let context = get_or_init_gpu_context(&state)?;
     let original_image = get_full_image_for_processing(&state)?;
     let base_image = composite_patches_on_image(&original_image, &js_adjustments)
@@ -473,7 +490,10 @@ fn generate_fullscreen_preview(
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
     let final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps)?;
     
-    encode_to_base64(&final_image, 95)
+    let mut buf = Cursor::new(Vec::new());
+    final_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 90)).map_err(|e| e.to_string())?;
+    
+    Ok(Response::new(buf.into_inner()))
 }
 
 #[tauri::command]
@@ -842,7 +862,7 @@ fn generate_mask_overlay(
     height: u32,
     scale: f32,
     crop_offset: (f32, f32),
-) -> Result<String, String> {
+) -> Result<Response, String> {
 
     let scaled_crop_offset = (crop_offset.0 * scale, crop_offset.1 * scale);
 
@@ -857,10 +877,9 @@ fn generate_mask_overlay(
         let mut buf = Cursor::new(Vec::new());
         rgba_mask.write_to(&mut buf, ImageFormat::Png).map_err(|e| e.to_string())?;
         
-        let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
-        Ok(format!("data:image/png;base64,{}", base64_str))
+        Ok(Response::new(buf.into_inner()))
     } else {
-        Ok("".to_string())
+        Ok(Response::new(Vec::new()))
     }
 }
 
@@ -1025,7 +1044,7 @@ async fn generate_ai_subject_mask(
 fn generate_preset_preview(
     js_adjustments: serde_json::Value,
     state: tauri::State<AppState>,
-) -> Result<String, String> {
+) -> Result<Response, String> {
     let context = get_or_init_gpu_context(&state)?;
 
     let loaded_image = state.original_image.lock().unwrap().clone()
@@ -1051,7 +1070,10 @@ fn generate_preset_preview(
     
     let processed_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps)?;
     
-    encode_to_base64(&processed_image, 50)
+    let mut buf = Cursor::new(Vec::new());
+    processed_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 50)).map_err(|e| e.to_string())?;
+    
+    Ok(Response::new(buf.into_inner()))
 }
 
 #[tauri::command]
@@ -1388,6 +1410,7 @@ fn main() {
             batch_export_images,
             cancel_export,
             generate_fullscreen_preview,
+            generate_original_transformed_preview,
             generate_preset_preview,
             generate_uncropped_preview,
             generate_mask_overlay,

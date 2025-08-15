@@ -138,6 +138,32 @@ interface PanoramaModalState {
 }
 
 const DEBUG = false;
+const REVOCATION_DELAY = 5000; // 5 seconds
+
+const useDelayedRevokeBlobUrl = (url: string | null | undefined) => {
+  const previousUrlRef = useRef<string | null | undefined>(null);
+
+  useEffect(() => {
+    if (previousUrlRef.current && previousUrlRef.current !== url) {
+      const urlToRevoke = previousUrlRef.current;
+      if (urlToRevoke && urlToRevoke.startsWith('blob:')) {
+        setTimeout(() => {
+          URL.revokeObjectURL(urlToRevoke);
+        }, REVOCATION_DELAY);
+      }
+    }
+    previousUrlRef.current = url;
+  }, [url]);
+
+  useEffect(() => {
+    return () => {
+      const finalUrl = previousUrlRef.current;
+      if (finalUrl && finalUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(finalUrl);
+      }
+    };
+  }, []);
+};
 
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
@@ -201,12 +227,18 @@ function App() {
   const [isFullResolution, setIsFullResolution] = useState(false);
   const [fullResolutionUrl, setFullResolutionUrl] = useState<string | null>(null);
   const [isLoadingFullRes, setIsLoadingFullRes] = useState(false);
+  const [transformedOriginalUrl, setTransformedOriginalUrl] = useState<string | null>(null);
   const fullResRequestRef = useRef<any>(null);
 
-  // Track display size changes for zoom calculations
+  useDelayedRevokeBlobUrl(finalPreviewUrl);
+  useDelayedRevokeBlobUrl(uncroppedAdjustedPreviewUrl);
+  useDelayedRevokeBlobUrl(fullScreenUrl);
+  useDelayedRevokeBlobUrl(transformedOriginalUrl);
+  useDelayedRevokeBlobUrl(selectedImage?.originalUrl);
+
   const handleDisplaySizeChange = useCallback((size: ImageDimensions & { scale?: number }) => {
     setDisplaySize({ width: size.width, height: size.height });
-    
+
     if (size.scale) {
       const baseWidth = size.width / size.scale;
       const baseHeight = size.height / size.scale;
@@ -216,14 +248,13 @@ function App() {
 
   const [initialFitScale, setInitialFitScale] = useState<number | null>(null);
 
-  // Initialize size tracking when image changes
   useEffect(() => {
     if (selectedImage && appSettings?.editorPreviewResolution) {
       setOriginalSize({ width: selectedImage.width, height: selectedImage.height });
-      
+
       const maxSize = appSettings.editorPreviewResolution;
       const aspectRatio = selectedImage.width / selectedImage.height;
-      
+
       if (selectedImage.width > selectedImage.height) {
         const width = Math.min(selectedImage.width, maxSize);
         const height = Math.round(width / aspectRatio);
@@ -233,7 +264,7 @@ function App() {
         const width = Math.round(height * aspectRatio);
         setPreviewSize({ width, height });
       }
-      
+
       setIsFullResolution(false);
       setFullResolutionUrl(null);
     } else {
@@ -389,6 +420,54 @@ function App() {
       debouncedSetHistory.cancel();
     }
   }, [canRedo, redoAdjustments, debouncedSetHistory]);
+
+  const geometricAdjustmentsKey = useMemo(() => {
+    if (!adjustments) return '';
+    const { crop, rotation, flipHorizontal, flipVertical, orientationSteps } = adjustments;
+    return JSON.stringify({ crop, rotation, flipHorizontal, flipVertical, orientationSteps });
+  }, [
+    adjustments?.crop,
+    adjustments?.rotation,
+    adjustments?.flipHorizontal,
+    adjustments?.flipVertical,
+    adjustments?.orientationSteps,
+  ]);
+
+  useEffect(() => {
+    setTransformedOriginalUrl(null);
+  }, [geometricAdjustmentsKey, selectedImage?.path]);
+
+  useEffect(() => {
+    let isEffectActive = true;
+    let objectUrl: string | null = null;
+
+    const generate = async () => {
+      if (showOriginal && selectedImage?.path && !transformedOriginalUrl) {
+        try {
+          const imageData: Uint8Array = await invoke('generate_original_transformed_preview', {
+            jsAdjustments: adjustments,
+          });
+          if (isEffectActive) {
+            const blob = new Blob([imageData], { type: 'image/jpeg' });
+            objectUrl = URL.createObjectURL(blob);
+            setTransformedOriginalUrl(objectUrl);
+          }
+        } catch (e) {
+          if (isEffectActive) {
+            console.error('Failed to generate original preview:', e);
+            setError('Failed to show original image.');
+            setShowOriginal(false);
+          }
+        }
+      }
+    };
+
+    generate();
+
+    return () => {
+      isEffectActive = false;
+    };
+  }, [showOriginal, selectedImage?.path, adjustments, transformedOriginalUrl]);
 
   useEffect(() => {
     const unlisten = listen('comfyui-status-update', (event: any) => {
@@ -1161,10 +1240,13 @@ function App() {
       return;
     }
 
+    let url: string | null = null;
     const generate = async () => {
       setIsFullScreenLoading(true);
       try {
-        const url: string = await invoke(Invokes.GenerateFullscreenPreview, { jsAdjustments: adjustments });
+        const imageData: Uint8Array = await invoke(Invokes.GenerateFullscreenPreview, { jsAdjustments: adjustments });
+        const blob = new Blob([imageData], { type: 'image/jpeg' });
+        url = URL.createObjectURL(blob);
         setFullScreenUrl(url);
       } catch (e) {
         console.error('Failed to generate fullscreen preview:', e);
@@ -1340,39 +1422,41 @@ function App() {
     [copiedFilePaths, currentFolderPath, handleLibraryRefresh],
   );
 
-  // Request full resolution preview when zoomed in
   const requestFullResolution = useCallback(
     debounce((currentAdjustments: any) => {
       if (!selectedImage?.path) return;
-      
+
       if (fullResRequestRef.current) {
         fullResRequestRef.current.cancelled = true;
       }
-      
+
       const request = { cancelled: false };
       fullResRequestRef.current = request;
-      
+
       invoke(Invokes.GenerateFullscreenPreview, {
-        jsAdjustments: currentAdjustments
-      }).then((fullResUrl: string) => {
-        if (!request.cancelled) {
-          setFullResolutionUrl(fullResUrl);
-          setIsFullResolution(true);
-          setIsLoadingFullRes(false);
-        }
-      }).catch((error: any) => {
-        if (!request.cancelled) {
-          console.error('Failed to generate full resolution preview:', error);
-          setIsFullResolution(false);
-          setFullResolutionUrl(null);
-          setIsLoadingFullRes(false);
-        }
-      });
+        jsAdjustments: currentAdjustments,
+      })
+        .then((imageData: Uint8Array) => {
+          if (!request.cancelled) {
+            const blob = new Blob([imageData], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+            setFullResolutionUrl(url);
+            setIsFullResolution(true);
+            setIsLoadingFullRes(false);
+          }
+        })
+        .catch((error: any) => {
+          if (!request.cancelled) {
+            console.error('Failed to generate full resolution preview:', error);
+            setIsFullResolution(false);
+            setFullResolutionUrl(null);
+            setIsLoadingFullRes(false);
+          }
+        });
     }, 300),
-    [selectedImage?.path]
+    [selectedImage?.path],
   );
-  
-  // Regenerate full resolution when adjustments change while zoomed
+
   useEffect(() => {
     if (isFullResolution && selectedImage?.path) {
       setFullResolutionUrl(null);
@@ -1381,90 +1465,115 @@ function App() {
     }
   }, [adjustments, isFullResolution, selectedImage?.path, requestFullResolution]);
 
-  // Helper function to handle full resolution logic
-  const handleFullResolutionLogic = useCallback((targetZoomPercent: number, currentDisplayWidth: number) => {
-    const needsFullRes = targetZoomPercent > 0.5;
-    const shouldUsePreview = previewSize.width > 0 && currentDisplayWidth <= previewSize.width;
-    
-    if (needsFullRes && !isFullResolution && !shouldUsePreview) {
-      if (!isLoadingFullRes) {
-        setIsLoadingFullRes(true);
-        requestFullResolution(adjustments);
-      }
-    } else if ((!needsFullRes || shouldUsePreview)) {
-      if (fullResRequestRef.current) {
-        fullResRequestRef.current.cancelled = true;
-      }
-      if (requestFullResolution.cancel) {
-        requestFullResolution.cancel();
-      }
-      if (isFullResolution) {
-        setIsFullResolution(false);
-        setFullResolutionUrl(null);
-      }
-      if (isLoadingFullRes) {
-        setIsLoadingFullRes(false);
-      }
-    }
-  }, [previewSize, isFullResolution, isLoadingFullRes, requestFullResolution, adjustments]);
+  const handleFullResolutionLogic = useCallback(
+    (targetZoomPercent: number, currentDisplayWidth: number) => {
+      const needsFullRes = targetZoomPercent > 0.5;
+      const shouldUsePreview = previewSize.width > 0 && currentDisplayWidth <= previewSize.width;
 
-  // Handle zoom changes with percentage relative to original image size
-  const handleZoomChange = useCallback((zoomValue: number, fitToWindow: boolean = false) => {
-    let targetZoomPercent: number;
-    
-    if (fitToWindow) {
-      if (originalSize.width > 0 && originalSize.height > 0 && baseRenderSize.width > 0 && baseRenderSize.height > 0) {
-        const originalAspect = originalSize.width / originalSize.height;
-        const baseAspect = baseRenderSize.width / baseRenderSize.height;
-        
-        if (originalAspect > baseAspect) {
-          targetZoomPercent = baseRenderSize.width / originalSize.width;
+      if (needsFullRes && !isFullResolution && !shouldUsePreview) {
+        if (!isLoadingFullRes) {
+          setIsLoadingFullRes(true);
+          requestFullResolution(adjustments);
+        }
+      } else if (!needsFullRes || shouldUsePreview) {
+        if (fullResRequestRef.current) {
+          fullResRequestRef.current.cancelled = true;
+        }
+        if (requestFullResolution.cancel) {
+          requestFullResolution.cancel();
+        }
+        if (isFullResolution) {
+          setIsFullResolution(false);
+          setFullResolutionUrl(null);
+        }
+        if (isLoadingFullRes) {
+          setIsLoadingFullRes(false);
+        }
+      }
+    },
+    [previewSize, isFullResolution, isLoadingFullRes, requestFullResolution, adjustments],
+  );
+
+  const handleZoomChange = useCallback(
+    (zoomValue: number, fitToWindow: boolean = false) => {
+      let targetZoomPercent: number;
+
+      const orientationSteps = adjustments.orientationSteps || 0;
+      const isSwapped = orientationSteps === 1 || orientationSteps === 3;
+      const effectiveOriginalWidth = isSwapped ? originalSize.height : originalSize.width;
+      const effectiveOriginalHeight = isSwapped ? originalSize.width : originalSize.height;
+
+      if (fitToWindow) {
+        if (
+          effectiveOriginalWidth > 0 &&
+          effectiveOriginalHeight > 0 &&
+          baseRenderSize.width > 0 &&
+          baseRenderSize.height > 0
+        ) {
+          const originalAspect = effectiveOriginalWidth / effectiveOriginalHeight;
+          const baseAspect = baseRenderSize.width / baseRenderSize.height;
+
+          if (originalAspect > baseAspect) {
+            targetZoomPercent = baseRenderSize.width / effectiveOriginalWidth;
+          } else {
+            targetZoomPercent = baseRenderSize.height / effectiveOriginalHeight;
+          }
         } else {
-          targetZoomPercent = baseRenderSize.height / originalSize.height;
+          targetZoomPercent = 1.0;
         }
       } else {
-        targetZoomPercent = 1.0;
+        targetZoomPercent = zoomValue;
       }
-    } else {
-      targetZoomPercent = zoomValue;
-    }
-    
-    targetZoomPercent = Math.max(0.1, Math.min(2.0, targetZoomPercent));
-    
-    let transformZoom = 1.0;
-    if (originalSize.width > 0 && originalSize.height > 0 && baseRenderSize.width > 0 && baseRenderSize.height > 0) {
-      const originalAspect = originalSize.width / originalSize.height;
-      const baseAspect = baseRenderSize.width / baseRenderSize.height;
-      
-      if (originalAspect > baseAspect) {
-        transformZoom = (targetZoomPercent * originalSize.width) / baseRenderSize.width;
-      } else {
-        transformZoom = (targetZoomPercent * originalSize.height) / baseRenderSize.height;
+
+      targetZoomPercent = Math.max(0.1, Math.min(2.0, targetZoomPercent));
+
+      let transformZoom = 1.0;
+      if (
+        effectiveOriginalWidth > 0 &&
+        effectiveOriginalHeight > 0 &&
+        baseRenderSize.width > 0 &&
+        baseRenderSize.height > 0
+      ) {
+        const originalAspect = effectiveOriginalWidth / effectiveOriginalHeight;
+        const baseAspect = baseRenderSize.width / baseRenderSize.height;
+
+        if (originalAspect > baseAspect) {
+          transformZoom = (targetZoomPercent * effectiveOriginalWidth) / baseRenderSize.width;
+        } else {
+          transformZoom = (targetZoomPercent * effectiveOriginalHeight) / baseRenderSize.height;
+        }
       }
-    }
-    
-    isProgrammaticZoom.current = true;
-    setZoom(transformZoom);
-    
-    const currentDisplayWidth = baseRenderSize.width * transformZoom;
-    handleFullResolutionLogic(targetZoomPercent, currentDisplayWidth);
-  }, [originalSize, baseRenderSize, handleFullResolutionLogic]);
 
-  // Handle manual zoom via mouse/trackpad
-  const handleUserTransform = useCallback((transformState: TransformState) => {
-    if (isProgrammaticZoom.current) {
-      isProgrammaticZoom.current = false;
-      return;
-    }
+      isProgrammaticZoom.current = true;
+      setZoom(transformZoom);
 
-    setZoom(transformState.scale);
-
-    if (originalSize.width > 0 && baseRenderSize.width > 0) {
-      const targetZoomPercent = (baseRenderSize.width * transformState.scale) / originalSize.width;
-      const currentDisplayWidth = baseRenderSize.width * transformState.scale;
+      const currentDisplayWidth = baseRenderSize.width * transformZoom;
       handleFullResolutionLogic(targetZoomPercent, currentDisplayWidth);
-    }
-  }, [originalSize, baseRenderSize, handleFullResolutionLogic]);
+    },
+    [originalSize, baseRenderSize, handleFullResolutionLogic, adjustments.orientationSteps],
+  );
+
+  const handleUserTransform = useCallback(
+    (transformState: TransformState) => {
+      if (isProgrammaticZoom.current) {
+        isProgrammaticZoom.current = false;
+        return;
+      }
+
+      setZoom(transformState.scale);
+
+      if (originalSize.width > 0 && baseRenderSize.width > 0) {
+        const orientationSteps = adjustments.orientationSteps || 0;
+        const isSwapped = orientationSteps === 1 || orientationSteps === 3;
+        const effectiveOriginalWidth = isSwapped ? originalSize.height : originalSize.width;
+
+        const targetZoomPercent = (baseRenderSize.width * transformState.scale) / effectiveOriginalWidth;
+        const currentDisplayWidth = baseRenderSize.width * transformState.scale;
+        handleFullResolutionLogic(targetZoomPercent, currentDisplayWidth);
+      }
+    },
+    [originalSize, baseRenderSize, handleFullResolutionLogic, adjustments.orientationSteps],
+  );
 
   const handleImageSelect = useCallback(
     (path: string) => {
@@ -1558,13 +1667,19 @@ function App() {
     const listeners = [
       listen('preview-update-final', (event: any) => {
         if (isEffectActive) {
-          setFinalPreviewUrl(event.payload);
+          const imageData = new Uint8Array(event.payload);
+          const blob = new Blob([imageData], { type: 'image/jpeg' });
+          const url = URL.createObjectURL(blob);
+          setFinalPreviewUrl(url);
           setIsAdjusting(false);
         }
       }),
       listen('preview-update-uncropped', (event: any) => {
         if (isEffectActive) {
-          setUncroppedAdjustedPreviewUrl(event.payload);
+          const imageData = new Uint8Array(event.payload);
+          const blob = new Blob([imageData], { type: 'image/jpeg' });
+          const url = URL.createObjectURL(blob);
+          setUncroppedAdjustedPreviewUrl(url);
         }
       }),
       listen('histogram-update', (event: any) => {
@@ -1983,6 +2098,10 @@ function App() {
           if (!isEffectActive) {
             return;
           }
+
+          const blob = new Blob([loadImageResult.original_image_bytes], { type: 'image/jpeg' });
+          const originalUrl = URL.createObjectURL(blob);
+
           setSelectedImage((currentSelected: SelectedImage | null) => {
             if (currentSelected && currentSelected.path === selectedImage.path) {
               return {
@@ -1992,7 +2111,7 @@ function App() {
                 isRaw: loadImageResult.is_raw,
                 isReady: true,
                 metadata: loadImageResult.metadata,
-                originalUrl: loadImageResult.original_base64,
+                originalUrl: originalUrl,
                 width: loadImageResult.width,
               };
             }
@@ -2655,6 +2774,7 @@ function App() {
               targetZoom={zoom}
               thumbnails={thumbnails}
               transformWrapperRef={transformWrapperRef}
+              transformedOriginalUrl={transformedOriginalUrl}
               uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
               updateSubMask={updateSubMask}
               waveform={waveform}

@@ -55,6 +55,7 @@ interface EditorProps {
   targetZoom: number;
   thumbnails: Record<string, string>;
   transformWrapperRef: any;
+  transformedOriginalUrl: string | null;
   uncroppedAdjustedPreviewUrl: string | null;
   updateSubMask(id: string | null, subMask: Partial<SubMask>): void;
   waveform: WaveformData | null;
@@ -107,6 +108,7 @@ export default function Editor({
   targetZoom,
   thumbnails,
   transformWrapperRef,
+  transformedOriginalUrl,
   uncroppedAdjustedPreviewUrl,
   updateSubMask,
   waveform,
@@ -129,6 +131,15 @@ export default function Editor({
   const isInitialMount = useRef(true);
   const transformStateRef = useRef<TransformState>(transformState);
   transformStateRef.current = transformState;
+
+  useEffect(() => {
+    const currentUrl = maskOverlayUrl;
+    return () => {
+      if (currentUrl && currentUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(currentUrl);
+      }
+    };
+  }, [maskOverlayUrl]);
 
   useEffect(() => {
     if (!transformWrapperRef.current) {
@@ -187,30 +198,28 @@ export default function Editor({
 
   const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
 
-  // Calculate zoom limits relative to original image size
   const transformConfig = useMemo(() => {
-    if (!selectedImage || !imageRenderSize.width || !originalSize?.width) {
+    if (!selectedImage || !imageRenderSize.scale || !originalSize) {
       return { minScale: 0.1, maxScale: 20 };
     }
-    
-    const originalWidth = originalSize.width;
-    const baseRenderWidth = imageRenderSize.width;
-    
-    const minTransformScale = (0.1 * originalWidth) / baseRenderWidth;
-    const maxTransformScale = (2.0 * originalWidth) / baseRenderWidth;
-    
-    return { 
-      minScale: Math.max(0.1, minTransformScale), 
-      maxScale: Math.max(20, maxTransformScale)
+
+    const scaleFor100Percent = 1 / imageRenderSize.scale;
+
+    const minScale = 0.1 * scaleFor100Percent;
+    const maxScale = 2.0 * scaleFor100Percent;
+
+    return {
+      minScale: Math.max(0.1, minScale),
+      maxScale: Math.max(20, maxScale),
     };
-  }, [selectedImage, imageRenderSize.width, originalSize]);
+  }, [selectedImage, imageRenderSize.scale, originalSize]);
 
   useEffect(() => {
     if (onDisplaySizeChange && imageRenderSize.width > 0) {
       const currentDisplaySize = {
         width: imageRenderSize.width * transformState.scale,
         height: imageRenderSize.height * transformState.scale,
-        scale: transformState.scale
+        scale: transformState.scale,
       };
       onDisplaySizeChange(currentDisplaySize);
     }
@@ -230,14 +239,20 @@ export default function Editor({
       }
       try {
         const cropOffset = [adjustments.crop?.x || 0, adjustments.crop?.y || 0];
-        const url: string = await invoke(Invokes.GenerateMaskOverlay, {
+        const imageData: Uint8Array = await invoke(Invokes.GenerateMaskOverlay, {
           cropOffset,
           height: Math.round(renderSize.height),
           maskDef,
           scale: renderSize.scale,
           width: Math.round(renderSize.width),
         });
-        setMaskOverlayUrl(url);
+        if (imageData.length > 0) {
+          const blob = new Blob([imageData], { type: 'image/png' });
+          const url = URL.createObjectURL(blob);
+          setMaskOverlayUrl(url);
+        } else {
+          setMaskOverlayUrl(null);
+        }
       } catch (e) {
         console.error('Failed to generate mask overlay:', e);
         setMaskOverlayUrl(null);
@@ -397,46 +412,64 @@ export default function Editor({
 
   const toggleShowOriginal = useCallback(() => setShowOriginal((prev: boolean) => !prev), [setShowOriginal]);
 
-  // Handle double-click zoom cycling (same logic as spacebar)
   const handleDoubleClick = useCallback(() => {
     if (isCropping || isMasking || isAiEditing) return;
-    
+
     const currentDisplaySize = {
       width: imageRenderSize.width * transformState.scale,
-      height: imageRenderSize.height * transformState.scale
+      height: imageRenderSize.height * transformState.scale,
     };
-    
-    const currentPercent = originalSize && originalSize.width > 0 && currentDisplaySize.width > 0 
-      ? Math.round((currentDisplaySize.width / originalSize.width) * 100)
-      : 100;
-      
+
+    const orientationSteps = adjustments.orientationSteps || 0;
+    const isSwapped = orientationSteps === 1 || orientationSteps === 3;
+    const effectiveOriginalWidth = originalSize && isSwapped ? originalSize.height : originalSize?.width || 0;
+    const effectiveOriginalHeight = originalSize && isSwapped ? originalSize.width : originalSize?.height || 0;
+
+    const currentPercent =
+      effectiveOriginalWidth > 0 && currentDisplaySize.width > 0
+        ? Math.round((currentDisplaySize.width / effectiveOriginalWidth) * 100)
+        : 100;
+
     let fitPercent = 100;
-    if (originalSize && originalSize.width > 0 && originalSize.height > 0 && baseRenderSize && baseRenderSize.width > 0 && baseRenderSize.height > 0) {
-      const originalAspect = originalSize.width / originalSize.height;
+    if (
+      effectiveOriginalWidth > 0 &&
+      effectiveOriginalHeight > 0 &&
+      baseRenderSize &&
+      baseRenderSize.width > 0 &&
+      baseRenderSize.height > 0
+    ) {
+      const originalAspect = effectiveOriginalWidth / effectiveOriginalHeight;
       const baseAspect = baseRenderSize.width / baseRenderSize.height;
-      
+
       if (originalAspect > baseAspect) {
-        fitPercent = Math.round((baseRenderSize.width / originalSize.width) * 100);
+        fitPercent = Math.round((baseRenderSize.width / effectiveOriginalWidth) * 100);
       } else {
-        fitPercent = Math.round((baseRenderSize.height / originalSize.height) * 100);
+        fitPercent = Math.round((baseRenderSize.height / effectiveOriginalHeight) * 100);
       }
     }
-    
+
     const doubleFitPercent = fitPercent * 2;
-    
+
     if (onZoomChange) {
       if (Math.abs(currentPercent - fitPercent) < 5) {
-        // Zoom 2x FitToWindows
         onZoomChange(doubleFitPercent < 100 ? doubleFitPercent / 100 : 1.0);
       } else if (Math.abs(currentPercent - doubleFitPercent) < 5 && doubleFitPercent < 100) {
-        // Zoom 100%
         onZoomChange(1.0);
       } else {
-        // Zoom FitToWindows
         onZoomChange(0, true);
       }
     }
-  }, [isCropping, isMasking, isAiEditing, transformState.scale, originalSize, imageRenderSize, baseRenderSize, onZoomChange]);
+  }, [
+    isCropping,
+    isMasking,
+    isAiEditing,
+    transformState.scale,
+    originalSize,
+    imageRenderSize,
+    baseRenderSize,
+    onZoomChange,
+    adjustments.orientationSteps,
+  ]);
 
   const doubleClickProps: any = useMemo(() => {
     if (isCropping || isMasking || isAiEditing) {
@@ -549,43 +582,44 @@ export default function Editor({
             }}
           >
             <TransformComponent
-              wrapperStyle={{ width: '100%', height: '100%' }} 
+              wrapperStyle={{ width: '100%', height: '100%' }}
               contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
               <div onDoubleClick={handleDoubleClick} style={{ width: '100%', height: '100%' }}>
                 <ImageCanvas
-                activeAiPatchContainerId={activeAiPatchContainerId}
-                activeAiSubMaskId={activeAiSubMaskId}
-                activeMaskContainerId={activeMaskContainerId}
-                activeMaskId={activeMaskId}
-                adjustments={adjustments}
-                brushSettings={brushSettings}
-                crop={crop}
-                finalPreviewUrl={finalPreviewUrl}
-                handleCropComplete={handleCropComplete}
-                imageRenderSize={imageRenderSize}
-                isAdjusting={isAdjusting}
-                isAiEditing={isAiEditing}
-                isCropping={isCropping}
-                isMaskControlHovered={isMaskControlHovered}
-                isMasking={isMasking}
-                isStraightenActive={isStraightenActive}
-                maskOverlayUrl={maskOverlayUrl}
-                onGenerateAiMask={onGenerateAiMask}
-                onQuickErase={onQuickErase}
-                onSelectAiSubMask={onSelectAiSubMask}
-                onSelectMask={onSelectMask}
-                onStraighten={onStraighten}
-                selectedImage={selectedImage}
-                setCrop={handleCropChange}
-                setIsMaskHovered={setIsMaskHovered}
-                showOriginal={showOriginal}
-                uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
-                updateSubMask={updateSubMask}
-                fullResolutionUrl={fullResolutionUrl}
-                isFullResolution={isFullResolution}
-                isLoadingFullRes={isLoadingFullRes}
-              />
+                  activeAiPatchContainerId={activeAiPatchContainerId}
+                  activeAiSubMaskId={activeAiSubMaskId}
+                  activeMaskContainerId={activeMaskContainerId}
+                  activeMaskId={activeMaskId}
+                  adjustments={adjustments}
+                  brushSettings={brushSettings}
+                  crop={crop}
+                  finalPreviewUrl={finalPreviewUrl}
+                  handleCropComplete={handleCropComplete}
+                  imageRenderSize={imageRenderSize}
+                  isAdjusting={isAdjusting}
+                  isAiEditing={isAiEditing}
+                  isCropping={isCropping}
+                  isMaskControlHovered={isMaskControlHovered}
+                  isMasking={isMasking}
+                  isStraightenActive={isStraightenActive}
+                  maskOverlayUrl={maskOverlayUrl}
+                  onGenerateAiMask={onGenerateAiMask}
+                  onQuickErase={onQuickErase}
+                  onSelectAiSubMask={onSelectAiSubMask}
+                  onSelectMask={onSelectMask}
+                  onStraighten={onStraighten}
+                  selectedImage={selectedImage}
+                  setCrop={handleCropChange}
+                  setIsMaskHovered={setIsMaskHovered}
+                  showOriginal={showOriginal}
+                  transformedOriginalUrl={transformedOriginalUrl}
+                  uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
+                  updateSubMask={updateSubMask}
+                  fullResolutionUrl={fullResolutionUrl}
+                  isFullResolution={isFullResolution}
+                  isLoadingFullRes={isLoadingFullRes}
+                />
               </div>
             </TransformComponent>
           </TransformWrapper>

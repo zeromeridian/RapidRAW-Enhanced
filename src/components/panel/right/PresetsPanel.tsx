@@ -282,6 +282,46 @@ export default function PresetsPanel({ activePanel, adjustments, selectedImage, 
   const previewQueue = useRef<Array<any>>([]);
   const isProcessingQueue = useRef(false);
 
+  useEffect(() => {
+    const allPresetIds = new Set();
+    presets.forEach((item: UserPreset) => {
+      if (item.preset) {
+        allPresetIds.add(item.preset.id);
+      } else if (item.folder) {
+        item.folder.children.forEach((p: Preset) => allPresetIds.add(p.id));
+      }
+    });
+
+    const currentPreviews = previewsRef.current;
+    const previewsToDelete = Object.keys(currentPreviews).filter((id) => !allPresetIds.has(id));
+
+    if (previewsToDelete.length > 0) {
+      setPreviews((prev) => {
+        const newPreviews = { ...prev };
+        previewsToDelete.forEach((id) => {
+          const url = newPreviews[id];
+          if (url && url.startsWith('blob:')) {
+            URL.revokeObjectURL(url);
+          }
+          delete newPreviews[id];
+        });
+        return newPreviews;
+      });
+    }
+  }, [presets]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(previewsRef.current).forEach((url) => {
+        if (url && url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+      previewQueue.current = [];
+      isProcessingQueue.current = false;
+    };
+  }, []);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -343,8 +383,18 @@ export default function PresetsPanel({ activePanel, adjustments, selectedImage, 
 
       try {
         const fullPresetAdjustments = { ...INITIAL_ADJUSTMENTS, ...preset.adjustments };
-        const previewUrl = await invoke(Invokes.GeneratePresetPreview, { jsAdjustments: fullPresetAdjustments });
-        setPreviews((prev: Record<string, string | null>) => ({ ...prev, [preset.id]: previewUrl }));
+        const imageData: Uint8Array = await invoke(Invokes.GeneratePresetPreview, {
+          jsAdjustments: fullPresetAdjustments,
+        });
+        const blob = new Blob([imageData], { type: 'image/jpeg' });
+        const url = URL.createObjectURL(blob);
+        setPreviews((prev: Record<string, string | null>) => {
+          const oldUrl = prev[preset.id];
+          if (oldUrl && oldUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(oldUrl);
+          }
+          return { ...prev, [preset.id]: url };
+        });
       } catch (error) {
         console.error(`Failed to generate preview for preset ${preset.name}:`, error);
         setPreviews((prev: Record<string, string | null>) => ({ ...prev, [preset.id]: null }));
@@ -393,10 +443,19 @@ export default function PresetsPanel({ activePanel, adjustments, selectedImage, 
       setIsGeneratingPreviews(true);
       try {
         const fullPresetAdjustments: any = { ...INITIAL_ADJUSTMENTS, ...preset.adjustments };
-        const previewUrl: string = await invoke(Invokes.GeneratePresetPreview, {
+        const imageData: Uint8Array = await invoke(Invokes.GeneratePresetPreview, {
           jsAdjustments: fullPresetAdjustments,
         });
-        setPreviews((prev: Record<string, string | null>) => ({ ...prev, [preset.id]: previewUrl }));
+        const blob = new Blob([imageData], { type: 'image/jpeg' });
+        const url = URL.createObjectURL(blob);
+
+        setPreviews((prev: Record<string, string | null>) => {
+          const oldUrl = prev[preset.id];
+          if (oldUrl && oldUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(oldUrl);
+          }
+          return { ...prev, [preset.id]: url };
+        });
       } catch (error) {
         console.error(`Failed to generate preview for preset ${preset.name}:`, error);
         setPreviews((prev: Record<string, string | null>) => ({ ...prev, [preset.id]: null }));
