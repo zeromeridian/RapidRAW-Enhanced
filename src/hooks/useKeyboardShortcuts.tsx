@@ -20,7 +20,7 @@ interface KeyboardShortcutsProps {
   handleRightPanelSelect(panel: Panel): void;
   handleSetColorLabel(label: string | null): void;
   handleToggleFullScreen(): void;
-  handleZoomChange(zoom: number): void;
+  handleZoomChange(zoomValue: number, fitToWindow?: boolean): void;
   isFullScreen: boolean;
   isStraightenActive: boolean;
   isViewLoading: boolean;
@@ -40,6 +40,9 @@ interface KeyboardShortcutsProps {
   sortedImageList: Array<ImageFile>;
   undo(): void;
   zoom: number;
+  displaySize?: { width: number; height: number };
+  baseRenderSize?: { width: number; height: number };
+  originalSize?: { width: number; height: number };
 }
 
 export const useKeyboardShortcuts = ({
@@ -81,6 +84,9 @@ export const useKeyboardShortcuts = ({
   sortedImageList,
   undo,
   zoom,
+  displaySize,
+  baseRenderSize,
+  originalSize,
 }: KeyboardShortcutsProps) => {
   useEffect(() => {
     const handleKeyDown = (event: any) => {
@@ -116,10 +122,37 @@ export const useKeyboardShortcuts = ({
         }
         if (key === ' ' && !isCtrl) {
           event.preventDefault();
-          if (Math.abs(zoom - 2) < 0.01) {
-            handleZoomChange(1);
+          
+          // Calculate current zoom percentage relative to original
+          const currentPercent = originalSize && originalSize.width > 0 && displaySize && displaySize.width > 0 
+            ? Math.round((displaySize.width / originalSize.width) * 100)
+            : 100;
+          
+          // Toggle between fit-to-window, 2x fit-to-window (if < 100%), and 100%
+          let fitPercent = 100;
+          if (originalSize && originalSize.width > 0 && originalSize.height > 0 && baseRenderSize && baseRenderSize.width > 0 && baseRenderSize.height > 0) {
+            const originalAspect = originalSize.width / originalSize.height;
+            const baseAspect = baseRenderSize.width / baseRenderSize.height;
+            
+            if (originalAspect > baseAspect) {
+              // Width is limiting (landscape)
+              fitPercent = Math.round((baseRenderSize.width / originalSize.width) * 100);
+            } else {
+              // Height is limiting (portrait)
+              fitPercent = Math.round((baseRenderSize.height / originalSize.height) * 100);
+            }
+          }
+
+          const doubleFitPercent = fitPercent * 2;
+          if (Math.abs(currentPercent - fitPercent) < 5) {
+            // Zoom 2x FitToWindows
+            handleZoomChange(doubleFitPercent < 100 ? doubleFitPercent / 100 : 1.0);
+          } else if (Math.abs(currentPercent - doubleFitPercent) < 5 && doubleFitPercent < 100) {
+            // Zoom 100%
+            handleZoomChange(1.0);
           } else {
-            handleZoomChange(2);
+            // Zoom FitToWindows
+            handleZoomChange(0, true);
           }
           return;
         }
@@ -166,10 +199,19 @@ export const useKeyboardShortcuts = ({
 
         if (selectedImage) {
           if (key === 'arrowup' || key === 'arrowdown') {
-            const zoomStep = 0.25;
-            const newZoom = key === 'arrowup' ? zoom + zoomStep : zoom - zoomStep;
-            const minZoom = activeRightPanel === Panel.Crop ? 0.4 : 0.7;
-            handleZoomChange(Math.max(minZoom, Math.min(newZoom, 10)));
+            // Calculate current zoom percentage relative to original
+            const currentPercent = originalSize && originalSize.width > 0 && displaySize && displaySize.width > 0 
+              ? (displaySize.width / originalSize.width)
+              : 1.0;
+            
+            const step = 0.1; // 10% steps
+            const newPercent = key === 'arrowup' 
+              ? currentPercent + step 
+              : currentPercent - step;
+            
+            // Clamp to 10%-200% of original size
+            const clampedPercent = Math.max(0.1, Math.min(newPercent, 2.0));
+            handleZoomChange(clampedPercent);
           } else {
             const isNext = key === 'arrowright';
             const currentIndex = sortedImageList.findIndex((img: ImageFile) => img.path === selectedImage.path);

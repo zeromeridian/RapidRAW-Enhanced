@@ -58,6 +58,14 @@ interface EditorProps {
   uncroppedAdjustedPreviewUrl: string | null;
   updateSubMask(id: string | null, subMask: Partial<SubMask>): void;
   waveform: WaveformData | null;
+  onDisplaySizeChange?(size: any): void;
+  onInitialFitScale?(scale: number): void;
+  onZoomChange?(zoomValue: number, fitToWindow?: boolean): void;
+  originalSize?: ImageDimensions;
+  baseRenderSize?: ImageDimensions;
+  isFullResolution?: boolean;
+  fullResolutionUrl?: string | null;
+  isLoadingFullRes?: boolean;
 }
 
 export default function Editor({
@@ -102,6 +110,14 @@ export default function Editor({
   uncroppedAdjustedPreviewUrl,
   updateSubMask,
   waveform,
+  onDisplaySizeChange,
+  onInitialFitScale,
+  onZoomChange,
+  originalSize,
+  baseRenderSize,
+  isFullResolution,
+  fullResolutionUrl,
+  isLoadingFullRes,
 }: EditorProps) {
   const [crop, setCrop] = useState<Crop | null>(null);
   const prevCropParams = useRef<any>(null);
@@ -170,6 +186,41 @@ export default function Editor({
   }, [selectedImage, adjustments.crop, adjustments.orientationSteps]);
 
   const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
+
+  // Calculate zoom limits relative to original image size
+  const transformConfig = useMemo(() => {
+    if (!selectedImage || !imageRenderSize.width || !originalSize?.width) {
+      return { minScale: 0.1, maxScale: 20 };
+    }
+    
+    const originalWidth = originalSize.width;
+    const baseRenderWidth = imageRenderSize.width;
+    
+    const minTransformScale = (0.1 * originalWidth) / baseRenderWidth;
+    const maxTransformScale = (2.0 * originalWidth) / baseRenderWidth;
+    
+    return { 
+      minScale: Math.max(0.1, minTransformScale), 
+      maxScale: Math.max(20, maxTransformScale)
+    };
+  }, [selectedImage, imageRenderSize.width, originalSize]);
+
+  useEffect(() => {
+    if (onDisplaySizeChange && imageRenderSize.width > 0) {
+      const currentDisplaySize = {
+        width: imageRenderSize.width * transformState.scale,
+        height: imageRenderSize.height * transformState.scale,
+        scale: transformState.scale
+      };
+      onDisplaySizeChange(currentDisplaySize);
+    }
+  }, [imageRenderSize, transformState.scale, onDisplaySizeChange]);
+
+  useEffect(() => {
+    if (onInitialFitScale && imageRenderSize.scale > 0) {
+      onInitialFitScale(imageRenderSize.scale);
+    }
+  }, [imageRenderSize.scale, onInitialFitScale]);
 
   const debouncedGenerateMaskOverlay = useCallback(
     debounce(async (maskDef, renderSize) => {
@@ -346,6 +397,47 @@ export default function Editor({
 
   const toggleShowOriginal = useCallback(() => setShowOriginal((prev: boolean) => !prev), [setShowOriginal]);
 
+  // Handle double-click zoom cycling (same logic as spacebar)
+  const handleDoubleClick = useCallback(() => {
+    if (isCropping || isMasking || isAiEditing) return;
+    
+    const currentDisplaySize = {
+      width: imageRenderSize.width * transformState.scale,
+      height: imageRenderSize.height * transformState.scale
+    };
+    
+    const currentPercent = originalSize && originalSize.width > 0 && currentDisplaySize.width > 0 
+      ? Math.round((currentDisplaySize.width / originalSize.width) * 100)
+      : 100;
+      
+    let fitPercent = 100;
+    if (originalSize && originalSize.width > 0 && originalSize.height > 0 && baseRenderSize && baseRenderSize.width > 0 && baseRenderSize.height > 0) {
+      const originalAspect = originalSize.width / originalSize.height;
+      const baseAspect = baseRenderSize.width / baseRenderSize.height;
+      
+      if (originalAspect > baseAspect) {
+        fitPercent = Math.round((baseRenderSize.width / originalSize.width) * 100);
+      } else {
+        fitPercent = Math.round((baseRenderSize.height / originalSize.height) * 100);
+      }
+    }
+    
+    const doubleFitPercent = fitPercent * 2;
+    
+    if (onZoomChange) {
+      if (Math.abs(currentPercent - fitPercent) < 5) {
+        // Zoom 2x FitToWindows
+        onZoomChange(doubleFitPercent < 100 ? doubleFitPercent / 100 : 1.0);
+      } else if (Math.abs(currentPercent - doubleFitPercent) < 5 && doubleFitPercent < 100) {
+        // Zoom 100%
+        onZoomChange(1.0);
+      } else {
+        // Zoom FitToWindows
+        onZoomChange(0, true);
+      }
+    }
+  }, [isCropping, isMasking, isAiEditing, transformState.scale, originalSize, imageRenderSize, baseRenderSize, onZoomChange]);
+
   const doubleClickProps: any = useMemo(() => {
     if (isCropping || isMasking || isAiEditing) {
       return {
@@ -423,6 +515,7 @@ export default function Editor({
           onUndo={onUndo}
           selectedImage={selectedImage}
           showOriginal={showOriginal}
+          isLoadingFullRes={isLoadingFullRes}
         />
 
         <div
@@ -442,30 +535,25 @@ export default function Editor({
           )}
 
           <TransformWrapper
-            centerZoomedOut={true}
-            doubleClick={doubleClickProps}
             key={selectedImage.path}
-            limitToBounds={true}
-            maxScale={10}
-            minScale={0.7}
-            onTransformed={(_, state: TransformState) => {
-              onZoomed(state);
-              setTransformState(state);
-            }}
-            panning={{ disabled: isPanningDisabled }}
             ref={transformWrapperRef}
+            minScale={transformConfig.minScale}
+            maxScale={transformConfig.maxScale}
+            limitToBounds={true}
+            centerZoomedOut={true}
+            doubleClick={{ disabled: true }}
+            panning={{ disabled: isPanningDisabled }}
+            onTransformed={(_, state: TransformState) => {
+              setTransformState(state);
+              onZoomed(state);
+            }}
           >
             <TransformComponent
-              contentStyle={{
-                alignItems: 'center',
-                display: 'flex',
-                height: '100%',
-                justifyContent: 'center',
-                width: '100%',
-              }}
-              wrapperStyle={{ width: '100%', height: '100%' }}
+              wrapperStyle={{ width: '100%', height: '100%' }} 
+              contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              <ImageCanvas
+              <div onDoubleClick={handleDoubleClick} style={{ width: '100%', height: '100%' }}>
+                <ImageCanvas
                 activeAiPatchContainerId={activeAiPatchContainerId}
                 activeAiSubMaskId={activeAiSubMaskId}
                 activeMaskContainerId={activeMaskContainerId}
@@ -494,7 +582,11 @@ export default function Editor({
                 showOriginal={showOriginal}
                 uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
                 updateSubMask={updateSubMask}
+                fullResolutionUrl={fullResolutionUrl}
+                isFullResolution={isFullResolution}
+                isLoadingFullRes={isLoadingFullRes}
               />
+              </div>
             </TransformComponent>
           </TransformWrapper>
         </div>

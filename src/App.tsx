@@ -33,6 +33,7 @@ import FolderTree from './components/panel/FolderTree';
 import Editor from './components/panel/Editor';
 import Controls from './components/panel/right/ControlsPanel';
 import { useThumbnails } from './hooks/useThumbnails';
+import { ImageDimensions } from './hooks/useImageRenderSize';
 import RightPanelSwitcher from './components/panel/right/RightPanelSwitcher';
 import MetadataPanel from './components/panel/right/MetadataPanel';
 import CropPanel from './components/panel/right/CropPanel';
@@ -193,6 +194,54 @@ function App() {
   const [activeAiPatchContainerId, setActiveAiPatchContainerId] = useState<string | null>(null);
   const [activeAiSubMaskId, setActiveAiSubMaskId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [displaySize, setDisplaySize] = useState<ImageDimensions>({ width: 0, height: 0 });
+  const [previewSize, setPreviewSize] = useState<ImageDimensions>({ width: 0, height: 0 });
+  const [baseRenderSize, setBaseRenderSize] = useState<ImageDimensions>({ width: 0, height: 0 });
+  const [originalSize, setOriginalSize] = useState<ImageDimensions>({ width: 0, height: 0 });
+  const [isFullResolution, setIsFullResolution] = useState(false);
+  const [fullResolutionUrl, setFullResolutionUrl] = useState<string | null>(null);
+  const [isLoadingFullRes, setIsLoadingFullRes] = useState(false);
+  const fullResRequestRef = useRef<any>(null);
+
+  // Track display size changes for zoom calculations
+  const handleDisplaySizeChange = useCallback((size: ImageDimensions & { scale?: number }) => {
+    setDisplaySize({ width: size.width, height: size.height });
+    
+    if (size.scale) {
+      const baseWidth = size.width / size.scale;
+      const baseHeight = size.height / size.scale;
+      setBaseRenderSize({ width: baseWidth, height: baseHeight });
+    }
+  }, []);
+
+  const [initialFitScale, setInitialFitScale] = useState<number | null>(null);
+
+  // Initialize size tracking when image changes
+  useEffect(() => {
+    if (selectedImage && appSettings?.editorPreviewResolution) {
+      setOriginalSize({ width: selectedImage.width, height: selectedImage.height });
+      
+      const maxSize = appSettings.editorPreviewResolution;
+      const aspectRatio = selectedImage.width / selectedImage.height;
+      
+      if (selectedImage.width > selectedImage.height) {
+        const width = Math.min(selectedImage.width, maxSize);
+        const height = Math.round(width / aspectRatio);
+        setPreviewSize({ width, height });
+      } else {
+        const height = Math.min(selectedImage.height, maxSize);
+        const width = Math.round(height * aspectRatio);
+        setPreviewSize({ width, height });
+      }
+      
+      setIsFullResolution(false);
+      setFullResolutionUrl(null);
+    } else {
+      setPreviewSize({ width: 0, height: 0 });
+      setOriginalSize({ width: 0, height: 0 });
+    }
+  }, [selectedImage, appSettings?.editorPreviewResolution]);
+
   const [renderedRightPanel, setRenderedRightPanel] = useState<Panel | null>(activeRightPanel);
   const [collapsibleSectionsState, setCollapsibleSectionsState] = useState<CollapsibleSectionsState>({
     basic: true,
@@ -1291,11 +1340,117 @@ function App() {
     [copiedFilePaths, currentFolderPath, handleLibraryRefresh],
   );
 
-  const handleZoomChange = useCallback((newZoomValue: number) => {
-    isProgrammaticZoom.current = true;
-    setZoom(newZoomValue);
-  }, []);
+  // Request full resolution preview when zoomed in
+  const requestFullResolution = useCallback(
+    debounce((currentAdjustments: any) => {
+      if (!selectedImage?.path) return;
+      
+      if (fullResRequestRef.current) {
+        fullResRequestRef.current.cancelled = true;
+      }
+      
+      const request = { cancelled: false };
+      fullResRequestRef.current = request;
+      
+      invoke(Invokes.GenerateFullscreenPreview, {
+        jsAdjustments: currentAdjustments
+      }).then((fullResUrl: string) => {
+        if (!request.cancelled) {
+          setFullResolutionUrl(fullResUrl);
+          setIsFullResolution(true);
+          setIsLoadingFullRes(false);
+        }
+      }).catch((error: any) => {
+        if (!request.cancelled) {
+          console.error('Failed to generate full resolution preview:', error);
+          setIsFullResolution(false);
+          setFullResolutionUrl(null);
+          setIsLoadingFullRes(false);
+        }
+      });
+    }, 300),
+    [selectedImage?.path]
+  );
+  
+  // Regenerate full resolution when adjustments change while zoomed
+  useEffect(() => {
+    if (isFullResolution && selectedImage?.path) {
+      setFullResolutionUrl(null);
+      setIsLoadingFullRes(true);
+      requestFullResolution(adjustments);
+    }
+  }, [adjustments, isFullResolution, selectedImage?.path, requestFullResolution]);
 
+  // Helper function to handle full resolution logic
+  const handleFullResolutionLogic = useCallback((targetZoomPercent: number, currentDisplayWidth: number) => {
+    const needsFullRes = targetZoomPercent > 0.5;
+    const shouldUsePreview = previewSize.width > 0 && currentDisplayWidth <= previewSize.width;
+    
+    if (needsFullRes && !isFullResolution && !shouldUsePreview) {
+      if (!isLoadingFullRes) {
+        setIsLoadingFullRes(true);
+        requestFullResolution(adjustments);
+      }
+    } else if ((!needsFullRes || shouldUsePreview)) {
+      if (fullResRequestRef.current) {
+        fullResRequestRef.current.cancelled = true;
+      }
+      if (requestFullResolution.cancel) {
+        requestFullResolution.cancel();
+      }
+      if (isFullResolution) {
+        setIsFullResolution(false);
+        setFullResolutionUrl(null);
+      }
+      if (isLoadingFullRes) {
+        setIsLoadingFullRes(false);
+      }
+    }
+  }, [previewSize, isFullResolution, isLoadingFullRes, requestFullResolution, adjustments]);
+
+  // Handle zoom changes with percentage relative to original image size
+  const handleZoomChange = useCallback((zoomValue: number, fitToWindow: boolean = false) => {
+    let targetZoomPercent: number;
+    
+    if (fitToWindow) {
+      if (originalSize.width > 0 && originalSize.height > 0 && baseRenderSize.width > 0 && baseRenderSize.height > 0) {
+        const originalAspect = originalSize.width / originalSize.height;
+        const baseAspect = baseRenderSize.width / baseRenderSize.height;
+        
+        if (originalAspect > baseAspect) {
+          targetZoomPercent = baseRenderSize.width / originalSize.width;
+        } else {
+          targetZoomPercent = baseRenderSize.height / originalSize.height;
+        }
+      } else {
+        targetZoomPercent = 1.0;
+      }
+    } else {
+      targetZoomPercent = zoomValue;
+    }
+    
+    targetZoomPercent = Math.max(0.1, Math.min(2.0, targetZoomPercent));
+    
+    let transformZoom = 1.0;
+    if (originalSize.width > 0 && originalSize.height > 0 && baseRenderSize.width > 0 && baseRenderSize.height > 0) {
+      const originalAspect = originalSize.width / originalSize.height;
+      const baseAspect = baseRenderSize.width / baseRenderSize.height;
+      
+      if (originalAspect > baseAspect) {
+        transformZoom = (targetZoomPercent * originalSize.width) / baseRenderSize.width;
+      } else {
+        transformZoom = (targetZoomPercent * originalSize.height) / baseRenderSize.height;
+      }
+    }
+    
+    isProgrammaticZoom.current = true;
+    setZoom(transformZoom);
+    
+    const currentDisplayWidth = baseRenderSize.width * transformZoom;
+    handleFullResolutionLogic(targetZoomPercent, currentDisplayWidth);
+  }, [originalSize, baseRenderSize, handleFullResolutionLogic]);
+
+  // Handle manual zoom via mouse/trackpad
   const handleUserTransform = useCallback((transformState: TransformState) => {
     if (isProgrammaticZoom.current) {
       isProgrammaticZoom.current = false;
@@ -1303,7 +1458,13 @@ function App() {
     }
 
     setZoom(transformState.scale);
-  }, []);
+
+    if (originalSize.width > 0 && baseRenderSize.width > 0) {
+      const targetZoomPercent = (baseRenderSize.width * transformState.scale) / originalSize.width;
+      const currentDisplayWidth = baseRenderSize.width * transformState.scale;
+      handleFullResolutionLogic(targetZoomPercent, currentDisplayWidth);
+    }
+  }, [originalSize, baseRenderSize, handleFullResolutionLogic]);
 
   const handleImageSelect = useCallback(
     (path: string) => {
@@ -1387,6 +1548,9 @@ function App() {
     sortedImageList,
     undo,
     zoom,
+    displaySize,
+    baseRenderSize,
+    originalSize,
   });
 
   useEffect(() => {
@@ -2494,6 +2658,14 @@ function App() {
               uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
               updateSubMask={updateSubMask}
               waveform={waveform}
+              onDisplaySizeChange={handleDisplaySizeChange}
+              onInitialFitScale={setInitialFitScale}
+              onZoomChange={handleZoomChange}
+              originalSize={originalSize}
+              baseRenderSize={baseRenderSize}
+              isFullResolution={isFullResolution}
+              fullResolutionUrl={fullResolutionUrl}
+              isLoadingFullRes={isLoadingFullRes}
             />
             <Resizer
               direction={Orientation.Horizontal}
@@ -2511,9 +2683,10 @@ function App() {
               isPasteDisabled={copiedAdjustments === null}
               isRatingDisabled={!selectedImage}
               isResizing={isResizing}
-              maxZoom={10}
-              minZoom={0.7}
               multiSelectedPaths={multiSelectedPaths}
+              displaySize={displaySize}
+              originalSize={originalSize}
+              baseRenderSize={baseRenderSize}
               onClearSelection={handleClearSelection}
               onContextMenu={handleThumbnailContextMenu}
               onCopy={handleCopyAdjustments}
