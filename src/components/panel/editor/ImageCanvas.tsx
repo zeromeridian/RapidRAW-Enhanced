@@ -577,7 +577,12 @@ const ImageCanvas = memo(
         img.src = currentPreviewUrl;
         img.onload = () => {
           if (img.src === latestEditedUrlRef.current) {
-            setLayers((prev) => [...prev, { id: img.src, url: img.src, opacity: 0 }]);
+            setLayers((prev) => {
+              if (prev.some((l) => l.id === img.src)) {
+                return prev;
+              }
+              return [...prev, { id: img.src, url: img.src, opacity: 0 }];
+            });
           }
         };
         return () => {
@@ -585,11 +590,16 @@ const ImageCanvas = memo(
         };
       }
 
-      if (layers.length === 0 && !currentPreviewUrl) {
+      if (!currentPreviewUrl) {
         const initialUrl = originalUrl || thumbnailUrl;
         if (initialUrl && initialUrl !== latestEditedUrlRef.current) {
           latestEditedUrlRef.current = initialUrl;
-          setLayers([{ id: initialUrl, url: initialUrl, opacity: 1 }]);
+          setLayers((prev) => {
+            if (prev.length === 0) {
+              return [{ id: initialUrl, url: initialUrl, opacity: 1 }];
+            }
+            return prev;
+          });
         }
       }
     }, [
@@ -598,7 +608,6 @@ const ImageCanvas = memo(
       fullResolutionUrl,
       transformedOriginalUrl,
       showOriginal,
-      layers,
       isFullResolution,
       isLoadingFullRes,
     ]);

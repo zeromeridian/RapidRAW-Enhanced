@@ -61,9 +61,7 @@ interface EditorProps {
   waveform: WaveformData | null;
   onDisplaySizeChange?(size: any): void;
   onInitialFitScale?(scale: number): void;
-  onZoomChange?(zoomValue: number, fitToWindow?: boolean): void;
   originalSize?: ImageDimensions;
-  baseRenderSize?: ImageDimensions;
   isFullResolution?: boolean;
   fullResolutionUrl?: string | null;
   isLoadingFullRes?: boolean;
@@ -114,9 +112,7 @@ export default function Editor({
   waveform,
   onDisplaySizeChange,
   onInitialFitScale,
-  onZoomChange,
   originalSize,
-  baseRenderSize,
   isFullResolution,
   fullResolutionUrl,
   isLoadingFullRes,
@@ -131,6 +127,9 @@ export default function Editor({
   const isInitialMount = useRef(true);
   const transformStateRef = useRef<TransformState>(transformState);
   transformStateRef.current = transformState;
+
+  const isAnimating = useRef(false);
+  const animationTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const currentUrl = maskOverlayUrl;
@@ -158,12 +157,35 @@ export default function Editor({
     const animationType = 'easeOut';
     const factor = Math.log(targetZoom / currentScale);
 
+    if (animationTimeoutRef.current) {
+      clearTimeout(animationTimeoutRef.current);
+    }
+
+    isAnimating.current = true;
+
     if (targetZoom > currentScale) {
       zoomIn(factor, animationTime, animationType);
     } else {
       zoomOut(-factor, animationTime, animationType);
     }
+
+    animationTimeoutRef.current = window.setTimeout(() => {
+      isAnimating.current = false;
+    }, animationTime + 50);
   }, [targetZoom, transformWrapperRef]);
+
+  const handleTransform = useCallback(
+    (_, state: TransformState) => {
+      setTransformState(state);
+
+      if (isAnimating.current) {
+        return;
+      }
+
+      onZoomed(state);
+    },
+    [onZoomed],
+  );
 
   useEffect(() => {
     if (isInitialMount.current) {
@@ -410,65 +432,6 @@ export default function Editor({
 
   const toggleShowOriginal = useCallback(() => setShowOriginal((prev: boolean) => !prev), [setShowOriginal]);
 
-  const handleDoubleClick = useCallback(() => {
-    if (isCropping || isMasking || isAiEditing) return;
-
-    const currentDisplaySize = {
-      width: imageRenderSize.width * transformState.scale,
-      height: imageRenderSize.height * transformState.scale,
-    };
-
-    const orientationSteps = adjustments.orientationSteps || 0;
-    const isSwapped = orientationSteps === 1 || orientationSteps === 3;
-    const effectiveOriginalWidth = originalSize && isSwapped ? originalSize.height : originalSize?.width || 0;
-    const effectiveOriginalHeight = originalSize && isSwapped ? originalSize.width : originalSize?.height || 0;
-
-    const currentPercent =
-      effectiveOriginalWidth > 0 && currentDisplaySize.width > 0
-        ? Math.round((currentDisplaySize.width / effectiveOriginalWidth) * 100)
-        : 100;
-
-    let fitPercent = 100;
-    if (
-      effectiveOriginalWidth > 0 &&
-      effectiveOriginalHeight > 0 &&
-      baseRenderSize &&
-      baseRenderSize.width > 0 &&
-      baseRenderSize.height > 0
-    ) {
-      const originalAspect = effectiveOriginalWidth / effectiveOriginalHeight;
-      const baseAspect = baseRenderSize.width / baseRenderSize.height;
-
-      if (originalAspect > baseAspect) {
-        fitPercent = Math.round((baseRenderSize.width / effectiveOriginalWidth) * 100);
-      } else {
-        fitPercent = Math.round((baseRenderSize.height / effectiveOriginalHeight) * 100);
-      }
-    }
-
-    const doubleFitPercent = fitPercent * 2;
-
-    if (onZoomChange) {
-      if (Math.abs(currentPercent - fitPercent) < 5) {
-        onZoomChange(doubleFitPercent < 100 ? doubleFitPercent / 100 : 1.0);
-      } else if (Math.abs(currentPercent - doubleFitPercent) < 5 && doubleFitPercent < 100) {
-        onZoomChange(1.0);
-      } else {
-        onZoomChange(0, true);
-      }
-    }
-  }, [
-    isCropping,
-    isMasking,
-    isAiEditing,
-    transformState.scale,
-    originalSize,
-    imageRenderSize,
-    baseRenderSize,
-    onZoomChange,
-    adjustments.orientationSteps,
-  ]);
-
   const doubleClickProps: any = useMemo(() => {
     if (isCropping || isMasking || isAiEditing) {
       return {
@@ -567,57 +530,59 @@ export default function Editor({
 
           <TransformWrapper
             ref={transformWrapperRef}
+            key={selectedImage.path}
             minScale={transformConfig.minScale}
             maxScale={transformConfig.maxScale}
             limitToBounds={true}
             centerZoomedOut={true}
-            doubleClick={{ disabled: true }}
+            doubleClick={doubleClickProps}
             panning={{ disabled: isPanningDisabled }}
-            onTransformed={(_, state: TransformState) => {
-              setTransformState(state);
-              onZoomed(state);
-            }}
+            onTransformed={handleTransform}
           >
             <TransformComponent
               wrapperStyle={{ width: '100%', height: '100%' }}
-              contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              contentStyle={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
-              <div onDoubleClick={handleDoubleClick} style={{ width: '100%', height: '100%' }}>
-                <ImageCanvas
-                  activeAiPatchContainerId={activeAiPatchContainerId}
-                  activeAiSubMaskId={activeAiSubMaskId}
-                  activeMaskContainerId={activeMaskContainerId}
-                  activeMaskId={activeMaskId}
-                  adjustments={adjustments}
-                  brushSettings={brushSettings}
-                  crop={crop}
-                  finalPreviewUrl={finalPreviewUrl}
-                  handleCropComplete={handleCropComplete}
-                  imageRenderSize={imageRenderSize}
-                  isAdjusting={isAdjusting}
-                  isAiEditing={isAiEditing}
-                  isCropping={isCropping}
-                  isMaskControlHovered={isMaskControlHovered}
-                  isMasking={isMasking}
-                  isStraightenActive={isStraightenActive}
-                  maskOverlayUrl={maskOverlayUrl}
-                  onGenerateAiMask={onGenerateAiMask}
-                  onQuickErase={onQuickErase}
-                  onSelectAiSubMask={onSelectAiSubMask}
-                  onSelectMask={onSelectMask}
-                  onStraighten={onStraighten}
-                  selectedImage={selectedImage}
-                  setCrop={handleCropChange}
-                  setIsMaskHovered={setIsMaskHovered}
-                  showOriginal={showOriginal}
-                  transformedOriginalUrl={transformedOriginalUrl}
-                  uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
-                  updateSubMask={updateSubMask}
-                  fullResolutionUrl={fullResolutionUrl}
-                  isFullResolution={isFullResolution}
-                  isLoadingFullRes={isLoadingFullRes}
-                />
-              </div>
+              <ImageCanvas
+                activeAiPatchContainerId={activeAiPatchContainerId}
+                activeAiSubMaskId={activeAiSubMaskId}
+                activeMaskContainerId={activeMaskContainerId}
+                activeMaskId={activeMaskId}
+                adjustments={adjustments}
+                brushSettings={brushSettings}
+                crop={crop}
+                finalPreviewUrl={finalPreviewUrl}
+                handleCropComplete={handleCropComplete}
+                imageRenderSize={imageRenderSize}
+                isAdjusting={isAdjusting}
+                isAiEditing={isAiEditing}
+                isCropping={isCropping}
+                isMaskControlHovered={isMaskControlHovered}
+                isMasking={isMasking}
+                isStraightenActive={isStraightenActive}
+                maskOverlayUrl={maskOverlayUrl}
+                onGenerateAiMask={onGenerateAiMask}
+                onQuickErase={onQuickErase}
+                onSelectAiSubMask={onSelectAiSubMask}
+                onSelectMask={onSelectMask}
+                onStraighten={onStraighten}
+                selectedImage={selectedImage}
+                setCrop={handleCropChange}
+                setIsMaskHovered={setIsMaskHovered}
+                showOriginal={showOriginal}
+                transformedOriginalUrl={transformedOriginalUrl}
+                uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
+                updateSubMask={updateSubMask}
+                fullResolutionUrl={fullResolutionUrl}
+                isFullResolution={isFullResolution}
+                isLoadingFullRes={isLoadingFullRes}
+              />
             </TransformComponent>
           </TransformWrapper>
         </div>
