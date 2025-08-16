@@ -60,7 +60,7 @@ fn develop_internal(file_bytes: &[u8], fast_demosaic: bool) -> Result<(DynamicIm
     let denominator = (original_white_level - original_black_level).max(1.0);
     let rescale_factor = (headroom_white_level - original_black_level) / denominator;
 
-    const HIGHLIGHT_COMPRESSION_POINT: f32 = 3.0; // FIXME: This is not a good solution yet
+    const HIGHLIGHT_COMPRESSION_POINT: f32 = 2.2; // FIXME: This is not a good solution yet
 
     match &mut developed_intermediate {
         Intermediate::Monochrome(pixels) => {
