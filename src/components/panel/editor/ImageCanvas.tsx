@@ -627,11 +627,11 @@ const ImageCanvas = memo(
 
     const handleTransitionEnd = useCallback((finishedId: string) => {
       setLayers((prev: Array<ImageLayer>) => {
-        if (prev.length > 1) {
-          const finalLayer = prev.find((l) => l.id === finishedId);
-          return finalLayer ? [finalLayer] : prev;
+        const finishedIndex = prev.findIndex((l) => l.id === finishedId);
+        if (finishedIndex < 0 || prev.length <= 1) {
+          return prev;
         }
-        return prev;
+        return prev.slice(finishedIndex);
       });
     }, []);
 
@@ -950,8 +950,7 @@ const ImageCanvas = memo(
         >
           <div
             className={clsx(
-              'transition-opacity duration-300',
-              isAdjusting && !showOriginal ? 'opacity-70' : 'opacity-100',
+              isAdjusting && !showOriginal ? 'opacity-90' : 'opacity-100',
             )}
             style={{
               height: '100%',
@@ -970,7 +969,8 @@ const ImageCanvas = memo(
                   src={layer.url ?? ''}
                   style={{
                     opacity: layer.opacity,
-                    transition: 'opacity 125ms ease-in-out',
+                    transition: 'opacity 150ms ease-in-out',
+                    willChange: 'opacity',
                     imageRendering: 'high-quality',
                     WebkitImageRendering: 'high-quality',
                     transform: 'translateZ(0)',
@@ -998,7 +998,6 @@ const ImageCanvas = memo(
           </div>
 
           <Stage
-            className="transition-opacity duration-300"
             height={imageRenderSize.height}
             onMouseDown={handleMouseDown}
             onMouseEnter={handleMouseEnter}

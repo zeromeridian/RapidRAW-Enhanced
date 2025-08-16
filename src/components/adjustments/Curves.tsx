@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ActiveChannel, Adjustments, Coord, Curves } from '../../utils/adjustments';
 import { Theme } from '../ui/AppProperties';
 
@@ -89,6 +90,7 @@ function getCurvePath(points: Array<Coord>) {
   return path;
 }
 
+// Generates the final histogram path string
 function getHistogramPath(data: Array<any>) {
   if (!data || data.length === 0) {
     return '';
@@ -103,6 +105,20 @@ function getHistogramPath(data: Array<any>) {
       const x = (index / 255) * 255;
       const y = (value / maxVal) * 255;
       return `${x},${255 - y}`;
+    })
+    .join(' ');
+
+  return `M0,255 L${pathData} L255,255 Z`;
+}
+
+function getZeroHistogramPath(data: Array<any>) {
+  if (!data || data.length === 0) {
+    return '';
+  }
+  const pathData = data
+    .map((_, index: number) => {
+      const x = (index / 255) * 255;
+      return `${x},255`;
     })
     .join(' ');
 
@@ -281,7 +297,25 @@ export default function CurveGraph({ adjustments, setAdjustments, histogram, the
             strokeWidth="0.5"
           />
 
-          {histogramData && <path d={getHistogramPath(histogramData)} fill={color} opacity={histogramOpacity} />}
+          <AnimatePresence>
+            {histogramData && (
+              <motion.path
+                key={activeChannel}
+                fill={color}
+                initial={{ d: getZeroHistogramPath(histogramData), opacity: 0 }}
+                animate={{
+                  d: getHistogramPath(histogramData),
+                  opacity: histogramOpacity,
+                  transition: { d: { duration: 0.5, ease: [0.22, 1, 0.36, 1] }, opacity: { duration: 1 } },
+                }}
+                exit={{
+                  d: getZeroHistogramPath(histogramData),
+                  opacity: 0,
+                  transition: { d: { duration: 0.3, ease: [0.55, 0, 0.78, 0.34] }, opacity: { duration: 1 } },
+                }}
+              />
+            )}
+          </AnimatePresence>
 
           <line x1="0" y1="255" x2="255" y2="0" stroke="rgba(255,255,255,0.2)" strokeWidth="1" strokeDasharray="2 2" />
 

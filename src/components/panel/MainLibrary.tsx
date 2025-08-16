@@ -687,7 +687,7 @@ const Cell = ({ columnIndex, rowIndex, style, data }: CellProps) => {
       <motion.div
         animate={{ opacity: 1, scale: 1 }}
         className="p-2 h-full"
-        initial={{ opacity: 0.5, scale: 0.9 }}
+        initial={{ opacity: 0.9, scale: 0.95 }}
         key={imageFile.path}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
       >

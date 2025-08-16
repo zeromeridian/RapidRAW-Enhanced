@@ -102,7 +102,7 @@ const EditorToolbar = memo(
             <span
               className={clsx(
                 'block transition-transform duration-200 delay-100',
-                showResolution ? 'scale-100' : 'scale-90',
+                showResolution ? 'scale-100' : 'scale-95',
               )}
             >
               {displayedResolution}

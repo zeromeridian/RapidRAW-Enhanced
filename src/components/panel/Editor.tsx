@@ -530,7 +530,6 @@ export default function Editor({
 
           <TransformWrapper
             ref={transformWrapperRef}
-            key={selectedImage.path}
             minScale={transformConfig.minScale}
             maxScale={transformConfig.maxScale}
             limitToBounds={true}
