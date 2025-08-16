@@ -51,6 +51,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-08-16:** Fast AI sky masks
 *   **2025-08-15:** Show full resolution image when zooming in
 *   **2025-08-15:** Implement Tauri's IPC as a replacement for the slow Base64 image transfer
 *   **2025-08-12:** Relative zoom indicator
@@ -59,11 +60,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-08-09:** Frontend refactored to TypeScript thanks to @varjolintu
 *   **2025-08-08:** New onnxruntime download strategy & the base for local inpainting
 *   **2025-08-05:** Improved HSL cascading, UI & animation improvements, ability to grow & shrink / feather AI masks
-*   **2025-08-03:** New high performance, seamless image panorama stitcher (without any dependencies on OpenCV)
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-08-03:** New high performance, seamless image panorama stitcher (without any dependencies on OpenCV)
 *   **2025-08-02:** Added an image straightening tool and improved crop & rotation functionality (especially on portrait images)
 *   **2025-08-02:** A new dedicated image importer, ability to rename and batch rename files, improved dark theme, and other fixes
 *   **2025-07-31:** Ability to tag & filter images by color labels, refactored image right clicking
@@ -135,7 +136,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
       <h4>Core Editing Engine</h4>
       <ul>
         <li><strong>GPU-Accelerated Processing:</strong> All image adjustments are processed on the GPU using a custom WGSL shader for rapid feedback.</li>
-        <li><strong>Masking:</strong> Create masks with AI subject and foreground detection. Combine with traditional Brush, Linear, and Radial masks for great control.</li>
+        <li><strong>Masking:</strong> Create masks with AI subject, sky and foreground detection. Combine with traditional Brush, Linear, and Radial masks for great control.</li>
         <li><strong>Generative Edits:</strong> Remove objects or add new elements with text prompts. Each edit creates a non-destructive patch layer, powered by an optional ComfyUI backend.</li>
         <li><strong>Full RAW Support:</strong> Supports a wide range of RAW camera formats thanks to rawler.</li>
         <li><strong>Non-Destructive Workflow:</strong> All edits are stored in a <code>.rrdata</code> sidecar file, leaving your original images untouched.</li>
