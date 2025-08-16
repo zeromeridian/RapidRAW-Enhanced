@@ -137,7 +137,7 @@ interface PanoramaModalState {
   stitchingSourcePaths: Array<string>;
 }
 
-const DEBUG = false;
+const DEBUG = true;
 const REVOCATION_DELAY = 5000;
 
 const useDelayedRevokeBlobUrl = (url: string | null | undefined) => {
@@ -212,6 +212,8 @@ function App() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isFullScreenLoading, setIsFullScreenLoading] = useState(false);
   const [fullScreenUrl, setFullScreenUrl] = useState<string | null>(null);
+  const [isAnimatingTheme, setIsAnimatingTheme] = useState(false);
+  const isInitialThemeMount = useRef(true);
   const [theme, setTheme] = useState(DEFAULT_THEME_ID);
   const [adaptivePalette, setAdaptivePalette] = useState<any>(null);
   const [activeRightPanel, setActiveRightPanel] = useState<Panel | null>(Panel.Adjustments);
@@ -248,33 +250,6 @@ function App() {
   }, []);
 
   const [initialFitScale, setInitialFitScale] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (selectedImage && appSettings?.editorPreviewResolution) {
-      setOriginalSize({ width: selectedImage.width, height: selectedImage.height });
-
-      const maxSize = appSettings.editorPreviewResolution;
-      const aspectRatio = selectedImage.width / selectedImage.height;
-
-      if (selectedImage.width > selectedImage.height) {
-        const width = Math.min(selectedImage.width, maxSize);
-        const height = Math.round(width / aspectRatio);
-        setPreviewSize({ width, height });
-      } else {
-        const height = Math.min(selectedImage.height, maxSize);
-        const width = Math.round(height * aspectRatio);
-        setPreviewSize({ width, height });
-      }
-
-      setIsFullResolution(false);
-      setFullResolutionUrl(null);
-      fullResCacheKeyRef.current = null;
-    } else {
-      setPreviewSize({ width: 0, height: 0 });
-      setOriginalSize({ width: 0, height: 0 });
-    }
-  }, [selectedImage, appSettings?.editorPreviewResolution]);
-
   const [renderedRightPanel, setRenderedRightPanel] = useState<Panel | null>(activeRightPanel);
   const [collapsibleSectionsState, setCollapsibleSectionsState] = useState<CollapsibleSectionsState>({
     basic: true,
@@ -1067,6 +1042,18 @@ function App() {
     invoke(Invokes.UpdateWindowEffect, { theme: isLight ? Theme.Light : Theme.Dark });
   }, [theme, adaptivePalette]);
 
+  useEffect(() => {
+    if (isInitialThemeMount.current) {
+      isInitialThemeMount.current = false;
+      return;
+    }
+
+    setIsAnimatingTheme(true);
+    const timer = setTimeout(() => setIsAnimatingTheme(false), 500);
+
+    return () => clearTimeout(timer);
+  }, [theme]);
+
   const handleRefreshFolderTree = useCallback(async () => {
     if (!rootPath) {
       return;
@@ -1501,20 +1488,25 @@ function App() {
 
   const handleFullResolutionLogic = useCallback(
     (targetZoomPercent: number, currentDisplayWidth: number) => {
-      const needsFullRes = targetZoomPercent > 0.5;
-      const shouldUsePreview = previewSize.width > 0 && currentDisplayWidth <= previewSize.width;
-
-      if (needsFullRes && !isFullResolution && !shouldUsePreview) {
+      if (!initialFitScale) {
+        return;
+      }
+      const highResThreshold = Math.max(initialFitScale * 2, 0.5);
+      const needsFullRes = targetZoomPercent > highResThreshold;
+      const previewIsAlreadyFullRes = previewSize.width >= originalSize.width;
+      if (needsFullRes && !previewIsAlreadyFullRes) {
+        if (isFullResolution) {
+          return;
+        }
         if (fullResolutionUrl && fullResCacheKeyRef.current === visualAdjustmentsKey) {
           setIsFullResolution(true);
           return;
         }
-
         if (!isLoadingFullRes) {
           setIsLoadingFullRes(true);
           requestFullResolution(adjustments, visualAdjustmentsKey);
         }
-      } else if (!needsFullRes || shouldUsePreview) {
+      } else {
         if (fullResRequestRef.current) {
           fullResRequestRef.current.cancelled = true;
         }
@@ -1530,7 +1522,9 @@ function App() {
       }
     },
     [
-      previewSize,
+      initialFitScale,
+      previewSize.width,
+      originalSize.width,
       isFullResolution,
       isLoadingFullRes,
       requestFullResolution,
@@ -1543,12 +1537,10 @@ function App() {
   const handleZoomChange = useCallback(
     (zoomValue: number, fitToWindow: boolean = false) => {
       let targetZoomPercent: number;
-
       const orientationSteps = adjustments.orientationSteps || 0;
       const isSwapped = orientationSteps === 1 || orientationSteps === 3;
       const effectiveOriginalWidth = isSwapped ? originalSize.height : originalSize.width;
       const effectiveOriginalHeight = isSwapped ? originalSize.width : originalSize.height;
-
       if (fitToWindow) {
         if (
           effectiveOriginalWidth > 0 &&
@@ -1558,7 +1550,6 @@ function App() {
         ) {
           const originalAspect = effectiveOriginalWidth / effectiveOriginalHeight;
           const baseAspect = baseRenderSize.width / baseRenderSize.height;
-
           if (originalAspect > baseAspect) {
             targetZoomPercent = baseRenderSize.width / effectiveOriginalWidth;
           } else {
@@ -1570,9 +1561,7 @@ function App() {
       } else {
         targetZoomPercent = zoomValue;
       }
-
       targetZoomPercent = Math.max(0.1, Math.min(2.0, targetZoomPercent));
-
       let transformZoom = 1.0;
       if (
         effectiveOriginalWidth > 0 &&
@@ -1582,17 +1571,14 @@ function App() {
       ) {
         const originalAspect = effectiveOriginalWidth / effectiveOriginalHeight;
         const baseAspect = baseRenderSize.width / baseRenderSize.height;
-
         if (originalAspect > baseAspect) {
           transformZoom = (targetZoomPercent * effectiveOriginalWidth) / baseRenderSize.width;
         } else {
           transformZoom = (targetZoomPercent * effectiveOriginalHeight) / baseRenderSize.height;
         }
       }
-
       isProgrammaticZoom.current = true;
       setZoom(transformZoom);
-
       const currentDisplayWidth = baseRenderSize.width * transformZoom;
       handleFullResolutionLogic(targetZoomPercent, currentDisplayWidth);
     },
@@ -1640,6 +1626,8 @@ function App() {
         thumbnailUrl: thumbnails[path],
         width: 0,
       });
+      setOriginalSize({ width: 0, height: 0 });
+      setPreviewSize({ width: 0, height: 0 });
       setMultiSelectedPaths([path]);
       setLibraryActivePath(null);
       setIsViewLoading(true);
@@ -2135,24 +2123,56 @@ function App() {
 
   useEffect(() => {
     if (selectedImage && !selectedImage.isReady && selectedImage.path) {
-      let isEffectActive = true;
-      const loadFullImageData = async () => {
+    let isEffectActive = true;
+    const loadFullImageData = async () => {
         try {
-          const loadImageResult: any = await invoke(Invokes.LoadImage, { path: selectedImage.path });
-          if (!isEffectActive) {
+        const loadImageResult: any = await invoke(Invokes.LoadImage, { path: selectedImage.path });
+        if (!isEffectActive) {
             return;
-          }
-          const histData: any = await invoke(Invokes.GenerateHistogram);
-          if (!isEffectActive) {
+        }
+        const histData: any = await invoke(Invokes.GenerateHistogram);
+        if (!isEffectActive) {
             return;
-          }
+        }
 
-          const blob = new Blob([loadImageResult.original_image_bytes], { type: 'image/jpeg' });
-          const originalUrl = URL.createObjectURL(blob);
+        // --- START OF ADDED/MOVED LOGIC ---
 
-          setSelectedImage((currentSelected: SelectedImage | null) => {
+        const { width, height } = loadImageResult;
+
+        // 1. Set originalSize directly from the loaded data
+        setOriginalSize({ width, height });
+
+        // 2. Calculate and set previewSize
+        if (appSettings?.editorPreviewResolution) {
+            const maxSize = appSettings.editorPreviewResolution;
+            const aspectRatio = width / height;
+
+            if (width > height) {
+            const pWidth = Math.min(width, maxSize);
+            const pHeight = Math.round(pWidth / aspectRatio);
+            setPreviewSize({ width: pWidth, height: pHeight });
+            } else {
+            const pHeight = Math.min(height, maxSize);
+            const pWidth = Math.round(pHeight * aspectRatio);
+            setPreviewSize({ width: pWidth, height: pHeight });
+            }
+        } else {
+            setPreviewSize({ width: 0, height: 0 });
+        }
+
+        // 3. Reset full resolution state
+        setIsFullResolution(false);
+        setFullResolutionUrl(null);
+        fullResCacheKeyRef.current = null;
+
+        // --- END OF ADDED/MOVED LOGIC ---
+
+        const blob = new Blob([loadImageResult.original_image_bytes], { type: 'image/jpeg' });
+        const originalUrl = URL.createObjectURL(blob);
+
+        setSelectedImage((currentSelected: SelectedImage | null) => {
             if (currentSelected && currentSelected.path === selectedImage.path) {
-              return {
+            return {
                 ...currentSelected,
                 exif: loadImageResult.exif,
                 height: loadImageResult.height,
@@ -2161,44 +2181,44 @@ function App() {
                 metadata: loadImageResult.metadata,
                 originalUrl: originalUrl,
                 width: loadImageResult.width,
-              };
+            };
             }
             return currentSelected;
-          });
+        });
 
-          let initialAdjusts;
-          if (loadImageResult.metadata.adjustments && !loadImageResult.metadata.adjustments.is_null) {
+        let initialAdjusts;
+        if (loadImageResult.metadata.adjustments && !loadImageResult.metadata.adjustments.is_null) {
             initialAdjusts = normalizeLoadedAdjustments(loadImageResult.metadata.adjustments);
-          } else {
+        } else {
             initialAdjusts = {
-              ...INITIAL_ADJUSTMENTS,
-              aspectRatio: loadImageResult.width / loadImageResult.height,
+            ...INITIAL_ADJUSTMENTS,
+            aspectRatio: loadImageResult.width / loadImageResult.height,
             };
-          }
-          if (loadImageResult.metadata.adjustments && !loadImageResult.metadata.adjustments.is_null) {
+        }
+        if (loadImageResult.metadata.adjustments && !loadImageResult.metadata.adjustments.is_null) {
             initialAdjusts = normalizeLoadedAdjustments(loadImageResult.metadata.adjustments);
-          }
-          setLiveAdjustments(initialAdjusts);
-          resetAdjustmentsHistory(initialAdjusts);
-          setHistogram(histData);
+        }
+        setLiveAdjustments(initialAdjusts);
+        resetAdjustmentsHistory(initialAdjusts);
+        setHistogram(histData);
         } catch (err) {
-          if (isEffectActive) {
+        if (isEffectActive) {
             console.error('Failed to load image:', err);
             setError(`Failed to load image: ${err}`);
             setSelectedImage(null);
-          }
-        } finally {
-          if (isEffectActive) {
-            setIsViewLoading(false);
-          }
         }
-      };
-      loadFullImageData();
-      return () => {
+        } finally {
+        if (isEffectActive) {
+            setIsViewLoading(false);
+        }
+        }
+    };
+    loadFullImageData();
+    return () => {
         isEffectActive = false;
-      };
+    };
     }
-  }, [selectedImage?.path, selectedImage?.isReady, resetAdjustmentsHistory]);
+  }, [selectedImage?.path, selectedImage?.isReady, resetAdjustmentsHistory, appSettings?.editorPreviewResolution]);
 
   const handleClearSelection = () => {
     if (selectedImage) {
@@ -3062,7 +3082,12 @@ function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-bg-primary font-sans text-text-primary overflow-hidden select-none">
+    <div
+      className={clsx(
+        'flex flex-col h-screen bg-bg-primary font-sans text-text-primary overflow-hidden select-none',
+        (appSettings?.adaptiveEditorTheme || isAnimatingTheme) && 'enable-color-transitions',
+      )}
+    >
       {appSettings?.decorations || (!isWindowFullScreen && <TitleBar />)}
       <div
         className={clsx('flex-1 flex flex-col min-h-0', [

@@ -11,9 +11,9 @@
     @apply text-text-primary font-sans;
   }
 
-  *,
-  *::before,
-  *::after {
+  .enable-color-transitions *,
+  .enable-color-transitions *::before,
+  .enable-color-transitions *::after {
     transition-property: color, background-color, border-color, fill, stroke;
     transition-duration: 0.4s;
     transition-timing-function: ease-in-out;

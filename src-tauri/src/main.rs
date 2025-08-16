@@ -491,7 +491,7 @@ fn generate_fullscreen_preview(
     let final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps)?;
     
     let mut buf = Cursor::new(Vec::new());
-    final_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 90)).map_err(|e| e.to_string())?;
+    final_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 92)).map_err(|e| e.to_string())?;
     
     Ok(Response::new(buf.into_inner()))
 }
