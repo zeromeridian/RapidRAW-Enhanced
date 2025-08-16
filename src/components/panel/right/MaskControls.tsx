@@ -42,6 +42,7 @@ interface MaskControlsProps {
   histogram: string;
   isGeneratingAiMask: boolean;
   onGenerateAiForegroundMask(id: string): void;
+  onGenerateAiSkyMask(id: string): void;
   onSelectMask(id: string | null): void;
   selectedImage: SelectedImage;
   setAdjustments(adjustments: Partial<Adjustments>): void;
@@ -57,6 +58,9 @@ function formatMaskTypeName(type: string) {
   }
   if (type === Mask.AiForeground) {
     return 'AI Foreground';
+  }
+  if (type === Mask.AiSky) {
+    return 'AI Sky';
   }
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
@@ -76,6 +80,12 @@ const SUB_MASK_CONFIG: Record<Mask, any> = {
     ],
   },
   [Mask.AiForeground]: {
+    parameters: [
+      { key: 'grow', label: 'Grow', min: -100, max: 100, step: 1, defaultValue: 0 },
+      { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 0 },
+    ],
+  },
+  [Mask.AiSky]: {
     parameters: [
       { key: 'grow', label: 'Grow', min: -100, max: 100, step: 1, defaultValue: 0 },
       { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 0 },
@@ -137,6 +147,7 @@ export default function MaskControls({
   histogram,
   isGeneratingAiMask,
   onGenerateAiForegroundMask,
+  onGenerateAiSkyMask,
   onSelectMask,
   selectedImage,
   setAdjustments,
@@ -190,6 +201,8 @@ export default function MaskControls({
 
     if (type === Mask.AiForeground) {
       onGenerateAiForegroundMask(subMask.id);
+    } else if (type === Mask.AiSky) {
+      onGenerateAiSkyMask(subMask.id);
     }
   };
 
@@ -338,7 +351,9 @@ export default function MaskControls({
     showContextMenu(event.clientX, event.clientY, options);
   };
 
-  const isAiMask = activeSubMask && (activeSubMask.type === Mask.AiSubject || activeSubMask.type === Mask.AiForeground);
+  const isAiMask =
+    activeSubMask &&
+    (activeSubMask.type === Mask.AiSubject || activeSubMask.type === Mask.AiForeground || activeSubMask.type === Mask.AiSky);
   const sectionVisibility = editingMask.adjustments.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility;
 
   return (

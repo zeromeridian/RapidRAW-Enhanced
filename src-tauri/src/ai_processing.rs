@@ -30,6 +30,11 @@ const U2NETP_FILENAME: &str = "u2net.onnx";
 const U2NETP_INPUT_SIZE: u32 = 320;
 const U2NETP_SHA256: &str = "8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491";
 
+const SKYSEG_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/skyseg-u2net.onnx?download=true";
+const SKYSEG_FILENAME: &str = "skyseg_u2net.onnx";
+const SKYSEG_INPUT_SIZE: u32 = 320;
+const SKYSEG_SHA256: &str = "ab9c34c64c3d821220a2886a4a06da4642ffa14d5b30e8d5339056a089aa1d39";
+
 const CLIP_MODEL_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/clip_model.onnx?download=true";
 const CLIP_MODEL_FILENAME: &str = "clip_model.onnx";
 const CLIP_TOKENIZER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/clip_tokenizer.json?download=true";
@@ -40,6 +45,7 @@ pub struct AiModels {
     pub sam_encoder: Session,
     pub sam_decoder: Session,
     pub u2netp: Session,
+    pub sky_seg: Session,
     pub clip_model: Option<Session>,
     pub clip_tokenizer: Option<Tokenizer>,
 }
@@ -152,6 +158,7 @@ pub async fn get_or_init_ai_models(
     download_and_verify_model(app_handle, &models_dir, ENCODER_FILENAME, ENCODER_URL, ENCODER_SHA256, "SAM Encoder").await?;
     download_and_verify_model(app_handle, &models_dir, DECODER_FILENAME, DECODER_URL, DECODER_SHA256, "SAM Decoder").await?;
     download_and_verify_model(app_handle, &models_dir, U2NETP_FILENAME, U2NETP_URL, U2NETP_SHA256, "Foreground Model").await?;
+    download_and_verify_model(app_handle, &models_dir, SKYSEG_FILENAME, SKYSEG_URL, SKYSEG_SHA256, "Sky Model").await?;
 
     let environment = Arc::new(Environment::builder().with_name("AI").build()?);
     let mut clip_model = None;
@@ -179,15 +186,18 @@ pub async fn get_or_init_ai_models(
     let encoder_path = models_dir.join(ENCODER_FILENAME);
     let decoder_path = models_dir.join(DECODER_FILENAME);
     let u2netp_path = models_dir.join(U2NETP_FILENAME);
+    let sky_seg_path = models_dir.join(SKYSEG_FILENAME);
 
     let sam_encoder = SessionBuilder::new(&environment)?.with_model_from_file(encoder_path)?;
     let sam_decoder = SessionBuilder::new(&environment)?.with_model_from_file(decoder_path)?;
     let u2netp = SessionBuilder::new(&environment)?.with_model_from_file(u2netp_path)?;
+    let sky_seg = SessionBuilder::new(&environment)?.with_model_from_file(sky_seg_path)?;
 
     let models = Arc::new(AiModels {
         sam_encoder,
         sam_decoder,
         u2netp,
+        sky_seg,
         clip_model,
         clip_tokenizer,
     });
@@ -298,6 +308,71 @@ pub fn run_sam_decoder(
     Ok(feathered_mask)
 }
 
+pub fn run_sky_seg_model(
+    image: &DynamicImage,
+    sky_seg_session: &Session,
+) -> Result<GrayImage> {
+    let (orig_width, orig_height) = image.dimensions();
+
+    let resized_image = image.resize(SKYSEG_INPUT_SIZE, SKYSEG_INPUT_SIZE, FilterType::Triangle);
+    let (resized_w, resized_h) = resized_image.dimensions();
+    let resized_rgb = resized_image.to_rgb8();
+
+    let mut square_input_image = image::RgbImage::new(SKYSEG_INPUT_SIZE, SKYSEG_INPUT_SIZE);
+    let paste_x = (SKYSEG_INPUT_SIZE - resized_w) / 2;
+    let paste_y = (SKYSEG_INPUT_SIZE - resized_h) / 2;
+    imageops::overlay(&mut square_input_image, &resized_rgb, paste_x.into(), paste_y.into());
+
+    let mut input_tensor: Array<f32, _> = Array::zeros((1, 3, SKYSEG_INPUT_SIZE as usize, SKYSEG_INPUT_SIZE as usize));
+    let mean = [0.485, 0.456, 0.406];
+    let std = [0.229, 0.224, 0.225];
+
+    for y in 0..SKYSEG_INPUT_SIZE {
+        for x in 0..SKYSEG_INPUT_SIZE {
+            let pixel = square_input_image.get_pixel(x, y);
+            input_tensor[[0, 0, y as usize, x as usize]] = (pixel[0] as f32 / 255.0 - mean[0]) / std[0];
+            input_tensor[[0, 1, y as usize, x as usize]] = (pixel[1] as f32 / 255.0 - mean[1]) / std[1];
+            input_tensor[[0, 2, y as usize, x as usize]] = (pixel[2] as f32 / 255.0 - mean[2]) / std[2];
+        }
+    }
+
+    let input_tensor_dyn = input_tensor.into_dyn();
+    let input_values = input_tensor_dyn.as_standard_layout();
+    let inputs = vec![Value::from_array(sky_seg_session.allocator(), &input_values)?];
+
+    let outputs = sky_seg_session.run(inputs)?;
+    let output_tensor = outputs[0].try_extract::<f32>()?.view().to_owned();
+
+    let (min_val, max_val) = output_tensor.iter().fold((f32::MAX, f32::MIN), |(min, max), &v| (min.min(v), max.max(v)));
+    let range = max_val - min_val;
+
+    let mask_data: Vec<u8> = output_tensor
+        .iter()
+        .map(|&val| {
+            if range > 1e-6 {
+                (((val - min_val) / range) * 255.0) as u8
+            } else {
+                0
+            }
+        })
+        .collect();
+
+    let square_mask = GrayImage::from_raw(SKYSEG_INPUT_SIZE, SKYSEG_INPUT_SIZE, mask_data)
+        .ok_or_else(|| anyhow::anyhow!("Failed to create mask from Sky Segmentation model output"))?;
+
+    let cropped_mask = imageops::crop_imm(
+        &square_mask,
+        paste_x,
+        paste_y,
+        resized_w,
+        resized_h,
+    ).to_image();
+
+    let final_mask = imageops::resize(&cropped_mask, orig_width, orig_height, FilterType::Triangle);
+
+    Ok(final_mask)
+}
+
 pub fn run_u2netp_model(
     image: &DynamicImage,
     u2netp_session: &Session,
@@ -370,6 +445,21 @@ pub struct AiSubjectMaskParameters {
     pub start_y: f64,
     pub end_x: f64,
     pub end_y: f64,
+    #[serde(default)]
+    pub mask_data_base64: Option<String>,
+    #[serde(default)]
+    pub rotation: Option<f32>,
+    #[serde(default)]
+    pub flip_horizontal: Option<bool>,
+    #[serde(default)]
+    pub flip_vertical: Option<bool>,
+    #[serde(default)]
+    pub orientation_steps: Option<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AiSkyMaskParameters {
     #[serde(default)]
     pub mask_data_base64: Option<String>,
     #[serde(default)]

@@ -8,7 +8,7 @@ import Input from '../../ui/Input';
 import Button from '../../ui/Button';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import {
-  SUB_MASK_COMPONENT_TYPES,
+  AI_SUB_MASK_COMPONENT_TYPES,
   Mask,
   MaskType,
   SubMask,
@@ -51,6 +51,9 @@ function formatMaskTypeName(type: Mask) {
   if (type === Mask.AiForeground) {
     return 'AI Foreground';
   }
+  if (type === Mask.AiSky) {
+    return 'AI Sky';
+  }
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
@@ -67,6 +70,12 @@ const SUB_MASK_CONFIG: any = {
     ],
   },
   [Mask.AiForeground]: {
+    parameters: [
+      { key: 'grow', label: 'Grow', min: -100, max: 100, step: 1, defaultValue: 0 },
+      { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 0 },
+    ],
+  },
+  [Mask.AiSky]: {
     parameters: [
       { key: 'grow', label: 'Grow', min: -100, max: 100, step: 1, defaultValue: 0 },
       { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 0 },
@@ -240,14 +249,16 @@ export default function AIControls({
 
   const handlePatchPropertyChange = (key: string, value: any) => updatePatch(editingPatch.id, { [key]: value });
 
-  const isAiMask = activeSubMask && (activeSubMask.type === Mask.AiSubject || activeSubMask.type === Mask.AiForeground);
+  const isAiMask =
+    activeSubMask &&
+    (activeSubMask.type === Mask.AiSubject || activeSubMask.type === Mask.AiForeground || activeSubMask.type === Mask.AiSky);
 
   return (
     <>
       <div className="p-4 border-b border-surface">
         <p className="text-sm mb-3 font-semibold text-text-primary">Add to Selection</p>
         <div className="grid grid-cols-3 gap-2">
-          {SUB_MASK_COMPONENT_TYPES.map((maskType: MaskType) => (
+          {AI_SUB_MASK_COMPONENT_TYPES.map((maskType: MaskType) => (
             <button
               className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors ${
                 maskType.disabled || isGeneratingAiMask || isGeneratingAi

@@ -7,6 +7,7 @@ import {
   ChevronsRight,
   Circle,
   ClipboardPaste,
+  Cloud,
   Copy,
   Droplet,
   Edit,
@@ -42,6 +43,7 @@ interface MasksPanelProps {
   histogram: any;
   isGeneratingAiMask: boolean;
   onGenerateAiForegroundMask(id: string): void;
+  onGenerateAiSkyMask(id: string): void;
   onSelectContainer(id: string | null): void;
   onSelectMask(id: string | null): void;
   selectedImage: SelectedImage;
@@ -72,6 +74,7 @@ export default function MasksPanel({
   histogram,
   isGeneratingAiMask,
   onGenerateAiForegroundMask,
+  onGenerateAiSkyMask,
   onSelectContainer,
   onSelectMask,
   selectedImage,
@@ -135,6 +138,8 @@ export default function MasksPanel({
     onSelectMask(subMask.id);
     if (type === Mask.AiForeground) {
       onGenerateAiForegroundMask(subMask.id);
+    } else if (type === Mask.AiSky) {
+      onGenerateAiSkyMask(subMask.id);
     }
   };
 
@@ -320,6 +325,7 @@ export default function MasksPanel({
             histogram={histogram}
             isGeneratingAiMask={isGeneratingAiMask}
             onGenerateAiForegroundMask={onGenerateAiForegroundMask}
+            onGenerateAiSkyMask={onGenerateAiSkyMask}
             onSelectMask={onSelectMask}
             selectedImage={selectedImage}
             setAdjustments={setAdjustments}

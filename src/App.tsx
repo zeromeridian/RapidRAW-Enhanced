@@ -733,6 +733,29 @@ function App() {
     }
   };
 
+  const handleGenerateAiSkyMask = async (subMaskId: string) => {
+    if (!selectedImage?.path) {
+      console.error('Cannot generate AI mask: No image selected.');
+      return;
+    }
+    setIsGeneratingAiMask(true);
+    try {
+      const newParameters = await invoke(Invokes.GenerateAiSkyMask, {
+        flipHorizontal: adjustments.flipHorizontal,
+        flipVertical: adjustments.flipVertical,
+        orientationSteps: adjustments.orientationSteps,
+        rotation: adjustments.rotation,
+      });
+
+      updateSubMask(subMaskId, { parameters: newParameters });
+    } catch (error) {
+      console.error('Failed to generate AI sky mask:', error);
+      setError(`AI Mask Failed: ${error}`);
+    } finally {
+      setIsGeneratingAiMask(false);
+    }
+  };
+
   const sortedImageList = useMemo(() => {
     const filteredList = imageList.filter((image) => {
       if (filterCriteria.rating > 0) {
@@ -2905,6 +2928,7 @@ function App() {
                           histogram={histogram}
                           isGeneratingAiMask={isGeneratingAiMask}
                           onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
+                          onGenerateAiSkyMask={handleGenerateAiSkyMask}
                           onSelectContainer={setActiveMaskContainerId}
                           onSelectMask={setActiveMaskId}
                           selectedImage={selectedImage}

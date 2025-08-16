@@ -48,7 +48,7 @@ use crate::file_management::{get_sidecar_path, load_settings, AppSettings};
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap, AiPatchDefinition};
 use crate::ai_processing::{
     AiState, get_or_init_ai_models, generate_image_embeddings, run_sam_decoder,
-    AiSubjectMaskParameters, run_u2netp_model, AiForegroundMaskParameters
+    AiSubjectMaskParameters, run_u2netp_model, AiForegroundMaskParameters, run_sky_seg_model, AiSkyMaskParameters
 };
 use crate::formats::{is_raw_file};
 use crate::image_loader::{load_base_image_from_bytes, composite_patches_on_image, load_and_composite};
@@ -913,6 +913,32 @@ async fn generate_ai_foreground_mask(
 }
 
 #[tauri::command]
+async fn generate_ai_sky_mask(
+    rotation: f32,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    orientation_steps: u8,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<AiSkyMaskParameters, String> {
+    let models = get_or_init_ai_models(&app_handle, &state.ai_state, &state.ai_init_lock)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let full_image = get_full_image_for_processing(&state)?;
+    let full_mask_image = run_sky_seg_model(&full_image, &models.sky_seg).map_err(|e| e.to_string())?;
+    let base64_data = encode_to_base64_png(&full_mask_image)?;
+
+    Ok(AiSkyMaskParameters {
+        mask_data_base64: Some(base64_data),
+        rotation: Some(rotation),
+        flip_horizontal: Some(flip_horizontal),
+        flip_vertical: Some(flip_vertical),
+        orientation_steps: Some(orientation_steps),
+    })
+}
+
+#[tauri::command]
 async fn generate_ai_subject_mask(
     path: String,
     start_point: (f64, f64),
@@ -1419,6 +1445,7 @@ fn main() {
             generate_mask_overlay,
             generate_ai_subject_mask,
             generate_ai_foreground_mask,
+            generate_ai_sky_mask,
             update_window_effect,
             check_comfyui_status,
             test_comfyui_connection,

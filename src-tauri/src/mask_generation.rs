@@ -5,7 +5,8 @@ use std::f32::consts::PI;
 use base64::{Engine as _, engine::general_purpose};
 use imageproc::morphology::{dilate, erode};
 use imageproc::distance_transform::Norm as DilationNorm;
-use crate::ai_processing::{AiSubjectMaskParameters, AiForegroundMaskParameters};
+// --- UPDATED IMPORT ---
+use crate::ai_processing::{AiSubjectMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -478,6 +479,31 @@ fn generate_ai_bitmap_from_base64(
     ))
 }
 
+fn generate_ai_sky_bitmap(
+    params_value: &Value,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+) -> Option<GrayImage> {
+    let params: AiSkyMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    let grow_feather: GrowFeatherParameters = serde_json::from_value(params_value.clone()).unwrap_or_default();
+    let data_url = params.mask_data_base64?;
+
+    let mut mask = generate_ai_bitmap_from_base64(
+        &data_url,
+        params.rotation.unwrap_or(0.0),
+        params.flip_horizontal.unwrap_or(false),
+        params.flip_vertical.unwrap_or(false),
+        params.orientation_steps.unwrap_or(0),
+        width, height, scale, crop_offset
+    )?;
+
+    apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather);
+
+    Some(mask)
+}
+
 fn generate_ai_foreground_bitmap(
     params_value: &Value,
     width: u32,
@@ -545,6 +571,7 @@ fn generate_sub_mask_bitmap(
         "brush" => Some(generate_brush_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)),
         "ai-subject" => generate_ai_subject_bitmap(&sub_mask.parameters, width, height, scale, crop_offset),
         "ai-foreground" => generate_ai_foreground_bitmap(&sub_mask.parameters, width, height, scale, crop_offset),
+        "ai-sky" => generate_ai_sky_bitmap(&sub_mask.parameters, width, height, scale, crop_offset),
         "quick-eraser" => generate_ai_subject_bitmap(&sub_mask.parameters, width, height, scale, crop_offset),
         _ => None,
     }

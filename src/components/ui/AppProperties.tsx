@@ -22,6 +22,7 @@ export enum Invokes {
   DuplicateFile = 'duplicate_file',
   ExportImage = 'export_image',
   GenerateAiForegroundMask = 'generate_ai_foreground_mask',
+  GenerateAiSkyMask = 'generate_ai_sky_mask',
   GenerateAiSubjectMask = 'generate_ai_subject_mask',
   GenerateFullscreenPreview = 'generate_fullscreen_preview',
   GenerateHistogram = 'generate_histogram',
