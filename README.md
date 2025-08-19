@@ -244,14 +244,11 @@ While the core functionality is in place, I'm actively working on improving seve
 
 | Task                                                                                         | Priority | Difficulty | Status |
 |----------------------------------------------------------------------------------------------|----------|------------|--------|
-| Refactoring the frontend (reduce prop drilling in React components)                         | Medium   | Medium     | [ ]    |
-| Optimize image transport (replace Base64 for better performance)                            | Low     | Medium     | [X]    |
-| Add AI-generated masks using [Segment Anything](https://github.com/facebookresearch/segment-anything) | High | Medium    | [X]    |
-| Implement a simple MVP of the ComfyUI based AI Roadmap                                        | Low   | High       | [X]    |
-| Centralize Coordinate Transformation Logic - See [#245](https://github.com/CyberTimon/RapidRAW/issues/245) | Medium      | Medium     | [ ]    |
-| Switch to a better rawloader (e.g. rawler)                                                   | High      | Medium     | [X]    |
+| Refactoring the frontend (reduce prop drilling in React components)                         | Low  | Medium     | [ ]    |
+| Write a tutorial on how to connect ComfyUI with RapidRAW                                    | Medium | Medium       | [ ]    |
+| Centralize Coordinate Transformation Logic - See [#245](https://github.com/CyberTimon/RapidRAW/issues/245) | Medium      | High | [ ]    |
 | Improve speed on older systems (e.g. Pascal GPUs)                                            | Medium   | High       | [ ]    |
-| Auto white balance detection and exposure correction                                         | Medium     | Medium     | [X]    |
+| Implement warping tools                                                                     | Low  | High       | [ ]    |
 
 ## AI Roadmap
 
