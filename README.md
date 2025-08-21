@@ -51,6 +51,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-08-21:** Added LUTs (.cube, .3dl, .png, .jpg, .jpeg, .tiff) support
 *   **2025-08-16:** Fast AI sky masks
 *   **2025-08-15:** Show full resolution image when zooming in
 *   **2025-08-15:** Implement Tauri's IPC as a replacement for the slow Base64 image transfer
