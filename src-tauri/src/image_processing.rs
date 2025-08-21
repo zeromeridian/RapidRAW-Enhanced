@@ -466,7 +466,7 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
         _pad_neg1: 0.0,
         _pad_neg2: 0.0,
 
-        has_lut: if js_adjustments["lutData"].is_string() { 1 } else { 0 },
+        has_lut: if js_adjustments["lutPath"].is_string() { 1 } else { 0 },
         lut_intensity: js_adjustments["lutIntensity"].as_f64().unwrap_or(100.0) as f32 / 100.0,
         _pad_lut1: 0.0,
         _pad_lut2: 0.0,

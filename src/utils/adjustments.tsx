@@ -457,7 +457,6 @@ export const COPYABLE_ADJUSTMENT_KEYS: Array<string> = [
   Effect.GrainSize,
   BasicAdjustment.Highlights,
   ColorAdjustment.Hsl,
-  'lutData',
   'lutIntensity',
   'lutName',
   'lutPath',

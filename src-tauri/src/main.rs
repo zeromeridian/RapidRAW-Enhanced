@@ -54,6 +54,7 @@ use crate::ai_processing::{
 use crate::formats::{is_raw_file};
 use crate::image_loader::{load_base_image_from_bytes, composite_patches_on_image, load_and_composite};
 use tagging_utils::{candidates, hierarchy};
+use crate::lut_processing::Lut;
 
 #[derive(Clone)]
 pub struct LoadedImage {
@@ -80,6 +81,7 @@ pub struct AppState {
     export_task_handle: Mutex<Option<JoinHandle<()>>>,
     panorama_result: Arc<Mutex<Option<RgbImage>>>,
     indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
+    pub lut_cache: Mutex<HashMap<String, Arc<Lut>>>,
 }
 
 #[derive(serde::Serialize)]
@@ -121,7 +123,6 @@ struct ExportSettings {
 
 #[derive(Serialize)]
 struct LutParseResult {
-    data: String,
     size: u32,
 }
 
@@ -265,6 +266,18 @@ fn read_exif_data(file_bytes: &[u8]) -> HashMap<String, String> {
     exif_data
 }
 
+fn get_or_load_lut(state: &tauri::State<AppState>, path: &str) -> Result<Arc<Lut>, String> {
+    let mut cache = state.lut_cache.lock().unwrap();
+    if let Some(lut) = cache.get(path) {
+        return Ok(lut.clone());
+    }
+
+    let lut = lut_processing::parse_lut_file(path).map_err(|e| e.to_string())?;
+    let arc_lut = Arc::new(lut);
+    cache.insert(path.to_string(), arc_lut.clone());
+    Ok(arc_lut)
+}
+
 #[tauri::command]
 async fn load_image(path: String, state: tauri::State<'_, AppState>, app_handle: tauri::AppHandle) -> Result<LoadImageResult, String> {
     let sidecar_path = get_sidecar_path(&path);
@@ -352,6 +365,7 @@ fn apply_adjustments(
     drop(cached_preview_lock);
     
     thread::spawn(move || {
+        let state = app_handle.state::<AppState>();
         let (preview_width, preview_height) = final_preview_base.dimensions();
 
         let mask_definitions: Vec<MaskDefinition> = js_adjustments.get("masks")
@@ -365,10 +379,10 @@ fn apply_adjustments(
             .collect();
 
         let final_adjustments = get_all_adjustments_from_json(&adjustments_clone);
-        let lut_data_base64 = adjustments_clone["lutData"].as_str();
-        let lut_size = adjustments_clone["lutSize"].as_u64().map(|s| s as u32);
+        let lut_path = adjustments_clone["lutPath"].as_str();
+        let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
 
-        if let Ok(final_processed_image) = process_and_get_dynamic_image(&context, &final_preview_base, final_adjustments, &mask_bitmaps, lut_data_base64, lut_size) {
+        if let Ok(final_processed_image) = process_and_get_dynamic_image(&context, &final_preview_base, final_adjustments, &mask_bitmaps, lut) {
             if let Ok(histogram_data) = image_processing::calculate_histogram_from_image(&final_processed_image) {
                 let _ = app_handle.emit("histogram-update", histogram_data);
             }
@@ -398,6 +412,7 @@ fn generate_uncropped_preview(
     let loaded_image = state.original_image.lock().unwrap().clone().ok_or("No original image loaded")?;
 
     thread::spawn(move || {
+        let state = app_handle.state::<AppState>();
         let patched_image = match composite_patches_on_image(&loaded_image.image, &adjustments_clone) {
             Ok(img) => img,
             Err(e) => {
@@ -434,10 +449,10 @@ fn generate_uncropped_preview(
             .collect();
 
         let uncropped_adjustments = get_all_adjustments_from_json(&adjustments_clone);
-        let lut_data_base64 = adjustments_clone["lutData"].as_str();
-        let lut_size = adjustments_clone["lutSize"].as_u64().map(|s| s as u32);
+        let lut_path = adjustments_clone["lutPath"].as_str();
+        let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
 
-        if let Ok(processed_image) = process_and_get_dynamic_image(&context, &processing_base, uncropped_adjustments, &mask_bitmaps, lut_data_base64, lut_size) {
+        if let Ok(processed_image) = process_and_get_dynamic_image(&context, &processing_base, uncropped_adjustments, &mask_bitmaps, lut) {
             let mut buf = Cursor::new(Vec::new());
             if processed_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80)).is_ok() {
                 let _ = app_handle.emit("preview-update-uncropped", buf.get_ref());
@@ -499,10 +514,10 @@ fn generate_fullscreen_preview(
         .collect();
 
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
-    let lut_data_base64 = js_adjustments["lutData"].as_str();
-    let lut_size = js_adjustments["lutSize"].as_u64().map(|s| s as u32);
+    let lut_path = js_adjustments["lutPath"].as_str();
+    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
 
-    let final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut_data_base64, lut_size)?;
+    let final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut)?;
     
     let mut buf = Cursor::new(Vec::new());
     final_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 92)).map_err(|e| e.to_string())?;
@@ -528,6 +543,7 @@ async fn export_image(
     let context = Arc::new(context);
 
     let task = tokio::spawn(async move {
+        let state = app_handle.state::<AppState>();
         let processing_result: Result<(), String> = (|| {
             let base_image = composite_patches_on_image(&original_image_data, &js_adjustments)
                 .map_err(|e| format!("Failed to composite AI patches for export: {}", e))?;
@@ -545,10 +561,10 @@ async fn export_image(
                 .collect();
 
             let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
-            let lut_data_base64 = js_adjustments["lutData"].as_str();
-            let lut_size = js_adjustments["lutSize"].as_u64().map(|s| s as u32);
+            let lut_path = js_adjustments["lutPath"].as_str();
+            let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
 
-            let mut final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut_data_base64, lut_size)?;
+            let mut final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut)?;
 
             if let Some(resize_opts) = export_settings.resize {
                 let (current_w, current_h) = final_image.dimensions();
@@ -640,6 +656,7 @@ async fn batch_export_images(
     let context = Arc::new(context);
 
     let task = tokio::spawn(async move {
+        let state = app_handle.state::<AppState>();
         let output_folder_path = std::path::Path::new(&output_folder);
         let total_paths = paths.len();
 
@@ -678,10 +695,10 @@ async fn batch_export_images(
                     .collect();
 
                 let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
-                let lut_data_base64 = js_adjustments["lutData"].as_str();
-                let lut_size = js_adjustments["lutSize"].as_u64().map(|s| s as u32);
+                let lut_path = js_adjustments["lutPath"].as_str();
+                let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
 
-                let mut final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut_data_base64, lut_size)?;
+                let mut final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut)?;
 
                 if let Some(resize_opts) = &export_settings.resize {
                     let (current_w, current_h) = final_image.dimensions();
@@ -1116,10 +1133,10 @@ fn generate_preset_preview(
         .collect();
 
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
-    let lut_data_base64 = js_adjustments["lutData"].as_str();
-    let lut_size = js_adjustments["lutSize"].as_u64().map(|s| s as u32);
+    let lut_path = js_adjustments["lutPath"].as_str();
+    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
     
-    let processed_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut_data_base64, lut_size)?;
+    let processed_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut)?;
     
     let mut buf = Cursor::new(Vec::new());
     processed_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 50)).map_err(|e| e.to_string())?;
@@ -1363,21 +1380,15 @@ async fn save_panorama(
 }
 
 #[tauri::command]
-async fn load_and_parse_lut(path: String) -> Result<LutParseResult, String> {
+async fn load_and_parse_lut(path: String, state: tauri::State<'_, AppState>) -> Result<LutParseResult, String> {
     let lut = lut_processing::parse_lut_file(&path).map_err(|e| e.to_string())?;
+    let lut_size = lut.size;
 
-    let byte_slice: &[u8] = unsafe {
-        std::slice::from_raw_parts(
-            lut.data.as_ptr() as *const u8,
-            lut.data.len() * std::mem::size_of::<f32>(),
-        )
-    };
-
-    let base64_data = general_purpose::STANDARD.encode(byte_slice);
+    let mut cache = state.lut_cache.lock().unwrap();
+    cache.insert(path, Arc::new(lut));
 
     Ok(LutParseResult {
-        data: base64_data,
-        size: lut.size,
+        size: lut_size,
     })
 }
 
@@ -1472,6 +1483,7 @@ fn main() {
             export_task_handle: Mutex::new(None),
             panorama_result: Arc::new(Mutex::new(None)),
             indexing_task_handle: Mutex::new(None),
+            lut_cache: Mutex::new(HashMap::new()),
         })
         .invoke_handler(tauri::generate_handler![
             load_image,

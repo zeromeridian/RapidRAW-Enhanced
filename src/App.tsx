@@ -138,7 +138,6 @@ interface PanoramaModalState {
 }
 
 interface LutData {
-  data: string;
   size: number;
 }
 
@@ -896,7 +895,6 @@ function App() {
           ...prev,
           lutPath: path,
           lutName: name,
-          lutData: result.data,
           lutSize: result.size,
           lutIntensity: 100,
           sectionVisibility: {

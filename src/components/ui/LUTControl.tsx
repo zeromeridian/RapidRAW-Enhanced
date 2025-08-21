@@ -46,7 +46,7 @@ export default function LUTControl({
             className="text-sm text-text-primary text-right select-none cursor-pointer truncate max-w-[150px] hover:text-accent transition-colors"
             title={lutName || 'Select a LUT file'}
           >
-            {lutName || 'None'}
+            {lutName || 'Select'}
           </button>
           
           {lutName && (

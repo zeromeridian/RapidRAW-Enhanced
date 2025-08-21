@@ -286,6 +286,7 @@ pub fn generate_thumbnail_data(
     path_str: &str,
     gpu_context: Option<&GpuContext>,
     preloaded_image: Option<&DynamicImage>,
+    app_handle: &AppHandle,
 ) -> anyhow::Result<DynamicImage> {
     let sidecar_path = get_sidecar_path(path_str);
     let metadata: Option<ImageMetadata> = fs::read_to_string(sidecar_path)
@@ -304,6 +305,7 @@ pub fn generate_thumbnail_data(
 
     if let (Some(context), Some(meta)) = (gpu_context, metadata) {
         if !meta.adjustments.is_null() {
+            let state = app_handle.state::<AppState>();
             const THUMBNAIL_PROCESSING_DIM: u32 = 1280;
             let orientation_steps = meta.adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
             let coarse_rotated_image = apply_coarse_rotation(base_image, orientation_steps);
@@ -375,16 +377,26 @@ pub fn generate_thumbnail_data(
                 .collect();
 
             let gpu_adjustments = get_all_adjustments_from_json(&meta.adjustments);
-            let lut_data_base64 = meta.adjustments["lutData"].as_str();
-            let lut_size = meta.adjustments["lutSize"].as_u64().map(|s| s as u32);
+            let lut_path = meta.adjustments["lutPath"].as_str();
+            let lut = lut_path.and_then(|p| {
+                let mut cache = state.lut_cache.lock().unwrap();
+                if let Some(cached_lut) = cache.get(p) {
+                    return Some(cached_lut.clone());
+                }
+                if let Ok(loaded_lut) = crate::lut_processing::parse_lut_file(p) {
+                    let arc_lut = Arc::new(loaded_lut);
+                    cache.insert(p.to_string(), arc_lut.clone());
+                    return Some(arc_lut);
+                }
+                None
+            });
 
             if let Ok(processed_image) = gpu_processing::process_and_get_dynamic_image(
                 context,
                 &cropped_preview,
                 gpu_adjustments,
                 &mask_bitmaps,
-                lut_data_base64,
-                lut_size,
+                lut,
             ) {
                 return Ok(processed_image);
             } else {
@@ -411,6 +423,7 @@ fn generate_single_thumbnail_and_cache(
     gpu_context: Option<&GpuContext>,
     preloaded_image: Option<&DynamicImage>,
     force_regenerate: bool,
+    app_handle: &AppHandle,
 ) -> Option<(String, u8)> {
     let original_path = Path::new(path_str);
     let sidecar_path = get_sidecar_path(path_str);
@@ -454,7 +467,7 @@ fn generate_single_thumbnail_and_cache(
         }
     }
 
-    if let Ok(thumb_image) = generate_thumbnail_data(path_str, gpu_context, preloaded_image) {
+    if let Ok(thumb_image) = generate_thumbnail_data(path_str, gpu_context, preloaded_image, app_handle) {
         if let Ok(thumb_data) = encode_thumbnail(&thumb_image) {
             let _ = fs::write(&cache_path, &thumb_data);
             let base64_str = general_purpose::STANDARD.encode(&thumb_data);
@@ -469,8 +482,9 @@ pub async fn generate_thumbnails(
     paths: Vec<String>,
     app_handle: tauri::AppHandle,
 ) -> Result<HashMap<String, String>, String> {
+    let app_handle_clone = app_handle.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let cache_dir = app_handle
+        let cache_dir = app_handle_clone
             .path()
             .app_cache_dir()
             .map_err(|e| e.to_string())?;
@@ -479,7 +493,7 @@ pub async fn generate_thumbnails(
             fs::create_dir_all(&thumb_cache_dir).map_err(|e| e.to_string())?;
         }
 
-        let state = app_handle.state::<AppState>();
+        let state = app_handle_clone.state::<AppState>();
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
 
         let thumbnails: HashMap<String, String> = paths
@@ -491,6 +505,7 @@ pub async fn generate_thumbnails(
                     gpu_context.as_ref(),
                     None,
                     false,
+                    &app_handle_clone,
                 )
                 .map(|(data, _rating)| (path_str.clone(), data))
             })
@@ -521,7 +536,7 @@ pub fn generate_thumbnails_progressive(
     let completed_count = Arc::new(AtomicUsize::new(0));
 
     thread::spawn(move || {
-        let state = app_handle.state::<AppState>();
+        let state = app_handle_clone.state::<AppState>();
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
 
         paths.par_iter().for_each(|path_str| {
@@ -531,6 +546,7 @@ pub fn generate_thumbnails_progressive(
                 gpu_context.as_ref(),
                 None,
                 false,
+                &app_handle_clone,
             );
 
             if let Some((thumbnail_data, rating)) = result {
@@ -787,6 +803,7 @@ pub fn save_metadata_and_update_thumbnail(
             gpu_context.as_ref(),
             preloaded_image_option.as_ref(),
             true,
+            &app_handle_clone,
         );
 
         if let Some((thumbnail_data, rating)) = result {
@@ -846,7 +863,42 @@ pub fn apply_adjustments_to_paths(
     });
 
     thread::spawn(move || {
-        let _ = generate_thumbnails_progressive(paths, app_handle);
+        let state = app_handle.state::<AppState>();
+        let cache_dir = app_handle.path().app_cache_dir().unwrap();
+        let thumb_cache_dir = cache_dir.join("thumbnails");
+        if !thumb_cache_dir.exists() {
+            fs::create_dir_all(&thumb_cache_dir).unwrap();
+        }
+
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+        let total_count = paths.len();
+        let completed_count = Arc::new(AtomicUsize::new(0));
+
+        paths.par_iter().for_each(|path_str| {
+            let result = generate_single_thumbnail_and_cache(
+                path_str,
+                &thumb_cache_dir,
+                gpu_context.as_ref(),
+                None,
+                true,
+                &app_handle,
+            );
+
+            if let Some((thumbnail_data, rating)) = result {
+                let _ = app_handle.emit(
+                    "thumbnail-generated",
+                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating }),
+                );
+            }
+
+            let completed = completed_count.fetch_add(1, Ordering::Relaxed) + 1;
+            let _ = app_handle.emit(
+                "thumbnail-progress",
+                serde_json::json!({ "completed": completed, "total": total_count }),
+            );
+        });
+
+        let _ = app_handle.emit("thumbnail-generation-complete", true);
     });
 
     Ok(())
@@ -881,7 +933,42 @@ pub fn reset_adjustments_for_paths(
     });
 
     thread::spawn(move || {
-        let _ = generate_thumbnails_progressive(paths, app_handle);
+        let state = app_handle.state::<AppState>();
+        let cache_dir = app_handle.path().app_cache_dir().unwrap();
+        let thumb_cache_dir = cache_dir.join("thumbnails");
+        if !thumb_cache_dir.exists() {
+            fs::create_dir_all(&thumb_cache_dir).unwrap();
+        }
+
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+        let total_count = paths.len();
+        let completed_count = Arc::new(AtomicUsize::new(0));
+
+        paths.par_iter().for_each(|path_str| {
+            let result = generate_single_thumbnail_and_cache(
+                path_str,
+                &thumb_cache_dir,
+                gpu_context.as_ref(),
+                None,
+                true,
+                &app_handle,
+            );
+
+            if let Some((thumbnail_data, rating)) = result {
+                let _ = app_handle.emit(
+                    "thumbnail-generated",
+                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating }),
+                );
+            }
+
+            let completed = completed_count.fetch_add(1, Ordering::Relaxed) + 1;
+            let _ = app_handle.emit(
+                "thumbnail-progress",
+                serde_json::json!({ "completed": completed, "total": total_count }),
+            );
+        });
+
+        let _ = app_handle.emit("thumbnail-generation-complete", true);
     });
 
     Ok(())
@@ -950,9 +1037,46 @@ pub fn apply_auto_adjustments_to_paths(
             eprintln!("Failed to apply auto adjustments to {}: {}", path, e);
         }
     });
+    
     thread::spawn(move || {
-        let _ = generate_thumbnails_progressive(paths, app_handle);
+        let state = app_handle.state::<AppState>();
+        let cache_dir = app_handle.path().app_cache_dir().unwrap();
+        let thumb_cache_dir = cache_dir.join("thumbnails");
+        if !thumb_cache_dir.exists() {
+            fs::create_dir_all(&thumb_cache_dir).unwrap();
+        }
+
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+        let total_count = paths.len();
+        let completed_count = Arc::new(AtomicUsize::new(0));
+
+        paths.par_iter().for_each(|path_str| {
+            let result = generate_single_thumbnail_and_cache(
+                path_str,
+                &thumb_cache_dir,
+                gpu_context.as_ref(),
+                None,
+                true,
+                &app_handle,
+            );
+
+            if let Some((thumbnail_data, rating)) = result {
+                let _ = app_handle.emit(
+                    "thumbnail-generated",
+                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating }),
+                );
+            }
+
+            let completed = completed_count.fetch_add(1, Ordering::Relaxed) + 1;
+            let _ = app_handle.emit(
+                "thumbnail-progress",
+                serde_json::json!({ "completed": completed, "total": total_count }),
+            );
+        });
+
+        let _ = app_handle.emit("thumbnail-generation-complete", true);
     });
+
     Ok(())
 }
 
@@ -1339,13 +1463,13 @@ pub fn get_cached_or_generate_thumbnail_image(
             eprintln!("Could not open cached thumbnail, regenerating: {:?}", cache_path);
         }
 
-        let thumb_image = generate_thumbnail_data(path_str, gpu_context, None)?;
+        let thumb_image = generate_thumbnail_data(path_str, gpu_context, None, app_handle)?;
         let thumb_data = encode_thumbnail(&thumb_image)?;
         fs::write(&cache_path, &thumb_data)?;
 
         Ok(thumb_image)
     } else {
-        generate_thumbnail_data(path_str, gpu_context, None)
+        generate_thumbnail_data(path_str, gpu_context, None, app_handle)
     }
 }
 

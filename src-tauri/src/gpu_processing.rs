@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use base64::{engine::general_purpose, Engine as _};
 use bytemuck;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba, Luma};
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
 use crate::AppState;
 use crate::image_processing::{AllAdjustments, GpuContext};
+use crate::lut_processing::Lut;
 
 pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuContext, String> {
     let mut context_lock = state.gpu_context.lock().unwrap();
@@ -96,8 +96,7 @@ pub fn run_gpu_processing(
     image: &DynamicImage,
     adjustments: AllAdjustments,
     mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
-    lut_data_base64: Option<&str>,
-    lut_size: Option<u32>,
+    lut: Option<Arc<Lut>>,
 ) -> Result<Vec<u8>, String> {
     let device = &context.device;
     let queue = &context.queue;
@@ -224,12 +223,12 @@ pub fn run_gpu_processing(
     });
     let dummy_mask_view = dummy_mask_texture.create_view(&Default::default());
 
-    let (lut_texture_view, lut_sampler) = if let (Some(data_b64), Some(size)) = (lut_data_base64, lut_size) {
-        let lut_bytes = general_purpose::STANDARD.decode(data_b64).map_err(|e| e.to_string())?;
-        let lut_floats: &[f32] = bytemuck::cast_slice(&lut_bytes);
+    let (lut_texture_view, lut_sampler) = if let Some(lut_arc) = lut {
+        let lut_data = &lut_arc.data;
+        let size = lut_arc.size;
 
-        let mut rgba_lut_data = Vec::with_capacity(lut_floats.len() / 3 * 4);
-        for chunk in lut_floats.chunks_exact(3) {
+        let mut rgba_lut_data = Vec::with_capacity(lut_data.len() / 3 * 4);
+        for chunk in lut_data.chunks_exact(3) {
             rgba_lut_data.push(chunk[0]);
             rgba_lut_data.push(chunk[1]);
             rgba_lut_data.push(chunk[2]);
@@ -366,10 +365,9 @@ pub fn process_and_get_dynamic_image(
     base_image: &DynamicImage,
     all_adjustments: AllAdjustments,
     mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
-    lut_data_base64: Option<&str>,
-    lut_size: Option<u32>,
+    lut: Option<Arc<Lut>>,
 ) -> Result<DynamicImage, String> {
-    let processed_pixels = run_gpu_processing(context, base_image, all_adjustments, mask_bitmaps, lut_data_base64, lut_size)?;
+    let processed_pixels = run_gpu_processing(context, base_image, all_adjustments, mask_bitmaps, lut)?;
     let (width, height) = base_image.dimensions();
     let img_buf = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(width, height, processed_pixels)
         .ok_or("Failed to create image buffer from GPU data")?;
