@@ -55,6 +55,11 @@ struct GlobalAdjustments {
     _pad_neg1: f32,
     _pad_neg2: f32,
 
+    has_lut: u32,
+    lut_intensity: f32,
+    _pad_lut1: f32,
+    _pad_lut2: f32,
+
     color_grading_shadows: ColorGradeSettings,
     color_grading_midtones: ColorGradeSettings,
     color_grading_highlights: ColorGradeSettings,
@@ -162,6 +167,9 @@ const HSL_RANGES: array<HslRange, 8> = array<HslRange, 8>(
 @group(0) @binding(16) var mask13: texture_2d<f32>;
 @group(0) @binding(17) var mask14: texture_2d<f32>;
 @group(0) @binding(18) var mask15: texture_2d<f32>;
+
+@group(0) @binding(19) var lut_texture: texture_3d<f32>;
+@group(0) @binding(20) var lut_sampler: sampler;
 
 const LUMA_COEFF = vec3<f32>(0.2126, 0.7152, 0.0722);
 
@@ -731,6 +739,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             );
             final_rgb = mix(final_rgb, mask_final_srgb, influence);
         }
+    }
+
+    if (adjustments.global.has_lut == 1u) {
+        let lut_color = textureSampleLevel(lut_texture, lut_sampler, final_rgb, 0.0).rgb;
+        final_rgb = mix(final_rgb, lut_color, adjustments.global.lut_intensity);
     }
 
     if (adjustments.global.grain_amount > 0.0) {

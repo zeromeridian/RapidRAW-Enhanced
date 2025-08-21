@@ -14,6 +14,7 @@ mod tagging_utils;
 mod panorama_stitching;
 mod panorama_utils;
 mod inpainting;
+mod lut_processing;
 
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
@@ -116,6 +117,12 @@ struct ExportSettings {
     keep_metadata: bool,
     strip_gps: bool,
     filename_template: Option<String>,
+}
+
+#[derive(Serialize)]
+struct LutParseResult {
+    data: String,
+    size: u32,
 }
 
 fn apply_all_transformations(
@@ -358,8 +365,10 @@ fn apply_adjustments(
             .collect();
 
         let final_adjustments = get_all_adjustments_from_json(&adjustments_clone);
+        let lut_data_base64 = adjustments_clone["lutData"].as_str();
+        let lut_size = adjustments_clone["lutSize"].as_u64().map(|s| s as u32);
 
-        if let Ok(final_processed_image) = process_and_get_dynamic_image(&context, &final_preview_base, final_adjustments, &mask_bitmaps) {
+        if let Ok(final_processed_image) = process_and_get_dynamic_image(&context, &final_preview_base, final_adjustments, &mask_bitmaps, lut_data_base64, lut_size) {
             if let Ok(histogram_data) = image_processing::calculate_histogram_from_image(&final_processed_image) {
                 let _ = app_handle.emit("histogram-update", histogram_data);
             }
@@ -425,8 +434,10 @@ fn generate_uncropped_preview(
             .collect();
 
         let uncropped_adjustments = get_all_adjustments_from_json(&adjustments_clone);
+        let lut_data_base64 = adjustments_clone["lutData"].as_str();
+        let lut_size = adjustments_clone["lutSize"].as_u64().map(|s| s as u32);
 
-        if let Ok(processed_image) = process_and_get_dynamic_image(&context, &processing_base, uncropped_adjustments, &mask_bitmaps) {
+        if let Ok(processed_image) = process_and_get_dynamic_image(&context, &processing_base, uncropped_adjustments, &mask_bitmaps, lut_data_base64, lut_size) {
             let mut buf = Cursor::new(Vec::new());
             if processed_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80)).is_ok() {
                 let _ = app_handle.emit("preview-update-uncropped", buf.get_ref());
@@ -488,7 +499,10 @@ fn generate_fullscreen_preview(
         .collect();
 
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
-    let final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps)?;
+    let lut_data_base64 = js_adjustments["lutData"].as_str();
+    let lut_size = js_adjustments["lutSize"].as_u64().map(|s| s as u32);
+
+    let final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut_data_base64, lut_size)?;
     
     let mut buf = Cursor::new(Vec::new());
     final_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 92)).map_err(|e| e.to_string())?;
@@ -531,7 +545,10 @@ async fn export_image(
                 .collect();
 
             let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
-            let mut final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps)?;
+            let lut_data_base64 = js_adjustments["lutData"].as_str();
+            let lut_size = js_adjustments["lutSize"].as_u64().map(|s| s as u32);
+
+            let mut final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut_data_base64, lut_size)?;
 
             if let Some(resize_opts) = export_settings.resize {
                 let (current_w, current_h) = final_image.dimensions();
@@ -661,7 +678,10 @@ async fn batch_export_images(
                     .collect();
 
                 let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
-                let mut final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps)?;
+                let lut_data_base64 = js_adjustments["lutData"].as_str();
+                let lut_size = js_adjustments["lutSize"].as_u64().map(|s| s as u32);
+
+                let mut final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut_data_base64, lut_size)?;
 
                 if let Some(resize_opts) = &export_settings.resize {
                     let (current_w, current_h) = final_image.dimensions();
@@ -1096,8 +1116,10 @@ fn generate_preset_preview(
         .collect();
 
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
+    let lut_data_base64 = js_adjustments["lutData"].as_str();
+    let lut_size = js_adjustments["lutSize"].as_u64().map(|s| s as u32);
     
-    let processed_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps)?;
+    let processed_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut_data_base64, lut_size)?;
     
     let mut buf = Cursor::new(Vec::new());
     processed_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 50)).map_err(|e| e.to_string())?;
@@ -1340,6 +1362,25 @@ async fn save_panorama(
     Ok(output_path.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+async fn load_and_parse_lut(path: String) -> Result<LutParseResult, String> {
+    let lut = lut_processing::parse_lut_file(&path).map_err(|e| e.to_string())?;
+
+    let byte_slice: &[u8] = unsafe {
+        std::slice::from_raw_parts(
+            lut.data.as_ptr() as *const u8,
+            lut.data.len() * std::mem::size_of::<f32>(),
+        )
+    };
+
+    let base64_data = general_purpose::STANDARD.encode(byte_slice);
+
+    Ok(LutParseResult {
+        data: base64_data,
+        size: lut.size,
+    })
+}
+
 fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowHandle) {
     #[cfg(target_os = "windows")]
     {
@@ -1453,6 +1494,7 @@ fn main() {
             get_supported_file_types,
             stitch_panorama,
             save_panorama,
+            load_and_parse_lut,
             image_processing::generate_histogram,
             image_processing::generate_waveform,
             image_processing::calculate_auto_adjustments,

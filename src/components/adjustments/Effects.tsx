@@ -1,14 +1,21 @@
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
 import { Adjustments, Effect } from '../../utils/adjustments';
+import LUTControl from '../ui/LUTControl';
 
 interface EffectsPanelProps {
   adjustments: Adjustments;
   isForMask: boolean;
   setAdjustments(adjustments: Partial<Adjustments>): any;
+  handleLutSelect(path: string): void;
 }
 
-export default function EffectsPanel({ adjustments, setAdjustments, isForMask = false }: EffectsPanelProps) {
+export default function EffectsPanel({
+  adjustments,
+  setAdjustments,
+  isForMask = false,
+  handleLutSelect,
+}: EffectsPanelProps) {
   const handleAdjustmentChange = (key: Effect, value: string) => {
     const numericValue = parseInt(value, 10);
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: numericValue }));
@@ -22,10 +29,36 @@ export default function EffectsPanel({ adjustments, setAdjustments, isForMask = 
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: value }));
   };
 
+  const handleLutIntensityChange = (intensity: number) => {
+    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, lutIntensity: intensity }));
+  };
+
+  const handleLutClear = () => {
+    setAdjustments((prev: Partial<Adjustments>) => ({
+      ...prev,
+      lutPath: null,
+      lutName: null,
+      lutData: null,
+      lutSize: 0,
+      lutIntensity: 100,
+    }));
+  };
+
   return (
     <div>
       {!isForMask && (
         <>
+          <div className="my-4 p-2 bg-bg-tertiary rounded-md">
+            <p className="text-md font-semibold mb-2 text-primary">LUT</p>
+            <LUTControl
+              lutName={adjustments.lutName || null}
+              lutIntensity={adjustments.lutIntensity || 100}
+              onLutSelect={handleLutSelect}
+              onIntensityChange={handleLutIntensityChange}
+              onClear={handleLutClear}
+            />
+          </div>
+
           <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
             <p className="text-md font-semibold mb-2 text-primary">Negative Conversion</p>
             <div className="mb-2">

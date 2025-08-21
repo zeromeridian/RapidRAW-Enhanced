@@ -137,6 +137,11 @@ interface PanoramaModalState {
   stitchingSourcePaths: Array<string>;
 }
 
+interface LutData {
+  data: string;
+  size: number;
+}
+
 const DEBUG = true;
 const REVOCATION_DELAY = 5000;
 
@@ -881,6 +886,31 @@ function App() {
       unlistenPromise.then((unlisten: any) => unlisten());
     };
   }, []);
+
+  const handleLutSelect = useCallback(
+    async (path: string) => {
+      try {
+        const result: LutData = await invoke('load_and_parse_lut', { path });
+        const name = path.split(/[\\/]/).pop() || 'LUT';
+        setAdjustments((prev: Partial<Adjustments>) => ({
+          ...prev,
+          lutPath: path,
+          lutName: name,
+          lutData: result.data,
+          lutSize: result.size,
+          lutIntensity: 100,
+          sectionVisibility: {
+            ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility),
+            effects: true,
+          },
+        }));
+      } catch (err) {
+        console.error('Failed to load or parse LUT:', err);
+        setError(`Failed to load LUT: ${err}`);
+      }
+    },
+    [setAdjustments],
+  );
 
   const handleRightPanelSelect = useCallback(
     (panelId: Panel) => {
@@ -2925,6 +2955,7 @@ function App() {
                           setCollapsibleState={setCollapsibleSectionsState}
                           setCopiedSectionAdjustments={setCopiedSectionAdjustments}
                           theme={theme}
+                          handleLutSelect={handleLutSelect}
                         />
                       )}
                       {renderedRightPanel === Panel.Metadata && <MetadataPanel selectedImage={selectedImage} />}

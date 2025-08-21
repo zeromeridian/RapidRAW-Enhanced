@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use base64::{engine::general_purpose, Engine as _};
 use bytemuck;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba, Luma};
 use wgpu::util::{DeviceExt, TextureDataOrder};
@@ -95,6 +96,8 @@ pub fn run_gpu_processing(
     image: &DynamicImage,
     adjustments: AllAdjustments,
     mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
+    lut_data_base64: Option<&str>,
+    lut_size: Option<u32>,
 ) -> Result<Vec<u8>, String> {
     let device = &context.device;
     let queue = &context.queue;
@@ -148,6 +151,23 @@ pub fn run_gpu_processing(
             count: None,
         });
     }
+
+    bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
+        binding: 3 + MAX_MASKS,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Texture {
+            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+            view_dimension: wgpu::TextureViewDimension::D3,
+            multisampled: false,
+        },
+        count: None,
+    });
+    bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
+        binding: 4 + MAX_MASKS,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+        count: None,
+    });
 
     let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Dynamic Bind Group Layout"),
@@ -204,6 +224,59 @@ pub fn run_gpu_processing(
     });
     let dummy_mask_view = dummy_mask_texture.create_view(&Default::default());
 
+    let (lut_texture_view, lut_sampler) = if let (Some(data_b64), Some(size)) = (lut_data_base64, lut_size) {
+        let lut_bytes = general_purpose::STANDARD.decode(data_b64).map_err(|e| e.to_string())?;
+        let lut_floats: &[f32] = bytemuck::cast_slice(&lut_bytes);
+
+        let mut rgba_lut_data = Vec::with_capacity(lut_floats.len() / 3 * 4);
+        for chunk in lut_floats.chunks_exact(3) {
+            rgba_lut_data.push(chunk[0]);
+            rgba_lut_data.push(chunk[1]);
+            rgba_lut_data.push(chunk[2]);
+            rgba_lut_data.push(1.0);
+        }
+
+        let lut_texture = device.create_texture_with_data(
+            queue,
+            &wgpu::TextureDescriptor {
+                label: Some("LUT 3D Texture"),
+                size: wgpu::Extent3d { width: size, height: size, depth_or_array_layers: size },
+                mip_level_count: 1, sample_count: 1,
+                dimension: wgpu::TextureDimension::D3,
+                format: wgpu::TextureFormat::Rgba32Float,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            },
+            TextureDataOrder::MipMajor,
+            bytemuck::cast_slice(&rgba_lut_data),
+        );
+
+        let view = lut_texture.create_view(&Default::default());
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+        (view, sampler)
+    } else {
+        let dummy_lut_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Dummy LUT Texture"),
+            size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D3,
+            format: wgpu::TextureFormat::Rgba32Float,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let view = dummy_lut_texture.create_view(&Default::default());
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
+        (view, sampler)
+    };
+
     let tile_size = 2048;
     let mut final_pixels = vec![0u8; (width * height * 4) as usize];
     let tiles_x = (width + tile_size - 1) / tile_size;
@@ -222,7 +295,6 @@ pub fn run_gpu_processing(
                 dimension: wgpu::TextureDimension::D2, format: wgpu::TextureFormat::Rgba8Unorm,
                 usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC, view_formats: &[],
             });
-            // THIS IS THE FIX: Create the view and store it in a variable
             let output_texture_view = output_texture.create_view(&Default::default());
 
             let mut tile_adjustments = adjustments;
@@ -237,7 +309,6 @@ pub fn run_gpu_processing(
 
             let mut bind_group_entries = vec![
                 wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&input_texture_view) },
-                // Use the new variable here
                 wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&output_texture_view) },
                 wgpu::BindGroupEntry { binding: 2, resource: adjustments_buffer.as_entire_binding() },
             ];
@@ -249,6 +320,15 @@ pub fn run_gpu_processing(
                     resource: wgpu::BindingResource::TextureView(view),
                 });
             }
+
+            bind_group_entries.push(wgpu::BindGroupEntry {
+                binding: 3 + MAX_MASKS,
+                resource: wgpu::BindingResource::TextureView(&lut_texture_view),
+            });
+            bind_group_entries.push(wgpu::BindGroupEntry {
+                binding: 4 + MAX_MASKS,
+                resource: wgpu::BindingResource::Sampler(&lut_sampler),
+            });
 
             let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Tile Bind Group"),
@@ -286,8 +366,10 @@ pub fn process_and_get_dynamic_image(
     base_image: &DynamicImage,
     all_adjustments: AllAdjustments,
     mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
+    lut_data_base64: Option<&str>,
+    lut_size: Option<u32>,
 ) -> Result<DynamicImage, String> {
-    let processed_pixels = run_gpu_processing(context, base_image, all_adjustments, mask_bitmaps)?;
+    let processed_pixels = run_gpu_processing(context, base_image, all_adjustments, mask_bitmaps, lut_data_base64, lut_size)?;
     let (width, height) = base_image.dimensions();
     let img_buf = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(width, height, processed_pixels)
         .ok_or("Failed to create image buffer from GPU data")?;

@@ -327,7 +327,8 @@ pub fn generate_thumbnail_data(
             let flip_horizontal = meta.adjustments["flipHorizontal"]
                 .as_bool()
                 .unwrap_or(false);
-            let flip_vertical = meta.adjustments["flipVertical"].as_bool().unwrap_or(false);
+            let flip_vertical = meta.adjustments["flipVertical"].as_bool()
+                .unwrap_or(false);
 
             let flipped_image = apply_flip(processing_base, flip_horizontal, flip_vertical);
             let rotated_image = apply_rotation(&flipped_image, rotation_degrees);
@@ -374,12 +375,16 @@ pub fn generate_thumbnail_data(
                 .collect();
 
             let gpu_adjustments = get_all_adjustments_from_json(&meta.adjustments);
+            let lut_data_base64 = meta.adjustments["lutData"].as_str();
+            let lut_size = meta.adjustments["lutSize"].as_u64().map(|s| s as u32);
 
             if let Ok(processed_image) = gpu_processing::process_and_get_dynamic_image(
                 context,
                 &cropped_preview,
                 gpu_adjustments,
                 &mask_bitmaps,
+                lut_data_base64,
+                lut_size,
             ) {
                 return Ok(processed_image);
             } else {

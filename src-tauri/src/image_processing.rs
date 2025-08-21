@@ -191,6 +191,11 @@ pub struct GlobalAdjustments {
     _pad_neg1: f32,
     _pad_neg2: f32,
 
+    pub has_lut: u32,
+    pub lut_intensity: f32,
+    _pad_lut1: f32,
+    _pad_lut2: f32,
+
     pub color_grading_shadows: ColorGradeSettings,
     pub color_grading_midtones: ColorGradeSettings,
     pub color_grading_highlights: ColorGradeSettings,
@@ -460,6 +465,11 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
         negative_blue_balance: js_adjustments["negativeBlueBalance"].as_f64().unwrap_or(0.0) as f32 / 100.0,
         _pad_neg1: 0.0,
         _pad_neg2: 0.0,
+
+        has_lut: if js_adjustments["lutData"].is_string() { 1 } else { 0 },
+        lut_intensity: js_adjustments["lutIntensity"].as_f64().unwrap_or(100.0) as f32 / 100.0,
+        _pad_lut1: 0.0,
+        _pad_lut2: 0.0,
 
         color_grading_shadows: if is_visible("color") { parse_color_grade_settings(&cg_obj["shadows"]) } else { ColorGradeSettings::default() },
         color_grading_midtones: if is_visible("color") { parse_color_grade_settings(&cg_obj["midtones"]) } else { ColorGradeSettings::default() },

@@ -59,6 +59,7 @@ export enum Effect {
   GrainAmount = 'grainAmount',
   GrainRoughness = 'grainRoughness',
   GrainSize = 'grainSize',
+  LutIntensity = 'lutIntensity',
   NegativeBlueBalance = 'negativeBlueBalance',
   NegativeGreenBalance = 'negativeGreenBalance',
   NegativeRedBalance = 'negativeRedBalance',
@@ -92,6 +93,11 @@ export interface Adjustments {
   highlights: number;
   hsl: Hsl;
   lumaNoiseReduction: number;
+  lutData?: string | null;
+  lutIntensity?: number;
+  lutName?: string | null;
+  lutPath?: string | null;
+  lutSize?: number;
   masks: Array<MaskContainer>;
   negativeBlueBalance: number;
   negativeGreenBalance: number;
@@ -350,6 +356,11 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
     yellows: { hue: 0, saturation: 0, luminance: 0 },
   },
   lumaNoiseReduction: 0,
+  lutData: null,
+  lutIntensity: 100,
+  lutName: null,
+  lutPath: null,
+  lutSize: 0,
   masks: [],
   negativeBlueBalance: 0,
   negativeGreenBalance: 0,
@@ -379,7 +390,9 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
 };
 
 export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any => {
-  if (!loadedAdjustments) {return INITIAL_ADJUSTMENTS;}
+  if (!loadedAdjustments) {
+    return INITIAL_ADJUSTMENTS;
+  }
 
   const normalizedMasks = (loadedAdjustments.masks || []).map((maskContainer: MaskContainer) => {
     const containerAdjustments = maskContainer.adjustments || {};
@@ -444,6 +457,11 @@ export const COPYABLE_ADJUSTMENT_KEYS: Array<string> = [
   Effect.GrainSize,
   BasicAdjustment.Highlights,
   ColorAdjustment.Hsl,
+  'lutData',
+  'lutIntensity',
+  'lutName',
+  'lutPath',
+  'lutSize',
   DetailsAdjustment.LumaNoiseReduction,
   Effect.NegativeBlueBalance,
   Effect.NegativeGreenBalance,
@@ -490,6 +508,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     Effect.GrainAmount,
     Effect.GrainRoughness,
     Effect.GrainSize,
+    Effect.LutIntensity,
     Effect.NegativeBlueBalance,
     Effect.NegativeGreenBalance,
     Effect.NegativeRedBalance,

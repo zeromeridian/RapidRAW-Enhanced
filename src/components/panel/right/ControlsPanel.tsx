@@ -23,6 +23,7 @@ interface ControlsProps {
   collapsibleState: any;
   copiedSectionAdjustments: Adjustments | null;
   handleAutoAdjustments(): void;
+  handleLutSelect(path: string): void;
   histogram: ChannelConfig | null;
   selectedImage: SelectedImage;
   setAdjustments(adjustments: Partial<Adjustments>): void;
@@ -36,6 +37,7 @@ export default function Controls({
   collapsibleState,
   copiedSectionAdjustments,
   handleAutoAdjustments,
+  handleLutSelect,
   histogram,
   selectedImage,
   setAdjustments,
@@ -199,6 +201,7 @@ export default function Controls({
                   setAdjustments={setAdjustments}
                   histogram={histogram}
                   theme={theme}
+                  handleLutSelect={handleLutSelect}
                 />
               </CollapsibleSection>
             </div>
