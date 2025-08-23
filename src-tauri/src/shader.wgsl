@@ -639,7 +639,15 @@ fn apply_all_adjustments(initial_rgb: vec3<f32>, adj: GlobalAdjustments, coords_
     var processed_rgb = apply_noise_reduction(initial_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction);
 
     processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
-    processed_rgb = processed_rgb * pow(2.0, adj.exposure);
+    if (adj.exposure > 0.0) {
+        let gamma = pow(2.0, adj.exposure * 1.5);
+        processed_rgb = 1.0 - pow(1.0 - max(vec3<f32>(0.0), processed_rgb), vec3<f32>(gamma));
+    } else if (adj.exposure < 0.0) {
+        let gamma = 1.0 - (adj.exposure * 0.9);
+        let curved_rgb = pow(max(vec3<f32>(0.0), processed_rgb), vec3<f32>(gamma));
+        let highlight_compression = 1.0 + (adj.exposure * 0.15);
+        processed_rgb = curved_rgb * highlight_compression;
+    }
     processed_rgb = apply_tonal_adjustments(processed_rgb, adj.contrast, adj.highlights, adj.shadows, adj.whites, adj.blacks);
 
     processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);
@@ -658,7 +666,15 @@ fn apply_all_mask_adjustments(initial_rgb: vec3<f32>, adj: MaskAdjustments, coor
     var processed_rgb = apply_noise_reduction(initial_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction);
 
     processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
-    processed_rgb = processed_rgb * pow(2.0, adj.exposure);
+    if (adj.exposure > 0.0) {
+        let gamma = pow(2.0, adj.exposure * 1.5);
+        processed_rgb = 1.0 - pow(1.0 - max(vec3<f32>(0.0), processed_rgb), vec3<f32>(gamma));
+    } else if (adj.exposure < 0.0) {
+        let gamma = 1.0 - adj.exposure;
+        let curved_rgb = pow(max(vec3<f32>(0.0), processed_rgb), vec3<f32>(gamma));
+        let highlight_compression = 1.0 + (adj.exposure * 0.15);
+        processed_rgb = curved_rgb * highlight_compression;
+    }
     processed_rgb = apply_tonal_adjustments(processed_rgb, adj.contrast, adj.highlights, adj.shadows, adj.whites, adj.blacks);
 
     processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);

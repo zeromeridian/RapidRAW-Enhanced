@@ -141,7 +141,7 @@ interface LutData {
   size: number;
 }
 
-const DEBUG = true;
+const DEBUG = false;
 const REVOCATION_DELAY = 5000;
 
 const useDelayedRevokeBlobUrl = (url: string | null | undefined) => {
