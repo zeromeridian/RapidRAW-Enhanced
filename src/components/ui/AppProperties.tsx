@@ -20,6 +20,8 @@ export enum Invokes {
   CreateFolder = 'create_folder',
   DeleteFolder = 'delete_folder',
   DuplicateFile = 'duplicate_file',
+  EstimateBatchExportSize = 'estimate_batch_export_size',
+  EstimateExportSize = 'estimate_export_size',
   ExportImage = 'export_image',
   GenerateAiForegroundMask = 'generate_ai_foreground_mask',
   GenerateAiSkyMask = 'generate_ai_sky_mask',

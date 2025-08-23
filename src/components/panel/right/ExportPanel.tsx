@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { Save, CheckCircle, XCircle, Loader, Ban } from 'lucide-react';
+import debounce from 'lodash.debounce';
 import Switch from '../../ui/Switch';
 import { Adjustments } from '../../../utils/adjustments';
 import {
@@ -37,6 +38,15 @@ function Section({ title, children }: SectionProps) {
   );
 }
 
+const formatBytes = (bytes: number, decimals = 2) => {
+  if (!+bytes) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+};
+
 export default function ExportPanel({
   adjustments,
   exportState,
@@ -53,6 +63,8 @@ export default function ExportPanel({
   const [keepMetadata, setKeepMetadata] = useState<boolean>(true);
   const [stripGps, setStripGps] = useState<boolean>(true);
   const [filenameTemplate, setFilenameTemplate] = useState<string>('{original_filename}_edited');
+  const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
+  const [isEstimating, setIsEstimating] = useState<boolean>(false);
   const filenameInputRef = useRef<HTMLInputElement>(null);
 
   const { status, progress, errorMessage } = exportState;
@@ -68,6 +80,57 @@ export default function ExportPanel({
     : multiSelectedPaths;
   const numImages = pathsToExport.length;
   const isBatchMode = numImages > 1;
+
+  const debouncedEstimateSize = useMemo(
+    () =>
+      debounce(async (currentAdjustments, exportSettings, format) => {
+        if (!selectedImage?.path) {
+          setEstimatedSize(null);
+          return;
+        }
+        setIsEstimating(true);
+        try {
+          const size: number = await invoke(Invokes.EstimateExportSize, {
+            jsAdjustments: currentAdjustments,
+            exportSettings,
+            outputFormat: format,
+          });
+          setEstimatedSize(size);
+        } catch (err) {
+          console.error('Failed to estimate export size:', err);
+          setEstimatedSize(null);
+        } finally {
+          setIsEstimating(false);
+        }
+      }, 500),
+    [selectedImage?.path],
+  );
+
+  useEffect(() => {
+    const exportSettings: ExportSettings = {
+      filenameTemplate,
+      jpegQuality,
+      keepMetadata,
+      resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
+      stripGps,
+    };
+    const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
+    debouncedEstimateSize(adjustments, exportSettings, format);
+
+    return () => debouncedEstimateSize.cancel();
+  }, [
+    adjustments,
+    fileFormat,
+    jpegQuality,
+    enableResize,
+    resizeMode,
+    resizeValue,
+    dontEnlarge,
+    keepMetadata,
+    stripGps,
+    filenameTemplate,
+    debouncedEstimateSize,
+  ]);
 
   const handleVariableClick = (variable: string) => {
     if (!filenameInputRef.current) {
@@ -178,7 +241,7 @@ export default function ExportPanel({
                 {FILE_FORMATS.map((format: FileFormat) => (
                   <button
                     className={`px-2 py-1.5 text-sm rounded-md transition-colors ${
-                      fileFormat === format.id ? 'bg-surface text-white' : 'bg-surface hover:bg-card-active'
+                      fileFormat === format.id ? 'bg-accent text-button-text' : 'bg-surface hover:bg-card-active'
                     } disabled:opacity-50`}
                     disabled={isExporting}
                     key={format.id}
@@ -285,6 +348,13 @@ export default function ExportPanel({
       </div>
 
       <div className="p-4 border-t border-surface flex-shrink-0 space-y-3">
+        <div className="text-center text-xs text-text-tertiary h-4">
+          {isEstimating ? (
+            <span className="italic">Estimating size...</span>
+          ) : estimatedSize !== null ? (
+            <span>Estimated file size: ~{formatBytes(estimatedSize)}</span>
+          ) : null}
+        </div>
         {isExporting ? (
           <button
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600/80 text-white font-bold rounded-lg hover:bg-red-600 transition-all"

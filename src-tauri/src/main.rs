@@ -525,6 +525,84 @@ fn generate_fullscreen_preview(
     Ok(Response::new(buf.into_inner()))
 }
 
+fn process_image_for_export(
+    base_image: &DynamicImage,
+    js_adjustments: &Value,
+    export_settings: &ExportSettings,
+    context: &GpuContext,
+    state: &tauri::State<AppState>,
+) -> Result<DynamicImage, String> {
+    let (transformed_image, unscaled_crop_offset) = 
+        apply_all_transformations(&base_image, &js_adjustments, 1.0);
+    let (img_w, img_h) = transformed_image.dimensions();
+
+    let mask_definitions: Vec<MaskDefinition> = js_adjustments.get("masks")
+        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .unwrap_or_else(Vec::new);
+
+    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions.iter()
+        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
+        .collect();
+
+    let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
+    let lut_path = js_adjustments["lutPath"].as_str();
+    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+
+    let mut final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut)?;
+
+    if let Some(resize_opts) = &export_settings.resize {
+        let (current_w, current_h) = final_image.dimensions();
+        let should_resize = if resize_opts.dont_enlarge {
+            match resize_opts.mode {
+                ResizeMode::LongEdge => current_w.max(current_h) > resize_opts.value,
+                ResizeMode::Width => current_w > resize_opts.value,
+                ResizeMode::Height => current_h > resize_opts.value,
+            }
+        } else { true };
+
+        if should_resize {
+            final_image = match resize_opts.mode {
+                ResizeMode::LongEdge => {
+                    let (w, h) = if current_w > current_h {
+                        (resize_opts.value, (resize_opts.value as f32 * (current_h as f32 / current_w as f32)).round() as u32)
+                    } else {
+                        ((resize_opts.value as f32 * (current_w as f32 / current_h as f32)).round() as u32, resize_opts.value)
+                    };
+                    final_image.thumbnail(w, h)
+                },
+                ResizeMode::Width => final_image.thumbnail(resize_opts.value, u32::MAX),
+                ResizeMode::Height => final_image.thumbnail(u32::MAX, resize_opts.value),
+            };
+        }
+    }
+    Ok(final_image)
+}
+
+fn encode_image_to_bytes(
+    image: &DynamicImage,
+    output_format: &str,
+    jpeg_quality: u8,
+) -> Result<Vec<u8>, String> {
+    let mut image_bytes = Vec::new();
+    let mut cursor = Cursor::new(&mut image_bytes);
+
+    match output_format.to_lowercase().as_str() {
+        "jpg" | "jpeg" => {
+            let rgb_image = image.to_rgb8();
+            let encoder = JpegEncoder::new_with_quality(&mut cursor, jpeg_quality);
+            rgb_image.write_with_encoder(encoder).map_err(|e| e.to_string())?;
+        }
+        "png" => {
+            image.write_to(&mut cursor, image::ImageFormat::Png).map_err(|e| e.to_string())?;
+        }
+        "tiff" => {
+            image.write_to(&mut cursor, image::ImageFormat::Tiff).map_err(|e| e.to_string())?;
+        }
+        _ => return Err(format!("Unsupported file format: {}", output_format)),
+    };
+    Ok(image_bytes)
+}
+
 #[tauri::command]
 async fn export_image(
     original_path: String,
@@ -548,70 +626,12 @@ async fn export_image(
             let base_image = composite_patches_on_image(&original_image_data, &js_adjustments)
                 .map_err(|e| format!("Failed to composite AI patches for export: {}", e))?;
 
-            let (transformed_image, unscaled_crop_offset) = 
-                apply_all_transformations(&base_image, &js_adjustments, 1.0);
-            let (img_w, img_h) = transformed_image.dimensions();
-
-            let mask_definitions: Vec<MaskDefinition> = js_adjustments.get("masks")
-                .and_then(|m| serde_json::from_value(m.clone()).ok())
-                .unwrap_or_else(Vec::new);
-
-            let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions.iter()
-                .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
-                .collect();
-
-            let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
-            let lut_path = js_adjustments["lutPath"].as_str();
-            let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
-
-            let mut final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut)?;
-
-            if let Some(resize_opts) = export_settings.resize {
-                let (current_w, current_h) = final_image.dimensions();
-                let should_resize = if resize_opts.dont_enlarge {
-                    match resize_opts.mode {
-                        ResizeMode::LongEdge => current_w.max(current_h) > resize_opts.value,
-                        ResizeMode::Width => current_w > resize_opts.value,
-                        ResizeMode::Height => current_h > resize_opts.value,
-                    }
-                } else { true };
-
-                if should_resize {
-                    final_image = match resize_opts.mode {
-                        ResizeMode::LongEdge => {
-                            let (w, h) = if current_w > current_h {
-                                (resize_opts.value, (resize_opts.value as f32 * (current_h as f32 / current_w as f32)).round() as u32)
-                            } else {
-                                ((resize_opts.value as f32 * (current_w as f32 / current_h as f32)).round() as u32, resize_opts.value)
-                            };
-                            final_image.thumbnail(w, h)
-                        },
-                        ResizeMode::Width => final_image.thumbnail(resize_opts.value, u32::MAX),
-                        ResizeMode::Height => final_image.thumbnail(u32::MAX, resize_opts.value),
-                    };
-                }
-            }
+            let final_image = process_image_for_export(&base_image, &js_adjustments, &export_settings, &context, &state)?;
 
             let output_path_obj = std::path::Path::new(&output_path);
             let extension = output_path_obj.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
             
-            let mut image_bytes = Vec::new();
-            let mut cursor = Cursor::new(&mut image_bytes);
-
-            match extension.as_str() {
-                "jpg" | "jpeg" => {
-                    let rgb_image = final_image.to_rgb8();
-                    let encoder = JpegEncoder::new_with_quality(&mut cursor, export_settings.jpeg_quality);
-                    rgb_image.write_with_encoder(encoder).map_err(|e| e.to_string())?;
-                }
-                "png" => {
-                    final_image.write_to(&mut cursor, image::ImageFormat::Png).map_err(|e| e.to_string())?;
-                }
-                "tiff" => {
-                    final_image.write_to(&mut cursor, image::ImageFormat::Tiff).map_err(|e| e.to_string())?;
-                }
-                _ => return Err(format!("Unsupported file extension: {}", extension)),
-            };
+            let mut image_bytes = encode_image_to_bytes(&final_image, &extension, export_settings.jpeg_quality)?;
 
             write_image_with_metadata(
                 &mut image_bytes,
@@ -682,49 +702,7 @@ async fn batch_export_images(
                 let base_image = load_and_composite(image_path_str, &js_adjustments, false)
                     .map_err(|e| e.to_string())?;
                 
-                let (transformed_image, unscaled_crop_offset) = 
-                    apply_all_transformations(&base_image, &js_adjustments, 1.0);
-                let (img_w, img_h) = transformed_image.dimensions();
-
-                let mask_definitions: Vec<MaskDefinition> = js_adjustments.get("masks")
-                    .and_then(|m| serde_json::from_value(m.clone()).ok())
-                    .unwrap_or_else(Vec::new);
-
-                let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions.iter()
-                    .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
-                    .collect();
-
-                let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
-                let lut_path = js_adjustments["lutPath"].as_str();
-                let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
-
-                let mut final_image = process_and_get_dynamic_image(&context, &transformed_image, all_adjustments, &mask_bitmaps, lut)?;
-
-                if let Some(resize_opts) = &export_settings.resize {
-                    let (current_w, current_h) = final_image.dimensions();
-                    let should_resize = if resize_opts.dont_enlarge {
-                        match resize_opts.mode {
-                            ResizeMode::LongEdge => current_w.max(current_h) > resize_opts.value,
-                            ResizeMode::Width => current_w > resize_opts.value,
-                            ResizeMode::Height => current_h > resize_opts.value,
-                        }
-                    } else { true };
-
-                    if should_resize {
-                        final_image = match resize_opts.mode {
-                            ResizeMode::LongEdge => {
-                                let (w, h) = if current_w > current_h {
-                                    (resize_opts.value, (resize_opts.value as f32 * (current_h as f32 / current_w as f32)).round() as u32)
-                                } else {
-                                    ((resize_opts.value as f32 * (current_w as f32 / current_h as f32)).round() as u32, resize_opts.value)
-                                };
-                                final_image.thumbnail(w, h)
-                            },
-                            ResizeMode::Width => final_image.thumbnail(resize_opts.value, u32::MAX),
-                            ResizeMode::Height => final_image.thumbnail(u32::MAX, resize_opts.value),
-                        };
-                    }
-                }
+                let final_image = process_image_for_export(&base_image, &js_adjustments, &export_settings, &context, &state)?;
 
                 let original_path = std::path::Path::new(image_path_str);
                 
@@ -757,23 +735,7 @@ async fn batch_export_images(
                 let new_filename = format!("{}.{}", new_stem, output_format);
                 let output_path = output_folder_path.join(new_filename);
 
-                let mut image_bytes = Vec::new();
-                let mut cursor = Cursor::new(&mut image_bytes);
-
-                match output_format.as_str() {
-                    "jpg" | "jpeg" => {
-                        let rgb_image = final_image.to_rgb8();
-                        let encoder = JpegEncoder::new_with_quality(&mut cursor, export_settings.jpeg_quality);
-                        rgb_image.write_with_encoder(encoder).map_err(|e| e.to_string())?;
-                    }
-                    "png" => {
-                        final_image.write_to(&mut cursor, image::ImageFormat::Png).map_err(|e| e.to_string())?;
-                    }
-                    "tiff" => {
-                        final_image.write_to(&mut cursor, image::ImageFormat::Tiff).map_err(|e| e.to_string())?;
-                    }
-                    _ => return Err(format!("Unsupported file format: {}", output_format)),
-                };
+                let mut image_bytes = encode_image_to_bytes(&final_image, &output_format, export_settings.jpeg_quality)?;
 
                 write_image_with_metadata(
                     &mut image_bytes,
@@ -814,6 +776,58 @@ fn cancel_export(state: tauri::State<AppState>) -> Result<(), String> {
         return Err("No export task is currently running.".to_string());
     }
     Ok(())
+}
+
+#[tauri::command]
+async fn estimate_export_size(
+    js_adjustments: Value,
+    export_settings: ExportSettings,
+    output_format: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<usize, String> {
+    let context = get_or_init_gpu_context(&state)?;
+    let original_image_data = get_full_image_for_processing(&state)?;
+    
+    let base_image = composite_patches_on_image(&original_image_data, &js_adjustments)
+        .map_err(|e| format!("Failed to composite AI patches for estimation: {}", e))?;
+
+    let final_image = process_image_for_export(&base_image, &js_adjustments, &export_settings, &context, &state)?;
+    
+    let image_bytes = encode_image_to_bytes(&final_image, &output_format, export_settings.jpeg_quality)?;
+
+    Ok(image_bytes.len())
+}
+
+#[tauri::command]
+async fn estimate_batch_export_size(
+    paths: Vec<String>,
+    export_settings: ExportSettings,
+    output_format: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<usize, String> {
+    if paths.is_empty() {
+        return Ok(0);
+    }
+    let context = get_or_init_gpu_context(&state)?;
+    let first_path = &paths[0];
+
+    let sidecar_path = get_sidecar_path(first_path);
+    let metadata: ImageMetadata = if sidecar_path.exists() {
+        let file_content = fs::read_to_string(sidecar_path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&file_content).unwrap_or_default()
+    } else {
+        ImageMetadata::default()
+    };
+    let js_adjustments = metadata.adjustments;
+
+    let base_image = load_and_composite(first_path, &js_adjustments, false)
+        .map_err(|e| e.to_string())?;
+
+    let final_image = process_image_for_export(&base_image, &js_adjustments, &export_settings, &context, &state)?;
+
+    let image_bytes = encode_image_to_bytes(&final_image, &output_format, export_settings.jpeg_quality)?;
+
+    Ok(image_bytes.len() * paths.len())
 }
 
 fn write_image_with_metadata(
@@ -1491,6 +1505,8 @@ fn main() {
             export_image,
             batch_export_images,
             cancel_export,
+            estimate_export_size,
+            estimate_batch_export_size,
             generate_fullscreen_preview,
             generate_original_transformed_preview,
             generate_preset_preview,

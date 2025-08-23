@@ -270,7 +270,7 @@ export default function CropPanel({
                   <button
                     className={clsx(
                       'px-2 py-1.5 text-sm rounded-md transition-colors',
-                      isPresetActive(preset) ? 'bg-surface text-text-primary' : 'bg-surface hover:bg-card-active',
+                      isPresetActive(preset) ? 'bg-accent text-button-text' : 'bg-surface hover:bg-card-active',
                     )}
                     key={preset.name}
                     onClick={() => handlePresetClick(preset)}
