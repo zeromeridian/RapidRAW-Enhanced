@@ -51,6 +51,8 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-08-24:** Improved keyboard shortcuts
+*   **2025-08-23:** Estimate file size before exporting
 *   **2025-08-21:** Added LUTs (.cube, .3dl, .png, .jpg, .jpeg, .tiff) support
 *   **2025-08-16:** Fast AI sky masks
 *   **2025-08-15:** Show full resolution image when zooming in
@@ -59,12 +61,12 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-08-11:** TypeScript cleanup & many bug fixes
 *   **2025-08-09:** Local inpainting without the need for ComfyUI, ability to change thumbnail aspect ratio
 *   **2025-08-09:** Frontend refactored to TypeScript thanks to @varjolintu
-*   **2025-08-08:** New onnxruntime download strategy & the base for local inpainting
-*   **2025-08-05:** Improved HSL cascading, UI & animation improvements, ability to grow & shrink / feather AI masks
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-08-08:** New onnxruntime download strategy & the base for local inpainting
+*   **2025-08-05:** Improved HSL cascading, UI & animation improvements, ability to grow & shrink / feather AI masks
 *   **2025-08-03:** New high performance, seamless image panorama stitcher (without any dependencies on OpenCV)
 *   **2025-08-02:** Added an image straightening tool and improved crop & rotation functionality (especially on portrait images)
 *   **2025-08-02:** A new dedicated image importer, ability to rename and batch rename files, improved dark theme, and other fixes
@@ -149,7 +151,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
         <li><strong>Tone Curves:</strong> Full control over Luma, Red, Green, and Blue channels.</li>
         <li><strong>Color Grading:</strong> Temperature, Tint, Vibrance, Saturation, and a full HSL color mixer.</li>
         <li><strong>Detail Enhancement:</strong> Sharpening, Clarity, Structure, and Noise Reduction.</li>
-        <li><strong>Effects:</strong> Dehaze, Vignette, and realistic Film Grain simulation.</li>
+        <li><strong>Effects:</strong> LUTs, Dehaze, Vignette, and Film Grain simulation.</li>
         <li><strong>Transform Tools:</strong> Crop with aspect ratio locking, Rotate, and Flip.</li>
       </ul>
     </td>
