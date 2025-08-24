@@ -639,6 +639,20 @@ function App() {
     ],
   );
 
+  const handleDeleteMaskContainer = useCallback(
+    (containerId: string) => {
+      setAdjustments((prev: Adjustments) => ({
+        ...prev,
+        masks: (prev.masks || []).filter((c) => c.id !== containerId),
+      }));
+      if (activeMaskContainerId === containerId) {
+        setActiveMaskContainerId(null);
+        setActiveMaskId(null);
+      }
+    },
+    [setAdjustments, activeMaskContainerId],
+  );
+
   const handleDeleteAiPatch = useCallback(
     (patchId: string) => {
       setAdjustments((prev: Adjustments) => ({
@@ -1685,7 +1699,9 @@ function App() {
   );
 
   useKeyboardShortcuts({
+    activeAiPatchContainerId,
     activeAiSubMaskId,
+    activeMaskContainerId,
     activeMaskId,
     activeRightPanel,
     canRedo,
@@ -1694,6 +1710,8 @@ function App() {
     customEscapeHandler,
     handleBackToLibrary,
     handleCopyAdjustments,
+    handleDeleteAiPatch,
+    handleDeleteMaskContainer,
     handleDeleteSelected,
     handleImageSelect,
     handlePasteAdjustments,
@@ -1711,6 +1729,7 @@ function App() {
     redo,
     selectedImage,
     setActiveAiSubMaskId,
+    setActiveMaskContainerId,
     setActiveMaskId,
     setCopiedFilePaths,
     setIsStraightenActive,

@@ -4,6 +4,7 @@ import { ImageFile, Panel, SelectedImage } from '../components/ui/AppProperties'
 interface KeyboardShortcutsProps {
   activeAiPatchContainerId?: string | null;
   activeAiSubMaskId: string | null;
+  activeMaskContainerId: string | null;
   activeMaskId: string | null;
   activeRightPanel: Panel | null;
   canRedo: boolean;
@@ -12,6 +13,8 @@ interface KeyboardShortcutsProps {
   customEscapeHandler: any;
   handleBackToLibrary(): void;
   handleCopyAdjustments(): void;
+  handleDeleteAiPatch(patchId: string): void;
+  handleDeleteMaskContainer(containerId: string): void;
   handleDeleteSelected(): void;
   handleImageSelect(path: string): void;
   handlePasteAdjustments(): void;
@@ -30,6 +33,7 @@ interface KeyboardShortcutsProps {
   redo(): void;
   selectedImage: SelectedImage | null;
   setActiveAiSubMaskId(id: string | null): void;
+  setActiveMaskContainerId(id: string | null): void;
   setActiveMaskId(id: string | null): void;
   setCopiedFilePaths(paths: Array<string>): void;
   setIsStraightenActive(active: any): void;
@@ -48,6 +52,7 @@ interface KeyboardShortcutsProps {
 export const useKeyboardShortcuts = ({
   activeAiPatchContainerId,
   activeAiSubMaskId,
+  activeMaskContainerId,
   activeMaskId,
   activeRightPanel,
   canRedo,
@@ -56,6 +61,8 @@ export const useKeyboardShortcuts = ({
   customEscapeHandler,
   handleBackToLibrary,
   handleCopyAdjustments,
+  handleDeleteAiPatch,
+  handleDeleteMaskContainer,
   handleDeleteSelected,
   handleImageSelect,
   handlePasteAdjustments,
@@ -74,6 +81,7 @@ export const useKeyboardShortcuts = ({
   redo,
   selectedImage,
   setActiveAiSubMaskId,
+  setActiveMaskContainerId,
   setActiveMaskId,
   setCopiedFilePaths,
   setIsStraightenActive,
@@ -113,6 +121,10 @@ export const useKeyboardShortcuts = ({
             onSelectPatchContainer(null);
           } else if (activeMaskId) {
             setActiveMaskId(null);
+          } else if (activeMaskContainerId) {
+            setActiveMaskContainerId(null);
+          } else if (activeRightPanel === Panel.Crop) {
+            handleRightPanelSelect(Panel.Adjustments);
           } else if (isFullScreen) {
             handleToggleFullScreen();
           } else {
@@ -122,18 +134,26 @@ export const useKeyboardShortcuts = ({
         }
         if (key === ' ' && !isCtrl) {
           event.preventDefault();
-          
+
           // Calculate current zoom percentage relative to original
-          const currentPercent = originalSize && originalSize.width > 0 && displaySize && displaySize.width > 0 
-            ? Math.round((displaySize.width / originalSize.width) * 100)
-            : 100;
-          
+          const currentPercent =
+            originalSize && originalSize.width > 0 && displaySize && displaySize.width > 0
+              ? Math.round((displaySize.width / originalSize.width) * 100)
+              : 100;
+
           // Toggle between fit-to-window, 2x fit-to-window (if < 100%), and 100%
           let fitPercent = 100;
-          if (originalSize && originalSize.width > 0 && originalSize.height > 0 && baseRenderSize && baseRenderSize.width > 0 && baseRenderSize.height > 0) {
+          if (
+            originalSize &&
+            originalSize.width > 0 &&
+            originalSize.height > 0 &&
+            baseRenderSize &&
+            baseRenderSize.width > 0 &&
+            baseRenderSize.height > 0
+          ) {
             const originalAspect = originalSize.width / originalSize.height;
             const baseAspect = baseRenderSize.width / baseRenderSize.height;
-            
+
             if (originalAspect > baseAspect) {
               // Width is limiting (landscape)
               fitPercent = Math.round((baseRenderSize.width / originalSize.width) * 100);
@@ -164,6 +184,10 @@ export const useKeyboardShortcuts = ({
           event.preventDefault();
           setShowOriginal((prev: boolean) => !prev);
         }
+        if (key === 'd' && !isCtrl) {
+          event.preventDefault();
+          handleRightPanelSelect(Panel.Adjustments);
+        }
         if (key === 'r' && !isCtrl) {
           event.preventDefault();
           handleRightPanelSelect(Panel.Crop);
@@ -175,6 +199,10 @@ export const useKeyboardShortcuts = ({
         if (key === 'k' && !isCtrl) {
           event.preventDefault();
           handleRightPanelSelect(Panel.Ai);
+        }
+        if (key === 'p' && !isCtrl) {
+          event.preventDefault();
+          handleRightPanelSelect(Panel.Presets);
         }
         if (key === 'i' && !isCtrl) {
           event.preventDefault();
@@ -200,15 +228,14 @@ export const useKeyboardShortcuts = ({
         if (selectedImage) {
           if (key === 'arrowup' || key === 'arrowdown') {
             // Calculate current zoom percentage relative to original
-            const currentPercent = originalSize && originalSize.width > 0 && displaySize && displaySize.width > 0 
-              ? (displaySize.width / originalSize.width)
-              : 1.0;
-            
+            const currentPercent =
+              originalSize && originalSize.width > 0 && displaySize && displaySize.width > 0
+                ? displaySize.width / originalSize.width
+                : 1.0;
+
             const step = 0.1; // 10% steps
-            const newPercent = key === 'arrowup' 
-              ? currentPercent + step 
-              : currentPercent - step;
-            
+            const newPercent = key === 'arrowup' ? currentPercent + step : currentPercent - step;
+
             // Clamp to 10%-200% of original size
             const clampedPercent = Math.max(0.1, Math.min(newPercent, 2.0));
             handleZoomChange(clampedPercent);
@@ -280,10 +307,21 @@ export const useKeyboardShortcuts = ({
 
       if (key === 'delete') {
         event.preventDefault();
-        handleDeleteSelected();
+        if (activeMaskContainerId) {
+          handleDeleteMaskContainer(activeMaskContainerId);
+        } else if (activeAiPatchContainerId) {
+          handleDeleteAiPatch(activeAiPatchContainerId);
+        } else {
+          handleDeleteSelected();
+        }
       }
 
       if (isCtrl) {
+        const currentPercent =
+          originalSize && originalSize.width > 0 && displaySize && displaySize.width > 0
+            ? displaySize.width / originalSize.width
+            : 1.0;
+
         switch (key) {
           case 'c':
             event.preventDefault();
@@ -324,6 +362,26 @@ export const useKeyboardShortcuts = ({
               redo();
             }
             break;
+          case '0':
+          case ')':
+            event.preventDefault();
+            handleZoomChange(0, true); // Fit to window
+            break;
+          case '1':
+          case '!':
+            event.preventDefault();
+            handleZoomChange(1.0); // 100%
+            break;
+          case '=':
+          case '+':
+            event.preventDefault();
+            handleZoomChange(Math.min(currentPercent * 1.2, 2.0));
+            break;
+          case '-':
+          case '_':
+            event.preventDefault();
+            handleZoomChange(Math.max(currentPercent / 1.2, 0.1));
+            break;
           default:
             break;
         }
@@ -336,6 +394,7 @@ export const useKeyboardShortcuts = ({
   }, [
     activeAiPatchContainerId,
     activeAiSubMaskId,
+    activeMaskContainerId,
     activeMaskId,
     activeRightPanel,
     canRedo,
@@ -344,6 +403,8 @@ export const useKeyboardShortcuts = ({
     customEscapeHandler,
     handleBackToLibrary,
     handleCopyAdjustments,
+    handleDeleteAiPatch,
+    handleDeleteMaskContainer,
     handleDeleteSelected,
     handleImageSelect,
     handlePasteAdjustments,
@@ -362,6 +423,7 @@ export const useKeyboardShortcuts = ({
     redo,
     selectedImage,
     setActiveAiSubMaskId,
+    setActiveMaskContainerId,
     setActiveMaskId,
     setCopiedFilePaths,
     setIsStraightenActive,
@@ -372,5 +434,8 @@ export const useKeyboardShortcuts = ({
     sortedImageList,
     undo,
     zoom,
+    displaySize,
+    baseRenderSize,
+    originalSize,
   ]);
 };

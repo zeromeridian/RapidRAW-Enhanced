@@ -464,16 +464,24 @@ export default function SettingsPanel({
               <div>
                 <h3 className="text-lg font-semibold pt-3 pb-2 text-accent">Editor</h3>
                 <div className="divide-y divide-border-color">
-                  <KeybindItem keys={['Esc']} description="Exit editor / fullscreen" />
+                  <KeybindItem keys={['Esc']} description="Deselect mask, exit crop/fullscreen/editor" />
                   <KeybindItem keys={['Ctrl/Cmd', '+', 'Z']} description="Undo adjustment" />
                   <KeybindItem keys={['Ctrl/Cmd', '+', 'Y']} description="Redo adjustment" />
-                  <KeybindItem keys={['Space']} description="Toggle 200% zoom" />
+                  <KeybindItem keys={['Delete']} description="Delete selected mask/patch or image" />
+                  <KeybindItem keys={['Space']} description="Cycle zoom (Fit, 2x Fit, 100%)" />
                   <KeybindItem keys={['←', '→']} description="Previous / Next image" />
-                  <KeybindItem keys={['↑', '↓']} description="Zoom out / Zoom in" />
+                  <KeybindItem keys={['↑', '↓']} description="Zoom in / Zoom out (by step)" />
+                  <KeybindItem keys={['Ctrl/Cmd', '+', '+']} description="Zoom in" />
+                  <KeybindItem keys={['Ctrl/Cmd', '+', '-']} description="Zoom out" />
+                  <KeybindItem keys={['Ctrl/Cmd', '+', '0']} description="Zoom to fit" />
+                  <KeybindItem keys={['Ctrl/Cmd', '+', '1']} description="Zoom to 100%" />
                   <KeybindItem keys={['F']} description="Toggle fullscreen" />
                   <KeybindItem keys={['B']} description="Show original (before/after)" />
+                  <KeybindItem keys={['D']} description="Toggle Adjustments panel" />
                   <KeybindItem keys={['R']} description="Toggle Crop panel" />
                   <KeybindItem keys={['M']} description="Toggle Masks panel" />
+                  <KeybindItem keys={['K']} description="Toggle AI panel" />
+                  <KeybindItem keys={['P']} description="Toggle Presets panel" />
                   <KeybindItem keys={['I']} description="Toggle Metadata panel" />
                   <KeybindItem keys={['W']} description="Toggle Waveform display" />
                   <KeybindItem keys={['E']} description="Toggle Export panel" />
