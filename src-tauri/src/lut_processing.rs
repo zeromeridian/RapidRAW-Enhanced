@@ -16,10 +16,13 @@ fn parse_cube(path: &Path) -> Result<Lut> {
 
     let mut size: Option<u32> = None;
     let mut data: Vec<f32> = Vec::new();
+    let mut line_num = 0;
 
     for line in reader.lines() {
+        line_num += 1;
         let line = line?;
         let trimmed = line.trim();
+
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
@@ -30,17 +33,44 @@ fn parse_cube(path: &Path) -> Result<Lut> {
         }
 
         match parts[0].to_uppercase().as_str() {
-            "TITLE" => continue,
+            "TITLE" | "DOMAIN_MIN" | "DOMAIN_MAX" => continue,
+
             "LUT_3D_SIZE" => {
-                if parts.len() > 1 {
-                    size = Some(parts[1].parse()?);
+                if parts.len() < 2 {
+                    return Err(anyhow!(
+                        "Malformed LUT_3D_SIZE on line {}: '{}'",
+                        line_num,
+                        line
+                    ));
                 }
+                size = Some(parts[1].parse().map_err(|e| {
+                    anyhow!(
+                        "Failed to parse LUT_3D_SIZE on line {}: '{}'. Error: {}",
+                        line_num,
+                        line,
+                        e
+                    )
+                })?);
             }
             _ => {
                 if size.is_some() {
-                    let r: f32 = parts.get(0).ok_or(anyhow!("Missing R value"))?.parse()?;
-                    let g: f32 = parts.get(1).ok_or(anyhow!("Missing G value"))?.parse()?;
-                    let b: f32 = parts.get(2).ok_or(anyhow!("Missing B value"))?.parse()?;
+                    if parts.len() < 3 {
+                        return Err(anyhow!(
+                            "Invalid data line on line {}: '{}'. Expected 3 float values, found {}",
+                            line_num,
+                            line,
+                            parts.len()
+                        ));
+                    }
+                    let r: f32 = parts[0].parse().map_err(|e| {
+                        anyhow!("Failed to parse R value on line {}: '{}'. Error: {}", line_num, line, e)
+                    })?;
+                    let g: f32 = parts[1].parse().map_err(|e| {
+                        anyhow!("Failed to parse G value on line {}: '{}'. Error: {}", line_num, line, e)
+                    })?;
+                    let b: f32 = parts[2].parse().map_err(|e| {
+                        anyhow!("Failed to parse B value on line {}: '{}'. Error: {}", line_num, line, e)
+                    })?;
                     data.push(r);
                     data.push(g);
                     data.push(b);
@@ -50,15 +80,20 @@ fn parse_cube(path: &Path) -> Result<Lut> {
     }
 
     let lut_size = size.ok_or(anyhow!("LUT_3D_SIZE not found in .cube file"))?;
-    if data.len() != (lut_size * lut_size * lut_size * 3) as usize {
+    let expected_len = (lut_size * lut_size * lut_size * 3) as usize;
+    if data.len() != expected_len {
         return Err(anyhow!(
-            "LUT data size mismatch. Expected {}, found {}",
-            lut_size * lut_size * lut_size * 3,
+            "LUT data size mismatch. Expected {} float values (for size {}), but found {}. The file may be corrupt or incomplete.",
+            expected_len,
+            lut_size,
             data.len()
         ));
     }
 
-    Ok(Lut { size: lut_size, data })
+    Ok(Lut {
+        size: lut_size,
+        data,
+    })
 }
 
 fn parse_3dl(path: &Path) -> Result<Lut> {
@@ -91,7 +126,7 @@ fn parse_3dl(path: &Path) -> Result<Lut> {
     let size = (num_entries as f64).cbrt().round() as u32;
 
     if size * size * size != num_entries as u32 {
-        return Err(anyhow!("Invalid 3DL LUT data size"));
+        return Err(anyhow!("Invalid 3DL LUT data size: the number of entries ({}) is not a perfect cube.", num_entries));
     }
 
     Ok(Lut { size, data })
@@ -100,7 +135,7 @@ fn parse_3dl(path: &Path) -> Result<Lut> {
 fn parse_hald(image: DynamicImage) -> Result<Lut> {
     let (width, height) = image.dimensions();
     if width != height {
-        return Err(anyhow!("HALD image must be square"));
+        return Err(anyhow!("HALD image must be square, but dimensions are {}x{}", width, height));
     }
 
     let total_pixels = width * height;
@@ -127,7 +162,11 @@ fn parse_hald(image: DynamicImage) -> Result<Lut> {
 
 pub fn parse_lut_file(path_str: &str) -> Result<Lut> {
     let path = Path::new(path_str);
-    let extension = path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+    let extension = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
 
     match extension.as_str() {
         "cube" => parse_cube(path),
