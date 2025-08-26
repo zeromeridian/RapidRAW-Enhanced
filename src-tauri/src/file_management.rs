@@ -97,6 +97,47 @@ pub struct LastFolderState {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct ComfyUIWorkflowConfig {
+    pub workflow_path: Option<String>,
+    pub model_checkpoints: HashMap<String, String>,
+    pub vae_loaders: HashMap<String, String>,
+    pub controlnet_loaders: HashMap<String, String>,
+    pub source_image_node_id: String,
+    pub mask_image_node_id: String,
+    pub text_prompt_node_id: String,
+    pub final_output_node_id: String,
+    pub sampler_node_id: String,
+    pub sampler_steps: u32,
+}
+
+impl Default for ComfyUIWorkflowConfig {
+    fn default() -> Self {
+        let mut model_checkpoints = HashMap::new();
+        model_checkpoints.insert("4".to_string(), "XL_RealVisXL_V5.0_Lightning.safetensors".to_string());
+
+        let mut vae_loaders = HashMap::new();
+        vae_loaders.insert("67".to_string(), "sdxl_vae.safetensors".to_string());
+
+        let mut controlnet_loaders = HashMap::new();
+        controlnet_loaders.insert("16".to_string(), "diffusion_pytorch_model_promax.safetensors".to_string());
+
+        Self {
+            workflow_path: None,
+            model_checkpoints,
+            vae_loaders,
+            controlnet_loaders,
+            source_image_node_id: "11".to_string(),
+            mask_image_node_id: "148".to_string(),
+            text_prompt_node_id: "6".to_string(),
+            final_output_node_id: "252".to_string(),
+            sampler_node_id: "3".to_string(),
+            sampler_steps: 10,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub last_root_path: Option<String>,
     pub editor_preview_resolution: Option<u32>,
@@ -106,6 +147,8 @@ pub struct AppSettings {
     pub transparent: Option<bool>,
     pub decorations: Option<bool>,
     pub comfyui_address: Option<String>,
+    #[serde(default)]
+    pub comfyui_workflow_config: ComfyUIWorkflowConfig,
     pub last_folder_state: Option<LastFolderState>,
     pub adaptive_editor_theme: Option<bool>,
     pub ui_visibility: Option<Value>,
@@ -129,6 +172,7 @@ impl Default for AppSettings {
             #[cfg(any(target_os = "windows", target_os = "macos"))]
             decorations: Some(false),
             comfyui_address: None,
+            comfyui_workflow_config: ComfyUIWorkflowConfig::default(),
             last_folder_state: None,
             adaptive_editor_theme: Some(false),
             ui_visibility: None,

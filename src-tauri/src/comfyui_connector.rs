@@ -4,19 +4,14 @@ use image::{DynamicImage, ImageFormat};
 use reqwest::multipart;
 use serde_json::{json, Value};
 use std::io::Cursor;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fs;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use uuid::Uuid;
 
-const WORKFLOWS_DIR: &str = "./workflows";
+use crate::file_management::ComfyUIWorkflowConfig;
 
-pub struct WorkflowInputs {
-    pub source_image_node_id: String,
-    pub mask_image_node_id: Option<String>,
-    pub text_prompt_node_id: Option<String>,
-    pub final_output_node_id: String,
-}
+const WORKFLOWS_DIR: &str = "./workflows";
 
 async fn upload_image(address: &str, image: DynamicImage, form_name: &str) -> Result<String> {
     let mut image_bytes = Cursor::new(Vec::new());
@@ -120,40 +115,72 @@ pub async fn ping_server(address: &str) -> Result<()> {
 
 pub async fn execute_workflow(
     address: &str,
-    workflow_name: &str,
-    inputs: WorkflowInputs,
+    config: &ComfyUIWorkflowConfig,
     source_image: DynamicImage,
     mask_image: Option<DynamicImage>,
     text_prompt: Option<String>,
 ) -> Result<Vec<u8>> {
-    let workflow_path = Path::new(WORKFLOWS_DIR).join(format!("{}.json", workflow_name));
+    let workflow_path = config.workflow_path.as_ref().map(PathBuf::from).unwrap_or_else(|| {
+        Path::new(WORKFLOWS_DIR).join("generative_replace.json")
+    });
+
     let workflow_str = fs::read_to_string(&workflow_path)
         .map_err(|e| anyhow!("Failed to read workflow file at {:?}: {}", workflow_path, e))?;
     let mut workflow: Value = serde_json::from_str(&workflow_str)?;
 
-    let source_filename = upload_image(address, source_image, "image").await?;
-    if let Some(node) = workflow.get_mut(&inputs.source_image_node_id) {
-        node["inputs"]["image"] = json!(source_filename);
-    } else {
-        return Err(anyhow!("Source image node ID '{}' not found in workflow.", inputs.source_image_node_id));
-    }
-
-    if let (Some(mask), Some(mask_node_id)) = (mask_image, &inputs.mask_image_node_id) {
-        let mask_filename = upload_image(address, mask, "image").await?;
-        if let Some(node) = workflow.get_mut(mask_node_id) {
-            node["inputs"]["image"] = json!(mask_filename);
-        } else {
-            return Err(anyhow!("Mask image node ID '{}' not found in workflow.", mask_node_id));
+    for (node_id, ckpt_name) in &config.model_checkpoints {
+        if let Some(node) = workflow.get_mut(node_id) {
+            if let Some(inputs) = node.get_mut("inputs") {
+                inputs["ckpt_name"] = json!(ckpt_name);
+            }
         }
     }
 
-    if let (Some(prompt_text), Some(prompt_node_id)) = (text_prompt, &inputs.text_prompt_node_id) {
-        if let Some(node) = workflow.get_mut(prompt_node_id) {
+    for (node_id, vae_name) in &config.vae_loaders {
+        if let Some(node) = workflow.get_mut(node_id) {
+            if let Some(inputs) = node.get_mut("inputs") {
+                inputs["vae_name"] = json!(vae_name);
+            }
+        }
+    }
+
+    for (node_id, controlnet_name) in &config.controlnet_loaders {
+        if let Some(node) = workflow.get_mut(node_id) {
+            if let Some(inputs) = node.get_mut("inputs") {
+                inputs["control_net_name"] = json!(controlnet_name);
+            }
+        }
+    }
+
+    if let Some(node) = workflow.get_mut(&config.sampler_node_id) {
+        if let Some(inputs) = node.get_mut("inputs") {
+            inputs["steps"] = json!(config.sampler_steps);
+        }
+    }
+
+    let source_filename = upload_image(address, source_image, "image").await?;
+    if let Some(node) = workflow.get_mut(&config.source_image_node_id) {
+        node["inputs"]["image"] = json!(source_filename);
+    } else {
+        return Err(anyhow!("Source image node ID '{}' not found in workflow.", config.source_image_node_id));
+    }
+
+    if let Some(mask) = mask_image {
+        let mask_filename = upload_image(address, mask, "image").await?;
+        if let Some(node) = workflow.get_mut(&config.mask_image_node_id) {
+            node["inputs"]["image"] = json!(mask_filename);
+        } else {
+            return Err(anyhow!("Mask image node ID '{}' not found in workflow.", config.mask_image_node_id));
+        }
+    }
+
+    if let Some(prompt_text) = text_prompt {
+        if let Some(node) = workflow.get_mut(&config.text_prompt_node_id) {
             if let Some(node_inputs) = node.get_mut("inputs") {
                 node_inputs["text"] = json!(prompt_text);
             }
         } else {
-            return Err(anyhow!("Text prompt node ID '{}' not found in workflow.", prompt_node_id));
+            return Err(anyhow!("Text prompt node ID '{}' not found in workflow.", config.text_prompt_node_id));
         }
     }
 
@@ -185,13 +212,13 @@ pub async fn execute_workflow(
         .and_then(|h| h.get("outputs"))
         .ok_or_else(|| anyhow!("Could not find outputs for prompt_id {} in history", prompt_id))?;
     
-    let images = outputs.get(&inputs.final_output_node_id)
+    let images = outputs.get(&config.final_output_node_id)
         .and_then(|n| n.get("images"))
         .and_then(|i| i.as_array())
-        .ok_or_else(|| anyhow!("No 'images' array found in specified output node '{}'", inputs.final_output_node_id))?;
+        .ok_or_else(|| anyhow!("No 'images' array found in specified output node '{}'", config.final_output_node_id))?;
     
     if images.is_empty() {
-        return Err(anyhow!("Output node '{}' produced no images", inputs.final_output_node_id));
+        return Err(anyhow!("Output node '{}' produced no images", config.final_output_node_id));
     }
 
     let first_image_info = &images[0];

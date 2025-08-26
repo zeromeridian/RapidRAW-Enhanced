@@ -1235,6 +1235,7 @@ async fn invoke_generative_replace_with_mask_def(
         inpainting::perform_fast_inpaint(&source_image, &mask_bitmap, patch_radius)?
     } else {
         let comfy_address = address.unwrap();
+        let comfy_config = settings.comfyui_workflow_config;
 
         let dilation_amount_u32 = ((img_w.min(img_h) as f32 * 0.01).round() as u32).max(1);
         let dilation_amount_u8 = std::cmp::min(dilation_amount_u32, 255) as u8;
@@ -1247,17 +1248,9 @@ async fn invoke_generative_replace_with_mask_def(
         }
         let mask_image = DynamicImage::ImageRgba8(rgba_mask);
 
-        let workflow_inputs = comfyui_connector::WorkflowInputs {
-            source_image_node_id: "11".to_string(),
-            mask_image_node_id: Some("148".to_string()),
-            text_prompt_node_id: Some("6".to_string()),
-            final_output_node_id: "252".to_string(),
-        };
-
         let result_png_bytes = comfyui_connector::execute_workflow(
             &comfy_address,
-            "generative_replace",
-            workflow_inputs,
+            &comfy_config,
             source_image,
             Some(mask_image),
             Some(patch_definition.prompt)
@@ -1452,6 +1445,7 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
 
