@@ -829,7 +829,6 @@ function App() {
         return;
       }
       setIsAdjusting(true);
-      setError(null);
       invoke(Invokes.ApplyAdjustments, { jsAdjustments: currentAdjustments }).catch((err) => {
         console.error('Failed to invoke apply_adjustments:', err);
         setError(`Processing failed: ${err}`);

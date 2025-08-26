@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Trash2, Wifi, WifiOff } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ExternalLink as ExternalLinkIcon, Save, Trash2, Wifi, WifiOff } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { open } from '@tauri-apps/plugin-dialog';
+import { open as openLink } from '@tauri-apps/plugin-shell';
+import { motion, AnimatePresence } from 'framer-motion';
+import clsx from 'clsx';
 import Button from '../ui/Button';
 import ConfirmModal from '../modals/ConfirmModal';
 import Dropdown, { OptionItem } from '../ui/Dropdown';
@@ -37,7 +41,7 @@ interface KeybindItemProps {
 
 interface SettingItemProps {
   children: any;
-  description: string;
+  description?: string;
   label: string;
 }
 
@@ -56,6 +60,19 @@ interface TestStatus {
 }
 
 const EXECUTE_TIMEOUT = 3000;
+
+const DEFAULT_WORKFLOW_CONFIG = {
+  workflowPath: null,
+  modelCheckpoints: { '4': 'XL_RealVisXL_V5.0_Lightning.safetensors' },
+  vaeLoaders: { '67': 'sdxl_vae.safetensors' },
+  controlnetLoaders: { '16': 'diffusion_pytorch_model_promax.safetensors' },
+  sourceImageNodeId: '11',
+  maskImageNodeId: '148',
+  textPromptNodeId: '6',
+  finalOutputNodeId: '252',
+  samplerNodeId: '3',
+  samplerSteps: 10,
+};
 
 const resolutions: Array<OptionItem> = [
   { value: 720, label: '720px' },
@@ -82,7 +99,7 @@ const KeybindItem = ({ keys, description }: KeybindItemProps) => (
 );
 
 const SettingItem = ({ children, description, label }: SettingItemProps) => (
-  <div className="pb-6 border-b border-border-color last:border-b-0 last:pb-0">
+  <div>
     <label className="block text-sm font-medium text-text-primary mb-2">{label}</label>
     {children}
     {description && <p className="text-xs text-text-secondary mt-2">{description}</p>}
@@ -110,6 +127,24 @@ const DataActionItem = ({
   </div>
 );
 
+const ExternalLink = ({ href, children }) => {
+  const handleClick = async (e) => {
+    e.preventDefault();
+    try {
+      await openLink(href);
+    } catch (err) {
+      console.error(`Failed to open link: ${href}`, err);
+    }
+  };
+
+  return (
+    <a href={href} onClick={handleClick} className="text-accent hover:underline inline-flex items-center gap-1">
+      {children}
+      <ExternalLinkIcon size={12} />
+    </a>
+  );
+};
+
 export default function SettingsPanel({
   appSettings,
   onBack,
@@ -119,13 +154,10 @@ export default function SettingsPanel({
 }: SettingsPanelProps) {
   const [isClearing, setIsClearing] = useState(false);
   const [clearMessage, setClearMessage] = useState('');
-
   const [isClearingCache, setIsClearingCache] = useState(false);
   const [cacheClearMessage, setCacheClearMessage] = useState('');
-
   const [isClearingTags, setIsClearingTags] = useState(false);
   const [tagsClearMessage, setTagsClearMessage] = useState('');
-
   const [confirmModalState, setConfirmModalState] = useState<ConfirmModalState>({
     confirmText: 'Confirm',
     confirmVariant: 'primary',
@@ -134,20 +166,51 @@ export default function SettingsPanel({
     onConfirm: () => {},
     title: '',
   });
-
-  const [testStatus, setTestStatus] = useState<TestStatus>({
-    message: '',
-    success: null,
-    testing: false,
-  });
+  const [testStatus, setTestStatus] = useState<TestStatus>({ message: '', success: null, testing: false });
+  const [saveStatus, setSaveStatus] = useState({ saving: false, message: '' });
+  const [isConfigExpanded, setIsConfigExpanded] = useState(false);
 
   const [comfyUiAddress, setComfyUiAddress] = useState<string>(appSettings?.comfyuiAddress || '');
+  const [comfyConfig, setComfyConfig] = useState(appSettings?.comfyuiWorkflowConfig || DEFAULT_WORKFLOW_CONFIG);
+
+  const resetToDefaults = () => {
+    setComfyConfig(DEFAULT_WORKFLOW_CONFIG);
+  };
 
   useEffect(() => {
     if (appSettings?.comfyuiAddress !== comfyUiAddress) {
       setComfyUiAddress(appSettings?.comfyuiAddress || '');
     }
-  }, [appSettings?.comfyuiAddress]);
+    setComfyConfig(appSettings?.comfyuiWorkflowConfig || DEFAULT_WORKFLOW_CONFIG);
+  }, [appSettings]);
+
+  const handleConfigChange = (field, value) => {
+    setComfyConfig((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveComfyConfig = () => {
+    setSaveStatus({ saving: true, message: 'Saving...' });
+    const newConfig = { ...comfyConfig };
+    onSettingsChange({ ...appSettings, comfyuiWorkflowConfig: newConfig });
+    setTimeout(() => {
+      setSaveStatus({ saving: false, message: 'Saved!' });
+      setTimeout(() => setSaveStatus({ saving: false, message: '' }), EXECUTE_TIMEOUT - 500);
+    }, 500);
+  };
+
+  const handleSelectWorkflowFile = async () => {
+    try {
+      const selected = await open({
+        filters: [{ name: 'ComfyUI Workflow', extensions: ['json'] }],
+        multiple: false,
+      });
+      if (typeof selected === 'string') {
+        handleConfigChange('workflowPath', selected);
+      }
+    } catch (err) {
+      console.error('Failed to open workflow file dialog:', err);
+    }
+  };
 
   const effectiveRootPath = rootPath || appSettings?.lastRootPath;
 
@@ -356,11 +419,11 @@ export default function SettingsPanel({
           </div>
 
           <div className="p-6 bg-surface rounded-xl shadow-md">
-            <h2 className="text-xl font-semibold mb-6 text-accent">Integrations</h2>
+            <h2 className="text-xl font-semibold mb-6 text-accent">ComfyUI</h2>
             <div className="space-y-6">
               <SettingItem
-                description="Enter the address and port of your running ComfyUI instance. Required for generative AI features."
                 label="ComfyUI Address"
+                description="Enter the address and port of your running ComfyUI instance. Required for generative AI features."
               >
                 <div className="flex items-center gap-2">
                   <Input
@@ -393,6 +456,274 @@ export default function SettingsPanel({
                   </p>
                 )}
               </SettingItem>
+
+              <SettingItem
+                label="Custom Workflow File"
+                description="Select a custom ComfyUI API format JSON file. If not set, the built-in workflow will be used."
+              >
+                <div className="flex items-center gap-2">
+                  <Input
+                    readOnly
+                    value={comfyConfig.workflowPath || 'Using built-in workflow'}
+                    className="flex-grow"
+                  />
+                  <Button onClick={handleSelectWorkflowFile}>Select</Button>
+                  <Button variant="secondary" onClick={resetToDefaults}>
+                    Reset
+                  </Button>
+                </div>
+              </SettingItem>
+
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setIsConfigExpanded(!isConfigExpanded)}
+              >
+                <h3 className="font-medium text-text-primary">Advanced Configuration</h3>
+                <ChevronDown
+                  className={clsx('transition-transform', isConfigExpanded && 'rotate-180')}
+                  size={20}
+                />
+              </div>
+
+              <AnimatePresence>
+                {isConfigExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: 'easeInOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-4 border-t border-border-color space-y-6">
+                      <div className="text-xs text-text-secondary space-y-2">
+                        <p className="font-semibold">How to find Node IDs:</p>
+                        <ol className="list-decimal list-inside space-y-1 pl-2">
+                          <li>
+                            In ComfyUI, build your workflow, then click{' '}
+                            <code className="bg-bg-primary px-1 rounded text-text-primary">Save (API Format)</code>.
+                          </li>
+                          <li>Open the saved JSON file in a text editor. Each node has a number ID.</li>
+                          <li>Find the IDs for the required nodes and enter them below.</li>
+                        </ol>
+                      </div>
+
+                      <div className="p-3 bg-bg-primary rounded-lg border border-border-color text-xs text-text-secondary space-y-2">
+                        {comfyConfig.workflowPath ? (
+                          <>
+                            <p className="font-semibold text-text-primary">Custom Workflow Requirements:</p>
+                            <p>Your workflow <strong>must</strong> follow this structure:</p>
+                            <ul className="list-disc list-inside space-y-1 pl-2">
+                              <li>
+                                <strong>Input:</strong> Accept the full-resolution source image and mask via the nodes
+                                specified below.
+                              </li>
+                              <li>
+                                <strong>Processing:</strong> Internally scale down the masked area to a model-friendly
+                                resolution (e.g., 1024px) for inpainting.
+                              </li>
+                              <li>
+                                <strong>Output:</strong> The final generated patch must be upscaled back to the{' '}
+                                <strong>exact original image resolution</strong> before being sent to the Final Output
+                                Node.
+                              </li>
+                              <li>
+                                This is critical because RapidRaw composites the output
+                                directly onto the original image, and a resolution mismatch will fail.
+                              </li>
+                            </ul>
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-semibold text-text-primary">Default Workflow Requirements:</p>
+                            <p>
+                              The built-in workflow handles resolution scaling automatically and requires the following
+                              custom nodes. Please install them using the ComfyUI Manager.
+                            </p>
+                            <ul className="list-disc list-inside space-y-1 pl-2">
+                              <li>
+                                <ExternalLink href="https://github.com/BadCafeCode/masquerade-nodes-comfyui">
+                                  Masquerade Nodes
+                                </ExternalLink>
+                              </li>
+                              <li>
+                                <ExternalLink href="https://github.com/kijai/ComfyUI-KJNodes">KJNodes</ExternalLink>
+                              </li>
+                            </ul>
+                          </>
+                        )}
+                      </div>
+
+                      <h4 className="text-base font-semibold text-accent-secondary pt-2">Node Configuration</h4>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                        <SettingItem label="Source Image Node ID">
+                          <Input
+                            type="number"
+                            value={comfyConfig.sourceImageNodeId || ''}
+                            onChange={(e) => handleConfigChange('sourceImageNodeId', e.target.value)}
+                          />
+                        </SettingItem>
+                        <SettingItem label="Mask Image Node ID">
+                          <Input
+                            type="number"
+                            value={comfyConfig.maskImageNodeId || ''}
+                            onChange={(e) => handleConfigChange('maskImageNodeId', e.target.value)}
+                          />
+                        </SettingItem>
+                        <SettingItem label="Text Prompt Node ID">
+                          <Input
+                            type="number"
+                            value={comfyConfig.textPromptNodeId || ''}
+                            onChange={(e) => handleConfigChange('textPromptNodeId', e.target.value)}
+                          />
+                        </SettingItem>
+                        <SettingItem label="Final Output Node ID">
+                          <Input
+                            type="number"
+                            value={comfyConfig.finalOutputNodeId || ''}
+                            onChange={(e) => handleConfigChange('finalOutputNodeId', e.target.value)}
+                          />
+                        </SettingItem>
+                        <SettingItem label="Sampler Node ID">
+                          <Input
+                            type="number"
+                            value={comfyConfig.samplerNodeId || ''}
+                            onChange={(e) => handleConfigChange('samplerNodeId', e.target.value)}
+                          />
+                        </SettingItem>
+                        <SettingItem label="Sampler Steps">
+                          <Input
+                            type="number"
+                            value={comfyConfig.samplerSteps || 10}
+                            onChange={(e) => handleConfigChange('samplerSteps', parseInt(e.target.value, 10) || 0)}
+                          />
+                        </SettingItem>
+                      </div>
+
+                      <h4 className="text-base font-semibold text-accent-secondary pt-2">Model Configuration</h4>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                        <SettingItem label="Checkpoint Node ID">
+                          <Input
+                            type="number"
+                            value={Object.keys(comfyConfig.modelCheckpoints || {})[0] || ''}
+                            onChange={(e) =>
+                              handleConfigChange('modelCheckpoints', {
+                                [e.target.value]: Object.values(comfyConfig.modelCheckpoints || {})[0] || '',
+                              })
+                            }
+                          />
+                        </SettingItem>
+                        <SettingItem
+                          label="Checkpoint Name"
+                          description={
+                            !comfyConfig.workflowPath && (
+                              <>
+                                Recommended:{' '}
+                                <ExternalLink href="https://civitai.com/models/139562/realvisxl-v50">
+                                  RealVisXL V5.0
+                                </ExternalLink>
+                              </>
+                            )
+                          }
+                        >
+                          <Input
+                            value={Object.values(comfyConfig.modelCheckpoints || {})[0] || ''}
+                            onChange={(e) =>
+                              handleConfigChange('modelCheckpoints', {
+                                [Object.keys(comfyConfig.modelCheckpoints || {})[0] || '']: e.target.value,
+                              })
+                            }
+                          />
+                        </SettingItem>
+                        <SettingItem label="VAE Node ID">
+                          <Input
+                            type="number"
+                            value={Object.keys(comfyConfig.vaeLoaders || {})[0] || ''}
+                            onChange={(e) =>
+                              handleConfigChange('vaeLoaders', {
+                                [e.target.value]: Object.values(comfyConfig.vaeLoaders || {})[0] || '',
+                              })
+                            }
+                          />
+                        </SettingItem>
+                        <SettingItem
+                          label="VAE Name"
+                          description={
+                            !comfyConfig.workflowPath && (
+                              <>
+                                Recommended:{' '}
+                                <ExternalLink href="https://huggingface.co/stabilityai/sdxl-vae/blob/main/sdxl_vae.safetensors">
+                                  SDXL VAE
+                                </ExternalLink>
+                              </>
+                            )
+                          }
+                        >
+                          <Input
+                            value={Object.values(comfyConfig.vaeLoaders || {})[0] || ''}
+                            onChange={(e) =>
+                              handleConfigChange('vaeLoaders', {
+                                [Object.keys(comfyConfig.vaeLoaders || {})[0] || '']: e.target.value,
+                              })
+                            }
+                          />
+                        </SettingItem>
+                        <SettingItem label="ControlNet Node ID">
+                          <Input
+                            type="number"
+                            value={Object.keys(comfyConfig.controlnetLoaders || {})[0] || ''}
+                            onChange={(e) =>
+                              handleConfigChange('controlnetLoaders', {
+                                [e.target.value]: Object.values(comfyConfig.controlnetLoaders || {})[0] || '',
+                              })
+                            }
+                          />
+                        </SettingItem>
+                        <SettingItem
+                          label="ControlNet Name"
+                          description={
+                            !comfyConfig.workflowPath && (
+                              <>
+                                Recommended:{' '}
+                                <ExternalLink href="https://huggingface.co/xinsir/controlnet-union-sdxl-1.0/blob/main/diffusion_pytorch_model_promax.safetensors">
+                                  Promax ControlNet
+                                </ExternalLink>
+                              </>
+                            )
+                          }
+                        >
+                          <Input
+                            value={Object.values(comfyConfig.controlnetLoaders || {})[0] || ''}
+                            onChange={(e) =>
+                              handleConfigChange('controlnetLoaders', {
+                                [Object.keys(comfyConfig.controlnetLoaders || {})[0] || '']: e.target.value,
+                              })
+                            }
+                          />
+                        </SettingItem>
+                      </div>
+
+                      <div className="flex justify-end items-center gap-4 pt-4">
+                        {saveStatus.message && (
+                          <p className="text-sm text-green-400 flex items-center gap-2">
+                            <Check size={16} />
+                            {saveStatus.message}
+                          </p>
+                        )}
+                        <Button onClick={handleSaveComfyConfig} disabled={saveStatus.saving} className="w-48">
+                          {saveStatus.saving ? (
+                            'Saving...'
+                          ) : (
+                            <>
+                              <Save size={16} className="mr-2" />
+                              Save Config
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 

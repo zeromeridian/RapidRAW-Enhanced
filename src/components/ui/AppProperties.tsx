@@ -98,8 +98,23 @@ export enum ThumbnailAspectRatio {
   Contain = 'contain',
 }
 
+export interface ComfyUIWorkflowConfig {
+  workflowPath: string | null;
+  modelCheckpoints: { [nodeId: string]: string };
+  vaeLoaders: { [nodeId: string]: string };
+  controlnetLoaders: { [nodeId: string]: string };
+  sourceImageNodeId: string;
+  maskImageNodeId: string;
+  textPromptNodeId: string;
+  finalOutputNodeId: string;
+  samplerNodeId: string;
+  samplerSteps: number;
+}
+
 export interface AppSettings {
   adaptiveEditorTheme?: Theme;
+  comfyuiAddress?: string;
+  comfyuiWorkflowConfig?: ComfyUIWorkflowConfig;
   decorations?: any;
   enableAiTagging?: boolean;
   filterCriteria?: FilterCriteria;
