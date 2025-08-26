@@ -51,6 +51,8 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-08-26:** User customisable ComfyUI workflow selection
+*   **2025-08-25:** Make LUTs parser more robust (support more advanced formats)
 *   **2025-08-24:** Improved keyboard shortcuts
 *   **2025-08-23:** Estimate file size before exporting
 *   **2025-08-21:** Added LUTs (.cube, .3dl, .png, .jpg, .jpeg, .tiff) support
@@ -59,12 +61,12 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-08-15:** Implement Tauri's IPC as a replacement for the slow Base64 image transfer
 *   **2025-08-12:** Relative zoom indicator
 *   **2025-08-11:** TypeScript cleanup & many bug fixes
-*   **2025-08-09:** Local inpainting without the need for ComfyUI, ability to change thumbnail aspect ratio
-*   **2025-08-09:** Frontend refactored to TypeScript thanks to @varjolintu
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-08-09:** Local inpainting without the need for ComfyUI, ability to change thumbnail aspect ratio
+*   **2025-08-09:** Frontend refactored to TypeScript thanks to @varjolintu
 *   **2025-08-08:** New onnxruntime download strategy & the base for local inpainting
 *   **2025-08-05:** Improved HSL cascading, UI & animation improvements, ability to grow & shrink / feather AI masks
 *   **2025-08-03:** New high performance, seamless image panorama stitcher (without any dependencies on OpenCV)
