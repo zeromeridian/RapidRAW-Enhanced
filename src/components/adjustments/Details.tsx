@@ -73,6 +73,28 @@ export default function DetailsPanel({ adjustments, setAdjustments }: DetailsPan
           value={adjustments.colorNoiseReduction}
         />
       </div>
+
+      <div className="p-2 bg-bg-tertiary rounded-md">
+        <p className="text-md font-semibold mb-2 text-primary">Lens Correction</p>
+        <Slider
+          label="Red/Cyan"
+          max={100}
+          min={-100}
+          onChange={(e: any) => handleAdjustmentChange(DetailsAdjustment.ChromaticAberrationRedCyan, e.target.value)}
+          step={1}
+          value={adjustments.chromaticAberrationRedCyan}
+        />
+        <Slider
+          label="Blue/Yellow"
+          max={100}
+          min={-100}
+          onChange={(e: any) =>
+            handleAdjustmentChange(DetailsAdjustment.ChromaticAberrationBlueYellow, e.target.value)
+          }
+          step={1}
+          value={adjustments.chromaticAberrationBlueYellow}
+        />
+      </div>
     </div>
   );
 }

@@ -45,6 +45,11 @@ struct GlobalAdjustments {
     grain_size: f32,
     grain_roughness: f32,
 
+    chromatic_aberration_red_cyan: f32,
+    chromatic_aberration_blue_yellow: f32,
+    _pad_ca1: f32,
+    _pad_ca2: f32,
+
     enable_negative_conversion: u32,
     film_base_r: f32,
     film_base_g: f32,
@@ -601,6 +606,36 @@ fn apply_noise_reduction(color: vec3<f32>, coords_i: vec2<i32>, luma_amount: f32
     return color;
 }
 
+fn apply_ca_correction(coords: vec2<u32>, ca_rc: f32, ca_by: f32) -> vec3<f32> {
+    let dims = vec2<f32>(textureDimensions(input_texture));
+    let center = dims / 2.0;
+    let current_pos = vec2<f32>(coords);
+
+    let to_center = current_pos - center;
+    let dist = length(to_center);
+    
+    if (dist == 0.0) {
+        return textureLoad(input_texture, coords, 0).rgb;
+    }
+
+    let dir = to_center / dist;
+
+    let red_shift = dir * dist * ca_rc;
+    let blue_shift = dir * dist * ca_by;
+
+    let red_coords = vec2<i32>(round(current_pos - red_shift));
+    let blue_coords = vec2<i32>(round(current_pos - blue_shift));
+    let green_coords = vec2<i32>(current_pos);
+
+    let max_coords = vec2<i32>(dims - 1.0);
+
+    let r = textureLoad(input_texture, clamp(red_coords, vec2<i32>(0), max_coords), 0).r;
+    let g = textureLoad(input_texture, clamp(green_coords, vec2<i32>(0), max_coords), 0).g;
+    let b = textureLoad(input_texture, clamp(blue_coords, vec2<i32>(0), max_coords), 0).b;
+
+    return vec3<f32>(r, g, b);
+}
+
 fn aces_fitted(c: vec3<f32>) -> vec3<f32> {
     return c;
 }
@@ -703,8 +738,15 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let absolute_coord = id.xy + vec2<u32>(adjustments.tile_offset_x, adjustments.tile_offset_y);
     let absolute_coord_i = vec2<i32>(absolute_coord);
 
-    let original_color = textureLoad(input_texture, absolute_coord, 0);
-    var initial_linear_rgb = srgb_to_linear(original_color.rgb);
+    let ca_rc = adjustments.global.chromatic_aberration_red_cyan;
+    let ca_by = adjustments.global.chromatic_aberration_blue_yellow;
+    var original_color_rgb = textureLoad(input_texture, absolute_coord, 0).rgb;
+    if (abs(ca_rc) > 0.000001 || abs(ca_by) > 0.000001) {
+        original_color_rgb = apply_ca_correction(absolute_coord, ca_rc, ca_by);
+    }
+    let original_alpha = textureLoad(input_texture, absolute_coord, 0).a;
+
+    var initial_linear_rgb = srgb_to_linear(original_color_rgb);
 
     if (adjustments.global.enable_negative_conversion == 1u) {
         initial_linear_rgb = vec3<f32>(1.0) - initial_linear_rgb;
@@ -783,5 +825,5 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         if (v_amount < 0.0) { final_rgb *= (1.0 + v_amount * vignette_mask); } else { final_rgb = mix(final_rgb, vec3<f32>(1.0), v_amount * vignette_mask); }
     }
 
-    textureStore(output_texture, id.xy, vec4<f32>(clamp(final_rgb, vec3<f32>(0.0), vec3<f32>(1.0)), original_color.a));
+    textureStore(output_texture, id.xy, vec4<f32>(clamp(final_rgb, vec3<f32>(0.0), vec3<f32>(1.0)), original_alpha));
 }

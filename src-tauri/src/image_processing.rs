@@ -181,6 +181,11 @@ pub struct GlobalAdjustments {
     pub grain_size: f32,
     pub grain_roughness: f32,
 
+    pub chromatic_aberration_red_cyan: f32,
+    pub chromatic_aberration_blue_yellow: f32,
+    _pad_ca1: f32,
+    _pad_ca2: f32,
+
     pub enable_negative_conversion: u32,
     pub film_base_r: f32,
     pub film_base_g: f32,
@@ -298,6 +303,8 @@ struct AdjustmentScales {
     grain_size: f32,
     grain_roughness: f32,
 
+    chromatic_aberration: f32,
+
     hsl_hue_multiplier: f32,
     hsl_saturation: f32,
     hsl_luminance: f32,
@@ -334,6 +341,8 @@ const SCALES: AdjustmentScales = AdjustmentScales {
     grain_amount: 200.0,
     grain_size: 50.0,
     grain_roughness: 100.0,
+
+    chromatic_aberration: 10000.0,
 
     hsl_hue_multiplier: 0.3,
     hsl_saturation: 100.0,
@@ -456,6 +465,11 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
         grain_size: get_val("effects", "grainSize", SCALES.grain_size, Some(25.0)),
         grain_roughness: get_val("effects", "grainRoughness", SCALES.grain_roughness, Some(50.0)),
         
+        chromatic_aberration_red_cyan: get_val("details", "chromaticAberrationRedCyan", SCALES.chromatic_aberration, None),
+        chromatic_aberration_blue_yellow: get_val("details", "chromaticAberrationBlueYellow", SCALES.chromatic_aberration, None),
+        _pad_ca1: 0.0,
+        _pad_ca2: 0.0,
+
         enable_negative_conversion: if neg_conv_enabled { 1 } else { 0 },
         film_base_r: film_base_rgb[0],
         film_base_g: film_base_rgb[1],

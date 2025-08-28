@@ -49,6 +49,8 @@ export enum DetailsAdjustment {
   ColorNoiseReduction = 'colorNoiseReduction',
   LumaNoiseReduction = 'lumaNoiseReduction',
   Sharpness = 'sharpness',
+  ChromaticAberrationRedCyan = 'chromaticAberrationRedCyan',
+  ChromaticAberrationBlueYellow = 'chromaticAberrationBlueYellow',
 }
 
 export enum Effect {
@@ -76,6 +78,8 @@ export interface Adjustments {
   aspectRatio: number | null;
   blacks: number;
   clarity: number;
+  chromaticAberrationBlueYellow: number;
+  chromaticAberrationRedCyan: number;
   colorGrading: ColorGradingProps;
   colorNoiseReduction: number;
   contrast: number;
@@ -313,6 +317,8 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   aspectRatio: null,
   blacks: 0,
   clarity: 0,
+  chromaticAberrationBlueYellow: 0,
+  chromaticAberrationRedCyan: 0,
   colorGrading: { ...INITIAL_COLOR_GRADING },
   colorNoiseReduction: 0,
   contrast: 0,
@@ -444,6 +450,8 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
 export const COPYABLE_ADJUSTMENT_KEYS: Array<string> = [
   BasicAdjustment.Blacks,
   Effect.Clarity,
+  DetailsAdjustment.ChromaticAberrationBlueYellow,
+  DetailsAdjustment.ChromaticAberrationRedCyan,
   ColorAdjustment.ColorGrading,
   DetailsAdjustment.ColorNoiseReduction,
   BasicAdjustment.Contrast,
@@ -498,7 +506,13 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     ColorAdjustment.Hsl,
     ColorAdjustment.ColorGrading,
   ],
-  details: [DetailsAdjustment.Sharpness, DetailsAdjustment.LumaNoiseReduction, DetailsAdjustment.ColorNoiseReduction],
+  details: [
+    DetailsAdjustment.Sharpness,
+    DetailsAdjustment.LumaNoiseReduction,
+    DetailsAdjustment.ColorNoiseReduction,
+    DetailsAdjustment.ChromaticAberrationRedCyan,
+    DetailsAdjustment.ChromaticAberrationBlueYellow,
+  ],
   effects: [
     Effect.Clarity,
     Effect.Dehaze,
