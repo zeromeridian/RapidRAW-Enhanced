@@ -715,10 +715,17 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         initial_linear_rgb = max(initial_linear_rgb, vec3<f32>(0.0));
     }
 
-    var processed_rgb_linear = apply_all_adjustments(initial_linear_rgb, adjustments.global, absolute_coord_i);
+    let globally_adjusted_linear = apply_all_adjustments(initial_linear_rgb, adjustments.global, absolute_coord_i);
+    var composite_rgb_linear = globally_adjusted_linear;
+    for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
+        let influence = get_mask_influence(i, absolute_coord);
+        if (influence > 0.001) {
+            let mask_adjusted_linear = apply_all_mask_adjustments(globally_adjusted_linear, adjustments.mask_adjustments[i], absolute_coord_i);
+            composite_rgb_linear = mix(composite_rgb_linear, mask_adjusted_linear, influence);
+        }
+    }
 
-    let base_srgb = linear_to_srgb(aces_fitted(processed_rgb_linear));
-    
+    let base_srgb = linear_to_srgb(aces_fitted(composite_rgb_linear));
     var final_rgb = apply_all_curves(base_srgb,
         adjustments.global.luma_curve, adjustments.global.luma_curve_count,
         adjustments.global.red_curve, adjustments.global.red_curve_count,
@@ -729,15 +736,13 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
-            let mask_adjusted_linear = apply_all_mask_adjustments(processed_rgb_linear, adjustments.mask_adjustments[i], absolute_coord_i);
-            let mask_base_srgb = linear_to_srgb(aces_fitted(mask_adjusted_linear));
-            let mask_final_srgb = apply_all_curves(mask_base_srgb,
+            let mask_curved_srgb = apply_all_curves(final_rgb,
                 adjustments.mask_adjustments[i].luma_curve, adjustments.mask_adjustments[i].luma_curve_count,
                 adjustments.mask_adjustments[i].red_curve, adjustments.mask_adjustments[i].red_curve_count,
                 adjustments.mask_adjustments[i].green_curve, adjustments.mask_adjustments[i].green_curve_count,
                 adjustments.mask_adjustments[i].blue_curve, adjustments.mask_adjustments[i].blue_curve_count
             );
-            final_rgb = mix(final_rgb, mask_final_srgb, influence);
+            final_rgb = mix(final_rgb, mask_curved_srgb, influence);
         }
     }
 
