@@ -1,8 +1,11 @@
-id: io.github.cybertimon.rapidraw
+id: io.github.CyberTimon.RapidRAW
 
 runtime: org.gnome.Platform
-runtime-version: '48'
+runtime-version: "48"
 sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+  - org.freedesktop.Sdk.Extension.node24
 
 command: RapidRAW
 finish-args:
@@ -11,48 +14,51 @@ finish-args:
   - --device=dri
   - --share=ipc
 
+build-options:
+  append-path: /usr/lib/sdk/node24/bin:/usr/lib/sdk/rust-stable/bin
+
 modules:
-  - name: binary
+  - modules/libonnxruntime.json
+  - name: RapidRAW
     buildsystem: simple
-
     sources:
-      - type: file
-        path: io.github.cybertimon.rapidraw.metainfo.xml
-      - type: file
-        url: https://github.com/CyberTimon/RapidRAW/releases/download/v1.3.10/03_RapidRAW_v1.3.10_ubuntu-24.04_amd64.deb
-        sha256: 54e9cb263b680267abbec612d5319dfd2cedd703b27c5dbc88fe80de22662afb
-        only-arches: [x86_64]
+      - type: git
+        url: https://github.com/CyberTimon/RapidRAW.git
+        tag: v1.3.10
+        commit: c9ce4796daa108bf4168ec381ff8f55dc552052e
         x-checker-data:
-          type: json
-          url: https://api.github.com/repos/CyberTimon/RapidRAW/releases/latest
-          version-query: .tag_name
-          url-query: '"https://github.com/CyberTimon/RapidRAW/releases/download/" + $version + "/03_RapidRAW_" + $version + "_ubuntu-24.04_amd64.deb"'
-      - type: file
-        url: https://github.com/CyberTimon/RapidRAW/releases/download/v1.3.10/03_RapidRAW_v1.3.10_ubuntu-24.04-arm_arm64.deb
-        sha256: 8d087edc9c42815767ff77e3b72b5925daa5edee652f977d1b6b01a71df96419
-        only-arches: [aarch64]
-        x-checker-data:
-          type: json
-          url: https://api.github.com/repos/CyberTimon/RapidRAW/releases/latest
-          version-query: .tag_name
-          url-query: '"https://github.com/CyberTimon/RapidRAW/releases/download/" + $version + "/03_RapidRAW_" + $version + "_ubuntu-24.04-arm_arm64.deb"'
+          type: git
+          tag-pattern: ^v([\d.]+)$
+
+      - node-sources.json
+
+      - cargo-sources.json
+
+    build-options:
+      env:
+        CARGO_HOME: /run/build/RapidRAW/cargo
+        XDG_CACHE_HOME: /run/build/RapidRAW/flatpak-node/cache
+        npm_config_cache: /run/build/RapidRAW/flatpak-node/npm-cache
+        npm_config_offline: "true"
+        ORT_STRATEGY: "system"
+
     build-commands:
-      - set -e
+      - npm ci --offline --legacy-peer-deps
+      - cargo --offline fetch --manifest-path src-tauri/Cargo.toml --verbose
+      - npm run --offline tauri build -- --no-bundle
 
-      - mkdir deb-extract
-      - ar -x *.deb --output deb-extract
-      - tar -C deb-extract -xf deb-extract/data.tar.gz
+      - install -Dm644 -t /app/share/metainfo/ io.github.CyberTimon.RapidRAW.metainfo.xml
+      - install -Dm644 -t /app/share/applications/ io.github.CyberTimon.RapidRAW.desktop
+      - install -Dm755 -t /app/bin/ src-tauri/target/release/RapidRAW
 
-      - 'install -Dm755 deb-extract/usr/bin/RapidRAW /app/bin/RapidRAW'
+      - install -Dm644 src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/io.github.CyberTimon.RapidRAW.png
+      - install -Dm644 src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github.CyberTimon.RapidRAW.png
+      - install -Dm644 src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/io.github.CyberTimon.RapidRAW.png
+      - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/256x256@2/apps/io.github.CyberTimon.RapidRAW.png
 
       - mkdir -p /app/lib/RapidRAW
-      - cp -r deb-extract/usr/lib/RapidRAW/. /app/lib/RapidRAW
-      - find /app/lib/RapidRAW -type f -exec chmod 644 {} \;
+      - cp -rf src-tauri/workflows /app/lib/RapidRAW
+      - cp -rf src-tauri/resources /app/lib/RapidRAW
 
-      - sed -i 's/^Icon=.*/Icon=io.github.cybertimon.rapidraw/' deb-extract/usr/share/applications/RapidRAW.desktop
-      - install -Dm644 deb-extract/usr/share/applications/RapidRAW.desktop /app/share/applications/io.github.cybertimon.rapidraw.desktop
-
-      - install -Dm644 deb-extract/usr/share/icons/hicolor/128x128/apps/RapidRAW.png /app/share/icons/hicolor/128x128/apps/io.github.cybertimon.rapidraw.png
-      - install -Dm644 deb-extract/usr/share/icons/hicolor/32x32/apps/RapidRAW.png /app/share/icons/hicolor/32x32/apps/io.github.cybertimon.rapidraw.png
-      - install -Dm644 deb-extract/usr/share/icons/hicolor/256x256@2/apps/RapidRAW.png /app/share/icons/hicolor/256x256@2/apps/io.github.cybertimon.rapidraw.png
-      - install -Dm644 io.github.cybertimon.rapidraw.metainfo.xml /app/share/metainfo/io.github.cybertimon.rapidraw.metainfo.xml
+    post-install:
+      - install -Dm644 LICENSE /app/share/licenses/io.github.CyberTimon.RapidRAW/LICENSE
