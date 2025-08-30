@@ -1,22 +1,23 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <component type="desktop-application">
   <id>io.github.CyberTimon.RapidRAW</id>
-  
+
   <name>RapidRAW</name>
-  <summary>A non-destructive, and GPU-accelerated RAW image editor built with performance in mind</summary>
+  <summary
+    >A non-destructive, and GPU-accelerated RAW image editor built with performance in mind</summary>
   <developer id="io.github.CyberTimon">
     <name>Timon Käch</name>
   </developer>
-  
+
   <metadata_license>FSFAP</metadata_license>
   <project_license>AGPL-3.0-only</project_license>
-  
+
   <supports>
     <control>pointing</control>
     <control>keyboard</control>
     <control>touch</control>
   </supports>
-  
+
   <description>
     <p>
       RapidRAW is a modern, high-performance alternative to Adobe Lightroom®. It delivers a simple, beautiful editing experience in a lightweight package (under 20MB) for Windows, macOS, and Linux.
@@ -25,20 +26,25 @@
       I developed this project as a personal challenge at the age of 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of both React and Rust, with the support from Google Gemini.
     </p>
   </description>
-  
-  <launchable type="desktop-id">io.github.CyberTimon.RapidRAW.desktop</launchable>
+
+  <launchable
+        type="desktop-id"
+    >io.github.CyberTimon.RapidRAW.desktop</launchable>
   <screenshots>
     <screenshot type="default">
-      <image>https://github.com/CyberTimon/RapidRAW/blob/v1.3.10/.github/assets/editor.png</image>
+      <image
+            >https://github.com/CyberTimon/RapidRAW/blob/v1.3.10/.github/assets/editor.png</image>
     </screenshot>
   </screenshots>
 
-  <content_rating type="oars-1.1"/>
-  <url type="homepage">https://github.com/CyberTimon/RapidRAW</url>  
+  <content_rating type="oars-1.1" />
+  <url type="homepage">https://github.com/CyberTimon/RapidRAW</url>
 
   <releases>
     <release version="v1.3.10" date="2025-08-24">
-      <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.3.10</url>
+      <url
+                type="details"
+            >https://github.com/CyberTimon/RapidRAW/releases/tag/v1.3.10</url>
       <description translate="no">
         <ul>
           <li>LUTs</li>
