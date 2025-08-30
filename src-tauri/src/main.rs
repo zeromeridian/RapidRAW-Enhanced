@@ -769,12 +769,12 @@ async fn batch_export_images(
 
 #[tauri::command]
 fn cancel_export(state: tauri::State<AppState>) -> Result<(), String> {
-    if let Some(handle) = state.export_task_handle.lock().unwrap().take() {
+    match state.export_task_handle.lock().unwrap().take() { Some(handle) => {
         handle.abort();
         println!("Export task cancellation requested.");
-    } else {
+    } _ => {
         return Err("No export task is currently running.".to_string());
-    }
+    }}
     Ok(())
 }
 
@@ -1460,7 +1460,8 @@ fn main() {
             };
 
             let ort_library_path = resource_path.join(ort_library_name);
-            std::env::set_var("ORT_DYLIB_PATH", &ort_library_path);
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            unsafe { std::env::set_var("ORT_DYLIB_PATH", &ort_library_path) };
             println!("Set ORT_DYLIB_PATH to: {}", ort_library_path.display());
 
             let settings: AppSettings = load_settings(app_handle.clone()).unwrap_or_default();
