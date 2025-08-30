@@ -16,7 +16,7 @@ const WORKFLOWS_DIR: &str = "./workflows";
 async fn upload_image(address: &str, image: DynamicImage, form_name: &str) -> Result<String> {
     let mut image_bytes = Cursor::new(Vec::new());
     image.write_to(&mut image_bytes, ImageFormat::Png)?;
-    
+
     let part = multipart::Part::bytes(image_bytes.into_inner())
         .file_name(format!("{}.png", Uuid::new_v4()))
         .mime_str("image/png")?;
@@ -105,7 +105,8 @@ async fn get_image(address: &str, filename: &str, subfolder: &str, folder_type: 
         return Err(anyhow!("ComfyUI get_image failed with status {}: {}", status, error_text));
     }
 
-    Ok(response.bytes().await?.to_vec())
+    let bytes = response.bytes().await?;
+    Ok(bytes.to_vec())
 }
 
 pub async fn ping_server(address: &str) -> Result<()> {
@@ -192,7 +193,8 @@ pub async fn execute_workflow(
     let prompt_id = queue_prompt(address, workflow, &client_id).await?;
 
     loop {
-        match read.next().await {
+        let next_item = read.next().await;
+        match next_item {
             Some(Ok(msg)) => {
                 if let Message::Text(text) = msg {
                     if let Ok(v) = serde_json::from_str::<Value>(&text) {
@@ -211,12 +213,12 @@ pub async fn execute_workflow(
     let outputs = history.get(&prompt_id)
         .and_then(|h| h.get("outputs"))
         .ok_or_else(|| anyhow!("Could not find outputs for prompt_id {} in history", prompt_id))?;
-    
+
     let images = outputs.get(&config.final_output_node_id)
         .and_then(|n| n.get("images"))
         .and_then(|i| i.as_array())
         .ok_or_else(|| anyhow!("No 'images' array found in specified output node '{}'", config.final_output_node_id))?;
-    
+
     if images.is_empty() {
         return Err(anyhow!("Output node '{}' produced no images", config.final_output_node_id));
     }
@@ -226,5 +228,6 @@ pub async fn execute_workflow(
     let subfolder = first_image_info.get("subfolder").and_then(|s| s.as_str()).unwrap_or("");
     let folder_type = first_image_info.get("type").and_then(|t| t.as_str()).ok_or_else(|| anyhow!("Could not get type from output"))?;
 
-    get_image(address, final_filename, subfolder, folder_type).await
+    let image_data = get_image(address, final_filename, subfolder, folder_type).await?;
+    Ok(image_data)
 }
