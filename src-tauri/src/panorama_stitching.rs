@@ -2,10 +2,10 @@ use image::{GrayImage, RgbImage};
 use nalgebra::Matrix3;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::time::Instant;
-use tauri::{AppHandle, Emitter};
 use std::fs;
 use std::path::Path;
+use std::time::Instant;
+use tauri::{AppHandle, Emitter};
 
 use crate::panorama_utils::{processing, stitching};
 
@@ -44,16 +44,16 @@ pub struct MatchInfo {
     pub inliers: usize,
 }
 
-pub fn stitch_images(
-    image_paths: Vec<String>,
-    app_handle: AppHandle,
-) -> Result<RgbImage, String> {
+pub fn stitch_images(image_paths: Vec<String>, app_handle: AppHandle) -> Result<RgbImage, String> {
     if image_paths.len() < 2 {
         return Err("At least two images are required for a panorama.".to_string());
     }
 
     let _ = app_handle.emit("panorama-progress", "Starting panorama process...");
-    println!("Starting panorama stitching process for {} images...", image_paths.len());
+    println!(
+        "Starting panorama stitching process for {} images...",
+        image_paths.len()
+    );
 
     let start_time = Instant::now();
     let _ = app_handle.emit("panorama-progress", "Loading and preparing images...");
@@ -64,19 +64,29 @@ pub fn stitch_images(
         .par_iter()
         .enumerate()
         .map(|(i, filename)| {
-            let _ = app_handle.emit("panorama-progress", format!("Processing '{}'", Path::new(filename).file_name().unwrap_or_default().to_string_lossy()));
+            let _ = app_handle.emit(
+                "panorama-progress",
+                format!(
+                    "Processing '{}'",
+                    Path::new(filename)
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                ),
+            );
             println!("  - Processing '{}'", filename);
 
-            let file_bytes = fs::read(filename).map_err(|e| format!("Failed to read image {}: {}", filename, e))?;
-            let dynamic_image = crate::image_loader::load_base_image_from_bytes(&file_bytes, filename, false)
-                .map_err(|e| format!("Failed to load image {}: {}", filename, e))?;
-            
+            let file_bytes = fs::read(filename)
+                .map_err(|e| format!("Failed to read image {}: {}", filename, e))?;
+            let dynamic_image =
+                crate::image_loader::load_base_image_from_bytes(&file_bytes, filename, false)
+                    .map_err(|e| format!("Failed to load image {}: {}", filename, e))?;
+
             let color_full = dynamic_image.to_rgb8();
             let gray_full = image::imageops::colorops::grayscale(&color_full);
 
             let (w, h) = gray_full.dimensions();
-            let (new_w, new_h, scale_factor) =
-                processing::calculate_downscale_dimensions(w, h);
+            let (new_w, new_h, scale_factor) = processing::calculate_downscale_dimensions(w, h);
 
             let gray_small = image::imageops::resize(
                 &gray_full,
@@ -84,7 +94,7 @@ pub fn stitch_images(
                 new_h,
                 image::imageops::FilterType::Triangle,
             );
-            
+
             let low_detail_mask = processing::generate_low_detail_mask(&gray_full);
 
             let features = processing::find_features(&gray_small, &brief_pairs);
@@ -109,7 +119,10 @@ pub fn stitch_images(
         }
     }
 
-    println!("Image loading and feature detection completed in {:.2?}\n", start_time.elapsed());
+    println!(
+        "Image loading and feature detection completed in {:.2?}\n",
+        start_time.elapsed()
+    );
 
     let start_time = Instant::now();
     let _ = app_handle.emit("panorama-progress", "Finding image matches...");
@@ -127,32 +140,55 @@ pub fn stitch_images(
             let features2 = &image_data[j].features;
 
             let initial_matches = processing::match_features(features1, features2);
-            if initial_matches.len() < processing::MIN_INLIERS_FOR_CONNECTION { return None; }
+            if initial_matches.len() < processing::MIN_INLIERS_FOR_CONNECTION {
+                return None;
+            }
 
             let keypoints1: Vec<KeyPoint> = features1.iter().map(|f| f.keypoint).collect();
             let keypoints2: Vec<KeyPoint> = features2.iter().map(|f| f.keypoint).collect();
 
-            if let Some((_h_small, inliers)) = processing::find_homography_ransac(&initial_matches, &keypoints1, &keypoints2) {
+            if let Some((_h_small, inliers)) =
+                processing::find_homography_ransac(&initial_matches, &keypoints1, &keypoints2)
+            {
                 if inliers.len() >= processing::MIN_INLIERS_FOR_CONNECTION {
-                    println!("  - Good match found: '{}' <-> '{}' ({} inliers)",
-                        Path::new(&image_data[i].filename).file_name().unwrap_or_default().to_string_lossy(), 
-                        Path::new(&image_data[j].filename).file_name().unwrap_or_default().to_string_lossy(), 
-                        inliers.len());
+                    println!(
+                        "  - Good match found: '{}' <-> '{}' ({} inliers)",
+                        Path::new(&image_data[i].filename)
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy(),
+                        Path::new(&image_data[j].filename)
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy(),
+                        inliers.len()
+                    );
 
-                    let inlier_points: Vec<(nalgebra::Point2<f64>, nalgebra::Point2<f64>)> = inliers.iter().map(|m| {
-                        let p1 = keypoints1[m.index1];
-                        let p2 = keypoints2[m.index2];
-                        (nalgebra::Point2::new(p1.x as f64, p1.y as f64), nalgebra::Point2::new(p2.x as f64, p2.y as f64))
-                    }).collect();
+                    let inlier_points: Vec<(nalgebra::Point2<f64>, nalgebra::Point2<f64>)> =
+                        inliers
+                            .iter()
+                            .map(|m| {
+                                let p1 = keypoints1[m.index1];
+                                let p2 = keypoints2[m.index2];
+                                (
+                                    nalgebra::Point2::new(p1.x as f64, p1.y as f64),
+                                    nalgebra::Point2::new(p2.x as f64, p2.y as f64),
+                                )
+                            })
+                            .collect();
 
                     if let Some(h_refined) = processing::compute_homography(&inlier_points) {
                         let s1 = image_data[i].scale_factor;
                         let s2 = image_data[j].scale_factor;
-                        let scale_mat_i_inv = Matrix3::new(1.0 / s1, 0.0, 0.0, 0.0, 1.0 / s1, 0.0, 0.0, 0.0, 1.0);
+                        let scale_mat_i_inv =
+                            Matrix3::new(1.0 / s1, 0.0, 0.0, 0.0, 1.0 / s1, 0.0, 0.0, 0.0, 1.0);
                         let scale_mat_j = Matrix3::new(s2, 0.0, 0.0, 0.0, s2, 0.0, 0.0, 0.0, 1.0);
                         let h_full = scale_mat_j * h_refined * scale_mat_i_inv;
 
-                        let match_info = MatchInfo { homography: h_full, inliers: inliers.len() };
+                        let match_info = MatchInfo {
+                            homography: h_full,
+                            inliers: inliers.len(),
+                        };
                         return Some(((i, j), match_info));
                     }
                 }
@@ -164,40 +200,70 @@ pub fn stitch_images(
     for result in match_results.into_iter().flatten() {
         pairwise_matches.insert(result.0, result.1);
     }
-    println!("Pairwise matching completed in {:.2?}\n", start_time.elapsed());
+    println!(
+        "Pairwise matching completed in {:.2?}\n",
+        start_time.elapsed()
+    );
 
     if pairwise_matches.is_empty() {
-        return Err("No suitable matches found between any pair of images. Cannot create a panorama.".to_string());
+        return Err(
+            "No suitable matches found between any pair of images. Cannot create a panorama."
+                .to_string(),
+        );
     }
 
     let start_time = Instant::now();
     let _ = app_handle.emit("panorama-progress", "Determining stitching order...");
     println!("Determining stitching order...");
-    let (ordered_indices, global_homographies) = build_stitching_order(&image_data, &pairwise_matches);
-    
+    let (ordered_indices, global_homographies) =
+        build_stitching_order(&image_data, &pairwise_matches);
+
     if ordered_indices.len() < 2 {
         return Err("Could not find a connected sequence of at least two images.".to_string());
     }
 
-    let ordered_filenames: Vec<_> = ordered_indices.iter().map(|&i| Path::new(&image_data[i].filename).file_name().unwrap_or_default().to_string_lossy().to_string()).collect();
+    let ordered_filenames: Vec<_> = ordered_indices
+        .iter()
+        .map(|&i| {
+            Path::new(&image_data[i].filename)
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string()
+        })
+        .collect();
     println!("Stitching order determined: {:?}", ordered_filenames);
-    let _ = app_handle.emit("panorama-progress", format!("Stitching order: {}", ordered_filenames.join(" -> ")));
-    
-    let stitched_images_info: Vec<&ImageInfo> = ordered_indices.iter().map(|&i| &image_data[i]).collect();
+    let _ = app_handle.emit(
+        "panorama-progress",
+        format!("Stitching order: {}", ordered_filenames.join(" -> ")),
+    );
+
+    let stitched_images_info: Vec<&ImageInfo> =
+        ordered_indices.iter().map(|&i| &image_data[i]).collect();
     let unstitched_count = image_data.len() - stitched_images_info.len();
     if unstitched_count > 0 {
-        let warning_msg = format!("Warning: {} image(s) could not be matched and will be excluded.", unstitched_count);
+        let warning_msg = format!(
+            "Warning: {} image(s) could not be matched and will be excluded.",
+            unstitched_count
+        );
         println!("{}", warning_msg);
         let _ = app_handle.emit("panorama-warning", warning_msg);
     }
-    println!("Global homography calculation completed in {:.2?}\n", start_time.elapsed());
+    println!(
+        "Global homography calculation completed in {:.2?}\n",
+        start_time.elapsed()
+    );
 
     let start_time = Instant::now();
     let _ = app_handle.emit("panorama-progress", "Warping and blending images...");
     println!("Warping and blending full-resolution images with progressive optimal seams...");
 
-    let panorama = stitching::progressive_seam_stitcher(&stitched_images_info, &global_homographies, app_handle.clone());
-    
+    let panorama = stitching::progressive_seam_stitcher(
+        &stitched_images_info,
+        &global_homographies,
+        app_handle.clone(),
+    );
+
     println!("Stitching completed in {:.2?}\n", start_time.elapsed());
 
     let _ = app_handle.emit("panorama-progress", "Finalizing panorama...");
@@ -210,7 +276,9 @@ struct DSU {
 
 impl DSU {
     fn new(n: usize) -> Self {
-        DSU { parent: (0..n).collect() }
+        DSU {
+            parent: (0..n).collect(),
+        }
     }
 
     fn find(&mut self, i: usize) -> usize {
@@ -294,11 +362,13 @@ fn build_stitching_order(
                     let h_vu = if let Some(m) = matches.get(&(v, u)) {
                         m.homography
                     } else if let Some(m) = matches.get(&(u, v)) {
-                        m.homography.try_inverse().expect("Failed to invert homography for MST edge")
+                        m.homography
+                            .try_inverse()
+                            .expect("Failed to invert homography for MST edge")
                     } else {
                         panic!("Match not found for MST edge between {} and {}", u, v);
                     };
-                    
+
                     let h_v_global = h_u_global * h_vu;
                     q.push_back((v, h_v_global));
                 }

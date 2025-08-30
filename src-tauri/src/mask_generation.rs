@@ -1,12 +1,14 @@
+use base64::{Engine as _, engine::general_purpose};
 use image::{GrayImage, Luma};
+use imageproc::distance_transform::Norm as DilationNorm;
+use imageproc::morphology::{dilate, erode};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::f32::consts::PI;
-use base64::{Engine as _, engine::general_purpose};
-use imageproc::morphology::{dilate, erode};
-use imageproc::distance_transform::Norm as DilationNorm;
 // --- UPDATED IMPORT ---
-use crate::ai_processing::{AiSubjectMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters};
+use crate::ai_processing::{
+    AiForegroundMaskParameters, AiSkyMaskParameters, AiSubjectMaskParameters,
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -74,7 +76,6 @@ struct GrowFeatherParameters {
     feather: f32,
 }
 
-
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 struct RadialMaskParameters {
@@ -140,11 +141,7 @@ struct BrushMaskParameters {
     lines: Vec<BrushLine>,
 }
 
-fn apply_grow_and_feather(
-    mask: &mut GrayImage,
-    grow: f32,
-    feather: f32,
-) {
+fn apply_grow_and_feather(mask: &mut GrayImage, grow: f32, feather: f32) {
     const GROW_SENSITIVITY_FACTOR: f32 = 0.2;
     let scaled_grow = grow * GROW_SENSITIVITY_FACTOR;
 
@@ -213,11 +210,11 @@ fn draw_feathered_ellipse_mut(
                 } else {
                     1.0 - (dist - inner_radius) / (radius - inner_radius).max(0.01)
                 };
-                
+
                 let final_value = (intensity * color_value as f32) as u8;
 
                 let current_pixel = mask.get_pixel_mut(x as u32, y as u32);
-                
+
                 if is_eraser {
                     current_pixel[0] = current_pixel[0].saturating_sub(final_value);
                 } else {
@@ -237,7 +234,8 @@ fn generate_radial_bitmap(
     scale: f32,
     crop_offset: (f32, f32),
 ) -> GrayImage {
-    let params: RadialMaskParameters = serde_json::from_value(params_value.clone()).unwrap_or_default();
+    let params: RadialMaskParameters =
+        serde_json::from_value(params_value.clone()).unwrap_or_default();
     let mut mask = GrayImage::new(width, height);
 
     let center_x = (params.center_x as f32 * scale - crop_offset.0) as i32;
@@ -261,7 +259,7 @@ fn generate_radial_bitmap(
             let norm_y = rot_dy / radius_y.max(0.01);
 
             let dist = (norm_x.powi(2) + norm_y.powi(2)).sqrt();
-            
+
             let inner_bound = 1.0 - params.feather.clamp(0.0, 1.0);
             let intensity = 1.0 - (dist - inner_bound) / (1.0 - inner_bound).max(0.01);
             let clamped_intensity = intensity.clamp(0.0, 1.0);
@@ -280,7 +278,8 @@ fn generate_linear_bitmap(
     scale: f32,
     crop_offset: (f32, f32),
 ) -> GrayImage {
-    let params: LinearMaskParameters = serde_json::from_value(params_value.clone()).unwrap_or_default();
+    let params: LinearMaskParameters =
+        serde_json::from_value(params_value.clone()).unwrap_or_default();
     let mut mask = GrayImage::new(width, height);
 
     let start_x = params.start_x as f32 * scale - crop_offset.0;
@@ -316,7 +315,7 @@ fn generate_linear_bitmap(
             let t = dist_perp / half_width;
 
             let intensity = 0.5 - t * 0.5;
-            
+
             let clamped_intensity = intensity.clamp(0.0, 1.0);
 
             mask.put_pixel(x_u, y_u, Luma([(clamped_intensity * 255.0) as u8]));
@@ -333,11 +332,14 @@ fn generate_brush_bitmap(
     scale: f32,
     crop_offset: (f32, f32),
 ) -> GrayImage {
-    let params: BrushMaskParameters = serde_json::from_value(params_value.clone()).unwrap_or_default();
+    let params: BrushMaskParameters =
+        serde_json::from_value(params_value.clone()).unwrap_or_default();
     let mut mask = GrayImage::new(width, height);
 
     for line in &params.lines {
-        if line.points.is_empty() { continue; }
+        if line.points.is_empty() {
+            continue;
+        }
 
         let is_eraser = line.tool == "eraser";
         let color_value = 255u8;
@@ -357,24 +359,52 @@ fn generate_brush_bitmap(
                 let dist = ((x2_f - x1_f).powi(2) + (y2_f - y1_f).powi(2)).sqrt();
                 let step_size = (radius * (1.0 - feather) / 2.0).max(1.0);
                 let steps = (dist / step_size).ceil() as i32;
-                
+
                 if steps > 1 {
                     for i in 0..=steps {
                         let t = i as f32 / steps as f32;
                         let interp_x = (x1_f + t * (x2_f - x1_f)) as i32;
                         let interp_y = (y1_f + t * (y2_f - y1_f)) as i32;
-                        draw_feathered_ellipse_mut(&mut mask, (interp_x, interp_y), radius, feather, color_value, is_eraser);
+                        draw_feathered_ellipse_mut(
+                            &mut mask,
+                            (interp_x, interp_y),
+                            radius,
+                            feather,
+                            color_value,
+                            is_eraser,
+                        );
                     }
                 } else {
-                    draw_feathered_ellipse_mut(&mut mask, (x1_f as i32, y1_f as i32), radius, feather, color_value, is_eraser);
-                    draw_feathered_ellipse_mut(&mut mask, (x2_f as i32, y2_f as i32), radius, feather, color_value, is_eraser);
+                    draw_feathered_ellipse_mut(
+                        &mut mask,
+                        (x1_f as i32, y1_f as i32),
+                        radius,
+                        feather,
+                        color_value,
+                        is_eraser,
+                    );
+                    draw_feathered_ellipse_mut(
+                        &mut mask,
+                        (x2_f as i32, y2_f as i32),
+                        radius,
+                        feather,
+                        color_value,
+                        is_eraser,
+                    );
                 }
             }
         } else {
             let p1 = &line.points[0];
             let x1 = (p1.x as f32 * scale - crop_offset.0) as i32;
             let y1 = (p1.y as f32 * scale - crop_offset.1) as i32;
-            draw_feathered_ellipse_mut(&mut mask, (x1, y1), radius, feather, color_value, is_eraser);
+            draw_feathered_ellipse_mut(
+                &mut mask,
+                (x1, y1),
+                radius,
+                feather,
+                color_value,
+                is_eraser,
+            );
         }
     }
     mask
@@ -414,8 +444,16 @@ fn generate_ai_bitmap_from_full_mask(
             let x_uncrop = x_out as f32 + crop_offset.0;
             let y_uncrop = y_out as f32 + crop_offset.1;
 
-            let x_unflipped = if flip_horizontal { scaled_coarse_rotated_w - x_uncrop } else { x_uncrop };
-            let y_unflipped = if flip_vertical { scaled_coarse_rotated_h - y_uncrop } else { y_uncrop };
+            let x_unflipped = if flip_horizontal {
+                scaled_coarse_rotated_w - x_uncrop
+            } else {
+                x_uncrop
+            };
+            let y_unflipped = if flip_vertical {
+                scaled_coarse_rotated_h - y_uncrop
+            } else {
+                y_uncrop
+            };
 
             let x_centered = x_unflipped - center_x;
             let y_centered = y_unflipped - center_y;
@@ -428,7 +466,10 @@ fn generate_ai_bitmap_from_full_mask(
             let (x_unrotated_coarse, y_unrotated_coarse) = match orientation_steps {
                 0 => (x_unrotated_fine, y_unrotated_fine),
                 1 => (y_unrotated_fine, scaled_coarse_rotated_w - x_unrotated_fine),
-                2 => (scaled_coarse_rotated_w - x_unrotated_fine, scaled_coarse_rotated_h - y_unrotated_fine),
+                2 => (
+                    scaled_coarse_rotated_w - x_unrotated_fine,
+                    scaled_coarse_rotated_h - y_unrotated_fine,
+                ),
                 3 => (scaled_coarse_rotated_h - y_unrotated_fine, x_unrotated_fine),
                 _ => (x_unrotated_fine, y_unrotated_fine),
             };
@@ -436,7 +477,11 @@ fn generate_ai_bitmap_from_full_mask(
             let x_src = x_unrotated_coarse / scale;
             let y_src = y_unrotated_coarse / scale;
 
-            if x_src >= 0.0 && x_src < full_mask_w as f32 && y_src >= 0.0 && y_src < full_mask_h as f32 {
+            if x_src >= 0.0
+                && x_src < full_mask_w as f32
+                && y_src >= 0.0
+                && y_src < full_mask_h as f32
+            {
                 let pixel = full_mask_image.get_pixel(x_src as u32, y_src as u32);
                 final_mask.put_pixel(x_out, y_out, *pixel);
             }
@@ -462,7 +507,7 @@ fn generate_ai_bitmap_from_base64(
     } else {
         data_url
     };
-    
+
     let decoded_bytes = general_purpose::STANDARD.decode(b64_data).ok()?;
     let full_mask_image = image::load_from_memory(&decoded_bytes).ok()?.to_luma8();
 
@@ -487,7 +532,8 @@ fn generate_ai_sky_bitmap(
     crop_offset: (f32, f32),
 ) -> Option<GrayImage> {
     let params: AiSkyMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
-    let grow_feather: GrowFeatherParameters = serde_json::from_value(params_value.clone()).unwrap_or_default();
+    let grow_feather: GrowFeatherParameters =
+        serde_json::from_value(params_value.clone()).unwrap_or_default();
     let data_url = params.mask_data_base64?;
 
     let mut mask = generate_ai_bitmap_from_base64(
@@ -496,7 +542,10 @@ fn generate_ai_sky_bitmap(
         params.flip_horizontal.unwrap_or(false),
         params.flip_vertical.unwrap_or(false),
         params.orientation_steps.unwrap_or(0),
-        width, height, scale, crop_offset
+        width,
+        height,
+        scale,
+        crop_offset,
     )?;
 
     apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather);
@@ -512,7 +561,8 @@ fn generate_ai_foreground_bitmap(
     crop_offset: (f32, f32),
 ) -> Option<GrayImage> {
     let params: AiForegroundMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
-    let grow_feather: GrowFeatherParameters = serde_json::from_value(params_value.clone()).unwrap_or_default();
+    let grow_feather: GrowFeatherParameters =
+        serde_json::from_value(params_value.clone()).unwrap_or_default();
     let data_url = params.mask_data_base64?;
 
     let mut mask = generate_ai_bitmap_from_base64(
@@ -521,7 +571,10 @@ fn generate_ai_foreground_bitmap(
         params.flip_horizontal.unwrap_or(false),
         params.flip_vertical.unwrap_or(false),
         params.orientation_steps.unwrap_or(0),
-        width, height, scale, crop_offset
+        width,
+        height,
+        scale,
+        crop_offset,
     )?;
 
     apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather);
@@ -537,7 +590,8 @@ fn generate_ai_subject_bitmap(
     crop_offset: (f32, f32),
 ) -> Option<GrayImage> {
     let params: AiSubjectMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
-    let grow_feather: GrowFeatherParameters = serde_json::from_value(params_value.clone()).unwrap_or_default();
+    let grow_feather: GrowFeatherParameters =
+        serde_json::from_value(params_value.clone()).unwrap_or_default();
     let data_url = params.mask_data_base64?;
 
     let mut mask = generate_ai_bitmap_from_base64(
@@ -546,7 +600,10 @@ fn generate_ai_subject_bitmap(
         params.flip_horizontal.unwrap_or(false),
         params.flip_vertical.unwrap_or(false),
         params.orientation_steps.unwrap_or(0),
-        width, height, scale, crop_offset
+        width,
+        height,
+        scale,
+        crop_offset,
     )?;
 
     apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather);
@@ -566,13 +623,37 @@ fn generate_sub_mask_bitmap(
     }
 
     match sub_mask.mask_type.as_str() {
-        "radial" => Some(generate_radial_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)),
-        "linear" => Some(generate_linear_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)),
-        "brush" => Some(generate_brush_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)),
-        "ai-subject" => generate_ai_subject_bitmap(&sub_mask.parameters, width, height, scale, crop_offset),
-        "ai-foreground" => generate_ai_foreground_bitmap(&sub_mask.parameters, width, height, scale, crop_offset),
+        "radial" => Some(generate_radial_bitmap(
+            &sub_mask.parameters,
+            width,
+            height,
+            scale,
+            crop_offset,
+        )),
+        "linear" => Some(generate_linear_bitmap(
+            &sub_mask.parameters,
+            width,
+            height,
+            scale,
+            crop_offset,
+        )),
+        "brush" => Some(generate_brush_bitmap(
+            &sub_mask.parameters,
+            width,
+            height,
+            scale,
+            crop_offset,
+        )),
+        "ai-subject" => {
+            generate_ai_subject_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)
+        }
+        "ai-foreground" => {
+            generate_ai_foreground_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)
+        }
         "ai-sky" => generate_ai_sky_bitmap(&sub_mask.parameters, width, height, scale, crop_offset),
-        "quick-eraser" => generate_ai_subject_bitmap(&sub_mask.parameters, width, height, scale, crop_offset),
+        "quick-eraser" => {
+            generate_ai_subject_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)
+        }
         _ => None,
     }
 }
@@ -592,7 +673,9 @@ pub fn generate_mask_bitmap(
     let mut subtractive_canvas = GrayImage::new(width, height);
 
     for sub_mask in &mask_def.sub_masks {
-        if let Some(sub_bitmap) = generate_sub_mask_bitmap(sub_mask, width, height, scale, crop_offset) {
+        if let Some(sub_bitmap) =
+            generate_sub_mask_bitmap(sub_mask, width, height, scale, crop_offset)
+        {
             match sub_mask.mode {
                 SubMaskMode::Additive => {
                     for (x, y, pixel) in additive_canvas.enumerate_pixels_mut() {

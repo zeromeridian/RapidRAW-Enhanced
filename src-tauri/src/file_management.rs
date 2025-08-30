@@ -3,35 +3,35 @@ use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 
 use anyhow::Result;
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
+use chrono::{DateTime, Utc};
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
+use little_exif::exif_tag::ExifTag;
+use little_exif::metadata::Metadata;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
 use uuid::Uuid;
 use walkdir::WalkDir;
-use chrono::{DateTime, Utc};
-use little_exif::exif_tag::ExifTag;
-use little_exif::metadata::Metadata;
 
-use crate::gpu_processing;
-use crate::formats::is_supported_image_file;
-use crate::image_processing::GpuContext;
-use crate::image_loader;
-use crate::image_processing::{
-    apply_crop, apply_flip, apply_rotation, auto_results_to_json, get_all_adjustments_from_json,
-    perform_auto_analysis, Crop, ImageMetadata, apply_coarse_rotation,
-};
-use crate::tagging::COLOR_TAG_PREFIX;
-use crate::mask_generation::{generate_mask_bitmap, MaskDefinition};
 use crate::AppState;
+use crate::formats::is_supported_image_file;
+use crate::gpu_processing;
+use crate::image_loader;
+use crate::image_processing::GpuContext;
+use crate::image_processing::{
+    Crop, ImageMetadata, apply_coarse_rotation, apply_crop, apply_flip, apply_rotation,
+    auto_results_to_json, get_all_adjustments_from_json, perform_auto_analysis,
+};
+use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
+use crate::tagging::COLOR_TAG_PREFIX;
 
 const THUMBNAIL_WIDTH: u32 = 640;
 
@@ -60,7 +60,6 @@ pub enum PresetItem {
 pub struct PresetFile {
     pub presets: Vec<PresetItem>,
 }
-
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -113,13 +112,19 @@ pub struct ComfyUIWorkflowConfig {
 impl Default for ComfyUIWorkflowConfig {
     fn default() -> Self {
         let mut model_checkpoints = HashMap::new();
-        model_checkpoints.insert("4".to_string(), "XL_RealVisXL_V5.0_Lightning.safetensors".to_string());
+        model_checkpoints.insert(
+            "4".to_string(),
+            "XL_RealVisXL_V5.0_Lightning.safetensors".to_string(),
+        );
 
         let mut vae_loaders = HashMap::new();
         vae_loaders.insert("67".to_string(), "sdxl_vae.safetensors".to_string());
 
         let mut controlnet_loaders = HashMap::new();
-        controlnet_loaders.insert("16".to_string(), "diffusion_pytorch_model_promax.safetensors".to_string());
+        controlnet_loaders.insert(
+            "16".to_string(),
+            "diffusion_pytorch_model_promax.safetensors".to_string(),
+        );
 
         Self {
             workflow_path: None,
@@ -184,7 +189,6 @@ impl Default for AppSettings {
     }
 }
 
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ImageFile {
     path: String,
@@ -224,7 +228,7 @@ pub fn list_images_in_dir(path: String) -> Result<Vec<ImageFile>, String> {
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
-            
+
             let sidecar_path = get_sidecar_path(&path_str);
             let (is_edited, tags) = if sidecar_path.exists() {
                 if let Ok(content) = fs::read_to_string(sidecar_path) {
@@ -233,9 +237,15 @@ pub fn list_images_in_dir(path: String) -> Result<Vec<ImageFile>, String> {
                             a.keys().len() > 1 || (a.keys().len() == 1 && !a.contains_key("rating"))
                         });
                         (edited, metadata.tags)
-                    } else { (false, None) }
-                } else { (false, None) }
-            } else { (false, None) };
+                    } else {
+                        (false, None)
+                    }
+                } else {
+                    (false, None)
+                }
+            } else {
+                (false, None)
+            };
 
             ImageFile {
                 path: path_str,
@@ -351,14 +361,15 @@ pub fn generate_thumbnail_data(
         if !meta.adjustments.is_null() {
             let state = app_handle.state::<AppState>();
             const THUMBNAIL_PROCESSING_DIM: u32 = 1280;
-            let orientation_steps = meta.adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
+            let orientation_steps =
+                meta.adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
             let coarse_rotated_image = apply_coarse_rotation(base_image, orientation_steps);
             let (full_w, full_h) = coarse_rotated_image.dimensions();
 
             let (processing_base, scale_for_gpu) =
                 if full_w > THUMBNAIL_PROCESSING_DIM || full_h > THUMBNAIL_PROCESSING_DIM {
-                    let base =
-                        coarse_rotated_image.thumbnail(THUMBNAIL_PROCESSING_DIM, THUMBNAIL_PROCESSING_DIM);
+                    let base = coarse_rotated_image
+                        .thumbnail(THUMBNAIL_PROCESSING_DIM, THUMBNAIL_PROCESSING_DIM);
                     let scale = if full_w > 0 {
                         base.width() as f32 / full_w as f32
                     } else {
@@ -373,8 +384,7 @@ pub fn generate_thumbnail_data(
             let flip_horizontal = meta.adjustments["flipHorizontal"]
                 .as_bool()
                 .unwrap_or(false);
-            let flip_vertical = meta.adjustments["flipVertical"].as_bool()
-                .unwrap_or(false);
+            let flip_vertical = meta.adjustments["flipVertical"].as_bool().unwrap_or(false);
 
             let flipped_image = apply_flip(processing_base, flip_horizontal, flip_vertical);
             let rotated_image = apply_rotation(&flipped_image, rotation_degrees);
@@ -450,7 +460,10 @@ pub fn generate_thumbnail_data(
     }
 
     let fallback_orientation_steps = adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
-    Ok(apply_coarse_rotation(base_image, fallback_orientation_steps))
+    Ok(apply_coarse_rotation(
+        base_image,
+        fallback_orientation_steps,
+    ))
 }
 
 fn encode_thumbnail(image: &DynamicImage) -> Result<Vec<u8>> {
@@ -511,7 +524,9 @@ fn generate_single_thumbnail_and_cache(
         }
     }
 
-    if let Ok(thumb_image) = generate_thumbnail_data(path_str, gpu_context, preloaded_image, app_handle) {
+    if let Ok(thumb_image) =
+        generate_thumbnail_data(path_str, gpu_context, preloaded_image, app_handle)
+    {
         if let Ok(thumb_data) = encode_thumbnail(&thumb_image) {
             let _ = fs::write(&cache_path, &thumb_data);
             let base64_str = general_purpose::STANDARD.encode(&thumb_data);
@@ -669,7 +684,9 @@ pub fn duplicate_file(path: String) -> Result<(), String> {
         return Err("Source path is not a file.".to_string());
     }
 
-    let parent = source_path.parent().ok_or("Could not get parent directory")?;
+    let parent = source_path
+        .parent()
+        .ok_or("Could not get parent directory")?;
     let stem = source_path
         .file_stem()
         .and_then(|s| s.to_str())
@@ -1026,9 +1043,8 @@ pub fn apply_auto_adjustments_to_paths(
     paths.par_iter().for_each(|path| {
         let result: Result<(), String> = (|| {
             let file_bytes = fs::read(path).map_err(|e| e.to_string())?;
-            let image =
-                image_loader::load_base_image_from_bytes(&file_bytes, path, false)
-                    .map_err(|e| e.to_string())?;
+            let image = image_loader::load_base_image_from_bytes(&file_bytes, path, false)
+                .map_err(|e| e.to_string())?;
 
             let auto_results = perform_auto_analysis(&image);
             let auto_adjustments_json = auto_results_to_json(&auto_results);
@@ -1070,7 +1086,9 @@ pub fn apply_auto_adjustments_to_paths(
                 }
             }
 
-            existing_metadata.rating = existing_metadata.adjustments["rating"].as_u64().unwrap_or(0) as u8;
+            existing_metadata.rating = existing_metadata.adjustments["rating"]
+                .as_u64()
+                .unwrap_or(0) as u8;
 
             if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
                 let _ = std::fs::write(sidecar_path, json_string);
@@ -1081,7 +1099,7 @@ pub fn apply_auto_adjustments_to_paths(
             eprintln!("Failed to apply auto adjustments to {}: {}", path, e);
         }
     });
-    
+
     thread::spawn(move || {
         let state = app_handle.state::<AppState>();
         let cache_dir = app_handle.path().app_cache_dir().unwrap();
@@ -1125,10 +1143,7 @@ pub fn apply_auto_adjustments_to_paths(
 }
 
 #[tauri::command]
-pub fn set_color_label_for_paths(
-    paths: Vec<String>,
-    color: Option<String>,
-) -> Result<(), String> {
+pub fn set_color_label_for_paths(paths: Vec<String>, color: Option<String>) -> Result<(), String> {
     paths.par_iter().for_each(|path| {
         let sidecar_path = get_sidecar_path(path);
 
@@ -1243,31 +1258,32 @@ pub fn handle_import_presets_from_file(
 ) -> Result<Vec<PresetItem>, String> {
     let content =
         fs::read_to_string(file_path).map_err(|e| format!("Failed to read preset file: {}", e))?;
-    let imported_preset_file: PresetFile =
-        serde_json::from_str(&content).map_err(|e| format!("Failed to parse preset file: {}", e))?;
+    let imported_preset_file: PresetFile = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse preset file: {}", e))?;
 
     let mut current_presets = load_presets(app_handle.clone())?;
-    
-    let mut current_names: HashSet<String> = current_presets.iter().map(|item| {
-        match item {
+
+    let mut current_names: HashSet<String> = current_presets
+        .iter()
+        .map(|item| match item {
             PresetItem::Preset(p) => p.name.clone(),
             PresetItem::Folder(f) => f.name.clone(),
-        }
-    }).collect();
+        })
+        .collect();
 
     for mut imported_item in imported_preset_file.presets {
         let (current_name, _new_id) = match &mut imported_item {
             PresetItem::Preset(p) => {
                 p.id = Uuid::new_v4().to_string();
                 (p.name.clone(), p.id.clone())
-            },
+            }
             PresetItem::Folder(f) => {
                 f.id = Uuid::new_v4().to_string();
                 for child in &mut f.children {
                     child.id = Uuid::new_v4().to_string();
                 }
                 (f.name.clone(), f.id.clone())
-            },
+            }
         };
 
         let mut new_name = current_name.clone();
@@ -1281,7 +1297,7 @@ pub fn handle_import_presets_from_file(
             PresetItem::Preset(p) => p.name = new_name.clone(),
             PresetItem::Folder(f) => f.name = new_name.clone(),
         }
-        
+
         current_names.insert(new_name);
         current_presets.push(imported_item);
     }
@@ -1493,8 +1509,7 @@ pub fn get_cached_or_generate_thumbnail_image(
     app_handle: &AppHandle,
     gpu_context: Option<&GpuContext>,
 ) -> Result<DynamicImage> {
-    let thumb_cache_dir = get_thumb_cache_dir(app_handle)
-        .map_err(|e| anyhow::anyhow!(e))?;
+    let thumb_cache_dir = get_thumb_cache_dir(app_handle).map_err(|e| anyhow::anyhow!(e))?;
 
     if let Some(cache_hash) = get_cache_key_hash(path_str) {
         let cache_filename = format!("{}.jpg", cache_hash);
@@ -1504,7 +1519,10 @@ pub fn get_cached_or_generate_thumbnail_image(
             if let Ok(image) = image::open(&cache_path) {
                 return Ok(image);
             }
-            eprintln!("Could not open cached thumbnail, regenerating: {:?}", cache_path);
+            eprintln!(
+                "Could not open cached thumbnail, regenerating: {:?}",
+                cache_path
+            );
         }
 
         let thumb_image = generate_thumbnail_data(path_str, gpu_context, None, app_handle)?;
@@ -1525,10 +1543,7 @@ pub async fn import_files(
     app_handle: AppHandle,
 ) -> Result<(), String> {
     let total_files = source_paths.len();
-    let _ = app_handle.emit(
-        "import-start",
-        serde_json::json!({ "total": total_files }),
-    );
+    let _ = app_handle.emit("import-start", serde_json::json!({ "total": total_files }));
 
     tokio::spawn(async move {
         for (i, source_path_str) in source_paths.iter().enumerate() {
@@ -1551,9 +1566,12 @@ pub async fn import_files(
                             .next()
                             .and_then(|tag| {
                                 if let &ExifTag::DateTimeOriginal(ref dt_str) = tag {
-                                    chrono::NaiveDateTime::parse_from_str(dt_str, "%Y:%m:%d %H:%M:%S")
-                                        .ok()
-                                        .map(|dt| DateTime::from_naive_utc_and_offset(dt, Utc))
+                                    chrono::NaiveDateTime::parse_from_str(
+                                        dt_str,
+                                        "%Y:%m:%d %H:%M:%S",
+                                    )
+                                    .ok()
+                                    .map(|dt| DateTime::from_naive_utc_and_offset(dt, Utc))
                                 } else {
                                     None
                                 }
@@ -1569,7 +1587,8 @@ pub async fn import_files(
 
                 let mut final_dest_folder = PathBuf::from(&destination_folder);
                 if settings.organize_by_date {
-                    let date_format_str = settings.date_folder_format
+                    let date_format_str = settings
+                        .date_folder_format
                         .replace("YYYY", "%Y")
                         .replace("MM", "%m")
                         .replace("DD", "%d");
@@ -1577,15 +1596,28 @@ pub async fn import_files(
                     final_dest_folder.push(subfolder);
                 }
 
-                fs::create_dir_all(&final_dest_folder).map_err(|e| format!("Failed to create destination folder: {}", e))?;
+                fs::create_dir_all(&final_dest_folder)
+                    .map_err(|e| format!("Failed to create destination folder: {}", e))?;
 
-                let new_stem = generate_filename_from_template(&settings.filename_template, source_path, i + 1, total_files, &file_date);
-                let extension = source_path.extension().and_then(|s| s.to_str()).unwrap_or("");
+                let new_stem = generate_filename_from_template(
+                    &settings.filename_template,
+                    source_path,
+                    i + 1,
+                    total_files,
+                    &file_date,
+                );
+                let extension = source_path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("");
                 let new_filename = format!("{}.{}", new_stem, extension);
                 let dest_file_path = final_dest_folder.join(new_filename);
 
                 if dest_file_path.exists() {
-                    return Err(format!("File already exists at destination: {}", dest_file_path.display()));
+                    return Err(format!(
+                        "File already exists at destination: {}",
+                        dest_file_path.display()
+                    ));
                 }
 
                 fs::copy(source_path, &dest_file_path).map_err(|e| e.to_string())?;
@@ -1631,8 +1663,15 @@ pub fn generate_filename_from_template(
     total: usize,
     file_date: &DateTime<Utc>,
 ) -> String {
-    let stem = original_path.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
-    let sequence_str = format!("{:0width$}", sequence, width = total.to_string().len().max(1));
+    let stem = original_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("image");
+    let sequence_str = format!(
+        "{:0width$}",
+        sequence,
+        width = total.to_string().len().max(1)
+    );
     let local_date = file_date.with_timezone(&chrono::Local);
 
     let mut result = template.to_string();
@@ -1662,8 +1701,13 @@ pub fn rename_files(paths: Vec<String>, name_template: String) -> Result<Vec<Str
             return Err(format!("File not found: {}", path_str));
         }
 
-        let parent = original_path.parent().ok_or("Could not get parent directory")?;
-        let extension = original_path.extension().and_then(|s| s.to_str()).unwrap_or("");
+        let parent = original_path
+            .parent()
+            .ok_or("Could not get parent directory")?;
+        let extension = original_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
 
         let file_date: DateTime<Utc> = Metadata::new_from_path(original_path)
             .ok()
@@ -1689,12 +1733,21 @@ pub fn rename_files(paths: Vec<String>, name_template: String) -> Result<Vec<Str
                     .unwrap_or_else(Utc::now)
             });
 
-        let new_stem = generate_filename_from_template(&name_template, original_path, i + 1, paths.len(), &file_date);
+        let new_stem = generate_filename_from_template(
+            &name_template,
+            original_path,
+            i + 1,
+            paths.len(),
+            &file_date,
+        );
         let new_filename = format!("{}.{}", new_stem, extension);
         let new_path = parent.join(new_filename);
 
         if new_path.exists() && new_path != original_path {
-            return Err(format!("A file with the name {} already exists.", new_path.display()));
+            return Err(format!(
+                "A file with the name {} already exists.",
+                new_path.display()
+            ));
         }
 
         operations.push((original_path.to_path_buf(), new_path));

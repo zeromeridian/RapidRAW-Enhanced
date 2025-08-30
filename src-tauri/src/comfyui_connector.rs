@@ -1,11 +1,11 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use futures_util::StreamExt;
 use image::{DynamicImage, ImageFormat};
 use reqwest::multipart;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
+use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use std::fs;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use uuid::Uuid;
 
@@ -34,17 +34,32 @@ async fn upload_image(address: &str, image: DynamicImage, form_name: &str) -> Re
 
     if !response.status().is_success() {
         let status = response.status();
-        let error_text = response.text().await.unwrap_or_else(|_| "Could not read error body".to_string());
-        return Err(anyhow!("ComfyUI upload failed with status {}: {}", status, error_text));
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Could not read error body".to_string());
+        return Err(anyhow!(
+            "ComfyUI upload failed with status {}: {}",
+            status,
+            error_text
+        ));
     }
 
-    let response_json = response.json::<Value>().await
+    let response_json = response
+        .json::<Value>()
+        .await
         .map_err(|e| anyhow!("Failed to decode ComfyUI upload response as JSON: {}", e))?;
 
-    response_json.get("name")
+    response_json
+        .get("name")
         .and_then(Value::as_str)
         .map(String::from)
-        .ok_or_else(|| anyhow!("Failed to get filename from ComfyUI upload response. Full response: {}", response_json))
+        .ok_or_else(|| {
+            anyhow!(
+                "Failed to get filename from ComfyUI upload response. Full response: {}",
+                response_json
+            )
+        })
 }
 
 async fn queue_prompt(address: &str, prompt: Value, client_id: &str) -> Result<String> {
@@ -62,17 +77,32 @@ async fn queue_prompt(address: &str, prompt: Value, client_id: &str) -> Result<S
 
     if !response.status().is_success() {
         let status = response.status();
-        let error_text = response.text().await.unwrap_or_else(|_| "Could not read error body".to_string());
-        return Err(anyhow!("ComfyUI queue_prompt failed with status {}: {}", status, error_text));
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Could not read error body".to_string());
+        return Err(anyhow!(
+            "ComfyUI queue_prompt failed with status {}: {}",
+            status,
+            error_text
+        ));
     }
 
-    let response_json = response.json::<Value>().await
+    let response_json = response
+        .json::<Value>()
+        .await
         .map_err(|e| anyhow!("Failed to decode ComfyUI prompt response as JSON: {}", e))?;
 
-    response_json.get("prompt_id")
+    response_json
+        .get("prompt_id")
         .and_then(Value::as_str)
         .map(String::from)
-        .ok_or_else(|| anyhow!("Failed to get prompt_id from ComfyUI. Full response: {}", response_json))
+        .ok_or_else(|| {
+            anyhow!(
+                "Failed to get prompt_id from ComfyUI. Full response: {}",
+                response_json
+            )
+        })
 }
 
 async fn get_history(address: &str, prompt_id: &str) -> Result<Value> {
@@ -81,28 +111,48 @@ async fn get_history(address: &str, prompt_id: &str) -> Result<Value> {
 
     if !response.status().is_success() {
         let status = response.status();
-        let error_text = response.text().await.unwrap_or_else(|_| "Could not read error body".to_string());
-        return Err(anyhow!("ComfyUI get_history failed with status {}: {}", status, error_text));
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Could not read error body".to_string());
+        return Err(anyhow!(
+            "ComfyUI get_history failed with status {}: {}",
+            status,
+            error_text
+        ));
     }
 
     Ok(response.json::<Value>().await?)
 }
 
-async fn get_image(address: &str, filename: &str, subfolder: &str, folder_type: &str) -> Result<Vec<u8>> {
+async fn get_image(
+    address: &str,
+    filename: &str,
+    subfolder: &str,
+    folder_type: &str,
+) -> Result<Vec<u8>> {
     let client = reqwest::Client::new();
-    let response = client.get(format!("http://{}/view", address))
+    let response = client
+        .get(format!("http://{}/view", address))
         .query(&[
             ("filename", filename),
             ("subfolder", subfolder),
-            ("type", folder_type)
+            ("type", folder_type),
         ])
         .send()
         .await?;
 
     if !response.status().is_success() {
         let status = response.status();
-        let error_text = response.text().await.unwrap_or_else(|_| "Could not read error body".to_string());
-        return Err(anyhow!("ComfyUI get_image failed with status {}: {}", status, error_text));
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Could not read error body".to_string());
+        return Err(anyhow!(
+            "ComfyUI get_image failed with status {}: {}",
+            status,
+            error_text
+        ));
     }
 
     let bytes = response.bytes().await?;
@@ -110,7 +160,9 @@ async fn get_image(address: &str, filename: &str, subfolder: &str, folder_type: 
 }
 
 pub async fn ping_server(address: &str) -> Result<()> {
-    reqwest::get(format!("http://{}", address)).await?.error_for_status()?;
+    reqwest::get(format!("http://{}", address))
+        .await?
+        .error_for_status()?;
     Ok(())
 }
 
@@ -121,9 +173,11 @@ pub async fn execute_workflow(
     mask_image: Option<DynamicImage>,
     text_prompt: Option<String>,
 ) -> Result<Vec<u8>> {
-    let workflow_path = config.workflow_path.as_ref().map(PathBuf::from).unwrap_or_else(|| {
-        Path::new(WORKFLOWS_DIR).join("generative_replace.json")
-    });
+    let workflow_path = config
+        .workflow_path
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| Path::new(WORKFLOWS_DIR).join("generative_replace.json"));
 
     let workflow_str = fs::read_to_string(&workflow_path)
         .map_err(|e| anyhow!("Failed to read workflow file at {:?}: {}", workflow_path, e))?;
@@ -163,7 +217,10 @@ pub async fn execute_workflow(
     if let Some(node) = workflow.get_mut(&config.source_image_node_id) {
         node["inputs"]["image"] = json!(source_filename);
     } else {
-        return Err(anyhow!("Source image node ID '{}' not found in workflow.", config.source_image_node_id));
+        return Err(anyhow!(
+            "Source image node ID '{}' not found in workflow.",
+            config.source_image_node_id
+        ));
     }
 
     if let Some(mask) = mask_image {
@@ -171,7 +228,10 @@ pub async fn execute_workflow(
         if let Some(node) = workflow.get_mut(&config.mask_image_node_id) {
             node["inputs"]["image"] = json!(mask_filename);
         } else {
-            return Err(anyhow!("Mask image node ID '{}' not found in workflow.", config.mask_image_node_id));
+            return Err(anyhow!(
+                "Mask image node ID '{}' not found in workflow.",
+                config.mask_image_node_id
+            ));
         }
     }
 
@@ -181,13 +241,18 @@ pub async fn execute_workflow(
                 node_inputs["text"] = json!(prompt_text);
             }
         } else {
-            return Err(anyhow!("Text prompt node ID '{}' not found in workflow.", config.text_prompt_node_id));
+            return Err(anyhow!(
+                "Text prompt node ID '{}' not found in workflow.",
+                config.text_prompt_node_id
+            ));
         }
     }
 
     let client_id = Uuid::new_v4().to_string();
     let ws_url = format!("ws://{}/ws?clientId={}", address, client_id);
-    let (ws_stream, _) = connect_async(&ws_url).await.map_err(|e| anyhow!("Failed to connect to WebSocket at {}: {}", ws_url, e))?;
+    let (ws_stream, _) = connect_async(&ws_url)
+        .await
+        .map_err(|e| anyhow!("Failed to connect to WebSocket at {}: {}", ws_url, e))?;
     let (_write, mut read) = ws_stream.split();
 
     let prompt_id = queue_prompt(address, workflow, &client_id).await?;
@@ -198,7 +263,10 @@ pub async fn execute_workflow(
             Some(Ok(msg)) => {
                 if let Message::Text(text) = msg {
                     if let Ok(v) = serde_json::from_str::<Value>(&text) {
-                        if v["type"] == "executing" && v["data"]["node"].is_null() && v["data"]["prompt_id"] == prompt_id {
+                        if v["type"] == "executing"
+                            && v["data"]["node"].is_null()
+                            && v["data"]["prompt_id"] == prompt_id
+                        {
                             break;
                         }
                     }
@@ -210,23 +278,47 @@ pub async fn execute_workflow(
     }
 
     let history = get_history(address, &prompt_id).await?;
-    let outputs = history.get(&prompt_id)
+    let outputs = history
+        .get(&prompt_id)
         .and_then(|h| h.get("outputs"))
-        .ok_or_else(|| anyhow!("Could not find outputs for prompt_id {} in history", prompt_id))?;
+        .ok_or_else(|| {
+            anyhow!(
+                "Could not find outputs for prompt_id {} in history",
+                prompt_id
+            )
+        })?;
 
-    let images = outputs.get(&config.final_output_node_id)
+    let images = outputs
+        .get(&config.final_output_node_id)
         .and_then(|n| n.get("images"))
         .and_then(|i| i.as_array())
-        .ok_or_else(|| anyhow!("No 'images' array found in specified output node '{}'", config.final_output_node_id))?;
+        .ok_or_else(|| {
+            anyhow!(
+                "No 'images' array found in specified output node '{}'",
+                config.final_output_node_id
+            )
+        })?;
 
     if images.is_empty() {
-        return Err(anyhow!("Output node '{}' produced no images", config.final_output_node_id));
+        return Err(anyhow!(
+            "Output node '{}' produced no images",
+            config.final_output_node_id
+        ));
     }
 
     let first_image_info = &images[0];
-    let final_filename = first_image_info.get("filename").and_then(|f| f.as_str()).ok_or_else(|| anyhow!("Could not get filename from output"))?;
-    let subfolder = first_image_info.get("subfolder").and_then(|s| s.as_str()).unwrap_or("");
-    let folder_type = first_image_info.get("type").and_then(|t| t.as_str()).ok_or_else(|| anyhow!("Could not get type from output"))?;
+    let final_filename = first_image_info
+        .get("filename")
+        .and_then(|f| f.as_str())
+        .ok_or_else(|| anyhow!("Could not get filename from output"))?;
+    let subfolder = first_image_info
+        .get("subfolder")
+        .and_then(|s| s.as_str())
+        .unwrap_or("");
+    let folder_type = first_image_info
+        .get("type")
+        .and_then(|t| t.as_str())
+        .ok_or_else(|| anyhow!("Could not get type from output"))?;
 
     let image_data = get_image(address, final_filename, subfolder, folder_type).await?;
     Ok(image_data)

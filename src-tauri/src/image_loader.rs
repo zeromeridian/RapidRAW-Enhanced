@@ -1,14 +1,14 @@
-use anyhow::{Result, Context};
-use base64::{engine::general_purpose, Engine as _};
-use image::{imageops, DynamicImage, ImageReader, RgbaImage, Rgba};
+use anyhow::{Context, Result};
+use base64::{Engine as _, engine::general_purpose};
+use image::{DynamicImage, ImageReader, Rgba, RgbaImage, imageops};
 use rawler::Orientation;
-use std::io::Cursor;
 use rayon::prelude::*;
 use serde_json::Value;
 use std::fs;
+use std::io::Cursor;
 
-use exif::{Reader as ExifReader, Tag};
 use crate::image_processing::apply_orientation;
+use exif::{Reader as ExifReader, Tag};
 
 use crate::formats::is_raw_file;
 use crate::raw_processing::develop_raw_image;
@@ -46,9 +46,14 @@ pub fn load_image_with_orientation(bytes: &[u8]) -> Result<DynamicImage> {
 
     let exif_reader = ExifReader::new();
     if let Ok(exif) = exif_reader.read_from_container(&mut cursor.clone()) {
-        if let Some(orientation) = exif.get_field(Tag::Orientation, exif::In::PRIMARY)
-                                       .and_then(|f| f.value.get_uint(0)) {
-            return Ok(apply_orientation(image, Orientation::from_u16(orientation as u16)));
+        if let Some(orientation) = exif
+            .get_field(Tag::Orientation, exif::In::PRIMARY)
+            .and_then(|f| f.value.get_uint(0))
+        {
+            return Ok(apply_orientation(
+                image,
+                Orientation::from_u16(orientation as u16),
+            ));
         }
     }
 
@@ -76,7 +81,7 @@ pub fn composite_patches_on_image(
                 .get("visible")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(true);
-            
+
             let has_data = patch_obj.get("patchData").is_some();
 
             is_visible && has_data
@@ -91,7 +96,7 @@ pub fn composite_patches_on_image(
         .par_iter()
         .filter_map(|patch_obj| {
             let patch_data = patch_obj.get("patchData")?;
-            
+
             let color_b64 = patch_data.get("color").and_then(|v| v.as_str())?;
             let mask_b64 = patch_data.get("mask").and_then(|v| v.as_str())?;
 
@@ -109,12 +114,16 @@ pub fn composite_patches_on_image(
                     for x in 0..width {
                         let color_pixel = color_image.get_pixel(x, y);
                         let mask_pixel = mask_image.get_pixel(x, y);
-                        patch_rgba.put_pixel(x, y, Rgba([
-                            color_pixel[0],
-                            color_pixel[1],
-                            color_pixel[2],
-                            mask_pixel[0],
-                        ]));
+                        patch_rgba.put_pixel(
+                            x,
+                            y,
+                            Rgba([
+                                color_pixel[0],
+                                color_pixel[1],
+                                color_pixel[2],
+                                mask_pixel[0],
+                            ]),
+                        );
                     }
                 }
                 Ok(patch_rgba)
