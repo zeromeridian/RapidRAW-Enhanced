@@ -186,21 +186,21 @@ pub async fn execute_workflow(
     mask_image: Option<DynamicImage>,
     text_prompt: Option<String>,
 ) -> Result<Vec<u8>> {
-    const MAX_DIMENSION: u32 = 1536;
+    let max_dimension = config.inpaint_resolution.unwrap_or(1536);
 
     let (w, h) = source_image.dimensions();
-    let processed_source_image = if w > MAX_DIMENSION || h > MAX_DIMENSION {
-        println!("Source image is {}x{}, downscaling to {}px long edge for ComfyUI.", w, h, MAX_DIMENSION);
-        source_image.thumbnail(MAX_DIMENSION, MAX_DIMENSION)
+    let processed_source_image = if w > max_dimension || h > max_dimension {
+        println!("Source image is {}x{}, downscaling to {}px long edge for ComfyUI.", w, h, max_dimension);
+        source_image.thumbnail(max_dimension, max_dimension)
     } else {
         source_image
     };
 
     let processed_mask_image = mask_image.map(|mask| {
         let (mw, mh) = mask.dimensions();
-        if mw > MAX_DIMENSION || mh > MAX_DIMENSION {
-            println!("Mask image is {}x{}, downscaling to {}px long edge for ComfyUI.", mw, mh, MAX_DIMENSION);
-            mask.thumbnail(MAX_DIMENSION, MAX_DIMENSION)
+        if mw > max_dimension || mh > max_dimension {
+            println!("Mask image is {}x{}, downscaling to {}px long edge for ComfyUI.", mw, mh, max_dimension);
+            mask.thumbnail(max_dimension, max_dimension)
         } else {
             mask
         }

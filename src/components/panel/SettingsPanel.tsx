@@ -72,6 +72,7 @@ const DEFAULT_WORKFLOW_CONFIG = {
   finalOutputNodeId: '252',
   samplerNodeId: '3',
   samplerSteps: 10,
+  inpaintResolution: 1536,
 };
 
 const resolutions: Array<OptionItem> = [
@@ -507,51 +508,25 @@ export default function SettingsPanel({
                         </ol>
                       </div>
 
-                      <div className="p-3 bg-bg-primary rounded-lg border border-border-color text-xs text-text-secondary space-y-2">
-                        {comfyConfig.workflowPath ? (
-                          <>
-                            <p className="font-semibold text-text-primary">Custom Workflow Requirements:</p>
-                            <p>Your workflow <strong>must</strong> follow this structure:</p>
-                            <ul className="list-disc list-inside space-y-1 pl-2">
-                              <li>
-                                <strong>Input:</strong> Accept the full-resolution source image and mask via the nodes
-                                specified below.
-                              </li>
-                              <li>
-                                <strong>Processing:</strong> Internally scale down the masked area to a model-friendly
-                                resolution (e.g., 1024px) for inpainting.
-                              </li>
-                              <li>
-                                <strong>Output:</strong> The final generated patch must be upscaled back to the{' '}
-                                <strong>exact original image resolution</strong> before being sent to the Final Output
-                                Node.
-                              </li>
-                              <li>
-                                This is critical because RapidRaw composites the output
-                                directly onto the original image, and a resolution mismatch will fail.
-                              </li>
-                            </ul>
-                          </>
-                        ) : (
-                          <>
-                            <p className="font-semibold text-text-primary">Default Workflow Requirements:</p>
-                            <p>
-                              The built-in workflow handles resolution scaling automatically and requires the following
-                              custom nodes. Please install them using the ComfyUI Manager.
-                            </p>
-                            <ul className="list-disc list-inside space-y-1 pl-2">
-                              <li>
-                                <ExternalLink href="https://github.com/BadCafeCode/masquerade-nodes-comfyui">
-                                  Masquerade Nodes
-                                </ExternalLink>
-                              </li>
-                              <li>
-                                <ExternalLink href="https://github.com/kijai/ComfyUI-KJNodes">KJNodes</ExternalLink>
-                              </li>
-                            </ul>
-                          </>
-                        )}
-                      </div>
+                      {!comfyConfig.workflowPath && (
+                        <div className="p-3 bg-bg-primary rounded-lg border border-border-color text-xs text-text-secondary space-y-2">
+                          <p className="font-semibold text-text-primary">Default Workflow Requirements:</p>
+                          <p>
+                            The built-in workflow handles resolution scaling automatically and requires the following
+                            custom nodes. Please install them using the ComfyUI Manager.
+                          </p>
+                          <ul className="list-disc list-inside space-y-1 pl-2">
+                            <li>
+                              <ExternalLink href="https://github.com/BadCafeCode/masquerade-nodes-comfyui">
+                                Masquerade Nodes
+                              </ExternalLink>
+                            </li>
+                            <li>
+                              <ExternalLink href="https://github.com/kijai/ComfyUI-KJNodes">KJNodes</ExternalLink>
+                            </li>
+                          </ul>
+                        </div>
+                      )}
 
                       <h4 className="text-base font-semibold text-accent-secondary pt-2">Node Configuration</h4>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-4">
@@ -595,6 +570,15 @@ export default function SettingsPanel({
                             type="number"
                             value={comfyConfig.samplerSteps || 10}
                             onChange={(e) => handleConfigChange('samplerSteps', parseInt(e.target.value, 10) || 0)}
+                          />
+                        </SettingItem>
+                        <SettingItem label="Inpaint Resolution">
+                          <Input
+                            type="number"
+                            value={comfyConfig.inpaintResolution || 1536}
+                            onChange={(e) =>
+                              handleConfigChange('inpaintResolution', parseInt(e.target.value, 10) || 0)
+                            }
                           />
                         </SettingItem>
                       </div>
