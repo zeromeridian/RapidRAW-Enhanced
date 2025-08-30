@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use futures_util::StreamExt;
-use image::{DynamicImage, ImageFormat};
+use image::{codecs::jpeg::JpegEncoder, DynamicImage};
 use reqwest::multipart;
 use serde_json::{json, Value};
 use std::io::Cursor;
@@ -12,14 +12,78 @@ use uuid::Uuid;
 use crate::file_management::ComfyUIWorkflowConfig;
 
 const WORKFLOWS_DIR: &str = "./workflows";
+const SERVER_MAX_UPLOAD_SIZE: usize = 104_857_600; // 100 MiB ComfyUI limit
+const TARGET_MAX_SIZE: usize = 4 * 1024 * 1024; // 4 MB
 
-async fn upload_image(address: &str, image: DynamicImage, form_name: &str) -> Result<String> {
-    let mut image_bytes = Cursor::new(Vec::new());
-    image.write_to(&mut image_bytes, ImageFormat::Png)?;
-    
-    let part = multipart::Part::bytes(image_bytes.into_inner())
-        .file_name(format!("{}.png", Uuid::new_v4()))
-        .mime_str("image/png")?;
+fn encode_jpeg(image: &DynamicImage, quality: u8) -> Result<Vec<u8>> {
+    let mut buffer = Cursor::new(Vec::new());
+    image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buffer, quality))?;
+    Ok(buffer.into_inner())
+}
+
+async fn upload_image(address: &str, image: &DynamicImage, form_name: &str) -> Result<String> {
+    println!("Preparing image for upload. Target size: < {} MB.", TARGET_MAX_SIZE / 1024 / 1024);
+
+    let final_image_bytes: Vec<u8>;
+    let initial_bytes = encode_jpeg(image, 92)?;
+
+    if initial_bytes.len() < TARGET_MAX_SIZE {
+        println!("Fast path: Image is {} bytes at quality 92. Uploading.", initial_bytes.len());
+        final_image_bytes = initial_bytes;
+    } else {
+        println!("Image too large at high quality ({} bytes). Optimizing with preview...", initial_bytes.len());
+
+        let preview_dim = 1920;
+        let preview_image = image.thumbnail(preview_dim, preview_dim);
+
+        let full_pixels = image.width() as u64 * image.height() as u64;
+        let preview_pixels = preview_image.width() as u64 * preview_image.height() as u64;
+        let scaling_factor = if full_pixels > 0 { preview_pixels as f64 / full_pixels as f64 } else { 1.0 };
+        let preview_target_max_size = (TARGET_MAX_SIZE as f64 * scaling_factor) as usize;
+
+        println!("  - Created {}x{} preview. Scaled target size: {} bytes.", preview_image.width(), preview_image.height(), preview_target_max_size);
+
+        let mut low_quality = 50u8;
+        let mut high_quality = 91u8;
+        let mut quality_from_preview = 85u8;
+
+        for _ in 0..7 {
+            let mid_quality = low_quality.saturating_add(high_quality) / 2;
+            if mid_quality <= low_quality { break; }
+
+            let preview_bytes = encode_jpeg(&preview_image, mid_quality)?;
+            if preview_bytes.len() > preview_target_max_size {
+                high_quality = mid_quality.saturating_sub(1);
+            } else {
+                quality_from_preview = mid_quality;
+                low_quality = mid_quality.saturating_add(1);
+            }
+        }
+        println!("  - Preview search determined optimal quality is around: {}", quality_from_preview);
+
+        let mut optimized_bytes = encode_jpeg(image, quality_from_preview)?;
+        println!("  - Encoded full-res image at quality {}: {} bytes.", quality_from_preview, optimized_bytes.len());
+
+        if optimized_bytes.len() > TARGET_MAX_SIZE {
+            let reduced_quality = quality_from_preview.saturating_sub(5).max(50);
+            println!("  - Still too large. Safety check: reducing quality to {}...", reduced_quality);
+            optimized_bytes = encode_jpeg(image, reduced_quality)?;
+            println!("  - Final size after safety check: {} bytes.", optimized_bytes.len());
+        }
+
+        if optimized_bytes.len() > SERVER_MAX_UPLOAD_SIZE {
+            return Err(anyhow!(
+                "Failed to compress image below server limit of {} bytes. Final size: {} bytes.",
+                SERVER_MAX_UPLOAD_SIZE, optimized_bytes.len()
+            ));
+        }
+
+        final_image_bytes = optimized_bytes;
+    }
+
+    let part = multipart::Part::bytes(final_image_bytes)
+        .file_name(format!("{}.jpeg", Uuid::new_v4()))
+        .mime_str("image/jpeg")?;
 
     let form = multipart::Form::new()
         .part(form_name.to_string(), part)
@@ -158,14 +222,14 @@ pub async fn execute_workflow(
         }
     }
 
-    let source_filename = upload_image(address, source_image, "image").await?;
+    let source_filename = upload_image(address, &source_image, "image").await?;
     if let Some(node) = workflow.get_mut(&config.source_image_node_id) {
         node["inputs"]["image"] = json!(source_filename);
     } else {
         return Err(anyhow!("Source image node ID '{}' not found in workflow.", config.source_image_node_id));
     }
 
-    if let Some(mask) = mask_image {
+    if let Some(ref mask) = mask_image {
         let mask_filename = upload_image(address, mask, "image").await?;
         if let Some(node) = workflow.get_mut(&config.mask_image_node_id) {
             node["inputs"]["image"] = json!(mask_filename);

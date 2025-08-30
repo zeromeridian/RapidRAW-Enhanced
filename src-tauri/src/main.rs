@@ -1241,12 +1241,12 @@ async fn invoke_generative_replace_with_mask_def(
         let dilation_amount_u8 = std::cmp::min(dilation_amount_u32, 255) as u8;
         let enlarged_mask_bitmap = dilate(&mask_bitmap, DilationNorm::LInf, dilation_amount_u8);
 
-        let mut rgba_mask = RgbaImage::new(img_w, img_h);
+        let mut rgb_mask = RgbImage::new(img_w, img_h);
         for (x, y, luma_pixel) in enlarged_mask_bitmap.enumerate_pixels() {
             let intensity = luma_pixel[0];
-            rgba_mask.put_pixel(x, y, Rgba([255, 255, 255, intensity]));
+            rgb_mask.put_pixel(x, y, Rgb([intensity, intensity, intensity]));
         }
-        let mask_image = DynamicImage::ImageRgba8(rgba_mask);
+        let mask_image = DynamicImage::ImageRgb8(rgb_mask);
 
         let result_png_bytes = comfyui_connector::execute_workflow(
             &comfy_address,
