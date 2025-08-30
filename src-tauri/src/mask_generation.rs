@@ -5,7 +5,6 @@ use std::f32::consts::PI;
 use base64::{Engine as _, engine::general_purpose};
 use imageproc::morphology::{dilate, erode};
 use imageproc::distance_transform::Norm as DilationNorm;
-// --- UPDATED IMPORT ---
 use crate::ai_processing::{AiSubjectMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -144,32 +143,40 @@ fn apply_grow_and_feather(
     mask: &mut GrayImage,
     grow: f32,
     feather: f32,
+    width: u32,
+    height: u32,
 ) {
-    const GROW_SENSITIVITY_FACTOR: f32 = 0.2;
-    let scaled_grow = grow * GROW_SENSITIVITY_FACTOR;
+    let base_dimension = width.min(height) as f32;
 
-    if scaled_grow.abs() > 0.1 {
-        let mut binary_mask = mask.clone();
-        for p in binary_mask.pixels_mut() {
-            if p[0] > 128 {
-                p[0] = 255;
-            } else {
-                p[0] = 0;
+    if grow.abs() > 0.01 {
+        const MAX_GROW_PERCENTAGE: f32 = 0.01;
+        let grow_pixels = (grow / 100.0) * base_dimension * MAX_GROW_PERCENTAGE;
+
+        if grow_pixels.abs() >= 1.0 {
+            let mut binary_mask = mask.clone();
+            for p in binary_mask.pixels_mut() {
+                if p[0] > 128 {
+                    p[0] = 255;
+                } else {
+                    p[0] = 0;
+                }
             }
-        }
 
-        let amount = scaled_grow.abs().round() as u8;
-        if amount > 0 {
-            if scaled_grow > 0.0 {
-                *mask = dilate(&binary_mask, DilationNorm::LInf, amount);
-            } else {
-                *mask = erode(&binary_mask, DilationNorm::LInf, amount);
+            let amount = grow_pixels.abs().round() as u8;
+            if amount > 0 {
+                if grow_pixels > 0.0 {
+                    *mask = dilate(&binary_mask, DilationNorm::LInf, amount);
+                } else {
+                    *mask = erode(&binary_mask, DilationNorm::LInf, amount);
+                }
             }
         }
     }
 
     if feather > 0.0 {
-        let sigma = feather.max(0.0) * 0.1;
+        const MAX_FEATHER_SIGMA_PERCENTAGE: f32 = 0.005;
+        let sigma = (feather / 100.0) * base_dimension * MAX_FEATHER_SIGMA_PERCENTAGE;
+
         if sigma > 0.01 {
             *mask = imageproc::filter::gaussian_blur_f32(mask, sigma);
         }
@@ -499,7 +506,7 @@ fn generate_ai_sky_bitmap(
         width, height, scale, crop_offset
     )?;
 
-    apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather);
+    apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather, width, height);
 
     Some(mask)
 }
@@ -524,7 +531,7 @@ fn generate_ai_foreground_bitmap(
         width, height, scale, crop_offset
     )?;
 
-    apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather);
+    apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather, width, height);
 
     Some(mask)
 }
@@ -549,7 +556,7 @@ fn generate_ai_subject_bitmap(
         width, height, scale, crop_offset
     )?;
 
-    apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather);
+    apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather, width, height);
 
     Some(mask)
 }
