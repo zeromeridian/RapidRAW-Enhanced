@@ -1,7 +1,4 @@
-use base64::{Engine as _, engine::general_purpose};
 use image::{GrayImage, Luma};
-use imageproc::distance_transform::Norm as DilationNorm;
-use imageproc::morphology::{dilate, erode};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::f32::consts::PI;
