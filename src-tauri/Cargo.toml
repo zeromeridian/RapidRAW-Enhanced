@@ -16,51 +16,51 @@ name = "rapidraw_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
-tauri = { version = "2.0", features = ["macos-private-api", "rustls-tls"] }
-tauri-plugin-dialog = "2.0"
+tauri = { version = "2.8", features = [ "macos-private-api", "rustls-tls" ] }
+tauri-plugin-dialog = "2.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-image = "0.25.0"
+image = "0.25.6"
 base64 = "0.22"
-tauri-plugin-fs = "2.3.0"
-rayon = "1.10.0"
-blake3 = "1.5.1"
+tauri-plugin-fs = "2.4.2"
+rayon = "1.11.0"
+blake3 = "1.8.2"
 palette = "0.7"
-jpeg-decoder = "0.3.0"
-wgpu = "0.19"
-pollster = "0.3"
-bytemuck = { version = "1.14", features = ["derive"] }
+jpeg-decoder = "0.3.2"
+wgpu = "26.0"
+pollster = "0.4"
+bytemuck = { version = "1.23", features = ["derive"] }
 window-vibrancy = "0.6.0"
-anyhow = "1.0.86"
+anyhow = "1.0.99"
 kamadak-exif = "0.6.1"
 rawler = { path = "rawler" }
 serde_bytes = "0.11.17"
 tokio = { version = "1", features = ["full"] }
-uuid = { version = "1.8", features = ["v4", "serde"] }
+uuid = { version = "1.18", features = ["v4", "serde"] }
 walkdir = "2.5.0"
-trash = "5.2.2"
+trash = "5.2.3"
 imageproc = "0.25.0"
 ort = { version = "1.16.3", features = ["load-dynamic"] }
-ndarray = "0.15.6"
+ndarray = "0.16.1"
 reqwest = { version = "0.12", features = ["json", "multipart"] }
-tokio-tungstenite = { version = "0.23", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.27", features = ["native-tls"] }
 futures-util = "0.3"
 tauri-plugin-process = "2"
-tauri-plugin-os = "2.3.0"
+tauri-plugin-os = "2.3.1"
 raw-window-handle = "0.6.2"
 os_info = "3"
 little_exif = "0.6"
 chrono = "0.4"
-tokenizers = "0.19.1"
-once_cell = "1.19"
+tokenizers = "0.22.0"
+once_cell = "1.21"
 futures = "0.3.31"
 sha2 = "0.10"
 nalgebra = "0.34.0"
-rand = "0.8"
+rand = "0.9"
 tauri-plugin-shell = "2.3.1"
 
 [build-dependencies]
-tauri-build = { version = "2.0", features = [] }
+tauri-build = { version = "2.4", features = [] }
 sha2 = "0.10"
 reqwest = { version = "0.12", features = ["blocking"] }
 hex = "0.4"
