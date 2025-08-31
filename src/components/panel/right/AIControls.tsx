@@ -57,7 +57,7 @@ function formatMaskTypeName(type: Mask) {
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
-const SUB_MASK_CONFIG: any = {
+export const SUB_MASK_CONFIG: any = {
   [Mask.Radial]: {
     parameters: [{ key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, multiplier: 100, defaultValue: 50 }],
   },
@@ -65,14 +65,14 @@ const SUB_MASK_CONFIG: any = {
   [Mask.Linear]: { parameters: [] },
   [Mask.AiSubject]: {
     parameters: [
-      { key: 'grow', label: 'Grow', min: -100, max: 100, step: 1, defaultValue: 0 },
-      { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 0 },
+      { key: 'grow', label: 'Grow', min: -100, max: 100, step: 1, defaultValue: 50 },
+      { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 25 },
     ],
   },
   [Mask.AiForeground]: {
     parameters: [
-      { key: 'grow', label: 'Grow', min: -100, max: 100, step: 1, defaultValue: 0 },
-      { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 0 },
+      { key: 'grow', label: 'Grow', min: -100, max: 100, step: 1, defaultValue: 50 },
+      { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 25 },
     ],
   },
   [Mask.AiSky]: {
@@ -158,17 +158,17 @@ export default function AIControls({
   const analyzingTimeoutRef = useRef<number>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<string>(editingPatch?.prompt || '');
-  const [useFastInpaint, setUseFastInpaint] = useState(true);
+  const isQuickErasePatch = editingPatch?.subMasks?.some((sm: SubMask) => sm.type === Mask.QuickEraser);
+  const [useFastInpaint, setUseFastInpaint] = useState(isQuickErasePatch || !isComfyUiConnected);
 
   useEffect(() => {
     setPrompt(editingPatch?.prompt || '');
   }, [editingPatch?.id, editingPatch?.prompt]);
 
   useEffect(() => {
-    if (!isComfyUiConnected) {
-      setUseFastInpaint(true);
-    }
-  }, [isComfyUiConnected]);
+    const isQuickErase = editingPatch?.subMasks?.some((sm: SubMask) => sm.type === Mask.QuickEraser);
+    setUseFastInpaint(isQuickErase || !isComfyUiConnected);
+  }, [isComfyUiConnected, editingPatch]);
 
   useEffect(() => {
     if (isGeneratingAiMask) {
@@ -186,6 +186,16 @@ export default function AIControls({
 
   const handleAddSubMask = (containerId: string, type: Mask) => {
     const subMask = createSubMask(type, selectedImage);
+
+    const config = SUB_MASK_CONFIG[type];
+    if (config && config.parameters) {
+      config.parameters.forEach((param: any) => {
+        if (param.defaultValue !== undefined) {
+          subMask.parameters[param.key] = param.defaultValue / (param.multiplier || 1);
+        }
+      });
+    }
+
     setAdjustments((prev: Partial<Adjustments>) => ({
       ...prev,
       aiPatches: prev.aiPatches?.map((p: AiPatch) =>
@@ -356,18 +366,22 @@ export default function AIControls({
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-text-primary">Generative Replace</h3>
           <p className="text-xs text-text-secondary -mt-2">
-            {useFastInpaint
+            {isQuickErasePatch
+              ? 'Fill selection to remove the object.'
+              : useFastInpaint
               ? 'Fill selection based on surrounding pixels.'
               : 'Describe what you want to generate in the selected area.'}
           </p>
           <div className="pt-1">
             <Switch
               checked={useFastInpaint}
-              disabled={!isComfyUiConnected}
+              disabled={isQuickErasePatch || !isComfyUiConnected}
               label="Use fast inpainting"
               onChange={setUseFastInpaint}
               tooltip={
-                !isComfyUiConnected
+                isQuickErasePatch
+                  ? 'Quick Erase always uses fast inpainting.'
+                  : !isComfyUiConnected
                   ? 'ComfyUI not connected, fast inpainting is required.'
                   : 'Fast inpainting is quicker but not generative. Uncheck to use ComfyUI with a text prompt.'
               }
@@ -441,20 +455,26 @@ export default function AIControls({
                     )}
                   </>
                 )}
-                {subMaskConfig.parameters?.map((param: any) => (
-                  <Slider
-                    defaultValue={param.defaultValue}
-                    key={param.key}
-                    label={param.label}
-                    max={param.max}
-                    min={param.min}
-                    onChange={(e: any) =>
-                      handleSubMaskParameterChange(param.key, parseFloat(e.target.value) / (param.multiplier || 1))
-                    }
-                    step={param.step}
-                    value={(activeSubMask.parameters[param.key] || 0) * (param.multiplier || 1)}
-                  />
-                ))}
+                {subMaskConfig.parameters?.map((param: any) => {
+                  const storedValue = activeSubMask.parameters[param.key];
+                  const multiplier = param.multiplier || 1;
+                  const sliderValue = storedValue === undefined ? param.defaultValue : storedValue * multiplier;
+
+                  return (
+                    <Slider
+                      defaultValue={param.defaultValue}
+                      key={param.key}
+                      label={param.label}
+                      max={param.max}
+                      min={param.min}
+                      onChange={(e: any) =>
+                        handleSubMaskParameterChange(param.key, parseFloat(e.target.value) / multiplier)
+                      }
+                      step={param.step}
+                      value={sliderValue}
+                    />
+                  );
+                })}
                 {subMaskConfig.showBrushTools && brushSettings && setBrushSettings && (
                   <BrushTools settings={brushSettings} onSettingsChange={setBrushSettings} />
                 )}

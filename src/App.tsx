@@ -525,6 +525,8 @@ function App() {
               : p,
           ),
         }));
+        setActiveAiPatchContainerId(null);
+        setActiveAiSubMaskId(null);
       } catch (err) {
         console.error('Generative replace failed:', err);
         setError(`AI Replace Failed: ${err}`);
@@ -536,7 +538,14 @@ function App() {
         setIsGeneratingAi(false);
       }
     },
-    [selectedImage?.path, isGeneratingAi, adjustments, setAdjustments],
+    [
+      selectedImage?.path,
+      isGeneratingAi,
+      adjustments,
+      setAdjustments,
+      setActiveAiPatchContainerId,
+      setActiveAiSubMaskId,
+    ],
   );
 
   const handleQuickErase = useCallback(
@@ -694,7 +703,12 @@ function App() {
         startPoint: [startPoint.x, startPoint.y],
       });
 
-      updateSubMask(subMaskId, { parameters: newParameters });
+      const subMask = adjustments.aiPatches
+        ?.flatMap((p: AiPatch) => p.subMasks)
+        .find((sm: SubMask) => sm.id === subMaskId);
+
+      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
+      updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
       console.error('Failed to generate AI subject mask:', error);
       setError(`AI Mask Failed: ${error}`);
@@ -717,7 +731,12 @@ function App() {
         rotation: adjustments.rotation,
       });
 
-      updateSubMask(subMaskId, { parameters: newParameters });
+      const subMask = adjustments.aiPatches
+        ?.flatMap((p: AiPatch) => p.subMasks)
+        .find((sm: SubMask) => sm.id === subMaskId);
+
+      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
+      updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
       console.error('Failed to generate AI foreground mask:', error);
       setError(`AI Mask Failed: ${error}`);
@@ -740,7 +759,12 @@ function App() {
         rotation: adjustments.rotation,
       });
 
-      updateSubMask(subMaskId, { parameters: newParameters });
+      const subMask = adjustments.aiPatches
+        ?.flatMap((p: AiPatch) => p.subMasks)
+        .find((sm: SubMask) => sm.id === subMaskId);
+
+      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
+      updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
       console.error('Failed to generate AI sky mask:', error);
       setError(`AI Mask Failed: ${error}`);
@@ -1110,6 +1134,7 @@ function App() {
 
   const handleSelectSubfolder = useCallback(
     async (path: string | null, isNewRoot = false) => {
+      await invoke('cancel_thumbnail_generation');
       setIsViewLoading(true);
       setSearchQuery('');
       try {

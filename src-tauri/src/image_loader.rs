@@ -1,17 +1,27 @@
-use anyhow::{Context, Result};
-use base64::{Engine as _, engine::general_purpose};
-use image::{DynamicImage, GenericImageView, ImageReader, Rgba, RgbaImage, imageops};
+use anyhow::{Result, Context};
+use base64::{engine::general_purpose, Engine as _};
+use image::{imageops, DynamicImage, GenericImageView, ImageReader};
 use rawler::Orientation;
 use rayon::prelude::*;
-use serde_json::Value;
+use serde::Deserialize;
+use serde_json::{Value, from_value};
 use std::fs;
-use std::io::Cursor;
-
-use crate::image_processing::apply_orientation;
+use crate::mask_generation::{generate_mask_bitmap, MaskDefinition, SubMask};
 use exif::{Reader as ExifReader, Tag};
-
+use crate::image_processing::apply_orientation;
 use crate::formats::is_raw_file;
 use crate::raw_processing::develop_raw_image;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PatchMaskInfo {
+    id: String,
+    name: String,
+    #[serde(default)]
+    invert: bool,
+    #[serde(default)]
+    sub_masks: Vec<SubMask>,
+}
 
 pub fn load_and_composite(
     path: &str,
@@ -77,14 +87,14 @@ pub fn composite_patches_on_image(
     let visible_patches: Vec<&Value> = patches_arr
         .par_iter()
         .filter(|patch_obj| {
-            let is_visible = patch_obj
-                .get("visible")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(true);
-
-            let has_data = patch_obj.get("patchData").is_some();
-
-            is_visible && has_data
+            let is_visible = patch_obj.get("visible").and_then(|v| v.as_bool()).unwrap_or(true);
+            if !is_visible {
+                return false;
+            }
+            patch_obj.get("patchData")
+                .and_then(|data| data.get("color"))
+                .and_then(|color| color.as_str())
+                .map_or(false, |s| !s.is_empty())
         })
         .collect();
 
@@ -93,60 +103,58 @@ pub fn composite_patches_on_image(
     }
 
     let (base_w, base_h) = base_image.dimensions();
+    let mut composited_rgba = base_image.to_rgba8();
 
-    let patch_layers: Result<Vec<RgbaImage>> = visible_patches
-        .par_iter()
-        .filter_map(|patch_obj| {
-            let patch_data = patch_obj.get("patchData")?;
+    for patch_obj in visible_patches {
+        let patch_info: PatchMaskInfo = from_value(patch_obj.clone())
+            .context("Failed to deserialize patch info for mask generation")?;
+        
+        let mask_def = MaskDefinition {
+            id: patch_info.id,
+            name: patch_info.name,
+            visible: true,
+            invert: patch_info.invert,
+            opacity: 100.0,
+            adjustments: Value::Null,
+            sub_masks: patch_info.sub_masks,
+        };
 
-            let color_b64 = patch_data.get("color").and_then(|v| v.as_str())?;
-            let mask_b64 = patch_data.get("mask").and_then(|v| v.as_str())?;
+        let mask_bitmap = generate_mask_bitmap(&mask_def, base_w, base_h, 1.0, (0.0, 0.0))
+            .context("Failed to generate mask from sub_masks for compositing")?;
 
-            let result: Result<RgbaImage> = (|| {
-                let color_bytes = general_purpose::STANDARD.decode(color_b64)?;
-                let mut color_image = image::load_from_memory(&color_bytes)?.to_rgb8();
+        let patch_data = patch_obj.get("patchData").context("Missing patchData")?;
+        let color_b64 = patch_data.get("color").and_then(|v| v.as_str()).context("Missing color data")?;
+        let color_bytes = general_purpose::STANDARD.decode(color_b64)?;
+        let mut color_image = image::load_from_memory(&color_bytes)?.to_rgb8();
 
-                let mask_bytes = general_purpose::STANDARD.decode(mask_b64)?;
-                let mut mask_image = image::load_from_memory(&mask_bytes)?.to_luma8();
+        let (patch_w, patch_h) = color_image.dimensions();
+        if base_w != patch_w || base_h != patch_h {
+            color_image = imageops::resize(&color_image, base_w, base_h, imageops::FilterType::Lanczos3);
+        }
 
-                let (patch_w, patch_h) = color_image.dimensions();
+        composited_rgba
+            .par_chunks_mut(base_w as usize * 4)
+            .enumerate()
+            .for_each(|(y, row)| {
+                for x in 0..base_w as usize {
+                    let mask_value = mask_bitmap.get_pixel(x as u32, y as u32)[0];
 
-                if base_w != patch_w || base_h != patch_h {
-                    println!("Patch resolution ({}x{}) differs from base image ({}x{}). Scaling up patch.", patch_w, patch_h, base_w, base_h);
-                    color_image = imageops::resize(&color_image, base_w, base_h, imageops::FilterType::Lanczos3);
-                    mask_image = imageops::resize(&mask_image, base_w, base_h, imageops::FilterType::Triangle);
-                }
+                    if mask_value > 0 {
+                        let patch_pixel = color_image.get_pixel(x as u32, y as u32);
+                        
+                        let alpha = mask_value as f32 / 255.0;
+                        let one_minus_alpha = 1.0 - alpha;
 
-                let (width, height) = color_image.dimensions();
-                let mut patch_rgba = RgbaImage::new(width, height);
+                        let base_r = row[x * 4 + 0];
+                        let base_g = row[x * 4 + 1];
+                        let base_b = row[x * 4 + 2];
 
-                for y in 0..height {
-                    for x in 0..width {
-                        let color_pixel = color_image.get_pixel(x, y);
-                        let mask_pixel = mask_image.get_pixel(x, y);
-                        patch_rgba.put_pixel(
-                            x,
-                            y,
-                            Rgba([
-                                color_pixel[0],
-                                color_pixel[1],
-                                color_pixel[2],
-                                mask_pixel[0],
-                            ]),
-                        );
+                        row[x * 4 + 0] = (patch_pixel[0] as f32 * alpha + base_r as f32 * one_minus_alpha).round() as u8;
+                        row[x * 4 + 1] = (patch_pixel[1] as f32 * alpha + base_g as f32 * one_minus_alpha).round() as u8;
+                        row[x * 4 + 2] = (patch_pixel[2] as f32 * alpha + base_b as f32 * one_minus_alpha).round() as u8;
                     }
                 }
-                Ok(patch_rgba)
-            })();
-
-            Some(result)
-        })
-        .collect();
-
-    let patch_layers = patch_layers?;
-    let mut composited_rgba = base_image.to_rgba8();
-    for patch_layer in &patch_layers {
-        imageops::overlay(&mut composited_rgba, patch_layer, 0, 0);
+            });
     }
 
     Ok(DynamicImage::ImageRgba8(composited_rgba))
