@@ -83,8 +83,14 @@ pub fn composite_patches_on_image(
     let visible_patches: Vec<&Value> = patches_arr
         .par_iter()
         .filter(|patch_obj| {
-            patch_obj.get("visible").and_then(|v| v.as_bool()).unwrap_or(true)
-                && patch_obj.get("patchData").is_some()
+            let is_visible = patch_obj.get("visible").and_then(|v| v.as_bool()).unwrap_or(true);
+            if !is_visible {
+                return false;
+            }
+            patch_obj.get("patchData")
+                .and_then(|data| data.get("color"))
+                .and_then(|color| color.as_str())
+                .map_or(false, |s| !s.is_empty())
         })
         .collect();
 
