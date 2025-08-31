@@ -1,11 +1,13 @@
+use crate::ai_processing::{
+    AiForegroundMaskParameters, AiSkyMaskParameters, AiSubjectMaskParameters,
+};
+use base64::{Engine as _, engine::general_purpose};
 use image::{GrayImage, Luma};
+use imageproc::distance_transform::Norm as DilationNorm;
+use imageproc::morphology::{dilate, erode};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::f32::consts::PI;
-use base64::{Engine as _, engine::general_purpose};
-use imageproc::morphology::{dilate, erode};
-use imageproc::distance_transform::Norm as DilationNorm;
-use crate::ai_processing::{AiSubjectMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -138,13 +140,7 @@ struct BrushMaskParameters {
     lines: Vec<BrushLine>,
 }
 
-fn apply_grow_and_feather(
-    mask: &mut GrayImage,
-    grow: f32,
-    feather: f32,
-    width: u32,
-    height: u32,
-) {
+fn apply_grow_and_feather(mask: &mut GrayImage, grow: f32, feather: f32, width: u32, height: u32) {
     let base_dimension = width.min(height) as f32;
 
     if grow.abs() > 0.01 {
@@ -557,7 +553,13 @@ fn generate_ai_sky_bitmap(
         crop_offset,
     )?;
 
-    apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather, width, height);
+    apply_grow_and_feather(
+        &mut mask,
+        grow_feather.grow,
+        grow_feather.feather,
+        width,
+        height,
+    );
 
     Some(mask)
 }
@@ -586,7 +588,13 @@ fn generate_ai_foreground_bitmap(
         crop_offset,
     )?;
 
-    apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather, width, height);
+    apply_grow_and_feather(
+        &mut mask,
+        grow_feather.grow,
+        grow_feather.feather,
+        width,
+        height,
+    );
 
     Some(mask)
 }
@@ -615,7 +623,13 @@ fn generate_ai_subject_bitmap(
         crop_offset,
     )?;
 
-    apply_grow_and_feather(&mut mask, grow_feather.grow, grow_feather.feather, width, height);
+    apply_grow_and_feather(
+        &mut mask,
+        grow_feather.grow,
+        grow_feather.feather,
+        width,
+        height,
+    );
 
     Some(mask)
 }

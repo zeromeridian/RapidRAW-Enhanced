@@ -1,6 +1,6 @@
-use anyhow::{Result, Context};
-use base64::{engine::general_purpose, Engine as _};
-use image::{imageops, DynamicImage, GenericImageView, ImageReader, RgbaImage, Rgba};
+use anyhow::{Context, Result};
+use base64::{Engine as _, engine::general_purpose};
+use image::{DynamicImage, GenericImageView, ImageReader, Rgba, RgbaImage, imageops};
 use rawler::Orientation;
 use rayon::prelude::*;
 use serde_json::Value;

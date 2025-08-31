@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 use futures_util::StreamExt;
-use image::{codecs::jpeg::JpegEncoder, DynamicImage, GenericImageView, ImageFormat};
+use image::{DynamicImage, GenericImageView, ImageFormat, codecs::jpeg::JpegEncoder};
 use reqwest::multipart;
 use serde_json::{Value, json};
 use std::fs;
@@ -17,11 +17,18 @@ const TARGET_MAX_SIZE: usize = 4 * 1024 * 1024; // 4 MB
 
 fn encode_jpeg(image: &DynamicImage, quality: u8) -> Result<Vec<u8>> {
     let mut buffer = Cursor::new(Vec::new());
-    image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buffer, quality))?;
+    image
+        .to_rgb8()
+        .write_with_encoder(JpegEncoder::new_with_quality(&mut buffer, quality))?;
     Ok(buffer.into_inner())
 }
 
-async fn upload_image(address: &str, image: &DynamicImage, form_name: &str, is_mask: bool) -> Result<String> {
+async fn upload_image(
+    address: &str,
+    image: &DynamicImage,
+    form_name: &str,
+    is_mask: bool,
+) -> Result<String> {
     let (final_image_bytes, file_name, mime_type) = if is_mask {
         println!("Uploading image as a PNG mask.");
         let mut buffer = Cursor::new(Vec::new());
@@ -32,27 +39,47 @@ async fn upload_image(address: &str, image: &DynamicImage, form_name: &str, is_m
             "image/png",
         )
     } else {
-        println!("Preparing image for upload. Target size: < {} MB.", TARGET_MAX_SIZE / 1024 / 1024);
+        println!(
+            "Preparing image for upload. Target size: < {} MB.",
+            TARGET_MAX_SIZE / 1024 / 1024
+        );
         let compressed_bytes = {
             let initial_bytes = encode_jpeg(image, 92)?;
             if initial_bytes.len() < TARGET_MAX_SIZE {
-                println!("Fast path: Image is {} bytes at quality 92. Uploading.", initial_bytes.len());
+                println!(
+                    "Fast path: Image is {} bytes at quality 92. Uploading.",
+                    initial_bytes.len()
+                );
                 initial_bytes
             } else {
-                println!("Image too large at high quality ({} bytes). Optimizing with preview...", initial_bytes.len());
+                println!(
+                    "Image too large at high quality ({} bytes). Optimizing with preview...",
+                    initial_bytes.len()
+                );
                 let preview_dim = 1920;
                 let preview_image = image.thumbnail(preview_dim, preview_dim);
                 let full_pixels = image.width() as u64 * image.height() as u64;
                 let preview_pixels = preview_image.width() as u64 * preview_image.height() as u64;
-                let scaling_factor = if full_pixels > 0 { preview_pixels as f64 / full_pixels as f64 } else { 1.0 };
+                let scaling_factor = if full_pixels > 0 {
+                    preview_pixels as f64 / full_pixels as f64
+                } else {
+                    1.0
+                };
                 let preview_target_max_size = (TARGET_MAX_SIZE as f64 * scaling_factor) as usize;
-                println!("  - Created {}x{} preview. Scaled target size: {} bytes.", preview_image.width(), preview_image.height(), preview_target_max_size);
+                println!(
+                    "  - Created {}x{} preview. Scaled target size: {} bytes.",
+                    preview_image.width(),
+                    preview_image.height(),
+                    preview_target_max_size
+                );
                 let mut low_quality = 50u8;
                 let mut high_quality = 91u8;
                 let mut quality_from_preview = 85u8;
                 for _ in 0..7 {
                     let mid_quality = low_quality.saturating_add(high_quality) / 2;
-                    if mid_quality <= low_quality { break; }
+                    if mid_quality <= low_quality {
+                        break;
+                    }
                     let preview_bytes = encode_jpeg(&preview_image, mid_quality)?;
                     if preview_bytes.len() > preview_target_max_size {
                         high_quality = mid_quality.saturating_sub(1);
@@ -61,17 +88,34 @@ async fn upload_image(address: &str, image: &DynamicImage, form_name: &str, is_m
                         low_quality = mid_quality.saturating_add(1);
                     }
                 }
-                println!("  - Preview search determined optimal quality is around: {}", quality_from_preview);
+                println!(
+                    "  - Preview search determined optimal quality is around: {}",
+                    quality_from_preview
+                );
                 let mut optimized_bytes = encode_jpeg(image, quality_from_preview)?;
-                println!("  - Encoded full-res image at quality {}: {} bytes.", quality_from_preview, optimized_bytes.len());
+                println!(
+                    "  - Encoded full-res image at quality {}: {} bytes.",
+                    quality_from_preview,
+                    optimized_bytes.len()
+                );
                 if optimized_bytes.len() > TARGET_MAX_SIZE {
                     let reduced_quality = quality_from_preview.saturating_sub(5).max(50);
-                    println!("  - Still too large. Safety check: reducing quality to {}...", reduced_quality);
+                    println!(
+                        "  - Still too large. Safety check: reducing quality to {}...",
+                        reduced_quality
+                    );
                     optimized_bytes = encode_jpeg(image, reduced_quality)?;
-                    println!("  - Final size after safety check: {} bytes.", optimized_bytes.len());
+                    println!(
+                        "  - Final size after safety check: {} bytes.",
+                        optimized_bytes.len()
+                    );
                 }
                 if optimized_bytes.len() > SERVER_MAX_UPLOAD_SIZE {
-                    return Err(anyhow!("Failed to compress image below server limit of {} bytes. Final size: {} bytes.", SERVER_MAX_UPLOAD_SIZE, optimized_bytes.len()));
+                    return Err(anyhow!(
+                        "Failed to compress image below server limit of {} bytes. Final size: {} bytes.",
+                        SERVER_MAX_UPLOAD_SIZE,
+                        optimized_bytes.len()
+                    ));
                 }
                 optimized_bytes
             }
@@ -243,7 +287,10 @@ pub async fn execute_workflow(
 
     let (w, h) = source_image.dimensions();
     let processed_source_image = if w > max_dimension || h > max_dimension {
-        println!("Source image is {}x{}, downscaling to {}px long edge for ComfyUI.", w, h, max_dimension);
+        println!(
+            "Source image is {}x{}, downscaling to {}px long edge for ComfyUI.",
+            w, h, max_dimension
+        );
         source_image.thumbnail(max_dimension, max_dimension)
     } else {
         source_image
@@ -252,16 +299,21 @@ pub async fn execute_workflow(
     let processed_mask_image = mask_image.map(|mask| {
         let (mw, mh) = mask.dimensions();
         if mw > max_dimension || mh > max_dimension {
-            println!("Mask image is {}x{}, downscaling to {}px long edge for ComfyUI.", mw, mh, max_dimension);
+            println!(
+                "Mask image is {}x{}, downscaling to {}px long edge for ComfyUI.",
+                mw, mh, max_dimension
+            );
             mask.thumbnail(max_dimension, max_dimension)
         } else {
             mask
         }
     });
 
-    let workflow_path = config.workflow_path.as_ref().map(PathBuf::from).unwrap_or_else(|| {
-        Path::new(WORKFLOWS_DIR).join("generative_replace.json")
-    });
+    let workflow_path = config
+        .workflow_path
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| Path::new(WORKFLOWS_DIR).join("generative_replace.json"));
 
     let workflow_str = fs::read_to_string(&workflow_path)
         .map_err(|e| anyhow!("Failed to read workflow file at {:?}: {}", workflow_path, e))?;
