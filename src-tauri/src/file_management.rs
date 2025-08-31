@@ -3,7 +3,7 @@ use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering, AtomicBool};
 use std::sync::Arc;
 use std::thread;
 
@@ -568,6 +568,10 @@ pub fn generate_thumbnails_progressive(
     paths: Vec<String>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
+    let state = app_handle.state::<AppState>();
+    state.thumbnail_cancellation_token.store(false, Ordering::SeqCst);
+    let cancellation_token = state.thumbnail_cancellation_token.clone();
+
     let cache_dir = app_handle
         .path()
         .app_cache_dir()
@@ -585,7 +589,11 @@ pub fn generate_thumbnails_progressive(
         let state = app_handle_clone.state::<AppState>();
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
 
-        paths.par_iter().for_each(|path_str| {
+        let _ = paths.par_iter().try_for_each(|path_str| -> Result<(), ()> {
+            if cancellation_token.load(Ordering::Relaxed) {
+                return Err(());
+            }
+
             let result = generate_single_thumbnail_and_cache(
                 path_str,
                 &thumb_cache_dir,
@@ -596,6 +604,9 @@ pub fn generate_thumbnails_progressive(
             );
 
             if let Some((thumbnail_data, rating)) = result {
+                if cancellation_token.load(Ordering::Relaxed) {
+                    return Err(());
+                }
                 let _ = app_handle_clone.emit(
                     "thumbnail-generated",
                     serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating }),
@@ -603,13 +614,19 @@ pub fn generate_thumbnails_progressive(
             }
 
             let completed = completed_count.fetch_add(1, Ordering::Relaxed) + 1;
+            if cancellation_token.load(Ordering::Relaxed) {
+                return Err(());
+            }
             let _ = app_handle_clone.emit(
                 "thumbnail-progress",
                 serde_json::json!({ "completed": completed, "total": total_count }),
             );
+            Ok(())
         });
 
-        let _ = app_handle_clone.emit("thumbnail-generation-complete", true);
+        if !cancellation_token.load(Ordering::Relaxed) {
+            let _ = app_handle_clone.emit("thumbnail-generation-complete", true);
+        }
     });
 
     Ok(())

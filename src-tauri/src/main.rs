@@ -23,6 +23,7 @@ use std::fs;
 use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgb, Rgba, RgbaImage, ImageFormat, GrayImage, RgbImage};
 use image::codecs::jpeg::JpegEncoder;
@@ -82,6 +83,7 @@ pub struct AppState {
     panorama_result: Arc<Mutex<Option<RgbImage>>>,
     indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
     pub lut_cache: Mutex<HashMap<String, Arc<Lut>>>,
+    thumbnail_cancellation_token: Arc<AtomicBool>,
 }
 
 #[derive(serde::Serialize)]
@@ -321,6 +323,12 @@ async fn load_image(path: String, state: tauri::State<'_, AppState>, app_handle:
         exif: exif_data,
         is_raw,
     })
+}
+
+#[tauri::command]
+fn cancel_thumbnail_generation(state: tauri::State<AppState>) -> Result<(), String> {
+    state.thumbnail_cancellation_token.store(true, Ordering::SeqCst);
+    Ok(())
 }
 
 #[tauri::command]
@@ -1502,6 +1510,7 @@ fn main() {
             panorama_result: Arc::new(Mutex::new(None)),
             indexing_task_handle: Mutex::new(None),
             lut_cache: Mutex::new(HashMap::new()),
+            thumbnail_cancellation_token: Arc::new(AtomicBool::new(false)),
         })
         .invoke_handler(tauri::generate_handler![
             load_image,
@@ -1534,6 +1543,7 @@ fn main() {
             file_management::get_folder_tree,
             file_management::generate_thumbnails,
             file_management::generate_thumbnails_progressive,
+            cancel_thumbnail_generation,
             file_management::create_folder,
             file_management::delete_folder,
             file_management::copy_files,

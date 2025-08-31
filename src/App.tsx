@@ -1134,6 +1134,7 @@ function App() {
 
   const handleSelectSubfolder = useCallback(
     async (path: string | null, isNewRoot = false) => {
+      await invoke('cancel_thumbnail_generation');
       setIsViewLoading(true);
       setSearchQuery('');
       try {
