@@ -17,12 +17,12 @@ mod tagging;
 mod tagging_utils;
 use std::thread;
 
-use std::sync::Arc;
 use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::path::Path;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use base64::{Engine as _, engine::general_purpose};
@@ -40,10 +40,10 @@ use little_exif::metadata::Metadata;
 use little_exif::rational::uR64;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::Mutex;
 use tauri::{Emitter, Manager, ipc::Response};
 use tokio::sync::Mutex as TokioMutex;
 use tokio::task::JoinHandle;
-use std::sync::Mutex;
 
 use crate::ai_processing::{
     AiForegroundMaskParameters, AiSkyMaskParameters, AiState, AiSubjectMaskParameters,
@@ -365,7 +365,9 @@ async fn load_image(
 
 #[tauri::command]
 fn cancel_thumbnail_generation(state: tauri::State<AppState>) -> Result<(), String> {
-    state.thumbnail_cancellation_token.store(true, Ordering::SeqCst);
+    state
+        .thumbnail_cancellation_token
+        .store(true, Ordering::SeqCst);
     Ok(())
 }
 

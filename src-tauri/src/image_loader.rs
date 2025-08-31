@@ -1,17 +1,17 @@
-use anyhow::{Result, Context};
-use base64::{engine::general_purpose, Engine as _};
-use image::{imageops, DynamicImage, GenericImageView, ImageReader};
+use crate::Cursor;
+use crate::formats::is_raw_file;
+use crate::image_processing::apply_orientation;
+use crate::mask_generation::{MaskDefinition, SubMask, generate_mask_bitmap};
+use crate::raw_processing::develop_raw_image;
+use anyhow::{Context, Result};
+use base64::{Engine as _, engine::general_purpose};
+use exif::{Reader as ExifReader, Tag};
+use image::{DynamicImage, GenericImageView, ImageReader, imageops};
 use rawler::Orientation;
 use rayon::prelude::*;
 use serde::Deserialize;
 use serde_json::{Value, from_value};
 use std::fs;
-use crate::mask_generation::{generate_mask_bitmap, MaskDefinition, SubMask};
-use exif::{Reader as ExifReader, Tag};
-use crate::image_processing::apply_orientation;
-use crate::formats::is_raw_file;
-use crate::raw_processing::develop_raw_image;
-use crate::Cursor;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -88,11 +88,15 @@ pub fn composite_patches_on_image(
     let visible_patches: Vec<&Value> = patches_arr
         .par_iter()
         .filter(|patch_obj| {
-            let is_visible = patch_obj.get("visible").and_then(|v| v.as_bool()).unwrap_or(true);
+            let is_visible = patch_obj
+                .get("visible")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
             if !is_visible {
                 return false;
             }
-            patch_obj.get("patchData")
+            patch_obj
+                .get("patchData")
                 .and_then(|data| data.get("color"))
                 .and_then(|color| color.as_str())
                 .map_or(false, |s| !s.is_empty())
@@ -109,7 +113,7 @@ pub fn composite_patches_on_image(
     for patch_obj in visible_patches {
         let patch_info: PatchMaskInfo = from_value(patch_obj.clone())
             .context("Failed to deserialize patch info for mask generation")?;
-        
+
         let mask_def = MaskDefinition {
             id: patch_info.id,
             name: patch_info.name,
@@ -124,13 +128,17 @@ pub fn composite_patches_on_image(
             .context("Failed to generate mask from sub_masks for compositing")?;
 
         let patch_data = patch_obj.get("patchData").context("Missing patchData")?;
-        let color_b64 = patch_data.get("color").and_then(|v| v.as_str()).context("Missing color data")?;
+        let color_b64 = patch_data
+            .get("color")
+            .and_then(|v| v.as_str())
+            .context("Missing color data")?;
         let color_bytes = general_purpose::STANDARD.decode(color_b64)?;
         let mut color_image = image::load_from_memory(&color_bytes)?.to_rgb8();
 
         let (patch_w, patch_h) = color_image.dimensions();
         if base_w != patch_w || base_h != patch_h {
-            color_image = imageops::resize(&color_image, base_w, base_h, imageops::FilterType::Lanczos3);
+            color_image =
+                imageops::resize(&color_image, base_w, base_h, imageops::FilterType::Lanczos3);
         }
 
         composited_rgba
@@ -142,7 +150,7 @@ pub fn composite_patches_on_image(
 
                     if mask_value > 0 {
                         let patch_pixel = color_image.get_pixel(x as u32, y as u32);
-                        
+
                         let alpha = mask_value as f32 / 255.0;
                         let one_minus_alpha = 1.0 - alpha;
 
@@ -150,9 +158,15 @@ pub fn composite_patches_on_image(
                         let base_g = row[x * 4 + 1];
                         let base_b = row[x * 4 + 2];
 
-                        row[x * 4 + 0] = (patch_pixel[0] as f32 * alpha + base_r as f32 * one_minus_alpha).round() as u8;
-                        row[x * 4 + 1] = (patch_pixel[1] as f32 * alpha + base_g as f32 * one_minus_alpha).round() as u8;
-                        row[x * 4 + 2] = (patch_pixel[2] as f32 * alpha + base_b as f32 * one_minus_alpha).round() as u8;
+                        row[x * 4 + 0] = (patch_pixel[0] as f32 * alpha
+                            + base_r as f32 * one_minus_alpha)
+                            .round() as u8;
+                        row[x * 4 + 1] = (patch_pixel[1] as f32 * alpha
+                            + base_g as f32 * one_minus_alpha)
+                            .round() as u8;
+                        row[x * 4 + 2] = (patch_pixel[2] as f32 * alpha
+                            + base_b as f32 * one_minus_alpha)
+                            .round() as u8;
                     }
                 }
             });

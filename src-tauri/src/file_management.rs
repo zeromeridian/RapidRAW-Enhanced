@@ -3,8 +3,8 @@ use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 
 use anyhow::Result;
@@ -584,7 +584,9 @@ pub fn generate_thumbnails_progressive(
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let state = app_handle.state::<AppState>();
-    state.thumbnail_cancellation_token.store(false, Ordering::SeqCst);
+    state
+        .thumbnail_cancellation_token
+        .store(false, Ordering::SeqCst);
     let cancellation_token = state.thumbnail_cancellation_token.clone();
 
     let cache_dir = app_handle
