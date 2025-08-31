@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Edit, Eye, EyeOff, FileEdit, Loader2, RotateCcw, Trash2, Wand2 } from 'lucide-react';
-import AIControls from './AIControls';
+import AIControls, { SUB_MASK_CONFIG } from './AIControls';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { Mask, AI_PANEL_CREATION_TYPES, MaskType, SubMask } from './Masks';
 import { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
@@ -177,6 +177,15 @@ export default function AIPanel({
 
   const handleAddAiPatchContainer = (type: Mask) => {
     const subMask = createSubMask(type, selectedImage);
+
+    const config = SUB_MASK_CONFIG[type];
+    if (config && config.parameters) {
+      config.parameters.forEach((param: any) => {
+        if (param.defaultValue !== undefined) {
+          subMask.parameters[param.key] = param.defaultValue / (param.multiplier || 1);
+        }
+      });
+    }
 
     let name: string;
     if (type === Mask.QuickEraser) {

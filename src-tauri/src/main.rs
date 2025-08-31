@@ -1259,18 +1259,26 @@ async fn invoke_generative_replace_with_mask_def(
         image::load_from_memory(&result_png_bytes).map_err(|e| e.to_string())?.to_rgba8()
     };
 
-    let (width, height) = patch_rgba.dimensions();
-    let mut color_image = RgbImage::new(width, height);
-    let mut mask_image = GrayImage::new(width, height);
+    let (patch_w, patch_h) = patch_rgba.dimensions();
+    let scaled_mask_bitmap = image::imageops::resize(
+        &mask_bitmap,
+        patch_w,
+        patch_h,
+        image::imageops::FilterType::Lanczos3,
+    );
+    let mut color_image = RgbImage::new(patch_w, patch_h);
+    let mask_image = scaled_mask_bitmap.clone();
 
-    for y in 0..height {
-        for x in 0..width {
-            let pixel = patch_rgba.get_pixel(x, y);
-            let rgb_data = [pixel[0], pixel[1], pixel[2]];
-            let alpha_data = [pixel[3]];
+    for y in 0..patch_h {
+        for x in 0..patch_w {
+            let mask_value = scaled_mask_bitmap.get_pixel(x, y)[0];
 
-            color_image.put_pixel(x, y, Rgb(rgb_data));
-            mask_image.put_pixel(x, y, Luma(alpha_data));
+            if mask_value > 0 {
+                let patch_pixel = patch_rgba.get_pixel(x, y);
+                color_image.put_pixel(x, y, Rgb([patch_pixel[0], patch_pixel[1], patch_pixel[2]]));
+            } else {
+                color_image.put_pixel(x, y, Rgb([0, 0, 0]));
+            }
         }
     }
 
