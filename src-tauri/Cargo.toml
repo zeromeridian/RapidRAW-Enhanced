@@ -41,7 +41,7 @@ walkdir = "2.5.0"
 trash = "5.2.3"
 imageproc = "0.25.0"
 ort = { version = "1.16.3", features = ["load-dynamic"] }
-ndarray = "0.16.1"
+ndarray = "0.15.6" # Align with old version used by ort
 reqwest = { version = "0.12", features = ["json", "multipart"] }
 tokio-tungstenite = { version = "0.27", features = ["native-tls"] }
 futures-util = "0.3"
