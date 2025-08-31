@@ -525,6 +525,8 @@ function App() {
               : p,
           ),
         }));
+        setActiveAiPatchContainerId(null);
+        setActiveAiSubMaskId(null);
       } catch (err) {
         console.error('Generative replace failed:', err);
         setError(`AI Replace Failed: ${err}`);
@@ -536,7 +538,14 @@ function App() {
         setIsGeneratingAi(false);
       }
     },
-    [selectedImage?.path, isGeneratingAi, adjustments, setAdjustments],
+    [
+      selectedImage?.path,
+      isGeneratingAi,
+      adjustments,
+      setAdjustments,
+      setActiveAiPatchContainerId,
+      setActiveAiSubMaskId,
+    ],
   );
 
   const handleQuickErase = useCallback(
