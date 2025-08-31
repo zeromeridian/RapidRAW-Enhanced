@@ -15,7 +15,9 @@ mod panorama_utils;
 mod raw_processing;
 mod tagging;
 mod tagging_utils;
+use std::thread;
 
+use std::sync::Arc;
 use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -41,7 +43,7 @@ use serde_json::Value;
 use tauri::{Emitter, Manager, ipc::Response};
 use tokio::sync::Mutex as TokioMutex;
 use tokio::task::JoinHandle;
-use window_vibrancy::{NSVisualEffectMaterial, apply_acrylic, apply_vibrancy};
+use std::sync::Mutex;
 
 use crate::ai_processing::{
     AiForegroundMaskParameters, AiSkyMaskParameters, AiState, AiSubjectMaskParameters,

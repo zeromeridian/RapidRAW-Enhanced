@@ -11,6 +11,7 @@ use exif::{Reader as ExifReader, Tag};
 use crate::image_processing::apply_orientation;
 use crate::formats::is_raw_file;
 use crate::raw_processing::develop_raw_image;
+use crate::Cursor;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
