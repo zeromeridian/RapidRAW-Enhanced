@@ -15,8 +15,9 @@ pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuCont
     }
     let instance_desc = wgpu::InstanceDescriptor::from_env_or_default();
     let instance = wgpu::Instance::new(&instance_desc);
-    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-        .map_err(|e| format!("Failed to find a wgpu adapter: {}", e))?;
+    let adapter =
+        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
+            .map_err(|e| format!("Failed to find a wgpu adapter: {}", e))?;
 
     let mut required_features = wgpu::Features::empty();
     if adapter
@@ -28,15 +29,14 @@ pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuCont
 
     let limits = adapter.limits();
 
-    let (device, queue) = pollster::block_on(adapter.request_device(
-        &wgpu::DeviceDescriptor {
-            label: Some("Processing Device"),
-            required_features,
-            required_limits: limits.clone(),
-            memory_hints: wgpu::MemoryHints::Performance,
-            trace: wgpu::Trace::Off,
-        }
-    )).map_err(|e| e.to_string())?;
+    let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+        label: Some("Processing Device"),
+        required_features,
+        required_limits: limits.clone(),
+        memory_hints: wgpu::MemoryHints::Performance,
+        trace: wgpu::Trace::Off,
+    }))
+    .map_err(|e| e.to_string())?;
 
     let new_context = GpuContext {
         device: Arc::new(device),
@@ -69,10 +69,19 @@ fn read_texture_data(
         label: Some("Readback Encoder"),
     });
     encoder.copy_texture_to_buffer(
-        wgpu::TexelCopyTextureInfo { texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        wgpu::TexelCopyTextureInfo {
+            texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
         wgpu::TexelCopyBufferInfo {
             buffer: &output_buffer,
-            layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(padded_bytes_per_row), rows_per_image: Some(size.height) },
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(padded_bytes_per_row),
+                rows_per_image: Some(size.height),
+            },
         },
         size,
     );
@@ -80,7 +89,9 @@ fn read_texture_data(
     queue.submit(Some(encoder.finish()));
     let buffer_slice = output_buffer.slice(..);
     let (tx, rx) = std::sync::mpsc::channel();
-    buffer_slice.map_async(wgpu::MapMode::Read, move |result| { tx.send(result).unwrap(); });
+    buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+        tx.send(result).unwrap();
+    });
     device.poll(wgpu::PollType::Poll).unwrap();
     rx.recv().unwrap().map_err(|e| e.to_string())?;
 
