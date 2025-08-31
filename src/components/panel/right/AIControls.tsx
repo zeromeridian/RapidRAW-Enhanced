@@ -158,17 +158,17 @@ export default function AIControls({
   const analyzingTimeoutRef = useRef<number>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<string>(editingPatch?.prompt || '');
-  const [useFastInpaint, setUseFastInpaint] = useState(true);
+  const isQuickErasePatch = editingPatch?.subMasks?.some((sm: SubMask) => sm.type === Mask.QuickEraser);
+  const [useFastInpaint, setUseFastInpaint] = useState(isQuickErasePatch || !isComfyUiConnected);
 
   useEffect(() => {
     setPrompt(editingPatch?.prompt || '');
   }, [editingPatch?.id, editingPatch?.prompt]);
 
   useEffect(() => {
-    if (!isComfyUiConnected) {
-      setUseFastInpaint(true);
-    }
-  }, [isComfyUiConnected]);
+    const isQuickErase = editingPatch?.subMasks?.some((sm: SubMask) => sm.type === Mask.QuickEraser);
+    setUseFastInpaint(isQuickErase || !isComfyUiConnected);
+  }, [isComfyUiConnected, editingPatch]);
 
   useEffect(() => {
     if (isGeneratingAiMask) {
@@ -366,18 +366,22 @@ export default function AIControls({
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-text-primary">Generative Replace</h3>
           <p className="text-xs text-text-secondary -mt-2">
-            {useFastInpaint
+            {isQuickErasePatch
+              ? 'Fill selection to remove the object.'
+              : useFastInpaint
               ? 'Fill selection based on surrounding pixels.'
               : 'Describe what you want to generate in the selected area.'}
           </p>
           <div className="pt-1">
             <Switch
               checked={useFastInpaint}
-              disabled={!isComfyUiConnected}
+              disabled={isQuickErasePatch || !isComfyUiConnected}
               label="Use fast inpainting"
               onChange={setUseFastInpaint}
               tooltip={
-                !isComfyUiConnected
+                isQuickErasePatch
+                  ? 'Quick Erase always uses fast inpainting.'
+                  : !isComfyUiConnected
                   ? 'ComfyUI not connected, fast inpainting is required.'
                   : 'Fast inpainting is quicker but not generative. Uncheck to use ComfyUI with a text prompt.'
               }
