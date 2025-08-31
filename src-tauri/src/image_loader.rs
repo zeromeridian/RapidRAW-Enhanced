@@ -1,6 +1,6 @@
-use anyhow::{Context, Result};
-use base64::{Engine as _, engine::general_purpose};
-use image::{DynamicImage, ImageReader, Rgba, RgbaImage, imageops};
+use anyhow::{Result, Context};
+use base64::{engine::general_purpose, Engine as _};
+use image::{imageops, DynamicImage, GenericImageView, ImageReader, RgbaImage, Rgba};
 use rawler::Orientation;
 use rayon::prelude::*;
 use serde_json::Value;
@@ -92,6 +92,8 @@ pub fn composite_patches_on_image(
         return Ok(base_image.clone());
     }
 
+    let (base_w, base_h) = base_image.dimensions();
+
     let patch_layers: Result<Vec<RgbaImage>> = visible_patches
         .par_iter()
         .filter_map(|patch_obj| {
@@ -102,10 +104,18 @@ pub fn composite_patches_on_image(
 
             let result: Result<RgbaImage> = (|| {
                 let color_bytes = general_purpose::STANDARD.decode(color_b64)?;
-                let color_image = image::load_from_memory(&color_bytes)?.to_rgb8();
+                let mut color_image = image::load_from_memory(&color_bytes)?.to_rgb8();
 
                 let mask_bytes = general_purpose::STANDARD.decode(mask_b64)?;
-                let mask_image = image::load_from_memory(&mask_bytes)?.to_luma8();
+                let mut mask_image = image::load_from_memory(&mask_bytes)?.to_luma8();
+
+                let (patch_w, patch_h) = color_image.dimensions();
+
+                if base_w != patch_w || base_h != patch_h {
+                    println!("Patch resolution ({}x{}) differs from base image ({}x{}). Scaling up patch.", patch_w, patch_h, base_w, base_h);
+                    color_image = imageops::resize(&color_image, base_w, base_h, imageops::FilterType::Lanczos3);
+                    mask_image = imageops::resize(&mask_image, base_w, base_h, imageops::FilterType::Triangle);
+                }
 
                 let (width, height) = color_image.dimensions();
                 let mut patch_rgba = RgbaImage::new(width, height);

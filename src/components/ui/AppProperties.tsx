@@ -109,6 +109,7 @@ export interface ComfyUIWorkflowConfig {
   finalOutputNodeId: string;
   samplerNodeId: string;
   samplerSteps: number;
+  inpaintResolution?: number;
 }
 
 export interface AppSettings {

@@ -107,6 +107,7 @@ pub struct ComfyUIWorkflowConfig {
     pub final_output_node_id: String,
     pub sampler_node_id: String,
     pub sampler_steps: u32,
+    pub inpaint_resolution: Option<u32>,
 }
 
 impl Default for ComfyUIWorkflowConfig {
@@ -137,6 +138,7 @@ impl Default for ComfyUIWorkflowConfig {
             final_output_node_id: "252".to_string(),
             sampler_node_id: "3".to_string(),
             sampler_steps: 10,
+            inpaint_resolution: Some(1536),
         }
     }
 }

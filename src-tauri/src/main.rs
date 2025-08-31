@@ -1528,7 +1528,7 @@ async fn invoke_generative_replace_with_mask_def(
         let mut rgba_mask = RgbaImage::new(img_w, img_h);
         for (x, y, luma_pixel) in enlarged_mask_bitmap.enumerate_pixels() {
             let intensity = luma_pixel[0];
-            rgba_mask.put_pixel(x, y, Rgba([255, 255, 255, intensity]));
+            rgba_mask.put_pixel(x, y, Rgba([0, 0, 0, intensity]));
         }
         let mask_image = DynamicImage::ImageRgba8(rgba_mask);
 
@@ -1549,18 +1549,20 @@ async fn invoke_generative_replace_with_mask_def(
 
     let (width, height) = patch_rgba.dimensions();
     let mut color_image = RgbImage::new(width, height);
-    let mask_image = mask_bitmap;
+    let mut mask_image = GrayImage::new(width, height);
 
     for y in 0..height {
         for x in 0..width {
-            if mask_image.get_pixel(x, y)[0] > 0 {
-                let patch_pixel = patch_rgba.get_pixel(x, y);
-                color_image.put_pixel(x, y, Rgb([patch_pixel[0], patch_pixel[1], patch_pixel[2]]));
-            }
+            let pixel = patch_rgba.get_pixel(x, y);
+            let rgb_data = [pixel[0], pixel[1], pixel[2]];
+            let alpha_data = [pixel[3]];
+
+            color_image.put_pixel(x, y, Rgb(rgb_data));
+            mask_image.put_pixel(x, y, Luma(alpha_data));
         }
     }
 
-    let quality = 75;
+    let quality = 85;
 
     let mut color_buf = Cursor::new(Vec::new());
     color_image

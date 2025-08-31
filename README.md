@@ -51,6 +51,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-08-30:** Optimize ComfyUI image transfer & speed
 *   **2025-08-28:** Chromatic aberration correction & Shader improvements
 *   **2025-08-26:** User customisable ComfyUI workflow selection
 *   **2025-08-25:** Make LUTs parser more robust (support more advanced formats)
@@ -59,11 +60,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-08-21:** Added LUTs (.cube, .3dl, .png, .jpg, .jpeg, .tiff) support
 *   **2025-08-16:** Fast AI sky masks
 *   **2025-08-15:** Show full resolution image when zooming in
-*   **2025-08-15:** Implement Tauri's IPC as a replacement for the slow Base64 image transfer
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-08-15:** Implement Tauri's IPC as a replacement for the slow Base64 image transfer
 *   **2025-08-12:** Relative zoom indicator
 *   **2025-08-11:** TypeScript cleanup & many bug fixes
 *   **2025-08-09:** Local inpainting without the need for ComfyUI, ability to change thumbnail aspect ratio
