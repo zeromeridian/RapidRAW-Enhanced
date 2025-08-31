@@ -153,13 +153,10 @@ fn inpaint_criminisi(source_image: &RgbImage, mask: &GrayImage, patch_radius: u3
                         let idx = (target_y * width + target_x) as usize;
 
                         if mask.get_pixel(target_x, target_y)[0] > 0 {
-                            let source_x =
-                                (best_match_x as i32 + dx).clamp(0, (width - 1) as i32) as u32;
-                            let source_y =
-                                (best_match_y as i32 + dy).clamp(0, (height - 1) as i32) as u32;
+                            let source_x = (best_match_x as i32 + dx).clamp(0, (width - 1) as i32) as u32;
+                            let source_y = (best_match_y as i32 + dy).clamp(0, (height - 1) as i32) as u32;
 
-                            let weight = gaussian_kernel
-                                [((dy + r) as usize * patch_diameter) + (dx + r) as usize];
+                            let weight = gaussian_kernel[((dy + r) as usize * patch_diameter) + (dx + r) as usize];
                             let source_pixel = output.get_pixel(source_x, source_y);
 
                             for i in 0..3 {
@@ -385,15 +382,10 @@ fn calculate_priority(
             }
         }
     }
-    let confidence_term = if count > 0 {
-        confidence_sum / count as f32
-    } else {
-        0.0
-    };
+    let confidence_term = if count > 0 { confidence_sum / count as f32 } else { 0.0 };
 
     let (normal_x, normal_y) = normal;
-    let (isophote_x, isophote_y) =
-        get_gradient_at_point(image, pixel_states, width, height, px, py);
+    let (isophote_x, isophote_y) = get_gradient_at_point(image, pixel_states, width, height, px, py);
 
     let data_term = (isophote_x * normal_x + isophote_y * normal_y).abs() / 255.0;
     let priority = confidence_term * data_term + 0.001;
@@ -492,41 +484,27 @@ fn find_best_match_local(
         return (px, py);
     }
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let search_sample: Vec<_> = if local_candidates.len() > max_samples {
-        local_candidates
-            .choose_multiple(&mut rng, max_samples)
-            .cloned()
-            .collect()
+        let mut shuffled = local_candidates.clone();
+        shuffled.shuffle(&mut rng);
+        shuffled.truncate(max_samples);
+        shuffled
     } else {
         local_candidates
     };
 
-    let best_match = search_sample.par_iter().min_by(|&&(ax, ay), &&(bx, by)| {
-        let ssd_a = calculate_ssd(
-            image,
-            pixel_states,
-            width,
-            height,
-            px,
-            py,
-            ax,
-            ay,
-            patch_radius,
-            kernel,
-        );
-        let ssd_b = calculate_ssd(
-            image,
-            pixel_states,
-            width,
-            height,
-            px,
-            py,
-            bx,
-            by,
-            patch_radius,
-            kernel,
-        );
+    let best_match = search_sample
+        .par_iter()
+        .min_by(|&&(ax, ay), &&(bx, by)| {
+            let ssd_a = calculate_ssd(image, pixel_states, width, height, px, py, ax, ay, patch_radius, kernel);
+            let ssd_b = calculate_ssd(image, pixel_states, width, height, px, py, bx, by, patch_radius, kernel);
+
+            let dist_sq_a = ((px as i64 - ax as i64).pow(2) + (py as i64 - ay as i64).pow(2)) as f64;
+            let dist_sq_b = ((px as i64 - bx as i64).pow(2) + (py as i64 - by as i64).pow(2)) as f64;
+
+            let score_a = ssd_a + dist_sq_a * 0.05;
+            let score_b = ssd_b + dist_sq_b * 0.05;
 
         let dist_sq_a = ((px as i64 - ax as i64).pow(2) + (py as i64 - ay as i64).pow(2)) as f64;
         let dist_sq_b = ((px as i64 - bx as i64).pow(2) + (py as i64 - by as i64).pow(2)) as f64;
