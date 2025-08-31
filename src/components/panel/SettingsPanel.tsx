@@ -146,6 +146,35 @@ const ExternalLink = ({ href, children }) => {
   );
 };
 
+const ModelConfigItem = ({ label, data, onChange, description }) => {
+  const [[key, value] = ['', '']] = Object.entries(data || {});
+
+  const handleKeyChange = (newKey) => {
+    onChange({ [newKey]: value });
+  };
+
+  const handleValueChange = (newValue) => {
+    onChange({ [key]: newValue });
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-text-primary mb-2">{label}</label>
+      <div className="flex items-center gap-4 bg-bg-primary p-3 rounded-lg border border-border-color">
+        <div className="flex-1">
+          <label className="block text-xs text-text-secondary mb-1">Node ID</label>
+          <Input type="number" value={key} onChange={(e) => handleKeyChange(e.target.value)} />
+        </div>
+        <div className="flex-1">
+          <label className="block text-xs text-text-secondary mb-1">Model Name</label>
+          <Input value={value} onChange={(e) => handleValueChange(e.target.value)} />
+        </div>
+      </div>
+      {description && <div className="text-xs text-text-secondary mt-2">{description}</div>}
+    </div>
+  );
+};
+
 export default function SettingsPanel({
   appSettings,
   onBack,
@@ -495,7 +524,7 @@ export default function SettingsPanel({
                     transition={{ duration: 0.3, ease: 'easeInOut' }}
                     className="overflow-hidden"
                   >
-                    <div className="pt-4 border-t border-border-color space-y-6">
+                    <div className="pt-4 border-t border-border-color space-y-8">
                       <div className="text-xs text-text-secondary space-y-2">
                         <p className="font-semibold">How to find Node IDs:</p>
                         <ol className="list-decimal list-inside space-y-1 pl-2">
@@ -528,162 +557,112 @@ export default function SettingsPanel({
                         </div>
                       )}
 
-                      <h4 className="text-base font-semibold text-accent-secondary pt-2">Node Configuration</h4>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-                        <SettingItem label="Source Image Node ID">
-                          <Input
-                            type="number"
-                            value={comfyConfig.sourceImageNodeId || ''}
-                            onChange={(e) => handleConfigChange('sourceImageNodeId', e.target.value)}
-                          />
-                        </SettingItem>
-                        <SettingItem label="Mask Image Node ID">
-                          <Input
-                            type="number"
-                            value={comfyConfig.maskImageNodeId || ''}
-                            onChange={(e) => handleConfigChange('maskImageNodeId', e.target.value)}
-                          />
-                        </SettingItem>
-                        <SettingItem label="Text Prompt Node ID">
-                          <Input
-                            type="number"
-                            value={comfyConfig.textPromptNodeId || ''}
-                            onChange={(e) => handleConfigChange('textPromptNodeId', e.target.value)}
-                          />
-                        </SettingItem>
-                        <SettingItem label="Final Output Node ID">
-                          <Input
-                            type="number"
-                            value={comfyConfig.finalOutputNodeId || ''}
-                            onChange={(e) => handleConfigChange('finalOutputNodeId', e.target.value)}
-                          />
-                        </SettingItem>
-                        <SettingItem label="Sampler Node ID">
-                          <Input
-                            type="number"
-                            value={comfyConfig.samplerNodeId || ''}
-                            onChange={(e) => handleConfigChange('samplerNodeId', e.target.value)}
-                          />
-                        </SettingItem>
-                        <SettingItem label="Sampler Steps">
-                          <Input
-                            type="number"
-                            value={comfyConfig.samplerSteps || 10}
-                            onChange={(e) => handleConfigChange('samplerSteps', parseInt(e.target.value, 10) || 0)}
-                          />
-                        </SettingItem>
-                        <SettingItem label="Inpaint Resolution">
-                          <Input
-                            type="number"
-                            value={comfyConfig.inpaintResolution || 1536}
-                            onChange={(e) =>
-                              handleConfigChange('inpaintResolution', parseInt(e.target.value, 10) || 0)
-                            }
-                          />
-                        </SettingItem>
+                      <div>
+                        <h4 className="text-base font-semibold text-accent-secondary mb-4">Node Configuration</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
+                          <SettingItem label="Source Image Node ID">
+                            <Input
+                              type="number"
+                              value={comfyConfig.sourceImageNodeId || ''}
+                              onChange={(e) => handleConfigChange('sourceImageNodeId', e.target.value)}
+                            />
+                          </SettingItem>
+                          <SettingItem label="Mask Image Node ID">
+                            <Input
+                              type="number"
+                              value={comfyConfig.maskImageNodeId || ''}
+                              onChange={(e) => handleConfigChange('maskImageNodeId', e.target.value)}
+                            />
+                          </SettingItem>
+                          <SettingItem label="Text Prompt Node ID">
+                            <Input
+                              type="number"
+                              value={comfyConfig.textPromptNodeId || ''}
+                              onChange={(e) => handleConfigChange('textPromptNodeId', e.target.value)}
+                            />
+                          </SettingItem>
+                          <SettingItem label="Final Output Node ID">
+                            <Input
+                              type="number"
+                              value={comfyConfig.finalOutputNodeId || ''}
+                              onChange={(e) => handleConfigChange('finalOutputNodeId', e.target.value)}
+                            />
+                          </SettingItem>
+                          <SettingItem label="Sampler Node ID">
+                            <Input
+                              type="number"
+                              value={comfyConfig.samplerNodeId || ''}
+                              onChange={(e) => handleConfigChange('samplerNodeId', e.target.value)}
+                            />
+                          </SettingItem>
+                          <SettingItem label="Sampler Steps">
+                            <Input
+                              type="number"
+                              value={comfyConfig.samplerSteps || 10}
+                              onChange={(e) => handleConfigChange('samplerSteps', parseInt(e.target.value, 10) || 0)}
+                            />
+                          </SettingItem>
+                          <SettingItem label="Inpaint Resolution">
+                            <Input
+                              type="number"
+                              value={comfyConfig.inpaintResolution || 1536}
+                              onChange={(e) =>
+                                handleConfigChange('inpaintResolution', parseInt(e.target.value, 10) || 0)
+                              }
+                            />
+                          </SettingItem>
+                        </div>
                       </div>
 
-                      <h4 className="text-base font-semibold text-accent-secondary pt-2">Model Configuration</h4>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-                        <SettingItem label="Checkpoint Node ID">
-                          <Input
-                            type="number"
-                            value={Object.keys(comfyConfig.modelCheckpoints || {})[0] || ''}
-                            onChange={(e) =>
-                              handleConfigChange('modelCheckpoints', {
-                                [e.target.value]: Object.values(comfyConfig.modelCheckpoints || {})[0] || '',
-                              })
+                      <div>
+                        <h4 className="text-base font-semibold text-accent-secondary mb-4">Model Configuration</h4>
+                        <div className="space-y-6">
+                          <ModelConfigItem
+                            label="Checkpoint"
+                            data={comfyConfig.modelCheckpoints}
+                            onChange={(newData) => handleConfigChange('modelCheckpoints', newData)}
+                            description={
+                              !comfyConfig.workflowPath && (
+                                <>
+                                  Recommended:{' '}
+                                  <ExternalLink href="https://civitai.com/models/139562/realvisxl-v50">
+                                    RealVisXL V5.0
+                                  </ExternalLink>
+                                </>
+                              )
                             }
                           />
-                        </SettingItem>
-                        <SettingItem
-                          label="Checkpoint Name"
-                          description={
-                            !comfyConfig.workflowPath && (
-                              <>
-                                Recommended:{' '}
-                                <ExternalLink href="https://civitai.com/models/139562/realvisxl-v50">
-                                  RealVisXL V5.0
-                                </ExternalLink>
-                              </>
-                            )
-                          }
-                        >
-                          <Input
-                            value={Object.values(comfyConfig.modelCheckpoints || {})[0] || ''}
-                            onChange={(e) =>
-                              handleConfigChange('modelCheckpoints', {
-                                [Object.keys(comfyConfig.modelCheckpoints || {})[0] || '']: e.target.value,
-                              })
+                          <ModelConfigItem
+                            label="VAE"
+                            data={comfyConfig.vaeLoaders}
+                            onChange={(newData) => handleConfigChange('vaeLoaders', newData)}
+                            description={
+                              !comfyConfig.workflowPath && (
+                                <>
+                                  Recommended:{' '}
+                                  <ExternalLink href="https://huggingface.co/stabilityai/sdxl-vae/blob/main/sdxl_vae.safetensors">
+                                    SDXL VAE
+                                  </ExternalLink>
+                                </>
+                              )
                             }
                           />
-                        </SettingItem>
-                        <SettingItem label="VAE Node ID">
-                          <Input
-                            type="number"
-                            value={Object.keys(comfyConfig.vaeLoaders || {})[0] || ''}
-                            onChange={(e) =>
-                              handleConfigChange('vaeLoaders', {
-                                [e.target.value]: Object.values(comfyConfig.vaeLoaders || {})[0] || '',
-                              })
+                          <ModelConfigItem
+                            label="ControlNet"
+                            data={comfyConfig.controlnetLoaders}
+                            onChange={(newData) => handleConfigChange('controlnetLoaders', newData)}
+                            description={
+                              !comfyConfig.workflowPath && (
+                                <>
+                                  Recommended:{' '}
+                                  <ExternalLink href="https://huggingface.co/xinsir/controlnet-union-sdxl-1.0/blob/main/diffusion_pytorch_model_promax.safetensors">
+                                    Promax ControlNet
+                                  </ExternalLink>
+                                </>
+                              )
                             }
                           />
-                        </SettingItem>
-                        <SettingItem
-                          label="VAE Name"
-                          description={
-                            !comfyConfig.workflowPath && (
-                              <>
-                                Recommended:{' '}
-                                <ExternalLink href="https://huggingface.co/stabilityai/sdxl-vae/blob/main/sdxl_vae.safetensors">
-                                  SDXL VAE
-                                </ExternalLink>
-                              </>
-                            )
-                          }
-                        >
-                          <Input
-                            value={Object.values(comfyConfig.vaeLoaders || {})[0] || ''}
-                            onChange={(e) =>
-                              handleConfigChange('vaeLoaders', {
-                                [Object.keys(comfyConfig.vaeLoaders || {})[0] || '']: e.target.value,
-                              })
-                            }
-                          />
-                        </SettingItem>
-                        <SettingItem label="ControlNet Node ID">
-                          <Input
-                            type="number"
-                            value={Object.keys(comfyConfig.controlnetLoaders || {})[0] || ''}
-                            onChange={(e) =>
-                              handleConfigChange('controlnetLoaders', {
-                                [e.target.value]: Object.values(comfyConfig.controlnetLoaders || {})[0] || '',
-                              })
-                            }
-                          />
-                        </SettingItem>
-                        <SettingItem
-                          label="ControlNet Name"
-                          description={
-                            !comfyConfig.workflowPath && (
-                              <>
-                                Recommended:{' '}
-                                <ExternalLink href="https://huggingface.co/xinsir/controlnet-union-sdxl-1.0/blob/main/diffusion_pytorch_model_promax.safetensors">
-                                  Promax ControlNet
-                                </ExternalLink>
-                              </>
-                            )
-                          }
-                        >
-                          <Input
-                            value={Object.values(comfyConfig.controlnetLoaders || {})[0] || ''}
-                            onChange={(e) =>
-                              handleConfigChange('controlnetLoaders', {
-                                [Object.keys(comfyConfig.controlnetLoaders || {})[0] || '']: e.target.value,
-                              })
-                            }
-                          />
-                        </SettingItem>
+                        </div>
                       </div>
 
                       <div className="flex justify-end items-center gap-4 pt-4">
