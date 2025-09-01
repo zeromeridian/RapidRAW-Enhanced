@@ -340,7 +340,7 @@ You have two options to run RapidRAW:
 - Grab the pre-built installer or application bundle for your operating system from the [**Releases**](https://github.com/CyberTimon/RapidRAW/releases) page.
 
 **Linux:**
-- On Debian-based distributions, install the `.deb` package.
+- On Debian-based distributions, install the `.deb` package from the [**Releases**](https://github.com/CyberTimon/RapidRAW/releases) page.
 - On Arch-based distributions, use the [`rapidraw-bin`](https://aur.archlinux.org/packages/rapidraw-bin) package from the AUR.
 
 **2. Build from Source**
