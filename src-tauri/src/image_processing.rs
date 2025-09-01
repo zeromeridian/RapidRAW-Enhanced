@@ -1,15 +1,15 @@
-use std::sync::Arc;
 use bytemuck::{Pod, Zeroable};
 use image::{DynamicImage, GenericImageView, Rgba};
-use imageproc::geometric_transformations::{rotate_about_center, Interpolation};
+use imageproc::geometric_transformations::{Interpolation, rotate_about_center};
+use rawler::decoders::Orientation;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::f32::consts::PI;
-use rawler::decoders::Orientation;
 use serde_json::json;
+use std::f32::consts::PI;
+use std::sync::Arc;
 
 pub use crate::gpu_processing::{get_or_init_gpu_context, process_and_get_dynamic_image};
-use crate::{AppState, mask_generation::MaskDefinition, load_settings};
+use crate::{AppState, load_settings, mask_generation::MaskDefinition};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ImageMetadata {
@@ -67,7 +67,7 @@ pub fn apply_rotation(image: &DynamicImage, rotation_degrees: f32) -> DynamicIma
     }
 
     let rgba_image = image.to_rgba8();
-    
+
     let rotated = rotate_about_center(
         &rgba_image,
         rotation_degrees * PI / 180.0,
@@ -166,7 +166,7 @@ pub struct GlobalAdjustments {
     pub temperature: f32,
     pub tint: f32,
     pub vibrance: f32,
-    
+
     pub sharpness: f32,
     pub luma_noise_reduction: f32,
     pub color_noise_reduction: f32,
@@ -233,14 +233,14 @@ pub struct MaskAdjustments {
     pub temperature: f32,
     pub tint: f32,
     pub vibrance: f32,
-    
+
     pub sharpness: f32,
     pub luma_noise_reduction: f32,
     pub color_noise_reduction: f32,
     pub clarity: f32,
     pub dehaze: f32,
     pub structure: f32,
-    
+
     _pad1: f32,
     _pad2: f32,
     _pad3: f32,
@@ -287,7 +287,7 @@ struct AdjustmentScales {
     temperature: f32,
     tint: f32,
     vibrance: f32,
-    
+
     sharpness: f32,
     luma_noise_reduction: f32,
     color_noise_reduction: f32,
@@ -326,7 +326,7 @@ const SCALES: AdjustmentScales = AdjustmentScales {
     temperature: 25.0,
     tint: 100.0,
     vibrance: 100.0,
-    
+
     sharpness: 40.0,
     luma_noise_reduction: 100.0,
     color_noise_reduction: 100.0,
@@ -358,15 +358,24 @@ fn parse_hsl_adjustments(js_hsl: &serde_json::Value) -> [HslColor; 8] {
     let mut hsl_array = [HslColor::default(); 8];
     if let Some(hsl_map) = js_hsl.as_object() {
         let color_map = [
-            ("reds", 0), ("oranges", 1), ("yellows", 2), ("greens", 3),
-            ("aquas", 4), ("blues", 5), ("purples", 6), ("magentas", 7),
+            ("reds", 0),
+            ("oranges", 1),
+            ("yellows", 2),
+            ("greens", 3),
+            ("aquas", 4),
+            ("blues", 5),
+            ("purples", 6),
+            ("magentas", 7),
         ];
         for (name, index) in color_map.iter() {
             if let Some(color_data) = hsl_map.get(*name) {
                 hsl_array[*index] = HslColor {
-                    hue: color_data["hue"].as_f64().unwrap_or(0.0) as f32 * SCALES.hsl_hue_multiplier,
-                    saturation: color_data["saturation"].as_f64().unwrap_or(0.0) as f32 / SCALES.hsl_saturation,
-                    luminance: color_data["luminance"].as_f64().unwrap_or(0.0) as f32 / SCALES.hsl_luminance,
+                    hue: color_data["hue"].as_f64().unwrap_or(0.0) as f32
+                        * SCALES.hsl_hue_multiplier,
+                    saturation: color_data["saturation"].as_f64().unwrap_or(0.0) as f32
+                        / SCALES.hsl_saturation,
+                    luminance: color_data["luminance"].as_f64().unwrap_or(0.0) as f32
+                        / SCALES.hsl_luminance,
                     _pad: 0.0,
                 };
             }
@@ -381,8 +390,10 @@ fn parse_color_grade_settings(js_cg: &serde_json::Value) -> ColorGradeSettings {
     }
     ColorGradeSettings {
         hue: js_cg["hue"].as_f64().unwrap_or(0.0) as f32,
-        saturation: js_cg["saturation"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_grading_saturation,
-        luminance: js_cg["luminance"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_grading_luminance,
+        saturation: js_cg["saturation"].as_f64().unwrap_or(0.0) as f32
+            / SCALES.color_grading_saturation,
+        luminance: js_cg["luminance"].as_f64().unwrap_or(0.0) as f32
+            / SCALES.color_grading_luminance,
         _pad: 0.0,
     }
 }
@@ -391,7 +402,12 @@ fn convert_points_to_aligned(frontend_points: Vec<serde_json::Value>) -> [Point;
     let mut aligned_points = [Point::default(); 16];
     for (i, point) in frontend_points.iter().enumerate().take(16) {
         if let (Some(x), Some(y)) = (point["x"].as_f64(), point["y"].as_f64()) {
-            aligned_points[i] = Point { x: x as f32, y: y as f32, _pad1: 0.0, _pad2: 0.0 };
+            aligned_points[i] = Point {
+                x: x as f32,
+                y: y as f32,
+                _pad1: 0.0,
+                _pad2: 0.0,
+            };
         }
     }
     aligned_points
@@ -409,25 +425,55 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
             .and_then(|s| s.as_bool())
             .unwrap_or(true)
     };
-    
+
     let get_val = |section: &str, key: &str, scale: f32, default: Option<f64>| -> f32 {
         if is_visible(section) {
-            js_adjustments[key].as_f64().unwrap_or(default.unwrap_or(0.0)) as f32 / scale
+            js_adjustments[key]
+                .as_f64()
+                .unwrap_or(default.unwrap_or(0.0)) as f32
+                / scale
         } else {
-            if let Some(d) = default { d as f32 / scale } else { 0.0 }
+            if let Some(d) = default {
+                d as f32 / scale
+            } else {
+                0.0
+            }
         }
     };
 
     let curves_obj = js_adjustments.get("curves").cloned().unwrap_or_default();
-    let luma_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["luma"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
-    let red_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["red"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
-    let green_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["green"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
-    let blue_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["blue"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
+    let luma_points: Vec<serde_json::Value> = if is_visible("curves") {
+        curves_obj["luma"].as_array().cloned().unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let red_points: Vec<serde_json::Value> = if is_visible("curves") {
+        curves_obj["red"].as_array().cloned().unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let green_points: Vec<serde_json::Value> = if is_visible("curves") {
+        curves_obj["green"].as_array().cloned().unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let blue_points: Vec<serde_json::Value> = if is_visible("curves") {
+        curves_obj["blue"].as_array().cloned().unwrap_or_default()
+    } else {
+        Vec::new()
+    };
 
-    let cg_obj = js_adjustments.get("colorGrading").cloned().unwrap_or_default();
+    let cg_obj = js_adjustments
+        .get("colorGrading")
+        .cloned()
+        .unwrap_or_default();
 
-    let neg_conv_enabled = js_adjustments["enableNegativeConversion"].as_bool().unwrap_or(false);
-    let film_base_hex = js_adjustments["filmBaseColor"].as_str().unwrap_or("#ff8800");
+    let neg_conv_enabled = js_adjustments["enableNegativeConversion"]
+        .as_bool()
+        .unwrap_or(false);
+    let film_base_hex = js_adjustments["filmBaseColor"]
+        .as_str()
+        .unwrap_or("#ff8800");
     let film_base_rgb = if film_base_hex.starts_with('#') && film_base_hex.len() == 7 {
         let r = u8::from_str_radix(&film_base_hex[1..3], 16).unwrap_or(255) as f32 / 255.0;
         let g = u8::from_str_radix(&film_base_hex[3..5], 16).unwrap_or(136) as f32 / 255.0;
@@ -444,29 +490,69 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
         shadows: get_val("basic", "shadows", SCALES.shadows, None),
         whites: get_val("basic", "whites", SCALES.whites, None),
         blacks: get_val("basic", "blacks", SCALES.blacks, None),
-        
+
         saturation: get_val("color", "saturation", SCALES.saturation, None),
         temperature: get_val("color", "temperature", SCALES.temperature, None),
         tint: get_val("color", "tint", SCALES.tint, None),
         vibrance: get_val("color", "vibrance", SCALES.vibrance, None),
-        
+
         sharpness: get_val("details", "sharpness", SCALES.sharpness, None),
-        luma_noise_reduction: get_val("details", "lumaNoiseReduction", SCALES.luma_noise_reduction, None),
-        color_noise_reduction: get_val("details", "colorNoiseReduction", SCALES.color_noise_reduction, None),
-        
+        luma_noise_reduction: get_val(
+            "details",
+            "lumaNoiseReduction",
+            SCALES.luma_noise_reduction,
+            None,
+        ),
+        color_noise_reduction: get_val(
+            "details",
+            "colorNoiseReduction",
+            SCALES.color_noise_reduction,
+            None,
+        ),
+
         clarity: get_val("effects", "clarity", SCALES.clarity, None),
         dehaze: get_val("effects", "dehaze", SCALES.dehaze, None),
         structure: get_val("effects", "structure", SCALES.structure, None),
         vignette_amount: get_val("effects", "vignetteAmount", SCALES.vignette_amount, None),
-        vignette_midpoint: get_val("effects", "vignetteMidpoint", SCALES.vignette_midpoint, Some(50.0)),
-        vignette_roundness: get_val("effects", "vignetteRoundness", SCALES.vignette_roundness, Some(0.0)),
-        vignette_feather: get_val("effects", "vignetteFeather", SCALES.vignette_feather, Some(50.0)),
+        vignette_midpoint: get_val(
+            "effects",
+            "vignetteMidpoint",
+            SCALES.vignette_midpoint,
+            Some(50.0),
+        ),
+        vignette_roundness: get_val(
+            "effects",
+            "vignetteRoundness",
+            SCALES.vignette_roundness,
+            Some(0.0),
+        ),
+        vignette_feather: get_val(
+            "effects",
+            "vignetteFeather",
+            SCALES.vignette_feather,
+            Some(50.0),
+        ),
         grain_amount: get_val("effects", "grainAmount", SCALES.grain_amount, None),
         grain_size: get_val("effects", "grainSize", SCALES.grain_size, Some(25.0)),
-        grain_roughness: get_val("effects", "grainRoughness", SCALES.grain_roughness, Some(50.0)),
-        
-        chromatic_aberration_red_cyan: get_val("details", "chromaticAberrationRedCyan", SCALES.chromatic_aberration, None),
-        chromatic_aberration_blue_yellow: get_val("details", "chromaticAberrationBlueYellow", SCALES.chromatic_aberration, None),
+        grain_roughness: get_val(
+            "effects",
+            "grainRoughness",
+            SCALES.grain_roughness,
+            Some(50.0),
+        ),
+
+        chromatic_aberration_red_cyan: get_val(
+            "details",
+            "chromaticAberrationRedCyan",
+            SCALES.chromatic_aberration,
+            None,
+        ),
+        chromatic_aberration_blue_yellow: get_val(
+            "details",
+            "chromaticAberrationBlueYellow",
+            SCALES.chromatic_aberration,
+            None,
+        ),
         _pad_ca1: 0.0,
         _pad_ca2: 0.0,
 
@@ -474,26 +560,61 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
         film_base_r: film_base_rgb[0],
         film_base_g: film_base_rgb[1],
         film_base_b: film_base_rgb[2],
-        negative_red_balance: js_adjustments["negativeRedBalance"].as_f64().unwrap_or(0.0) as f32 / 100.0,
-        negative_green_balance: js_adjustments["negativeGreenBalance"].as_f64().unwrap_or(0.0) as f32 / 100.0,
-        negative_blue_balance: js_adjustments["negativeBlueBalance"].as_f64().unwrap_or(0.0) as f32 / 100.0,
+        negative_red_balance: js_adjustments["negativeRedBalance"].as_f64().unwrap_or(0.0) as f32
+            / 100.0,
+        negative_green_balance: js_adjustments["negativeGreenBalance"]
+            .as_f64()
+            .unwrap_or(0.0) as f32
+            / 100.0,
+        negative_blue_balance: js_adjustments["negativeBlueBalance"]
+            .as_f64()
+            .unwrap_or(0.0) as f32
+            / 100.0,
         _pad_neg1: 0.0,
         _pad_neg2: 0.0,
 
-        has_lut: if js_adjustments["lutPath"].is_string() { 1 } else { 0 },
+        has_lut: if js_adjustments["lutPath"].is_string() {
+            1
+        } else {
+            0
+        },
         lut_intensity: js_adjustments["lutIntensity"].as_f64().unwrap_or(100.0) as f32 / 100.0,
         _pad_lut1: 0.0,
         _pad_lut2: 0.0,
 
-        color_grading_shadows: if is_visible("color") { parse_color_grade_settings(&cg_obj["shadows"]) } else { ColorGradeSettings::default() },
-        color_grading_midtones: if is_visible("color") { parse_color_grade_settings(&cg_obj["midtones"]) } else { ColorGradeSettings::default() },
-        color_grading_highlights: if is_visible("color") { parse_color_grade_settings(&cg_obj["highlights"]) } else { ColorGradeSettings::default() },
-        color_grading_blending: if is_visible("color") { cg_obj["blending"].as_f64().unwrap_or(50.0) as f32 / SCALES.color_grading_blending } else { 0.5 },
-        color_grading_balance: if is_visible("color") { cg_obj["balance"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_grading_balance } else { 0.0 },
+        color_grading_shadows: if is_visible("color") {
+            parse_color_grade_settings(&cg_obj["shadows"])
+        } else {
+            ColorGradeSettings::default()
+        },
+        color_grading_midtones: if is_visible("color") {
+            parse_color_grade_settings(&cg_obj["midtones"])
+        } else {
+            ColorGradeSettings::default()
+        },
+        color_grading_highlights: if is_visible("color") {
+            parse_color_grade_settings(&cg_obj["highlights"])
+        } else {
+            ColorGradeSettings::default()
+        },
+        color_grading_blending: if is_visible("color") {
+            cg_obj["blending"].as_f64().unwrap_or(50.0) as f32 / SCALES.color_grading_blending
+        } else {
+            0.5
+        },
+        color_grading_balance: if is_visible("color") {
+            cg_obj["balance"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_grading_balance
+        } else {
+            0.0
+        },
         _pad2: 0.0,
         _pad3: 0.0,
 
-        hsl: if is_visible("color") { parse_hsl_adjustments(&js_adjustments.get("hsl").cloned().unwrap_or_default()) } else { [HslColor::default(); 8] },
+        hsl: if is_visible("color") {
+            parse_hsl_adjustments(&js_adjustments.get("hsl").cloned().unwrap_or_default())
+        } else {
+            [HslColor::default(); 8]
+        },
         luma_curve: convert_points_to_aligned(luma_points.clone()),
         red_curve: convert_points_to_aligned(red_points.clone()),
         green_curve: convert_points_to_aligned(green_points.clone()),
@@ -517,7 +638,7 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
             .and_then(|s| s.as_bool())
             .unwrap_or(true)
     };
-    
+
     let get_val = |section: &str, key: &str, scale: f32| -> f32 {
         if is_visible(section) {
             adj[key].as_f64().unwrap_or(0.0) as f32 / scale
@@ -527,10 +648,26 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
     };
 
     let curves_obj = adj.get("curves").cloned().unwrap_or_default();
-    let luma_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["luma"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
-    let red_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["red"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
-    let green_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["green"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
-    let blue_points: Vec<serde_json::Value> = if is_visible("curves") { curves_obj["blue"].as_array().cloned().unwrap_or_default() } else { Vec::new() };
+    let luma_points: Vec<serde_json::Value> = if is_visible("curves") {
+        curves_obj["luma"].as_array().cloned().unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let red_points: Vec<serde_json::Value> = if is_visible("curves") {
+        curves_obj["red"].as_array().cloned().unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let green_points: Vec<serde_json::Value> = if is_visible("curves") {
+        curves_obj["green"].as_array().cloned().unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let blue_points: Vec<serde_json::Value> = if is_visible("curves") {
+        curves_obj["blue"].as_array().cloned().unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     let cg_obj = adj.get("colorGrading").cloned().unwrap_or_default();
 
     MaskAdjustments {
@@ -540,31 +677,62 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         shadows: get_val("basic", "shadows", SCALES.shadows),
         whites: get_val("basic", "whites", SCALES.whites),
         blacks: get_val("basic", "blacks", SCALES.blacks),
-        
+
         saturation: get_val("color", "saturation", SCALES.saturation),
         temperature: get_val("color", "temperature", SCALES.temperature),
         tint: get_val("color", "tint", SCALES.tint),
         vibrance: get_val("color", "vibrance", SCALES.vibrance),
-        
+
         sharpness: get_val("details", "sharpness", SCALES.sharpness),
         luma_noise_reduction: get_val("details", "lumaNoiseReduction", SCALES.luma_noise_reduction),
-        color_noise_reduction: get_val("details", "colorNoiseReduction", SCALES.color_noise_reduction),
-        
+        color_noise_reduction: get_val(
+            "details",
+            "colorNoiseReduction",
+            SCALES.color_noise_reduction,
+        ),
+
         clarity: get_val("effects", "clarity", SCALES.clarity),
         dehaze: get_val("effects", "dehaze", SCALES.dehaze),
         structure: get_val("effects", "structure", SCALES.structure),
-        
-        _pad1: 0.0, _pad2: 0.0, _pad3: 0.0, _pad4: 0.0,
 
-        color_grading_shadows: if is_visible("color") { parse_color_grade_settings(&cg_obj["shadows"]) } else { ColorGradeSettings::default() },
-        color_grading_midtones: if is_visible("color") { parse_color_grade_settings(&cg_obj["midtones"]) } else { ColorGradeSettings::default() },
-        color_grading_highlights: if is_visible("color") { parse_color_grade_settings(&cg_obj["highlights"]) } else { ColorGradeSettings::default() },
-        color_grading_blending: if is_visible("color") { cg_obj["blending"].as_f64().unwrap_or(50.0) as f32 / SCALES.color_grading_blending } else { 0.5 },
-        color_grading_balance: if is_visible("color") { cg_obj["balance"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_grading_balance } else { 0.0 },
+        _pad1: 0.0,
+        _pad2: 0.0,
+        _pad3: 0.0,
+        _pad4: 0.0,
+
+        color_grading_shadows: if is_visible("color") {
+            parse_color_grade_settings(&cg_obj["shadows"])
+        } else {
+            ColorGradeSettings::default()
+        },
+        color_grading_midtones: if is_visible("color") {
+            parse_color_grade_settings(&cg_obj["midtones"])
+        } else {
+            ColorGradeSettings::default()
+        },
+        color_grading_highlights: if is_visible("color") {
+            parse_color_grade_settings(&cg_obj["highlights"])
+        } else {
+            ColorGradeSettings::default()
+        },
+        color_grading_blending: if is_visible("color") {
+            cg_obj["blending"].as_f64().unwrap_or(50.0) as f32 / SCALES.color_grading_blending
+        } else {
+            0.5
+        },
+        color_grading_balance: if is_visible("color") {
+            cg_obj["balance"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_grading_balance
+        } else {
+            0.0
+        },
         _pad5: 0.0,
         _pad6: 0.0,
 
-        hsl: if is_visible("color") { parse_hsl_adjustments(&adj.get("hsl").cloned().unwrap_or_default()) } else { [HslColor::default(); 8] },
+        hsl: if is_visible("color") {
+            parse_hsl_adjustments(&adj.get("hsl").cloned().unwrap_or_default())
+        } else {
+            [HslColor::default(); 8]
+        },
         luma_curve: convert_points_to_aligned(luma_points.clone()),
         red_curve: convert_points_to_aligned(red_points.clone()),
         green_curve: convert_points_to_aligned(green_points.clone()),
@@ -581,11 +749,17 @@ pub fn get_all_adjustments_from_json(js_adjustments: &serde_json::Value) -> AllA
     let mut mask_adjustments = [MaskAdjustments::default(); 16];
     let mut mask_count = 0;
 
-    let mask_definitions: Vec<MaskDefinition> = js_adjustments.get("masks")
+    let mask_definitions: Vec<MaskDefinition> = js_adjustments
+        .get("masks")
         .and_then(|m| serde_json::from_value(m.clone()).ok())
         .unwrap_or_else(Vec::new);
 
-    for (i, mask_def) in mask_definitions.iter().filter(|m| m.visible).enumerate().take(16) {
+    for (i, mask_def) in mask_definitions
+        .iter()
+        .filter(|m| m.visible)
+        .enumerate()
+        .take(16)
+    {
         mask_adjustments[i] = get_mask_adjustments_from_json(&mask_def.adjustments);
         mask_count += 1;
     }
@@ -616,16 +790,24 @@ pub struct HistogramData {
 }
 
 #[tauri::command]
-pub fn generate_histogram(state: tauri::State<AppState>, app_handle: tauri::AppHandle) -> Result<HistogramData, String> {
+pub fn generate_histogram(
+    state: tauri::State<AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<HistogramData, String> {
     let cached_preview_lock = state.cached_preview.lock().unwrap();
 
     if let Some(cached) = &*cached_preview_lock {
         calculate_histogram_from_image(&cached.image)
     } else {
         drop(cached_preview_lock);
-        let image = state.original_image.lock().unwrap().as_ref()
+        let image = state
+            .original_image
+            .lock()
+            .unwrap()
+            .as_ref()
             .ok_or("No image loaded to generate histogram")?
-            .image.clone();
+            .image
+            .clone();
 
         let settings = load_settings(app_handle).unwrap_or_default();
         let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
@@ -667,14 +849,23 @@ pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramD
     normalize_histogram_range(&mut blue, 0.99);
     normalize_histogram_range(&mut luma, 0.99);
 
-    Ok(HistogramData { red, green, blue, luma })
+    Ok(HistogramData {
+        red,
+        green,
+        blue,
+        luma,
+    })
 }
 
 fn apply_gaussian_smoothing(histogram: &mut Vec<f32>, sigma: f32) {
-    if sigma <= 0.0 { return; }
-    
+    if sigma <= 0.0 {
+        return;
+    }
+
     let kernel_radius = (sigma * 3.0).ceil() as usize;
-    if kernel_radius == 0 || kernel_radius >= histogram.len() { return; }
+    if kernel_radius == 0 || kernel_radius >= histogram.len() {
+        return;
+    }
 
     let kernel_size = 2 * kernel_radius + 1;
     let mut kernel = vec![0.0; kernel_size];
@@ -710,11 +901,13 @@ fn apply_gaussian_smoothing(histogram: &mut Vec<f32>, sigma: f32) {
 }
 
 fn normalize_histogram_range(histogram: &mut Vec<f32>, percentile_clip: f32) {
-    if histogram.is_empty() { return; }
+    if histogram.is_empty() {
+        return;
+    }
 
     let mut sorted_data = histogram.clone();
     sorted_data.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    
+
     let clip_index = ((sorted_data.len() - 1) as f32 * percentile_clip).round() as usize;
     let max_val = sorted_data[clip_index.min(sorted_data.len() - 1)];
 
@@ -741,16 +934,24 @@ pub struct WaveformData {
 }
 
 #[tauri::command]
-pub fn generate_waveform(state: tauri::State<AppState>, app_handle: tauri::AppHandle) -> Result<WaveformData, String> {
+pub fn generate_waveform(
+    state: tauri::State<AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<WaveformData, String> {
     let cached_preview_lock = state.cached_preview.lock().unwrap();
 
     if let Some(cached) = &*cached_preview_lock {
         calculate_waveform_from_image(&cached.image)
     } else {
         drop(cached_preview_lock);
-        let image = state.original_image.lock().unwrap().as_ref()
+        let image = state
+            .original_image
+            .lock()
+            .unwrap()
+            .as_ref()
             .ok_or("No image loaded to generate waveform")?
-            .image.clone();
+            .image
+            .clone();
 
         let settings = load_settings(app_handle).unwrap_or_default();
         let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
@@ -766,11 +967,16 @@ pub fn calculate_waveform_from_image(image: &DynamicImage) -> Result<WaveformDat
     if image.width() == 0 || image.height() == 0 {
         return Err("Image has zero dimensions.".to_string());
     }
-    let preview_height = (image.height() as f32 * (WAVEFORM_WIDTH as f32 / image.width() as f32)).round() as u32;
+    let preview_height =
+        (image.height() as f32 * (WAVEFORM_WIDTH as f32 / image.width() as f32)).round() as u32;
     if preview_height == 0 {
         return Err("Image has zero height after scaling for waveform.".to_string());
     }
-    let preview = image.resize(WAVEFORM_WIDTH, preview_height, image::imageops::FilterType::Triangle);
+    let preview = image.resize(
+        WAVEFORM_WIDTH,
+        preview_height,
+        image::imageops::FilterType::Triangle,
+    );
     let rgb_image = preview.to_rgb8();
 
     let mut red = vec![0; (WAVEFORM_WIDTH * WAVEFORM_HEIGHT) as usize];
@@ -850,12 +1056,18 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
     let mut cumulative_sum = 0u32;
     for i in 0..256 {
         cumulative_sum += luma_hist[i];
-        if cumulative_sum > clip_threshold { black_point = i; break; }
+        if cumulative_sum > clip_threshold {
+            black_point = i;
+            break;
+        }
     }
     cumulative_sum = 0;
     for i in (0..256).rev() {
         cumulative_sum += luma_hist[i];
-        if cumulative_sum > clip_threshold { white_point = i; break; }
+        if cumulative_sum > clip_threshold {
+            white_point = i;
+            break;
+        }
     }
 
     let mid_point = (black_point + white_point) / 2;
@@ -929,7 +1141,8 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
     let mut edge_luma_sum = 0.0;
     let mut edge_pixel_count = 0;
     for (x, y, pixel) in rgb_image.enumerate_pixels() {
-        let luma = (0.2126 * pixel[0] as f32 + 0.7152 * pixel[1] as f32 + 0.0722 * pixel[2] as f32) / 255.0;
+        let luma = (0.2126 * pixel[0] as f32 + 0.7152 * pixel[1] as f32 + 0.0722 * pixel[2] as f32)
+            / 255.0;
         if x >= center_x_start && x < center_x_end && y >= center_y_start && y < center_y_end {
             center_luma_sum += luma;
             center_pixel_count += 1;
@@ -951,15 +1164,40 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
     }
 
     println!("\n--- Auto Adjustments Analysis ---");
-    println!("Tonal Range: black_point={:.1}, white_point={:.1}, mid_point={:.1}, range={:.1}", black_point, white_point, mid_point, range);
-    println!("Distribution: shadow_percent={:.2}%, highlight_percent={:.2}%", shadow_percent * 100.0, highlight_percent * 100.0);
-    println!("White Balance Trigger: bright_r={:.1}, bright_g={:.1}, bright_b={:.1}", bright_r, bright_g, bright_b);
-    println!("Saturation: mean_saturation={:.3}, dull_pixel_percent={:.2}%", mean_saturation, dull_pixel_percent * 100.0);
-    println!("Dehaze Trigger: range < 128.0 ({}), mean_saturation < 0.15 ({})", range < 128.0, mean_saturation < 0.15);
-    println!("Vignette: center_luma={:.3}, edge_luma={:.3}", avg_center_luma, avg_edge_luma);
+    println!(
+        "Tonal Range: black_point={:.1}, white_point={:.1}, mid_point={:.1}, range={:.1}",
+        black_point, white_point, mid_point, range
+    );
+    println!(
+        "Distribution: shadow_percent={:.2}%, highlight_percent={:.2}%",
+        shadow_percent * 100.0,
+        highlight_percent * 100.0
+    );
+    println!(
+        "White Balance Trigger: bright_r={:.1}, bright_g={:.1}, bright_b={:.1}",
+        bright_r, bright_g, bright_b
+    );
+    println!(
+        "Saturation: mean_saturation={:.3}, dull_pixel_percent={:.2}%",
+        mean_saturation,
+        dull_pixel_percent * 100.0
+    );
+    println!(
+        "Dehaze Trigger: range < 128.0 ({}), mean_saturation < 0.15 ({})",
+        range < 128.0,
+        mean_saturation < 0.15
+    );
+    println!(
+        "Vignette: center_luma={:.3}, edge_luma={:.3}",
+        avg_center_luma, avg_edge_luma
+    );
     println!("---------------------------------");
     println!("Calculated Values (pre-clamp):");
-    println!("  Exposure: {:.2}, Contrast: {:.2}", exposure / 20.0, contrast);
+    println!(
+        "  Exposure: {:.2}, Contrast: {:.2}",
+        exposure / 20.0,
+        contrast
+    );
     println!("  Highlights: {:.2}, Shadows: {:.2}", highlights, shadows);
     println!("  Temperature: {:.2}, Tint: {:.2}", temperature, tint);
     println!("  Vibrance: {:.2}, Dehaze: {:.2}", vibrancy, dehaze);
@@ -999,11 +1237,17 @@ pub fn auto_results_to_json(results: &AutoAdjustmentResults) -> serde_json::Valu
 }
 
 #[tauri::command]
-pub fn calculate_auto_adjustments(state: tauri::State<AppState>) -> Result<serde_json::Value, String> {
-    let original_image = state.original_image.lock().unwrap()
+pub fn calculate_auto_adjustments(
+    state: tauri::State<AppState>,
+) -> Result<serde_json::Value, String> {
+    let original_image = state
+        .original_image
+        .lock()
+        .unwrap()
         .as_ref()
         .ok_or("No image loaded for auto adjustments")?
-        .image.clone();
+        .image
+        .clone();
 
     let results = perform_auto_analysis(&original_image);
 

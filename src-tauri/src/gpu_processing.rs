@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bytemuck;
-use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba, Luma};
+use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba};
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
 use crate::AppState;
@@ -14,11 +14,15 @@ pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuCont
         return Ok(context.clone());
     }
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
-    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-        .ok_or("Failed to find a wgpu adapter.")?;
+    let adapter =
+        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
+            .ok_or("Failed to find a wgpu adapter.")?;
 
     let mut required_features = wgpu::Features::empty();
-    if adapter.features().contains(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES) {
+    if adapter
+        .features()
+        .contains(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES)
+    {
         required_features |= wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
     }
 
@@ -31,7 +35,8 @@ pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuCont
             required_limits: limits.clone(),
         },
         None,
-    )).map_err(|e| e.to_string())?;
+    ))
+    .map_err(|e| e.to_string())?;
 
     let new_context = GpuContext {
         device: Arc::new(device),
@@ -60,12 +65,23 @@ fn read_texture_data(
         mapped_at_creation: false,
     });
 
-    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Readback Encoder") });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("Readback Encoder"),
+    });
     encoder.copy_texture_to_buffer(
-        wgpu::ImageCopyTexture { texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        wgpu::ImageCopyTexture {
+            texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
         wgpu::ImageCopyBuffer {
             buffer: &output_buffer,
-            layout: wgpu::ImageDataLayout { offset: 0, bytes_per_row: Some(padded_bytes_per_row), rows_per_image: Some(size.height) },
+            layout: wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(padded_bytes_per_row),
+                rows_per_image: Some(size.height),
+            },
         },
         size,
     );
@@ -73,7 +89,9 @@ fn read_texture_data(
     queue.submit(Some(encoder.finish()));
     let buffer_slice = output_buffer.slice(..);
     let (tx, rx) = std::sync::mpsc::channel();
-    buffer_slice.map_async(wgpu::MapMode::Read, move |result| { tx.send(result).unwrap(); });
+    buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+        tx.send(result).unwrap();
+    });
     device.poll(wgpu::Maintain::Wait);
     rx.recv().unwrap().map_err(|e| e.to_string())?;
 
@@ -105,7 +123,10 @@ pub fn run_gpu_processing(
     const MAX_MASKS: u32 = 16;
 
     if width > max_dim || height > max_dim {
-        return Err(format!("Image dimensions ({}x{}) exceed GPU limits ({}).", width, height, max_dim));
+        return Err(format!(
+            "Image dimensions ({}x{}) exceed GPU limits ({}).",
+            width, height, max_dim
+        ));
     }
 
     let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -115,26 +136,34 @@ pub fn run_gpu_processing(
 
     let mut bind_group_layout_entries = vec![
         wgpu::BindGroupLayoutEntry {
-            binding: 0, visibility: wgpu::ShaderStages::COMPUTE,
+            binding: 0,
+            visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Texture {
                 sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                view_dimension: wgpu::TextureViewDimension::D2, multisampled: false,
-            }, count: None,
+                view_dimension: wgpu::TextureViewDimension::D2,
+                multisampled: false,
+            },
+            count: None,
         },
         wgpu::BindGroupLayoutEntry {
-            binding: 1, visibility: wgpu::ShaderStages::COMPUTE,
+            binding: 1,
+            visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::StorageTexture {
                 access: wgpu::StorageTextureAccess::WriteOnly,
                 format: wgpu::TextureFormat::Rgba8Unorm,
                 view_dimension: wgpu::TextureViewDimension::D2,
-            }, count: None,
+            },
+            count: None,
         },
         wgpu::BindGroupLayoutEntry {
-            binding: 2, visibility: wgpu::ShaderStages::COMPUTE,
+            binding: 2,
+            visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Buffer {
                 ty: wgpu::BufferBindingType::Uniform,
-                has_dynamic_offset: false, min_binding_size: None,
-            }, count: None,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
         },
     ];
 
@@ -180,21 +209,33 @@ pub fn run_gpu_processing(
     });
 
     let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-        label: Some("Compute Pipeline"), layout: Some(&pipeline_layout),
-        module: &shader_module, entry_point: "main",
+        label: Some("Compute Pipeline"),
+        layout: Some(&pipeline_layout),
+        module: &shader_module,
+        entry_point: "main",
     });
 
     let img_rgba = image.to_rgba8();
-    let full_texture_size = wgpu::Extent3d { width, height, depth_or_array_layers: 1 };
+    let full_texture_size = wgpu::Extent3d {
+        width,
+        height,
+        depth_or_array_layers: 1,
+    };
 
     let input_texture = device.create_texture_with_data(
         queue,
         &wgpu::TextureDescriptor {
-            label: Some("Full Input Texture"), size: full_texture_size, mip_level_count: 1, sample_count: 1,
-            dimension: wgpu::TextureDimension::D2, format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, view_formats: &[],
+            label: Some("Full Input Texture"),
+            size: full_texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
         },
-        TextureDataOrder::MipMajor, &img_rgba,
+        TextureDataOrder::MipMajor,
+        &img_rgba,
     );
     let input_texture_view = input_texture.create_view(&Default::default());
 
@@ -203,19 +244,30 @@ pub fn run_gpu_processing(
         let mask_texture = device.create_texture_with_data(
             queue,
             &wgpu::TextureDescriptor {
-                label: Some("Full Mask Texture"), size: full_texture_size, mip_level_count: 1, sample_count: 1,
-                dimension: wgpu::TextureDimension::D2, format: wgpu::TextureFormat::R8Unorm,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, view_formats: &[],
+                label: Some("Full Mask Texture"),
+                size: full_texture_size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::R8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
             },
-            TextureDataOrder::MipMajor, mask_bitmap,
+            TextureDataOrder::MipMajor,
+            mask_bitmap,
         );
         mask_views.push(mask_texture.create_view(&Default::default()));
     }
 
     let dummy_mask_texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Dummy Mask Texture"),
-        size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
-        mip_level_count: 1, sample_count: 1,
+        size: wgpu::Extent3d {
+            width: 1,
+            height: 1,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::R8Unorm,
         usage: wgpu::TextureUsages::TEXTURE_BINDING,
@@ -239,8 +291,13 @@ pub fn run_gpu_processing(
             queue,
             &wgpu::TextureDescriptor {
                 label: Some("LUT 3D Texture"),
-                size: wgpu::Extent3d { width: size, height: size, depth_or_array_layers: size },
-                mip_level_count: 1, sample_count: 1,
+                size: wgpu::Extent3d {
+                    width: size,
+                    height: size,
+                    depth_or_array_layers: size,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
                 dimension: wgpu::TextureDimension::D3,
                 format: wgpu::TextureFormat::Rgba32Float,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
@@ -263,7 +320,11 @@ pub fn run_gpu_processing(
     } else {
         let dummy_lut_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Dummy LUT Texture"),
-            size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D3,
@@ -287,12 +348,21 @@ pub fn run_gpu_processing(
             let y_start = tile_y * tile_size;
             let tile_width = (width - x_start).min(tile_size);
             let tile_height = (height - y_start).min(tile_size);
-            let tile_texture_size = wgpu::Extent3d { width: tile_width, height: tile_height, depth_or_array_layers: 1 };
+            let tile_texture_size = wgpu::Extent3d {
+                width: tile_width,
+                height: tile_height,
+                depth_or_array_layers: 1,
+            };
 
             let output_texture = device.create_texture(&wgpu::TextureDescriptor {
-                label: Some("Output Tile Texture"), size: tile_texture_size, mip_level_count: 1, sample_count: 1,
-                dimension: wgpu::TextureDimension::D2, format: wgpu::TextureFormat::Rgba8Unorm,
-                usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC, view_formats: &[],
+                label: Some("Output Tile Texture"),
+                size: tile_texture_size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC,
+                view_formats: &[],
             });
             let output_texture_view = output_texture.create_view(&Default::default());
 
@@ -307,9 +377,18 @@ pub fn run_gpu_processing(
             });
 
             let mut bind_group_entries = vec![
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&input_texture_view) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&output_texture_view) },
-                wgpu::BindGroupEntry { binding: 2, resource: adjustments_buffer.as_entire_binding() },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&input_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&output_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: adjustments_buffer.as_entire_binding(),
+                },
             ];
 
             for i in 0..MAX_MASKS as usize {
@@ -335,24 +414,31 @@ pub fn run_gpu_processing(
                 entries: &bind_group_entries,
             });
 
-            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Tile Encoder") });
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Tile Encoder"),
+            });
             {
-                let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None, timestamp_writes: None });
+                let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: None,
+                    timestamp_writes: None,
+                });
                 compute_pass.set_pipeline(&compute_pipeline);
                 compute_pass.set_bind_group(0, &bind_group, &[]);
                 compute_pass.dispatch_workgroups((tile_width + 7) / 8, (tile_height + 7) / 8, 1);
             }
             queue.submit(Some(encoder.finish()));
 
-            let processed_tile_data = read_texture_data(device, queue, &output_texture, tile_texture_size)?;
+            let processed_tile_data =
+                read_texture_data(device, queue, &output_texture, tile_texture_size)?;
 
             for row in 0..tile_height {
                 let final_y = y_start + row;
                 let final_row_offset = (final_y * width + x_start) as usize * 4;
                 let tile_row_offset = (row * tile_width) as usize * 4;
                 let copy_bytes = (tile_width * 4) as usize;
-                final_pixels[final_row_offset..final_row_offset + copy_bytes]
-                    .copy_from_slice(&processed_tile_data[tile_row_offset..tile_row_offset + copy_bytes]);
+                final_pixels[final_row_offset..final_row_offset + copy_bytes].copy_from_slice(
+                    &processed_tile_data[tile_row_offset..tile_row_offset + copy_bytes],
+                );
             }
         }
     }
@@ -367,7 +453,8 @@ pub fn process_and_get_dynamic_image(
     mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
     lut: Option<Arc<Lut>>,
 ) -> Result<DynamicImage, String> {
-    let processed_pixels = run_gpu_processing(context, base_image, all_adjustments, mask_bitmaps, lut)?;
+    let processed_pixels =
+        run_gpu_processing(context, base_image, all_adjustments, mask_bitmaps, lut)?;
     let (width, height) = base_image.dimensions();
     let img_buf = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(width, height, processed_pixels)
         .ok_or("Failed to create image buffer from GPU data")?;

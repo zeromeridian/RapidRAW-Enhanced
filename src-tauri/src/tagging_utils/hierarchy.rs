@@ -1,13 +1,29 @@
-use std::collections::HashMap;
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 pub static TAG_HIERARCHY: Lazy<HashMap<&'static str, Vec<&'static str>>> = Lazy::new(|| {
     let mut m = HashMap::new();
 
     // --- People Hierarchy ---
     let people_children = [
-        "man", "woman", "child", "baby", "boy", "girl", "teenager", "adult", "senior",
-        "crowd", "family", "couple", "portrait", "self-portrait", "face", "hands", "feet", "candid",
+        "man",
+        "woman",
+        "child",
+        "baby",
+        "boy",
+        "girl",
+        "teenager",
+        "adult",
+        "senior",
+        "crowd",
+        "family",
+        "couple",
+        "portrait",
+        "self-portrait",
+        "face",
+        "hands",
+        "feet",
+        "candid",
     ];
     for child in people_children {
         m.insert(child, vec!["person", "people"]);
@@ -37,9 +53,34 @@ pub static TAG_HIERARCHY: Lazy<HashMap<&'static str, Vec<&'static str>>> = Lazy:
 
     // --- Nature & Landscape Hierarchy ---
     let nature_children = [
-        "mountain", "hill", "valley", "canyon", "desert", "forest", "jungle", "tree", "flower",
-        "field", "meadow", "grass", "farm", "garden", "park", "beach", "coast", "ocean", "sea",
-        "river", "lake", "waterfall", "island", "cave", "rock", "volcano", "glacier", "snow",
+        "mountain",
+        "hill",
+        "valley",
+        "canyon",
+        "desert",
+        "forest",
+        "jungle",
+        "tree",
+        "flower",
+        "field",
+        "meadow",
+        "grass",
+        "farm",
+        "garden",
+        "park",
+        "beach",
+        "coast",
+        "ocean",
+        "sea",
+        "river",
+        "lake",
+        "waterfall",
+        "island",
+        "cave",
+        "rock",
+        "volcano",
+        "glacier",
+        "snow",
     ];
     for child in nature_children {
         m.insert(child, vec!["nature", "landscape"]);
@@ -58,9 +99,26 @@ pub static TAG_HIERARCHY: Lazy<HashMap<&'static str, Vec<&'static str>>> = Lazy:
 
     // --- Architecture & Urban Hierarchy ---
     let architecture_children = [
-        "skyscraper", "bridge", "tunnel", "house", "home", "apartment", "cabin", "castle",
-        "church", "cathedral", "tower", "lighthouse", "ruins", "monument", "statue", "fountain",
-        "door", "window", "interior", "room",
+        "skyscraper",
+        "bridge",
+        "tunnel",
+        "house",
+        "home",
+        "apartment",
+        "cabin",
+        "castle",
+        "church",
+        "cathedral",
+        "tower",
+        "lighthouse",
+        "ruins",
+        "monument",
+        "statue",
+        "fountain",
+        "door",
+        "window",
+        "interior",
+        "room",
     ];
     for child in architecture_children {
         m.insert(child, vec!["architecture", "building"]);
@@ -71,7 +129,17 @@ pub static TAG_HIERARCHY: Lazy<HashMap<&'static str, Vec<&'static str>>> = Lazy:
 
     // --- Vehicle Hierarchy ---
     let vehicle_children = [
-        "car", "bicycle", "motorcycle", "bus", "train", "airplane", "boat", "ship", "truck", "van", "scooter",
+        "car",
+        "bicycle",
+        "motorcycle",
+        "bus",
+        "train",
+        "airplane",
+        "boat",
+        "ship",
+        "truck",
+        "van",
+        "scooter",
     ];
     for child in vehicle_children {
         m.insert(child, vec!["vehicle"]);
@@ -79,8 +147,23 @@ pub static TAG_HIERARCHY: Lazy<HashMap<&'static str, Vec<&'static str>>> = Lazy:
 
     // --- Food & Drink Hierarchy ---
     let food_children = [
-        "fruit", "apple", "banana", "orange", "vegetable", "carrot", "broccoli", "tomato",
-        "bread", "cake", "pizza", "pasta", "sushi", "burger", "sandwich", "salad", "soup",
+        "fruit",
+        "apple",
+        "banana",
+        "orange",
+        "vegetable",
+        "carrot",
+        "broccoli",
+        "tomato",
+        "bread",
+        "cake",
+        "pizza",
+        "pasta",
+        "sushi",
+        "burger",
+        "sandwich",
+        "salad",
+        "soup",
     ];
     for child in food_children {
         m.insert(child, vec!["food"]);

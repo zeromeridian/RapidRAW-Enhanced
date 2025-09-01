@@ -1,3 +1,4 @@
+use crate::image_processing::apply_orientation;
 use anyhow::Result;
 use image::DynamicImage;
 use rawler::{
@@ -6,7 +7,6 @@ use rawler::{
     rawimage::RawImage,
     rawsource::RawSource,
 };
-use crate::image_processing::apply_orientation;
 
 pub fn develop_raw_image(file_bytes: &[u8], fast_demosaic: bool) -> Result<DynamicImage> {
     let (developed_image, orientation) = develop_internal(file_bytes, fast_demosaic)?;
@@ -20,7 +20,9 @@ fn apply_tonemap_and_gamma(linear_val: f32) -> f32 {
     let c = 2.43;
     let d = 0.59;
     let e = 0.14;
-    let tonemapped = ((x * (a * x + b)) / (x * (c * x + d) + e)).max(0.0).min(1.0);
+    let tonemapped = ((x * (a * x + b)) / (x * (c * x + d) + e))
+        .max(0.0)
+        .min(1.0);
 
     if tonemapped <= 0.0031308 {
         tonemapped * 12.92
@@ -41,8 +43,18 @@ fn develop_internal(file_bytes: &[u8], fast_demosaic: bool) -> Result<(DynamicIm
         .map(Orientation::from_u16)
         .unwrap_or(Orientation::Normal);
 
-    let original_white_level = raw_image.whitelevel.0.get(0).cloned().unwrap_or(u16::MAX as u32) as f32;
-    let original_black_level = raw_image.blacklevel.levels.get(0).map(|r| r.as_f32()).unwrap_or(0.0);
+    let original_white_level = raw_image
+        .whitelevel
+        .0
+        .get(0)
+        .cloned()
+        .unwrap_or(u16::MAX as u32) as f32;
+    let original_black_level = raw_image
+        .blacklevel
+        .levels
+        .get(0)
+        .map(|r| r.as_f32())
+        .unwrap_or(0.0);
 
     let headroom_white_level = u32::MAX as f32;
     for level in raw_image.whitelevel.0.iter_mut() {
@@ -79,7 +91,8 @@ fn develop_internal(file_bytes: &[u8], fast_demosaic: bool) -> Result<(DynamicIm
 
                 let (final_r, final_g, final_b) = if max_c > 1.0 {
                     let min_c = r.min(g).min(b);
-                    let compression_factor = (1.0 - (max_c - 1.0) / (HIGHLIGHT_COMPRESSION_POINT - 1.0))
+                    let compression_factor = (1.0
+                        - (max_c - 1.0) / (HIGHLIGHT_COMPRESSION_POINT - 1.0))
                         .max(0.0)
                         .min(1.0);
                     let compressed_r = min_c + (r - min_c) * compression_factor;
@@ -89,7 +102,11 @@ fn develop_internal(file_bytes: &[u8], fast_demosaic: bool) -> Result<(DynamicIm
 
                     if compressed_max > 1e-6 {
                         let rescale = max_c / compressed_max;
-                        (compressed_r * rescale, compressed_g * rescale, compressed_b * rescale)
+                        (
+                            compressed_r * rescale,
+                            compressed_g * rescale,
+                            compressed_b * rescale,
+                        )
                     } else {
                         (max_c, max_c, max_c)
                     }

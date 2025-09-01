@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use image::{DynamicImage, GenericImageView};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -63,13 +63,28 @@ fn parse_cube(path: &Path) -> Result<Lut> {
                         ));
                     }
                     let r: f32 = parts[0].parse().map_err(|e| {
-                        anyhow!("Failed to parse R value on line {}: '{}'. Error: {}", line_num, line, e)
+                        anyhow!(
+                            "Failed to parse R value on line {}: '{}'. Error: {}",
+                            line_num,
+                            line,
+                            e
+                        )
                     })?;
                     let g: f32 = parts[1].parse().map_err(|e| {
-                        anyhow!("Failed to parse G value on line {}: '{}'. Error: {}", line_num, line, e)
+                        anyhow!(
+                            "Failed to parse G value on line {}: '{}'. Error: {}",
+                            line_num,
+                            line,
+                            e
+                        )
                     })?;
                     let b: f32 = parts[2].parse().map_err(|e| {
-                        anyhow!("Failed to parse B value on line {}: '{}'. Error: {}", line_num, line, e)
+                        anyhow!(
+                            "Failed to parse B value on line {}: '{}'. Error: {}",
+                            line_num,
+                            line,
+                            e
+                        )
                     })?;
                     data.push(r);
                     data.push(g);
@@ -126,7 +141,10 @@ fn parse_3dl(path: &Path) -> Result<Lut> {
     let size = (num_entries as f64).cbrt().round() as u32;
 
     if size * size * size != num_entries as u32 {
-        return Err(anyhow!("Invalid 3DL LUT data size: the number of entries ({}) is not a perfect cube.", num_entries));
+        return Err(anyhow!(
+            "Invalid 3DL LUT data size: the number of entries ({}) is not a perfect cube.",
+            num_entries
+        ));
     }
 
     Ok(Lut { size, data })
@@ -135,7 +153,11 @@ fn parse_3dl(path: &Path) -> Result<Lut> {
 fn parse_hald(image: DynamicImage) -> Result<Lut> {
     let (width, height) = image.dimensions();
     if width != height {
-        return Err(anyhow!("HALD image must be square, but dimensions are {}x{}", width, height));
+        return Err(anyhow!(
+            "HALD image must be square, but dimensions are {}x{}",
+            width,
+            height
+        ));
     }
 
     let total_pixels = width * height;
