@@ -534,12 +534,6 @@ fn find_best_match_local(
         let score_a = ssd_a + dist_sq_a * 0.05;
         let score_b = ssd_b + dist_sq_b * 0.05;
 
-        let dist_sq_a = ((px as i64 - ax as i64).pow(2) + (py as i64 - ay as i64).pow(2)) as f64;
-        let dist_sq_b = ((px as i64 - bx as i64).pow(2) + (py as i64 - by as i64).pow(2)) as f64;
-
-        let score_a = ssd_a + dist_sq_a * 0.05;
-        let score_b = ssd_b + dist_sq_b * 0.05;
-
         score_a.partial_cmp(&score_b).unwrap_or(Ordering::Equal)
     });
 

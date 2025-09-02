@@ -191,18 +191,6 @@ pub fn find_homography_ransac(
         })
         .collect();
 
-    let points: Vec<(Point2<f64>, Point2<f64>)> = matches
-        .iter()
-        .map(|m| {
-            let p1 = keypoints1[m.index1];
-            let p2 = keypoints2[m.index2];
-            (
-                Point2::new(p1.x as f64, p1.y as f64),
-                Point2::new(p2.x as f64, p2.y as f64),
-            )
-        })
-        .collect();
-
     if points.len() < 4 {
         return None;
     }
@@ -218,9 +206,6 @@ pub fn find_homography_ransac(
         if sample_indices.len() < 4 {
             continue;
         }
-
-        let sample_points: Vec<(Point2<f64>, Point2<f64>)> =
-            sample_indices.iter().map(|&i| points[i]).collect();
 
         let sample_points: Vec<(Point2<f64>, Point2<f64>)> =
             sample_indices.iter().map(|&i| points[i]).collect();
