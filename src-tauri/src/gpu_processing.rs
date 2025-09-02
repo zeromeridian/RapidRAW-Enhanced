@@ -4,7 +4,7 @@ use bytemuck;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba};
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
-use crate::AppState;
+use crate::{AppState, GpuImageCache};
 use crate::image_processing::{AllAdjustments, GpuContext};
 use crate::lut_processing::Lut;
 
@@ -111,14 +111,15 @@ fn read_texture_data(
 
 pub fn run_gpu_processing(
     context: &GpuContext,
-    image: &DynamicImage,
+    input_texture_view: &wgpu::TextureView,
+    width: u32,
+    height: u32,
     adjustments: AllAdjustments,
     mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
     lut: Option<Arc<Lut>>,
 ) -> Result<Vec<u8>, String> {
     let device = &context.device;
     let queue = &context.queue;
-    let (width, height) = image.dimensions();
     let max_dim = context.limits.max_texture_dimension_2d;
     const MAX_MASKS: u32 = 16;
 
@@ -217,29 +218,11 @@ pub fn run_gpu_processing(
         cache: None,
     });
 
-    let img_rgba = image.to_rgba8();
     let full_texture_size = wgpu::Extent3d {
         width,
         height,
         depth_or_array_layers: 1,
     };
-
-    let input_texture = device.create_texture_with_data(
-        queue,
-        &wgpu::TextureDescriptor {
-            label: Some("Full Input Texture"),
-            size: full_texture_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        },
-        TextureDataOrder::MipMajor,
-        &img_rgba,
-    );
-    let input_texture_view = input_texture.create_view(&Default::default());
 
     let mut mask_views = Vec::new();
     for mask_bitmap in mask_bitmaps.iter() {
@@ -450,14 +433,70 @@ pub fn run_gpu_processing(
 
 pub fn process_and_get_dynamic_image(
     context: &GpuContext,
+    state: &tauri::State<AppState>,
     base_image: &DynamicImage,
+    transform_hash: u64,
     all_adjustments: AllAdjustments,
     mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
     lut: Option<Arc<Lut>>,
 ) -> Result<DynamicImage, String> {
-    let processed_pixels =
-        run_gpu_processing(context, base_image, all_adjustments, mask_bitmaps, lut)?;
     let (width, height) = base_image.dimensions();
+    let device = &context.device;
+    let queue = &context.queue;
+
+    let mut cache_lock = state.gpu_image_cache.lock().unwrap();
+
+    if let Some(cache) = &*cache_lock {
+        if cache.transform_hash != transform_hash || cache.width != width || cache.height != height {
+            *cache_lock = None;
+        }
+    }
+
+    if cache_lock.is_none() {
+        let img_rgba = base_image.to_rgba8();
+        let texture_size = wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        };
+        let texture = device.create_texture_with_data(
+            queue,
+            &wgpu::TextureDescriptor {
+                label: Some("Cached Input Texture"),
+                size: texture_size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            },
+            TextureDataOrder::MipMajor,
+            &img_rgba,
+        );
+        let texture_view = texture.create_view(&Default::default());
+
+        *cache_lock = Some(GpuImageCache {
+            texture,
+            texture_view,
+            width,
+            height,
+            transform_hash,
+        });
+    }
+
+    let cache = cache_lock.as_ref().unwrap();
+
+    let processed_pixels = run_gpu_processing(
+        context,
+        &cache.texture_view,
+        cache.width,
+        cache.height,
+        all_adjustments,
+        mask_bitmaps,
+        lut,
+    )?;
+
     let img_buf = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(width, height, processed_pixels)
         .ok_or("Failed to create image buffer from GPU data")?;
     Ok(DynamicImage::ImageRgba8(img_buf))

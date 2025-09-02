@@ -44,6 +44,7 @@ use std::sync::Mutex;
 use tauri::{Emitter, Manager, ipc::Response};
 use tokio::sync::Mutex as TokioMutex;
 use tokio::task::JoinHandle;
+use wgpu::{Texture, TextureView};
 
 use crate::ai_processing::{
     AiForegroundMaskParameters, AiSkyMaskParameters, AiState, AiSubjectMaskParameters,
@@ -79,10 +80,19 @@ pub struct CachedPreview {
     unscaled_crop_offset: (f32, f32),
 }
 
+pub struct GpuImageCache {
+    pub texture: Texture,
+    pub texture_view: TextureView,
+    pub width: u32,
+    pub height: u32,
+    pub transform_hash: u64,
+}
+
 pub struct AppState {
     original_image: Mutex<Option<LoadedImage>>,
     cached_preview: Mutex<Option<CachedPreview>>,
     gpu_context: Mutex<Option<GpuContext>>,
+    gpu_image_cache: Mutex<Option<GpuImageCache>>,
     ai_state: Mutex<Option<AiState>>,
     ai_init_lock: TokioMutex<()>,
     export_task_handle: Mutex<Option<JoinHandle<()>>>,
@@ -346,6 +356,7 @@ async fn load_image(
     let original_image_bytes = buf.into_inner();
 
     *state.cached_preview.lock().unwrap() = None;
+    *state.gpu_image_cache.lock().unwrap() = None;
     *state.original_image.lock().unwrap() = Some(LoadedImage {
         path: path.clone(),
         image: pristine_img,
@@ -399,6 +410,7 @@ fn apply_adjustments(
                     cached.unscaled_crop_offset,
                 )
             } else {
+                *state.gpu_image_cache.lock().unwrap() = None;
                 let (base, scale, offset) =
                     generate_transformed_preview(&loaded_image, &adjustments_clone, &app_handle)?;
                 *cached_preview_lock = Some(CachedPreview {
@@ -410,6 +422,7 @@ fn apply_adjustments(
                 (base, scale, offset)
             }
         } else {
+            *state.gpu_image_cache.lock().unwrap() = None;
             let (base, scale, offset) =
                 generate_transformed_preview(&loaded_image, &adjustments_clone, &app_handle)?;
             *cached_preview_lock = Some(CachedPreview {
@@ -456,7 +469,9 @@ fn apply_adjustments(
 
         if let Ok(final_processed_image) = process_and_get_dynamic_image(
             &context,
+            &state,
             &final_preview_base,
+            new_transform_hash,
             final_adjustments,
             &mask_bitmaps,
             lut,
@@ -560,7 +575,9 @@ fn generate_uncropped_preview(
 
         if let Ok(processed_image) = process_and_get_dynamic_image(
             &context,
+            &state,
             &processing_base,
+            0,
             uncropped_adjustments,
             &mask_bitmaps,
             lut,
@@ -651,7 +668,9 @@ fn generate_fullscreen_preview(
 
     let final_image = process_and_get_dynamic_image(
         &context,
+        &state,
         &transformed_image,
+        0,
         all_adjustments,
         &mask_bitmaps,
         lut,
@@ -693,7 +712,9 @@ fn process_image_for_export(
 
     let mut final_image = process_and_get_dynamic_image(
         &context,
+        &state,
         &transformed_image,
+        0,
         all_adjustments,
         &mask_bitmaps,
         lut,
@@ -1431,7 +1452,9 @@ fn generate_preset_preview(
 
     let processed_image = process_and_get_dynamic_image(
         &context,
+        &state,
         &transformed_image,
+        0,
         all_adjustments,
         &mask_bitmaps,
         lut,
@@ -1827,6 +1850,7 @@ fn main() {
             original_image: Mutex::new(None),
             cached_preview: Mutex::new(None),
             gpu_context: Mutex::new(None),
+            gpu_image_cache: Mutex::new(None),
             ai_state: Mutex::new(None),
             ai_init_lock: TokioMutex::new(()),
             export_task_handle: Mutex::new(None),

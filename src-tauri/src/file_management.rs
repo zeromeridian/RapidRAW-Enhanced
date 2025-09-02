@@ -449,7 +449,9 @@ pub fn generate_thumbnail_data(
 
             if let Ok(processed_image) = gpu_processing::process_and_get_dynamic_image(
                 context,
+                &state,
                 &cropped_preview,
+                0,
                 gpu_adjustments,
                 &mask_bitmaps,
                 lut,
