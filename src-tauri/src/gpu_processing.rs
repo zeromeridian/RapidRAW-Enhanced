@@ -13,10 +13,11 @@ pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuCont
     if let Some(context) = &*context_lock {
         return Ok(context.clone());
     }
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
+    let instance_desc = wgpu::InstanceDescriptor::from_env_or_default();
+    let instance = wgpu::Instance::new(&instance_desc);
     let adapter =
         pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-            .ok_or("Failed to find a wgpu adapter.")?;
+            .map_err(|e| format!("Failed to find a wgpu adapter: {}", e))?;
 
     let mut required_features = wgpu::Features::empty();
     if adapter
@@ -28,14 +29,13 @@ pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuCont
 
     let limits = adapter.limits();
 
-    let (device, queue) = pollster::block_on(adapter.request_device(
-        &wgpu::DeviceDescriptor {
-            label: Some("Processing Device"),
-            required_features,
-            required_limits: limits.clone(),
-        },
-        None,
-    ))
+    let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+        label: Some("Processing Device"),
+        required_features,
+        required_limits: limits.clone(),
+        memory_hints: wgpu::MemoryHints::Performance,
+        trace: wgpu::Trace::Off,
+    }))
     .map_err(|e| e.to_string())?;
 
     let new_context = GpuContext {
@@ -69,15 +69,15 @@ fn read_texture_data(
         label: Some("Readback Encoder"),
     });
     encoder.copy_texture_to_buffer(
-        wgpu::ImageCopyTexture {
+        wgpu::TexelCopyTextureInfo {
             texture,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
             aspect: wgpu::TextureAspect::All,
         },
-        wgpu::ImageCopyBuffer {
+        wgpu::TexelCopyBufferInfo {
             buffer: &output_buffer,
-            layout: wgpu::ImageDataLayout {
+            layout: wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(padded_bytes_per_row),
                 rows_per_image: Some(size.height),
@@ -92,7 +92,7 @@ fn read_texture_data(
     buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
         tx.send(result).unwrap();
     });
-    device.poll(wgpu::Maintain::Wait);
+    device.poll(wgpu::PollType::Wait).unwrap();
     rx.recv().unwrap().map_err(|e| e.to_string())?;
 
     let padded_data = buffer_slice.get_mapped_range().to_vec();
@@ -212,7 +212,9 @@ pub fn run_gpu_processing(
         label: Some("Compute Pipeline"),
         layout: Some(&pipeline_layout),
         module: &shader_module,
-        entry_point: "main",
+        entry_point: Some("main"),
+        compilation_options: Default::default(),
+        cache: None,
     });
 
     let img_rgba = image.to_rgba8();

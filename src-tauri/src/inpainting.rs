@@ -492,12 +492,12 @@ fn find_best_match_local(
         return (px, py);
     }
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let search_sample: Vec<_> = if local_candidates.len() > max_samples {
-        local_candidates
-            .choose_multiple(&mut rng, max_samples)
-            .cloned()
-            .collect()
+        let mut shuffled = local_candidates.clone();
+        shuffled.shuffle(&mut rng);
+        shuffled.truncate(max_samples);
+        shuffled
     } else {
         local_candidates
     };
@@ -527,6 +527,12 @@ fn find_best_match_local(
             patch_radius,
             kernel,
         );
+
+        let dist_sq_a = ((px as i64 - ax as i64).pow(2) + (py as i64 - ay as i64).pow(2)) as f64;
+        let dist_sq_b = ((px as i64 - bx as i64).pow(2) + (py as i64 - by as i64).pow(2)) as f64;
+
+        let score_a = ssd_a + dist_sq_a * 0.05;
+        let score_b = ssd_b + dist_sq_b * 0.05;
 
         let dist_sq_a = ((px as i64 - ax as i64).pow(2) + (py as i64 - ay as i64).pow(2)) as f64;
         let dist_sq_b = ((px as i64 - bx as i64).pow(2) + (py as i64 - by as i64).pow(2)) as f64;

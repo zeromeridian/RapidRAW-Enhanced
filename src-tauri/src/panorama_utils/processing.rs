@@ -4,7 +4,7 @@ use imageproc::corners::{Corner, corners_fast9};
 use imageproc::filter::gaussian_blur_f32;
 use nalgebra::{Matrix3, Point2, SVD};
 use rand::prelude::*;
-use rand::thread_rng;
+use rand::rng;
 use rayon::prelude::*;
 
 const MAX_PROCESSING_DIMENSION: u32 = 1600;
@@ -81,7 +81,11 @@ fn non_maximal_suppression(corners: &[Corner], radius: f32) -> Vec<KeyPoint> {
 pub fn generate_brief_pairs() -> Vec<(Point2<i32>, Point2<i32>)> {
     let mut rng = StdRng::seed_from_u64(12345);
     let half_patch = BRIEF_PATCH_SIZE as i32 / 2;
-    let distribution = rand::distributions::Uniform::new(-half_patch, half_patch);
+    let distribution = match rand::distr::Uniform::new(-half_patch, half_patch) {
+        Ok(dist) => dist,
+        Err(e) => panic!("Failed to create uniform distribution: {}", e),
+    };
+
     (0..BRIEF_DESCRIPTOR_SIZE)
         .map(|_| {
             (
@@ -171,9 +175,21 @@ pub fn find_homography_ransac(
     keypoints1: &[KeyPoint],
     keypoints2: &[KeyPoint],
 ) -> Option<(Matrix3<f64>, Vec<Match>)> {
-    let mut rng = thread_rng();
+    let mut rng = rng();
     let mut best_h: Option<Matrix3<f64>> = None;
     let mut best_inliers: Vec<Match> = Vec::new();
+
+    let points: Vec<(Point2<f64>, Point2<f64>)> = matches
+        .iter()
+        .map(|m| {
+            let p1 = keypoints1[m.index1];
+            let p2 = keypoints2[m.index2];
+            (
+                Point2::new(p1.x as f64, p1.y as f64),
+                Point2::new(p2.x as f64, p2.y as f64),
+            )
+        })
+        .collect();
 
     let points: Vec<(Point2<f64>, Point2<f64>)> = matches
         .iter()
@@ -202,6 +218,9 @@ pub fn find_homography_ransac(
         if sample_indices.len() < 4 {
             continue;
         }
+
+        let sample_points: Vec<(Point2<f64>, Point2<f64>)> =
+            sample_indices.iter().map(|&i| points[i]).collect();
 
         let sample_points: Vec<(Point2<f64>, Point2<f64>)> =
             sample_indices.iter().map(|&i| points[i]).collect();
