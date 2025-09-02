@@ -92,7 +92,7 @@ fn read_texture_data(
     buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
         tx.send(result).unwrap();
     });
-    device.poll(wgpu::PollType::Poll).unwrap();
+    device.poll(wgpu::PollType::Wait).unwrap();
     rx.recv().unwrap().map_err(|e| e.to_string())?;
 
     let padded_data = buffer_slice.get_mapped_range().to_vec();
