@@ -269,7 +269,7 @@ pub struct MaskAdjustments {
 #[repr(C)]
 pub struct AllAdjustments {
     pub global: GlobalAdjustments,
-    pub mask_adjustments: [MaskAdjustments; 16],
+    pub mask_adjustments: [MaskAdjustments; 14],
     pub mask_count: u32,
     pub tile_offset_x: u32,
     pub tile_offset_y: u32,
@@ -746,7 +746,7 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
 
 pub fn get_all_adjustments_from_json(js_adjustments: &serde_json::Value) -> AllAdjustments {
     let global = get_global_adjustments_from_json(js_adjustments);
-    let mut mask_adjustments = [MaskAdjustments::default(); 16];
+    let mut mask_adjustments = [MaskAdjustments::default(); 14];
     let mut mask_count = 0;
 
     let mask_definitions: Vec<MaskDefinition> = js_adjustments

@@ -121,7 +121,7 @@ pub fn run_gpu_processing(
     let device = &context.device;
     let queue = &context.queue;
     let max_dim = context.limits.max_texture_dimension_2d;
-    const MAX_MASKS: u32 = 16;
+    const MAX_MASKS: u32 = 14;
 
     if width > max_dim || height > max_dim {
         return Err(format!(

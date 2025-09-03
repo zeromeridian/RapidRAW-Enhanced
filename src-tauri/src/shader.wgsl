@@ -129,7 +129,7 @@ struct MaskAdjustments {
 
 struct AllAdjustments {
     global: GlobalAdjustments,
-    mask_adjustments: array<MaskAdjustments, 16>,
+    mask_adjustments: array<MaskAdjustments, 14>,
     mask_count: u32,
     tile_offset_x: u32,
     tile_offset_y: u32,
@@ -170,11 +170,9 @@ const HSL_RANGES: array<HslRange, 8> = array<HslRange, 8>(
 @group(0) @binding(14) var mask11: texture_2d<f32>;
 @group(0) @binding(15) var mask12: texture_2d<f32>;
 @group(0) @binding(16) var mask13: texture_2d<f32>;
-@group(0) @binding(17) var mask14: texture_2d<f32>;
-@group(0) @binding(18) var mask15: texture_2d<f32>;
 
-@group(0) @binding(19) var lut_texture: texture_3d<f32>;
-@group(0) @binding(20) var lut_sampler: sampler;
+@group(0) @binding(17) var lut_texture: texture_3d<f32>;
+@group(0) @binding(18) var lut_sampler: sampler;
 
 const LUMA_COEFF = vec3<f32>(0.2126, 0.7152, 0.0722);
 
@@ -724,8 +722,6 @@ fn get_mask_influence(mask_index: u32, coords: vec2<u32>) -> f32 {
         case 11u: { return textureLoad(mask11, coords, 0).r; }
         case 12u: { return textureLoad(mask12, coords, 0).r; }
         case 13u: { return textureLoad(mask13, coords, 0).r; }
-        case 14u: { return textureLoad(mask14, coords, 0).r; }
-        case 15u: { return textureLoad(mask15, coords, 0).r; }
         default: { return 0.0; }
     }
 }
