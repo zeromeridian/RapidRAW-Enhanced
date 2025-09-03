@@ -758,7 +758,7 @@ pub fn get_all_adjustments_from_json(js_adjustments: &serde_json::Value) -> AllA
         .iter()
         .filter(|m| m.visible)
         .enumerate()
-        .take(16)
+        .take(14)
     {
         mask_adjustments[i] = get_mask_adjustments_from_json(&mask_def.adjustments);
         mask_count += 1;
