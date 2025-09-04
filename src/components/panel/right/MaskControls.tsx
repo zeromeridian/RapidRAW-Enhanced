@@ -22,7 +22,6 @@ import { INITIAL_MASK_ADJUSTMENTS, ADJUSTMENT_SECTIONS, MaskContainer, Adjustmen
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { BrushSettings, Option, OPTION_SEPARATOR, SelectedImage } from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
-import { ChannelConfig } from '../../adjustments/Curves';
 
 interface BrushToolsProps {
   onSettingsChange(settings: any): void;
