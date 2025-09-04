@@ -183,8 +183,8 @@ pub struct GlobalAdjustments {
 
     pub chromatic_aberration_red_cyan: f32,
     pub chromatic_aberration_blue_yellow: f32,
+    pub show_clipping: u32,
     _pad_ca1: f32,
-    _pad_ca2: f32,
 
     pub enable_negative_conversion: u32,
     pub film_base_r: f32,
@@ -553,8 +553,8 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
             SCALES.chromatic_aberration,
             None,
         ),
+        show_clipping: if js_adjustments["showClipping"].as_bool().unwrap_or(false) { 1 } else { 0 },
         _pad_ca1: 0.0,
-        _pad_ca2: 0.0,
 
         enable_negative_conversion: if neg_conv_enabled { 1 } else { 0 },
         film_base_r: film_base_rgb[0],

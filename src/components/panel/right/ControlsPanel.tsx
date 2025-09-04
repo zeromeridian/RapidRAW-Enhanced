@@ -26,7 +26,7 @@ interface ControlsProps {
   handleLutSelect(path: string): void;
   histogram: ChannelConfig | null;
   selectedImage: SelectedImage;
-  setAdjustments(adjustments: Partial<Adjustments>): void;
+  setAdjustments(updater: (prev: Adjustments) => Adjustments): void;
   setCollapsibleState(state: any): void;
   setCopiedSectionAdjustments(adjustments: any): void;
   theme: string;
@@ -48,7 +48,7 @@ export default function Controls({
   const { showContextMenu } = useContextMenu();
 
   const handleToggleVisibility = (sectionName: string) => {
-    setAdjustments((prev: Partial<Adjustments>) => {
+    setAdjustments((prev: Adjustments) => {
       const currentVisibility: SectionVisibility = prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
       return {
         ...prev,
@@ -61,7 +61,7 @@ export default function Controls({
   };
 
   const handleResetAdjustments = () => {
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       ...Object.keys(ADJUSTMENT_SECTIONS)
         .flatMap((s) => ADJUSTMENT_SECTIONS[s])
@@ -100,7 +100,7 @@ export default function Controls({
       if (!copiedSectionAdjustments || copiedSectionAdjustments.section !== sectionName) {
         return;
       }
-      setAdjustments((prev: Partial<Adjustments>) => ({
+      setAdjustments((prev: Adjustments) => ({
         ...prev,
         ...copiedSectionAdjustments.values,
         sectionVisibility: {
@@ -115,7 +115,7 @@ export default function Controls({
       for (const key of sectionKeys) {
         resetValues[key] = JSON.parse(JSON.stringify(INITIAL_ADJUSTMENTS[key]));
       }
-      setAdjustments((prev: Partial<Adjustments>) => ({
+      setAdjustments((prev: Adjustments) => ({
         ...prev,
         ...resetValues,
         sectionVisibility: {
@@ -187,7 +187,7 @@ export default function Controls({
           const sectionVisibility = adjustments.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
 
           return (
-            <div className="flex-shrink-0" key={sectionName}>
+            <div className="flex-shrink-0 group" key={sectionName}>
               <CollapsibleSection
                 isContentVisible={sectionVisibility[sectionName]}
                 isOpen={collapsibleState[sectionName]}

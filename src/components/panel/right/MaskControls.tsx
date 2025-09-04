@@ -22,6 +22,7 @@ import { INITIAL_MASK_ADJUSTMENTS, ADJUSTMENT_SECTIONS, MaskContainer, Adjustmen
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { BrushSettings, Option, OPTION_SEPARATOR, SelectedImage } from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
+import { ChannelConfig } from '../../adjustments/Curves';
 
 interface BrushToolsProps {
   onSettingsChange(settings: any): void;
@@ -45,7 +46,7 @@ interface MaskControlsProps {
   onGenerateAiSkyMask(id: string): void;
   onSelectMask(id: string | null): void;
   selectedImage: SelectedImage;
-  setAdjustments(adjustments: Partial<Adjustments>): void;
+  setAdjustments(updater: (prev: Adjustments) => Adjustments): void;
   setBrushSettings(brushSettings: BrushSettings): void;
   setIsMaskControlHovered(hovered: boolean): void;
   updateMask(id: string, adjustments: any): void;
@@ -190,7 +191,7 @@ export default function MaskControls({
   const handleAddSubMask = (containerId: string, type: Mask) => {
     const subMask = createSubMask(type, selectedImage);
 
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       masks: prev.masks?.map((c: MaskContainer) =>
         c.id === containerId ? { ...c, subMasks: [...c.subMasks, subMask] } : c,
@@ -213,7 +214,7 @@ export default function MaskControls({
         onSelectMask(null);
       }
 
-      setAdjustments((prev: Partial<Adjustments>) => ({
+      setAdjustments((prev: Adjustments) => ({
         ...prev,
         masks: prev.masks?.map((c: MaskContainer) =>
           c.id === containerId ? { ...c, subMasks: c.subMasks.filter((sm: SubMask) => sm.id !== subMaskId) } : c,
@@ -542,7 +543,7 @@ export default function MaskControls({
                   adjustments={editingMask.adjustments}
                   setAdjustments={setMaskContainerAdjustments}
                   histogram={histogram}
-                  isForMask={sectionName === 'effects'}
+                  isMasksView={true}
                 />
               </CollapsibleSection>
             );

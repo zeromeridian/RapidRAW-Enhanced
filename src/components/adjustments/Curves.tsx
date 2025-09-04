@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AlertOctagon } from 'lucide-react';
+import clsx from 'clsx';
 import { ActiveChannel, Adjustments, Coord, Curves } from '../../utils/adjustments';
 import { Theme } from '../ui/AppProperties';
 
@@ -18,8 +20,9 @@ interface ColorData {
 
 interface CurveGraphProps {
   adjustments: Adjustments;
-  histogram: Curves;
-  setAdjustments(adjustments: Partial<Adjustments>): void;
+  histogram: ChannelConfig | null;
+  isMasksView?: boolean;
+  setAdjustments(updater: (prev: any) => any): void;
   theme: string;
 }
 
@@ -90,7 +93,6 @@ function getCurvePath(points: Array<Coord>) {
   return path;
 }
 
-// Generates the final histogram path string
 function getHistogramPath(data: Array<any>) {
   if (!data || data.length === 0) {
     return '';
@@ -125,7 +127,7 @@ function getZeroHistogramPath(data: Array<any>) {
   return `M0,255 L${pathData} L255,255 Z`;
 }
 
-export default function CurveGraph({ adjustments, setAdjustments, histogram, theme }: CurveGraphProps) {
+export default function CurveGraph({ adjustments, setAdjustments, histogram, theme, isMasksView }: CurveGraphProps) {
   const [activeChannel, setActiveChannel] = useState<ActiveChannel>(ActiveChannel.Luma);
   const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
   const [localPoints, setLocalPoints] = useState<Array<Coord> | null>(null);
@@ -163,6 +165,13 @@ export default function CurveGraph({ adjustments, setAdjustments, histogram, the
     setLocalPoints(null);
     setDraggingPointIndex(null);
   }, [activeChannel]);
+
+  const handleToggleClipping = () => {
+    setAdjustments((prev: Adjustments) => ({
+      ...prev,
+      showClipping: !prev.showClipping,
+    }));
+  };
 
   const getMousePos = (e: any) => {
     const svg = svgRef.current;
@@ -203,7 +212,7 @@ export default function CurveGraph({ adjustments, setAdjustments, histogram, the
 
     setLocalPoints(newPoints);
 
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       curves: { ...prev.curves, [activeChannel]: newPoints },
     }));
@@ -223,7 +232,7 @@ export default function CurveGraph({ adjustments, setAdjustments, histogram, the
     const newPointIndex = newPoints.findIndex((p: Coord) => p.x === x && p.y === y);
 
     setLocalPoints(newPoints);
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       curves: { ...prev.curves, [activeChannel]: newPoints },
     }));
@@ -238,7 +247,7 @@ export default function CurveGraph({ adjustments, setAdjustments, histogram, the
     ];
 
     setLocalPoints(defaultPoints);
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       curves: { ...prev.curves, [activeChannel]: defaultPoints },
     }));
@@ -261,28 +270,47 @@ export default function CurveGraph({ adjustments, setAdjustments, histogram, the
 
   return (
     <div className="select-none">
-      <div className="flex items-center justify-start gap-1 mb-2 mt-2">
-        {Object.keys(channelConfig).map((channel: any) => (
-          <button
-            className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all
+      <div className="flex items-center justify-between gap-1 mb-2 mt-2">
+        <div className="flex items-center gap-1">
+          {Object.keys(channelConfig).map((channel: any) => (
+            <button
+              className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all
               ${
                 activeChannel === channel
                   ? 'ring-2 ring-offset-2 ring-offset-surface ring-accent'
                   : 'bg-surface-secondary'
               }
               ${channel === ActiveChannel.Luma ? 'text-text-primary' : ''}`}
-            key={channel}
-            onClick={() => setActiveChannel(channel as ActiveChannel)}
-            style={{
-              backgroundColor:
-                channel !== ActiveChannel.Luma && activeChannel !== channel
-                  ? channelConfig[channel].color + '40'
-                  : undefined,
-            }}
+              key={channel}
+              onClick={() => setActiveChannel(channel as ActiveChannel)}
+              style={{
+                backgroundColor:
+                  channel !== ActiveChannel.Luma && activeChannel !== channel
+                    ? channelConfig[channel].color + '40'
+                    : undefined,
+              }}
+            >
+              {channel.charAt(0).toUpperCase()}
+            </button>
+          ))}
+        </div>
+        {!isMasksView && (
+          <button
+            className={clsx(
+              'w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all opacity-0 group-hover:opacity-100',
+              {
+                'ring-2 ring-offset-2 ring-offset-surface ring-accent bg-accent text-button-text !opacity-100':
+                  adjustments.showClipping,
+                'bg-surface-secondary text-text-primary': !adjustments.showClipping,
+              },
+            )}
+            key="clipping"
+            onClick={handleToggleClipping}
+            title="Toggle Clipping Warnings"
           >
-            {channel.charAt(0).toUpperCase()}
+            <AlertOctagon size={14} />
           </button>
-        ))}
+        )}
       </div>
 
       <div
