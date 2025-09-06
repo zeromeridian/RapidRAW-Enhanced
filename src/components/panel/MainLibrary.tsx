@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, forwardRef, useMemo } from 'react';
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-shell';
 import {
   AlertTriangle,
   Check,
@@ -750,9 +751,49 @@ export default function MainLibrary({
   const [appVersion, setAppVersion] = useState('');
   const [supportedTypes, setSupportedTypes] = useState<SupportedTypes | null>(null);
   const libraryContainerRef = useRef<HTMLDivElement>(null);
+  const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+  const [latestVersion, setLatestVersion] = useState('');
 
   useEffect(() => {
-    getVersion().then(setAppVersion);
+    const compareVersions = (v1: string, v2: string) => {
+      const parts1 = v1.split('.').map(Number);
+      const parts2 = v2.split('.').map(Number);
+      const len = Math.max(parts1.length, parts2.length);
+      for (let i = 0; i < len; i++) {
+        const p1 = parts1[i] || 0;
+        const p2 = parts2[i] || 0;
+        if (p1 < p2) return -1;
+        if (p1 > p2) return 1;
+      }
+      return 0;
+    };
+
+    const checkVersion = async () => {
+      try {
+        const currentVersion = await getVersion();
+        setAppVersion(currentVersion);
+
+        const response = await fetch('https://api.github.com/repos/CyberTimon/RapidRAW/releases/latest');
+        if (!response.ok) {
+          console.error('Failed to fetch latest release info from GitHub.');
+          return;
+        }
+        const data = await response.json();
+        const latestTag = data.tag_name;
+        if (!latestTag) return;
+
+        const latestVersionStr = latestTag.startsWith('v') ? latestTag.substring(1) : latestTag;
+        setLatestVersion(latestVersionStr);
+
+        if (compareVersions(currentVersion, latestVersionStr) < 0) {
+          setIsUpdateAvailable(true);
+        }
+      } catch (error) {
+        console.error('Error checking for updates:', error);
+      }
+    };
+
+    checkVersion();
   }, []);
 
   useEffect(() => {
@@ -881,7 +922,27 @@ export default function MainLibrary({
                 </div>
               </div>
               <p className="absolute bottom-8 left-8 lg:left-16 text-xs text-text-secondary">
-                {appVersion && `Version ${appVersion} - `}Images by Timon Käch (@timonkaech.photography)
+                {appVersion && (
+                  <span
+                    className={`group transition-all duration-300 ease-in-out rounded-md px-2 py-1 ${
+                      isUpdateAvailable ? 'cursor-pointer border border-yellow-500 hover:bg-yellow-500/20 mr-2' : ''
+                    }`}
+                    onClick={() => {
+                      if (isUpdateAvailable) {
+                        open('https://github.com/CyberTimon/RapidRAW/releases/latest');
+                      }
+                    }}
+                    title={
+                      isUpdateAvailable ? `Click to download version ${latestVersion}` : `You are on the latest version`
+                    }
+                  >
+                    <span className={isUpdateAvailable ? 'group-hover:hidden' : ''}>Version {appVersion}</span>
+                    {isUpdateAvailable && (
+                      <span className="hidden group-hover:inline text-yellow-400">New version available!</span>
+                    )}
+                  </span>
+                )}
+                - Images by Timon Käch (@timonkaech.photography)
               </p>
             </>
           )}
