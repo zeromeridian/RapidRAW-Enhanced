@@ -255,6 +255,7 @@ While the core functionality is in place, I'm actively working on improving seve
 
 | Task                                                                                         | Priority | Difficulty | Status |
 |----------------------------------------------------------------------------------------------|----------|------------|--------|
+| Find a better X-Trans demosaicing algorithm                                                  | Medium  | High     | [ ]    |
 | Refactoring the frontend (reduce prop drilling in React components)                         | Low  | Medium     | [ ]    |
 | Write a tutorial on how to connect ComfyUI with RapidRAW                                    | Medium | Medium       | [ ]    |
 | Centralize Coordinate Transformation Logic - See [#245](https://github.com/CyberTimon/RapidRAW/issues/245) | Medium      | High | [ ]    |
