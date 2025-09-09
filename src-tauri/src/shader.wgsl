@@ -374,7 +374,7 @@ fn apply_tonal_adjustments(color: vec3<f32>, con: f32, hi: f32, sh: f32, wh: f32
 fn apply_white_balance(color: vec3<f32>, temp: f32, tnt: f32) -> vec3<f32> {
     var rgb = color;
     let temp_kelvin_mult = vec3<f32>(1.0 + temp * 0.2, 1.0 + temp * 0.05, 1.0 - temp * 0.2);
-    let tint_mult = vec3<f32>(1.0 - tnt * 0.25, 1.0 + tnt * 0.25, 1.0 - tnt * 0.25);
+    let tint_mult = vec3<f32>(1.0 + tnt * 0.25, 1.0 - tnt * 0.25, 1.0 + tnt * 0.25);
     rgb *= temp_kelvin_mult * tint_mult;
     return rgb;
 }
