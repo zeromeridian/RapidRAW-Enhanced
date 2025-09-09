@@ -142,14 +142,14 @@ struct HslRange {
 }
 
 const HSL_RANGES: array<HslRange, 8> = array<HslRange, 8>(
-    HslRange(0.0, 60.0),    // Red:     -30 to 30
-    HslRange(30.0, 60.0),   // Orange:    0 to 60
-    HslRange(60.0, 60.0),   // Yellow:   30 to 90
-    HslRange(120.0, 90.0),  // Green:    75 to 165
-    HslRange(180.0, 60.0),  // Aqua:    150 to 210
-    HslRange(240.0, 90.0),  // Blue:    195 to 285
-    HslRange(300.0, 60.0),  // Purple:  270 to 330
-    HslRange(330.0, 60.0)   // Magenta: 300 to 360 (wraps to 0)
+    HslRange(0.0, 90.0),     // Red
+    HslRange(45.0, 90.0),    // Orange
+    HslRange(90.0, 90.0),    // Yellow
+    HslRange(135.0, 90.0),   // Green
+    HslRange(180.0, 90.0),   // Aqua
+    HslRange(225.0, 90.0),   // Blue
+    HslRange(270.0, 90.0),   // Purple
+    HslRange(315.0, 90.0)    // Magenta
 );
 
 @group(0) @binding(0) var input_texture: texture_2d<f32>;
@@ -422,57 +422,30 @@ fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>, coords
     if (saturation_mask < 0.001) {
         return color;
     }
-    var hsv = original_hsv;
+    let original_hue = original_hsv.x;
+    var total_hue_shift: f32 = 0.0;
+    var total_sat_multiplier: f32 = 0.0;
     var total_lum_adjust: f32 = 0.0;
+    for (var i = 0u; i < 8u; i = i + 1u) {
+        let influence = get_hsl_influence(original_hue, HSL_RANGES[i].center, HSL_RANGES[i].width) * saturation_mask;
+        total_hue_shift += hsl_adjustments[i].hue * 1.5 * influence;
+        total_sat_multiplier += hsl_adjustments[i].saturation * influence;
+        total_lum_adjust += hsl_adjustments[i].luminance * influence;
+    }
 
-    var influence = get_hsl_influence(hsv.x, HSL_RANGES[0].center, HSL_RANGES[0].width) * saturation_mask;
-    hsv.x = (hsv.x + hsl_adjustments[0].hue * influence + 360.0) % 360.0;
-    hsv.y = clamp(hsv.y * (1.0 + hsl_adjustments[0].saturation * influence), 0.0, 1.0);
-    total_lum_adjust += hsl_adjustments[0].luminance * influence;
-
-    influence = get_hsl_influence(hsv.x, HSL_RANGES[1].center, HSL_RANGES[1].width) * saturation_mask;
-    hsv.x = (hsv.x + hsl_adjustments[1].hue * influence + 360.0) % 360.0;
-    hsv.y = clamp(hsv.y * (1.0 + hsl_adjustments[1].saturation * influence), 0.0, 1.0);
-    total_lum_adjust += hsl_adjustments[1].luminance * influence;
-
-    influence = get_hsl_influence(hsv.x, HSL_RANGES[2].center, HSL_RANGES[2].width) * saturation_mask;
-    hsv.x = (hsv.x + hsl_adjustments[2].hue * influence + 360.0) % 360.0;
-    hsv.y = clamp(hsv.y * (1.0 + hsl_adjustments[2].saturation * influence), 0.0, 1.0);
-    total_lum_adjust += hsl_adjustments[2].luminance * influence;
-
-    influence = get_hsl_influence(hsv.x, HSL_RANGES[3].center, HSL_RANGES[3].width) * saturation_mask;
-    hsv.x = (hsv.x + hsl_adjustments[3].hue * influence + 360.0) % 360.0;
-    hsv.y = clamp(hsv.y * (1.0 + hsl_adjustments[3].saturation * influence), 0.0, 1.0);
-    total_lum_adjust += hsl_adjustments[3].luminance * influence;
-
-    influence = get_hsl_influence(hsv.x, HSL_RANGES[4].center, HSL_RANGES[4].width) * saturation_mask;
-    hsv.x = (hsv.x + hsl_adjustments[4].hue * influence + 360.0) % 360.0;
-    hsv.y = clamp(hsv.y * (1.0 + hsl_adjustments[4].saturation * influence), 0.0, 1.0);
-    total_lum_adjust += hsl_adjustments[4].luminance * influence;
-
-    influence = get_hsl_influence(hsv.x, HSL_RANGES[5].center, HSL_RANGES[5].width) * saturation_mask;
-    hsv.x = (hsv.x + hsl_adjustments[5].hue * influence + 360.0) % 360.0;
-    hsv.y = clamp(hsv.y * (1.0 + hsl_adjustments[5].saturation * influence), 0.0, 1.0);
-    total_lum_adjust += hsl_adjustments[5].luminance * influence;
-
-    influence = get_hsl_influence(hsv.x, HSL_RANGES[6].center, HSL_RANGES[6].width) * saturation_mask;
-    hsv.x = (hsv.x + hsl_adjustments[6].hue * influence + 360.0) % 360.0;
-    hsv.y = clamp(hsv.y * (1.0 + hsl_adjustments[6].saturation * influence), 0.0, 1.0);
-    total_lum_adjust += hsl_adjustments[6].luminance * influence;
-
-    influence = get_hsl_influence(hsv.x, HSL_RANGES[7].center, HSL_RANGES[7].width) * saturation_mask;
-    hsv.x = (hsv.x + hsl_adjustments[7].hue * influence + 360.0) % 360.0;
-    hsv.y = clamp(hsv.y * (1.0 + hsl_adjustments[7].saturation * influence), 0.0, 1.0);
-    total_lum_adjust += hsl_adjustments[7].luminance * influence;
-
+    if (original_hsv.y * (1.0 + total_sat_multiplier) < 0.0001) {
+        let final_luma = original_luma * (1.0 + total_lum_adjust);
+        return vec3<f32>(final_luma);
+    }
+    var hsv = original_hsv;
+    hsv.x = (hsv.x + total_hue_shift + 360.0) % 360.0;
+    hsv.y = clamp(hsv.y * (1.0 + total_sat_multiplier), 0.0, 1.0);
     let hs_shifted_rgb = hsv_to_rgb(vec3<f32>(hsv.x, hsv.y, original_hsv.z));
     let new_luma = get_luma(hs_shifted_rgb);
     let target_luma = original_luma * (1.0 + total_lum_adjust);
-
     if (new_luma < 0.0001) {
         return vec3<f32>(max(0.0, target_luma));
     }
-
     let final_color = hs_shifted_rgb * (target_luma / new_luma);
     return final_color;
 }
