@@ -51,7 +51,8 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
-*   **2025-09-06:** New update notifier that alerts users when a new version becomes available.
+*   **2025-09-09:** Many shader improvements & bug fixes, invert tint slider 
+*   **2025-09-06:** New update notifier that alerts users when a new version becomes available
 *   **2025-09-04:** Added toggleable clipping warnings (blue = shadows, red = highlights)
 *   **2025-09-02:** Transition to Rust 2024 & Cache image on GPU
 *   **2025-08-31:** Cancel thumbnail generation on folder change & optimized ai patch saving  
@@ -59,11 +60,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-08-28:** Chromatic aberration correction & Shader improvements
 *   **2025-08-26:** User customisable ComfyUI workflow selection
 *   **2025-08-25:** Make LUTs parser more robust (support more advanced formats)
-*   **2025-08-24:** Improved keyboard shortcuts
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-08-24:** Improved keyboard shortcuts
 *   **2025-08-23:** Estimate file size before exporting
 *   **2025-08-21:** Added LUTs (.cube, .3dl, .png, .jpg, .jpeg, .tiff) support
 *   **2025-08-16:** Fast AI sky masks
