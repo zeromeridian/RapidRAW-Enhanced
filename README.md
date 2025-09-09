@@ -387,6 +387,8 @@ WEBKIT_DISABLE_COMPOSITING_MODE=1 RapidRAW
 ```
 
 This issue is related to **WebKit** and **NVIDIA drivers**, not RapidRAW directly. Switching to **X11** or using **AMD / Intel GPUs** may also help.
+
+See [#306](https://github.com/CyberTimon/RapidRAW/issues/306) for more information.
 </details>
 
 ## Contributing
