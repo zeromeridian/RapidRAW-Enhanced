@@ -428,7 +428,7 @@ fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>, coords
     var total_lum_adjust: f32 = 0.0;
     for (var i = 0u; i < 8u; i = i + 1u) {
         let influence = get_hsl_influence(original_hue, HSL_RANGES[i].center, HSL_RANGES[i].width) * saturation_mask;
-        total_hue_shift += hsl_adjustments[i].hue * 1.5 * influence;
+        total_hue_shift += hsl_adjustments[i].hue * 2.0 * influence;
         total_sat_multiplier += hsl_adjustments[i].saturation * influence;
         total_lum_adjust += hsl_adjustments[i].luminance * influence;
     }

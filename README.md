@@ -51,6 +51,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-09-10:** Generative AI roadmap & started building RapidRAW website 
 *   **2025-09-09:** Many shader improvements & bug fixes, invert tint slider 
 *   **2025-09-06:** New update notifier that alerts users when a new version becomes available
 *   **2025-09-04:** Added toggleable clipping warnings (blue = shadows, red = highlights)
@@ -59,11 +60,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-08-30:** Optimize ComfyUI image transfer & speed
 *   **2025-08-28:** Chromatic aberration correction & Shader improvements
 *   **2025-08-26:** User customisable ComfyUI workflow selection
-*   **2025-08-25:** Make LUTs parser more robust (support more advanced formats)
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-08-25:** Make LUTs parser more robust (support more advanced formats)
 *   **2025-08-24:** Improved keyboard shortcuts
 *   **2025-08-23:** Estimate file size before exporting
 *   **2025-08-21:** Added LUTs (.cube, .3dl, .png, .jpg, .jpeg, .tiff) support
@@ -265,19 +266,38 @@ While the core functionality is in place, I'm actively working on improving seve
 
 ## AI Roadmap
 
-RapidRAW features a two-tier approach to AI to provide both speed and power. It distinguishes between lightweight, integrated tools and heavy, optional generative features.
+I've designed RapidRAW's AI features with flexibility in mind. You have three ways to use them, giving you the choice between fast local tools, powerful self-hosting, and simple cloud convenience.
 
-1.  **Built-in AI Masking:** The core application includes lightweight, fast and open source AI models (SAM from Meta) for intelligent masking (e.g., Subject and Foreground selection). These tools run locally, are always available, and are designed to accelerate your standard editing workflow.
+### 1. Built-in AI Tools (Local & Free)
 
-2.  **Optional Generative AI:** For computationally intensive tasks like inpainting (Generative Replace), RapidRAW connects to an external ComfyUI backend. This keeps the main application small and fast, while offloading heavy processing to a dedicated, user-run server.
+These features are integrated directly into RapidRAW and run entirely on your computer. They are fast, free, and require no setup from you.
 
-### Current Status: Generative AI is in Developer Preview
+*   **AI Masking:** Instantly detect and mask subjects, skies, and foregrounds.
+*   **Automatic Tagging:** The image library is automatically tagged with keywords using a local CLIP model, making your photos easy to search.
+*   **Simple Generative Replace:** A basic, CPU-based inpainting tool for removing small distractions.
 
-> The **Built-in AI Masking** is fully functional for all users.
->
-> The **Optional Generative AI** features, however, currently require a manual setup of a [ComfyUI](https://github.com/comfyanonymous/ComfyUI) backend. The official, easy-to-use Docker container is **not yet provided**.
->
-> This means the generative tools are considered a **developer preview** and are not ready for general, out-of-the-box use.
+### 2. Self-Hosted Integration with ComfyUI (Local & Free)
+
+For users with a capable GPU who want maximum control, I've made it so RapidRAW can connect to your own local [ComfyUI](https://github.com/comfyanonymous/ComfyUI) server.
+
+*   **Full Control:** Use your own hardware and any custom Stable Diffusion model or workflow you choose.
+*   **Cost-Free Power:** Leverage your existing hardware for advanced generative edits at no extra cost.
+*   **Custom Workflow Selection:** Import your own ComfyUI workflows and use your custom nodes.
+
+### 3. Optional Cloud Service (Subscription)
+
+To be clear, **I won't lock features behind a paywall.** All of RapidRAW's functionality is available for free if you use the built-in tools or self-host.
+
+However, I realize that not everyone has the powerful hardware or technical desire to set up and maintain their own ComfyUI server. For those who want a simpler solution, I will be offering an optional **$5/month subscription** (pricing is not final).
+
+This is purely a **convenience service**. It provides the **same high-quality results** as a self-hosted setup without any of the hassle - just log in, and it works. Subscribing is also the best way to support the project and help me dedicate more time to its development.
+
+| Feature                 | Built-in AI (Free)                               | Self-Hosted (ComfyUI)                               | Optional Cloud Service                           |
+| ----------------------- | ------------------------------------------------ | --------------------------------------------------- | ------------------------------------------------ |
+| **Cost**                | Free, included                                   | Free (requires your own hardware)                   | **$5 / month**                                   |
+| **Setup**               | None                                             | Manual ComfyUI server setup                         | **None (Just log in)**                           |
+| **Use Case**            | Everyday workflow acceleration                   | Full control for technical users                    | **Maximum convenience**                          |
+| **Status**              | **Available**                                | **Available**                                   | **Coming Soon**                                 |
 
 <details>
 <summary><strong>Click to see the Generative AI features in action</strong></summary>
@@ -285,30 +305,8 @@ RapidRAW features a two-tier approach to AI to provide both speed and power. It 
 <p align="center">
   <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/.github/assets/ai.gif" alt="Experimental generative AI features" style="max-width: 100%;">
   <br>
-  <em>Generative Replace powered by a local ComfyUI backend.</em>
+  <em>Generative Replace, which can be powered by either a local ComfyUI backend or the upcoming optional cloud service.</em>
 </p>
-</details>
-
-### Foundational Generative Integration
-
-The initial work on generative AI focused on building a connection to the ComfyUI backend and implementing the first key features.
-
-*   **Modular Backend:** RapidRAW connects to a local ComfyUI server, which acts as the inference engine.
-*   **Generative Replace (Inpainting):** Users can paint a mask over an area of the image (or use the AI masking tool to create a precise selection) and provide a text prompt to fill that area with generated content.
-*   **Non-Destructive Patches:** Each generative edit is stored as a separate "patch" layer. These can be toggled, re-ordered, or deleted at any time, consistent with RapidRAW's non-destructive philosophy.
-
-<details>
-<summary><strong>The Technical Approach for Generative AI</strong></summary>
-<br>
-The integration is designed as follows:
-
-1.  **Optional Backend:** Users who want generative features can run an official, pre-configured Docker container which launches a ComfyUI server with all necessary models and custom nodes.
-2.  **Automatic Detection:** RapidRAW automatically detects if the local ComfyUI server is running and enables the generative AI tools in the UI.
-3.  **Workflow-Based Execution:** When a user triggers a generative action (e.g., "Generative Replace"), RapidRAW sends the source image, mask, and text prompt to the ComfyUI server along with a specific, predefined workflow JSON.
-4.  **Backend Processing:** The Docker container handles all the heavy processing on the GPU, executing the Stable Diffusion workflow.
-5.  **Seamless Integration:** The resulting image (the generated patch) is sent back to RapidRAW and composited into the editor as a patch onto the source image.
-
-This approach ensures that RapidRAW's core experience remains fast and lightweight, while providing an extensible path for optional, powerful AI features.
 </details>
 
 ## Initial Development Log
