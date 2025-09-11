@@ -29,7 +29,7 @@
   <launchable type="desktop-id">io.github.CyberTimon.RapidRAW.desktop</launchable>
   <screenshots>
     <screenshot type="default">
-      <image>https://github.com/CyberTimon/RapidRAW/blob/v1.3.10/.github/assets/editor.png?raw=true</image>
+      <image>https://raw.githubusercontent.com/CyberTimon/RapidRAW/refs/tags/v1.3.12/.github/assets/editor.png</image>
         <caption>Editor interface</caption>
     </screenshot>
   </screenshots>
@@ -38,6 +38,22 @@
   <url type="homepage">https://github.com/CyberTimon/RapidRAW</url>
 
   <releases>
+    <release version="v1.3.12" date="2025-09-09">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.3.11</url>
+        <description translate="no">
+            <p>Clipping Warnings</p>
+            <p>You can now toggle clipping warnings in the Curves tool to highlight overexposed areas in red and underexposed areas in blue.</p>
+            <p>Update Notifier</p>
+            <p>With the new update notifier, you’ll never miss an update.</p>
+            <p>Other Improvements</p>
+            <ul>
+                <li>Updated all dependencies and migrated from Rust 2021 to Rust 2024 (thanks @RayJW).</li>
+                <li>Improved performance through updated dependencies.</li>
+                <li>Enhanced accuracy in the HSL panel.</li>
+                <li>Fixed the inverted tint slider (you may need to readjust existing edits).</li>
+            </ul>
+        </description>
+    </release>
     <release version="v1.3.11" date="2025-08-31">
         <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.3.11</url>
         <description translate="no">
