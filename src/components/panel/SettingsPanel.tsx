@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, ExternalLink as ExternalLinkIcon, Save, Trash2, Wifi, WifiOff } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ExternalLink as ExternalLinkIcon, Save, Sparkles, Trash2, Wifi, WifiOff } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { open } from '@tauri-apps/plugin-dialog';
 import { open as openLink } from '@tauri-apps/plugin-shell';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
+import { SignedIn, SignedOut, SignInButton, UserButton, useUser } from '@clerk/clerk-react';
 import Button from '../ui/Button';
 import ConfirmModal from '../modals/ConfirmModal';
 import Dropdown, { OptionItem } from '../ui/Dropdown';
@@ -128,8 +129,8 @@ const DataActionItem = ({
   </div>
 );
 
-const ExternalLink = ({ href, children }) => {
-  const handleClick = async (e) => {
+const ExternalLink = ({ href, children, className }: { href: string; children: any; className?: string }) => {
+  const handleClick = async (e: any) => {
     e.preventDefault();
     try {
       await openLink(href);
@@ -139,21 +140,25 @@ const ExternalLink = ({ href, children }) => {
   };
 
   return (
-    <a href={href} onClick={handleClick} className="text-accent hover:underline inline-flex items-center gap-1">
+    <a
+      href={href}
+      onClick={handleClick}
+      className={clsx('text-accent hover:underline inline-flex items-center gap-1', className)}
+    >
       {children}
       <ExternalLinkIcon size={12} />
     </a>
   );
 };
 
-const ModelConfigItem = ({ label, data, onChange, description }) => {
+const ModelConfigItem = ({ label, data, onChange, description }: any) => {
   const [[key, value] = ['', '']] = Object.entries(data || {});
 
-  const handleKeyChange = (newKey) => {
+  const handleKeyChange = (newKey: any) => {
     onChange({ [newKey]: value });
   };
 
-  const handleValueChange = (newValue) => {
+  const handleValueChange = (newValue: any) => {
     onChange({ [key]: newValue });
   };
 
@@ -167,7 +172,7 @@ const ModelConfigItem = ({ label, data, onChange, description }) => {
         </div>
         <div className="flex-1">
           <label className="block text-xs text-text-secondary mb-1">Model Name</label>
-          <Input value={value} onChange={(e) => handleValueChange(e.target.value)} />
+          <Input value={value as string} onChange={(e) => handleValueChange(e.target.value)} />
         </div>
       </div>
       {description && <div className="text-xs text-text-secondary mt-2">{description}</div>}
@@ -182,6 +187,7 @@ export default function SettingsPanel({
   onSettingsChange,
   rootPath,
 }: SettingsPanelProps) {
+  const { user } = useUser();
   const [isClearing, setIsClearing] = useState(false);
   const [clearMessage, setClearMessage] = useState('');
   const [isClearingCache, setIsClearingCache] = useState(false);
@@ -214,8 +220,8 @@ export default function SettingsPanel({
     setComfyConfig(appSettings?.comfyuiWorkflowConfig || DEFAULT_WORKFLOW_CONFIG);
   }, [appSettings]);
 
-  const handleConfigChange = (field, value) => {
-    setComfyConfig((prev) => ({ ...prev, [field]: value }));
+  const handleConfigChange = (field: any, value: any) => {
+    setComfyConfig((prev: any) => ({ ...prev, [field]: value }));
   };
 
   const handleSaveComfyConfig = () => {
@@ -251,7 +257,7 @@ export default function SettingsPanel({
       const count: number = await invoke(Invokes.ClearAllSidecars, { rootPath: effectiveRootPath });
       setClearMessage(`${count} sidecar files deleted successfully.`);
       onLibraryRefresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to clear sidecars:', err);
       setClearMessage(`Error: ${err}`);
     } finally {
@@ -278,10 +284,10 @@ export default function SettingsPanel({
     setIsClearingTags(true);
     setTagsClearMessage('Clearing AI tags from all sidecar files...');
     try {
-      const count = await invoke(Invokes.ClearAllTags, { rootPath: effectiveRootPath });
+      const count: number = await invoke(Invokes.ClearAllTags, { rootPath: effectiveRootPath });
       setTagsClearMessage(`${count} files updated. Tags removed.`);
       onLibraryRefresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to clear tags:', err);
       setTagsClearMessage(`Error: ${err}`);
     } finally {
@@ -329,7 +335,7 @@ export default function SettingsPanel({
       await invoke(Invokes.ClearThumbnailCache);
       setCacheClearMessage('Thumbnail cache cleared successfully.');
       onLibraryRefresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to clear thumbnail cache:', err);
       setCacheClearMessage(`Error: ${err}`);
     } finally {
@@ -388,12 +394,45 @@ export default function SettingsPanel({
           <h1 className="text-3xl font-bold text-accent">Settings</h1>
         </header>
         <div className="flex-1 overflow-y-auto pr-2 -mr-2 space-y-8 custom-scrollbar">
+          {/* commented out until the endpoint is available and production ready
+          <div className="p-6 bg-surface rounded-xl shadow-md">
+            <h2 className="text-xl font-semibold mb-6 text-accent">Account</h2>
+            <div className="flex items-center justify-between">
+              <div>
+                <SignedIn>
+                  <p className="text-sm text-text-primary">
+                    Signed in as <span className="font-semibold">{user?.primaryEmailAddress?.emailAddress}</span>
+                  </p>
+                  {user?.publicMetadata?.plan === 'pro' && (
+                    <p className="text-xs text-accent flex items-center gap-1.5 mt-1">
+                      <Sparkles size={14} /> Pro Member
+                    </p>
+                  )}
+                </SignedIn>
+                <SignedOut>
+                  <p className="text-sm text-text-secondary">Sign in to access generative cloud features.</p>
+                </SignedOut>
+              </div>
+              <div className="flex items-center gap-4">
+                <SignedOut>
+                  <SignInButton mode="modal">
+                    <Button>Sign In</Button>
+                  </SignInButton>
+                </SignedOut>
+                <SignedIn>
+                  <UserButton afterSignOutUrl="/" />
+                </SignedIn>
+              </div>
+            </div>
+          </div> 
+          */}
+
           <div className="p-6 bg-surface rounded-xl shadow-md">
             <h2 className="text-xl font-semibold mb-6 text-accent">General Settings</h2>
             <div className="space-y-6">
               <SettingItem label="Theme" description="Change the look and feel of the application.">
                 <Dropdown
-                  onChange={(value: ThemeProps) => onSettingsChange({ ...appSettings, theme: value })}
+                  onChange={(value: any) => onSettingsChange({ ...appSettings, theme: value })}
                   options={THEMES.map((theme: ThemeProps) => ({ value: theme.id, label: theme.name }))}
                   value={appSettings?.theme || DEFAULT_THEME_ID}
                 />
@@ -440,7 +479,7 @@ export default function SettingsPanel({
                 label="Preview Resolution"
               >
                 <Dropdown
-                  onChange={(value: number) => onSettingsChange({ ...appSettings, editorPreviewResolution: value })}
+                  onChange={(value: any) => onSettingsChange({ ...appSettings, editorPreviewResolution: value })}
                   options={resolutions}
                   value={appSettings?.editorPreviewResolution || 1920}
                 />
@@ -620,7 +659,7 @@ export default function SettingsPanel({
                           <ModelConfigItem
                             label="Checkpoint"
                             data={comfyConfig.modelCheckpoints}
-                            onChange={(newData) => handleConfigChange('modelCheckpoints', newData)}
+                            onChange={(newData: any) => handleConfigChange('modelCheckpoints', newData)}
                             description={
                               !comfyConfig.workflowPath && (
                                 <>
@@ -635,7 +674,7 @@ export default function SettingsPanel({
                           <ModelConfigItem
                             label="VAE"
                             data={comfyConfig.vaeLoaders}
-                            onChange={(newData) => handleConfigChange('vaeLoaders', newData)}
+                            onChange={(newData: any) => handleConfigChange('vaeLoaders', newData)}
                             description={
                               !comfyConfig.workflowPath && (
                                 <>
@@ -650,7 +689,7 @@ export default function SettingsPanel({
                           <ModelConfigItem
                             label="ControlNet"
                             data={comfyConfig.controlnetLoaders}
-                            onChange={(newData) => handleConfigChange('controlnetLoaders', newData)}
+                            onChange={(newData: any) => handleConfigChange('controlnetLoaders', newData)}
                             description={
                               !comfyConfig.workflowPath && (
                                 <>

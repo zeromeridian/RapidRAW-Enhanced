@@ -15,8 +15,8 @@ mod panorama_utils;
 mod raw_processing;
 mod tagging;
 mod tagging_utils;
-use std::thread;
 
+use std::thread;
 use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -44,6 +44,9 @@ use std::sync::Mutex;
 use tauri::{Emitter, Manager, ipc::Response};
 use tokio::sync::Mutex as TokioMutex;
 use tokio::task::JoinHandle;
+use tempfile::NamedTempFile;
+use reqwest;
+use std::io::Write;
 use wgpu::{Texture, TextureView};
 
 use crate::ai_processing::{
@@ -137,6 +140,21 @@ struct ExportSettings {
     keep_metadata: bool,
     strip_gps: bool,
     filename_template: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct GitHubContent {
+    name: String,
+    path: String,
+    download_url: String,
+    #[serde(rename = "type")]
+    content_type: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CommunityPreset {
+    pub name: String,
+    pub download_url: String,
 }
 
 #[derive(Serialize)]
@@ -1511,15 +1529,11 @@ async fn invoke_generative_replace_with_mask_def(
     patch_definition: AiPatchDefinition,
     current_adjustments: Value,
     use_fast_inpaint: bool,
+    token: Option<String>, // reserved parameter for future authentication, when the optional generative cloud service releases
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let address = settings.comfyui_address;
-
-    if !use_fast_inpaint && address.is_none() {
-        return Err("ComfyUI address is not configured in settings.".to_string());
-    }
 
     let mut source_image_adjustments = current_adjustments.clone();
     if let Some(patches) = source_image_adjustments
@@ -1547,11 +1561,10 @@ async fn invoke_generative_replace_with_mask_def(
     let mask_bitmap = generate_mask_bitmap(&mask_def_for_generation, img_w, img_h, 1.0, (0.0, 0.0))
         .ok_or("Failed to generate mask bitmap for AI replace")?;
 
-    let patch_rgba = if use_fast_inpaint {
+    let patch_rgba = if use_fast_inpaint { // cpu based inpainting, low quality but no setup required
         let patch_radius = calculate_dynamic_patch_radius(img_w, img_h);
         inpainting::perform_fast_inpaint(&source_image, &mask_bitmap, patch_radius)?
-    } else {
-        let comfy_address = address.unwrap();
+    } else if let Some(address) = settings.comfyui_address { // self hosted generative ai service
         let comfy_config = settings.comfyui_workflow_config;
 
         let dilation_amount_u32 = ((img_w.min(img_h) as f32 * 0.01).round() as u32).max(1);
@@ -1566,7 +1579,7 @@ async fn invoke_generative_replace_with_mask_def(
         let mask_image = DynamicImage::ImageRgba8(rgba_mask);
 
         let result_png_bytes = comfyui_connector::execute_workflow(
-            &comfy_address,
+            &address,
             &comfy_config,
             source_image,
             Some(mask_image),
@@ -1578,6 +1591,44 @@ async fn invoke_generative_replace_with_mask_def(
         image::load_from_memory(&result_png_bytes)
             .map_err(|e| e.to_string())?
             .to_rgba8()
+    } else if let Some(auth_token) = token { // convenience cloud service
+        let client = reqwest::Client::new();
+        let api_url = "https://api.letshopeitcompiles.com/inpaint"; // endpoint not yet built
+
+        let mut source_buf = Cursor::new(Vec::new());
+        source_image.write_to(&mut source_buf, ImageFormat::Png).map_err(|e| e.to_string())?;
+        let source_base64 = general_purpose::STANDARD.encode(source_buf.get_ref());
+
+        let mut mask_buf = Cursor::new(Vec::new());
+        mask_bitmap.write_to(&mut mask_buf, ImageFormat::Png).map_err(|e| e.to_string())?;
+        let mask_base64 = general_purpose::STANDARD.encode(mask_buf.get_ref());
+
+        let request_body = serde_json::json!({
+            "prompt": patch_definition.prompt,
+            "image": source_base64,
+            "mask": mask_base64,
+        });
+
+        let response = client
+            .post(api_url)
+            .header("Authorization", format!("Bearer {}", auth_token))
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to send request to cloud service: {}", e))?;
+
+        if response.status().is_success() {
+            let response_bytes = response.bytes().await.map_err(|e| e.to_string())?;
+            image::load_from_memory(&response_bytes)
+                .map_err(|e| format!("Failed to decode cloud service response: {}", e))?
+                .to_rgba8()
+        } else {
+            let status = response.status();
+            let error_body = response.text().await.unwrap_or_else(|_| "Could not read error body".to_string());
+            return Err(format!("Cloud service returned an error ({}): {}", status, error_body));
+        }
+    } else {
+        return Err("No generative backend available. Connect to ComfyUI or upgrade to Pro for Cloud AI.".to_string());
     };
 
     let (patch_w, patch_h) = patch_rgba.dimensions();
@@ -1703,6 +1754,110 @@ async fn stitch_panorama(
         Ok(Err(e)) => Err(e),
         Err(join_err) => Err(format!("Panorama task failed: {}", join_err)),
     }
+}
+
+#[tauri::command]
+async fn fetch_community_presets() -> Result<Vec<CommunityPreset>, String> {
+    let client = reqwest::Client::new();
+    let url = "https://api.github.com/repos/CyberTimon/RapidRAW-Presets/contents/presets";
+    
+    let response = client.get(url)
+        .header("User-Agent", "RapidRAW-App")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch from GitHub: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("GitHub API returned an error: {}", response.status()));
+    }
+
+    let contents: Vec<GitHubContent> = response.json().await
+        .map_err(|e| format!("Failed to parse GitHub response: {}", e))?;
+
+    let presets = contents.into_iter()
+        .filter(|item| item.content_type == "file" && item.name.ends_with(".rrpreset"))
+        .map(|item| CommunityPreset {
+            name: item.name.replace(".rrpreset", ""),
+            download_url: item.download_url,
+        })
+        .collect();
+
+    Ok(presets)
+}
+
+#[tauri::command]
+async fn fetch_preset_content(url: String) -> Result<String, String> {
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("Failed to download preset content: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("Failed to download preset, status: {}", response.status()));
+    }
+
+    response.text()
+        .await
+        .map_err(|e| format!("Failed to read preset content: {}", e))
+}
+
+#[tauri::command]
+async fn generate_community_preset_preview(
+    image_path: String,
+    js_adjustments: serde_json::Value,
+    state: tauri::State<'_, AppState>,
+) -> Result<Response, String> {
+    let context = crate::image_processing::get_or_init_gpu_context(&state)?;
+
+    let image_bytes = fs::read(&image_path).map_err(|e| e.to_string())?;
+    let original_image = crate::image_loader::load_base_image_from_bytes(&image_bytes, &image_path, true)
+        .map_err(|e| e.to_string())?;
+
+    const PRESET_PREVIEW_DIM: u32 = 400;
+    let preview_base = original_image.thumbnail(PRESET_PREVIEW_DIM, PRESET_PREVIEW_DIM);
+
+    let (transformed_image, unscaled_crop_offset) =
+        crate::apply_all_transformations(&preview_base, &js_adjustments, 1.0);
+    let (img_w, img_h) = transformed_image.dimensions();
+
+    let mask_definitions: Vec<MaskDefinition> = js_adjustments
+        .get("masks")
+        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .unwrap_or_else(Vec::new);
+
+    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
+        .iter()
+        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
+        .collect();
+
+    let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
+    let lut_path = js_adjustments["lutPath"].as_str();
+    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+
+    let processed_image = crate::image_processing::process_and_get_dynamic_image(
+        &context,
+        &state,
+        &transformed_image,
+        0,
+        all_adjustments,
+        &mask_bitmaps,
+        lut,
+    )?;
+
+    let mut buf = Cursor::new(Vec::new());
+    processed_image
+        .to_rgb8()
+        .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 75))
+        .map_err(|e| e.to_string())?;
+
+    Ok(Response::new(buf.into_inner()))
+}
+
+#[tauri::command]
+async fn save_temp_file(bytes: Vec<u8>) -> Result<String, String> {
+    let mut temp_file = NamedTempFile::new().map_err(|e| e.to_string())?;
+    temp_file.write_all(&bytes).map_err(|e| e.to_string())?;
+    let (_file, path) = temp_file.keep().map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -1883,6 +2038,10 @@ fn main() {
             stitch_panorama,
             save_panorama,
             load_and_parse_lut,
+            fetch_community_presets,
+            fetch_preset_content,
+            generate_community_preset_preview,
+            save_temp_file,
             image_processing::generate_histogram,
             image_processing::generate_waveform,
             image_processing::calculate_auto_adjustments,
@@ -1912,6 +2071,7 @@ fn main() {
             file_management::apply_auto_adjustments_to_paths,
             file_management::handle_import_presets_from_file,
             file_management::handle_export_presets_to_file,
+            file_management::save_community_preset,
             file_management::clear_all_sidecars,
             file_management::clear_thumbnail_cache,
             file_management::set_color_label_for_paths,

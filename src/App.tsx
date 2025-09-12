@@ -6,6 +6,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir } from '@tauri-apps/api/path';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import debounce from 'lodash.debounce';
+import { ClerkProvider } from '@clerk/clerk-react';
 import clsx from 'clsx';
 import {
   Aperture,
@@ -26,8 +27,10 @@ import {
   Trash2,
   Undo,
   X,
+  Users,
 } from 'lucide-react';
 import TitleBar from './window/TitleBar';
+import CommunityPage from './components/panel/CommunityPage';
 import MainLibrary from './components/panel/MainLibrary';
 import FolderTree from './components/panel/FolderTree';
 import Editor from './components/panel/Editor';
@@ -98,6 +101,8 @@ import {
   ThumbnailAspectRatio,
 } from './components/ui/AppProperties';
 import { ChannelConfig } from './components/adjustments/Curves';
+
+const CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA'; // local dev key
 
 interface CollapsibleSectionsState {
   basic: boolean;
@@ -172,6 +177,7 @@ const useDelayedRevokeBlobUrl = (url: string | null | undefined) => {
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [activeView, setActiveView] = useState('library');
   const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
   const [currentFolderPath, setCurrentFolderPath] = useState<string | null>(null);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
@@ -1139,6 +1145,7 @@ function App() {
       setSearchQuery('');
       try {
         setCurrentFolderPath(path);
+        setActiveView('library');
 
         if (isNewRoot) {
           setExpandedFolders(new Set([path]));
@@ -3090,45 +3097,50 @@ function App() {
     return (
       <div className="flex flex-row flex-grow h-full min-h-0">
         <div className="flex-1 flex flex-col min-w-0 gap-2">
-          <MainLibrary
-            activePath={libraryActivePath}
-            aiModelDownloadStatus={aiModelDownloadStatus}
-            appSettings={appSettings}
-            currentFolderPath={currentFolderPath}
-            filterCriteria={filterCriteria}
-            imageList={sortedImageList}
-            imageRatings={imageRatings}
-            importState={importState}
-            indexingProgress={indexingProgress}
-            isIndexing={isIndexing}
-            isLoading={isViewLoading}
-            isTreeLoading={isTreeLoading}
-            libraryScrollTop={libraryScrollTop}
-            multiSelectedPaths={multiSelectedPaths}
-            onClearSelection={handleClearSelection}
-            onContextMenu={handleThumbnailContextMenu}
-            onContinueSession={handleContinueSession}
-            onEmptyAreaContextMenu={handleMainLibraryContextMenu}
-            onGoHome={handleGoHome}
-            onImageClick={handleLibraryImageSingleClick}
-            onImageDoubleClick={handleImageSelect}
-            onLibraryRefresh={handleLibraryRefresh}
-            onOpenFolder={handleOpenFolder}
-            onSettingsChange={handleSettingsChange}
-            onThumbnailAspectRatioChange={setThumbnailAspectRatio}
-            onThumbnailSizeChange={setThumbnailSize}
-            rootPath={rootPath}
-            searchQuery={searchQuery}
-            setFilterCriteria={setFilterCriteria}
-            setLibraryScrollTop={setLibraryScrollTop}
-            setSearchQuery={setSearchQuery}
-            setSortCriteria={setSortCriteria}
-            sortCriteria={sortCriteria}
-            theme={theme}
-            thumbnailAspectRatio={thumbnailAspectRatio}
-            thumbnails={thumbnails}
-            thumbnailSize={thumbnailSize}
-          />
+          {activeView === 'community' ? (
+            <CommunityPage onBackToLibrary={() => setActiveView('library')} />
+          ) : (
+            <MainLibrary
+              activePath={libraryActivePath}
+              aiModelDownloadStatus={aiModelDownloadStatus}
+              appSettings={appSettings}
+              currentFolderPath={currentFolderPath}
+              filterCriteria={filterCriteria}
+              imageList={sortedImageList}
+              imageRatings={imageRatings}
+              importState={importState}
+              indexingProgress={indexingProgress}
+              isIndexing={isIndexing}
+              isLoading={isViewLoading}
+              isTreeLoading={isTreeLoading}
+              libraryScrollTop={libraryScrollTop}
+              multiSelectedPaths={multiSelectedPaths}
+              onClearSelection={handleClearSelection}
+              onContextMenu={handleThumbnailContextMenu}
+              onContinueSession={handleContinueSession}
+              onEmptyAreaContextMenu={handleMainLibraryContextMenu}
+              onGoHome={handleGoHome}
+              onImageClick={handleLibraryImageSingleClick}
+              onImageDoubleClick={handleImageSelect}
+              onLibraryRefresh={handleLibraryRefresh}
+              onOpenFolder={handleOpenFolder}
+              onSettingsChange={handleSettingsChange}
+              onThumbnailAspectRatioChange={setThumbnailAspectRatio}
+              onThumbnailSizeChange={setThumbnailSize}
+              rootPath={rootPath}
+              searchQuery={searchQuery}
+              setFilterCriteria={setFilterCriteria}
+              setLibraryScrollTop={setLibraryScrollTop}
+              setSearchQuery={setSearchQuery}
+              setSortCriteria={setSortCriteria}
+              sortCriteria={sortCriteria}
+              theme={theme}
+              thumbnailAspectRatio={thumbnailAspectRatio}
+              thumbnails={thumbnails}
+              thumbnailSize={thumbnailSize}
+              onNavigateToCommunity={() => setActiveView('community')}
+            />
+          )}
           {rootPath && (
             <BottomBar
               isCopied={isCopied}
@@ -3151,6 +3163,10 @@ function App() {
         </div>
       </div>
     );
+  };
+
+  const renderContent = () => {
+    return renderMainView();
   };
 
   return (
@@ -3199,7 +3215,7 @@ function App() {
               />
             </>
           )}
-          <div className="flex-1 flex flex-col min-w-0">{renderMainView()}</div>
+          <div className="flex-1 flex flex-col min-w-0">{renderContent()}</div>
           {!selectedImage && isLibraryExportPanelVisible && (
             <Resizer
               direction={Orientation.Vertical}
@@ -3268,9 +3284,11 @@ function App() {
 }
 
 const AppWrapper = () => (
-  <ContextMenuProvider>
-    <App />
-  </ContextMenuProvider>
+  <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+    <ContextMenuProvider>
+      <App />
+    </ContextMenuProvider>
+  </ClerkProvider>
 );
 
 export default AppWrapper;

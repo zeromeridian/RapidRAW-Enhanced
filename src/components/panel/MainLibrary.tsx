@@ -15,6 +15,7 @@ import {
   SlidersHorizontal,
   Star as StarIcon,
   Search,
+  Users,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FixedSizeGrid as Grid } from 'react-window';
@@ -101,6 +102,7 @@ interface MainLibraryProps {
   thumbnailAspectRatio: ThumbnailAspectRatio;
   thumbnails: Record<string, string>;
   thumbnailSize: ThumbnailSize;
+  onNavigateToCommunity(): void;
 }
 
 interface SearchInputProps {
@@ -746,6 +748,7 @@ export default function MainLibrary({
   thumbnailAspectRatio,
   thumbnails,
   thumbnailSize,
+  onNavigateToCommunity,
 }: MainLibraryProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [appVersion, setAppVersion] = useState('');
@@ -998,6 +1001,13 @@ export default function MainLibrary({
             thumbnailSize={thumbnailSize}
             thumbnailAspectRatio={thumbnailAspectRatio}
           />
+          <Button
+            className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
+            onClick={onNavigateToCommunity}
+            title="Community Hub"
+          >
+            <Users className="w-8 h-8" />
+          </Button>
           <Button
             className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
             onClick={onOpenFolder}
