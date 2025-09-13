@@ -22,9 +22,27 @@ const DEFAULT_PREVIEW_IMAGE_URL = 'https://raw.githubusercontent.com/CyberTimon/
 
 interface CommunityPreset {
   name: string;
-  download_url: string;
-  creator?: string;
+  creator: string;
+  adjustments: Record<string, any>;
 }
+
+const containerVariants = {
+  hidden: { opacity: 1 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.06,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+  },
+};
 
 const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => {
   const [presets, setPresets] = useState<CommunityPreset[]>([]);
@@ -36,8 +54,6 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
   const [downloadStatus, setDownloadStatus] = useState<Record<string, 'idle' | 'downloading' | 'success'>>({});
   const [allPreviewsLoaded, setAllPreviewsLoaded] = useState(false);
 
-  const previewQueue = useRef<CommunityPreset[]>([]);
-  const isProcessingQueue = useRef(false);
   const previewsRef = useRef(previews);
   previewsRef.current = previews;
 
@@ -78,74 +94,48 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
   }, [fetchDefaultPreviewImage]);
 
   useEffect(() => {
-    if (presets.length > 0 && Object.keys(previews).length === presets.length) {
-      setAllPreviewsLoaded(true);
-    } else {
-      setAllPreviewsLoaded(false);
-    }
-  }, [previews, presets]);
-
-  const processPreviewQueue = useCallback(async () => {
-    if (isProcessingQueue.current || previewQueue.current.length === 0 || !previewImagePath) {
+    if (presets.length === 0 || !previewImagePath) {
       return;
     }
 
-    isProcessingQueue.current = true;
+    const generateAllPreviews = async () => {
+      setAllPreviewsLoaded(false);
+      const newPreviews: Record<string, string | null> = {};
 
-    while (previewQueue.current.length > 0) {
-      const preset = previewQueue.current.shift();
-      if (!preset || previewsRef.current[preset.name]) continue;
+      const previewPromises = presets.map(async (preset) => {
+        try {
+          const fullPresetAdjustments = { ...INITIAL_ADJUSTMENTS, ...preset.adjustments };
 
-      try {
-        const presetContent: string = await invoke(Invokes.FetchPresetContent, { url: preset.download_url });
-        
-        const presetFile = JSON.parse(presetContent);
-        
-        const creator = presetFile?.creator;
-        if (creator) {
-          setPresets(prevPresets => 
-            prevPresets.map(p => 
-              p.name === preset.name ? { ...p, creator } : p
-            )
-          );
+          const imageData: Uint8Array = await invoke(Invokes.GenerateCommunityPresetPreview, {
+            imagePath: previewImagePath,
+            jsAdjustments: fullPresetAdjustments,
+          });
+
+          const blob = new Blob([imageData], { type: 'image/jpeg' });
+          return { name: preset.name, url: URL.createObjectURL(blob) };
+        } catch (error) {
+          console.error(`Failed to generate preview for ${preset.name}:`, error);
+          return { name: preset.name, url: null };
         }
+      });
 
-        const presetAdjustments = presetFile?.presets?.[0]?.preset?.adjustments;
-        if (!presetAdjustments) {
-            console.error("Invalid preset file format for preview:", preset.name, presetFile);
-            continue;
-        }
+      const results = await Promise.all(previewPromises);
+      
+      results.forEach(result => {
+        newPreviews[result.name] = result.url;
+      });
 
-        const fullPresetAdjustments = { ...INITIAL_ADJUSTMENTS, ...presetAdjustments };
+      setPreviews(prev => {
+        Object.values(prev).forEach(url => url?.startsWith('blob:') && URL.revokeObjectURL(url));
+        return newPreviews;
+      });
+      setAllPreviewsLoaded(true);
+    };
 
-        const imageData: Uint8Array = await invoke(Invokes.GenerateCommunityPresetPreview, {
-          imagePath: previewImagePath,
-          jsAdjustments: fullPresetAdjustments,
-        });
+    generateAllPreviews();
 
-        const blob = new Blob([imageData], { type: 'image/jpeg' });
-        const url = URL.createObjectURL(blob);
+  }, [presets, previewImagePath]);
 
-        setPreviews(prev => {
-          const oldUrl = prev[preset.name];
-          if (oldUrl?.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
-          return { ...prev, [preset.name]: url };
-        });
-      } catch (error) {
-        console.error(`Failed to generate preview for ${preset.name}:`, error);
-        setPreviews(prev => ({ ...prev, [preset.name]: null }));
-      }
-    }
-
-    isProcessingQueue.current = false;
-  }, [previewImagePath]);
-
-  useEffect(() => {
-    if (presets.length > 0 && previewImagePath) {
-      previewQueue.current = [...presets];
-      processPreviewQueue();
-    }
-  }, [presets, previewImagePath, processPreviewQueue]);
 
   const handleSelectPreviewImage = async () => {
     try {
@@ -155,7 +145,6 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
         defaultPath: await homeDir(),
       });
       if (typeof selected === 'string') {
-        Object.values(previews).forEach(url => url && URL.revokeObjectURL(url));
         setPreviews({});
         setPreviewImagePath(selected);
       }
@@ -167,17 +156,13 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
   const handleDownloadPreset = async (preset: CommunityPreset) => {
     setDownloadStatus(prev => ({ ...prev, [preset.name]: 'downloading' }));
     try {
-      const content: string = await invoke(Invokes.FetchPresetContent, { url: preset.download_url });
-      
-      const presetFile = JSON.parse(content);
-      const presetAdjustments = presetFile?.presets?.[0]?.preset?.adjustments;
-      if (!presetAdjustments) {
-          throw new Error("Invalid preset file format for download.");
+      if (!preset.adjustments) {
+          throw new Error("Preset adjustments are missing.");
       }
 
       await invoke(Invokes.SaveCommunityPreset, {
         name: preset.name,
-        adjustments: presetAdjustments,
+        adjustments: preset.adjustments,
       });
       setDownloadStatus(prev => ({ ...prev, [preset.name]: 'success' }));
     } catch (error) {
@@ -256,24 +241,25 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
             Fetching presets from GitHub...
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
             <AnimatePresence>
               {filteredAndSortedPresets.map(preset => {
                 const previewUrl = previews[preset.name];
                 const status = downloadStatus[preset.name] || 'idle';
-
                 if (!previewUrl) {
                   return null;
                 }
-
                 return (
                   <motion.div
                     key={preset.name}
                     layout
-                    initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.98 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    variants={itemVariants}
+                    exit={{ opacity: 0, scale: 0.9 }}
                     className="bg-surface rounded-lg overflow-hidden group border border-border-color flex flex-col"
                   >
                     <div className="relative w-full h-45 bg-bg-primary flex items-center justify-center">
@@ -299,15 +285,13 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
                     </div>
                     <div className="p-3 text-center">
                       <h4 className="font-semibold truncate text-text-primary">{preset.name}</h4>
-                      {preset.creator && (
-                        <p className="text-xs text-text-secondary font-['cursive'] italic mt-1">by {preset.creator}</p>
-                      )}
+                      <p className="text-xs text-text-secondary font-['cursive'] italic mt-1">by {preset.creator}</p>
                     </div>
                   </motion.div>
                 );
               })}
             </AnimatePresence>
-          </div>
+          </motion.div>
         )}
         {allPreviewsLoaded && (
           <motion.div

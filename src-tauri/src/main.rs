@@ -154,7 +154,8 @@ struct GitHubContent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CommunityPreset {
     pub name: String,
-    pub download_url: String,
+    pub creator: String,
+    pub adjustments: Value,
 }
 
 #[derive(Serialize)]
@@ -1759,45 +1760,22 @@ async fn stitch_panorama(
 #[tauri::command]
 async fn fetch_community_presets() -> Result<Vec<CommunityPreset>, String> {
     let client = reqwest::Client::new();
-    let url = "https://api.github.com/repos/CyberTimon/RapidRAW-Presets/contents/presets";
+    let url = "https://raw.githubusercontent.com/CyberTimon/RapidRAW-Presets/main/manifest.json";
     
     let response = client.get(url)
         .header("User-Agent", "RapidRAW-App")
         .send()
         .await
-        .map_err(|e| format!("Failed to fetch from GitHub: {}", e))?;
+        .map_err(|e| format!("Failed to fetch manifest from GitHub: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("GitHub API returned an error: {}", response.status()));
+        return Err(format!("GitHub returned an error: {}", response.status()));
     }
 
-    let contents: Vec<GitHubContent> = response.json().await
-        .map_err(|e| format!("Failed to parse GitHub response: {}", e))?;
-
-    let presets = contents.into_iter()
-        .filter(|item| item.content_type == "file" && item.name.ends_with(".rrpreset"))
-        .map(|item| CommunityPreset {
-            name: item.name.replace(".rrpreset", ""),
-            download_url: item.download_url,
-        })
-        .collect();
+    let presets: Vec<CommunityPreset> = response.json().await
+        .map_err(|e| format!("Failed to parse manifest.json: {}", e))?;
 
     Ok(presets)
-}
-
-#[tauri::command]
-async fn fetch_preset_content(url: String) -> Result<String, String> {
-    let response = reqwest::get(&url)
-        .await
-        .map_err(|e| format!("Failed to download preset content: {}", e))?;
-    
-    if !response.status().is_success() {
-        return Err(format!("Failed to download preset, status: {}", response.status()));
-    }
-
-    response.text()
-        .await
-        .map_err(|e| format!("Failed to read preset content: {}", e))
 }
 
 #[tauri::command]
@@ -2039,7 +2017,6 @@ fn main() {
             save_panorama,
             load_and_parse_lut,
             fetch_community_presets,
-            fetch_preset_content,
             generate_community_preset_preview,
             save_temp_file,
             image_processing::generate_histogram,
