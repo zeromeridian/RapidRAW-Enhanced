@@ -235,9 +235,10 @@ export default function AIPanel({
     onTogglePatchVisibility(id);
   };
 
-  const handleOpenContainerForEditing = (container: any) => {
+  const handleOpenContainerForEditing = (container: AiPatch) => {
     onSelectPatchContainer(container.id);
-    onSelectSubMask(null);
+    const lastSubMaskId = container.subMasks.length > 0 ? container.subMasks[container.subMasks.length - 1].id : null;
+    onSelectSubMask(lastSubMaskId);
   };
 
   const handleDeselect = () => onSelectSubMask(null);

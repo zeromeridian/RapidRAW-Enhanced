@@ -191,7 +191,8 @@ export default function MasksPanel({
 
   const handleOpenContainerForEditing = (container: MaskContainer) => {
     onSelectContainer(container.id);
-    onSelectMask(null);
+    const lastSubMaskId = container.subMasks.length > 0 ? container.subMasks[container.subMasks.length - 1].id : null;
+    onSelectMask(lastSubMaskId);
   };
 
   const handleDeselect = () => onSelectMask(null);
