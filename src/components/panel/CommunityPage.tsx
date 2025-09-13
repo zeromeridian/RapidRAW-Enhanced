@@ -22,6 +22,7 @@ const DEFAULT_PREVIEW_IMAGE_URL = 'https://raw.githubusercontent.com/CyberTimon/
 interface CommunityPreset {
   name: string;
   download_url: string;
+  creator?: string;
 }
 
 const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => {
@@ -89,6 +90,16 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
         const presetContent: string = await invoke(Invokes.FetchPresetContent, { url: preset.download_url });
         
         const presetFile = JSON.parse(presetContent);
+        
+        const creator = presetFile?.creator;
+        if (creator) {
+          setPresets(prevPresets => 
+            prevPresets.map(p => 
+              p.name === preset.name ? { ...p, creator } : p
+            )
+          );
+        }
+
         const presetAdjustments = presetFile?.presets?.[0]?.preset?.adjustments;
         if (!presetAdjustments) {
             console.error("Invalid preset file format for preview:", preset.name, presetFile);
@@ -265,8 +276,11 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
                       </Button>
                     </div>
                   </div>
-                  <div className="p-3">
-                    <h4 className="font-semibold truncate text-text-primary text-center">{preset.name}</h4>
+                  <div className="p-3 text-center">
+                    <h4 className="font-semibold truncate text-text-primary">{preset.name}</h4>
+                    {preset.creator && (
+                      <p className="text-xs text-text-secondary font-['cursive'] italic mt-1">by {preset.creator}</p>
+                    )}
                   </div>
                 </div>
               );

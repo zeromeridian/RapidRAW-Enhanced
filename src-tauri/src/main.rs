@@ -1812,7 +1812,7 @@ async fn generate_community_preset_preview(
     let original_image = crate::image_loader::load_base_image_from_bytes(&image_bytes, &image_path, true)
         .map_err(|e| e.to_string())?;
 
-    const PRESET_PREVIEW_DIM: u32 = 400;
+    const PRESET_PREVIEW_DIM: u32 = 720;
     let preview_base = original_image.thumbnail(PRESET_PREVIEW_DIM, PRESET_PREVIEW_DIM);
 
     let (transformed_image, unscaled_crop_offset) =

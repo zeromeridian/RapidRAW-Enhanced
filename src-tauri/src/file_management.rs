@@ -42,6 +42,12 @@ pub struct Preset {
     pub adjustments: Value,
 }
 
+#[derive(Serialize)]
+struct ExportPresetFile<'a> {
+    creator: &'a str,
+    presets: &'a [PresetItem],
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PresetFolder {
     pub id: String,
@@ -1334,9 +1340,11 @@ pub fn handle_export_presets_to_file(
     presets_to_export: Vec<PresetItem>,
     file_path: String,
 ) -> Result<(), String> {
-    let preset_file = PresetFile {
-        presets: presets_to_export,
+    let preset_file = ExportPresetFile {
+        creator: "Anonymous",
+        presets: &presets_to_export,
     };
+
     let json_string = serde_json::to_string_pretty(&preset_file)
         .map_err(|e| format!("Failed to serialize presets: {}", e))?;
     fs::write(file_path, json_string).map_err(|e| format!("Failed to write preset file: {}", e))

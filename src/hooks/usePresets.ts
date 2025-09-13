@@ -366,26 +366,21 @@ export function usePresets(currentAdjustments: Adjustments) {
 
   const sortAllPresetsAlphabetically = useCallback(() => {
     setPresets((currentPresets) => {
-      // Deep copy to avoid mutation issues with nested structures
       const newPresets: Array<UserPreset> = JSON.parse(JSON.stringify(currentPresets));
       const sortOptions = { numeric: true, sensitivity: 'base' };
 
-      // Sort presets within each folder
       newPresets.forEach((item: UserPreset) => {
         if (item.folder && item.folder.children) {
           item.folder.children.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, sortOptions));
         }
       });
 
-      // Separate root items into folders and presets
       const folders = newPresets.filter((item: UserPreset) => item.folder);
       const rootPresets = newPresets.filter((item: UserPreset) => item.preset);
 
-      // Sort each group alphabetically
       folders.sort((a: any, b: any) => a.folder.name.localeCompare(b.folder.name, undefined, sortOptions));
       rootPresets.sort((a: any, b: any) => a.preset.name.localeCompare(b.preset.name, undefined, sortOptions));
 
-      // Combine them back, folders first
       const sortedPresets = [...folders, ...rootPresets];
 
       savePresetsToBackend(sortedPresets);
