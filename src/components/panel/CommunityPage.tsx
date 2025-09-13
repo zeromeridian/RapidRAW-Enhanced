@@ -12,6 +12,7 @@ import {
   Users,
   Github,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { Invokes } from '../ui/AppProperties';
@@ -33,6 +34,7 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [downloadStatus, setDownloadStatus] = useState<Record<string, 'idle' | 'downloading' | 'success'>>({});
+  const [allPreviewsLoaded, setAllPreviewsLoaded] = useState(false);
 
   const previewQueue = useRef<CommunityPreset[]>([]);
   const isProcessingQueue = useRef(false);
@@ -74,6 +76,14 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
       });
     };
   }, [fetchDefaultPreviewImage]);
+
+  useEffect(() => {
+    if (presets.length > 0 && Object.keys(previews).length === presets.length) {
+      setAllPreviewsLoaded(true);
+    } else {
+      setAllPreviewsLoaded(false);
+    }
+  }, [previews, presets]);
 
   const processPreviewQueue = useCallback(async () => {
     if (isProcessingQueue.current || previewQueue.current.length === 0 || !previewImagePath) {
@@ -247,58 +257,77 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredAndSortedPresets.map(preset => {
-              const status = downloadStatus[preset.name] || 'idle';
-              return (
-                <div key={preset.name} className="bg-surface rounded-lg overflow-hidden group border border-border-color flex flex-col">
-                  <div className="relative w-full h-40 bg-bg-primary flex items-center justify-center">
-                    {previews[preset.name] ? (
+            <AnimatePresence>
+              {filteredAndSortedPresets.map(preset => {
+                const previewUrl = previews[preset.name];
+                const status = downloadStatus[preset.name] || 'idle';
+
+                if (!previewUrl) {
+                  return null;
+                }
+
+                return (
+                  <motion.div
+                    key={preset.name}
+                    layout
+                    initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    className="bg-surface rounded-lg overflow-hidden group border border-border-color flex flex-col"
+                  >
+                    <div className="relative w-full h-45 bg-bg-primary flex items-center justify-center">
                       <img 
-                        src={previews[preset.name]!} 
+                        src={previewUrl} 
                         alt={preset.name} 
                         className="w-full h-full object-cover transition-all duration-300 group-hover:blur-sm group-hover:brightness-75" 
                       />
-                    ) : (
-                      <Loader2 size={24} className="animate-spin text-text-secondary" />
-                    )}
-                    
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleDownloadPreset(preset)}
-                        disabled={status !== 'idle'}
-                        className="shadow-lg"
-                      >
-                        {status === 'idle' && <>Save</>}
-                        {status === 'downloading' && <><Loader2 size={14} className="mr-2 animate-spin" /> Saving...</>}
-                        {status === 'success' && <><CheckCircle2 size={14} className="mr-2" /> Saved</>}
-                      </Button>
+                      
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleDownloadPreset(preset)}
+                          disabled={status !== 'idle'}
+                          className="shadow-lg"
+                        >
+                          {status === 'idle' && <>Save</>}
+                          {status === 'downloading' && <><Loader2 size={14} className="mr-2 animate-spin" /> Saving...</>}
+                          {status === 'success' && <><CheckCircle2 size={14} className="mr-2" /> Saved</>}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="p-3 text-center">
-                    <h4 className="font-semibold truncate text-text-primary">{preset.name}</h4>
-                    {preset.creator && (
-                      <p className="text-xs text-text-secondary font-['cursive'] italic mt-1">by {preset.creator}</p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                    <div className="p-3 text-center">
+                      <h4 className="font-semibold truncate text-text-primary">{preset.name}</h4>
+                      {preset.creator && (
+                        <p className="text-xs text-text-secondary font-['cursive'] italic mt-1">by {preset.creator}</p>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
         )}
-        <div className="text-center mt-8 py-4 text-sm text-text-secondary">
-          <p>Want to get your preset featured?</p>
-          <a
-            href="https://github.com/CyberTimon/RapidRAW-Presets/issues/new?assignees=&labels=preset-submission&template=preset_submission.md&title=Preset+Submission%3A+%5BYour+Preset+Name%5D"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent hover:underline inline-flex items-center gap-2"
+        {allPreviewsLoaded && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="text-center mt-8 py-4 text-sm text-text-secondary"
           >
-            <Github size={14} />
-            Create an issue on GitHub
-          </a>
-        </div>
+            <p>Want to get your preset featured?</p>
+            <a
+              href="https://github.com/CyberTimon/RapidRAW-Presets/issues/new?assignees=&labels=preset-submission&template=preset_submission.md&title=Preset+Submission%3A+%5BYour+Preset+Name%5D"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent hover:underline inline-flex items-center gap-2"
+            >
+              <Github size={14} />
+              Create an issue on GitHub
+            </a>
+          </motion.div>
+        )}
       </div>
     </div>
   );
