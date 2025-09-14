@@ -6,6 +6,8 @@ use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
 
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
@@ -392,7 +394,8 @@ pub fn generate_thumbnail_data(
             let flip_horizontal = meta.adjustments["flipHorizontal"]
                 .as_bool()
                 .unwrap_or(false);
-            let flip_vertical = meta.adjustments["flipVertical"].as_bool().unwrap_or(false);
+            let flip_vertical = meta.adjustments["flipVertical"].as_bool()
+                .unwrap_or(false);
 
             let flipped_image = apply_flip(processing_base, flip_horizontal, flip_vertical);
             let rotated_image = apply_rotation(&flipped_image, rotation_degrees);
@@ -453,11 +456,16 @@ pub fn generate_thumbnail_data(
                 None
             });
 
+            let mut hasher = DefaultHasher::new();
+            path_str.hash(&mut hasher);
+            meta.adjustments.to_string().hash(&mut hasher);
+            let unique_hash = hasher.finish();
+
             if let Ok(processed_image) = gpu_processing::process_and_get_dynamic_image(
                 context,
                 &state,
                 &cropped_preview,
-                0,
+                unique_hash,
                 gpu_adjustments,
                 &mask_bitmaps,
                 lut,

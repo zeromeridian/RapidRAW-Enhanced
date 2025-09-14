@@ -60,7 +60,7 @@ export enum Invokes {
   TestComfyuiConnection = 'test_comfyui_connection',
   UpdateWindowEffect = 'update_window_effect',
   FetchCommunityPresets = 'fetch_community_presets',
-  GenerateCommunityPresetPreview = 'generate_community_preset_preview',
+  GenerateAllCommunityPreviews = 'generate_all_community_previews',
   SaveCommunityPreset = 'save_community_preset',
   SaveTempFile = 'save_temp_file',
 }
