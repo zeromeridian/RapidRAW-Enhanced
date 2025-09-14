@@ -1,35 +1,5 @@
 {
-  "3": {
-    "inputs": {
-      "seed": 3,
-      "steps": 10,
-      "cfg": 1,
-      "sampler_name": "euler",
-      "scheduler": "sgm_uniform",
-      "denoise": 1,
-      "model": [
-        "4",
-        0
-      ],
-      "positive": [
-        "15",
-        0
-      ],
-      "negative": [
-        "15",
-        1
-      ],
-      "latent_image": [
-        "121",
-        0
-      ]
-    },
-    "class_type": "KSampler",
-    "_meta": {
-      "title": "KSampler"
-    }
-  },
-  "4": {
+  "1": {
     "inputs": {
       "ckpt_name": "XL_RealVisXL_V5.0_Lightning.safetensors"
     },
@@ -38,145 +8,78 @@
       "title": "Load Checkpoint"
     }
   },
-  "6": {
-    "inputs": {
-      "text": "hand",
-      "clip": [
-        "4",
-        1
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "Positive"
-    }
-  },
   "7": {
     "inputs": {
       "text": "",
       "clip": [
-        "4",
+        "1",
         1
       ]
     },
     "class_type": "CLIPTextEncode",
     "_meta": {
-      "title": "Negetive"
+      "title": "CLIP Text Encode (Prompt)"
     }
   },
   "8": {
     "inputs": {
-      "samples": [
-        "3",
-        0
-      ],
-      "vae": [
-        "67",
-        0
+      "text": "",
+      "clip": [
+        "1",
+        1
       ]
     },
-    "class_type": "VAEDecode",
+    "class_type": "CLIPTextEncode",
     "_meta": {
-      "title": "VAE Decode"
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "9": {
+    "inputs": {
+      "width": [
+        "37",
+        0
+      ],
+      "height": [
+        "37",
+        0
+      ],
+      "batch_size": 1,
+      "color": 0
+    },
+    "class_type": "EmptyImage",
+    "_meta": {
+      "title": "EmptyImage"
+    }
+  },
+  "10": {
+    "inputs": {
+      "value": 0.0,
+      "mask": [
+        "36",
+        2
+      ]
+    },
+    "class_type": "ThresholdMask",
+    "_meta": {
+      "title": "ThresholdMask"
     }
   },
   "11": {
-    "inputs": {
-      "image": "example.png"
-    },
-    "class_type": "LoadImage",
-    "_meta": {
-      "title": "Load Image"
-    }
-  },
-  "15": {
-    "inputs": {
-      "strength": 0.7500000000000001,
-      "start_percent": 0,
-      "end_percent": 0.9000000000000002,
-      "positive": [
-        "6",
-        0
-      ],
-      "negative": [
-        "7",
-        0
-      ],
-      "control_net": [
-        "17",
-        0
-      ],
-      "image": [
-        "54",
-        0
-      ]
-    },
-    "class_type": "ControlNetApplyAdvanced",
-    "_meta": {
-      "title": "Apply ControlNet"
-    }
-  },
-  "16": {
-    "inputs": {
-      "control_net_name": "diffusion_pytorch_model_promax.safetensors"
-    },
-    "class_type": "ControlNetLoader",
-    "_meta": {
-      "title": "Load ControlNet Model"
-    }
-  },
-  "17": {
-    "inputs": {
-      "type": "repaint",
-      "control_net": [
-        "16",
-        0
-      ]
-    },
-    "class_type": "SetUnionControlNetType",
-    "_meta": {
-      "title": "SetUnionControlNetType"
-    }
-  },
-  "48": {
-    "inputs": {
-      "mask": [
-        "50",
-        0
-      ]
-    },
-    "class_type": "MaskToImage",
-    "_meta": {
-      "title": "Convert Mask to Image"
-    }
-  },
-  "50": {
-    "inputs": {
-      "mask": [
-        "91",
-        0
-      ]
-    },
-    "class_type": "InvertMask",
-    "_meta": {
-      "title": "InvertMask"
-    }
-  },
-  "54": {
     "inputs": {
       "x": 0,
       "y": 0,
       "resize_source": false,
       "destination": [
-        "83",
-        0
+        "36",
+        1
       ],
       "source": [
-        "48",
+        "9",
         0
       ],
       "mask": [
-        "91",
+        "10",
         0
       ]
     },
@@ -185,203 +88,63 @@
       "title": "ImageCompositeMasked"
     }
   },
-  "55": {
+  "12": {
     "inputs": {
-      "images": [
-        "54",
+      "control_net_name": "diffusion_pytorch_model_promax.safetensors"
+    },
+    "class_type": "ControlNetLoader",
+    "_meta": {
+      "title": "Load ControlNet Model"
+    }
+  },
+  "13": {
+    "inputs": {
+      "type": "repaint",
+      "control_net": [
+        "12",
         0
       ]
     },
-    "class_type": "PreviewImage",
+    "class_type": "SetUnionControlNetType",
     "_meta": {
-      "title": "Preview Image"
+      "title": "SetUnionControlNetType"
     }
   },
-  "67": {
+  "14": {
     "inputs": {
-      "vae_name": "sdxl_vae.safetensors"
-    },
-    "class_type": "VAELoader",
-    "_meta": {
-      "title": "Load VAE"
-    }
-  },
-  "72": {
-    "inputs": {
-      "images": [
-        "83",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "Preview Image"
-    }
-  },
-  "73": {
-    "inputs": {
-      "padding": 128,
-      "constraints": "keep_ratio_divisible",
-      "constraint_x": 2,
-      "constraint_y": 2,
-      "min_width": 0,
-      "min_height": 0,
-      "batch_behavior": "match_ratio",
-      "mask": [
-        "80",
-        0
-      ]
-    },
-    "class_type": "Mask To Region",
-    "_meta": {
-      "title": "Mask To Region"
-    }
-  },
-  "80": {
-    "inputs": {
-      "mask": [
-        "152",
-        0
-      ]
-    },
-    "class_type": "MaskToImage",
-    "_meta": {
-      "title": "Mask to Image"
-    }
-  },
-  "81": {
-    "inputs": {
-      "method": "intensity",
-      "image": [
-        "82",
-        0
-      ]
-    },
-    "class_type": "Image To Mask",
-    "_meta": {
-      "title": "Image To Mask"
-    }
-  },
-  "82": {
-    "inputs": {
-      "force_resize_width": 0,
-      "force_resize_height": 0,
-      "image": [
-        "80",
+      "strength": 1,
+      "start_percent": 0,
+      "end_percent": 1,
+      "positive": [
+        "7",
         0
       ],
-      "mask": [
-        "73",
-        0
-      ]
-    },
-    "class_type": "Cut By Mask",
-    "_meta": {
-      "title": "Cut By Mask"
-    }
-  },
-  "83": {
-    "inputs": {
-      "force_resize_width": 0,
-      "force_resize_height": 0,
-      "image": [
-        "11",
-        0
-      ],
-      "mask": [
-        "73",
-        0
-      ]
-    },
-    "class_type": "Cut By Mask",
-    "_meta": {
-      "title": "Cut By Mask"
-    }
-  },
-  "91": {
-    "inputs": {
-      "value": 0.5,
-      "mask": [
-        "81",
-        0
-      ]
-    },
-    "class_type": "ThresholdMask",
-    "_meta": {
-      "title": "ThresholdMask"
-    }
-  },
-  "93": {
-    "inputs": {
-      "resize_behavior": "keep_ratio_fit",
-      "image_base": [
-        "11",
-        0
-      ],
-      "image_to_paste": [
-        "95",
-        0
-      ],
-      "mask": [
-        "99",
-        0
-      ]
-    },
-    "class_type": "Paste By Mask",
-    "_meta": {
-      "title": "Paste By Mask"
-    }
-  },
-  "95": {
-    "inputs": {
-      "force_resize_width": 0,
-      "force_resize_height": 0,
-      "image": [
+      "negative": [
         "8",
         0
       ],
-      "mask": [
-        "126",
-        0
-      ]
-    },
-    "class_type": "Cut By Mask",
-    "_meta": {
-      "title": "Cut By Mask"
-    }
-  },
-  "96": {
-    "inputs": {
-      "images": [
-        "95",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "Preview Image"
-    }
-  },
-  "99": {
-    "inputs": {
-      "mask": [
-        "256",
-        0
-      ]
-    },
-    "class_type": "MaskToImage",
-    "_meta": {
-      "title": "Mask to Image"
-    }
-  },
-  "121": {
-    "inputs": {
-      "pixels": [
-        "83",
+      "control_net": [
+        "13",
         0
       ],
+      "image": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "ControlNetApplyAdvanced",
+    "_meta": {
+      "title": "Apply ControlNet"
+    }
+  },
+  "15": {
+    "inputs": {
+      "pixels": [
+        "36",
+        1
+      ],
       "vae": [
-        "67",
+        "49",
         0
       ]
     },
@@ -390,10 +153,81 @@
       "title": "VAE Encode"
     }
   },
-  "125": {
+  "16": {
+    "inputs": {
+      "samples": [
+        "15",
+        0
+      ],
+      "mask": [
+        "36",
+        2
+      ]
+    },
+    "class_type": "SetLatentNoiseMask",
+    "_meta": {
+      "title": "Set Latent Noise Mask"
+    }
+  },
+  "23": {
+    "inputs": {
+      "samples": [
+        "28",
+        0
+      ],
+      "vae": [
+        "49",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "28": {
+    "inputs": {
+      "seed": 916306623895077,
+      "steps": 10,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "ddim_uniform",
+      "denoise": 1,
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "14",
+        0
+      ],
+      "negative": [
+        "14",
+        1
+      ],
+      "latent_image": [
+        "16",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "30": {
+    "inputs": {
+      "image": "0cb8d588-fb67-4c8b-9843-59a87666ea84.jpeg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "31": {
     "inputs": {
       "images": [
-        "8",
+        "11",
         0
       ]
     },
@@ -402,33 +236,102 @@
       "title": "Preview Image"
     }
   },
-  "126": {
+  "35": {
     "inputs": {
-      "mask": [
-        "91",
+      "stitcher": [
+        "36",
+        0
+      ],
+      "inpainted_image": [
+        "23",
         0
       ]
     },
-    "class_type": "MaskToImage",
+    "class_type": "InpaintStitchImproved",
     "_meta": {
-      "title": "Convert Mask to Image"
+      "title": "✂️ Inpaint Stitch (Improved)"
     }
   },
-  "148": {
+  "36": {
     "inputs": {
-      "image": "2eb77a83-5601-4a9d-b065-9cdc59d655ec.png",
-      "channel": "alpha"
+      "downscale_algorithm": "bilinear",
+      "upscale_algorithm": "bicubic",
+      "preresize": false,
+      "preresize_mode": "ensure maximum resolution",
+      "preresize_min_width": 1024,
+      "preresize_min_height": 1024,
+      "preresize_max_width": 16384,
+      "preresize_max_height": 16384,
+      "mask_fill_holes": false,
+      "mask_expand_pixels": 0,
+      "mask_invert": false,
+      "mask_blend_pixels": 32,
+      "mask_hipass_filter": 0.1,
+      "extend_for_outpainting": false,
+      "extend_up_factor": 1,
+      "extend_down_factor": 1.0000000000000002,
+      "extend_left_factor": 1,
+      "extend_right_factor": 1,
+      "context_from_mask_extend_factor": 1.5000000000000002,
+      "output_resize_to_target_size": true,
+      "output_target_width": [
+        "37",
+        0
+      ],
+      "output_target_height": [
+        "37",
+        0
+      ],
+      "output_padding": "32",
+      "image": [
+        "30",
+        0
+      ],
+      "mask": [
+        "48",
+        0
+      ]
     },
-    "class_type": "LoadImageMask",
+    "class_type": "InpaintCropImproved",
     "_meta": {
-      "title": "Load Image (as Mask)"
+      "title": "✂️ Inpaint Crop (Improved)"
     }
   },
-  "152": {
+  "37": {
+    "inputs": {
+      "value": 1280
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Int"
+    }
+  },
+  "41": {
+    "inputs": {
+      "images": [
+        "35",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "47": {
+    "inputs": {
+      "image": "d22ce86a-c2de-4cdc-b2d6-b8b5fbaf0fd9.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "48": {
     "inputs": {
       "mask": [
-        "148",
-        0
+        "47",
+        1
       ]
     },
     "class_type": "InvertMask",
@@ -436,60 +339,13 @@
       "title": "InvertMask"
     }
   },
-  "252": {
+  "49": {
     "inputs": {
-      "images": [
-        "93",
-        0
-      ]
+      "vae_name": "sdxl_vae.safetensors"
     },
-    "class_type": "PreviewImage",
+    "class_type": "VAELoader",
     "_meta": {
-      "title": "Preview Image"
-    }
-  },
-  "255": {
-    "inputs": {
-      "images": [
-        "99",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "Preview Image"
-    }
-  },
-  "256": {
-    "inputs": {
-      "expand": -8,
-      "incremental_expandrate": 0,
-      "tapered_corners": true,
-      "flip_input": false,
-      "blur_radius": 4,
-      "lerp_alpha": 1,
-      "decay_factor": 1,
-      "fill_holes": false,
-      "mask": [
-        "152",
-        0
-      ]
-    },
-    "class_type": "GrowMaskWithBlur",
-    "_meta": {
-      "title": "Grow Mask With Blur"
-    }
-  },
-  "261": {
-    "inputs": {
-      "images": [
-        "82",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "Preview Image"
+      "title": "Load VAE"
     }
   }
 }

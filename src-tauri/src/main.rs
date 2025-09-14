@@ -1589,12 +1589,8 @@ async fn invoke_generative_replace_with_mask_def(
     } else if let Some(address) = settings.comfyui_address { // self hosted generative ai service
         let comfy_config = settings.comfyui_workflow_config;
 
-        let dilation_amount_u32 = ((img_w.min(img_h) as f32 * 0.01).round() as u32).max(1);
-        let dilation_amount_u8 = std::cmp::min(dilation_amount_u32, 255) as u8;
-        let enlarged_mask_bitmap = dilate(&mask_bitmap, DilationNorm::LInf, dilation_amount_u8);
-
         let mut rgba_mask = RgbaImage::new(img_w, img_h);
-        for (x, y, luma_pixel) in enlarged_mask_bitmap.enumerate_pixels() {
+        for (x, y, luma_pixel) in mask_bitmap.enumerate_pixels() {
             let intensity = luma_pixel[0];
             rgba_mask.put_pixel(x, y, Rgba([0, 0, 0, intensity]));
         }
@@ -1676,7 +1672,7 @@ async fn invoke_generative_replace_with_mask_def(
         }
     }
 
-    let quality = 85;
+    let quality = 92;
 
     let mut color_buf = Cursor::new(Vec::new());
     color_image

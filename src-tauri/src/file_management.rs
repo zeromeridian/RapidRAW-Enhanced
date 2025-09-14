@@ -122,16 +122,16 @@ impl Default for ComfyUIWorkflowConfig {
     fn default() -> Self {
         let mut model_checkpoints = HashMap::new();
         model_checkpoints.insert(
-            "4".to_string(),
+            "1".to_string(),
             "XL_RealVisXL_V5.0_Lightning.safetensors".to_string(),
         );
 
         let mut vae_loaders = HashMap::new();
-        vae_loaders.insert("67".to_string(), "sdxl_vae.safetensors".to_string());
+        vae_loaders.insert("49".to_string(), "sdxl_vae.safetensors".to_string());
 
         let mut controlnet_loaders = HashMap::new();
         controlnet_loaders.insert(
-            "16".to_string(),
+            "12".to_string(),
             "diffusion_pytorch_model_promax.safetensors".to_string(),
         );
 
@@ -140,13 +140,13 @@ impl Default for ComfyUIWorkflowConfig {
             model_checkpoints,
             vae_loaders,
             controlnet_loaders,
-            source_image_node_id: "11".to_string(),
-            mask_image_node_id: "148".to_string(),
-            text_prompt_node_id: "6".to_string(),
-            final_output_node_id: "252".to_string(),
-            sampler_node_id: "3".to_string(),
+            source_image_node_id: "30".to_string(),
+            mask_image_node_id: "47".to_string(),
+            text_prompt_node_id: "7".to_string(),
+            final_output_node_id: "41".to_string(),
+            sampler_node_id: "28".to_string(),
             sampler_steps: 10,
-            inpaint_resolution: Some(1536),
+            inpaint_resolution: Some(3072),
         }
     }
 }
@@ -171,6 +171,7 @@ pub struct AppSettings {
     pub tagging_thread_count: Option<u32>,
     pub thumbnail_size: Option<String>,
     pub thumbnail_aspect_ratio: Option<String>,
+    pub ai_provider: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -195,6 +196,7 @@ impl Default for AppSettings {
             tagging_thread_count: Some(3),
             thumbnail_size: Some("medium".to_string()),
             thumbnail_aspect_ratio: Some("cover".to_string()),
+            ai_provider: Some("cpu".to_string()),
         }
     }
 }
