@@ -3043,6 +3043,10 @@ function App() {
                           activePanel={activeRightPanel}
                           adjustments={adjustments}
                           selectedImage={selectedImage}
+                          onNavigateToCommunity={() => {
+                            handleBackToLibrary();
+                            setActiveView('community');
+                          }}
                           setAdjustments={setAdjustments}
                         />
                       )}
