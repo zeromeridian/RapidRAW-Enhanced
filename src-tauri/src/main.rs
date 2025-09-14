@@ -32,8 +32,6 @@ use image::{
     DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, Rgb, RgbImage, Rgba,
     RgbaImage,
 };
-use imageproc::distance_transform::Norm as DilationNorm;
-use imageproc::morphology::dilate;
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;

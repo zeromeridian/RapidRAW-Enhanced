@@ -86,7 +86,9 @@ const DEFAULT_WORKFLOW_CONFIG = {
   finalOutputNodeId: '41',
   samplerNodeId: '28',
   samplerSteps: 10,
-  inpaintResolution: 3072,
+  transferResolution: 3072,
+  inpaintResolutionNodeId: '37',
+  inpaintResolution: 1280,
 };
 
 const resolutions: Array<OptionItem> = [
@@ -703,13 +705,8 @@ export default function SettingsPanel({
                                   </p>
                                   <ul className="list-disc list-inside space-y-1 pl-2">
                                     <li>
-                                      <ExternalLink href="https://github.com/BadCafeCode/masquerade-nodes-comfyui">
-                                        Masquerade Nodes
-                                      </ExternalLink>
-                                    </li>
-                                    <li>
-                                      <ExternalLink href="https://github.com/kijai/ComfyUI-KJNodes">
-                                        KJNodes
+                                      <ExternalLink href="https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch">
+                                        Comfyui Inpaint CropAndStitch
                                       </ExternalLink>
                                     </li>
                                   </ul>
@@ -756,6 +753,13 @@ export default function SettingsPanel({
                                       onChange={(e) => handleConfigChange('samplerNodeId', e.target.value)}
                                     />
                                   </SettingItem>
+                                  <SettingItem label="Inpaint Resolution Node ID">
+                                    <Input
+                                      type="number"
+                                      value={comfyConfig.inpaintResolutionNodeId || ''}
+                                      onChange={(e) => handleConfigChange('inpaintResolutionNodeId', e.target.value)}
+                                    />
+                                  </SettingItem>
                                   <SettingItem label="Sampler Steps">
                                     <Input
                                       type="number"
@@ -765,10 +769,19 @@ export default function SettingsPanel({
                                       }
                                     />
                                   </SettingItem>
+                                  <SettingItem label="Transfer Resolution">
+                                    <Input
+                                      type="number"
+                                      value={comfyConfig.transferResolution || 3072}
+                                      onChange={(e) =>
+                                        handleConfigChange('transferResolution', parseInt(e.target.value, 10) || 0)
+                                      }
+                                    />
+                                  </SettingItem>
                                   <SettingItem label="Inpaint Resolution">
                                     <Input
                                       type="number"
-                                      value={comfyConfig.inpaintResolution || 1536}
+                                      value={comfyConfig.inpaintResolution || 1280}
                                       onChange={(e) =>
                                         handleConfigChange('inpaintResolution', parseInt(e.target.value, 10) || 0)
                                       }
