@@ -706,7 +706,7 @@ export default function SettingsPanel({
                                   <ul className="list-disc list-inside space-y-1 pl-2">
                                     <li>
                                       <ExternalLink href="https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch">
-                                        Comfyui Inpaint CropAndStitch
+                                        ComfyUI Inpaint CropAndStitch
                                       </ExternalLink>
                                     </li>
                                   </ul>
