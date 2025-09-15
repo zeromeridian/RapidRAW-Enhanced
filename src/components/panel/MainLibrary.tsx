@@ -1004,7 +1004,7 @@ export default function MainLibrary({
           <Button
             className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
             onClick={onNavigateToCommunity}
-            title="Community Hub"
+            title="Community Presets"
           >
             <Users className="w-8 h-8" />
           </Button>

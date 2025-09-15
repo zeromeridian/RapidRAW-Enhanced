@@ -3043,6 +3043,10 @@ function App() {
                           activePanel={activeRightPanel}
                           adjustments={adjustments}
                           selectedImage={selectedImage}
+                          onNavigateToCommunity={() => {
+                            handleBackToLibrary();
+                            setActiveView('community');
+                          }}
                           setAdjustments={setAdjustments}
                         />
                       )}
@@ -3098,7 +3102,12 @@ function App() {
       <div className="flex flex-row flex-grow h-full min-h-0">
         <div className="flex-1 flex flex-col min-w-0 gap-2">
           {activeView === 'community' ? (
-            <CommunityPage onBackToLibrary={() => setActiveView('library')} />
+            <CommunityPage
+              onBackToLibrary={() => setActiveView('library')}
+              supportedTypes={supportedTypes}
+              imageList={sortedImageList}
+              currentFolderPath={currentFolderPath}
+            />
           ) : (
             <MainLibrary
               activePath={libraryActivePath}

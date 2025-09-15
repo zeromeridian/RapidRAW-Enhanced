@@ -38,8 +38,6 @@ use image::{
     DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, Rgb, RgbImage, Rgba,
     RgbaImage,
 };
-use imageproc::distance_transform::Norm as DilationNorm;
-use imageproc::morphology::dilate;
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;
@@ -276,6 +274,13 @@ fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
         }
     }
 
+    hasher.finish()
+}
+
+fn calculate_full_job_hash(path: &str, adjustments: &serde_json::Value) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    path.hash(&mut hasher);
+    adjustments.to_string().hash(&mut hasher);
     hasher.finish()
 }
 
@@ -544,6 +549,8 @@ fn generate_uncropped_preview(
 
     thread::spawn(move || {
         let state = app_handle.state::<AppState>();
+        let path = loaded_image.path.clone();
+        let unique_hash = calculate_full_job_hash(&path, &adjustments_clone);
         let patched_image =
             match composite_patches_on_image(&loaded_image.image, &adjustments_clone) {
                 Ok(img) => img,
@@ -602,7 +609,7 @@ fn generate_uncropped_preview(
             &context,
             &state,
             &processing_base,
-            0,
+            unique_hash,
             uncropped_adjustments,
             &mask_bitmaps,
             lut,
@@ -670,6 +677,8 @@ fn generate_fullscreen_preview(
 ) -> Result<Response, String> {
     let context = get_or_init_gpu_context(&state)?;
     let original_image = get_full_image_for_processing(&state)?;
+    let path = state.original_image.lock().unwrap().as_ref().ok_or("Original image path not found")?.path.clone();
+    let unique_hash = calculate_full_job_hash(&path, &js_adjustments);
     let base_image = composite_patches_on_image(&original_image, &js_adjustments)
         .map_err(|e| format!("Failed to composite AI patches for fullscreen: {}", e))?;
 
@@ -695,7 +704,7 @@ fn generate_fullscreen_preview(
         &context,
         &state,
         &transformed_image,
-        0,
+        unique_hash,
         all_adjustments,
         &mask_bitmaps,
         lut,
@@ -711,6 +720,7 @@ fn generate_fullscreen_preview(
 }
 
 fn process_image_for_export(
+    path: &str,
     base_image: &DynamicImage,
     js_adjustments: &Value,
     export_settings: &ExportSettings,
@@ -731,15 +741,19 @@ fn process_image_for_export(
         .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
         .collect();
 
-    let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
+    let mut all_adjustments = get_all_adjustments_from_json(&js_adjustments);
+    all_adjustments.global.show_clipping = 0;
+
     let lut_path = js_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+
+    let unique_hash = calculate_full_job_hash(path, js_adjustments);
 
     let mut final_image = process_and_get_dynamic_image(
         &context,
         &state,
         &transformed_image,
-        0,
+        unique_hash,
         all_adjustments,
         &mask_bitmaps,
         lut,
@@ -838,6 +852,7 @@ async fn export_image(
                 .map_err(|e| format!("Failed to composite AI patches for export: {}", e))?;
 
             let final_image = process_image_for_export(
+                &original_path,
                 &base_image,
                 &js_adjustments,
                 &export_settings,
@@ -939,6 +954,7 @@ async fn batch_export_images(
                     .map_err(|e| e.to_string())?;
 
                 let final_image = process_image_for_export(
+                    image_path_str,
                     &base_image,
                     &js_adjustments,
                     &export_settings,
@@ -1059,11 +1075,13 @@ async fn estimate_export_size(
 ) -> Result<usize, String> {
     let context = get_or_init_gpu_context(&state)?;
     let original_image_data = get_full_image_for_processing(&state)?;
+    let path = state.original_image.lock().unwrap().as_ref().ok_or("Original image path not found")?.path.clone();
 
     let base_image = composite_patches_on_image(&original_image_data, &js_adjustments)
         .map_err(|e| format!("Failed to composite AI patches for estimation: {}", e))?;
 
     let final_image = process_image_for_export(
+        &path,
         &base_image,
         &js_adjustments,
         &export_settings,
@@ -1103,6 +1121,7 @@ async fn estimate_batch_export_size(
         load_and_composite(first_path, &js_adjustments, false).map_err(|e| e.to_string())?;
 
     let final_image = process_image_for_export(
+        first_path,
         &base_image,
         &js_adjustments,
         &export_settings,
@@ -1453,6 +1472,8 @@ fn generate_preset_preview(
         .clone()
         .ok_or("No original image loaded for preset preview")?;
     let original_image = loaded_image.image;
+    let path = loaded_image.path;
+    let unique_hash = calculate_full_job_hash(&path, &js_adjustments);
 
     const PRESET_PREVIEW_DIM: u32 = 200;
     let preview_base = original_image.thumbnail(PRESET_PREVIEW_DIM, PRESET_PREVIEW_DIM);
@@ -1479,7 +1500,7 @@ fn generate_preset_preview(
         &context,
         &state,
         &transformed_image,
-        0,
+        unique_hash,
         all_adjustments,
         &mask_bitmaps,
         lut,
@@ -1576,12 +1597,8 @@ async fn invoke_generative_replace_with_mask_def(
         // self hosted generative ai service
         let comfy_config = settings.comfyui_workflow_config;
 
-        let dilation_amount_u32 = ((img_w.min(img_h) as f32 * 0.01).round() as u32).max(1);
-        let dilation_amount_u8 = std::cmp::min(dilation_amount_u32, 255) as u8;
-        let enlarged_mask_bitmap = dilate(&mask_bitmap, DilationNorm::LInf, dilation_amount_u8);
-
         let mut rgba_mask = RgbaImage::new(img_w, img_h);
-        for (x, y, luma_pixel) in enlarged_mask_bitmap.enumerate_pixels() {
+        for (x, y, luma_pixel) in mask_bitmap.enumerate_pixels() {
             let intensity = luma_pixel[0];
             rgba_mask.put_pixel(x, y, Rgba([0, 0, 0, intensity]));
         }
@@ -1677,7 +1694,7 @@ async fn invoke_generative_replace_with_mask_def(
         }
     }
 
-    let quality = 85;
+    let quality = 92;
 
     let mut color_buf = Cursor::new(Vec::new());
     color_image
@@ -1804,56 +1821,121 @@ async fn fetch_community_presets() -> Result<Vec<CommunityPreset>, String> {
 }
 
 #[tauri::command]
-async fn generate_community_preset_preview(
-    image_path: String,
-    js_adjustments: serde_json::Value,
+async fn generate_all_community_previews(
+    image_paths: Vec<String>,
+    presets: Vec<CommunityPreset>,
     state: tauri::State<'_, AppState>,
-) -> Result<Response, String> {
+) -> Result<HashMap<String, Vec<u8>>, String> {
     let context = crate::image_processing::get_or_init_gpu_context(&state)?;
+    let mut results: HashMap<String, Vec<u8>> = HashMap::new();
 
-    let image_bytes = fs::read(&image_path).map_err(|e| e.to_string())?;
-    let original_image =
-        crate::image_loader::load_base_image_from_bytes(&image_bytes, &image_path, true)
-            .map_err(|e| e.to_string())?;
+    const TILE_DIM: u32 = 360;
+    const PROCESSING_DIM: u32 = TILE_DIM * 2;
 
-    const PRESET_PREVIEW_DIM: u32 = 720;
-    let preview_base = original_image.thumbnail(PRESET_PREVIEW_DIM, PRESET_PREVIEW_DIM);
+    let mut base_thumbnails: Vec<DynamicImage> = Vec::new();
+    for image_path in image_paths.iter() {
+        let image_bytes = fs::read(image_path).map_err(|e| e.to_string())?;
+        let original_image =
+            crate::image_loader::load_base_image_from_bytes(&image_bytes, &image_path, true)
+                .map_err(|e| e.to_string())?;
+        base_thumbnails.push(original_image.thumbnail(PROCESSING_DIM, PROCESSING_DIM));
+    }
 
-    let (transformed_image, unscaled_crop_offset) =
-        crate::apply_all_transformations(&preview_base, &js_adjustments, 1.0);
-    let (img_w, img_h) = transformed_image.dimensions();
+    for preset in presets.iter() {
+        let mut processed_tiles: Vec<RgbImage> = Vec::new();
+        let js_adjustments = &preset.adjustments;
 
-    let mask_definitions: Vec<MaskDefinition> = js_adjustments
-        .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
-        .unwrap_or_else(Vec::new);
+        let mut preset_hasher = DefaultHasher::new();
+        preset.name.hash(&mut preset_hasher);
+        let preset_hash = preset_hasher.finish();
 
-    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-        .iter()
-        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
-        .collect();
+        for (i, base_image) in base_thumbnails.iter().enumerate() {
+            let (transformed_image, unscaled_crop_offset) =
+                crate::apply_all_transformations(&base_image, &js_adjustments, 1.0);
+            let (img_w, img_h) = transformed_image.dimensions();
 
-    let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
-    let lut_path = js_adjustments["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+            let mask_definitions: Vec<MaskDefinition> = js_adjustments
+                .get("masks")
+                .and_then(|m| serde_json::from_value(m.clone()).ok())
+                .unwrap_or_else(Vec::new);
 
-    let processed_image = crate::image_processing::process_and_get_dynamic_image(
-        &context,
-        &state,
-        &transformed_image,
-        0,
-        all_adjustments,
-        &mask_bitmaps,
-        lut,
-    )?;
+            let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
+                .iter()
+                .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
+                .collect();
 
-    let mut buf = Cursor::new(Vec::new());
-    processed_image
-        .to_rgb8()
-        .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 75))
-        .map_err(|e| e.to_string())?;
+            let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
+            let lut_path = js_adjustments["lutPath"].as_str();
+            let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
 
-    Ok(Response::new(buf.into_inner()))
+            let unique_hash = preset_hash.wrapping_add(i as u64);
+
+            let processed_image_dynamic = crate::image_processing::process_and_get_dynamic_image(
+                &context,
+                &state,
+                &transformed_image,
+                unique_hash,
+                all_adjustments,
+                &mask_bitmaps,
+                lut,
+            )?;
+            
+            let processed_image = processed_image_dynamic.to_rgb8();
+
+            let (proc_w, proc_h) = processed_image.dimensions();
+            let size = proc_w.min(proc_h);
+            let cropped_processed_image = image::imageops::crop_imm(
+                &processed_image,
+                (proc_w - size) / 2,
+                (proc_h - size) / 2,
+                size,
+                size,
+            )
+            .to_image();
+
+            let final_tile = image::imageops::resize(
+                &cropped_processed_image,
+                TILE_DIM,
+                TILE_DIM,
+                image::imageops::FilterType::Lanczos3,
+            );
+            processed_tiles.push(final_tile);
+        }
+
+        let final_image_buffer = match processed_tiles.len() {
+            1 => processed_tiles.remove(0),
+            2 => {
+                let mut canvas = RgbImage::new(TILE_DIM * 2, TILE_DIM);
+                image::imageops::overlay(&mut canvas, &processed_tiles[0], 0, 0);
+                image::imageops::overlay(&mut canvas, &processed_tiles[1], TILE_DIM as i64, 0);
+                canvas
+            }
+            4 => {
+                let mut canvas = RgbImage::new(TILE_DIM * 2, TILE_DIM * 2);
+                image::imageops::overlay(&mut canvas, &processed_tiles[0], 0, 0);
+                image::imageops::overlay(&mut canvas, &processed_tiles[1], TILE_DIM as i64, 0);
+                image::imageops::overlay(&mut canvas, &processed_tiles[2], 0, TILE_DIM as i64);
+                image::imageops::overlay(
+                    &mut canvas,
+                    &processed_tiles[3],
+                    TILE_DIM as i64,
+                    TILE_DIM as i64,
+                );
+                canvas
+            }
+            _ => continue,
+        };
+
+        let mut buf = Cursor::new(Vec::new());
+        if final_image_buffer
+            .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 75))
+            .is_ok()
+        {
+            results.insert(preset.name.clone(), buf.into_inner());
+        }
+    }
+
+    Ok(results)
 }
 
 #[tauri::command]
@@ -2071,7 +2153,7 @@ fn main() {
             save_panorama,
             load_and_parse_lut,
             fetch_community_presets,
-            generate_community_preset_preview,
+            generate_all_community_previews,
             save_temp_file,
             image_processing::generate_histogram,
             image_processing::generate_waveform,

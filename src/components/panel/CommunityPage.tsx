@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
-import { homeDir } from '@tauri-apps/api/path';
 import {
   ArrowLeft,
   CheckCircle2,
   ChevronDown,
-  Image as ImageIcon,
   Loader2,
   Search,
   Users,
@@ -15,7 +12,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
-import { Invokes } from '../ui/AppProperties';
+import { Invokes, SupportedTypes, ImageFile } from '../ui/AppProperties';
 import { INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 
 const DEFAULT_PREVIEW_IMAGE_URL = 'https://raw.githubusercontent.com/CyberTimon/RapidRAW-Presets/main/sample-image.jpg';
@@ -44,11 +41,28 @@ const itemVariants = {
   },
 };
 
-const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => {
+interface CommunityPageProps {
+  onBackToLibrary: () => void;
+  supportedTypes: SupportedTypes | null;
+  imageList: ImageFile[];
+  currentFolderPath: string | null;
+}
+
+// More robust shuffle algorithm
+const shuffleArray = (array: any[]) => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
+
+const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: CommunityPageProps) => {
   const [presets, setPresets] = useState<CommunityPreset[]>([]);
   const [previews, setPreviews] = useState<Record<string, string | null>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [previewImagePath, setPreviewImagePath] = useState<string | null>(null);
+  const [previewImagePaths, setPreviewImagePaths] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [downloadStatus, setDownloadStatus] = useState<Record<string, 'idle' | 'downloading' | 'success'>>({});
@@ -57,14 +71,15 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
   const previewsRef = useRef(previews);
   previewsRef.current = previews;
 
-  const fetchDefaultPreviewImage = useCallback(async () => {
+  const fetchDefaultPreviewImage = useCallback(async (): Promise<string | null> => {
     try {
       const response = await fetch(DEFAULT_PREVIEW_IMAGE_URL);
       const blob = await response.blob();
       const tempPath: string = await invoke(Invokes.SaveTempFile, { bytes: Array.from(new Uint8Array(await blob.arrayBuffer())) });
-      setPreviewImagePath(tempPath);
+      return tempPath;
     } catch (error) {
       console.error("Failed to fetch default preview image:", error);
+      return null;
     }
   }, []);
 
@@ -82,7 +97,6 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
     };
 
     fetchPresets();
-    fetchDefaultPreviewImage();
 
     return () => {
       Object.values(previewsRef.current).forEach(url => {
@@ -91,67 +105,71 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
         }
       });
     };
-  }, [fetchDefaultPreviewImage]);
+  }, []);
 
   useEffect(() => {
-    if (presets.length === 0 || !previewImagePath) {
+    const setupPreviewImages = async () => {
+      setPreviews({});
+
+      if (!currentFolderPath || imageList.length === 0) {
+        const defaultPath = await fetchDefaultPreviewImage();
+        if (defaultPath) {
+          setPreviewImagePaths([defaultPath]);
+        }
+        return;
+      }
+
+      const shuffled = shuffleArray(imageList);
+
+      if (imageList.length === 1) {
+        setPreviewImagePaths([imageList[0].path]);
+      } else if (imageList.length >= 2 && imageList.length <= 3) {
+        setPreviewImagePaths(shuffled.slice(0, 2).map(img => img.path));
+      } else if (imageList.length >= 4) {
+        setPreviewImagePaths(shuffled.slice(0, 4).map(img => img.path));
+      }
+    };
+
+    setupPreviewImages();
+  }, [imageList, currentFolderPath, fetchDefaultPreviewImage]);
+
+  useEffect(() => {
+    if (presets.length === 0 || previewImagePaths.length === 0) {
       return;
     }
 
     const generateAllPreviews = async () => {
       setAllPreviewsLoaded(false);
-      const newPreviews: Record<string, string | null> = {};
+      try {
+        const previewDataMap: Record<string, number[]> = await invoke(Invokes.GenerateAllCommunityPreviews, {
+          imagePaths: previewImagePaths,
+          presets: presets.map(p => ({
+            ...p,
+            adjustments: { ...INITIAL_ADJUSTMENTS, ...p.adjustments }
+          })),
+        });
 
-      const previewPromises = presets.map(async (preset) => {
-        try {
-          const fullPresetAdjustments = { ...INITIAL_ADJUSTMENTS, ...preset.adjustments };
-
-          const imageData: Uint8Array = await invoke(Invokes.GenerateCommunityPresetPreview, {
-            imagePath: previewImagePath,
-            jsAdjustments: fullPresetAdjustments,
-          });
-
-          const blob = new Blob([imageData], { type: 'image/jpeg' });
-          return { name: preset.name, url: URL.createObjectURL(blob) };
-        } catch (error) {
-          console.error(`Failed to generate preview for ${preset.name}:`, error);
-          return { name: preset.name, url: null };
+        const newPreviews: Record<string, string | null> = {};
+        for (const [presetName, imageData] of Object.entries(previewDataMap)) {
+          const blob = new Blob([new Uint8Array(imageData)], { type: 'image/jpeg' });
+          newPreviews[presetName] = URL.createObjectURL(blob);
         }
-      });
 
-      const results = await Promise.all(previewPromises);
-      
-      results.forEach(result => {
-        newPreviews[result.name] = result.url;
-      });
+        setPreviews(prev => {
+          Object.values(prev).forEach(url => url?.startsWith('blob:') && URL.revokeObjectURL(url));
+          return newPreviews;
+        });
 
-      setPreviews(prev => {
-        Object.values(prev).forEach(url => url?.startsWith('blob:') && URL.revokeObjectURL(url));
-        return newPreviews;
-      });
-      setAllPreviewsLoaded(true);
+      } catch (error) {
+        console.error(`Failed to generate previews:`, error);
+      } finally {
+        setAllPreviewsLoaded(true);
+      }
     };
 
     generateAllPreviews();
 
-  }, [presets, previewImagePath]);
-
-
-  const handleSelectPreviewImage = async () => {
-    try {
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: 'Image', extensions: ['jpg', 'jpeg', 'png', 'tif', 'tiff', 'webp', 'arw', 'cr2', 'nef', 'dng'] }],
-        defaultPath: await homeDir(),
-      });
-      if (typeof selected === 'string') {
-        setPreviews({});
-        setPreviewImagePath(selected);
-      }
-    } catch (error) {
-      console.error("Failed to open file dialog:", error);
-    }
-  };
+  }, [presets, previewImagePaths]);
 
   const handleDownloadPreset = async (preset: CommunityPreset) => {
     setDownloadStatus(prev => ({ ...prev, [preset.name]: 'downloading' }));
@@ -201,12 +219,6 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
             <p className="text-sm text-text-secondary">Discover presets created by the community.</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <Button onClick={handleSelectPreviewImage} variant="secondary">
-            <ImageIcon size={16} className="mr-2" />
-            Change Preview Image
-          </Button>
-        </div>
       </header>
 
       <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
@@ -251,9 +263,7 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
               {filteredAndSortedPresets.map(preset => {
                 const previewUrl = previews[preset.name];
                 const status = downloadStatus[preset.name] || 'idle';
-                if (!previewUrl) {
-                  return null;
-                }
+                
                 return (
                   <motion.div
                     key={preset.name}
@@ -262,12 +272,16 @@ const CommunityPage = ({ onBackToLibrary }: { onBackToLibrary: () => void }) => 
                     exit={{ opacity: 0, scale: 0.9 }}
                     className="bg-surface rounded-lg overflow-hidden group border border-border-color flex flex-col"
                   >
-                    <div className="relative w-full h-45 bg-bg-primary flex items-center justify-center">
-                      <img 
-                        src={previewUrl} 
-                        alt={preset.name} 
-                        className="w-full h-full object-cover transition-all duration-300 group-hover:blur-sm group-hover:brightness-75" 
-                      />
+                    <div className="relative w-full aspect-square bg-bg-primary flex items-center justify-center text-text-secondary">
+                      {previewUrl ? (
+                        <img 
+                          src={previewUrl} 
+                          alt={preset.name} 
+                          className="w-full h-full object-cover transition-all duration-300 group-hover:blur-sm group-hover:brightness-75" 
+                        />
+                      ) : (
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                      )}
                       
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <Button

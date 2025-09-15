@@ -283,7 +283,7 @@ pub async fn execute_workflow(
     mask_image: Option<DynamicImage>,
     text_prompt: Option<String>,
 ) -> Result<Vec<u8>> {
-    let max_dimension = config.inpaint_resolution.unwrap_or(1536);
+    let max_dimension = config.transfer_resolution.unwrap_or(3072);
 
     let (w, h) = source_image.dimensions();
     let processed_source_image = if w > max_dimension || h > max_dimension {
@@ -340,6 +340,12 @@ pub async fn execute_workflow(
             if let Some(inputs) = node.get_mut("inputs") {
                 inputs["control_net_name"] = json!(controlnet_name);
             }
+        }
+    }
+
+    if let Some(node) = workflow.get_mut(&config.inpaint_resolution_node_id) {
+        if let Some(inputs) = node.get_mut("inputs") {
+            inputs["value"] = json!(config.inpaint_resolution);
         }
     }
 
