@@ -43,8 +43,8 @@ tauri-plugin-os = "2.3.1"
 raw-window-handle = "0.6.2"
 os_info = "3"
 log = "0.4"
-log-panics = "2.1.0"
-
+log-panics = {version ="2.1.0", features = ["backtrace"]}
+fern = "0.7"
 little_exif = "0.6"
 chrono = "0.4"
 tokenizers = "0.22.0"
@@ -57,7 +57,6 @@ tauri-plugin-shell = "2.3.1"
 tempfile = "3.22.0"
 num_cpus = "1.17.0"
 mimalloc = "0.1.48"
-fern = "0.7.1"
 
 
 [build-dependencies]
