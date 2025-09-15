@@ -553,7 +553,11 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
             SCALES.chromatic_aberration,
             None,
         ),
-        show_clipping: if js_adjustments["showClipping"].as_bool().unwrap_or(false) { 1 } else { 0 },
+        show_clipping: if js_adjustments["showClipping"].as_bool().unwrap_or(false) {
+            1
+        } else {
+            0
+        },
         _pad_ca1: 0.0,
 
         enable_negative_conversion: if neg_conv_enabled { 1 } else { 0 },

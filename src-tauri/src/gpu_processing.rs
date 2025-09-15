@@ -4,9 +4,9 @@ use bytemuck;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba};
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
-use crate::{AppState, GpuImageCache};
 use crate::image_processing::{AllAdjustments, GpuContext};
 use crate::lut_processing::Lut;
+use crate::{AppState, GpuImageCache};
 
 pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuContext, String> {
     let mut context_lock = state.gpu_context.lock().unwrap();
@@ -447,7 +447,8 @@ pub fn process_and_get_dynamic_image(
     let mut cache_lock = state.gpu_image_cache.lock().unwrap();
 
     if let Some(cache) = &*cache_lock {
-        if cache.transform_hash != transform_hash || cache.width != width || cache.height != height {
+        if cache.transform_hash != transform_hash || cache.width != width || cache.height != height
+        {
             *cache_lock = None;
         }
     }

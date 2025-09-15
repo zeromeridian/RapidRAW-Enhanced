@@ -14,9 +14,9 @@ use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
 use little_exif::exif_tag::ExifTag;
 use little_exif::metadata::Metadata;
-use rayon::prelude::*;
-use rayon::ThreadPoolBuilder;
 use num_cpus;
+use rayon::ThreadPoolBuilder;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
@@ -588,7 +588,6 @@ pub async fn generate_thumbnails(
     .map_err(|e| e.to_string())?
 }
 
-
 #[tauri::command]
 pub fn generate_thumbnails_progressive(
     paths: Vec<String>,
@@ -601,7 +600,7 @@ pub fn generate_thumbnails_progressive(
     let cancellation_token = state.thumbnail_cancellation_token.clone();
 
     let pool = ThreadPoolBuilder::new()
-        .num_threads(num_cpus::get_physical())
+        .num_threads(num_cpus::get_physical() - 1)
         .build()
         .unwrap();
     let cache_dir = app_handle
@@ -617,7 +616,7 @@ pub fn generate_thumbnails_progressive(
     let total_count = paths.len();
     let completed_count = Arc::new(AtomicUsize::new(0));
 
-    pool.install(move || {
+    pool.spawn(move || {
         let state = app_handle_clone.state::<AppState>();
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
 
