@@ -735,7 +735,9 @@ fn process_image_for_export(
         .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
         .collect();
 
-    let all_adjustments = get_all_adjustments_from_json(&js_adjustments);
+    let mut all_adjustments = get_all_adjustments_from_json(&js_adjustments);
+    all_adjustments.global.show_clipping = 0;
+
     let lut_path = js_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
 
