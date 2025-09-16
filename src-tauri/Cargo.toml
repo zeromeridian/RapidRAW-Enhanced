@@ -43,7 +43,7 @@ tauri-plugin-os = "2.3.1"
 raw-window-handle = "0.6.2"
 os_info = "3"
 log = "0.4"
-log-panics = {version ="2.1.0", features = ["backtrace"]}
+log-panics = {version ="2.1.0", features = ["backtrace"] }
 fern = "0.7"
 little_exif = "0.6"
 chrono = "0.4"

@@ -21,7 +21,8 @@ mod tagging;
 mod tagging_utils;
 
 use log;
-use log_panics as logging;
+use rand::rand_core::le;
+use std::panic;
 use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -2033,6 +2034,7 @@ fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowH
     {}
 }
 
+/// Hook panic messages to the logger.
 fn logger(){
     let log_file = fs::OpenOptions::new()
             .write(true)
@@ -2040,6 +2042,9 @@ fn logger(){
             .append(true)
             .open("RapidRaw.log")
             .unwrap();
+    
+    let var = std::env::var("RUST_LOG").unwrap_or_else(|_| "error".to_string());
+    let level: log::LevelFilter = var.parse().unwrap_or(log::LevelFilter::Error);
     
     fern::Dispatch::new()
         .format(|out, message, record| {
@@ -2050,14 +2055,16 @@ fn logger(){
                 message
             ))
         })
-        .level(log::LevelFilter::Debug)
+        .level(level)
         .chain(std::io::stderr())   
         .chain(log_file)            
         .apply()
         .unwrap();
 
 
-    logging::init();
+    panic::set_hook(Box::new(|error| {
+        log::error!("PANIC! {:#?}", error);
+    }));
 }
 
 fn main() {
