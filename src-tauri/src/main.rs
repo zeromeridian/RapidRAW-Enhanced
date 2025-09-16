@@ -2050,7 +2050,7 @@ fn logger(){
                 message
             ))
         })
-        .level(log::LevelFilter::Error)
+        .level(log::LevelFilter::Debug)
         .chain(std::io::stderr())   
         .chain(log_file)            
         .apply()
