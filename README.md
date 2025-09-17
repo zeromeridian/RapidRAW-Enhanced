@@ -51,6 +51,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2025-09-17:** Automatic image culling (duplicate & blur detection)
 *   **2025-09-14:** Grid previews in community panel & improved ComfyUi workflow
 *   **2025-09-12:** New community presets panel to share & showcase presets 
 *   **2025-09-10:** Extended generative AI roadmap & started building RapidRAW website 
@@ -59,11 +60,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-09-04:** Added toggleable clipping warnings (blue = shadows, red = highlights)
 *   **2025-09-02:** Transition to Rust 2024 & Cache image on GPU
 *   **2025-08-31:** Cancel thumbnail generation on folder change & optimized ai patch saving  
-*   **2025-08-30:** Optimize ComfyUI image transfer & speed
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2025-08-30:** Optimize ComfyUI image transfer & speed
 *   **2025-08-28:** Chromatic aberration correction & Shader improvements
 *   **2025-08-26:** User customisable ComfyUI workflow selection
 *   **2025-08-25:** Make LUTs parser more robust (support more advanced formats)
