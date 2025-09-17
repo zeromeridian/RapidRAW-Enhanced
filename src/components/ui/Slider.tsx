@@ -15,7 +15,7 @@ interface SliderProps {
 /**
  * A reusable slider component with a clickable reset icon and an interactive handle.
  * The slider's thumb animates with an "ease-in-out" effect when the value is set programmatically.
- * The numeric value can be clicked to manually input a precise value.
+ * The numeric value can be clicked to manually input a precise value, including negative numbers.
  * Double-clicking the label, value, or slider track will also reset the value.
  *
  * @param {Element|string} label - The text label for the slider.
@@ -41,7 +41,7 @@ const Slider = ({
   const [isDragging, setIsDragging] = useState(false);
   const animationFrameRef = useRef<any>(undefined);
   const [isEditing, setIsEditing] = useState(false);
-  const [inputValue, setInputValue] = useState<number>(value);
+  const [inputValue, setInputValue] = useState<string>(String(value));
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isLabelHovered, setIsLabelHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -108,7 +108,7 @@ const Slider = ({
 
   useEffect(() => {
     if (!isEditing) {
-      setInputValue(value);
+      setInputValue(String(value));
     }
   }, [value, isEditing]);
 
@@ -128,7 +128,7 @@ const Slider = ({
     onChange(syntheticEvent);
   };
 
-  const handleChange = (e: any) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDisplayValue(Number(e.target.value));
     onChange(e);
   };
@@ -140,13 +140,12 @@ const Slider = ({
     setIsEditing(true);
   };
 
-  const handleInputChange = (e: any) => {
-    setInputValue(Number(e.target.value));
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
   };
 
   const handleInputCommit = () => {
-    let newValue = inputValue;
-
+    let newValue = parseFloat(inputValue);
     if (isNaN(newValue)) {
       newValue = value;
     } else {
@@ -162,25 +161,25 @@ const Slider = ({
     setIsEditing(false);
   };
 
-  const handleInputKeyDown = (e: any) => {
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleInputCommit();
-      e.target.blur();
+      e.currentTarget.blur();
     } else if (e.key === 'Escape') {
-      setInputValue(value);
+      setInputValue(String(value));
       setIsEditing(false);
-      e.target.blur();
+      e.currentTarget.blur();
     }
   };
 
-  const handleRangeKeyDown = (e: any) => {
+  const handleRangeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if ((e.ctrlKey || e.metaKey) && ['z', 'y'].includes(e.key.toLowerCase())) {
-      e.target.blur();
+      e.currentTarget.blur();
       return;
     }
 
     if (GLOBAL_KEYS.includes(e.key)) {
-      e.target.blur();
+      e.currentTarget.blur();
     }
   };
 

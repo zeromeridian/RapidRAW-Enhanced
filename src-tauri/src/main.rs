@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod ai_processing;
+mod culling;
 mod comfyui_connector;
 mod file_management;
 mod formats;
@@ -2137,7 +2138,8 @@ fn main() {
             file_management::set_color_label_for_paths,
             file_management::import_files,
             tagging::start_background_indexing,
-            tagging::clear_all_tags
+            tagging::clear_all_tags,
+            culling::cull_images,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

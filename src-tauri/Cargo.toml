@@ -52,6 +52,7 @@ nalgebra = "0.34.0"
 rand = "0.9"
 tauri-plugin-shell = "2.3.1"
 tempfile = "3.22.0"
+image_hasher = "3.0.0"
 
 [build-dependencies]
 tauri-build = { version = "2.4", features = [] }

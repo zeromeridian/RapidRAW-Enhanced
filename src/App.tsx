@@ -28,6 +28,7 @@ import {
   Undo,
   X,
   Users,
+  Gauge,
 } from 'lucide-react';
 import TitleBar from './window/TitleBar';
 import CommunityPage from './components/panel/CommunityPage';
@@ -53,6 +54,7 @@ import ConfirmModal from './components/modals/ConfirmModal';
 import ImportSettingsModal from './components/modals/ImportSettingsModal';
 import RenameFileModal from './components/modals/RenameFileModal';
 import PanoramaModal from './components/modals/PanoramaModal';
+import CullingModal from './components/modals/CullingModal';
 import { useHistoryState } from './hooks/useHistoryState';
 import Resizer from './components/ui/Resizer';
 import {
@@ -99,6 +101,7 @@ import {
   Orientation,
   ThumbnailSize,
   ThumbnailAspectRatio,
+  CullingSuggestions,
 } from './components/ui/AppProperties';
 import { ChannelConfig } from './components/adjustments/Curves';
 
@@ -140,6 +143,14 @@ interface PanoramaModalState {
   isOpen: boolean;
   progressMessage: string | null;
   stitchingSourcePaths: Array<string>;
+}
+
+interface CullingModalState {
+  isOpen: boolean;
+  suggestions: CullingSuggestions | null;
+  progress: { current: number; total: number; stage: string } | null;
+  error: string | null;
+  pathsToCull: Array<string>;
 }
 
 interface LutData {
@@ -306,6 +317,13 @@ function App() {
     isOpen: false,
     progressMessage: '',
     stitchingSourcePaths: [],
+  });
+  const [cullingModalState, setCullingModalState] = useState<CullingModalState>({
+    isOpen: false,
+    suggestions: null,
+    progress: null,
+    error: null,
+    pathsToCull: [],
   });
   const [customEscapeHandler, setCustomEscapeHandler] = useState(null);
   const [isGeneratingAiMask, setIsGeneratingAiMask] = useState(false);
@@ -2012,6 +2030,47 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let isEffectActive = true;
+
+    const unlistenStart = listen('culling-start', (event: any) => {
+      if (isEffectActive) {
+        setCullingModalState({
+          isOpen: true,
+          progress: { current: 0, total: event.payload, stage: 'Initializing...' },
+          suggestions: null,
+          error: null,
+        });
+      }
+    });
+
+    const unlistenProgress = listen('culling-progress', (event: any) => {
+      if (isEffectActive) {
+        setCullingModalState((prev) => ({ ...prev, progress: event.payload }));
+      }
+    });
+
+    const unlistenComplete = listen('culling-complete', (event: any) => {
+      if (isEffectActive) {
+        setCullingModalState((prev) => ({ ...prev, progress: null, suggestions: event.payload }));
+      }
+    });
+
+    const unlistenError = listen('culling-error', (event: any) => {
+      if (isEffectActive) {
+        setCullingModalState((prev) => ({ ...prev, progress: null, error: String(event.payload) }));
+      }
+    });
+
+    return () => {
+      isEffectActive = false;
+      unlistenStart.then((f) => f());
+      unlistenProgress.then((f) => f());
+      unlistenComplete.then((f) => f());
+      unlistenError.then((f) => f());
+    };
+  }, []);
+
   const handleSavePanorama = async (): Promise<string> => {
     if (panoramaModalState.stitchingSourcePaths.length === 0) {
       const err = 'Source paths for panorama not found.';
@@ -2514,6 +2573,7 @@ function App() {
     const copyLabel = isSingleSelection ? 'Copy Image' : `Copy ${selectionCount} Images`;
     const autoAdjustLabel = isSingleSelection ? 'Auto Adjust Image' : `Auto Adjust ${selectionCount} Images`;
     const renameLabel = isSingleSelection ? 'Rename Image' : `Rename ${selectionCount} Images`;
+    const cullLabel = isSingleSelection ? 'Cull Image' : `Cull ${selectionCount} Images`;
 
     const handleApplyAutoAdjustmentsToSelection = () => {
       if (finalSelection.length === 0) {
@@ -2587,28 +2647,51 @@ function App() {
         label: pasteLabel,
         onClick: handlePasteAdjustments,
       },
-      { label: autoAdjustLabel, icon: Aperture, onClick: handleApplyAutoAdjustmentsToSelection },
       {
-        disabled: selectionCount < 2,
-        icon: Images,
-        label: isSingleSelection ? 'Stitch Image' : `Stitch ${selectionCount} Images`,
-        onClick: () => {
-          setPanoramaModalState({
-            error: null,
-            finalImageBase64: null,
-            isOpen: true,
-            progressMessage: 'Starting panorama process...',
-            stitchingSourcePaths: finalSelection,
-          });
-          invoke(Invokes.StitchPanorama, { paths: finalSelection }).catch((err) => {
-            setPanoramaModalState((prev: PanoramaModalState) => ({
-              ...prev,
-              error: String(err),
-              isOpen: true,
-              progressMessage: 'Failed to start.',
-            }));
-          });
-        },
+        label: 'Productivity',
+        icon: Gauge,
+        submenu: [
+          {
+            label: autoAdjustLabel,
+            icon: Aperture,
+            onClick: handleApplyAutoAdjustmentsToSelection,
+          },
+          {
+            disabled: selectionCount < 2,
+            icon: Images,
+            label: isSingleSelection ? 'Stitch Image' : `Stitch ${selectionCount} Images`,
+            onClick: () => {
+              setPanoramaModalState({
+                error: null,
+                finalImageBase64: null,
+                isOpen: true,
+                progressMessage: 'Starting panorama process...',
+                stitchingSourcePaths: finalSelection,
+              });
+              invoke(Invokes.StitchPanorama, { paths: finalSelection }).catch((err) => {
+                setPanoramaModalState((prev: PanoramaModalState) => ({
+                  ...prev,
+                  error: String(err),
+                  isOpen: true,
+                  progressMessage: 'Failed to start.',
+                }));
+              });
+            },
+          },
+          {
+            label: cullLabel,
+            icon: Users,
+            onClick: () =>
+              setCullingModalState({
+                isOpen: true,
+                progress: null,
+                suggestions: null,
+                error: null,
+                pathsToCull: finalSelection,
+              }),
+            disabled: imageList.length < 2,
+          },
+        ],
       },
       { type: OPTION_SEPARATOR },
       {
@@ -3293,6 +3376,28 @@ function App() {
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onSave={handleStartImport}
+      />
+      <CullingModal
+        isOpen={cullingModalState.isOpen}
+        onClose={() => setCullingModalState({ isOpen: false, progress: null, suggestions: null, error: null, pathsToCull: [] })}
+        progress={cullingModalState.progress}
+        suggestions={cullingModalState.suggestions}
+        error={cullingModalState.error}
+        imagePaths={cullingModalState.pathsToCull}
+        thumbnails={thumbnails}
+        onApply={(action, paths) => {
+          if (action === 'reject') {
+            handleSetColorLabel('red', paths);
+          } else if (action === 'rate_zero') {
+            handleRate(1, paths);
+          } else if (action === 'delete') {
+            executeDelete(paths, { includeAssociated: false });
+          }
+          setCullingModalState({ isOpen: false, progress: null, suggestions: null, error: null, pathsToCull: [] });
+        }}
+        onError={(err) => {
+          setCullingModalState((prev) => ({ ...prev, error: err, progress: null }));
+        }}
       />
     </div>
   );
