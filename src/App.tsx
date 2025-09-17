@@ -2865,6 +2865,12 @@ function App() {
           },
         ],
       },
+      {
+        icon: FolderInput,
+        label: 'Import Images',
+        onClick: () => handleImportClick(currentFolderPath as string),
+        disabled: !currentFolderPath,
+      },
     ];
     showContextMenu(event.clientX, event.clientY, options);
   };
