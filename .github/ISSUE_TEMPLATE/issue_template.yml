@@ -84,8 +84,6 @@ body:
         - 16GB
         - 32GB
         - 64GB or more
-    validations:
-      required: true
 
   - type: input
     id: cpu-gpu
