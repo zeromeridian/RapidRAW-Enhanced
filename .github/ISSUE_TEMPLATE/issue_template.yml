@@ -46,6 +46,10 @@ body:
       description: If you have any screenshots, error messages, or log files, please share them here.
       placeholder: Paste screenshots or error messages here...
 
+  - type: markdown
+    attributes:
+      value: "### Your Environment"
+
   - type: dropdown
     id: operating-system
     attributes:
@@ -53,11 +57,10 @@ body:
       options:
         - Windows 11
         - Windows 10
-        - macOS Sonoma (14.x)
-        - macOS Ventura (13.x)
-        - macOS Monterey (12.x)
+        - macOS Apple Silicon
+        - macOS Intel
+        - Ubuntu 24.04
         - Ubuntu 22.04
-        - Ubuntu 20.04
         - Other Linux
         - Other (please specify in additional info)
     validations:
@@ -84,14 +87,20 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: storage-type
+  - type: input
+    id: cpu-gpu
     attributes:
-      label: Storage type
+      label: CPU / GPU
+      description: What CPU and/or GPU (including driver version) are you using? This is helpful for performance / rendering issues.
+      placeholder: e.g., Apple M1 Pro, or Intel i7-12700K / NVIDIA RTX 3080
+
+  - type: dropdown
+    id: image-storage-type
+    attributes:
+      label: Image Storage Type
       options:
         - SSD (Internal)
         - HDD (Internal)
-        - NVMe (Internal)
         - External SSD
         - External HDD
         - External SD Card
