@@ -53,13 +53,13 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 
 *   **2025-09-17:** Automatic image culling (duplicate & blur detection)
 *   **2025-09-14:** Grid previews in community panel & improved ComfyUi workflow
-*   **2025-09-12:** New community presets panel to share & showcase presets 
-*   **2025-09-10:** Extended generative AI roadmap & started building RapidRAW website 
-*   **2025-09-09:** Many shader improvements & bug fixes, invert tint slider 
+*   **2025-09-12:** New community presets panel to share & showcase presets
+*   **2025-09-10:** Extended generative AI roadmap & started building RapidRAW website
+*   **2025-09-09:** Many shader improvements & bug fixes, invert tint slider
 *   **2025-09-06:** New update notifier that alerts users when a new version becomes available
 *   **2025-09-04:** Added toggleable clipping warnings (blue = shadows, red = highlights)
 *   **2025-09-02:** Transition to Rust 2024 & Cache image on GPU
-*   **2025-08-31:** Cancel thumbnail generation on folder change & optimized ai patch saving  
+*   **2025-08-31:** Cancel thumbnail generation on folder change & optimized ai patch saving
 
 <details>
 <summary><strong>Expand further</strong></summary>
@@ -94,7 +94,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-07-20:** Ability to add presets to folders, export preset folders etc, preset _animations_
 *   **2025-07-20:** Tutorials on how to use RapidRAW
 *   **2025-07-19:** Initial color negative conversion implementation, shader improvements
-*   **2025-07-19:** New color wheels, persistent collapsed / expanded state for UI elements 
+*   **2025-07-19:** New color wheels, persistent collapsed / expanded state for UI elements
 *   **2025-07-19:** Fixed banding & purple artefacts on RAW images, better color noise reduction, show exposure in stops
 *   **2025-07-18:** Smooth zoom slider, new adaptive editor theme setting
 *   **2025-07-18:** New export functionality: Export with metadata, GPS metadata remover, batch export file naming scheme using tags
@@ -121,7 +121,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-06-30:** AI-powered subject masking
 *   **2025-06-30:** Precompiled Linux builds
 *   **2025-06-29:** New 5:4 aspect ratio, new low contrast grey theme and more cameras support (DJI Mavic lineup)
-*   **2025-06-28:** Release cleanup, CI/CD improvements and minor fixes 
+*   **2025-06-28:** Release cleanup, CI/CD improvements and minor fixes
 *   **2025-06-27:** Initial release. For more information about the earlier progress, look at the [Initial Development Log](#initial-development-log)
 
 </details>
@@ -300,7 +300,7 @@ This is purely a **convenience service**. It provides the **same high-quality re
 | **Cost**                | Free, included                                   | Free (requires your own hardware)                   | **$5 / month**                                   |
 | **Setup**               | None                                             | Manual ComfyUI server setup                         | **None (Just log in)**                           |
 | **Use Case**            | Everyday workflow acceleration                   | Full control for technical users                    | **Maximum convenience**                          |
-| **Status**              | **Available**                                | **Available**                                   | **Coming Soon**                                 |
+| **Status**              | **Available**                                    | **Available**                                       | **Coming Soon**                                 |
 
 <details>
 <summary><strong>Click to see the Generative AI features in action</strong></summary>
@@ -346,6 +346,7 @@ You have two options to run RapidRAW:
 - Grab the pre-built installer or application bundle for your operating system from the [**Releases**](https://github.com/CyberTimon/RapidRAW/releases) page.
 
 **Linux:**
+- The official Flatpak package supports all Linux distributions and is available on [Flathub](https://flathub.org/apps/io.github.CyberTimon.RapidRAW).
 - On Debian-based distributions, install the `.deb` package from the [**Releases**](https://github.com/CyberTimon/RapidRAW/releases) page.
 - On Arch-based distributions, use the [`rapidraw-bin`](https://aur.archlinux.org/packages/rapidraw-bin) package from the AUR.
 
