@@ -49,7 +49,7 @@
             <p>I've also adjusted the UI to better align with the project's AI Roadmap. This includes a placeholder for a planned future cloud service, which would be an option for those who don't have the hardware to self-host or prefer not to set it up themselves (not paywalling features).</p>
             <p>If you have any ideas or feedback on the AI roadmap, feel free to let me know.</p>
             <p>Info</p>
-            <p>Upgrading to this version will reset the app’s settings & comfyui config (your edits will not be affected).</p>
+            <p>Upgrading to this version will reset the app’s settings &amp; comfyui config (your edits will not be affected).</p>
         </description>
     </release>
     <release version="v1.3.12" date="2025-09-09">
