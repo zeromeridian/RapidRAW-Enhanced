@@ -51,7 +51,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
-*   **2025-09-20:** Universal presets importer, prioritize dGPU
+*   **2025-09-20:** Universal presets importer, prioritize dGPU & improved local contrast tools (sharpness, clarity etc.)
 *   **2025-09-17:** Automatic image culling (duplicate & blur detection)
 *   **2025-09-14:** Grid previews in community panel & improved ComfyUi workflow
 *   **2025-09-12:** New community presets panel to share & showcase presets 
