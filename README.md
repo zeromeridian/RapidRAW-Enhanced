@@ -399,7 +399,7 @@ Contributions are welcome and highly appreciated! Whether it's reporting a bug, 
 
 ### Tickets regarding image formats
 In the unfortunate case that the RAW files from your camera are not supported by RapidRAW please submit a ticket here: [rawler issues](https://github.com/dnglab/dnglab/issues). 
-Once support is added in rawler they will flow upstream into RapidRAW.
+Once support is added in rawler please create a ticket for RapidRAW so we can update the packages.
 
 ### Feature requests
 Please submit feature requests in the discussion tab with the tag "idea" this way users can vote on features that they find important and we can prioritize feature development.
