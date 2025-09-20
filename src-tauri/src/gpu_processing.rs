@@ -16,7 +16,10 @@ pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuCont
     let instance_desc = wgpu::InstanceDescriptor::from_env_or_default();
     let instance = wgpu::Instance::new(&instance_desc);
     let adapter =
-        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
+        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            ..Default::default()
+        }))
             .map_err(|e| format!("Failed to find a wgpu adapter: {}", e))?;
 
     let mut required_features = wgpu::Features::empty();
