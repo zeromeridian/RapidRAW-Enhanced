@@ -16,6 +16,7 @@ mod panorama_utils;
 mod raw_processing;
 mod tagging;
 mod tagging_utils;
+mod preset_converter;
 
 use std::thread;
 use std::collections::{HashMap, hash_map::DefaultHasher};
@@ -2131,6 +2132,7 @@ fn main() {
             file_management::reset_adjustments_for_paths,
             file_management::apply_auto_adjustments_to_paths,
             file_management::handle_import_presets_from_file,
+            file_management::handle_import_legacy_presets_from_file,
             file_management::handle_export_presets_to_file,
             file_management::save_community_preset,
             file_management::clear_all_sidecars,

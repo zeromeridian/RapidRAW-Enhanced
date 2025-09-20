@@ -31,6 +31,7 @@ dependencies = [
  "raw-window-handle",
  "rawler",
  "rayon",
+ "regex",
  "reqwest",
  "serde",
  "serde_bytes",

@@ -53,6 +53,7 @@ rand = "0.9"
 tauri-plugin-shell = "2.3.1"
 tempfile = "3.22.0"
 image_hasher = "3.0.0"
+regex = "1.11.2"
 
 [build-dependencies]
 tauri-build = { version = "2.4", features = [] }
