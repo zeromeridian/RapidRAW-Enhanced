@@ -59,7 +59,7 @@ fn extract_tone_curve_points(xmp_str: &str, curve_name: &str) -> Option<Vec<Valu
         let mut final_y = y;
         if curve_name == "ToneCurvePV2012" {
             const SHADOW_RANGE_END: f64 = 64.0;
-            const SHADOW_DAMPEN_START: f64 = 0.6;
+            const SHADOW_DAMPEN_START: f64 = 0.8;
             const SHADOW_DAMPEN_END: f64 = 1.0;
 
             let x_f64 = x as f64;
