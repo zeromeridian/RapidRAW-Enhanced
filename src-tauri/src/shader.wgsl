@@ -481,12 +481,17 @@ fn apply_color_grading(color: vec3<f32>, shadows: ColorGradeSettings, midtones: 
 fn apply_local_contrast(
     processed_color_linear: vec3<f32>, 
     coords_i: vec2<i32>, 
-    radius: i32, 
-    amount: f32
+    base_radius_px: f32,
+    amount: f32,
+    scale: f32
 ) -> vec3<f32> {
     if (amount == 0.0) { 
         return processed_color_linear; 
     }
+
+    let scaled_radius_f32 = max(1.0, base_radius_px * scale);
+    let radius = i32(ceil(scaled_radius_f32));
+
     let center_luma = get_luma(processed_color_linear);
     let shadow_protection = smoothstep(0.0, 0.25, center_luma);
     let highlight_protection = 1.0 - smoothstep(0.75, 1.0, center_luma);
@@ -497,7 +502,7 @@ fn apply_local_contrast(
     var blurred_luma = 0.0;
     var total_weight = 0.0;
     let max_coords = vec2<i32>(textureDimensions(input_texture) - 1u);
-    let spatial_sigma = f32(radius);
+    let spatial_sigma = scaled_radius_f32;
     let range_sigma = 0.2;
     for (var y = -radius; y <= radius; y += 1) {
         for (var x = -radius; x <= radius; x += 1) {
@@ -553,8 +558,12 @@ fn apply_dehaze(color: vec3<f32>, amount: f32) -> vec3<f32> {
     }
 }
 
-fn apply_noise_reduction(color: vec3<f32>, coords_i: vec2<i32>, luma_amount: f32, color_amount: f32) -> vec3<f32> {
+fn apply_noise_reduction(color: vec3<f32>, coords_i: vec2<i32>, luma_amount: f32, color_amount: f32, scale: f32) -> vec3<f32> {
     if (luma_amount <= 0.0 && color_amount <= 0.0) { return color; }
+    
+    let luma_threshold = 0.1 / scale;
+    let color_threshold = 0.2 / scale;
+
     var accum_color = vec3<f32>(0.0);
     var total_weight = 0.0;
     let center_luma = get_luma(color);
@@ -565,9 +574,15 @@ fn apply_noise_reduction(color: vec3<f32>, coords_i: vec2<i32>, luma_amount: f32
             let sample_coords = clamp(coords_i + offset, vec2<i32>(0), max_coords);
             let sample_color_linear = srgb_to_linear(textureLoad(input_texture, sample_coords, 0).rgb);
             var luma_weight = 1.0;
-            if (luma_amount > 0.0) { let luma_diff = abs(get_luma(sample_color_linear) - center_luma); luma_weight = 1.0 - smoothstep(0.0, 0.1, luma_diff / luma_amount); }
+            if (luma_amount > 0.0) { 
+                let luma_diff = abs(get_luma(sample_color_linear) - center_luma); 
+                luma_weight = 1.0 - smoothstep(0.0, luma_threshold, luma_diff / luma_amount); 
+            }
             var color_weight = 1.0;
-            if (color_amount > 0.0) { let color_diff = distance(sample_color_linear, color); color_weight = 1.0 - smoothstep(0.0, 0.2, color_diff / color_amount); }
+            if (color_amount > 0.0) { 
+                let color_diff = distance(sample_color_linear, color); 
+                color_weight = 1.0 - smoothstep(0.0, color_threshold, color_diff / color_amount); 
+            }
             let weight = luma_weight * color_weight;
             accum_color += sample_color_linear * weight;
             total_weight += weight;
@@ -641,17 +656,17 @@ fn apply_all_curves(color: vec3<f32>, luma_curve: array<Point, 16>, luma_curve_c
     }
 }
 
-fn apply_all_adjustments(initial_rgb: vec3<f32>, adj: GlobalAdjustments, coords_i: vec2<i32>) -> vec3<f32> {
-    var processed_rgb = apply_noise_reduction(initial_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction);
+fn apply_all_adjustments(initial_rgb: vec3<f32>, adj: GlobalAdjustments, coords_i: vec2<i32>, scale: f32) -> vec3<f32> {
+    var processed_rgb = apply_noise_reduction(initial_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction, scale);
+
+    processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);
+    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 2.0, adj.sharpness, scale);
+    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 8.0, adj.clarity, scale);
+    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20.0, adj.structure, scale);
 
     processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
     processed_rgb = processed_rgb * pow(2.0, adj.exposure);
     processed_rgb = apply_tonal_adjustments(processed_rgb, adj.contrast, adj.highlights, adj.shadows, adj.whites, adj.blacks);
-
-    processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);
-    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 2, adj.sharpness);
-    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 8, adj.clarity);
-    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20, adj.structure);
 
     processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
     processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_blending, adj.color_grading_balance);
@@ -660,17 +675,17 @@ fn apply_all_adjustments(initial_rgb: vec3<f32>, adj: GlobalAdjustments, coords_
     return processed_rgb;
 }
 
-fn apply_all_mask_adjustments(initial_rgb: vec3<f32>, adj: MaskAdjustments, coords_i: vec2<i32>) -> vec3<f32> {
-    var processed_rgb = apply_noise_reduction(initial_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction);
+fn apply_all_mask_adjustments(initial_rgb: vec3<f32>, adj: MaskAdjustments, coords_i: vec2<i32>, scale: f32) -> vec3<f32> {
+    var processed_rgb = apply_noise_reduction(initial_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction, scale);
+
+    processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);
+    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 2.0, adj.sharpness, scale);
+    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 8.0, adj.clarity, scale);
+    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20.0, adj.structure, scale);
 
     processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
     processed_rgb = processed_rgb * pow(2.0, adj.exposure);
     processed_rgb = apply_tonal_adjustments(processed_rgb, adj.contrast, adj.highlights, adj.shadows, adj.whites, adj.blacks);
-
-    processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);
-    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 2, adj.sharpness);
-    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 8, adj.clarity);
-    processed_rgb = apply_local_contrast(processed_rgb, coords_i, 20, adj.structure);
 
     processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
     processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_blending, adj.color_grading_balance);
@@ -704,6 +719,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let out_dims = vec2<u32>(textureDimensions(output_texture));
     if (id.x >= out_dims.x || id.y >= out_dims.y) { return; }
 
+    const REFERENCE_DIMENSION: f32 = 1080.0;
+    let full_dims = vec2<f32>(textureDimensions(input_texture));
+    let current_ref_dim = min(full_dims.x, full_dims.y);
+    let scale = max(0.1, current_ref_dim / REFERENCE_DIMENSION);
+
     let absolute_coord = id.xy + vec2<u32>(adjustments.tile_offset_x, adjustments.tile_offset_y);
     let absolute_coord_i = vec2<i32>(absolute_coord);
 
@@ -726,12 +746,12 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         initial_linear_rgb = max(initial_linear_rgb, vec3<f32>(0.0));
     }
 
-    let globally_adjusted_linear = apply_all_adjustments(initial_linear_rgb, adjustments.global, absolute_coord_i);
+    let globally_adjusted_linear = apply_all_adjustments(initial_linear_rgb, adjustments.global, absolute_coord_i, scale);
     var composite_rgb_linear = globally_adjusted_linear;
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
-            let mask_adjusted_linear = apply_all_mask_adjustments(globally_adjusted_linear, adjustments.mask_adjustments[i], absolute_coord_i);
+            let mask_adjusted_linear = apply_all_mask_adjustments(globally_adjusted_linear, adjustments.mask_adjustments[i], absolute_coord_i, scale);
             composite_rgb_linear = mix(composite_rgb_linear, mask_adjusted_linear, influence);
         }
     }
@@ -766,12 +786,12 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         let g = adjustments.global;
         let coord = vec2<f32>(absolute_coord_i);
         let amount = g.grain_amount * 0.5;
-        let scale = 1.0 / max(g.grain_size, 0.1);
+        let grain_frequency = (1.0 / max(g.grain_size, 0.1)) / scale;
         let roughness = g.grain_roughness;
         let luma = max(0.0, get_luma(final_rgb));
         let luma_mask = smoothstep(0.0, 0.15, luma) * (1.0 - smoothstep(0.6, 1.0, luma));
-        let base_coord = coord * scale;
-        let rough_coord = coord * scale * 0.6;
+        let base_coord = coord * grain_frequency;
+        let rough_coord = coord * grain_frequency * 0.6;
         let noise1 = vec3<f32>(gradient_noise(base_coord), gradient_noise(base_coord + 11.3), gradient_noise(base_coord + 23.7));
         let noise2 = vec3<f32>(gradient_noise(rough_coord + 35.1), gradient_noise(rough_coord + 43.9), gradient_noise(rough_coord + 57.5));
         let noise = mix(noise1, noise2, roughness);

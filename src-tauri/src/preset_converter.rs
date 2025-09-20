@@ -114,6 +114,7 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
         ("Vibrance", "vibrance"),
         ("Saturation", "saturation"),
         ("Texture", "structure"),
+        ("Sharpness", "sharpness"),
         ("SharpenRadius", "sharpenRadius"),
         ("SharpenDetail", "sharpenDetail"),
         ("SharpenEdgeMasking", "sharpenMasking"),
@@ -151,7 +152,6 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
         let adjusted_shadows = (shadows_val * 1.5).min(100.0);
         adjustments.insert("shadows".to_string(), json!(adjusted_shadows));
     }
-    adjustments.insert("sharpness".to_string(), json!(0));
 
     if let Some(adjusted_k) = get_attr_as_f64(&attrs, "Temperature") {
         const AS_SHOT_DEFAULT: f64 = 5500.0;
@@ -180,8 +180,8 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
             if let Some(num) = parse_num(raw.trim_start_matches('+')) {
                 if let Some(Value::Number(n)) = num_to_json(num) {
                     if let Some(val_f64) = n.as_f64() {
-                        let halved_hue = val_f64 * 0.5;
-                        color_map.insert("hue".to_string(), json!(halved_hue));
+                        let adjusted_hue = val_f64 * 0.75;
+                        color_map.insert("hue".to_string(), json!(adjusted_hue));
                     }
                 }
             }
