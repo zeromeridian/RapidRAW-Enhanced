@@ -395,22 +395,18 @@ See [#306](https://github.com/CyberTimon/RapidRAW/issues/306) for more informati
 
 ## Contributing
 
-Contributions are welcome and highly appreciated! Whether it's reporting a bug, suggesting a feature, or submitting a pull request, your help makes this project better. Please feel free to open an issue or discussion topic for ideas.
+I’m really grateful for any contributions you make to RapidRAW! Whether you’re reporting a bug, suggesting a new feature, or submitting a pull request - your input helps shape the project and makes it better for everyone. Don’t hesitate to open an issue or start a discussion to share your ideas.  
 
-### Tickets regarding image formats
-In the unfortunate case that the RAW files from your camera are not supported by RapidRAW please submit a ticket here: [rawler issues](https://github.com/dnglab/dnglab/issues). 
-Once support is added in rawler please create a ticket for RapidRAW so we can update the packages.
+### Image format issues
+If your camera’s RAW files aren’t supported, please open a issue here first: [rawler issues](https://github.com/dnglab/dnglab/issues). Once support is added in rawler, create a issue for RapidRAW so I can update the packages and keep everything in sync.  
 
 ### Feature requests
-Please submit feature requests in the discussion tab with the tag "idea" this way users can vote on features that they find important and we can prioritize feature development.
+Got an idea? Add it in the discussion tab with the **"idea"** tag. This way, the community can vote on features they'd love to see, and I can focus on the most impactful ones.  
 
-### Stale tickets
-To keep the ticket list up to date, tidy and relevant please update your ticket regularly to indicate that the problem is still there on the latest available release. 
-Tickets older than 2 weeks that have not been updated will be marked stale and closed after 2 more weeks (4 weeks total).
-(We reserve the right to deviate from this guideline in special circumstances, This is currently a manual process this means there could be a delay in processing stale-ness)
+### Stale issues
+To keep things tidy and relevant, please update your issue if the issue still exists with the latest release. Issues with no updates after 4-6 weeks will be closed as stale.
 
-We would like to thank you for your contribution and ideas for RapidRAW as they are highly appreciated to make RapidRAW even better.
-
+Thank you for contributing your time and ideas - every bit of feedback makes RapidRAW a stronger and more useful project!  
 
 ## Special Thanks
 
