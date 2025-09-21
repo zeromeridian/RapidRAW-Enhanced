@@ -396,7 +396,18 @@ See [#306](https://github.com/CyberTimon/RapidRAW/issues/306) for more informati
 
 ## Contributing
 
-Contributions are welcome and highly appreciated! Whether it's reporting a bug, suggesting a feature, or submitting a pull request, your help makes this project better. Please feel free to open an issue to discuss your ideas.
+I’m really grateful for any contributions you make to RapidRAW! Whether you’re reporting a bug, suggesting a new feature, or submitting a pull request - your input helps shape the project and makes it better for everyone. Don’t hesitate to open an issue or start a discussion to share your ideas.  
+
+### Image format issues
+If your camera’s RAW files aren’t supported, please open a issue here first: [rawler issues](https://github.com/dnglab/dnglab/issues). Once support is added in rawler, create a issue for RapidRAW so I can update the packages and keep everything in sync.  
+
+### Feature requests
+Got an idea? Add it in the discussion tab with the **"idea"** tag. This way, the community can vote on features they'd love to see, and I can focus on the most impactful ones.  
+
+### Stale issues
+To keep things tidy and relevant, please update your issue if the issue still exists with the latest release. Issues with no updates after 4-6 weeks will be closed as stale.
+
+Thank you for contributing your time and ideas - every bit of feedback makes RapidRAW a stronger and more useful project!  
 
 ## Special Thanks
 
