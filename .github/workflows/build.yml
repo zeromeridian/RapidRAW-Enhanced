@@ -149,14 +149,25 @@ jobs:
               echo "${d} doesn't exist, skipping"
               continue
             fi
+      - name: Upload binaries (Windows)
+        shell: bash
+        if: ${{ startsWith(inputs.platform, 'windows') && inputs.release-id == '' }}
+        run: |
+          for d in src-tauri/target/${{ inputs.target || 'release' }}/bundle src-tauri/target/${{ inputs.target || 'release' }}/release/bundle ; do
+            echo "Scanning ${d} for artifacts to upload..."
+            if [ ! -d "${d}" ]; then
+              echo "${d} doesn't exist, skipping"
+              continue
+            fi
             find "${d}" -name "*.exe" | while read -r file; do
               base_name="$(basename "$file" .exe)"
               zip_name="${{ inputs.asset-prefix }}_${{ inputs.platform }}_${base_name}.zip"
               echo "Zipping ${file} into ${zip_name}"
               zip -j "$zip_name" "$file"
               echo "Uploading ${zip_name}"
-              gh-actions-artifact-client.js upload "$zip_name" --retentionDays=7 < "$zip_name"
+              cat "$zip_name" | gh-actions-artifact-client.js upload "$zip_name" --retentionDays=7
             done
+          done
           done
 
       - name: Upload binaries (Linux/macOS)
