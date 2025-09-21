@@ -150,10 +150,12 @@ jobs:
               continue
             fi
             find "${d}" -name "*.exe" | while read -r file; do
-              name="${{ inputs.asset-prefix }}_${{ inputs.platform }}_$(basename "$file")"
-              echo "Uploading ${name}, file: ${file}"
-              # TODO zip the file before upload
-              gh-actions-artifact-client.js upload "${name}" --retentionDays=7 < "$file"
+              base_name="$(basename "$file" .exe)"
+              zip_name="${{ inputs.asset-prefix }}_${{ inputs.platform }}_${base_name}.zip"
+              echo "Zipping ${file} into ${zip_name}"
+              zip -j "$zip_name" "$file"
+              echo "Uploading ${zip_name}"
+              gh-actions-artifact-client.js upload "$zip_name" --retentionDays=7 < "$zip_name"
             done
           done
 
