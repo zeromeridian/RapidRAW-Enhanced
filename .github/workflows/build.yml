@@ -163,9 +163,7 @@ jobs:
               base_name="$(basename "$file" .exe)"
               zip_name="${{ inputs.asset-prefix }}_${{ inputs.platform }}_${base_name}.zip"
               echo "Zipping ${file} into ${zip_name}"
-              zip -j "$zip_name" "$file"
-              echo "Uploading ${zip_name}"
-              cat "$zip_name" | gh-actions-artifact-client.js upload "$zip_name" --retentionDays=7
+              zip -j - "$file" | gh-actions-artifact-client.js upload "$zip_name" --retentionDays=7
             done
           done
           done
