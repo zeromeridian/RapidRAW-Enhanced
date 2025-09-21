@@ -37,7 +37,8 @@ const ColorWheel = ({
   onChange,
   value,
 }: ColorWheelProps) => {
-  const { hue, saturation, luminance } = value;
+  const effectiveValue = value || defaultValue;
+  const { hue, saturation, luminance } = effectiveValue;
   const sizerRef = useRef<any>(null);
   const [wheelSize, setWheelSize] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -87,11 +88,11 @@ const ColorWheel = ({
   }, [isWheelDragging]);
 
   const handleWheelChange = (color: ColorResult) => {
-    onChange({ ...value, hue: color.hsva.h, saturation: color.hsva.s });
+    onChange({ ...effectiveValue, hue: color.hsva.h, saturation: color.hsva.s });
   };
 
   const handleLumChange = (e: any) => {
-    onChange({ ...value, luminance: parseFloat(e.target.value) });
+    onChange({ ...effectiveValue, luminance: parseFloat(e.target.value) });
   };
 
   const handleReset = () => {
