@@ -1,5 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use mimalloc::MiMalloc;
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
 mod ai_processing;
 mod culling;
 mod comfyui_connector;
@@ -18,7 +22,8 @@ mod tagging;
 mod tagging_utils;
 mod preset_converter;
 
-use std::thread;
+use log;
+use std::panic;
 use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -26,6 +31,7 @@ use std::io::Cursor;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
 
 use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
@@ -38,15 +44,15 @@ use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;
 use little_exif::rational::uR64;
+use reqwest;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::io::Write;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, ipc::Response};
+use tempfile::NamedTempFile;
 use tokio::sync::Mutex as TokioMutex;
 use tokio::task::JoinHandle;
-use tempfile::NamedTempFile;
-use reqwest;
-use std::io::Write;
 use wgpu::{Texture, TextureView};
 
 use crate::ai_processing::{
@@ -1585,10 +1591,12 @@ async fn invoke_generative_replace_with_mask_def(
     let mask_bitmap = generate_mask_bitmap(&mask_def_for_generation, img_w, img_h, 1.0, (0.0, 0.0))
         .ok_or("Failed to generate mask bitmap for AI replace")?;
 
-    let patch_rgba = if use_fast_inpaint { // cpu based inpainting, low quality but no setup required
+    let patch_rgba = if use_fast_inpaint {
+        // cpu based inpainting, low quality but no setup required
         let patch_radius = calculate_dynamic_patch_radius(img_w, img_h);
         inpainting::perform_fast_inpaint(&source_image, &mask_bitmap, patch_radius)?
-    } else if let Some(address) = settings.comfyui_address { // self hosted generative ai service
+    } else if let Some(address) = settings.comfyui_address {
+        // self hosted generative ai service
         let comfy_config = settings.comfyui_workflow_config;
 
         let mut rgba_mask = RgbaImage::new(img_w, img_h);
@@ -1611,16 +1619,21 @@ async fn invoke_generative_replace_with_mask_def(
         image::load_from_memory(&result_png_bytes)
             .map_err(|e| e.to_string())?
             .to_rgba8()
-    } else if let Some(auth_token) = token { // convenience cloud service
+    } else if let Some(auth_token) = token {
+        // convenience cloud service
         let client = reqwest::Client::new();
         let api_url = "https://api.letshopeitcompiles.com/inpaint"; // endpoint not yet built
 
         let mut source_buf = Cursor::new(Vec::new());
-        source_image.write_to(&mut source_buf, ImageFormat::Png).map_err(|e| e.to_string())?;
+        source_image
+            .write_to(&mut source_buf, ImageFormat::Png)
+            .map_err(|e| e.to_string())?;
         let source_base64 = general_purpose::STANDARD.encode(source_buf.get_ref());
 
         let mut mask_buf = Cursor::new(Vec::new());
-        mask_bitmap.write_to(&mut mask_buf, ImageFormat::Png).map_err(|e| e.to_string())?;
+        mask_bitmap
+            .write_to(&mut mask_buf, ImageFormat::Png)
+            .map_err(|e| e.to_string())?;
         let mask_base64 = general_purpose::STANDARD.encode(mask_buf.get_ref());
 
         let request_body = serde_json::json!({
@@ -1644,11 +1657,20 @@ async fn invoke_generative_replace_with_mask_def(
                 .to_rgba8()
         } else {
             let status = response.status();
-            let error_body = response.text().await.unwrap_or_else(|_| "Could not read error body".to_string());
-            return Err(format!("Cloud service returned an error ({}): {}", status, error_body));
+            let error_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Could not read error body".to_string());
+            return Err(format!(
+                "Cloud service returned an error ({}): {}",
+                status, error_body
+            ));
         }
     } else {
-        return Err("No generative backend available. Connect to ComfyUI or upgrade to Pro for Cloud AI.".to_string());
+        return Err(
+            "No generative backend available. Connect to ComfyUI or upgrade to Pro for Cloud AI."
+                .to_string(),
+        );
     };
 
     let (patch_w, patch_h) = patch_rgba.dimensions();
@@ -1780,8 +1802,9 @@ async fn stitch_panorama(
 async fn fetch_community_presets() -> Result<Vec<CommunityPreset>, String> {
     let client = reqwest::Client::new();
     let url = "https://raw.githubusercontent.com/CyberTimon/RapidRAW-Presets/main/manifest.json";
-    
-    let response = client.get(url)
+
+    let response = client
+        .get(url)
         .header("User-Agent", "RapidRAW-App")
         .send()
         .await
@@ -1791,7 +1814,9 @@ async fn fetch_community_presets() -> Result<Vec<CommunityPreset>, String> {
         return Err(format!("GitHub returned an error: {}", response.status()));
     }
 
-    let presets: Vec<CommunityPreset> = response.json().await
+    let presets: Vec<CommunityPreset> = response
+        .json()
+        .await
         .map_err(|e| format!("Failed to parse manifest.json: {}", e))?;
 
     Ok(presets)
@@ -2010,7 +2035,41 @@ fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowH
     {}
 }
 
+/// Hook panic messages to the logger.
+fn logger(){
+    let log_file = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .append(true)
+            .open("RapidRaw.log")
+            .unwrap();
+    
+    let var = std::env::var("RUST_LOG").unwrap_or_else(|_| "error".to_string());
+    let level: log::LevelFilter = var.parse().unwrap_or(log::LevelFilter::Error);
+    
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{} [{}] {}",
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                message
+            ))
+        })
+        .level(level)
+        .chain(std::io::stderr())   
+        .chain(log_file)            
+        .apply()
+        .unwrap();
+
+
+    panic::set_hook(Box::new(|error| {
+        log::error!("PANIC! {:#?}", error);
+    }));
+}
+
 fn main() {
+    logger();
     tauri::Builder::default()
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
