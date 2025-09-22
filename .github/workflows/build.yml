@@ -45,24 +45,6 @@ jobs:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
 
-      - name: Determine Version
-        id: determine-version
-        shell: bash
-        run: |
-          APP_VERSION=""
-          REF="${{ inputs.ref }}"
-
-          if [[ "$REF" == refs/tags/v* ]]; then
-            APP_VERSION="${REF#refs/tags/v}"
-            echo "Release version determined from tag: $APP_VERSION"
-          else
-            DESCRIBE=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-            APP_VERSION="${DESCRIBE#v}"
-            echo "CI version determined from latest tag or fallback: $APP_VERSION"
-          fi
-          
-          echo "version=${APP_VERSION}" >> "$GITHUB_OUTPUT"
-
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -103,12 +85,6 @@ jobs:
         if: ${{ inputs.target != '' }}
         run: rustup target add ${{ inputs.target }}
 
-      - name: Set application version
-        shell: bash
-        run: |
-          echo "Setting version to: ${{ steps.determine-version.outputs.version }}"
-          npx tauri-version --no-git --no-lock "${{ steps.determine-version.outputs.version }}"
-
       - id: patch-release-name
         shell: bash
         if: ${{ inputs.release-id != '' }}
@@ -139,7 +115,7 @@ jobs:
         if: ${{ startsWith(inputs.platform, 'windows') && inputs.release-id == '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}_artifacts
+          name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}${{ inputs.target && format('_{0}', inputs.target) || '' }}_artifacts
           path: |
             src-tauri/target/${{ inputs.target || 'release' }}/bundle/**/*.exe
             src-tauri/target/${{ inputs.target || 'release' }}/release/bundle/**/*.exe
@@ -151,7 +127,7 @@ jobs:
         if: ${{ !startsWith(inputs.platform, 'windows') && inputs.release-id == '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}_artifacts
+          name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}${{ inputs.target && format('_{0}', inputs.target) || '' }}_artifacts
           path: |
             src-tauri/target/${{ inputs.target || 'release' }}/**/*.rpm
             src-tauri/target/${{ inputs.target || 'release' }}/**/*.deb
