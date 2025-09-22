@@ -135,33 +135,28 @@ jobs:
           releaseId: ${{ inputs.release-id }}
           retryAttempts: 3
 
-      - name: Setup gh actions artifact client
-        if: ${{ inputs.release-id == '' }}
-        uses: lhotari/gh-actions-artifact-client@v2
-
-      - name: Upload binaries (Windows)
-        shell: bash
+      - name: Upload Windows Artifacts
         if: ${{ startsWith(inputs.platform, 'windows') && inputs.release-id == '' }}
-        run: |
-          for d in src-tauri/target/${{ inputs.target || 'release' }}/bundle src-tauri/target/${{ inputs.target || 'release' }}/release/bundle ; do
-            echo "Scanning ${d} for artifacts to upload..."
-            if [ ! -d "${d}" ]; then
-              echo "${d} doesn't exist, skipping"
-              continue
-            fi
-            find "${d}" -name "*.exe" | while read -r file; do
-              name="${{ inputs.asset-prefix }}_${{ inputs.platform }}_$(basename "$file")"
-              echo "Uploading ${name}, file: ${file}"
-              # TODO zip the file before upload
-              gh-actions-artifact-client.js upload "${name}" --retentionDays=7 < "$file"
-            done
-          done
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}_artifacts
+          path: |
+            src-tauri/target/${{ inputs.target || 'release' }}/bundle/**/*.exe
+            src-tauri/target/${{ inputs.target || 'release' }}/release/bundle/**/*.exe
+          retention-days: 7
+          compression-level: 6
+          if-no-files-found: warn
 
-      - name: Upload binaries (Linux/macOS)
+      - name: Upload Linux/macOS Artifacts
         if: ${{ !startsWith(inputs.platform, 'windows') && inputs.release-id == '' }}
-        run: |
-          find src-tauri/target/${{ inputs.target || 'release' }} -type f -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" | while read -r file; do
-            name="${{ inputs.asset-prefix }}_${{ inputs.platform }}_$(basename "$file")"
-            echo "Uploading $name, file: $file"
-            zip -j - "$file" | gh-actions-artifact-client.js upload "${name}" --retentionDays=7
-          done
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}_artifacts
+          path: |
+            src-tauri/target/${{ inputs.target || 'release' }}/**/*.rpm
+            src-tauri/target/${{ inputs.target || 'release' }}/**/*.deb
+            src-tauri/target/${{ inputs.target || 'release' }}/**/*.AppImage
+            src-tauri/target/${{ inputs.target || 'release' }}/**/*.dmg
+          retention-days: 7
+          compression-level: 6
+          if-no-files-found: warn
