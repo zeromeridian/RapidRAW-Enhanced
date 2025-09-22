@@ -18,6 +18,7 @@ export enum Invokes {
   ClearThumbnailCache = 'clear_thumbnail_cache',
   CopyFiles = 'copy_files',
   CreateFolder = 'create_folder',
+  CullImages = 'cull_images',
   DeleteFolder = 'delete_folder',
   DuplicateFile = 'duplicate_file',
   EstimateBatchExportSize = 'estimate_batch_export_size',
@@ -37,6 +38,7 @@ export enum Invokes {
   GetSupportedFileTypes = 'get_supported_file_types',
   HandleExportPresetsToFile = 'handle_export_presets_to_file',
   HandleImportPresetsFromFile = 'handle_import_presets_from_file',
+  HandleImportLegacyPresetsFromFile = 'handle_import_legacy_presets_from_file',
   ImportFiles = 'import_files',
   InvokeGenerativeReplace = 'invoke_generative_replace',
   InvokeGenerativeReplaseWithMaskDef = 'invoke_generative_replace_with_mask_def',
@@ -235,4 +237,32 @@ export interface WaveformData {
   luma: Array<number>;
   red: Array<number>;
   width: number;
+}
+
+export interface CullingSettings {
+  similarityThreshold: number;
+  blurThreshold: number;
+  groupSimilar: boolean;
+  filterBlurry: boolean;
+}
+
+export interface ImageAnalysisResult {
+  path: string;
+  qualityScore: number;
+  sharpnessMetric: number;
+  centerFocusMetric: number;
+  exposureMetric: number;
+  width: number;
+  height: number;
+}
+
+export interface CullGroup {
+  representative: ImageAnalysisResult;
+  duplicates: ImageAnalysisResult[];
+}
+
+export interface CullingSuggestions {
+  similarGroups: CullGroup[];
+  blurryImages: ImageAnalysisResult[];
+  failedPaths: string[];
 }

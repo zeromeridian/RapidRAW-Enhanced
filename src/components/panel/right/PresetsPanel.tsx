@@ -265,6 +265,7 @@ export default function PresetsPanel({
     duplicatePreset,
     exportPresetsToFile,
     importPresetsFromFile,
+    importLegacyPresetsFromFile,
     isLoading,
     movePreset,
     presets,
@@ -643,13 +644,24 @@ export default function PresetsPanel({
   const handleImportPresets = async () => {
     try {
       const selectedPath = await openDialog({
-        filters: [{ name: 'Preset File', extensions: ['rrpreset'] }],
+        filters: [
+          { name: 'All Preset Files', extensions: ['rrpreset', 'xmp', 'lrtemplate'] },
+          { name: 'RapidRAW Preset', extensions: ['rrpreset'] },
+          { name: 'Legacy Preset', extensions: ['xmp', 'lrtemplate'] },
+        ],
         multiple: false,
         title: 'Import Presets',
       });
 
       if (typeof selectedPath === 'string') {
-        await importPresetsFromFile(selectedPath);
+        const isLegacy = selectedPath.toLowerCase().endsWith('.xmp') || selectedPath.toLowerCase().endsWith('.lrtemplate');
+
+        if (isLegacy) {
+          await importLegacyPresetsFromFile(selectedPath);
+        } else {
+          await importPresetsFromFile(selectedPath);
+        }
+
         setFolderPreviewsGenerated(new Set<string>());
         setPreviews({});
       }

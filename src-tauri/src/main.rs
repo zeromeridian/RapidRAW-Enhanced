@@ -5,6 +5,7 @@ use mimalloc::MiMalloc;
 static GLOBAL: MiMalloc = MiMalloc;
 
 mod ai_processing;
+mod culling;
 mod comfyui_connector;
 mod file_management;
 mod formats;
@@ -19,6 +20,7 @@ mod panorama_utils;
 mod raw_processing;
 mod tagging;
 mod tagging_utils;
+mod preset_converter;
 
 use log;
 use std::panic;
@@ -2189,6 +2191,7 @@ fn main() {
             file_management::reset_adjustments_for_paths,
             file_management::apply_auto_adjustments_to_paths,
             file_management::handle_import_presets_from_file,
+            file_management::handle_import_legacy_presets_from_file,
             file_management::handle_export_presets_to_file,
             file_management::save_community_preset,
             file_management::clear_all_sidecars,
@@ -2196,7 +2199,8 @@ fn main() {
             file_management::set_color_label_for_paths,
             file_management::import_files,
             tagging::start_background_indexing,
-            tagging::clear_all_tags
+            tagging::clear_all_tags,
+            culling::cull_images,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

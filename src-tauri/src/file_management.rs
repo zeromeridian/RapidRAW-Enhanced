@@ -24,6 +24,7 @@ use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
 use uuid::Uuid;
 use walkdir::WalkDir;
+use regex::Regex;
 
 use crate::AppState;
 use crate::formats::is_supported_image_file;
@@ -36,6 +37,7 @@ use crate::image_processing::{
 };
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::tagging::COLOR_TAG_PREFIX;
+use crate::preset_converter;
 
 const THUMBNAIL_WIDTH: u32 = 640;
 
@@ -1350,6 +1352,59 @@ pub fn handle_import_presets_from_file(
         current_names.insert(new_name);
         current_presets.push(imported_item);
     }
+
+    save_presets(current_presets.clone(), app_handle)?;
+    Ok(current_presets)
+}
+
+#[tauri::command]
+pub fn handle_import_legacy_presets_from_file(
+    file_path: String,
+    app_handle: AppHandle,
+) -> Result<Vec<PresetItem>, String> {
+    let content = fs::read_to_string(&file_path)
+        .map_err(|e| format!("Failed to read legacy preset file: {}", e))?;
+
+    let xmp_content = if file_path.to_lowercase().ends_with(".lrtemplate") {
+        let re = Regex::new(r#"(?s)s.xmp = "(.*)""#).unwrap();
+        if let Some(caps) = re.captures(&content) {
+            caps.get(1)
+                .map(|m| m.as_str().replace(r#"\""#, r#"""#))
+                .unwrap_or(content)
+        } else {
+            content
+        }
+    } else {
+        content
+    };
+
+    let converted_preset = preset_converter::convert_xmp_to_preset(&xmp_content)?;
+
+    let mut current_presets = load_presets(app_handle.clone())?;
+
+    let current_names: HashSet<String> = current_presets
+        .iter()
+        .flat_map(|item| match item {
+            PresetItem::Preset(p) => vec![p.name.clone()],
+            PresetItem::Folder(f) => {
+                let mut names = vec![f.name.clone()];
+                names.extend(f.children.iter().map(|c| c.name.clone()));
+                names
+            }
+        })
+        .collect();
+
+    let mut new_name = converted_preset.name.clone();
+    let mut counter = 1;
+    while current_names.contains(&new_name) {
+        new_name = format!("{} ({})", converted_preset.name, counter);
+        counter += 1;
+    }
+
+    let mut final_preset = converted_preset;
+    final_preset.name = new_name;
+
+    current_presets.push(PresetItem::Preset(final_preset));
 
     save_presets(current_presets.clone(), app_handle)?;
     Ok(current_presets)

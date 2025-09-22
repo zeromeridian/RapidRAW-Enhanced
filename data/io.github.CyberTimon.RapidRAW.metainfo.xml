@@ -29,7 +29,7 @@
   <launchable type="desktop-id">io.github.CyberTimon.RapidRAW.desktop</launchable>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/CyberTimon/RapidRAW/refs/tags/v1.3.12/.github/assets/editor.png</image>
+      <image>https://raw.githubusercontent.com/CyberTimon/RapidRAW/refs/tags/v1.3.13/.github/assets/editor.png</image>
         <caption>Editor interface</caption>
     </screenshot>
   </screenshots>
@@ -38,8 +38,22 @@
   <url type="homepage">https://github.com/CyberTimon/RapidRAW</url>
 
   <releases>
+    <release version="v1.3.13" date="2025-09-14">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.3.13</url>
+        <description translate="no">
+            <p>Community Presets Sharing</p>
+            <p>I wanted to create a place where people can share presets with each other, so I've added a new Community Presets page. To get things started, I've already shared 7 of my own. I'm looking forward to seeing what you all come up with.</p>
+            <p>To submit your own preset, please follow the submission guide located at the bottom of the Community Presets page.</p>
+            <p>Generative AI Improvements</p>
+            <p>This release includes a new ComfyUI workflow that handles high-quality inpainting much better. The results should now be nearly the same resolution as the original image. The installation for the workflow is also simpler, now requiring only one custom ComfyUI node.</p>
+            <p>I've also adjusted the UI to better align with the project's AI Roadmap. This includes a placeholder for a planned future cloud service, which would be an option for those who don't have the hardware to self-host or prefer not to set it up themselves (not paywalling features).</p>
+            <p>If you have any ideas or feedback on the AI roadmap, feel free to let me know.</p>
+            <p>Info</p>
+            <p>Upgrading to this version will reset the app’s settings &amp; comfyui config (your edits will not be affected).</p>
+        </description>
+    </release>
     <release version="v1.3.12" date="2025-09-09">
-        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.3.11</url>
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.3.12</url>
         <description translate="no">
             <p>Clipping Warnings</p>
             <p>You can now toggle clipping warnings in the Curves tool to highlight overexposed areas in red and underexposed areas in blue.</p>

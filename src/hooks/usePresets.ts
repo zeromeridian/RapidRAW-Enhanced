@@ -404,6 +404,24 @@ export function usePresets(currentAdjustments: Adjustments) {
     [setPresets],
   );
 
+  const importLegacyPresetsFromFile = useCallback(
+    async (filePath: string) => {
+      setIsLoading(true);
+      try {
+        const updatedPresetList: Array<UserPreset> = await invoke(Invokes.HandleImportLegacyPresetsFromFile, {
+          filePath,
+        });
+        setPresets(updatedPresetList);
+      } catch (error) {
+        console.error('Failed to import legacy presets from file:', error);
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [setPresets],
+  );
+
   const exportPresetsToFile = useCallback(async (presetsToExport: Array<any>, filePath: string) => {
     try {
       await invoke(Invokes.HandleExportPresetsToFile, { presetsToExport, filePath });
@@ -420,6 +438,7 @@ export function usePresets(currentAdjustments: Adjustments) {
     duplicatePreset,
     exportPresetsToFile,
     importPresetsFromFile,
+    importLegacyPresetsFromFile,
     isLoading,
     movePreset,
     presets,
