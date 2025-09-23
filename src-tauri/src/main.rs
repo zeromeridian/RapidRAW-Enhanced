@@ -1,3 +1,4 @@
+//! This file contains the wrapper for the main entry point for the application.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use mimalloc::MiMalloc;
