@@ -23,6 +23,7 @@ dependencies = [
  "little_exif",
  "log",
  "log-panics",
+ "memmap2",
  "mimalloc",
  "nalgebra 0.34.0",
  "ndarray",

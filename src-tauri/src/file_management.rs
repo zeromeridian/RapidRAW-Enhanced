@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use memmap2::{MmapOptions, Mmap};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -372,6 +373,22 @@ pub fn get_sidecar_path(image_path: &str) -> PathBuf {
     path.with_file_name(new_filename)
 }
 
+pub fn read_file_mapped(path: &Path) -> Result<Mmap> {
+    let file = fs::File::open(path)?;
+    let mmap = unsafe { 
+        MmapOptions::new()
+            .len(file.metadata()?.len() as usize)
+            .map(&file)?
+    };
+    Ok(mmap)
+}
+
+/*pub fn image_to_bytes(img: &DynamicImage) -> Vec<u8> {
+    img.to_rgba8().into_raw()
+}
+*/
+
+
 pub fn generate_thumbnail_data(
     path_str: &str,
     gpu_context: Option<&GpuContext>,
@@ -386,12 +403,16 @@ pub fn generate_thumbnail_data(
     let adjustments = metadata
         .as_ref()
         .map_or(serde_json::Value::Null, |m| m.adjustments.clone());
+    
+    let composite_image = if let Some(img) = preloaded_image {
+            
+            image_loader::composite_patches_on_image(img, &adjustments)?
+        } else {
+            
+            let mmap = read_file_mapped(Path::new(path_str))?;
+            image_loader::load_and_composite(&mmap, path_str, &adjustments, true)?
+        };
 
-    let base_image = if let Some(img) = preloaded_image {
-        image_loader::composite_patches_on_image(img, &adjustments)?
-    } else {
-        image_loader::load_and_composite(path_str, &adjustments, true)?
-    };
 
     if let (Some(context), Some(meta)) = (gpu_context, metadata) {
         if !meta.adjustments.is_null() {
@@ -399,7 +420,7 @@ pub fn generate_thumbnail_data(
             const THUMBNAIL_PROCESSING_DIM: u32 = 1280;
             let orientation_steps =
                 meta.adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
-            let coarse_rotated_image = apply_coarse_rotation(base_image, orientation_steps);
+            let coarse_rotated_image = apply_coarse_rotation(composite_image, orientation_steps);
             let (full_w, full_h) = coarse_rotated_image.dimensions();
 
             let (processing_base, scale_for_gpu) =
@@ -505,7 +526,7 @@ pub fn generate_thumbnail_data(
 
     let fallback_orientation_steps = adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
     Ok(apply_coarse_rotation(
-        base_image,
+        composite_image,
         fallback_orientation_steps,
     ))
 }
@@ -517,6 +538,7 @@ fn encode_thumbnail(image: &DynamicImage) -> Result<Vec<u8>> {
     encoder.encode_image(&thumbnail.to_rgba8())?;
     Ok(buf.into_inner())
 }
+
 
 fn generate_single_thumbnail_and_cache(
     path_str: &str,
