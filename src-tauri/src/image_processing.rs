@@ -155,6 +155,19 @@ pub struct ColorGradeSettings {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
 #[repr(C)]
+pub struct ColorCalibrationSettings {
+    pub shadows_tint: f32,
+    pub red_hue: f32,
+    pub red_saturation: f32,
+    pub green_hue: f32,
+    pub green_saturation: f32,
+    pub blue_hue: f32,
+    pub blue_saturation: f32,
+    _pad1: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
+#[repr(C)]
 pub struct GlobalAdjustments {
     pub exposure: f32,
     pub contrast: f32,
@@ -208,6 +221,8 @@ pub struct GlobalAdjustments {
     pub color_grading_balance: f32,
     _pad2: f32,
     _pad3: f32,
+
+    pub color_calibration: ColorCalibrationSettings,
 
     pub hsl: [HslColor; 8],
     pub luma_curve: [Point; 16],
@@ -468,6 +483,26 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
         .cloned()
         .unwrap_or_default();
 
+    let cal_obj = js_adjustments
+        .get("colorCalibration")
+        .cloned()
+        .unwrap_or_default();
+
+    let color_cal_settings = if is_visible("color") {
+        ColorCalibrationSettings {
+            shadows_tint: cal_obj["shadowsTint"].as_f64().unwrap_or(0.0) as f32 / 100.0,
+            red_hue: cal_obj["redHue"].as_f64().unwrap_or(0.0) as f32 / 100.0,
+            red_saturation: cal_obj["redSaturation"].as_f64().unwrap_or(0.0) as f32 / 100.0,
+            green_hue: cal_obj["greenHue"].as_f64().unwrap_or(0.0) as f32 / 100.0,
+            green_saturation: cal_obj["greenSaturation"].as_f64().unwrap_or(0.0) as f32 / 100.0,
+            blue_hue: cal_obj["blueHue"].as_f64().unwrap_or(0.0) as f32 / 100.0,
+            blue_saturation: cal_obj["blueSaturation"].as_f64().unwrap_or(0.0) as f32 / 100.0,
+            _pad1: 0.0,
+        }
+    } else {
+        ColorCalibrationSettings::default()
+    };
+
     let neg_conv_enabled = js_adjustments["enableNegativeConversion"]
         .as_bool()
         .unwrap_or(false);
@@ -613,6 +648,8 @@ fn get_global_adjustments_from_json(js_adjustments: &serde_json::Value) -> Globa
         },
         _pad2: 0.0,
         _pad3: 0.0,
+
+        color_calibration: color_cal_settings,
 
         hsl: if is_visible("color") {
             parse_hsl_adjustments(&js_adjustments.get("hsl").cloned().unwrap_or_default())

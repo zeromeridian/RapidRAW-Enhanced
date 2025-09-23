@@ -72,6 +72,16 @@ export enum Effect {
   VignetteRoundness = 'vignetteRoundness',
 }
 
+export interface ColorCalibration {
+  shadowsTint: number;
+  redHue: number;
+  redSaturation: number;
+  greenHue: number;
+  greenSaturation: number;
+  blueHue: number;
+  blueSaturation: number;
+}
+
 export interface Adjustments {
   [index: string]: any;
   aiPatches: Array<AiPatch>;
@@ -80,6 +90,7 @@ export interface Adjustments {
   clarity: number;
   chromaticAberrationBlueYellow: number;
   chromaticAberrationRedCyan: number;
+  colorCalibration: ColorCalibration;
   colorGrading: ColorGradingProps;
   colorNoiseReduction: number;
   contrast: number;
@@ -249,6 +260,16 @@ const INITIAL_COLOR_GRADING: ColorGradingProps = {
   shadows: { hue: 0, saturation: 0, luminance: 0 },
 };
 
+const INITIAL_COLOR_CALIBRATION: ColorCalibration = {
+  shadowsTint: 0,
+  redHue: 0,
+  redSaturation: 0,
+  greenHue: 0,
+  greenSaturation: 0,
+  blueHue: 0,
+  blueSaturation: 0,
+};
+
 export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   blacks: 0,
   clarity: 0,
@@ -320,6 +341,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   clarity: 0,
   chromaticAberrationBlueYellow: 0,
   chromaticAberrationRedCyan: 0,
+  colorCalibration: { ...INITIAL_COLOR_CALIBRATION },
   colorGrading: { ...INITIAL_COLOR_GRADING },
   colorNoiseReduction: 0,
   contrast: 0,
@@ -437,6 +459,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
   return {
     ...INITIAL_ADJUSTMENTS,
     ...loadedAdjustments,
+    colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, ...(loadedAdjustments.colorCalibration || {}) },
     colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...(loadedAdjustments.colorGrading || {}) },
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
     curves: { ...INITIAL_ADJUSTMENTS.curves, ...(loadedAdjustments.curves || {}) },
@@ -454,6 +477,7 @@ export const COPYABLE_ADJUSTMENT_KEYS: Array<string> = [
   Effect.Clarity,
   DetailsAdjustment.ChromaticAberrationBlueYellow,
   DetailsAdjustment.ChromaticAberrationRedCyan,
+  'colorCalibration',
   ColorAdjustment.ColorGrading,
   DetailsAdjustment.ColorNoiseReduction,
   BasicAdjustment.Contrast,
@@ -508,6 +532,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     ColorAdjustment.Vibrance,
     ColorAdjustment.Hsl,
     ColorAdjustment.ColorGrading,
+    'colorCalibration',
   ],
   details: [
     DetailsAdjustment.Sharpness,

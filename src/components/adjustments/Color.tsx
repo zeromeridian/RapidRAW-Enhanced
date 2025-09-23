@@ -1,8 +1,14 @@
 import { useState } from 'react';
 import Slider from '../ui/Slider';
 import ColorWheel from '../ui/ColorWheel';
-import { ColorAdjustment, HueSatLum, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import {
+  ColorAdjustment,
+  ColorCalibration,
+  HueSatLum,
+  INITIAL_ADJUSTMENTS,
+} from '../../utils/adjustments';
 import { Adjustments, ColorGrading } from '../../utils/adjustments';
+import { AppSettings } from '../ui/AppProperties';
 
 interface ColorProps {
   color: string;
@@ -12,6 +18,7 @@ interface ColorProps {
 interface ColorPanelProps {
   adjustments: Adjustments;
   setAdjustments(adjustments: Partial<Adjustments>): any;
+  appSettings: AppSettings | null;
 }
 
 interface ColorSwatchProps {
@@ -56,19 +63,15 @@ const ColorGradingPanel = ({ adjustments, setAdjustments }: ColorPanelProps) => 
     }));
   };
 
-  // --- FIX IS HERE ---
-  // The `value` parameter is now correctly typed as a string.
   const handleGlobalChange = (grading: ColorGrading, value: string) => {
     setAdjustments((prev: Partial<Adjustments>) => ({
       ...prev,
       colorGrading: {
         ...(prev.colorGrading || INITIAL_ADJUSTMENTS.colorGrading),
-        // Use parseFloat for safe conversion from string to number.
         [grading]: parseFloat(value),
       },
     }));
   };
-  // --- END FIX ---
 
   return (
     <div>
@@ -124,8 +127,96 @@ const ColorGradingPanel = ({ adjustments, setAdjustments }: ColorPanelProps) => 
   );
 };
 
-export default function ColorPanel({ adjustments, setAdjustments }: ColorPanelProps) {
+const ColorCalibrationPanel = ({ adjustments, setAdjustments }: ColorPanelProps) => {
+  const [activePrimary, setActivePrimary] = useState('red');
+  const colorCalibration = adjustments.colorCalibration || INITIAL_ADJUSTMENTS.colorCalibration;
+
+  const PRIMARY_COLORS = [
+    { name: 'red', color: '#f87171' },
+    { name: 'green', color: '#4ade80' },
+    { name: 'blue', color: '#60a5fa' },
+  ];
+
+  const handleShadowsChange = (value: string) => {
+    setAdjustments((prev: Partial<Adjustments>) => ({
+      ...prev,
+      colorCalibration: {
+        ...(prev.colorCalibration || INITIAL_ADJUSTMENTS.colorCalibration),
+        shadowsTint: parseFloat(value),
+      },
+    }));
+  };
+
+  const handlePrimaryChange = (key: 'Hue' | 'Saturation', value: string) => {
+    const fullKey = `${activePrimary}${key}` as keyof ColorCalibration;
+    setAdjustments((prev: Partial<Adjustments>) => ({
+      ...prev,
+      colorCalibration: {
+        ...(prev.colorCalibration || INITIAL_ADJUSTMENTS.colorCalibration),
+        [fullKey]: parseFloat(value),
+      },
+    }));
+  };
+
+  const currentValues = {
+    hue: colorCalibration[`${activePrimary}Hue` as keyof ColorCalibration] || 0,
+    saturation: colorCalibration[`${activePrimary}Saturation` as keyof ColorCalibration] || 0,
+  };
+
+  return (
+    <div className="p-2 bg-bg-tertiary rounded-md mt-4">
+      <p className="text-md font-semibold mb-3 text-primary">Color Calibration</p>
+      <div>
+        <p className="text-sm font-medium mb-1 text-secondary">Shadows</p>
+        <Slider
+          label="Tint"
+          min={-100}
+          max={100}
+          step={1}
+          defaultValue={0}
+          value={colorCalibration.shadowsTint}
+          onChange={(e: any) => handleShadowsChange(e.target.value)}
+        />
+      </div>
+      <div className="mt-3">
+        <p className="text-sm font-medium mb-3 text-secondary">Primaries</p>
+        <div className="flex justify-center gap-6 mb-4 px-1">
+          {PRIMARY_COLORS.map(({ name, color }) => (
+            <ColorSwatch
+              color={color}
+              isActive={activePrimary === name}
+              key={name}
+              name={name}
+              onClick={setActivePrimary}
+            />
+          ))}
+        </div>
+        <Slider
+          label="Hue"
+          min={-100}
+          max={100}
+          step={1}
+          defaultValue={0}
+          value={currentValues.hue}
+          onChange={(e: any) => handlePrimaryChange('Hue', e.target.value)}
+        />
+        <Slider
+          label="Saturation"
+          min={-100}
+          max={100}
+          step={1}
+          defaultValue={0}
+          value={currentValues.saturation}
+          onChange={(e: any) => handlePrimaryChange('Saturation', e.target.value)}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default function ColorPanel({ adjustments, setAdjustments, appSettings }: ColorPanelProps) {
   const [activeColor, setActiveColor] = useState('reds');
+  const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
 
   const handleGlobalChange = (key: ColorAdjustment, value: string) => {
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: parseFloat(value) }));
@@ -190,7 +281,7 @@ export default function ColorPanel({ adjustments, setAdjustments }: ColorPanelPr
 
       <div className="p-2 bg-bg-tertiary rounded-md mt-4">
         <p className="text-md font-semibold mb-3 text-primary">Color Grading</p>
-        <ColorGradingPanel adjustments={adjustments} setAdjustments={setAdjustments} />
+        <ColorGradingPanel adjustments={adjustments} setAdjustments={setAdjustments} appSettings={appSettings} />
       </div>
 
       <div className="p-2 bg-bg-tertiary rounded-md mt-4">
@@ -231,6 +322,10 @@ export default function ColorPanel({ adjustments, setAdjustments }: ColorPanelPr
           value={currentHsl.luminance}
         />
       </div>
+
+      {adjustmentVisibility.colorCalibration !== false && (
+        <ColorCalibrationPanel adjustments={adjustments} setAdjustments={setAdjustments} appSettings={appSettings} />
+      )}
     </div>
   );
 }

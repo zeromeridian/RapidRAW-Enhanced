@@ -189,9 +189,10 @@ fn default_adjustment_visibility() -> HashMap<String, bool> {
     map.insert("sharpening".to_string(), true);
     map.insert("presence".to_string(), true);
     map.insert("noiseReduction".to_string(), true);
-    map.insert("chromaticAberration".to_string(), true);
-    map.insert("negativeConversion".to_string(), true);
+    map.insert("chromaticAberration".to_string(), false);
+    map.insert("negativeConversion".to_string(), false);
     map.insert("vignette".to_string(), true);
+    map.insert("colorCalibration".to_string(), false);
     map.insert("grain".to_string(), true);
     map
 }

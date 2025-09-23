@@ -79,9 +79,10 @@ const adjustmentVisibilityDefaults = {
   sharpening: true,
   presence: true,
   noiseReduction: true,
-  chromaticAberration: true,
-  negativeConversion: true,
+  chromaticAberration: false,
+  negativeConversion: false,
   vignette: true,
+  colorCalibration: false,
   grain: true,
 };
 
@@ -588,26 +589,13 @@ export default function SettingsPanel({
               />
               <Switch
                 label="Chromatic Aberration"
-                checked={appSettings?.adjustmentVisibility?.chromaticAberration ?? true}
+                checked={appSettings?.adjustmentVisibility?.chromaticAberration ?? false}
                 onChange={(checked) =>
                   onSettingsChange({
                     ...appSettings,
                     adjustmentVisibility: {
                       ...(appSettings?.adjustmentVisibility || adjustmentVisibilityDefaults),
                       chromaticAberration: checked,
-                    },
-                  })
-                }
-              />
-              <Switch
-                label="Negative Conversion"
-                checked={appSettings?.adjustmentVisibility?.negativeConversion ?? true}
-                onChange={(checked) =>
-                  onSettingsChange({
-                    ...appSettings,
-                    adjustmentVisibility: {
-                      ...(appSettings?.adjustmentVisibility || adjustmentVisibilityDefaults),
-                      negativeConversion: checked,
                     },
                   })
                 }
@@ -621,6 +609,32 @@ export default function SettingsPanel({
                     adjustmentVisibility: {
                       ...(appSettings?.adjustmentVisibility || adjustmentVisibilityDefaults),
                       grain: checked,
+                    },
+                  })
+                }
+              />
+              <Switch
+                label="Color Calibration"
+                checked={appSettings?.adjustmentVisibility?.colorCalibration ?? true}
+                onChange={(checked) =>
+                  onSettingsChange({
+                    ...appSettings,
+                    adjustmentVisibility: {
+                      ...(appSettings?.adjustmentVisibility || adjustmentVisibilityDefaults),
+                      colorCalibration: checked,
+                    },
+                  })
+                }
+              />
+              <Switch
+                label="Negative Conversion"
+                checked={appSettings?.adjustmentVisibility?.negativeConversion ?? false}
+                onChange={(checked) =>
+                  onSettingsChange({
+                    ...appSettings,
+                    adjustmentVisibility: {
+                      ...(appSettings?.adjustmentVisibility || adjustmentVisibilityDefaults),
+                      negativeConversion: checked,
                     },
                   })
                 }

@@ -19,6 +19,17 @@ struct ColorGradeSettings {
     _pad: f32,
 }
 
+struct ColorCalibrationSettings {
+    shadows_tint: f32,
+    red_hue: f32,
+    red_saturation: f32,
+    green_hue: f32,
+    green_saturation: f32,
+    blue_hue: f32,
+    blue_saturation: f32,
+    _pad1: f32,
+}
+
 struct GlobalAdjustments {
     exposure: f32,
     contrast: f32,
@@ -72,6 +83,8 @@ struct GlobalAdjustments {
     color_grading_balance: f32,
     _pad2: f32,
     _pad3: f32,
+
+    color_calibration: ColorCalibrationSettings,
 
     hsl: array<HslColor, 8>,
     luma_curve: array<Point, 16>,
@@ -371,6 +384,35 @@ fn apply_tonal_adjustments(color: vec3<f32>, con: f32, hi: f32, sh: f32, wh: f32
     return rgb;
 }
 
+fn apply_color_calibration(color: vec3<f32>, cal: ColorCalibrationSettings) -> vec3<f32> {
+    var c = color;
+
+    let s_r = cal.red_saturation;
+    let s_g = cal.green_saturation;
+    let s_b = cal.blue_saturation;
+    let h_r = cal.red_hue * 0.5;
+    let h_g = cal.green_hue * 0.5;
+    let h_b = cal.blue_hue * 0.5;
+
+    let cal_matrix = mat3x3<f32>(
+        vec3<f32>(1.0 + s_r, -h_g, h_b),
+        vec3<f32>(h_r, 1.0 + s_g, -h_b),
+        vec3<f32>(-h_r, h_g, 1.0 + s_b)
+    );
+
+    c = cal_matrix * c;
+
+    let st = cal.shadows_tint;
+    if (abs(st) > 0.001) {
+        let luma = get_luma(max(vec3(0.0), c));
+        let mask = 1.0 - smoothstep(0.0, 0.3, luma);
+        let tint_mult = vec3<f32>(1.0 + st * 0.25, 1.0 - st * 0.25, 1.0 + st * 0.25);
+        c = mix(c, c * tint_mult, mask);
+    }
+
+    return c;
+}
+
 fn apply_white_balance(color: vec3<f32>, temp: f32, tnt: f32) -> vec3<f32> {
     var rgb = color;
     let temp_kelvin_mult = vec3<f32>(1.0 + temp * 0.2, 1.0 + temp * 0.05, 1.0 - temp * 0.2);
@@ -667,6 +709,8 @@ fn apply_all_adjustments(initial_rgb: vec3<f32>, adj: GlobalAdjustments, coords_
     processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
     processed_rgb = processed_rgb * pow(2.0, adj.exposure);
     processed_rgb = apply_tonal_adjustments(processed_rgb, adj.contrast, adj.highlights, adj.shadows, adj.whites, adj.blacks);
+
+    processed_rgb = apply_color_calibration(processed_rgb, adj.color_calibration);
 
     processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
     processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_blending, adj.color_grading_balance);
