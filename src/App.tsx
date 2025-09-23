@@ -3093,6 +3093,7 @@ function App() {
                           setCopiedSectionAdjustments={setCopiedSectionAdjustments}
                           theme={theme}
                           handleLutSelect={handleLutSelect}
+                          appSettings={appSettings}
                         />
                       )}
                       {renderedRightPanel === Panel.Metadata && <MetadataPanel selectedImage={selectedImage} />}

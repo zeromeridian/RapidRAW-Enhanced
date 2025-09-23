@@ -132,6 +132,7 @@ export interface AppSettings {
   thumbnailSize?: ThumbnailSize;
   thumbnailAspectRatio?: ThumbnailAspectRatio;
   uiVisibility?: UiVisibility;
+  adjustmentVisibility?: { [key: string]: boolean };
 }
 
 export interface BrushSettings {

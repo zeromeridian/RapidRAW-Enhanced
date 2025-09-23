@@ -75,6 +75,16 @@ interface TestStatus {
 
 const EXECUTE_TIMEOUT = 3000;
 
+const adjustmentVisibilityDefaults = {
+  sharpening: true,
+  presence: true,
+  noiseReduction: true,
+  chromaticAberration: true,
+  negativeConversion: true,
+  vignette: true,
+  grain: true,
+};
+
 const DEFAULT_WORKFLOW_CONFIG = {
   workflowPath: null,
   modelCheckpoints: { '1': 'XL_RealVisXL_V5.0_Lightning.safetensors' },
@@ -553,6 +563,68 @@ export default function SettingsPanel({
                   value={appSettings?.editorPreviewResolution || 1920}
                 />
               </SettingItem>
+            </div>
+          </div>
+
+          <div className="p-6 bg-surface rounded-xl shadow-md">
+            <h2 className="text-xl font-semibold mb-6 text-accent">Adjustments Visibility</h2>
+            <p className="text-sm text-text-secondary mb-4">
+              Hide adjustment sections you don't use often to simplify the editing panel. Your settings will be
+              preserved and applied even when hidden.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              <Switch
+                label="Noise Reduction"
+                checked={appSettings?.adjustmentVisibility?.noiseReduction ?? true}
+                onChange={(checked) =>
+                  onSettingsChange({
+                    ...appSettings,
+                    adjustmentVisibility: {
+                      ...(appSettings?.adjustmentVisibility || adjustmentVisibilityDefaults),
+                      noiseReduction: checked,
+                    },
+                  })
+                }
+              />
+              <Switch
+                label="Chromatic Aberration"
+                checked={appSettings?.adjustmentVisibility?.chromaticAberration ?? true}
+                onChange={(checked) =>
+                  onSettingsChange({
+                    ...appSettings,
+                    adjustmentVisibility: {
+                      ...(appSettings?.adjustmentVisibility || adjustmentVisibilityDefaults),
+                      chromaticAberration: checked,
+                    },
+                  })
+                }
+              />
+              <Switch
+                label="Negative Conversion"
+                checked={appSettings?.adjustmentVisibility?.negativeConversion ?? true}
+                onChange={(checked) =>
+                  onSettingsChange({
+                    ...appSettings,
+                    adjustmentVisibility: {
+                      ...(appSettings?.adjustmentVisibility || adjustmentVisibilityDefaults),
+                      negativeConversion: checked,
+                    },
+                  })
+                }
+              />
+              <Switch
+                label="Grain"
+                checked={appSettings?.adjustmentVisibility?.grain ?? true}
+                onChange={(checked) =>
+                  onSettingsChange({
+                    ...appSettings,
+                    adjustmentVisibility: {
+                      ...(appSettings?.adjustmentVisibility || adjustmentVisibilityDefaults),
+                      grain: checked,
+                    },
+                  })
+                }
+              />
             </div>
           </div>
 

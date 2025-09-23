@@ -7,7 +7,7 @@ import EffectsPanel from '../../adjustments/Effects';
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import { Adjustments, SectionVisibility, INITIAL_ADJUSTMENTS, ADJUSTMENT_SECTIONS } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { OPTION_SEPARATOR, SelectedImage } from '../../ui/AppProperties';
+import { OPTION_SEPARATOR, SelectedImage, AppSettings } from '../../ui/AppProperties';
 import { ChannelConfig } from '../../adjustments/Curves';
 
 interface ControlsPanelOption {
@@ -30,6 +30,7 @@ interface ControlsProps {
   setCollapsibleState(state: any): void;
   setCopiedSectionAdjustments(adjustments: any): void;
   theme: string;
+  appSettings: AppSettings | null;
 }
 
 export default function Controls({
@@ -44,6 +45,7 @@ export default function Controls({
   setCollapsibleState,
   setCopiedSectionAdjustments,
   theme,
+  appSettings,
 }: ControlsProps) {
   const { showContextMenu } = useContextMenu();
 
@@ -202,6 +204,7 @@ export default function Controls({
                   histogram={histogram}
                   theme={theme}
                   handleLutSelect={handleLutSelect}
+                  appSettings={appSettings}
                 />
               </CollapsibleSection>
             </div>
