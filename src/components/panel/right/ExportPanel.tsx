@@ -189,7 +189,9 @@ export default function ExportPanel({
       } else {
         const selectedFormat: any = FILE_FORMATS.find((f) => f.id === fileFormat);
         const originalFilename = selectedImage.path.split(/[\\/]/).pop();
-        const name = originalFilename ? originalFilename?.split('.') : '';
+        const name = originalFilename
+          ? originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename
+          : '';
         const filePath = await save({
           title: 'Save Edited Image',
           defaultPath: `${name}_edited.${selectedFormat.extensions[0]}`,
