@@ -13,7 +13,7 @@ body:
     id: what-happened
     attributes:
       label: What happened?
-      description: Describe the problem you encountered.
+      description: Describe the problem you encountered including error messages (if any).
       placeholder: Tell us what went wrong...
     validations:
       required: true
@@ -36,13 +36,6 @@ body:
         1. Go to...
         2. Click on...
         3. See error...
-
-  - type: textarea
-    id: screenshots-logs
-    attributes:
-      label: Screenshots or error messages
-      description: If you have any screenshots, error messages, or log files, please share them here.
-      placeholder: Paste screenshots or error messages here...
 
   - type: markdown
     attributes:
