@@ -11,8 +11,6 @@ use rawler::Orientation;
 use rayon::prelude::*;
 use serde::Deserialize;
 use serde_json::{Value, from_value};
-//use tauri::path;
-//use std::fs;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]

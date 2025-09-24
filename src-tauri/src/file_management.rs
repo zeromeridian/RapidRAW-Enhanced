@@ -1,10 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use fs2::FileExt;
 use memmap2::{MmapOptions, Mmap};
 use std::io::Cursor;
+use std::io::Error;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::hash::{Hash, Hasher};
@@ -96,6 +99,21 @@ impl Default for FilterCriteria {
             rating: 0,
             raw_status: "all".to_string(),
             colors: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ReadFileError {
+    Io(std::io::Error),
+    Locked,
+}
+
+impl fmt::Display for ReadFileError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ReadFileError::Io(err) => write!(f, "IO error: {}", err),
+            ReadFileError::Locked => write!(f, "File is locked"),
         }
     }
 }
@@ -373,12 +391,16 @@ pub fn get_sidecar_path(image_path: &str) -> PathBuf {
     path.with_file_name(new_filename)
 }
 
-pub fn read_file_mapped(path: &Path) -> Result<Mmap> {
-    let file = fs::File::open(path)?;
-    let mmap = unsafe { 
+pub fn read_file_mapped(path: &Path) -> Result<Mmap, ReadFileError> {
+    let file = fs::File::open(path).map_err(ReadFileError::Io)?;
+    if file.try_lock_exclusive().is_err() {
+        return Err(ReadFileError::Locked);
+    }
+    let mmap = unsafe {
         MmapOptions::new()
-            .len(file.metadata()?.len() as usize)
-            .map(&file)?
+            .len(file.metadata().map_err(ReadFileError::Io)?.len() as usize)
+            .map(&file)
+            .map_err(ReadFileError::Io)?
     };
     Ok(mmap)
 }
@@ -409,7 +431,7 @@ pub fn generate_thumbnail_data(
             image_loader::composite_patches_on_image(img, &adjustments)?
         } else {
             
-            let mmap = read_file_mapped(Path::new(path_str))?;
+            let mmap = read_file_mapped(Path::new(path_str)).expect("Failed to map file");
             image_loader::load_and_composite(&mmap, path_str, &adjustments, true)?
         };
 
