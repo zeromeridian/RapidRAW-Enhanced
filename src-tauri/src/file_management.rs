@@ -3,7 +3,6 @@ use std::fs;
 use fs2::FileExt;
 use memmap2::{MmapOptions, Mmap};
 use std::io::Cursor;
-use std::io::Error;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
