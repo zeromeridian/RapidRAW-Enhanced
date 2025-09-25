@@ -282,11 +282,6 @@ export const useKeyboardShortcuts = ({
         }
       }
 
-      if (['0', '1', '2', '3', '4', '5'].includes(key) && !isCtrl) {
-        event.preventDefault();
-        handleRate(parseInt(key, 10));
-      }
-
       if (code.startsWith('Digit') && !isCtrl) {
         event.preventDefault();
         const keyNum = parseInt(code.replace('Digit', ''), 10);
@@ -303,6 +298,9 @@ export const useKeyboardShortcuts = ({
             handleRate(keyNum);
           }
         }
+      } else if (['0', '1', '2', '3', '4', '5'].includes(key) && !isCtrl) {
+        event.preventDefault();
+        handleRate(parseInt(key, 10));
       }
 
       if (key === 'delete') {
