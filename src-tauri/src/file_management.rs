@@ -322,7 +322,7 @@ pub struct FolderNode {
 
 fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
     let mut children = Vec::new();
-
+    
     let entries = match fs::read_dir(path) {
         Ok(entries) => entries,
         Err(e) => {
@@ -337,8 +337,9 @@ fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
             .file_name()
             .and_then(|s| s.to_str())
             .map_or(false, |s| s.starts_with('.'));
-
-        if current_path.is_dir() && !is_hidden {
+        let mut is_dir: bool = false;
+        if current_path.is_dir() && !is_hidden { 
+            is_dir = true;
             let sub_children = scan_dir_recursive(&current_path)?;
             children.push(FolderNode {
                 name: current_path
@@ -348,12 +349,12 @@ fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
                     .into_owned(),
                 path: current_path.to_string_lossy().into_owned(),
                 children: sub_children,
-                is_dir: current_path.is_dir(),
+                is_dir: is_dir,
             });
         }
     }
 
-    children.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    children.sort_by_cached_key(|n| n.name.to_lowercase());
 
     Ok(children)
 }
@@ -392,7 +393,7 @@ pub fn get_sidecar_path(image_path: &str) -> PathBuf {
 
 pub fn read_file_mapped(path: &Path) -> Result<Mmap, ReadFileError> {
     let file = fs::File::open(path).map_err(ReadFileError::Io)?;
-    if file.try_lock_exclusive().is_err() {
+    if file.try_lock_shared().is_err() {
         return Err(ReadFileError::Locked);
     }
     let mmap = unsafe {

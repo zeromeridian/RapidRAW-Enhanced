@@ -926,25 +926,21 @@ async fn batch_export_images(
 
 
         let results: Vec<Result<(), String>> = paths
-            .par_chunks(1000) 
-            .flat_map(|chunk| {
-                chunk.par_iter().enumerate().map(|(_, image_path_str)| {
-                    let global_index = paths.iter().position(|p| p == image_path_str).unwrap();
-
-                    
-                    if app_handle.state::<AppState>().export_task_handle.lock().unwrap().is_none() {
-                        return Err("Export cancelled".to_string());
-                    }
-
-                    
-                    let _ = app_handle.emit(
-                        "batch-export-progress",
-                        serde_json::json!({ 
-                            "current": global_index, 
-                            "total": total_paths, 
-                            "path": image_path_str 
-                        }),
-                    );
+            .par_iter()
+            .enumerate()
+            .map(|(global_index, image_path_str)| {
+                if app_handle.state::<AppState>().export_task_handle.lock().unwrap().is_none() {
+                    return Err("Export cancelled".to_string());
+                }
+        
+                let _ = app_handle.emit(
+                    "batch-export-progress",
+                    serde_json::json!({
+                        "current": global_index,
+                        "total": total_paths,
+                        "path": image_path_str
+                    }),
+                );
 
                     
                     let result: Result<(), String> = (|| {
@@ -1038,7 +1034,6 @@ async fn batch_export_images(
                     })();
 
                     result
-                })
             })
             .collect();
 
