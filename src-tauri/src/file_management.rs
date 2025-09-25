@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use fs2::FileExt;
 use memmap2::{MmapOptions, Mmap};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
