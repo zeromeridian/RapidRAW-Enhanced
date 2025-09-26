@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
+use std::io::{self, BufRead};
 
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
@@ -319,7 +320,80 @@ pub struct FolderNode {
     pub is_dir: bool,
 }
 
-fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
+pub fn load_ignore_list_from_file<P: AsRef<Path>>(path: P) -> io::Result<HashSet<String>> {
+    let file = fs::File::open(path)?;
+    let reader = io::BufReader::new(file);
+    let mut set = HashSet::new();
+    for line_res in reader.lines() {
+        let line = line_res?;
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        set.insert(trimmed.to_lowercase());
+    }
+    Ok(set)
+}
+
+pub fn scan_dir_recursive_with_ignore(
+    path: &Path,
+    ignore: &HashSet<String>,
+) -> Result<Vec<FolderNode>, std::io::Error> {
+    let mut children = Vec::new();
+
+    let entries = match fs::read_dir(path) {
+        Ok(e) => e,
+        Err(e) => {
+            log::error!("Could not scan directory '{}': {}", path.display(), e);
+            return Ok(Vec::new());
+        }
+    };
+
+    for entry_res in entries {
+        let entry = match entry_res {
+            Ok(en) => en,
+            Err(e) => {
+                eprintln!("Failed to read dir entry in '{}': {}", path.display(), e);
+                continue;
+            }
+        };
+        let current_path = entry.path();
+
+        let fname_opt = current_path.file_name().and_then(|s| s.to_str());
+        let fname_lower = fname_opt.map(|s| s.to_lowercase());
+
+        if let Some(ref fname_lc) = fname_lower {
+            if ignore.contains(fname_lc) {
+                eprintln!("Skipping ignored directory: {}", fname_lc);
+                continue;
+            }
+        }
+
+        //optional
+        let is_hidden = fname_opt.map_or(false, |s| s.starts_with('.'));
+
+        if current_path.is_dir() && !is_hidden {
+            let sub_children = scan_dir_recursive_with_ignore(
+                &current_path,
+                ignore,
+            )?;
+            children.push(FolderNode {
+                name: fname_opt
+                    .unwrap_or_default()
+                    .to_string(),
+                path: current_path.to_string_lossy().into_owned(),
+                children: sub_children,
+                is_dir: true,
+            });
+        }
+    }
+
+    children.sort_by_cached_key(|n| n.name.to_lowercase());
+    Ok(children)
+}
+
+
+/*fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
     let mut children = Vec::new();
     
     let entries = match fs::read_dir(path) {
@@ -357,15 +431,26 @@ fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
 
     Ok(children)
 }
+*/
 
 fn get_folder_tree_sync(path: String) -> Result<FolderNode, String> {
     let root_path = Path::new(&path);
+    let ignore_file = std::env::var("THUMBNAIL_IGNORE_FILE")
+        .unwrap_or_else(|_| "ignore.txt".to_string());
+    let ignore_set = load_ignore_list_from_file(&ignore_file)
+        .unwrap_or_else(|_| {
+            ["appdata", "cookies", "temporary internet files", "inetcache"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
+        });
+
     let name = root_path
         .file_name()
         .unwrap_or_default()
         .to_string_lossy()
         .into_owned();
-    let children = scan_dir_recursive(root_path).map_err(|e| e.to_string())?;
+    let children = scan_dir_recursive_with_ignore(root_path, &ignore_set).map_err(|e| e.to_string())?;
     Ok(FolderNode {
         name,
         path: path.clone(),
