@@ -62,6 +62,7 @@ regex = "1.11.2"
 memmap2 = "0.9.8"
 fs2 = "0.4.3"
 io = "0.0.2"
+directories = "6.0.0"
 
 [build-dependencies]
 tauri-build = { version = "2.4", features = [] }

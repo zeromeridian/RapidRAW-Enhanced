@@ -4,6 +4,9 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
+use std::sync::Once;
+static INIT: Once = Once::new();
+
 mod ai_processing;
 mod culling;
 mod comfyui_connector;
@@ -28,13 +31,14 @@ use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
+use directories::ProjectDirs;
 use image::codecs::jpeg::JpegEncoder;
 use image::{
     DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, Rgb, RgbImage, Rgba,
@@ -2048,14 +2052,24 @@ fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowH
     {}
 }
 
+fn log_path<'a>() -> Result<PathBuf, &'a str> {
+    let proj_dirs = ProjectDirs::from("com", "CT", "RapidRaw")
+        .expect("Could not determine user directory");
+    let log_dir = proj_dirs.data_local_dir();
+    std::fs::create_dir_all(log_dir).map_err(|_| "Could not create log directory")?;
+    Ok(log_dir.join("RapidRaw.log"))
+}
+
+
 /// Hook panic messages to the logger.
-fn logger(){
+fn logger() -> Result<(), fern::InitError> {
     let log_file = fs::OpenOptions::new()
             .write(true)
             .create(true)
             .append(true)
-            .open("RapidRaw.log")
-            .unwrap();
+            .open(log_path()
+            .expect("Failed to get/open log path"))?;
+
     
     let var = std::env::var("RUST_LOG").unwrap_or_else(|_| "error".to_string());
     let level: log::LevelFilter = var.parse().unwrap_or(log::LevelFilter::Error);
@@ -2072,17 +2086,26 @@ fn logger(){
         .level(level)
         .chain(std::io::stderr())   
         .chain(log_file)            
-        .apply()
-        .unwrap();
-
+        .apply()?;
 
     panic::set_hook(Box::new(|error| {
         log::error!("PANIC! {:#?}", error);
     }));
+    Ok(())
+}
+
+pub fn init_logger() {
+    INIT.call_once(|| {
+        if let Err(e) = logger() {
+                eprintln!("Failed to initialize logger: {:?}", e);
+        }
+    });
+
 }
 
 fn main() {
-    logger();
+    init_logger();
+        
     tauri::Builder::default()
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
@@ -2111,11 +2134,14 @@ fn main() {
                     "libonnxruntime.dylib"
                 }
             };
-
-            let ort_library_path = resource_path.join(ort_library_name);
-            // TODO: Audit that the environment access only happens in single-threaded code.
-            unsafe { std::env::set_var("ORT_DYLIB_PATH", &ort_library_path) };
-            println!("Set ORT_DYLIB_PATH to: {}", ort_library_path.display());
+            let ort_library_path = Mutex::new(resource_path.join(ort_library_name));
+            {
+                let path = ort_library_path.lock().unwrap();
+                unsafe {
+                    std::env::set_var("ORT_DYLIB_PATH", &*path);
+                }
+                println!("Set ORT_DYLIB_PATH to: {}", path.display());
+            }
 
             let settings: AppSettings = load_settings(app_handle.clone()).unwrap_or_default();
             let window_cfg = app.config().app.windows.get(0).unwrap().clone();
