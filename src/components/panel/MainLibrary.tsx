@@ -926,37 +926,42 @@ export default function MainLibrary({
               </div>
               <div className="absolute bottom-8 left-8 lg:left-16 text-xs text-text-secondary space-y-1">
                 {appVersion && (
-                  <p>
-                    <span
-                      className={`group transition-all duration-300 ease-in-out rounded-md py-1 ${
-                        isUpdateAvailable ? 'cursor-pointer border border-yellow-500 px-2 hover:bg-yellow-500/20' : ''
-                      }`}
-                      onClick={() => {
-                        if (isUpdateAvailable) {
-                          open('https://github.com/CyberTimon/RapidRAW/releases/latest');
+                  <div className="flex items-center space-x-2">
+                    <p>
+                      <span
+                        className={`group transition-all duration-300 ease-in-out rounded-md py-1 ${
+                          isUpdateAvailable
+                            ? 'cursor-pointer border border-yellow-500 px-2 hover:bg-yellow-500/20'
+                            : ''
+                        }`}
+                        onClick={() => {
+                          if (isUpdateAvailable) {
+                            open('https://github.com/CyberTimon/RapidRAW/releases/latest');
+                          }
+                        }}
+                        title={
+                          isUpdateAvailable ? `Click to download version ${latestVersion}` : `You are on the latest version`
                         }
-                      }}
-                      title={
-                        isUpdateAvailable ? `Click to download version ${latestVersion}` : `You are on the latest version`
-                      }
-                    >
-                      <span className={isUpdateAvailable ? 'group-hover:hidden' : ''}>Version {appVersion}</span>
-                      {isUpdateAvailable && (
-                        <span className="hidden group-hover:inline text-yellow-400">New version available!</span>
-                      )}
-                    </span>
-                  </p>
+                      >
+                        <span className={isUpdateAvailable ? 'group-hover:hidden' : ''}>Version {appVersion}</span>
+                        {isUpdateAvailable && (
+                          <span className="hidden group-hover:inline text-yellow-400">New version available!</span>
+                        )}
+                      </span>
+                    </p>
+                    <span>-</span>
+                    <p>
+                      <a
+                        href="https://ko-fi.com/cybertimon"
+                        className="hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Donate on Ko-fi
+                      </a>
+                    </p>
+                  </div>
                 )}
-                <p>
-                  <a
-                    href="https://ko-fi.com/cybertimon"
-                    className="hover:underline"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Donate on Ko-fi
-                  </a>
-                </p>
                 <p>Images by Timon Käch (@timonkaech.photography)</p>
               </div>
             </>
