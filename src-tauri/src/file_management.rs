@@ -439,7 +439,7 @@ fn get_folder_tree_sync(path: String) -> Result<FolderNode, String> {
         .unwrap_or_else(|_| "ignore.txt".to_string());
     let ignore_set = load_ignore_list_from_file(&ignore_file)
         .unwrap_or_else(|_| {
-            ["appdata", "cookies", "temporary internet files", "inetcache"]
+            ["example"]
                 .iter()
                 .map(|s| s.to_string())
                 .collect()
