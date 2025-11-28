@@ -160,6 +160,14 @@ interface PanoramaModalState {
   stitchingSourcePaths: Array<string>;
 }
 
+interface HdrModalState {
+  error: string | null;
+  finalImageBase64: string | null;
+  isOpen: boolean;
+  progressMessage: string | null;
+  stitchingSourcePaths: Array<string>;
+}
+
 interface CullingModalState {
   isOpen: boolean;
   suggestions: CullingSuggestions | null;
@@ -351,6 +359,13 @@ function App() {
   const [folderActionTarget, setFolderActionTarget] = useState<string | null>(null);
   const [confirmModalState, setConfirmModalState] = useState<ConfirmModalState>({ isOpen: false });
   const [panoramaModalState, setPanoramaModalState] = useState<PanoramaModalState>({
+    error: null,
+    finalImageBase64: null,
+    isOpen: false,
+    progressMessage: '',
+    stitchingSourcePaths: [],
+  });
+  const [hdrModalState, setHdrModalState] = useState<HdrModalState>({
     error: null,
     finalImageBase64: null,
     isOpen: false,
@@ -2433,6 +2448,52 @@ function App() {
   useEffect(() => {
     let isEffectActive = true;
 
+    const unlistenProgress = listen('hdr-progress', (event: any) => {
+      if (isEffectActive) {
+        setHdrModalState((prev: HdrModalState) => ({
+          ...prev,
+          error: null,
+          finalImageBase64: null,
+          isOpen: true,
+          progressMessage: event.payload,
+        }));
+      }
+    });
+
+    const unlistenComplete = listen('hdr-complete', (event: any) => {
+      if (isEffectActive) {
+        const { base64 } = event.payload;
+        setHdrModalState((prev: HdrModalState) => ({
+          ...prev,
+          error: null,
+          finalImageBase64: base64,
+          progressMessage: 'Hdr Ready',
+        }));
+      }
+    });
+
+    const unlistenError = listen('hdr-error', (event: any) => {
+      if (isEffectActive) {
+        setHdrModalState((prev: HdrModalState) => ({
+          ...prev,
+          error: String(event.payload),
+          finalImageBase64: null,
+          progressMessage: 'An error occurred.',
+        }));
+      }
+    });
+
+    return () => {
+      isEffectActive = false;
+      unlistenProgress.then((f: any) => f());
+      unlistenComplete.then((f: any) => f());
+      unlistenError.then((f: any) => f());
+    };
+  }, []);
+
+  useEffect(() => {
+    let isEffectActive = true;
+
     const unlistenStart = listen('culling-start', (event: any) => {
       if (isEffectActive) {
         setCullingModalState({
@@ -3084,6 +3145,7 @@ function App() {
     const cullLabel = isSingleSelection ? 'Cull Image' : `Cull Images`;
     const collageLabel = isSingleSelection ? 'Create Collage' : `Create Collage`;
     const stitchLabel = `Stitch Panorama`;
+    const mergeLabel = `Merge to HDR`;
 
     const handleCreateVirtualCopy = async (sourcePath: string) => {
       try {
@@ -3196,6 +3258,28 @@ function App() {
               });
               invoke(Invokes.StitchPanorama, { paths: finalSelection }).catch((err) => {
                 setPanoramaModalState((prev: PanoramaModalState) => ({
+                  ...prev,
+                  error: String(err),
+                  isOpen: true,
+                  progressMessage: 'Failed to start.',
+                }));
+              });
+            },
+          },
+          {
+            disabled: selectionCount < 2  || selectionCount > 9,
+            icon: Images,
+            label: mergeLabel,
+            onClick: () => {
+              setHdrModalState({
+                error: null,
+                finalImageBase64: null,
+                isOpen: true,
+                progressMessage: 'Starting hdr process...',
+                stitchingSourcePaths: finalSelection,
+              });
+              invoke(Invokes.MergeHdr, { paths: finalSelection }).catch((err) => {
+                setHdrModalState((prev: HdrModalState) => ({
                   ...prev,
                   error: String(err),
                   isOpen: true,

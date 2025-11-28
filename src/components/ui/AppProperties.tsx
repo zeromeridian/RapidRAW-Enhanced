@@ -68,6 +68,7 @@ export enum Invokes {
   ShowInFinder = 'show_in_finder',
   StartBackgroundIndexing = 'start_background_indexing',
   StitchPanorama = 'stitch_panorama',
+  MergeHdr = 'merge_hdr',
   TestComfyuiConnection = 'test_comfyui_connection',
   UpdateWindowEffect = 'update_window_effect',
   FetchCommunityPresets = 'fetch_community_presets',

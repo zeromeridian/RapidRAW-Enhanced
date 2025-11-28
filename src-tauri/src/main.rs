@@ -34,6 +34,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::io::Write;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
@@ -42,6 +43,10 @@ use image::{
     DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, Rgb, RgbImage, Rgba,
     RgbaImage, imageops,
 };
+use image_hdr::exif::{get_exif_data, get_exposures, get_gains};
+use image_hdr::hdr_merge_images;
+use image_hdr::input::HDRInput;
+use image_hdr::stretch::apply_histogram_stretch;
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;
@@ -70,9 +75,9 @@ use crate::image_loader::{
     composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
 };
 use crate::image_processing::{
-    Crop, GpuContext, ImageMetadata, apply_coarse_rotation, apply_crop, apply_flip, apply_rotation,
-    get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
-    downscale_f32_image, apply_cpu_default_raw_processing,
+    Crop, GpuContext, ImageMetadata, apply_coarse_rotation, apply_cpu_default_raw_processing,
+    apply_crop, apply_flip, apply_rotation, downscale_f32_image, get_all_adjustments_from_json,
+    get_or_init_gpu_context, process_and_get_dynamic_image,
 };
 use crate::lut_processing::Lut;
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
@@ -109,6 +114,7 @@ pub struct AppState {
     ai_state: Mutex<Option<AiState>>,
     ai_init_lock: TokioMutex<()>,
     export_task_handle: Mutex<Option<JoinHandle<()>>>,
+    hdr_result: Arc<Mutex<Option<RgbImage>>>,
     panorama_result: Arc<Mutex<Option<RgbImage>>>,
     indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
     pub lut_cache: Mutex<HashMap<String, Arc<Lut>>>,
@@ -320,11 +326,7 @@ fn generate_transformed_preview(
     let (full_res_w, full_res_h) = transformed_full_res.dimensions();
 
     let final_preview_base = if full_res_w > final_preview_dim || full_res_h > final_preview_dim {
-        downscale_f32_image(
-            &transformed_full_res,
-            final_preview_dim,
-            final_preview_dim,
-        )
+        downscale_f32_image(&transformed_full_res, final_preview_dim, final_preview_dim)
     } else {
         transformed_full_res
     };
@@ -475,8 +477,8 @@ fn apply_watermark(
     let (base_w, base_h) = base_image.dimensions();
     let base_min_dim = base_w.min(base_h) as f32;
 
-    let watermark_scale_factor = (base_min_dim * (watermark_settings.scale / 100.0))
-        / watermark_img.width().max(1) as f32;
+    let watermark_scale_factor =
+        (base_min_dim * (watermark_settings.scale / 100.0)) / watermark_img.width().max(1) as f32;
     let new_wm_w = (watermark_img.width() as f32 * watermark_scale_factor).round() as u32;
     let new_wm_h = (watermark_img.height() as f32 * watermark_scale_factor).round() as u32;
 
@@ -516,9 +518,9 @@ fn apply_watermark(
         WatermarkAnchor::CenterLeft | WatermarkAnchor::Center | WatermarkAnchor::CenterRight => {
             (base_h as i64 - wm_h as i64) / 2
         }
-        WatermarkAnchor::BottomLeft | WatermarkAnchor::BottomCenter | WatermarkAnchor::BottomRight => {
-            base_h as i64 - wm_h as i64 - spacing_pixels
-        }
+        WatermarkAnchor::BottomLeft
+        | WatermarkAnchor::BottomCenter
+        | WatermarkAnchor::BottomRight => base_h as i64 - wm_h as i64 - spacing_pixels,
     };
 
     image::imageops::overlay(base_image, &final_watermark, x, y);
@@ -1455,7 +1457,9 @@ async fn estimate_batch_export_size(
 
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
-        .filter_map(|def| generate_mask_bitmap(def, preview_w, preview_h, 1.0, unscaled_crop_offset))
+        .filter_map(|def| {
+            generate_mask_bitmap(def, preview_w, preview_h, 1.0, unscaled_crop_offset)
+        })
         .collect();
 
     let mut all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw);
@@ -2242,6 +2246,85 @@ async fn stitch_panorama(
 }
 
 #[tauri::command]
+async fn merge_hdr(
+    paths: Vec<String>,
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    if paths.len() < 2 {
+        return Err("Please select at least two images to merge.".to_string());
+    }
+
+    let hdr_result_handle = state.hdr_result.clone();
+
+    let images : Vec<HDRInput> = paths
+        .iter()
+        .map(|path| {
+            let _ = app_handle.emit(
+                "hdr-progress",
+                format!(
+                    "Processing '{}'",
+                    Path::new(path)
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                ),
+            );
+            println!("  - Processing '{}'", path);
+
+            let file_bytes =
+                fs::read(path).map_err(|e| format!("Failed to read image {}: {}", path, e)).unwrap();
+            let dynamic_image =
+                crate::image_loader::load_base_image_from_bytes(&file_bytes, path, false)
+                    .map_err(|e| format!("Failed to load image {}: {}", path, e)).unwrap();
+
+            println!("Read image with dimensions: {}x{}", dynamic_image.width(), dynamic_image.height());
+
+            let exif = get_exif_data(&file_bytes).unwrap();
+            println!("Read image with exif:");
+            let gains = get_gains(&exif).unwrap_or(1.0);
+            println!("Read image with gains: {}x{}", gains, dynamic_image.width());
+            let exposure = get_exposures(&exif).unwrap_or(1.0);
+            println!("Read image with exposures: {}x{}", exposure, dynamic_image.width());
+
+            HDRInput::with_image(&dynamic_image, Duration::from_secs_f32(exposure), gains).unwrap()
+        })
+        .collect();
+
+    println!("Starting HDR merge of {} images", images.len());
+
+    let hdr_merged = hdr_merge_images(&mut images.into()).map_err(|e| e.to_string())?;
+
+    println!("HDR merge completed");
+
+    let stretched = apply_histogram_stretch(&hdr_merged).map_err(|e| e.to_string())?;
+
+    println!("Histogram stretch applied");
+
+    let mut buf = Cursor::new(Vec::new());
+
+    if let Err(e) = stretched.write_to(&mut buf, ImageFormat::Png) {
+        return Err(format!("Failed to encode panorama preview: {}", e));
+    }
+
+    let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
+    let final_base64 = format!("data:image/png;base64,{}", base64_str);
+
+
+    let _ = app_handle.emit("hdr-progress", "Creating preview...");
+
+    *hdr_result_handle.lock().unwrap() = Some(stretched.to_rgb8());
+
+    let _ = app_handle.emit(
+        "hdr-complete",
+        serde_json::json!({
+            "base64": final_base64,
+        }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
 async fn fetch_community_presets() -> Result<Vec<CommunityPreset>, String> {
     let client = reqwest::Client::new();
     let url = "https://raw.githubusercontent.com/CyberTimon/RapidRAW-Presets/main/manifest.json";
@@ -2635,11 +2718,7 @@ fn setup_logging(app_handle: &tauri::AppHandle) {
             || "at an unknown location".to_string(),
             |loc| format!("at {}:{}:{}", loc.file(), loc.line(), loc.column()),
         );
-        log::error!(
-            "PANIC! {} - {}",
-            location,
-            message.trim()
-        );
+        log::error!("PANIC! {} - {}", location, message.trim());
     }));
 
     log::info!(
@@ -2774,6 +2853,7 @@ fn main() {
             ai_state: Mutex::new(None),
             ai_init_lock: TokioMutex::new(()),
             export_task_handle: Mutex::new(None),
+            hdr_result: Arc::new(Mutex::new(None)),
             panorama_result: Arc::new(Mutex::new(None)),
             indexing_task_handle: Mutex::new(None),
             lut_cache: Mutex::new(HashMap::new()),
@@ -2804,6 +2884,7 @@ fn main() {
             get_supported_file_types,
             save_collage,
             stitch_panorama,
+            merge_hdr,
             save_panorama,
             load_and_parse_lut,
             fetch_community_presets,
