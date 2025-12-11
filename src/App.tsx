@@ -114,6 +114,7 @@ import {
   CullingSuggestions,
 } from './components/ui/AppProperties';
 import { ChannelConfig } from './components/adjustments/Curves';
+import HdrModal from './components/modals/HdrModal';
 
 const CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA'; // local dev key
 
@@ -2563,6 +2564,26 @@ function App() {
     }
   };
 
+  const handleSaveHdr = async (): Promise<string> => {
+    if (hdrModalState.stitchingSourcePaths.length === 0) {
+      const err = 'Source paths for HDR not found.';
+      setHdrModalState((prev: HdrModalState) => ({ ...prev, error: err }));
+      throw new Error(err);
+    }
+
+    try {
+      const savedPath: string = await invoke(Invokes.SaveHdr, {
+        firstPathStr: hdrModalState.stitchingSourcePaths[0],
+      });
+      await refreshImageList();
+      return savedPath;
+    } catch (err) {
+      console.error('Failed to save HDR image:', err);
+      setHdrModalState((prev: HdrModalState) => ({ ...prev, error: String(err) }));
+      throw err;
+    }
+  }
+
   const handleSaveCollage = async (base64Data: string, firstPath: string): Promise<string> => {
     try {
       const savedPath: string = await invoke(Invokes.SaveCollage, {
@@ -4019,6 +4040,24 @@ function App() {
         }}
         onSave={handleSavePanorama}
         progressMessage={panoramaModalState.progressMessage}
+      />
+      <HdrModal         error={hdrModalState.error}
+                        finalImageBase64={hdrModalState.finalImageBase64}
+                        isOpen={hdrModalState.isOpen}
+                        onClose={() =>
+                          setHdrModalState({
+                            isOpen: false,
+                            progressMessage: '',
+                            finalImageBase64: null,
+                            error: null,
+                            stitchingSourcePaths: [],
+                          })
+                        }
+                        onOpenFile={(path: string) => {
+                          handleImageSelect(path);
+                        }}
+                        onSave={handleSaveHdr}
+                        progressMessage={hdrModalState.progressMessage}
       />
       <CreateFolderModal
         isOpen={isCreateFolderModalOpen}

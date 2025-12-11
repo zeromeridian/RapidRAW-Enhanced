@@ -38,15 +38,16 @@ use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
+use exif::{Exif, In, Tag};
 use image::codecs::jpeg::JpegEncoder;
 use image::{
     DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, Rgb, RgbImage, Rgba,
     RgbaImage, imageops,
 };
 use image_hdr::exif::{get_exif_data, get_exposures, get_gains};
-use image_hdr::hdr_merge_images;
 use image_hdr::input::HDRInput;
 use image_hdr::stretch::apply_histogram_stretch;
+use image_hdr::{Error, hdr_merge_images};
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;
@@ -2369,7 +2370,7 @@ async fn merge_hdr(
 
     let hdr_result_handle = state.hdr_result.clone();
 
-    let images : Vec<HDRInput> = paths
+    let images: Vec<HDRInput> = paths
         .iter()
         .map(|path| {
             let _ = app_handle.emit(
@@ -2384,20 +2385,36 @@ async fn merge_hdr(
             );
             println!("  - Processing '{}'", path);
 
-            let file_bytes =
-                fs::read(path).map_err(|e| format!("Failed to read image {}: {}", path, e)).unwrap();
+            let file_bytes = fs::read(path)
+                .map_err(|e| format!("Failed to read image {}: {}", path, e))
+                .unwrap();
             let dynamic_image =
-                crate::image_loader::load_base_image_from_bytes(&file_bytes, path, false)
-                    .map_err(|e| format!("Failed to load image {}: {}", path, e)).unwrap();
+                crate::image_loader::load_base_image_from_bytes(&file_bytes, path, false, 2.5)
+                    .map_err(|e| format!("Failed to load image {}: {}", path, e))
+                    .unwrap();
 
-            println!("Read image with dimensions: {}x{}", dynamic_image.width(), dynamic_image.height());
+            println!(
+                "Read image with dimensions: {}x{}",
+                dynamic_image.width(),
+                dynamic_image.height()
+            );
 
-            let exif = get_exif_data(&file_bytes).unwrap();
-            println!("Read image with exif:");
-            let gains = get_gains(&exif).unwrap_or(1.0);
-            println!("Read image with gains: {}x{}", gains, dynamic_image.width());
-            let exposure = get_exposures(&exif).unwrap_or(1.0);
-            println!("Read image with exposures: {}x{}", exposure, dynamic_image.width());
+            let (gains, exposure) = match get_exif_data(&file_bytes) {
+                Ok(exif) => {
+                    let gains = get_gains(&exif).unwrap_or(1.0);
+                    println!("Read image with gains: {}x{}", gains, dynamic_image.width());
+                    let exposure = get_exposures(&exif).unwrap_or(1.0);
+                    println!(
+                        "Read image with exposures: {}x{}",
+                        exposure,
+                        dynamic_image.width()
+                    );
+                    (gains, exposure)
+                }
+                Err(_) => {
+                    (1.0, 1.0) // TODO
+                }
+            };
 
             HDRInput::with_image(&dynamic_image, Duration::from_secs_f32(exposure), gains).unwrap()
         })
@@ -2416,12 +2433,11 @@ async fn merge_hdr(
     let mut buf = Cursor::new(Vec::new());
 
     if let Err(e) = stretched.write_to(&mut buf, ImageFormat::Png) {
-        return Err(format!("Failed to encode panorama preview: {}", e));
+        return Err(format!("Failed to encode hdr preview: {}", e));
     }
 
     let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
     let final_base64 = format!("data:image/png;base64,{}", base64_str);
-
 
     let _ = app_handle.emit("hdr-progress", "Creating preview...");
 
