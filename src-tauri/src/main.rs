@@ -2432,7 +2432,8 @@ async fn merge_hdr(
 
     let mut buf = Cursor::new(Vec::new());
 
-    if let Err(e) = stretched.write_to(&mut buf, ImageFormat::Png) {
+    if let Err(e) = stretched.to_rgb8().write_to(&mut buf, ImageFormat::Png) {
+        // to_rgb8() is not nice but hdr preview as png
         return Err(format!("Failed to encode hdr preview: {}", e));
     }
 
