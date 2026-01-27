@@ -30,7 +30,7 @@ dependencies = [
  "memmap2",
  "mimalloc",
  "nalgebra 0.34.1",
- "ndarray 0.15.6",
+ "ndarray",
  "num_cpus",
  "once_cell",
  "ort",
@@ -2976,7 +2976,7 @@ checksum = "0f401958e284ad5c7a124aa8cbd83e8072e91f7c04ca48c77e1f55d9b660206d"
 dependencies = [
  "image",
  "kamadak-exif",
- "ndarray 0.16.1",
+ "ndarray",
  "rayon",
  "thiserror 2.0.17",
 ]
@@ -4057,21 +4057,6 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "rawpointer",
-]
-
-[[package]]
-name = "ndarray"
-version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "882ed72dce9365842bf196bdeedf5055305f11fc8c03dee7bb0194a6cad34841"
-dependencies = [
- "matrixmultiply",
- "num-complex",
- "num-integer",
- "num-traits",
- "portable-atomic",
- "portable-atomic-util",
- "rawpointer",
  "rayon",
 ]
 
@@ -4653,7 +4638,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fa7e49bd669d32d7bc2a15ec540a527e7764aec722a45467814005725bcd721"
 dependencies = [
  "libloading 0.8.9",
- "ndarray 0.15.6",
+ "ndarray",
  "ort-sys",
  "smallvec 2.0.0-alpha.10",
  "tracing",

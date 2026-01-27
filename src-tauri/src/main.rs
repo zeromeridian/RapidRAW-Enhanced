@@ -30,14 +30,15 @@ use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
+use std::io::Write;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::thread;
-use std::io::Write;
 use std::sync::Mutex;
-use std::sync::mpsc::{self, Sender, Receiver};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread;
 use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose};
@@ -54,7 +55,7 @@ use image_hdr::stretch::apply_histogram_stretch;
 use image_hdr::{Error, hdr_merge_images};
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
-use imageproc::hough::{detect_lines, LineDetectionOptions};
+use imageproc::hough::{LineDetectionOptions, detect_lines};
 use rayon::prelude::*;
 use reqwest;
 use serde::{Deserialize, Serialize};
@@ -70,18 +71,16 @@ use crate::ai_processing::{
     generate_image_embeddings, get_or_init_ai_models, run_sam_decoder, run_sky_seg_model,
     run_u2netp_model,
 };
-use crate::file_management::{
-    AppSettings, load_settings, parse_virtual_path,
-    read_file_mapped,
-};
+use crate::file_management::{AppSettings, load_settings, parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::image_loader::{
     composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
 };
 use crate::image_processing::{
-    Crop, GpuContext, ImageMetadata, apply_coarse_rotation, apply_crop, apply_flip, apply_rotation,
-    get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image, apply_unwarp_geometry,
-    downscale_f32_image, apply_cpu_default_raw_processing, GeometryParams, warp_image_geometry, apply_geometry_warp
+    Crop, GeometryParams, GpuContext, ImageMetadata, apply_coarse_rotation,
+    apply_cpu_default_raw_processing, apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
+    apply_unwarp_geometry, downscale_f32_image, get_all_adjustments_from_json,
+    get_or_init_gpu_context, process_and_get_dynamic_image, warp_image_geometry,
 };
 use crate::lut_processing::Lut;
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
@@ -2888,17 +2887,31 @@ async fn merge_hdr(
             let (gains, exposure) = match get_exif_data(&file_bytes) {
                 Ok(exif) => {
                     let gains = get_gains(&exif).unwrap_or(1.0);
-                    println!("Read image with gains: {}x{}", gains, dynamic_image.width());
+                    println!("Read image with gains: {}", gains);
                     let exposure = get_exposures(&exif).unwrap_or(1.0);
                     println!(
-                        "Read image with exposures: {}x{}",
-                        exposure,
-                        dynamic_image.width()
+                        "Read image with exposure: {}",
+                        exposure
                     );
                     (gains, exposure)
                 }
                 Err(_) => {
-                    (1.0, 1.0) // TODO
+                    let exif = exif_processing::read_exif_data(&path, &file_bytes);
+
+                    let gains = match exif.get("PhotographicSensitivity") {
+                        None => 1.0,
+                        Some(gains) => f32::from_str(gains).unwrap_or_else(|_| 1.0),
+                    };
+                    println!("Read image with gains: {}", gains);
+                    let exposure = match exif.get("ExposureTime") {
+                        None => 1.0,
+                        Some(exposure) => parse_exposure_time(exposure).unwrap_or_else(|_| 1.0),
+                    };
+                    println!(
+                        "Read image with exposure: {}",
+                        exposure
+                    );
+                    (gains, exposure)
                 }
             };
 
@@ -2937,6 +2950,38 @@ async fn merge_hdr(
         }),
     );
     Ok(())
+}
+
+fn parse_exposure_time(input: &str) -> Result<f32, String> {
+    // 1. Remove units like "s", "sec", or whitespace
+    let cleaned: String = input
+        .chars()
+        .filter(|c| c.is_numeric() || *c == '/' || *c == '.')
+        .collect();
+
+    if cleaned.is_empty() {
+        return Err("No numeric data found".to_string());
+    }
+
+    // 2. Handle fractional format
+    if cleaned.contains('/') {
+        let parts: Vec<&str> = cleaned.split('/').collect();
+        if parts.len() == 2 {
+            let num = parts[0].parse::<f32>().map_err(|_| "Invalid numerator")?;
+            let den = parts[1].parse::<f32>().map_err(|_| "Invalid denominator")?;
+
+            if den == 0.0 {
+                return Err("Division by zero".to_string());
+            }
+            Ok(num / den)
+        } else {
+            Err("Invalid fraction format".to_string())
+        }
+    } else {
+        // 3. Handle decimal format
+        cleaned.parse::<f32>()
+            .map_err(|_| format!("Could not parse '{}' as f32", cleaned))
+    }
 }
 
 #[tauri::command]
@@ -3241,10 +3286,7 @@ fn setup_logging(app_handle: &tauri::AppHandle) {
 
 #[tauri::command]
 fn get_log_file_path(app_handle: tauri::AppHandle) -> Result<String, String> {
-    let log_dir = app_handle
-        .path()
-        .app_log_dir()
-        .map_err(|e| e.to_string())?;
+    let log_dir = app_handle.path().app_log_dir().map_err(|e| e.to_string())?;
     let log_file_path = log_dir.join("app.log");
     Ok(log_file_path.to_string_lossy().to_string())
 }
