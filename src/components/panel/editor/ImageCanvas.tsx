@@ -33,12 +33,12 @@ interface ImageCanvasProps {
   finalPreviewUrl: string | null;
   handleCropComplete(c: Crop, cp: PercentCrop): void;
   imageRenderSize: RenderSize;
-  isAdjusting: boolean;
   isAiEditing: boolean;
   isCropping: boolean;
   isMaskControlHovered: boolean;
   isMasking: boolean;
   isStraightenActive: boolean;
+  isRotationActive?: boolean;
   maskOverlayUrl: string | null;
   onGenerateAiMask(id: string | null, start: Coord, end: Coord): void;
   onQuickErase(subMaskId: string | null, startPoint: Coord, endpoint: Coord): void;
@@ -78,20 +78,52 @@ interface MaskOverlay {
   subMask: SubMask;
 }
 
-const ORIGINAL_LAYER = 'original';
+const CustomGrid = ({ 
+  denseVisible, 
+  ruleOfThirdsVisible 
+}: { 
+  denseVisible: boolean; 
+  ruleOfThirdsVisible: boolean; 
+}) => (
+  <div className="absolute inset-0 pointer-events-none w-full h-full">
 
-function linesIntersect(eraserLine: DrawnLine, drawnLine: DrawnLine) {
-  const threshold = eraserLine.brushSize / 2 + drawnLine.brushSize / 2;
-  for (const p1 of eraserLine.points) {
-    for (const p2 of drawnLine.points) {
-      const distance = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
-      if (distance < threshold) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
+    <div 
+      className={clsx(
+        "absolute inset-0 w-full h-full transition-opacity duration-300 ease-in-out",
+        ruleOfThirdsVisible ? "opacity-100" : "opacity-0"
+      )}
+    >
+       <div className="absolute top-0 bottom-0 border-l border-white/40 left-1/3" />
+       <div className="absolute top-0 bottom-0 border-l border-white/40 left-2/3" />
+       <div className="absolute left-0 right-0 border-t border-white/40 top-1/3" />
+       <div className="absolute left-0 right-0 border-t border-white/40 top-2/3" />
+    </div>
+
+    <div 
+      className={clsx(
+        "absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out",
+        denseVisible ? "opacity-100" : "opacity-0"
+      )}
+    >
+       {[...Array(17)].map((_, i) => (
+         <div 
+           key={`v-${i}`} 
+           className="absolute top-0 bottom-0 border-l border-white/40" 
+           style={{ left: `${(i + 1) * 5.555}%` }} 
+         />
+       ))}
+       {[...Array(17)].map((_, i) => (
+         <div 
+           key={`h-${i}`} 
+           className="absolute left-0 right-0 border-t border-white/40" 
+           style={{ top: `${(i + 1) * 5.555}%` }} 
+         />
+       ))}
+    </div>
+  </div>
+);
+
+const ORIGINAL_LAYER = 'original';
 
 const MaskOverlay = memo(
   ({
@@ -263,16 +295,13 @@ const MaskOverlay = memo(
         <Group onClick={handleSelect} onTap={handleSelect}>
           {lines.map((line: DrawnLine, i: number) => (
             <Line
-              dash={[4, 4]}
               hitStrokeWidth={line.brushSize * scale}
               key={i}
               lineCap="round"
               lineJoin="round"
-              opacity={isSelected ? 1 : 0.7}
               points={line.points.flatMap((p: Coord) => [(p.x - cropX) * scale, (p.y - cropY) * scale])}
-              stroke={isSelected ? '#0ea5e9' : subMask.mode === SubMaskMode.Subtractive ? '#f43f5e' : 'white'}
+              stroke="transparent"
               strokeScaleEnabled={false}
-              strokeWidth={isSelected ? 3 : 2}
               tension={0.5}
             />
           ))}
@@ -473,12 +502,12 @@ const ImageCanvas = memo(
     finalPreviewUrl,
     handleCropComplete,
     imageRenderSize,
-    isAdjusting,
     isAiEditing,
     isCropping,
     isMaskControlHovered,
     isMasking,
     isStraightenActive,
+    isRotationActive,
     maskOverlayUrl,
     onGenerateAiMask,
     onQuickErase,
@@ -504,8 +533,11 @@ const ImageCanvas = memo(
     const cropImageRef = useRef<HTMLImageElement>(null);
     const imagePathRef = useRef<string | null>(null);
     const latestEditedUrlRef = useRef<string | null>(null);
+    const [displayedMaskUrl, setDisplayedMaskUrl] = useState<string | null>(null);
+    const [maskOpacity, setMaskOpacity] = useState(0);
 
     const isDrawing = useRef(false);
+    const drawingStageRef = useRef<any>(null);
     const currentLine = useRef<DrawnLine | null>(null);
     const [previewLine, setPreviewLine] = useState<DrawnLine | null>(null);
     const [cursorPreview, setCursorPreview] = useState<CursorPreview>({ x: 0, y: 0, visible: false });
@@ -547,6 +579,34 @@ const ImageCanvas = memo(
       (isMasking || isAiEditing) &&
       (activeSubMask?.type === Mask.AiSubject || activeSubMask?.type === Mask.QuickEraser);
     const isToolActive = isBrushActive || isAiSubjectActive;
+
+    useEffect(() => {
+      if (maskOverlayUrl && (isMasking || isAiEditing)) {
+        setDisplayedMaskUrl(maskOverlayUrl);
+        requestAnimationFrame(() => {
+          setMaskOpacity(1);
+        });
+      } else {
+        setMaskOpacity(0);
+      }
+    }, [maskOverlayUrl, isMasking, isAiEditing]);
+
+    const handleMaskTransitionEnd = useCallback(() => {
+      if (maskOpacity === 0) {
+        setDisplayedMaskUrl(null);
+      }
+    }, [maskOpacity]);
+
+
+    useEffect(() => {
+      if (isToolActive) {
+        return;
+      }
+      isDrawing.current = false;
+      drawingStageRef.current = null;
+      currentLine.current = null;
+      setPreviewLine(null);
+    }, [isToolActive]);
 
     const sortedSubMasks = useMemo(() => {
       if (!activeContainer) {
@@ -620,13 +680,12 @@ const ImageCanvas = memo(
     useEffect(() => {
       const layerToFadeIn = layers.find((l: ImageLayer) => l.opacity === 0);
       if (layerToFadeIn) {
-        const timer = setTimeout(() => {
-          setLayers((prev: Array<ImageLayer>) =>
-            prev.map((l: ImageLayer) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)),
-          );
-        }, 10);
-
-        return () => clearTimeout(timer);
+        const frame = requestAnimationFrame(() => {
+           setLayers((prev: Array<ImageLayer>) =>
+             prev.map((l: ImageLayer) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)),
+           );
+        });
+        return () => cancelAnimationFrame(frame);
       }
     }, [layers]);
 
@@ -656,43 +715,45 @@ const ImageCanvas = memo(
       const pointerPos = stage.getPointerPosition();
       if (!pointerPos) return;
 
-      const x = (pointerPos.x - imageRenderSize.offsetX) / imageRenderSize.scale;
-      const y = (pointerPos.y - imageRenderSize.offsetY) / imageRenderSize.scale;
+      const x = pointerPos.x / imageRenderSize.scale;
+      const y = pointerPos.y / imageRenderSize.scale;
 
-      const imgWidth = imageRenderSize.width / imageRenderSize.scale;
-      const imgHeight = imageRenderSize.height / imageRenderSize.scale;
+      const imgLogicalWidth = imageRenderSize.width / imageRenderSize.scale;
+      const imgLogicalHeight = imageRenderSize.height / imageRenderSize.scale;
       
-      if (x < 0 || x > imgWidth || y < 0 || y > imgHeight) return;
+      if (x < 0 || x > imgLogicalWidth || y < 0 || y > imgLogicalHeight) return;
 
       const img = new Image();
       img.crossOrigin = "Anonymous";
       img.src = finalPreviewUrl;
       
       img.onload = () => {
+        const radius = 5;
+        const side = radius * 2 + 1;
+
         const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
+        canvas.width = side;
+        canvas.height = side;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (!ctx) return;
 
-        ctx.drawImage(img, 0, 0);
-
-        const scaleX = img.width / imgWidth;
-        const scaleY = img.height / imgHeight;
+        const scaleX = img.width / imgLogicalWidth;
+        const scaleY = img.height / imgLogicalHeight;
         const srcX = Math.floor(x * scaleX);
         const srcY = Math.floor(y * scaleY);
 
-        const radius = 5; 
         const startX = Math.max(0, srcX - radius);
         const startY = Math.max(0, srcY - radius);
         const endX = Math.min(img.width, srcX + radius + 1);
         const endY = Math.min(img.height, srcY + radius + 1);
-        const w = endX - startX;
-        const h = endY - startY;
+        const sw = endX - startX;
+        const sh = endY - startY;
 
-        if (w <= 0 || h <= 0) return;
+        if (sw <= 0 || sh <= 0) return;
 
-        const imageData = ctx.getImageData(startX, startY, w, h);
+        ctx.drawImage(img, startX, startY, sw, sh, 0, 0, sw, sh);
+
+        const imageData = ctx.getImageData(0, 0, sw, sh);
         const data = imageData.data;
         
         let rTotal = 0, gTotal = 0, bTotal = 0;
@@ -704,6 +765,8 @@ const ImageCanvas = memo(
           bTotal += data[i + 2];
           count++;
         }
+
+        if (count === 0) return;
 
         const avgR = rTotal / count;
         const avgG = gTotal / count;
@@ -740,13 +803,17 @@ const ImageCanvas = memo(
 
         if (isToolActive) {
           e.evt.preventDefault();
-          isDrawing.current = true;
           const stage = e.target.getStage();
           const pos = stage.getPointerPosition();
           if (!pos) {
+            isDrawing.current = false;
+            currentLine.current = null;
+            setPreviewLine(null);
             return;
           }
 
+          isDrawing.current = true;
+          drawingStageRef.current = stage;
           const toolType = isAiSubjectActive ? ToolType.AiSeletor : ToolType.Brush;
 
           const newLine: DrawnLine = {
@@ -776,9 +843,19 @@ const ImageCanvas = memo(
           return;
         }
 
-        if (isToolActive) {
+        let pos;
+        if (e && typeof e.target?.getStage === 'function') {
           const stage = e.target.getStage();
-          const pos = stage.getPointerPosition();
+          pos = stage.getPointerPosition();
+        } else if (e && e.clientX != null && e.clientY != null) {
+          const stage = drawingStageRef.current;
+          if (stage) {
+            stage.setPointersPositions(e);
+            pos = stage.getPointerPosition();
+          }
+        }
+
+        if (isToolActive) {
           if (pos) {
             setCursorPreview({ x: pos.x, y: pos.y, visible: true });
           } else {
@@ -790,8 +867,6 @@ const ImageCanvas = memo(
           return;
         }
 
-        const stage = e.target.getStage();
-        const pos = stage.getPointerPosition();
         if (!pos) {
           return;
         }
@@ -818,6 +893,7 @@ const ImageCanvas = memo(
       const line = currentLine.current;
       currentLine.current = null;
       setPreviewLine(null);
+      drawingStageRef.current = null;
 
       if (!wasDrawing || !line) {
         return;
@@ -861,23 +937,12 @@ const ImageCanvas = memo(
 
         const existingLines = activeSubMask.parameters.lines || [];
 
-        if (brushSettings?.tool === ToolType.Eraser) {
-          const remainingLines = existingLines.filter(
-            (drawnLine: DrawnLine) => !linesIntersect(imageSpaceLine, drawnLine),
-          );
-          if (remainingLines.length !== existingLines.length) {
-            updateSubMask(activeId, {
-              parameters: { ...activeSubMask.parameters, lines: remainingLines },
-            });
-          }
-        } else {
-          updateSubMask(activeId, {
-            parameters: {
-              ...activeSubMask.parameters,
-              lines: [...existingLines, imageSpaceLine],
-            },
-          });
-        }
+        updateSubMask(activeId, {
+          parameters: {
+            ...activeSubMask.parameters,
+            lines: [...existingLines, imageSpaceLine],
+          },
+        });
       }
     }, [
       activeAiSubMaskId,
@@ -902,10 +967,29 @@ const ImageCanvas = memo(
 
     const handleMouseLeave = useCallback(() => {
       setCursorPreview((p: CursorPreview) => ({ ...p, visible: false }));
-      if (isDrawing.current) {
+    }, []);
+
+    useEffect(() => {
+      if (!isToolActive) return;
+      function onMove(e: MouseEvent) {
+        if (!isDrawing.current) {
+          return;
+        }
+        handleMouseMove(e);
+      }
+      function onUp() {
+        if (!isDrawing.current) {
+          return;
+        }
         handleMouseUp();
       }
-    }, [handleMouseUp]);
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+      return () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      };
+    }, [isToolActive, handleMouseMove, handleMouseUp]);
 
     const handleStraightenMouseDown = (e: any) => {
       if (e.evt.button !== 0) {
@@ -1026,14 +1110,10 @@ const ImageCanvas = memo(
 
     const cropImageTransforms = useMemo(() => {
       const transforms = [`rotate(${adjustments.rotation || 0}deg)`];
-      if (adjustments.flipHorizontal) {
-        transforms.push('scaleX(-1)');
-      }
-      if (adjustments.flipVertical) {
-        transforms.push('scaleY(-1)');
-      }
       return transforms.join(' ');
     }, [adjustments.rotation, adjustments.flipHorizontal, adjustments.flipVertical]);
+
+    const showCustomGrid = isRotationActive || isStraightenActive;
 
     return (
       <div className="relative" style={{ width: '100%', height: '100%' }}>
@@ -1045,9 +1125,7 @@ const ImageCanvas = memo(
           }}
         >
           <div
-            className={clsx(
-              isAdjusting && !showOriginal ? 'opacity-90' : 'opacity-100',
-            )}
+            className="opacity-100"
             style={{
               height: '100%',
               opacity: isContentReady ? 1 : 0,
@@ -1066,8 +1144,8 @@ const ImageCanvas = memo(
                     src={layer.url}
                     style={{
                       opacity: layer.opacity,
-                      transition: 'opacity 150ms ease-in-out',
-                      willChange: 'opacity',
+                      transition: 'opacity 100ms linear',
+                      willChange: 'opacity, transform',
                       imageRendering: 'high-quality',
                       WebkitImageRendering: 'high-quality',
                       transform: 'translateZ(0)',
@@ -1076,18 +1154,19 @@ const ImageCanvas = memo(
                   />
                 ) : null,
               )}
-              {(isMasking || isAiEditing) && maskOverlayUrl && (
+              {displayedMaskUrl && (
                 <img
                   alt="Mask Overlay"
                   className="absolute object-contain pointer-events-none"
-                  src={maskOverlayUrl}
+                  src={displayedMaskUrl}
                   decoding="async"
+                  onTransitionEnd={handleMaskTransitionEnd}
                   style={{
                     height: `${imageRenderSize.height}px`,
                     left: `${imageRenderSize.offsetX}px`,
-                    opacity: showOriginal || isMaskControlHovered ? 0 : 1,
+                    opacity: showOriginal || isMaskControlHovered ? 0 : maskOpacity,
                     top: `${imageRenderSize.offsetY}px`,
-                    transition: 'opacity 125ms ease-in-out',
+                    transition: 'opacity 200ms ease-in-out',
                     width: `${imageRenderSize.width}px`,
                   }}
                 />
@@ -1178,7 +1257,13 @@ const ImageCanvas = memo(
                 crop={crop}
                 onChange={setCrop}
                 onComplete={handleCropComplete}
-                ruleOfThirds={!isStraightenActive}
+                ruleOfThirds={false}
+                renderSelectionAddon={() => (
+                  <CustomGrid
+                    denseVisible={isRotationActive && !isStraightenActive}
+                    ruleOfThirdsVisible={!isStraightenActive} 
+                  />
+                )}
               >
                 <img
                   alt="Crop preview"

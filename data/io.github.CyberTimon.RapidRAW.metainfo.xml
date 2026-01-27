@@ -22,14 +22,14 @@
       RapidRAW is a modern, high-performance alternative to Adobe Lightroom®. It delivers a simple, beautiful editing experience in a lightweight package (under 20MB) for Windows, macOS, and Linux.
     </p>
     <p>
-      I developed this project as a personal challenge at the age of 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of both React and Rust, with the support from Google Gemini.
+      I started developing this project as a personal challenge when I was 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of React, WGSL and Rust, with the support from Google Gemini.
     </p>
   </description>
 
   <launchable type="desktop-id">io.github.CyberTimon.RapidRAW.desktop</launchable>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/CyberTimon/RapidRAW/refs/tags/v1.4.2/.github/assets/editor.png</image>
+      <image>https://raw.githubusercontent.com/CyberTimon/RapidRAW/2f7c0354580bbd403287a924e2a7fce9f2cdfc40/.github/assets/editor.png</image>
         <caption>Editor interface</caption>
     </screenshot>
   </screenshots>
@@ -38,6 +38,87 @@
   <url type="homepage">https://github.com/CyberTimon/RapidRAW</url>
 
   <releases>
+    <release version="v1.4.10" date="2026-01-26">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.4.10</url>
+        <description translate="no">
+            <p>New Features</p>
+            <ul>
+                <li>Reworked Local Contrast: A completely new shader approach for sharpness, clarity, and structure that eliminates "black hole" artifacts around high-contrast edges.</li>
+                <li>Fine Rotation Grid: The rotation and transform grid now dynamically transitions from the rule of thirds to a high-precision fine grid for better alignment accuracy.</li>
+                <li>Favourite Lenses: Frequently used lenses can now be saved in settings for quick access within the Lens Correction panel.</li>
+                <li>Improved Lens Correction: Enhanced the mathematical accuracy of lens profile applications based on initial testing and feedback.</li>
+            </ul>
+            <p>Core Improvements</p>
+            <ul>
+                <li>Fixed quick eraser functionality.</li>
+                <li>Improved contrast for the sepia UI theme.</li>
+            </ul>
+        </description>
+    </release>
+    <release version="v1.4.9" date="2026-01-25">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.4.9</url>
+        <description translate="no">
+            <p>New Features</p>
+            <ul>
+                <li>Lens Correction: Integrated the Lensfun library for dedicated corrections of optical flaws.</li>
+                <li>Geometry Warping Tools: Added a dedicated transform modal to fix perspective and composition with dynamic alignment guides.</li>
+                <li>Refactored Masking System: Rebuilt the masking panel to support sequential masking, drag-and-drop reordering, and individual component opacity.</li>
+                <li>Export Presets: Added a manager to save and reuse export settings like quality and dimensions.</li>
+                <li>AI Infrastructure: Migrated to a dedicated middleware client (RapidRAW-AI-Connector) for more robust and flexible generative AI integration.</li>
+                <li>Improved Large Library Performance: The filmstrip now uses virtualized rendering, significantly speeding up navigation in folders with thousands of images.</li>
+                <li>Centralized EXIF: Refactored metadata handling for better consistency and added support for formats like .RAF, .CR3 and more.</li>
+            </ul>
+            <p>Core Improvements</p>
+            <ul>
+                <li>Implemented library preloading to reduce image loading times.</li>
+                <li>Improved UI contrast and standardized slider styles across the application.</li>
+                <li>Updated the Rawler library for improved camera support.</li>
+                <li>General stability improvements and "under the hood" code cleanup.</li>
+            </ul>
+        </description>
+    </release>
+    <release version="v1.4.8" date="2026-01-11">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.4.8</url>
+        <description translate="no">
+            <p>New Features</p>
+            <ul>
+                <li>Live Previews: See changes in near real-time as you drag sliders, thanks to a large rewrite of the GPU processing engine. The old behavior can be restored in settings for less powerful machines.</li>
+                <li>Updated Collage Maker: Completely overhauled with drag &amp; drop placement, an option to keep aspect ratios, and zoom &amp; pan controls within each cell.</li>
+                <li>LUT Quality Improvement: Implemented tetrahedral interpolation to eliminate banding and posterization artifacts, ensuring smooth color transitions even with low-resolution LUTs.</li>
+            </ul>
+            <p>Core Improvements</p>
+            <ul>
+                <li>Added a separate preview worker and optional high-quality live previews.</li>
+                <li>Enhanced EXIF UI with more info when hovering over the image name.</li>
+                <li>Added a 'Prefer RAW' filter option to the library.</li>
+                <li>Added support for uppercase file extensions.</li>
+                <li>The thumbnail cache is now flushed when switching folders.</li>
+                <li>AI masking stability improvements under load.</li>
+                <li>Updated the Rawler library.</li>
+            </ul>
+        </description>
+    </release>
+    <release version="v1.4.7" date="2025-12-23">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.4.7</url>
+        <description translate="no">
+            <p>New Features</p>
+            <ul>
+                <li>Image Denoising: Implemented the BM3D algorithm for effective noise removal while preserving actual image detail.</li>
+                <li>White Balance Picker: Added a pipette tool to pick a neutral reference point and automatically set the correct temperature and tint.</li>
+                <li>Reworked Metadata Handling: Hovering over the file name now displays key shooting data. EXIF data is now reliably written to the file during export.</li>
+                <li>Reworked Grain: A new film grain engine that generates natural monochromatic noise without RGB color noise or grid patterns.</li>
+                <li>Delete Workflow Improvements: Deleting an image no longer forces the library list to reload, making culling significantly smoother.</li>
+            </ul>
+            <p>Core Improvements</p>
+            <ul>
+                <li>Exposure slider added to masking tools.</li>
+                <li>Improved mask eraser tool behavior.</li>
+                <li>Batch export stability improvements and RAM optimization.</li>
+                <li>New export option added directly to the context menu.</li>
+                <li>Updated dark mode wallpaper.</li>
+            </ul>
+        </description>
+    </release>
     <release version="v1.4.6" date="2025-11-30">
         <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.4.6</url>
         <description translate="no">

@@ -40,7 +40,7 @@ import {
   ThumbnailAspectRatio,
 } from '../ui/AppProperties';
 import { Color, COLOR_LABELS } from '../../utils/adjustments';
-import { ImportState, Status } from './right/ExportImportProperties';
+import { ImportState, Status } from '../ui/ExportImportProperties';
 
 interface DropdownMenuProps {
   buttonContent: any;
@@ -191,6 +191,7 @@ const rawStatusOptions: Array<KeyValueLabel> = [
   { key: RawStatus.All, label: 'All Types' },
   { key: RawStatus.RawOnly, label: 'RAW Only' },
   { key: RawStatus.NonRawOnly, label: 'Non-RAW Only' },
+  { key: RawStatus.RawOverNonRaw, label: 'Prefer RAW' },
 ];
 
 const thumbnailSizeOptions: Array<ThumbnailSizeOption> = [
@@ -936,7 +937,6 @@ function Thumbnail({
       }}
       onContextMenu={onContextMenu}
       onDoubleClick={() => onImageDoubleClick(path)}
-      title={path.split(/[\\/]/).pop()}
     >
       {layers.length > 0 && (
         <div className="absolute inset-0 w-full h-full">
@@ -1160,6 +1160,12 @@ export default function MainLibrary({
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
   const loadedThumbnailsRef = useRef(new Set<string>());
 
+  const prevScrollState = useRef({
+    path: null as string | null,
+    top: -1,
+    folder: null as string | null,
+  });
+
   const groups = useMemo(() => {
     if (libraryViewMode === LibraryViewMode.Flat) return null;
     return groupImagesByFolder(imageList, currentFolderPath);
@@ -1232,23 +1238,38 @@ export default function MainLibrary({
     }
 
     if (found && outerRef.current) {
-      const element = outerRef.current;
-      const clientHeight = element.clientHeight;
-      const scrollTop = element.scrollTop;
-      const itemBottom = targetTop + rowHeight;
-      const SCROLL_OFFSET = 120;
+      const prev = prevScrollState.current;
 
-      if (itemBottom > scrollTop + clientHeight) {
-        element.scrollTo({
-          top: itemBottom - clientHeight + SCROLL_OFFSET,
-          behavior: 'smooth',
-        });
-      }
-      else if (targetTop < scrollTop) {
-        element.scrollTo({
-          top: targetTop - SCROLL_OFFSET,
-          behavior: 'smooth',
-        });
+      const shouldScroll = 
+        activePath !== prev.path || 
+        Math.abs(targetTop - prev.top) > 1 || 
+        currentFolderPath !== prev.folder;
+
+      if (shouldScroll) {
+        const element = outerRef.current;
+        const clientHeight = element.clientHeight;
+        const scrollTop = element.scrollTop;
+        const itemBottom = targetTop + rowHeight;
+        const SCROLL_OFFSET = 120;
+
+        if (itemBottom > scrollTop + clientHeight) {
+          element.scrollTo({
+            top: itemBottom - clientHeight + SCROLL_OFFSET,
+            behavior: 'smooth',
+          });
+        }
+        else if (targetTop < scrollTop) {
+          element.scrollTo({
+            top: targetTop - SCROLL_OFFSET,
+            behavior: 'smooth',
+          });
+        }
+
+        prevScrollState.current = {
+          path: activePath,
+          top: targetTop,
+          folder: currentFolderPath
+        };
       }
     }
   }, [activePath, imageList, libraryViewMode, thumbnailSize, currentFolderPath, multiSelectedPaths.length]);

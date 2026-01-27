@@ -1,4 +1,5 @@
 import React from 'react';
+import { ExportPreset } from './ExportImportProperties';
 import { Adjustments, Color } from '../../utils/adjustments';
 import { ToolType } from '../panel/right/Masks';
 
@@ -10,10 +11,11 @@ export enum Invokes {
   ApplyAdjustments = 'apply_adjustments',
   ApplyAdjustmentsToPaths = 'apply_adjustments_to_paths',
   ApplyAutoAdjustmentsToPaths = 'apply_auto_adjustments_to_paths',
+  ApplyDenoising = 'apply_denoising',
   BatchExportImages = 'batch_export_images',
   CalculateAutoAdjustments = 'calculate_auto_adjustments',
   CancelExport = 'cancel_export',
-  CheckComfyuiStatus = 'check_comfyui_status',
+  CheckAIConnectorStatus = 'check_ai_connector_status',
   ClearAllSidecars = 'clear_all_sidecars',
   ClearAiTags = 'clear_ai_tags',
   ClearAllTags = 'clear_all_tags',
@@ -39,6 +41,7 @@ export enum Invokes {
   GenerateUncroppedPreview = 'generate_uncropped_preview',
   GenerateWaveform = 'image_processing::generate_waveform',
   GetFolderTree = 'get_folder_tree',
+  GetLogFilePath = 'get_log_file_path',
   GetPinnedFolderTrees = 'get_pinned_folder_trees',
   GetSupportedFileTypes = 'get_supported_file_types',
   HandleExportPresetsToFile = 'handle_export_presets_to_file',
@@ -61,6 +64,7 @@ export enum Invokes {
   ResetAdjustmentsForPaths = 'reset_adjustments_for_paths',
   SaveMetadataAndUpdateThumbnail = 'save_metadata_and_update_thumbnail',
   SaveCollage = 'save_collage',
+  SaveDenoisedImage = 'save_denoised_image',
   SavePanorama = 'save_panorama',
   SaveHdr = 'save_hdr',
   SavePresets = 'save_presets',
@@ -70,7 +74,7 @@ export enum Invokes {
   StartBackgroundIndexing = 'start_background_indexing',
   StitchPanorama = 'stitch_panorama',
   MergeHdr = 'merge_hdr',
-  TestComfyuiConnection = 'test_comfyui_connection',
+  TestAIConnectorConnection = 'test_ai_connector_connection',
   UpdateWindowEffect = 'update_window_effect',
   FetchCommunityPresets = 'fetch_community_presets',
   GenerateAllCommunityPreviews = 'generate_all_community_previews',
@@ -92,6 +96,7 @@ export enum RawStatus {
   All = 'all',
   NonRawOnly = 'nonRawOnly',
   RawOnly = 'rawOnly',
+  RawOverNonRaw = 'rawOverNonRaw',
 }
 
 export enum SortDirection {
@@ -115,32 +120,21 @@ export enum ThumbnailAspectRatio {
   Contain = 'contain',
 }
 
-export interface ComfyUIWorkflowConfig {
-  workflowPath: string | null;
-  modelCheckpoints: { [nodeId: string]: string };
-  vaeLoaders: { [nodeId: string]: string };
-  controlnetLoaders: { [nodeId: string]: string };
-  sourceImageNodeId: string;
-  maskImageNodeId: string;
-  textPromptNodeId: string;
-  finalOutputNodeId: string;
-  samplerNodeId: string;
-  samplerSteps: number;
-  inpaintResolution?: number;
-}
-
 export interface AppSettings {
   adaptiveEditorTheme?: Theme;
-  comfyuiAddress?: string;
-  comfyuiWorkflowConfig?: ComfyUIWorkflowConfig;
+  aiConnectorAddress?: string;
   decorations?: any;
   editorPreviewResolution?: number;
+  enableZoomHifi?: boolean;
+  enableLivePreviews?: boolean;
+  enableHighQualityLivePreviews?: boolean;
   enableAiTagging?: boolean;
   enableExifReading?: boolean;
   filterCriteria?: FilterCriteria;
   lastFolderState?: any;
   pinnedFolders?: any;
   lastRootPath: string | null;
+  libraryViewMode?: LibraryViewMode;
   sortCriteria?: SortCriteria;
   theme: Theme;
   thumbnailSize?: ThumbnailSize;
@@ -151,6 +145,8 @@ export interface AppSettings {
   rawHighlightCompression?: number;
   processingBackend?: string;
   linuxGpuOptimization?: boolean;
+  exportPresets?: ExportPreset[];
+  myLenses?: any;
 }
 
 export interface BrushSettings {

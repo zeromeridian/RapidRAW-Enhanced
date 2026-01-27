@@ -276,26 +276,30 @@ fn get_raw_hsl_influence(hue: f32, center: f32, width: f32) -> f32 {
 }
 
 fn hash(p: vec2<f32>) -> f32 {
-    var p_mut = p * mat2x2<f32>(vec2<f32>(127.1, 311.7), vec2<f32>(269.5, 183.3));
-    return fract(sin(p_mut.x + p_mut.y) * 43758.5453123);
+    var p3  = fract(vec3<f32>(p.xyx) * .1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
 }
 
 fn gradient_noise(p: vec2<f32>) -> f32 {
     let i = floor(p);
     let f = fract(p);
-    let u = f * f * (3.0 - 2.0 * f);
-    let grad_00 = (vec2<f32>(hash(i), hash(i + 17.0)) * 2.0 - 1.0);
-    let grad_01 = (vec2<f32>(hash(i + vec2(0.0, 1.0)), hash(i + vec2(0.0, 1.0) + 17.0)) * 2.0 - 1.0);
-    let grad_10 = (vec2<f32>(hash(i + vec2(1.0, 0.0)), hash(i + vec2(1.0, 0.0) + 17.0)) * 2.0 - 1.0);
-    let grad_11 = (vec2<f32>(hash(i + vec2(1.0, 1.0)), hash(i + vec2(1.0, 1.0) + 17.0)) * 2.0 - 1.0);
-    let dot_00 = dot(grad_00, f - vec2(0.0, 0.0));
-    let dot_01 = dot(grad_01, f - vec2(0.0, 1.0));
-    let dot_10 = dot(grad_10, f - vec2(1.0, 0.0));
-    let dot_11 = dot(grad_11, f - vec2(1.0, 1.0));
+    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+
+    let ga = vec2<f32>(hash(i + vec2(0.0, 0.0)), hash(i + vec2(0.0, 0.0) + vec2(11.0, 37.0))) * 2.0 - 1.0;
+    let gb = vec2<f32>(hash(i + vec2(1.0, 0.0)), hash(i + vec2(1.0, 0.0) + vec2(11.0, 37.0))) * 2.0 - 1.0;
+    let gc = vec2<f32>(hash(i + vec2(0.0, 1.0)), hash(i + vec2(0.0, 1.0) + vec2(11.0, 37.0))) * 2.0 - 1.0;
+    let gd = vec2<f32>(hash(i + vec2(1.0, 1.0)), hash(i + vec2(1.0, 1.0) + vec2(11.0, 37.0))) * 2.0 - 1.0;
+    
+    let dot_00 = dot(ga, f - vec2(0.0, 0.0));
+    let dot_10 = dot(gb, f - vec2(1.0, 0.0));
+    let dot_01 = dot(gc, f - vec2(0.0, 1.0));
+    let dot_11 = dot(gd, f - vec2(1.0, 1.0));
+    
     let bottom_interp = mix(dot_00, dot_10, u.x);
     let top_interp = mix(dot_01, dot_11, u.x);
-    let final_interp = mix(bottom_interp, top_interp, u.y);
-    return final_interp;
+    
+    return mix(bottom_interp, top_interp, u.y);
 }
 
 fn dither(coords: vec2<u32>) -> f32 {
@@ -642,16 +646,20 @@ fn apply_local_contrast(
     processed_color_linear: vec3<f32>, 
     blurred_color_input_space: vec3<f32>,
     amount: f32,
-    is_raw: u32
+    is_raw: u32,
+    mode: u32 
 ) -> vec3<f32> {
     if (amount == 0.0) { 
         return processed_color_linear; 
     }
 
     let center_luma = get_luma(processed_color_linear);
-    let shadow_protection = smoothstep(0.0, 0.1, center_luma);
-    let highlight_protection = 1.0 - smoothstep(0.6, 1.0, center_luma);
+
+    let shadow_threshold = select(0.03, 0.1, is_raw == 1u);
+    let shadow_protection = smoothstep(0.0, shadow_threshold, center_luma);
+    let highlight_protection = 1.0 - smoothstep(0.9, 1.0, center_luma);
     let midtone_mask = shadow_protection * highlight_protection;
+    
     if (midtone_mask < 0.001) {
         return processed_color_linear;
     }
@@ -664,16 +672,38 @@ fn apply_local_contrast(
     }
 
     let blurred_luma = get_luma(blurred_color_linear);
-
     let safe_center_luma = max(center_luma, 0.0001);
-    let blurred_color = processed_color_linear * (blurred_luma / safe_center_luma);
+    let safe_blurred_luma = max(blurred_luma, 0.0001);
+
     var final_color: vec3<f32>;
+
     if (amount < 0.0) {
-        final_color = mix(processed_color_linear, blurred_color, -amount);
+        let blurred_color_projected = processed_color_linear * (safe_blurred_luma / safe_center_luma);
+        var blur_amount = -amount;
+        if (mode == 0u) {
+            blur_amount = blur_amount * 0.5;
+        }
+        final_color = mix(processed_color_linear, blurred_color_projected, blur_amount);
     } else {
-        let detail_vector = processed_color_linear - blurred_color;
-        final_color = processed_color_linear + detail_vector * amount * 1.5;
+        let log_ratio = log2(safe_center_luma / safe_blurred_luma);
+        
+        var effective_amount = amount;
+
+        if (mode == 0u) {
+            let edge_magnitude = abs(log_ratio);
+            let normalized_edge = clamp(edge_magnitude / 3.0, 0.0, 1.0);
+            let edge_dampener = 1.0 - pow(normalized_edge, 0.5);
+            
+            effective_amount = amount * edge_dampener * 0.8;
+        } 
+        else {
+            effective_amount = amount;
+        }
+
+        let contrast_factor = exp2(log_ratio * effective_amount);
+        final_color = processed_color_linear * contrast_factor;
     }
+    
     return mix(processed_color_linear, final_color, midtone_mask);
 }
 
@@ -702,7 +732,7 @@ fn apply_centre_local_contrast(
     let clarity_strength = centre_amount * (2.0 * centre_mask - 1.0) * CLARITY_SCALE;
 
     if (abs(clarity_strength) > 0.001) {
-        processed_color = apply_local_contrast(processed_color, blurred_color_srgb, clarity_strength, is_raw);
+        processed_color = apply_local_contrast(processed_color, blurred_color_srgb, clarity_strength, is_raw, 1u);
     }
     
     return processed_color;
@@ -999,6 +1029,76 @@ fn get_mask_influence(mask_index: u32, coords: vec2<u32>) -> f32 {
     }
 }
 
+fn sample_lut_tetrahedral(uv: vec3<f32>) -> vec3<f32> {
+    let dims = vec3<f32>(textureDimensions(lut_texture));
+    let size = dims - vec3<f32>(1.0);
+    let scaled = clamp(uv, vec3<f32>(0.0), vec3<f32>(1.0)) * size;
+    let i_base = floor(scaled);
+    let f = scaled - i_base;
+    let coord0 = vec3<i32>(i_base);
+    let coord1 = min(coord0 + vec3<i32>(1), vec3<i32>(dims) - vec3<i32>(1));
+    let c000 = textureLoad(lut_texture, coord0, 0).rgb;
+    let c111 = textureLoad(lut_texture, coord1, 0).rgb;
+    
+    var res = vec3<f32>(0.0);
+
+    if (f.r > f.g) {
+        if (f.g > f.b) {
+            let c100 = textureLoad(lut_texture, vec3<i32>(coord1.x, coord0.y, coord0.z), 0).rgb;
+            let c110 = textureLoad(lut_texture, vec3<i32>(coord1.x, coord1.y, coord0.z), 0).rgb;
+            
+            res = c000 * (1.0 - f.r) +
+                  c100 * (f.r - f.g) +
+                  c110 * (f.g - f.b) +
+                  c111 * (f.b);
+        } else if (f.r > f.b) {
+            let c100 = textureLoad(lut_texture, vec3<i32>(coord1.x, coord0.y, coord0.z), 0).rgb;
+            let c101 = textureLoad(lut_texture, vec3<i32>(coord1.x, coord0.y, coord1.z), 0).rgb;
+            
+            res = c000 * (1.0 - f.r) +
+                  c100 * (f.r - f.b) +
+                  c101 * (f.b - f.g) +
+                  c111 * (f.g);
+        } else {
+            let c001 = textureLoad(lut_texture, vec3<i32>(coord0.x, coord0.y, coord1.z), 0).rgb;
+            let c101 = textureLoad(lut_texture, vec3<i32>(coord1.x, coord0.y, coord1.z), 0).rgb;
+            
+            res = c000 * (1.0 - f.b) +
+                  c001 * (f.b - f.r) +
+                  c101 * (f.r - f.g) +
+                  c111 * (f.g);
+        }
+    } else {
+        if (f.b > f.g) {
+            let c001 = textureLoad(lut_texture, vec3<i32>(coord0.x, coord0.y, coord1.z), 0).rgb;
+            let c011 = textureLoad(lut_texture, vec3<i32>(coord0.x, coord1.y, coord1.z), 0).rgb;
+            
+            res = c000 * (1.0 - f.b) +
+                  c001 * (f.b - f.g) +
+                  c011 * (f.g - f.r) +
+                  c111 * (f.r);
+        } else if (f.b > f.r) {
+            let c010 = textureLoad(lut_texture, vec3<i32>(coord0.x, coord1.y, coord0.z), 0).rgb;
+            let c011 = textureLoad(lut_texture, vec3<i32>(coord0.x, coord1.y, coord1.z), 0).rgb;
+            
+            res = c000 * (1.0 - f.g) +
+                  c010 * (f.g - f.b) +
+                  c011 * (f.b - f.r) +
+                  c111 * (f.r);
+        } else {
+            let c010 = textureLoad(lut_texture, vec3<i32>(coord0.x, coord1.y, coord0.z), 0).rgb;
+            let c110 = textureLoad(lut_texture, vec3<i32>(coord1.x, coord1.y, coord0.z), 0).rgb;
+            
+            res = c000 * (1.0 - f.g) +
+                  c010 * (f.g - f.r) +
+                  c110 * (f.r - f.b) +
+                  c111 * (f.b);
+        }
+    }
+    
+    return res;
+}
+
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let out_dims = vec2<u32>(textureDimensions(output_texture));
@@ -1041,9 +1141,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let structure_blurred = textureLoad(structure_blur_texture, id.xy, 0).rgb;
     
     var locally_contrasted_rgb = initial_linear_rgb;
-    locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, sharpness_blurred, adjustments.global.sharpness, adjustments.global.is_raw_image);
-    locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, clarity_blurred, adjustments.global.clarity, adjustments.global.is_raw_image);
-    locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, structure_blurred, adjustments.global.structure, adjustments.global.is_raw_image);
+    locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, sharpness_blurred, adjustments.global.sharpness, adjustments.global.is_raw_image, 0u);
+    locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, clarity_blurred, adjustments.global.clarity, adjustments.global.is_raw_image, 1u);
+    locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, structure_blurred, adjustments.global.structure, adjustments.global.is_raw_image, 1u);
     locally_contrasted_rgb = apply_centre_local_contrast(locally_contrasted_rgb, adjustments.global.centre, absolute_coord_i, clarity_blurred, adjustments.global.is_raw_image);
 
     var processed_rgb = apply_linear_exposure(locally_contrasted_rgb, adjustments.global.exposure);
@@ -1066,9 +1166,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             let mask_adj = adjustments.mask_adjustments[i];
 
             var mask_base_linear = composite_rgb_linear;
-            mask_base_linear = apply_local_contrast(mask_base_linear, sharpness_blurred, mask_adj.sharpness, adjustments.global.is_raw_image);
-            mask_base_linear = apply_local_contrast(mask_base_linear, clarity_blurred, mask_adj.clarity, adjustments.global.is_raw_image);
-            mask_base_linear = apply_local_contrast(mask_base_linear, structure_blurred, mask_adj.structure, adjustments.global.is_raw_image);
+            mask_base_linear = apply_local_contrast(mask_base_linear, sharpness_blurred, mask_adj.sharpness, adjustments.global.is_raw_image, 0u);
+            mask_base_linear = apply_local_contrast(mask_base_linear, clarity_blurred, mask_adj.clarity, adjustments.global.is_raw_image, 1u);
+            mask_base_linear = apply_local_contrast(mask_base_linear, structure_blurred, mask_adj.structure, adjustments.global.is_raw_image, 1u);
 
             let mask_adjusted_linear = apply_all_mask_adjustments(mask_base_linear, mask_adj, absolute_coord_i, id.xy, scale, adjustments.global.is_raw_image, adjustments.global.tonemapper_mode);
             composite_rgb_linear = mix(composite_rgb_linear, mask_adjusted_linear, influence);
@@ -1103,7 +1203,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 
     if (adjustments.global.has_lut == 1u) {
-        let lut_color = textureSampleLevel(lut_texture, lut_sampler, final_rgb, 0.0).rgb;
+        let lut_color = sample_lut_tetrahedral(final_rgb);
+        
         final_rgb = mix(final_rgb, lut_color, adjustments.global.lut_intensity);
     }
 
@@ -1117,10 +1218,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         let luma_mask = smoothstep(0.0, 0.15, luma) * (1.0 - smoothstep(0.6, 1.0, luma));
         let base_coord = coord * grain_frequency;
         let rough_coord = coord * grain_frequency * 0.6;
-        let noise1 = vec3<f32>(gradient_noise(base_coord), gradient_noise(base_coord + 11.3), gradient_noise(base_coord + 23.7));
-        let noise2 = vec3<f32>(gradient_noise(rough_coord + 35.1), gradient_noise(rough_coord + 43.9), gradient_noise(rough_coord + 57.5));
-        let noise = mix(noise1, noise2, roughness);
-        final_rgb += noise * amount * luma_mask;
+        let noise_base = gradient_noise(base_coord);
+        let noise_rough = gradient_noise(rough_coord + vec2<f32>(5.2, 1.3)); 
+        let noise_val = mix(noise_base, noise_rough, roughness);
+        final_rgb += vec3<f32>(noise_val) * amount * luma_mask;
     }
 
     let g = adjustments.global;

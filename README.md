@@ -5,10 +5,15 @@
 <div align="center">
 
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![wgpu](https://img.shields.io/badge/wgpu-%23282C34.svg?style=for-the-badge&logo=webgpu&logoColor=white)](https://wgpu.rs/)
 [![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)](https://react.dev/)
 [![Tauri](https://img.shields.io/badge/Tauri-24C8DB?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app/)
 [![AGPL-3.0](https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=for-the-badge)](https://opensource.org/licenses/AGPL-3.0)
 [![GitHub stars](https://img.shields.io/github/stars/CyberTimon/RapidRAW?style=for-the-badge&logo=github&label=Stars)](https://github.com/CyberTimon/RapidRAW/stargazers)
+<br>
+[![www.getrapidraw.com](https://img.shields.io/badge/getrapidraw.com-%232ea44f?style=for-the-badge&logo=safari&logoColor=white)](https://www.getrapidraw.com)
+[![Instagram](https://img.shields.io/badge/Instagram-%23E4405F.svg?style=for-the-badge&logo=Instagram&logoColor=white)](https://www.instagram.com/getrapidraw/)
+[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/cvFugZ2Hw8)
 
 </div>
 
@@ -18,7 +23,7 @@
 
 RapidRAW is a modern, high-performance alternative to Adobe Lightroom®. It delivers a simple, beautiful editing experience in a lightweight package (under 20MB) for Windows, macOS, and Linux.
 
-I developed this project as a personal challenge at the age of 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of both React and Rust, with the support from Google Gemini.
+I started developing this project as a personal challenge when I was 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of React, WGSL and Rust, with the support from Google Gemini.
 
 <table width="100%">
   <tr>
@@ -59,6 +64,38 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2026-01-26:** Favorite lens saving, improved rotation controls (finer grid), better local contrast adjustments
+*   **2026-01-25:** Filmstrip performance boost, improved sorting, lens distortion fixes for AI masks & crop
+*   **2026-01-24:** Added automatic lens, TCA & vignette correction using lensfun
+*   **2026-01-22:** Improved and centralized EXIF data handling for greater accuracy and support
+*   **2026-01-21:** Inpainting now works correctly on images with geometry transformations
+*   **2026-01-20:** Export preset management for saving export settings 
+*   **2026-01-19:** Preload library for faster startup & automatic geometry transformation helper lines
+*   **2026-01-18:** Implement image geometry transformation utils
+*   **2026-01-17:** Refactor AI panel to correctly work with the new masking system
+*   **2026-01-16:** Major masking system overhaul with drag & drop, per-mask opacity/invert & UI improvements
+
+<details>
+<summary><strong>Expand further</strong></summary>
+
+*   **2026-01-13:** New python middleware client for external generative AI integration (ComfyUI)
+*   **2026-01-12:** Created a RapidRAW community discord server
+*   **2026-01-11:** Separate preview worker, optional high-quality live previews & mask/ai patch caching
+*   **2026-01-10:** Enhanced EXIF UI, optimized color wheels/curves & rawler update
+*   **2026-01-09:** Live previews for all adjustments & masks with optimized GPU processing
+*   **2026-01-05:** Collage maker upgrade (drag & drop, zoom, ratio options)
+*   **2026-01-05:** 'Prefer RAW' filter option added to library
+*   **2026-01-05:** Support for uppercase file extensions
+*   **2026-01-05:** Flush thumbnail cache on folder switch
+*   **2025-12-27:** Fix LUT banding issues with improved sampling
+*   **2025-12-26:** AI masking stability improvements under load
+*   **2025-12-23:** Metadata card in toolbar & context menu export
+*   **2025-12-23:** Monochromatic grain & white balance picker improvements
+*   **2025-12-22:** BM3D Denoising with comparison slider
+*   **2025-12-20:** Batch export stability improvements & RAM optimization
+*   **2025-12-14:** Exposure slider added to masking tools
+*   **2025-12-14:** Improved delete workflow
+*   **2025-12-08:** Improved mask eraser tool behavior & ORT v2 migration
 *   **2025-12-07:** Write EXIF metadata to file
 *   **2025-12-07:** Color picker for white balance
 *   **2025-11-30:** HSL luminance artifacts fix
@@ -69,10 +106,6 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2025-11-22:** DNG loader improvements
 *   **2025-11-18:** Improved vibrancy adjustment
 *   **2025-11-15:** Virtual copies & library improvements
-
-<details>
-<summary><strong>Expand further</strong></summary>
-
 *   **2025-11-14:** Open-with-file cross plattform compatibilty & single instance lock
 *   **2025-11-13:** Rewritten tagging system to support pill-like image tagging
 *   **2025-11-10:** Improved folder tree with search functionality
@@ -308,7 +341,7 @@ While the core functionality is in place, I'm actively working on improving seve
 | Write a tutorial on how to connect ComfyUI with RapidRAW                                    | Medium | Medium       | [ ]    |
 | Centralize Coordinate Transformation Logic - See [#245](https://github.com/CyberTimon/RapidRAW/issues/245) | Medium      | High | [ ]    |
 | Improve speed on older systems (e.g. Pascal GPUs)                                            | Medium   | High       | [ ]    |
-| Implement warping tools                                                                     | Low  | High       | [ ]    |
+| Implement warping tools                                                                     | Low  | High       | [X]    |
 
 ## AI Roadmap
 
@@ -324,10 +357,14 @@ These features are integrated directly into RapidRAW and run entirely on your co
 
 ### 2. Self-Hosted Integration with ComfyUI (Local & Free)
 
-For users with a capable GPU who want maximum control, I've made it so RapidRAW can connect to your own local [ComfyUI](https://github.com/comfyanonymous/ComfyUI) server.
+For users with a capable GPU who want maximum control, RapidRAW can connect to your own local [ComfyUI](https://github.com/comfyanonymous/ComfyUI) server. This is managed by the [**RapidRAW-AI-Connector**](https://github.com/CyberTimon/RapidRAW-AI-Connector), a lightweight middleware that bridges RapidRAW and ComfyUI. Its purpose is to manage image caching, workflow injection, and AI coordination.
 
-*   **Full Control:** Use your own hardware and any custom Stable Diffusion model or workflow you choose.
-*   **Cost-Free Power:** Leverage your existing hardware for advanced generative edits at no extra cost.
+**Why this approach?** This new architecture makes generative edits much more efficient. Instead of sending the entire high-resolution image for every single change, the AI Connector intelligently caches it. The full image is sent only once; for every subsequent edit, only the tiny mask and text are transferred. This makes the process significantly faster and more responsive.
+
+This setup gives you the best of both worlds: a highly efficient workflow while retaining full control to use your own hardware and any custom Diffusion models or workflows you choose.
+
+*   **Full Control:** Use your own hardware and any custom Diffusion model or workflow you choose.
+*   **Cost-Free Power:** Utilise your existing hardware for advanced generative edits at no extra cost.
 *   **Custom Workflow Selection:** Import your own ComfyUI workflows and use your custom nodes.
 
 ### 3. Optional Cloud Service (Subscription)
@@ -340,8 +377,8 @@ This is purely a **convenience service**. It provides the **same high-quality re
 
 | Feature                 | Built-in AI (Free)                               | Self-Hosted (ComfyUI)                               | Optional Cloud Service                           |
 | ----------------------- | ------------------------------------------------ | --------------------------------------------------- | ------------------------------------------------ |
-| **Cost**                | Free, included                                   | Free (requires your own hardware)                   | $5 / month                                   |
-| **Setup**               | None                                             | Manual ComfyUI server setup                         | None (Just log in)                           |
+| **Cost**                | Free, included                                   | Free (requires your own hardware)                   | $TBD / month                                   |
+| **Setup**               | None                                             | Manual ComfyUI / AI Connector setup                         | None (Just log in)                           |
 | **Use Case**            | Everyday workflow acceleration                   | Full control for technical users                    | Maximum convenience                          |
 | **Status**              | **Available**                                    | **Available**                                       | Coming Soon                                 |
 
@@ -457,6 +494,7 @@ A huge thank you to the following projects and tools that were very important in
 
 *   **[Google AI Studio](https://aistudio.google.com):** For providing amazing assistance in researching, implementing image processing algorithms and giving an overall speed boost.
 *   **[rawler](https://github.com/dnglab/dnglab/tree/main/rawler):** For the excellent Rust crate that provides the foundation for RAW file processing in this project.
+*   **[lensfun](https://lensfun.github.io/):** For its invaluable open-source library and comprehensive database for automatic lens correction.
 *   **[pixls.us](https://discuss.pixls.us/):** For being an incredible community full of knowledgeable people who offered inspiration, advice, and ideas.
 *   **[darktable & co.](https://github.com/darktable-org/darktable):** For some reference implementations that guided parts of this work.
 *   **You:** For using and supporting RapidRAW. Your interest keeps this project alive and evolving.

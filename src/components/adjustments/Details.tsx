@@ -7,6 +7,7 @@ interface DetailsPanelProps {
   setAdjustments(adjustments: Partial<Adjustments>): any;
   appSettings: AppSettings | null;
   isForMask?: boolean;
+  onDragStateChange?: (isDragging: boolean) => void;
 }
 
 export default function DetailsPanel({
@@ -14,6 +15,7 @@ export default function DetailsPanel({
   setAdjustments,
   appSettings,
   isForMask = false,
+  onDragStateChange,
 }: DetailsPanelProps) {
   const handleAdjustmentChange = (key: string, value: string) => {
     const numericValue = parseInt(value, 10);
@@ -34,12 +36,13 @@ export default function DetailsPanel({
             onChange={(e: any) => handleAdjustmentChange(DetailsAdjustment.Sharpness, e.target.value)}
             step={1}
             value={adjustments.sharpness}
+            onDragStateChange={onDragStateChange}
           />
         </div>
       )}
 
       {adjustmentVisibility.presence !== false && (
-        <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
+        <div className="p-2 bg-bg-tertiary rounded-md">
           <p className="text-md font-semibold mb-2 text-primary">Presence</p>
           <Slider
             label="Clarity"
@@ -48,6 +51,7 @@ export default function DetailsPanel({
             onChange={(e: any) => handleAdjustmentChange(DetailsAdjustment.Clarity, e.target.value)}
             step={1}
             value={adjustments.clarity}
+            onDragStateChange={onDragStateChange}
           />
           <Slider
             label="Dehaze"
@@ -56,6 +60,7 @@ export default function DetailsPanel({
             onChange={(e: any) => handleAdjustmentChange(DetailsAdjustment.Dehaze, e.target.value)}
             step={1}
             value={adjustments.dehaze}
+            onDragStateChange={onDragStateChange}
           />
           <Slider
             label="Structure"
@@ -64,6 +69,7 @@ export default function DetailsPanel({
             onChange={(e: any) => handleAdjustmentChange(DetailsAdjustment.Structure, e.target.value)}
             step={1}
             value={adjustments.structure}
+            onDragStateChange={onDragStateChange}
           />
           {!isForMask && (
             <Slider
@@ -73,11 +79,13 @@ export default function DetailsPanel({
               onChange={(e: any) => handleAdjustmentChange(DetailsAdjustment.Centré, e.target.value)}
               step={1}
               value={adjustments.centré}
+              onDragStateChange={onDragStateChange}
             />
           )}
         </div>
       )}
 
+      {/* Hide noise reduction to stop people from thinking it exists
       {adjustmentVisibility.noiseReduction !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
           <p className="text-md font-semibold mb-2 text-primary">Noise Reduction</p>
@@ -99,9 +107,10 @@ export default function DetailsPanel({
           />
         </div>
       )}
+      */}
 
       {adjustmentVisibility.chromaticAberration !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
+        <div className="mt-4 p-2 bg-bg-tertiary rounded-md">
           <p className="text-md font-semibold mb-2 text-primary">Chromatic Aberration</p>
           <Slider
             label="Red/Cyan"
@@ -112,6 +121,7 @@ export default function DetailsPanel({
             }
             step={1}
             value={adjustments.chromaticAberrationRedCyan}
+            onDragStateChange={onDragStateChange}
           />
           <Slider
             label="Blue/Yellow"
@@ -122,6 +132,7 @@ export default function DetailsPanel({
             }
             step={1}
             value={adjustments.chromaticAberrationBlueYellow}
+            onDragStateChange={onDragStateChange}
           />
         </div>
       )}
