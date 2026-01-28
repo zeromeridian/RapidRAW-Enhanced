@@ -82,7 +82,7 @@ export default function HdrModal({
       return (
         <>
           <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-text-primary mb-2 text-center">Panorama Failed</h3>
+          <h3 className="text-lg font-semibold text-text-primary mb-2 text-center">HDR Failed</h3>
           <p className="text-sm text-text-secondary text-center p-2 rounded-md max-h-40 overflow-y-auto">
             {String(error)}
           </p>
@@ -96,11 +96,11 @@ export default function HdrModal({
           {savedPath && (
             <>
               <CheckCircle className="w-16 h-16 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-text-primary mb-4 text-center">Panorama Saved!</h3>
+              <h3 className="text-lg font-semibold text-text-primary mb-4 text-center">HDR Saved!</h3>
             </>
           )}
           <div className="w-full bg-bg-primary rounded-md overflow-hidden border border-surface">
-            <img src={finalImageBase64} alt="Stitched Panorama" className="w-full h-full object-contain" />
+            <img src={finalImageBase64} alt="Merged HDR" className="w-full h-full object-contain" />
           </div>
         </>
       );
@@ -111,7 +111,7 @@ export default function HdrModal({
         <div className="w-16 h-16 mx-auto mb-4">
           <Loader2 className="w-16 h-16 text-accent animate-spin" />
         </div>
-        <h3 className="text-lg font-semibold text-text-primary mb-2 text-center">Stitching Panorama</h3>
+        <h3 className="text-lg font-semibold text-text-primary mb-2 text-center">Merging HDR</h3>
         <p className="text-sm text-text-secondary text-center min-h-[1.25rem]">{progressMessage}</p>
       </>
     );
@@ -149,7 +149,7 @@ export default function HdrModal({
           </button>
           <Button onClick={handleSave} disabled={isSaving}>
             {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save size={16} className="mr-2" />}
-            {isSaving ? 'Saving...' : 'Save Panorama'}
+            {isSaving ? 'Saving...' : 'Save HDR'}
           </Button>
         </>
       );

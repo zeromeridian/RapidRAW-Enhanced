@@ -130,7 +130,7 @@ pub struct AppState {
     ai_state: Mutex<Option<AiState>>,
     ai_init_lock: TokioMutex<()>,
     export_task_handle: Mutex<Option<JoinHandle<()>>>,
-    hdr_result: Arc<Mutex<Option<RgbImage>>>,
+    hdr_result: Arc<Mutex<Option<DynamicImage>>>,
     panorama_result: Arc<Mutex<Option<DynamicImage>>>,
     denoise_result: Arc<Mutex<Option<DynamicImage>>>,
     indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
@@ -2932,7 +2932,6 @@ async fn merge_hdr(
     let mut buf = Cursor::new(Vec::new());
 
     if let Err(e) = stretched.to_rgb8().write_to(&mut buf, ImageFormat::Png) {
-        // to_rgb8() is not nice but hdr preview as png
         return Err(format!("Failed to encode hdr preview: {}", e));
     }
 
@@ -2941,7 +2940,7 @@ async fn merge_hdr(
 
     let _ = app_handle.emit("hdr-progress", "Creating preview...");
 
-    *hdr_result_handle.lock().unwrap() = Some(stretched.to_rgb8());
+    *hdr_result_handle.lock().unwrap() = Some(stretched);
 
     let _ = app_handle.emit(
         "hdr-complete",
@@ -2982,6 +2981,47 @@ fn parse_exposure_time(input: &str) -> Result<f32, String> {
         cleaned.parse::<f32>()
             .map_err(|_| format!("Could not parse '{}' as f32", cleaned))
     }
+}
+
+#[tauri::command]
+async fn save_hdr(
+    first_path_str: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let hdr_image = state
+        .hdr_result
+        .lock()
+        .unwrap()
+        .take()
+        .ok_or_else(|| {
+            "No hdr image found in memory to save. It might have already been saved."
+                .to_string()
+        })?;
+
+    let (first_path, _) = parse_virtual_path(&first_path_str);
+    let parent_dir = first_path
+        .parent()
+        .ok_or_else(|| "Could not determine parent directory of the first image.".to_string())?;
+    let stem = first_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("hdr");
+
+    let (output_filename, image_to_save): (String, DynamicImage) = if hdr_image.color().has_alpha() {
+        (format!("{}_Hdr.png", stem), DynamicImage::ImageRgba8(hdr_image.to_rgba8()))
+    } else if hdr_image.as_rgb32f().is_some() {
+        (format!("{}_Hdr.tiff", stem), hdr_image)
+    } else {
+        (format!("{}_Hdr.png", stem), DynamicImage::ImageRgb8(hdr_image.to_rgb8()))
+    };
+
+    let output_path = parent_dir.join(output_filename);
+
+    image_to_save
+        .save(&output_path)
+        .map_err(|e| format!("Failed to save hdr image: {}", e))?;
+
+    Ok(output_path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -3464,8 +3504,9 @@ fn main() {
             get_log_file_path,
             save_collage,
             stitch_panorama,
-            merge_hdr,
             save_panorama,
+            merge_hdr,
+            save_hdr,
             apply_denoising,
             save_denoised_image,
             load_and_parse_lut,
