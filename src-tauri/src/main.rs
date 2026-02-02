@@ -42,17 +42,15 @@ use std::thread;
 use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose};
-use chrono::{DateTime, Utc};
-use exif::{Exif, In, Tag};
 use image::codecs::jpeg::JpegEncoder;
 use image::{
     DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, Rgb, RgbImage, Rgba,
     RgbaImage, imageops,
 };
 use image_hdr::exif::{get_exif_data, get_exposures, get_gains};
+use image_hdr::hdr_merge_images;
 use image_hdr::input::HDRInput;
 use image_hdr::stretch::apply_histogram_stretch;
-use image_hdr::{Error, hdr_merge_images};
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
 use imageproc::hough::{LineDetectionOptions, detect_lines};
@@ -2905,10 +2903,9 @@ async fn merge_hdr(
             let file_bytes = fs::read(path)
                 .map_err(|e| format!("Failed to read image {}: {}", path, e))
                 .unwrap();
-            let dynamic_image =
-                crate::image_loader::load_base_image_from_bytes(&file_bytes, path, false, 2.5)
-                    .map_err(|e| format!("Failed to load image {}: {}", path, e))
-                    .unwrap();
+            let dynamic_image = load_base_image_from_bytes(&file_bytes, path, false, 2.5, None)
+                .map_err(|e| format!("Failed to load image {}: {}", path, e))
+                .unwrap();
 
             println!(
                 "Read image with dimensions: {}x{}",
@@ -2921,10 +2918,7 @@ async fn merge_hdr(
                     let gains = get_gains(&exif).unwrap_or(1.0);
                     println!("Read image with gains: {}", gains);
                     let exposure = get_exposures(&exif).unwrap_or(1.0);
-                    println!(
-                        "Read image with exposure: {}",
-                        exposure
-                    );
+                    println!("Read image with exposure: {}", exposure);
                     (gains, exposure)
                 }
                 Err(_) => {
@@ -2939,10 +2933,7 @@ async fn merge_hdr(
                         None => 1.0,
                         Some(exposure) => parse_exposure_time(exposure).unwrap_or_else(|_| 1.0),
                     };
-                    println!(
-                        "Read image with exposure: {}",
-                        exposure
-                    );
+                    println!("Read image with exposure: {}", exposure);
                     (gains, exposure)
                 }
             };
@@ -3010,7 +3001,8 @@ fn parse_exposure_time(input: &str) -> Result<f32, String> {
         }
     } else {
         // 3. Handle decimal format
-        cleaned.parse::<f32>()
+        cleaned
+            .parse::<f32>()
             .map_err(|_| format!("Could not parse '{}' as f32", cleaned))
     }
 }
@@ -3020,15 +3012,9 @@ async fn save_hdr(
     first_path_str: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
-    let hdr_image = state
-        .hdr_result
-        .lock()
-        .unwrap()
-        .take()
-        .ok_or_else(|| {
-            "No hdr image found in memory to save. It might have already been saved."
-                .to_string()
-        })?;
+    let hdr_image = state.hdr_result.lock().unwrap().take().ok_or_else(|| {
+        "No hdr image found in memory to save. It might have already been saved.".to_string()
+    })?;
 
     let (first_path, _) = parse_virtual_path(&first_path_str);
     let parent_dir = first_path
@@ -3039,12 +3025,19 @@ async fn save_hdr(
         .and_then(|s| s.to_str())
         .unwrap_or("hdr");
 
-    let (output_filename, image_to_save): (String, DynamicImage) = if hdr_image.color().has_alpha() {
-        (format!("{}_Hdr.png", stem), DynamicImage::ImageRgba8(hdr_image.to_rgba8()))
+    let (output_filename, image_to_save): (String, DynamicImage) = if hdr_image.color().has_alpha()
+    {
+        (
+            format!("{}_Hdr.png", stem),
+            DynamicImage::ImageRgba8(hdr_image.to_rgba8()),
+        )
     } else if hdr_image.as_rgb32f().is_some() {
         (format!("{}_Hdr.tiff", stem), hdr_image)
     } else {
-        (format!("{}_Hdr.png", stem), DynamicImage::ImageRgb8(hdr_image.to_rgb8()))
+        (
+            format!("{}_Hdr.png", stem),
+            DynamicImage::ImageRgb8(hdr_image.to_rgb8()),
+        )
     };
 
     let output_path = parent_dir.join(output_filename);
