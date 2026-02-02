@@ -85,7 +85,7 @@ pub fn stitch_images(
                 .map_err(|e| format!("Failed to read image {}: {}", filename, e))?;
 
             let mut dynamic_image =
-                crate::image_loader::load_base_image_from_bytes(&file_bytes, filename, false, 2.5)
+                crate::image_loader::load_base_image_from_bytes(&file_bytes, filename, false, 2.5, None)
                     .map_err(|e| format!("Failed to load image {}: {}", filename, e))?;
 
             if is_raw_file(filename) {

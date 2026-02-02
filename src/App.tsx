@@ -3537,6 +3537,16 @@ function App() {
     event.stopPropagation();
     if (!selectedImage) return;
 
+    const handleCreateVirtualCopy = async (sourcePath: string) => {
+      try {
+        await invoke(Invokes.CreateVirtualCopy, { sourceVirtualPath: sourcePath });
+        await refreshImageList();
+      } catch (err) {
+        console.error('Failed to create virtual copy:', err);
+        setError(`Failed to create virtual copy: ${err}`);
+      }
+    };
+
     const commonTags = getCommonTags([selectedImage.path]);
 
     const options: Array<Option> = [
@@ -3559,8 +3569,57 @@ function App() {
         onClick: handlePasteAdjustments,
         disabled: copiedAdjustments === null,
       },
+      {
+        label: 'Productivity',
+        icon: Gauge,
+        submenu: [
+          {
+            label: 'Auto Adjust Image',
+            icon: Aperture,
+            onClick: handleAutoAdjustments,
+          },
+          {
+            icon: CopyPlus,
+            label: 'Create Virtual Copy',
+            onClick: () => handleCreateVirtualCopy(selectedImage.path),
+          },
+          {
+            label: 'Denoise',
+            icon: Grip,
+            onClick: () => {
+              setDenoiseModalState({
+                isOpen: true,
+                isProcessing: false,
+                previewBase64: null,
+                error: null,
+                targetPath: selectedImage.path,
+                progressMessage: null,
+              });
+            },
+          },
+          {
+            disabled: true,
+            icon: Images,
+            label: 'Stitch Panorama',
+          },
+          {
+            icon: LayoutTemplate,
+            label: 'Frame Image',
+            onClick: () => {
+              setCollageModalState({
+                isOpen: true,
+                sourceImages: [selectedImage],
+              });
+            },
+          },
+          {
+            label: 'Cull Image',
+            icon: Users,
+            disabled: true,
+          },
+        ],
+      },
       { type: OPTION_SEPARATOR },
-      { label: 'Auto Adjust Image', icon: Aperture, onClick: handleAutoAdjustments },
       {
         label: 'Rating',
         icon: Star,
@@ -3613,7 +3672,7 @@ function App() {
             ...INITIAL_ADJUSTMENTS,
             aspectRatio: originalAspectRatio,
             rating: currentRating,
-            aiPatches: []
+            aiPatches: [],
           });
         },
       },
@@ -3712,7 +3771,7 @@ function App() {
     const autoAdjustLabel = isSingleSelection ? 'Auto Adjust Image' : `Auto Adjust ${selectionCount} Images`;
     const renameLabel = isSingleSelection ? 'Rename Image' : `Rename ${selectionCount} Images`;
     const cullLabel = isSingleSelection ? 'Cull Image' : `Cull ${selectionCount} Images`;
-    const collageLabel = isSingleSelection ? 'Create Collage' : `Create Collage`;
+    const collageLabel = isSingleSelection ? 'Frame Image' : 'Create Collage';
     const stitchLabel = `Stitch Panorama`;
     const mergeLabel = `Merge to HDR`;
 
@@ -3732,7 +3791,9 @@ function App() {
       invoke(Invokes.ApplyAutoAdjustmentsToPaths, { paths: finalSelection })
         .then(async () => {
           if (selectedImage && finalSelection.includes(selectedImage.path)) {
-            const metadata: Metadata = await invoke(Invokes.LoadMetadata, { path: selectedImage.path });
+            const metadata: Metadata = await invoke(Invokes.LoadMetadata, {
+              path: selectedImage.path,
+            });
             if (metadata.adjustments && !metadata.adjustments.is_null) {
               const normalized = normalizeLoadedAdjustments(metadata.adjustments);
               setLiveAdjustments(normalized);
@@ -3740,7 +3801,9 @@ function App() {
             }
           }
           if (libraryActivePath && finalSelection.includes(libraryActivePath)) {
-            const metadata: Metadata = await invoke(Invokes.LoadMetadata, { path: libraryActivePath });
+            const metadata: Metadata = await invoke(Invokes.LoadMetadata, {
+              path: libraryActivePath,
+            });
             if (metadata.adjustments && !metadata.adjustments.is_null) {
               const normalized = normalizeLoadedAdjustments(metadata.adjustments);
               setLibraryActiveAdjustments(normalized);
@@ -3756,7 +3819,7 @@ function App() {
     const onExportClick = () => {
       if (selectedImage) {
         if (selectedImage.path !== path) {
-            handleImageSelect(path);
+          handleImageSelect(path);
         }
         setRenderedRightPanel(Panel.Export);
         setActiveRightPanel(Panel.Export);
@@ -3802,7 +3865,8 @@ function App() {
                 : INITIAL_ADJUSTMENTS;
             const adjustmentsToCopy: any = {};
             for (const key of COPYABLE_ADJUSTMENT_KEYS) {
-              if (sourceAdjustments.hasOwnProperty(key)) adjustmentsToCopy[key] = sourceAdjustments[key];
+              if (sourceAdjustments.hasOwnProperty(key))
+                adjustmentsToCopy[key] = sourceAdjustments[key];
             }
             setCopiedAdjustments(adjustmentsToCopy);
             setIsCopied(true);
@@ -3838,18 +3902,18 @@ function App() {
             icon: Grip,
             disabled: !isSingleSelection,
             onClick: () => {
-                setDenoiseModalState({
-                    isOpen: true,
-                    isProcessing: false,
-                    previewBase64: null,
-                    error: null,
-                    targetPath: finalSelection[0],
-                    progressMessage: null
-                });
-            }
+              setDenoiseModalState({
+                isOpen: true,
+                isProcessing: false,
+                previewBase64: null,
+                error: null,
+                targetPath: finalSelection[0],
+                progressMessage: null,
+              });
+            },
           },
           {
-            disabled: selectionCount < 2  || selectionCount > 30,
+            disabled: selectionCount < 2 || selectionCount > 30,
             icon: Images,
             label: stitchLabel,
             onClick: () => {
@@ -3896,7 +3960,9 @@ function App() {
             icon: LayoutTemplate,
             label: collageLabel,
             onClick: () => {
-              const imagesForCollage = imageList.filter(img => finalSelection.includes(img.path));
+              const imagesForCollage = imageList.filter((img) =>
+                finalSelection.includes(img.path),
+              );
               setCollageModalState({
                 isOpen: true,
                 sourceImages: imagesForCollage,
@@ -3915,7 +3981,7 @@ function App() {
                 error: null,
                 pathsToCull: finalSelection,
               }),
-            disabled: imageList.length < 2,
+            disabled: selectionCount < 2,
           },
         ],
       },
@@ -4257,7 +4323,8 @@ function App() {
     folderTree,
     pinnedFolderTrees,
     pinnedFolders,
-    activeTreeSection
+    activeTreeSection,
+    copiedFilePaths
   ]);
 
   const memoizedLibraryView = useMemo(() => (
@@ -4367,7 +4434,8 @@ function App() {
     isPasted,
     copiedAdjustments,
     libraryActiveAdjustments,
-    supportedTypes
+    supportedTypes,
+    copiedFilePaths
   ]);
 
   const renderMainView = () => {
