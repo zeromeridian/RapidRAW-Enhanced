@@ -883,6 +883,12 @@ pub struct GlobalAdjustments {
     _pad_end2: f32,
     _pad_end3: f32,
     _pad_end4: f32,
+
+    pub glow_amount: f32,
+    pub halation_amount: f32,
+    pub flare_amount: f32,
+
+    _pad_creative_1: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
@@ -907,10 +913,10 @@ pub struct MaskAdjustments {
     pub dehaze: f32,
     pub structure: f32,
 
+    pub glow_amount: f32,
+    pub halation_amount: f32,
+    pub flare_amount: f32,
     _pad1: f32,
-    _pad2: f32,
-    _pad3: f32,
-    _pad4: f32,
 
     _pad_cg1: f32,
     _pad_cg2: f32,
@@ -942,7 +948,7 @@ pub struct MaskAdjustments {
 #[repr(C)]
 pub struct AllAdjustments {
     pub global: GlobalAdjustments,
-    pub mask_adjustments: [MaskAdjustments; 11],
+    pub mask_adjustments: [MaskAdjustments; 9],
     pub mask_count: u32,
     pub tile_offset_x: u32,
     pub tile_offset_y: u32,
@@ -991,6 +997,10 @@ struct AdjustmentScales {
 
     color_calibration_hue: f32,
     color_calibration_saturation: f32,
+
+    glow: f32,
+    halation: f32,
+    flares: f32,
 }
 
 const SCALES: AdjustmentScales = AdjustmentScales {
@@ -1006,7 +1016,7 @@ const SCALES: AdjustmentScales = AdjustmentScales {
     tint: 100.0,
     vibrance: 100.0,
 
-    sharpness: 80.0,
+    sharpness: 40.0,
     luma_noise_reduction: 100.0,
     color_noise_reduction: 100.0,
     clarity: 200.0,
@@ -1035,6 +1045,10 @@ const SCALES: AdjustmentScales = AdjustmentScales {
 
     color_calibration_hue: 400.0,
     color_calibration_saturation: 120.0,
+
+    glow: 100.0,
+    halation: 100.0,
+    flares: 100.0,
 };
 
 fn parse_hsl_adjustments(js_hsl: &serde_json::Value) -> [HslColor; 8] {
@@ -1446,6 +1460,12 @@ fn get_global_adjustments_from_json(
         _pad_end2: 0.0,
         _pad_end3: 0.0,
         _pad_end4: 0.0,
+
+        glow_amount: get_val("effects", "glowAmount", SCALES.glow, None),
+        halation_amount: get_val("effects", "halationAmount", SCALES.halation, None),
+        flare_amount: get_val("effects", "flareAmount", SCALES.flares, None),
+
+        _pad_creative_1: 0.0,
     }
 }
 
@@ -1519,10 +1539,10 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         dehaze: get_val("effects", "dehaze", SCALES.dehaze),
         structure: get_val("effects", "structure", SCALES.structure),
 
+        glow_amount: get_val("effects", "glowAmount", SCALES.glow),
+        halation_amount: get_val("effects", "halationAmount", SCALES.halation),
+        flare_amount: get_val("effects", "flareAmount", SCALES.flares),
         _pad1: 0.0,
-        _pad2: 0.0,
-        _pad3: 0.0,
-        _pad4: 0.0,
 
         _pad_cg1: 0.0,
         _pad_cg2: 0.0,
@@ -1580,7 +1600,7 @@ pub fn get_all_adjustments_from_json(
     is_raw: bool,
 ) -> AllAdjustments {
     let global = get_global_adjustments_from_json(js_adjustments, is_raw);
-    let mut mask_adjustments = [MaskAdjustments::default(); 11];
+    let mut mask_adjustments = [MaskAdjustments::default(); 9];
     let mut mask_count = 0;
 
     let mask_definitions: Vec<MaskDefinition> = js_adjustments

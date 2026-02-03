@@ -152,6 +152,7 @@ fn default_included_adjustments() -> HashSet<String> {
         "negativeGreenBalance", "negativeRedBalance", "saturation", "sectionVisibility",
         "shadows", "sharpness", "showClipping", "structure", "temperature", "tint",
         "toneMapper", "vibrance", "vignetteAmount", "vignetteFeather", "vignetteMidpoint",
+        "flareAmount", "glowAmount", "halationAmount",
         "vignetteRoundness", "whites",
     ]
     .iter()
@@ -165,6 +166,8 @@ pub struct CopyPasteSettings {
     pub mode: PasteMode,
     #[serde(default = "default_included_adjustments")]
     pub included_adjustments: HashSet<String>,
+    #[serde(default)] 
+    pub known_adjustments: HashSet<String>,
 }
 
 impl Default for CopyPasteSettings {
@@ -172,6 +175,7 @@ impl Default for CopyPasteSettings {
         Self {
             mode: PasteMode::Merge,
             included_adjustments: default_included_adjustments(),
+            known_adjustments: default_included_adjustments(), 
         }
     }
 }
@@ -1819,11 +1823,43 @@ fn get_settings_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, Strin
 #[tauri::command]
 pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
     let path = get_settings_path(&app_handle)?;
-    if !path.exists() {
-        return Ok(AppSettings::default());
+
+    let mut settings: AppSettings = if path.exists() {
+        let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&content).map_err(|e| e.to_string())?
+    } else {
+        AppSettings::default()
+    };
+
+    let all_current_keys = default_included_adjustments();
+    let mut settings_modified = false;
+
+    let is_first_migration = settings.copy_paste_settings.known_adjustments.is_empty();
+
+    if is_first_migration {
+        settings.copy_paste_settings.included_adjustments = all_current_keys.clone();
+        settings.copy_paste_settings.known_adjustments = all_current_keys;
+        settings_modified = true;
+    } else {
+        let new_features: Vec<String> = all_current_keys
+            .difference(&settings.copy_paste_settings.known_adjustments)
+            .cloned()
+            .collect();
+
+        if !new_features.is_empty() {
+            settings.copy_paste_settings.included_adjustments.extend(new_features);
+            settings.copy_paste_settings.known_adjustments = all_current_keys;
+            settings_modified = true;
+        }
     }
-    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&content).map_err(|e| e.to_string())
+
+    if settings_modified {
+        if let Ok(json_string) = serde_json::to_string_pretty(&settings) {
+            let _ = fs::write(&path, json_string);
+        }
+    }
+
+    Ok(settings)
 }
 
 #[tauri::command]
