@@ -271,7 +271,7 @@ export default function ColorPanel({
                   ? 'bg-accent text-button-text'
                   : 'hover:bg-bg-secondary text-text-secondary'
               }`}
-              title="White Balance Picker (Click to pick a neutral grey area)"
+              title="White Balance Picker"
             >
               <Pipette size={16} />
             </button>

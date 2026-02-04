@@ -569,6 +569,7 @@ export default function SettingsPanel({
               onClick={onBack}
               size="icon"
               variant="ghost"
+              title="Go to Home"
             >
               <ArrowLeft />
             </Button>

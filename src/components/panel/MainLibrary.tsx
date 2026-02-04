@@ -1462,7 +1462,7 @@ export default function MainLibrary({
                       className="px-3 bg-surface text-text-primary shadow-none h-11"
                       onClick={() => setShowSettings(true)}
                       size="lg"
-                      title="Settings"
+                      title="Go to Settings"
                       variant="ghost"
                     >
                       <Settings size={20} />
