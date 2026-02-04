@@ -541,7 +541,7 @@ export default function LensCorrectionModal({
         <h2 className="text-xl font-bold text-primary text-shadow-shiny">Lens Correction</h2>
         <button
           onClick={handleReset}
-          title="Reset Correction"
+          title="Reset Lens Correction"
           className="p-2 rounded-full hover:bg-surface transition-colors"
         >
           <RotateCcw size={18} />

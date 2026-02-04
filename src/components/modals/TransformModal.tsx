@@ -344,7 +344,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         <h2 className="text-xl font-bold text-primary text-shadow-shiny">Transform</h2>
         <button
           onClick={handleReset}
-          title="Reset All Parameters"
+          title="Reset Transform"
           className="p-2 rounded-full hover:bg-surface transition-colors"
         >
           <RotateCcw size={18} />
