@@ -101,23 +101,21 @@ const ColorWheel = ({
       ref={containerRef}
     >
       <div
-        className="grid cursor-pointer place-items-center"
+        className="relative cursor-pointer h-5 min-w-[60px]"
         onClick={handleReset}
         onDoubleClick={handleReset}
         onMouseEnter={() => setIsLabelHovered(true)}
         onMouseLeave={() => setIsLabelHovered(false)}
       >
         <span
-          aria-hidden={isLabelHovered}
-          className={`col-start-1 row-start-1 text-sm font-medium text-text-secondary select-none transition-opacity duration-200 ease-in-out text-center ${
+          className={`absolute inset-0 flex items-center justify-center text-sm font-medium text-text-secondary select-none transition-opacity duration-200 ease-in-out ${
             isLabelHovered ? 'opacity-0' : 'opacity-100'
           }`}
         >
           {label}
         </span>
         <span
-          aria-hidden={!isLabelHovered}
-          className={`col-start-1 row-start-1 text-sm font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none text-center ${
+          className={`absolute inset-0 flex items-center justify-center text-sm font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out ${
             isLabelHovered ? 'opacity-100' : 'opacity-0'
           }`}
         >
