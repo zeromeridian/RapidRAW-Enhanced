@@ -62,6 +62,8 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2026-02-04:** Global tooltips & major UI polish
+*   **2026-02-03:** New creative effects: Glow, Halation & Lens Flares
 *   **2026-01-31:** Accurate color noise reduction for RAW images & improved image loading
 *   **2026-01-30:** Enhanced Lensfun DB parsing and improved lens matching logic
 *   **2026-01-29:** Add cross-channel copy/paste & flat-line clipping logic for curves
@@ -70,12 +72,12 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2026-01-24:** Added automatic lens, TCA & vignette correction using lensfun
 *   **2026-01-22:** Improved and centralized EXIF data handling for greater accuracy and support
 *   **2026-01-21:** Inpainting now works correctly on images with geometry transformations
-*   **2026-01-20:** Export preset management for saving export settings 
-*   **2026-01-19:** Preload library for faster startup & automatic geometry transformation helper lines
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2026-01-20:** Export preset management for saving export settings 
+*   **2026-01-19:** Preload library for faster startup & automatic geometry transformation helper lines
 *   **2026-01-18:** Implement image geometry transformation utils
 *   **2026-01-17:** Refactor AI panel to correctly work with the new masking system
 *   **2026-01-16:** Major masking system overhaul with drag & drop, per-mask opacity/invert & UI improvements
@@ -241,7 +243,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
         <li><strong>Tone Curves:</strong> Full control over Luma/RGB channels.</li>
         <li><strong>Color Grading:</strong> Temperature, Tint, Vibrance, Saturation, color wheels and a full HSL color mixer.</li>
         <li><strong>Detail Enhancement:</strong> Sharpening, Clarity, Structure, and Noise Reduction.</li>
-        <li><strong>Effects:</strong> LUTs, Dehaze, Vignette, and Film Grain simulation.</li>
+        <li><strong>Effects:</strong> LUTs, Dehaze, Vignette, Glow, Halation, Flares and Film Grain.</li>
         <li><strong>Transform Tools:</strong> Perspective correction, rotation, straightening, crop, and warping tools.</li>
       </ul>
     </td>
