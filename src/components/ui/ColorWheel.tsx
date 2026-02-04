@@ -92,6 +92,9 @@ const ColorWheel = ({
   const hsva: HsvaColor = { h: hue, s: saturation, v: 100, a: 1 };
   const hexColor = hsvaToHex(hsva);
 
+  const pointerSize = isWheelDragging ? 14 : 12;
+  const pointerOffset = pointerSize / 2;
+
   return (
     <div
       className="relative flex flex-col items-center gap-2"
@@ -127,7 +130,6 @@ const ColorWheel = ({
           <div
             className="absolute inset-0 cursor-pointer"
             onDoubleClick={handleReset}
-            title="Double-click to reset"
             onMouseDownCapture={handleDragStart}
             onTouchStartCapture={handleDragStart}
           >
@@ -143,9 +145,10 @@ const ColorWheel = ({
                       border: '2px solid white',
                       borderRadius: '50%',
                       boxShadow: '0 0 2px rgba(0,0,0,0.5)',
-                      height: 12,
-                      transform: 'translate(-6px, -6px)',
-                      width: 12,
+                      height: pointerSize,
+                      width: pointerSize,
+                      transform: `translate(-${pointerOffset}px, -${pointerOffset}px)`,
+                      transition: 'width 150ms ease-out, height 150ms ease-out, transform 150ms ease-out',
                     }}
                   />
                 </div>
