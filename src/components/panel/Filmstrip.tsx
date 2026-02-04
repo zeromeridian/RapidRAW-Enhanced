@@ -115,6 +115,11 @@ const FilmstripThumbnail = memo(({
   const colorLabel = COLOR_LABELS.find((c: Color) => c.name === colorTag);
   const isVirtualCopy = path.includes('?vc=');
 
+  const filename = path.split(/[\\/]/).pop() || '';
+  const truncatedTitle = filename.length > 40 
+    ? filename.substring(0, 20) + '...' + filename.substring(filename.length - 17)
+    : filename;
+
   useEffect(() => {
     if (thumbnailAspectRatio === ThumbnailAspectRatio.Contain && thumbData) {
       const img = new Image();
@@ -203,7 +208,7 @@ const FilmstripThumbnail = memo(({
       style={{
         zIndex: isActive ? 2 : isSelected ? 1 : 'auto',
       }}
-      title={path.split(/[\\/]/).pop()}
+      title={truncatedTitle}
     >
       {layers.length > 0 ? (
         <div className="absolute inset-0 w-full h-full">
@@ -222,7 +227,7 @@ const FilmstripThumbnail = memo(({
                 <img alt="" className="absolute inset-0 w-full h-full object-cover blur-md scale-110 opacity-50" src={layer.url} />
               )}
               <img
-                alt={path.split(/[\\/]/).pop()}
+                alt={truncatedTitle}
                 className={`${imageClasses} ${
                   thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
                 } relative`}

@@ -83,6 +83,7 @@ import {
 } from './utils/adjustments';
 import { generatePaletteFromImage } from './utils/palette';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import GlobalTooltip from './components/ui/GlobalTooltip';
 import { THEMES, DEFAULT_THEME_ID, ThemeProps } from './utils/themes';
 import { SubMask, ToolType } from './components/panel/right/Masks';
 import {
@@ -3577,22 +3578,31 @@ function App() {
       {
         label: 'Reset Adjustments',
         icon: RotateCcw,
-        onClick: () => {
-          debouncedSetHistory.cancel();
-          const currentRating = adjustments.rating;
+        isDestructive: true,
+        submenu: [
+          { label: 'Cancel', icon: X, onClick: () => {} },
+          {
+            label: 'Confirm',
+            icon: Check,
+            isDestructive: true,
+            onClick: () => {
+              debouncedSetHistory.cancel();
+              const currentRating = adjustments.rating;
 
-          const originalAspectRatio =
-            selectedImage.width && selectedImage.height
-              ? selectedImage.width / selectedImage.height
-              : null;
+              const originalAspectRatio =
+                selectedImage.width && selectedImage.height
+                  ? selectedImage.width / selectedImage.height
+                  : null;
 
-          resetAdjustmentsHistory({
-            ...INITIAL_ADJUSTMENTS,
-            aspectRatio: originalAspectRatio,
-            rating: currentRating,
-            aiPatches: [],
-          });
-        },
+              resetAdjustmentsHistory({
+                ...INITIAL_ADJUSTMENTS,
+                aspectRatio: originalAspectRatio,
+                rating: currentRating,
+                aiPatches: [],
+              });
+            },
+          },
+        ],
       },
     ];
     showContextMenu(event.clientX, event.clientY, options);
@@ -4727,6 +4737,7 @@ const AppWrapper = () => (
   <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
     <ContextMenuProvider>
       <App />
+      <GlobalTooltip />
     </ContextMenuProvider>
   </ClerkProvider>
 );

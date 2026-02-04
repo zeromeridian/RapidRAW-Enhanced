@@ -307,7 +307,7 @@ export default function CropPanel({
     <div className="flex flex-col h-full">
       <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
         <h2 className="text-xl font-bold text-primary text-shadow-shiny">Crop & Transform</h2>
-        <button className="p-2 rounded-full hover:bg-surface transition-colors" onClick={handleReset} title="Reset All">
+        <button className="p-2 rounded-full hover:bg-surface transition-colors" onClick={handleReset} title="Reset Crop & Transform">
           <RotateCcw size={18} />
         </button>
       </div>

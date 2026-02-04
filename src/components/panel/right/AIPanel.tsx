@@ -609,12 +609,11 @@ export default function AIPanel({
     >
       <div className="flex flex-col h-full select-none overflow-hidden" onClick={handleDeselect}>
         <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface h-[69px]">
-          <h2 className="text-xl font-bold text-primary text-shadow-shiny">AI Tools</h2>
+          <h2 className="text-xl font-bold text-primary text-shadow-shiny">Inpainting</h2>
           <button
             className="p-2 rounded-full hover:bg-surface transition-colors"
-            disabled={!adjustments.aiPatches?.length || isGeneratingAi}
             onClick={handleResetAllAiEdits}
-            title="Reset All AI Edits"
+            title="Reset Inpainting"
           >
             <RotateCcw size={18} />
           </button>
