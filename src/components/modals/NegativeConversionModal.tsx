@@ -227,7 +227,7 @@ export default function NegativeConversionModal({
                 >
                   NegPy
                 </a>
-                {' '}by marcinz606 (
+                {' '}created by marcinz606 (
                 <a
                   href="https://github.com/marcinz606/NegPy/blob/main/LICENSE"
                   target="_blank"

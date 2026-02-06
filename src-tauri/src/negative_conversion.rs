@@ -39,9 +39,9 @@ impl Default for NegativeConversionParams {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct ChannelBounds {
-    min: f32,
-    max: f32,
+pub struct ChannelBounds {
+    pub min: f32,
+    pub max: f32,
 }
 
 fn analyze_bounds(log_data: &[f32], width: usize, height: usize) -> [ChannelBounds; 3] {
@@ -98,7 +98,8 @@ fn analyze_bounds(log_data: &[f32], width: usize, height: usize) -> [ChannelBoun
 
 fn run_pipeline(
     input: &DynamicImage,
-    params: &NegativeConversionParams
+    params: &NegativeConversionParams,
+    override_bounds: Option<[ChannelBounds; 3]>,
 ) -> DynamicImage {
     let rgb = input.to_rgb32f();
     let (width, height) = rgb.dimensions();
@@ -108,7 +109,11 @@ fn run_pipeline(
         -v.clamp(1e-6, 1.0).log10()
     }).collect();
 
-    let bounds = analyze_bounds(&log_pixels, width as usize, height as usize);
+    let bounds = if let Some(b) = override_bounds {
+        b
+    } else {
+        analyze_bounds(&log_pixels, width as usize, height as usize)
+    };
     
     let mut out_buffer = vec![0.0f32; raw_pixels.len()];
 
@@ -227,7 +232,7 @@ pub async fn preview_negative_conversion(
         }
     };
 
-    let processed = run_pipeline(&base_image_for_processing, &params);
+    let processed = run_pipeline(&base_image_for_processing, &params, None);
 
     let mut buf = Cursor::new(Vec::new());
     processed.to_rgb8()
@@ -284,8 +289,17 @@ pub async fn convert_negative_full(
             }
         }
     };
-    
-    let processed = run_pipeline(&original_image, &params);
+
+    let bounds_reference_img = downscale_f32_image(&original_image, 1080, 1080);
+
+    let ref_rgb = bounds_reference_img.to_rgb32f();
+    let (ref_w, ref_h) = ref_rgb.dimensions();
+    let ref_log_pixels: Vec<f32> = ref_rgb.as_raw().par_iter().map(|&v| {
+        -v.clamp(1e-6, 1.0).log10()
+    }).collect();
+
+    let correct_bounds = analyze_bounds(&ref_log_pixels, ref_w as usize, ref_h as usize);
+    let processed = run_pipeline(&original_image, &params, Some(correct_bounds));
 
     *state.negative_conversion_result.lock().unwrap() = Some(processed);
     
