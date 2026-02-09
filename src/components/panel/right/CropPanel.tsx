@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   FlipHorizontal,
   FlipVertical,
@@ -33,18 +33,19 @@ interface CropPanelProps {
 interface CropPreset {
   name: string;
   value: number | null;
+  tooltip: string;
 }
 
 const PRESETS: Array<CropPreset> = [
-  { name: 'Free', value: null },
-  { name: 'Original', value: ORIGINAL_RATIO },
-  { name: '1:1', value: 1 },
-  { name: '5:4', value: 5 / 4 },
-  { name: '4:3', value: 4 / 3 },
-  { name: '3:2', value: 3 / 2 },
-  { name: '16:9', value: 16 / 9 },
-  { name: '21:9', value: 21 / 9 },
-  { name: '65:24', value: 65 / 24 },
+  { name: 'Free', value: null, tooltip: 'Freeform crop' },
+  { name: 'Original', value: ORIGINAL_RATIO, tooltip: 'Original image aspect ratio' },
+  { name: '1:1', value: 1, tooltip: 'Square - Instagram, profile pictures' },
+  { name: '5:4', value: 5 / 4, tooltip: '5:4 - Instagram landscape, 8x10 prints' },
+  { name: '4:3', value: 4 / 3, tooltip: '4:3 - Traditional monitors, tablets' },
+  { name: '3:2', value: 3 / 2, tooltip: '3:2 - 35mm film, DSLR cameras' },
+  { name: '16:9', value: 16 / 9, tooltip: '16:9 - Widescreen, desktop wallpapers, YouTube' },
+  { name: '21:9', value: 21 / 9, tooltip: '21:9 - Ultrawide monitors, cinematic' },
+  { name: '65:24', value: 65 / 24, tooltip: '65:24 - Panoramic 35mm wide format' },
 ];
 
 export default function CropPanel({
@@ -60,6 +61,9 @@ export default function CropPanel({
   const [isTransformModalOpen, setIsTransformModalOpen] = useState(false);
   const [isLensModalOpen, setIsLensModalOpen] = useState(false);
   const [isRotationActive, setIsRotationActive] = useState(false);
+  const [preferPortrait, setPreferPortrait] = useState(false);
+  const [isEditingCustom, setIsEditingCustom] = useState(false);
+  const lastSyncedRatio = useRef<number | null>(null);
 
   const { aspectRatio, rotation = 0, flipHorizontal = false, flipVertical = false, orientationSteps = 0 } = adjustments;
 
@@ -131,19 +135,26 @@ export default function CropPanel({
   const isCustomActive = aspectRatio !== null && !activePreset;
 
   useEffect(() => {
-    if (isCustomActive && aspectRatio) {
-      const currentInputRatio = parseFloat(customW) / parseFloat(customH);
-      if (isNaN(currentInputRatio) || Math.abs(currentInputRatio - aspectRatio) > RATIO_TOLERANCE) {
+    if (aspectRatio && aspectRatio !== 1) {
+      setPreferPortrait(aspectRatio < 1);
+    }
+  }, [aspectRatio]);
+
+  useEffect(() => {
+    if (isCustomActive && aspectRatio && !isEditingCustom) {
+      if (lastSyncedRatio.current === null || Math.abs(lastSyncedRatio.current - aspectRatio) > RATIO_TOLERANCE) {
         const h = 100;
         const w = aspectRatio * h;
         setCustomW(w.toFixed(1).replace(/\.0$/, ''));
         setCustomH(h.toString());
+        lastSyncedRatio.current = aspectRatio;
       }
     } else if (!isCustomActive) {
       setCustomW('');
       setCustomH('');
+      lastSyncedRatio.current = null;
     }
-  }, [isCustomActive, aspectRatio, customW, customH]);
+  }, [isCustomActive, aspectRatio, isEditingCustom]);
 
   useEffect(() => {
     if (activePreset?.value === ORIGINAL_RATIO) {
@@ -158,7 +169,7 @@ export default function CropPanel({
     }
   }, [orientationSteps, activePreset, aspectRatio, getEffectiveOriginalRatio, setAdjustments]);
 
-  const handleCustomInputChange = (e: any) => {
+  const handleCustomInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     if (name === 'customW') {
       setCustomW(value);
@@ -167,14 +178,20 @@ export default function CropPanel({
     }
   };
 
+  const handleCustomInputFocus = () => {
+    setIsEditingCustom(true);
+  };
+
   const handleApplyCustomRatio = () => {
+    setIsEditingCustom(false);
     const numW = parseFloat(customW);
     const numH = parseFloat(customH);
 
     if (numW > 0 && numH > 0) {
       const newAspectRatio = numW / numH;
+      lastSyncedRatio.current = newAspectRatio;
       if (
-        adjustments?.aspectRatio &&
+        !adjustments?.aspectRatio ||
         Math.abs(adjustments.aspectRatio - newAspectRatio) > RATIO_TOLERANCE
       ) {
         setAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newAspectRatio, crop: null }));
@@ -182,11 +199,20 @@ export default function CropPanel({
     }
   };
 
-  const handleKeyDown = (e: any) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleApplyCustomRatio();
-      e.target.blur();
+      (e.target as HTMLInputElement).blur();
+    } else if (e.key === 'Escape') {
+      setIsEditingCustom(false);
+      if (aspectRatio) {
+        const h = 100;
+        const w = aspectRatio * h;
+        setCustomW(w.toFixed(1).replace(/\.0$/, ''));
+        setCustomH(h.toString());
+      }
+      (e.target as HTMLInputElement).blur();
     }
   };
 
@@ -202,20 +228,23 @@ export default function CropPanel({
 
     let targetRatio = preset.value;
     if (activePreset === preset && targetRatio && targetRatio !== 1) {
+      const newRatio = 1 / (adjustments.aspectRatio ? adjustments.aspectRatio : 1);
+      setPreferPortrait(newRatio < 1);
       setAdjustments((prev: Adjustments) => ({
         ...prev,
-        aspectRatio: 1 / (prev.aspectRatio ? prev.aspectRatio : 1),
+        aspectRatio: newRatio,
         crop: null,
       }));
-
       return;
     }
 
-    const imageRatio = getEffectiveOriginalRatio();
-
     let newAspectRatio = targetRatio;
-    if (targetRatio && imageRatio && imageRatio < 1 && targetRatio > 1) {
-      newAspectRatio = 1 / targetRatio;
+    if (targetRatio && targetRatio !== 1) {
+      if (preferPortrait) {
+        newAspectRatio = targetRatio > 1 ? 1 / targetRatio : targetRatio;
+      } else {
+        newAspectRatio = targetRatio > 1 ? targetRatio : targetRatio;
+      }
     }
 
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, aspectRatio: newAspectRatio, crop: null }));
@@ -223,9 +252,11 @@ export default function CropPanel({
 
   const handleOrientationToggle = useCallback(() => {
     if (aspectRatio && aspectRatio !== 1) {
+      const newRatio = 1 / aspectRatio;
+      setPreferPortrait(newRatio < 1);
       setAdjustments((prev: Partial<Adjustments>) => ({
         ...prev,
-        aspectRatio: 1 / (prev.aspectRatio ? prev.aspectRatio : 1),
+        aspectRatio: newRatio,
         crop: null,
       }));
     }
@@ -235,6 +266,9 @@ export default function CropPanel({
     const originalAspectRatio =
       selectedImage?.width && selectedImage?.height ? selectedImage.width / selectedImage.height : null;
 
+    setPreferPortrait(false);
+    setIsEditingCustom(false);
+    lastSyncedRatio.current = null;
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       aspectRatio: originalAspectRatio,
@@ -270,7 +304,7 @@ export default function CropPanel({
     return rotation || 0;
   }, [rotation]);
 
-  const handleFineRotationChange = (e: any) => {
+  const handleFineRotationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newFineRotation = parseFloat(e.target.value);
     setAdjustments((prev: Adjustments) => ({ ...prev, rotation: newFineRotation }));
   };
@@ -303,11 +337,18 @@ export default function CropPanel({
     setGlobalRotationActive?.(false);
   };
 
+  const getOrientationTooltip = () => {
+    if (isOrientationToggleDisabled) {
+      return 'Switch orientation';
+    }
+    return orientation === Orientation.Vertical ? 'Switch to landscape' : 'Switch to portrait';
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
         <h2 className="text-xl font-bold text-primary text-shadow-shiny">Crop & Transform</h2>
-        <button className="p-2 rounded-full hover:bg-surface transition-colors" onClick={handleReset} title="Reset All">
+        <button className="p-2 rounded-full hover:bg-surface transition-colors" onClick={handleReset} title="Reset Crop & Transform">
           <RotateCcw size={18} />
         </button>
       </div>
@@ -322,7 +363,7 @@ export default function CropPanel({
                   className="p-1.5 rounded-md hover:bg-surface disabled:text-text-tertiary disabled:cursor-not-allowed"
                   disabled={isOrientationToggleDisabled}
                   onClick={handleOrientationToggle}
-                  title="Switch Orientation"
+                  title={getOrientationTooltip()}
                 >
                   {orientation === Orientation.Vertical ? (
                     <RectangleVertical size={16} />
@@ -340,6 +381,7 @@ export default function CropPanel({
                     )}
                     key={preset.name}
                     onClick={() => handlePresetClick(preset)}
+                    title={preset.tooltip}
                   >
                     {preset.name}
                   </button>
@@ -354,7 +396,7 @@ export default function CropPanel({
                   onClick={() => {
                     const imageRatio = getEffectiveOriginalRatio();
                     let newAspectRatio = BASE_RATIO;
-                    if (imageRatio && imageRatio < 1) {
+                    if (preferPortrait || (imageRatio && imageRatio < 1)) {
                       newAspectRatio = 1 / BASE_RATIO;
                     }
                     setAdjustments((prev: Partial<Adjustments>) => ({
@@ -363,6 +405,7 @@ export default function CropPanel({
                       crop: null,
                     }));
                   }}
+                  title="Enter custom aspect ratio"
                 >
                   Custom
                 </button>
@@ -379,8 +422,10 @@ export default function CropPanel({
                       name="customW"
                       onBlur={handleApplyCustomRatio}
                       onChange={handleCustomInputChange}
+                      onFocus={handleCustomInputFocus}
                       onKeyDown={handleKeyDown}
                       placeholder="W"
+                      title="Width"
                       type="number"
                       value={customW}
                     />
@@ -391,8 +436,10 @@ export default function CropPanel({
                       name="customH"
                       onBlur={handleApplyCustomRatio}
                       onChange={handleCustomInputChange}
+                      onFocus={handleCustomInputFocus}
                       onKeyDown={handleKeyDown}
                       placeholder="H"
+                      title="Height"
                       type="number"
                       value={customH}
                     />
@@ -467,6 +514,7 @@ export default function CropPanel({
                 <button
                   className="flex flex-col items-center justify-center p-3 rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary"
                   onClick={() => handleStepRotate(-90)}
+                  title="Rotate 90° counter-clockwise"
                 >
                   <RotateCcw size={20} className="transition-none" />
                   <span className="text-xs mt-1.5 transition-none">Rotate Left</span>
@@ -474,6 +522,7 @@ export default function CropPanel({
                 <button
                   className="flex flex-col items-center justify-center p-3 rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary"
                   onClick={() => handleStepRotate(90)}
+                  title="Rotate 90° clockwise"
                 >
                   <RotateCw size={20} className="transition-none" />
                   <span className="text-xs mt-1.5 transition-none">Rotate Right</span>
@@ -491,6 +540,7 @@ export default function CropPanel({
                       flipHorizontal: !prev.flipHorizontal,
                     }))
                   }
+                  title="Flip image horizontally"
                 >
                   <FlipHorizontal size={20} className="transition-none" />
                   <span className="text-xs mt-1.5 transition-none">Flip Horiz</span>
@@ -505,6 +555,7 @@ export default function CropPanel({
                   onClick={() =>
                     setAdjustments((prev: Adjustments) => ({ ...prev, flipVertical: !prev.flipVertical }))
                   }
+                  title="Flip image vertically"
                 >
                   <FlipVertical size={20} className="transition-none" />
                   <span className="text-xs mt-1.5 transition-none">Flip Vert</span>
@@ -518,6 +569,7 @@ export default function CropPanel({
                 <button
                   className="flex flex-col items-center justify-center p-3 rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary group"
                   onClick={() => setIsTransformModalOpen(true)}
+                  title="Perspective and keystone correction"
                 >
                   <Scan size={20} className="transition-none" />
                   <span className="text-xs mt-1.5 transition-none">Transform</span>
@@ -525,6 +577,7 @@ export default function CropPanel({
                 <button
                   className="flex flex-col items-center justify-center p-3 rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary group"
                   onClick={() => setIsLensModalOpen(true)}
+                  title="Lens distortion correction"
                 >
                   <Aperture size={20} className="transition-none" />
                   <span className="text-xs mt-1.5 transition-none">Lens</span>

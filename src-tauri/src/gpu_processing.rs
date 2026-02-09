@@ -153,8 +153,12 @@ struct BlurParams {
 struct FlareParams {
     amount: f32,
     is_raw: u32,
-    _pad1: u32,
+    exposure: f32,
+    brightness: f32,
+    contrast: f32,
+    whites: f32,
     aspect_ratio: f32,
+    _pad: f32,
 }
 
 pub struct GpuProcessor {
@@ -560,8 +564,12 @@ impl GpuProcessor {
             let f_params = FlareParams {
                 amount: adjustments.global.flare_amount,
                 is_raw: adjustments.global.is_raw_image,
-                _pad1: 0,
+                exposure: adjustments.global.exposure,
+                brightness: adjustments.global.brightness,
+                contrast: adjustments.global.contrast,
+                whites: adjustments.global.whites,
                 aspect_ratio,
+                _pad: 0.0,
             };
             queue.write_buffer(&self.flare_params_buffer, 0, bytemuck::bytes_of(&f_params));
 

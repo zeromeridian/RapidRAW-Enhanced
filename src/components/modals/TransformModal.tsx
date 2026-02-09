@@ -344,7 +344,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         <h2 className="text-xl font-bold text-primary text-shadow-shiny">Transform</h2>
         <button
           onClick={handleReset}
-          title="Reset All Parameters"
+          title="Reset Transform"
           className="p-2 rounded-full hover:bg-surface transition-colors"
         >
           <RotateCcw size={18} />
@@ -576,7 +576,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               onMouseLeave={() => toggleCompare(false)}
               className={clsx(
                 'p-2 rounded-full transition-colors select-none',
-                isCompareActive ? 'bg-accent text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
+                isCompareActive ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white'
               )}
               title="Hold to Compare"
             >

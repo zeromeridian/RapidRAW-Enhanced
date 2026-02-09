@@ -1,8 +1,12 @@
 struct FlareParams {
     amount: f32,
     is_raw: u32,
-    _pad1: u32,
+    exposure: f32,
+    brightness: f32,
+    contrast: f32,
+    whites: f32,
     aspect_ratio: f32,
+    _pad: f32,
 }
 
 @group(0) @binding(0) var input_texture: texture_2d<f32>;
@@ -21,28 +25,79 @@ fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
     return select(higher, lower, c <= cutoff);
 }
 
+fn linear_to_srgb(c: vec3<f32>) -> vec3<f32> {
+    let c_clamped = clamp(c, vec3<f32>(0.0), vec3<f32>(1.0));
+    let cutoff = vec3<f32>(0.0031308);
+    let a = vec3<f32>(0.055);
+    let higher = (1.0 + a) * pow(c_clamped, vec3<f32>(1.0 / 2.4)) - a;
+    let lower = c_clamped * 12.92;
+    return select(higher, lower, c_clamped <= cutoff);
+}
+
+fn apply_filmic_exposure(color_in: vec3<f32>, brightness_adj: f32) -> vec3<f32> {
+    if (brightness_adj == 0.0) {
+        return color_in;
+    }
+    const RATIONAL_CURVE_MIX: f32 = 0.95;
+    const MIDTONE_STRENGTH: f32 = 1.2;
+    let original_luma = get_luma(color_in);
+    if (abs(original_luma) < 0.00001) {
+        return color_in;
+    }
+    let direct_adj = brightness_adj * (1.0 - RATIONAL_CURVE_MIX);
+    let rational_adj = brightness_adj * RATIONAL_CURVE_MIX;
+    let scale = pow(2.0, direct_adj);
+    let k = pow(2.0, -rational_adj * MIDTONE_STRENGTH);
+    let luma_abs = abs(original_luma);
+    let luma_floor = floor(luma_abs);
+    let luma_fract = luma_abs - luma_floor;
+    let shaped_fract = luma_fract / (luma_fract + (1.0 - luma_fract) * k);
+    let shaped_luma_abs = luma_floor + shaped_fract;
+    let new_luma = sign(original_luma) * shaped_luma_abs * scale;
+    let chroma = color_in - vec3<f32>(original_luma);
+    let total_luma_scale = new_luma / original_luma;
+    let chroma_scale = pow(total_luma_scale, 0.8);
+    return vec3<f32>(new_luma) + chroma * chroma_scale;
+}
+
+fn apply_tonal_adjustments(color: vec3<f32>, con: f32, wh: f32) -> vec3<f32> {
+    var rgb = color;
+
+    if (wh != 0.0) {
+        let white_level = 1.0 - wh * 0.25;
+        rgb = rgb / max(white_level, 0.01);
+    }
+    return rgb;
+}
+
 @compute @workgroup_size(16, 16, 1)
 fn threshold_main(@builtin(global_invocation_id) id: vec3<u32>) {
     let out_dims = vec2<u32>(textureDimensions(threshold_texture));
     if (id.x >= out_dims.x || id.y >= out_dims.y) { return; }
 
     let uv = (vec2<f32>(id.xy) + 0.5) / vec2<f32>(out_dims);
-    
-    let c = textureSampleLevel(input_texture, input_sampler, uv, 0.0).rgb;
-    
+
+    let raw_sample = textureSampleLevel(input_texture, input_sampler, uv, 0.0).rgb;
+
     var linear_color: vec3<f32>;
     if (params.is_raw == 1u) {
-        linear_color = c;
+        linear_color = raw_sample;
     } else {
-        linear_color = srgb_to_linear(c);
+        linear_color = srgb_to_linear(raw_sample);
     }
 
-    let luma = get_luma(linear_color);
-    
+    if (params.exposure != 0.0) {
+        linear_color = linear_color * pow(2.0, params.exposure);
+    }
+
+    linear_color = apply_filmic_exposure(linear_color, params.brightness);
+    linear_color = apply_tonal_adjustments(linear_color, params.contrast, params.whites);
+
+    let luma_for_threshold = get_luma(linear_color);
     let threshold_val = mix(0.88, 0.50, clamp(params.amount, 0.0, 1.0));
     let knee = 0.15;
-    
-    let x = luma - threshold_val + knee;
+
+    let x = luma_for_threshold - threshold_val + knee;
     var bright_contrib: f32;
     
     if (x <= 0.0) {
@@ -52,8 +107,9 @@ fn threshold_main(@builtin(global_invocation_id) id: vec3<u32>) {
     } else {
         bright_contrib = x - knee;
     }
+
+    let output_color = linear_color * (bright_contrib / max(luma_for_threshold, 0.001));
     
-    let output_color = linear_color * (bright_contrib / max(luma, 0.001));
     textureStore(threshold_texture, id.xy, vec4<f32>(output_color, 1.0));
 }
 

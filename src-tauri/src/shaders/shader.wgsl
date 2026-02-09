@@ -62,16 +62,7 @@ struct GlobalAdjustments {
     chromatic_aberration_blue_yellow: f32,
     show_clipping: u32,
     is_raw_image: u32,
-
-    enable_negative_conversion: u32,
-    film_base_r: f32,
-    film_base_g: f32,
-    film_base_b: f32,
-    negative_red_balance: f32,
-    negative_green_balance: f32,
-    negative_blue_balance: f32,
-    _pad_neg1: f32,
-    _pad_neg2: f32,
+    _pad_ca1: f32,
 
     has_lut: u32,
     lut_intensity: f32,
@@ -1112,7 +1103,8 @@ fn apply_glow_bloom(
     color: vec3<f32>,
     blurred_color_input_space: vec3<f32>,
     amount: f32,
-    is_raw: u32
+    is_raw: u32,
+    exp: f32, bright: f32, con: f32, wh: f32
 ) -> vec3<f32> {
     if (amount <= 0.0) {
         return color;
@@ -1124,6 +1116,10 @@ fn apply_glow_bloom(
     } else {
         blurred_linear = srgb_to_linear(blurred_color_input_space);
     }
+
+    blurred_linear = apply_linear_exposure(blurred_linear, exp);
+    blurred_linear = apply_filmic_exposure(blurred_linear, bright);
+    blurred_linear = apply_tonal_adjustments(blurred_linear, 0.0, 0.0, wh, 0.0);
 
     let linear_luma = get_luma(max(blurred_linear, vec3<f32>(0.0)));
 
@@ -1173,7 +1169,13 @@ fn apply_glow_bloom(
     return color + bloom_color * amount * 3.8 * protection;
 }
 
-fn apply_halation(color: vec3<f32>, blurred_color_input_space: vec3<f32>, amount: f32, is_raw: u32) -> vec3<f32> {
+fn apply_halation(
+    color: vec3<f32>, 
+    blurred_color_input_space: vec3<f32>, 
+    amount: f32, 
+    is_raw: u32,
+    exp: f32, bright: f32, con: f32, wh: f32
+) -> vec3<f32> {
     if (amount <= 0.0) { return color; }
     
     var blurred_linear: vec3<f32>;
@@ -1182,6 +1184,10 @@ fn apply_halation(color: vec3<f32>, blurred_color_input_space: vec3<f32>, amount
     } else {
         blurred_linear = srgb_to_linear(blurred_color_input_space);
     }
+
+    blurred_linear = apply_linear_exposure(blurred_linear, exp);
+    blurred_linear = apply_filmic_exposure(blurred_linear, bright);
+    blurred_linear = apply_tonal_adjustments(blurred_linear, 0.0, 0.0, wh, 0.0);
     
     let linear_luma = get_luma(max(blurred_linear, vec3<f32>(0.0)));
 
@@ -1246,15 +1252,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         initial_linear_rgb = color_from_texture;
     }
 
-    if (adjustments.global.enable_negative_conversion == 1u) {
-        initial_linear_rgb = vec3<f32>(1.0) - initial_linear_rgb;
-        let film_base_color = vec3<f32>(adjustments.global.film_base_r, adjustments.global.film_base_g, adjustments.global.film_base_b);
-        initial_linear_rgb -= film_base_color;
-        let balance_mult = vec3<f32>(1.0 + adjustments.global.negative_red_balance, 1.0 + adjustments.global.negative_green_balance, 1.0 + adjustments.global.negative_blue_balance);
-        initial_linear_rgb *= balance_mult;
-        initial_linear_rgb = max(initial_linear_rgb, vec3<f32>(0.0));
-    }
-
     let sharpness_blurred = textureLoad(sharpness_blur_texture, id.xy, 0).rgb;
     let clarity_blurred = textureLoad(clarity_blur_texture, id.xy, 0).rgb;
     let structure_blurred = textureLoad(structure_blur_texture, id.xy, 0).rgb;
@@ -1277,8 +1274,43 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         processed_rgb = srgb_to_linear(srgb_emulated);
     }
 
+    if (adjustments.global.glow_amount > 0.0) {
+        processed_rgb = apply_glow_bloom(
+            processed_rgb,
+            structure_blurred,
+            adjustments.global.glow_amount,
+            adjustments.global.is_raw_image,
+            adjustments.global.exposure, adjustments.global.brightness, adjustments.global.contrast, adjustments.global.whites
+        );
+    }
+    if (adjustments.global.halation_amount > 0.0) {
+        processed_rgb = apply_halation(
+            processed_rgb,
+            clarity_blurred,
+            adjustments.global.halation_amount,
+            adjustments.global.is_raw_image,
+            adjustments.global.exposure, adjustments.global.brightness, adjustments.global.contrast, adjustments.global.whites
+        );
+    }
+    if (adjustments.global.flare_amount > 0.0) {
+        let uv = vec2<f32>(absolute_coord) / full_dims;
+        var flare_color = textureSampleLevel(flare_texture, flare_sampler, uv, 0.0).rgb;
+        flare_color *= 1.4;
+        flare_color = flare_color * flare_color;
+        let linear_luma = get_luma(max(processed_rgb, vec3<f32>(0.0)));
+        var perceptual_luma: f32;
+        if (linear_luma <= 1.0) {
+            perceptual_luma = pow(max(linear_luma, 0.0), 1.0 / 2.2);
+        } else {
+            perceptual_luma = 1.0 + pow(linear_luma - 1.0, 1.0 / 2.2);
+        }
+        let protection = 1.0 - smoothstep(0.7, 1.8, perceptual_luma);
+        processed_rgb += flare_color * adjustments.global.flare_amount * protection;
+    }
+
     let globally_adjusted_linear = apply_all_adjustments(processed_rgb, adjustments.global, absolute_coord_i, id.xy, scale);
     var composite_rgb_linear = globally_adjusted_linear;
+
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
@@ -1289,44 +1321,51 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             mask_base_linear = apply_local_contrast(mask_base_linear, clarity_blurred, mask_adj.clarity, adjustments.global.is_raw_image, 1u);
             mask_base_linear = apply_local_contrast(mask_base_linear, structure_blurred, mask_adj.structure, adjustments.global.is_raw_image, 1u);
 
-            let mask_adjusted_linear = apply_all_mask_adjustments(mask_base_linear, mask_adj, absolute_coord_i, id.xy, scale, adjustments.global.is_raw_image, adjustments.global.tonemapper_mode);
-
-            var mask_with_effects = mask_adjusted_linear;
-            
             if (mask_adj.glow_amount > 0.0) {
-                mask_with_effects = apply_glow_bloom(mask_with_effects, structure_blurred, mask_adj.glow_amount, adjustments.global.is_raw_image);
+                mask_base_linear = apply_glow_bloom(
+                    mask_base_linear,
+                    structure_blurred, 
+                    mask_adj.glow_amount, 
+                    adjustments.global.is_raw_image,
+                    adjustments.global.exposure + mask_adj.exposure, 
+                    adjustments.global.brightness + mask_adj.brightness, 
+                    adjustments.global.contrast + mask_adj.contrast, 
+                    adjustments.global.whites + mask_adj.whites
+                );
             }
             if (mask_adj.halation_amount > 0.0) {
-                mask_with_effects = apply_halation(mask_with_effects, clarity_blurred, mask_adj.halation_amount, adjustments.global.is_raw_image);
+                mask_base_linear = apply_halation(
+                    mask_base_linear,
+                    clarity_blurred, 
+                    mask_adj.halation_amount, 
+                    adjustments.global.is_raw_image,
+                    adjustments.global.exposure + mask_adj.exposure, 
+                    adjustments.global.brightness + mask_adj.brightness, 
+                    adjustments.global.contrast + mask_adj.contrast, 
+                    adjustments.global.whites + mask_adj.whites
+                );
             }
+
+            var mask_adjusted_linear = apply_all_mask_adjustments(mask_base_linear, mask_adj, absolute_coord_i, id.xy, scale, adjustments.global.is_raw_image, adjustments.global.tonemapper_mode);
+
             if (mask_adj.flare_amount > 0.0) {
                 let uv = vec2<f32>(absolute_coord) / full_dims;
                 var flare_color = textureSampleLevel(flare_texture, flare_sampler, uv, 0.0).rgb;
                 flare_color *= 1.4;
                 flare_color = flare_color * flare_color;
-                let current_luma = get_luma(max(mask_with_effects, vec3<f32>(0.0)));
-                let protection = 1.0 - smoothstep(0.7, 1.8, current_luma);
-                mask_with_effects += flare_color * mask_adj.flare_amount * protection;
+                let mask_linear_luma = get_luma(max(mask_adjusted_linear, vec3<f32>(0.0)));
+                var mask_perceptual_luma: f32;
+                if (mask_linear_luma <= 1.0) {
+                    mask_perceptual_luma = pow(max(mask_linear_luma, 0.0), 1.0 / 2.2);
+                } else {
+                    mask_perceptual_luma = 1.0 + pow(max(mask_linear_luma - 1.0, 0.0), 1.0 / 2.2);
+                }
+                let protection = 1.0 - smoothstep(0.7, 1.8, mask_perceptual_luma);
+                mask_adjusted_linear += flare_color * mask_adj.flare_amount * protection;
             }
-            
-            composite_rgb_linear = mix(composite_rgb_linear, mask_with_effects, influence);
-        }
-    }
 
-    if (adjustments.global.glow_amount > 0.0) {
-        composite_rgb_linear = apply_glow_bloom(composite_rgb_linear, structure_blurred, adjustments.global.glow_amount, adjustments.global.is_raw_image);
-    }
-    if (adjustments.global.halation_amount > 0.0) {
-        composite_rgb_linear = apply_halation(composite_rgb_linear, clarity_blurred, adjustments.global.halation_amount, adjustments.global.is_raw_image);
-    }
-    if (adjustments.global.flare_amount > 0.0) {
-        let uv = vec2<f32>(absolute_coord) / full_dims;
-        var flare_color = textureSampleLevel(flare_texture, flare_sampler, uv, 0.0).rgb;
-        flare_color *= 1.4;
-        flare_color = flare_color * flare_color;
-        let current_luma = get_luma(max(composite_rgb_linear, vec3<f32>(0.0)));
-        let protection = 1.0 - smoothstep(0.7, 1.8, current_luma);
-        composite_rgb_linear += flare_color * adjustments.global.flare_amount * protection; 
+            composite_rgb_linear = mix(composite_rgb_linear, mask_adjusted_linear, influence);
+        }
     }
 
     var base_srgb: vec3<f32>;

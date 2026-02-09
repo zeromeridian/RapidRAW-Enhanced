@@ -36,6 +36,7 @@ import {
   Users,
   Gauge,
   Grip,
+  SquaresExclude,
 } from 'lucide-react';
 import TitleBar from './window/TitleBar';
 import CommunityPage from './components/panel/CommunityPage';
@@ -62,6 +63,7 @@ import ConfirmModal from './components/modals/ConfirmModal';
 import ImportSettingsModal from './components/modals/ImportSettingsModal';
 import RenameFileModal from './components/modals/RenameFileModal';
 import PanoramaModal from './components/modals/PanoramaModal';
+import NegativeConversionModal from './components/modals/NegativeConversionModal';
 import DenoiseModal from './components/modals/DenoiseModal';
 import CollageModal from './components/modals/CollageModal';
 import CopyPasteSettingsModal from './components/modals/CopyPasteSettingsModal';
@@ -83,6 +85,7 @@ import {
 } from './utils/adjustments';
 import { generatePaletteFromImage } from './utils/palette';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import GlobalTooltip from './components/ui/GlobalTooltip';
 import { THEMES, DEFAULT_THEME_ID, ThemeProps } from './utils/themes';
 import { SubMask, ToolType } from './components/panel/right/Masks';
 import {
@@ -181,6 +184,11 @@ interface DenoiseModalState {
   error: string | null;
   targetPath: string | null;
   progressMessage: string | null;
+}
+
+interface NegativeConversionModalState {
+  isOpen: boolean;
+  targetPath: string | null;
 }
 
 interface CullingModalState {
@@ -433,6 +441,10 @@ function App() {
     isOpen: false,
     progressMessage: '',
     stitchingSourcePaths: [],
+  });
+  const [negativeModalState, setNegativeModalState] = useState<NegativeConversionModalState>({
+    isOpen: false,
+    targetPath: null,
   });
   const [denoiseModalState, setDenoiseModalState] = useState<DenoiseModalState>({
     isOpen: false,
@@ -2535,7 +2547,9 @@ function App() {
     confirmModalState.isOpen ||
     panoramaModalState.isOpen ||
     cullingModalState.isOpen ||
-    collageModalState.isOpen;
+    collageModalState.isOpen ||
+    denoiseModalState.isOpen ||
+    negativeModalState.isOpen;
 
   useKeyboardShortcuts({
     isModalOpen: isAnyModalOpen,
@@ -3598,6 +3612,18 @@ function App() {
             },
           },
           {
+            label: 'Convert Negative',
+            icon: SquaresExclude,
+            onClick: () => {
+              if (selectedImage) {
+                setNegativeModalState({
+                  isOpen: true,
+                  targetPath: selectedImage.path
+                });
+              }
+            }
+          },
+          {
             disabled: true,
             icon: Images,
             label: 'Stitch Panorama',
@@ -3911,6 +3937,17 @@ function App() {
                 progressMessage: null,
               });
             },
+          },
+          {
+            label: 'Convert Negative',
+            icon: SquaresExclude,
+            disabled: !isSingleSelection,
+            onClick: () => {
+              setNegativeModalState({
+                isOpen: true,
+                targetPath: finalSelection[0]
+              });
+            }
           },
           {
             disabled: selectionCount < 2 || selectionCount > 30,
@@ -4759,23 +4796,36 @@ function App() {
         onSave={handleSavePanorama}
         progressMessage={panoramaModalState.progressMessage}
       />
-      <HdrModal         error={hdrModalState.error}
-                        finalImageBase64={hdrModalState.finalImageBase64}
-                        isOpen={hdrModalState.isOpen}
-                        onClose={() =>
-                          setHdrModalState({
-                            isOpen: false,
-                            progressMessage: '',
-                            finalImageBase64: null,
-                            error: null,
-                            stitchingSourcePaths: [],
-                          })
-                        }
-                        onOpenFile={(path: string) => {
-                          handleImageSelect(path);
-                        }}
-                        onSave={handleSaveHdr}
-                        progressMessage={hdrModalState.progressMessage}
+      <HdrModal
+        error={hdrModalState.error}
+        finalImageBase64={hdrModalState.finalImageBase64}
+        isOpen={hdrModalState.isOpen}
+        onClose={() =>
+          setHdrModalState({
+            isOpen: false,
+            progressMessage: "",
+            finalImageBase64: null,
+            error: null,
+            stitchingSourcePaths: [],
+          })
+        }
+        onOpenFile={(path: string) => {
+          handleImageSelect(path);
+        }}
+        onSave={handleSaveHdr}
+        progressMessage={hdrModalState.progressMessage}
+      />
+      <NegativeConversionModal
+        isOpen={negativeModalState.isOpen}
+        onClose={() => setNegativeModalState(prev => ({ ...prev, isOpen: false }))}
+        selectedImagePath={negativeModalState.targetPath}
+        onSave={(savedPath) => {
+            refreshImageList().then(() => {
+              if (selectedImage?.path === negativeModalState.targetPath) {
+                handleImageSelect(savedPath);
+              }
+            });
+        }}
       />
       <DenoiseModal
         isOpen={denoiseModalState.isOpen}
@@ -4850,6 +4900,7 @@ const AppWrapper = () => (
   <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
     <ContextMenuProvider>
       <App />
+      <GlobalTooltip />
     </ContextMenuProvider>
   </ClerkProvider>
 );

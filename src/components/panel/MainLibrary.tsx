@@ -1462,7 +1462,7 @@ export default function MainLibrary({
                       className="px-3 bg-surface text-text-primary shadow-none h-11"
                       onClick={() => setShowSettings(true)}
                       size="lg"
-                      title="Settings"
+                      title="Go to Settings"
                       variant="ghost"
                     >
                       <Settings size={20} />
@@ -1614,7 +1614,7 @@ export default function MainLibrary({
           <Button
             className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
             onClick={onGoHome}
-            title="Go to Home Screen"
+            title="Go to Home"
           >
             <Home className="w-8 h-8" />
           </Button>
