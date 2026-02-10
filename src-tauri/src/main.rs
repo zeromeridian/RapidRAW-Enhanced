@@ -48,13 +48,13 @@ use image::{
     DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, Rgb, RgbImage, Rgba,
     RgbaImage, imageops,
 };
-use image_hdr::exif::{get_exif_data, get_exposures, get_gains};
 use image_hdr::hdr_merge_images;
 use image_hdr::input::HDRInput;
 use image_hdr::stretch::apply_histogram_stretch;
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
 use imageproc::hough::{LineDetectionOptions, detect_lines};
+use log::debug;
 use rayon::prelude::*;
 use reqwest;
 use serde::{Deserialize, Serialize};
@@ -2900,59 +2900,59 @@ async fn merge_hdr(
                         .to_string_lossy()
                 ),
             );
-            println!("  - Processing '{}'", path);
 
-            let file_bytes = fs::read(path)
-                .map_err(|e| format!("Failed to read image {}: {}", path, e))
-                .unwrap();
+            let file_bytes =
+                fs::read(path).map_err(|e| format!("Failed to read image {}: {}", path, e))?;
             let dynamic_image = load_base_image_from_bytes(&file_bytes, path, false, 2.5, None)
-                .map_err(|e| format!("Failed to load image {}: {}", path, e))
-                .unwrap();
+                .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
 
-            println!(
-                "Read image with dimensions: {}x{}",
-                dynamic_image.width(),
-                dynamic_image.height()
-            );
+            let exif = exif_processing::read_exif_data(&path, &file_bytes);
 
-            let (gains, exposure) = match get_exif_data(&file_bytes) {
-                Ok(exif) => {
-                    let gains = get_gains(&exif).unwrap_or(1.0);
-                    println!("Read image with gains: {}", gains);
-                    let exposure = get_exposures(&exif).unwrap_or(1.0);
-                    println!("Read image with exposure: {}", exposure);
-                    (gains, exposure)
+            let gains = match exif.get("PhotographicSensitivity") {
+                None => {
+                    return Err(format!(
+                        "Image {} is missing 'PhotographicSensitivity' in EXIF data",
+                        path
+                    ));
                 }
-                Err(_) => {
-                    let exif = exif_processing::read_exif_data(&path, &file_bytes);
-
-                    let gains = match exif.get("PhotographicSensitivity") {
-                        None => 1.0,
-                        Some(gains) => f32::from_str(gains).unwrap_or_else(|_| 1.0),
-                    };
-                    println!("Read image with gains: {}", gains);
-                    let exposure = match exif.get("ExposureTime") {
-                        None => 1.0,
-                        Some(exposure) => parse_exposure_time(exposure).unwrap_or_else(|_| 1.0),
-                    };
-                    println!("Read image with exposure: {}", exposure);
-                    (gains, exposure)
-                }
+                Some(gains) => f32::from_str(gains).map_err(|_| {
+                    format!(
+                        "Could not parse PhotographicSensitivity '{}' as f32 from image {}",
+                        gains, path
+                    )
+                })?,
             };
+            debug!("Read image {} with gains: {}", path, gains);
+            let exposure = match exif.get("ExposureTime") {
+                None => {
+                    return Err(format!(
+                        "Image {} is missing 'ExposureTime' in EXIF data",
+                        path
+                    ));
+                }
+                Some(exposure) => parse_exposure_time(exposure).map_err(|e| {
+                    format!(
+                        "Could not parse ExposureTime '{}' as f32 from image {}: {}",
+                        exposure, path, e
+                    )
+                })?,
+            };
+            debug!("Read image {} with exposure: {}", path, exposure);
 
-            HDRInput::with_image(&dynamic_image, Duration::from_secs_f32(exposure), gains).unwrap()
+            HDRInput::with_image(&dynamic_image, Duration::from_secs_f32(exposure), gains)
+                .map_err(|e| format!("Failed to prepare HDR input for image {}: {}", path, e))
         })
-        .collect();
+        .collect::<Result<Vec<HDRInput>, String>>()?;
 
-    println!("Starting HDR merge of {} images", images.len());
+    debug!("Starting HDR merge of {} images", images.len());
 
     let hdr_merged = hdr_merge_images(&mut images.into()).map_err(|e| e.to_string())?;
 
-    println!("HDR merge completed");
+    debug!("HDR merge completed");
 
     let stretched = apply_histogram_stretch(&hdr_merged).map_err(|e| e.to_string())?;
 
-    println!("Histogram stretch applied");
+    debug!("Histogram stretch applied");
 
     let mut buf = Cursor::new(Vec::new());
 
