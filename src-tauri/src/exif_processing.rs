@@ -36,7 +36,7 @@ fn fmt_date_str(s: String) -> String {
 
 pub fn read_exif_data(path: &str, file_bytes: &[u8]) -> HashMap<String, String> {
     if is_raw_file(path) {
-        if let Some(map) = extract_metadata(path) {
+        if let Some(map) = extract_metadata(path, file_bytes) {
             return map;
         }
     }
@@ -54,87 +54,84 @@ pub fn read_exif_data(path: &str, file_bytes: &[u8]) -> HashMap<String, String> 
     exif_data
 }
 
-pub fn extract_metadata(path_str: &str) -> Option<HashMap<String, String>> {
+pub fn extract_metadata(path_str: &str, file_bytes: &[u8]) -> Option<HashMap<String, String>> {
     let mut map = HashMap::new();
 
-    if let Ok(file) = std::fs::File::open(path_str) {
-        let mut bufreader = BufReader::new(&file);
-        let exifreader = exif::Reader::new();
+    let exifreader = exif::Reader::new();
 
-        if let Ok(exif_obj) = exifreader.read_from_container(&mut bufreader) {
-            for field in exif_obj.fields() {
-                 match field.tag {
-                    exif::Tag::ExposureTime => {
-                        if let exif::Value::Rational(ref v) = field.value {
-                            if !v.is_empty() {
-                                let r = &v[0];
-                                if r.num == 1 && r.denom > 1 {
-                                    map.insert("ExposureTime".to_string(), format!("1/{} s", r.denom));
+    if let Ok(exif_obj) = exifreader.read_from_container(&mut Cursor::new(file_bytes)) {
+        for field in exif_obj.fields() {
+             match field.tag {
+                exif::Tag::ExposureTime => {
+                    if let exif::Value::Rational(ref v) = field.value {
+                        if !v.is_empty() {
+                            let r = &v[0];
+                            if r.num == 1 && r.denom > 1 {
+                                map.insert("ExposureTime".to_string(), format!("1/{} s", r.denom));
+                            } else {
+                                let val = r.num as f32 / r.denom as f32;
+                                if val < 1.0 && val > 0.0 {
+                                    map.insert("ExposureTime".to_string(), format!("1/{} s", (1.0/val).round()));
                                 } else {
-                                    let val = r.num as f32 / r.denom as f32;
-                                    if val < 1.0 && val > 0.0 {
-                                        map.insert("ExposureTime".to_string(), format!("1/{} s", (1.0/val).round()));
-                                    } else {
-                                        map.insert("ExposureTime".to_string(), format!("{} s", val));
-                                    }
+                                    map.insert("ExposureTime".to_string(), format!("{} s", val));
                                 }
                             }
                         }
-                    },
-                    exif::Tag::ShutterSpeedValue => {
-                         if let exif::Value::SRational(ref v) = field.value {
-                             if !v.is_empty() {
-                                 let val = v[0].num as f32 / v[0].denom as f32;
-                                 map.insert("ShutterSpeedValue".to_string(), val.to_string());
-                             }
-                         }
-                    },
-                    exif::Tag::FNumber => {
-                         if let exif::Value::Rational(ref v) = field.value {
-                             if !v.is_empty() {
-                                 let val = v[0].num as f32 / v[0].denom as f32;
-                                 map.insert("FNumber".to_string(), format!("f/{}", val));
-                             }
-                         }
-                    },
-                    exif::Tag::ApertureValue => {
-                         if let exif::Value::Rational(ref v) = field.value {
-                             if !v.is_empty() {
-                                 let val = v[0].num as f32 / v[0].denom as f32;
-                                 map.insert("ApertureValue".to_string(), format!("f/{}", val));
-                             }
-                         }
-                    },
-                     exif::Tag::FocalLength => {
-                         if let exif::Value::Rational(ref v) = field.value {
-                             if !v.is_empty() {
-                                 let val = v[0].num as f32 / v[0].denom as f32;
-                                 map.insert("FocalLength".to_string(), val.to_string());
-                                 map.insert("FocalLengthIn35mmFilm".to_string(), val.to_string());
-                             }
-                         }
-                    },
-                    exif::Tag::PhotographicSensitivity | exif::Tag::ISOSpeed => {
-                        map.insert("PhotographicSensitivity".to_string(), field.display_value().to_string());
-                        map.insert("ISOSpeed".to_string(), field.display_value().to_string());
-                    },
-                    exif::Tag::DateTimeOriginal => {
-                        map.insert("DateTimeOriginal".to_string(), fmt_date_str(field.display_value().to_string()));
-                    },
-                    exif::Tag::DateTime => {
-                        map.insert("CreateDate".to_string(), fmt_date_str(field.display_value().to_string()));
-                    },
-                    exif::Tag::DateTimeDigitized => {
-                        map.insert("ModifyDate".to_string(), fmt_date_str(field.display_value().to_string()));
-                    },
-                    _ => {
-                        let val = field.display_value().with_unit(&exif_obj).to_string();
-                        if !val.trim().is_empty() {
-                            map.insert(field.tag.to_string(), val);
-                        }
                     }
-                 }
-            }
+                },
+                exif::Tag::ShutterSpeedValue => {
+                     if let exif::Value::SRational(ref v) = field.value {
+                         if !v.is_empty() {
+                             let val = v[0].num as f32 / v[0].denom as f32;
+                             map.insert("ShutterSpeedValue".to_string(), val.to_string());
+                         }
+                     }
+                },
+                exif::Tag::FNumber => {
+                     if let exif::Value::Rational(ref v) = field.value {
+                         if !v.is_empty() {
+                             let val = v[0].num as f32 / v[0].denom as f32;
+                             map.insert("FNumber".to_string(), format!("f/{}", val));
+                         }
+                     }
+                },
+                exif::Tag::ApertureValue => {
+                     if let exif::Value::Rational(ref v) = field.value {
+                         if !v.is_empty() {
+                             let val = v[0].num as f32 / v[0].denom as f32;
+                             map.insert("ApertureValue".to_string(), format!("f/{}", val));
+                         }
+                     }
+                },
+                 exif::Tag::FocalLength => {
+                     if let exif::Value::Rational(ref v) = field.value {
+                         if !v.is_empty() {
+                             let val = v[0].num as f32 / v[0].denom as f32;
+                             map.insert("FocalLength".to_string(), val.to_string());
+                             map.insert("FocalLengthIn35mmFilm".to_string(), val.to_string());
+                         }
+                     }
+                },
+                exif::Tag::PhotographicSensitivity | exif::Tag::ISOSpeed => {
+                    map.insert("PhotographicSensitivity".to_string(), field.display_value().to_string());
+                    map.insert("ISOSpeed".to_string(), field.display_value().to_string());
+                },
+                exif::Tag::DateTimeOriginal => {
+                    map.insert("DateTimeOriginal".to_string(), fmt_date_str(field.display_value().to_string()));
+                },
+                exif::Tag::DateTime => {
+                    map.insert("CreateDate".to_string(), fmt_date_str(field.display_value().to_string()));
+                },
+                exif::Tag::DateTimeDigitized => {
+                    map.insert("ModifyDate".to_string(), fmt_date_str(field.display_value().to_string()));
+                },
+                _ => {
+                    let val = field.display_value().with_unit(&exif_obj).to_string();
+                    if !val.trim().is_empty() {
+                        map.insert(field.tag.to_string(), val);
+                    }
+                }
+             }
         }
     }
 
