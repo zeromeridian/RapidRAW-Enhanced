@@ -54,7 +54,6 @@ use image_hdr::stretch::apply_histogram_stretch;
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
 use imageproc::hough::{LineDetectionOptions, detect_lines};
-use log::debug;
 use rayon::prelude::*;
 use reqwest;
 use serde::{Deserialize, Serialize};
@@ -2922,7 +2921,7 @@ async fn merge_hdr(
                     )
                 })?,
             };
-            debug!("Read image {} with gains: {}", path, gains);
+            log::info!("Read image {} with gains: {}", path, gains);
             let exposure = match exif.get("ExposureTime") {
                 None => {
                     return Err(format!(
@@ -2937,22 +2936,22 @@ async fn merge_hdr(
                     )
                 })?,
             };
-            debug!("Read image {} with exposure: {}", path, exposure);
+            log::info!("Read image {} with exposure: {}", path, exposure);
 
             HDRInput::with_image(&dynamic_image, Duration::from_secs_f32(exposure), gains)
                 .map_err(|e| format!("Failed to prepare HDR input for image {}: {}", path, e))
         })
         .collect::<Result<Vec<HDRInput>, String>>()?;
 
-    debug!("Starting HDR merge of {} images", images.len());
+    log::info!("Starting HDR merge of {} images", images.len());
 
     let hdr_merged = hdr_merge_images(&mut images.into()).map_err(|e| e.to_string())?;
 
-    debug!("HDR merge completed");
+    log::info!("HDR merge completed");
 
     let stretched = apply_histogram_stretch(&hdr_merged).map_err(|e| e.to_string())?;
 
-    debug!("Histogram stretch applied");
+    log::info!("Histogram stretch applied");
 
     let mut buf = Cursor::new(Vec::new());
 
