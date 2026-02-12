@@ -62,6 +62,8 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+*   **2026-02-12:** Straight brush mask lines using shift click and enhanced Lensfun DB parsing
+*   **2026-02-10:** Improved image loading performance
 *   **2026-02-06:** Refactored negative conversion logic using characteristic curves.
 *   **2026-02-04:** Global tooltips & major UI polish
 *   **2026-02-03:** New creative effects: Glow, Halation & Lens Flares
@@ -70,12 +72,12 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 *   **2026-01-29:** Add cross-channel copy/paste & flat-line clipping logic for curves
 *   **2026-01-26:** Favorite lens saving, improved rotation controls (finer grid), better local contrast adjustments
 *   **2026-01-25:** Filmstrip performance boost, improved sorting, lens distortion fixes for AI masks & crop
-*   **2026-01-24:** Added automatic lens, TCA & vignette correction using lensfun
-*   **2026-01-22:** Improved and centralized EXIF data handling for greater accuracy and support
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+*   **2026-01-24:** Added automatic lens, TCA & vignette correction using lensfun
+*   **2026-01-22:** Improved and centralized EXIF data handling for greater accuracy and support
 *   **2026-01-21:** Inpainting now works correctly on images with geometry transformations
 *   **2026-01-20:** Export preset management for saving export settings 
 *   **2026-01-19:** Preload library for faster startup & automatic geometry transformation helper lines
