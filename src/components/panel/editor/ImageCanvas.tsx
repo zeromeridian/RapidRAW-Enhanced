@@ -1231,7 +1231,6 @@ const ImageCanvas = memo(
                   alt="Mask Overlay"
                   className="absolute object-contain pointer-events-none"
                   src={displayedMaskUrl}
-                  decoding="async"
                   onTransitionEnd={handleMaskTransitionEnd}
                   style={{
                     height: `${imageRenderSize.height}px`,
