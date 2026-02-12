@@ -538,6 +538,7 @@ const ImageCanvas = memo(
 
     const isDrawing = useRef(false);
     const drawingStageRef = useRef<any>(null);
+    const lastBrushPoint = useRef<Coord | null>(null);
     const currentLine = useRef<DrawnLine | null>(null);
     const [previewLine, setPreviewLine] = useState<DrawnLine | null>(null);
     const [cursorPreview, setCursorPreview] = useState<CursorPreview>({ x: 0, y: 0, visible: false });
@@ -605,6 +606,7 @@ const ImageCanvas = memo(
       isDrawing.current = false;
       drawingStageRef.current = null;
       currentLine.current = null;
+      lastBrushPoint.current = null;
       setPreviewLine(null);
     }, [isToolActive]);
 
@@ -812,9 +814,71 @@ const ImageCanvas = memo(
             return;
           }
 
+          const toolType = isAiSubjectActive ? ToolType.AiSeletor : ToolType.Brush;
+          const isShiftClick = isBrushActive && e.evt.shiftKey && lastBrushPoint.current;
+
+          if (isShiftClick) {
+            const { scale } = imageRenderSize;
+            const cropX = adjustments.crop?.x || 0;
+            const cropY = adjustments.crop?.y || 0;
+
+            const startImageSpace = lastBrushPoint.current!;
+            const endImageSpace = {
+              x: pos.x / scale + cropX,
+              y: pos.y / scale + cropY,
+            };
+
+            const dx = endImageSpace.x - startImageSpace.x;
+            const dy = endImageSpace.y - startImageSpace.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const steps = Math.max(Math.ceil(distance), 2);
+            const interpolatedPoints: Coord[] = [];
+            for (let i = 0; i <= steps; i++) {
+              const t = i / steps;
+              interpolatedPoints.push({
+                x: startImageSpace.x + dx * t,
+                y: startImageSpace.y + dy * t,
+              });
+            }
+
+            const imageSpaceLine: DrawnLine = {
+              brushSize: (brushSettings?.size ?? 0) / scale,
+              feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
+              points: interpolatedPoints,
+              tool: brushSettings?.tool ?? ToolType.Brush,
+            };
+
+            const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
+            const existingLines = activeSubMask?.parameters?.lines || [];
+
+            updateSubMask(activeId, {
+              parameters: {
+                ...activeSubMask?.parameters,
+                lines: [...existingLines, imageSpaceLine],
+              },
+            });
+
+            lastBrushPoint.current = endImageSpace;
+
+            const screenPoints = interpolatedPoints.map((p) => ({
+              x: (p.x - cropX) * scale,
+              y: (p.y - cropY) * scale,
+            }));
+            const previewDrwnLine: DrawnLine = {
+              brushSize: brushSettings?.size ?? 0,
+              points: screenPoints,
+              tool: brushSettings?.tool ?? ToolType.Brush,
+            };
+            setPreviewLine(previewDrwnLine);
+            setTimeout(() => setPreviewLine(null), 50);
+
+            isDrawing.current = false;
+            currentLine.current = null;
+            return;
+          }
+
           isDrawing.current = true;
           drawingStageRef.current = stage;
-          const toolType = isAiSubjectActive ? ToolType.AiSeletor : ToolType.Brush;
 
           const newLine: DrawnLine = {
             brushSize: isBrushActive && brushSettings?.size ? brushSettings.size : 2,
@@ -834,7 +898,7 @@ const ImageCanvas = memo(
           }
         }
       },
-      [isWbPickerActive, handleWbClick, isBrushActive, isAiSubjectActive, brushSettings, onSelectMask, onSelectAiSubMask, isMasking, isAiEditing],
+      [isWbPickerActive, handleWbClick, isBrushActive, isAiSubjectActive, brushSettings, onSelectMask, onSelectAiSubMask, isMasking, isAiEditing, imageRenderSize, adjustments.crop, activeMaskId, activeAiSubMaskId, activeSubMask, updateSubMask],
     );
 
     const handleMouseMove = useCallback(
@@ -943,6 +1007,14 @@ const ImageCanvas = memo(
             lines: [...existingLines, imageSpaceLine],
           },
         });
+
+        const lastPoint = line.points[line.points.length - 1];
+        if (lastPoint) {
+          lastBrushPoint.current = {
+            x: lastPoint.x / scale + cropX,
+            y: lastPoint.y / scale + cropY,
+          };
+        }
       }
     }, [
       activeAiSubMaskId,
