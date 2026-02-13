@@ -69,6 +69,7 @@ use crate::ai_processing::{
     generate_image_embeddings, get_or_init_ai_models, run_sam_decoder, run_sky_seg_model,
     run_u2netp_model,
 };
+use crate::exif_processing::{read_exposure_time_secs, read_iso};
 use crate::file_management::{AppSettings, load_settings, parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::image_loader::{
@@ -1624,7 +1625,7 @@ async fn batch_export_images(
                         } else {
                             ImageMetadata::default()
                         };
-                        let mut js_adjustments = metadata.adjustments; 
+                        let mut js_adjustments = metadata.adjustments;
                         hydrate_adjustments(&state, &mut js_adjustments);
                         let is_raw = is_raw_file(&source_path_str);
 
@@ -2905,36 +2906,24 @@ async fn merge_hdr(
             let dynamic_image = load_base_image_from_bytes(&file_bytes, path, false, 2.5, None)
                 .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
 
-            let exif = exif_processing::read_exif_data(&path, &file_bytes);
-
-            let gains = match exif.get("PhotographicSensitivity") {
+            let gains = match read_iso(&path, &file_bytes) {
                 None => {
                     return Err(format!(
                         "Image {} is missing 'PhotographicSensitivity' in EXIF data",
                         path
                     ));
                 }
-                Some(gains) => f32::from_str(gains).map_err(|_| {
-                    format!(
-                        "Could not parse PhotographicSensitivity '{}' as f32 from image {}",
-                        gains, path
-                    )
-                })?,
+                Some(gains) => gains as f32,
             };
             log::info!("Read image {} with gains: {}", path, gains);
-            let exposure = match exif.get("ExposureTime") {
+            let exposure = match read_exposure_time_secs(&path, &file_bytes) {
                 None => {
                     return Err(format!(
                         "Image {} is missing 'ExposureTime' in EXIF data",
                         path
                     ));
                 }
-                Some(exposure) => parse_exposure_time(exposure).map_err(|e| {
-                    format!(
-                        "Could not parse ExposureTime '{}' as f32 from image {}: {}",
-                        exposure, path, e
-                    )
-                })?,
+                Some(exposure) => exposure,
             };
             log::info!("Read image {} with exposure: {}", path, exposure);
 
@@ -2973,39 +2962,6 @@ async fn merge_hdr(
         }),
     );
     Ok(())
-}
-
-fn parse_exposure_time(input: &str) -> Result<f32, String> {
-    // 1. Remove units like "s", "sec", or whitespace
-    let cleaned: String = input
-        .chars()
-        .filter(|c| c.is_numeric() || *c == '/' || *c == '.')
-        .collect();
-
-    if cleaned.is_empty() {
-        return Err("No numeric data found".to_string());
-    }
-
-    // 2. Handle fractional format
-    if cleaned.contains('/') {
-        let parts: Vec<&str> = cleaned.split('/').collect();
-        if parts.len() == 2 {
-            let num = parts[0].parse::<f32>().map_err(|_| "Invalid numerator")?;
-            let den = parts[1].parse::<f32>().map_err(|_| "Invalid denominator")?;
-
-            if den == 0.0 {
-                return Err("Division by zero".to_string());
-            }
-            Ok(num / den)
-        } else {
-            Err("Invalid fraction format".to_string())
-        }
-    } else {
-        // 3. Handle decimal format
-        cleaned
-            .parse::<f32>()
-            .map_err(|_| format!("Could not parse '{}' as f32", cleaned))
-    }
 }
 
 #[tauri::command]
