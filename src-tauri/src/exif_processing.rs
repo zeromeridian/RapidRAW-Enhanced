@@ -5,7 +5,7 @@ use std::path::Path;
 
 use crate::formats::is_raw_file;
 use chrono::{DateTime, Utc};
-use exif::{Exif, Field, In};
+use exif::{Exif, Field, In, Value};
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;
@@ -70,23 +70,35 @@ pub fn read_exposure_time_secs(path: &str, file_bytes: &[u8]) -> Option<f32> {
 
     if let Some(exif) = read_exif(file_bytes) {
         if let Some(exposure) = exif.get_field(exif::Tag::ExposureTime, In::PRIMARY) {
-            let num = exposure.value.get_uint(0)?;
-            let denom = exposure.value.get_uint(0)?;
-            return if denom == 0 {
-                None
-            } else {
-                Some(num as f32 / denom as f32)
-            };
+            if let Value::Rational(ref r) = exposure.value {
+                if r.is_empty() {
+                    return None;
+                }
+
+                let val = r.get(0)?;
+
+                return if val.denom == 0 {
+                    None
+                } else {
+                    Some(val.num as f32 / val.denom as f32)
+                };
+            }
         } else if let Some(shutter_speed) =
             exif.get_field(exif::Tag::ShutterSpeedValue, In::PRIMARY)
         {
-            let num = shutter_speed.value.get_uint(0)?;
-            let denom = shutter_speed.value.get_uint(0)?;
-            return if denom == 0 {
-                None
-            } else {
-                Some(num as f32 / denom as f32)
-            };
+            if let Value::Rational(ref r) = shutter_speed.value {
+                if r.is_empty() {
+                    return None;
+                }
+
+                let val = r.get(0)?;
+
+                return if val.denom == 0 {
+                    None
+                } else {
+                    Some(val.num as f32 / val.denom as f32)
+                };
+            }
         }
     }
     None
