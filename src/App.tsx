@@ -1916,6 +1916,8 @@ function App() {
     setIsWbPickerActive(false);
     setActiveAiSubMaskId(null);
     setLibraryActivePath(lastActivePath);
+    setLiveAdjustments(INITIAL_ADJUSTMENTS);
+    resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
   }, [selectedImage?.path]);
 
   const handleImageSelect = useCallback(
@@ -1925,7 +1927,7 @@ function App() {
       }
       applyAdjustments.cancel();
       debouncedSave.cancel();
-      patchesSentToBackend.current.clear(); 
+      patchesSentToBackend.current.clear();
 
       setSelectedImage({
         exif: null,
@@ -1950,14 +1952,12 @@ function App() {
       setFullScreenUrl(null);
       setFullResolutionUrl(null);
       setTransformedOriginalUrl(null);
-      setLiveAdjustments(INITIAL_ADJUSTMENTS);
-      resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
       setShowOriginal(false);
       setActiveMaskId(null);
       setActiveMaskContainerId(null);
       setActiveAiPatchContainerId(null);
       setActiveAiSubMaskId(null);
-      setIsWbPickerActive(false); 
+      setIsWbPickerActive(false);
 
       if (transformWrapperRef.current) {
         transformWrapperRef.current.resetTransform(0);
@@ -1966,7 +1966,7 @@ function App() {
       setZoom(1);
       setIsLibraryExportPanelVisible(false);
     },
-    [selectedImage?.path, applyAdjustments, debouncedSave, thumbnails, resetAdjustmentsHistory],
+    [selectedImage?.path, applyAdjustments, debouncedSave, thumbnails],
   );
 
   const executeDelete = useCallback(
@@ -3220,47 +3220,66 @@ function App() {
 
   useEffect(() => {
     if (selectedImage && !selectedImage.isReady && selectedImage.path) {
-    let isEffectActive = true;
-    const loadFullImageData = async () => {
+      let isEffectActive = true;
+
+      const loadMetadataEarly = async () => {
         try {
-        const loadImageResult: any = await invoke(Invokes.LoadImage, { path: selectedImage.path });
-        if (!isEffectActive) {
-            return;
-        }
-        if (!isEffectActive) {
-            return;
-        }
+          const metadata: any = await invoke(Invokes.LoadMetadata, { path: selectedImage.path });
+          if (!isEffectActive) return;
 
-        const { width, height } = loadImageResult;
-        setOriginalSize({ width, height });
+          let initialAdjusts;
+          if (metadata.adjustments && !metadata.adjustments.is_null) {
+            initialAdjusts = normalizeLoadedAdjustments(metadata.adjustments);
+          } else {
+            initialAdjusts = { ...INITIAL_ADJUSTMENTS };
+          }
+          
+          setLiveAdjustments(initialAdjusts);
+          resetAdjustmentsHistory(initialAdjusts);
+        } catch (err) {
+          console.error('Failed to load metadata early:', err);
+        }
+      };
 
-        if (appSettings?.editorPreviewResolution) {
+      loadMetadataEarly();
+
+      const loadFullImageData = async () => {
+        try {
+          const loadImageResult: any = await invoke(Invokes.LoadImage, { path: selectedImage.path });
+          if (!isEffectActive) {
+            return;
+          }
+
+          const { width, height } = loadImageResult;
+          setOriginalSize({ width, height });
+
+          if (appSettings?.editorPreviewResolution) {
             const maxSize = appSettings.editorPreviewResolution;
             const aspectRatio = width / height;
 
             if (width > height) {
-            const pWidth = Math.min(width, maxSize);
-            const pHeight = Math.round(pWidth / aspectRatio);
-            setPreviewSize({ width: pWidth, height: pHeight });
+              const pWidth = Math.min(width, maxSize);
+              const pHeight = Math.round(pWidth / aspectRatio);
+              setPreviewSize({ width: pWidth, height: pHeight });
             } else {
-            const pHeight = Math.min(height, maxSize);
-            const pWidth = Math.round(pHeight * aspectRatio);
-            setPreviewSize({ width: pWidth, height: pHeight });
+              const pHeight = Math.min(height, maxSize);
+              const pWidth = Math.round(pHeight * aspectRatio);
+              setPreviewSize({ width: pWidth, height: pHeight });
             }
-        } else {
+          } else {
             setPreviewSize({ width: 0, height: 0 });
-        }
+          }
 
-        setIsFullResolution(false);
-        setFullResolutionUrl(null);
-        fullResCacheKeyRef.current = null;
+          setIsFullResolution(false);
+          setFullResolutionUrl(null);
+          fullResCacheKeyRef.current = null;
 
-        const blob = new Blob([loadImageResult.original_image_bytes], { type: 'image/jpeg' });
-        const originalUrl = URL.createObjectURL(blob);
+          const blob = new Blob([loadImageResult.original_image_bytes], { type: 'image/jpeg' });
+          const originalUrl = URL.createObjectURL(blob);
 
-        setSelectedImage((currentSelected: SelectedImage | null) => {
+          setSelectedImage((currentSelected: SelectedImage | null) => {
             if (currentSelected && currentSelected.path === selectedImage.path) {
-            return {
+              return {
                 ...currentSelected,
                 exif: loadImageResult.exif,
                 height: loadImageResult.height,
@@ -3269,42 +3288,34 @@ function App() {
                 metadata: loadImageResult.metadata,
                 originalUrl: originalUrl,
                 width: loadImageResult.width,
-            };
+              };
             }
             return currentSelected;
-        });
+          });
 
-        let initialAdjusts;
-        if (loadImageResult.metadata.adjustments && !loadImageResult.metadata.adjustments.is_null) {
-            initialAdjusts = normalizeLoadedAdjustments(loadImageResult.metadata.adjustments);
-
-            if (!initialAdjusts.aspectRatio && !initialAdjusts.crop) {
-              initialAdjusts.aspectRatio = loadImageResult.width / loadImageResult.height;
+          // Only update aspect ratio if it wasn't loaded from metadata
+          setLiveAdjustments((prev: Adjustments) => {
+            if (!prev.aspectRatio && !prev.crop) {
+              return { ...prev, aspectRatio: loadImageResult.width / loadImageResult.height };
             }
-        } else {
-            initialAdjusts = {
-            ...INITIAL_ADJUSTMENTS,
-            aspectRatio: loadImageResult.width / loadImageResult.height,
-            };
-        }
-        setLiveAdjustments(initialAdjusts);
-        resetAdjustmentsHistory(initialAdjusts);
+            return prev;
+          });
         } catch (err) {
-        if (isEffectActive) {
+          if (isEffectActive) {
             console.error('Failed to load image:', err);
             setError(`Failed to load image: ${err}`);
             setSelectedImage(null);
-        }
+          }
         } finally {
-        if (isEffectActive) {
+          if (isEffectActive) {
             setIsViewLoading(false);
+          }
         }
-        }
-    };
-    loadFullImageData();
-    return () => {
+      };
+      loadFullImageData();
+      return () => {
         isEffectActive = false;
-    };
+      };
     }
   }, [selectedImage?.path, selectedImage?.isReady, resetAdjustmentsHistory, appSettings?.editorPreviewResolution]);
 
