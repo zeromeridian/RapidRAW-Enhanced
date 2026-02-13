@@ -5,7 +5,7 @@ use std::path::Path;
 
 use crate::formats::is_raw_file;
 use chrono::{DateTime, Utc};
-use exif::{Exif, Field, In, Value};
+use exif::{Exif, In, Value};
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;

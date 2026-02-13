@@ -3640,6 +3640,11 @@ function App() {
             label: 'Stitch Panorama',
           },
           {
+            disabled: true,
+            icon: Images,
+            label: 'Merge to HDR',
+          },
+          {
             icon: LayoutTemplate,
             label: 'Frame Image',
             onClick: () => {
@@ -3805,9 +3810,9 @@ function App() {
     const pasteLabel = isSingleSelection ? 'Paste Adjustments' : `Paste Adjustments to ${selectionCount} Images`;
     const resetLabel = isSingleSelection ? 'Reset Adjustments' : `Reset Adjustments on ${selectionCount} Images`;
     const copyLabel = isSingleSelection ? 'Copy Image' : `Copy ${selectionCount} Images`;
-    const autoAdjustLabel = isSingleSelection ? 'Auto Adjust Image' : `Auto Adjust ${selectionCount} Images`;
+    const autoAdjustLabel = isSingleSelection ? 'Auto Adjust Image' : `Auto Adjust Images`;
     const renameLabel = isSingleSelection ? 'Rename Image' : `Rename ${selectionCount} Images`;
-    const cullLabel = isSingleSelection ? 'Cull Image' : `Cull ${selectionCount} Images`;
+    const cullLabel = isSingleSelection ? 'Cull Image' : `Cull Images`;
     const collageLabel = isSingleSelection ? 'Frame Image' : 'Create Collage';
     const stitchLabel = `Stitch Panorama`;
     const mergeLabel = `Merge to HDR`;

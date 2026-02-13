@@ -34,7 +34,6 @@ use std::io::Cursor;
 use std::io::Write;
 use std::panic;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -50,7 +49,6 @@ use image::{
 };
 use image_hdr::hdr_merge_images;
 use image_hdr::input::HDRInput;
-use image_hdr::stretch::apply_histogram_stretch;
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
 use imageproc::hough::{LineDetectionOptions, detect_lines};
@@ -2933,18 +2931,12 @@ async fn merge_hdr(
         .collect::<Result<Vec<HDRInput>, String>>()?;
 
     log::info!("Starting HDR merge of {} images", images.len());
-
     let hdr_merged = hdr_merge_images(&mut images.into()).map_err(|e| e.to_string())?;
-
     log::info!("HDR merge completed");
-
-    let stretched = apply_histogram_stretch(&hdr_merged).map_err(|e| e.to_string())?;
-
-    log::info!("Histogram stretch applied");
 
     let mut buf = Cursor::new(Vec::new());
 
-    if let Err(e) = stretched.to_rgb8().write_to(&mut buf, ImageFormat::Png) {
+    if let Err(e) = hdr_merged.to_rgb8().write_to(&mut buf, ImageFormat::Png) {
         return Err(format!("Failed to encode hdr preview: {}", e));
     }
 
@@ -2953,7 +2945,7 @@ async fn merge_hdr(
 
     let _ = app_handle.emit("hdr-progress", "Creating preview...");
 
-    *hdr_result_handle.lock().unwrap() = Some(stretched);
+    *hdr_result_handle.lock().unwrap() = Some(hdr_merged);
 
     let _ = app_handle.emit(
         "hdr-complete",
