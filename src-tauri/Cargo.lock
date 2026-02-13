@@ -20,6 +20,7 @@ dependencies = [
  "half",
  "hex",
  "image",
+ "image-hdr",
  "image_hasher",
  "imageproc",
  "io",
@@ -2968,6 +2969,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "image-hdr"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f401958e284ad5c7a124aa8cbd83e8072e91f7c04ca48c77e1f55d9b660206d"
+dependencies = [
+ "image",
+ "kamadak-exif",
+ "ndarray",
+ "rayon",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "image-webp"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4043,6 +4057,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "rawpointer",
+ "rayon",
 ]
 
 [[package]]

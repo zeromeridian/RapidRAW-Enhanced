@@ -3,14 +3,15 @@ use std::fs;
 use std::io::{BufReader, Cursor};
 use std::path::Path;
 
+use crate::formats::is_raw_file;
 use chrono::{DateTime, Utc};
+use exif::{Exif, Field, In, Value};
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;
 use little_exif::rational::{iR64, uR64};
 use rawler;
-
-use crate::formats::is_raw_file;
+use rawler::decoders::RawMetadata;
 
 fn to_ur64(val: &exif::Rational) -> uR64 {
     uR64 {
@@ -34,16 +35,105 @@ fn fmt_date_str(s: String) -> String {
     clean
 }
 
+pub fn read_exif(file_bytes: &[u8]) -> Option<Exif> {
+    let exifreader = exif::Reader::new();
+    exifreader
+        .read_from_container(&mut Cursor::new(file_bytes))
+        .ok()
+}
+
+pub fn read_raw_metadata(file_bytes: &[u8]) -> Option<RawMetadata> {
+    let loader = rawler::RawLoader::new();
+    let raw_source = rawler::rawsource::RawSource::new_from_slice(file_bytes);
+    let decoder = loader.get_decoder(&raw_source).ok()?;
+    decoder.raw_metadata(&raw_source, &Default::default()).ok()
+}
+
+pub fn read_exposure_time_secs(path: &str, file_bytes: &[u8]) -> Option<f32> {
+    if is_raw_file(path) {
+        if let Some(meta) = read_raw_metadata(file_bytes) {
+            if let Some(r) = meta.exif.exposure_time {
+                return if r.d == 0 {
+                    return None;
+                } else {
+                    Some(r.n as f32 / r.d as f32)
+                };
+            } else if let Some(r) = meta.exif.shutter_speed_value {
+                return if r.d == 0 {
+                    None
+                } else {
+                    Some(r.n as f32 / r.d as f32)
+                };
+            }
+        }
+    }
+
+    if let Some(exif) = read_exif(file_bytes) {
+        if let Some(exposure) = exif.get_field(exif::Tag::ExposureTime, In::PRIMARY) {
+            if let Value::Rational(ref r) = exposure.value {
+                if r.is_empty() {
+                    return None;
+                }
+
+                let val = r.get(0)?;
+
+                return if val.denom == 0 {
+                    None
+                } else {
+                    Some(val.num as f32 / val.denom as f32)
+                };
+            }
+        } else if let Some(shutter_speed) =
+            exif.get_field(exif::Tag::ShutterSpeedValue, In::PRIMARY)
+        {
+            if let Value::Rational(ref r) = shutter_speed.value {
+                if r.is_empty() {
+                    return None;
+                }
+
+                let val = r.get(0)?;
+
+                return if val.denom == 0 {
+                    None
+                } else {
+                    Some(val.num as f32 / val.denom as f32)
+                };
+            }
+        }
+    }
+    None
+}
+
+pub fn read_iso(path: &str, file_bytes: &[u8]) -> Option<u32> {
+    if is_raw_file(path) {
+        if let Some(meta) = read_raw_metadata(file_bytes) {
+            if let Some(r) = meta.exif.iso_speed {
+                return Some(r);
+            } else if let Some(r) = meta.exif.iso_speed_ratings {
+                return Some(r as u32);
+            }
+        }
+    }
+
+    if let Some(exif) = read_exif(file_bytes) {
+        if let Some(r) = exif.get_field(exif::Tag::ISOSpeed, In::PRIMARY) {
+            return r.value.get_uint(0);
+        } else if let Some(r) = exif.get_field(exif::Tag::PhotographicSensitivity, In::PRIMARY) {
+            return r.value.get_uint(0);
+        }
+    }
+    None
+}
+
 pub fn read_exif_data(path: &str, file_bytes: &[u8]) -> HashMap<String, String> {
     if is_raw_file(path) {
-        if let Some(map) = extract_metadata(path, file_bytes) {
+        if let Some(map) = extract_metadata(file_bytes) {
             return map;
         }
     }
 
     let mut exif_data = HashMap::new();
-    let exif_reader = exif::Reader::new();
-    if let Ok(exif) = exif_reader.read_from_container(&mut Cursor::new(file_bytes)) {
+    if let Some(exif) = read_exif(file_bytes) {
         for field in exif.fields() {
             exif_data.insert(
                 field.tag.to_string(),
@@ -54,14 +144,12 @@ pub fn read_exif_data(path: &str, file_bytes: &[u8]) -> HashMap<String, String> 
     exif_data
 }
 
-pub fn extract_metadata(path_str: &str, file_bytes: &[u8]) -> Option<HashMap<String, String>> {
+pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
     let mut map = HashMap::new();
 
-    let exifreader = exif::Reader::new();
-
-    if let Ok(exif_obj) = exifreader.read_from_container(&mut Cursor::new(file_bytes)) {
+    if let Some(exif_obj) = read_exif(file_bytes) {
         for field in exif_obj.fields() {
-             match field.tag {
+            match field.tag {
                 exif::Tag::ExposureTime => {
                     if let exif::Value::Rational(ref v) = field.value {
                         if !v.is_empty() {
@@ -131,28 +219,16 @@ pub fn extract_metadata(path_str: &str, file_bytes: &[u8]) -> Option<HashMap<Str
                         map.insert(field.tag.to_string(), val);
                     }
                 }
-             }
+            }
         }
     }
 
     if !map.is_empty() {
         return Some(map);
     }
-    
-    let loader = rawler::RawLoader::new();
-    let raw_source = match rawler::rawsource::RawSource::new(Path::new(path_str)) {
-        Ok(s) => s,
-        Err(_) => return None,
-    };
-    let decoder = match loader.get_decoder(&raw_source) {
-        Ok(d) => d,
-        Err(_) => return None,
-    };
-    let metadata = match decoder.raw_metadata(&raw_source, &Default::default()) {
-        Ok(m) => m,
-        Err(_) => return None,
-    };
-    
+
+    let metadata = read_raw_metadata(file_bytes)?;
+
     let exif = metadata.exif;
 
     let fmt_rat = |r: &rawler::formats::tiff::Rational| -> f32 {

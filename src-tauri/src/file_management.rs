@@ -422,13 +422,12 @@ pub async fn read_exif_for_paths(
         .par_iter()
         .filter_map(|virtual_path| {
             let (source_path, _) = parse_virtual_path(virtual_path);
-            let source_path_str = source_path.to_string_lossy().to_string();
 
             let exif_map = if let Ok(mmap) = read_file_mapped(&source_path) {
-                exif_processing::extract_metadata(&source_path_str, &mmap)
+                exif_processing::extract_metadata(&mmap)
             } else {
                 let bytes = fs::read(&source_path).ok()?;
-                exif_processing::extract_metadata(&source_path_str, &bytes)
+                exif_processing::extract_metadata(&bytes)
             };
 
             exif_map.map(|map| (virtual_path.clone(), map))

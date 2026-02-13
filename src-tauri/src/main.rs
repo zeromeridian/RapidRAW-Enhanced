@@ -31,14 +31,16 @@ use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
+use std::io::Write;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::thread;
-use std::io::Write;
 use std::sync::Mutex;
-use std::sync::mpsc::{self, Sender, Receiver};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread;
+use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose};
 use image::codecs::jpeg::JpegEncoder;
@@ -46,9 +48,12 @@ use image::{
     DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, Rgb, RgbImage, Rgba,
     RgbaImage, imageops,
 };
+use image_hdr::hdr_merge_images;
+use image_hdr::input::HDRInput;
+use image_hdr::stretch::apply_histogram_stretch;
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
-use imageproc::hough::{detect_lines, LineDetectionOptions};
+use imageproc::hough::{LineDetectionOptions, detect_lines};
 use rayon::prelude::*;
 use reqwest;
 use serde::{Deserialize, Serialize};
@@ -64,18 +69,17 @@ use crate::ai_processing::{
     generate_image_embeddings, get_or_init_ai_models, run_sam_decoder, run_sky_seg_model,
     run_u2netp_model,
 };
-use crate::file_management::{
-    AppSettings, load_settings, parse_virtual_path,
-    read_file_mapped,
-};
+use crate::exif_processing::{read_exposure_time_secs, read_iso};
+use crate::file_management::{AppSettings, load_settings, parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::image_loader::{
     composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
 };
 use crate::image_processing::{
-    Crop, GpuContext, ImageMetadata, apply_coarse_rotation, apply_crop, apply_flip, apply_rotation,
-    get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image, apply_unwarp_geometry,
-    downscale_f32_image, apply_cpu_default_raw_processing, GeometryParams, warp_image_geometry, apply_geometry_warp
+    Crop, GeometryParams, GpuContext, ImageMetadata, apply_coarse_rotation,
+    apply_cpu_default_raw_processing, apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
+    apply_unwarp_geometry, downscale_f32_image, get_all_adjustments_from_json,
+    get_or_init_gpu_context, process_and_get_dynamic_image, warp_image_geometry,
 };
 use crate::lut_processing::Lut;
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
@@ -125,6 +129,7 @@ pub struct AppState {
     ai_state: Mutex<Option<AiState>>,
     ai_init_lock: TokioMutex<()>,
     export_task_handle: Mutex<Option<JoinHandle<()>>>,
+    hdr_result: Arc<Mutex<Option<DynamicImage>>>,
     panorama_result: Arc<Mutex<Option<DynamicImage>>>,
     denoise_result: Arc<Mutex<Option<DynamicImage>>>,
     negative_conversion_result: Arc<Mutex<Option<DynamicImage>>>,
@@ -135,7 +140,7 @@ pub struct AppState {
     preview_worker_tx: Mutex<Option<Sender<PreviewJob>>>,
     pub mask_cache: Mutex<HashMap<u64, GrayImage>>,
     pub patch_cache: Mutex<HashMap<String, serde_json::Value>>,
-    pub geometry_cache: Mutex<HashMap<u64, DynamicImage>>, 
+    pub geometry_cache: Mutex<HashMap<u64, DynamicImage>>,
     pub thumbnail_geometry_cache: Mutex<HashMap<String, (u64, DynamicImage, f32)>>,
     pub lens_db: Mutex<Option<lens_correction::LensDatabase>>,
     pub load_image_generation: Arc<AtomicUsize>,
@@ -253,7 +258,7 @@ const GEOMETRY_KEYS: &[&str] = &[
     "transformRotate", "transformAspect", "transformScale",
     "transformXOffset", "transformYOffset", "lensDistortionAmount",
     "lensVignetteAmount", "lensTcaAmount", "lensDistortionParams",
-    "lensMaker", "lensModel", "lensDistortionEnabled", 
+    "lensMaker", "lensModel", "lensDistortionEnabled",
     "lensTcaEnabled", "lensVignetteEnabled"
 ];
 
@@ -269,7 +274,7 @@ pub fn calculate_geometry_hash(adjustments: &serde_json::Value) -> u64 {
     for key in GEOMETRY_KEYS {
         if let Some(val) = adjustments.get(key) {
             key.hash(&mut hasher);
-            val.to_string().hash(&mut hasher); 
+            val.to_string().hash(&mut hasher);
         }
     }
 
@@ -452,11 +457,7 @@ fn generate_transformed_preview(
     let (full_res_w, full_res_h) = transformed_full_res.dimensions();
 
     let final_preview_base = if full_res_w > final_preview_dim || full_res_h > final_preview_dim {
-        downscale_f32_image(
-            &transformed_full_res,
-            final_preview_dim,
-            final_preview_dim,
-        )
+        downscale_f32_image(&transformed_full_res, final_preview_dim, final_preview_dim)
     } else {
         transformed_full_res
     };
@@ -625,8 +626,8 @@ fn apply_watermark(
     let (base_w, base_h) = base_image.dimensions();
     let base_min_dim = base_w.min(base_h) as f32;
 
-    let watermark_scale_factor = (base_min_dim * (watermark_settings.scale / 100.0))
-        / watermark_img.width().max(1) as f32;
+    let watermark_scale_factor =
+        (base_min_dim * (watermark_settings.scale / 100.0)) / watermark_img.width().max(1) as f32;
     let new_wm_w = (watermark_img.width() as f32 * watermark_scale_factor).round() as u32;
     let new_wm_h = (watermark_img.height() as f32 * watermark_scale_factor).round() as u32;
 
@@ -666,9 +667,9 @@ fn apply_watermark(
         WatermarkAnchor::CenterLeft | WatermarkAnchor::Center | WatermarkAnchor::CenterRight => {
             (base_h as i64 - wm_h as i64) / 2
         }
-        WatermarkAnchor::BottomLeft | WatermarkAnchor::BottomCenter | WatermarkAnchor::BottomRight => {
-            base_h as i64 - wm_h as i64 - spacing_pixels
-        }
+        WatermarkAnchor::BottomLeft
+        | WatermarkAnchor::BottomCenter
+        | WatermarkAnchor::BottomRight => base_h as i64 - wm_h as i64 - spacing_pixels,
     };
 
     image::imageops::overlay(base_image, &final_watermark, x, y);
@@ -685,16 +686,16 @@ pub fn get_cached_or_generate_mask(
     crop_offset: (f32, f32),
 ) -> Option<GrayImage> {
     let mut hasher = DefaultHasher::new();
-    
+
     let def_json = serde_json::to_string(&def).unwrap_or_default();
     def_json.hash(&mut hasher);
-    
+
     width.hash(&mut hasher);
     height.hash(&mut hasher);
     scale.to_bits().hash(&mut hasher);
     crop_offset.0.to_bits().hash(&mut hasher);
     crop_offset.1.to_bits().hash(&mut hasher);
-    
+
     let key = hasher.finish();
 
     {
@@ -709,7 +710,7 @@ pub fn get_cached_or_generate_mask(
     if let Some(img) = &generated {
         let mut cache = state.mask_cache.lock().unwrap();
         if cache.len() > 50 {
-            cache.clear(); 
+            cache.clear();
         }
         cache.insert(key, img.clone());
     }
@@ -887,7 +888,7 @@ fn process_preview_job(
 fn start_preview_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
     let (tx, rx): (Sender<PreviewJob>, Receiver<PreviewJob>) = mpsc::channel();
-    
+
     *state.preview_worker_tx.lock().unwrap() = Some(tx);
 
     std::thread::spawn(move || {
@@ -895,7 +896,7 @@ fn start_preview_worker(app_handle: tauri::AppHandle) {
             while let Ok(next_job) = rx.try_recv() {
                 job = next_job;
             }
-            
+
             let state = app_handle.state::<AppState>();
             if let Err(e) = process_preview_job(&app_handle, state, job) {
                 log::error!("Preview worker error: {}", e);
@@ -959,7 +960,7 @@ fn generate_uncropped_preview(
 
         let flip_horizontal = adjustments_clone["flipHorizontal"].as_bool().unwrap_or(false);
         let flip_vertical = adjustments_clone["flipVertical"].as_bool().unwrap_or(false);
-        
+
         let flipped_image = apply_flip(coarse_rotated_image, flip_horizontal, flip_vertical);
 
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
@@ -1095,7 +1096,7 @@ async fn preview_geometry_transform(
             cached_image
         } else {
             let context = get_or_init_gpu_context(&state)?;
-            
+
             let original_image = {
                 let guard = state.original_image.lock().unwrap();
                 let loaded = guard.as_ref().ok_or("No image loaded")?;
@@ -1103,7 +1104,7 @@ async fn preview_geometry_transform(
             };
 
             let settings = load_settings(app_handle.clone()).unwrap_or_default();
-            let interactive_divisor = 1.5; 
+            let interactive_divisor = 1.5;
             let final_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
             let target_dim = (final_preview_dim as f32 / interactive_divisor) as u32;
 
@@ -1123,20 +1124,20 @@ async fn preview_geometry_transform(
                 for key in GEOMETRY_KEYS {
                     match *key {
                         "transformScale" |
-                        "lensDistortionAmount" | 
-                        "lensVignetteAmount" | 
+                        "lensDistortionAmount" |
+                        "lensVignetteAmount" |
                         "lensTcaAmount" => {
                             obj.insert(key.to_string(), serde_json::json!(100.0));
                         },
                         "lensDistortionParams" |
-                        "lensMaker" | 
+                        "lensMaker" |
                         "lensModel" => {
                             obj.insert(key.to_string(), serde_json::Value::Null);
                         },
-                        "lensDistortionEnabled" | 
-                        "lensTcaEnabled" | 
+                        "lensDistortionEnabled" |
+                        "lensTcaEnabled" |
                         "lensVignetteEnabled" => {
-                            obj.insert(key.to_string(), serde_json::json!(true)); 
+                            obj.insert(key.to_string(), serde_json::json!(true));
                         },
                         _ => {
                             obj.insert(key.to_string(), serde_json::json!(0.0));
@@ -1192,14 +1193,14 @@ async fn preview_geometry_transform(
             let gray_image = flipped_image.to_luma8();
             let mut visualization = flipped_image.to_rgba8();
             let edges = canny(&gray_image, 50.0, 100.0);
-            
+
             let min_dim = gray_image.width().min(gray_image.height());
-            
+
             let options = LineDetectionOptions {
-                vote_threshold: (min_dim as f32 * 0.24) as u32, 
+                vote_threshold: (min_dim as f32 * 0.24) as u32,
                 suppression_radius: 15,
             };
-            
+
             let lines = detect_lines(&edges, options);
 
             for line in lines {
@@ -1208,9 +1209,9 @@ async fn preview_geometry_transform(
                 let alignment_threshold = 0.5;
                 let is_vertical = angle_norm < alignment_threshold || angle_norm > (180.0 - alignment_threshold);
                 let is_horizontal = (angle_norm - 90.0).abs() < alignment_threshold;
-                
+
                 let color = if is_vertical || is_horizontal {
-                    Rgba([0, 255, 0, 255]) 
+                    Rgba([0, 255, 0, 255])
                 } else {
                     Rgba([255, 0, 0, 255])
                 };
@@ -1221,9 +1222,9 @@ async fn preview_geometry_transform(
                 let b = theta_rad.sin();
                 let x0 = a * r;
                 let y0 = b * r;
-                
+
                 let dist = (visualization.width().max(visualization.height()) * 2) as f32;
-                
+
                 let x1 = x0 + dist * (-b);
                 let y1 = y0 + dist * (a);
                 let x2 = x0 - dist * (-b);
@@ -1250,9 +1251,9 @@ async fn preview_geometry_transform(
     }).await.map_err(|e| e.to_string())?;
 
     let mut buf = Cursor::new(Vec::new());
-    
+
     final_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 75)).map_err(|e| e.to_string())?;
-    
+
     let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
     Ok(format!("data:image/jpeg;base64,{}", base64_str))
 }
@@ -1565,8 +1566,8 @@ async fn batch_export_images(
     let progress_counter = Arc::new(AtomicUsize::new(0));
 
     let available_cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
-    let num_threads = (available_cores / 2).clamp(1, 4); 
-    
+    let num_threads = (available_cores / 2).clamp(1, 4);
+
     log::info!("Starting batch export. System cores: {}, Export threads: {}", available_cores, num_threads);
 
     let task = tokio::spawn(async move {
@@ -1624,7 +1625,7 @@ async fn batch_export_images(
                         } else {
                             ImageMetadata::default()
                         };
-                        let mut js_adjustments = metadata.adjustments; 
+                        let mut js_adjustments = metadata.adjustments;
                         hydrate_adjustments(&state, &mut js_adjustments);
                         let is_raw = is_raw_file(&source_path_str);
 
@@ -2875,6 +2876,137 @@ async fn save_panorama(
 }
 
 #[tauri::command]
+async fn merge_hdr(
+    paths: Vec<String>,
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    if paths.len() < 2 {
+        return Err("Please select at least two images to merge.".to_string());
+    }
+
+    let hdr_result_handle = state.hdr_result.clone();
+
+    let images: Vec<HDRInput> = paths
+        .iter()
+        .map(|path| {
+            let _ = app_handle.emit(
+                "hdr-progress",
+                format!(
+                    "Processing '{}'",
+                    Path::new(path)
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                ),
+            );
+
+            let file_bytes =
+                fs::read(path).map_err(|e| format!("Failed to read image {}: {}", path, e))?;
+            let dynamic_image = load_base_image_from_bytes(&file_bytes, path, false, 2.5, None)
+                .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
+
+            let gains = match read_iso(&path, &file_bytes) {
+                None => {
+                    return Err(format!(
+                        "Image {} is missing 'PhotographicSensitivity' in EXIF data",
+                        path
+                    ));
+                }
+                Some(gains) => gains as f32,
+            };
+            log::info!("Read image {} with gains: {}", path, gains);
+            let exposure = match read_exposure_time_secs(&path, &file_bytes) {
+                None => {
+                    return Err(format!(
+                        "Image {} is missing 'ExposureTime' in EXIF data",
+                        path
+                    ));
+                }
+                Some(exposure) => exposure,
+            };
+            log::info!("Read image {} with exposure: {}", path, exposure);
+
+            HDRInput::with_image(&dynamic_image, Duration::from_secs_f32(exposure), gains)
+                .map_err(|e| format!("Failed to prepare HDR input for image {}: {}", path, e))
+        })
+        .collect::<Result<Vec<HDRInput>, String>>()?;
+
+    log::info!("Starting HDR merge of {} images", images.len());
+
+    let hdr_merged = hdr_merge_images(&mut images.into()).map_err(|e| e.to_string())?;
+
+    log::info!("HDR merge completed");
+
+    let stretched = apply_histogram_stretch(&hdr_merged).map_err(|e| e.to_string())?;
+
+    log::info!("Histogram stretch applied");
+
+    let mut buf = Cursor::new(Vec::new());
+
+    if let Err(e) = stretched.to_rgb8().write_to(&mut buf, ImageFormat::Png) {
+        return Err(format!("Failed to encode hdr preview: {}", e));
+    }
+
+    let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
+    let final_base64 = format!("data:image/png;base64,{}", base64_str);
+
+    let _ = app_handle.emit("hdr-progress", "Creating preview...");
+
+    *hdr_result_handle.lock().unwrap() = Some(stretched);
+
+    let _ = app_handle.emit(
+        "hdr-complete",
+        serde_json::json!({
+            "base64": final_base64,
+        }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+async fn save_hdr(
+    first_path_str: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let hdr_image = state.hdr_result.lock().unwrap().take().ok_or_else(|| {
+        "No hdr image found in memory to save. It might have already been saved.".to_string()
+    })?;
+
+    let (first_path, _) = parse_virtual_path(&first_path_str);
+    let parent_dir = first_path
+        .parent()
+        .ok_or_else(|| "Could not determine parent directory of the first image.".to_string())?;
+    let stem = first_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("hdr");
+
+    let (output_filename, image_to_save): (String, DynamicImage) = if hdr_image.color().has_alpha()
+    {
+        (
+            format!("{}_Hdr.png", stem),
+            DynamicImage::ImageRgba8(hdr_image.to_rgba8()),
+        )
+    } else if hdr_image.as_rgb32f().is_some() {
+        (format!("{}_Hdr.tiff", stem), hdr_image)
+    } else {
+        (
+            format!("{}_Hdr.png", stem),
+            DynamicImage::ImageRgb8(hdr_image.to_rgb8()),
+        )
+    };
+
+    let output_path = parent_dir.join(output_filename);
+
+    image_to_save
+        .save(&output_path)
+        .map_err(|e| format!("Failed to save hdr image: {}", e))?;
+
+    Ok(output_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 async fn apply_denoising(
     path: String,
     intensity: f32,
@@ -2928,7 +3060,7 @@ async fn save_denoised_image(
 
     let (output_filename, image_to_save): (String, DynamicImage) = if is_raw {
         let filename = format!("{}_Denoised.tiff", stem);
-        (filename, denoised_image) 
+        (filename, denoised_image)
     } else {
         let filename = format!("{}_Denoised.png", stem);
         (filename, DynamicImage::ImageRgb8(denoised_image.to_rgb8()))
@@ -3167,11 +3299,7 @@ fn setup_logging(app_handle: &tauri::AppHandle) {
             || "at an unknown location".to_string(),
             |loc| format!("at {}:{}:{}", loc.file(), loc.line(), loc.column()),
         );
-        log::error!(
-            "PANIC! {} - {}",
-            location,
-            message.trim()
-        );
+        log::error!("PANIC! {} - {}", location, message.trim());
     }));
 
     log::info!(
@@ -3182,10 +3310,7 @@ fn setup_logging(app_handle: &tauri::AppHandle) {
 
 #[tauri::command]
 fn get_log_file_path(app_handle: tauri::AppHandle) -> Result<String, String> {
-    let log_dir = app_handle
-        .path()
-        .app_log_dir()
-        .map_err(|e| e.to_string())?;
+    let log_dir = app_handle.path().app_log_dir().map_err(|e| e.to_string())?;
     let log_file_path = log_dir.join("app.log");
     Ok(log_file_path.to_string_lossy().to_string())
 }
@@ -3293,7 +3418,7 @@ fn main() {
                     log::info!("Applied Linux GPU optimizations.");
                 }
             }
-            
+
             start_preview_worker(app_handle.clone());
 
             let window_cfg = app.config().app.windows.get(0).unwrap().clone();
@@ -3323,6 +3448,7 @@ fn main() {
             ai_state: Mutex::new(None),
             ai_init_lock: TokioMutex::new(()),
             export_task_handle: Mutex::new(None),
+            hdr_result: Arc::new(Mutex::new(None)),
             panorama_result: Arc::new(Mutex::new(None)),
             denoise_result: Arc::new(Mutex::new(None)),
             negative_conversion_result: Arc::new(Mutex::new(None)),
@@ -3365,6 +3491,8 @@ fn main() {
             save_collage,
             stitch_panorama,
             save_panorama,
+            merge_hdr,
+            save_hdr,
             apply_denoising,
             save_denoised_image,
             load_and_parse_lut,
