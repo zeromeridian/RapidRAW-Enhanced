@@ -1439,7 +1439,7 @@ pub fn save_metadata_and_update_thumbnail(
             &path_clone,
             &thumb_cache_dir,
             gpu_context.as_ref(),
-            preloaded_image_option.as_ref(),
+            preloaded_image_option.as_deref(),
             true,
             &app_handle_clone,
         );

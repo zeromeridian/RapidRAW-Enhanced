@@ -61,6 +61,7 @@ use tempfile::NamedTempFile;
 use tokio::sync::Mutex as TokioMutex;
 use tokio::task::JoinHandle;
 use wgpu::{Texture, TextureView};
+use mozjpeg_rs::{Encoder, Preset};
 
 use crate::ai_processing::{
     AiForegroundMaskParameters, AiSkyMaskParameters, AiState, AiSubjectMaskParameters,
@@ -86,7 +87,7 @@ use tagging_utils::{candidates, hierarchy};
 #[derive(Clone)]
 pub struct LoadedImage {
     path: String,
-    image: DynamicImage,
+    image: Arc<DynamicImage>, 
     is_raw: bool,
 }
 
@@ -585,7 +586,7 @@ async fn load_image(
 
     *state.original_image.lock().unwrap() = Some(LoadedImage {
         path: source_path_str.clone(),
-        image: pristine_img,
+        image: Arc::new(pristine_img),
         is_raw,
     });
 
@@ -721,6 +722,7 @@ fn process_preview_job(
     state: tauri::State<AppState>,
     job: PreviewJob,
 ) -> Result<(), String> {
+    let fn_start = std::time::Instant::now();
     let context = get_or_init_gpu_context(&state)?;
     let mut adjustments_json = job.adjustments;
     hydrate_adjustments(&state, &mut adjustments_json);
@@ -734,7 +736,7 @@ fn process_preview_job(
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let hq_live = settings.enable_high_quality_live_previews.unwrap_or(false);
     let interactive_divisor = if hq_live { 1.5 } else { 2.0 };
-    let interactive_quality = if hq_live { 75 } else { 45 };
+    let interactive_quality = if hq_live { 78 } else { 50 };
 
     let mut cached_preview_lock = state.cached_preview.lock().unwrap();
 
@@ -870,16 +872,23 @@ fn process_preview_job(
             }
         }
 
-        let mut buf = Cursor::new(Vec::new());
-        if final_processed_image
-            .to_rgb8()
-            .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, jpeg_quality))
-            .is_ok()
+        let (width, height) = final_processed_image.dimensions();
+        let rgb_pixels = final_processed_image.to_rgb8().into_vec();
+
+        match Encoder::new(Preset::BaselineFastest)
+            .quality(jpeg_quality as u8)
+            .encode_rgb(&rgb_pixels, width as u32, height as u32)
         {
-            let _ = app_handle.emit("preview-update-final", buf.get_ref());
+            Ok(bytes) => {
+                let _ = app_handle.emit("preview-update-final", bytes);
+            },
+            Err(e) => {
+                log::error!("Failed to encode preview with mozjpeg-rs: {}", e);
+            }
         }
     }
 
+    log::info!("[process_preview_job] completed in {:?}", fn_start.elapsed());
     Ok(())
 }
 
@@ -947,7 +956,7 @@ fn generate_uncropped_preview(
                 Ok(img) => img,
                 Err(e) => {
                     eprintln!("Failed to composite patches for uncropped preview: {}", e);
-                    loaded_image.image
+                    loaded_image.image.as_ref().clone()
                 }
             };
 
@@ -1044,9 +1053,9 @@ fn generate_original_transformed_preview(
     let mut adjustments_clone = js_adjustments.clone();
     hydrate_adjustments(&state, &mut adjustments_clone);
 
-    let mut image_for_preview = loaded_image.image.clone();
+    let image_for_preview = loaded_image.image.clone();
     if loaded_image.is_raw {
-        apply_cpu_default_raw_processing(&mut image_for_preview);
+        apply_cpu_default_raw_processing(&mut image_for_preview.as_ref().clone());
     }
 
     let (transformed_full_res, _unscaled_crop_offset) =
@@ -1263,7 +1272,7 @@ fn get_full_image_for_processing(
     let loaded_image = original_image_lock
         .as_ref()
         .ok_or("No original image loaded")?;
-    Ok((loaded_image.image.clone(), loaded_image.is_raw))
+    Ok((loaded_image.image.clone().as_ref().clone(), loaded_image.is_raw))
 }
 
 #[tauri::command]
