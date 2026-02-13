@@ -501,6 +501,21 @@ async fn load_image(
     let generation_tracker = state.load_image_generation.clone();
     let cancel_token = Some((generation_tracker.clone(), my_generation));
 
+    {
+        *state.original_image.lock().unwrap() = None;
+        *state.cached_preview.lock().unwrap() = None;
+        *state.gpu_image_cache.lock().unwrap() = None;
+
+        state.mask_cache.lock().unwrap().clear();
+        state.patch_cache.lock().unwrap().clear();
+        state.geometry_cache.lock().unwrap().clear();
+
+        *state.denoise_result.lock().unwrap() = None;
+        *state.hdr_result.lock().unwrap() = None;
+        *state.panorama_result.lock().unwrap() = None;
+        *state.negative_conversion_result.lock().unwrap() = None;
+    }
+
     let (source_path, sidecar_path) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
 
@@ -577,12 +592,6 @@ async fn load_image(
     }
 
     let (orig_width, orig_height) = pristine_img.dimensions();
-
-    *state.cached_preview.lock().unwrap() = None;
-    *state.gpu_image_cache.lock().unwrap() = None;
-    state.mask_cache.lock().unwrap().clear();
-    state.patch_cache.lock().unwrap().clear();
-    state.geometry_cache.lock().unwrap().clear();
 
     *state.original_image.lock().unwrap() = Some(LoadedImage {
         path: source_path_str.clone(),
@@ -736,7 +745,7 @@ fn process_preview_job(
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let hq_live = settings.enable_high_quality_live_previews.unwrap_or(false);
     let interactive_divisor = if hq_live { 1.5 } else { 2.0 };
-    let interactive_quality = if hq_live { 78 } else { 50 };
+    let interactive_quality = if hq_live { 80 } else { 50 };
 
     let mut cached_preview_lock = state.cached_preview.lock().unwrap();
 
