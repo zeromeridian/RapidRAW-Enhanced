@@ -8,6 +8,8 @@ import { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjus
 import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
 import { BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import { RenderSize } from '../../../hooks/useImageRenderSize';
+import type { OverlayMode } from '../right/CropPanel';
+import CompositionOverlays from '../../overlays/CompositionOverlays';
 
 interface CursorPreview {
   visible: boolean;
@@ -58,6 +60,8 @@ interface ImageCanvasProps {
   isWbPickerActive?: boolean;
   onWbPicked?: () => void;
   setAdjustments(fn: (prev: Adjustments) => Adjustments): void;
+  overlayMode?: OverlayMode;
+  overlayRotation?: number;
 }
 
 interface ImageLayer {
@@ -534,7 +538,10 @@ const ImageCanvas = memo(
      isWbPickerActive = false,
      onWbPicked,
      setAdjustments,
+     overlayRotation,
+     overlayMode
    }: ImageCanvasProps) => {
+
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
     const [layers, setLayers] = useState<Array<ImageLayer>>([]);
     const cropImageRef = useRef<HTMLImageElement>(null);
@@ -1195,6 +1202,22 @@ const ImageCanvas = memo(
       return transforms.join(' ');
     }, [adjustments.rotation, adjustments.flipHorizontal, adjustments.flipVertical]);
 
+    const getCropDimensions = () => {
+      if (!crop || !uncroppedImageRenderSize?.width || !uncroppedImageRenderSize?.height) {
+        return { width: 0, height: 0 };
+      }
+
+      const width = crop.unit === '%'
+        ? uncroppedImageRenderSize.width * (crop.width / 100)
+        : crop.width;
+
+      const height = crop.unit === '%'
+        ? uncroppedImageRenderSize.height * (crop.height / 100)
+        : crop.height;
+
+      return { width, height };
+    };
+
     const showCustomGrid = isRotationActive || isStraightenActive;
 
     return (
@@ -1341,12 +1364,31 @@ const ImageCanvas = memo(
                 onChange={setCrop}
                 onComplete={handleCropComplete}
                 ruleOfThirds={false}
-                renderSelectionAddon={() => (
-                  <CustomGrid
-                    denseVisible={isRotationActive && !isStraightenActive}
-                    ruleOfThirdsVisible={!isStraightenActive}
-                  />
-                )}
+                renderSelectionAddon={() => {
+                  if (isRotationActive || isStraightenActive) {
+                    return (
+                      <CustomGrid
+                        denseVisible={isRotationActive && !isStraightenActive}
+                        ruleOfThirdsVisible={!isStraightenActive}
+                      />
+                    );
+                  }
+
+                  const { width, height } = getCropDimensions();
+
+                  if (width > 0 && height > 0) {
+                    return (
+                      <CompositionOverlays
+                        width={width}
+                        height={height}
+                        mode={overlayMode || 'none'}
+                        rotation={overlayRotation || 0}
+                      />
+                    );
+                  }
+
+                  return null;
+                }}
               >
                 <img
                   alt="Crop preview"

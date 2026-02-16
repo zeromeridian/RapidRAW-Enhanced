@@ -22,7 +22,7 @@ const BASE_RATIO = 1.618;
 const ORIGINAL_RATIO = 0;
 const RATIO_TOLERANCE = 0.01;
 
-export type OverlayMode = 'none' | 'thirds' | 'goldenTriangle' | 'goldenSpirale' | 'phiGrid' | '1_5_rectangle';
+export type OverlayMode = 'none' | 'thirds' | 'goldenTriangle' | 'goldenSpiral' | 'phiGrid' | '1_5_rectangle';
 
 interface CropPanelProps {
   adjustments: Adjustments;
@@ -66,7 +66,7 @@ const OVERLAYS: Array<OverlayOption> = [
   { id: 'none', name: 'None', tooltip: 'No overlay' },
   { id: 'thirds', name: 'Thirds', tooltip: 'Rule of Thirds' },
   { id: 'goldenTriangle', name: 'Triangle', tooltip: 'Golden Triangle' },
-  { id: 'goldenSpirale', name: 'Spiral', tooltip: 'Golden Spiral (Fibonacci)' },
+  { id: 'goldenSpiral', name: 'Spiral', tooltip: 'Golden Spiral (Fibonacci)' },
   { id: 'phiGrid', name: 'Phi Grid', tooltip: 'Phi Grid (Golden Ratio)' },
   { id: '1_5_rectangle', name: '1.5 Rect', tooltip: '1.5 Rectangle (Harmonic Armature)' },
 ];

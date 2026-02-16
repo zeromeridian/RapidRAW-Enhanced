@@ -48,7 +48,7 @@ import { useThumbnails } from './hooks/useThumbnails';
 import { ImageDimensions } from './hooks/useImageRenderSize';
 import RightPanelSwitcher from './components/panel/right/RightPanelSwitcher';
 import MetadataPanel from './components/panel/right/MetadataPanel';
-import CropPanel from './components/panel/right/CropPanel';
+import CropPanel, { type OverlayMode } from './components/panel/right/CropPanel';
 import PresetsPanel from './components/panel/right/PresetsPanel';
 import AIPanel from './components/panel/right/AIPanel';
 import ExportPanel from './components/panel/right/ExportPanel';
@@ -358,6 +358,8 @@ function App() {
   const [fullResolutionUrl, setFullResolutionUrl] = useState<string | null>(null);
   const [isLoadingFullRes, setIsLoadingFullRes] = useState(false);
   const [isRotationActive, setIsRotationActive] = useState(false);
+  const [overlayMode, setOverlayMode] = useState<OverlayMode>('thirds');
+  const [overlayRotation, setOverlayRotation] = useState(0);
   const [transformedOriginalUrl, setTransformedOriginalUrl] = useState<string | null>(null);
   const fullResRequestRef = useRef<any>(null);
   const fullResCacheKeyRef = useRef<string | null>(null);
@@ -4556,6 +4558,8 @@ function App() {
               fullResolutionUrl={fullResolutionUrl}
               isLoadingFullRes={isLoadingFullRes}
               isRotationActive={isRotationActive}
+              overlayMode={overlayMode}
+              overlayRotation={overlayRotation}
             />
             <Resizer
               direction={Orientation.Horizontal}
@@ -4644,6 +4648,10 @@ function App() {
                           setAdjustments={setAdjustments}
                           setIsStraightenActive={setIsStraightenActive}
                           setIsRotationActive={setIsRotationActive}
+                          overlayMode={overlayMode}
+                          overlayRotation={overlayRotation}
+                          setOverlayRotation={setOverlayRotation}
+                          setOverlayMode={setOverlayMode}
                         />
                       )}
                       {renderedRightPanel === Panel.Masks && (
