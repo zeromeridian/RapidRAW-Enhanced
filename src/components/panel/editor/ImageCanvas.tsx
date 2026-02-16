@@ -8,6 +8,8 @@ import { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjus
 import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
 import { BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import { RenderSize } from '../../../hooks/useImageRenderSize';
+import type { OverlayMode } from '../right/CropPanel';
+import CompositionOverlays from './overlays/CompositionOverlays';
 
 interface CursorPreview {
   visible: boolean;
@@ -58,6 +60,8 @@ interface ImageCanvasProps {
   isWbPickerActive?: boolean;
   onWbPicked?: () => void;
   setAdjustments(fn: (prev: Adjustments) => Adjustments): void;
+  overlayMode?: OverlayMode;
+  overlayRotation?: number;
 }
 
 interface ImageLayer {
@@ -77,51 +81,6 @@ interface MaskOverlay {
   scale: number;
   subMask: SubMask;
 }
-
-const CustomGrid = ({
-    denseVisible,
-    ruleOfThirdsVisible,
-  }: {
-  denseVisible: boolean;
-  ruleOfThirdsVisible: boolean;
-}) => (
-  <div className="absolute inset-0 pointer-events-none w-full h-full">
-
-    <div
-      className={clsx(
-        "absolute inset-0 w-full h-full transition-opacity duration-300 ease-in-out",
-        ruleOfThirdsVisible ? "opacity-100" : "opacity-0"
-      )}
-    >
-      <div className="absolute top-0 bottom-0 border-l border-white/40 left-1/3" />
-      <div className="absolute top-0 bottom-0 border-l border-white/40 left-2/3" />
-      <div className="absolute left-0 right-0 border-t border-white/40 top-1/3" />
-      <div className="absolute left-0 right-0 border-t border-white/40 top-2/3" />
-    </div>
-
-    <div
-      className={clsx(
-        'absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out',
-        denseVisible ? 'opacity-100' : 'opacity-0',
-      )}
-    >
-      {[...Array(17)].map((_, i) => (
-        <div
-          key={`v-${i}`}
-          className="absolute top-0 bottom-0 border-l border-white/40"
-          style={{ left: `${(i + 1) * 5.555}%` }}
-        />
-      ))}
-      {[...Array(17)].map((_, i) => (
-        <div
-          key={`h-${i}`}
-          className="absolute left-0 right-0 border-t border-white/40"
-          style={{ top: `${(i + 1) * 5.555}%` }}
-        />
-      ))}
-    </div>
-  </div>
-);
 
 const ORIGINAL_LAYER = 'original';
 
@@ -499,42 +458,44 @@ const MaskOverlay = memo(
 
 const ImageCanvas = memo(
   ({
-     activeAiPatchContainerId,
-     activeAiSubMaskId,
-     activeMaskContainerId,
-     activeMaskId,
-     adjustments,
-     brushSettings,
-     crop,
-     finalPreviewUrl,
-     handleCropComplete,
-     imageRenderSize,
-     isAiEditing,
-     isCropping,
-     isMaskControlHovered,
-     isMasking,
-     isStraightenActive,
-     isRotationActive,
-     maskOverlayUrl,
-     onGenerateAiMask,
-     onQuickErase,
-     onSelectAiSubMask,
-     onSelectMask,
-     onStraighten,
-     selectedImage,
-     setCrop,
-     setIsMaskHovered,
-     showOriginal,
-     transformedOriginalUrl,
-     uncroppedAdjustedPreviewUrl,
-     updateSubMask,
-     fullResolutionUrl,
-     isFullResolution,
-     isLoadingFullRes,
-     isWbPickerActive = false,
-     onWbPicked,
-     setAdjustments,
-   }: ImageCanvasProps) => {
+    activeAiPatchContainerId,
+    activeAiSubMaskId,
+    activeMaskContainerId,
+    activeMaskId,
+    adjustments,
+    brushSettings,
+    crop,
+    finalPreviewUrl,
+    handleCropComplete,
+    imageRenderSize,
+    isAiEditing,
+    isCropping,
+    isMaskControlHovered,
+    isMasking,
+    isStraightenActive,
+    isRotationActive,
+    maskOverlayUrl,
+    onGenerateAiMask,
+    onQuickErase,
+    onSelectAiSubMask,
+    onSelectMask,
+    onStraighten,
+    selectedImage,
+    setCrop,
+    setIsMaskHovered,
+    showOriginal,
+    transformedOriginalUrl,
+    uncroppedAdjustedPreviewUrl,
+    updateSubMask,
+    fullResolutionUrl,
+    isFullResolution,
+    isLoadingFullRes,
+    isWbPickerActive = false,
+    onWbPicked,
+    setAdjustments,
+    overlayRotation,
+    overlayMode
+  }: ImageCanvasProps) => {
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
     const [layers, setLayers] = useState<Array<ImageLayer>>([]);
     const cropImageRef = useRef<HTMLImageElement>(null);
@@ -1195,7 +1156,21 @@ const ImageCanvas = memo(
       return transforms.join(' ');
     }, [adjustments.rotation, adjustments.flipHorizontal, adjustments.flipVertical]);
 
-    const showCustomGrid = isRotationActive || isStraightenActive;
+    const getCropDimensions = () => {
+      if (!crop || !uncroppedImageRenderSize?.width || !uncroppedImageRenderSize?.height) {
+        return { width: 0, height: 0 };
+      }
+
+      const width = crop.unit === '%'
+        ? uncroppedImageRenderSize.width * (crop.width / 100)
+        : crop.width;
+
+      const height = crop.unit === '%'
+        ? uncroppedImageRenderSize.height * (crop.height / 100)
+        : crop.height;
+
+      return { width, height };
+    };
 
     return (
       <div className="relative" style={{ width: '100%', height: '100%' }}>
@@ -1341,12 +1316,24 @@ const ImageCanvas = memo(
                 onChange={setCrop}
                 onComplete={handleCropComplete}
                 ruleOfThirds={false}
-                renderSelectionAddon={() => (
-                  <CustomGrid
-                    denseVisible={isRotationActive && !isStraightenActive}
-                    ruleOfThirdsVisible={!isStraightenActive}
-                  />
-                )}
+                renderSelectionAddon={() => {
+                  const { width, height } = getCropDimensions();
+                  if (width <= 0 || height <= 0) {
+                    return null;
+                  }
+                  const showDenseGrid = isRotationActive && !isStraightenActive;
+                  const currentOverlayMode =
+                    isRotationActive || isStraightenActive ? 'none' : overlayMode || 'none';
+                  return (
+                    <CompositionOverlays
+                      width={width}
+                      height={height}
+                      mode={currentOverlayMode}
+                      rotation={overlayRotation || 0}
+                      denseVisible={showDenseGrid}
+                    />
+                  );
+                }}
               >
                 <img
                   alt="Crop preview"
