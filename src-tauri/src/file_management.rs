@@ -616,11 +616,26 @@ pub fn list_images_recursive(path: String) -> Result<Vec<ImageFile>, String> {
 }
 
 #[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct FolderNode {
     pub name: String,
     pub path: String,
     pub children: Vec<FolderNode>,
     pub is_dir: bool,
+    pub image_count: usize, // ← NEW
+}
+
+fn count_raw_images_in_dir(path: &Path) -> usize {
+    match fs::read_dir(path) {
+        Ok(entries) => entries
+            .filter_map(Result::ok)
+            .filter(|e| {
+                e.path().is_file()
+                    && is_raw_file(&e.path().to_string_lossy())
+            })
+            .count(),
+        Err(_) => 0,
+    }
 }
 
 fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
@@ -628,14 +643,12 @@ fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
 
     let entries = match fs::read_dir(path) {
         Ok(entries) => entries,
-        Err(e) => {
-            log::warn!("Could not scan directory '{}': {}", path.display(), e);
-            return Ok(Vec::new());
-        }
+        Err(_) => return Ok(Vec::new()),
     };
 
-    for entry in entries.filter_map(std::result::Result::ok) {
+    for entry in entries.filter_map(Result::ok) {
         let current_path = entry.path();
+
         let is_hidden = current_path
             .file_name()
             .and_then(|s| s.to_str())
@@ -643,6 +656,12 @@ fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
 
         if current_path.is_dir() && !is_hidden {
             let sub_children = scan_dir_recursive(&current_path)?;
+
+            let own_count = count_raw_images_in_dir(&current_path);
+
+            let children_sum: usize =
+                sub_children.iter().map(|c| c.image_count).sum();
+
             children.push(FolderNode {
                 name: current_path
                     .file_name()
@@ -651,7 +670,8 @@ fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
                     .into_owned(),
                 path: current_path.to_string_lossy().into_owned(),
                 children: sub_children,
-                is_dir: current_path.is_dir(),
+                is_dir: true,
+                image_count: own_count + children_sum,
             });
         }
     }
@@ -663,23 +683,26 @@ fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
 
 fn get_folder_tree_sync(path: String) -> Result<FolderNode, String> {
     let root_path = Path::new(&path);
+
     if !root_path.is_dir() {
-        return Err(format!(
-            "Could not scan directory '{}': No such file or directory (os error 2)",
-            path
-        ));
+        return Err(format!("Directory does not exist: {}", path));
     }
-    let name = root_path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .into_owned();
+
     let children = scan_dir_recursive(root_path).map_err(|e| e.to_string())?;
+
+    let own_count = count_raw_images_in_dir(root_path);
+    let children_sum: usize = children.iter().map(|c| c.image_count).sum();
+
     Ok(FolderNode {
-        name,
+        name: root_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned(),
         path: path.clone(),
         children,
-        is_dir: root_path.is_dir(),
+        is_dir: true,
+        image_count: own_count + children_sum,
     })
 }
 

@@ -4,10 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useMemo, useEffect } from 'react';
 
 export interface FolderTree {
-  children: any;
+  children: FolderTree[];
   is_dir: boolean;
   name: string;
   path: string;
+  imageCount?: number;
 }
 
 interface FolderTreeProps {
@@ -177,7 +178,12 @@ function TreeNode({
             'text-text-primary': !isSelected
           })}
         >
-          {node.name}
+        <span className="truncate">{node.name}</span>
+           {typeof node.imageCount === "number" && (
+             <span className="text-text-secondary text-xs ml-1">
+                ({node.imageCount})
+             </span>
+           )}
         </span>
 
         {hasChildren && (
