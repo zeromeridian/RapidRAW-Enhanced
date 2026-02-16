@@ -22,7 +22,7 @@ const BASE_RATIO = 1.618;
 const ORIGINAL_RATIO = 0;
 const RATIO_TOLERANCE = 0.01;
 
-export type OverlayMode = 'none' | 'thirds' | 'goldenTriangle' | 'goldenSpiral' | 'phiGrid' | 'harmonicArmature' | 'diagonal';
+export type OverlayMode = 'none' | 'thirds' | 'goldenTriangle' | 'goldenSpiral' | 'phiGrid' | 'armature' | 'diagonal';
 
 interface CropPanelProps {
   adjustments: Adjustments;
@@ -69,7 +69,7 @@ const OVERLAYS: Array<OverlayOption> = [
   { id: 'goldenTriangle', name: 'Triangle', tooltip: 'Golden Triangle' },
   { id: 'goldenSpiral', name: 'Spiral', tooltip: 'Golden Spiral (Fibonacci)' },
   { id: 'phiGrid', name: 'Phi Grid', tooltip: 'Phi Grid (Golden Ratio)' },
-  { id: 'harmonicArmature', name: 'Harmonic Armature', tooltip: 'Harmonic Armature' },
+  { id: 'armature', name: 'Armature', tooltip: 'Armature' },
 ];
 
 export default function CropPanel({
@@ -514,9 +514,21 @@ export default function CropPanel({
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-3">
                 <p className="text-sm font-semibold text-text-primary">Composition Guides</p>
-                <div className="p-1.5 text-text-tertiary">
-                  <LayoutGrid size={16} />
-                </div>
+                <button
+                  className={clsx(
+                    "p-1.5 rounded-md transition-colors",
+                    ['goldenSpiral', 'goldenTriangle', 'diagonal'].includes(activeOverlay)
+                      ? "text-text-primary hover:bg-surface"
+                      : "text-text-tertiary cursor-default"
+                  )}
+                  onClick={() => setOverlayRotation((prev: number) => (prev + 1) % 4)}
+                  data-tooltip="Rotate Overlay (Shift+O)"
+                  disabled={!['goldenSpiral', 'goldenTriangle', 'diagonal'].includes(activeOverlay)}
+                >
+                  <RotateCw
+                    size={16}
+                  />
+                </button>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {OVERLAYS.map((overlay) => (
