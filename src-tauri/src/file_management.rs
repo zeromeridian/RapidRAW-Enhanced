@@ -197,6 +197,8 @@ pub struct ExportPreset {
     pub watermark_scale: u32,
     pub watermark_spacing: u32,
     pub watermark_opacity: u32,
+    #[serde(default)]
+    pub export_masks: Option<bool>,
 }
 
 fn default_export_presets() -> Vec<ExportPreset> {
@@ -219,6 +221,7 @@ fn default_export_presets() -> Vec<ExportPreset> {
             watermark_scale: 10,
             watermark_spacing: 5,
             watermark_opacity: 75,
+            export_masks: Some(false),
         },
         ExportPreset {
             id: "default-fast".to_string(),
@@ -238,6 +241,7 @@ fn default_export_presets() -> Vec<ExportPreset> {
             watermark_scale: 10,
             watermark_spacing: 5,
             watermark_opacity: 75,
+            export_masks: Some(false),
         },
     ]
 }

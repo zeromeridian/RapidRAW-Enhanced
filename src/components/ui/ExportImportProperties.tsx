@@ -37,7 +37,6 @@ export interface ExportSettings {
   } | null;
   stripGps: boolean;
   watermark: WatermarkSettings | null;
-  /** When true (single-image export), also write per-mask files: image with that mask's adjustments + grayscale alpha. */
   exportMasks?: boolean;
 }
 
