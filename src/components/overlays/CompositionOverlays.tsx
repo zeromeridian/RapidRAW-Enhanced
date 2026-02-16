@@ -141,14 +141,10 @@ export default function CompositionOverlays(
   const renderGoldenSpiral = () => {
     const r = rotation % 4;
 
-    const isOddRotation = r === 1 || r === 3;
     const PHI = (1 + Math.sqrt(5)) / 2;
 
     const baseW = 1000;
     const baseH = baseW / PHI;
-
-    const scaleX = (isOddRotation ? height : width) / baseW;
-    const scaleY = (isOddRotation ? width : height) / baseH;
 
     const pathData = [
       "M 0 618.03",
