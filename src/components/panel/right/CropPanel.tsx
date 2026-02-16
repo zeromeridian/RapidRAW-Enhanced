@@ -3,11 +3,11 @@ import {
   Aperture,
   FlipHorizontal,
   FlipVertical,
+  Grid3x3,
   RectangleHorizontal,
   RectangleVertical,
   RotateCcw,
   RotateCw,
-  RotateCwSquare,
   Ruler,
   Scan,
   X
@@ -108,13 +108,14 @@ export default function CropPanel({
       const activeTag = document.activeElement?.tagName.toLowerCase();
       if (activeTag === 'input' || activeTag === 'textarea') return;
 
+      if (e.ctrlKey || e.metaKey) return;
+
       if (e.key.toLowerCase() === 'o') {
         e.preventDefault();
 
         if (e.shiftKey) {
           setOverlayRotation((prev) => (prev + 1) % 4);
         } else {
-
           const currentIndex = OVERLAYS.findIndex((o) => o.id === activeOverlay);
           const nextIndex = (currentIndex + 1) % OVERLAYS.length;
           setOverlay(OVERLAYS[nextIndex].id);
@@ -399,6 +400,19 @@ export default function CropPanel({
     setGlobalRotationActive?.(false);
   };
 
+  const handleOverlayCycle = () => {
+    const currentIndex = OVERLAYS.findIndex((o) => o.id === activeOverlay);
+    const nextIndex = (currentIndex + 1) % OVERLAYS.length;
+    setOverlay(OVERLAYS[nextIndex].id);
+  };
+
+  const getOverlayTooltip = () => {
+    const current = OVERLAYS.find((o) => o.id === activeOverlay);
+    if (!current) return 'Composition Overlay';
+    const isRotatable = ['goldenSpiral', 'goldenTriangle'].includes(activeOverlay);
+    return `Overlay: ${current.name}${isRotatable ? ' (Shift+O to rotate)' : ''}`;
+  };
+
   const getOrientationTooltip = () => {
     if (isOrientationToggleDisabled) {
       return 'Switch orientation';
@@ -421,18 +435,27 @@ export default function CropPanel({
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-3">
                 <p className="text-sm font-semibold text-text-primary">Aspect Ratio</p>
-                <button
-                  className="p-1.5 rounded-md hover:bg-surface disabled:text-text-tertiary disabled:cursor-not-allowed"
-                  disabled={isOrientationToggleDisabled}
-                  onClick={handleOrientationToggle}
-                  data-tooltip={getOrientationTooltip()}
-                >
-                  {orientation === Orientation.Vertical ? (
-                    <RectangleVertical size={16} />
-                  ) : (
-                    <RectangleHorizontal size={16} />
-                  )}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
+                    onClick={handleOverlayCycle}
+                    data-tooltip={getOverlayTooltip()}
+                  >
+                    <Grid3x3 size={16} />
+                  </button>
+                  <button
+                    className="p-1.5 rounded-md hover:bg-surface disabled:text-text-tertiary disabled:cursor-not-allowed"
+                    disabled={isOrientationToggleDisabled}
+                    onClick={handleOrientationToggle}
+                    data-tooltip={getOrientationTooltip()}
+                  >
+                    {orientation === Orientation.Vertical ? (
+                      <RectangleVertical size={16} />
+                    ) : (
+                      <RectangleHorizontal size={16} />
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {PRESETS.map((preset: CropPreset) => (
@@ -507,42 +530,6 @@ export default function CropPanel({
                     />
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex justify-between items-center mb-3">
-                <p className="text-sm font-semibold text-text-primary">Composition Guides</p>
-                <button
-                  className={clsx(
-                    "p-1.5 rounded-md transition-colors",
-                    ['goldenSpiral', 'goldenTriangle'].includes(activeOverlay)
-                      ? "text-text-primary hover:bg-surface"
-                      : "text-text-tertiary cursor-default"
-                  )}
-                  onClick={() => setOverlayRotation((prev: number) => (prev + 1) % 4)}
-                  data-tooltip="Rotate Overlay (Shift+O)"
-                  disabled={!['goldenSpiral', 'goldenTriangle'].includes(activeOverlay)}
-                >
-                  <RotateCwSquare
-                    size={16}
-                  />
-                </button>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {OVERLAYS.map((overlay) => (
-                  <button
-                    key={overlay.id}
-                    className={clsx(
-                      'px-2 py-1.5 text-sm rounded-md transition-colors truncate',
-                      activeOverlay === overlay.id ? 'bg-accent text-button-text' : 'bg-surface hover:bg-card-active',
-                    )}
-                    onClick={() => setOverlay(overlay.id)}
-                    data-tooltip={overlay.tooltip}
-                  >
-                    {overlay.name}
-                  </button>
-                ))}
               </div>
             </div>
 

@@ -9,7 +9,7 @@ import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
 import { BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import { RenderSize } from '../../../hooks/useImageRenderSize';
 import type { OverlayMode } from '../right/CropPanel';
-import CompositionOverlays from '../../overlays/CompositionOverlays';
+import CompositionOverlays from './overlays/CompositionOverlays';
 
 interface CursorPreview {
   visible: boolean;
@@ -81,51 +81,6 @@ interface MaskOverlay {
   scale: number;
   subMask: SubMask;
 }
-
-const CustomGrid = ({
-    denseVisible,
-    ruleOfThirdsVisible,
-  }: {
-  denseVisible: boolean;
-  ruleOfThirdsVisible: boolean;
-}) => (
-  <div className="absolute inset-0 pointer-events-none w-full h-full">
-
-    <div
-      className={clsx(
-        "absolute inset-0 w-full h-full transition-opacity duration-300 ease-in-out",
-        ruleOfThirdsVisible ? "opacity-100" : "opacity-0"
-      )}
-    >
-      <div className="absolute top-0 bottom-0 border-l border-white/40 left-1/3" />
-      <div className="absolute top-0 bottom-0 border-l border-white/40 left-2/3" />
-      <div className="absolute left-0 right-0 border-t border-white/40 top-1/3" />
-      <div className="absolute left-0 right-0 border-t border-white/40 top-2/3" />
-    </div>
-
-    <div
-      className={clsx(
-        'absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out',
-        denseVisible ? 'opacity-100' : 'opacity-0',
-      )}
-    >
-      {[...Array(17)].map((_, i) => (
-        <div
-          key={`v-${i}`}
-          className="absolute top-0 bottom-0 border-l border-white/40"
-          style={{ left: `${(i + 1) * 5.555}%` }}
-        />
-      ))}
-      {[...Array(17)].map((_, i) => (
-        <div
-          key={`h-${i}`}
-          className="absolute left-0 right-0 border-t border-white/40"
-          style={{ top: `${(i + 1) * 5.555}%` }}
-        />
-      ))}
-    </div>
-  </div>
-);
 
 const ORIGINAL_LAYER = 'original';
 
@@ -1217,8 +1172,6 @@ const ImageCanvas = memo(
       return { width, height };
     };
 
-    const showCustomGrid = isRotationActive || isStraightenActive;
-
     return (
       <div className="relative" style={{ width: '100%', height: '100%' }}>
         <div
@@ -1364,29 +1317,22 @@ const ImageCanvas = memo(
                 onComplete={handleCropComplete}
                 ruleOfThirds={false}
                 renderSelectionAddon={() => {
-                  if (isRotationActive || isStraightenActive) {
-                    return (
-                      <CustomGrid
-                        denseVisible={isRotationActive && !isStraightenActive}
-                        ruleOfThirdsVisible={!isStraightenActive}
-                      />
-                    );
-                  }
-
                   const { width, height } = getCropDimensions();
-
-                  if (width > 0 && height > 0) {
-                    return (
-                      <CompositionOverlays
-                        width={width}
-                        height={height}
-                        mode={overlayMode || 'none'}
-                        rotation={overlayRotation || 0}
-                      />
-                    );
+                  if (width <= 0 || height <= 0) {
+                    return null;
                   }
-
-                  return null;
+                  const showDenseGrid = isRotationActive && !isStraightenActive;
+                  const currentOverlayMode =
+                    isRotationActive || isStraightenActive ? 'none' : overlayMode || 'none';
+                  return (
+                    <CompositionOverlays
+                      width={width}
+                      height={height}
+                      mode={currentOverlayMode}
+                      rotation={overlayRotation || 0}
+                      denseVisible={showDenseGrid}
+                    />
+                  );
                 }}
               >
                 <img
