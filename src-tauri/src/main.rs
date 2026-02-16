@@ -75,7 +75,7 @@ use crate::image_loader::{
     composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
 };
 use crate::image_processing::{
-    Crop, GeometryParams, GpuContext, ImageMetadata, apply_coarse_rotation,
+    AllAdjustments, Crop, GeometryParams, GpuContext, ImageMetadata, apply_coarse_rotation,
     apply_cpu_default_raw_processing, apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
     apply_unwarp_geometry, downscale_f32_image, get_all_adjustments_from_json,
     get_or_init_gpu_context, process_and_get_dynamic_image, warp_image_geometry,
@@ -180,6 +180,8 @@ struct ExportSettings {
     strip_gps: bool,
     filename_template: Option<String>,
     watermark: Option<WatermarkSettings>,
+    #[serde(default)]
+    export_masks: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1451,6 +1453,94 @@ fn process_image_for_export(
     Ok(final_image)
 }
 
+
+/// Build AllAdjustments with only one mask at index 0 (for per-mask export).
+fn build_single_mask_adjustments(all: &AllAdjustments, mask_index: usize) -> AllAdjustments {
+    let mut single = AllAdjustments {
+        global: all.global,
+        mask_adjustments: all.mask_adjustments,
+        mask_count: 1,
+        tile_offset_x: all.tile_offset_x,
+        tile_offset_y: all.tile_offset_y,
+        mask_atlas_cols: all.mask_atlas_cols,
+    };
+    single.mask_adjustments[0] = all.mask_adjustments[mask_index];
+    for i in 1..single.mask_adjustments.len() {
+        single.mask_adjustments[i] = Default::default();
+    }
+    single
+}
+
+fn encode_grayscale_to_png(bitmap: &GrayImage) -> Result<Vec<u8>, String> {
+    let mut buf = Vec::new();
+    let mut cursor = Cursor::new(&mut buf);
+    bitmap
+        .write_to(&mut cursor, ImageFormat::Png)
+        .map_err(|e| e.to_string())?;
+    Ok(buf)
+}
+
+fn apply_export_resize_and_watermark(
+    mut image: DynamicImage,
+    export_settings: &ExportSettings,
+) -> Result<DynamicImage, String> {
+    if let Some(resize_opts) = &export_settings.resize {
+        let (current_w, current_h) = image.dimensions();
+        let should_resize = if resize_opts.dont_enlarge {
+            match resize_opts.mode {
+                ResizeMode::LongEdge => current_w.max(current_h) > resize_opts.value,
+                ResizeMode::ShortEdge => current_w.min(current_h) > resize_opts.value,
+                ResizeMode::Width => current_w > resize_opts.value,
+                ResizeMode::Height => current_h > resize_opts.value,
+            }
+        } else {
+            true
+        };
+        if should_resize {
+            image = match resize_opts.mode {
+                ResizeMode::LongEdge => {
+                    let (w, h) = if current_w > current_h {
+                        (
+                            resize_opts.value,
+                            (resize_opts.value as f32 * (current_h as f32 / current_w as f32))
+                                .round() as u32,
+                        )
+                    } else {
+                        (
+                            (resize_opts.value as f32 * (current_w as f32 / current_h as f32))
+                                .round() as u32,
+                            resize_opts.value,
+                        )
+                    };
+                    image.resize(w, h, imageops::FilterType::Lanczos3)
+                }
+                ResizeMode::ShortEdge => {
+                    let (w, h) = if current_w < current_h {
+                        (
+                            resize_opts.value,
+                            (resize_opts.value as f32 * (current_h as f32 / current_w as f32))
+                                .round() as u32,
+                        )
+                    } else {
+                        (
+                            (resize_opts.value as f32 * (current_w as f32 / current_h as f32))
+                                .round() as u32,
+                            resize_opts.value,
+                        )
+                    };
+                    image.resize(w, h, imageops::FilterType::Lanczos3)
+                }
+                ResizeMode::Width => image.resize(resize_opts.value, u32::MAX, imageops::FilterType::Lanczos3),
+                ResizeMode::Height => image.resize(u32::MAX, resize_opts.value, imageops::FilterType::Lanczos3),
+            };
+        }
+    }
+    if let Some(watermark_settings) = &export_settings.watermark {
+        apply_watermark(&mut image, watermark_settings)?;
+    }
+    Ok(image)
+}
+
 fn encode_image_to_bytes(
     image: &DynamicImage,
     output_format: &str,
@@ -1543,6 +1633,68 @@ async fn export_image(
             )?;
 
             fs::write(&output_path, image_bytes).map_err(|e| e.to_string())?;
+
+            if export_settings.export_masks {
+                let (transformed_image, unscaled_crop_offset) =
+                    apply_all_transformations(&base_image, &js_adjustments);
+                let (img_w, img_h) = transformed_image.dimensions();
+                let mask_definitions: Vec<MaskDefinition> = js_adjustments
+                    .get("masks")
+                    .and_then(|m| serde_json::from_value(m.clone()).ok())
+                    .unwrap_or_else(Vec::new);
+                let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
+                    .iter()
+                    .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
+                    .collect();
+                if !mask_bitmaps.is_empty() {
+                    let all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw);
+                    let lut_path = js_adjustments["lutPath"].as_str();
+                    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+                    let unique_hash = calculate_full_job_hash(&source_path_str, &js_adjustments);
+                    let output_dir = output_path_obj.parent().unwrap_or_else(|| output_path_obj.as_ref());
+                    let stem = output_path_obj
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("export");
+                    for (i, _) in mask_bitmaps.iter().enumerate() {
+                        let single_adjustments = build_single_mask_adjustments(&all_adjustments, i);
+                        // Full-white mask so this mask's color settings apply to the entire image, not just the mask region.
+                        let full_white_mask = ImageBuffer::from_fn(img_w, img_h, |_, _| Luma([255u8]));
+                        let single_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = vec![full_white_mask];
+                        let processed = process_and_get_dynamic_image(
+                            &context,
+                            &state,
+                            &transformed_image,
+                            unique_hash,
+                            single_adjustments,
+                            &single_bitmaps,
+                            lut.clone(),
+                            "export_mask_image",
+                        )?;
+                        let with_options = apply_export_resize_and_watermark(processed, &export_settings)?;
+                        let (out_w, out_h) = with_options.dimensions();
+                        let alpha_resized = imageops::resize(
+                            &mask_bitmaps[i],
+                            out_w,
+                            out_h,
+                            imageops::FilterType::Lanczos3,
+                        );
+                        let mask_image_path = output_dir.join(format!("{}_mask_{}_image.{}", stem, i, extension));
+                        let mask_alpha_path = output_dir.join(format!("{}_mask_{}_alpha.png", stem, i));
+                        let mut mask_image_bytes = encode_image_to_bytes(&with_options, &extension, export_settings.jpeg_quality)?;
+                        exif_processing::write_image_with_metadata(
+                            &mut mask_image_bytes,
+                            &source_path_str,
+                            &extension,
+                            export_settings.keep_metadata,
+                            export_settings.strip_gps,
+                        )?;
+                        fs::write(&mask_image_path, mask_image_bytes).map_err(|e| e.to_string())?;
+                        let alpha_bytes = encode_grayscale_to_png(&alpha_resized)?;
+                        fs::write(&mask_alpha_path, alpha_bytes).map_err(|e| e.to_string())?;
+                    }
+                }
+            }
 
             Ok(())
         })();

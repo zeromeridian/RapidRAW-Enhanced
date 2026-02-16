@@ -186,6 +186,8 @@ export default function ExportPanel({
     setKeepMetadata,
     stripGps,
     setStripGps,
+    exportMasks,
+    setExportMasks,
     filenameTemplate,
     setFilenameTemplate,
     enableWatermark,
@@ -371,6 +373,7 @@ export default function ExportPanel({
       keepMetadata,
       resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
       stripGps,
+      exportMasks: isEditorContext && !isBatchMode ? exportMasks : undefined,
       watermark:
         enableWatermark && watermarkPath
           ? {
@@ -551,6 +554,17 @@ export default function ExportPanel({
                 </div>
               )}
             </Section>
+
+            {isEditorContext && !isBatchMode && (
+              <Section title="Masks">
+                <Switch
+                  label="Export masks as separate files"
+                  checked={exportMasks}
+                  onChange={setExportMasks}
+                  disabled={isExporting}
+                />
+              </Section>
+            )}
 
             <Section title="Watermark">
               <Switch

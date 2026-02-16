@@ -37,6 +37,8 @@ export interface ExportSettings {
   } | null;
   stripGps: boolean;
   watermark: WatermarkSettings | null;
+  /** When true (single-image export), also write per-mask files: image with that mask's adjustments + grayscale alpha. */
+  exportMasks?: boolean;
 }
 
 export enum WatermarkAnchor {
@@ -98,6 +100,7 @@ export interface ExportPreset {
   dontEnlarge: boolean;
   keepMetadata: boolean;
   stripGps: boolean;
+  exportMasks?: boolean;
   filenameTemplate: string;
   enableWatermark: boolean;
   watermarkPath: string | null;
