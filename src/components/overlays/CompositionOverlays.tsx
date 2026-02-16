@@ -38,6 +38,16 @@ export default function CompositionOverlays(
     </>
   );
 
+  const renderDiagonal = () => (
+    <>
+      <line x1={0} y1={0} x2={width * 0.666} y2={height} {...strokeProps} />
+      <line x1={width * 0.333} y1={0} x2={width} y2={height} {...strokeProps} />
+
+      <line x1={width} y1={0} x2={width * 0.333} y2={height} {...strokeProps} />
+      <line x1={width * 0.666} y1={0} x2={0} y2={height} {...strokeProps} />
+    </>
+  );
+
   const renderPhiGrid = () => {
     const p1 = 0.382;
     const p2 = 0.618;
@@ -97,53 +107,40 @@ export default function CompositionOverlays(
   };
 
   const renderHarmonicArmature = () => {
-    const d1 = <line key="d1" x1={0} y1={0} x2={width} y2={height} {...strokeProps} />;
-    const d2 = <line key="d2" x1={width} y1={0} x2={0} y2={height} {...strokeProps} />;
+    const midX = width / 2;
+    const midY = height / 2;
 
-    const renderExtendedRecip = (
-      sx: number, sy: number,
-      ex: number, ey: number,
-      px: number, py: number,
-      key: string
-    ) => {
-      const dx = ex - sx;
-      const dy = ey - sy;
-
-      if (dx === 0 || dy === 0) return null;
-
-      const mDiagonal = dy / dx;
-      const mRecip = -1 / mDiagonal;
-
-      let targetX: number;
-      let targetY: number;
-
-      targetX = px === 0 ? width : 0;
-      targetY = mRecip * (targetX - px) + py;
-
-      if (targetY < 0) {
-        targetY = 0;
-        targetX = (targetY - py) / mRecip + px;
-      } else if (targetY > height) {
-        targetY = height;
-        targetX = (targetY - py) / mRecip + px;
-      }
-
-      return <line key={key} x1={px} y1={py} x2={targetX} y2={targetY} {...strokeProps} />;
+    const dashedStrokeProps = {
+      ...strokeProps,
+      strokeDasharray: '5,5',
     };
 
     return (
       <>
-        {d1} {d2}
-        {renderExtendedRecip(0, 0, width, height, width, 0, 'r1')}
-        {renderExtendedRecip(0, 0, width, height, 0, height, 'r2')}
-        {renderExtendedRecip(width, 0, 0, height, 0, 0, 'r3')}
-        {renderExtendedRecip(width, 0, 0, height, width, height, 'r4')}
+
+        <line x1={0} y1={0} x2={width} y2={height} {...dashedStrokeProps} />
+        <line x1={width} y1={0} x2={0} y2={height} {...dashedStrokeProps} />
+        <line x1={midX} y1={0} x2={midX} y2={height} {...dashedStrokeProps} />
+        <line x1={0} y1={midY} x2={width} y2={midY} {...dashedStrokeProps} />
+
+        <line x1={0} y1={0} x2={midX} y2={height} {...strokeProps} />
+        <line x1={0} y1={0} x2={width} y2={midY} {...strokeProps} />
+
+        <line x1={width} y1={0} x2={midX} y2={height} {...strokeProps} />
+        <line x1={width} y1={0} x2={0} y2={midY} {...strokeProps} />
+
+        <line x1={0} y1={height} x2={midX} y2={0} {...strokeProps} />
+        <line x1={0} y1={height} x2={width} y2={midY} {...strokeProps} />
+
+        <line x1={width} y1={height} x2={midX} y2={0} {...strokeProps} />
+        <line x1={width} y1={height} x2={0} y2={midY} {...strokeProps} />
       </>
     );
   };
 
   const renderGoldenSpiral = () => {
     const r = rotation % 4;
+
     const isOddRotation = r === 1 || r === 3;
     const PHI = (1 + Math.sqrt(5)) / 2;
 
@@ -166,9 +163,10 @@ export default function CompositionOverlays(
     ].join(" ");
 
     const transform = `
-    rotate(${r * 90} ${width / 2} ${height / 2}) 
-    translate(${(width - (isOddRotation ? height : width)) / 2} ${(height - (isOddRotation ? width : height)) / 2})
-    scale(${scaleX}, ${scaleY})
+    translate(${width / 2} ${height / 2}) 
+    rotate(${r * 90}) 
+    scale(${r % 2 === 0 ? width / baseW : height / baseW}, ${r % 2 === 0 ? height / baseH : width / baseH})
+    translate(${-baseW / 2} ${-baseH / 2})
   `;
 
     return (
@@ -202,7 +200,8 @@ export default function CompositionOverlays(
       {mode === 'phiGrid' && renderPhiGrid()}
       {mode === 'goldenTriangle' && renderGoldenTriangle()}
       {mode === 'goldenSpiral' && renderGoldenSpiral()}
-      {mode === '1_5_rectangle' && renderHarmonicArmature()}
+      {mode === 'harmonicArmature' && renderHarmonicArmature()}
+      {mode === 'diagonal' && renderDiagonal()}
     </svg>
   );
 }
