@@ -93,7 +93,7 @@ export default function CropPanel({
   const [isEditingCustom, setIsEditingCustom] = useState(false);
 
   const [internalOverlayMode, setInternalOverlayMode] = useState<OverlayMode>('thirds');
-  const [internalOverlayRotation, setInternalOverlayRotation] = useState(0);
+  const [_internalOverlayRotation, setInternalOverlayRotation] = useState(0);
 
   const activeOverlay = propOverlayMode ?? internalOverlayMode;
   const setOverlay = setPropOverlayMode ?? setInternalOverlayMode;
