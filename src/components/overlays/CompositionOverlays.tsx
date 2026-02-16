@@ -106,34 +106,32 @@ export default function CompositionOverlays(
     );
   };
 
-  const renderHarmonicArmature = () => {
-    const midX = width / 2;
-    const midY = height / 2;
+  const renderArmature = () => {
+    const m = height / width;
+    const x = (m * m * width) / (m * m + 1);
+    const y = m * x;
 
-    const dashedStrokeProps = {
-      ...strokeProps,
-      strokeDasharray: '5,5',
-    };
+    const leftX = width - x;
+    const rightX = x;
+    const topY = y;
+    const bottomY = height - y;
+
+    const dashedStrokeProps = { ...strokeProps, strokeDasharray: '5 5' };
 
     return (
       <>
+        <line x1={0} y1={0} x2={width} y2={height} {...strokeProps} />
+        <line x1={width} y1={0} x2={0} y2={height} {...strokeProps} />
 
-        <line x1={0} y1={0} x2={width} y2={height} {...dashedStrokeProps} />
-        <line x1={width} y1={0} x2={0} y2={height} {...dashedStrokeProps} />
-        <line x1={midX} y1={0} x2={midX} y2={height} {...dashedStrokeProps} />
-        <line x1={0} y1={midY} x2={width} y2={midY} {...dashedStrokeProps} />
+        <line x1={width} y1={0} x2={0} y2={height / (m * m)} {...strokeProps} />
+        <line x1={0} y1={0} x2={width} y2={height / (m * m)} {...strokeProps} />
+        <line x1={0} y1={height} x2={width} y2={height - (height / (m * m))} {...strokeProps} />
+        <line x1={width} y1={height} x2={0} y2={height - (height / (m * m))} {...strokeProps} />
 
-        <line x1={0} y1={0} x2={midX} y2={height} {...strokeProps} />
-        <line x1={0} y1={0} x2={width} y2={midY} {...strokeProps} />
-
-        <line x1={width} y1={0} x2={midX} y2={height} {...strokeProps} />
-        <line x1={width} y1={0} x2={0} y2={midY} {...strokeProps} />
-
-        <line x1={0} y1={height} x2={midX} y2={0} {...strokeProps} />
-        <line x1={0} y1={height} x2={width} y2={midY} {...strokeProps} />
-
-        <line x1={width} y1={height} x2={midX} y2={0} {...strokeProps} />
-        <line x1={width} y1={height} x2={0} y2={midY} {...strokeProps} />
+        <line x1={leftX} y1={0} x2={leftX} y2={height} {...dashedStrokeProps} />
+        <line x1={rightX} y1={0} x2={rightX} y2={height} {...dashedStrokeProps} />
+        <line x1={0} y1={topY} x2={width} y2={topY} {...dashedStrokeProps} />
+        <line x1={0} y1={bottomY} x2={width} y2={bottomY} {...dashedStrokeProps} />
       </>
     );
   };
@@ -199,7 +197,7 @@ export default function CompositionOverlays(
       {mode === 'phiGrid' && renderPhiGrid()}
       {mode === 'goldenTriangle' && renderGoldenTriangle()}
       {mode === 'goldenSpiral' && renderGoldenSpiral()}
-      {mode === 'harmonicArmature' && renderHarmonicArmature()}
+      {mode === 'armature' && renderArmature()}
       {mode === 'diagonal' && renderDiagonal()}
     </svg>
   );
