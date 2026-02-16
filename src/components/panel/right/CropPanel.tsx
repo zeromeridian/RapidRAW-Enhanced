@@ -3,11 +3,11 @@ import {
   Aperture,
   FlipHorizontal,
   FlipVertical,
-  LayoutGrid,
   RectangleHorizontal,
   RectangleVertical,
   RotateCcw,
   RotateCw,
+  RotateCwSquare,
   Ruler,
   Scan,
   X
@@ -525,7 +525,7 @@ export default function CropPanel({
                   data-tooltip="Rotate Overlay (Shift+O)"
                   disabled={!['goldenSpiral', 'goldenTriangle', 'diagonal'].includes(activeOverlay)}
                 >
-                  <RotateCw
+                  <RotateCwSquare
                     size={16}
                   />
                 </button>
