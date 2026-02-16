@@ -97,7 +97,6 @@ export default function CropPanel({
 
   const activeOverlay = propOverlayMode ?? internalOverlayMode;
   const setOverlay = setPropOverlayMode ?? setInternalOverlayMode;
-  const activeOverlayRotation = propOverlayRotation ?? internalOverlayRotation;
   const setOverlayRotation = propSetOverlayRotation ?? setInternalOverlayRotation;
 
   const lastSyncedRatio = useRef<number | null>(null);
@@ -517,13 +516,13 @@ export default function CropPanel({
                 <button
                   className={clsx(
                     "p-1.5 rounded-md transition-colors",
-                    ['goldenSpiral', 'goldenTriangle', 'diagonal'].includes(activeOverlay)
+                    ['goldenSpiral', 'goldenTriangle'].includes(activeOverlay)
                       ? "text-text-primary hover:bg-surface"
                       : "text-text-tertiary cursor-default"
                   )}
                   onClick={() => setOverlayRotation((prev: number) => (prev + 1) % 4)}
                   data-tooltip="Rotate Overlay (Shift+O)"
-                  disabled={!['goldenSpiral', 'goldenTriangle', 'diagonal'].includes(activeOverlay)}
+                  disabled={!['goldenSpiral', 'goldenTriangle'].includes(activeOverlay)}
                 >
                   <RotateCwSquare
                     size={16}
