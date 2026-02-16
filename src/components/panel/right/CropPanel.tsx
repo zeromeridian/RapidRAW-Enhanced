@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Aperture,
   FlipHorizontal,
@@ -34,7 +34,7 @@ interface CropPanelProps {
   overlayMode?: OverlayMode;
   setOverlayMode?(mode: OverlayMode): void;
   overlayRotation?: number;
-  setOverlayRotation?(rotation: number): void;
+  setOverlayRotation?(rotation: SetStateAction<number>): void;
 }
 
 interface CropPreset {
