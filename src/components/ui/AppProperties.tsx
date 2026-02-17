@@ -170,6 +170,7 @@ export interface Folder {
   children: any;
   id?: string | undefined;
   name?: string | undefined;
+  imageCount?: number;
 }
 
 export interface ImageFile {

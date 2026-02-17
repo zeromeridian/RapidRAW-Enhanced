@@ -4,10 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useMemo, useEffect } from 'react';
 
 export interface FolderTree {
-  children: any;
+  children: FolderTree[];
   is_dir: boolean;
   name: string;
   path: string;
+  imageCount?: number;
 }
 
 interface FolderTreeProps {
@@ -37,6 +38,7 @@ interface TreeNodeProps {
   onToggle(path: string): void;
   selectedPath: string | null;
   pinnedFolders: string[];
+  showImageCounts: boolean;
 }
 
 interface VisibleProps {
@@ -104,6 +106,7 @@ function TreeNode({
   onToggle,
   selectedPath,
   pinnedFolders,
+  showImageCounts,
 }: TreeNodeProps) {
   const hasChildren = node.children && node.children.length > 0;
   const isSelected = node.path === selectedPath;
@@ -177,7 +180,19 @@ function TreeNode({
             'text-text-primary': !isSelected
           })}
         >
-          {node.name}
+          <span className="truncate">{node.name}</span>
+           {typeof node.imageCount === "number" && (
+             <span 
+               className={clsx(
+                 "inline-block text-text-secondary text-xs ml-1 transition-all ease-in-out duration-300",
+                 showImageCounts 
+                   ? "opacity-100 translate-x-0" 
+                   : "opacity-0 -translate-x-2"
+               )}
+             >
+                ({node.imageCount})
+             </span>
+           )}
         </span>
 
         {hasChildren && (
@@ -222,6 +237,7 @@ function TreeNode({
                       onToggle={onToggle}
                       selectedPath={selectedPath}
                       pinnedFolders={pinnedFolders}
+                      showImageCounts={showImageCounts}
                     />
                   </motion.div>
                 ))}
@@ -252,6 +268,7 @@ export default function FolderTree({
   onActiveSectionChange,
 }: FolderTreeProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [isHovering, setIsHovering] = useState(false);
 
   const handleEmptyAreaContextMenu = (e: any) => {
     if (e.target === e.currentTarget) {
@@ -318,6 +335,8 @@ export default function FolderTree({
         !isResizing && 'transition-[width] duration-300 ease-in-out',
       )}
       style={style}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
     >
       <button
         className="absolute top-1/2 -translate-y-1/2 right-1 w-6 h-10 hover:bg-card-active rounded-md flex items-center justify-center z-30"
@@ -382,6 +401,7 @@ export default function FolderTree({
                             onToggle={onToggleFolder}
                             selectedPath={selectedPath}
                             pinnedFolders={pinnedFolders}
+                            showImageCounts={isHovering}
                           />
                         ))}
                       </div>
@@ -419,6 +439,7 @@ export default function FolderTree({
                           onToggle={onToggleFolder}
                           selectedPath={selectedPath}
                           pinnedFolders={pinnedFolders}
+                          showImageCounts={isHovering}
                         />
                       </div>
                     </motion.div>
