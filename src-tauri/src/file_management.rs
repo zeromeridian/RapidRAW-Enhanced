@@ -450,7 +450,7 @@ pub fn list_images_in_dir(path: String) -> Result<Vec<ImageFile>, String> {
         let entry_path = entry.path();
         let file_name = entry_path.file_name().unwrap_or_default().to_string_lossy();
 
-        if is_supported_image_file(&entry_path.to_string_lossy()) {
+        if is_supported_image_file(&entry_path.to_string_lossy().as_ref()) {
             let path_str = entry_path.to_string_lossy().into_owned();
             image_files.insert(path_str, entry_path.clone());
         } else if file_name.ends_with(".rrdata") {
@@ -539,7 +539,7 @@ pub fn list_images_recursive(path: String) -> Result<Vec<ImageFile>, String> {
         
         let file_name = entry_path.file_name().unwrap_or_default().to_string_lossy();
 
-        if is_supported_image_file(&entry_path.to_string_lossy()) {
+        if is_supported_image_file(&entry_path.to_string_lossy().as_ref()) {
             let path_str = entry_path.to_string_lossy().into_owned();
             image_files.insert(path_str, entry_path.to_path_buf());
         } else if file_name.ends_with(".rrdata") {
@@ -622,75 +622,70 @@ pub struct FolderNode {
     pub path: String,
     pub children: Vec<FolderNode>,
     pub is_dir: bool,
-    pub image_count: usize, // ← NEW
+    pub image_count: usize,
 }
 
-fn count_raw_images_in_dir(path: &Path) -> usize {
-    match fs::read_dir(path) {
-        Ok(entries) => entries
-            .filter_map(Result::ok)
-            .filter(|e| {
-                e.path().is_file()
-                    && is_raw_file(&e.path().to_string_lossy())
-            })
-            .count(),
-        Err(_) => 0,
-    }
-}
-
-fn scan_dir_recursive(path: &Path) -> Result<Vec<FolderNode>, std::io::Error> {
-    let mut children = Vec::new();
+fn scan_dir_and_count(path: &Path) -> Result<(Vec<FolderNode>, usize), std::io::Error> {
+    let mut children_folders = Vec::new();
+    let mut current_dir_image_count = 0;
 
     let entries = match fs::read_dir(path) {
         Ok(entries) => entries,
-        Err(_) => return Ok(Vec::new()),
+        Err(e) => {
+            log::warn!("Could not scan directory '{}': {}", path.display(), e);
+            return Ok((Vec::new(), 0));
+        }
     };
 
     for entry in entries.filter_map(Result::ok) {
         let current_path = entry.path();
+        let file_type = match entry.file_type() {
+            Ok(ft) => ft,
+            Err(e) => {
+                log::warn!("Skipping file with unreadable type: {}", e);
+                continue;
+            }
+        };
 
-        let is_hidden = current_path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .map_or(false, |s| s.starts_with('.'));
+        if file_type.is_dir() {
+            let file_name = entry.file_name();
+            let name_str = file_name.to_string_lossy();
 
-        if current_path.is_dir() && !is_hidden {
-            let sub_children = scan_dir_recursive(&current_path)?;
+            if name_str.starts_with('.') {
+                continue;
+            }
 
-            let own_count = count_raw_images_in_dir(&current_path);
+            let (grand_children, sub_dir_own_images) = scan_dir_and_count(&current_path)?;
 
-            let children_sum: usize =
-                sub_children.iter().map(|c| c.image_count).sum();
+            let grand_children_sum: usize = grand_children.iter().map(|c| c.image_count).sum();
+            let total_child_count = sub_dir_own_images + grand_children_sum;
 
-            children.push(FolderNode {
-                name: current_path
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .into_owned(),
+            children_folders.push(FolderNode {
+                name: name_str.into_owned(),
                 path: current_path.to_string_lossy().into_owned(),
-                children: sub_children,
+                children: grand_children,
                 is_dir: true,
-                image_count: own_count + children_sum,
+                image_count: total_child_count,
             });
+
+        } else if file_type.is_file() {
+            if is_supported_image_file(&current_path) {
+                current_dir_image_count += 1;
+            }
         }
     }
 
-    children.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-
-    Ok(children)
+    Ok((children_folders, current_dir_image_count))
 }
 
 fn get_folder_tree_sync(path: String) -> Result<FolderNode, String> {
     let root_path = Path::new(&path);
-
     if !root_path.is_dir() {
         return Err(format!("Directory does not exist: {}", path));
     }
 
-    let children = scan_dir_recursive(root_path).map_err(|e| e.to_string())?;
+    let (children, own_count) = scan_dir_and_count(root_path).map_err(|e| e.to_string())?;
 
-    let own_count = count_raw_images_in_dir(root_path);
     let children_sum: usize = children.iter().map(|c| c.image_count).sum();
 
     Ok(FolderNode {
@@ -717,19 +712,27 @@ pub async fn get_folder_tree(path: String) -> Result<FolderNode, String> {
 
 #[tauri::command]
 pub async fn get_pinned_folder_trees(paths: Vec<String>) -> Result<Vec<FolderNode>, String> {
-    let results: Vec<Result<FolderNode, String>> = paths
-        .par_iter()
-        .map(|path| get_folder_tree_sync(path.clone()))
-        .collect();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let results: Vec<Result<FolderNode, String>> = paths
+            .par_iter()
+            .map(|path| get_folder_tree_sync(path.clone()))
+            .collect();
 
-    let mut folder_nodes = Vec::new();
-    for result in results {
-        match result {
-            Ok(node) => folder_nodes.push(node),
-            Err(e) => log::warn!("Failed to get tree for pinned folder: {}", e),
+        let mut folder_nodes = Vec::new();
+        for result in results {
+            match result {
+                Ok(node) => folder_nodes.push(node),
+                Err(e) => log::warn!("Failed to get tree for pinned folder: {}", e),
+            }
         }
+        folder_nodes
+    })
+    .await;
+
+    match result {
+        Ok(nodes) => Ok(nodes),
+        Err(e) => Err(format!("Task failed: {}", e)),
     }
-    Ok(folder_nodes)
 }
 
 pub fn read_file_mapped(path: &Path) -> Result<Mmap, ReadFileError> {
@@ -2233,7 +2236,7 @@ pub fn delete_files_with_associated(paths: Vec<String>) -> Result<(), String> {
 
                 if let Some(base_stem) = entry_filename_str.split('.').next() {
                     if stems_to_delete.contains(base_stem) {
-                        if is_supported_image_file(&entry_filename_str)
+                        if is_supported_image_file(&entry_filename_str.as_ref())
                             || entry_filename_str.ends_with(".rrdata")
                         {
                             files_to_trash.insert(entry_path);
@@ -2530,7 +2533,7 @@ pub fn rename_files(paths: Vec<String>, name_template: String) -> Result<Vec<Str
 
     for (old_path, new_path) in operations {
         fs::rename(&old_path, &new_path).map_err(|e| format!("Failed to rename {} to {}: {}", old_path.display(), new_path.display(), e))?;
-        if is_supported_image_file(&new_path.to_string_lossy()) {
+        if is_supported_image_file(&new_path.to_string_lossy().as_ref()) {
              final_new_paths.push(new_path.to_string_lossy().into_owned());
         }
     }

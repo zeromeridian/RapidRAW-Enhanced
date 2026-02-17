@@ -408,7 +408,7 @@ pub fn get_creation_date_from_path(path: &Path) -> DateTime<Utc> {
         }
     }
 
-    if is_raw_file(&path.to_string_lossy()) {
+    if is_raw_file(&path.to_string_lossy().as_ref()) {
          let loader = rawler::RawLoader::new();
          if let Ok(raw_source) = rawler::rawsource::RawSource::new(path) {
              if let Ok(decoder) = loader.get_decoder(&raw_source) {

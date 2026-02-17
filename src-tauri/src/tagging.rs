@@ -283,7 +283,7 @@ pub async fn start_background_indexing(
             Ok(entries) => entries
                 .filter_map(Result::ok)
                 .map(|entry| entry.path())
-                .filter(|path| path.is_file() && is_supported_image_file(&path.to_string_lossy()))
+                .filter(|path| path.is_file() && is_supported_image_file(&path.to_string_lossy().as_ref()))
                 .collect(),
             Err(e) => {
                 eprintln!("Failed to read directory '{}': {}", folder_path, e);
