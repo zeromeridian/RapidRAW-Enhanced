@@ -8,6 +8,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import debounce from 'lodash.debounce';
 import throttle from 'lodash.throttle';
 import { ClerkProvider } from '@clerk/clerk-react';
+import { ToastContainer, toast, Slide } from 'react-toastify';
 import clsx from 'clsx';
 import {
   Aperture,
@@ -512,6 +513,7 @@ function App() {
     const timer = setTimeout(() => setIsCopied(false), 1000);
     return () => clearTimeout(timer);
   }, [isCopied]);
+
   useEffect(() => {
     if (!isPasted) {
       return;
@@ -519,6 +521,17 @@ function App() {
     const timer = setTimeout(() => setIsPasted(false), 1000);
     return () => clearTimeout(timer);
   }, [isPasted]);
+
+  const isLightTheme = useMemo(() =>
+    [Theme.Light, Theme.Snow, Theme.Arctic].includes(theme as Theme),
+  [theme]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      setError(null);
+    }
+  }, [error]);
 
   const debouncedSetHistory = useMemo(
     () => debounce((newAdjustments) => setHistoryAdjustments(newAdjustments), 300),
@@ -4761,14 +4774,6 @@ function App() {
           !appSettings?.decorations && rootPath && !isWindowFullScreen && 'pt-12',
         ])}
       >
-        {error && (
-          <div className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded-lg z-50">
-            {error}
-            <button onClick={() => setError(null)} className="ml-4 font-bold hover:text-gray-200">
-              ×
-            </button>
-          </div>
-        )}
         <div className="flex flex-row flex-grow h-full min-h-0">
           {memoizedFolderTree}
           <div className="flex-1 flex flex-col min-w-0">{renderContent()}</div>
@@ -4915,6 +4920,23 @@ function App() {
         onSave={handleSaveCollage}
         sourceImages={collageModalState.sourceImages}
         thumbnails={thumbnails}
+      />
+      <ToastContainer
+        position="bottom-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable={false}
+        pauseOnHover
+        theme={isLightTheme ? "light" : "dark"}
+        transition={Slide}
+        toastClassName={() => clsx(
+            "relative flex min-h-16 p-4 rounded-lg justify-between overflow-hidden cursor-pointer mb-4",
+            "!bg-surface !text-text-primary !border !border-border-color !shadow-2xl !max-w-[420px]"
+        )}
       />
     </div>
   );
