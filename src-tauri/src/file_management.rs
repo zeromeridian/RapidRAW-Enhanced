@@ -308,6 +308,8 @@ pub struct AppSettings {
     pub export_presets: Vec<ExportPreset>,
     #[serde(default)]
     pub my_lenses: Option<Vec<MyLens>>,
+    #[serde(default)]
+    pub enable_folder_image_counts: Option<bool>,
 }
 
 fn default_adjustment_visibility() -> HashMap<String, bool> {
@@ -362,6 +364,7 @@ impl Default for AppSettings {
             library_view_mode: Some("flat".to_string()),
             export_presets: default_export_presets(),
             my_lenses: Some(Vec::new()),
+            enable_folder_image_counts: Some(false),
         }
     }
 }

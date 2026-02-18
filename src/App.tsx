@@ -4372,6 +4372,7 @@ function App() {
           pinnedFolders={pinnedFolders}
           activeSection={activeTreeSection}
           onActiveSectionChange={handleActiveTreeSectionChange}
+          showImageCounts={appSettings?.enableFolderImageCounts ?? false}
         />
         <Resizer
           direction={Orientation.Vertical}

@@ -653,6 +653,18 @@ export default function SettingsPanel({
                     </SettingItem>
 
                     <SettingItem
+                      label="Folder Image Counts"
+                      description="Show the number of images inside folders when hovering over the folder tree."
+                    >
+                      <Switch
+                        checked={appSettings?.enableFolderImageCounts ?? false}
+                        id="folder-image-counts-toggle"
+                        label="Show Image Counts"
+                        onChange={(checked) => onSettingsChange({ ...appSettings, enableFolderImageCounts: checked })}
+                      />
+                    </SettingItem>
+
+                    <SettingItem
                       description="Enables or disables transparency effects for the application window. Relaunch required."
                       label="Window Effects"
                     >
@@ -858,7 +870,7 @@ export default function SettingsPanel({
                           icon={<Trash2 size={16} className="mr-2" />}
                           isProcessing={isClearingAiTags}
                           message={aiTagsClearMessage}
-                          data-tooltip="Clear AI Tags"
+                          title="Clear AI Tags"
                         />
                         <DataActionItem
                           buttonAction={handleClearTags}
@@ -868,7 +880,7 @@ export default function SettingsPanel({
                           icon={<Trash2 size={16} className="mr-2" />}
                           isProcessing={isClearingTags}
                           message={tagsClearMessage}
-                          data-tooltip="Clear All Tags"
+                          title="Clear All Tags"
                         />
                       </div>
                     </div>
@@ -1155,7 +1167,7 @@ export default function SettingsPanel({
                       icon={<Trash2 size={16} className="mr-2" />}
                       isProcessing={isClearing}
                       message={clearMessage}
-                      data-tooltip="Clear All Sidecar Files"
+                      title="Clear All Sidecar Files"
                     />
 
                     <DataActionItem
@@ -1165,7 +1177,7 @@ export default function SettingsPanel({
                       icon={<Trash2 size={16} className="mr-2" />}
                       isProcessing={isClearingCache}
                       message={cacheClearMessage}
-                      data-tooltip="Clear Thumbnail Cache"
+                      title="Clear Thumbnail Cache"
                     />
 
                     <DataActionItem
@@ -1187,7 +1199,7 @@ export default function SettingsPanel({
                       icon={<ExternalLinkIcon size={16} className="mr-2" />}
                       isProcessing={false}
                       message=""
-                      data-tooltip="View Application Logs"
+                      title="View Application Logs"
                     />
                   </div>
                 </div>
