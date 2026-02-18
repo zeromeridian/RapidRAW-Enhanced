@@ -108,6 +108,13 @@ const backendOptions: OptionItem[] = [
   { value: 'gl', label: 'OpenGL' },
 ];
 
+const linearRawOptions: OptionItem[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'gamma', label: 'Apply Gamma' },
+  { value: 'skip_calib', label: 'Skip Calibrate' },
+  { value: 'gamma_skip_calib', label: 'Apply Gamma & Skip Calibrate' },
+];
+
 const settingCategories = [
   { id: 'general', label: 'General', icon: SlidersHorizontal },
   { id: 'processing', label: 'Processing', icon: Cpu },
@@ -983,6 +990,17 @@ export default function SettingsPanel({
                         onChange={(e: any) =>
                           handleProcessingSettingChange('rawHighlightCompression', parseFloat(e.target.value))
                         }
+                      />
+                    </SettingItem>
+
+                    <SettingItem
+                      label="Linear RAW Processing"
+                      description="Fixes color casts or pink tint in some DNG files. Controls how already processed LinearRAW data is interpreted."
+                    >
+                      <Dropdown
+                        onChange={(value: any) => onSettingsChange({ ...appSettings, linearRawMode: value })}
+                        options={linearRawOptions}
+                        value={appSettings?.linearRawMode || 'auto'}
                       />
                     </SettingItem>
 

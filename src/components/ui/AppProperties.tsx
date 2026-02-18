@@ -148,6 +148,7 @@ export interface AppSettings {
   exportPresets?: ExportPreset[];
   myLenses?: any;
   enableFolderImageCounts?: boolean;
+  linearRawMode?: string;
 }
 
 export interface BrushSettings {

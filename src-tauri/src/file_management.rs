@@ -246,6 +246,10 @@ fn default_export_presets() -> Vec<ExportPreset> {
     ]
 }
 
+fn default_linear_raw_mode() -> String {
+    "auto".to_string()
+}
+
 fn default_tagging_shortcuts_option() -> Option<Vec<String>> {
     Some(vec![
         "portrait".to_string(),
@@ -310,6 +314,8 @@ pub struct AppSettings {
     pub my_lenses: Option<Vec<MyLens>>,
     #[serde(default)]
     pub enable_folder_image_counts: Option<bool>,
+    #[serde(default = "default_linear_raw_mode")]
+    pub linear_raw_mode: String,
 }
 
 fn default_adjustment_visibility() -> HashMap<String, bool> {
@@ -365,6 +371,7 @@ impl Default for AppSettings {
             export_presets: default_export_presets(),
             my_lenses: Some(Vec::new()),
             enable_folder_image_counts: Some(false),
+            linear_raw_mode: default_linear_raw_mode(),
         }
     }
 }
@@ -808,6 +815,7 @@ pub fn generate_thumbnail_data(
                 
                 let settings = crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
                 let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
+                let linear_mode = settings.linear_raw_mode;
 
                 let composite_image = if let Some(img) = preloaded_image {
                     image_loader::composite_patches_on_image(img, &adjustments)?
@@ -819,6 +827,7 @@ pub fn generate_thumbnail_data(
                             &adjustments,
                             true,
                             highlight_compression,
+                            linear_mode.clone(),
                             None,
                         )?,
                         Err(_) => {
@@ -831,6 +840,7 @@ pub fn generate_thumbnail_data(
                                 &adjustments,
                                 true,
                                 highlight_compression,
+                                linear_mode.clone(),
                                 None,
                             )?
                         }
@@ -952,6 +962,7 @@ pub fn generate_thumbnail_data(
 
     let settings = crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
     let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
+    let linear_mode = settings.linear_raw_mode;
 
     let mut final_image = if let Some(img) = preloaded_image {
         image_loader::composite_patches_on_image(img, &adjustments)?
@@ -963,6 +974,7 @@ pub fn generate_thumbnail_data(
                 &adjustments,
                 true,
                 highlight_compression,
+                linear_mode.clone(),
                 None,
             )?,
             Err(e) => {
@@ -974,6 +986,7 @@ pub fn generate_thumbnail_data(
                     &adjustments,
                     true,
                     highlight_compression,
+                    linear_mode.clone(),
                     None,
                 )?
             }
@@ -1652,6 +1665,7 @@ pub fn apply_auto_adjustments_to_paths(
 ) -> Result<(), String> {
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
+    let linear_mode = settings.linear_raw_mode;
 
     paths.par_iter().for_each(|path| {
         let result: Result<(), String> = (|| {
@@ -1664,6 +1678,7 @@ pub fn apply_auto_adjustments_to_paths(
                 &source_path_str,
                 false,
                 highlight_compression,
+                linear_mode.clone(),
                 None,
             )
             .map_err(|e| e.to_string())?;
