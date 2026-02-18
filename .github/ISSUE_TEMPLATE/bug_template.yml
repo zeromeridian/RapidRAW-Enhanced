@@ -89,7 +89,7 @@ body:
       label: Lenses and Camera Support
       description: Does your issue involve specific lenses or camera models?
       options:
-        - label: I understand that RapidRAW uses **external libraries** for lenses (lensfun) and raw file support (dnglab), and that not all models may be supported.
+        - label: I understand that RapidRAW uses **external libraries** for lenses ([lensfun](https://github.com/lensfun/lensfun/)) and raw file support ([dnglab](https://github.com/dnglab/dnglab/)), and that not all models may be supported.
           required: true
         - label: I have checked these external libraries for support of **my specific lenses and raw file formats** and acknowledge that my lenses and raw files are supported by them.
           required: true
