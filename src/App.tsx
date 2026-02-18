@@ -500,6 +500,26 @@ function App() {
     currentPath?: string;
   }>({});
 
+  useEffect(() => {
+    if (currentFolderPath) {
+      preloadedDataRef.current = {
+        ...preloadedDataRef.current,
+        currentPath: currentFolderPath,
+        images: Promise.resolve(imageList),
+      };
+    }
+  }, [currentFolderPath, imageList]);
+
+  useEffect(() => {
+    if (rootPath && folderTree) {
+      preloadedDataRef.current = {
+        ...preloadedDataRef.current,
+        rootPath: rootPath,
+        tree: Promise.resolve(folderTree),
+      };
+    }
+  }, [rootPath, folderTree]);
+
   const [exportState, setExportState] = useState<ExportState>({
     errorMessage: '',
     progress: { current: 0, total: 0 },
