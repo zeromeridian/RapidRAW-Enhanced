@@ -82,3 +82,14 @@ body:
       options:
         - label: I have searched existing issues and didn't find a duplicate
           required: true
+
+  - type: checkboxes
+    id: lenses-and-camera-support
+    attributes:
+      label: Lenses and Camera Support
+      description: Does your issue involve specific lenses or camera models?
+      options:
+        - label: I understand that RapidRAW uses **external libraries** for lenses (lensfun) and raw file support (dnglab), and that not all models may be supported.
+          required: true
+        - label: I have checked these external libraries for support of **my specific lenses and raw file formats** and acknowledge that my lenses and raw files are supported by them.
+          required: true
