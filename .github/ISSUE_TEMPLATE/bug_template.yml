@@ -32,7 +32,7 @@ body:
     id: reproduction-steps
     attributes:
       label: How can we reproduce this?
-      description: List the steps to recreate the issue
+      description: List the steps to recreate the issue.
       placeholder: |
         1. Go to...
         2. Click on...
@@ -63,7 +63,7 @@ body:
     attributes:
       label: RapidRAW Version
       description: What version of RapidRAW are you using?
-      placeholder: e.g., v1.2.3
+      placeholder: e.g., v1.4.3
     validations:
       required: true
 
@@ -73,15 +73,6 @@ body:
       label: Additional information
       description: Any other details that might help us understand the problem?
       placeholder: Any other context, workarounds you've tried, GPU driver version, etc...
-
-  - type: checkboxes
-    id: similar-issues
-    attributes:
-      label: Similar issues
-      description: Have you checked for similar issues?
-      options:
-        - label: I have searched existing issues and didn't find a duplicate
-          required: true
 
   - type: markdown
     attributes:
@@ -96,9 +87,11 @@ body:
         | Raw file decoding | [dnglab](https://github.com/dnglab/dnglab/) | [Open an issue](https://github.com/dnglab/dnglab/issues/new) |
 
   - type: checkboxes
-    id: lenses-and-camera-support
+    id: acknowledgement-checkboxes
     attributes:
       label: Acknowledgement
       options:
         - label: I have verified that my camera and lenses are supported by the external libraries listed above, or my issue is unrelated to camera/lens support.
+          required: true
+        - label: I have searched all existing issues, both open and closed, and did not find a duplicate.
           required: true
