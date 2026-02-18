@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for taking the time to report a bug! Please fill out the information below to help us understand and fix the issue.
-        
+
         > **Note:** This template is for reporting bugs and issues only. For feature requests, please use the [Discussions page](../../discussions) instead.
 
   - type: textarea
@@ -83,13 +83,22 @@ body:
         - label: I have searched existing issues and didn't find a duplicate
           required: true
 
+  - type: markdown
+    attributes:
+      value: |
+        ### Lenses & Camera Support
+
+        RapidRAW relies on external libraries for lens corrections and raw file decoding. If your camera or lens is unsupported, please open an issue directly with the relevant project:
+
+        | Feature | Library | Request addition |
+        |---|---|---|
+        | Lens corrections | [lensfun](https://github.com/lensfun/lensfun/) | [Open an issue](https://github.com/lensfun/lensfun/issues/new) |
+        | Raw file decoding | [dnglab](https://github.com/dnglab/dnglab/) | [Open an issue](https://github.com/dnglab/dnglab/issues/new) |
+
   - type: checkboxes
     id: lenses-and-camera-support
     attributes:
-      label: Lenses and Camera Support
-      description: Does your issue involve specific lenses or camera models?
+      label: Acknowledgement
       options:
-        - label: I understand that RapidRAW uses **external libraries** for lenses ([lensfun](https://github.com/lensfun/lensfun/)) and raw file support ([dnglab](https://github.com/dnglab/dnglab/)), and that not all models may be supported.
-          required: true
-        - label: I have checked these external libraries for support of **my specific lenses and raw file formats** and acknowledge that my lenses and raw files are supported by them.
+        - label: I have verified that my camera and lenses are supported by the external libraries listed above, or my issue is unrelated to camera/lens support.
           required: true
