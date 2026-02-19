@@ -38,6 +38,7 @@ pub fn load_and_composite(
     adjustments: &Value,
     use_fast_raw_dev: bool,
     highlight_compression: f32,
+    linear_mode: String,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<DynamicImage> {
     let base_image = load_base_image_from_bytes(
@@ -45,6 +46,7 @@ pub fn load_and_composite(
         path,
         use_fast_raw_dev,
         highlight_compression,
+        linear_mode,
         cancel_token,
     )?;
     composite_patches_on_image(&base_image, adjustments)
@@ -109,6 +111,7 @@ pub fn load_base_image_from_bytes(
     path_for_ext_check: &str,
     use_fast_raw_dev: bool,
     highlight_compression: f32,
+    linear_mode: String,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<DynamicImage> {
     let path = std::path::Path::new(path_for_ext_check);
@@ -130,7 +133,7 @@ pub fn load_base_image_from_bytes(
 
     if is_raw_file(path_for_ext_check) {
         match panic::catch_unwind(move || {
-            develop_raw_image(bytes, use_fast_raw_dev, highlight_compression, cancel_token)
+            develop_raw_image(bytes, use_fast_raw_dev, highlight_compression, linear_mode, cancel_token)
         }) {
             Ok(Ok(mut image)) => {
                 if !use_fast_raw_dev {

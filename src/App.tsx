@@ -210,6 +210,16 @@ interface SearchCriteria {
   mode: 'AND' | 'OR';
 }
 
+const RIGHT_PANEL_ORDER = [
+  Panel.Metadata,
+  Panel.Adjustments,
+  Panel.Crop,
+  Panel.Masks,
+  Panel.Ai,
+  Panel.Presets,
+  Panel.Export,
+];
+
 const DEBUG = false;
 const REVOCATION_DELAY = 5000;
 
@@ -346,6 +356,7 @@ function App() {
   const [theme, setTheme] = useState(DEFAULT_THEME_ID);
   const [adaptivePalette, setAdaptivePalette] = useState<any>(null);
   const [activeRightPanel, setActiveRightPanel] = useState<Panel | null>(Panel.Adjustments);
+  const [slideDirection, setSlideDirection] = useState(1);
   const [activeMaskContainerId, setActiveMaskContainerId] = useState<string | null>(null);
   const [activeMaskId, setActiveMaskId] = useState<string | null>(null);
   const [activeAiPatchContainerId, setActiveAiPatchContainerId] = useState<string | null>(null);
@@ -488,6 +499,26 @@ function App() {
     rootPath?: string;
     currentPath?: string;
   }>({});
+
+  useEffect(() => {
+    if (currentFolderPath) {
+      preloadedDataRef.current = {
+        ...preloadedDataRef.current,
+        currentPath: currentFolderPath,
+        images: Promise.resolve(imageList),
+      };
+    }
+  }, [currentFolderPath, imageList]);
+
+  useEffect(() => {
+    if (rootPath && folderTree) {
+      preloadedDataRef.current = {
+        ...preloadedDataRef.current,
+        rootPath: rootPath,
+        tree: Promise.resolve(folderTree),
+      };
+    }
+  }, [rootPath, folderTree]);
 
   const [exportState, setExportState] = useState<ExportState>({
     errorMessage: '',
@@ -1424,6 +1455,9 @@ function App() {
       if (panelId === activeRightPanel) {
         setActiveRightPanel(null);
       } else {
+        const currentIndex = activeRightPanel ? RIGHT_PANEL_ORDER.indexOf(activeRightPanel) : -1;
+        const newIndex = RIGHT_PANEL_ORDER.indexOf(panelId);
+        setSlideDirection(newIndex > currentIndex ? 1 : -1);
         setActiveRightPanel(panelId);
         setRenderedRightPanel(panelId);
       }
@@ -1947,6 +1981,7 @@ function App() {
     setIsWbPickerActive(false);
     setActiveAiSubMaskId(null);
     setLibraryActivePath(lastActivePath);
+    setSlideDirection(1);
     setLiveAdjustments(INITIAL_ADJUSTMENTS);
     resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
   }, [selectedImage?.path]);
@@ -4372,6 +4407,7 @@ function App() {
           pinnedFolders={pinnedFolders}
           activeSection={activeTreeSection}
           onActiveSectionChange={handleActiveTreeSectionChange}
+          showImageCounts={appSettings?.enableFolderImageCounts ?? false}
         />
         <Resizer
           direction={Orientation.Vertical}
@@ -4508,9 +4544,20 @@ function App() {
 
   const renderMainView = () => {
     const panelVariants: any = {
-      animate: { opacity: 1, y: 0, transition: { duration: 0.2, ease: 'circOut' } },
-      exit: { opacity: 0.4, y: -20, transition: { duration: 0.1, ease: 'circIn' } },
-      initial: { opacity: 0.4, y: 20 },
+      animate: (direction: number) => ({
+        opacity: 1,
+        y: 0,
+        transition: { duration: direction === 0 ? 0 : 0.2, ease: 'circOut' }
+      }),
+      exit: (direction: number) => ({
+        opacity: direction === 0 ? 1 : 0.2,
+        y: direction === 0 ? 0 : (direction > 0 ? -20 : 20),
+        transition: { duration: direction === 0 ? 0 : 0.1, ease: 'circIn' }
+      }),
+      initial: (direction: number) => ({
+        opacity: direction === 0 ? 1 : 0.2,
+        y: direction === 0 ? 0 : (direction > 0 ? 20 : -20),
+      }),
     };
 
     if (selectedImage) {
@@ -4623,11 +4670,12 @@ function App() {
               style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
             >
               <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
-                <AnimatePresence mode="wait">
+                <AnimatePresence mode="wait" custom={slideDirection}>
                   {activeRightPanel && (
                     <motion.div
                       animate="animate"
                       className="h-full w-full"
+                      custom={slideDirection}
                       exit="exit"
                       initial="initial"
                       key={renderedRightPanel}

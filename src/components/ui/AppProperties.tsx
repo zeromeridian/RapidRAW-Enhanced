@@ -147,6 +147,8 @@ export interface AppSettings {
   linuxGpuOptimization?: boolean;
   exportPresets?: ExportPreset[];
   myLenses?: any;
+  enableFolderImageCounts?: boolean;
+  linearRawMode?: string;
 }
 
 export interface BrushSettings {

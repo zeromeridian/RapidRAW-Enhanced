@@ -530,6 +530,7 @@ async fn load_image(
 
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
+    let linear_mode = settings.linear_raw_mode;
 
     let path_clone = source_path_str.clone();
 
@@ -546,7 +547,14 @@ async fn load_image(
                     }
 
                     let img =
-                        load_base_image_from_bytes(&mmap, &path_clone, false, highlight_compression, cancel_token.clone())
+                        load_base_image_from_bytes(
+                            &mmap, 
+                            &path_clone, 
+                            false, 
+                            highlight_compression, 
+                            linear_mode.clone(), 
+                            cancel_token.clone()
+                        )
                             .map_err(|e| e.to_string())?;
                     let exif = exif_processing::read_exif_data(&path_clone, &mmap);
                     Ok((img, exif))
@@ -570,6 +578,7 @@ async fn load_image(
                         &path_clone,
                         false,
                         highlight_compression,
+                        linear_mode.clone(),
                         cancel_token.clone()
                     )
                     .map_err(|e| e.to_string())?;
@@ -1733,6 +1742,7 @@ async fn batch_export_images(
         let total_paths = paths.len();
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
         let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
+        let linear_mode = settings.linear_raw_mode;
 
         let pool_result = rayon::ThreadPoolBuilder::new()
             .num_threads(num_threads)
@@ -1792,6 +1802,7 @@ async fn batch_export_images(
                                 &js_adjustments,
                                 false,
                                 highlight_compression,
+                                linear_mode.clone(),
                                 None,
                             )
                             .map_err(|e| format!("Failed to load image from mmap: {}", e))?,
@@ -1810,6 +1821,7 @@ async fn batch_export_images(
                                     &js_adjustments,
                                     false,
                                     highlight_compression,
+                                    linear_mode.clone(),
                                     None,
                                 )
                                 .map_err(|e| format!("Failed to load image from bytes: {}", e))?
@@ -2051,11 +2063,19 @@ async fn estimate_batch_export_size(
 
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
+    let linear_mode = settings.linear_raw_mode;
 
     const ESTIMATE_DIM: u32 = 1280;
 
     let original_image = match read_file_mapped(Path::new(&source_path_str)) {
-        Ok(mmap) => load_base_image_from_bytes(&mmap, &source_path_str, true, highlight_compression, None)
+        Ok(mmap) => load_base_image_from_bytes(
+            &mmap, 
+            &source_path_str, 
+            true, 
+            highlight_compression, 
+            linear_mode.clone(),
+            None
+        )
             .map_err(|e| e.to_string())?,
         Err(e) => {
             log::warn!(
@@ -2064,7 +2084,14 @@ async fn estimate_batch_export_size(
                 e
             );
             let bytes = fs::read(&source_path_str).map_err(|io_err| io_err.to_string())?;
-            load_base_image_from_bytes(&bytes, &source_path_str, true, highlight_compression, None)
+            load_base_image_from_bytes(
+                &bytes, 
+                &source_path_str, 
+                true, 
+                highlight_compression, 
+                linear_mode.clone(),
+                None
+            )
                 .map_err(|e| e.to_string())?
         }
     };
@@ -2672,6 +2699,7 @@ async fn generate_all_community_previews(
 
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
+    let linear_mode = settings.linear_raw_mode;
 
     let mut base_thumbnails: Vec<(DynamicImage, bool)> = Vec::new();
     for image_path in image_paths.iter() {
@@ -2679,7 +2707,7 @@ async fn generate_all_community_previews(
         let source_path_str = source_path.to_string_lossy().to_string();
         let image_bytes = fs::read(&source_path).map_err(|e| e.to_string())?;
         let original_image =
-            crate::image_loader::load_base_image_from_bytes(&image_bytes, &source_path_str, true, highlight_compression, None)
+            crate::image_loader::load_base_image_from_bytes(&image_bytes, &source_path_str, true, highlight_compression, linear_mode.clone(), None)
                 .map_err(|e| e.to_string())?;
         let is_raw = is_raw_file(&source_path_str);
         base_thumbnails.push((
@@ -2920,6 +2948,9 @@ async fn merge_hdr(
     }
 
     let hdr_result_handle = state.hdr_result.clone();
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
+    let linear_mode = settings.linear_raw_mode;
 
     let images: Vec<HDRInput> = paths
         .iter()
@@ -2937,7 +2968,14 @@ async fn merge_hdr(
 
             let file_bytes =
                 fs::read(path).map_err(|e| format!("Failed to read image {}: {}", path, e))?;
-            let dynamic_image = load_base_image_from_bytes(&file_bytes, path, false, 2.5, None)
+            let dynamic_image = load_base_image_from_bytes(
+                &file_bytes, 
+                path, 
+                false, 
+                highlight_compression, 
+                linear_mode.clone(),
+                None
+            )
                 .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
 
             let gains = match read_iso(&path, &file_bytes) {
@@ -3146,6 +3184,7 @@ fn generate_preview_for_path(
     let is_raw = is_raw_file(&source_path_str);
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
+    let linear_mode = settings.linear_raw_mode;
 
     let base_image = match read_file_mapped(&source_path) {
         Ok(mmap) => load_and_composite(
@@ -3154,6 +3193,7 @@ fn generate_preview_for_path(
             &js_adjustments,
             false,
             highlight_compression,
+            linear_mode.clone(),
             None,
         )
         .map_err(|e| e.to_string())?,
@@ -3170,6 +3210,7 @@ fn generate_preview_for_path(
                 &js_adjustments,
                 false,
                 highlight_compression,
+                linear_mode.clone(),
                 None,
             )
             .map_err(|e| e.to_string())?
