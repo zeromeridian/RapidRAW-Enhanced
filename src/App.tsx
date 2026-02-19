@@ -4505,6 +4505,7 @@ function App() {
             onReset={() => handleResetAdjustments()}
             rating={libraryActiveAdjustments.rating || 0}
             thumbnailAspectRatio={thumbnailAspectRatio}
+            totalImages={imageList.length}
           />
         )}
       </div>
@@ -4657,6 +4658,7 @@ function App() {
               thumbnailAspectRatio={thumbnailAspectRatio}
               thumbnails={thumbnails}
               zoom={zoom}
+              totalImages={sortedImageList.length}
             />
           </div>
 
