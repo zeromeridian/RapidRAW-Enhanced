@@ -549,6 +549,10 @@ export default function Editor({
             doubleClick={doubleClickProps}
             panning={{ disabled: isPanningDisabled || isWbPickerActive }}
             onTransformed={handleTransform}
+            wheel={{
+              step: transformState.scale * 0.0013,
+              smoothStep: transformState.scale * 0.0013
+            }}
           >
             <TransformComponent
               wrapperStyle={{ width: '100%', height: '100%' }}
