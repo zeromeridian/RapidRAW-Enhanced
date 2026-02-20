@@ -4702,7 +4702,17 @@ function App() {
                           onDragStateChange={setIsSliderDragging}
                         />
                       )}
-                      {renderedRightPanel === Panel.Metadata && <MetadataPanel selectedImage={selectedImage} />}
+                      {renderedRightPanel === Panel.Metadata && (
+                        <MetadataPanel
+                          selectedImage={selectedImage}
+                          rating={adjustments.rating || 0}
+                          tags={imageList.find(img => img.path === selectedImage.path)?.tags || []}
+                          onRate={handleRate}
+                          onSetColorLabel={handleSetColorLabel}
+                          onTagsChanged={handleTagsChanged}
+                          appSettings={appSettings}
+                        />
+                      )}
                       {renderedRightPanel === Panel.Crop && (
                         <CropPanel
                           adjustments={adjustments}
