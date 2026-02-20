@@ -70,6 +70,9 @@ interface EditorProps {
   onWbPicked?: () => void;
   overlayMode?: OverlayMode;
   overlayRotation?: number;
+  adjustmentsHistory: any[];
+  adjustmentsHistoryIndex: number;
+  goToAdjustmentsHistoryIndex(index: number): void;
 }
 
 export default function Editor({
@@ -125,6 +128,9 @@ export default function Editor({
   onWbPicked,
   overlayMode = 'none',
   overlayRotation = 0,
+  adjustmentsHistory,
+  adjustmentsHistoryIndex,
+  goToAdjustmentsHistoryIndex,
 }: EditorProps) {
   const [crop, setCrop] = useState<Crop | null>(null);
   const prevCropParams = useRef<any>(null);
@@ -522,6 +528,9 @@ export default function Editor({
           isLoadingFullRes={isLoadingFullRes}
           showDateView={showExifDateView}
           onToggleDateView={() => setShowExifDateView(prev => !prev)}
+          adjustmentsHistory={adjustmentsHistory}
+          adjustmentsHistoryIndex={adjustmentsHistoryIndex}
+          goToAdjustmentsHistoryIndex={goToAdjustmentsHistoryIndex}
         />
 
         <div

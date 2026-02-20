@@ -332,6 +332,9 @@ function App() {
     canUndo,
     canRedo,
     resetHistory: resetAdjustmentsHistory,
+    history: adjustmentsHistory,
+    historyIndex: adjustmentsHistoryIndex,
+    goToIndex: goToAdjustmentsHistoryIndex,
   } = useHistoryState(INITIAL_ADJUSTMENTS);
   const [adjustments, setLiveAdjustments] = useState<Adjustments>(INITIAL_ADJUSTMENTS);
   const [showOriginal, setShowOriginal] = useState(false);
@@ -4621,6 +4624,9 @@ function App() {
               isRotationActive={isRotationActive}
               overlayMode={overlayMode}
               overlayRotation={overlayRotation}
+              adjustmentsHistory={adjustmentsHistory}
+              adjustmentsHistoryIndex={adjustmentsHistoryIndex}
+              goToAdjustmentsHistoryIndex={goToAdjustmentsHistoryIndex}
             />
             <Resizer
               direction={Orientation.Horizontal}
