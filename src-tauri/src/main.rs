@@ -2962,7 +2962,7 @@ async fn merge_hdr(
     let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
     let linear_mode = settings.linear_raw_mode;
 
-    let images: Vec<HDRInput> = paths
+    let loaded_items: Vec<(String, DynamicImage, Duration, f32)> = paths
         .iter()
         .map(|path| {
             let _ = app_handle.emit(
@@ -2986,31 +2986,43 @@ async fn merge_hdr(
                 linear_mode.clone(),
                 None
             )
-                .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
+            .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
 
             let gains = match read_iso(&path, &file_bytes) {
-                None => {
-                    return Err(format!(
-                        "Image {} is missing 'PhotographicSensitivity' in EXIF data",
-                        path
-                    ));
-                }
+                None => return Err(format!("Image {} is missing ISO/Sensitivity data", path)),
                 Some(gains) => gains as f32,
             };
-            log::info!("Read image {} with gains: {}", path, gains);
-            let exposure = match read_exposure_time_secs(&path, &file_bytes) {
-                None => {
-                    return Err(format!(
-                        "Image {} is missing 'ExposureTime' in EXIF data",
-                        path
-                    ));
-                }
-                Some(exposure) => exposure,
-            };
-            log::info!("Read image {} with exposure: {}", path, exposure);
 
-            HDRInput::with_image(&dynamic_image, Duration::from_secs_f32(exposure), gains)
-                .map_err(|e| format!("Failed to prepare HDR input for image {}: {}", path, e))
+            let exposure = match read_exposure_time_secs(&path, &file_bytes) {
+                None => return Err(format!("Image {} is missing ExposureTime data", path)),
+                Some(exp) => Duration::from_secs_f32(exp),
+            };
+
+            Ok((path.clone(), dynamic_image, exposure, gains))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+
+    if let Some((first_path, first_img, _, _)) = loaded_items.first() {
+        let (width, height) = (first_img.width(), first_img.height());
+
+        for (path, img, _, _) in loaded_items.iter().skip(1) {
+            if img.width() != width || img.height() != height {
+                return Err(format!(
+                    "Dimension mismatch detected.\n\nBase image ({}): {}x{}\nTarget image ({}): {}x{}\n\nHDR merge requires all images to be exactly the same size.",
+                    Path::new(first_path).file_name().unwrap_or_default().to_string_lossy(),
+                    width, height,
+                    Path::new(path).file_name().unwrap_or_default().to_string_lossy(),
+                    img.width(), img.height()
+                ));
+            }
+        }
+    }
+
+    let images: Vec<HDRInput> = loaded_items
+        .iter()
+        .map(|(path, img, exposure, gains)| {
+            HDRInput::with_image(img, *exposure, *gains)
+                .map_err(|e| format!("Failed to prepare HDR input for {}: {}", path, e))
         })
         .collect::<Result<Vec<HDRInput>, String>>()?;
 
@@ -3019,7 +3031,6 @@ async fn merge_hdr(
     log::info!("HDR merge completed");
 
     let mut buf = Cursor::new(Vec::new());
-
     if let Err(e) = hdr_merged.to_rgb8().write_to(&mut buf, ImageFormat::Png) {
         return Err(format!("Failed to encode hdr preview: {}", e));
     }
@@ -3653,15 +3664,15 @@ fn main() {
                             fullscreen,
                         };
 
+                        if let Ok(position) = window_for_handler.outer_position() {
+                            state.x = position.x;
+                            state.y = position.y;
+                        }
+
                         if !maximized && !fullscreen {
-                            if let (Ok(size), Ok(position)) = (
-                                window_for_handler.outer_size(),
-                                window_for_handler.outer_position(),
-                            ) {
+                            if let Ok(size) = window_for_handler.outer_size() {
                                 state.width = size.width;
                                 state.height = size.height;
-                                state.x = position.x;
-                                state.y = position.y;
                             }
                         }
 

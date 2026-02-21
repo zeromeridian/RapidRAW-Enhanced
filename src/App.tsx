@@ -1998,6 +1998,15 @@ function App() {
       debouncedSave.cancel();
       patchesSentToBackend.current.clear();
 
+      const knownRating = imageRatings[path] ?? 0;
+      const placeholderAdjustments = {
+        ...INITIAL_ADJUSTMENTS,
+        rating: knownRating,
+      };
+
+      setLiveAdjustments(placeholderAdjustments);
+      resetAdjustmentsHistory(placeholderAdjustments);
+
       setSelectedImage({
         exif: null,
         height: 0,
@@ -2035,7 +2044,7 @@ function App() {
       setZoom(1);
       setIsLibraryExportPanelVisible(false);
     },
-    [selectedImage?.path, applyAdjustments, debouncedSave, thumbnails],
+    [selectedImage?.path, applyAdjustments, debouncedSave, thumbnails, imageRatings, resetAdjustmentsHistory],
   );
 
   const executeDelete = useCallback(
@@ -3428,7 +3437,6 @@ function App() {
             return currentSelected;
           });
 
-          // Only update aspect ratio if it wasn't loaded from metadata
           setLiveAdjustments((prev: Adjustments) => {
             if (!prev.aspectRatio && !prev.crop) {
               return { ...prev, aspectRatio: loadImageResult.width / loadImageResult.height };
