@@ -660,6 +660,18 @@ export default function SettingsPanel({
                     </SettingItem>
 
                     <SettingItem
+                      label="Sync Metadata to XMP"
+                      description="Automatically write ratings, color labels and tags back to standard XMP sidecar files for compatibility with other photo editors."
+                    >
+                      <Switch
+                        checked={appSettings?.syncMetadataBackToXmp ?? false}
+                        id="sync-xmp-toggle"
+                        label="Sync to XMP"
+                        onChange={(checked) => onSettingsChange({ ...appSettings, syncMetadataBackToXmp: checked })}
+                      />
+                    </SettingItem>
+
+                    <SettingItem
                       label="Folder Image Counts"
                       description="Show the number of images inside folders when hovering over the folder tree."
                     >

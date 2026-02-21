@@ -149,6 +149,7 @@ export interface AppSettings {
   myLenses?: any;
   enableFolderImageCounts?: boolean;
   linearRawMode?: string;
+  syncMetadataBackToXmp?: boolean;
 }
 
 export interface BrushSettings {
