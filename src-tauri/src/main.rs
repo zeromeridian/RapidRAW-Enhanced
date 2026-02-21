@@ -34,12 +34,12 @@ use std::io::Cursor;
 use std::io::Write;
 use std::panic;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
+
 use std::time::Duration;
+use std::sync::{Arc, Mutex};
 
 use base64::{Engine as _, engine::general_purpose};
 use image::codecs::jpeg::JpegEncoder;
@@ -83,6 +83,15 @@ use crate::image_processing::{
 use crate::lut_processing::Lut;
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
 use tagging_utils::{candidates, hierarchy};
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct WindowState {
+    width: u32,
+    height: u32,
+    x: i32,
+    y: i32,
+}
+
 
 #[derive(Clone)]
 pub struct LoadedImage {
@@ -3494,12 +3503,74 @@ fn main() {
             let transparent = settings.transparent.unwrap_or(window_cfg.transparent);
             let decorations = settings.decorations.unwrap_or(window_cfg.decorations);
 
-            let window = tauri::WebviewWindowBuilder::from_config(app.handle(), &window_cfg)
-                .unwrap()
-                .transparent(transparent)
-                .decorations(decorations)
-                .build()
-                .expect("Failed to build window");
+let window_cfg = app.config().app.windows.iter()
+    .find(|w| w.label == "main")
+    .expect("Main window config not found")
+    .clone();
+
+let window = tauri::WebviewWindowBuilder::from_config(app.handle(), &window_cfg)
+    .unwrap()
+    .build()
+    .expect("Failed to build window");
+
+if let Ok(config_dir) = app.path().app_config_dir() {
+    let path = config_dir.join("window_state.json");
+
+    if let Ok(contents) = std::fs::read_to_string(&path) {
+        if let Ok(state) = serde_json::from_str::<WindowState>(&contents) {
+
+            let _ = window.set_size(
+                tauri::Size::Physical(
+                    tauri::PhysicalSize::new(state.width, state.height)
+                )
+            );
+
+            let _ = window.set_position(
+                tauri::Position::Physical(
+                    tauri::PhysicalPosition::new(state.x, state.y)
+                )
+            );
+
+        } else {
+            let _ = window.center();
+        }
+    } else {
+        let _ = window.center();
+    }
+}
+
+let window_for_handler = window.clone();
+
+window.clone().on_window_event(move |event| {
+    match event {
+        tauri::WindowEvent::Resized(_) |
+        tauri::WindowEvent::Moved(_) => {
+
+            if let (Ok(size), Ok(position)) =
+                (window_for_handler.outer_size(), window_for_handler.outer_position())
+            {
+                if let Ok(config_dir) =
+                    window_for_handler.app_handle().path().app_config_dir()
+                {
+                    let path = config_dir.join("window_state.json");
+                    let _ = std::fs::create_dir_all(&config_dir);
+
+                    let state = WindowState {
+                        width: size.width,
+                        height: size.height,
+                        x: position.x,
+                        y: position.y,
+                    };
+
+                    if let Ok(json) = serde_json::to_string(&state) {
+                        let _ = std::fs::write(&path, json);
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+});
 
             if transparent {
                 let theme = settings.theme.unwrap_or("dark".to_string());
