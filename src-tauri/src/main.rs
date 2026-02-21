@@ -90,8 +90,9 @@ struct WindowState {
     height: u32,
     x: i32,
     y: i32,
+    maximized: bool,
+    fullscreen: bool,
 }
-
 
 #[derive(Clone)]
 pub struct LoadedImage {
@@ -3402,7 +3403,42 @@ fn handle_file_open(app_handle: &tauri::AppHandle, path: PathBuf) {
 }
 
 #[tauri::command]
-fn frontend_ready(app_handle: tauri::AppHandle, state: tauri::State<AppState>) -> Result<(), String> {
+fn frontend_ready(
+    app_handle: tauri::AppHandle,
+    window: tauri::Window,
+    state: tauri::State<AppState>
+) -> Result<(), String> {
+    if let Ok(config_dir) = app_handle.path().app_config_dir() {
+        let path = config_dir.join("window_state.json");
+        let mut should_maximize = false;
+        let mut should_fullscreen = false;
+
+        if let Ok(contents) = std::fs::read_to_string(&path) {
+            if let Ok(saved_state) = serde_json::from_str::<WindowState>(&contents) {
+                should_maximize = saved_state.maximized;
+                should_fullscreen = saved_state.fullscreen;
+            }
+        }
+
+        if let Err(e) = window.show() {
+            log::error!("Failed to show window: {}", e);
+        }
+        
+        if let Err(e) = window.set_focus() {
+            log::error!("Failed to focus window: {}", e);
+        }
+
+        if should_maximize {
+            let _ = window.maximize();
+        }
+        if should_fullscreen {
+            let _ = window.set_fullscreen(true);
+        }
+    } else {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+
     if let Some(path) = state.initial_file_path.lock().unwrap().take() {
         log::info!("Frontend is ready, emitting open-with-file for initial path: {}", &path);
         handle_file_open(&app_handle, PathBuf::from(path));
@@ -3503,80 +3539,92 @@ fn main() {
             let transparent = settings.transparent.unwrap_or(window_cfg.transparent);
             let decorations = settings.decorations.unwrap_or(window_cfg.decorations);
 
-let window_cfg = app.config().app.windows.iter()
-    .find(|w| w.label == "main")
-    .expect("Main window config not found")
-    .clone();
+            let main_window_cfg = app.config().app.windows.iter()
+                .find(|w| w.label == "main")
+                .expect("Main window config not found")
+                .clone();
 
-let window = tauri::WebviewWindowBuilder::from_config(app.handle(), &window_cfg)
-    .unwrap()
-    .build()
-    .expect("Failed to build window");
+            let mut window_builder = tauri::WebviewWindowBuilder::from_config(app.handle(), &main_window_cfg)
+                .unwrap()
+                .transparent(transparent)
+                .decorations(decorations)
+                .visible(false);
 
-if let Ok(config_dir) = app.path().app_config_dir() {
-    let path = config_dir.join("window_state.json");
-
-    if let Ok(contents) = std::fs::read_to_string(&path) {
-        if let Ok(state) = serde_json::from_str::<WindowState>(&contents) {
-
-            let _ = window.set_size(
-                tauri::Size::Physical(
-                    tauri::PhysicalSize::new(state.width, state.height)
-                )
-            );
-
-            let _ = window.set_position(
-                tauri::Position::Physical(
-                    tauri::PhysicalPosition::new(state.x, state.y)
-                )
-            );
-
-        } else {
-            let _ = window.center();
-        }
-    } else {
-        let _ = window.center();
-    }
-}
-
-let window_for_handler = window.clone();
-
-window.clone().on_window_event(move |event| {
-    match event {
-        tauri::WindowEvent::Resized(_) |
-        tauri::WindowEvent::Moved(_) => {
-
-            if let (Ok(size), Ok(position)) =
-                (window_for_handler.outer_size(), window_for_handler.outer_position())
-            {
-                if let Ok(config_dir) =
-                    window_for_handler.app_handle().path().app_config_dir()
-                {
-                    let path = config_dir.join("window_state.json");
-                    let _ = std::fs::create_dir_all(&config_dir);
-
-                    let state = WindowState {
-                        width: size.width,
-                        height: size.height,
-                        x: position.x,
-                        y: position.y,
-                    };
-
-                    if let Ok(json) = serde_json::to_string(&state) {
-                        let _ = std::fs::write(&path, json);
-                    }
-                }
+            if !transparent {
+                window_builder = window_builder.background_color(tauri::window::Color(100, 100, 100, 255));
+            } else {
+                window_builder = window_builder.background_color(tauri::window::Color(0, 0, 0, 0));
             }
-        }
-        _ => {}
-    }
-});
+
+            let window = window_builder.build().expect("Failed to build window");
 
             if transparent {
                 let theme = settings.theme.unwrap_or("dark".to_string());
                 apply_window_effect(theme, &window);
             }
 
+            if let Ok(config_dir) = app.path().app_config_dir() {
+                let path = config_dir.join("window_state.json");
+                if let Ok(contents) = std::fs::read_to_string(&path) {
+                    if let Ok(state) = serde_json::from_str::<WindowState>(&contents) {
+                        let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(state.width, state.height)));
+                        let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(state.x, state.y)));
+                    } else { let _ = window.center(); }
+                } else { let _ = window.center(); }
+            } else { let _ = window.center(); }
+
+            let window_failsafe = window.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+                if let Ok(false) = window_failsafe.is_visible() {
+                    log::warn!("Frontend failed to report ready within timeout. Forcing window visibility.");
+                    let _ = window_failsafe.show();
+                    let _ = window_failsafe.set_focus();
+                }
+            });
+
+            let window_for_handler = window.clone();
+            window.clone().on_window_event(move |event| {
+                match event {
+                    tauri::WindowEvent::Resized(_) |
+                    tauri::WindowEvent::Moved(_) => {
+                        let maximized = window_for_handler.is_maximized().unwrap_or(false);
+                        let fullscreen = window_for_handler.is_fullscreen().unwrap_or(false);
+
+                        if let Ok(config_dir) = window_for_handler.app_handle().path().app_config_dir() {
+                            let path = config_dir.join("window_state.json");
+                            let _ = std::fs::create_dir_all(&config_dir);
+
+                            let mut state = WindowState {
+                                width: 1280, height: 720, x: 0, y: 0,
+                                maximized: false, fullscreen: false,
+                            };
+                            if let Ok(contents) = std::fs::read_to_string(&path) {
+                                if let Ok(existing) = serde_json::from_str::<WindowState>(&contents) {
+                                    state = existing;
+                                }
+                            }
+
+                            if !maximized && !fullscreen {
+                                if let (Ok(size), Ok(position)) =
+                                    (window_for_handler.outer_size(), window_for_handler.outer_position())
+                                {
+                                    state.width = size.width;
+                                    state.height = size.height;
+                                    state.x = position.x;
+                                    state.y = position.y;
+                                }
+                            }
+                            state.maximized = maximized;
+                            state.fullscreen = fullscreen;
+                            if let Ok(json) = serde_json::to_string(&state) {
+                                let _ = std::fs::write(&path, json);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            });
             Ok(())
         })
         .manage(AppState {
