@@ -3415,8 +3415,28 @@ fn frontend_ready(
 
         if let Ok(contents) = std::fs::read_to_string(&path) {
             if let Ok(saved_state) = serde_json::from_str::<WindowState>(&contents) {
-                should_maximize = saved_state.maximized;
-                should_fullscreen = saved_state.fullscreen;
+                #[cfg(target_os = "windows")]
+                {
+                    should_maximize = saved_state.maximized;
+                    should_fullscreen = saved_state.fullscreen;
+                }
+
+                if should_maximize || should_fullscreen {
+                    if let Some(monitor) = window.current_monitor().ok().flatten()
+                        .or_else(|| window.primary_monitor().ok().flatten())
+                        .or_else(|| window.available_monitors().ok().and_then(|m| m.into_iter().next()))
+                    {
+                        let monitor_size = monitor.size();
+                        let monitor_pos = monitor.position();
+                        let default_width = 1280i32;
+                        let default_height = 720i32;
+                        let center_x = monitor_pos.x + (monitor_size.width as i32 - default_width) / 2;
+                        let center_y = monitor_pos.y + (monitor_size.height as i32 - default_height) / 2;
+
+                        let _ = window.set_size(tauri::PhysicalSize::new(default_width as u32, default_height as u32));
+                        let _ = window.set_position(tauri::PhysicalPosition::new(center_x, center_y));
+                    }
+                }
             }
         }
 
@@ -3583,44 +3603,69 @@ fn main() {
                 }
             });
 
-            let window_for_handler = window.clone();
-            window.clone().on_window_event(move |event| {
-                match event {
-                    tauri::WindowEvent::Resized(_) |
-                    tauri::WindowEvent::Moved(_) => {
-                        let maximized = window_for_handler.is_maximized().unwrap_or(false);
-                        let fullscreen = window_for_handler.is_fullscreen().unwrap_or(false);
+            let pending_window_state = Arc::new(Mutex::new(None::<WindowState>));
+            let pending_state_for_saver = pending_window_state.clone();
+            let app_handle_for_saver = app.handle().clone();
 
-                        if let Ok(config_dir) = window_for_handler.app_handle().path().app_config_dir() {
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+
+                    let state_to_save = {
+                        let mut lock = pending_state_for_saver.lock().unwrap();
+                        lock.take()
+                    };
+
+                    if let Some(state) = state_to_save {
+                        if let Ok(config_dir) = app_handle_for_saver.path().app_config_dir() {
                             let path = config_dir.join("window_state.json");
                             let _ = std::fs::create_dir_all(&config_dir);
-
-                            let mut state = WindowState {
-                                width: 1280, height: 720, x: 0, y: 0,
-                                maximized: false, fullscreen: false,
-                            };
-                            if let Ok(contents) = std::fs::read_to_string(&path) {
-                                if let Ok(existing) = serde_json::from_str::<WindowState>(&contents) {
-                                    state = existing;
-                                }
-                            }
-
-                            if !maximized && !fullscreen {
-                                if let (Ok(size), Ok(position)) =
-                                    (window_for_handler.outer_size(), window_for_handler.outer_position())
-                                {
-                                    state.width = size.width;
-                                    state.height = size.height;
-                                    state.x = position.x;
-                                    state.y = position.y;
-                                }
-                            }
-                            state.maximized = maximized;
-                            state.fullscreen = fullscreen;
                             if let Ok(json) = serde_json::to_string(&state) {
-                                let _ = std::fs::write(&path, json);
+                                let _ = std::fs::write(&path, json); 
                             }
                         }
+                    }
+                }
+            });
+
+            let window_for_handler = window.clone();
+            let pending_state_for_handler = pending_window_state.clone();
+
+            window.on_window_event(move |event| {
+                match event {
+                    tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
+                        #[cfg(target_os = "windows")]
+                        let maximized = window_for_handler.is_maximized().unwrap_or(false);
+                        #[cfg(not(target_os = "windows"))]
+                        let maximized = false;
+
+                        #[cfg(target_os = "windows")]
+                        let fullscreen = window_for_handler.is_fullscreen().unwrap_or(false);
+                        #[cfg(not(target_os = "windows"))]
+                        let fullscreen = false;
+
+                        let mut state = WindowState {
+                            width: 1280,
+                            height: 720,
+                            x: 0,
+                            y: 0,
+                            maximized,
+                            fullscreen,
+                        };
+
+                        if !maximized && !fullscreen {
+                            if let (Ok(size), Ok(position)) = (
+                                window_for_handler.outer_size(),
+                                window_for_handler.outer_position(),
+                            ) {
+                                state.width = size.width;
+                                state.height = size.height;
+                                state.x = position.x;
+                                state.y = position.y;
+                            }
+                        }
+
+                        *pending_state_for_handler.lock().unwrap() = Some(state);
                     }
                     _ => {}
                 }
