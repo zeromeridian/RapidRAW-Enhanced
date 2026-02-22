@@ -149,16 +149,21 @@ pub fn load_base_image_from_bytes(
                 Ok(image)
             }
             Ok(Err(e)) => {
-                log::warn!("Error developing RAW file '{}': {}", path_for_ext_check, e);
-                Err(e)
+                let classified = classify_raw_develop_error(path_for_ext_check, e);
+                log::warn!(
+                    "Error developing RAW file '{}': {}",
+                    path_for_ext_check,
+                    classified
+                );
+                Err(classified)
             }
             Err(_) => {
                 log::error!(
-                    "Panic while processing corrupt RAW file: {}",
+                    "Panic while processing RAW file: {}",
                     path_for_ext_check
                 );
                 Err(anyhow!(
-                    "Failed to process corrupt RAW file: {}",
+                    "Failed to process RAW file: {}",
                     path_for_ext_check
                 ))
             }
@@ -166,6 +171,23 @@ pub fn load_base_image_from_bytes(
     } else {
         load_image_with_orientation(bytes, cancel_token)
     }
+}
+
+fn classify_raw_develop_error(path: &str, err: anyhow::Error) -> anyhow::Error {
+    let error_text = err.to_string();
+    let lowered = error_text.to_ascii_lowercase();
+    let unsupported_compression =
+        lowered.contains("nef compression") && lowered.contains("not supported");
+
+    if unsupported_compression {
+        return anyhow!(
+            "Unsupported RAW compression format for '{}'. Original error: {}",
+            path,
+            error_text
+        );
+    }
+
+    err
 }
 
 pub fn load_image_with_orientation(

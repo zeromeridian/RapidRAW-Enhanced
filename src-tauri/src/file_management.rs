@@ -44,6 +44,22 @@ use crate::exif_processing;
 
 const THUMBNAIL_WIDTH: u32 = 640;
 
+fn resolve_thumbnail_cache_dir(app_handle: &AppHandle) -> std::result::Result<PathBuf, String> {
+    let cache_dir = app_handle.path().app_cache_dir().map_err(|e| e.to_string())?;
+    let thumb_cache_dir = cache_dir.join("thumbnails");
+    if !thumb_cache_dir.exists() {
+        fs::create_dir_all(&thumb_cache_dir).map_err(|e| e.to_string())?;
+    }
+    Ok(thumb_cache_dir)
+}
+
+fn emit_thumbnail_cache_setup_error(app_handle: &AppHandle, path: &str, reason: &str) {
+    let _ = app_handle.emit(
+        "thumbnail-generation-error",
+        serde_json::json!({ "path": path, "reason": reason }),
+    );
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Preset {
     pub id: String,
@@ -1517,11 +1533,23 @@ pub fn save_metadata_and_update_thumbnail(
             serde_json::json!({ "completed": 0, "total": 1 }),
         );
 
-        let cache_dir = app_handle_clone.path().app_cache_dir().unwrap();
-        let thumb_cache_dir = cache_dir.join("thumbnails");
-        if !thumb_cache_dir.exists() {
-            fs::create_dir_all(&thumb_cache_dir).unwrap();
-        }
+        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle_clone) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::warn!(
+                    "Unable to initialize thumbnail cache directory for '{}': {}",
+                    path_clone,
+                    e
+                );
+                emit_thumbnail_cache_setup_error(&app_handle_clone, &path_clone, &e);
+                let _ = app_handle_clone.emit(
+                    "thumbnail-progress",
+                    serde_json::json!({ "completed": 1, "total": 1 }),
+                );
+                let _ = app_handle_clone.emit("thumbnail-generation-complete", true);
+                return;
+            }
+        };
 
         let result = generate_single_thumbnail_and_cache(
             &path_clone,
@@ -1599,11 +1627,17 @@ pub fn apply_adjustments_to_paths(
 
     thread::spawn(move || {
         let state = app_handle.state::<AppState>();
-        let cache_dir = app_handle.path().app_cache_dir().unwrap();
-        let thumb_cache_dir = cache_dir.join("thumbnails");
-        if !thumb_cache_dir.exists() {
-            fs::create_dir_all(&thumb_cache_dir).unwrap();
-        }
+        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
+                for path in &paths {
+                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
+                }
+                let _ = app_handle.emit("thumbnail-generation-complete", true);
+                return;
+            }
+        };
 
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
         let total_count = paths.len();
@@ -1678,11 +1712,17 @@ pub fn reset_adjustments_for_paths(
 
     thread::spawn(move || {
         let state = app_handle.state::<AppState>();
-        let cache_dir = app_handle.path().app_cache_dir().unwrap();
-        let thumb_cache_dir = cache_dir.join("thumbnails");
-        if !thumb_cache_dir.exists() {
-            fs::create_dir_all(&thumb_cache_dir).unwrap();
-        }
+        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
+                for path in &paths {
+                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
+                }
+                let _ = app_handle.emit("thumbnail-generation-complete", true);
+                return;
+            }
+        };
 
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
         let total_count = paths.len();
@@ -1804,11 +1844,17 @@ pub fn apply_auto_adjustments_to_paths(
 
     thread::spawn(move || {
         let state = app_handle.state::<AppState>();
-        let cache_dir = app_handle.path().app_cache_dir().unwrap();
-        let thumb_cache_dir = cache_dir.join("thumbnails");
-        if !thumb_cache_dir.exists() {
-            fs::create_dir_all(&thumb_cache_dir).unwrap();
-        }
+        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
+                for path in &paths {
+                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
+                }
+                let _ = app_handle.emit("thumbnail-generation-complete", true);
+                return;
+            }
+        };
 
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
         let total_count = paths.len();
