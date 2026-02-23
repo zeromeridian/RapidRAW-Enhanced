@@ -1083,9 +1083,9 @@ fn generate_original_transformed_preview(
     let mut adjustments_clone = js_adjustments.clone();
     hydrate_adjustments(&state, &mut adjustments_clone);
 
-    let image_for_preview = loaded_image.image.clone();
+    let mut image_for_preview = loaded_image.image.as_ref().clone();
     if loaded_image.is_raw {
-        apply_cpu_default_raw_processing(&mut image_for_preview.as_ref().clone());
+        apply_cpu_default_raw_processing(&mut image_for_preview);
     }
 
     let (transformed_full_res, _unscaled_crop_offset) =
@@ -2077,16 +2077,14 @@ async fn estimate_batch_export_size(
 
     const ESTIMATE_DIM: u32 = 1280;
 
-    let original_image = match read_file_mapped(Path::new(&source_path_str)) {
-        Ok(mmap) => load_base_image_from_bytes(
-            &mmap, 
-            &source_path_str, 
-            true, 
-            highlight_compression, 
-            linear_mode.clone(),
-            None
-        )
-            .map_err(|e| e.to_string())?,
+    let mmap_guard; 
+    let vec_guard; 
+
+    let file_slice: &[u8] = match read_file_mapped(Path::new(&source_path_str)) {
+        Ok(mmap) => {
+            mmap_guard = Some(mmap);
+            mmap_guard.as_ref().unwrap()
+        }
         Err(e) => {
             log::warn!(
                 "Failed to memory-map file '{}': {}. Falling back to standard read.",
@@ -2094,27 +2092,87 @@ async fn estimate_batch_export_size(
                 e
             );
             let bytes = fs::read(&source_path_str).map_err(|io_err| io_err.to_string())?;
-            load_base_image_from_bytes(
-                &bytes, 
-                &source_path_str, 
-                true, 
-                highlight_compression, 
-                linear_mode.clone(),
-                None
-            )
-                .map_err(|e| e.to_string())?
+            vec_guard = Some(bytes);
+            vec_guard.as_ref().unwrap()
         }
     };
 
-    let base_image_preview = downscale_f32_image(&original_image, ESTIMATE_DIM, ESTIMATE_DIM);
+    let original_image = load_base_image_from_bytes(
+        file_slice, 
+        &source_path_str, 
+        true,
+        highlight_compression, 
+        linear_mode.clone(),
+        None
+    ).map_err(|e| e.to_string())?;
 
-    let processed_preview = process_image_for_export_pipeline(
-        &source_path_str,
-        &base_image_preview,
-        &js_adjustments,
+    let raw_scale_factor = if is_raw {
+        crate::raw_processing::get_fast_demosaic_scale_factor(
+            file_slice, 
+            original_image.width(), 
+            original_image.height()
+        )
+    } else {
+        1.0
+    };
+
+    let mut scaled_adjustments = js_adjustments.clone();
+    if let Some(crop_val) = scaled_adjustments.get_mut("crop") {
+        if let Ok(c) = serde_json::from_value::<Crop>(crop_val.clone()) {
+            *crop_val = serde_json::to_value(Crop {
+                x: c.x * raw_scale_factor as f64,
+                y: c.y * raw_scale_factor as f64,
+                width: c.width * raw_scale_factor as f64,
+                height: c.height * raw_scale_factor as f64,
+            }).unwrap_or(serde_json::Value::Null);
+        }
+    }
+
+    let (transformed_shrunk_res, unscaled_crop_offset) =
+        apply_all_transformations(&original_image, &scaled_adjustments);
+    let (shrunk_w, shrunk_h) = transformed_shrunk_res.dimensions();
+
+    let preview_base = if shrunk_w > ESTIMATE_DIM || shrunk_h > ESTIMATE_DIM {
+        downscale_f32_image(&transformed_shrunk_res, ESTIMATE_DIM, ESTIMATE_DIM)
+    } else {
+        transformed_shrunk_res.clone()
+    };
+
+    let (preview_w, preview_h) = preview_base.dimensions();
+    let gpu_scale = if shrunk_w > 0 { preview_w as f32 / shrunk_w as f32 } else { 1.0 };
+
+    let total_scale = gpu_scale * raw_scale_factor;
+
+    let mask_definitions: Vec<MaskDefinition> = scaled_adjustments
+        .get("masks")
+        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .unwrap_or_else(Vec::new);
+
+    let scaled_crop_offset = (
+        unscaled_crop_offset.0 * gpu_scale,
+        unscaled_crop_offset.1 * gpu_scale,
+    );
+
+    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
+        .iter()
+        .filter_map(|def| generate_mask_bitmap(def, preview_w, preview_h, total_scale, scaled_crop_offset))
+        .collect();
+
+    let mut all_adjustments = get_all_adjustments_from_json(&scaled_adjustments, is_raw);
+    all_adjustments.global.show_clipping = 0;
+
+    let lut_path = scaled_adjustments["lutPath"].as_str();
+    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+    let unique_hash = calculate_full_job_hash(&source_path_str, &scaled_adjustments).wrapping_add(1);
+
+    let processed_preview = process_and_get_dynamic_image(
         &context,
         &state,
-        is_raw,
+        &preview_base,
+        unique_hash,
+        all_adjustments,
+        &mask_bitmaps,
+        lut,
         "estimate_batch_export_size",
     )?;
 
@@ -2125,9 +2183,8 @@ async fn estimate_batch_export_size(
     )?;
     let single_image_estimated_size = preview_bytes.len();
 
-    let (transformed_full_res, _) =
-        apply_all_transformations(&original_image, &js_adjustments);
-    let (full_w, full_h) = transformed_full_res.dimensions();
+    let full_w = (shrunk_w as f32 / raw_scale_factor).round() as u32;
+    let full_h = (shrunk_h as f32 / raw_scale_factor).round() as u32;
 
     let (final_full_w, final_full_h) = if let Some(resize_opts) = &export_settings.resize {
         calculate_resize_target(full_w, full_h, resize_opts)
@@ -2198,7 +2255,12 @@ async fn generate_ai_foreground_mask(
         .await
         .map_err(|e| e.to_string())?;
 
-    let (full_image, _) = get_full_image_for_processing(&state)?;
+    let (mut full_image, is_raw) = get_full_image_for_processing(&state)?;
+
+    if is_raw {
+        apply_cpu_default_raw_processing(&mut full_image);
+    }
+
     let warped_image = apply_geometry_warp(&full_image, &js_adjustments);
     let full_mask_image =
         run_u2netp_model(&warped_image, &models.u2netp).map_err(|e| e.to_string())?;
@@ -2227,7 +2289,11 @@ async fn generate_ai_sky_mask(
         .await
         .map_err(|e| e.to_string())?;
 
-    let (full_image, _) = get_full_image_for_processing(&state)?;
+    let (mut full_image, is_raw) = get_full_image_for_processing(&state)?;
+
+    if is_raw {
+        apply_cpu_default_raw_processing(&mut full_image);
+    }
     let warped_image = apply_geometry_warp(&full_image, &js_adjustments);
     let full_mask_image =
         run_sky_seg_model(&warped_image, &models.sky_seg).map_err(|e| e.to_string())?;
@@ -2259,7 +2325,11 @@ async fn generate_ai_subject_mask(
         .await
         .map_err(|e| e.to_string())?;
 
-    let (full_image, _) = get_full_image_for_processing(&state)?;
+    let (mut full_image, is_raw) = get_full_image_for_processing(&state)?;
+
+    if is_raw {
+        apply_cpu_default_raw_processing(&mut full_image);
+    }
     let warped_image = apply_geometry_warp(&full_image, &js_adjustments);
 
     let embeddings = {

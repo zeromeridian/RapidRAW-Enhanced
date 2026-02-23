@@ -570,9 +570,9 @@ pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams
 pub fn apply_cpu_default_raw_processing(image: &mut DynamicImage) {
     let mut f32_image = image.to_rgb32f();
 
-    const GAMMA: f32 = 2.2;
+    const GAMMA: f32 = 2.38;
     const INV_GAMMA: f32 = 1.0 / GAMMA;
-    const CONTRAST: f32 = 1.15;
+    const CONTRAST: f32 = 1.28;
 
     f32_image.par_chunks_mut(3).for_each(|pixel_chunk| {
         let r_gamma = pixel_chunk[0].powf(INV_GAMMA);
@@ -1706,7 +1706,7 @@ pub fn remove_raw_artifacts_and_enhance(image: &mut DynamicImage) {
             }
         });
 
-    apply_gentle_detail_enhance(&mut buffer, &ycbcr_buffer, 0.4);
+    apply_gentle_detail_enhance(&mut buffer, &ycbcr_buffer, 0.35);
 
     *image = DynamicImage::ImageRgb32F(buffer);
 }

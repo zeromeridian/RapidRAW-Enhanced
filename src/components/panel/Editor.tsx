@@ -144,8 +144,14 @@ export default function Editor({
   const transformStateRef = useRef<TransformState>(transformState);
   transformStateRef.current = transformState;
 
+  const [isPanning, setIsPanning] = useState(false);
+  const isClickAnimating = useRef(false);
+  const clickAnimationTime = 200;
+
   const isAnimating = useRef(false);
   const animationTimeoutRef = useRef<number | null>(null);
+
+  const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const currentUrl = maskOverlayUrl;
@@ -448,18 +454,58 @@ export default function Editor({
 
   const toggleShowOriginal = useCallback(() => setShowOriginal((prev: boolean) => !prev), [setShowOriginal]);
 
-  const doubleClickProps: any = useMemo(() => {
-    if (isCropping || isMasking || isAiEditing) {
-      return {
-        disabled: true,
-      };
-    }
-    return {
-      animationTime: 200,
-      animationType: 'easeOut',
-      mode: transformState.scale >= 2 ? 'reset' : 'zoomIn',
-    };
-  }, [isCropping, isMasking, isAiEditing, transformState.scale]);
+  const doubleClickProps = useMemo(() => ({ disabled: true }), []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    mouseDownPos.current = { x: e.clientX, y: e.clientY };
+  }, []);
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      const wrapper = transformWrapperRef.current;
+      if (!wrapper) return;
+
+      if (isCropping || isMasking || isAiEditing || isWbPickerActive) return;
+
+      if (mouseDownPos.current) {
+        const dx = Math.abs(e.clientX - mouseDownPos.current.x);
+        const dy = Math.abs(e.clientY - mouseDownPos.current.y);
+        if (dx > 5 || dy > 5) return;
+      }
+
+      const currentScale = transformStateRef.current.scale;
+      
+      if (isClickAnimating.current || currentScale > 1.01) {
+        wrapper.resetTransform(clickAnimationTime, 'easeOut');
+        isClickAnimating.current = false;
+      } else {
+        isClickAnimating.current = true;
+        
+        setTimeout(() => {
+          isClickAnimating.current = false;
+        }, clickAnimationTime + 50);
+
+        const wrapperElement = wrapper.instance.wrapperComponent;
+        if (!wrapperElement) return;
+
+        const currentPositionX = transformStateRef.current.positionX;
+        const currentPositionY = transformStateRef.current.positionY;
+
+        const rect = wrapperElement.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const targetScale = Math.min(currentScale * 2, transformConfig.maxScale);
+        const ratio = targetScale / currentScale;
+
+        const newPositionX = mouseX - (mouseX - currentPositionX) * ratio;
+        const newPositionY = mouseY - (mouseY - currentPositionY) * ratio;
+
+        wrapper.setTransform(newPositionX, newPositionY, targetScale, clickAnimationTime, 'easeOut');
+      }
+    },
+    [isCropping, isMasking, isAiEditing, isWbPickerActive, transformWrapperRef, transformConfig.maxScale],
+  );
 
   if (!selectedImage) {
     return (
@@ -495,6 +541,19 @@ export default function Editor({
         activeSubMask?.type === Mask.QuickEraser));
 
   const waveFormData: WaveformData = waveform || { blue: [], green: [], height: 0, luma: [], red: [], width: 0 };
+
+  const isZoomActionActive = !isCropping && !isMasking && !isAiEditing && !isWbPickerActive;
+  
+  let cursorStyle = 'default';
+  if (isZoomActionActive) {
+    if (isPanning) {
+      cursorStyle = 'grabbing';
+    } else if (transformState.scale > 1.01) {
+      cursorStyle = 'zoom-out';
+    } else {
+      cursorStyle = 'zoom-in';
+    }
+  }
 
   return (
     <>
@@ -558,9 +617,11 @@ export default function Editor({
             doubleClick={doubleClickProps}
             panning={{ disabled: isPanningDisabled || isWbPickerActive }}
             onTransformed={handleTransform}
+            onPanning={() => setIsPanning(true)}
+            onPanningStop={() => setIsPanning(false)}
             wheel={{
               step: transformState.scale * 0.0013,
-              smoothStep: transformState.scale * 0.0013
+              smoothStep: transformState.scale * 0.0013,
             }}
           >
             <TransformComponent
@@ -571,6 +632,10 @@ export default function Editor({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+              }}
+              contentProps={{
+                onMouseDown: handleMouseDown,
+                onClick: handleClick,
               }}
             >
               <ImageCanvas
@@ -611,6 +676,7 @@ export default function Editor({
                 setAdjustments={setAdjustments}
                 overlayRotation={overlayRotation}
                 overlayMode={overlayMode}
+                cursorStyle={cursorStyle}
               />
             </TransformComponent>
           </TransformWrapper>

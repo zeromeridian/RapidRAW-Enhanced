@@ -844,42 +844,55 @@ pub fn generate_thumbnail_data(
                 }
             };
 
-            let (processing_base, scale_for_gpu) = if let Some(hit) = cached_base {
+            let (processing_base, total_scale) = if let Some(hit) = cached_base {
                 hit
             } else {
-                
                 let settings = crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
                 let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
                 let linear_mode = settings.linear_raw_mode;
+                let mut raw_scale_factor = 1.0;
 
                 let composite_image = if let Some(img) = preloaded_image {
                     image_loader::composite_patches_on_image(img, &adjustments)?
                 } else {
-                    match read_file_mapped(&source_path) {
-                        Ok(mmap) => image_loader::load_and_composite(
-                            &mmap,
-                            &source_path_str,
-                            &adjustments,
-                            true,
-                            highlight_compression,
-                            linear_mode.clone(),
-                            None,
-                        )?,
-                        Err(_) => {
-                            let file_bytes = fs::read(&source_path).map_err(|io_err| {
+                    let mmap_guard; 
+                    let vec_guard; 
+
+                    let file_slice: &[u8] = match read_file_mapped(&source_path) {
+                        Ok(mmap) => {
+                            mmap_guard = Some(mmap);
+                            mmap_guard.as_ref().unwrap()
+                        }
+                        Err(e) => {
+                            if preloaded_image.is_none() {
+                                log::warn!("Fallback read for {}: {}", source_path_str, e);
+                            }
+                            let bytes = fs::read(&source_path).map_err(|io_err| {
                                 anyhow::anyhow!("Fallback read failed for {}: {}", source_path_str, io_err)
                             })?;
-                            image_loader::load_and_composite(
-                                &file_bytes,
-                                &source_path_str,
-                                &adjustments,
-                                true,
-                                highlight_compression,
-                                linear_mode.clone(),
-                                None,
-                            )?
+                            vec_guard = Some(bytes);
+                            vec_guard.as_ref().unwrap()
                         }
+                    };
+
+                    let img = image_loader::load_and_composite(
+                        file_slice,
+                        &source_path_str,
+                        &adjustments,
+                        true,
+                        highlight_compression,
+                        linear_mode.clone(),
+                        None,
+                    )?;
+
+                    if is_raw {
+                        raw_scale_factor = crate::raw_processing::get_fast_demosaic_scale_factor(
+                            file_slice, 
+                            img.width(), 
+                            img.height()
+                        );
                     }
+                    img
                 };
 
                 let warped_image = apply_geometry_warp(&composite_image, &meta.adjustments);
@@ -888,7 +901,7 @@ pub fn generate_thumbnail_data(
                 
                 let (full_w, full_h) = coarse_rotated_image.dimensions();
 
-                let (base, scale) = if full_w > THUMBNAIL_PROCESSING_DIM || full_h > THUMBNAIL_PROCESSING_DIM {
+                let (base, gpu_scale) = if full_w > THUMBNAIL_PROCESSING_DIM || full_h > THUMBNAIL_PROCESSING_DIM {
                     let base = crate::image_processing::downscale_f32_image(
                         &coarse_rotated_image,
                         THUMBNAIL_PROCESSING_DIM,
@@ -904,13 +917,15 @@ pub fn generate_thumbnail_data(
                     (coarse_rotated_image.clone(), 1.0)
                 };
 
+                let total_scale = gpu_scale * raw_scale_factor;
+
                 let mut cache = state.thumbnail_geometry_cache.lock().unwrap();
                 if cache.len() > 30 { cache.clear(); }
-                cache.insert(path_str.to_string(), (geometry_hash, base.clone(), scale));
+                cache.insert(path_str.to_string(), (geometry_hash, base.clone(), total_scale));
 
-                (base, scale)
+                (base, total_scale)
             };
-            
+
             let rotation_degrees = meta.adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
             let flip_horizontal = meta.adjustments["flipHorizontal"].as_bool().unwrap_or(false);
             let flip_vertical = meta.adjustments["flipVertical"].as_bool().unwrap_or(false);
@@ -921,10 +936,10 @@ pub fn generate_thumbnail_data(
             let crop_data: Option<Crop> = serde_json::from_value(meta.adjustments["crop"].clone()).ok();
             let scaled_crop_json = if let Some(c) = &crop_data {
                 serde_json::to_value(Crop {
-                    x: c.x * scale_for_gpu as f64,
-                    y: c.y * scale_for_gpu as f64,
-                    width: c.width * scale_for_gpu as f64,
-                    height: c.height * scale_for_gpu as f64,
+                    x: c.x * total_scale as f64,
+                    y: c.y * total_scale as f64,
+                    width: c.width * total_scale as f64,
+                    height: c.height * total_scale as f64,
                 })
                 .unwrap_or(serde_json::Value::Null)
             } else {
@@ -949,10 +964,10 @@ pub fn generate_thumbnail_data(
                         def,
                         preview_w,
                         preview_h,
-                        scale_for_gpu,
+                        total_scale,
                         (
-                            unscaled_crop_offset.0 * scale_for_gpu,
-                            unscaled_crop_offset.1 * scale_for_gpu,
+                            unscaled_crop_offset.0 * total_scale,
+                            unscaled_crop_offset.1 * total_scale,
                         ),
                     )
                 })
