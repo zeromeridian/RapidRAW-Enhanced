@@ -102,15 +102,18 @@ fn read_texture_data(
     let buffer_slice = output_buffer.slice(..);
     let (tx, rx) = std::sync::mpsc::channel();
     buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-        tx.send(result).unwrap();
+        let _ = tx.send(result);
     });
     device
         .poll(wgpu::PollType::Wait {
             submission_index: None,
             timeout: Some(std::time::Duration::from_secs(60)),
         })
-        .unwrap();
-    rx.recv().unwrap().map_err(|e| e.to_string())?;
+        .map_err(|e| format!("Failed while polling mapped GPU buffer: {}", e))?;
+    let map_result = rx
+        .recv()
+        .map_err(|e| format!("Failed receiving GPU map result: {}", e))?;
+    map_result.map_err(|e| e.to_string())?;
 
     let padded_data = buffer_slice.get_mapped_range().to_vec();
     output_buffer.unmap();

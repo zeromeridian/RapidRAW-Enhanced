@@ -3373,11 +3373,13 @@ fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowH
         };
 
         if is_win11_or_newer {
-            window_vibrancy::apply_acrylic(&window, color)
-                .expect("Failed to apply acrylic effect on Windows 11");
+            if let Err(e) = window_vibrancy::apply_acrylic(&window, color) {
+                log::warn!("Failed to apply acrylic effect on Windows 11: {}", e);
+            }
         } else {
-            window_vibrancy::apply_blur(&window, color)
-                .expect("Failed to apply blur effect on Windows 10 or older");
+            if let Err(e) = window_vibrancy::apply_blur(&window, color) {
+                log::warn!("Failed to apply blur effect on Windows 10 or older: {}", e);
+            }
         }
     }
 
@@ -3387,8 +3389,9 @@ fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowH
             "light" => window_vibrancy::NSVisualEffectMaterial::ContentBackground,
             _ => window_vibrancy::NSVisualEffectMaterial::HudWindow,
         };
-        window_vibrancy::apply_vibrancy(&window, material, None, None)
-            .expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
+        if let Err(e) = window_vibrancy::apply_vibrancy(&window, material, None, None) {
+            log::warn!("Failed to apply macOS vibrancy effect: {}", e);
+        }
     }
 
     #[cfg(target_os = "linux")]
