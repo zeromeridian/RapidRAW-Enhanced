@@ -130,6 +130,7 @@ struct PreviewJob {
 }
 
 pub struct AppState {
+    window_setup_complete: AtomicBool,
     original_image: Mutex<Option<LoadedImage>>,
     cached_preview: Mutex<Option<CachedPreview>>,
     gpu_context: Mutex<Option<GpuContext>>,
@@ -3489,57 +3490,53 @@ fn frontend_ready(
     window: tauri::Window,
     state: tauri::State<AppState>
 ) -> Result<(), String> {
-    if let Ok(config_dir) = app_handle.path().app_config_dir() {
-        let path = config_dir.join("window_state.json");
-        let mut should_maximize = false;
-        let mut should_fullscreen = false;
+    let is_first_run = !state.window_setup_complete.swap(true, std::sync::atomic::Ordering::Relaxed);
+    if is_first_run {
+        if let Ok(config_dir) = app_handle.path().app_config_dir() {
+            let path = config_dir.join("window_state.json");
+            let mut should_maximize = false;
+            let mut should_fullscreen = false;
 
-        if let Ok(contents) = std::fs::read_to_string(&path) {
-            if let Ok(saved_state) = serde_json::from_str::<WindowState>(&contents) {
-                #[cfg(target_os = "windows")]
-                {
-                    should_maximize = saved_state.maximized;
-                    should_fullscreen = saved_state.fullscreen;
-                }
-
-                if should_maximize || should_fullscreen {
-                    if let Some(monitor) = window.current_monitor().ok().flatten()
-                        .or_else(|| window.primary_monitor().ok().flatten())
-                        .or_else(|| window.available_monitors().ok().and_then(|m| m.into_iter().next()))
+            if let Ok(contents) = std::fs::read_to_string(&path) {
+                if let Ok(saved_state) = serde_json::from_str::<WindowState>(&contents) {
+                    #[cfg(any(windows, target_os = "linux"))]
                     {
-                        let monitor_size = monitor.size();
-                        let monitor_pos = monitor.position();
-                        let default_width = 1280i32;
-                        let default_height = 720i32;
-                        let center_x = monitor_pos.x + (monitor_size.width as i32 - default_width) / 2;
-                        let center_y = monitor_pos.y + (monitor_size.height as i32 - default_height) / 2;
+                        should_maximize = saved_state.maximized;
+                        should_fullscreen = saved_state.fullscreen;
+                    }
 
-                        let _ = window.set_size(tauri::PhysicalSize::new(default_width as u32, default_height as u32));
-                        let _ = window.set_position(tauri::PhysicalPosition::new(center_x, center_y));
+                    if should_maximize || should_fullscreen {
+                        if let Some(monitor) = window.current_monitor().ok().flatten()
+                            .or_else(|| window.primary_monitor().ok().flatten())
+                            .or_else(|| window.available_monitors().ok().and_then(|m| m.into_iter().next()))
+                        {
+                            let monitor_size = monitor.size();
+                            let monitor_pos = monitor.position();
+                            let default_width = 1280i32;
+                            let default_height = 720i32;
+                            let center_x = monitor_pos.x + (monitor_size.width as i32 - default_width) / 2;
+                            let center_y = monitor_pos.y + (monitor_size.height as i32 - default_height) / 2;
+
+                            let _ = window.set_size(tauri::PhysicalSize::new(default_width as u32, default_height as u32));
+                            let _ = window.set_position(tauri::PhysicalPosition::new(center_x, center_y));
+                        }
                     }
                 }
             }
+            if should_maximize {
+                let _ = window.maximize();
+            }
+            if should_fullscreen {
+                let _ = window.set_fullscreen(true);
+            }
         }
-
-        if let Err(e) = window.show() {
-            log::error!("Failed to show window: {}", e);
-        }
-        
-        if let Err(e) = window.set_focus() {
-            log::error!("Failed to focus window: {}", e);
-        }
-
-        if should_maximize {
-            let _ = window.maximize();
-        }
-        if should_fullscreen {
-            let _ = window.set_fullscreen(true);
-        }
-    } else {
-        let _ = window.show();
-        let _ = window.set_focus();
     }
-
+    if let Err(e) = window.show() {
+        log::error!("Failed to show window: {}", e);
+    }
+    if let Err(e) = window.set_focus() {
+        log::error!("Failed to focus window: {}", e);
+    }
     if let Some(path) = state.initial_file_path.lock().unwrap().take() {
         log::info!("Frontend is ready, emitting open-with-file for initial path: {}", &path);
         handle_file_open(&app_handle, PathBuf::from(path));
@@ -3715,14 +3712,15 @@ fn main() {
             window.on_window_event(move |event| {
                 match event {
                     tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
-                        #[cfg(target_os = "windows")]
+
+                        #[cfg(any(windows, target_os = "linux"))]
                         let maximized = window_for_handler.is_maximized().unwrap_or(false);
-                        #[cfg(not(target_os = "windows"))]
+                        #[cfg(not(any(windows, target_os = "linux")))]
                         let maximized = false;
 
-                        #[cfg(target_os = "windows")]
+                        #[cfg(any(windows, target_os = "linux"))]
                         let fullscreen = window_for_handler.is_fullscreen().unwrap_or(false);
-                        #[cfg(not(target_os = "windows"))]
+                        #[cfg(not(any(windows, target_os = "linux")))]
                         let fullscreen = false;
 
                         let mut state = WindowState {
@@ -3754,6 +3752,7 @@ fn main() {
             Ok(())
         })
         .manage(AppState {
+            window_setup_complete: AtomicBool::new(false),
             original_image: Mutex::new(None),
             cached_preview: Mutex::new(None),
             gpu_context: Mutex::new(None),
