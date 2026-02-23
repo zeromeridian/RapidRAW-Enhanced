@@ -937,21 +937,31 @@ export default function SettingsPanel({
                                     )}
                                   </AnimatePresence>
                                 </div>
-                                <div className="relative">
-                                  <Input
-                                    type="text"
-                                    value={newAiTag}
-                                    onChange={(e) => setNewAiTag(e.target.value)}
-                                    onKeyDown={handleAiTagInputKeyDown}
-                                    placeholder="Add custom AI tags (comma separated)..."
-                                    className="pr-10"
-                                  />
+                                <div className="flex items-center gap-2">
+                                  <div className="relative flex-1">
+                                    <Input
+                                      type="text"
+                                      value={newAiTag}
+                                      onChange={(e) => setNewAiTag(e.target.value)}
+                                      onKeyDown={handleAiTagInputKeyDown}
+                                      placeholder="Add custom AI tags (comma separated)..."
+                                      className="pr-10"
+                                    />
+                                    <button
+                                      onClick={handleAddAiTag}
+                                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface"
+                                      data-tooltip="Add AI tag"
+                                    >
+                                      <Plus size={18} />
+                                    </button>
+                                  </div>
                                   <button
-                                    onClick={handleAddAiTag}
-                                    className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface"
-                                    data-tooltip="Add AI tag"
+                                    onClick={() => onSettingsChange({ ...appSettings, customAiTags: [] })}
+                                    disabled={customAiTags.length === 0}
+                                    className="p-2 text-text-secondary hover:text-red-400 hover:bg-surface rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-secondary disabled:hover:bg-transparent"
+                                    data-tooltip="Clear AI Tag List"
                                   >
-                                    <Plus size={18} />
+                                    <Trash2 size={18} />
                                   </button>
                                 </div>
                               </div>
@@ -1001,21 +1011,31 @@ export default function SettingsPanel({
                             )}
                           </AnimatePresence>
                         </div>
-                        <div className="relative">
-                          <Input
-                            type="text"
-                            value={newShortcut}
-                            onChange={(e) => setNewShortcut(e.target.value)}
-                            onKeyDown={handleInputKeyDown}
-                            placeholder="Add shortcuts (comma separated)..."
-                            className="pr-10"
-                          />
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <Input
+                              type="text"
+                              value={newShortcut}
+                              onChange={(e) => setNewShortcut(e.target.value)}
+                              onKeyDown={handleInputKeyDown}
+                              placeholder="Add shortcuts (comma separated)..."
+                              className="pr-10"
+                            />
+                            <button
+                              onClick={handleAddShortcut}
+                              className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface"
+                              data-tooltip="Add Shortcut"
+                            >
+                              <Plus size={18} />
+                            </button>
+                          </div>
                           <button
-                            onClick={handleAddShortcut}
-                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface"
-                            data-tooltip="Add shortcut"
+                            onClick={() => onSettingsChange({ ...appSettings, taggingShortcuts: [] })}
+                            disabled={taggingShortcuts.length === 0}
+                            className="p-2 text-text-secondary hover:text-red-400 hover:bg-surface rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-secondary disabled:hover:bg-transparent"
+                            data-tooltip="Clear Shortcuts Tag List"
                           >
-                            <Plus size={18} />
+                            <Trash2 size={18} />
                           </button>
                         </div>
                       </div>
