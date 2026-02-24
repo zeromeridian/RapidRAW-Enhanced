@@ -520,9 +520,13 @@ export default function LibraryExportPanel({
               {enableResize && (
                 <div className="space-y-4 pl-2 border-l-2 border-surface">
                   <div className="flex items-center gap-2">
-                    <div className={`w-full ${isExporting ? 'opacity-50 pointer-events-none' : ''}`}>
-                      <Dropdown options={resizeModeOptions} value={resizeMode} onChange={setResizeMode} />
-                    </div>
+                    <Dropdown
+                      options={resizeModeOptions}
+                      value={resizeMode}
+                      onChange={setResizeMode}
+                      disabled={isExporting}
+                      className="w-full"
+                    />
                     <input
                       className="w-24 bg-bg-primary text-center rounded-md p-2 border border-surface focus:border-accent focus:ring-accent"
                       disabled={isExporting}
@@ -583,13 +587,13 @@ export default function LibraryExportPanel({
                   />
                   {watermarkPath && (
                     <>
-                      <div className={`w-full ${isExporting ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <Dropdown
-                          options={anchorOptions}
-                          value={watermarkAnchor}
-                          onChange={(val: WatermarkAnchor) => setWatermarkAnchor(val)}
-                        />
-                      </div>
+                      <Dropdown
+                        options={anchorOptions}
+                        value={watermarkAnchor}
+                        onChange={(val) => setWatermarkAnchor(val)}
+                        disabled={isExporting}
+                        className="w-full"
+                      />
                       <Slider
                         label="Scale"
                         min={1}
