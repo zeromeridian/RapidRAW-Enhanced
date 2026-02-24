@@ -152,6 +152,7 @@ export default function Editor({
   const animationTimeoutRef = useRef<number | null>(null);
 
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
+  const savedZoomState = useRef<{ scale: number; positionX: number; positionY: number } | null>(null);
 
   useEffect(() => {
     const currentUrl = maskOverlayUrl;
@@ -474,34 +475,61 @@ export default function Editor({
       }
 
       const currentScale = transformStateRef.current.scale;
-      
+
       if (isClickAnimating.current || currentScale > 1.01) {
+        if (!isClickAnimating.current && currentScale > 1.01) {
+          savedZoomState.current = {
+            scale: currentScale,
+            positionX: transformStateRef.current.positionX,
+            positionY: transformStateRef.current.positionY,
+          };
+        }
         wrapper.resetTransform(clickAnimationTime, 'easeOut');
         isClickAnimating.current = false;
       } else {
         isClickAnimating.current = true;
-        
+
         setTimeout(() => {
           isClickAnimating.current = false;
         }, clickAnimationTime + 50);
 
-        const wrapperElement = wrapper.instance.wrapperComponent;
-        if (!wrapperElement) return;
+        if (savedZoomState.current) {
+          const wrapperElement = wrapper.instance.wrapperComponent;
+          if (!wrapperElement) return;
 
-        const currentPositionX = transformStateRef.current.positionX;
-        const currentPositionY = transformStateRef.current.positionY;
+          const currentPositionX = transformStateRef.current.positionX;
+          const currentPositionY = transformStateRef.current.positionY;
 
-        const rect = wrapperElement.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
+          const rect = wrapperElement.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          const mouseY = e.clientY - rect.top;
 
-        const targetScale = Math.min(currentScale * 2, transformConfig.maxScale);
-        const ratio = targetScale / currentScale;
+          const targetScale = savedZoomState.current.scale;
+          const ratio = targetScale / currentScale;
 
-        const newPositionX = mouseX - (mouseX - currentPositionX) * ratio;
-        const newPositionY = mouseY - (mouseY - currentPositionY) * ratio;
+          const newPositionX = mouseX - (mouseX - currentPositionX) * ratio;
+          const newPositionY = mouseY - (mouseY - currentPositionY) * ratio;
 
-        wrapper.setTransform(newPositionX, newPositionY, targetScale, clickAnimationTime, 'easeOut');
+          wrapper.setTransform(newPositionX, newPositionY, targetScale, clickAnimationTime, 'easeOut');
+        } else {
+          const wrapperElement = wrapper.instance.wrapperComponent;
+          if (!wrapperElement) return;
+
+          const currentPositionX = transformStateRef.current.positionX;
+          const currentPositionY = transformStateRef.current.positionY;
+
+          const rect = wrapperElement.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          const mouseY = e.clientY - rect.top;
+
+          const targetScale = Math.min(currentScale * 2, transformConfig.maxScale);
+          const ratio = targetScale / currentScale;
+
+          const newPositionX = mouseX - (mouseX - currentPositionX) * ratio;
+          const newPositionY = mouseY - (mouseY - currentPositionY) * ratio;
+
+          wrapper.setTransform(newPositionX, newPositionY, targetScale, clickAnimationTime, 'easeOut');
+        }
       }
     },
     [isCropping, isMasking, isAiEditing, isWbPickerActive, transformWrapperRef, transformConfig.maxScale],

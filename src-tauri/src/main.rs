@@ -1307,64 +1307,73 @@ fn get_full_image_for_processing(
 }
 
 #[tauri::command]
-fn generate_fullscreen_preview(
+async fn generate_fullscreen_preview(
     js_adjustments: serde_json::Value,
-    state: tauri::State<AppState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
-    let context = get_or_init_gpu_context(&state)?;
+    let app_handle_clone = app_handle.clone();
+    tokio::task::spawn_blocking(move || {
+        let state = app_handle_clone.state::<AppState>();
+        
+        let context = get_or_init_gpu_context(&state)?;
 
-    let mut adjustments_clone = js_adjustments.clone();
-    hydrate_adjustments(&state, &mut adjustments_clone);
+        let mut adjustments_clone = js_adjustments.clone();
+        hydrate_adjustments(&state, &mut adjustments_clone);
 
-    let (original_image, is_raw) = get_full_image_for_processing(&state)?;
-    let path = state
-        .original_image
-        .lock()
-        .unwrap()
-        .as_ref()
-        .ok_or("Original image path not found")?
-        .path
-        .clone();
-    let unique_hash = calculate_full_job_hash(&path, &adjustments_clone);
-    let base_image = composite_patches_on_image(&original_image, &adjustments_clone)
-        .map_err(|e| format!("Failed to composite AI patches for fullscreen: {}", e))?;
+        let (original_image, is_raw) = get_full_image_for_processing(&state)?;
 
-    let (transformed_image, unscaled_crop_offset) =
-        apply_all_transformations(&base_image, &adjustments_clone);
-    let (img_w, img_h) = transformed_image.dimensions();
+        let path = state
+            .original_image
+            .lock()
+            .unwrap()
+            .as_ref()
+            .ok_or("Original image path not found")?
+            .path
+            .clone();
 
-    let mask_definitions: Vec<MaskDefinition> = adjustments_clone
-        .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
-        .unwrap_or_else(Vec::new);
+        let unique_hash = calculate_full_job_hash(&path, &adjustments_clone);
+        let base_image = composite_patches_on_image(&original_image, &adjustments_clone)
+            .map_err(|e| format!("Failed to composite AI patches for fullscreen: {}", e))?;
 
-    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-        .iter()
-        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
-        .collect();
+        let (transformed_image, unscaled_crop_offset) =
+            apply_all_transformations(&base_image, &adjustments_clone);
+        let (img_w, img_h) = transformed_image.dimensions();
 
-    let all_adjustments = get_all_adjustments_from_json(&adjustments_clone, is_raw);
-    let lut_path = adjustments_clone["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+        let mask_definitions: Vec<MaskDefinition> = adjustments_clone
+            .get("masks")
+            .and_then(|m| serde_json::from_value(m.clone()).ok())
+            .unwrap_or_else(Vec::new);
 
-    let final_image = process_and_get_dynamic_image(
-        &context,
-        &state,
-        &transformed_image,
-        unique_hash,
-        all_adjustments,
-        &mask_bitmaps,
-        lut,
-        "generate_fullscreen_preview",
-    )?;
+        let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
+            .iter()
+            .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
+            .collect();
 
-    let mut buf = Cursor::new(Vec::new());
-    final_image
-        .to_rgb8()
-        .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 92))
-        .map_err(|e| e.to_string())?;
+        let all_adjustments = get_all_adjustments_from_json(&adjustments_clone, is_raw);
+        let lut_path = adjustments_clone["lutPath"].as_str();
+        let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
 
-    Ok(Response::new(buf.into_inner()))
+        let final_image = process_and_get_dynamic_image(
+            &context,
+            &state,
+            &transformed_image,
+            unique_hash,
+            all_adjustments,
+            &mask_bitmaps,
+            lut,
+            "generate_fullscreen_preview",
+        )?;
+
+        let mut buf = Cursor::new(Vec::new());
+        final_image
+            .to_rgb8()
+            .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 92))
+            .map_err(|e| e.to_string())?;
+
+        Ok(Response::new(buf.into_inner()))
+    })
+    .await
+    .map_err(|e| format!("Task failed: {}", e))?
 }
 
 fn calculate_resize_target(
@@ -3668,8 +3677,13 @@ fn main() {
                 let path = config_dir.join("window_state.json");
                 if let Ok(contents) = std::fs::read_to_string(&path) {
                     if let Ok(state) = serde_json::from_str::<WindowState>(&contents) {
-                        let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(state.width, state.height)));
-                        let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(state.x, state.y)));
+                        if state.width >= 200 && state.height >= 150 {
+                            let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(state.width, state.height)));
+                            let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(state.x, state.y)));
+                        } else {
+                            log::warn!("Saved window state had unreasonable dimensions ({}x{}), centering instead.", state.width, state.height);
+                            let _ = window.center();
+                        }
                     } else { let _ = window.center(); }
                 } else { let _ = window.center(); }
             } else { let _ = window.center(); }
@@ -3726,6 +3740,10 @@ fn main() {
                         #[cfg(not(any(windows, target_os = "linux")))]
                         let fullscreen = false;
 
+                        if window_for_handler.is_minimized().unwrap_or(false) {
+                            return;
+                        }
+
                         let mut state = WindowState {
                             width: 1280,
                             height: 720,
@@ -3742,8 +3760,10 @@ fn main() {
 
                         if !maximized && !fullscreen {
                             if let Ok(size) = window_for_handler.outer_size() {
-                                state.width = size.width;
-                                state.height = size.height;
+                                if size.width >= 200 && size.height >= 150 {
+                                    state.width = size.width;
+                                    state.height = size.height;
+                                }
                             }
                         }
 
