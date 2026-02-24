@@ -44,6 +44,22 @@ use crate::exif_processing;
 
 const THUMBNAIL_WIDTH: u32 = 640;
 
+fn resolve_thumbnail_cache_dir(app_handle: &AppHandle) -> std::result::Result<PathBuf, String> {
+    let cache_dir = app_handle.path().app_cache_dir().map_err(|e| e.to_string())?;
+    let thumb_cache_dir = cache_dir.join("thumbnails");
+    if !thumb_cache_dir.exists() {
+        fs::create_dir_all(&thumb_cache_dir).map_err(|e| e.to_string())?;
+    }
+    Ok(thumb_cache_dir)
+}
+
+fn emit_thumbnail_cache_setup_error(app_handle: &AppHandle, path: &str, reason: &str) {
+    let _ = app_handle.emit(
+        "thumbnail-generation-error",
+        serde_json::json!({ "path": path, "reason": reason }),
+    );
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Preset {
     pub id: String,
@@ -291,6 +307,10 @@ pub struct AppSettings {
     pub tagging_thread_count: Option<u32>,
     #[serde(default = "default_tagging_shortcuts_option")]
     pub tagging_shortcuts: Option<Vec<String>>,
+    #[serde(default)]
+    pub custom_ai_tags: Option<Vec<String>>,
+    #[serde(default)]
+    pub ai_tag_count: Option<u32>,
     pub thumbnail_size: Option<String>,
     pub thumbnail_aspect_ratio: Option<String>,
     pub ai_provider: Option<String>,
@@ -359,6 +379,8 @@ impl Default for AppSettings {
             enable_ai_tagging: Some(false),
             tagging_thread_count: Some(3),
             tagging_shortcuts: default_tagging_shortcuts_option(),
+            custom_ai_tags: Some(Vec::new()),
+            ai_tag_count: Some(10),
             thumbnail_size: Some("medium".to_string()),
             thumbnail_aspect_ratio: Some("cover".to_string()),
             ai_provider: Some("cpu".to_string()),
@@ -844,42 +866,55 @@ pub fn generate_thumbnail_data(
                 }
             };
 
-            let (processing_base, scale_for_gpu) = if let Some(hit) = cached_base {
+            let (processing_base, total_scale) = if let Some(hit) = cached_base {
                 hit
             } else {
-                
                 let settings = crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
                 let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
                 let linear_mode = settings.linear_raw_mode;
+                let mut raw_scale_factor = 1.0;
 
                 let composite_image = if let Some(img) = preloaded_image {
                     image_loader::composite_patches_on_image(img, &adjustments)?
                 } else {
-                    match read_file_mapped(&source_path) {
-                        Ok(mmap) => image_loader::load_and_composite(
-                            &mmap,
-                            &source_path_str,
-                            &adjustments,
-                            true,
-                            highlight_compression,
-                            linear_mode.clone(),
-                            None,
-                        )?,
-                        Err(_) => {
-                            let file_bytes = fs::read(&source_path).map_err(|io_err| {
+                    let mmap_guard; 
+                    let vec_guard; 
+
+                    let file_slice: &[u8] = match read_file_mapped(&source_path) {
+                        Ok(mmap) => {
+                            mmap_guard = Some(mmap);
+                            mmap_guard.as_ref().unwrap()
+                        }
+                        Err(e) => {
+                            if preloaded_image.is_none() {
+                                log::warn!("Fallback read for {}: {}", source_path_str, e);
+                            }
+                            let bytes = fs::read(&source_path).map_err(|io_err| {
                                 anyhow::anyhow!("Fallback read failed for {}: {}", source_path_str, io_err)
                             })?;
-                            image_loader::load_and_composite(
-                                &file_bytes,
-                                &source_path_str,
-                                &adjustments,
-                                true,
-                                highlight_compression,
-                                linear_mode.clone(),
-                                None,
-                            )?
+                            vec_guard = Some(bytes);
+                            vec_guard.as_ref().unwrap()
                         }
+                    };
+
+                    let img = image_loader::load_and_composite(
+                        file_slice,
+                        &source_path_str,
+                        &adjustments,
+                        true,
+                        highlight_compression,
+                        linear_mode.clone(),
+                        None,
+                    )?;
+
+                    if is_raw {
+                        raw_scale_factor = crate::raw_processing::get_fast_demosaic_scale_factor(
+                            file_slice, 
+                            img.width(), 
+                            img.height()
+                        );
                     }
+                    img
                 };
 
                 let warped_image = apply_geometry_warp(&composite_image, &meta.adjustments);
@@ -888,7 +923,7 @@ pub fn generate_thumbnail_data(
                 
                 let (full_w, full_h) = coarse_rotated_image.dimensions();
 
-                let (base, scale) = if full_w > THUMBNAIL_PROCESSING_DIM || full_h > THUMBNAIL_PROCESSING_DIM {
+                let (base, gpu_scale) = if full_w > THUMBNAIL_PROCESSING_DIM || full_h > THUMBNAIL_PROCESSING_DIM {
                     let base = crate::image_processing::downscale_f32_image(
                         &coarse_rotated_image,
                         THUMBNAIL_PROCESSING_DIM,
@@ -904,13 +939,15 @@ pub fn generate_thumbnail_data(
                     (coarse_rotated_image.clone(), 1.0)
                 };
 
+                let total_scale = gpu_scale * raw_scale_factor;
+
                 let mut cache = state.thumbnail_geometry_cache.lock().unwrap();
                 if cache.len() > 30 { cache.clear(); }
-                cache.insert(path_str.to_string(), (geometry_hash, base.clone(), scale));
+                cache.insert(path_str.to_string(), (geometry_hash, base.clone(), total_scale));
 
-                (base, scale)
+                (base, total_scale)
             };
-            
+
             let rotation_degrees = meta.adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
             let flip_horizontal = meta.adjustments["flipHorizontal"].as_bool().unwrap_or(false);
             let flip_vertical = meta.adjustments["flipVertical"].as_bool().unwrap_or(false);
@@ -921,10 +958,10 @@ pub fn generate_thumbnail_data(
             let crop_data: Option<Crop> = serde_json::from_value(meta.adjustments["crop"].clone()).ok();
             let scaled_crop_json = if let Some(c) = &crop_data {
                 serde_json::to_value(Crop {
-                    x: c.x * scale_for_gpu as f64,
-                    y: c.y * scale_for_gpu as f64,
-                    width: c.width * scale_for_gpu as f64,
-                    height: c.height * scale_for_gpu as f64,
+                    x: c.x * total_scale as f64,
+                    y: c.y * total_scale as f64,
+                    width: c.width * total_scale as f64,
+                    height: c.height * total_scale as f64,
                 })
                 .unwrap_or(serde_json::Value::Null)
             } else {
@@ -949,10 +986,10 @@ pub fn generate_thumbnail_data(
                         def,
                         preview_w,
                         preview_h,
-                        scale_for_gpu,
+                        total_scale,
                         (
-                            unscaled_crop_offset.0 * scale_for_gpu,
-                            unscaled_crop_offset.1 * scale_for_gpu,
+                            unscaled_crop_offset.0 * total_scale,
+                            unscaled_crop_offset.1 * total_scale,
                         ),
                     )
                 })
@@ -1517,11 +1554,23 @@ pub fn save_metadata_and_update_thumbnail(
             serde_json::json!({ "completed": 0, "total": 1 }),
         );
 
-        let cache_dir = app_handle_clone.path().app_cache_dir().unwrap();
-        let thumb_cache_dir = cache_dir.join("thumbnails");
-        if !thumb_cache_dir.exists() {
-            fs::create_dir_all(&thumb_cache_dir).unwrap();
-        }
+        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle_clone) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::warn!(
+                    "Unable to initialize thumbnail cache directory for '{}': {}",
+                    path_clone,
+                    e
+                );
+                emit_thumbnail_cache_setup_error(&app_handle_clone, &path_clone, &e);
+                let _ = app_handle_clone.emit(
+                    "thumbnail-progress",
+                    serde_json::json!({ "completed": 1, "total": 1 }),
+                );
+                let _ = app_handle_clone.emit("thumbnail-generation-complete", true);
+                return;
+            }
+        };
 
         let result = generate_single_thumbnail_and_cache(
             &path_clone,
@@ -1599,11 +1648,17 @@ pub fn apply_adjustments_to_paths(
 
     thread::spawn(move || {
         let state = app_handle.state::<AppState>();
-        let cache_dir = app_handle.path().app_cache_dir().unwrap();
-        let thumb_cache_dir = cache_dir.join("thumbnails");
-        if !thumb_cache_dir.exists() {
-            fs::create_dir_all(&thumb_cache_dir).unwrap();
-        }
+        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
+                for path in &paths {
+                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
+                }
+                let _ = app_handle.emit("thumbnail-generation-complete", true);
+                return;
+            }
+        };
 
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
         let total_count = paths.len();
@@ -1678,11 +1733,17 @@ pub fn reset_adjustments_for_paths(
 
     thread::spawn(move || {
         let state = app_handle.state::<AppState>();
-        let cache_dir = app_handle.path().app_cache_dir().unwrap();
-        let thumb_cache_dir = cache_dir.join("thumbnails");
-        if !thumb_cache_dir.exists() {
-            fs::create_dir_all(&thumb_cache_dir).unwrap();
-        }
+        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
+                for path in &paths {
+                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
+                }
+                let _ = app_handle.emit("thumbnail-generation-complete", true);
+                return;
+            }
+        };
 
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
         let total_count = paths.len();
@@ -1804,11 +1865,17 @@ pub fn apply_auto_adjustments_to_paths(
 
     thread::spawn(move || {
         let state = app_handle.state::<AppState>();
-        let cache_dir = app_handle.path().app_cache_dir().unwrap();
-        let thumb_cache_dir = cache_dir.join("thumbnails");
-        if !thumb_cache_dir.exists() {
-            fs::create_dir_all(&thumb_cache_dir).unwrap();
-        }
+        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
+                for path in &paths {
+                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
+                }
+                let _ = app_handle.emit("thumbnail-generation-complete", true);
+                return;
+            }
+        };
 
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
         let total_count = paths.len();
