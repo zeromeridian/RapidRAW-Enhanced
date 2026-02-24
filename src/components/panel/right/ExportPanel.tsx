@@ -589,7 +589,7 @@ export default function ExportPanel({
                         <Dropdown
                           options={anchorOptions}
                           value={watermarkAnchor}
-                          onChange={(val) => setWatermarkAnchor(val as WatermarkAnchor)}
+                          onChange={(val: WatermarkAnchor) => setWatermarkAnchor(val)}
                         />
                       </div>
                       <Slider

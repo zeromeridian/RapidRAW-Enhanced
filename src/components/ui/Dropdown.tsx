@@ -9,7 +9,8 @@ interface DropdownProps {
   options: Array<any>;
   placeholder?: string;
   searchPlaceholder?: string;
-  value: string;
+  value: string | null;
+  disabled?: boolean;
 }
 
 export interface OptionItem {
@@ -24,6 +25,7 @@ export default function Dropdown({
   placeholder = 'Select an option',
   searchPlaceholder = 'Filter options...',
   value,
+  disabled = false,
 }: DropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<any>(null);
@@ -99,7 +101,9 @@ export default function Dropdown({
       <button
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 focus:ring-accent focus:border-accent focus:outline-none focus:ring-2 flex justify-between items-center text-left"
+        aria-disabled={disabled}
+        disabled={disabled}
+        className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 focus:ring-accent focus:border-accent focus:outline-none focus:ring-2 flex justify-between items-center text-left disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={() => setIsOpen(!isOpen)}
         type="button"
       >
