@@ -545,7 +545,7 @@ const EditorToolbar = memo(
                 : 'bg-surface hover:bg-card-active text-text-primary',
             )}
             onClick={onToggleShowOriginal}
-            data-tooltip={showOriginal ? 'Show Edited (.)' : 'Show Original (.)'}
+            data-tooltip={showOriginal ? 'Show Edited (B)' : 'Show Original (B)'}
           >
             {showOriginal ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
