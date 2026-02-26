@@ -27,6 +27,7 @@ import {
   RotateCcw,
   Star,
   Save,
+  SquaresUnite,
   Palette,
   Tag,
   Trash2,
@@ -37,7 +38,7 @@ import {
   Users,
   Gauge,
   Grip,
-  SquaresExclude,
+  Film,
 } from 'lucide-react';
 import TitleBar from './window/TitleBar';
 import CommunityPage from './components/panel/CommunityPage';
@@ -3685,7 +3686,7 @@ function App() {
           },
           {
             label: 'Convert Negative',
-            icon: SquaresExclude,
+            icon: Film,
             onClick: () => {
               if (selectedImage) {
                 setNegativeModalState({
@@ -3697,7 +3698,7 @@ function App() {
           },
           {
             disabled: true,
-            icon: Images,
+            icon: SquaresUnite,
             label: 'Stitch Panorama',
           },
           {
@@ -4017,7 +4018,7 @@ function App() {
           },
           {
             label: 'Convert Negative',
-            icon: SquaresExclude,
+            icon: Film,
             disabled: !isSingleSelection,
             onClick: () => {
               setNegativeModalState({
@@ -4028,7 +4029,7 @@ function App() {
           },
           {
             disabled: selectionCount < 2 || selectionCount > 30,
-            icon: Images,
+            icon: SquaresUnite,
             label: stitchLabel,
             onClick: () => {
               setPanoramaModalState({
