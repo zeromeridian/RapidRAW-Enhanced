@@ -2420,8 +2420,8 @@ function App() {
         jsAdjustments: currentAdjustments,
       })
         .then(() => {
+          fullResCacheKeyRef.current = key;
           if (!request.cancelled) {
-            fullResCacheKeyRef.current = key;
             setIsLoadingFullRes(false);
           }
         })

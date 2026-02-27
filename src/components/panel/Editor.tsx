@@ -135,7 +135,7 @@ export default function Editor({
   const transformStateRef = useRef<TransformState>(transformState);
   transformStateRef.current = transformState;
 
-  const [isPanning, setIsPanning] = useState(false);
+  const [isPanningState, setIsPanningState] = useState(false);
   const isClickAnimating = useRef(false);
   const clickAnimationTime = 200;
 
@@ -144,6 +144,9 @@ export default function Editor({
 
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
   const savedZoomState = useRef<{ scale: number; positionX: number; positionY: number } | null>(null);
+
+  const focalPointRef = useRef({ x: 0.5, y: 0.5 });
+  const isTransitioningRef = useRef(false);
 
   useEffect(() => {
     const currentUrl = maskOverlayUrl;
@@ -188,9 +191,60 @@ export default function Editor({
     }, animationTime + 50);
   }, [targetZoom, transformWrapperRef]);
 
+  useEffect(() => {
+    isTransitioningRef.current = true;
+    const timer = setTimeout(() => {
+      isTransitioningRef.current = false;
+
+      const wrapper = transformWrapperRef.current;
+      if (!wrapper?.instance) return;
+
+      const state = wrapper.instance.transformState;
+      if (state.scale <= 1.01) return;
+
+      const wrapperEl = wrapper.instance.wrapperComponent;
+      const contentEl = wrapper.instance.contentComponent;
+      if (!wrapperEl || !contentEl) return;
+
+      const ww = wrapperEl.offsetWidth;
+      const wh = wrapperEl.offsetHeight;
+      const cw = contentEl.offsetWidth;
+      const ch = contentEl.offsetHeight;
+
+      const targetPosX = ww / 2 - focalPointRef.current.x * cw * state.scale;
+      const targetPosY = wh / 2 - focalPointRef.current.y * ch * state.scale;
+
+      if (Math.abs(state.positionX - targetPosX) > 5 || Math.abs(state.positionY - targetPosY) > 5) {
+        wrapper.setTransform(targetPosX, targetPosY, state.scale, 250, 'easeOut');
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [isFullScreen, transformWrapperRef]);
+
   const handleTransform = useCallback(
-    (_, state: TransformState) => {
+    (ref: any, state: TransformState) => {
       setTransformState(state);
+
+      if (!isTransitioningRef.current) {
+        if (state.scale > 1.01) {
+          const wrapperEl = ref.instance?.wrapperComponent;
+          const contentEl = ref.instance?.contentComponent;
+          if (wrapperEl && contentEl) {
+            const ww = wrapperEl.offsetWidth;
+            const wh = wrapperEl.offsetHeight;
+            const cw = contentEl.offsetWidth;
+            const ch = contentEl.offsetHeight;
+
+            focalPointRef.current = {
+              x: (ww / 2 - state.positionX) / (cw * state.scale),
+              y: (wh / 2 - state.positionY) / (ch * state.scale),
+            };
+          }
+        } else {
+          focalPointRef.current = { x: 0.5, y: 0.5 };
+        }
+      }
 
       if (isAnimating.current) {
         return;
@@ -565,7 +619,7 @@ export default function Editor({
   
   let cursorStyle = 'default';
   if (isZoomActionActive) {
-    if (isPanning) {
+    if (isPanningState) {
       cursorStyle = 'grabbing';
     } else if (transformState.scale > 1.01) {
       cursorStyle = 'zoom-out';
@@ -634,8 +688,8 @@ export default function Editor({
           doubleClick={doubleClickProps}
           panning={{ disabled: isPanningDisabled || isWbPickerActive }}
           onTransformed={handleTransform}
-          onPanning={() => setIsPanning(true)}
-          onPanningStop={() => setIsPanning(false)}
+          onPanning={() => setIsPanningState(true)}
+          onPanningStop={() => setIsPanningState(false)}
           wheel={{
             step: transformState.scale * 0.0013,
             smoothStep: transformState.scale * 0.0013,
