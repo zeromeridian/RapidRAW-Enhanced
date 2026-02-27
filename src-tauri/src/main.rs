@@ -1054,13 +1054,18 @@ fn generate_uncropped_preview(
             lut,
             "generate_uncropped_preview",
         ) {
-            let mut buf = Cursor::new(Vec::new());
-            if processed_image
-                .to_rgb8()
-                .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80))
-                .is_ok()
+            let (width, height) = processed_image.dimensions();
+            let rgb_pixels = processed_image.to_rgb8().into_vec();
+            match Encoder::new(Preset::BaselineFastest)
+                .quality(80)
+                .encode_rgb(&rgb_pixels, width as u32, height as u32)
             {
-                let _ = app_handle.emit("preview-update-uncropped", buf.get_ref());
+                Ok(bytes) => {
+                    let _ = app_handle.emit("preview-update-uncropped", bytes);
+                }
+                Err(e) => {
+                    log::error!("Failed to encode uncropped preview with mozjpeg-rs: {}", e);
+                }
             }
         }
     });
@@ -1102,13 +1107,15 @@ fn generate_original_transformed_preview(
         transformed_full_res
     };
 
-    let mut buf = Cursor::new(Vec::new());
-    transformed_image
-        .to_rgb8()
-        .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80))
-        .map_err(|e| e.to_string())?;
+    let (width, height) = transformed_image.dimensions();
+    let rgb_pixels = transformed_image.to_rgb8().into_vec();
 
-    Ok(Response::new(buf.into_inner()))
+    let bytes = Encoder::new(Preset::BaselineFastest)
+        .quality(80)
+        .encode_rgb(&rgb_pixels, width as u32, height as u32)
+        .map_err(|e| format!("Failed to encode with mozjpeg-rs: {}", e))?;
+
+    Ok(Response::new(bytes))
 }
 
 #[tauri::command]
@@ -1288,11 +1295,15 @@ async fn preview_geometry_transform(
         }
     }).await.map_err(|e| e.to_string())?;
 
-    let mut buf = Cursor::new(Vec::new());
+    let (width, height) = final_image.dimensions();
+    let rgb_pixels = final_image.to_rgb8().into_vec();
 
-    final_image.to_rgb8().write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 75)).map_err(|e| e.to_string())?;
+    let bytes = Encoder::new(Preset::BaselineFastest)
+        .quality(75)
+        .encode_rgb(&rgb_pixels, width as u32, height as u32)
+        .map_err(|e| format!("Failed to encode with mozjpeg-rs: {}", e))?;
 
-    let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
+    let base64_str = general_purpose::STANDARD.encode(&bytes);
     Ok(format!("data:image/jpeg;base64,{}", base64_str))
 }
 
@@ -1310,7 +1321,7 @@ fn get_full_image_for_processing(
 async fn generate_fullscreen_preview(
     js_adjustments: serde_json::Value,
     app_handle: tauri::AppHandle,
-) -> Result<Response, String> {
+) -> Result<(), String> {
     let app_handle_clone = app_handle.clone();
     tokio::task::spawn_blocking(move || {
         let state = app_handle_clone.state::<AppState>();
@@ -1364,13 +1375,22 @@ async fn generate_fullscreen_preview(
             "generate_fullscreen_preview",
         )?;
 
-        let mut buf = Cursor::new(Vec::new());
-        final_image
-            .to_rgb8()
-            .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 92))
-            .map_err(|e| e.to_string())?;
+        let (width, height) = final_image.dimensions();
+        let rgb_pixels = final_image.to_rgb8().into_vec();
 
-        Ok(Response::new(buf.into_inner()))
+        match Encoder::new(Preset::BaselineFastest)
+            .quality(92)
+            .encode_rgb(&rgb_pixels, width as u32, height as u32)
+        {
+            Ok(bytes) => {
+                let _ = app_handle_clone.emit("preview-update-final", bytes);
+            }
+            Err(e) => {
+                log::error!("Failed to encode fullscreen preview with mozjpeg-rs: {}", e);
+            }
+        }
+
+        Ok(())
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?
@@ -3343,13 +3363,15 @@ fn generate_preview_for_path(
         lut,
         "generate_preview_for_path",
     )?;
-    let mut buf = Cursor::new(Vec::new());
-    final_image
-        .to_rgb8()
-        .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 92))
-        .map_err(|e| e.to_string())?;
+    let (width, height) = final_image.dimensions();
+    let rgb_pixels = final_image.to_rgb8().into_vec();
 
-    Ok(Response::new(buf.into_inner()))
+    let bytes = Encoder::new(Preset::BaselineFastest)
+        .quality(92)
+        .encode_rgb(&rgb_pixels, width as u32, height as u32)
+        .map_err(|e| format!("Failed to encode with mozjpeg-rs: {}", e))?;
+
+    Ok(Response::new(bytes))
 }
 
 #[tauri::command]

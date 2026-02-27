@@ -1394,7 +1394,11 @@ export default function MainLibrary({
       THEMES.find((t: ThemeProps) => t.id === DEFAULT_THEME_ID);
     const splashImage = selectedTheme?.splashImage;
     return (
-      <div className="flex-1 flex h-full bg-bg-secondary overflow-hidden shadow-lg">
+      <div
+        className={`flex-1 flex h-full bg-bg-secondary overflow-hidden shadow-lg ${
+          !appSettings.decorations ? 'pt-2' : ''
+        }`}
+      >
         <div className="w-1/2 hidden md:block relative">
           <AnimatePresence>
             <motion.img

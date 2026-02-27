@@ -8,7 +8,6 @@ import debounce from 'lodash.debounce';
 import { AnimatePresence } from 'framer-motion';
 import { ImageDimensions, useImageRenderSize } from '../../hooks/useImageRenderSize';
 import { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
-import FullScreenViewer from './editor/FullScreenViewer';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
 import Waveform from './editor/Waveform';
@@ -27,9 +26,7 @@ interface EditorProps {
   canRedo: boolean;
   canUndo: boolean;
   finalPreviewUrl: string | null;
-  fullScreenUrl: string | null;
   isFullScreen: boolean;
-  isFullScreenLoading: boolean;
   isLoading: boolean;
   isMaskControlHovered: boolean;
   isStraightenActive: boolean;
@@ -63,8 +60,6 @@ interface EditorProps {
   onDisplaySizeChange?(size: any): void;
   onInitialFitScale?(scale: number): void;
   originalSize?: ImageDimensions;
-  isFullResolution?: boolean;
-  fullResolutionUrl?: string | null;
   isLoadingFullRes?: boolean;
   isWbPickerActive?: boolean;
   onWbPicked?: () => void;
@@ -86,9 +81,7 @@ export default function Editor({
   canRedo,
   canUndo,
   finalPreviewUrl,
-  fullScreenUrl,
   isFullScreen,
-  isFullScreenLoading,
   isLoading,
   isMaskControlHovered,
   isStraightenActive,
@@ -121,8 +114,6 @@ export default function Editor({
   onDisplaySizeChange,
   onInitialFitScale,
   originalSize,
-  isFullResolution,
-  fullResolutionUrl,
   isLoadingFullRes,
   isWbPickerActive = false,
   onWbPicked,
@@ -584,24 +575,21 @@ export default function Editor({
   }
 
   return (
-    <>
-      <FullScreenViewer
-        isOpen={isFullScreen}
-        onClose={onToggleFullScreen}
-        onTransformChange={setTransformState}
-        thumbnailUrl={thumbnails[selectedImage.path] || selectedImage.thumbnailUrl}
-        transformState={transformState}
-        url={fullScreenUrl}
-      />
+    <div className={clsx("flex-1 bg-bg-secondary flex flex-col relative overflow-hidden min-h-0 transition-all duration-300 ease-in-out", isFullScreen ? "rounded-none p-0 gap-0" : "rounded-lg p-2 gap-2")}>
+      <AnimatePresence>
+        {isWaveformVisible && !isFullScreen && <Waveform waveformData={waveFormData} onClose={onCloseWaveform} />}
+      </AnimatePresence>
 
-      <div className="flex-1 bg-bg-secondary rounded-lg flex flex-col relative overflow-hidden p-2 gap-2 min-h-0">
-        <AnimatePresence>
-          {isWaveformVisible && <Waveform waveformData={waveFormData} onClose={onCloseWaveform} />}
-        </AnimatePresence>
+      <div
+        className={clsx(
+          "flex-shrink-0 overflow-hidden transition-all duration-300 ease-in-out",
+          isFullScreen ? "max-h-0 opacity-0 m-0" : "max-h-[100px] opacity-100"
+        )}
+      >
         <EditorToolbar
           canRedo={canRedo}
           canUndo={canUndo}
-          isFullScreenLoading={isFullScreenLoading}
+          isFullScreenLoading={isLoadingFullRes ?? false}
           isLoading={isLoading}
           isWaveformVisible={isWaveformVisible}
           onBackToLibrary={onBackToLibrary}
@@ -619,97 +607,94 @@ export default function Editor({
           adjustmentsHistoryIndex={adjustmentsHistoryIndex}
           goToAdjustmentsHistoryIndex={goToAdjustmentsHistoryIndex}
         />
+      </div>
 
-        <div
-          className="flex-1 relative overflow-hidden rounded-lg"
-          onContextMenu={onContextMenu}
-          ref={imageContainerRef}
+      <div
+        className="flex-1 relative overflow-hidden rounded-lg"
+        onContextMenu={onContextMenu}
+        ref={imageContainerRef}
+      >
+        {showSpinner && (
+          <div
+            className={clsx(
+              'absolute inset-0 bg-bg-secondary/80 flex items-center justify-center z-50 transition-opacity duration-300',
+              isLoaderVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
+            )}
+          >
+            <Loader2 size={48} className="animate-spin text-accent" />
+          </div>
+        )}
+
+        <TransformWrapper
+          ref={transformWrapperRef}
+          minScale={transformConfig.minScale}
+          maxScale={transformConfig.maxScale}
+          limitToBounds={true}
+          centerZoomedOut={true}
+          doubleClick={doubleClickProps}
+          panning={{ disabled: isPanningDisabled || isWbPickerActive }}
+          onTransformed={handleTransform}
+          onPanning={() => setIsPanning(true)}
+          onPanningStop={() => setIsPanning(false)}
+          wheel={{
+            step: transformState.scale * 0.0013,
+            smoothStep: transformState.scale * 0.0013,
+          }}
         >
-          {showSpinner && (
-            <div
-              className={clsx(
-                'absolute inset-0 bg-bg-secondary/80 flex items-center justify-center z-50 transition-opacity duration-300',
-                isLoaderVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
-              )}
-            >
-              <Loader2 size={48} className="animate-spin text-accent" />
-            </div>
-          )}
-
-          <TransformWrapper
-            ref={transformWrapperRef}
-            minScale={transformConfig.minScale}
-            maxScale={transformConfig.maxScale}
-            limitToBounds={true}
-            centerZoomedOut={true}
-            doubleClick={doubleClickProps}
-            panning={{ disabled: isPanningDisabled || isWbPickerActive }}
-            onTransformed={handleTransform}
-            onPanning={() => setIsPanning(true)}
-            onPanningStop={() => setIsPanning(false)}
-            wheel={{
-              step: transformState.scale * 0.0013,
-              smoothStep: transformState.scale * 0.0013,
+          <TransformComponent
+            wrapperStyle={{ width: '100%', height: '100%' }}
+            contentStyle={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            contentProps={{
+              onMouseDown: handleMouseDown,
+              onClick: handleClick,
             }}
           >
-            <TransformComponent
-              wrapperStyle={{ width: '100%', height: '100%' }}
-              contentStyle={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              contentProps={{
-                onMouseDown: handleMouseDown,
-                onClick: handleClick,
-              }}
-            >
-              <ImageCanvas
-                activeAiPatchContainerId={activeAiPatchContainerId}
-                activeAiSubMaskId={activeAiSubMaskId}
-                activeMaskContainerId={activeMaskContainerId}
-                activeMaskId={activeMaskId}
-                adjustments={adjustments}
-                brushSettings={brushSettings}
-                crop={crop}
-                finalPreviewUrl={finalPreviewUrl}
-                handleCropComplete={handleCropComplete}
-                imageRenderSize={imageRenderSize}
-                isAiEditing={isAiEditing}
-                isCropping={isCropping}
-                isMaskControlHovered={isMaskControlHovered}
-                isMasking={isMasking}
-                isStraightenActive={isStraightenActive}
-                isRotationActive={isRotationActive}
-                maskOverlayUrl={maskOverlayUrl}
-                onGenerateAiMask={onGenerateAiMask}
-                onQuickErase={onQuickErase}
-                onSelectAiSubMask={onSelectAiSubMask}
-                onSelectMask={onSelectMask}
-                onStraighten={onStraighten}
-                selectedImage={selectedImage}
-                setCrop={handleCropChange}
-                setIsMaskHovered={setIsMaskHovered}
-                showOriginal={showOriginal}
-                transformedOriginalUrl={transformedOriginalUrl}
-                uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
-                updateSubMask={updateSubMask}
-                fullResolutionUrl={fullResolutionUrl}
-                isFullResolution={isFullResolution}
-                isLoadingFullRes={isLoadingFullRes}
-                isWbPickerActive={isWbPickerActive}
-                onWbPicked={onWbPicked}
-                setAdjustments={setAdjustments}
-                overlayRotation={overlayRotation}
-                overlayMode={overlayMode}
-                cursorStyle={cursorStyle}
-              />
-            </TransformComponent>
-          </TransformWrapper>
-        </div>
+            <ImageCanvas
+              activeAiPatchContainerId={activeAiPatchContainerId}
+              activeAiSubMaskId={activeAiSubMaskId}
+              activeMaskContainerId={activeMaskContainerId}
+              activeMaskId={activeMaskId}
+              adjustments={adjustments}
+              brushSettings={brushSettings}
+              crop={crop}
+              finalPreviewUrl={finalPreviewUrl}
+              handleCropComplete={handleCropComplete}
+              imageRenderSize={imageRenderSize}
+              isAiEditing={isAiEditing}
+              isCropping={isCropping}
+              isMaskControlHovered={isMaskControlHovered}
+              isMasking={isMasking}
+              isStraightenActive={isStraightenActive}
+              isRotationActive={isRotationActive}
+              maskOverlayUrl={maskOverlayUrl}
+              onGenerateAiMask={onGenerateAiMask}
+              onQuickErase={onQuickErase}
+              onSelectAiSubMask={onSelectAiSubMask}
+              onSelectMask={onSelectMask}
+              onStraighten={onStraighten}
+              selectedImage={selectedImage}
+              setCrop={handleCropChange}
+              setIsMaskHovered={setIsMaskHovered}
+              showOriginal={showOriginal}
+              transformedOriginalUrl={transformedOriginalUrl}
+              uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
+              updateSubMask={updateSubMask}
+              isWbPickerActive={isWbPickerActive}
+              onWbPicked={onWbPicked}
+              setAdjustments={setAdjustments}
+              overlayRotation={overlayRotation}
+              overlayMode={overlayMode}
+              cursorStyle={cursorStyle}
+            />
+          </TransformComponent>
+        </TransformWrapper>
       </div>
-    </>
+    </div>
   );
 }

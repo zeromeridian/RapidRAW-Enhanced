@@ -353,8 +353,7 @@ function App() {
   const [isSliderDragging, setIsSliderDragging] = useState(false);
   const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isFullScreenLoading, setIsFullScreenLoading] = useState(false);
-  const [fullScreenUrl, setFullScreenUrl] = useState<string | null>(null);
+  const [isHighResNeeded, setIsHighResNeeded] = useState(false);
   const [isAnimatingTheme, setIsAnimatingTheme] = useState(false);
   const isInitialThemeMount = useRef(true);
   const [theme, setTheme] = useState(DEFAULT_THEME_ID);
@@ -370,8 +369,6 @@ function App() {
   const [previewSize, setPreviewSize] = useState<ImageDimensions>({ width: 0, height: 0 });
   const [baseRenderSize, setBaseRenderSize] = useState<ImageDimensions>({ width: 0, height: 0 });
   const [originalSize, setOriginalSize] = useState<ImageDimensions>({ width: 0, height: 0 });
-  const [isFullResolution, setIsFullResolution] = useState(false);
-  const [fullResolutionUrl, setFullResolutionUrl] = useState<string | null>(null);
   const [isLoadingFullRes, setIsLoadingFullRes] = useState(false);
   const [isRotationActive, setIsRotationActive] = useState(false);
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('thirds');
@@ -383,7 +380,6 @@ function App() {
 
   useDelayedRevokeBlobUrl(finalPreviewUrl);
   useDelayedRevokeBlobUrl(uncroppedAdjustedPreviewUrl);
-  useDelayedRevokeBlobUrl(fullScreenUrl);
   useDelayedRevokeBlobUrl(transformedOriginalUrl);
   useDelayedRevokeBlobUrl(selectedImage?.originalUrl);
 
@@ -2028,8 +2024,6 @@ function App() {
       setHistogram(null);
       setFinalPreviewUrl(null);
       setUncroppedAdjustedPreviewUrl(null);
-      setFullScreenUrl(null);
-      setFullResolutionUrl(null);
       setTransformedOriginalUrl(null);
       setShowOriginal(false);
       setActiveMaskId(null);
@@ -2037,6 +2031,7 @@ function App() {
       setActiveAiPatchContainerId(null);
       setActiveAiSubMaskId(null);
       setIsWbPickerActive(false);
+      setIsHighResNeeded(false);
 
       if (transformWrapperRef.current) {
         transformWrapperRef.current.resetTransform(0);
@@ -2044,6 +2039,11 @@ function App() {
 
       setZoom(1);
       setIsLibraryExportPanelVisible(false);
+      
+      fullResCacheKeyRef.current = null;
+      if (fullResRequestRef.current) {
+        fullResRequestRef.current.cancelled = true;
+      }
     },
     [selectedImage?.path, applyAdjustments, debouncedSave, thumbnails, imageRatings, resetAdjustmentsHistory],
   );
@@ -2166,7 +2166,6 @@ function App() {
   const handleToggleFullScreen = useCallback(() => {
     if (isFullScreen) {
       setIsFullScreen(false);
-      setFullScreenUrl(null);
     } else {
       if (!selectedImage) {
         return;
@@ -2174,29 +2173,6 @@ function App() {
       setIsFullScreen(true);
     }
   }, [isFullScreen, selectedImage]);
-
-  useEffect(() => {
-    if (!isFullScreen || !selectedImage?.isReady) {
-      return;
-    }
-
-    let url: string | null = null;
-    const generate = async () => {
-      setIsFullScreenLoading(true);
-      try {
-        const imageData: Uint8Array = await invoke(Invokes.GenerateFullscreenPreview, { jsAdjustments: adjustments });
-        const blob = new Blob([imageData], { type: 'image/jpeg' });
-        url = URL.createObjectURL(blob);
-        setFullScreenUrl(url);
-      } catch (e) {
-        console.error('Failed to generate fullscreen preview:', e);
-        setError('Failed to generate full screen preview.');
-      } finally {
-        setIsFullScreenLoading(false);
-      }
-    };
-    generate();
-  }, [isFullScreen, selectedImage?.path, selectedImage?.isReady, adjustments]);
 
   const handleCopyAdjustments = useCallback(() => {
     const sourceAdjustments = selectedImage ? adjustments : libraryActiveAdjustments;
@@ -2443,21 +2419,15 @@ function App() {
       invoke(Invokes.GenerateFullscreenPreview, {
         jsAdjustments: currentAdjustments,
       })
-        .then((imageData: Uint8Array) => {
+        .then(() => {
           if (!request.cancelled) {
-            const blob = new Blob([imageData], { type: 'image/jpeg' });
-            const url = URL.createObjectURL(blob);
-            setFullResolutionUrl(url);
             fullResCacheKeyRef.current = key;
-            setIsFullResolution(true);
             setIsLoadingFullRes(false);
           }
         })
         .catch((error: any) => {
           if (!request.cancelled) {
-            console.error('Failed to generate full resolution preview:', error);
-            setIsFullResolution(false);
-            setFullResolutionUrl(null);
+            console.error('Failed to generate high resolution preview:', error);
             fullResCacheKeyRef.current = null;
             setIsLoadingFullRes(false);
           }
@@ -2467,13 +2437,28 @@ function App() {
   );
 
   useEffect(() => {
-    if (isFullResolution && selectedImage?.path) {
+    if ((isFullScreen || isHighResNeeded) && selectedImage?.isReady) {
       if (fullResCacheKeyRef.current !== visualAdjustmentsKey) {
         setIsLoadingFullRes(true);
         requestFullResolution(adjustments, visualAdjustmentsKey);
       }
+    } else if (!isFullScreen && !isHighResNeeded) {
+      if (fullResRequestRef.current) {
+        fullResRequestRef.current.cancelled = true;
+      }
+      if (requestFullResolution.cancel) {
+        requestFullResolution.cancel();
+      }
+      setIsLoadingFullRes(false);
     }
-  }, [adjustments, isFullResolution, selectedImage?.path, requestFullResolution, visualAdjustmentsKey]);
+  }, [
+    adjustments,
+    isFullScreen,
+    isHighResNeeded,
+    selectedImage?.isReady,
+    requestFullResolution,
+    visualAdjustmentsKey
+  ]);
 
   const handleFullResolutionLogic = useCallback(
     (targetZoomPercent: number, currentDisplayWidth: number) => {
@@ -2487,43 +2472,17 @@ function App() {
       const highResThreshold = Math.max(initialFitScale * 2, 0.5);
       const needsFullRes = targetZoomPercent > highResThreshold;
       const previewIsAlreadyFullRes = previewSize.width >= originalSize.width;
+      
       if (needsFullRes && !previewIsAlreadyFullRes) {
-        if (isFullResolution) {
-          return;
-        }
-        if (fullResolutionUrl && fullResCacheKeyRef.current === visualAdjustmentsKey) {
-          setIsFullResolution(true);
-          return;
-        }
-        if (!isLoadingFullRes) {
-          setIsLoadingFullRes(true);
-          requestFullResolution(adjustments, visualAdjustmentsKey);
-        }
+        setIsHighResNeeded(true);
       } else {
-        if (fullResRequestRef.current) {
-          fullResRequestRef.current.cancelled = true;
-        }
-        if (requestFullResolution.cancel) {
-          requestFullResolution.cancel();
-        }
-        if (isFullResolution) {
-          setIsFullResolution(false);
-        }
-        if (isLoadingFullRes) {
-          setIsLoadingFullRes(false);
-        }
+        setIsHighResNeeded(false);
       }
     },
     [
       initialFitScale,
       previewSize.width,
       originalSize.width,
-      isFullResolution,
-      isLoadingFullRes,
-      requestFullResolution,
-      adjustments,
-      fullResolutionUrl,
-      visualAdjustmentsKey,
       appSettings,
     ],
   );
@@ -3415,8 +3374,6 @@ function App() {
             setPreviewSize({ width: 0, height: 0 });
           }
 
-          setIsFullResolution(false);
-          setFullResolutionUrl(null);
           fullResCacheKeyRef.current = null;
 
           const blob = new Blob([loadImageResult.original_image_bytes], { type: 'image/jpeg' });
@@ -4400,7 +4357,16 @@ function App() {
 
   const memoizedFolderTree = useMemo(() => (
     rootPath && (
-      <>
+      <div
+        className={clsx(
+          "flex h-full overflow-hidden flex-shrink-0",
+          !isResizing && "transition-all duration-300 ease-in-out"
+        )}
+        style={{
+          maxWidth: isFullScreen ? '0px' : '1000px',
+          opacity: isFullScreen ? 0 : 1,
+        }}
+      >
         <FolderTree
           expandedFolders={expandedFolders}
           isLoading={isTreeLoading}
@@ -4425,7 +4391,7 @@ function App() {
           direction={Orientation.Vertical}
           onMouseDown={createResizeHandler(setLeftPanelWidth, leftPanelWidth)}
         />
-      </>
+      </div>
     )
   ), [
     rootPath,
@@ -4440,7 +4406,8 @@ function App() {
     pinnedFolderTrees,
     pinnedFolders,
     activeTreeSection,
-    copiedFilePaths
+    copiedFilePaths,
+    isFullScreen
   ]);
 
   const memoizedLibraryView = useMemo(() => (
@@ -4588,9 +4555,7 @@ function App() {
               canRedo={canRedo}
               canUndo={canUndo}
               finalPreviewUrl={finalPreviewUrl}
-              fullScreenUrl={fullScreenUrl}
               isFullScreen={isFullScreen}
-              isFullScreenLoading={isFullScreenLoading}
               isLoading={isViewLoading}
               isMaskControlHovered={isMaskControlHovered}
               isStraightenActive={isStraightenActive}
@@ -4627,8 +4592,6 @@ function App() {
               onZoomChange={handleZoomChange}
               originalSize={originalSize}
               baseRenderSize={baseRenderSize}
-              isFullResolution={isFullResolution}
-              fullResolutionUrl={fullResolutionUrl}
               isLoadingFullRes={isLoadingFullRes}
               isRotationActive={isRotationActive}
               overlayMode={overlayMode}
@@ -4637,192 +4600,214 @@ function App() {
               adjustmentsHistoryIndex={adjustmentsHistoryIndex}
               goToAdjustmentsHistoryIndex={goToAdjustmentsHistoryIndex}
             />
-            <Resizer
-              direction={Orientation.Horizontal}
-              onMouseDown={createResizeHandler(setBottomPanelHeight, bottomPanelHeight)}
-            />
-            <BottomBar
-              filmstripHeight={bottomPanelHeight}
-              imageList={sortedImageList}
-              imageRatings={imageRatings}
-              isCopied={isCopied}
-              isCopyDisabled={!selectedImage}
-              isFilmstripVisible={uiVisibility.filmstrip}
-              isLoading={isViewLoading}
-              isPasted={isPasted}
-              isPasteDisabled={copiedAdjustments === null}
-              isRatingDisabled={!selectedImage}
-              isResizing={isResizing}
-              multiSelectedPaths={multiSelectedPaths}
-              displaySize={displaySize}
-              originalSize={originalSize}
-              baseRenderSize={baseRenderSize}
-              onClearSelection={handleClearSelection}
-              onContextMenu={handleThumbnailContextMenu}
-              onCopy={handleCopyAdjustments}
-              onOpenCopyPasteSettings={() => setIsCopyPasteSettingsModalOpen(true)}
-              onImageSelect={handleImageClick}
-              onPaste={() => handlePasteAdjustments()}
-              onRate={handleRate}
-              onZoomChange={handleZoomChange}
-              rating={adjustments.rating || 0}
-              selectedImage={selectedImage}
-              setIsFilmstripVisible={(value: boolean) =>
-                setUiVisibility((prev: UiVisibility) => ({ ...prev, filmstrip: value }))
-              }
-              thumbnailAspectRatio={thumbnailAspectRatio}
-              thumbnails={thumbnails}
-              zoom={zoom}
-              totalImages={sortedImageList.length}
-            />
-          </div>
-
-          <Resizer
-            onMouseDown={createResizeHandler(setRightPanelWidth, rightPanelWidth)}
-            direction={Orientation.Vertical}
-          />
-          <div className="flex bg-bg-secondary rounded-lg h-full">
-            <div
-              className={clsx('h-full overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}
-              style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
-            >
-              <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
-                <AnimatePresence mode="wait" custom={slideDirection}>
-                  {activeRightPanel && (
-                    <motion.div
-                      animate="animate"
-                      className="h-full w-full"
-                      custom={slideDirection}
-                      exit="exit"
-                      initial="initial"
-                      key={renderedRightPanel}
-                      variants={panelVariants}
-                    >
-                      {renderedRightPanel === Panel.Adjustments && (
-                        <Controls
-                          adjustments={adjustments}
-                          collapsibleState={collapsibleSectionsState}
-                          copiedSectionAdjustments={copiedSectionAdjustments}
-                          handleAutoAdjustments={handleAutoAdjustments}
-                          histogram={histogram}
-                          selectedImage={selectedImage}
-                          setAdjustments={setAdjustments}
-                          setCollapsibleState={setCollapsibleSectionsState}
-                          setCopiedSectionAdjustments={setCopiedSectionAdjustments}
-                          theme={theme}
-                          handleLutSelect={handleLutSelect}
-                          appSettings={appSettings}
-                          isWbPickerActive={isWbPickerActive}
-                          toggleWbPicker={toggleWbPicker}
-                          onDragStateChange={setIsSliderDragging}
-                        />
-                      )}
-                      {renderedRightPanel === Panel.Metadata && (
-                        <MetadataPanel
-                          selectedImage={selectedImage}
-                          rating={adjustments.rating || 0}
-                          tags={imageList.find(img => img.path === selectedImage.path)?.tags || []}
-                          onRate={handleRate}
-                          onSetColorLabel={handleSetColorLabel}
-                          onTagsChanged={handleTagsChanged}
-                          appSettings={appSettings}
-                        />
-                      )}
-                      {renderedRightPanel === Panel.Crop && (
-                        <CropPanel
-                          adjustments={adjustments}
-                          isStraightenActive={isStraightenActive}
-                          selectedImage={selectedImage}
-                          setAdjustments={setAdjustments}
-                          setIsStraightenActive={setIsStraightenActive}
-                          setIsRotationActive={setIsRotationActive}
-                          overlayMode={overlayMode}
-                          overlayRotation={overlayRotation}
-                          setOverlayRotation={setOverlayRotation}
-                          setOverlayMode={setOverlayMode}
-                        />
-                      )}
-                      {renderedRightPanel === Panel.Masks && (
-                        <MasksPanel
-                          activeMaskContainerId={activeMaskContainerId}
-                          activeMaskId={activeMaskId}
-                          adjustments={adjustments}
-                          aiModelDownloadStatus={aiModelDownloadStatus}
-                          appSettings={appSettings}
-                          brushSettings={brushSettings}
-                          copiedMask={copiedMask}
-                          histogram={histogram}
-                          isGeneratingAiMask={isGeneratingAiMask}
-                          onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
-                          onGenerateAiSkyMask={handleGenerateAiSkyMask}
-                          onSelectContainer={setActiveMaskContainerId}
-                          onSelectMask={setActiveMaskId}
-                          selectedImage={selectedImage}
-                          setAdjustments={setAdjustments}
-                          setBrushSettings={setBrushSettings}
-                          setCopiedMask={setCopiedMask}
-                          setCustomEscapeHandler={setCustomEscapeHandler}
-                          onDragStateChange={setIsSliderDragging}
-                          setIsMaskControlHovered={setIsMaskControlHovered}
-                        />
-                      )}
-                      {renderedRightPanel === Panel.Presets && (
-                        <PresetsPanel
-                          activePanel={activeRightPanel}
-                          adjustments={adjustments}
-                          selectedImage={selectedImage}
-                          onNavigateToCommunity={() => {
-                            handleBackToLibrary();
-                            setActiveView('community');
-                          }}
-                          setAdjustments={setAdjustments}
-                        />
-                      )}
-                      {renderedRightPanel === Panel.Export && (
-                        <ExportPanel
-                          adjustments={adjustments}
-                          exportState={exportState}
-                          multiSelectedPaths={multiSelectedPaths}
-                          selectedImage={selectedImage}
-                          setExportState={setExportState}
-                          appSettings={appSettings}
-                          onSettingsChange={handleSettingsChange}
-                        />
-                      )}
-                      {renderedRightPanel === Panel.Ai && (
-                        <AIPanel
-                          activePatchContainerId={activeAiPatchContainerId}
-                          activeSubMaskId={activeAiSubMaskId}
-                          adjustments={adjustments}
-                          aiModelDownloadStatus={aiModelDownloadStatus}
-                          brushSettings={brushSettings}
-                          isAIConnectorConnected={isAIConnectorConnected}
-                          isGeneratingAi={isGeneratingAi}
-                          isGeneratingAiMask={isGeneratingAiMask}
-                          onDeletePatch={handleDeleteAiPatch}
-                          onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
-                          onGenerativeReplace={handleGenerativeReplace}
-                          onSelectPatchContainer={setActiveAiPatchContainerId}
-                          onSelectSubMask={setActiveAiSubMaskId}
-                          onTogglePatchVisibility={handleToggleAiPatchVisibility}
-                          selectedImage={selectedImage}
-                          setAdjustments={setAdjustments}
-                          setBrushSettings={setBrushSettings}
-                          setCustomEscapeHandler={setCustomEscapeHandler}
-                        />
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
             <div
               className={clsx(
-                'h-full border-l transition-colors',
-                activeRightPanel ? 'border-surface' : 'border-transparent',
+                "flex flex-col w-full overflow-hidden flex-shrink-0",
+                !isResizing && "transition-all duration-300 ease-in-out"
               )}
+              style={{
+                maxHeight: isFullScreen ? '0px' : '500px',
+                opacity: isFullScreen ? 0 : 1,
+              }}
             >
-              <RightPanelSwitcher activePanel={activeRightPanel} onPanelSelect={handleRightPanelSelect} />
+              <Resizer
+                direction={Orientation.Horizontal}
+                onMouseDown={createResizeHandler(setBottomPanelHeight, bottomPanelHeight)}
+              />
+              <BottomBar
+                filmstripHeight={bottomPanelHeight}
+                imageList={sortedImageList}
+                imageRatings={imageRatings}
+                isCopied={isCopied}
+                isCopyDisabled={!selectedImage}
+                isFilmstripVisible={uiVisibility.filmstrip}
+                isLoading={isViewLoading}
+                isPasted={isPasted}
+                isPasteDisabled={copiedAdjustments === null}
+                isRatingDisabled={!selectedImage}
+                isResizing={isResizing}
+                multiSelectedPaths={multiSelectedPaths}
+                displaySize={displaySize}
+                originalSize={originalSize}
+                baseRenderSize={baseRenderSize}
+                onClearSelection={handleClearSelection}
+                onContextMenu={handleThumbnailContextMenu}
+                onCopy={handleCopyAdjustments}
+                onOpenCopyPasteSettings={() => setIsCopyPasteSettingsModalOpen(true)}
+                onImageSelect={handleImageClick}
+                onPaste={() => handlePasteAdjustments()}
+                onRate={handleRate}
+                onZoomChange={handleZoomChange}
+                rating={adjustments.rating || 0}
+                selectedImage={selectedImage}
+                setIsFilmstripVisible={(value: boolean) =>
+                  setUiVisibility((prev: UiVisibility) => ({ ...prev, filmstrip: value }))
+                }
+                thumbnailAspectRatio={thumbnailAspectRatio}
+                thumbnails={thumbnails}
+                zoom={zoom}
+                totalImages={sortedImageList.length}
+              />
+            </div>
+          </div>
+
+          <div
+            className={clsx(
+              "flex h-full overflow-hidden flex-shrink-0",
+              !isResizing && "transition-all duration-300 ease-in-out"
+            )}
+            style={{
+              maxWidth: isFullScreen ? '0px' : '1000px',
+              opacity: isFullScreen ? 0 : 1,
+            }}
+          >
+            <Resizer
+              onMouseDown={createResizeHandler(setRightPanelWidth, rightPanelWidth)}
+              direction={Orientation.Vertical}
+            />
+            <div className="flex bg-bg-secondary rounded-lg h-full">
+              <div
+                className={clsx('h-full overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}
+                style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
+              >
+                <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
+                  <AnimatePresence mode="wait" custom={slideDirection}>
+                    {activeRightPanel && (
+                      <motion.div
+                        animate="animate"
+                        className="h-full w-full"
+                        custom={slideDirection}
+                        exit="exit"
+                        initial="initial"
+                        key={renderedRightPanel}
+                        variants={panelVariants}
+                      >
+                        {renderedRightPanel === Panel.Adjustments && (
+                          <Controls
+                            adjustments={adjustments}
+                            collapsibleState={collapsibleSectionsState}
+                            copiedSectionAdjustments={copiedSectionAdjustments}
+                            handleAutoAdjustments={handleAutoAdjustments}
+                            histogram={histogram}
+                            selectedImage={selectedImage}
+                            setAdjustments={setAdjustments}
+                            setCollapsibleState={setCollapsibleSectionsState}
+                            setCopiedSectionAdjustments={setCopiedSectionAdjustments}
+                            theme={theme}
+                            handleLutSelect={handleLutSelect}
+                            appSettings={appSettings}
+                            isWbPickerActive={isWbPickerActive}
+                            toggleWbPicker={toggleWbPicker}
+                            onDragStateChange={setIsSliderDragging}
+                          />
+                        )}
+                        {renderedRightPanel === Panel.Metadata && (
+                          <MetadataPanel
+                            selectedImage={selectedImage}
+                            rating={adjustments.rating || 0}
+                            tags={imageList.find(img => img.path === selectedImage.path)?.tags || []}
+                            onRate={handleRate}
+                            onSetColorLabel={handleSetColorLabel}
+                            onTagsChanged={handleTagsChanged}
+                            appSettings={appSettings}
+                          />
+                        )}
+                        {renderedRightPanel === Panel.Crop && (
+                          <CropPanel
+                            adjustments={adjustments}
+                            isStraightenActive={isStraightenActive}
+                            selectedImage={selectedImage}
+                            setAdjustments={setAdjustments}
+                            setIsStraightenActive={setIsStraightenActive}
+                            setIsRotationActive={setIsRotationActive}
+                            overlayMode={overlayMode}
+                            overlayRotation={overlayRotation}
+                            setOverlayRotation={setOverlayRotation}
+                            setOverlayMode={setOverlayMode}
+                          />
+                        )}
+                        {renderedRightPanel === Panel.Masks && (
+                          <MasksPanel
+                            activeMaskContainerId={activeMaskContainerId}
+                            activeMaskId={activeMaskId}
+                            adjustments={adjustments}
+                            aiModelDownloadStatus={aiModelDownloadStatus}
+                            appSettings={appSettings}
+                            brushSettings={brushSettings}
+                            copiedMask={copiedMask}
+                            histogram={histogram}
+                            isGeneratingAiMask={isGeneratingAiMask}
+                            onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
+                            onGenerateAiSkyMask={handleGenerateAiSkyMask}
+                            onSelectContainer={setActiveMaskContainerId}
+                            onSelectMask={setActiveMaskId}
+                            selectedImage={selectedImage}
+                            setAdjustments={setAdjustments}
+                            setBrushSettings={setBrushSettings}
+                            setCopiedMask={setCopiedMask}
+                            setCustomEscapeHandler={setCustomEscapeHandler}
+                            onDragStateChange={setIsSliderDragging}
+                            setIsMaskControlHovered={setIsMaskControlHovered}
+                          />
+                        )}
+                        {renderedRightPanel === Panel.Presets && (
+                          <PresetsPanel
+                            activePanel={activeRightPanel}
+                            adjustments={adjustments}
+                            selectedImage={selectedImage}
+                            onNavigateToCommunity={() => {
+                              handleBackToLibrary();
+                              setActiveView('community');
+                            }}
+                            setAdjustments={setAdjustments}
+                          />
+                        )}
+                        {renderedRightPanel === Panel.Export && (
+                          <ExportPanel
+                            adjustments={adjustments}
+                            exportState={exportState}
+                            multiSelectedPaths={multiSelectedPaths}
+                            selectedImage={selectedImage}
+                            setExportState={setExportState}
+                            appSettings={appSettings}
+                            onSettingsChange={handleSettingsChange}
+                          />
+                        )}
+                        {renderedRightPanel === Panel.Ai && (
+                          <AIPanel
+                            activePatchContainerId={activeAiPatchContainerId}
+                            activeSubMaskId={activeAiSubMaskId}
+                            adjustments={adjustments}
+                            aiModelDownloadStatus={aiModelDownloadStatus}
+                            brushSettings={brushSettings}
+                            isAIConnectorConnected={isAIConnectorConnected}
+                            isGeneratingAi={isGeneratingAi}
+                            isGeneratingAiMask={isGeneratingAiMask}
+                            onDeletePatch={handleDeleteAiPatch}
+                            onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
+                            onGenerativeReplace={handleGenerativeReplace}
+                            onSelectPatchContainer={setActiveAiPatchContainerId}
+                            onSelectSubMask={setActiveAiSubMaskId}
+                            onTogglePatchVisibility={handleToggleAiPatchVisibility}
+                            selectedImage={selectedImage}
+                            setAdjustments={setAdjustments}
+                            setBrushSettings={setBrushSettings}
+                            setCustomEscapeHandler={setCustomEscapeHandler}
+                          />
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+              <div
+                className={clsx(
+                  'h-full border-l transition-colors',
+                  activeRightPanel ? 'border-surface' : 'border-transparent',
+                )}
+              >
+                <RightPanelSwitcher activePanel={activeRightPanel} onPanelSelect={handleRightPanelSelect} />
+              </div>
             </div>
           </div>
         </div>
@@ -4842,11 +4827,18 @@ function App() {
         (appSettings?.adaptiveEditorTheme || isAnimatingTheme) && 'enable-color-transitions',
       )}
     >
-      {appSettings?.decorations || (!isWindowFullScreen && <TitleBar />)}
       <div
-        className={clsx('flex-1 flex flex-col min-h-0', [
-          rootPath && 'p-2 gap-2',
-          !appSettings?.decorations && rootPath && !isWindowFullScreen && 'pt-12',
+        className={clsx(
+          "flex-shrink-0 overflow-hidden transition-all duration-300 ease-in-out z-50",
+          isFullScreen ? "max-h-0 opacity-0 pointer-events-none" : "max-h-[60px] opacity-100"
+        )}
+      >
+        {appSettings?.decorations || (!isWindowFullScreen && <TitleBar />)}
+      </div>
+      <div
+        className={clsx('flex-1 flex flex-col min-h-0 transition-all duration-300 ease-in-out', [
+          rootPath && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2'),
+          !appSettings?.decorations && !isWindowFullScreen && !isFullScreen && (rootPath ? 'pt-12' : 'pt-10'),
         ])}
       >
         <div className="flex flex-row flex-grow h-full min-h-0">
@@ -4860,7 +4852,7 @@ function App() {
           )}
           <div
             className={clsx('flex-shrink-0 overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}
-            style={{ width: isLibraryExportPanelVisible ? `${rightPanelWidth}px` : '0px' }}
+            style={{ width: isLibraryExportPanelVisible && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
           >
             <LibraryExportPanel
               exportState={exportState}
