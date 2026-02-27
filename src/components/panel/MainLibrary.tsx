@@ -1395,9 +1395,7 @@ export default function MainLibrary({
     const splashImage = selectedTheme?.splashImage;
     return (
       <div
-        className={`flex-1 flex h-full bg-bg-secondary overflow-hidden shadow-lg ${
-          !appSettings.decorations ? 'pt-2' : ''
-        }`}
+        className={`flex-1 flex h-full bg-bg-secondary overflow-hidden shadow-lg`}
       >
         <div className="w-1/2 hidden md:block relative">
           <AnimatePresence>

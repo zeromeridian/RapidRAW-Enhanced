@@ -148,6 +148,19 @@ export default function Editor({
   const focalPointRef = useRef({ x: 0.5, y: 0.5 });
   const isTransitioningRef = useRef(false);
 
+  const [toolbarOverflowVisible, setToolbarOverflowVisible] = useState(!isFullScreen);
+
+  useEffect(() => {
+    if (isFullScreen) {
+      setToolbarOverflowVisible(false);
+    } else {
+      const timer = setTimeout(() => {
+        setToolbarOverflowVisible(true);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isFullScreen]);
+
   useEffect(() => {
     const currentUrl = maskOverlayUrl;
     return () => {
@@ -190,37 +203,6 @@ export default function Editor({
       isAnimating.current = false;
     }, animationTime + 50);
   }, [targetZoom, transformWrapperRef]);
-
-  useEffect(() => {
-    isTransitioningRef.current = true;
-    const timer = setTimeout(() => {
-      isTransitioningRef.current = false;
-
-      const wrapper = transformWrapperRef.current;
-      if (!wrapper?.instance) return;
-
-      const state = wrapper.instance.transformState;
-      if (state.scale <= 1.01) return;
-
-      const wrapperEl = wrapper.instance.wrapperComponent;
-      const contentEl = wrapper.instance.contentComponent;
-      if (!wrapperEl || !contentEl) return;
-
-      const ww = wrapperEl.offsetWidth;
-      const wh = wrapperEl.offsetHeight;
-      const cw = contentEl.offsetWidth;
-      const ch = contentEl.offsetHeight;
-
-      const targetPosX = ww / 2 - focalPointRef.current.x * cw * state.scale;
-      const targetPosY = wh / 2 - focalPointRef.current.y * ch * state.scale;
-
-      if (Math.abs(state.positionX - targetPosX) > 5 || Math.abs(state.positionY - targetPosY) > 5) {
-        wrapper.setTransform(targetPosX, targetPosY, state.scale, 250, 'easeOut');
-      }
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [isFullScreen, transformWrapperRef]);
 
   const handleTransform = useCallback(
     (ref: any, state: TransformState) => {
@@ -636,8 +618,9 @@ export default function Editor({
 
       <div
         className={clsx(
-          "flex-shrink-0 overflow-hidden transition-all duration-300 ease-in-out",
-          isFullScreen ? "max-h-0 opacity-0 m-0" : "max-h-[100px] opacity-100"
+          "flex-shrink-0 transition-all duration-300 ease-in-out",
+          isFullScreen ? "max-h-0 opacity-0 m-0" : "max-h-[100px] opacity-100",
+          toolbarOverflowVisible ? "overflow-visible" : "overflow-hidden"
         )}
       >
         <EditorToolbar
