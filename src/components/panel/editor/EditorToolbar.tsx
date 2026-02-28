@@ -545,42 +545,17 @@ const EditorToolbar = memo(
                 : 'bg-surface hover:bg-card-active text-text-primary',
             )}
             onClick={onToggleShowOriginal}
-            data-tooltip={showOriginal ? 'Show Edited (.)' : 'Show Original (.)'}
+            data-tooltip={showOriginal ? 'Show Edited (B)' : 'Show Original (B)'}
           >
             {showOriginal ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
           <button
             className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
-            disabled={isFullScreenLoading}
             onClick={onToggleFullScreen}
             data-tooltip="Toggle Fullscreen (F)"
           >
             <div className="relative w-5 h-5 flex items-center justify-center">
-              <AnimatePresence mode="wait" initial={false}>
-                {isFullScreenLoading ? (
-                  <motion.div
-                    key="loader"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.5 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute"
-                  >
-                    <Loader2 size={20} className="animate-spin text-accent" />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="maximize"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.5 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute"
-                  >
-                    <Maximize size={20} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                <Maximize size={20} />
             </div>
           </button>
         </div>

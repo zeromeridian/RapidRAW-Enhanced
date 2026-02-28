@@ -54,9 +54,6 @@ interface ImageCanvasProps {
   transformedOriginalUrl: string | null;
   uncroppedAdjustedPreviewUrl: string | null;
   updateSubMask(id: string | null, subMask: Partial<SubMask>): void;
-  fullResolutionUrl?: string | null;
-  isFullResolution?: boolean;
-  isLoadingFullRes?: boolean;
   isWbPickerActive?: boolean;
   onWbPicked?: () => void;
   setAdjustments(fn: (prev: Adjustments) => Adjustments): void;
@@ -496,9 +493,6 @@ const ImageCanvas = memo(
     transformedOriginalUrl,
     uncroppedAdjustedPreviewUrl,
     updateSubMask,
-    fullResolutionUrl,
-    isFullResolution,
-    isLoadingFullRes,
     isWbPickerActive = false,
     onWbPicked,
     setAdjustments,
@@ -614,9 +608,7 @@ const ImageCanvas = memo(
 
       const currentPreviewUrl = showOriginal
         ? transformedOriginalUrl
-        : isFullResolution && !isLoadingFullRes && fullResolutionUrl
-          ? fullResolutionUrl
-          : finalPreviewUrl;
+        : finalPreviewUrl;
 
       if (imageChanged) {
         imagePathRef.current = currentImagePath;
@@ -660,11 +652,8 @@ const ImageCanvas = memo(
     }, [
       selectedImage,
       finalPreviewUrl,
-      fullResolutionUrl,
       transformedOriginalUrl,
       showOriginal,
-      isFullResolution,
-      isLoadingFullRes,
     ]);
 
     useEffect(() => {

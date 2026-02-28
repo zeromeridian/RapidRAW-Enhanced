@@ -951,13 +951,13 @@ function Thumbnail({
               onTransitionEnd={() => handleTransitionEnd(layer.id)}
             >
               {thumbnailAspectRatio === ThumbnailAspectRatio.Contain && (
-                <img alt="" className="absolute inset-0 w-full h-full object-cover blur-md scale-110 brightness-[0.5]" src={layer.url} />
+                <img alt="" className="absolute inset-0 w-full h-full object-cover blur-md scale-110 brightness-[0.4]" src={layer.url} />
               )}
               <img
                 alt={path.split(/[\\/]/).pop()}
                 className={`w-full h-full group-hover:scale-[1.02] transition-transform duration-300 ${
                   thumbnailAspectRatio === ThumbnailAspectRatio.Contain
-                    ? 'object-contain [filter:drop-shadow(0_2px_8px_rgba(0,0,0,0.5))_drop-shadow(0_0_1px_rgba(255,255,255,0.25))]'
+                    ? 'object-contain'
                     : 'object-cover'
                 } relative`}
                 decoding="async"
@@ -1394,7 +1394,9 @@ export default function MainLibrary({
       THEMES.find((t: ThemeProps) => t.id === DEFAULT_THEME_ID);
     const splashImage = selectedTheme?.splashImage;
     return (
-      <div className="flex-1 flex h-full bg-bg-secondary overflow-hidden shadow-lg">
+      <div
+        className={`flex-1 flex h-full bg-bg-secondary overflow-hidden shadow-lg`}
+      >
         <div className="w-1/2 hidden md:block relative">
           <AnimatePresence>
             <motion.img
