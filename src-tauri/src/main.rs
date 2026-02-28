@@ -3525,11 +3525,12 @@ fn frontend_ready(
     state: tauri::State<AppState>
 ) -> Result<(), String> {
     let is_first_run = !state.window_setup_complete.swap(true, std::sync::atomic::Ordering::Relaxed);
+    let mut should_maximize = false;
+    let mut should_fullscreen = false;
+
     if is_first_run {
         if let Ok(config_dir) = app_handle.path().app_config_dir() {
             let path = config_dir.join("window_state.json");
-            let mut should_maximize = false;
-            let mut should_fullscreen = false;
 
             if let Ok(contents) = std::fs::read_to_string(&path) {
                 if let Ok(saved_state) = serde_json::from_str::<WindowState>(&contents) {
@@ -3557,20 +3558,24 @@ fn frontend_ready(
                     }
                 }
             }
-            if should_maximize {
-                let _ = window.maximize();
-            }
-            if should_fullscreen {
-                let _ = window.set_fullscreen(true);
-            }
         }
     }
+
     if let Err(e) = window.show() {
         log::error!("Failed to show window: {}", e);
     }
     if let Err(e) = window.set_focus() {
         log::error!("Failed to focus window: {}", e);
     }
+    if is_first_run {
+        if should_maximize {
+            let _ = window.maximize();
+        }
+        if should_fullscreen {
+            let _ = window.set_fullscreen(true);
+        }
+    }
+
     if let Some(path) = state.initial_file_path.lock().unwrap().take() {
         log::info!("Frontend is ready, emitting open-with-file for initial path: {}", &path);
         handle_file_open(&app_handle, PathBuf::from(path));
