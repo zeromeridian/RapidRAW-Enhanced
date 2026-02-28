@@ -96,10 +96,7 @@ const ColorWheel = ({
   const pointerOffset = pointerSize / 2;
 
   return (
-    <div
-      className="relative flex flex-col items-center gap-2"
-      ref={containerRef}
-    >
+    <div className="relative flex flex-col items-center gap-2" ref={containerRef}>
       <div
         className="relative cursor-pointer h-5 min-w-[60px]"
         onClick={handleReset}

@@ -104,9 +104,9 @@ export default function ConfirmModal({
           >
             {cancelText}
           </Button>
-          <Button 
-            onClick={handleConfirm} 
-            variant={confirmVariant} 
+          <Button
+            onClick={handleConfirm}
+            variant={confirmVariant}
             autoFocus={true}
             className="focus:outline-none focus:ring-0 focus:ring-offset-0"
           >

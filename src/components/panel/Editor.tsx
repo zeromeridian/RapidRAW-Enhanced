@@ -105,7 +105,7 @@ export default function Editor({
   setShowOriginal,
   showOriginal,
   targetZoom,
-  thumbnails,
+  thumbnails: _thumbnails,
   transformWrapperRef,
   transformedOriginalUrl,
   uncroppedAdjustedPreviewUrl,
@@ -616,7 +616,7 @@ export default function Editor({
   const waveFormData: WaveformData = waveform || { blue: [], green: [], height: 0, luma: [], red: [], width: 0 };
 
   const isZoomActionActive = !isCropping && !isMasking && !isAiEditing && !isWbPickerActive;
-  
+
   let cursorStyle = 'default';
   if (isZoomActionActive) {
     if (isPanningState) {
@@ -629,15 +629,20 @@ export default function Editor({
   }
 
   return (
-    <div className={clsx("flex-1 bg-bg-secondary flex flex-col relative overflow-hidden min-h-0 transition-all duration-300 ease-in-out", isFullScreen ? "rounded-none p-0 gap-0" : "rounded-lg p-2 gap-2")}>
+    <div
+      className={clsx(
+        'flex-1 bg-bg-secondary flex flex-col relative overflow-hidden min-h-0 transition-all duration-300 ease-in-out',
+        isFullScreen ? 'rounded-none p-0 gap-0' : 'rounded-lg p-2 gap-2',
+      )}
+    >
       <AnimatePresence>
         {isWaveformVisible && !isFullScreen && <Waveform waveformData={waveFormData} onClose={onCloseWaveform} />}
       </AnimatePresence>
 
       <div
         className={clsx(
-          "flex-shrink-0 overflow-hidden transition-all duration-300 ease-in-out",
-          isFullScreen ? "max-h-0 opacity-0 m-0" : "max-h-[100px] opacity-100"
+          'flex-shrink-0 overflow-hidden transition-all duration-300 ease-in-out',
+          isFullScreen ? 'max-h-0 opacity-0 m-0' : 'max-h-[100px] opacity-100',
         )}
       >
         <EditorToolbar
@@ -656,18 +661,14 @@ export default function Editor({
           showOriginal={showOriginal}
           isLoadingFullRes={isLoadingFullRes}
           showDateView={showExifDateView}
-          onToggleDateView={() => setShowExifDateView(prev => !prev)}
+          onToggleDateView={() => setShowExifDateView((prev) => !prev)}
           adjustmentsHistory={adjustmentsHistory}
           adjustmentsHistoryIndex={adjustmentsHistoryIndex}
           goToAdjustmentsHistoryIndex={goToAdjustmentsHistoryIndex}
         />
       </div>
 
-      <div
-        className="flex-1 relative overflow-hidden rounded-lg"
-        onContextMenu={onContextMenu}
-        ref={imageContainerRef}
-      >
+      <div className="flex-1 relative overflow-hidden rounded-lg" onContextMenu={onContextMenu} ref={imageContainerRef}>
         {showSpinner && (
           <div
             className={clsx(

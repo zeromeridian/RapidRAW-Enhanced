@@ -13,14 +13,14 @@ interface HdrModalProps {
 }
 
 export default function HdrModal({
-                                        error,
-                                        finalImageBase64,
-                                        isOpen,
-                                        onClose,
-                                        onOpenFile,
-                                        onSave,
-                                        progressMessage,
-                                      }: HdrModalProps) {
+  error,
+  finalImageBase64,
+  isOpen,
+  onClose,
+  onOpenFile,
+  onSave,
+  progressMessage,
+}: HdrModalProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [savedPath, setSavedPath] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -54,7 +54,7 @@ export default function HdrModal({
     try {
       const path = await onSave();
       setSavedPath(path);
-    } catch (e) {
+    } catch (_e) {
       // Error handling can be added here if needed
     } finally {
       setIsSaving(false);

@@ -250,12 +250,7 @@ function ContextMenu() {
         >
           <div className="bg-surface/90 backdrop-blur-md rounded-lg shadow-xl p-2 w-64" role="menu">
             {options.map((option: any, index: number) => (
-              <MenuItem
-                hideContextMenu={hideContextMenu}
-                key={index}
-                option={option}
-                path={[index]}
-              />
+              <MenuItem hideContextMenu={hideContextMenu} key={index} option={option} path={[index]} />
             ))}
           </div>
         </motion.div>

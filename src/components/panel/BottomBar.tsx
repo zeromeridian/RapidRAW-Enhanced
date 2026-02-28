@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Star, Copy, ClipboardPaste, RotateCcw, ChevronUp, ChevronDown, Check, Save, Loader2, Settings } from 'lucide-react';
+import { Star, Copy, ClipboardPaste, RotateCcw, ChevronUp, ChevronDown, Check, Save, Settings } from 'lucide-react';
 import clsx from 'clsx';
 import Filmstrip from './Filmstrip';
 import { GLOBAL_KEYS, ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
@@ -68,8 +68,8 @@ const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
                 disabled
                   ? 'text-text-secondary opacity-40'
                   : starValue <= rating
-                  ? 'fill-accent text-accent'
-                  : 'text-text-secondary hover:text-accent',
+                    ? 'fill-accent text-accent'
+                    : 'text-text-secondary hover:text-accent',
               )}
             />
           </button>
@@ -110,10 +110,8 @@ export default function BottomBar({
   setIsFilmstripVisible,
   thumbnails,
   thumbnailAspectRatio,
-  zoom = 0,
   displaySize,
   originalSize,
-  baseRenderSize,
   totalImages,
 }: BottomBarProps) {
   const [isEditingPercent, setIsEditingPercent] = useState(false);
@@ -133,7 +131,6 @@ export default function BottomBar({
   const numSelected = multiSelectedPaths.length;
   const total = totalImages ?? 0;
   const showSelectionCounter = numSelected > 1;
-
 
   useEffect(() => {
     if (isZoomReady && !isDraggingSlider.current) {
@@ -232,10 +229,7 @@ export default function BottomBar({
     <div className="flex-shrink-0 bg-bg-secondary rounded-lg flex flex-col">
       {!isLibraryView && (
         <div
-          className={clsx(
-            'overflow-hidden',
-            !isResizing && 'transition-all duration-300 ease-in-out',
-          )}
+          className={clsx('overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}
           style={{ height: isFilmstripVisible ? `${filmstripHeight}px` : '0px' }}
         >
           <div className="w-full p-2" style={{ height: `${filmstripHeight}px` }}>
@@ -259,8 +253,8 @@ export default function BottomBar({
       <div
         className={clsx(
           'flex-shrink-0 h-10 flex items-center justify-between px-3',
-          !isLibraryView && 'border-t', 
-          (!isLibraryView && isFilmstripVisible) ? 'border-surface' : 'border-transparent'
+          !isLibraryView && 'border-t',
+          !isLibraryView && isFilmstripVisible ? 'border-surface' : 'border-transparent',
         )}
       >
         <div className="flex items-center gap-4">
@@ -298,7 +292,9 @@ export default function BottomBar({
             )}
           >
             <div className="h-5 w-px bg-surface mr-4"></div>
-            <span className="text-sm text-text-secondary whitespace-nowrap">{numSelected} of {total} images selected</span>
+            <span className="text-sm text-text-secondary whitespace-nowrap">
+              {numSelected} of {total} images selected
+            </span>
           </div>
         </div>
         <div className="flex-grow" />
@@ -335,7 +331,7 @@ export default function BottomBar({
                   {isZoomLabelHovered ? 'Reset Zoom' : 'Zoom'}
                 </span>
               </div>
-              
+
               <div className="relative flex-1 h-5">
                 <div className="absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/2 bg-surface rounded-full pointer-events-none" />
                 <input

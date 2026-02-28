@@ -166,7 +166,7 @@ export default function LibraryExportPanel({
   multiSelectedPaths,
   onClose,
   setExportState,
-  imageList,
+  imageList: _imageList,
   appSettings,
   onSettingsChange,
 }: LibraryExportPanelProps) {
@@ -231,7 +231,7 @@ export default function LibraryExportPanel({
           } else {
             setImageAspectRatio(3 / 2);
           }
-        } catch (error) {
+        } catch (_error) {
           console.warn(`Could not get dimensions for preview, using default aspect ratio.`);
           setImageAspectRatio(3 / 2);
         }
@@ -298,7 +298,7 @@ export default function LibraryExportPanel({
           setIsEstimating(false);
         }
       }, 500),
-    []
+    [],
   );
 
   useEffect(() => {
@@ -324,7 +324,7 @@ export default function LibraryExportPanel({
               opacity: watermarkOpacity,
             }
           : null,
-      exportMasks
+      exportMasks,
     };
     const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
     debouncedEstimateSize(multiSelectedPaths, exportSettings, format);
@@ -380,7 +380,11 @@ export default function LibraryExportPanel({
     setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
 
     let finalFilenameTemplate = filenameTemplate;
-    if (numImages > 1 && !filenameTemplate.includes('{sequence}') && !filenameTemplate.includes('{original_filename}')) {
+    if (
+      numImages > 1 &&
+      !filenameTemplate.includes('{sequence}') &&
+      !filenameTemplate.includes('{original_filename}')
+    ) {
       finalFilenameTemplate = `${filenameTemplate}_{sequence}`;
       setFilenameTemplate(finalFilenameTemplate);
     }
@@ -443,9 +447,7 @@ export default function LibraryExportPanel({
   return (
     <div className="h-full bg-bg-secondary rounded-lg flex flex-col">
       <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
-        <h2 className="text-xl font-bold text-primary text-shadow-shiny">
-          Export
-        </h2>
+        <h2 className="text-xl font-bold text-primary text-shadow-shiny">Export</h2>
         <button
           onClick={onClose}
           className="p-1 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary"

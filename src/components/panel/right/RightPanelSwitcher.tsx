@@ -14,9 +14,7 @@ interface RightPanelSwitcherProps {
 }
 
 const panelGroups: Array<Array<PanelOptions>> = [
-  [
-    { id: Panel.Metadata, icon: Info, title: 'Info' },
-  ],
+  [{ id: Panel.Metadata, icon: Info, title: 'Info' }],
   [
     { id: Panel.Adjustments, icon: SlidersHorizontal, title: 'Adjust' },
     { id: Panel.Crop, icon: Scaling, title: 'Crop' },

@@ -39,9 +39,7 @@ export function useThumbnails(imageList: Array<ImageFile>, setThumbnails: any) {
         }
       });
 
-      return hasChanges || Object.keys(nextThumbnails).length !== imagePaths.length 
-        ? nextThumbnails 
-        : prevThumbnails;
+      return hasChanges || Object.keys(nextThumbnails).length !== imagePaths.length ? nextThumbnails : prevThumbnails;
     });
 
     let unlistenComplete: any;

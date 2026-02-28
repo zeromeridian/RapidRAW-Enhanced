@@ -1,6 +1,5 @@
-import React from 'react';
 import { ExportPreset } from './ExportImportProperties';
-import { Adjustments, Color } from '../../utils/adjustments';
+import { Adjustments } from '../../utils/adjustments';
 import { ToolType } from '../panel/right/Masks';
 
 export const GLOBAL_KEYS = [' ', 'ArrowUp', 'ArrowDown', 'f', 'b', 'w'];

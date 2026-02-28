@@ -50,7 +50,7 @@ export default function LUTControl({
           >
             {lutName || 'Select'}
           </button>
-          
+
           {lutName && (
             <button
               onClick={onClear}
