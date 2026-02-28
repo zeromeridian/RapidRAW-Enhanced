@@ -17,7 +17,14 @@ const tsRecommended = tseslint.configs.recommended.map((config) =>
 
 module.exports = [
   {
-    ignores: ['dist/**', 'node_modules/**', 'src-tauri/target/**', 'src-tauri/gen/**', 'data/**'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'src-tauri/target/**',
+      'src-tauri/gen/**',
+      'src-tauri/rawler/**',
+      'data/**',
+    ],
   },
   jsRecommendedForTs,
   ...tsRecommended,
