@@ -16,7 +16,12 @@
     "linux": {
       "rpm": {
         "provides": ["rapid-raw"],
-        "recommends": ["webkit2gtk4.1", "webkit2gtk4", "libwebkit2gtk-4_1-0", "webkit2gtk-4_1-injected-bundles"]
+        "recommends": [
+          "webkit2gtk4.1",
+          "webkit2gtk4",
+          "libwebkit2gtk-4_1-0",
+          "webkit2gtk-4_1-injected-bundles"
+        ]
       }
     }
   }

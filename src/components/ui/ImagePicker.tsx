@@ -8,7 +8,12 @@ interface ImagePickerProps {
   label: string;
 }
 
-export default function ImagePicker({ imageName, onImageSelect, onClear, label }: ImagePickerProps) {
+export default function ImagePicker({
+  imageName,
+  onImageSelect,
+  onClear,
+  label,
+}: ImagePickerProps) {
   const handleSelectFile = async () => {
     try {
       const selected = await open({
@@ -40,7 +45,7 @@ export default function ImagePicker({ imageName, onImageSelect, onClear, label }
           >
             {imageName || 'Select'}
           </button>
-
+          
           {imageName && (
             <button
               onClick={onClear}

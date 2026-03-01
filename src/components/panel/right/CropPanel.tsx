@@ -10,7 +10,7 @@ import {
   RotateCw,
   Ruler,
   Scan,
-  X,
+  X
 } from 'lucide-react';
 import { Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import clsx from 'clsx';
@@ -49,6 +49,7 @@ interface OverlayOption {
   tooltip: string;
 }
 
+
 const PRESETS: Array<CropPreset> = [
   { name: 'Free', value: null, tooltip: 'Freeform crop' },
   { name: 'Original', value: ORIGINAL_RATIO, tooltip: 'Original image aspect ratio' },
@@ -80,7 +81,7 @@ export default function CropPanel({
   setIsRotationActive: setGlobalRotationActive,
   overlayMode: propOverlayMode,
   setOverlayMode: setPropOverlayMode,
-  overlayRotation: _propOverlayRotation,
+  overlayRotation: propOverlayRotation,
   setOverlayRotation: propSetOverlayRotation,
 }: CropPanelProps) {
   const [customW, setCustomW] = useState('');
@@ -92,7 +93,7 @@ export default function CropPanel({
   const [isEditingCustom, setIsEditingCustom] = useState(false);
 
   const [internalOverlayMode, setInternalOverlayMode] = useState<OverlayMode>('thirds');
-  const [, setInternalOverlayRotation] = useState(0);
+  const [_internalOverlayRotation, setInternalOverlayRotation] = useState(0);
 
   const activeOverlay = propOverlayMode ?? internalOverlayMode;
   const setOverlay = setPropOverlayMode ?? setInternalOverlayMode;
@@ -164,7 +165,8 @@ export default function CropPanel({
       (p: CropPreset) =>
         p.value &&
         p.value !== ORIGINAL_RATIO &&
-        (Math.abs(aspectRatio - p.value) < RATIO_TOLERANCE || Math.abs(aspectRatio - 1 / p.value) < RATIO_TOLERANCE),
+        (Math.abs(aspectRatio - p.value) < RATIO_TOLERANCE ||
+          Math.abs(aspectRatio - 1 / p.value) < RATIO_TOLERANCE),
     );
 
     if (numericPresetMatch) {
@@ -217,7 +219,11 @@ export default function CropPanel({
   useEffect(() => {
     if (activePreset?.value === ORIGINAL_RATIO) {
       const newOriginalRatio = getEffectiveOriginalRatio();
-      if (newOriginalRatio !== null && aspectRatio && Math.abs(aspectRatio - newOriginalRatio) > RATIO_TOLERANCE) {
+      if (
+        newOriginalRatio !== null &&
+        aspectRatio &&
+        Math.abs(aspectRatio - newOriginalRatio) > RATIO_TOLERANCE
+      ) {
         setAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newOriginalRatio, crop: null }));
       }
     }
@@ -244,7 +250,10 @@ export default function CropPanel({
     if (numW > 0 && numH > 0) {
       const newAspectRatio = numW / numH;
       lastSyncedRatio.current = newAspectRatio;
-      if (!adjustments?.aspectRatio || Math.abs(adjustments.aspectRatio - newAspectRatio) > RATIO_TOLERANCE) {
+      if (
+        !adjustments?.aspectRatio ||
+        Math.abs(adjustments.aspectRatio - newAspectRatio) > RATIO_TOLERANCE
+      ) {
         setAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newAspectRatio, crop: null }));
       }
     }
@@ -277,7 +286,7 @@ export default function CropPanel({
       return;
     }
 
-    const targetRatio = preset.value;
+    let targetRatio = preset.value;
     if (activePreset === preset && targetRatio && targetRatio !== 1) {
       const newRatio = 1 / (adjustments.aspectRatio ? adjustments.aspectRatio : 1);
       setPreferPortrait(newRatio < 1);
@@ -415,11 +424,7 @@ export default function CropPanel({
     <div className="flex flex-col h-full">
       <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
         <h2 className="text-xl font-bold text-primary text-shadow-shiny">Crop & Transform</h2>
-        <button
-          className="p-2 rounded-full hover:bg-surface transition-colors"
-          onClick={handleReset}
-          data-tooltip="Reset Crop & Transform"
-        >
+        <button className="p-2 rounded-full hover:bg-surface transition-colors" onClick={handleReset} data-tooltip="Reset Crop & Transform">
           <RotateCcw size={18} />
         </button>
       </div>
@@ -632,7 +637,9 @@ export default function CropPanel({
                       ? 'bg-accent text-button-text'
                       : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
                   )}
-                  onClick={() => setAdjustments((prev: Adjustments) => ({ ...prev, flipVertical: !prev.flipVertical }))}
+                  onClick={() =>
+                    setAdjustments((prev: Adjustments) => ({ ...prev, flipVertical: !prev.flipVertical }))
+                  }
                   data-tooltip="Flip image vertically"
                 >
                   <FlipVertical size={20} className="transition-none" />

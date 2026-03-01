@@ -97,7 +97,7 @@ export default function Controls({
     const handleCopy = () => {
       const adjustmentsToCopy: any = {};
       for (const key of sectionKeys) {
-        if (Object.prototype.hasOwnProperty.call(adjustments, key)) {
+        if (adjustments.hasOwnProperty(key)) {
           adjustmentsToCopy[key] = JSON.parse(JSON.stringify(adjustments[key]));
         }
       }

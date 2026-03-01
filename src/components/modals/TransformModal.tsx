@@ -1,6 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Check, RotateCcw, Grid3X3, Eye, EyeOff, Info, LineChart, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import {
+  Check,
+  RotateCcw,
+  Grid3X3,
+  Eye,
+  EyeOff,
+  Info,
+  LineChart,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
@@ -73,40 +84,46 @@ const DEFAULT_PARAMS: TransformParams = {
 
 const SLIDER_DIVISOR = 100.0;
 
-const CustomGrid = ({ denseVisible, ruleOfThirdsVisible }: { denseVisible: boolean; ruleOfThirdsVisible: boolean }) => (
+const CustomGrid = ({ 
+  denseVisible, 
+  ruleOfThirdsVisible 
+}: { 
+  denseVisible: boolean; 
+  ruleOfThirdsVisible: boolean; 
+}) => (
   <div className="absolute inset-0 pointer-events-none w-full h-full z-10">
-    <div
+    <div 
       className={clsx(
-        'absolute inset-0 w-full h-full transition-opacity duration-300 ease-in-out',
-        ruleOfThirdsVisible ? 'opacity-100' : 'opacity-0',
+        "absolute inset-0 w-full h-full transition-opacity duration-300 ease-in-out",
+        ruleOfThirdsVisible ? "opacity-100" : "opacity-0"
       )}
     >
-      <div className="absolute top-0 bottom-0 border-l border-white/40 left-1/3" />
-      <div className="absolute top-0 bottom-0 border-l border-white/40 left-2/3" />
-      <div className="absolute left-0 right-0 border-t border-white/40 top-1/3" />
-      <div className="absolute left-0 right-0 border-t border-white/40 top-2/3" />
+       <div className="absolute top-0 bottom-0 border-l border-white/40 left-1/3" />
+       <div className="absolute top-0 bottom-0 border-l border-white/40 left-2/3" />
+       <div className="absolute left-0 right-0 border-t border-white/40 top-1/3" />
+       <div className="absolute left-0 right-0 border-t border-white/40 top-2/3" />
     </div>
 
-    <div
+    <div 
       className={clsx(
-        'absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out',
-        denseVisible ? 'opacity-100' : 'opacity-0',
+        "absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out",
+        denseVisible ? "opacity-100" : "opacity-0"
       )}
     >
-      {[...Array(17)].map((_, i) => (
-        <div
-          key={`v-${i}`}
-          className="absolute top-0 bottom-0 border-l border-white/40"
-          style={{ left: `${(i + 1) * 5.555}%` }}
-        />
-      ))}
-      {[...Array(17)].map((_, i) => (
-        <div
-          key={`h-${i}`}
-          className="absolute left-0 right-0 border-t border-white/40"
-          style={{ top: `${(i + 1) * 5.555}%` }}
-        />
-      ))}
+       {[...Array(17)].map((_, i) => (
+         <div 
+           key={`v-${i}`} 
+           className="absolute top-0 bottom-0 border-l border-white/40" 
+           style={{ left: `${(i + 1) * 5.555}%` }} 
+         />
+       ))}
+       {[...Array(17)].map((_, i) => (
+         <div 
+           key={`h-${i}`} 
+           className="absolute left-0 right-0 border-t border-white/40" 
+           style={{ top: `${(i + 1) * 5.555}%` }} 
+         />
+       ))}
     </div>
   </div>
 );
@@ -134,7 +151,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
     const handleWindowMouseMove = (e: MouseEvent) => {
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
-      setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+      setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     };
     const handleWindowMouseUp = () => setIsDragging(false);
@@ -228,7 +245,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         console.error('Preview transform failed', e);
       }
     }, 30),
-    [currentAdjustments],
+    [currentAdjustments]
   );
 
   useEffect(() => {
@@ -334,7 +351,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         </button>
       </div>
 
-      <div
+      <div 
         className="flex-grow overflow-y-auto p-4 flex flex-col gap-6 text-text-secondary"
         onPointerDownCapture={handleInteractionStart}
       >
@@ -346,7 +363,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             min={-100}
             max={100}
             defaultValue={0}
-            onChange={(e) => handleChange('distortion', Number(e.target.value))}
+            onChange={e => handleChange('distortion', Number(e.target.value))}
           />
         </div>
 
@@ -359,7 +376,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             max={100}
             defaultValue={0}
             step={1}
-            onChange={(e) => handleChange('vertical', Number(e.target.value))}
+            onChange={e => handleChange('vertical', Number(e.target.value))}
           />
           <Slider
             label="Horizontal"
@@ -368,7 +385,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             max={100}
             defaultValue={0}
             step={1}
-            onChange={(e) => handleChange('horizontal', Number(e.target.value))}
+            onChange={e => handleChange('horizontal', Number(e.target.value))}
           />
         </div>
 
@@ -381,7 +398,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             max={45}
             step={0.1}
             defaultValue={0}
-            onChange={(e) => handleChange('rotate', Number(e.target.value))}
+            onChange={e => handleChange('rotate', Number(e.target.value))}
           />
           <Slider
             label="Aspect"
@@ -390,7 +407,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             max={100}
             defaultValue={0}
             step={1}
-            onChange={(e) => handleChange('aspect', Number(e.target.value))}
+            onChange={e => handleChange('aspect', Number(e.target.value))}
           />
           <Slider
             label="Scale"
@@ -399,7 +416,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             max={150}
             defaultValue={100}
             step={1}
-            onChange={(e) => handleChange('scale', Number(e.target.value))}
+            onChange={e => handleChange('scale', Number(e.target.value))}
           />
         </div>
 
@@ -412,7 +429,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             max={100}
             defaultValue={0}
             step={1}
-            onChange={(e) => handleChange('x_offset', Number(e.target.value))}
+            onChange={e => handleChange('x_offset', Number(e.target.value))}
           />
           <Slider
             label="Y Axis"
@@ -421,7 +438,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             max={100}
             defaultValue={0}
             step={1}
-            onChange={(e) => handleChange('y_offset', Number(e.target.value))}
+            onChange={e => handleChange('y_offset', Number(e.target.value))}
           />
         </div>
 
@@ -480,7 +497,10 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
                   />
 
                   {!isCompareActive && (
-                    <CustomGrid ruleOfThirdsVisible={showGrid} denseVisible={showGrid && isInteracting} />
+                    <CustomGrid 
+                      ruleOfThirdsVisible={showGrid}
+                      denseVisible={showGrid && isInteracting}
+                    />
                   )}
 
                   {isCompareActive && (
@@ -495,13 +515,13 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
 
           <div
             className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/70 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-xl z-20 pointer-events-auto"
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
           >
             <button
               onClick={() => setShowGrid(!showGrid)}
               className={clsx(
                 'p-2 rounded-full transition-colors',
-                showGrid ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white',
+                showGrid ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
               )}
               data-tooltip="Toggle Grid"
             >
@@ -511,7 +531,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               onClick={handleShowLinesToggle}
               className={clsx(
                 'p-2 rounded-full transition-colors',
-                showLines ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white',
+                showLines ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
               )}
               data-tooltip="Toggle Helper Lines"
             >
@@ -521,7 +541,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             <div className="w-px h-5 bg-white/20 mx-1"></div>
 
             <button
-              onClick={() => setZoom((z) => Math.max(0.1, z - 0.25))}
+              onClick={() => setZoom(z => Math.max(0.1, z - 0.25))}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip="Zoom Out"
             >
@@ -533,7 +553,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             </span>
 
             <button
-              onClick={() => setZoom((z) => Math.min(8, z + 0.25))}
+              onClick={() => setZoom(z => Math.min(8, z + 0.25))}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip="Zoom In"
             >
@@ -556,7 +576,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               onMouseLeave={() => toggleCompare(false)}
               className={clsx(
                 'p-2 rounded-full transition-colors select-none',
-                isCompareActive ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white',
+                isCompareActive ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white'
               )}
               data-tooltip="Hold to Compare"
             >
@@ -586,7 +606,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
           >
             <div className="flex-grow min-h-0 overflow-hidden">{renderContent()}</div>
             <div className="flex-shrink-0 p-4 flex justify-end gap-3 border-t border-surface bg-bg-secondary z-20">

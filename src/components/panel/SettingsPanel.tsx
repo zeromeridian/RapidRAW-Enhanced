@@ -3,7 +3,7 @@ import {
   ArrowLeft,
   Cloud,
   Cpu,
-  ExternalLink,
+  ExternalLink as ExternalLinkIcon,
   Server,
   Info,
   Trash2,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { open as openLink } from '@tauri-apps/plugin-shell';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { useUser } from '@clerk/clerk-react';
@@ -165,6 +166,28 @@ const DataActionItem = ({
   </div>
 );
 
+const ExternalLink = ({ href, children, className }: { href: string; children: any; className?: string }) => {
+  const handleClick = async (e: any) => {
+    e.preventDefault();
+    try {
+      await openLink(href);
+    } catch (err) {
+      console.error(`Failed to open link: ${href}`, err);
+    }
+  };
+
+  return (
+    <a
+      href={href}
+      onClick={handleClick}
+      className={clsx('text-accent hover:underline inline-flex items-center gap-1', className)}
+    >
+      {children}
+      <ExternalLinkIcon size={12} />
+    </a>
+  );
+};
+
 const aiProviders = [
   { id: 'cpu', label: 'CPU', icon: Cpu },
   { id: 'ai-connector', label: 'AI Connector', icon: Server },
@@ -217,7 +240,7 @@ export default function SettingsPanel({
   onSettingsChange,
   rootPath,
 }: SettingsPanelProps) {
-  const { user: _user } = useUser();
+  const { user } = useUser();
   const [isClearing, setIsClearing] = useState(false);
   const [clearMessage, setClearMessage] = useState('');
   const [isClearingCache, setIsClearingCache] = useState(false);
@@ -809,10 +832,7 @@ export default function SettingsPanel({
                     )}
                     <div className="divide-y divide-border-color">
                       {(appSettings?.myLenses || []).map((lens: MyLens, index: number) => (
-                        <div
-                          key={`${lens.maker}-${lens.model}-${index}`}
-                          className="flex justify-between items-center py-3"
-                        >
+                        <div key={`${lens.maker}-${lens.model}-${index}`} className="flex justify-between items-center py-3">
                           <div className="flex items-center gap-3">
                             <div className="p-2 bg-surface rounded-md text-accent">
                               <Bookmark size={16} />
@@ -860,8 +880,8 @@ export default function SettingsPanel({
                           className="overflow-hidden"
                         >
                           <div className="pl-4 border-l-2 border-border-color ml-1 mt-4 space-y-6">
-                            <SettingItem
-                              label="Maximum AI Tags"
+                            <SettingItem 
+                              label="Maximum AI Tags" 
                               description="The maximum number of tags to generate per image."
                             >
                               <Slider
@@ -1235,12 +1255,10 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <h3 className="text-lg font-semibold text-text-primary">
-                            Self-Hosted (RapidRAW AI Connector)
-                          </h3>
+                          <h3 className="text-lg font-semibold text-text-primary">Self-Hosted (RapidRAW AI Connector)</h3>
                           <p className="text-sm text-text-secondary mt-1">
-                            For users with a capable GPU who want maximum control, connect RapidRAW to your own local AI
-                            Connector server. This gives you full control for technical workflows.
+                            For users with a capable GPU who want maximum control, connect RapidRAW to your own local
+                            AI Connector server. This gives you full control for technical workflows.
                           </p>
                           <ul className="mt-3 mb-6 space-y-1 list-disc list-inside text-sm text-text-secondary">
                             <li>Use your own ComfyUI instance</li>
@@ -1256,9 +1274,7 @@ export default function SettingsPanel({
                                 <Input
                                   className="flex-grow"
                                   id="ai-connector-address"
-                                  onBlur={() =>
-                                    onSettingsChange({ ...appSettings, aiConnectorAddress: aiConnectorAddress })
-                                  }
+                                  onBlur={() => onSettingsChange({ ...appSettings, aiConnectorAddress: aiConnectorAddress })}
                                   onChange={(e: any) => setAiConnectorAddress(e.target.value)}
                                   onKeyDown={(e: any) => e.stopPropagation()}
                                   placeholder="127.0.0.1:8188"
@@ -1372,7 +1388,7 @@ export default function SettingsPanel({
                         </>
                       }
                       disabled={!logPath || logPath.startsWith('Could not')}
-                      icon={<ExternalLink size={16} className="mr-2" />}
+                      icon={<ExternalLinkIcon size={16} className="mr-2" />}
                       isProcessing={false}
                       message=""
                       title="View Application Logs"
@@ -1422,10 +1438,7 @@ export default function SettingsPanel({
                         <KeybindItem keys={['Space']} description="Cycle zoom (Fit, 2x Fit, 100%)" />
                         <KeybindItem keys={['←', '→']} description="Previous / Next image" />
                         <KeybindItem keys={['↑', '↓']} description="Zoom in / Zoom out (by step)" />
-                        <KeybindItem
-                          keys={['Shift', '+', 'Mouse Wheel']}
-                          description="Adjust slider value by 2 steps"
-                        />
+                        <KeybindItem keys={['Shift', '+', 'Mouse Wheel']} description="Adjust slider value by 2 steps" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '+']} description="Zoom in" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '-']} description="Zoom out" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '0']} description="Zoom to fit" />

@@ -121,7 +121,7 @@ export default function ExportPresetsList({
                 className={`p-2 bg-surface hover:bg-card-active rounded-md transition-colors ${
                   isSaved ? 'text-green-500' : 'text-text-secondary'
                 }`}
-                data-tooltip={isSaved ? 'Saved!' : 'Overwrite selected preset'}
+                data-tooltip={isSaved ? "Saved!" : "Overwrite selected preset"}
               >
                 {isSaved ? <Check size={18} /> : <Save size={18} />}
               </button>
@@ -153,10 +153,7 @@ export default function ExportPresetsList({
           >
             <Save size={18} />
           </button>
-          <button
-            onClick={() => setIsCreating(false)}
-            className="p-2 bg-surface text-text-secondary rounded-md hover:bg-card-active"
-          >
+          <button onClick={() => setIsCreating(false)} className="p-2 bg-surface text-text-secondary rounded-md hover:bg-card-active">
             <X size={18} />
           </button>
         </div>

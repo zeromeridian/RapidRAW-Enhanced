@@ -1,4 +1,5 @@
 import Slider from '../ui/Slider';
+import Switch from '../ui/Switch';
 import { Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
 import LUTControl from '../ui/LUTControl';
 import { AppSettings } from '../ui/AppProperties';
@@ -23,6 +24,14 @@ export default function EffectsPanel({
   const handleAdjustmentChange = (key: string, value: string) => {
     const numericValue = parseInt(value, 10);
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: numericValue }));
+  };
+
+  const handleCheckedChange = (key: Effect, checked: boolean) => {
+    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: checked }));
+  };
+
+  const handleColorChange = (key: Effect, value: string) => {
+    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: value }));
   };
 
   const handleLutIntensityChange = (intensity: number) => {

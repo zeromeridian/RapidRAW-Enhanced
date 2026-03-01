@@ -2,7 +2,12 @@ import { useState } from 'react';
 import { Pipette } from 'lucide-react';
 import Slider from '../ui/Slider';
 import ColorWheel from '../ui/ColorWheel';
-import { ColorAdjustment, ColorCalibration, HueSatLum, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import {
+  ColorAdjustment,
+  ColorCalibration,
+  HueSatLum,
+  INITIAL_ADJUSTMENTS,
+} from '../../utils/adjustments';
 import { Adjustments, ColorGrading } from '../../utils/adjustments';
 import { AppSettings } from '../ui/AppProperties';
 
@@ -323,7 +328,9 @@ export default function ColorPanel({
             <button
               onClick={toggleWbPicker}
               className={`p-1.5 rounded-md transition-colors ${
-                isWbPickerActive ? 'bg-accent text-button-text' : 'hover:bg-bg-secondary text-text-secondary'
+                isWbPickerActive
+                  ? 'bg-accent text-button-text'
+                  : 'hover:bg-bg-secondary text-text-secondary'
               }`}
               data-tooltip="White Balance Picker"
             >

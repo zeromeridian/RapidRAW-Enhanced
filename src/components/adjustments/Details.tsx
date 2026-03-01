@@ -1,5 +1,5 @@
 import Slider from '../ui/Slider';
-import { Adjustments, DetailsAdjustment } from '../../utils/adjustments';
+import { Adjustments, DetailsAdjustment, Effect } from '../../utils/adjustments';
 import { AppSettings } from '../ui/AppProperties';
 
 interface DetailsPanelProps {
@@ -116,7 +116,9 @@ export default function DetailsPanel({
             label="Red/Cyan"
             max={100}
             min={-100}
-            onChange={(e: any) => handleAdjustmentChange(DetailsAdjustment.ChromaticAberrationRedCyan, e.target.value)}
+            onChange={(e: any) =>
+              handleAdjustmentChange(DetailsAdjustment.ChromaticAberrationRedCyan, e.target.value)
+            }
             step={1}
             value={adjustments.chromaticAberrationRedCyan}
             onDragStateChange={onDragStateChange}

@@ -209,7 +209,7 @@ function DroppableFolderItem({ folder, onContextMenu, children, onToggle, isExpa
         className="flex items-center gap-2 p-2 rounded-lg bg-surface cursor-pointer"
         onContextMenu={(e: any) => onContextMenu(e, { folder })}
       >
-        <div className="p-1 cursor-grab" ref={setDraggableNodeRef} {...listeners} {...attributes}>
+        <div className="p-1 cursor-grab" {...listeners} {...attributes}>
           {isExpanded ? (
             <FolderOpen
               className="text-primary"
@@ -654,8 +654,7 @@ export default function PresetsPanel({
       });
 
       if (typeof selectedPath === 'string') {
-        const isLegacy =
-          selectedPath.toLowerCase().endsWith('.xmp') || selectedPath.toLowerCase().endsWith('.lrtemplate');
+        const isLegacy = selectedPath.toLowerCase().endsWith('.xmp') || selectedPath.toLowerCase().endsWith('.lrtemplate');
 
         if (isLegacy) {
           await importLegacyPresetsFromFile(selectedPath);

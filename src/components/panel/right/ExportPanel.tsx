@@ -219,8 +219,8 @@ export default function ExportPanel({
     ? multiSelectedPaths.length > 0
       ? multiSelectedPaths
       : selectedImage
-        ? [selectedImage.path]
-        : []
+      ? [selectedImage.path]
+      : []
     : multiSelectedPaths;
   const numImages = pathsToExport.length;
   const isBatchMode = numImages > 1;
@@ -289,7 +289,7 @@ export default function ExportPanel({
           setIsEstimating(false);
         }
       }, 500),
-    [selectedImage?.path],
+    [selectedImage?.path]
   );
 
   useEffect(() => {
@@ -446,7 +446,9 @@ export default function ExportPanel({
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
-        <h2 className="text-xl font-bold text-primary text-shadow-shiny">Export</h2>
+        <h2 className="text-xl font-bold text-primary text-shadow-shiny">
+          Export
+        </h2>
       </div>
       <div className="flex-grow overflow-y-auto p-4 text-text-secondary space-y-6">
         {canExport ? (

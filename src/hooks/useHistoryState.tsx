@@ -36,14 +36,11 @@ export const useHistoryState = (initialState: any) => {
     setIndex(0);
   }, []);
 
-  const goToIndex = useCallback(
-    (newIndex: number) => {
-      if (newIndex >= 0 && newIndex < history.length) {
-        setIndex(newIndex);
-      }
-    },
-    [history.length],
-  );
+  const goToIndex = useCallback((newIndex: number) => {
+    if (newIndex >= 0 && newIndex < history.length) {
+      setIndex(newIndex);
+    }
+  }, [history.length]);
 
   const canUndo = index > 0;
   const canRedo = index < history.length - 1;

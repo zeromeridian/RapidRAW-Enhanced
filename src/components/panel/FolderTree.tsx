@@ -91,7 +91,9 @@ function SectionHeader({ title, isOpen, onToggle }: { title: string; isOpen: boo
           <ChevronRight size={14} className="text-text-secondary" />
         )}
       </div>
-      <span className="ml-1 text-xs font-bold uppercase text-text-secondary tracking-wider select-none">{title}</span>
+      <span className="ml-1 text-xs font-bold uppercase text-text-secondary tracking-wider select-none">
+        {title}
+      </span>
     </div>
   );
 }
@@ -159,9 +161,9 @@ function TreeNode({
         <div
           className={clsx('cursor-pointer p-0.5 rounded transition-colors', {
             'cursor-default': !hasChildren,
-            'text-primary': isSelected && isExpanded,
+            'text-primary': isSelected && isExpanded, 
             'text-text-secondary': !isSelected || !isExpanded,
-            'hover:bg-surface-hover': !isSelected && hasChildren,
+            'hover:bg-surface-hover': !isSelected && hasChildren
           })}
           onClick={handleFolderIconClick}
         >
@@ -171,25 +173,27 @@ function TreeNode({
             <Folder size={16} className={isSelected ? 'text-primary' : 'text-text-secondary'} />
           )}
         </div>
-
-        <span
-          onDoubleClick={handleNameDoubleClick}
+        
+        <span 
+          onDoubleClick={handleNameDoubleClick} 
           className={clsx('truncate select-none cursor-pointer flex-1 font-medium', {
             'text-primary': isSelected,
-            'text-text-primary': !isSelected,
+            'text-text-primary': !isSelected
           })}
         >
           <span className="truncate">{node.name}</span>
-          {typeof node.imageCount === 'number' && (
-            <span
-              className={clsx(
-                'inline-block text-text-secondary text-xs ml-1 transition-all ease-in-out duration-300',
-                showImageCounts ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2',
-              )}
-            >
-              ({node.imageCount})
-            </span>
-          )}
+           {typeof node.imageCount === "number" && (
+             <span 
+               className={clsx(
+                 "inline-block text-text-secondary text-xs ml-1 transition-all ease-in-out duration-300",
+                 showImageCounts 
+                   ? "opacity-100 translate-x-0" 
+                   : "opacity-0 -translate-x-2"
+               )}
+             >
+                ({node.imageCount})
+             </span>
+           )}
         </span>
 
         {hasChildren && (
@@ -314,7 +318,8 @@ export default function FolderTree({
 
       if (hasPinnedResults && activeSection !== 'pinned') {
         onActiveSectionChange('pinned');
-      } else if (!hasPinnedResults && hasBaseResults && activeSection !== 'current') {
+      }
+      else if (!hasPinnedResults && hasBaseResults && activeSection !== 'current') {
         onActiveSectionChange('current');
       }
     }

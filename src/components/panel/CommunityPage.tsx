@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { ArrowLeft, CheckCircle2, ChevronDown, Loader2, Search, Users, Github } from 'lucide-react';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ChevronDown,
+  Loader2,
+  Search,
+  Users,
+  Github,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -67,12 +75,10 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
     try {
       const response = await fetch(DEFAULT_PREVIEW_IMAGE_URL);
       const blob = await response.blob();
-      const tempPath: string = await invoke(Invokes.SaveTempFile, {
-        bytes: Array.from(new Uint8Array(await blob.arrayBuffer())),
-      });
+      const tempPath: string = await invoke(Invokes.SaveTempFile, { bytes: Array.from(new Uint8Array(await blob.arrayBuffer())) });
       return tempPath;
     } catch (error) {
-      console.error('Failed to fetch default preview image:', error);
+      console.error("Failed to fetch default preview image:", error);
       return null;
     }
   }, []);
@@ -84,7 +90,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
         const communityPresets: CommunityPreset[] = await invoke(Invokes.FetchCommunityPresets);
         setPresets(communityPresets);
       } catch (error) {
-        console.error('Failed to fetch community presets:', error);
+        console.error("Failed to fetch community presets:", error);
       } finally {
         setIsLoading(false);
       }
@@ -93,7 +99,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
     fetchPresets();
 
     return () => {
-      Object.values(previewsRef.current).forEach((url) => {
+      Object.values(previewsRef.current).forEach(url => {
         if (url && url.startsWith('blob:')) {
           URL.revokeObjectURL(url);
         }
@@ -118,9 +124,9 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
       if (imageList.length === 1) {
         setPreviewImagePaths([imageList[0].path]);
       } else if (imageList.length >= 2 && imageList.length <= 3) {
-        setPreviewImagePaths(shuffled.slice(0, 2).map((img) => img.path));
+        setPreviewImagePaths(shuffled.slice(0, 2).map(img => img.path));
       } else if (imageList.length >= 4) {
-        setPreviewImagePaths(shuffled.slice(0, 4).map((img) => img.path));
+        setPreviewImagePaths(shuffled.slice(0, 4).map(img => img.path));
       }
     };
 
@@ -137,9 +143,9 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
       try {
         const previewDataMap: Record<string, number[]> = await invoke(Invokes.GenerateAllCommunityPreviews, {
           imagePaths: previewImagePaths,
-          presets: presets.map((p) => ({
+          presets: presets.map(p => ({
             ...p,
-            adjustments: { ...INITIAL_ADJUSTMENTS, ...p.adjustments },
+            adjustments: { ...INITIAL_ADJUSTMENTS, ...p.adjustments }
           })),
         });
 
@@ -149,10 +155,11 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
           newPreviews[presetName] = URL.createObjectURL(blob);
         }
 
-        setPreviews((prev) => {
-          Object.values(prev).forEach((url) => url?.startsWith('blob:') && URL.revokeObjectURL(url));
+        setPreviews(prev => {
+          Object.values(prev).forEach(url => url?.startsWith('blob:') && URL.revokeObjectURL(url));
           return newPreviews;
         });
+
       } catch (error) {
         console.error(`Failed to generate previews:`, error);
       } finally {
@@ -161,29 +168,30 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
     };
 
     generateAllPreviews();
+
   }, [presets, previewImagePaths]);
 
   const handleDownloadPreset = async (preset: CommunityPreset) => {
-    setDownloadStatus((prev) => ({ ...prev, [preset.name]: 'downloading' }));
+    setDownloadStatus(prev => ({ ...prev, [preset.name]: 'downloading' }));
     try {
       if (!preset.adjustments) {
-        throw new Error('Preset adjustments are missing.');
+          throw new Error("Preset adjustments are missing.");
       }
 
       await invoke(Invokes.SaveCommunityPreset, {
         name: preset.name,
         adjustments: preset.adjustments,
       });
-      setDownloadStatus((prev) => ({ ...prev, [preset.name]: 'success' }));
+      setDownloadStatus(prev => ({ ...prev, [preset.name]: 'success' }));
     } catch (error) {
       console.error(`Failed to download preset ${preset.name}:`, error);
-      setDownloadStatus((prev) => ({ ...prev, [preset.name]: 'idle' }));
+      setDownloadStatus(prev => ({ ...prev, [preset.name]: 'idle' }));
     }
   };
 
   const filteredAndSortedPresets = useMemo(() => {
     return presets
-      .filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
       .sort((a, b) => {
         if (sortBy === 'name') {
           return a.name.localeCompare(b.name);
@@ -252,10 +260,10 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
             animate="visible"
           >
             <AnimatePresence>
-              {filteredAndSortedPresets.map((preset) => {
+              {filteredAndSortedPresets.map(preset => {
                 const previewUrl = previews[preset.name];
                 const status = downloadStatus[preset.name] || 'idle';
-
+                
                 return (
                   <motion.div
                     key={preset.name}
@@ -266,15 +274,15 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
                   >
                     <div className="relative w-full aspect-square bg-bg-primary flex items-center justify-center text-text-secondary">
                       {previewUrl ? (
-                        <img
-                          src={previewUrl}
-                          alt={preset.name}
-                          className="w-full h-full object-cover transition-all duration-300 group-hover:blur-sm group-hover:brightness-75"
+                        <img 
+                          src={previewUrl} 
+                          alt={preset.name} 
+                          className="w-full h-full object-cover transition-all duration-300 group-hover:blur-sm group-hover:brightness-75" 
                         />
                       ) : (
                         <Loader2 className="h-6 w-6 animate-spin" />
                       )}
-
+                      
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <Button
                           size="sm"
@@ -284,16 +292,8 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
                           className="shadow-lg"
                         >
                           {status === 'idle' && <>Save</>}
-                          {status === 'downloading' && (
-                            <>
-                              <Loader2 size={14} className="mr-2 animate-spin" /> Saving...
-                            </>
-                          )}
-                          {status === 'success' && (
-                            <>
-                              <CheckCircle2 size={14} className="mr-2" /> Saved
-                            </>
-                          )}
+                          {status === 'downloading' && <><Loader2 size={14} className="mr-2 animate-spin" /> Saving...</>}
+                          {status === 'success' && <><CheckCircle2 size={14} className="mr-2" /> Saved</>}
                         </Button>
                       </div>
                     </div>
