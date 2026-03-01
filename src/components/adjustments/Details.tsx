@@ -1,5 +1,5 @@
 import Slider from '../ui/Slider';
-import { Adjustments, DetailsAdjustment, Effect } from '../../utils/adjustments';
+import { Adjustments, DetailsAdjustment } from '../../utils/adjustments';
 import { AppSettings } from '../ui/AppProperties';
 
 interface DetailsPanelProps {

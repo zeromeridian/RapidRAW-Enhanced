@@ -58,7 +58,7 @@ export function usePresets(currentAdjustments: Adjustments) {
   const addPreset = (name: string, folderId = null) => {
     const presetAdjustments: Record<string, any> = {};
     for (const key of COPYABLE_ADJUSTMENT_KEYS) {
-      if (currentAdjustments.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(currentAdjustments, key)) {
         presetAdjustments[key] = currentAdjustments[key];
       }
     }
@@ -158,7 +158,7 @@ export function usePresets(currentAdjustments: Adjustments) {
   const updatePreset = (id: string | null) => {
     const presetAdjustments: Record<string, any> = {};
     for (const key of COPYABLE_ADJUSTMENT_KEYS) {
-      if (currentAdjustments.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(currentAdjustments, key)) {
         presetAdjustments[key] = currentAdjustments[key];
       }
     }

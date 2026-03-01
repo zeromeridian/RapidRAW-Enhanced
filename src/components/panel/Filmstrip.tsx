@@ -546,7 +546,7 @@ interface FilmStripProps {
 export default function Filmstrip({
   imageList,
   imageRatings,
-  isLoading,
+  isLoading: _isLoading,
   multiSelectedPaths,
   onClearSelection,
   onContextMenu,

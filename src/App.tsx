@@ -90,13 +90,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import GlobalTooltip from './components/ui/GlobalTooltip';
 import { THEMES, DEFAULT_THEME_ID, ThemeProps } from './utils/themes';
 import { SubMask, ToolType } from './components/panel/right/Masks';
-import {
-  EXPORT_TIMEOUT,
-  ExportState,
-  IMPORT_TIMEOUT,
-  ImportState,
-  Status,
-} from './components/ui/ExportImportProperties';
+import { ExportState, IMPORT_TIMEOUT, ImportState, Status } from './components/ui/ExportImportProperties';
 import {
   AppSettings,
   BrushSettings,
@@ -486,7 +480,6 @@ function App() {
   const [isMaskControlHovered, setIsMaskControlHovered] = useState(false);
   const [libraryScrollTop, setLibraryScrollTop] = useState<number>(0);
   const { showContextMenu } = useContextMenu();
-  const imagePathList = useMemo(() => imageList.map((f: ImageFile) => f.path), [imageList]);
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   const { loading: isThumbnailsLoading } = useThumbnails(imageList, setThumbnails);
   const transformWrapperRef = useRef<any>(null);
@@ -627,7 +620,7 @@ function App() {
 
   const visualAdjustmentsKey = useMemo(() => {
     if (!adjustments) return '';
-    const { rating, sectionVisibility, ...visualAdjustments } = adjustments;
+    const { rating: _rating, sectionVisibility: _sectionVisibility, ...visualAdjustments } = adjustments;
     return JSON.stringify(visualAdjustments);
   }, [adjustments]);
 
@@ -1477,10 +1470,7 @@ function App() {
         setTheme(newSettings.theme);
       }
 
-      const {
-        searchCriteria,
-        ...settingsToSave
-      } = newSettings as any;
+      const { searchCriteria: _searchCriteria, ...settingsToSave } = newSettings as any;
       setAppSettings(newSettings);
       invoke(Invokes.SaveSettings, { settings: settingsToSave }).catch((err) => {
         console.error('Failed to save settings:', err);
@@ -1635,7 +1625,7 @@ function App() {
     if (appSettings?.adaptiveEditorTheme && selectedImage && finalPreviewUrl) {
       generatePaletteFromImage(finalPreviewUrl)
         .then(setAdaptivePalette)
-        .catch((err) => {
+        .catch((_err) => {
           const darkTheme = THEMES.find((t) => t.id === Theme.Dark);
           setAdaptivePalette(darkTheme ? darkTheme.cssVariables : null);
         });
@@ -1656,7 +1646,7 @@ function App() {
     }
 
     let finalCssVariables: any = { ...baseTheme.cssVariables };
-    let effectThemeForWindow = baseTheme.id;
+    const effectThemeForWindow = baseTheme.id;
 
     if (adaptivePalette) {
       finalCssVariables = { ...finalCssVariables, ...adaptivePalette };
@@ -2178,7 +2168,9 @@ function App() {
     const sourceAdjustments = selectedImage ? adjustments : libraryActiveAdjustments;
     const adjustmentsToCopy: any = {};
     for (const key of COPYABLE_ADJUSTMENT_KEYS) {
-      if (sourceAdjustments.hasOwnProperty(key)) adjustmentsToCopy[key] = sourceAdjustments[key];
+      if (Object.prototype.hasOwnProperty.call(sourceAdjustments, key)) {
+        adjustmentsToCopy[key] = sourceAdjustments[key];
+      }
     }
     setCopiedAdjustments(adjustmentsToCopy);
     setIsCopied(true);
@@ -2461,7 +2453,7 @@ function App() {
   ]);
 
   const handleFullResolutionLogic = useCallback(
-    (targetZoomPercent: number, currentDisplayWidth: number) => {
+    (targetZoomPercent: number) => {
       if (appSettings?.enableZoomHifi === false) {
         return;
       }
@@ -2532,8 +2524,7 @@ function App() {
       }
       isProgrammaticZoom.current = true;
       setZoom(transformZoom);
-      const currentDisplayWidth = baseRenderSize.width * transformZoom;
-      handleFullResolutionLogic(targetZoomPercent, currentDisplayWidth);
+      handleFullResolutionLogic(targetZoomPercent);
     },
     [originalSize, baseRenderSize, handleFullResolutionLogic, adjustments.orientationSteps],
   );
@@ -2553,8 +2544,7 @@ function App() {
         const effectiveOriginalWidth = isSwapped ? originalSize.height : originalSize.width;
 
         const targetZoomPercent = (baseRenderSize.width * transformState.scale) / effectiveOriginalWidth;
-        const currentDisplayWidth = baseRenderSize.width * transformState.scale;
-        handleFullResolutionLogic(targetZoomPercent, currentDisplayWidth);
+        handleFullResolutionLogic(targetZoomPercent);
       }
     },
     [originalSize, baseRenderSize, handleFullResolutionLogic, adjustments.orientationSteps],
@@ -3926,8 +3916,9 @@ function App() {
                 : INITIAL_ADJUSTMENTS;
             const adjustmentsToCopy: any = {};
             for (const key of COPYABLE_ADJUSTMENT_KEYS) {
-              if (sourceAdjustments.hasOwnProperty(key))
+              if (Object.prototype.hasOwnProperty.call(sourceAdjustments, key)) {
                 adjustmentsToCopy[key] = sourceAdjustments[key];
+              }
             }
             setCopiedAdjustments(adjustmentsToCopy);
             setIsCopied(true);

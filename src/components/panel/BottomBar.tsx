@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Star, Copy, ClipboardPaste, RotateCcw, ChevronUp, ChevronDown, Check, Save, Loader2, Settings } from 'lucide-react';
+import { Star, Copy, ClipboardPaste, RotateCcw, ChevronUp, ChevronDown, Check, Save, Settings } from 'lucide-react';
 import clsx from 'clsx';
 import Filmstrip from './Filmstrip';
 import { GLOBAL_KEYS, ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
@@ -110,10 +110,8 @@ export default function BottomBar({
   setIsFilmstripVisible,
   thumbnails,
   thumbnailAspectRatio,
-  zoom = 0,
   displaySize,
   originalSize,
-  baseRenderSize,
   totalImages,
 }: BottomBarProps) {
   const [isEditingPercent, setIsEditingPercent] = useState(false);

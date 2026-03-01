@@ -105,7 +105,7 @@ export default function Editor({
   setShowOriginal,
   showOriginal,
   targetZoom,
-  thumbnails,
+  thumbnails: _thumbnails,
   transformWrapperRef,
   transformedOriginalUrl,
   uncroppedAdjustedPreviewUrl,

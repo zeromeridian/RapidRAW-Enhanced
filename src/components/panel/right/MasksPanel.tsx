@@ -17,7 +17,6 @@ import {
   Circle,
   ClipboardPaste,
   Copy,
-  Edit,
   Eye,
   EyeOff,
   FileEdit,
@@ -714,7 +713,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
       animate={{ opacity: 1, height: 'auto', marginTop: '4px' }}
       exit={{ opacity: 0, height: 0, marginTop: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className={`p-4 rounded-lg text-center`}
+      className={`p-4 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
     >
       <p className="text-sm font-medium text-text-secondary">
         Drop here to create a new mask
@@ -998,7 +997,7 @@ function SubMaskRow({ subMask, index, totalCount, containerId, isActive, parentV
    );
 }
 
-function SettingsPanel({ container, activeSubMask, aiModelDownloadStatus, brushSettings, setBrushSettings, updateContainer, updateSubMask, histogram, appSettings, isGeneratingAiMask, setIsMaskControlHovered, collapsibleState, setCollapsibleState, copiedSectionAdjustments, setCopiedSectionAdjustments, onDragStateChange, isSettingsSectionOpen, setSettingsSectionOpen, presets }: any) {
+function SettingsPanel({ container, activeSubMask, aiModelDownloadStatus, brushSettings, setBrushSettings, updateContainer, updateSubMask, histogram, appSettings, isGeneratingAiMask: _isGeneratingAiMask, setIsMaskControlHovered, collapsibleState, setCollapsibleState, copiedSectionAdjustments, setCopiedSectionAdjustments, onDragStateChange, isSettingsSectionOpen, setSettingsSectionOpen, presets }: any) {
   const { showContextMenu } = useContextMenu();
   const isActive = !!container;
   const presetButtonRef = useRef<HTMLButtonElement>(null);

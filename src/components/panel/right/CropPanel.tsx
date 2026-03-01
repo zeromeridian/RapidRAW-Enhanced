@@ -81,7 +81,7 @@ export default function CropPanel({
   setIsRotationActive: setGlobalRotationActive,
   overlayMode: propOverlayMode,
   setOverlayMode: setPropOverlayMode,
-  overlayRotation: propOverlayRotation,
+  overlayRotation: _propOverlayRotation,
   setOverlayRotation: propSetOverlayRotation,
 }: CropPanelProps) {
   const [customW, setCustomW] = useState('');
@@ -286,7 +286,7 @@ export default function CropPanel({
       return;
     }
 
-    let targetRatio = preset.value;
+    const targetRatio = preset.value;
     if (activePreset === preset && targetRatio && targetRatio !== 1) {
       const newRatio = 1 / (adjustments.aspectRatio ? adjustments.aspectRatio : 1);
       setPreferPortrait(newRatio < 1);
