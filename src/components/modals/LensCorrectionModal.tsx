@@ -578,13 +578,12 @@ export default function LensCorrectionModal({
           <p className="text-sm font-semibold text-text-primary">Manual Selection</p>
 
           <div className="space-y-4">
-              <Dropdown
-                options={myLensOptions}
-                value=""
-                onChange={handleMyLensSelect}
-                placeholder="Choose Saved Lens"
-              />
-            
+            <Dropdown
+              options={myLensOptions}
+              value=""
+              onChange={handleMyLensSelect}
+              placeholder="Choose Saved Lens"
+            />
             <Dropdown
               options={makerOptions}
               value={params.lensMaker}

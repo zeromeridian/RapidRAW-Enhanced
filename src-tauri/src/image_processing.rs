@@ -149,42 +149,45 @@ pub fn downscale_f32_image(image: &DynamicImage, nwidth: u32, nheight: u32) -> D
     }
 
     let img = image.to_rgb32f();
-    let mut out = Rgb32FImage::new(new_w, new_h);
+    let src: &[f32] = img.as_flat_samples().samples;
 
     let x_ratio = width as f32 / new_w as f32;
     let y_ratio = height as f32 / new_h as f32;
 
-    for y_out in 0..new_h {
-        for x_out in 0..new_w {
-            let x_start = (x_out as f32 * x_ratio).floor() as u32;
-            let y_start = (y_out as f32 * y_ratio).floor() as u32;
-            let x_end = ((x_out + 1) as f32 * x_ratio).ceil() as u32;
-            let y_end = ((y_out + 1) as f32 * y_ratio).ceil() as u32;
-
-            let mut r_sum = 0.0;
-            let mut g_sum = 0.0;
-            let mut b_sum = 0.0;
-            let mut count = 0.0;
-
-            for y_in in y_start..y_end.min(height) {
-                for x_in in x_start..x_end.min(width) {
-                    let pixel = img.get_pixel(x_in, y_in);
-                    r_sum += pixel[0];
-                    g_sum += pixel[1];
-                    b_sum += pixel[2];
-                    count += 1.0;
+    let mut out_buf = vec![0.0f32; (new_w * new_h * 3) as usize];
+    out_buf
+        .par_chunks_exact_mut(new_w as usize * 3)
+        .enumerate()
+        .for_each(|(y_out, row)| {
+            let y_start = (y_out as f32 * y_ratio).floor() as usize;
+            let y_end = (((y_out + 1) as f32 * y_ratio).ceil() as usize).min(height as usize);
+            for x_out in 0..new_w as usize {
+                let x_start = (x_out as f32 * x_ratio).floor() as usize;
+                let x_end = (((x_out + 1) as f32 * x_ratio).ceil() as usize).min(width as usize);
+                let mut r_sum = 0.0f32;
+                let mut g_sum = 0.0f32;
+                let mut b_sum = 0.0f32;
+                let mut count = 0u32;
+                for y_in in y_start..y_end {
+                    let row_offset = y_in * width as usize * 3;
+                    for x_in in x_start..x_end {
+                        let idx = row_offset + x_in * 3;
+                        r_sum += src[idx];
+                        g_sum += src[idx + 1];
+                        b_sum += src[idx + 2];
+                        count += 1;
+                    }
+                }
+                if count > 0 {
+                    let n = count as f32;
+                    let out_idx = x_out * 3;
+                    row[out_idx] = r_sum / n;
+                    row[out_idx + 1] = g_sum / n;
+                    row[out_idx + 2] = b_sum / n;
                 }
             }
-
-            if count > 0.0 {
-                out.put_pixel(
-                    x_out,
-                    y_out,
-                    image::Rgb([r_sum / count, g_sum / count, b_sum / count]),
-                );
-            }
-        }
-    }
+        });
+    let out = Rgb32FImage::from_raw(new_w, new_h, out_buf).expect("buffer size mismatch");
     DynamicImage::ImageRgb32F(out)
 }
 

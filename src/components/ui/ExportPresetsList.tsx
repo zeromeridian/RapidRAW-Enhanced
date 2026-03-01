@@ -96,14 +96,13 @@ export default function ExportPresetsList({
 
       {!isCreating ? (
         <div className="flex gap-2">
-          <div className="flex-grow">
-            <Dropdown
-              value={selectedPresetId}
-              onChange={handleSelect}
-              options={dropdownOptions}
-              placeholder="Select a preset..."
-            />
-          </div>
+          <Dropdown
+            value={selectedPresetId}
+            onChange={handleSelect}
+            options={dropdownOptions}
+            placeholder="Select a preset..."
+            className="w-full"
+          />
 
           <button
             onClick={() => setIsCreating(true)}

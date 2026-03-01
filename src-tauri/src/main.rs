@@ -129,6 +129,12 @@ struct PreviewJob {
     is_interactive: bool,
 }
 
+#[derive(serde::Serialize, Clone)]
+struct PreviewUpdatePayload {
+    path: String,
+    data: Vec<u8>,
+}
+
 pub struct AppState {
     window_setup_complete: AtomicBool,
     original_image: Mutex<Option<LoadedImage>>,
@@ -911,7 +917,10 @@ fn process_preview_job(
             .encode_rgb(&rgb_pixels, width as u32, height as u32)
         {
             Ok(bytes) => {
-                let _ = app_handle.emit("preview-update-final", bytes);
+                let _ = app_handle.emit("preview-update-final", PreviewUpdatePayload {
+                    path: loaded_image.path.clone(),
+                    data: bytes,
+                });
             },
             Err(e) => {
                 log::error!("Failed to encode preview with mozjpeg-rs: {}", e);
@@ -1383,7 +1392,10 @@ async fn generate_fullscreen_preview(
             .encode_rgb(&rgb_pixels, width as u32, height as u32)
         {
             Ok(bytes) => {
-                let _ = app_handle_clone.emit("preview-update-final", bytes);
+                let _ = app_handle_clone.emit("preview-update-final", PreviewUpdatePayload {
+                    path: path.clone(),
+                    data: bytes,
+                });
             }
             Err(e) => {
                 log::error!("Failed to encode fullscreen preview with mozjpeg-rs: {}", e);
@@ -3510,6 +3522,28 @@ fn get_log_file_path(app_handle: tauri::AppHandle) -> Result<String, String> {
     Ok(log_file_path.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+fn frontend_log(level: String, message: String) -> Result<(), String> {
+    let trimmed = message.trim();
+    if trimmed.is_empty() {
+        return Ok(());
+    }
+
+    let log_line = |line: &str| match level.to_lowercase().as_str() {
+        "error" => log::error!("[frontend] {}", line),
+        "warn" => log::warn!("[frontend] {}", line),
+        "debug" => log::debug!("[frontend] {}", line),
+        "trace" => log::trace!("[frontend] {}", line),
+        _ => log::info!("[frontend] {}", line),
+    };
+
+    for line in trimmed.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        log_line(line);
+    }
+
+    Ok(())
+}
+
 fn handle_file_open(app_handle: &tauri::AppHandle, path: PathBuf) {
     if let Some(path_str) = path.to_str() {
         if let Err(e) = app_handle.emit("open-with-file", path_str) {
@@ -3851,6 +3885,7 @@ fn main() {
             invoke_generative_replace_with_mask_def,
             get_supported_file_types,
             get_log_file_path,
+            frontend_log,
             save_collage,
             stitch_panorama,
             save_panorama,
