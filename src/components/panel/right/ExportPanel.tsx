@@ -9,6 +9,7 @@ import Slider from '../../ui/Slider';
 import ImagePicker from '../../ui/ImagePicker';
 import { Adjustments } from '../../../utils/adjustments';
 import {
+  ExportPreset,
   ExportSettings,
   FileFormat,
   FILE_FORMATS,
@@ -206,22 +207,30 @@ export default function ExportPanel({
     currentSettingsObject,
   } = useExportSettings();
 
-  const formatInitialized = useRef(false);
+  const initDone = useRef(false);
   useEffect(() => {
-    if (!formatInitialized.current && appSettings?.lastExportFormat) {
-      setFileFormat(appSettings.lastExportFormat);
-      formatInitialized.current = true;
-    } else if (appSettings !== null) {
-      formatInitialized.current = true;
+    if (initDone.current || appSettings === null) return;
+    initDone.current = true;
+    const lastUsed = appSettings.exportPresets?.find(p => p.id === '__last_used__');
+    if (lastUsed) {
+      handleApplyPreset(lastUsed);
     }
-  }, [appSettings, setFileFormat]);
+  }, [appSettings, handleApplyPreset]);
 
-  const handleSetFileFormat = useCallback((format: string) => {
-    setFileFormat(format);
-    if (appSettings) {
-      onSettingsChange({ ...appSettings, lastExportFormat: format });
-    }
-  }, [appSettings, onSettingsChange, setFileFormat]);
+  const saveLastUsedPreset = useCallback((exportPath: string) => {
+    if (!appSettings) return;
+    const lastUsedPreset: ExportPreset = {
+      ...currentSettingsObject,
+      id: '__last_used__',
+      name: '__last_used__',
+      lastExportPath: exportPath,
+    };
+    const updatedPresets = [
+      ...(appSettings.exportPresets ?? []).filter(p => p.id !== '__last_used__'),
+      lastUsedPreset,
+    ];
+    onSettingsChange({ ...appSettings, exportPresets: updatedPresets });
+  }, [appSettings, currentSettingsObject, onSettingsChange]);
 
   const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
@@ -405,17 +414,17 @@ export default function ExportPanel({
           : null,
     };
 
+    const lastExportPath = appSettings?.exportPresets?.find(p => p.id === '__last_used__')?.lastExportPath;
+
     try {
       if (isBatchMode || !isEditorContext) {
         const outputFolder = await open({
           title: `Select Folder to Export ${numImages} Image(s)`,
           directory: true,
-          defaultPath: appSettings?.lastExportPath ?? undefined,
+          defaultPath: lastExportPath ?? undefined,
         });
         if (outputFolder) {
-          if (appSettings) {
-            onSettingsChange({ ...appSettings, lastExportPath: outputFolder as string });
-          }
+          saveLastUsedPreset(outputFolder as string);
           await invoke(Invokes.BatchExportImages, {
             exportSettings,
             outputFolder,
@@ -430,9 +439,8 @@ export default function ExportPanel({
         const originalFilename = selectedImage.path.split(/[\\/]/).pop() || '';
         const stem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
         const suggestedName = finalFilenameTemplate.replace('{original_filename}', stem);
-        const lastDir = appSettings?.lastExportPath;
-        const defaultPath = lastDir
-          ? `${lastDir}/${suggestedName}.${selectedFormat.extensions[0]}`
+        const defaultPath = lastExportPath
+          ? `${lastExportPath}/${suggestedName}.${selectedFormat.extensions[0]}`
           : `${suggestedName}.${selectedFormat.extensions[0]}`;
         const filePath = await save({
           title: 'Save Edited Image',
@@ -445,9 +453,7 @@ export default function ExportPanel({
         });
         if (filePath) {
           const dir = filePath.substring(0, Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')));
-          if (dir && appSettings) {
-            onSettingsChange({ ...appSettings, lastExportPath: dir });
-          }
+          if (dir) saveLastUsedPreset(dir);
           await invoke(Invokes.ExportImage, {
             exportSettings,
             jsAdjustments: adjustments,
@@ -504,7 +510,7 @@ export default function ExportPanel({
                     } disabled:opacity-50`}
                     disabled={isExporting}
                     key={format.id}
-                    onClick={() => handleSetFileFormat(format.id)}
+                    onClick={() => setFileFormat(format.id)}
                   >
                     {format.name}
                   </button>
@@ -525,28 +531,30 @@ export default function ExportPanel({
               )}
             </Section>
 
-            <Section title="File Naming">
-              <input
-                className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
-                disabled={isExporting}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilenameTemplate(e.target.value)}
-                ref={filenameInputRef}
-                type="text"
-                value={filenameTemplate}
-              />
-              <div className="flex flex-wrap gap-2 mt-2">
-                {FILENAME_VARIABLES.map((variable: string) => (
-                  <button
-                    className="px-2 py-1 bg-surface text-text-secondary text-xs rounded-md hover:bg-card-active transition-colors disabled:opacity-50"
-                    disabled={isExporting}
-                    key={variable}
-                    onClick={() => handleVariableClick(variable)}
-                  >
-                    {variable}
-                  </button>
-                ))}
-              </div>
-            </Section>
+            {isBatchMode && (
+              <Section title="File Naming">
+                <input
+                  className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
+                  disabled={isExporting}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilenameTemplate(e.target.value)}
+                  ref={filenameInputRef}
+                  type="text"
+                  value={filenameTemplate}
+                />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {FILENAME_VARIABLES.map((variable: string) => (
+                    <button
+                      className="px-2 py-1 bg-surface text-text-secondary text-xs rounded-md hover:bg-card-active transition-colors disabled:opacity-50"
+                      disabled={isExporting}
+                      key={variable}
+                      onClick={() => handleVariableClick(variable)}
+                    >
+                      {variable}
+                    </button>
+                  ))}
+                </div>
+              </Section>
+            )}
 
             <Section title="Image Sizing">
               <Switch label="Resize to Fit" checked={enableResize} onChange={setEnableResize} disabled={isExporting} />

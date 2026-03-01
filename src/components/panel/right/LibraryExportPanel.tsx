@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { Save, CheckCircle, XCircle, Loader, X, Ban } from 'lucide-react';
@@ -8,6 +8,7 @@ import Dropdown from '../../ui/Dropdown';
 import Slider from '../../ui/Slider';
 import ImagePicker from '../../ui/ImagePicker';
 import {
+  ExportPreset,
   FileFormat,
   FILE_FORMATS,
   FILENAME_VARIABLES,
@@ -207,6 +208,31 @@ export default function LibraryExportPanel({
     currentSettingsObject,
   } = useExportSettings();
 
+  const initDone = useRef(false);
+  useEffect(() => {
+    if (initDone.current || appSettings === null) return;
+    initDone.current = true;
+    const lastUsed = appSettings.exportPresets?.find(p => p.id === '__last_used__');
+    if (lastUsed) {
+      handleApplyPreset(lastUsed);
+    }
+  }, [appSettings, handleApplyPreset]);
+
+  const saveLastUsedPreset = useCallback((exportPath: string) => {
+    if (!appSettings) return;
+    const lastUsedPreset: ExportPreset = {
+      ...currentSettingsObject,
+      id: '__last_used__',
+      name: '__last_used__',
+      lastExportPath: exportPath,
+    };
+    const updatedPresets = [
+      ...(appSettings.exportPresets ?? []).filter(p => p.id !== '__last_used__'),
+      lastUsedPreset,
+    ];
+    onSettingsChange({ ...appSettings, exportPresets: updatedPresets });
+  }, [appSettings, currentSettingsObject, onSettingsChange]);
+
   const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
   const [watermarkImageAspectRatio, setWatermarkImageAspectRatio] = useState(1);
@@ -404,17 +430,17 @@ export default function LibraryExportPanel({
           : null,
     };
 
+    const lastExportPath = appSettings?.exportPresets?.find(p => p.id === '__last_used__')?.lastExportPath;
+
     try {
       const outputFolder = await open({
         directory: true,
         title: `Select Folder to Export ${numImages} Image(s)`,
-        defaultPath: appSettings?.lastExportPath ?? undefined,
+        defaultPath: lastExportPath ?? undefined,
       });
 
       if (outputFolder) {
-        if (appSettings) {
-          onSettingsChange({ ...appSettings, lastExportPath: outputFolder as string });
-        }
+        saveLastUsedPreset(outputFolder as string);
         await invoke(Invokes.BatchExportImages, {
           exportSettings,
           outputFolder,
