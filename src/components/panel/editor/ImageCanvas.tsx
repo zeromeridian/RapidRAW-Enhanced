@@ -59,6 +59,7 @@ interface ImageCanvasProps {
   overlayMode?: OverlayMode;
   overlayRotation?: number;
   cursorStyle: string;
+  isMaxZoom?: boolean;
 }
 
 interface ImageLayer {
@@ -83,18 +84,18 @@ interface MaskOverlay {
 
 const MaskOverlay = memo(
   ({
-     adjustments,
-     imageHeight,
-     imageWidth,
-     isToolActive,
-     isSelected,
-     onMaskMouseEnter,
-     onMaskMouseLeave,
-     onSelect,
-     onUpdate,
-     scale,
-     subMask,
-   }: MaskOverlay) => {
+    adjustments,
+    imageHeight,
+    imageWidth,
+    isToolActive,
+    isSelected,
+    onMaskMouseEnter,
+    onMaskMouseLeave,
+    onSelect,
+    onUpdate,
+    scale,
+    subMask,
+  }: MaskOverlay) => {
     const shapeRef = useRef<any>(null);
     const trRef = useRef<any>(null);
 
@@ -155,15 +156,18 @@ const MaskOverlay = memo(
       });
     }, [subMask.id, subMask.parameters, onUpdate, scale, cropX, cropY]);
 
-    const handleRadialDragEnd = useCallback((e: any) => {
-      onUpdate(subMask.id, {
-        parameters: {
-          ...subMask.parameters,
-          centerX: e.target.x() / scale + cropX,
-          centerY: e.target.y() / scale + cropY,
-        },
-      });
-    }, [subMask.id, subMask.parameters, onUpdate, scale, cropX, cropY]);
+    const handleRadialDragEnd = useCallback(
+      (e: any) => {
+        onUpdate(subMask.id, {
+          parameters: {
+            ...subMask.parameters,
+            centerX: e.target.x() / scale + cropX,
+            centerY: e.target.y() / scale + cropY,
+          },
+        });
+      },
+      [subMask.id, subMask.parameters, onUpdate, scale, cropX, cropY],
+    );
 
     const handleGroupDragEnd = (e: any) => {
       const group = e.target;
@@ -291,7 +295,16 @@ const MaskOverlay = memo(
               ref={trRef}
               centeredScaling={true}
               rotateEnabled={true}
-              enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'bottom-center', 'middle-left', 'middle-right']}
+              enabledAnchors={[
+                'top-left',
+                'top-right',
+                'bottom-left',
+                'bottom-right',
+                'top-center',
+                'bottom-center',
+                'middle-left',
+                'middle-right',
+              ]}
               onMouseDown={(e) => {
                 e.cancelBubble = true;
                 e.evt.preventDefault();
@@ -332,7 +345,7 @@ const MaskOverlay = memo(
         hitStrokeWidth: 20,
       };
 
-      const perpendicularDragBoundFunc = function(pos: any) {
+      const perpendicularDragBoundFunc = function (pos: any) {
         const group = this.getParent();
         const transform = group.getAbsoluteTransform().copy();
         transform.invert();
@@ -497,7 +510,8 @@ const ImageCanvas = memo(
     setAdjustments,
     overlayRotation,
     overlayMode,
-    cursorStyle
+    cursorStyle,
+    isMaxZoom,
   }: ImageCanvasProps) => {
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
     const [layers, setLayers] = useState<Array<ImageLayer>>([]);
@@ -579,7 +593,6 @@ const ImageCanvas = memo(
       }
     }, [maskOpacity]);
 
-
     useEffect(() => {
       if (isToolActive) {
         return;
@@ -605,9 +618,7 @@ const ImageCanvas = memo(
       const { path: currentImagePath, originalUrl, thumbnailUrl } = selectedImage;
       const imageChanged = currentImagePath !== imagePathRef.current;
 
-      const currentPreviewUrl = showOriginal
-        ? transformedOriginalUrl
-        : finalPreviewUrl;
+      const currentPreviewUrl = showOriginal ? transformedOriginalUrl : finalPreviewUrl;
 
       if (imageChanged) {
         imagePathRef.current = currentImagePath;
@@ -648,12 +659,7 @@ const ImageCanvas = memo(
           });
         }
       }
-    }, [
-      selectedImage,
-      finalPreviewUrl,
-      transformedOriginalUrl,
-      showOriginal,
-    ]);
+    }, [selectedImage, finalPreviewUrl, transformedOriginalUrl, showOriginal]);
 
     useEffect(() => {
       const layerToFadeIn = layers.find((l: ImageLayer) => l.opacity === 0);
@@ -686,90 +692,95 @@ const ImageCanvas = memo(
       }
     }, [isCropping, uncroppedAdjustedPreviewUrl]);
 
-    const handleWbClick = useCallback((e: any) => {
-      if (!isWbPickerActive || !finalPreviewUrl || !onWbPicked) return;
+    const handleWbClick = useCallback(
+      (e: any) => {
+        if (!isWbPickerActive || !finalPreviewUrl || !onWbPicked) return;
 
-      const stage = e.target.getStage();
-      const pointerPos = stage.getPointerPosition();
-      if (!pointerPos) return;
+        const stage = e.target.getStage();
+        const pointerPos = stage.getPointerPosition();
+        if (!pointerPos) return;
 
-      const x = pointerPos.x / imageRenderSize.scale;
-      const y = pointerPos.y / imageRenderSize.scale;
+        const x = pointerPos.x / imageRenderSize.scale;
+        const y = pointerPos.y / imageRenderSize.scale;
 
-      const imgLogicalWidth = imageRenderSize.width / imageRenderSize.scale;
-      const imgLogicalHeight = imageRenderSize.height / imageRenderSize.scale;
+        const imgLogicalWidth = imageRenderSize.width / imageRenderSize.scale;
+        const imgLogicalHeight = imageRenderSize.height / imageRenderSize.scale;
 
-      if (x < 0 || x > imgLogicalWidth || y < 0 || y > imgLogicalHeight) return;
+        if (x < 0 || x > imgLogicalWidth || y < 0 || y > imgLogicalHeight) return;
 
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      img.src = finalPreviewUrl;
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.src = finalPreviewUrl;
 
-      img.onload = () => {
-        const radius = 5;
-        const side = radius * 2 + 1;
+        img.onload = () => {
+          const radius = 5;
+          const side = radius * 2 + 1;
 
-        const canvas = document.createElement('canvas');
-        canvas.width = side;
-        canvas.height = side;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (!ctx) return;
+          const canvas = document.createElement('canvas');
+          canvas.width = side;
+          canvas.height = side;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          if (!ctx) return;
 
-        const scaleX = img.width / imgLogicalWidth;
-        const scaleY = img.height / imgLogicalHeight;
-        const srcX = Math.floor(x * scaleX);
-        const srcY = Math.floor(y * scaleY);
+          const scaleX = img.width / imgLogicalWidth;
+          const scaleY = img.height / imgLogicalHeight;
+          const srcX = Math.floor(x * scaleX);
+          const srcY = Math.floor(y * scaleY);
 
-        const startX = Math.max(0, srcX - radius);
-        const startY = Math.max(0, srcY - radius);
-        const endX = Math.min(img.width, srcX + radius + 1);
-        const endY = Math.min(img.height, srcY + radius + 1);
-        const sw = endX - startX;
-        const sh = endY - startY;
+          const startX = Math.max(0, srcX - radius);
+          const startY = Math.max(0, srcY - radius);
+          const endX = Math.min(img.width, srcX + radius + 1);
+          const endY = Math.min(img.height, srcY + radius + 1);
+          const sw = endX - startX;
+          const sh = endY - startY;
 
-        if (sw <= 0 || sh <= 0) return;
+          if (sw <= 0 || sh <= 0) return;
 
-        ctx.drawImage(img, startX, startY, sw, sh, 0, 0, sw, sh);
+          ctx.drawImage(img, startX, startY, sw, sh, 0, 0, sw, sh);
 
-        const imageData = ctx.getImageData(0, 0, sw, sh);
-        const data = imageData.data;
+          const imageData = ctx.getImageData(0, 0, sw, sh);
+          const data = imageData.data;
 
-        let rTotal = 0, gTotal = 0, bTotal = 0;
-        let count = 0;
+          let rTotal = 0,
+            gTotal = 0,
+            bTotal = 0;
+          let count = 0;
 
-        for (let i = 0; i < data.length; i += 4) {
-          rTotal += data[i];
-          gTotal += data[i + 1];
-          bTotal += data[i + 2];
-          count++;
-        }
+          for (let i = 0; i < data.length; i += 4) {
+            rTotal += data[i];
+            gTotal += data[i + 1];
+            bTotal += data[i + 2];
+            count++;
+          }
 
-        if (count === 0) return;
+          if (count === 0) return;
 
-        const avgR = rTotal / count;
-        const avgG = gTotal / count;
-        const avgB = bTotal / count;
+          const avgR = rTotal / count;
+          const avgG = gTotal / count;
+          const avgB = bTotal / count;
 
-        const linR = Math.pow(avgR / 255.0, 2.2);
-        const linG = Math.pow(avgG / 255.0, 2.2);
-        const linB = Math.pow(avgB / 255.0, 2.2);
+          const linR = Math.pow(avgR / 255.0, 2.2);
+          const linG = Math.pow(avgG / 255.0, 2.2);
+          const linB = Math.pow(avgB / 255.0, 2.2);
 
-        const sumRB = linR + linB;
-        const deltaTemp = sumRB > 0.0001 ? ((linB - linR) / sumRB) * 125.0 : 0;
+          const sumRB = linR + linB;
+          const deltaTemp = sumRB > 0.0001 ? ((linB - linR) / sumRB) * 125.0 : 0;
 
-        const linM = sumRB / 2.0;
-        const sumGM = linG + linM;
-        const deltaTint = sumGM > 0.0001 ? ((linG - linM) / sumGM) * 400.0 : 0;
+          const linM = sumRB / 2.0;
+          const sumGM = linG + linM;
+          const deltaTint = sumGM > 0.0001 ? ((linG - linM) / sumGM) * 400.0 : 0;
 
-        setAdjustments((prev: Adjustments) => ({
-          ...prev,
-          temperature: Math.max(-100, Math.min(100, (prev.temperature || 0) + deltaTemp)),
-          tint: Math.max(-100, Math.min(100, (prev.tint || 0) + deltaTint)),
-        }));
+          setAdjustments((prev: Adjustments) => ({
+            ...prev,
+            temperature: Math.max(-100, Math.min(100, (prev.temperature || 0) + deltaTemp)),
+            tint: Math.max(-100, Math.min(100, (prev.tint || 0) + deltaTint)),
+          }));
 
-        onWbPicked();
-      };
-    }, [isWbPickerActive, finalPreviewUrl, imageRenderSize, onWbPicked, setAdjustments]);
+          onWbPicked();
+        };
+      },
+      [isWbPickerActive, finalPreviewUrl, imageRenderSize, onWbPicked, setAdjustments],
+    );
 
     const handleMouseDown = useCallback(
       (e: any) => {
@@ -876,7 +887,24 @@ const ImageCanvas = memo(
           }
         }
       },
-      [isWbPickerActive, handleWbClick, isBrushActive, isAiSubjectActive, brushSettings, onSelectMask, onSelectAiSubMask, isMasking, isAiEditing, imageRenderSize, adjustments.crop, activeMaskId, activeAiSubMaskId, activeSubMask, updateSubMask, effectiveImageDimensions],
+      [
+        isWbPickerActive,
+        handleWbClick,
+        isBrushActive,
+        isAiSubjectActive,
+        brushSettings,
+        onSelectMask,
+        onSelectAiSubMask,
+        isMasking,
+        isAiEditing,
+        imageRenderSize,
+        adjustments.crop,
+        activeMaskId,
+        activeAiSubMaskId,
+        activeSubMask,
+        updateSubMask,
+        effectiveImageDimensions,
+      ],
     );
 
     const handleMouseMove = useCallback(
@@ -1009,7 +1037,7 @@ const ImageCanvas = memo(
       onGenerateAiMask,
       onQuickErase,
       updateSubMask,
-      effectiveImageDimensions
+      effectiveImageDimensions,
     ]);
 
     const handleMouseEnter = useCallback(() => {
@@ -1180,13 +1208,9 @@ const ImageCanvas = memo(
         return { width: 0, height: 0 };
       }
 
-      const width = crop.unit === '%'
-        ? uncroppedImageRenderSize.width * (crop.width / 100)
-        : crop.width;
+      const width = crop.unit === '%' ? uncroppedImageRenderSize.width * (crop.width / 100) : crop.width;
 
-      const height = crop.unit === '%'
-        ? uncroppedImageRenderSize.height * (crop.height / 100)
-        : crop.height;
+      const height = crop.unit === '%' ? uncroppedImageRenderSize.height * (crop.height / 100) : crop.height;
 
       return { width, height };
     };
@@ -1229,8 +1253,7 @@ const ImageCanvas = memo(
                       opacity: layer.opacity,
                       transition: 'opacity 80ms linear',
                       willChange: 'opacity, transform',
-                      imageRendering: 'high-quality',
-                      WebkitImageRendering: 'high-quality',
+                      imageRendering: isMaxZoom ? 'pixelated' : 'auto',
                       transform: 'translateZ(0)',
                       backfaceVisibility: 'hidden',
                     }}
@@ -1250,6 +1273,7 @@ const ImageCanvas = memo(
                     top: `${imageRenderSize.offsetY}px`,
                     transition: 'opacity 200ms ease-in-out',
                     width: `${imageRenderSize.width}px`,
+                    imageRendering: isMaxZoom ? 'pixelated' : 'auto',
                   }}
                 />
               )}
@@ -1350,8 +1374,7 @@ const ImageCanvas = memo(
                     return null;
                   }
                   const showDenseGrid = isRotationActive && !isStraightenActive;
-                  const currentOverlayMode =
-                    isRotationActive || isStraightenActive ? 'none' : overlayMode || 'none';
+                  const currentOverlayMode = isRotationActive || isStraightenActive ? 'none' : overlayMode || 'none';
                   return (
                     <CompositionOverlays
                       width={width}
@@ -1373,6 +1396,7 @@ const ImageCanvas = memo(
                     height: `${uncroppedImageRenderSize.height}px`,
                     objectFit: 'contain',
                     transform: cropImageTransforms,
+                    imageRendering: isMaxZoom ? 'pixelated' : 'auto',
                   }}
                 />
               </ReactCrop>

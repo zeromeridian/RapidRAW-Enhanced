@@ -596,8 +596,8 @@ export default function Editor({
         activeSubMask?.type === Mask.QuickEraser));
 
   const waveFormData: WaveformData = waveform || { blue: [], green: [], height: 0, luma: [], red: [], width: 0 };
-
   const isZoomActionActive = !isCropping && !isMasking && !isAiEditing && !isWbPickerActive;
+  const isMaxZoom = transformState.scale >= transformConfig.maxScale - 0.02;
 
   let cursorStyle = 'default';
   if (isZoomActionActive) {
@@ -733,6 +733,7 @@ export default function Editor({
               overlayRotation={overlayRotation}
               overlayMode={overlayMode}
               cursorStyle={cursorStyle}
+              isMaxZoom={isMaxZoom}
             />
           </TransformComponent>
         </TransformWrapper>
