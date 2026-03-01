@@ -242,6 +242,7 @@ fn default_export_presets() -> Vec<ExportPreset> {
             watermark_spacing: 5,
             watermark_opacity: 75,
             export_masks: Some(false),
+            last_export_path: None,
         },
         ExportPreset {
             id: "default-fast".to_string(),
@@ -262,6 +263,7 @@ fn default_export_presets() -> Vec<ExportPreset> {
             watermark_spacing: 5,
             watermark_opacity: 75,
             export_masks: Some(false),
+            last_export_path: None,
         },
     ]
 }
