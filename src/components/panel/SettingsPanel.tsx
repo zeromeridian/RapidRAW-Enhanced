@@ -91,7 +91,7 @@ const adjustmentVisibilityDefaults = {
   grain: true,
 };
 
-const resolutions: Array<OptionItem> = [
+const resolutions: OptionItem<number>[] = [
   { value: 720, label: '720px' },
   { value: 1280, label: '1280px' },
   { value: 1920, label: '1920px' },
@@ -99,7 +99,7 @@ const resolutions: Array<OptionItem> = [
   { value: 3840, label: '3840px' },
 ];
 
-const backendOptions: OptionItem[] = [
+const backendOptions: OptionItem<string>[] = [
   { value: 'auto', label: 'Auto' },
   { value: 'vulkan', label: 'Vulkan' },
   { value: 'dx12', label: 'DirectX 12' },
@@ -107,7 +107,7 @@ const backendOptions: OptionItem[] = [
   { value: 'gl', label: 'OpenGL' },
 ];
 
-const linearRawOptions: OptionItem[] = [
+const linearRawOptions: OptionItem<string>[] = [
   { value: 'auto', label: 'Auto' },
   { value: 'gamma', label: 'Apply Gamma' },
   { value: 'skip_calib', label: 'Skip Calibrate' },

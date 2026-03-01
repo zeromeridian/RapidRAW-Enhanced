@@ -3,38 +3,40 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Check, ChevronDown } from 'lucide-react';
 import Input from './Input';
 
-interface DropdownProps {
+export interface OptionItem<T extends React.Key> {
+  label: string;
+  value: T;
+}
+
+interface DropdownProps<T extends React.Key> {
   className?: string;
-  onChange: any;
-  options: Array<any>;
+  onChange: (value: T) => void;
+  options: Array<OptionItem<T>>;
   placeholder?: string;
   searchPlaceholder?: string;
-  value: string;
+  value: T | null;
+  disabled?: boolean;
 }
 
-export interface OptionItem {
-  label: string;
-  value: any;
-}
-
-export default function Dropdown({
+const Dropdown = <T extends React.Key>({
   className = '',
   onChange,
   options,
   placeholder = 'Select an option',
   searchPlaceholder = 'Filter options...',
   value,
-}: DropdownProps) {
+  disabled = false,
+}: DropdownProps<T>) => {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<any>(null);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearch, setShowSearch] = useState(false);
-  const selectedOption = options.find((opt: OptionItem) => opt.value === value) || null;
+  const selectedOption = options.find((opt) => opt.value === value) || null;
 
   useEffect(() => {
-    const handleClickOutside = (event: any) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -51,14 +53,14 @@ export default function Dropdown({
     }
   }, [isOpen]);
 
-  const handleSelect = (option: OptionItem) => {
+  const handleSelect = (option: OptionItem<T>) => {
     onChange(option.value);
     setIsOpen(false);
   };
 
   const filteredOptions = useMemo(() => {
     if (!searchTerm) return options;
-    return options.filter((opt: OptionItem) => String(opt.label).toLowerCase().includes(searchTerm.toLowerCase()));
+    return options.filter((opt) => opt.label.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [options, searchTerm]);
 
   const isPrintableKey = (e: React.KeyboardEvent<Element>): boolean => {
@@ -99,7 +101,8 @@ export default function Dropdown({
       <button
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 focus:ring-accent focus:border-accent focus:outline-none focus:ring-2 flex justify-between items-center text-left"
+        disabled={disabled}
+        className="w-full bg-bg-primary border border-border-color rounded-md px-3 py-2 focus:ring-accent focus:border-accent focus:outline-none focus:ring-2 flex justify-between items-center text-left disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={() => setIsOpen(!isOpen)}
         type="button"
       >
@@ -135,7 +138,7 @@ export default function Dropdown({
                 />
               )}
 
-              {filteredOptions.map((option: OptionItem) => {
+              {filteredOptions.map((option: OptionItem<T>) => {
                 const isSelected = value === option.value;
                 return (
                   <button
@@ -164,4 +167,6 @@ export default function Dropdown({
       </AnimatePresence>
     </div>
   );
-}
+};
+
+export default Dropdown;
