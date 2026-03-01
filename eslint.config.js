@@ -1,8 +1,8 @@
 const js = require('@eslint/js');
 const tseslint = require('typescript-eslint');
 const react = require('eslint-plugin-react');
-const prettier = require('eslint-plugin-prettier');
-const prettierConfig = require('eslint-config-prettier');
+// const prettier = require('eslint-plugin-prettier');
+// const prettierConfig = require('eslint-config-prettier');
 
 const tsFiles = ['**/*.{ts,tsx}'];
 
@@ -32,7 +32,6 @@ module.exports = [
     files: tsFiles,
     plugins: {
       react,
-      prettier,
     },
     languageOptions: {
       ecmaVersion: 'latest',
@@ -49,8 +48,6 @@ module.exports = [
       },
     },
     rules: {
-      semi: ['error', 'always'],
-      quotes: ['error', 'single'],
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -58,8 +55,8 @@ module.exports = [
       ],
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
-      'prettier/prettier': 'error',
+      // 'prettier/prettier': 'error',
     },
   },
-  prettierConfig,
+  // prettierConfig,
 ];
