@@ -166,7 +166,7 @@ export default function LibraryExportPanel({
   multiSelectedPaths,
   onClose,
   setExportState,
-  imageList,
+  imageList: _imageList,
   appSettings,
   onSettingsChange,
 }: LibraryExportPanelProps) {
@@ -231,7 +231,7 @@ export default function LibraryExportPanel({
           } else {
             setImageAspectRatio(3 / 2);
           }
-        } catch (error) {
+        } catch (_error) {
           console.warn(`Could not get dimensions for preview, using default aspect ratio.`);
           setImageAspectRatio(3 / 2);
         }

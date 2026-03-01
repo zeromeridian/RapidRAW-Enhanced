@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { relaunch } from '@tauri-apps/plugin-process';
-import { open as openLink } from '@tauri-apps/plugin-shell';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { useUser } from '@clerk/clerk-react';
@@ -166,28 +165,6 @@ const DataActionItem = ({
   </div>
 );
 
-const ExternalLink = ({ href, children, className }: { href: string; children: any; className?: string }) => {
-  const handleClick = async (e: any) => {
-    e.preventDefault();
-    try {
-      await openLink(href);
-    } catch (err) {
-      console.error(`Failed to open link: ${href}`, err);
-    }
-  };
-
-  return (
-    <a
-      href={href}
-      onClick={handleClick}
-      className={clsx('text-accent hover:underline inline-flex items-center gap-1', className)}
-    >
-      {children}
-      <ExternalLinkIcon size={12} />
-    </a>
-  );
-};
-
 const aiProviders = [
   { id: 'cpu', label: 'CPU', icon: Cpu },
   { id: 'ai-connector', label: 'AI Connector', icon: Server },
@@ -240,7 +217,7 @@ export default function SettingsPanel({
   onSettingsChange,
   rootPath,
 }: SettingsPanelProps) {
-  const { user } = useUser();
+  const { user: _user } = useUser();
   const [isClearing, setIsClearing] = useState(false);
   const [clearMessage, setClearMessage] = useState('');
   const [isClearingCache, setIsClearingCache] = useState(false);

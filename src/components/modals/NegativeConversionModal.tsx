@@ -5,7 +5,6 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize,
-  Wand2,
   Save,
   Loader2,
   Eye,
@@ -49,7 +48,6 @@ export default function NegativeConversionModal({
 }: NegativeConversionModalProps) {
   const [params, setParams] = useState<NegativeParams>(DEFAULT_PARAMS);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isMounted, setIsMounted] = useState(false);

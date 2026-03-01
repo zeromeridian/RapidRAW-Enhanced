@@ -209,7 +209,7 @@ function DroppableFolderItem({ folder, onContextMenu, children, onToggle, isExpa
         className="flex items-center gap-2 p-2 rounded-lg bg-surface cursor-pointer"
         onContextMenu={(e: any) => onContextMenu(e, { folder })}
       >
-        <div className="p-1 cursor-grab" {...listeners} {...attributes}>
+        <div className="p-1 cursor-grab" ref={setDraggableNodeRef} {...listeners} {...attributes}>
           {isExpanded ? (
             <FolderOpen
               className="text-primary"

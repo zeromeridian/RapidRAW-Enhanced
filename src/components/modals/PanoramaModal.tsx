@@ -54,7 +54,7 @@ export default function PanoramaModal({
     try {
       const path = await onSave();
       setSavedPath(path);
-    } catch (e) {
+    } catch (_e) {
       // Error handling can be added here if needed
     } finally {
       setIsSaving(false);

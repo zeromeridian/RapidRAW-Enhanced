@@ -1,15 +1,6 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { 
-  Check, 
-  ChevronDown, 
-  ChevronRight, 
-  Palette, 
-  Plus, 
-  Star, 
-  Tag, 
-  X 
-} from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Plus, Star, Tag, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { SelectedImage, AppSettings, Invokes } from '../../ui/AppProperties';
@@ -149,7 +140,7 @@ export default function MetadataPanel({
     const lonStr = exif.GPSLongitude;
     const lonRef = exif.GPSLongitudeRef;
 
-    let gpsData: GPSData = { lat: null, lon: null, altitude: exif.GPSAltitude || null };
+    const gpsData: GPSData = { lat: null, lon: null, altitude: exif.GPSAltitude || null };
     if (latStr && latRef && lonStr && lonRef) {
       const parsedLat = parseDms(latStr);
       const parsedLon = parseDms(lonStr);

@@ -1121,7 +1121,7 @@ export default function MainLibrary({
   isIndexing,
   isLoading,
   isThumbnailsLoading,
-  isTreeLoading,
+  isTreeLoading: _isTreeLoading,
   libraryScrollTop,
   libraryViewMode,
   multiSelectedPaths,
@@ -1153,7 +1153,7 @@ export default function MainLibrary({
 }: MainLibraryProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [appVersion, setAppVersion] = useState('');
-  const [supportedTypes, setSupportedTypes] = useState<SupportedTypes | null>(null);
+  const [, setSupportedTypes] = useState<SupportedTypes | null>(null);
   const libraryContainerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<List>(null);
   const outerRef = useRef<HTMLDivElement>(null);
@@ -1636,7 +1636,7 @@ export default function MainLibrary({
               const rowHeight = itemWidth + ITEM_GAP;
               const headerHeight = 40;
 
-              let rows: any[] = [];
+              const rows: any[] = [];
 
               if (libraryViewMode === LibraryViewMode.Recursive && groups) {
                 groups.forEach((group) => {

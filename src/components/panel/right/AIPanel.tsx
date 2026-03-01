@@ -223,7 +223,7 @@ export default function AIPanel({
   isGeneratingAi,
   onGenerativeReplace,
   onDeletePatch,
-  onTogglePatchVisibility,
+  onTogglePatchVisibility: _onTogglePatchVisibility,
   activePatchContainerId,
   onSelectPatchContainer,
   activeSubMaskId,
@@ -251,10 +251,9 @@ export default function AIPanel({
     properties: true,
   });
 
-  const { showContextMenu } = useContextMenu();
   const { setNodeRef: setRootDroppableRef, isOver: isRootOver } = useDroppable({ id: 'ai-list-root' });
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-  
+
   const activeContainer = (adjustments.aiPatches || []).find((p) => p.id === activePatchContainerId);
   const activeSubMaskData = activeContainer?.subMasks.find((sm) => sm.id === activeSubMaskId);
   const isAiMask = activeSubMaskData && [Mask.AiSubject, Mask.AiForeground, Mask.AiSky].includes(activeSubMaskData.type);
@@ -381,9 +380,9 @@ export default function AIPanel({
         const cy = cY + cH / 2;
         const ox = imgW / 2;
         const oy = imgH / 2;
-        
+
         const p = { ...subMask.parameters };
-        
+
         if (type === Mask.Linear) {
           p.startX = cx + (p.startX - ox) * ratioX;
           p.endX = cx + (p.endX - ox) * ratioX;
@@ -834,7 +833,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
       animate={{ opacity: 1, height: 'auto', marginTop: '4px' }}
       exit={{ opacity: 0, height: 0, marginTop: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className={`p-4 rounded-lg text-center`}
+      className={`p-4 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
     >
       <p className="text-sm font-medium text-text-secondary">Drop here to create a new edit</p>
     </motion.div>
@@ -854,8 +853,8 @@ function DraggableGridItem({ maskType, isGenerating, onClick, activePatchContain
       {...attributes}
       disabled={maskType.disabled || isGenerating}
       onClick={onClick}
-      className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors 
-              ${maskType.disabled || isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'} 
+      className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors
+              ${maskType.disabled || isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'}
               ${isDragging ? 'opacity-50' : ''}`}
       data-tooltip={maskType.disabled ? 'Coming Soon' : activePatchContainerId ? `Add ${maskType.name} to Current Edit` : `Create New ${maskType.name} Edit`}
     >
@@ -961,8 +960,8 @@ function ContainerRow({
       <div
         {...listeners}
         {...attributes}
-        className={`flex items-center gap-2 p-2 rounded-md transition-colors group 
-             ${isSelected ? 'bg-surface' : 'hover:bg-card-active'} 
+        className={`flex items-center gap-2 p-2 rounded-md transition-colors group
+             ${isSelected ? 'bg-surface' : 'hover:bg-card-active'}
              ${borderClass}`}
         onClick={(e) => {
           e.stopPropagation();
@@ -1155,9 +1154,9 @@ function SubMaskRow({
       {...listeners}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`flex items-center gap-2 p-2 rounded-md transition-colors group mt-0.5 cursor-pointer 
-            ${isActive ? 'bg-surface' : 'hover:bg-card-active'} 
-            ${isOver && !isDraggingContainer ? 'border-t-2 border-accent' : ''} 
+      className={`flex items-center gap-2 p-2 rounded-md transition-colors group mt-0.5 cursor-pointer
+            ${isActive ? 'bg-surface' : 'hover:bg-card-active'}
+            ${isOver && !isDraggingContainer ? 'border-t-2 border-accent' : ''}
             ${isDragging ? 'opacity-40 z-50' : ''}
             ${parentVisible === false ? 'opacity-50' : ''}
             ${isDraggingContainer ? 'opacity-30 pointer-events-none' : ''}
@@ -1247,7 +1246,7 @@ function SettingsPanel({
   updateSubMask,
   isAIConnectorConnected,
   isGeneratingAi,
-  isGeneratingAiMask,
+  isGeneratingAiMask: _isGeneratingAiMask,
   onGenerativeReplace,
   collapsibleState,
   setCollapsibleState,
@@ -1259,7 +1258,7 @@ function SettingsPanel({
 
   const [prompt, setPrompt] = useState(displayContainer.prompt || '');
   const [useFastInpaint, setUseFastInpaint] = useState(!isAIConnectorConnected);
-  
+
   useEffect(() => {
     if (container) setPrompt(container.prompt || '');
   }, [container?.id]);
@@ -1402,7 +1401,7 @@ function SettingsPanel({
                   </div>
                 </div>
               )}
-              
+
               {subMaskConfig.parameters?.map((param: any) => (
                 <Slider
                   key={param.key}

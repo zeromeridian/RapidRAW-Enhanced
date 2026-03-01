@@ -14,7 +14,6 @@ import {
   SquareDashed,
   CircleDashed,
   Activity,
-  Bookmark,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../ui/Button';
@@ -100,12 +99,6 @@ const parseFocalLength = (exif: any): number | null => {
   return isNaN(val) ? null : val;
 };
 
-const parseFocalLength35 = (exif: any): number | null => {
-  if (!exif || !exif.FocalLengthIn35mmFilm) return null;
-  const val = parseFloat(exif.FocalLengthIn35mmFilm);
-  return isNaN(val) ? null : val;
-};
-
 const parseAperture = (exif: any): number | null => {
   if (!exif || !exif.FNumber) return null;
   const val = parseFloat(exif.FNumber);
@@ -145,7 +138,6 @@ export default function LensCorrectionModal({
   const lastMousePos = useRef({ x: 0, y: 0 });
 
   const focalLength = useMemo(() => parseFocalLength(selectedImage?.exif), [selectedImage?.exif]);
-  const focalLength35 = useMemo(() => parseFocalLength35(selectedImage?.exif), [selectedImage?.exif]);
   const aperture = useMemo(() => parseAperture(selectedImage?.exif), [selectedImage?.exif]);
   const distance = useMemo(() => parseDistance(selectedImage?.exif), [selectedImage?.exif]);
 
