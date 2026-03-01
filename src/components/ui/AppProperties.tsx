@@ -151,6 +151,8 @@ export interface AppSettings {
   linearRawMode?: string;
   enableXmpSync?: boolean;
   createXmpIfMissing?: boolean;
+  lastExportPath?: string;
+  lastExportFormat?: string;
 }
 
 export interface BrushSettings {

@@ -408,9 +408,13 @@ export default function LibraryExportPanel({
       const outputFolder = await open({
         directory: true,
         title: `Select Folder to Export ${numImages} Image(s)`,
+        defaultPath: appSettings?.lastExportPath ?? undefined,
       });
 
       if (outputFolder) {
+        if (appSettings) {
+          onSettingsChange({ ...appSettings, lastExportPath: outputFolder as string });
+        }
         await invoke(Invokes.BatchExportImages, {
           exportSettings,
           outputFolder,
