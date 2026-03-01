@@ -129,6 +129,12 @@ struct PreviewJob {
     is_interactive: bool,
 }
 
+#[derive(serde::Serialize, Clone)]
+struct PreviewUpdatePayload {
+    path: String,
+    data: Vec<u8>,
+}
+
 pub struct AppState {
     window_setup_complete: AtomicBool,
     original_image: Mutex<Option<LoadedImage>>,
@@ -911,7 +917,10 @@ fn process_preview_job(
             .encode_rgb(&rgb_pixels, width as u32, height as u32)
         {
             Ok(bytes) => {
-                let _ = app_handle.emit("preview-update-final", bytes);
+                let _ = app_handle.emit("preview-update-final", PreviewUpdatePayload {
+                    path: loaded_image.path.clone(),
+                    data: bytes,
+                });
             },
             Err(e) => {
                 log::error!("Failed to encode preview with mozjpeg-rs: {}", e);
@@ -1383,7 +1392,10 @@ async fn generate_fullscreen_preview(
             .encode_rgb(&rgb_pixels, width as u32, height as u32)
         {
             Ok(bytes) => {
-                let _ = app_handle_clone.emit("preview-update-final", bytes);
+                let _ = app_handle_clone.emit("preview-update-final", PreviewUpdatePayload {
+                    path: path.clone(),
+                    data: bytes,
+                });
             }
             Err(e) => {
                 log::error!("Failed to encode fullscreen preview with mozjpeg-rs: {}", e);
