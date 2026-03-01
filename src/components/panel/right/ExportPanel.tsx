@@ -437,7 +437,11 @@ export default function ExportPanel({
         const filePath = await save({
           title: 'Save Edited Image',
           defaultPath,
-          filters: FILE_FORMATS.map((f: FileFormat) => ({ name: f.name, extensions: f.extensions })),
+          filters: [
+            { name: selectedFormat.name, extensions: selectedFormat.extensions },
+            ...FILE_FORMATS.filter((f: FileFormat) => f.id !== fileFormat)
+              .map((f: FileFormat) => ({ name: f.name, extensions: f.extensions })),
+          ],
         });
         if (filePath) {
           const dir = filePath.substring(0, Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')));
