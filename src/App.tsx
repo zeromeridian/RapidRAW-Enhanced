@@ -314,6 +314,8 @@ function App() {
   });
   const [supportedTypes, setSupportedTypes] = useState<SupportedTypes | null>(null);
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
+  const selectedImagePathRef = useRef<string | null>(null);
+  useEffect(() => { selectedImagePathRef.current = selectedImage?.path ?? null; }, [selectedImage?.path]);
   const [multiSelectedPaths, setMultiSelectedPaths] = useState<Array<string>>([]);
   const [libraryActivePath, setLibraryActivePath] = useState<string | null>(null);
   const [libraryActiveAdjustments, setLibraryActiveAdjustments] = useState<Adjustments>(INITIAL_ADJUSTMENTS);
@@ -2616,7 +2618,9 @@ function App() {
     const listeners = [
       listen('preview-update-final', (event: any) => {
         if (isEffectActive) {
-          const imageData = new Uint8Array(event.payload);
+          const { path, data } = event.payload;
+          if (path !== selectedImagePathRef.current) return;
+          const imageData = new Uint8Array(data);
           const blob = new Blob([imageData], { type: 'image/jpeg' });
           const url = URL.createObjectURL(blob);
           setFinalPreviewUrl(url);
