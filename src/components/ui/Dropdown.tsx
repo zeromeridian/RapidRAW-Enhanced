@@ -18,7 +18,7 @@ interface DropdownProps<T extends React.Key> {
   disabled?: boolean;
 }
 
-export default function Dropdown<T extends React.Key>({
+const Dropdown = <T extends React.Key>({
   className = '',
   onChange,
   options,
@@ -26,7 +26,7 @@ export default function Dropdown<T extends React.Key>({
   searchPlaceholder = 'Filter options...',
   value,
   disabled = false,
-}: DropdownProps<T>) {
+}: DropdownProps<T>) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -167,4 +167,6 @@ export default function Dropdown<T extends React.Key>({
       </AnimatePresence>
     </div>
   );
-}
+};
+
+export default Dropdown;

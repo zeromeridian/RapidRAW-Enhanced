@@ -92,7 +92,7 @@ const adjustmentVisibilityDefaults = {
   grain: true,
 };
 
-const resolutions: Array<OptionItem<number>> = [
+const resolutions: OptionItem<number>[] = [
   { value: 720, label: '720px' },
   { value: 1280, label: '1280px' },
   { value: 1920, label: '1920px' },
