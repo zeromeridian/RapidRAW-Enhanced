@@ -6,7 +6,8 @@ export type TextVariant =
   | 'heading'
   | 'subheading'
   | 'body'
-  | 'label';
+  | 'label'
+  | 'small';
 export type TextWeight = 'bold' | 'semibold' | 'medium' | 'normal';
 export type TextColor = 'primary' | 'secondary' | 'accent';
 
@@ -76,13 +77,14 @@ export const TextVariants: Record<TextVariant, VariantConfig> = {
     size: 'text-lg',
     defaultWeight: 'semibold',
     defaultColor: 'primary',
-    defaultElement: 'h3',
+    defaultElement: 'h2',
   },
   subheading: {
     size: 'text-md',
     defaultWeight: 'semibold',
     defaultColor: 'primary',
     defaultElement: 'p',
+    extraClasses: 'mb-3',
   },
   body: {
     size: 'text-sm',
@@ -91,6 +93,12 @@ export const TextVariants: Record<TextVariant, VariantConfig> = {
     defaultElement: 'p',
   },
   label: {
+    size: 'text-sm',
+    defaultWeight: 'medium',
+    defaultColor: 'secondary',
+    defaultElement: 'p',
+  },
+  small: {
     size: 'text-xs',
     defaultWeight: 'medium', //CHECK WEIGHTS
     defaultColor: 'secondary',
