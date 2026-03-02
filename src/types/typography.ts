@@ -1,15 +1,23 @@
-export type TextVariant = 'display' | 'headline' | 'title' | 'heading' | 'subheading' | 'body' | 'label';
+export type TextVariant =
+  | 'displayLarge'
+  | 'display'
+  | 'headline'
+  | 'title'
+  | 'heading'
+  | 'subheading'
+  | 'body'
+  | 'label';
 export type TextWeight = 'bold' | 'semibold' | 'medium' | 'normal';
 export type TextColor = 'primary' | 'secondary';
 
-export const TEXT_WEIGHTS: Record<TextWeight, string> = {
+export const TextWeights: Record<TextWeight, string> = {
   bold: 'font-bold',
   semibold: 'font-semibold',
   medium: 'font-medium',
   normal: 'font-normal',
 };
 
-export const TEXT_COLORS: Record<TextColor, string> = {
+export const TextColors: Record<TextColor, string> = {
   primary: 'text-text-primary',
   secondary: 'text-text-secondary',
 };
@@ -22,9 +30,16 @@ export interface VariantConfig {
   extraClasses?: string;
 }
 
-export const TEXT_VARIANTS: Record<TextVariant, VariantConfig> = {
-  display: {
+export const TextVariants: Record<TextVariant, VariantConfig> = {
+  displayLarge: {
     size: 'text-5xl',
+    defaultWeight: 'bold',
+    defaultColor: 'primary',
+    defaultElement: 'h1',
+    extraClasses: 'text-shadow-shiny',
+  },
+  display: {
+    size: 'text-3xl',
     defaultWeight: 'bold',
     defaultColor: 'primary',
     defaultElement: 'h1',

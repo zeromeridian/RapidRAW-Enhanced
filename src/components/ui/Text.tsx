@@ -1,9 +1,9 @@
 import React, { forwardRef } from 'react';
 import clsx from 'clsx';
-import { TextVariant, TextWeight, TextColor, TEXT_VARIANTS, TEXT_WEIGHTS, TEXT_COLORS } from '../../types/typography';
+import { TextWeight, TextColor, VariantConfig, TextWeights, TextColors } from '../../types/typography';
 
 export interface TextProps extends React.HTMLAttributes<HTMLElement> {
-  variant: TextVariant;
+  variant: VariantConfig;
   weight?: TextWeight;
   color?: TextColor;
   as?: React.ElementType;
@@ -12,17 +12,16 @@ export interface TextProps extends React.HTMLAttributes<HTMLElement> {
 
 export const Text = forwardRef<HTMLElement, TextProps>(
   ({ variant, weight, color, as, className, children, ...props }, ref) => {
-    const config = TEXT_VARIANTS[variant];
-    const Component = as || config.defaultElement;
+    const Component = as || variant.defaultElement;
 
     return (
       <Component
         ref={ref}
         className={clsx(
-          config.size,
-          TEXT_WEIGHTS[weight || config.defaultWeight],
-          TEXT_COLORS[color || config.defaultColor],
-          config.extraClasses,
+          variant.size,
+          TextWeights[weight || variant.defaultWeight],
+          TextColors[color || variant.defaultColor],
+          variant.extraClasses,
           className,
         )}
         {...props}
@@ -34,3 +33,4 @@ export const Text = forwardRef<HTMLElement, TextProps>(
 );
 
 Text.displayName = 'Text';
+export default Text;
