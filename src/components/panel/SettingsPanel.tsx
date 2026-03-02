@@ -28,6 +28,8 @@ import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import { Invokes } from '../ui/AppProperties';
+import Text from '../ui/Text';
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 
 interface ConfirmModalState {
   confirmText: string;
@@ -122,15 +124,19 @@ const settingCategories = [
 
 const KeybindItem = ({ keys, description }: KeybindItemProps) => (
   <div className="flex justify-between items-center py-2">
-    <span className="text-text-secondary text-sm">{description}</span>
+    <Text as="span">{description}</Text>
     <div className="flex items-center gap-1">
       {keys.map((key: string, index: number) => (
-        <kbd
+        <Text
+          as="kbd"
+          variant={TextVariants.small}
+          color={TextColors.primary}
+          weight={TextWeights.semibold}
           key={index}
-          className="px-2 py-1 text-xs font-sans font-semibold text-text-primary bg-bg-primary border border-border-color rounded-md"
+          className="px-2 py-1 font-sans bg-bg-primary border border-border-color rounded-md"
         >
           {key}
-        </kbd>
+        </Text>
       ))}
     </div>
   </div>
@@ -138,9 +144,15 @@ const KeybindItem = ({ keys, description }: KeybindItemProps) => (
 
 const SettingItem = ({ children, description, label }: SettingItemProps) => (
   <div>
-    <label className="block text-sm font-medium text-text-primary mb-2">{label}</label>
+    <Text variant={TextVariants.label} color={TextColors.primary} className="mb-2">
+      {label}
+    </Text>
     {children}
-    {description && <p className="text-xs text-text-secondary mt-2">{description}</p>}
+    {description && (
+      <Text variant={TextVariants.small} className="mt-2">
+        {description}
+      </Text>
+    )}
   </div>
 );
 
@@ -155,13 +167,21 @@ const DataActionItem = ({
   title,
 }: DataActionItemProps) => (
   <div className="pb-6 border-b border-border-color last:border-b-0 last:pb-0">
-    <h3 className="text-sm font-medium text-text-primary mb-2">{title}</h3>
-    <p className="text-xs text-text-secondary mb-3">{description}</p>
+    <Text as="p" variant={TextVariants.label} color={TextColors.primary} className="mb-2">
+      {title}
+    </Text>
+    <Text variant={TextVariants.small} className="mb-3">
+      {description}
+    </Text>
     <Button variant="destructive" onClick={buttonAction} disabled={isProcessing || disabled}>
       {icon}
       {isProcessing ? 'Processing...' : buttonText}
     </Button>
-    {message && <p className="text-sm text-accent mt-3">{message}</p>}
+    {message && (
+      <Text as="p" variant={TextVariants.label} color={TextColors.accent} className="mt-3">
+        {message}
+      </Text>
+    )}
   </div>
 );
 
@@ -587,7 +607,9 @@ export default function SettingsPanel({
             >
               <ArrowLeft />
             </Button>
-            <h1 className="text-3xl font-bold text-accent text-shadow-shiny whitespace-nowrap">Settings</h1>
+            <Text variant={TextVariants.display} color={TextColors.accent}>
+              Settings
+            </Text>
           </div>
 
           <div className="relative flex w-full min-[1200px]:w-[450px] p-2 bg-surface rounded-md">
@@ -633,7 +655,9 @@ export default function SettingsPanel({
                 className="space-y-8"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">General Settings</h2>
+                  <Text variant={TextVariants.title} color={TextColors.accent}>
+                    General Settings
+                  </Text>
                   <div className="space-y-6">
                     <SettingItem label="Theme" description="Change the look and feel of the application.">
                       <Dropdown
@@ -725,11 +749,13 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">Adjustments Visibility</h2>
-                  <p className="text-sm text-text-secondary mb-4">
+                  <Text variant={TextVariants.title} color={TextColors.accent}>
+                    Adjustments Visibility
+                  </Text>
+                  <Text className="mb-4">
                     Hide adjustment sections you don't use often to simplify the editing panel. Your settings will be
                     preserved and applied even when hidden.
-                  </p>
+                  </Text>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <Switch
                       label="Chromatic Aberration"
@@ -774,13 +800,17 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">My Lenses</h2>
-                  <p className="text-sm text-text-secondary mb-6">
+                  <Text variant={TextVariants.title} color={TextColors.accent}>
+                    My Lenses
+                  </Text>
+                  <Text className="mb-6">
                     Create a list of your frequently used lenses to quickly access them in the Lens Correction panel.
-                  </p>
+                  </Text>
 
                   <div className="bg-bg-primary rounded-lg p-4 border border-border-color mb-6">
-                    <h3 className="text-sm font-medium text-text-primary mb-3">Add New Lens</h3>
+                    <Text as="h3" variant={TextVariants.label} color={TextColors.primary} className="mb-3">
+                      Add New Lens
+                    </Text>
                     <div className="space-y-4">
                       <Dropdown
                         options={lensMakers.map((m) => ({ label: m, value: m }))}
@@ -803,20 +833,27 @@ export default function SettingsPanel({
                   </div>
 
                   <div className="space-y-2">
-                    <h3 className="text-sm font-medium text-text-primary mb-3">Saved Lenses</h3>
+                    <Text as="h3" variant={TextVariants.label} color={TextColors.primary} className="mb-3">
+                      Saved Lenses
+                    </Text>
                     {(!appSettings?.myLenses || appSettings.myLenses.length === 0) && (
-                      <p className="text-sm text-text-secondary italic">No lenses added yet.</p>
+                      <Text className="italic">No lenses added yet.</Text>
                     )}
                     <div className="divide-y divide-border-color">
                       {(appSettings?.myLenses || []).map((lens: MyLens, index: number) => (
-                        <div key={`${lens.maker}-${lens.model}-${index}`} className="flex justify-between items-center py-3">
+                        <div
+                          key={`${lens.maker}-${lens.model}-${index}`}
+                          className="flex justify-between items-center py-3"
+                        >
                           <div className="flex items-center gap-3">
                             <div className="p-2 bg-surface rounded-md text-accent">
                               <Bookmark size={16} />
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-text-primary">{lens.model}</p>
-                              <p className="text-xs text-text-secondary">{lens.maker}</p>
+                              <Text color={TextColors.primary} weight={TextWeights.medium}>
+                                {lens.model}
+                              </Text>
+                              <Text variant={TextVariants.small}>{lens.maker}</Text>
                             </div>
                           </div>
                           <button
@@ -833,7 +870,9 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">Tagging</h2>
+                  <Text variant={TextVariants.title} color={TextColors.accent}>
+                    Tagging
+                  </Text>
                   <div className="space-y-6">
                     <SettingItem
                       description="Enables automatic image tagging using an AI (CLIP) model. This will download an additional model and impact performance while browsing folders. Tags are used for searching a folder."
@@ -857,8 +896,8 @@ export default function SettingsPanel({
                           className="overflow-hidden"
                         >
                           <div className="pl-4 border-l-2 border-border-color ml-1 mt-4 space-y-6">
-                            <SettingItem 
-                              label="Maximum AI Tags" 
+                            <SettingItem
+                              label="Maximum AI Tags"
                               description="The maximum number of tags to generate per image."
                             >
                               <Slider
@@ -892,9 +931,11 @@ export default function SettingsPanel({
                                           exit="exit"
                                           onClick={() => handleRemoveAiTag(tag)}
                                           data-tooltip={`Remove tag "${tag}"`}
-                                          className="flex items-center gap-1 bg-surface text-text-primary text-sm font-medium px-2 py-1 rounded group cursor-pointer"
+                                          className="flex items-center gap-1 bg-surface px-2 py-1 rounded group cursor-pointer"
                                         >
-                                          <span>{tag}</span>
+                                          <Text variant={TextVariants.label} color={TextColors.primary}>
+                                            {tag}
+                                          </Text>
                                           <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
                                             <X size={14} />
                                           </span>
@@ -907,9 +948,10 @@ export default function SettingsPanel({
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
                                         transition={{ duration: 0.2 }}
-                                        className="text-sm text-text-secondary italic px-1 select-none"
                                       >
-                                        No custom AI tags (Using built-in list)
+                                        <Text className="px-1 select-none italic">
+                                          No custom AI tags (Using built-in list)
+                                        </Text>
                                       </motion.span>
                                     )}
                                   </AnimatePresence>
@@ -966,9 +1008,11 @@ export default function SettingsPanel({
                                   exit="exit"
                                   onClick={() => handleRemoveShortcut(shortcut)}
                                   data-tooltip={`Remove shortcut "${shortcut}"`}
-                                  className="flex items-center gap-1 bg-surface text-text-primary text-sm font-medium px-2 py-1 rounded group cursor-pointer"
+                                  className="flex items-center gap-1 bg-surface px-2 py-1 rounded group cursor-pointer"
                                 >
-                                  <span>{shortcut}</span>
+                                  <Text variant={TextVariants.label} color={TextColors.primary}>
+                                    {shortcut}
+                                  </Text>
                                   <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
                                     <X size={14} />
                                   </span>
@@ -1057,7 +1101,9 @@ export default function SettingsPanel({
                 className="space-y-8"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">Processing Engine</h2>
+                  <Text variant={TextVariants.title} color={TextColors.accent}>
+                    Processing Engine
+                  </Text>
                   <div className="space-y-6">
                     <SettingItem
                       description="Higher resolutions provide a sharper preview but may impact performance on less powerful systems."
@@ -1180,9 +1226,11 @@ export default function SettingsPanel({
 
                     {restartRequired && (
                       <>
-                        <div className="p-3 bg-blue-900/20 text-blue-300 border border-blue-500/50 rounded-lg text-sm flex items-center gap-3">
+                        <div className="p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg flex items-center gap-3">
                           <Info size={18} />
-                          <p>Changes to the processing engine require an application restart to take effect.</p>
+                          <Text color={TextColors.info}>
+                            Changes to the processing engine require an application restart to take effect.
+                          </Text>
                         </div>
                         <div className="flex justify-end">
                           <Button onClick={handleSaveAndRelaunch}>Save & Relaunch</Button>
@@ -1193,11 +1241,13 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">Generative AI</h2>
-                  <p className="text-sm text-text-secondary mb-4">
+                  <Text variant={TextVariants.title} color={TextColors.accent}>
+                    Generative AI
+                  </Text>
+                  <Text className="mb-4">
                     RapidRAW's AI is built for flexibility. Choose your ideal workflow, from fast local tools to
                     powerful self-hosting.
-                  </p>
+                  </Text>
 
                   <AiProviderSwitch selectedProvider={aiProvider} onProviderChange={handleProviderChange} />
 
@@ -1211,11 +1261,11 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <h3 className="text-lg font-semibold text-text-primary">Built-in AI (CPU)</h3>
-                          <p className="text-sm text-text-secondary mt-1">
+                          <Text variant={TextVariants.heading}>Built-in AI (CPU)</Text>
+                          <Text className="mt-1">
                             Integrated directly into RapidRAW, these features run entirely on your computer. They are
                             fast, free, and require no setup, making them ideal for everyday workflow acceleration.
-                          </p>
+                          </Text>
                           <ul className="mt-3 space-y-1 list-disc list-inside text-sm text-text-secondary">
                             <li>AI Masking (Subject, Sky, Foreground)</li>
                             <li>Automatic Image Tagging</li>
@@ -1232,16 +1282,16 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <h3 className="text-lg font-semibold text-text-primary">Self-Hosted (RapidRAW AI Connector)</h3>
-                          <p className="text-sm text-text-secondary mt-1">
-                            For users with a capable GPU who want maximum control, connect RapidRAW to your own local
-                            AI Connector server. This gives you full control for technical workflows.
-                          </p>
-                          <ul className="mt-3 mb-6 space-y-1 list-disc list-inside text-sm text-text-secondary">
+                          <Text variant={TextVariants.heading}>Self-Hosted (RapidRAW AI Connector)</Text>
+                          <Text className="mt-1">
+                            For users with a capable GPU who want maximum control, connect RapidRAW to your own local AI
+                            Connector server. This gives you full control for technical workflows.
+                          </Text>
+                          <Text as="ul" className="mt-3 mb-6 space-y-1 list-disc list-inside">
                             <li>Use your own ComfyUI instance</li>
                             <li>Cost-free advanced generative edits</li>
                             <li>Custom workflow selection</li>
-                          </ul>
+                          </Text>
                           <div className="space-y-6">
                             <SettingItem
                               label="AI Connector Address"
@@ -1251,7 +1301,9 @@ export default function SettingsPanel({
                                 <Input
                                   className="flex-grow"
                                   id="ai-connector-address"
-                                  onBlur={() => onSettingsChange({ ...appSettings, aiConnectorAddress: aiConnectorAddress })}
+                                  onBlur={() =>
+                                    onSettingsChange({ ...appSettings, aiConnectorAddress: aiConnectorAddress })
+                                  }
                                   onChange={(e: any) => setAiConnectorAddress(e.target.value)}
                                   onKeyDown={(e: any) => e.stopPropagation()}
                                   placeholder="127.0.0.1:8188"
@@ -1267,15 +1319,14 @@ export default function SettingsPanel({
                                 </Button>
                               </div>
                               {testStatus.message && (
-                                <p
-                                  className={`text-sm mt-2 flex items-center gap-2 ${
-                                    testStatus.success ? 'text-green-400' : 'text-red-400'
-                                  }`}
+                                <Text
+                                  color={testStatus.success ? TextColors.success : TextColors.error}
+                                  className="mt-2 flex items-center gap-2"
                                 >
                                   {testStatus.success === true && <Wifi size={16} />}
                                   {testStatus.success === false && <WifiOff size={16} />}
                                   {testStatus.message}
-                                </p>
+                                </Text>
                               )}
                             </SettingItem>
                           </div>
@@ -1290,25 +1341,25 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <h3 className="text-lg font-semibold text-text-primary">Cloud Service</h3>
-                          <p className="text-sm text-text-secondary mt-1">
+                          <Text variant={TextVariants.heading}>Cloud Service</Text>
+                          <Text className="mt-1">
                             For those who want a simpler solution, an optional subscription provides the same
                             high-quality results as self-hosting without any hassle. This is the most convenient option
                             and the best way to support the project.
-                          </p>
-                          <ul className="mt-3 space-y-1 list-disc list-inside text-sm text-text-secondary">
+                          </Text>
+                          <Text as="ul" className="mt-3 space-y-1 list-disc list-inside">
                             <li>Maximum convenience, no setup</li>
                             <li>Same results as self-hosting</li>
                             <li>No powerful hardware required</li>
-                          </ul>
+                          </Text>
 
                           <div className="mt-6 p-4 bg-bg-primary rounded-lg border border-border-color text-center space-y-3">
                             <span className="inline-block bg-accent text-button-text text-xs font-semibold px-2 py-1 rounded-full">
                               Coming Soon
                             </span>
-                            <p className="text-sm text-text-secondary">
+                            <Text>
                               Keep an eye on the GitHub page to be notified when the cloud service is available.
-                            </p>
+                            </Text>
                           </div>
                         </motion.div>
                       )}
@@ -1317,20 +1368,22 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">Data Management</h2>
+                  <Text variant={TextVariants.title} color={TextColors.accent}>
+                    Data Management
+                  </Text>
                   <div className="space-y-6">
                     <DataActionItem
                       buttonAction={handleClearSidecars}
                       buttonText="Delete All Edits in Folder"
                       description={
-                        <>
+                        <Text as="span" variant={TextVariants.small}>
                           This will delete all{' '}
                           <code className="bg-bg-primary px-1 rounded text-text-primary">.rrdata</code> files
                           (containing your edits) within the current base folder:
-                          <span className="block font-mono text-xs bg-bg-primary p-2 rounded mt-2 break-all border border-border-color">
+                          <span className="block font-mono bg-bg-primary p-2 rounded mt-2 break-all border border-border-color">
                             {effectiveRootPath || 'No folder selected'}
                           </span>
-                        </>
+                        </Text>
                       }
                       disabled={!effectiveRootPath}
                       icon={<Trash2 size={16} className="mr-2" />}
@@ -1357,12 +1410,12 @@ export default function SettingsPanel({
                       }}
                       buttonText="Open Log File"
                       description={
-                        <>
+                        <Text as="span" variant={TextVariants.small}>
                           View the application's log file for troubleshooting. The log is located at:
-                          <span className="block font-mono text-xs bg-bg-primary p-2 rounded mt-2 break-all border border-border-color">
+                          <span className="block font-mono bg-bg-primary p-2 rounded mt-2 break-all border border-border-color">
                             {logPath || 'Loading...'}
                           </span>
-                        </>
+                        </Text>
                       }
                       disabled={!logPath || logPath.startsWith('Could not')}
                       icon={<ExternalLinkIcon size={16} className="mr-2" />}
@@ -1385,10 +1438,14 @@ export default function SettingsPanel({
                 className="space-y-8"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">Keyboard Shortcuts</h2>
+                  <Text variant={TextVariants.title} color={TextColors.accent}>
+                    Keyboard Shortcuts
+                  </Text>
                   <div className="space-y-4">
                     <div>
-                      <h3 className="text-lg font-semibold pt-3 pb-2 text-accent">General</h3>
+                      <Text variant={TextVariants.heading} className="pt-3 pb-2">
+                        General
+                      </Text>
                       <div className="divide-y divide-border-color">
                         <KeybindItem keys={['Space', 'Enter']} description="Open selected image" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', 'C']} description="Copy selected adjustments" />
@@ -1406,7 +1463,9 @@ export default function SettingsPanel({
                       </div>
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold pt-3 pb-2 text-accent">Editor</h3>
+                      <Text variant={TextVariants.heading} className="pt-3 pb-2">
+                        Editor
+                      </Text>
                       <div className="divide-y divide-border-color">
                         <KeybindItem keys={['Esc']} description="Deselect mask, exit crop/fullscreen/editor" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', 'Z']} description="Undo adjustment" />
@@ -1415,7 +1474,10 @@ export default function SettingsPanel({
                         <KeybindItem keys={['Space']} description="Cycle zoom (Fit, 2x Fit, 100%)" />
                         <KeybindItem keys={['←', '→']} description="Previous / Next image" />
                         <KeybindItem keys={['↑', '↓']} description="Zoom in / Zoom out (by step)" />
-                        <KeybindItem keys={['Shift', '+', 'Mouse Wheel']} description="Adjust slider value by 2 steps" />
+                        <KeybindItem
+                          keys={['Shift', '+', 'Mouse Wheel']}
+                          description="Adjust slider value by 2 steps"
+                        />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '+']} description="Zoom in" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '-']} description="Zoom out" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '0']} description="Zoom to fit" />
