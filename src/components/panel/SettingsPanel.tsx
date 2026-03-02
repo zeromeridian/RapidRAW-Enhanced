@@ -144,7 +144,7 @@ const KeybindItem = ({ keys, description }: KeybindItemProps) => (
 
 const SettingItem = ({ children, description, label }: SettingItemProps) => (
   <div>
-    <Text variant={TextVariants.label} color={TextColors.primary} className="mb-2">
+    <Text variant={TextVariants.label} color={TextColors.primary} className="block mb-2">
       {label}
     </Text>
     {children}
