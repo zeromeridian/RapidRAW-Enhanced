@@ -16,7 +16,6 @@ export const TextWeights: Record<TextWeight, string> = {
   medium: 'medium',
   normal: 'normal',
 };
-
 export const TextColors: Record<TextColor, TextColor> = {
   primary: 'primary',
   secondary: 'secondary',
@@ -30,7 +29,6 @@ export const TEXT_WEIGHT_KEYS: Record<TextWeight, string> = {
   medium: 'font-medium',
   normal: 'font-normal',
 };
-
 export const TEXT_COLOR_KEYS: Record<TextColor, string> = {
   primary: 'text-text-primary',
   secondary: 'text-text-secondary',
