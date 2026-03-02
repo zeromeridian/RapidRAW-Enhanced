@@ -2,6 +2,9 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, ChevronDown } from 'lucide-react';
 import Input from './Input';
+import Text from './Text';
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
+import clsx from 'clsx';
 
 export interface OptionItem<T extends React.Key> {
   label: string;
@@ -106,7 +109,9 @@ const Dropdown = <T extends React.Key>({
         onClick={() => setIsOpen(!isOpen)}
         type="button"
       >
-        <span className="text-text-primary">{selectedOption ? selectedOption.label : placeholder}</span>
+        <Text as="span" variant={TextVariants.body} color={TextColors.primary}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </Text>
         <ChevronDown
           className={`text-text-secondary transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           size={20}
@@ -144,19 +149,19 @@ const Dropdown = <T extends React.Key>({
                   <button
                     key={option.value}
                     onClick={() => handleSelect(option)}
-                    className={`
-                      w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between
-                      transition-colors duration-150
-                      ${
-                        isSelected
-                          ? 'bg-bg-primary text-text-primary font-semibold'
-                          : 'text-text-primary hover:bg-bg-primary'
-                      }
-                    `}
+                    className={clsx(
+                      'w-full text-left px-3 py-2 rounded-md flex items-center justify-between',
+                      'transition-colors duration-150 hover:bg-bg-primary',
+                      {
+                        'bg-bg-primary': isSelected,
+                      },
+                    )}
                     role="option"
                     aria-selected={isSelected}
                   >
-                    <span>{option.label}</span>
+                    <Text color={TextColors.primary} weight={isSelected ? TextWeights.semibold : TextWeights.normal}>
+                      {option.label}
+                    </Text>
                     {isSelected && <Check size={16} />}
                   </button>
                 );
