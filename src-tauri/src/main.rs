@@ -3462,7 +3462,7 @@ fn setup_logging(app_handle: &tauri::AppHandle) {
     let log_file = fs::OpenOptions::new()
         .write(true)
         .create(true)
-        .append(true)
+        .truncate(true)
         .open(&log_file_path)
         .ok();
 
