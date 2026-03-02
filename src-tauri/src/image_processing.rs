@@ -406,7 +406,9 @@ fn compute_lens_auto_crop_scale(params: &GeometryParams, width: f32, height: f32
         }
     }
 
-    max_scale
+    // Add a small margin to account for bilinear interpolation sampling
+    // beyond the exact boundary, which can bleed in black pixels at edges.
+    max_scale * 1.005
 }
 
 pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> DynamicImage {

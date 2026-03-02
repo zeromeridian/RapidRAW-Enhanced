@@ -43,6 +43,7 @@ interface GeometryParams {
   lens_distortion_enabled: boolean;
   lens_tca_enabled: boolean;
   lens_vignette_enabled: boolean;
+  lens_auto_crop: boolean;
 }
 
 type TransformParams = Omit<
@@ -62,6 +63,7 @@ type TransformParams = Omit<
   | 'lens_distortion_enabled'
   | 'lens_tca_enabled'
   | 'lens_vignette_enabled'
+  | 'lens_auto_crop'
 >;
 
 interface TransformModalProps {
@@ -233,6 +235,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
           lens_distortion_enabled: currentAdjustments.lensDistortionEnabled ?? true,
           lens_tca_enabled: currentAdjustments.lensTcaEnabled ?? true,
           lens_vignette_enabled: currentAdjustments.lensVignetteEnabled ?? true,
+          lens_auto_crop: currentAdjustments.lensAutoCropEnabled ?? true,
         };
 
         const result: string = await invoke('preview_geometry_transform', {
@@ -326,6 +329,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         lens_distortion_enabled: currentAdjustments.lensDistortionEnabled ?? true,
         lens_tca_enabled: currentAdjustments.lensTcaEnabled ?? true,
         lens_vignette_enabled: currentAdjustments.lensVignetteEnabled ?? true,
+        lens_auto_crop: currentAdjustments.lensAutoCropEnabled ?? true,
       };
       const result: string = await invoke('preview_geometry_transform', {
         params: fullParams,
