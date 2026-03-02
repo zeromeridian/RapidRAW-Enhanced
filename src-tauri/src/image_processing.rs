@@ -490,6 +490,11 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
                     let mut src_x = current_vec.x * inv_z;
                     let mut src_y = current_vec.y * inv_z;
 
+                    if auto_crop_scale > 1.0 {
+                        src_x = cx + (src_x - cx) / auto_crop_scale;
+                        src_y = cy + (src_y - cy) / auto_crop_scale;
+                    }
+
                     if has_lens_correction {
                         let dx = (src_x - cx) as f64;
                         let dy = (src_y - cy) as f64;
@@ -520,14 +525,9 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
                         let dy = (src_y - cy) as f64;
                         let r2_norm = (dx * dx + dy * dy) * max_radius_sq_inv;
                         let f = 1.0 + k_distortion * r2_norm;
-                        
+
                         src_x = cx + (dx * f) as f32;
                         src_y = cy + (dy * f) as f32;
-                    }
-
-                    if auto_crop_scale > 1.0 {
-                        src_x = cx + (src_x - cx) / auto_crop_scale;
-                        src_y = cy + (src_y - cy) / auto_crop_scale;
                     }
 
                     if has_tca {
@@ -604,11 +604,6 @@ pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams
                 let mut current_x = x_f;
                 let mut current_y = y_f;
 
-                if auto_crop_scale > 1.0 {
-                    current_x = cx + (current_x - cx) * auto_crop_scale;
-                    current_y = cy + (current_y - cy) * auto_crop_scale;
-                }
-
                 if k_distortion.abs() > 1e-5 {
                     let dx = (current_x - cx) as f64;
                     let dy = (current_y - cy) as f64;
@@ -676,8 +671,13 @@ pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams
 
                 if target_vec.z.abs() > 1e-6 {
                     let inv_z = 1.0 / target_vec.z;
-                    let src_x = target_vec.x * inv_z;
-                    let src_y = target_vec.y * inv_z;
+                    let mut src_x = target_vec.x * inv_z;
+                    let mut src_y = target_vec.y * inv_z;
+
+                    if auto_crop_scale > 1.0 {
+                        src_x = cx + (src_x - cx) * auto_crop_scale;
+                        src_y = cy + (src_y - cy) * auto_crop_scale;
+                    }
 
                     interpolate_pixel(src_raw, width_usize, height_usize, src_x, src_y, pixel);
                 }
