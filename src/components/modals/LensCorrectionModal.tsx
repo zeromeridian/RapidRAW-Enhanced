@@ -50,7 +50,6 @@ interface GeometryParams {
   lens_distortion_enabled: boolean;
   lens_tca_enabled: boolean;
   lens_vignette_enabled: boolean;
-  lens_auto_crop: boolean;
 }
 
 interface MyLens {
@@ -61,7 +60,6 @@ interface MyLens {
 interface LensParams {
   lensMaker: string | null;
   lensModel: string | null;
-  lensAutoCropEnabled: boolean;
   lensDistortionAmount: number;
   lensVignetteAmount: number;
   lensTcaAmount: number;
@@ -69,10 +67,15 @@ interface LensParams {
   lensTcaEnabled: boolean;
   lensVignetteEnabled: boolean;
   lensDistortionParams: {
-    k1: number; k2: number; k3: number;
+    k1: number;
+    k2: number;
+    k3: number;
     model: number;
-    tca_vr: number; tca_vb: number;
-    vig_k1: number; vig_k2: number; vig_k3: number;
+    tca_vr: number;
+    tca_vb: number;
+    vig_k1: number;
+    vig_k2: number;
+    vig_k3: number;
   } | null;
 }
 
@@ -87,7 +90,6 @@ interface LensCorrectionModalProps {
 const DEFAULT_PARAMS: LensParams = {
   lensMaker: null,
   lensModel: null,
-  lensAutoCropEnabled: true,
   lensDistortionAmount: 100,
   lensVignetteAmount: 100,
   lensTcaAmount: 100,
@@ -160,7 +162,7 @@ export default function LensCorrectionModal({
     const handleWindowMouseMove = (e: MouseEvent) => {
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
-      setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     };
     const handleWindowMouseUp = () => {
@@ -205,12 +207,12 @@ export default function LensCorrectionModal({
 
   const fetchDistortionParams = async (maker: string, model: string) => {
     try {
-      const distParams: any = await invoke('get_lens_distortion_params', { 
-        maker, 
-        model, 
-        focalLength: focalLength, 
-        aperture: aperture, 
-        distance: distance 
+      const distParams: any = await invoke('get_lens_distortion_params', {
+        maker,
+        model,
+        focalLength: focalLength,
+        aperture: aperture,
+        distance: distance,
       });
       return distParams;
     } catch (error) {
@@ -235,11 +237,10 @@ export default function LensCorrectionModal({
           lens_distortion_amount: currentParams.lensDistortionAmount / SLIDER_DIVISOR,
           lens_vignette_amount: currentParams.lensVignetteAmount / SLIDER_DIVISOR,
           lens_tca_amount: currentParams.lensTcaAmount / SLIDER_DIVISOR,
-          
+
           lens_distortion_enabled: currentParams.lensDistortionEnabled,
           lens_vignette_enabled: currentParams.lensVignetteEnabled,
           lens_tca_enabled: currentParams.lensTcaEnabled,
-          lens_auto_crop: currentParams.lensAutoCropEnabled,
 
           lens_dist_k1: currentParams.lensDistortionParams?.k1 ?? 0,
           lens_dist_k2: currentParams.lensDistortionParams?.k2 ?? 0,
@@ -262,7 +263,7 @@ export default function LensCorrectionModal({
         console.error('Lens correction preview failed', e);
       }
     }, 50),
-    [currentAdjustments]
+    [currentAdjustments],
   );
 
   useEffect(() => {
@@ -275,11 +276,10 @@ export default function LensCorrectionModal({
           setMyLenses(settings.myLenses);
         }
       });
-      
+
       const initParams: LensParams = {
         lensMaker: currentAdjustments.lensMaker,
         lensModel: currentAdjustments.lensModel,
-        lensAutoCropEnabled: currentAdjustments.lensAutoCropEnabled ?? true,
         lensDistortionAmount: currentAdjustments.lensDistortionAmount ?? 100,
         lensVignetteAmount: currentAdjustments.lensVignetteAmount ?? 100,
         lensTcaAmount: currentAdjustments.lensTcaAmount ?? 100,
@@ -288,7 +288,7 @@ export default function LensCorrectionModal({
         lensVignetteEnabled: currentAdjustments.lensVignetteEnabled ?? true,
         lensDistortionParams: currentAdjustments.lensDistortionParams,
       };
-      
+
       setParams(initParams);
       setDetectionStatus('idle');
       handleResetZoom();
@@ -317,20 +317,20 @@ export default function LensCorrectionModal({
   }, [isOpen, currentAdjustments]);
 
   const handleMakerChange = (maker: string) => {
-    const newParams = { 
-      ...params, 
-      lensMaker: maker, 
-      lensModel: null, 
-      lensDistortionParams: null 
+    const newParams = {
+      ...params,
+      lensMaker: maker,
+      lensModel: null,
+      lensDistortionParams: null,
     };
     setParams(newParams);
     setLenses([]);
     setDetectionStatus('idle');
-    
+
     invoke('get_lensfun_lenses_for_maker', { maker })
       .then((l: any) => setLenses(l))
       .catch(console.error);
-      
+
     updatePreview(newParams);
   };
 
@@ -386,7 +386,7 @@ export default function LensCorrectionModal({
     }
     const exifMaker = selectedImage.exif.Make || '';
     const exifModel = selectedImage.exif.LensModel || '';
-    
+
     if (!exifModel) {
       setDetectionStatus('not_found');
       return;
@@ -396,27 +396,27 @@ export default function LensCorrectionModal({
 
     try {
       const result: [string, string] | null = await invoke('autodetect_lens', { maker: exifMaker, model: exifModel });
-      
+
       if (result) {
         const [detectedMaker, detectedModel] = result;
-        
+
         if (detectedMaker !== params.lensMaker) {
           await invoke('get_lensfun_lenses_for_maker', { maker: detectedMaker }).then((l: any) => setLenses(l));
         }
 
         const distortionParams = await fetchDistortionParams(detectedMaker, detectedModel);
 
-        const newParams = { 
-          ...params, 
-          lensMaker: detectedMaker, 
+        const newParams = {
+          ...params,
+          lensMaker: detectedMaker,
           lensModel: detectedModel,
-          lensDistortionParams: distortionParams
+          lensDistortionParams: distortionParams,
         };
 
         setParams(newParams);
         setDetectionStatus('success');
         updatePreview(newParams);
-        
+
         setTimeout(() => {
           setDetectionStatus('idle');
         }, 2000);
@@ -438,7 +438,6 @@ export default function LensCorrectionModal({
   const handleReset = () => {
     const resetParams = {
       ...DEFAULT_PARAMS,
-      lensAutoCropEnabled: true,
       lensDistortionEnabled: true,
       lensTcaEnabled: true,
       lensVignetteEnabled: true,
@@ -465,11 +464,10 @@ export default function LensCorrectionModal({
         lens_distortion_amount: (currentAdjustments.lensDistortionAmount ?? 100) / SLIDER_DIVISOR,
         lens_vignette_amount: (currentAdjustments.lensVignetteAmount ?? 100) / SLIDER_DIVISOR,
         lens_tca_amount: (currentAdjustments.lensTcaAmount ?? 100) / SLIDER_DIVISOR,
-        
+
         lens_distortion_enabled: false,
         lens_vignette_enabled: false,
         lens_tca_enabled: false,
-        lens_auto_crop: false,
 
         lens_dist_k1: currentAdjustments.lensDistortionParams?.k1 ?? 0,
         lens_dist_k2: currentAdjustments.lensDistortionParams?.k2 ?? 0,
@@ -498,8 +496,8 @@ export default function LensCorrectionModal({
     transformOrigin: 'center center',
   };
 
-  const makerOptions = makers.map(m => ({ label: m, value: m }));
-  const lensOptions = lenses.map(m => ({ label: m, value: m }));
+  const makerOptions = makers.map((m) => ({ label: m, value: m }));
+  const lensOptions = lenses.map((m) => ({ label: m, value: m }));
   const myLensOptions = useMemo(() => {
     if (myLenses.length === 0) {
       return [{ label: 'Manage your lenses in Settings', value: 'none' }];
@@ -557,8 +555,8 @@ export default function LensCorrectionModal({
               detectionStatus === 'not_found'
                 ? 'bg-red-500/20 text-red-400'
                 : detectionStatus === 'success'
-                ? 'bg-green-500/20 text-green-400'
-                : 'bg-surface hover:bg-card-active'
+                  ? 'bg-green-500/20 text-green-400'
+                  : 'bg-surface hover:bg-card-active',
             )}
             disabled={detectionStatus === 'detecting'}
           >
@@ -586,12 +584,7 @@ export default function LensCorrectionModal({
           <p className="text-sm font-semibold text-text-primary">Manual Selection</p>
 
           <div className="space-y-4">
-            <Dropdown
-              options={myLensOptions}
-              value=""
-              onChange={handleMyLensSelect}
-              placeholder="Choose Saved Lens"
-            />
+            <Dropdown options={myLensOptions} value="" onChange={handleMyLensSelect} placeholder="Choose Saved Lens" />
             <Dropdown
               options={makerOptions}
               value={params.lensMaker}
@@ -611,18 +604,25 @@ export default function LensCorrectionModal({
 
         <div className="space-y-3">
           <p className="text-sm font-semibold text-text-primary">Corrections</p>
-          
+
           <div className="flex flex-col gap-4">
             <div>
-              <div className={clsx("flex items-center gap-3 p-2 rounded-md transition-colors", availability.distortion ? "bg-surface" : "bg-surface/30 opacity-60")}>
-                  <div className="p-1.5 bg-bg-primary rounded text-text-secondary"><SquareDashed size={16}/></div>
-                  <Switch 
-                    className="flex-grow"
-                    label="Distortion"
-                    checked={params.lensDistortionEnabled && availability.distortion} 
-                    onChange={(val) => handleToggleChange('lensDistortionEnabled', val)}
-                    disabled={!availability.distortion}
-                  />
+              <div
+                className={clsx(
+                  'flex items-center gap-3 p-2 rounded-md transition-colors',
+                  availability.distortion ? 'bg-surface' : 'bg-surface/30 opacity-60',
+                )}
+              >
+                <div className="p-1.5 bg-bg-primary rounded text-text-secondary">
+                  <SquareDashed size={16} />
+                </div>
+                <Switch
+                  className="flex-grow"
+                  label="Distortion"
+                  checked={params.lensDistortionEnabled && availability.distortion}
+                  onChange={(val) => handleToggleChange('lensDistortionEnabled', val)}
+                  disabled={!availability.distortion}
+                />
               </div>
               <AnimatePresence initial={false}>
                 {availability.distortion && params.lensDistortionEnabled && (
@@ -639,7 +639,7 @@ export default function LensCorrectionModal({
                       min={0}
                       max={200}
                       defaultValue={100}
-                      onChange={e => handleAmountChange('lensDistortionAmount', Number(e.target.value))}
+                      onChange={(e) => handleAmountChange('lensDistortionAmount', Number(e.target.value))}
                     />
                   </motion.div>
                 )}
@@ -647,15 +647,22 @@ export default function LensCorrectionModal({
             </div>
 
             <div>
-              <div className={clsx("flex items-center gap-3 p-2 rounded-md transition-colors", availability.tca ? "bg-surface" : "bg-surface/30 opacity-60")}>
-                  <div className="p-1.5 bg-bg-primary rounded text-text-secondary"><Activity size={16}/></div>
-                  <Switch 
-                    className="flex-grow"
-                    label="Chromatic Aberration"
-                    checked={params.lensTcaEnabled && availability.tca} 
-                    onChange={(val) => handleToggleChange('lensTcaEnabled', val)}
-                    disabled={!availability.tca}
-                  />
+              <div
+                className={clsx(
+                  'flex items-center gap-3 p-2 rounded-md transition-colors',
+                  availability.tca ? 'bg-surface' : 'bg-surface/30 opacity-60',
+                )}
+              >
+                <div className="p-1.5 bg-bg-primary rounded text-text-secondary">
+                  <Activity size={16} />
+                </div>
+                <Switch
+                  className="flex-grow"
+                  label="Chromatic Aberration"
+                  checked={params.lensTcaEnabled && availability.tca}
+                  onChange={(val) => handleToggleChange('lensTcaEnabled', val)}
+                  disabled={!availability.tca}
+                />
               </div>
               <AnimatePresence initial={false}>
                 {availability.tca && params.lensTcaEnabled && (
@@ -672,7 +679,7 @@ export default function LensCorrectionModal({
                       min={0}
                       max={200}
                       defaultValue={100}
-                      onChange={e => handleAmountChange('lensTcaAmount', Number(e.target.value))}
+                      onChange={(e) => handleAmountChange('lensTcaAmount', Number(e.target.value))}
                     />
                   </motion.div>
                 )}
@@ -680,15 +687,22 @@ export default function LensCorrectionModal({
             </div>
 
             <div>
-              <div className={clsx("flex items-center gap-3 p-2 rounded-md transition-colors", availability.vignetting ? "bg-surface" : "bg-surface/30 opacity-60")}>
-                  <div className="p-1.5 bg-bg-primary rounded text-text-secondary"><CircleDashed size={16}/></div>
-                  <Switch 
-                    className="flex-grow"
-                    label="Vignetting"
-                    checked={params.lensVignetteEnabled && availability.vignetting} 
-                    onChange={(val) => handleToggleChange('lensVignetteEnabled', val)}
-                    disabled={!availability.vignetting}
-                  />
+              <div
+                className={clsx(
+                  'flex items-center gap-3 p-2 rounded-md transition-colors',
+                  availability.vignetting ? 'bg-surface' : 'bg-surface/30 opacity-60',
+                )}
+              >
+                <div className="p-1.5 bg-bg-primary rounded text-text-secondary">
+                  <CircleDashed size={16} />
+                </div>
+                <Switch
+                  className="flex-grow"
+                  label="Vignetting"
+                  checked={params.lensVignetteEnabled && availability.vignetting}
+                  onChange={(val) => handleToggleChange('lensVignetteEnabled', val)}
+                  disabled={!availability.vignetting}
+                />
               </div>
               <AnimatePresence initial={false}>
                 {availability.vignetting && params.lensVignetteEnabled && (
@@ -705,29 +719,16 @@ export default function LensCorrectionModal({
                       min={0}
                       max={200}
                       defaultValue={100}
-                      onChange={e => handleAmountChange('lensVignetteAmount', Number(e.target.value))}
+                      onChange={(e) => handleAmountChange('lensVignetteAmount', Number(e.target.value))}
                     />
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
-
-            <div>
-              <div className={clsx("flex items-center gap-3 p-2 rounded-md transition-colors", availability.distortion && params.lensDistortionEnabled ? "bg-surface" : "bg-surface/30 opacity-60")}>
-                  <div className="p-1.5 bg-bg-primary rounded text-text-secondary"><Scissors size={16}/></div>
-                  <Switch
-                    className="flex-grow"
-                    label="Auto Crop"
-                    checked={params.lensAutoCropEnabled && availability.distortion && params.lensDistortionEnabled}
-                    onChange={(val) => handleToggleChange('lensAutoCropEnabled', val)}
-                    disabled={!availability.distortion || !params.lensDistortionEnabled}
-                  />
-              </div>
-            </div>
           </div>
         </div>
 
-        <div className="mt-auto pt-4 space-y-2">
+        <div className="mt-auto space-y-2">
           {currentAdjustments.masks && currentAdjustments.masks.length > 0 && (
             <div className="p-3 bg-surface rounded-md border border-surface flex items-center gap-3">
               <Info size={16} className="text-text-secondary flex-shrink-0" />
@@ -748,8 +749,8 @@ export default function LensCorrectionModal({
                   className="underline hover:text-primary transition-colors"
                 >
                   Lensfun Project
-                </a>
-                {' '} (
+                </a>{' '}
+                (
                 <a
                   href="https://creativecommons.org/licenses/by-sa/3.0/"
                   target="_blank"
@@ -804,10 +805,10 @@ export default function LensCorrectionModal({
 
           <div
             className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/70 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-xl z-20 pointer-events-auto"
-            onMouseDown={e => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             <button
-              onClick={() => setZoom(z => Math.max(0.1, z - 0.25))}
+              onClick={() => setZoom((z) => Math.max(0.1, z - 0.25))}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip="Zoom Out"
             >
@@ -817,7 +818,7 @@ export default function LensCorrectionModal({
               {Math.round(zoom * 100)}%
             </span>
             <button
-              onClick={() => setZoom(z => Math.min(8, z + 0.25))}
+              onClick={() => setZoom((z) => Math.min(8, z + 0.25))}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip="Zoom In"
             >
@@ -837,7 +838,7 @@ export default function LensCorrectionModal({
               onMouseLeave={() => toggleCompare(false)}
               className={clsx(
                 'p-2 rounded-full transition-colors select-none',
-                isCompareActive ? 'bg-accent text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
+                isCompareActive ? 'bg-accent text-white' : 'text-white/60 hover:bg-white/10 hover:text-white',
               )}
               data-tooltip="Hold to Compare"
             >
@@ -867,11 +868,14 @@ export default function LensCorrectionModal({
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
-            onMouseDown={e => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex-grow min-h-0 overflow-hidden">{renderContent()}</div>
             <div className="flex-shrink-0 p-4 flex justify-end gap-3 border-t border-surface bg-bg-secondary z-20">
-              <button onClick={onClose} className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors"
+              >
                 Cancel
               </button>
               <Button onClick={handleApply} disabled={isApplying || !previewUrl}>
