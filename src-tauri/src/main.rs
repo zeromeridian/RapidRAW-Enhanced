@@ -277,7 +277,8 @@ const GEOMETRY_KEYS: &[&str] = &[
     "transformXOffset", "transformYOffset", "lensDistortionAmount",
     "lensVignetteAmount", "lensTcaAmount", "lensDistortionParams",
     "lensMaker", "lensModel", "lensDistortionEnabled",
-    "lensTcaEnabled", "lensVignetteEnabled"
+    "lensTcaEnabled", "lensVignetteEnabled",
+    "lensAutoCropEnabled"
 ];
 
 pub fn calculate_geometry_hash(adjustments: &serde_json::Value) -> u64 {
@@ -1190,7 +1191,8 @@ async fn preview_geometry_transform(
                         },
                         "lensDistortionEnabled" |
                         "lensTcaEnabled" |
-                        "lensVignetteEnabled" => {
+                        "lensVignetteEnabled" |
+                        "lensAutoCropEnabled" => {
                             obj.insert(key.to_string(), serde_json::json!(true));
                         },
                         _ => {
