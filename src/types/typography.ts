@@ -95,7 +95,7 @@ export const TextVariants: Record<TextVariant, VariantConfig> = {
   },
   body: {
     size: 'text-sm',
-    defaultWeight: 'normal', //weight used for sm is all over the place
+    defaultWeight: 'normal',
     defaultColor: 'secondary',
     defaultElement: 'p',
   },
@@ -107,7 +107,7 @@ export const TextVariants: Record<TextVariant, VariantConfig> = {
   },
   small: {
     size: 'text-xs',
-    defaultWeight: 'normal', //CHECK WEIGHTS
+    defaultWeight: 'normal',
     defaultColor: 'secondary',
     defaultElement: 'p',
   },
