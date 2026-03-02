@@ -9,9 +9,9 @@ export type TextVariant =
   | 'label'
   | 'small';
 export type TextWeight = 'bold' | 'semibold' | 'medium' | 'normal';
-export type TextColor = 'primary' | 'secondary' | 'accent';
+export type TextColor = 'primary' | 'secondary' | 'accent' | 'info' | 'success' | 'error';
 
-export const TextWeights: Record<TextWeight, string> = {
+export const TextWeights: Record<TextWeight, TextWeight> = {
   bold: 'bold',
   semibold: 'semibold',
   medium: 'medium',
@@ -21,6 +21,9 @@ export const TextColors: Record<TextColor, TextColor> = {
   primary: 'primary',
   secondary: 'secondary',
   accent: 'accent',
+  info: 'info',
+  success: 'success',
+  error: 'error',
 };
 
 // Map keys to classes
@@ -34,6 +37,9 @@ export const TEXT_COLOR_KEYS: Record<TextColor, string> = {
   primary: 'text-text-primary',
   secondary: 'text-text-secondary',
   accent: 'text-accent',
+  info: 'text-blue-300',
+  success: 'text-green-400',
+  error: 'text-red-400',
 };
 
 export interface VariantConfig {
@@ -96,12 +102,12 @@ export const TextVariants: Record<TextVariant, VariantConfig> = {
     size: 'text-sm',
     defaultWeight: 'medium',
     defaultColor: 'secondary',
-    defaultElement: 'p',
+    defaultElement: 'span',
   },
   small: {
     size: 'text-xs',
-    defaultWeight: 'medium', //CHECK WEIGHTS
+    defaultWeight: 'normal', //CHECK WEIGHTS
     defaultColor: 'secondary',
-    defaultElement: 'span',
+    defaultElement: 'p',
   },
 };
