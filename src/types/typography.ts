@@ -9,7 +9,7 @@ export type TextVariant =
   | 'label'
   | 'small';
 export type TextWeight = 'bold' | 'semibold' | 'medium' | 'normal';
-export type TextColor = 'primary' | 'secondary' | 'accent' | 'info' | 'success' | 'error';
+export type TextColor = 'primary' | 'secondary' | 'accent' | 'info' | 'success' | 'error' | 'white';
 
 export const TextWeights: Record<TextWeight, TextWeight> = {
   bold: 'bold',
@@ -24,6 +24,7 @@ export const TextColors: Record<TextColor, TextColor> = {
   info: 'info',
   success: 'success',
   error: 'error',
+  white: 'white',
 };
 
 // Map keys to classes
@@ -40,6 +41,7 @@ export const TEXT_COLOR_KEYS: Record<TextColor, string> = {
   info: 'text-blue-300',
   success: 'text-green-400',
   error: 'text-red-400',
+  white: 'text-white',
 };
 
 export interface VariantConfig {
@@ -86,7 +88,7 @@ export const TextVariants: Record<TextVariant, VariantConfig> = {
     defaultElement: 'h2',
   },
   subheading: {
-    //Currently no uses - its this weak maybe add <Text as="h3" variant={TextVariants.label} color={TextColors.primary}> as own thing
+    //Currently nothing uses this - if it's this weak maybe add <Text as="h3" variant={TextVariants.label} color={TextColors.primary}> as own thing
     size: 'text-md',
     defaultWeight: 'semibold',
     defaultColor: 'primary',
