@@ -277,7 +277,7 @@ const GEOMETRY_KEYS: &[&str] = &[
     "transformXOffset", "transformYOffset", "lensDistortionAmount",
     "lensVignetteAmount", "lensTcaAmount", "lensDistortionParams",
     "lensMaker", "lensModel", "lensDistortionEnabled",
-    "lensTcaEnabled", "lensVignetteEnabled"
+    "lensTcaEnabled", "lensVignetteEnabled",
 ];
 
 pub fn calculate_geometry_hash(adjustments: &serde_json::Value) -> u64 {
