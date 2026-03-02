@@ -1,6 +1,6 @@
 import React, { forwardRef } from 'react';
 import clsx from 'clsx';
-import { TextWeight, TextColor, VariantConfig, TextWeights, TextColors } from '../../types/typography';
+import { TextWeight, TextColor, VariantConfig, TEXT_WEIGHT_KEYS, TEXT_COLOR_KEYS } from '../../types/typography';
 
 export interface TextProps extends React.HTMLAttributes<HTMLElement> {
   variant: VariantConfig;
@@ -19,8 +19,8 @@ export const Text = forwardRef<HTMLElement, TextProps>(
         ref={ref}
         className={clsx(
           variant.size,
-          TextWeights[weight || variant.defaultWeight],
-          TextColors[color || variant.defaultColor],
+          TEXT_WEIGHT_KEYS[weight ?? variant.defaultWeight],
+          TEXT_COLOR_KEYS[color ?? variant.defaultColor],
           variant.extraClasses,
           className,
         )}
