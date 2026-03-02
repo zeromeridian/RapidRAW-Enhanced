@@ -377,8 +377,6 @@ export default function LibraryExportPanel({
       return;
     }
 
-    setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
-
     let finalFilenameTemplate = filenameTemplate;
     if (numImages > 1 && !filenameTemplate.includes('{sequence}') && !filenameTemplate.includes('{original_filename}')) {
       finalFilenameTemplate = `${filenameTemplate}_{sequence}`;
@@ -411,14 +409,13 @@ export default function LibraryExportPanel({
       });
 
       if (outputFolder) {
+        setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
         await invoke(Invokes.BatchExportImages, {
           exportSettings,
           outputFolder,
           outputFormat: FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0],
           paths: multiSelectedPaths,
         });
-      } else {
-        setExportState((prev: ExportState) => ({ ...prev, status: Status.Idle }));
       }
     } catch (error) {
       console.error('Error exporting images:', error);

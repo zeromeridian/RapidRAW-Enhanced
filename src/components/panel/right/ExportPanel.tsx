@@ -361,8 +361,6 @@ export default function ExportPanel({
       return;
     }
 
-    setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
-
     let finalFilenameTemplate = filenameTemplate;
     if (isBatchMode && !filenameTemplate.includes('{sequence}') && !filenameTemplate.includes('{original_filename}')) {
       finalFilenameTemplate = `${filenameTemplate}_{sequence}`;
@@ -392,14 +390,13 @@ export default function ExportPanel({
       if (isBatchMode || !isEditorContext) {
         const outputFolder = await open({ title: `Select Folder to Export ${numImages} Image(s)`, directory: true });
         if (outputFolder) {
+          setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
           await invoke(Invokes.BatchExportImages, {
             exportSettings,
             outputFolder,
             outputFormat: FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0],
             paths: pathsToExport,
           });
-        } else {
-          setExportState((prev: ExportState) => ({ ...prev, status: Status.Idle }));
         }
       } else {
         const selectedFormat: any = FILE_FORMATS.find((f) => f.id === fileFormat);
@@ -413,14 +410,13 @@ export default function ExportPanel({
           filters: FILE_FORMATS.map((f: FileFormat) => ({ name: f.name, extensions: f.extensions })),
         });
         if (filePath) {
+          setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
           await invoke(Invokes.ExportImage, {
             exportSettings,
             jsAdjustments: adjustments,
             originalPath: selectedImage.path,
             outputPath: filePath,
           });
-        } else {
-          setExportState((prev: ExportState) => ({ ...prev, status: Status.Idle }));
         }
       }
     } catch (error) {
