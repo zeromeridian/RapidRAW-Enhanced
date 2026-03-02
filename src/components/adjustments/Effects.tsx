@@ -2,6 +2,8 @@ import Slider from '../ui/Slider';
 import { Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
 import LUTControl from '../ui/LUTControl';
 import { AppSettings } from '../ui/AppProperties';
+import Text from '../ui/Text';
+import { TextVariants } from '../../types/typography';
 
 interface EffectsPanelProps {
   adjustments: Adjustments;
@@ -45,7 +47,7 @@ export default function EffectsPanel({
   return (
     <div>
       <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
-        <p className="text-md font-semibold mb-2 text-primary">Creative</p>
+        <Text variant={TextVariants.subheading}>Creative</Text>
 
         <Slider
           label="Glow"
@@ -81,7 +83,7 @@ export default function EffectsPanel({
       {!isForMask && (
         <>
           <div className="my-4 p-2 bg-bg-tertiary rounded-md">
-            <p className="text-md font-semibold mb-2 text-primary">LUT</p>
+            <Text variant={TextVariants.subheading}>LUT</Text>
             <LUTControl
               lutName={adjustments.lutName || null}
               lutIntensity={adjustments.lutIntensity || 100}
@@ -94,7 +96,7 @@ export default function EffectsPanel({
 
           {adjustmentVisibility.vignette !== false && (
             <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
-              <p className="text-md font-semibold mb-2 text-primary">Vignette</p>
+              <Text variant={TextVariants.subheading}>Vignette</Text>
               <Slider
                 label="Amount"
                 max={100}
@@ -138,7 +140,7 @@ export default function EffectsPanel({
 
           {adjustmentVisibility.grain !== false && (
             <div className="p-2 bg-bg-tertiary rounded-md">
-              <p className="text-md font-semibold mb-2 text-primary">Grain</p>
+              <Text variant={TextVariants.subheading}>Grain</Text>
               <Slider
                 label="Amount"
                 max={100}
