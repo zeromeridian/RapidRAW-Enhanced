@@ -69,7 +69,7 @@ export const TextVariants: Record<TextVariant, VariantConfig> = {
     size: 'text-2xl',
     defaultWeight: 'bold',
     defaultColor: 'primary',
-    defaultElement: 'h1', // check community page as this does not follow current style
+    defaultElement: 'h1',
     extraClasses: 'text-shadow-shiny',
   },
   title: {
@@ -86,11 +86,12 @@ export const TextVariants: Record<TextVariant, VariantConfig> = {
     defaultElement: 'h2',
   },
   subheading: {
+    //Currently no uses - its this weak maybe add <Text as="h3" variant={TextVariants.label} color={TextColors.primary}> as own thing
     size: 'text-md',
     defaultWeight: 'semibold',
     defaultColor: 'primary',
-    defaultElement: 'p',
-    extraClasses: 'mb-3',
+    defaultElement: 'h3',
+    extraClasses: 'mb-2',
   },
   body: {
     size: 'text-sm',

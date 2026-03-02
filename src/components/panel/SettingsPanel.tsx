@@ -167,7 +167,7 @@ const DataActionItem = ({
   title,
 }: DataActionItemProps) => (
   <div className="pb-6 border-b border-border-color last:border-b-0 last:pb-0">
-    <Text as="p" variant={TextVariants.label} color={TextColors.primary} className="mb-2">
+    <Text color={TextColors.primary} weight={TextWeights.medium} className="mb-2">
       {title}
     </Text>
     <Text variant={TextVariants.small} className="mb-3">
@@ -178,7 +178,7 @@ const DataActionItem = ({
       {isProcessing ? 'Processing...' : buttonText}
     </Button>
     {message && (
-      <Text as="p" variant={TextVariants.label} color={TextColors.accent} className="mt-3">
+      <Text color={TextColors.accent} weight={TextWeights.medium} className="mt-3">
         {message}
       </Text>
     )}
@@ -808,7 +808,7 @@ export default function SettingsPanel({
                   </Text>
 
                   <div className="bg-bg-primary rounded-lg p-4 border border-border-color mb-6">
-                    <Text as="h3" variant={TextVariants.label} color={TextColors.primary} className="mb-3">
+                    <Text as="h3" color={TextColors.primary} weight={TextWeights.medium} className="mb-3">
                       Add New Lens
                     </Text>
                     <div className="space-y-4">
@@ -833,7 +833,7 @@ export default function SettingsPanel({
                   </div>
 
                   <div className="space-y-2">
-                    <Text as="h3" variant={TextVariants.label} color={TextColors.primary} className="mb-3">
+                    <Text as="h3" color={TextColors.primary} weight={TextWeights.medium} className="mb-3">
                       Saved Lenses
                     </Text>
                     {(!appSettings?.myLenses || appSettings.myLenses.length === 0) && (
