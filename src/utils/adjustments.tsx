@@ -111,6 +111,7 @@ export enum LensAdjustment {
   LensDistortionEnabled = 'lensDistortionEnabled',
   LensTcaEnabled = 'lensTcaEnabled',
   LensVignetteEnabled = 'lensVignetteEnabled',
+  LensAutoCropEnabled = 'lensAutoCropEnabled',
 }
 
 export interface ColorCalibration {
@@ -154,6 +155,7 @@ export interface Adjustments {
   lensDistortionAmount: number;
   lensVignetteAmount: number;
   lensTcaAmount: number;
+  lensAutoCropEnabled: boolean;
   lensDistortionEnabled: boolean;
   lensTcaEnabled: boolean;
   lensVignetteEnabled: boolean;
@@ -468,6 +470,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   lensDistortionAmount: 100,
   lensVignetteAmount: 100,
   lensTcaAmount: 100,
+  lensAutoCropEnabled: true,
   lensDistortionEnabled: true,
   lensTcaEnabled: true,
   lensVignetteEnabled: true,
@@ -573,6 +576,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     lensDistortionAmount: loadedAdjustments.lensDistortionAmount ?? INITIAL_ADJUSTMENTS.lensDistortionAmount,
     lensVignetteAmount: loadedAdjustments.lensVignetteAmount ?? INITIAL_ADJUSTMENTS.lensVignetteAmount,
     lensTcaAmount: loadedAdjustments.lensTcaAmount ?? INITIAL_ADJUSTMENTS.lensTcaAmount,
+    lensAutoCropEnabled: loadedAdjustments.lensAutoCropEnabled ?? INITIAL_ADJUSTMENTS.lensAutoCropEnabled,
     lensDistortionEnabled: loadedAdjustments.lensDistortionEnabled ?? INITIAL_ADJUSTMENTS.lensDistortionEnabled,
     lensTcaEnabled: loadedAdjustments.lensTcaEnabled ?? INITIAL_ADJUSTMENTS.lensTcaEnabled,
     lensVignetteEnabled: loadedAdjustments.lensVignetteEnabled ?? INITIAL_ADJUSTMENTS.lensVignetteEnabled,

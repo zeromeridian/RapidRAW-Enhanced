@@ -58,6 +58,7 @@ pub struct GeometryParams {
     pub lens_distortion_enabled: bool,
     pub lens_tca_enabled: bool,
     pub lens_vignette_enabled: bool,
+    pub lens_auto_crop: bool,
     pub lens_dist_k1: f32,
     pub lens_dist_k2: f32,
     pub lens_dist_k3: f32,
@@ -86,6 +87,7 @@ impl Default for GeometryParams {
             lens_distortion_enabled: true,
             lens_tca_enabled: true,
             lens_vignette_enabled: true,
+            lens_auto_crop: true,
             lens_dist_k1: 0.0,
             lens_dist_k2: 0.0,
             lens_dist_k3: 0.0,
@@ -118,6 +120,7 @@ pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> Geometr
         lens_distortion_enabled: adjustments["lensDistortionEnabled"].as_bool().unwrap_or(true),
         lens_tca_enabled: adjustments["lensTcaEnabled"].as_bool().unwrap_or(true),
         lens_vignette_enabled: adjustments["lensVignetteEnabled"].as_bool().unwrap_or(true),
+        lens_auto_crop: adjustments["lensAutoCropEnabled"].as_bool().unwrap_or(true),
 
         lens_dist_k1: lens_params.and_then(|p| p.get("k1").and_then(|k| k.as_f64())).unwrap_or(0.0) as f32,
         lens_dist_k2: lens_params.and_then(|p| p.get("k2").and_then(|k| k.as_f64())).unwrap_or(0.0) as f32,
@@ -339,6 +342,75 @@ fn interpolate_pixel_with_tca(
     pixel_out[2] = sample_channel(bx, by, 2);
 }
 
+/// Computes the uniform scale factor needed to crop out black borders
+/// introduced by lens distortion correction. Samples edge midpoints to find
+/// the worst-case inward displacement and returns a scale >= 1.0.
+fn compute_lens_auto_crop_scale(params: &GeometryParams, width: f32, height: f32) -> f64 {
+    let cx = (width / 2.0) as f64;
+    let cy = (height / 2.0) as f64;
+    let half_diagonal = ((cx * cx + cy * cy) as f64).sqrt();
+
+    let lk1 = params.lens_dist_k1 as f64;
+    let lk2 = params.lens_dist_k2 as f64;
+    let lk3 = params.lens_dist_k3 as f64;
+    let lens_dist_amt = (params.lens_distortion_amount as f64) * 2.5;
+    let is_ptlens = params.lens_model == 1;
+
+    // Compute the distorted radius for a given undistorted radius
+    let distort = |ru_norm: f64| -> f64 {
+        let ru_norm2 = ru_norm * ru_norm;
+        let rd_norm = if is_ptlens {
+            let a = lk1; let b = lk2; let c = lk3;
+            let d = 1.0 - a - b - c;
+            let poly = a * ru_norm2 * ru_norm + b * ru_norm2 + c * ru_norm + d;
+            ru_norm * poly
+        } else {
+            let poly = 1.0 + lk1 * ru_norm2
+                     + lk2 * (ru_norm2 * ru_norm2)
+                     + lk3 * (ru_norm2 * ru_norm2 * ru_norm2);
+            ru_norm * poly
+        };
+        ru_norm + (rd_norm - ru_norm) * lens_dist_amt
+    };
+
+    // Sample edge midpoints and corners — these are the locations most
+    // susceptible to black-border artifacts from lens distortion.
+    let sample_points: [(f64, f64); 8] = [
+        (cx, 0.0),            // top center
+        (cx, height as f64),  // bottom center
+        (0.0, cy),            // left center
+        (width as f64, cy),   // right center
+        (0.0, 0.0),           // top-left
+        (width as f64, 0.0),  // top-right
+        (0.0, height as f64), // bottom-left
+        (width as f64, height as f64), // bottom-right
+    ];
+
+    let mut max_scale: f64 = 1.0;
+
+    for &(px, py) in &sample_points {
+        let dx = px - cx;
+        let dy = py - cy;
+        let ru = (dx * dx + dy * dy).sqrt();
+        if ru < 1e-6 { continue; }
+
+        let ru_norm = ru / half_diagonal;
+        let effective_r_norm = distort(ru_norm);
+        let scale = effective_r_norm / ru_norm;
+
+        // If scale > 1.0 the source coordinate is pushed outside the image
+        // bounds, creating black borders. We need to zoom in by that factor
+        // to compensate.
+        if scale > max_scale {
+            max_scale = scale;
+        }
+    }
+
+    // Add a small margin to account for bilinear interpolation sampling
+    // beyond the exact boundary, which can bleed in black pixels at edges.
+    max_scale * 1.005
+}
+
 pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> DynamicImage {
     let src_img = image.to_rgb32f();
     let (width, height) = src_img.dimensions();
@@ -361,6 +433,12 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
 
     let has_lens_correction = params.lens_distortion_enabled && (lk1.abs() > 1e-6 || lk2.abs() > 1e-6 || lk3.abs() > 1e-6);
     let is_ptlens = params.lens_model == 1;
+
+    let auto_crop_scale = if params.lens_auto_crop && has_lens_correction {
+        compute_lens_auto_crop_scale(&params, width as f32, height as f32) as f32
+    } else {
+        1.0
+    };
 
     let vr = if (params.tca_vr - 1.0).abs() > 1e-5 { params.tca_vr + (1.0 - params.tca_vr) * (1.0 - params.lens_tca_amount) } else { 1.0 };
     let vb = if (params.tca_vb - 1.0).abs() > 1e-5 { params.tca_vb + (1.0 - params.tca_vb) * (1.0 - params.lens_tca_amount) } else { 1.0 };
@@ -406,8 +484,8 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
                                 let poly = a * ru_norm2 * ru_norm + b * ru_norm2 + c * ru_norm + d;
                                 ru_norm * poly
                             } else {
-                                let poly = 1.0 + lk1 * ru_norm2 
-                                         + lk2 * (ru_norm2 * ru_norm2) 
+                                let poly = 1.0 + lk1 * ru_norm2
+                                         + lk2 * (ru_norm2 * ru_norm2)
                                          + lk3 * (ru_norm2 * ru_norm2 * ru_norm2);
                                 ru_norm * poly
                             };
@@ -418,6 +496,11 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
                             src_x = cx + dx * scale as f32;
                             src_y = cy + dy * scale as f32;
                         }
+                    }
+
+                    if auto_crop_scale > 1.0 {
+                        src_x = cx + (src_x - cx) / auto_crop_scale;
+                        src_y = cy + (src_y - cy) / auto_crop_scale;
                     }
 
                     if k_distortion.abs() > 1e-5 {

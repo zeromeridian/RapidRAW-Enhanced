@@ -14,6 +14,7 @@ import {
   SquareDashed,
   CircleDashed,
   Activity,
+  Scissors,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../ui/Button';
@@ -49,6 +50,7 @@ interface GeometryParams {
   lens_distortion_enabled: boolean;
   lens_tca_enabled: boolean;
   lens_vignette_enabled: boolean;
+  lens_auto_crop: boolean;
 }
 
 interface MyLens {
@@ -59,13 +61,14 @@ interface MyLens {
 interface LensParams {
   lensMaker: string | null;
   lensModel: string | null;
+  lensAutoCropEnabled: boolean;
   lensDistortionAmount: number;
   lensVignetteAmount: number;
   lensTcaAmount: number;
   lensDistortionEnabled: boolean;
   lensTcaEnabled: boolean;
   lensVignetteEnabled: boolean;
-  lensDistortionParams: { 
+  lensDistortionParams: {
     k1: number; k2: number; k3: number;
     model: number;
     tca_vr: number; tca_vb: number;
@@ -84,6 +87,7 @@ interface LensCorrectionModalProps {
 const DEFAULT_PARAMS: LensParams = {
   lensMaker: null,
   lensModel: null,
+  lensAutoCropEnabled: true,
   lensDistortionAmount: 100,
   lensVignetteAmount: 100,
   lensTcaAmount: 100,
@@ -235,6 +239,7 @@ export default function LensCorrectionModal({
           lens_distortion_enabled: currentParams.lensDistortionEnabled,
           lens_vignette_enabled: currentParams.lensVignetteEnabled,
           lens_tca_enabled: currentParams.lensTcaEnabled,
+          lens_auto_crop: currentParams.lensAutoCropEnabled,
 
           lens_dist_k1: currentParams.lensDistortionParams?.k1 ?? 0,
           lens_dist_k2: currentParams.lensDistortionParams?.k2 ?? 0,
@@ -274,6 +279,7 @@ export default function LensCorrectionModal({
       const initParams: LensParams = {
         lensMaker: currentAdjustments.lensMaker,
         lensModel: currentAdjustments.lensModel,
+        lensAutoCropEnabled: currentAdjustments.lensAutoCropEnabled ?? true,
         lensDistortionAmount: currentAdjustments.lensDistortionAmount ?? 100,
         lensVignetteAmount: currentAdjustments.lensVignetteAmount ?? 100,
         lensTcaAmount: currentAdjustments.lensTcaAmount ?? 100,
@@ -432,6 +438,7 @@ export default function LensCorrectionModal({
   const handleReset = () => {
     const resetParams = {
       ...DEFAULT_PARAMS,
+      lensAutoCropEnabled: true,
       lensDistortionEnabled: true,
       lensTcaEnabled: true,
       lensVignetteEnabled: true,
@@ -462,6 +469,7 @@ export default function LensCorrectionModal({
         lens_distortion_enabled: false,
         lens_vignette_enabled: false,
         lens_tca_enabled: false,
+        lens_auto_crop: false,
 
         lens_dist_k1: currentAdjustments.lensDistortionParams?.k1 ?? 0,
         lens_dist_k2: currentAdjustments.lensDistortionParams?.k2 ?? 0,
@@ -702,6 +710,19 @@ export default function LensCorrectionModal({
                   </motion.div>
                 )}
               </AnimatePresence>
+            </div>
+
+            <div>
+              <div className={clsx("flex items-center gap-3 p-2 rounded-md transition-colors", availability.distortion && params.lensDistortionEnabled ? "bg-surface" : "bg-surface/30 opacity-60")}>
+                  <div className="p-1.5 bg-bg-primary rounded text-text-secondary"><Scissors size={16}/></div>
+                  <Switch
+                    className="flex-grow"
+                    label="Auto Crop"
+                    checked={params.lensAutoCropEnabled && availability.distortion && params.lensDistortionEnabled}
+                    onChange={(val) => handleToggleChange('lensAutoCropEnabled', val)}
+                    disabled={!availability.distortion || !params.lensDistortionEnabled}
+                  />
+              </div>
             </div>
           </div>
         </div>
