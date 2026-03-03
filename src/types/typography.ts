@@ -89,11 +89,11 @@ export const TextVariants: Record<TextVariant, VariantConfig> = {
   },
   subheading: {
     //Currently nothing uses this - if it's this weak maybe add <Text as="h3" variant={TextVariants.label} color={TextColors.primary}> as own thing
+    // Use heading instead of this to cut down number of font sizes - or vice-versa?
     size: 'text-md',
     defaultWeight: 'semibold',
     defaultColor: 'primary',
     defaultElement: 'h3',
-    extraClasses: 'mb-2',
   },
   body: {
     size: 'text-sm',

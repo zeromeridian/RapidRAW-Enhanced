@@ -30,7 +30,9 @@ export default function DetailsPanel({
     <div>
       {adjustmentVisibility.sharpening !== false && (
         <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.subheading}>Sharpening</Text>
+          <Text variant={TextVariants.subheading} className="mb-2">
+            Sharpening
+          </Text>
           <Slider
             label="Sharpness"
             max={100}
@@ -45,7 +47,9 @@ export default function DetailsPanel({
 
       {adjustmentVisibility.presence !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.subheading}>Presence</Text>
+          <Text variant={TextVariants.subheading} className="mb-2">
+            Presence
+          </Text>
           <Slider
             label="Clarity"
             max={100}
@@ -90,7 +94,7 @@ export default function DetailsPanel({
       {/* Hide noise reduction to stop people from thinking it exists
       {adjustmentVisibility.noiseReduction !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.subheading}>Noise Reduction</Text>
+          <Text variant={TextVariants.subheading} className="mb-2">Noise Reduction</Text>
           <Slider
             label="Luminance"
             max={100}
@@ -113,7 +117,9 @@ export default function DetailsPanel({
 
       {adjustmentVisibility.chromaticAberration !== false && (
         <div className="mt-4 p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.subheading}>Chromatic Aberration</Text>
+          <Text variant={TextVariants.subheading} className="mb-2">
+            Chromatic Aberration
+          </Text>
           <Slider
             label="Red/Cyan"
             max={100}

@@ -47,7 +47,9 @@ export default function EffectsPanel({
   return (
     <div>
       <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.subheading}>Creative</Text>
+        <Text variant={TextVariants.subheading} className="mb-2">
+          Creative
+        </Text>
 
         <Slider
           label="Glow"
@@ -83,7 +85,9 @@ export default function EffectsPanel({
       {!isForMask && (
         <>
           <div className="my-4 p-2 bg-bg-tertiary rounded-md">
-            <Text variant={TextVariants.subheading}>LUT</Text>
+            <Text variant={TextVariants.subheading} className="mb-2">
+              LUT
+            </Text>
             <LUTControl
               lutName={adjustments.lutName || null}
               lutIntensity={adjustments.lutIntensity || 100}
@@ -96,7 +100,9 @@ export default function EffectsPanel({
 
           {adjustmentVisibility.vignette !== false && (
             <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
-              <Text variant={TextVariants.subheading}>Vignette</Text>
+              <Text variant={TextVariants.subheading} className="mb-2">
+                Vignette
+              </Text>
               <Slider
                 label="Amount"
                 max={100}
@@ -140,7 +146,9 @@ export default function EffectsPanel({
 
           {adjustmentVisibility.grain !== false && (
             <div className="p-2 bg-bg-tertiary rounded-md">
-              <Text variant={TextVariants.subheading}>Grain</Text>
+              <Text variant={TextVariants.subheading} className="mb-2">
+                Grain
+              </Text>
               <Slider
                 label="Amount"
                 max={100}

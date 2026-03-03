@@ -1488,7 +1488,7 @@ export default function MainLibrary({
               <div className="my-auto text-left">
                 <Text variant={TextVariants.displayLarge}>RapidRAW</Text>
                 <Text
-                  variant={TextVariants.heading}
+                  variant={TextVariants.subheading}
                   color={TextColors.secondary}
                   weight={TextWeights.normal}
                   className="mb-10 max-w-md"
