@@ -162,15 +162,6 @@ export default function Editor({
   }, [isFullScreen]);
 
   useEffect(() => {
-    const currentUrl = maskOverlayUrl;
-    return () => {
-      if (currentUrl && currentUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(currentUrl);
-      }
-    };
-  }, [maskOverlayUrl]);
-
-  useEffect(() => {
     if (!transformWrapperRef.current) {
       return;
     }
@@ -251,7 +242,7 @@ export default function Editor({
   const isMasking = activeRightPanel === Panel.Masks;
   const isAiEditing = activeRightPanel === Panel.Ai;
 
-  const hasDisplayableImage = finalPreviewUrl || selectedImage.originalUrl || selectedImage.thumbnailUrl;
+  const hasDisplayableImage = finalPreviewUrl || selectedImage.thumbnailUrl;
   const showSpinner = isLoading && !hasDisplayableImage;
 
   const croppedDimensions = useMemo<ImageDimensions | null>(() => {

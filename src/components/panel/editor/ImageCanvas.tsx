@@ -62,12 +62,6 @@ interface ImageCanvasProps {
   isMaxZoom?: boolean;
 }
 
-interface ImageLayer {
-  id: string;
-  opacity: number;
-  url: string | null;
-}
-
 interface MaskOverlay {
   adjustments: Adjustments;
   imageHeight: number;
@@ -514,12 +508,8 @@ const ImageCanvas = memo(
     isMaxZoom,
   }: ImageCanvasProps) => {
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
-    const [layers, setLayers] = useState<Array<ImageLayer>>([]);
     const cropImageRef = useRef<HTMLImageElement>(null);
-    const imagePathRef = useRef<string | null>(null);
-    const latestEditedUrlRef = useRef<string | null>(null);
     const [displayedMaskUrl, setDisplayedMaskUrl] = useState<string | null>(null);
-    const [maskOpacity, setMaskOpacity] = useState(0);
 
     const isDrawing = useRef(false);
     const drawingStageRef = useRef<any>(null);
@@ -579,19 +569,10 @@ const ImageCanvas = memo(
     useEffect(() => {
       if (maskOverlayUrl && (isMasking || isAiEditing)) {
         setDisplayedMaskUrl(maskOverlayUrl);
-        requestAnimationFrame(() => {
-          setMaskOpacity(1);
-        });
       } else {
-        setMaskOpacity(0);
-      }
-    }, [maskOverlayUrl, isMasking, isAiEditing]);
-
-    const handleMaskTransitionEnd = useCallback(() => {
-      if (maskOpacity === 0) {
         setDisplayedMaskUrl(null);
       }
-    }, [maskOpacity]);
+    }, [maskOverlayUrl, isMasking, isAiEditing]);
 
     useEffect(() => {
       if (isToolActive) {
@@ -613,75 +594,6 @@ const ImageCanvas = memo(
       const otherMasks = activeContainer.subMasks.filter((m: SubMask) => m.id !== activeId);
       return selectedMask ? [...otherMasks, selectedMask] : activeContainer.subMasks;
     }, [activeContainer, activeMaskId, activeAiSubMaskId, isMasking, isAiEditing]);
-
-    useEffect(() => {
-      const { path: currentImagePath, originalUrl, thumbnailUrl } = selectedImage;
-      const imageChanged = currentImagePath !== imagePathRef.current;
-
-      const currentPreviewUrl = showOriginal ? transformedOriginalUrl : finalPreviewUrl;
-
-      if (imageChanged) {
-        imagePathRef.current = currentImagePath;
-        latestEditedUrlRef.current = null;
-        const initialUrl = thumbnailUrl || originalUrl;
-        setLayers(initialUrl ? [{ id: initialUrl, url: initialUrl, opacity: 1 }] : []);
-        return;
-      }
-
-      if (currentPreviewUrl && currentPreviewUrl !== latestEditedUrlRef.current) {
-        latestEditedUrlRef.current = currentPreviewUrl;
-        const img = new Image();
-        img.src = currentPreviewUrl;
-        img.onload = () => {
-          if (img.src === latestEditedUrlRef.current) {
-            setLayers((prev) => {
-              if (prev.some((l) => l.id === img.src)) {
-                return prev;
-              }
-              return [...prev, { id: img.src, url: img.src, opacity: 0 }];
-            });
-          }
-        };
-        return () => {
-          img.onload = null;
-        };
-      }
-
-      if (!currentPreviewUrl) {
-        const initialUrl = originalUrl || thumbnailUrl;
-        if (initialUrl && initialUrl !== latestEditedUrlRef.current) {
-          latestEditedUrlRef.current = initialUrl;
-          setLayers((prev) => {
-            if (prev.length === 0) {
-              return [{ id: initialUrl, url: initialUrl, opacity: 1 }];
-            }
-            return prev;
-          });
-        }
-      }
-    }, [selectedImage, finalPreviewUrl, transformedOriginalUrl, showOriginal]);
-
-    useEffect(() => {
-      const layerToFadeIn = layers.find((l: ImageLayer) => l.opacity === 0);
-      if (layerToFadeIn) {
-        const frame = requestAnimationFrame(() => {
-          setLayers((prev: Array<ImageLayer>) =>
-            prev.map((l: ImageLayer) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)),
-          );
-        });
-        return () => cancelAnimationFrame(frame);
-      }
-    }, [layers]);
-
-    const handleTransitionEnd = useCallback((finishedId: string) => {
-      setLayers((prev: Array<ImageLayer>) => {
-        const finishedIndex = prev.findIndex((l) => l.id === finishedId);
-        if (finishedIndex < 0 || prev.length <= 1) {
-          return prev;
-        }
-        return prev.slice(finishedIndex);
-      });
-    }, []);
 
     useEffect(() => {
       if (isCropping && uncroppedAdjustedPreviewUrl) {
@@ -1168,8 +1080,8 @@ const ImageCanvas = memo(
       }
     };
 
-    const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.originalUrl;
-    const isContentReady = layers.length > 0 && layers.some((l) => l.url);
+    const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.thumbnailUrl;
+    const activeSrc = showOriginal ? transformedOriginalUrl : finalPreviewUrl || selectedImage.thumbnailUrl;
 
     const uncroppedImageRenderSize = useMemo<Partial<RenderSize> | null>(() => {
       if (!selectedImage?.width || !selectedImage?.height || !imageRenderSize?.width || !imageRenderSize?.height) {
@@ -1235,41 +1147,32 @@ const ImageCanvas = memo(
             className="opacity-100"
             style={{
               height: '100%',
-              opacity: isContentReady ? 1 : 0,
               position: 'relative',
               width: '100%',
             }}
           >
             <div className="absolute inset-0 w-full h-full">
-              {layers.map((layer: ImageLayer) =>
-                layer.url ? (
-                  <img
-                    alt=" "
-                    className="absolute inset-0 w-full h-full object-contain"
-                    key={layer.id}
-                    onTransitionEnd={() => handleTransitionEnd(layer.id)}
-                    src={layer.url}
-                    style={{
-                      opacity: layer.opacity,
-                      transition: 'opacity 80ms linear',
-                      willChange: 'opacity, transform',
-                      imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                      transform: 'translateZ(0)',
-                      backfaceVisibility: 'hidden',
-                    }}
-                  />
-                ) : null,
+              {activeSrc && (
+                <img
+                  alt=" "
+                  className="absolute inset-0 w-full h-full object-contain"
+                  src={activeSrc}
+                  style={{
+                    imageRendering: isMaxZoom ? 'pixelated' : 'auto',
+                    transform: 'translateZ(0)',
+                    backfaceVisibility: 'hidden',
+                  }}
+                />
               )}
               {displayedMaskUrl && (
                 <img
                   alt="Mask Overlay"
                   className="absolute object-contain pointer-events-none"
                   src={displayedMaskUrl}
-                  onTransitionEnd={handleMaskTransitionEnd}
                   style={{
                     height: `${imageRenderSize.height}px`,
                     left: `${imageRenderSize.offsetX}px`,
-                    opacity: showOriginal || isMaskControlHovered ? 0 : maskOpacity,
+                    opacity: showOriginal || isMaskControlHovered ? 0 : 1,
                     top: `${imageRenderSize.offsetY}px`,
                     transition: 'opacity 200ms ease-in-out',
                     width: `${imageRenderSize.width}px`,

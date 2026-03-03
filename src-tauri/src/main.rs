@@ -127,12 +127,14 @@ pub struct GpuProcessorState {
 struct PreviewJob {
     adjustments: serde_json::Value,
     is_interactive: bool,
+    job_id: u64,
 }
 
 #[derive(serde::Serialize, Clone)]
 struct PreviewUpdatePayload {
     path: String,
-    data: Vec<u8>,
+    data: String,
+    job_id: u64,
 }
 
 pub struct AppState {
@@ -773,7 +775,7 @@ fn process_preview_job(
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let hq_live = settings.enable_high_quality_live_previews.unwrap_or(false);
     let interactive_divisor = if hq_live { 1.5 } else { 2.0 };
-    let interactive_quality = if hq_live { 80 } else { 50 };
+    let interactive_quality = if hq_live { 70 } else { 50 };
 
     let mut cached_preview_lock = state.cached_preview.lock().unwrap();
 
@@ -917,9 +919,12 @@ fn process_preview_job(
             .encode_rgb(&rgb_pixels, width as u32, height as u32)
         {
             Ok(bytes) => {
+                let base64_str = general_purpose::STANDARD.encode(&bytes);
+                let data_url = format!("data:image/jpeg;base64,{}", base64_str);
                 let _ = app_handle.emit("preview-update-final", PreviewUpdatePayload {
                     path: loaded_image.path.clone(),
-                    data: bytes,
+                    data: data_url,
+                    job_id: job.job_id,
                 });
             },
             Err(e) => {
@@ -940,8 +945,8 @@ fn start_preview_worker(app_handle: tauri::AppHandle) {
 
     std::thread::spawn(move || {
         while let Ok(mut job) = rx.recv() {
-            while let Ok(next_job) = rx.try_recv() {
-                job = next_job;
+            while let Ok(latest_job) = rx.try_recv() {
+                job = latest_job;
             }
 
             let state = app_handle.state::<AppState>();
@@ -956,6 +961,7 @@ fn start_preview_worker(app_handle: tauri::AppHandle) {
 fn apply_adjustments(
     js_adjustments: serde_json::Value,
     is_interactive: bool,
+    job_id: u64,
     state: tauri::State<AppState>,
 ) -> Result<(), String> {
     let tx_guard = state.preview_worker_tx.lock().unwrap();
@@ -963,6 +969,7 @@ fn apply_adjustments(
         let job = PreviewJob {
             adjustments: js_adjustments,
             is_interactive,
+            job_id,
         };
         tx.send(job).map_err(|e| format!("Failed to send to preview worker: {}", e))?;
     }
@@ -1070,7 +1077,9 @@ fn generate_uncropped_preview(
                 .encode_rgb(&rgb_pixels, width as u32, height as u32)
             {
                 Ok(bytes) => {
-                    let _ = app_handle.emit("preview-update-uncropped", bytes);
+                    let base64_str = general_purpose::STANDARD.encode(&bytes);
+                    let data_url = format!("data:image/jpeg;base64,{}", base64_str);
+                    let _ = app_handle.emit("preview-update-uncropped", data_url);
                 }
                 Err(e) => {
                     log::error!("Failed to encode uncropped preview with mozjpeg-rs: {}", e);
@@ -1087,7 +1096,7 @@ fn generate_original_transformed_preview(
     js_adjustments: serde_json::Value,
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<Response, String> {
+) -> Result<String, String> {
     let loaded_image = state
         .original_image
         .lock()
@@ -1124,7 +1133,8 @@ fn generate_original_transformed_preview(
         .encode_rgb(&rgb_pixels, width as u32, height as u32)
         .map_err(|e| format!("Failed to encode with mozjpeg-rs: {}", e))?;
 
-    Ok(Response::new(bytes))
+    let base64_str = general_purpose::STANDARD.encode(&bytes);
+    Ok(format!("data:image/jpeg;base64,{}", base64_str))
 }
 
 #[tauri::command]
@@ -1329,6 +1339,7 @@ fn get_full_image_for_processing(
 #[tauri::command]
 async fn generate_fullscreen_preview(
     js_adjustments: serde_json::Value,
+    job_id: u64,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let app_handle_clone = app_handle.clone();
@@ -1392,9 +1403,12 @@ async fn generate_fullscreen_preview(
             .encode_rgb(&rgb_pixels, width as u32, height as u32)
         {
             Ok(bytes) => {
+                let base64_str = general_purpose::STANDARD.encode(&bytes);
+                let data_url = format!("data:image/jpeg;base64,{}", base64_str);
                 let _ = app_handle_clone.emit("preview-update-final", PreviewUpdatePayload {
                     path: path.clone(),
-                    data: bytes,
+                    data: data_url,
+                    job_id,
                 });
             }
             Err(e) => {
