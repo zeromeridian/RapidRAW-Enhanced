@@ -6,7 +6,7 @@ import { ColorAdjustment, ColorCalibration, HueSatLum, INITIAL_ADJUSTMENTS } fro
 import { Adjustments, ColorGrading } from '../../utils/adjustments';
 import { AppSettings } from '../ui/AppProperties';
 import Text from '../ui/Text';
-import { TextColors, TextVariants } from '../../types/typography';
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 
 interface ColorProps {
   color: string;
@@ -237,7 +237,7 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
         Color Calibration
       </Text>
       <div>
-        <Text variant={TextVariants.label} color={TextColors.primary} className="mb-1">
+        <Text color={TextColors.primary} weight={TextWeights.medium} className="mb-1">
           Shadows
         </Text>
         <Slider
@@ -252,7 +252,7 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
         />
       </div>
       <div className="mt-3">
-        <Text as="p" variant={TextVariants.label} color={TextColors.primary} className="mb-3">
+        <Text color={TextColors.primary} weight={TextWeights.medium} className="mb-3">
           Primaries
         </Text>
         <div className="flex justify-center gap-6 mb-4 px-1">
