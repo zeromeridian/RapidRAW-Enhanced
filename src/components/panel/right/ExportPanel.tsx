@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { Save, CheckCircle, XCircle, Loader, Ban } from 'lucide-react';
@@ -9,6 +9,7 @@ import Slider from '../../ui/Slider';
 import ImagePicker from '../../ui/ImagePicker';
 import { Adjustments } from '../../../utils/adjustments';
 import {
+  ExportPreset,
   ExportSettings,
   FileFormat,
   FILE_FORMATS,
@@ -206,6 +207,31 @@ export default function ExportPanel({
     currentSettingsObject,
   } = useExportSettings();
 
+  const initDone = useRef(false);
+  useEffect(() => {
+    if (initDone.current || appSettings === null) return;
+    initDone.current = true;
+    const lastUsed = appSettings.exportPresets?.find(p => p.id === '__last_used__');
+    if (lastUsed) {
+      handleApplyPreset(lastUsed);
+    }
+  }, [appSettings, handleApplyPreset]);
+
+  const saveLastUsedPreset = useCallback((exportPath: string) => {
+    if (!appSettings) return;
+    const lastUsedPreset: ExportPreset = {
+      ...currentSettingsObject,
+      id: '__last_used__',
+      name: '__last_used__',
+      lastExportPath: exportPath,
+    };
+    const updatedPresets = [
+      ...(appSettings.exportPresets ?? []).filter(p => p.id !== '__last_used__'),
+      lastUsedPreset,
+    ];
+    onSettingsChange({ ...appSettings, exportPresets: updatedPresets });
+  }, [appSettings, currentSettingsObject, onSettingsChange]);
+
   const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
   const [watermarkImageAspectRatio, setWatermarkImageAspectRatio] = useState(1);
@@ -361,8 +387,6 @@ export default function ExportPanel({
       return;
     }
 
-    setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
-
     let finalFilenameTemplate = filenameTemplate;
     if (isBatchMode && !filenameTemplate.includes('{sequence}') && !filenameTemplate.includes('{original_filename}')) {
       finalFilenameTemplate = `${filenameTemplate}_{sequence}`;
@@ -388,39 +412,52 @@ export default function ExportPanel({
           : null,
     };
 
+    const lastExportPath = appSettings?.exportPresets?.find(p => p.id === '__last_used__')?.lastExportPath;
+
     try {
       if (isBatchMode || !isEditorContext) {
-        const outputFolder = await open({ title: `Select Folder to Export ${numImages} Image(s)`, directory: true });
+        const outputFolder = await open({
+          title: `Select Folder to Export ${numImages} Image(s)`,
+          directory: true,
+          defaultPath: lastExportPath ?? undefined,
+        });
         if (outputFolder) {
+          saveLastUsedPreset(outputFolder as string);
+          setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
           await invoke(Invokes.BatchExportImages, {
             exportSettings,
             outputFolder,
             outputFormat: FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0],
             paths: pathsToExport,
           });
-        } else {
-          setExportState((prev: ExportState) => ({ ...prev, status: Status.Idle }));
         }
       } else {
         const selectedFormat: any = FILE_FORMATS.find((f) => f.id === fileFormat);
-        const originalFilename = selectedImage.path.split(/[\\/]/).pop();
-        const name = originalFilename
-          ? originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename
-          : '';
+        const originalFilename = selectedImage.path.split(/[\\/]/).pop() || '';
+        const stem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
+        const suggestedName = finalFilenameTemplate.replace('{original_filename}', stem);
+        const defaultPath = lastExportPath
+          ? `${lastExportPath}/${suggestedName}.${selectedFormat.extensions[0]}`
+          : `${suggestedName}.${selectedFormat.extensions[0]}`;
         const filePath = await save({
           title: 'Save Edited Image',
-          defaultPath: `${name}_edited.${selectedFormat.extensions[0]}`,
-          filters: FILE_FORMATS.map((f: FileFormat) => ({ name: f.name, extensions: f.extensions })),
+          defaultPath,
+          filters: [
+            { name: selectedFormat.name, extensions: selectedFormat.extensions },
+            ...FILE_FORMATS.filter((f: FileFormat) => f.id !== fileFormat)
+              .map((f: FileFormat) => ({ name: f.name, extensions: f.extensions })),
+          ],
         });
         if (filePath) {
+          const dir = filePath.substring(0, Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')));
+          if (dir) saveLastUsedPreset(dir);
+          setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
           await invoke(Invokes.ExportImage, {
             exportSettings,
             jsAdjustments: adjustments,
             originalPath: selectedImage.path,
             outputPath: filePath,
           });
-        } else {
-          setExportState((prev: ExportState) => ({ ...prev, status: Status.Idle }));
         }
       }
     } catch (error) {

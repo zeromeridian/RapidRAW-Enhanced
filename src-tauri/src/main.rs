@@ -277,7 +277,7 @@ const GEOMETRY_KEYS: &[&str] = &[
     "transformXOffset", "transformYOffset", "lensDistortionAmount",
     "lensVignetteAmount", "lensTcaAmount", "lensDistortionParams",
     "lensMaker", "lensModel", "lensDistortionEnabled",
-    "lensTcaEnabled", "lensVignetteEnabled"
+    "lensTcaEnabled", "lensVignetteEnabled",
 ];
 
 pub fn calculate_geometry_hash(adjustments: &serde_json::Value) -> u64 {
@@ -3462,7 +3462,7 @@ fn setup_logging(app_handle: &tauri::AppHandle) {
     let log_file = fs::OpenOptions::new()
         .write(true)
         .create(true)
-        .append(true)
+        .truncate(true)
         .open(&log_file_path)
         .ok();
 
