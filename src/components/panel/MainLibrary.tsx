@@ -1786,7 +1786,7 @@ export default function MainLibrary({
         </div>
       ) : searchCriteria.tags.length > 0 || searchCriteria.text ? (
         <div
-          className="flex-1 flex flex-col items-center justify-center text-center"
+          className="flex-1 flex flex-col text-text-secondary items-center justify-center text-center"
           onContextMenu={onEmptyAreaContextMenu}
         >
           <Search className="h-12 w-12 text-secondary mb-4" />
