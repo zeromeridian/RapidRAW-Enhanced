@@ -3259,7 +3259,7 @@ async fn save_denoised_image(
 
     let (output_filename, image_to_save): (String, DynamicImage) = if is_raw {
         let filename = format!("{}_Denoised.tiff", stem);
-        (filename, denoised_image)
+        (filename, DynamicImage::ImageRgb16(denoised_image.to_rgb16()))
     } else {
         let filename = format!("{}_Denoised.png", stem);
         (filename, DynamicImage::ImageRgb8(denoised_image.to_rgb8()))
