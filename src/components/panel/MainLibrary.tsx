@@ -1536,7 +1536,7 @@ export default function MainLibrary({
                   </div>
                 </div>
               </div>
-              <div className="absolute bottom-8 left-8 lg:left-16 text-xs text-text-secondary space-y-1">
+              <Text variant={TextVariants.small} as="div" className="absolute bottom-8 left-8 lg:left-16 space-y-1">
                 <p>
                   Images by{' '}
                   <a
@@ -1594,7 +1594,7 @@ export default function MainLibrary({
                     </p>
                   </div>
                 )}
-              </div>
+              </Text>
             </>
           )}
         </div>
@@ -1612,7 +1612,7 @@ export default function MainLibrary({
           <Text variant={TextVariants.headline}>Library</Text>
           <div className="flex items-center gap-2">
             {currentFolderPath ? (
-              <p className="text-sm text-text-secondary truncate">{currentFolderPath}</p>
+              <Text className="truncate">{currentFolderPath}</Text>
             ) : (
               <p className="text-sm invisible select-none pointer-events-none h-5 overflow-hidden"></p>
             )}
@@ -1627,24 +1627,24 @@ export default function MainLibrary({
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           {importState.status === Status.Importing && (
-            <div className="flex items-center gap-2 text-sm text-accent animate-pulse">
+            <Text as="div" color={TextColors.accent} className="flex items-center gap-2 animate-pulse">
               <FolderInput size={16} />
               <span>
                 Importing... ({importState.progress?.current}/{importState.progress?.total})
               </span>
-            </div>
+            </Text>
           )}
           {importState.status === Status.Success && (
-            <div className="flex items-center gap-2 text-sm text-green-400">
+            <Text as="div" color={TextColors.success} className="flex items-center gap-2">
               <Check size={16} />
               <span>Import Complete!</span>
-            </div>
+            </Text>
           )}
           {importState.status === Status.Error && (
-            <div className="flex items-center gap-2 text-sm text-red-400">
+            <Text as="div" color={TextColors.error} className="flex items-center gap-2">
               <AlertTriangle size={16} />
               <span>Import Failed!</span>
-            </div>
+            </Text>
           )}
           <SearchInput
             indexingProgress={indexingProgress}

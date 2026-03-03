@@ -1266,11 +1266,11 @@ export default function SettingsPanel({
                             Integrated directly into RapidRAW, these features run entirely on your computer. They are
                             fast, free, and require no setup, making them ideal for everyday workflow acceleration.
                           </Text>
-                          <ul className="mt-3 space-y-1 list-disc list-inside text-sm text-text-secondary">
+                          <Text as="ul" className="mt-3 space-y-1 list-disc list-inside">
                             <li>AI Masking (Subject, Sky, Foreground)</li>
                             <li>Automatic Image Tagging</li>
                             <li>Simple CPU-based Generative Replace</li>
-                          </ul>
+                          </Text>
                         </motion.div>
                       )}
 
