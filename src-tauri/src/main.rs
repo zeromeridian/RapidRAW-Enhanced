@@ -891,12 +891,12 @@ fn process_preview_job(
     );
 
     if let Ok(final_processed_image) = final_processed_image_result {
+        if let Ok(histogram_data) =
+            image_processing::calculate_histogram_from_image(&final_processed_image)
+        {
+            let _ = app_handle.emit("histogram-update", histogram_data);
+        }
         if !is_interactive {
-            if let Ok(histogram_data) =
-                image_processing::calculate_histogram_from_image(&final_processed_image)
-            {
-                let _ = app_handle.emit("histogram-update", histogram_data);
-            }
             if let Ok(waveform_data) =
                 image_processing::calculate_waveform_from_image(&final_processed_image)
             {
