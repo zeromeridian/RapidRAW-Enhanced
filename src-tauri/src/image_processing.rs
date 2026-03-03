@@ -667,17 +667,18 @@ pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams
                     }
                 }
 
+                if auto_crop_scale > 1.0 {
+                    current_x = cx + (current_x - cx) * auto_crop_scale;
+                    current_y = cy + (current_y - cy) * auto_crop_scale;
+                }
+
                 let target_vec = forward_transform * NaVector3::new(current_x, current_y, 1.0);
 
                 if target_vec.z.abs() > 1e-6 {
                     let inv_z = 1.0 / target_vec.z;
-                    let mut src_x = target_vec.x * inv_z;
-                    let mut src_y = target_vec.y * inv_z;
 
-                    if auto_crop_scale > 1.0 {
-                        src_x = cx + (src_x - cx) * auto_crop_scale;
-                        src_y = cy + (src_y - cy) * auto_crop_scale;
-                    }
+                    let src_x = target_vec.x * inv_z; 
+                    let src_y = target_vec.y * inv_z;
 
                     interpolate_pixel(src_raw, width_usize, height_usize, src_x, src_y, pixel);
                 }
