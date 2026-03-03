@@ -1,13 +1,4 @@
-export type TextVariant =
-  | 'displayLarge'
-  | 'display'
-  | 'headline'
-  | 'title'
-  | 'heading'
-  | 'subheading'
-  | 'body'
-  | 'label'
-  | 'small';
+export type TextVariant = 'displayLarge' | 'display' | 'headline' | 'title' | 'heading' | 'body' | 'label' | 'small';
 export type TextWeight = 'bold' | 'semibold' | 'medium' | 'normal';
 export type TextColor = 'primary' | 'secondary' | 'accent' | 'info' | 'success' | 'error' | 'white';
 
@@ -75,6 +66,7 @@ export const TextVariants: Record<TextVariant, VariantConfig> = {
     extraClasses: 'text-shadow-shiny',
   },
   title: {
+    // Modals with text-lg are to use this as larger heading was removed
     size: 'text-xl',
     defaultWeight: 'bold',
     defaultColor: 'primary',
@@ -82,14 +74,6 @@ export const TextVariants: Record<TextVariant, VariantConfig> = {
     extraClasses: 'text-shadow-shiny',
   },
   heading: {
-    size: 'text-lg',
-    defaultWeight: 'semibold',
-    defaultColor: 'primary',
-    defaultElement: 'h2',
-  },
-  subheading: {
-    //Currently nothing uses heading - if it's this weak maybe add <Text as="h3" variant={TextVariants.label} color={TextColors.primary}> as own thing
-    // Use heading instead of this to cut down number of font sizes - or vice-versa?
     size: 'text-md',
     defaultWeight: 'semibold',
     defaultColor: 'primary',

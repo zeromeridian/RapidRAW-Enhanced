@@ -233,7 +233,7 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
 
   return (
     <div className="p-2 bg-bg-tertiary rounded-md mt-4">
-      <Text variant={TextVariants.subheading} className="mb-2">
+      <Text variant={TextVariants.heading} className="mb-2">
         Color Calibration
       </Text>
       <div>
@@ -326,7 +326,7 @@ export default function ColorPanel({
     <div>
       <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
         <div className="flex justify-between items-center mb-2">
-          <Text variant={TextVariants.subheading}>White Balance</Text>
+          <Text variant={TextVariants.heading}>White Balance</Text>
           {!isForMask && toggleWbPicker && (
             <button
               onClick={toggleWbPicker}
@@ -360,7 +360,7 @@ export default function ColorPanel({
       </div>
 
       <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.subheading} className="mb-2">
+        <Text variant={TextVariants.heading} className="mb-2">
           Presence
         </Text>
         <Slider
@@ -384,7 +384,7 @@ export default function ColorPanel({
       </div>
 
       <div className="p-2 bg-bg-tertiary rounded-md mt-4">
-        <Text variant={TextVariants.subheading} className="mb-3">
+        <Text variant={TextVariants.heading} className="mb-3">
           Color Grading
         </Text>
         <ColorGradingPanel
@@ -396,7 +396,7 @@ export default function ColorPanel({
       </div>
 
       <div className="p-2 bg-bg-tertiary rounded-md mt-4">
-        <Text variant={TextVariants.subheading} className="mb-3">
+        <Text variant={TextVariants.heading} className="mb-3">
           Color Mixer
         </Text>
         <div className="flex justify-between mb-4 px-1">

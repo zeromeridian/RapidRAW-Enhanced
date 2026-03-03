@@ -1261,7 +1261,7 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <Text variant={TextVariants.subheading}>Built-in AI (CPU)</Text>
+                          <Text variant={TextVariants.heading}>Built-in AI (CPU)</Text>
                           <Text className="mt-1">
                             Integrated directly into RapidRAW, these features run entirely on your computer. They are
                             fast, free, and require no setup, making them ideal for everyday workflow acceleration.
@@ -1282,7 +1282,7 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <Text variant={TextVariants.subheading}>Self-Hosted (RapidRAW AI Connector)</Text>
+                          <Text variant={TextVariants.heading}>Self-Hosted (RapidRAW AI Connector)</Text>
                           <Text className="mt-1">
                             For users with a capable GPU who want maximum control, connect RapidRAW to your own local AI
                             Connector server. This gives you full control for technical workflows.
@@ -1341,7 +1341,7 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <Text variant={TextVariants.subheading}>Cloud Service</Text>
+                          <Text variant={TextVariants.heading}>Cloud Service</Text>
                           <Text className="mt-1">
                             For those who want a simpler solution, an optional subscription provides the same
                             high-quality results as self-hosting without any hassle. This is the most convenient option
@@ -1443,7 +1443,7 @@ export default function SettingsPanel({
                   </Text>
                   <div className="space-y-4">
                     <div>
-                      <Text variant={TextVariants.subheading} className="pt-3 pb-2">
+                      <Text variant={TextVariants.heading} className="pt-3 pb-2">
                         General
                       </Text>
                       <div className="divide-y divide-border-color">
@@ -1463,7 +1463,7 @@ export default function SettingsPanel({
                       </div>
                     </div>
                     <div>
-                      <Text variant={TextVariants.subheading} className="pt-3 pb-2">
+                      <Text variant={TextVariants.heading} className="pt-3 pb-2">
                         Editor
                       </Text>
                       <div className="divide-y divide-border-color">
