@@ -127,14 +127,7 @@ pub struct GpuProcessorState {
 struct PreviewJob {
     adjustments: serde_json::Value,
     is_interactive: bool,
-    job_id: u64,
-}
-
-#[derive(serde::Serialize, Clone)]
-struct PreviewUpdatePayload {
-    path: String,
-    data: String,
-    job_id: u64,
+    responder: tokio::sync::oneshot::Sender<Vec<u8>>,
 }
 
 pub struct AppState {
@@ -759,11 +752,11 @@ pub fn get_cached_or_generate_mask(
 fn process_preview_job(
     app_handle: &tauri::AppHandle,
     state: tauri::State<AppState>,
-    job: PreviewJob,
-) -> Result<(), String> {
+    mut adjustments_json: serde_json::Value,
+    is_interactive: bool,
+) -> Result<Vec<u8>, String> {
     let fn_start = std::time::Instant::now();
     let context = get_or_init_gpu_context(&state)?;
-    let mut adjustments_json = job.adjustments;
     hydrate_adjustments(&state, &mut adjustments_json);
     let adjustments_clone = adjustments_json;
 
@@ -845,7 +838,7 @@ fn process_preview_job(
 
     drop(cached_preview_lock);
 
-    let (processing_image, effective_scale, jpeg_quality) = if job.is_interactive {
+    let (processing_image, effective_scale, jpeg_quality) = if is_interactive {
         let orig_w = final_preview_base.width() as f32;
         let small_w = small_preview_base.width() as f32;
         let scale_factor = if orig_w > 0.0 { small_w / orig_w } else { 1.0 };
@@ -898,7 +891,7 @@ fn process_preview_job(
     );
 
     if let Ok(final_processed_image) = final_processed_image_result {
-        if !job.is_interactive {
+        if !is_interactive {
             if let Ok(histogram_data) =
                 image_processing::calculate_histogram_from_image(&final_processed_image)
             {
@@ -919,22 +912,16 @@ fn process_preview_job(
             .encode_rgb(&rgb_pixels, width as u32, height as u32)
         {
             Ok(bytes) => {
-                let base64_str = general_purpose::STANDARD.encode(&bytes);
-                let data_url = format!("data:image/jpeg;base64,{}", base64_str);
-                let _ = app_handle.emit("preview-update-final", PreviewUpdatePayload {
-                    path: loaded_image.path.clone(),
-                    data: data_url,
-                    job_id: job.job_id,
-                });
+                log::info!("[process_preview_job] completed in {:?}", fn_start.elapsed());
+                return Ok(bytes);
             },
             Err(e) => {
-                log::error!("Failed to encode preview with mozjpeg-rs: {}", e);
+                return Err(format!("Failed to encode preview: {}", e));
             }
         }
     }
 
-    log::info!("[process_preview_job] completed in {:?}", fn_start.elapsed());
-    Ok(())
+    Err("Processing failed".to_string())
 }
 
 fn start_preview_worker(app_handle: tauri::AppHandle) {
@@ -950,30 +937,45 @@ fn start_preview_worker(app_handle: tauri::AppHandle) {
             }
 
             let state = app_handle.state::<AppState>();
-            if let Err(e) = process_preview_job(&app_handle, state, job) {
-                log::error!("Preview worker error: {}", e);
+            let responder = job.responder;
+            match process_preview_job(&app_handle, state, job.adjustments, job.is_interactive) {
+                Ok(bytes) => {
+                    let _ = responder.send(bytes);
+                }
+                Err(e) => {
+                    log::error!("Preview worker error: {}", e);
+                }
             }
         }
     });
 }
 
 #[tauri::command]
-fn apply_adjustments(
+async fn apply_adjustments(
     js_adjustments: serde_json::Value,
     is_interactive: bool,
-    job_id: u64,
-    state: tauri::State<AppState>,
-) -> Result<(), String> {
-    let tx_guard = state.preview_worker_tx.lock().unwrap();
-    if let Some(tx) = &*tx_guard {
-        let job = PreviewJob {
-            adjustments: js_adjustments,
-            is_interactive,
-            job_id,
-        };
-        tx.send(job).map_err(|e| format!("Failed to send to preview worker: {}", e))?;
+    state: tauri::State<'_, AppState>,
+) -> Result<Response, String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+
+    {
+        let tx_guard = state.preview_worker_tx.lock().unwrap();
+        if let Some(worker_tx) = &*tx_guard {
+            let job = PreviewJob {
+                adjustments: js_adjustments,
+                is_interactive,
+                responder: tx,
+            };
+            worker_tx.send(job).map_err(|e| format!("Failed to send to preview worker: {}", e))?;
+        } else {
+            return Err("Preview worker not running".to_string());
+        }
     }
-    Ok(())
+
+    match rx.await {
+        Ok(bytes) => Ok(Response::new(bytes)),
+        Err(_) => Err("Superseded or worker failed".to_string()),
+    }
 }
 
 #[tauri::command]
@@ -1339,13 +1341,11 @@ fn get_full_image_for_processing(
 #[tauri::command]
 async fn generate_fullscreen_preview(
     js_adjustments: serde_json::Value,
-    job_id: u64,
     app_handle: tauri::AppHandle,
-) -> Result<(), String> {
+) -> Result<Response, String> {
     let app_handle_clone = app_handle.clone();
     tokio::task::spawn_blocking(move || {
         let state = app_handle_clone.state::<AppState>();
-        
         let context = get_or_init_gpu_context(&state)?;
 
         let mut adjustments_clone = js_adjustments.clone();
@@ -1398,25 +1398,12 @@ async fn generate_fullscreen_preview(
         let (width, height) = final_image.dimensions();
         let rgb_pixels = final_image.to_rgb8().into_vec();
 
-        match Encoder::new(Preset::BaselineFastest)
+        let bytes = Encoder::new(Preset::BaselineFastest)
             .quality(92)
             .encode_rgb(&rgb_pixels, width as u32, height as u32)
-        {
-            Ok(bytes) => {
-                let base64_str = general_purpose::STANDARD.encode(&bytes);
-                let data_url = format!("data:image/jpeg;base64,{}", base64_str);
-                let _ = app_handle_clone.emit("preview-update-final", PreviewUpdatePayload {
-                    path: path.clone(),
-                    data: data_url,
-                    job_id,
-                });
-            }
-            Err(e) => {
-                log::error!("Failed to encode fullscreen preview with mozjpeg-rs: {}", e);
-            }
-        }
+            .map_err(|e| format!("Failed to encode fullscreen preview with mozjpeg-rs: {}", e))?;
 
-        Ok(())
+        Ok(Response::new(bytes))
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?

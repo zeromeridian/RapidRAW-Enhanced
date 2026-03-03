@@ -304,7 +304,6 @@ function App() {
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('thirds');
   const [overlayRotation, setOverlayRotation] = useState(0);
   const [transformedOriginalUrl, setTransformedOriginalUrl] = useState<string | null>(null);
-  const fullResRequestRef = useRef<any>(null);
   const fullResCacheKeyRef = useRef<string | null>(null);
   const patchesSentToBackend = useRef<Set<string>>(new Set());
 
@@ -1236,6 +1235,7 @@ function App() {
   const applyAdjustments = useCallback(
     async (currentAdjustments: Adjustments, dragging: boolean = false) => {
       if (!selectedImage?.isReady) return;
+      const currentPath = selectedImage.path;
 
       const payload = JSON.parse(JSON.stringify(currentAdjustments));
 
@@ -1270,16 +1270,30 @@ function App() {
       const jobId = ++previewJobIdRef.current;
 
       try {
-        await invoke(Invokes.ApplyAdjustments, {
+        const buffer: ArrayBuffer = await invoke(Invokes.ApplyAdjustments, {
           jsAdjustments: payload,
           isInteractive: dragging,
-          jobId: jobId,
         });
+
+        if (currentPath !== selectedImagePathRef.current) return;
+
+        if (buffer && buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
+          latestRenderedJobIdRef.current = jobId;
+          const blob = new Blob([buffer], { type: 'image/jpeg' });
+          const url = URL.createObjectURL(blob);
+
+          setFinalPreviewUrl((prevUrl) => {
+            if (prevUrl && prevUrl.startsWith('blob:')) URL.revokeObjectURL(prevUrl);
+            return url;
+          });
+        }
       } catch (err) {
-        console.error('Failed to invoke apply_adjustments:', err);
+        if (err !== 'Superseded or worker failed') {
+          console.error('Failed to apply adjustments:', err);
+        }
       }
     },
-    [selectedImage?.isReady],
+    [selectedImage?.isReady, selectedImage?.path],
   );
 
   const generateUncroppedPreview = useCallback(
@@ -1955,9 +1969,6 @@ function App() {
       setIsLibraryExportPanelVisible(false);
 
       fullResCacheKeyRef.current = null;
-      if (fullResRequestRef.current) {
-        fullResRequestRef.current.cancelled = true;
-      }
     },
     [selectedImage?.path, applyAdjustments, debouncedSave, thumbnails, imageRatings, resetAdjustmentsHistory],
   );
@@ -2327,33 +2338,34 @@ function App() {
     debounce((currentAdjustments: any, key: string) => {
       if (!selectedImage?.path) return;
 
-      if (fullResRequestRef.current) {
-        fullResRequestRef.current.cancelled = true;
-      }
-
-      const request = { cancelled: false };
-      fullResRequestRef.current = request;
-
       const jobId = ++previewJobIdRef.current;
 
-      invoke(Invokes.GenerateFullscreenPreview, {
+      invoke<ArrayBuffer>(Invokes.GenerateFullscreenPreview, {
         jsAdjustments: currentAdjustments,
-        jobId: jobId,
       })
-        .then(() => {
-          fullResCacheKeyRef.current = key;
-          if (!request.cancelled) {
+        .then((buffer) => {
+          if (jobId >= latestRenderedJobIdRef.current) {
+            latestRenderedJobIdRef.current = jobId;
+            const blob = new Blob([buffer], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+
+            setFinalPreviewUrl((prevUrl) => {
+              if (prevUrl && prevUrl.startsWith('blob:')) URL.revokeObjectURL(prevUrl);
+              return url;
+            });
+
+            fullResCacheKeyRef.current = key;
             setIsLoadingFullRes(false);
           }
         })
         .catch((error: any) => {
-          if (!request.cancelled) {
+          if (jobId >= latestRenderedJobIdRef.current) {
             console.error('Failed to generate high resolution preview:', error);
             fullResCacheKeyRef.current = null;
             setIsLoadingFullRes(false);
           }
         });
-    }, 300),
+    }, 100),
     [selectedImage?.path],
   );
 
@@ -2364,9 +2376,6 @@ function App() {
         requestFullResolution(adjustments, visualAdjustmentsKey);
       }
     } else if (!isFullScreen && !isHighResNeeded) {
-      if (fullResRequestRef.current) {
-        fullResRequestRef.current.cancelled = true;
-      }
       if (requestFullResolution.cancel) {
         requestFullResolution.cancel();
       }
@@ -2531,17 +2540,6 @@ function App() {
   useEffect(() => {
     let isEffectActive = true;
     const listeners = [
-      listen('preview-update-final', (event: any) => {
-        if (isEffectActive) {
-          const { path, data, job_id } = event.payload;
-          if (path !== selectedImagePathRef.current) return;
-
-          if (job_id >= latestRenderedJobIdRef.current) {
-            latestRenderedJobIdRef.current = job_id;
-            setFinalPreviewUrl(data);
-          }
-        }
-      }),
       listen('preview-update-uncropped', (event: any) => {
         if (isEffectActive) {
           setUncroppedAdjustedPreviewUrl(event.payload);
