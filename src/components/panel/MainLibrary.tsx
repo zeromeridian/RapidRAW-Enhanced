@@ -1771,7 +1771,7 @@ export default function MainLibrary({
       ) : isIndexing || aiModelDownloadStatus || importState.status === Status.Importing ? (
         <div className="flex-1 flex flex-col items-center justify-center" onContextMenu={onEmptyAreaContextMenu}>
           <Loader2 className="h-12 w-12 text-secondary animate-spin mb-4" />
-          <Text variant={TextVariants.heading} color={TextColors.secondary}>
+          <Text variant={TextVariants.subheading} color={TextColors.secondary}>
             {aiModelDownloadStatus
               ? `Downloading ${aiModelDownloadStatus}...`
               : isIndexing && indexingProgress.total > 0
@@ -1790,7 +1790,7 @@ export default function MainLibrary({
           onContextMenu={onEmptyAreaContextMenu}
         >
           <Search className="h-12 w-12 text-secondary mb-4" />
-          <Text variant={TextVariants.heading} color={TextColors.secondary}>
+          <Text variant={TextVariants.subheading} color={TextColors.secondary}>
             No Results Found
           </Text>
           <Text className="mt-2 max-w-sm">
