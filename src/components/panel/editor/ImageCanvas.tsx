@@ -510,6 +510,7 @@ const ImageCanvas = memo(
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
     const cropImageRef = useRef<HTMLImageElement>(null);
     const [displayedMaskUrl, setDisplayedMaskUrl] = useState<string | null>(null);
+    const [originalLoaded, setOriginalLoaded] = useState(false);
 
     const isDrawing = useRef(false);
     const drawingStageRef = useRef<any>(null);
@@ -1081,7 +1082,30 @@ const ImageCanvas = memo(
     };
 
     const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.thumbnailUrl;
-    const activeSrc = showOriginal ? transformedOriginalUrl : finalPreviewUrl || selectedImage.thumbnailUrl;
+    const editedSrc = finalPreviewUrl || selectedImage.thumbnailUrl;
+    const originalSrc = transformedOriginalUrl;
+    const isShowingOriginal = showOriginal && !!originalSrc;
+
+    useEffect(() => {
+      if (!originalSrc) {
+        setOriginalLoaded(false);
+        return;
+      }
+
+      const img = new Image();
+      img.src = originalSrc;
+
+      if (img.complete) {
+        setOriginalLoaded(true);
+      } else {
+        setOriginalLoaded(false);
+        img.onload = () => setOriginalLoaded(true);
+      }
+
+      return () => {
+        img.onload = null;
+      };
+    }, [originalSrc]);
 
     const uncroppedImageRenderSize = useMemo<Partial<RenderSize> | null>(() => {
       if (!selectedImage?.width || !selectedImage?.height || !imageRenderSize?.width || !imageRenderSize?.height) {
@@ -1152,11 +1176,12 @@ const ImageCanvas = memo(
             }}
           >
             <div className="absolute inset-0 w-full h-full">
-              {activeSrc && (
+              {/* Bottom Layer: The Edited Image */}
+              {editedSrc && (
                 <img
-                  alt=" "
+                  alt="Edited"
                   className="absolute inset-0 w-full h-full object-contain"
-                  src={activeSrc}
+                  src={editedSrc}
                   style={{
                     imageRendering: isMaxZoom ? 'pixelated' : 'auto',
                     transform: 'translateZ(0)',
@@ -1164,6 +1189,24 @@ const ImageCanvas = memo(
                   }}
                 />
               )}
+
+              {originalSrc && (
+                <img
+                  alt="Original"
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                  src={originalSrc}
+                  style={{
+                    imageRendering: isMaxZoom ? 'pixelated' : 'auto',
+                    transform: 'translateZ(0)',
+                    backfaceVisibility: 'hidden',
+                    opacity: isShowingOriginal && originalLoaded ? 1 : 0,
+                    transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
+                    zIndex: 2,
+                  }}
+                />
+              )}
+
+              {/* Mask Overlay (Fades Out) */}
               {displayedMaskUrl && (
                 <img
                   alt="Mask Overlay"
@@ -1172,11 +1215,12 @@ const ImageCanvas = memo(
                   style={{
                     height: `${imageRenderSize.height}px`,
                     left: `${imageRenderSize.offsetX}px`,
-                    opacity: showOriginal || isMaskControlHovered ? 0 : 1,
+                    opacity: isShowingOriginal || isMaskControlHovered ? 0 : 1,
                     top: `${imageRenderSize.offsetY}px`,
-                    transition: 'opacity 200ms ease-in-out',
+                    transition: 'opacity 300ms ease-in-out',
                     width: `${imageRenderSize.width}px`,
                     imageRendering: isMaxZoom ? 'pixelated' : 'auto',
+                    zIndex: 3,
                   }}
                 />
               )}
@@ -1193,7 +1237,8 @@ const ImageCanvas = memo(
             style={{
               cursor: effectiveCursor,
               left: `${imageRenderSize.offsetX}px`,
-              opacity: showOriginal ? 0 : 1,
+              opacity: isShowingOriginal ? 0 : 1,
+              transition: 'opacity 300ms ease-in-out',
               pointerEvents: showOriginal ? 'none' : 'auto',
               position: 'absolute',
               top: `${imageRenderSize.offsetY}px`,
