@@ -1969,6 +1969,10 @@ function App() {
       setIsLibraryExportPanelVisible(false);
 
       fullResCacheKeyRef.current = null;
+      setFinalPreviewUrl((prev) => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return null;
+      });
     },
     [selectedImage?.path, applyAdjustments, debouncedSave, thumbnails, imageRatings, resetAdjustmentsHistory],
   );
