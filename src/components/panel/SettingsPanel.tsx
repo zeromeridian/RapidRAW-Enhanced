@@ -124,7 +124,9 @@ const settingCategories = [
 
 const KeybindItem = ({ keys, description }: KeybindItemProps) => (
   <div className="flex justify-between items-center py-2">
-    <Text as="span">{description}</Text>
+    <Text variant={TextVariants.label} weight={TextWeights.normal}>
+      {description}
+    </Text>
     <div className="flex items-center gap-1">
       {keys.map((key: string, index: number) => (
         <Text
@@ -178,7 +180,7 @@ const DataActionItem = ({
       {isProcessing ? 'Processing...' : buttonText}
     </Button>
     {message && (
-      <Text color={TextColors.accent} weight={TextWeights.medium} className="mt-3">
+      <Text color={TextColors.accent} className="mt-3">
         {message}
       </Text>
     )}
@@ -607,7 +609,7 @@ export default function SettingsPanel({
             >
               <ArrowLeft />
             </Button>
-            <Text variant={TextVariants.display} color={TextColors.accent}>
+            <Text variant={TextVariants.display} color={TextColors.accent} className="whitespace-nowrap">
               Settings
             </Text>
           </div>
@@ -1226,7 +1228,7 @@ export default function SettingsPanel({
 
                     {restartRequired && (
                       <>
-                        <div className="p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg flex items-center gap-3">
+                        <div className="p-3 bg-blue-900/20 text-blue-300 border border-blue-500/50 rounded-lg flex items-center gap-3">
                           <Info size={18} />
                           <Text color={TextColors.info}>
                             Changes to the processing engine require an application restart to take effect.
