@@ -74,7 +74,7 @@ export const TextVariants: Record<TextVariant, VariantConfig> = {
     extraClasses: 'text-shadow-shiny',
   },
   heading: {
-    size: 'text-md',
+    size: 'text-base',
     defaultWeight: 'semibold',
     defaultColor: 'primary',
     defaultElement: 'h3',
