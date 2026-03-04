@@ -2396,8 +2396,13 @@ function App() {
       if (!initialFitScale) {
         return;
       }
+
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+      const physicalZoomPercent = targetZoomPercent * dpr;
+
       const highResThreshold = Math.max(initialFitScale * 2, 0.5);
-      const needsFullRes = targetZoomPercent > highResThreshold;
+      const needsFullRes = physicalZoomPercent > highResThreshold;
+
       const previewIsAlreadyFullRes = previewSize.width >= originalSize.width;
 
       if (needsFullRes && !previewIsAlreadyFullRes) {
@@ -2411,11 +2416,14 @@ function App() {
 
   const handleZoomChange = useCallback(
     (zoomValue: number, fitToWindow: boolean = false) => {
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
       let targetZoomPercent: number;
+
       const orientationSteps = adjustments.orientationSteps || 0;
       const isSwapped = orientationSteps === 1 || orientationSteps === 3;
       const effectiveOriginalWidth = isSwapped ? originalSize.height : originalSize.width;
       const effectiveOriginalHeight = isSwapped ? originalSize.width : originalSize.height;
+
       if (fitToWindow) {
         if (
           effectiveOriginalWidth > 0 &&
@@ -2434,9 +2442,11 @@ function App() {
           targetZoomPercent = 1.0;
         }
       } else {
-        targetZoomPercent = zoomValue;
+        targetZoomPercent = zoomValue / dpr;
       }
-      targetZoomPercent = Math.max(0.1, Math.min(2.0, targetZoomPercent));
+
+      targetZoomPercent = Math.max(0.1 / dpr, Math.min(4.0, targetZoomPercent));
+
       let transformZoom = 1.0;
       if (
         effectiveOriginalWidth > 0 &&

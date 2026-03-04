@@ -768,7 +768,7 @@ fn process_preview_job(
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let hq_live = settings.enable_high_quality_live_previews.unwrap_or(false);
     let interactive_divisor = if hq_live { 1.5 } else { 2.0 };
-    let interactive_quality = if hq_live { 70 } else { 50 };
+    let interactive_quality = if hq_live { 70 } else { 60 };
 
     let mut cached_preview_lock = state.cached_preview.lock().unwrap();
 
