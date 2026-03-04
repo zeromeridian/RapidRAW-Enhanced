@@ -166,7 +166,7 @@ const DataActionItem = ({
   message,
   title,
 }: DataActionItemProps) => (
-  <div className="pb-6 border-b border-border-color last:border-b-0 last:pb-0">
+  <div className="pb-8 border-b border-border-color last:border-b-0 last:pb-0">
     <Text variant={TextVariants.heading} className="mb-2">
       {title}
     </Text>
@@ -652,13 +652,13 @@ export default function SettingsPanel({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-8"
+                className="space-y-10"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-6">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     General Settings
                   </Text>
-                  <div className="space-y-6">
+                  <div className="space-y-8">
                     <SettingItem label="Theme" description="Change the look and feel of the application.">
                       <Dropdown
                         onChange={(value: any) => onSettingsChange({ ...appSettings, theme: value })}
@@ -749,7 +749,7 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-6">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     Adjustments Visibility
                   </Text>
                   <Text className="mb-4">
@@ -800,195 +800,199 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-6">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     My Lenses
                   </Text>
                   <Text className="mb-6">
                     Create a list of your frequently used lenses to quickly access them in the Lens Correction panel.
                   </Text>
 
-                  <div className="bg-bg-primary rounded-lg p-4 border border-border-color mb-6">
-                    <Text variant={TextVariants.heading} className="mb-3">
-                      Add New Lens
-                    </Text>
-                    <div className="space-y-4">
-                      <Dropdown
-                        options={lensMakers.map((m) => ({ label: m, value: m }))}
-                        value={tempLensMaker}
-                        onChange={handleTempMakerChange}
-                        placeholder="Select Manufacturer"
-                      />
-                      <Dropdown
-                        options={lensModels.map((m) => ({ label: m, value: m }))}
-                        value={tempLensModel}
-                        onChange={setTempLensModel}
-                        placeholder="Select Lens Model"
-                        disabled={!tempLensMaker}
-                      />
-                      <Button onClick={handleAddLens} disabled={!tempLensMaker || !tempLensModel} className="w-full">
-                        <Plus size={16} className="mr-2" />
-                        Add to My Lenses
-                      </Button>
+                  <div className="space-y-8">
+                    <div className="bg-bg-primary rounded-lg p-4 border border-border-color">
+                      <Text variant={TextVariants.heading} className="mb-3">
+                        Add New Lens
+                      </Text>
+                      <div className="space-y-4">
+                        <Dropdown
+                          options={lensMakers.map((m) => ({ label: m, value: m }))}
+                          value={tempLensMaker}
+                          onChange={handleTempMakerChange}
+                          placeholder="Select Manufacturer"
+                        />
+                        <Dropdown
+                          options={lensModels.map((m) => ({ label: m, value: m }))}
+                          value={tempLensModel}
+                          onChange={setTempLensModel}
+                          placeholder="Select Lens Model"
+                          disabled={!tempLensMaker}
+                        />
+                        <Button onClick={handleAddLens} disabled={!tempLensMaker || !tempLensModel} className="w-full">
+                          <Plus size={16} className="mr-1" />
+                          Add to My Lenses
+                        </Button>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <Text variant={TextVariants.heading} className="mb-3">
-                      Saved Lenses
-                    </Text>
-                    {(!appSettings?.myLenses || appSettings.myLenses.length === 0) && (
-                      <Text className="italic">No lenses added yet.</Text>
-                    )}
-                    <div className="divide-y divide-border-color">
-                      {(appSettings?.myLenses || []).map((lens: MyLens, index: number) => (
-                        <div
-                          key={`${lens.maker}-${lens.model}-${index}`}
-                          className="flex justify-between items-center py-3"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-surface rounded-md text-accent">
-                              <Bookmark size={16} />
-                            </div>
-                            <div>
-                              <Text color={TextColors.primary} weight={TextWeights.medium}>
-                                {lens.model}
-                              </Text>
-                              <Text variant={TextVariants.small}>{lens.maker}</Text>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleRemoveLens(index)}
-                            className="p-2 text-text-secondary hover:text-red-400 hover:bg-bg-primary rounded-md transition-colors"
-                            data-tooltip="Remove lens"
+                    <div>
+                      <Text variant={TextVariants.heading} className="mb-3">
+                        Saved Lenses
+                      </Text>
+                      {(!appSettings?.myLenses || appSettings.myLenses.length === 0) && (
+                        <Text className="italic">No lenses added yet.</Text>
+                      )}
+                      <div className="divide-y divide-border-color">
+                        {(appSettings?.myLenses || []).map((lens: MyLens, index: number) => (
+                          <div
+                            key={`${lens.maker}-${lens.model}-${index}`}
+                            className="flex justify-between items-center py-3 first:pt-0 last:pb-0"
                           >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      ))}
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-surface rounded-md text-accent">
+                                <Bookmark size={16} />
+                              </div>
+                              <div>
+                                <Text color={TextColors.primary} weight={TextWeights.medium}>
+                                  {lens.model}
+                                </Text>
+                                <Text variant={TextVariants.small}>{lens.maker}</Text>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleRemoveLens(index)}
+                              className="p-2 text-text-secondary hover:text-red-400 hover:bg-bg-primary rounded-md transition-colors"
+                              data-tooltip="Remove lens"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-6">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     Tagging
                   </Text>
-                  <div className="space-y-6">
-                    <SettingItem
-                      description="Enables automatic image tagging using an AI (CLIP) model. This will download an additional model and impact performance while browsing folders. Tags are used for searching a folder."
-                      label="AI Tagging"
-                    >
-                      <Switch
-                        checked={appSettings?.enableAiTagging ?? false}
-                        id="ai-tagging-toggle"
-                        label="Automatic AI Tagging"
-                        onChange={(checked) => onSettingsChange({ ...appSettings, enableAiTagging: checked })}
-                      />
-                    </SettingItem>
+                  <div className="space-y-8">
+                    <div className="space-y-4">
+                      <SettingItem
+                        description="Enables automatic image tagging using an AI (CLIP) model. This will download an additional model and impact performance while browsing folders. Tags are used for searching a folder."
+                        label="AI Tagging"
+                      >
+                        <Switch
+                          checked={appSettings?.enableAiTagging ?? false}
+                          id="ai-tagging-toggle"
+                          label="Automatic AI Tagging"
+                          onChange={(checked) => onSettingsChange({ ...appSettings, enableAiTagging: checked })}
+                        />
+                      </SettingItem>
 
-                    <AnimatePresence>
-                      {(appSettings?.enableAiTagging ?? false) && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.3, ease: 'easeInOut' }}
-                          className="overflow-hidden"
-                        >
-                          <div className="pl-4 border-l-2 border-border-color ml-1 mt-4 space-y-6">
-                            <SettingItem
-                              label="Maximum AI Tags"
-                              description="The maximum number of tags to generate per image."
-                            >
-                              <Slider
-                                label="Amount"
-                                min={1}
-                                max={20}
-                                step={1}
-                                value={appSettings?.aiTagCount ?? 10}
-                                defaultValue={10}
-                                onChange={(e: any) =>
-                                  onSettingsChange({ ...appSettings, aiTagCount: parseInt(e.target.value) })
-                                }
-                              />
-                            </SettingItem>
+                      <AnimatePresence>
+                        {(appSettings?.enableAiTagging ?? false) && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: 'easeInOut' }}
+                            className="overflow-hidden"
+                          >
+                            <div className="pl-4 border-l-2 border-border-color ml-1 space-y-8">
+                              <SettingItem
+                                label="Maximum AI Tags"
+                                description="The maximum number of tags to generate per image."
+                              >
+                                <Slider
+                                  label="Amount"
+                                  min={1}
+                                  max={20}
+                                  step={1}
+                                  value={appSettings?.aiTagCount ?? 10}
+                                  defaultValue={10}
+                                  onChange={(e: any) =>
+                                    onSettingsChange({ ...appSettings, aiTagCount: parseInt(e.target.value) })
+                                  }
+                                />
+                              </SettingItem>
 
-                            <SettingItem
-                              label="Custom AI Tag List"
-                              description="If provided, the AI will ONLY use tags from this list, overriding RapidRAW’s built-in list. Tagging works only in English."
-                            >
-                              <div>
-                                <div className="flex flex-wrap gap-2 p-2 bg-bg-primary rounded-md min-h-[40px] border border-border-color mb-2 items-center">
-                                  <AnimatePresence>
-                                    {customAiTags.length > 0 ? (
-                                      customAiTags.map((tag: string) => (
-                                        <motion.div
-                                          key={tag}
-                                          layout
-                                          variants={shortcutTagVariants}
-                                          initial={false}
-                                          animate="visible"
-                                          exit="exit"
-                                          onClick={() => handleRemoveAiTag(tag)}
-                                          data-tooltip={`Remove tag "${tag}"`}
-                                          className="flex items-center gap-1 bg-surface px-2 py-1 rounded group cursor-pointer"
+                              <SettingItem
+                                label="Custom AI Tag List"
+                                description="If provided, the AI will ONLY use tags from this list, overriding RapidRAW’s built-in list. Tagging works only in English."
+                              >
+                                <div>
+                                  <div className="flex flex-wrap gap-2 p-2 bg-bg-primary rounded-md min-h-[40px] border border-border-color mb-2 items-center">
+                                    <AnimatePresence>
+                                      {customAiTags.length > 0 ? (
+                                        customAiTags.map((tag: string) => (
+                                          <motion.div
+                                            key={tag}
+                                            layout
+                                            variants={shortcutTagVariants}
+                                            initial={false}
+                                            animate="visible"
+                                            exit="exit"
+                                            onClick={() => handleRemoveAiTag(tag)}
+                                            data-tooltip={`Remove tag "${tag}"`}
+                                            className="flex items-center gap-1 bg-surface px-2 py-1 rounded group cursor-pointer"
+                                          >
+                                            <Text variant={TextVariants.label} color={TextColors.primary}>
+                                              {tag}
+                                            </Text>
+                                            <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
+                                              <X size={14} />
+                                            </span>
+                                          </motion.div>
+                                        ))
+                                      ) : (
+                                        <motion.span
+                                          key="no-ai-tags-placeholder"
+                                          initial={{ opacity: 0 }}
+                                          animate={{ opacity: 1 }}
+                                          exit={{ opacity: 0 }}
+                                          transition={{ duration: 0.2 }}
                                         >
-                                          <Text variant={TextVariants.label} color={TextColors.primary}>
-                                            {tag}
+                                          <Text className="px-1 select-none italic">
+                                            No custom AI tags (Using built-in list)
                                           </Text>
-                                          <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
-                                            <X size={14} />
-                                          </span>
-                                        </motion.div>
-                                      ))
-                                    ) : (
-                                      <motion.span
-                                        key="no-ai-tags-placeholder"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.2 }}
+                                        </motion.span>
+                                      )}
+                                    </AnimatePresence>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                      <Input
+                                        type="text"
+                                        value={newAiTag}
+                                        onChange={(e) => setNewAiTag(e.target.value)}
+                                        onKeyDown={handleAiTagInputKeyDown}
+                                        placeholder="Add custom AI tags (comma separated)..."
+                                        className="pr-10"
+                                      />
+                                      <button
+                                        onClick={handleAddAiTag}
+                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface"
+                                        data-tooltip="Add AI tag"
                                       >
-                                        <Text className="px-1 select-none italic">
-                                          No custom AI tags (Using built-in list)
-                                        </Text>
-                                      </motion.span>
-                                    )}
-                                  </AnimatePresence>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="relative flex-1">
-                                    <Input
-                                      type="text"
-                                      value={newAiTag}
-                                      onChange={(e) => setNewAiTag(e.target.value)}
-                                      onKeyDown={handleAiTagInputKeyDown}
-                                      placeholder="Add custom AI tags (comma separated)..."
-                                      className="pr-10"
-                                    />
+                                        <Plus size={18} />
+                                      </button>
+                                    </div>
                                     <button
-                                      onClick={handleAddAiTag}
-                                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface"
-                                      data-tooltip="Add AI tag"
+                                      onClick={() => onSettingsChange({ ...appSettings, customAiTags: [] })}
+                                      disabled={customAiTags.length === 0}
+                                      className="p-2 text-text-secondary hover:text-red-400 hover:bg-surface rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-secondary disabled:hover:bg-transparent"
+                                      data-tooltip="Clear AI Tag List"
                                     >
-                                      <Plus size={18} />
+                                      <Trash2 size={18} />
                                     </button>
                                   </div>
-                                  <button
-                                    onClick={() => onSettingsChange({ ...appSettings, customAiTags: [] })}
-                                    disabled={customAiTags.length === 0}
-                                    className="p-2 text-text-secondary hover:text-red-400 hover:bg-surface rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-secondary disabled:hover:bg-transparent"
-                                    data-tooltip="Clear AI Tag List"
-                                  >
-                                    <Trash2 size={18} />
-                                  </button>
                                 </div>
-                              </div>
-                            </SettingItem>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                              </SettingItem>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
 
                     <SettingItem
                       label="Tagging Shortcuts"
@@ -1062,8 +1066,8 @@ export default function SettingsPanel({
                       </div>
                     </SettingItem>
 
-                    <div className="pt-6 border-t border-border-color">
-                      <div className="space-y-6">
+                    <div className="pt-8 border-t border-border-color">
+                      <div className="space-y-8">
                         <DataActionItem
                           buttonAction={handleClearAiTags}
                           buttonText="Clear AI Tags"
@@ -1098,13 +1102,13 @@ export default function SettingsPanel({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-8"
+                className="space-y-10"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-6">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     Processing Engine
                   </Text>
-                  <div className="space-y-6">
+                  <div className="space-y-8">
                     <SettingItem
                       description="Higher resolutions provide a sharper preview but may impact performance on less powerful systems."
                       label="Preview Resolution"
@@ -1241,7 +1245,7 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-6">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     Generative AI
                   </Text>
                   <Text className="mb-4">
@@ -1251,7 +1255,7 @@ export default function SettingsPanel({
 
                   <AiProviderSwitch selectedProvider={aiProvider} onProviderChange={handleProviderChange} />
 
-                  <div className="mt-6">
+                  <div className="mt-8">
                     <AnimatePresence mode="wait">
                       {aiProvider === 'cpu' && (
                         <motion.div
@@ -1282,17 +1286,19 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <Text variant={TextVariants.heading}>Self-Hosted (RapidRAW AI Connector)</Text>
-                          <Text className="mt-1">
-                            For users with a capable GPU who want maximum control, connect RapidRAW to your own local AI
-                            Connector server. This gives you full control for technical workflows.
-                          </Text>
-                          <Text as="ul" className="mt-3 mb-6 space-y-1 list-disc list-inside">
-                            <li>Use your own ComfyUI instance</li>
-                            <li>Cost-free advanced generative edits</li>
-                            <li>Custom workflow selection</li>
-                          </Text>
-                          <div className="space-y-6">
+                          <div className="space-y-8">
+                            <div>
+                              <Text variant={TextVariants.heading}>Self-Hosted (RapidRAW AI Connector)</Text>
+                              <Text className="mt-1">
+                                For users with a capable GPU who want maximum control, connect RapidRAW to your own
+                                local AI Connector server. This gives you full control for technical workflows.
+                              </Text>
+                              <Text as="ul" className="mt-3 space-y-1 list-disc list-inside">
+                                <li>Use your own ComfyUI instance</li>
+                                <li>Cost-free advanced generative edits</li>
+                                <li>Custom workflow selection</li>
+                              </Text>
+                            </div>
                             <SettingItem
                               label="AI Connector Address"
                               description="Enter the address and port of your running AI Connector instance. Required for generative AI features."
@@ -1353,7 +1359,7 @@ export default function SettingsPanel({
                             <li>No powerful hardware required</li>
                           </Text>
 
-                          <div className="mt-6 p-4 bg-bg-primary rounded-lg border border-border-color text-center space-y-3">
+                          <div className="mt-8 p-4 bg-bg-primary rounded-lg border border-border-color text-center space-y-3">
                             <span className="inline-block bg-accent text-button-text text-xs font-semibold px-2 py-1 rounded-full">
                               Coming Soon
                             </span>
@@ -1368,10 +1374,10 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-6">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     Data Management
                   </Text>
-                  <div className="space-y-6">
+                  <div className="space-y-8">
                     <DataActionItem
                       buttonAction={handleClearSidecars}
                       buttonText="Delete All Edits in Folder"
@@ -1435,17 +1441,15 @@ export default function SettingsPanel({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-8"
+                className="space-y-10"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-6">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     Keyboard Shortcuts
                   </Text>
-                  <div className="space-y-4">
+                  <div className="space-y-8">
                     <div>
-                      <Text variant={TextVariants.heading} className="pt-3 pb-2">
-                        General
-                      </Text>
+                      <Text variant={TextVariants.heading}>General</Text>
                       <div className="divide-y divide-border-color">
                         <KeybindItem keys={['Space', 'Enter']} description="Open selected image" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', 'C']} description="Copy selected adjustments" />
@@ -1463,9 +1467,7 @@ export default function SettingsPanel({
                       </div>
                     </div>
                     <div>
-                      <Text variant={TextVariants.heading} className="pt-3 pb-2">
-                        Editor
-                      </Text>
+                      <Text variant={TextVariants.heading}>Editor</Text>
                       <div className="divide-y divide-border-color">
                         <KeybindItem keys={['Esc']} description="Deselect mask, exit crop/fullscreen/editor" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', 'Z']} description="Undo adjustment" />
