@@ -150,6 +150,10 @@ export default function Editor({
 
   const [toolbarOverflowVisible, setToolbarOverflowVisible] = useState(!isFullScreen);
 
+  // Queue mechanism for LIVE instantaneous mask previews
+  const isGeneratingOverlayRef = useRef(false);
+  const pendingOverlayRequestRef = useRef<any>(null);
+
   useEffect(() => {
     if (isFullScreen) {
       setToolbarOverflowVisible(false);
@@ -293,6 +297,50 @@ export default function Editor({
       onInitialFitScale(imageRenderSize.scale);
     }
   }, [imageRenderSize.scale, onInitialFitScale]);
+
+  const processOverlayQueue = useCallback(async () => {
+    if (isGeneratingOverlayRef.current || !pendingOverlayRequestRef.current) return;
+
+    const { maskDef, renderSize } = pendingOverlayRequestRef.current;
+    pendingOverlayRequestRef.current = null;
+
+    if (!maskDef || !maskDef.visible || renderSize.width === 0) {
+      setMaskOverlayUrl(null);
+      return;
+    }
+
+    isGeneratingOverlayRef.current = true;
+    try {
+      const cropOffset = [adjustments.crop?.x || 0, adjustments.crop?.y || 0];
+      const dataUrl: string = await invoke(Invokes.GenerateMaskOverlay, {
+        cropOffset,
+        height: Math.round(renderSize.height),
+        maskDef,
+        scale: renderSize.scale,
+        width: Math.round(renderSize.width),
+      });
+      if (dataUrl) {
+        setMaskOverlayUrl(dataUrl);
+      } else {
+        setMaskOverlayUrl(null);
+      }
+    } catch (e) {
+      console.error('Failed to generate live mask overlay:', e);
+    } finally {
+      isGeneratingOverlayRef.current = false;
+      if (pendingOverlayRequestRef.current) {
+        requestAnimationFrame(processOverlayQueue);
+      }
+    }
+  }, [adjustments.crop]);
+
+  const handleLiveMaskPreview = useCallback(
+    (maskDef: any) => {
+      pendingOverlayRequestRef.current = { maskDef, renderSize: imageRenderSize };
+      processOverlayQueue();
+    },
+    [imageRenderSize, processOverlayQueue],
+  );
 
   const debouncedGenerateMaskOverlay = useCallback(
     debounce(async (maskDef, renderSize) => {
@@ -707,6 +755,7 @@ export default function Editor({
               isRotationActive={isRotationActive}
               maskOverlayUrl={maskOverlayUrl}
               onGenerateAiMask={onGenerateAiMask}
+              onLiveMaskPreview={handleLiveMaskPreview}
               onQuickErase={onQuickErase}
               onSelectAiSubMask={onSelectAiSubMask}
               onSelectMask={onSelectMask}
