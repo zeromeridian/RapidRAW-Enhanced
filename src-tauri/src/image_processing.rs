@@ -490,6 +490,11 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
                     let mut src_x = current_vec.x * inv_z;
                     let mut src_y = current_vec.y * inv_z;
 
+                    if auto_crop_scale > 1.0 {
+                        src_x = cx + (src_x - cx) / auto_crop_scale;
+                        src_y = cy + (src_y - cy) / auto_crop_scale;
+                    }
+
                     if has_lens_correction {
                         let dx = (src_x - cx) as f64;
                         let dy = (src_y - cy) as f64;
@@ -520,14 +525,9 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
                         let dy = (src_y - cy) as f64;
                         let r2_norm = (dx * dx + dy * dy) * max_radius_sq_inv;
                         let f = 1.0 + k_distortion * r2_norm;
-                        
+
                         src_x = cx + (dx * f) as f32;
                         src_y = cy + (dy * f) as f32;
-                    }
-
-                    if auto_crop_scale > 1.0 {
-                        src_x = cx + (src_x - cx) / auto_crop_scale;
-                        src_y = cy + (src_y - cy) / auto_crop_scale;
                     }
 
                     if has_tca {
@@ -604,11 +604,6 @@ pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams
                 let mut current_x = x_f;
                 let mut current_y = y_f;
 
-                if auto_crop_scale > 1.0 {
-                    current_x = cx + (current_x - cx) * auto_crop_scale;
-                    current_y = cy + (current_y - cy) * auto_crop_scale;
-                }
-
                 if k_distortion.abs() > 1e-5 {
                     let dx = (current_x - cx) as f64;
                     let dy = (current_y - cy) as f64;
@@ -672,11 +667,17 @@ pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams
                     }
                 }
 
+                if auto_crop_scale > 1.0 {
+                    current_x = cx + (current_x - cx) * auto_crop_scale;
+                    current_y = cy + (current_y - cy) * auto_crop_scale;
+                }
+
                 let target_vec = forward_transform * NaVector3::new(current_x, current_y, 1.0);
 
                 if target_vec.z.abs() > 1e-6 {
                     let inv_z = 1.0 / target_vec.z;
-                    let src_x = target_vec.x * inv_z;
+
+                    let src_x = target_vec.x * inv_z; 
                     let src_y = target_vec.y * inv_z;
 
                     interpolate_pixel(src_raw, width_usize, height_usize, src_x, src_y, pixel);
@@ -1958,26 +1959,67 @@ pub fn generate_histogram(
 }
 
 pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramData, String> {
-    let mut red_counts = vec![0u32; 256];
-    let mut green_counts = vec![0u32; 256];
-    let mut blue_counts = vec![0u32; 256];
-    let mut luma_counts = vec![0u32; 256];
+    let init_hist = || ([0u32; 256], [0u32; 256], [0u32; 256], [0u32; 256]);
 
-    for pixel in image.to_rgb8().pixels() {
-        let r = pixel[0] as usize;
-        let g = pixel[1] as usize;
-        let b = pixel[2] as usize;
-        red_counts[r] += 1;
-        green_counts[g] += 1;
-        blue_counts[b] += 1;
-        let luma_val = (0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32).round() as usize;
-        luma_counts[luma_val.min(255)] += 1;
-    }
+    let reduce_hist = |mut a: ([u32; 256], [u32; 256], [u32; 256], [u32; 256]),
+                       b: ([u32; 256], [u32; 256], [u32; 256], [u32; 256])| {
+        for i in 0..256 {
+            a.0[i] += b.0[i];
+            a.1[i] += b.1[i];
+            a.2[i] += b.2[i];
+            a.3[i] += b.3[i];
+        }
+        a
+    };
 
-    let mut red: Vec<f32> = red_counts.into_iter().map(|c| c as f32).collect();
-    let mut green: Vec<f32> = green_counts.into_iter().map(|c| c as f32).collect();
-    let mut blue: Vec<f32> = blue_counts.into_iter().map(|c| c as f32).collect();
-    let mut luma: Vec<f32> = luma_counts.into_iter().map(|c| c as f32).collect();
+    let (r_c, g_c, b_c, l_c) = match image {
+        DynamicImage::ImageRgb32F(f32_img) => {
+            let raw = f32_img.as_raw();
+            raw.par_chunks(30_000)
+                .fold(init_hist, |mut acc, chunk| {
+                    for pixel in chunk.chunks_exact(3).step_by(2) {
+                        let r = (pixel[0].clamp(0.0, 1.0) * 255.0) as usize;
+                        let g = (pixel[1].clamp(0.0, 1.0) * 255.0) as usize;
+                        let b = (pixel[2].clamp(0.0, 1.0) * 255.0) as usize;
+
+                        acc.0[r] += 1;
+                        acc.1[g] += 1;
+                        acc.2[b] += 1;
+
+                        let luma = (r * 218 + g * 732 + b * 74) >> 10;
+                        acc.3[luma.min(255)] += 1;
+                    }
+                    acc
+                })
+                .reduce(init_hist, reduce_hist)
+        }
+        _ => {
+            let rgb = image.to_rgb8();
+            let raw = rgb.as_raw();
+            raw.par_chunks(30_000)
+                .fold(init_hist, |mut acc, chunk| {
+                    for pixel in chunk.chunks_exact(3).step_by(2) {
+                        let r = pixel[0] as usize;
+                        let g = pixel[1] as usize;
+                        let b = pixel[2] as usize;
+
+                        acc.0[r] += 1;
+                        acc.1[g] += 1;
+                        acc.2[b] += 1;
+
+                        let luma = (r * 218 + g * 732 + b * 74) >> 10;
+                        acc.3[luma.min(255)] += 1;
+                    }
+                    acc
+                })
+                .reduce(init_hist, reduce_hist)
+        }
+    };
+
+    let mut red: Vec<f32> = r_c.into_iter().map(|c| c as f32).collect();
+    let mut green: Vec<f32> = g_c.into_iter().map(|c| c as f32).collect();
+    let mut blue: Vec<f32> = b_c.into_iter().map(|c| c as f32).collect();
+    let mut luma: Vec<f32> = l_c.into_iter().map(|c| c as f32).collect();
 
     let smoothing_sigma = 2.5;
     apply_gaussian_smoothing(&mut red, smoothing_sigma);
@@ -1990,12 +2032,7 @@ pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramD
     normalize_histogram_range(&mut blue, 0.99);
     normalize_histogram_range(&mut luma, 0.99);
 
-    Ok(HistogramData {
-        red,
-        green,
-        blue,
-        luma,
-    })
+    Ok(HistogramData { red, green, blue, luma })
 }
 
 fn apply_gaussian_smoothing(histogram: &mut Vec<f32>, sigma: f32) {
@@ -2105,49 +2142,81 @@ pub fn calculate_waveform_from_image(image: &DynamicImage) -> Result<WaveformDat
     const WAVEFORM_WIDTH: u32 = 256;
     const WAVEFORM_HEIGHT: u32 = 256;
 
-    if image.width() == 0 || image.height() == 0 {
+    let (orig_w, orig_h) = image.dimensions();
+    if orig_w == 0 || orig_h == 0 {
         return Err("Image has zero dimensions.".to_string());
     }
-    let preview_height =
-        (image.height() as f32 * (WAVEFORM_WIDTH as f32 / image.width() as f32)).round() as u32;
+
+    let preview_height = (orig_h as f32 * (WAVEFORM_WIDTH as f32 / orig_w as f32)).round() as u32;
     if preview_height == 0 {
         return Err("Image has zero height after scaling for waveform.".to_string());
     }
-    let preview = image.resize(
-        WAVEFORM_WIDTH,
-        preview_height,
-        image::imageops::FilterType::Triangle,
-    );
-    let rgb_image = preview.to_rgb8();
 
     let mut red = vec![0; (WAVEFORM_WIDTH * WAVEFORM_HEIGHT) as usize];
     let mut green = vec![0; (WAVEFORM_WIDTH * WAVEFORM_HEIGHT) as usize];
     let mut blue = vec![0; (WAVEFORM_WIDTH * WAVEFORM_HEIGHT) as usize];
     let mut luma = vec![0; (WAVEFORM_WIDTH * WAVEFORM_HEIGHT) as usize];
 
-    for (x, _, pixel) in rgb_image.enumerate_pixels() {
-        let r = pixel[0] as usize;
-        let g = pixel[1] as usize;
-        let b = pixel[2] as usize;
+    let x_ratio = orig_w as f32 / WAVEFORM_WIDTH as f32;
+    let y_ratio = orig_h as f32 / preview_height as f32;
+    let stride = orig_w as usize * 3;
 
-        let r_idx = (255 - r) * WAVEFORM_WIDTH as usize + x as usize;
-        let g_idx = (255 - g) * WAVEFORM_WIDTH as usize + x as usize;
-        let b_idx = (255 - b) * WAVEFORM_WIDTH as usize + x as usize;
+    match image {
+        DynamicImage::ImageRgb32F(f32_img) => {
+            let raw = f32_img.as_raw();
 
-        red[r_idx] += 1;
-        green[g_idx] += 1;
-        blue[b_idx] += 1;
+            for y_out in 0..preview_height {
+                let y_in = ((y_out as f32 * y_ratio) as usize).min(orig_h as usize - 1);
+                let row_start = y_in * stride;
 
-        let luma_val = (0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32).round() as usize;
-        let luma_idx = (255 - luma_val.min(255)) * WAVEFORM_WIDTH as usize + x as usize;
-        luma[luma_idx] += 1;
+                for x_out in 0..WAVEFORM_WIDTH {
+                    let x_in = ((x_out as f32 * x_ratio) as usize).min(orig_w as usize - 1);
+                    let idx = row_start + x_in * 3;
+
+                    let r = (raw[idx].clamp(0.0, 1.0) * 255.0) as usize;
+                    let g = (raw[idx + 1].clamp(0.0, 1.0) * 255.0) as usize;
+                    let b = (raw[idx + 2].clamp(0.0, 1.0) * 255.0) as usize;
+
+                    let out_x = x_out as usize;
+                    red[(255 - r) * WAVEFORM_WIDTH as usize + out_x] += 1;
+                    green[(255 - g) * WAVEFORM_WIDTH as usize + out_x] += 1;
+                    blue[(255 - b) * WAVEFORM_WIDTH as usize + out_x] += 1;
+
+                    let luma_val = (r * 218 + g * 732 + b * 74) >> 10;
+                    luma[(255 - luma_val.min(255)) * WAVEFORM_WIDTH as usize + out_x] += 1;
+                }
+            }
+        }
+        _ => {
+            let rgb = image.to_rgb8();
+            let raw = rgb.as_raw();
+
+            for y_out in 0..preview_height {
+                let y_in = ((y_out as f32 * y_ratio) as usize).min(orig_h as usize - 1);
+                let row_start = y_in * stride;
+
+                for x_out in 0..WAVEFORM_WIDTH {
+                    let x_in = ((x_out as f32 * x_ratio) as usize).min(orig_w as usize - 1);
+                    let idx = row_start + x_in * 3;
+
+                    let r = raw[idx] as usize;
+                    let g = raw[idx + 1] as usize;
+                    let b = raw[idx + 2] as usize;
+
+                    let out_x = x_out as usize;
+                    red[(255 - r) * WAVEFORM_WIDTH as usize + out_x] += 1;
+                    green[(255 - g) * WAVEFORM_WIDTH as usize + out_x] += 1;
+                    blue[(255 - b) * WAVEFORM_WIDTH as usize + out_x] += 1;
+
+                    let luma_val = (r * 218 + g * 732 + b * 74) >> 10;
+                    luma[(255 - luma_val.min(255)) * WAVEFORM_WIDTH as usize + out_x] += 1;
+                }
+            }
+        }
     }
 
     Ok(WaveformData {
-        red,
-        green,
-        blue,
-        luma,
+        red, green, blue, luma,
         width: WAVEFORM_WIDTH,
         height: WAVEFORM_HEIGHT,
     })

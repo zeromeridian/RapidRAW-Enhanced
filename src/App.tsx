@@ -216,32 +216,6 @@ const RIGHT_PANEL_ORDER = [
 ];
 
 const DEBUG = false;
-const REVOCATION_DELAY = 5000;
-
-const useDelayedRevokeBlobUrl = (url: string | null | undefined) => {
-  const previousUrlRef = useRef<string | null | undefined>(null);
-
-  useEffect(() => {
-    if (previousUrlRef.current && previousUrlRef.current !== url) {
-      const urlToRevoke = previousUrlRef.current;
-      if (urlToRevoke && urlToRevoke.startsWith('blob:')) {
-        setTimeout(() => {
-          URL.revokeObjectURL(urlToRevoke);
-        }, REVOCATION_DELAY);
-      }
-    }
-    previousUrlRef.current = url;
-  }, [url]);
-
-  useEffect(() => {
-    return () => {
-      const finalUrl = previousUrlRef.current;
-      if (finalUrl && finalUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(finalUrl);
-      }
-    };
-  }, []);
-};
 
 const getParentDir = (filePath: string): string => {
   const separator = filePath.includes('/') ? '/' : '\\';
@@ -250,46 +224,6 @@ const getParentDir = (filePath: string): string => {
     return '';
   }
   return filePath.substring(0, lastSeparatorIndex);
-};
-
-const useAsyncThrottle = <T extends unknown[]>(fn: (...args: T) => Promise<void>, deps: any[] = []) => {
-  const isProcessing = useRef(false);
-  const nextArgs = useRef<T | null>(null);
-  const mounted = useRef(true);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-      nextArgs.current = null;
-    };
-  }, []);
-
-  const trigger = useCallback((...args: T) => {
-    if (isProcessing.current) {
-      nextArgs.current = args;
-      return;
-    }
-
-    isProcessing.current = true;
-    fn(...args).finally(() => {
-      if (!mounted.current) return;
-      isProcessing.current = false;
-      if (nextArgs.current) {
-        const argsToProcess = nextArgs.current;
-        nextArgs.current = null;
-        trigger(...argsToProcess);
-      }
-    });
-  }, deps);
-
-  return useMemo(() => {
-    const func: any = trigger;
-    func.cancel = () => {
-      nextArgs.current = null;
-    };
-    return func as ((...args: T) => void) & { cancel: () => void };
-  }, [trigger]);
 };
 
 function App() {
@@ -370,14 +304,8 @@ function App() {
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('thirds');
   const [overlayRotation, setOverlayRotation] = useState(0);
   const [transformedOriginalUrl, setTransformedOriginalUrl] = useState<string | null>(null);
-  const fullResRequestRef = useRef<any>(null);
   const fullResCacheKeyRef = useRef<string | null>(null);
   const patchesSentToBackend = useRef<Set<string>>(new Set());
-
-  useDelayedRevokeBlobUrl(finalPreviewUrl);
-  useDelayedRevokeBlobUrl(uncroppedAdjustedPreviewUrl);
-  useDelayedRevokeBlobUrl(transformedOriginalUrl);
-  useDelayedRevokeBlobUrl(selectedImage?.originalUrl);
 
   const handleDisplaySizeChange = useCallback((size: ImageDimensions & { scale?: number }) => {
     setDisplaySize({ width: size.width, height: size.height });
@@ -494,6 +422,8 @@ function App() {
     rootPath?: string;
     currentPath?: string;
   }>({});
+  const previewJobIdRef = useRef<number>(0);
+  const latestRenderedJobIdRef = useRef<number>(0);
 
   useEffect(() => {
     if (currentFolderPath) {
@@ -643,18 +573,15 @@ function App() {
 
   useEffect(() => {
     let isEffectActive = true;
-    let objectUrl: string | null = null;
 
     const generate = async () => {
       if (showOriginal && selectedImage?.path && !transformedOriginalUrl) {
         try {
-          const imageData: Uint8Array = await invoke('generate_original_transformed_preview', {
+          const base64Data: string = await invoke('generate_original_transformed_preview', {
             jsAdjustments: adjustments,
           });
           if (isEffectActive) {
-            const blob = new Blob([imageData], { type: 'image/jpeg' });
-            objectUrl = URL.createObjectURL(blob);
-            setTransformedOriginalUrl(objectUrl);
+            setTransformedOriginalUrl(base64Data);
           }
         } catch (e) {
           if (isEffectActive) {
@@ -1305,9 +1232,10 @@ function App() {
     return list;
   }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchCriteria, appSettings]);
 
-  const applyAdjustments = useAsyncThrottle(
+  const applyAdjustments = useCallback(
     async (currentAdjustments: Adjustments, dragging: boolean = false) => {
       if (!selectedImage?.isReady) return;
+      const currentPath = selectedImage.path;
 
       const payload = JSON.parse(JSON.stringify(currentAdjustments));
 
@@ -1339,36 +1267,52 @@ function App() {
         });
       }
 
+      const jobId = ++previewJobIdRef.current;
+
       try {
-        await invoke(Invokes.ApplyAdjustments, {
+        const buffer: ArrayBuffer = await invoke(Invokes.ApplyAdjustments, {
           jsAdjustments: payload,
           isInteractive: dragging,
         });
+
+        if (currentPath !== selectedImagePathRef.current) return;
+
+        if (buffer && buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
+          latestRenderedJobIdRef.current = jobId;
+          const blob = new Blob([buffer], { type: 'image/jpeg' });
+          const url = URL.createObjectURL(blob);
+
+          setFinalPreviewUrl((prevUrl) => {
+            if (prevUrl && prevUrl.startsWith('blob:')) URL.revokeObjectURL(prevUrl);
+            return url;
+          });
+        }
       } catch (err) {
-        console.error('Failed to invoke apply_adjustments:', err);
+        if (err !== 'Superseded or worker failed') {
+          console.error('Failed to apply adjustments:', err);
+        }
       }
     },
-    [selectedImage?.isReady],
+    [selectedImage?.isReady, selectedImage?.path],
   );
 
-  const debouncedApplyAdjustments = useCallback(
-    debounce((currentAdjustments) => {
-      applyAdjustments(currentAdjustments, false);
-    }, 50),
-    [applyAdjustments],
-  );
-
-  const debouncedGenerateUncroppedPreview = useCallback(
-    debounce((currentAdjustments) => {
+  const generateUncroppedPreview = useCallback(
+    (currentAdjustments: Adjustments) => {
       if (!selectedImage?.isReady) {
         return;
       }
       invoke(Invokes.GenerateUncroppedPreview, { jsAdjustments: currentAdjustments }).catch((err) =>
         console.error('Failed to generate uncropped preview:', err),
       );
-    }, 50),
+    },
     [selectedImage?.isReady],
   );
+
+  useEffect(() => {
+    if (activeRightPanel === Panel.Crop && selectedImage?.isReady) {
+      generateUncroppedPreview(adjustments);
+    }
+  }, [adjustments, activeRightPanel, selectedImage?.isReady, generateUncroppedPreview]);
 
   const debouncedSave = useCallback(
     debounce((path, adjustmentsToSave) => {
@@ -1976,7 +1920,6 @@ function App() {
       if (selectedImage?.path === path) {
         return;
       }
-      applyAdjustments.cancel();
       debouncedSave.cancel();
       patchesSentToBackend.current.clear();
 
@@ -2026,9 +1969,10 @@ function App() {
       setIsLibraryExportPanelVisible(false);
 
       fullResCacheKeyRef.current = null;
-      if (fullResRequestRef.current) {
-        fullResRequestRef.current.cancelled = true;
-      }
+      setFinalPreviewUrl((prev) => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return null;
+      });
     },
     [selectedImage?.path, applyAdjustments, debouncedSave, thumbnails, imageRatings, resetAdjustmentsHistory],
   );
@@ -2398,30 +2342,34 @@ function App() {
     debounce((currentAdjustments: any, key: string) => {
       if (!selectedImage?.path) return;
 
-      if (fullResRequestRef.current) {
-        fullResRequestRef.current.cancelled = true;
-      }
+      const jobId = ++previewJobIdRef.current;
 
-      const request = { cancelled: false };
-      fullResRequestRef.current = request;
-
-      invoke(Invokes.GenerateFullscreenPreview, {
+      invoke<ArrayBuffer>(Invokes.GenerateFullscreenPreview, {
         jsAdjustments: currentAdjustments,
       })
-        .then(() => {
-          fullResCacheKeyRef.current = key;
-          if (!request.cancelled) {
+        .then((buffer) => {
+          if (jobId >= latestRenderedJobIdRef.current) {
+            latestRenderedJobIdRef.current = jobId;
+            const blob = new Blob([buffer], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+
+            setFinalPreviewUrl((prevUrl) => {
+              if (prevUrl && prevUrl.startsWith('blob:')) URL.revokeObjectURL(prevUrl);
+              return url;
+            });
+
+            fullResCacheKeyRef.current = key;
             setIsLoadingFullRes(false);
           }
         })
         .catch((error: any) => {
-          if (!request.cancelled) {
+          if (jobId >= latestRenderedJobIdRef.current) {
             console.error('Failed to generate high resolution preview:', error);
             fullResCacheKeyRef.current = null;
             setIsLoadingFullRes(false);
           }
         });
-    }, 300),
+    }, 100),
     [selectedImage?.path],
   );
 
@@ -2432,9 +2380,6 @@ function App() {
         requestFullResolution(adjustments, visualAdjustmentsKey);
       }
     } else if (!isFullScreen && !isHighResNeeded) {
-      if (fullResRequestRef.current) {
-        fullResRequestRef.current.cancelled = true;
-      }
       if (requestFullResolution.cancel) {
         requestFullResolution.cancel();
       }
@@ -2451,8 +2396,13 @@ function App() {
       if (!initialFitScale) {
         return;
       }
-      const highResThreshold = Math.max(initialFitScale * 2, 0.5);
-      const needsFullRes = targetZoomPercent > highResThreshold;
+
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+      const physicalZoomPercent = targetZoomPercent * dpr;
+
+      const highResThreshold = Math.max(initialFitScale * 1.5, 0.5);
+      const needsFullRes = physicalZoomPercent > highResThreshold;
+
       const previewIsAlreadyFullRes = previewSize.width >= originalSize.width;
 
       if (needsFullRes && !previewIsAlreadyFullRes) {
@@ -2466,11 +2416,14 @@ function App() {
 
   const handleZoomChange = useCallback(
     (zoomValue: number, fitToWindow: boolean = false) => {
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
       let targetZoomPercent: number;
+
       const orientationSteps = adjustments.orientationSteps || 0;
       const isSwapped = orientationSteps === 1 || orientationSteps === 3;
       const effectiveOriginalWidth = isSwapped ? originalSize.height : originalSize.width;
       const effectiveOriginalHeight = isSwapped ? originalSize.width : originalSize.height;
+
       if (fitToWindow) {
         if (
           effectiveOriginalWidth > 0 &&
@@ -2489,9 +2442,11 @@ function App() {
           targetZoomPercent = 1.0;
         }
       } else {
-        targetZoomPercent = zoomValue;
+        targetZoomPercent = zoomValue / dpr;
       }
-      targetZoomPercent = Math.max(0.1, Math.min(2.0, targetZoomPercent));
+
+      targetZoomPercent = Math.max(0.1 / dpr, Math.min(4.0, targetZoomPercent));
+
       let transformZoom = 1.0;
       if (
         effectiveOriginalWidth > 0 &&
@@ -2599,22 +2554,9 @@ function App() {
   useEffect(() => {
     let isEffectActive = true;
     const listeners = [
-      listen('preview-update-final', (event: any) => {
-        if (isEffectActive) {
-          const { path, data } = event.payload;
-          if (path !== selectedImagePathRef.current) return;
-          const imageData = new Uint8Array(data);
-          const blob = new Blob([imageData], { type: 'image/jpeg' });
-          const url = URL.createObjectURL(blob);
-          setFinalPreviewUrl(url);
-        }
-      }),
       listen('preview-update-uncropped', (event: any) => {
         if (isEffectActive) {
-          const imageData = new Uint8Array(event.payload);
-          const blob = new Blob([imageData], { type: 'image/jpeg' });
-          const url = URL.createObjectURL(blob);
-          setUncroppedAdjustedPreviewUrl(url);
+          setUncroppedAdjustedPreviewUrl(event.payload);
         }
       }),
       listen('histogram-update', (event: any) => {
@@ -3045,24 +2987,6 @@ function App() {
     }
   };
 
-  const throttledInteractiveUpdate = useMemo(
-    () =>
-      throttle(
-        (currentAdjustments) => {
-          applyAdjustments(currentAdjustments, true);
-        },
-        100,
-        { leading: true, trailing: true },
-      ),
-    [applyAdjustments],
-  );
-
-  useEffect(() => {
-    return () => {
-      throttledInteractiveUpdate.cancel();
-    };
-  }, [throttledInteractiveUpdate]);
-
   useEffect(() => {
     if (!selectedImage?.isReady) return;
 
@@ -3071,27 +2995,20 @@ function App() {
     }
 
     if (isSliderDragging) {
-      debouncedApplyAdjustments.cancel();
-
-      const livePreviewsEnabled = appSettings?.enableLivePreviews !== false;
-      const idleTimeoutDuration = livePreviewsEnabled ? 150 : 50;
-
-      if (livePreviewsEnabled) {
-        throttledInteractiveUpdate(adjustments);
+      if (appSettings?.enableLivePreviews !== false) {
+        applyAdjustments(adjustments, true);
       }
 
       dragIdleTimer.current = setTimeout(() => {
         applyAdjustments(adjustments, false);
-      }, idleTimeoutDuration);
+      }, 150);
     } else {
-      throttledInteractiveUpdate.cancel();
-      debouncedApplyAdjustments(adjustments);
+      applyAdjustments(adjustments, false);
       debouncedSave(selectedImage.path, adjustments);
     }
 
     return () => {
       if (dragIdleTimer.current) clearTimeout(dragIdleTimer.current);
-      debouncedApplyAdjustments.cancel();
     };
   }, [
     adjustments,
@@ -3099,19 +3016,9 @@ function App() {
     selectedImage?.isReady,
     isSliderDragging,
     applyAdjustments,
-    debouncedApplyAdjustments,
-    throttledInteractiveUpdate,
     debouncedSave,
     appSettings?.enableLivePreviews,
   ]);
-
-  useEffect(() => {
-    if (activeRightPanel === Panel.Crop && selectedImage?.isReady) {
-      debouncedGenerateUncroppedPreview(adjustments);
-    }
-
-    return () => debouncedGenerateUncroppedPreview.cancel();
-  }, [adjustments, activeRightPanel, selectedImage?.isReady, debouncedGenerateUncroppedPreview]);
 
   const handleOpenFolder = async () => {
     try {
@@ -3373,9 +3280,6 @@ function App() {
 
           fullResCacheKeyRef.current = null;
 
-          const blob = new Blob([loadImageResult.original_image_bytes], { type: 'image/jpeg' });
-          const originalUrl = URL.createObjectURL(blob);
-
           setSelectedImage((currentSelected: SelectedImage | null) => {
             if (currentSelected && currentSelected.path === selectedImage.path) {
               return {
@@ -3385,7 +3289,7 @@ function App() {
                 isRaw: loadImageResult.is_raw,
                 isReady: true,
                 metadata: loadImageResult.metadata,
-                originalUrl: originalUrl,
+                originalUrl: null,
                 width: loadImageResult.width,
               };
             }

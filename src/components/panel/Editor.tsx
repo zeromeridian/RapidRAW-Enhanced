@@ -134,21 +134,18 @@ export default function Editor({
   const isInitialMount = useRef(true);
   const transformStateRef = useRef<TransformState>(transformState);
   transformStateRef.current = transformState;
-
   const [isPanningState, setIsPanningState] = useState(false);
   const isClickAnimating = useRef(false);
   const clickAnimationTime = 200;
-
   const isAnimating = useRef(false);
   const animationTimeoutRef = useRef<number | null>(null);
-
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
   const savedZoomState = useRef<{ scale: number; positionX: number; positionY: number } | null>(null);
-
   const focalPointRef = useRef({ x: 0.5, y: 0.5 });
   const isTransitioningRef = useRef(false);
-
   const [toolbarOverflowVisible, setToolbarOverflowVisible] = useState(!isFullScreen);
+  const isGeneratingOverlayRef = useRef(false);
+  const pendingOverlayRequestRef = useRef<any>(null);
 
   useEffect(() => {
     if (isFullScreen) {
@@ -160,15 +157,6 @@ export default function Editor({
       return () => clearTimeout(timer);
     }
   }, [isFullScreen]);
-
-  useEffect(() => {
-    const currentUrl = maskOverlayUrl;
-    return () => {
-      if (currentUrl && currentUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(currentUrl);
-      }
-    };
-  }, [maskOverlayUrl]);
 
   useEffect(() => {
     if (!transformWrapperRef.current) {
@@ -251,7 +239,7 @@ export default function Editor({
   const isMasking = activeRightPanel === Panel.Masks;
   const isAiEditing = activeRightPanel === Panel.Ai;
 
-  const hasDisplayableImage = finalPreviewUrl || selectedImage.originalUrl || selectedImage.thumbnailUrl;
+  const hasDisplayableImage = finalPreviewUrl || selectedImage.thumbnailUrl;
   const showSpinner = isLoading && !hasDisplayableImage;
 
   const croppedDimensions = useMemo<ImageDimensions | null>(() => {
@@ -302,6 +290,50 @@ export default function Editor({
       onInitialFitScale(imageRenderSize.scale);
     }
   }, [imageRenderSize.scale, onInitialFitScale]);
+
+  const processOverlayQueue = useCallback(async () => {
+    if (isGeneratingOverlayRef.current || !pendingOverlayRequestRef.current) return;
+
+    const { maskDef, renderSize } = pendingOverlayRequestRef.current;
+    pendingOverlayRequestRef.current = null;
+
+    if (!maskDef || !maskDef.visible || renderSize.width === 0) {
+      setMaskOverlayUrl(null);
+      return;
+    }
+
+    isGeneratingOverlayRef.current = true;
+    try {
+      const cropOffset = [adjustments.crop?.x || 0, adjustments.crop?.y || 0];
+      const dataUrl: string = await invoke(Invokes.GenerateMaskOverlay, {
+        cropOffset,
+        height: Math.round(renderSize.height),
+        maskDef,
+        scale: renderSize.scale,
+        width: Math.round(renderSize.width),
+      });
+      if (dataUrl) {
+        setMaskOverlayUrl(dataUrl);
+      } else {
+        setMaskOverlayUrl(null);
+      }
+    } catch (e) {
+      console.error('Failed to generate live mask overlay:', e);
+    } finally {
+      isGeneratingOverlayRef.current = false;
+      if (pendingOverlayRequestRef.current) {
+        requestAnimationFrame(processOverlayQueue);
+      }
+    }
+  }, [adjustments.crop]);
+
+  const handleLiveMaskPreview = useCallback(
+    (maskDef: any) => {
+      pendingOverlayRequestRef.current = { maskDef, renderSize: imageRenderSize };
+      processOverlayQueue();
+    },
+    [imageRenderSize, processOverlayQueue],
+  );
 
   const debouncedGenerateMaskOverlay = useCallback(
     debounce(async (maskDef, renderSize) => {
@@ -682,15 +714,17 @@ export default function Editor({
             step: transformState.scale * 0.0013,
             smoothStep: transformState.scale * 0.0013,
           }}
+          customTransform={(x, y, scale) => `translate(${x}px, ${y}px) scale(${scale})`}
         >
           <TransformComponent
-            wrapperStyle={{ width: '100%', height: '100%' }}
+            wrapperStyle={{ width: '100%', height: '100%', willChange: 'transform' }}
             contentStyle={{
               width: '100%',
               height: '100%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              willChange: 'transform',
             }}
             contentProps={{
               onMouseDown: handleMouseDown,
@@ -716,6 +750,7 @@ export default function Editor({
               isRotationActive={isRotationActive}
               maskOverlayUrl={maskOverlayUrl}
               onGenerateAiMask={onGenerateAiMask}
+              onLiveMaskPreview={handleLiveMaskPreview}
               onQuickErase={onQuickErase}
               onSelectAiSubMask={onSelectAiSubMask}
               onSelectMask={onSelectMask}
