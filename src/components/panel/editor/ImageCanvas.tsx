@@ -1383,13 +1383,9 @@ const ImageCanvas = memo(
                           width: `${imageRenderSize.width}px`,
                           height: `${imageRenderSize.height}px`,
                           imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                          transform: 'translateZ(0)',
-                          backfaceVisibility: 'hidden',
                         }
                       : {
                           imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                          transform: 'translateZ(0)',
-                          backfaceVisibility: 'hidden',
                         }
                   }
                 />
@@ -1413,16 +1409,12 @@ const ImageCanvas = memo(
                           width: `${imageRenderSize.width}px`,
                           height: `${imageRenderSize.height}px`,
                           imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                          transform: 'translateZ(0)',
-                          backfaceVisibility: 'hidden',
                           opacity: isShowingOriginal && originalLoaded ? 1 : 0,
                           transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
                           zIndex: 2,
                         }
                       : {
                           imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                          transform: 'translateZ(0)',
-                          backfaceVisibility: 'hidden',
                           opacity: isShowingOriginal && originalLoaded ? 1 : 0,
                           transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
                           zIndex: 2,
