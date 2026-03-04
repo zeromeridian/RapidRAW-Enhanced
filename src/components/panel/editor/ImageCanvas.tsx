@@ -1176,52 +1176,69 @@ const ImageCanvas = memo(
             }}
           >
             <div className="absolute inset-0 w-full h-full">
-              {/* Bottom Layer: The Edited Image */}
               {editedSrc && (
                 <img
                   alt="Edited"
-                  className="absolute inset-0 w-full h-full object-contain"
+                  className={
+                    imageRenderSize.width > 0 && imageRenderSize.height > 0
+                      ? 'pointer-events-none'
+                      : 'absolute inset-0 w-full h-full object-contain pointer-events-none'
+                  }
                   src={editedSrc}
-                  style={{
-                    imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                    transform: 'translateZ(0)',
-                    backfaceVisibility: 'hidden',
-                  }}
+                  style={
+                    imageRenderSize.width > 0 && imageRenderSize.height > 0
+                      ? {
+                          position: 'absolute',
+                          left: `${imageRenderSize.offsetX}px`,
+                          top: `${imageRenderSize.offsetY}px`,
+                          width: `${imageRenderSize.width}px`,
+                          height: `${imageRenderSize.height}px`,
+                          imageRendering: isMaxZoom ? 'pixelated' : 'auto',
+                          transform: 'translateZ(0)',
+                          backfaceVisibility: 'hidden',
+                        }
+                      : {
+                          imageRendering: isMaxZoom ? 'pixelated' : 'auto',
+                          transform: 'translateZ(0)',
+                          backfaceVisibility: 'hidden',
+                        }
+                  }
                 />
               )}
 
               {originalSrc && (
                 <img
                   alt="Original"
-                  className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                  className={
+                    imageRenderSize.width > 0 && imageRenderSize.height > 0
+                      ? 'pointer-events-none'
+                      : 'absolute inset-0 w-full h-full object-contain pointer-events-none'
+                  }
                   src={originalSrc}
-                  style={{
-                    imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                    transform: 'translateZ(0)',
-                    backfaceVisibility: 'hidden',
-                    opacity: isShowingOriginal && originalLoaded ? 1 : 0,
-                    transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
-                    zIndex: 2,
-                  }}
-                />
-              )}
-
-              {/* Mask Overlay (Fades Out) */}
-              {displayedMaskUrl && (
-                <img
-                  alt="Mask Overlay"
-                  className="absolute object-contain pointer-events-none"
-                  src={displayedMaskUrl}
-                  style={{
-                    height: `${imageRenderSize.height}px`,
-                    left: `${imageRenderSize.offsetX}px`,
-                    opacity: isShowingOriginal || isMaskControlHovered ? 0 : 1,
-                    top: `${imageRenderSize.offsetY}px`,
-                    transition: 'opacity 300ms ease-in-out',
-                    width: `${imageRenderSize.width}px`,
-                    imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                    zIndex: 3,
-                  }}
+                  style={
+                    imageRenderSize.width > 0 && imageRenderSize.height > 0
+                      ? {
+                          position: 'absolute',
+                          left: `${imageRenderSize.offsetX}px`,
+                          top: `${imageRenderSize.offsetY}px`,
+                          width: `${imageRenderSize.width}px`,
+                          height: `${imageRenderSize.height}px`,
+                          imageRendering: isMaxZoom ? 'pixelated' : 'auto',
+                          transform: 'translateZ(0)',
+                          backfaceVisibility: 'hidden',
+                          opacity: isShowingOriginal && originalLoaded ? 1 : 0,
+                          transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
+                          zIndex: 2,
+                        }
+                      : {
+                          imageRendering: isMaxZoom ? 'pixelated' : 'auto',
+                          transform: 'translateZ(0)',
+                          backfaceVisibility: 'hidden',
+                          opacity: isShowingOriginal && originalLoaded ? 1 : 0,
+                          transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
+                          zIndex: 2,
+                        }
+                  }
                 />
               )}
             </div>
