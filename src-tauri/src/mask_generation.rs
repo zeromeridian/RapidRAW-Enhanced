@@ -225,7 +225,8 @@ fn draw_feathered_ellipse_mut(
                 let current_pixel = mask.get_pixel_mut(x as u32, y as u32);
 
                 if is_eraser {
-                    current_pixel[0] = current_pixel[0].saturating_sub(final_value);
+                    let ceiling = 255u8.saturating_sub(final_value);
+                    current_pixel[0] = current_pixel[0].min(ceiling);
                 } else {
                     if final_value > current_pixel[0] {
                         current_pixel[0] = final_value;
