@@ -1,15 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback, forwardRef, memo, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { Image as ImageIcon, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
-import { VariableSizeList as List, ListChildComponentProps, areEqual } from 'react-window';
+import { Grid, useGridCallbackRef } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import { ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
 import { Color, COLOR_LABELS } from '../../utils/adjustments';
 
-const VERTICAL_PADDING = 20; 
-const HORIZONTAL_PADDING = 4; 
-const ITEM_GAP = 8; 
+const VERTICAL_PADDING = 20;
+const ITEM_GAP = 8;
 
 interface ImageLayer {
   id: string;
@@ -28,51 +27,8 @@ interface ItemData {
   onImageSelect?: (path: string, event: any) => void;
   itemHeight: number;
   setSize: (index: number, width: number) => void;
-  sizeMap: Record<number, number>;
 }
 
-const OuterElement = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>((props, ref) => {
-  const { onWheel, style, ...rest } = props;
-  return (
-    <div
-      ref={ref}
-      style={{ 
-        ...style, 
-        overflowY: 'hidden',
-        overflowX: 'auto',
-      }}
-      onWheel={(e) => {
-        if (e.currentTarget.style.scrollBehavior !== 'auto') {
-           e.currentTarget.style.scrollBehavior = 'auto';
-        }
-
-        if (e.deltaY !== 0 && Math.abs(e.deltaX) < Math.abs(e.deltaY)) {
-          e.currentTarget.scrollLeft += e.deltaY;
-          e.preventDefault();
-        }
-        onWheel?.(e);
-      }}
-      {...rest}
-    />
-  );
-});
-OuterElement.displayName = 'OuterElement';
-
-const InnerElement = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ style, ...rest }, ref) => {
-  return (
-    <div
-      ref={ref}
-      style={{
-        ...style,
-        width: typeof style?.width === 'number' ? style.width + (HORIZONTAL_PADDING * 2) : style?.width,
-        height: '100%',
-        position: 'relative',
-      }}
-      {...rest}
-    />
-  );
-});
-InnerElement.displayName = 'InnerElement';
 
 const FilmstripThumbnail = memo(({
   imageFile,
@@ -272,41 +228,35 @@ const FilmstripThumbnail = memo(({
   );
 });
 
-const FilmstripRow = memo(({ index, style, data }: ListChildComponentProps<ItemData>) => {
-  const {
-    imageList,
-    imageRatings,
-    selectedPath,
-    multiSelectedPaths,
-    thumbnails,
-    thumbnailAspectRatio,
-    onContextMenu,
-    onImageSelect,
-    itemHeight,
-    setSize
-  } = data;
-
-  const imageFile = imageList[index];
+const FilmstripCell = ({
+  columnIndex,
+  style,
+  imageList,
+  imageRatings,
+  selectedPath,
+  multiSelectedPaths,
+  thumbnails,
+  thumbnailAspectRatio,
+  onContextMenu,
+  onImageSelect,
+  itemHeight,
+  setSize,
+}: any) => {
+  const imageFile = imageList[columnIndex];
   const fullWidth = style.width as number;
   const contentWidth = fullWidth - ITEM_GAP;
 
   return (
-    <div 
-      style={{ 
+    <div
+      style={{
         ...style,
-        left: (style.left as number) + HORIZONTAL_PADDING,
-        height: '100%', 
+        height: '100%',
         display: 'flex',
-        alignItems: 'center', 
-        justifyContent: 'flex-start'
+        alignItems: 'center',
+        justifyContent: 'flex-start',
       }}
     >
-      <div 
-        style={{ 
-          width: contentWidth, 
-          height: itemHeight
-        }}
-      >
+      <div style={{ width: contentWidth, height: itemHeight }}>
         <FilmstripThumbnail
           imageFile={imageFile}
           imageRatings={imageRatings}
@@ -317,27 +267,25 @@ const FilmstripRow = memo(({ index, style, data }: ListChildComponentProps<ItemD
           thumbData={thumbnails ? thumbnails[imageFile.path] : undefined}
           thumbnailAspectRatio={thumbnailAspectRatio}
           itemHeight={itemHeight}
-          index={index}
+          index={columnIndex}
           setSize={setSize}
           knownWidth={contentWidth}
         />
       </div>
     </div>
   );
-}, areEqual);
+};
 
-const FilmstripList = ({ 
-  height, 
-  width, 
-  data 
-}: { 
-  height: number; 
-  width: number; 
-  data: Omit<ItemData, 'itemHeight' | 'setSize' | 'sizeMap' | 'gap'> & { clickTriggeredScroll: React.MutableRefObject<boolean> } 
+const FilmstripList = ({
+  height,
+  data,
+}: {
+  height: number;
+  data: Omit<ItemData, 'itemHeight' | 'setSize'> & { clickTriggeredScroll: React.RefObject<boolean> };
 }) => {
-  const listRef = useRef<List>(null);
-  const outerRef = useRef<HTMLDivElement>(null); 
-  const sizeMap = useRef<Record<number, number>>({});
+  const [gridHandle, setGridHandle] = useGridCallbackRef();
+  const sizeMapRef = useRef<Record<number, number>>({});
+  const [sizeMapVersion, setSizeMapVersion] = useState(0);
   const visibleRange = useRef({ start: 0, stop: 0 });
   const prevSelectedPath = useRef<string | null>(null);
   const isReadyForSmooth = useRef(false);
@@ -351,46 +299,50 @@ const FilmstripList = ({
   const pendingScrollTarget = useRef<number | null>(null);
   const itemHeight = Math.max(20, height - VERTICAL_PADDING);
 
-  const getItemSize = useCallback((index: number) => {
-    let w;
-    if (data.thumbnailAspectRatio === ThumbnailAspectRatio.Cover) {
-      w = itemHeight;
-    } else {
-      w = sizeMap.current[index] || (itemHeight * 1.5);
-    }
-    return w + ITEM_GAP;
-  }, [data.thumbnailAspectRatio, itemHeight]);
+  const getColumnWidth = useCallback(
+    (index: number) => {
+      let w;
+      if (data.thumbnailAspectRatio === ThumbnailAspectRatio.Cover) {
+        w = itemHeight;
+      } else {
+        w = sizeMapRef.current[index] || itemHeight * 1.5;
+      }
+      return w + ITEM_GAP;
+    },
+    // sizeMapVersion ensures a new function reference when sizes change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data.thumbnailAspectRatio, itemHeight, sizeMapVersion],
+  );
 
   useEffect(() => {
     isReadyForSmooth.current = false;
     const timer = setTimeout(() => {
-        isReadyForSmooth.current = true;
+      isReadyForSmooth.current = true;
     }, 500);
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     if (!isReadyForSmooth.current) {
-        return;
+      return;
     }
 
     if (resizeEndTimer.current) clearTimeout(resizeEndTimer.current);
 
     resizeEndTimer.current = window.setTimeout(() => {
-        const { selectedPath, imageList } = currentDataRef.current;
-        if (selectedPath && listRef.current && outerRef.current) {
-            const index = imageList.findIndex(img => img.path === selectedPath);
-            if (index !== -1) {
-                outerRef.current.style.scrollBehavior = 'smooth';
-                listRef.current.scrollToItem(index, 'center');
-            }
+      const { selectedPath, imageList } = currentDataRef.current;
+      if (selectedPath && gridHandle) {
+        const index = imageList.findIndex((img) => img.path === selectedPath);
+        if (index !== -1) {
+          gridHandle.scrollToColumn({ index, align: 'center', behavior: 'smooth' });
         }
+      }
     }, 500);
-    
+
     return () => {
-        if (resizeEndTimer.current) clearTimeout(resizeEndTimer.current);
+      if (resizeEndTimer.current) clearTimeout(resizeEndTimer.current);
     };
-  }, [height]);
+  }, [height, gridHandle]);
 
   useEffect(() => {
     return () => {
@@ -404,87 +356,90 @@ const FilmstripList = ({
   }, []);
 
   useEffect(() => {
-    sizeMap.current = {}; 
-    if (listRef.current) {
-      listRef.current.resetAfterIndex(0); 
-    }
+    sizeMapRef.current = {};
+    setSizeMapVersion((v) => v + 1);
   }, [height, data.thumbnailAspectRatio]);
 
-  const onItemsRendered = useCallback(({ visibleStartIndex, visibleStopIndex }: any) => {
-    visibleRange.current = { start: visibleStartIndex, stop: visibleStopIndex };
-  }, []);
+  const onCellsRendered = useCallback(
+    (visibleCells: { columnStartIndex: number; columnStopIndex: number }) => {
+      visibleRange.current = {
+        start: visibleCells.columnStartIndex,
+        stop: visibleCells.columnStopIndex,
+      };
+    },
+    [],
+  );
 
   const isItemVisible = useCallback((index: number) => {
     const { start, stop } = visibleRange.current;
-    return index > start && index < stop; 
+    return index > start && index < stop;
   }, []);
 
-  const performSafeScroll = useCallback((index: number, bypassLock = false) => {
-    if (!listRef.current || !outerRef.current) return;
+  const performSafeScroll = useCallback(
+    (index: number, bypassLock = false) => {
+      if (!gridHandle) return;
 
-    if (!bypassLock && isAnimatingScroll.current) {
-      pendingScrollTarget.current = index;
-      return;
-    }
+      if (!bypassLock && isAnimatingScroll.current) {
+        pendingScrollTarget.current = index;
+        return;
+      }
 
-    isAnimatingScroll.current = true;
-    pendingScrollTarget.current = null; 
+      isAnimatingScroll.current = true;
+      pendingScrollTarget.current = null;
 
-    if (!isReadyForSmooth.current) {
-        outerRef.current.style.scrollBehavior = 'auto';
-    } else {
-        outerRef.current.style.scrollBehavior = 'smooth';
-    }
+      gridHandle.scrollToColumn({
+        index,
+        align: 'center',
+        behavior: isReadyForSmooth.current ? 'smooth' : 'instant',
+      });
 
-    listRef.current.scrollToItem(index, 'center');
+      if (scrollAnimationTimeout.current) clearTimeout(scrollAnimationTimeout.current);
 
-    if (scrollAnimationTimeout.current) clearTimeout(scrollAnimationTimeout.current);
-    
-    scrollAnimationTimeout.current = setTimeout(() => {
+      scrollAnimationTimeout.current = setTimeout(() => {
         isAnimatingScroll.current = false;
 
         if (pendingScrollTarget.current !== null && pendingScrollTarget.current !== index) {
-             const nextTarget = pendingScrollTarget.current;
-             if (!isItemVisible(nextTarget)) {
-                 performSafeScroll(nextTarget);
-             } else {
-                 pendingScrollTarget.current = null;
-             }
+          const nextTarget = pendingScrollTarget.current;
+          if (!isItemVisible(nextTarget)) {
+            performSafeScroll(nextTarget);
+          } else {
+            pendingScrollTarget.current = null;
+          }
         }
-    }, 250);
-
-  }, [isReadyForSmooth, isItemVisible]);
-
+      }, 250);
+    },
+    [gridHandle, isItemVisible],
+  );
 
   useEffect(() => {
     const currentPath = data.selectedPath;
 
-    if (currentPath && listRef.current && outerRef.current) {
-      const index = data.imageList.findIndex(img => img.path === currentPath);
-      
+    if (currentPath && gridHandle) {
+      const index = data.imageList.findIndex((img) => img.path === currentPath);
+
       if (index !== -1) {
         if (currentPath !== prevSelectedPath.current) {
           const isVisible = isItemVisible(index);
 
           if (data.clickTriggeredScroll.current) {
-              data.clickTriggeredScroll.current = false;
-              performSafeScroll(index, true); 
+            data.clickTriggeredScroll.current = false;
+            performSafeScroll(index, true);
           } else if (!isVisible) {
-              performSafeScroll(index);
+            performSafeScroll(index);
           }
           prevSelectedPath.current = currentPath;
         } else {
           if (!isItemVisible(index)) {
-             performSafeScroll(index, true);
+            performSafeScroll(index, true);
           }
         }
       }
     }
-  }, [data.selectedPath, data.imageList, isItemVisible, data.clickTriggeredScroll, performSafeScroll]);
+  }, [data.selectedPath, data.imageList, isItemVisible, data.clickTriggeredScroll, performSafeScroll, gridHandle]);
 
   const setSize = useCallback((index: number, width: number) => {
-    if (sizeMap.current[index] !== width) {
-      sizeMap.current[index] = width;
+    if (sizeMapRef.current[index] !== width) {
+      sizeMapRef.current[index] = width;
 
       if (index < lowestPendingIndexRef.current) {
         lowestPendingIndexRef.current = index;
@@ -492,9 +447,7 @@ const FilmstripList = ({
 
       if (pendingResizeRef.current === null) {
         pendingResizeRef.current = requestAnimationFrame(() => {
-          if (listRef.current && lowestPendingIndexRef.current !== Infinity) {
-            listRef.current.resetAfterIndex(lowestPendingIndexRef.current);
-          }
+          setSizeMapVersion((v) => v + 1);
           lowestPendingIndexRef.current = Infinity;
           pendingResizeRef.current = null;
         });
@@ -502,31 +455,37 @@ const FilmstripList = ({
     }
   }, []);
 
-  const itemData = useMemo(() => ({
-    ...data,
-    itemHeight,
-    setSize,
-    sizeMap: sizeMap.current
-  }), [data, itemHeight, setSize]);
+  const cellProps = useMemo(
+    () => ({
+      ...data,
+      itemHeight,
+      setSize,
+    }),
+    [data, itemHeight, setSize],
+  );
 
   return (
-    <List
-      ref={listRef}
-      outerRef={outerRef}
-      height={height}
-      width={width}
-      itemCount={data.imageList.length}
-      itemSize={getItemSize}
-      layout="horizontal"
-      outerElementType={OuterElement}
-      innerElementType={InnerElement}
-      className="custom-scrollbar"
-      itemData={itemData}
-      onItemsRendered={onItemsRendered}
-      overscanCount={16}
-    >
-      {FilmstripRow}
-    </List>
+    <div style={{ height }} className="w-full">
+      <Grid
+        gridRef={setGridHandle}
+        rowCount={1}
+        rowHeight={itemHeight}
+        columnCount={data.imageList.length}
+        columnWidth={getColumnWidth}
+        cellComponent={FilmstripCell}
+        cellProps={cellProps}
+        className="custom-scrollbar"
+        style={{ overflowY: 'hidden' }}
+        onWheel={(e: React.WheelEvent<HTMLDivElement>) => {
+          if (e.deltaY !== 0 && Math.abs(e.deltaX) < Math.abs(e.deltaY)) {
+            e.currentTarget.scrollLeft += e.deltaY;
+            e.preventDefault();
+          }
+        }}
+        onCellsRendered={onCellsRendered}
+        overscanCount={16}
+      />
+    </div>
   );
 };
 
@@ -566,11 +525,10 @@ export default function Filmstrip({
 
   return (
     <div className="h-full w-full" onClick={onClearSelection}>
-      <AutoSizer>
-        {({ height, width }) => (
-          <FilmstripList 
-            height={height} 
-            width={width}
+      <AutoSizer disableWidth>
+        {({ height }) => (
+          <FilmstripList
+            height={height}
             data={{
               imageList,
               imageRatings,
