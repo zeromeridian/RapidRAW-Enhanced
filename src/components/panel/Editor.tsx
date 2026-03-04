@@ -134,23 +134,16 @@ export default function Editor({
   const isInitialMount = useRef(true);
   const transformStateRef = useRef<TransformState>(transformState);
   transformStateRef.current = transformState;
-
   const [isPanningState, setIsPanningState] = useState(false);
   const isClickAnimating = useRef(false);
   const clickAnimationTime = 200;
-
   const isAnimating = useRef(false);
   const animationTimeoutRef = useRef<number | null>(null);
-
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
   const savedZoomState = useRef<{ scale: number; positionX: number; positionY: number } | null>(null);
-
   const focalPointRef = useRef({ x: 0.5, y: 0.5 });
   const isTransitioningRef = useRef(false);
-
   const [toolbarOverflowVisible, setToolbarOverflowVisible] = useState(!isFullScreen);
-
-  // Queue mechanism for LIVE instantaneous mask previews
   const isGeneratingOverlayRef = useRef(false);
   const pendingOverlayRequestRef = useRef<any>(null);
 

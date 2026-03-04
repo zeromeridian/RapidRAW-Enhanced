@@ -198,38 +198,50 @@ fn draw_feathered_ellipse_mut(
     let feather_amount = feather.clamp(0.0, 1.0);
     let inner_radius = radius * (1.0 - feather_amount);
 
-    let top = (cy as f32 - radius).ceil() as i32;
-    let bottom = (cy as f32 + radius).floor() as i32;
-    let left = (cx as f32 - radius).ceil() as i32;
-    let right = (cx as f32 + radius).floor() as i32;
+    let radius_sq = radius * radius;
+    let inner_radius_sq = inner_radius * inner_radius;
+    let feather_range = (radius - inner_radius).max(0.01);
+
+    let width = mask.width() as i32;
+    let height = mask.height() as i32;
+
+    let left = ((cx as f32 - radius).ceil() as i32).max(0);
+    let right = ((cx as f32 + radius).floor() as i32).min(width - 1);
+    let top = ((cy as f32 - radius).ceil() as i32).max(0);
+    let bottom = ((cy as f32 + radius).floor() as i32).min(height - 1);
+
+    if left > right || top > bottom {
+        return;
+    }
 
     for y in top..=bottom {
+        let dy = y as f32 - cy as f32;
+        let dy_sq = dy * dy;
+
         for x in left..=right {
-            if x < 0 || x >= mask.width() as i32 || y < 0 || y >= mask.height() as i32 {
-                continue;
-            }
-
             let dx = x as f32 - cx as f32;
-            let dy = y as f32 - cy as f32;
-            let dist = (dx * dx + dy * dy).sqrt();
+            let dist_sq = dx * dx + dy_sq;
 
-            if dist <= radius {
-                let intensity = if dist <= inner_radius {
-                    1.0
+            if dist_sq <= radius_sq {
+                let intensity = if dist_sq <= inner_radius_sq {
+                    1.0 
                 } else {
-                    1.0 - (dist - inner_radius) / (radius - inner_radius).max(0.01)
+                    let dist = dist_sq.sqrt();
+                    1.0 - (dist - inner_radius) / feather_range
                 };
 
                 let final_value = (intensity * color_value as f32) as u8;
 
-                let current_pixel = mask.get_pixel_mut(x as u32, y as u32);
+                if final_value > 0 {
+                    let current_pixel = mask.get_pixel_mut(x as u32, y as u32);
 
-                if is_eraser {
-                    let ceiling = 255u8.saturating_sub(final_value);
-                    current_pixel[0] = current_pixel[0].min(ceiling);
-                } else {
-                    if final_value > current_pixel[0] {
-                        current_pixel[0] = final_value;
+                    if is_eraser {
+                        let ceiling = 255u8.saturating_sub(final_value);
+                        current_pixel[0] = current_pixel[0].min(ceiling);
+                    } else {
+                        if final_value > current_pixel[0] {
+                            current_pixel[0] = final_value;
+                        }
                     }
                 }
             }
