@@ -2400,7 +2400,7 @@ function App() {
       const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
       const physicalZoomPercent = targetZoomPercent * dpr;
 
-      const highResThreshold = Math.max(initialFitScale * 2, 0.5);
+      const highResThreshold = Math.max(initialFitScale * 1.5, 0.5);
       const needsFullRes = physicalZoomPercent > highResThreshold;
 
       const previewIsAlreadyFullRes = previewSize.width >= originalSize.width;
