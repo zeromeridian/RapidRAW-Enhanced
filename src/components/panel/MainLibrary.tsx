@@ -428,7 +428,7 @@ function SearchInput({ indexingProgress, isIndexing, searchCriteria, setSearchCr
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ duration: 0.15 }}
-              className="flex-shrink-0 bg-bg-primary text-text-secondary text-xs px-2 py-1 rounded-md whitespace-nowrap"
+              className="flex-shrink-0 bg-bg-primary px-2 py-1 rounded-md whitespace-nowrap"
             >
               <Text variant={TextVariants.small}>
                 Separate tags with <kbd className="font-sans font-semibold">,</kbd>
@@ -1055,7 +1055,7 @@ function Thumbnail({
               <Text variant={TextVariants.label} color={TextColors.primary}>
                 {rating}
               </Text>
-              <StarIcon size={12} className="text-accent fill-accent" />
+              <StarIcon size={16} className="text-accent fill-accent" />
             </>
           )}
         </div>
@@ -1786,7 +1786,7 @@ export default function MainLibrary({
         </div>
       ) : searchCriteria.tags.length > 0 || searchCriteria.text ? (
         <div
-          className="flex-1 flex flex-col text-text-secondary items-center justify-center text-center"
+          className="flex-1 flex flex-col items-center justify-center text-text-secondary text-center"
           onContextMenu={onEmptyAreaContextMenu}
         >
           <Search className="h-12 w-12 text-secondary mb-4" />
@@ -1799,13 +1799,9 @@ export default function MainLibrary({
           </Text>
         </div>
       ) : (
-        <div
-          text-text-secondary
-          className="flex-1 flex flex-col items-center justify-center text-text-secondary"
-          onContextMenu={onEmptyAreaContextMenu}
-        >
-          <SlidersHorizontal className="h-12 w-12 mb-4" />
-          <Text className="text-text-secondary">No images found that match your filter.</Text>
+        <div className="flex-1 flex flex-col items-center justify-center" onContextMenu={onEmptyAreaContextMenu}>
+          <SlidersHorizontal className="h-12 w-12 mb-4 text-text-secondary" />
+          <Text>No images found that match your filter.</Text>
         </div>
       )}
     </div>
