@@ -146,7 +146,7 @@ const KeybindItem = ({ keys, description }: KeybindItemProps) => (
 
 const SettingItem = ({ children, description, label }: SettingItemProps) => (
   <div>
-    <Text variant={TextVariants.label} color={TextColors.primary} className="block mb-2">
+    <Text as="h3" color={TextColors.primary} weight={TextWeights.medium} className="block mb-2">
       {label}
     </Text>
     {children}
@@ -169,7 +169,7 @@ const DataActionItem = ({
   title,
 }: DataActionItemProps) => (
   <div className="pb-6 border-b border-border-color last:border-b-0 last:pb-0">
-    <Text color={TextColors.primary} weight={TextWeights.medium} className="mb-2">
+    <Text as="h3" color={TextColors.primary} weight={TextWeights.medium} className="mb-2">
       {title}
     </Text>
     <Text variant={TextVariants.small} className="mb-3">
