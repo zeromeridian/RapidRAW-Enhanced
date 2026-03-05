@@ -229,10 +229,10 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
               </div>
             </div>
             <div className="bg-bg-primary p-4 rounded-md max-h-64 overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-6">
                 {Object.entries(ADJUSTMENT_SECTIONS).map(([section, keys]) => (
                   <div key={section}>
-                    <Text variant={TextVariants.heading} className="mb-2 mt-3 first:mt-0">
+                    <Text variant={TextVariants.heading} className="mb-2">
                       {capitalize(section)}
                     </Text>
                     {keys.map((key) => (

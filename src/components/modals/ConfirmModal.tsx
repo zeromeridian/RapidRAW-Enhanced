@@ -93,7 +93,7 @@ export default function ConfirmModal({
         onClick={(e: any) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        <Text variant={TextVariants.heading} id="confirm-modal-title" className="mb-4">
+        <Text variant={TextVariants.title} id="confirm-modal-title" className="mb-4">
           {title}
         </Text>
         <Text className="mb-6 whitespace-pre-wrap">{message}</Text>

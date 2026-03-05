@@ -68,7 +68,6 @@ export const TextVariants: Record<TextVariant, VariantConfig> = {
     extraClasses: 'text-shadow-shiny',
   },
   title: {
-    // Modals with text-lg are to use this as larger heading was removed
     size: 'text-xl',
     defaultWeight: 'bold',
     defaultColor: 'primary',

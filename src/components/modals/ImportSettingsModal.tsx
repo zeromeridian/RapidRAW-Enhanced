@@ -102,7 +102,7 @@ export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave
         onClick={(e: any) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        <Text variant={TextVariants.title} className="mb-8">
+        <Text variant={TextVariants.title} className="mb-4">
           Import Settings
         </Text>
 

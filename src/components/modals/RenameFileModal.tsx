@@ -103,7 +103,7 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
         onClick={(e: any) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        <Text variant={TextVariants.title} className="mb-6">
+        <Text variant={TextVariants.title} className="mb-4">
           {isSingleFile ? 'Rename Image' : `Rename ${fileCount} Images`}
         </Text>
 
