@@ -1178,7 +1178,7 @@ export default function SettingsPanel({
                         onModeChange={handlePreviewModeChange}
                       />
 
-                      <div className="mt-2">
+                      <div className="mt-3">
                         <AnimatePresence mode="wait">
                           {!(appSettings?.enableZoomHifi ?? false) ? (
                             <motion.div
