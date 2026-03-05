@@ -488,7 +488,7 @@ const MaskOverlay = memo(
         ...commonProps,
         strokeWidth: isSelected ? 2.5 : 2,
         dash: [6, 6],
-        hitStrokeWidth: 20,
+        hitStrokeWidth: 40,
       };
 
       const showFeatherLines = isSelected && (!isToolActive || p.isInitialDraw);

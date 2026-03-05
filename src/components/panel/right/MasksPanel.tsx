@@ -319,7 +319,6 @@ export default function MasksPanel({
       subMask.parameters.range = Math.min(imgW, imgH) * 0.1;
     }
 
-    // Configure Linear and Radial to await the user's manual drawing interaction
     if (type === Mask.Linear || type === Mask.Radial) {
       if (!subMask.parameters) subMask.parameters = {};
       subMask.parameters.isInitialDraw = true;

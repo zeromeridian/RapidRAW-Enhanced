@@ -329,7 +329,16 @@ export default function Editor({
 
   const handleLiveMaskPreview = useCallback(
     (maskDef: any) => {
-      pendingOverlayRequestRef.current = { maskDef, renderSize: imageRenderSize };
+      let normalizedDef = maskDef;
+      if (maskDef && !maskDef.adjustments) {
+        normalizedDef = {
+          ...maskDef,
+          adjustments: {},
+          opacity: 100,
+        };
+      }
+
+      pendingOverlayRequestRef.current = { maskDef: normalizedDef, renderSize: imageRenderSize };
       processOverlayQueue();
     },
     [imageRenderSize, processOverlayQueue],
