@@ -1360,9 +1360,14 @@ export default function SettingsPanel({
                           </Text>
 
                           <div className="mt-8 p-4 bg-bg-primary rounded-lg border border-border-color text-center space-y-3">
-                            <span className="inline-block bg-accent text-button-text text-xs font-semibold px-2 py-1 rounded-full">
+                            <Text
+                              variant={TextVariants.small}
+                              color={TextColors.button}
+                              weight={TextWeights.semibold}
+                              className="inline-block bg-accent px-2 py-1 rounded-full"
+                            >
                               Coming Soon
-                            </span>
+                            </Text>
                             <Text>
                               Keep an eye on the GitHub page to be notified when the cloud service is available.
                             </Text>
