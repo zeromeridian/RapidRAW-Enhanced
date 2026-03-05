@@ -958,7 +958,7 @@ export default function SettingsPanel({
                             transition={{ duration: 0.3, ease: 'easeInOut' }}
                             className="overflow-hidden"
                           >
-                            <div className="pl-4 border-l-2 border-border-color ml-1 mt-4 space-y-6">
+                            <div className="pl-4 border-l-2 border-border-color ml-1 space-y-8">
                               <SettingItem
                                 label="Maximum AI Tags"
                                 description="The maximum number of tags to generate per image."
@@ -1397,19 +1397,19 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <h3 className="text-lg font-semibold text-text-primary">
-                            Self-Hosted (RapidRAW AI Connector)
-                          </h3>
-                          <p className="text-sm text-text-secondary mt-1">
-                            For users with a capable GPU who want maximum control, connect RapidRAW to your own local AI
-                            Connector server. This gives you full control for technical workflows.
-                          </p>
-                          <ul className="mt-3 mb-6 space-y-1 list-disc list-inside text-sm text-text-secondary">
-                            <li>Use your own ComfyUI instance</li>
-                            <li>Cost-free advanced generative edits</li>
-                            <li>Custom workflow selection</li>
-                          </ul>
-                          <div className="space-y-6">
+                          <div className="space-y-8">
+                            <div>
+                              <Text variant={TextVariants.heading}>Self-Hosted (RapidRAW AI Connector)</Text>
+                              <Text className="mt-1">
+                                For users with a capable GPU who want maximum control, connect RapidRAW to your own
+                                Connector server. This gives you full control for technical workflows.
+                              </Text>
+                              <Text as="ul" className="mt-3 space-y-1 list-disc list-inside">
+                                <li>Use your own ComfyUI instance</li>
+                                <li>Cost-free advanced generative edits</li>
+                                <li>Custom workflow selection</li>
+                              </Text>
+                            </div>
                             <SettingItem
                               label="AI Connector Address"
                               description="Enter the address and port of your running AI Connector instance. Required for generative AI features."
