@@ -1230,12 +1230,14 @@ export default function SettingsPanel({
 
                     {restartRequired && (
                       <>
-                        <div className="p-3 bg-blue-900/20 text-blue-300 border border-blue-500/50 rounded-lg flex items-center gap-3">
+                        <Text
+                          as="div"
+                          color={TextColors.info}
+                          className="p-3 bg-blue-900/10 border border-blue-500/50 rounded-lg flex items-center gap-3"
+                        >
                           <Info size={18} />
-                          <Text color={TextColors.info}>
-                            Changes to the processing engine require an application restart to take effect.
-                          </Text>
-                        </div>
+                          <p>Changes to the processing engine require an application restart to take effect.</p>
+                        </Text>
                         <div className="flex justify-end">
                           <Button onClick={handleSaveAndRelaunch}>Save & Relaunch</Button>
                         </div>

@@ -31,7 +31,7 @@ export const TEXT_COLOR_KEYS: Record<TextColor, string> = {
   secondary: 'text-text-secondary',
   accent: 'text-accent',
   button: 'text-button-text',
-  info: 'text-blue-300',
+  info: 'text-blue-400',
   success: 'text-green-400',
   error: 'text-red-400',
   white: 'text-white',
