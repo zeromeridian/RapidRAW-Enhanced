@@ -4,6 +4,8 @@ import clsx from 'clsx';
 import { ADJUSTMENT_SECTIONS, COPYABLE_ADJUSTMENT_KEYS, CopyPasteSettings, PasteMode } from '../../utils/adjustments';
 import Button from '../ui/Button';
 import Switch from '../ui/Switch';
+import Text from '../ui/Text';
+import { TextVariants } from '../../types/typography';
 
 interface CopyPasteSettingsModalProps {
   isOpen: boolean;
@@ -186,25 +188,29 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-semibold text-text-primary mb-4">Copy & Paste Settings</h3>
+        <Text variant={TextVariants.title} className="mb-4">
+          Copy & Paste Settings
+        </Text>
         <div className="flex-grow overflow-y-auto pr-2 -mr-2 space-y-6">
           <div>
-            <label className="font-semibold text-text-primary block mb-2">Paste Mode</label>
+            <Text variant={TextVariants.heading} className="block mb-2">
+              Paste Mode
+            </Text>
             <PasteModeSwitch
               selectedMode={localSettings.mode}
               onModeChange={(mode) => setLocalSettings((p) => ({ ...p, mode }))}
               isVisible={show}
             />
-            <p className="text-xs text-text-secondary mt-2">
+            <Text variant={TextVariants.small} className="mt-2">
               <b>Merge:</b> Adds your copied changes, leaving other settings untouched.
               <br />
               <b>Replace:</b> Overwrites all selected settings, resetting the rest to their defaults.
-            </p>
+            </Text>
           </div>
 
           <div>
             <div className="flex justify-between items-center mb-2">
-              <label className="font-semibold text-text-primary">Included Adjustments</label>
+              <Text variant={TextVariants.heading}>Included Adjustments</Text>
               <div className="flex gap-2">
                 <Button
                   className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors"
@@ -226,7 +232,9 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2">
                 {Object.entries(ADJUSTMENT_SECTIONS).map(([section, keys]) => (
                   <div key={section}>
-                    <h4 className="font-semibold text-text-primary mb-2 mt-3 first:mt-0">{capitalize(section)}</h4>
+                    <Text variant={TextVariants.heading} className="mb-2 mt-3 first:mt-0">
+                      {capitalize(section)}
+                    </Text>
                     {keys.map((key) => (
                       <div key={key} className="mb-1.5 last:mb-0">
                         <Switch
