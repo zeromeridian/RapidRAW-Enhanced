@@ -14,6 +14,8 @@ import {
   SlidersHorizontal,
   Keyboard,
   Bookmark,
+  Scaling,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -97,6 +99,13 @@ const resolutions: OptionItem<number>[] = [
   { value: 1920, label: '1920px' },
   { value: 2560, label: '2560px' },
   { value: 3840, label: '3840px' },
+];
+
+const zoomMultiplierOptions: OptionItem<number>[] = [
+  { value: 1.0, label: '1.0x (Native)' },
+  { value: 0.75, label: '0.75x' },
+  { value: 0.5, label: '0.50x (Half)' },
+  { value: 0.25, label: '0.25x' },
 ];
 
 const backendOptions: OptionItem<string>[] = [
@@ -210,6 +219,50 @@ const AiProviderSwitch = ({ selectedProvider, onProviderChange }: AiProviderSwit
   );
 };
 
+const previewModes = [
+  { id: 'static', label: 'Fixed Resolution', icon: ImageIcon },
+  { id: 'dynamic', label: 'Dynamic', icon: Scaling },
+];
+
+interface PreviewModeSwitchProps {
+  mode: 'static' | 'dynamic';
+  onModeChange: (mode: 'static' | 'dynamic') => void;
+}
+
+const PreviewModeSwitch = ({ mode, onModeChange }: PreviewModeSwitchProps) => {
+  return (
+    <div className="relative flex w-full p-1 bg-bg-primary rounded-md border border-border-color">
+      {previewModes.map((item) => (
+        <button
+          key={item.id}
+          onClick={() => onModeChange(item.id as 'static' | 'dynamic')}
+          className={clsx(
+            'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+            {
+              'text-text-primary hover:bg-surface': mode !== item.id,
+              'text-button-text': mode === item.id,
+            },
+          )}
+          style={{ WebkitTapHighlightColor: 'transparent' }}
+        >
+          {mode === item.id && (
+            <motion.span
+              layoutId="preview-mode-switch-bubble"
+              className="absolute inset-0 z-0 bg-accent"
+              style={{ borderRadius: 6 }}
+              transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center">
+            <item.icon size={16} className="mr-2" />
+            {item.label}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+};
+
 export default function SettingsPanel({
   appSettings,
   onBack,
@@ -252,6 +305,7 @@ export default function SettingsPanel({
     rawHighlightCompression: appSettings?.rawHighlightCompression ?? 2.5,
     processingBackend: appSettings?.processingBackend || 'auto',
     linuxGpuOptimization: appSettings?.linuxGpuOptimization ?? false,
+    highResZoomMultiplier: appSettings?.highResZoomMultiplier || 1.0,
   });
   const [restartRequired, setRestartRequired] = useState(false);
   const [activeCategory, setActiveCategory] = useState('general');
@@ -272,6 +326,7 @@ export default function SettingsPanel({
       rawHighlightCompression: appSettings?.rawHighlightCompression ?? 2.5,
       processingBackend: appSettings?.processingBackend || 'auto',
       linuxGpuOptimization: appSettings?.linuxGpuOptimization ?? false,
+      highResZoomMultiplier: appSettings?.highResZoomMultiplier || 1.0,
     });
     setRestartRequired(false);
   }, [appSettings]);
@@ -314,6 +369,11 @@ export default function SettingsPanel({
   const handleProviderChange = (provider: string) => {
     setAiProvider(provider);
     onSettingsChange({ ...appSettings, aiProvider: provider });
+  };
+
+  const handlePreviewModeChange = (mode: 'static' | 'dynamic') => {
+    const enableZoomHifi = mode === 'dynamic';
+    onSettingsChange({ ...appSettings, enableZoomHifi });
   };
 
   const handleTempMakerChange = (maker: string) => {
@@ -809,7 +869,10 @@ export default function SettingsPanel({
                     )}
                     <div className="divide-y divide-border-color">
                       {(appSettings?.myLenses || []).map((lens: MyLens, index: number) => (
-                        <div key={`${lens.maker}-${lens.model}-${index}`} className="flex justify-between items-center py-3">
+                        <div
+                          key={`${lens.maker}-${lens.model}-${index}`}
+                          className="flex justify-between items-center py-3"
+                        >
                           <div className="flex items-center gap-3">
                             <div className="p-2 bg-surface rounded-md text-accent">
                               <Bookmark size={16} />
@@ -857,8 +920,8 @@ export default function SettingsPanel({
                           className="overflow-hidden"
                         >
                           <div className="pl-4 border-l-2 border-border-color ml-1 mt-4 space-y-6">
-                            <SettingItem 
-                              label="Maximum AI Tags" 
+                            <SettingItem
+                              label="Maximum AI Tags"
                               description="The maximum number of tags to generate per image."
                             >
                               <Slider
@@ -1059,28 +1122,71 @@ export default function SettingsPanel({
                 <div className="p-6 bg-surface rounded-xl shadow-md">
                   <h2 className="text-xl font-semibold mb-6 text-accent">Processing Engine</h2>
                   <div className="space-y-6">
-                    <SettingItem
-                      description="Higher resolutions provide a sharper preview but may impact performance on less powerful systems."
-                      label="Preview Resolution"
-                    >
-                      <Dropdown
-                        onChange={(value: any) => handleProcessingSettingChange('editorPreviewResolution', value)}
-                        options={resolutions}
-                        value={processingSettings.editorPreviewResolution}
+                    <div>
+                      <h3 className="text-sm font-medium text-text-primary mb-2">Preview Rendering Strategy</h3>
+                      <PreviewModeSwitch
+                        mode={appSettings?.enableZoomHifi ? 'dynamic' : 'static'}
+                        onModeChange={handlePreviewModeChange}
                       />
-                    </SettingItem>
 
-                    <SettingItem
-                      label="High Quality Zoom"
-                      description="Load a higher quality version of the image when zooming in for more detail. Disabling this can improve performance."
-                    >
-                      <Switch
-                        checked={appSettings?.enableZoomHifi ?? true}
-                        id="zoom-hifi-toggle"
-                        label="Enable High Quality Zoom"
-                        onChange={(checked) => onSettingsChange({ ...appSettings, enableZoomHifi: checked })}
-                      />
-                    </SettingItem>
+                      <div className="mt-4">
+                        <AnimatePresence mode="wait">
+                          {!(appSettings?.enableZoomHifi ?? false) ? (
+                            <motion.div
+                              key="static-preview"
+                              initial={{ opacity: 0, x: 10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -10 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <p className="text-sm text-text-secondary mb-4">
+                                The editor renders the image at a fixed resolution. This mode is the fastest and most
+                                consistent, making it ideal for lower-end hardware where smooth performance is
+                                prioritized over pixel-perfect zoom.
+                              </p>
+                              <SettingItem
+                                description="Determines the maximum resolution of the preview. Lower values significantly improve performance."
+                                label="Preview Resolution"
+                              >
+                                <Dropdown
+                                  onChange={(value: any) =>
+                                    handleProcessingSettingChange('editorPreviewResolution', value)
+                                  }
+                                  options={resolutions}
+                                  value={processingSettings.editorPreviewResolution}
+                                />
+                              </SettingItem>
+                            </motion.div>
+                          ) : (
+                            <motion.div
+                              key="dynamic-preview"
+                              initial={{ opacity: 0, x: 10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -10 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <p className="text-sm text-text-secondary mb-4">
+                                The editor renders the preview to match your display's actual pixel density. This
+                                ensures that every detail is represented with 1:1 pixel accuracy, providing maximum
+                                clarity when zooming and checking focus.
+                              </p>
+                              <SettingItem
+                                label="Render Resolution Scale"
+                                description="Controls the pixel density of the zoomed render. A lower value tells the editor to render as if your screen has a lower resolution, dramatically improving performance on 4K/Retina displays."
+                              >
+                                <Dropdown
+                                  onChange={(value: any) =>
+                                    handleProcessingSettingChange('highResZoomMultiplier', value)
+                                  }
+                                  options={zoomMultiplierOptions}
+                                  value={processingSettings.highResZoomMultiplier}
+                                />
+                              </SettingItem>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
 
                     <div className="space-y-4">
                       <SettingItem
@@ -1110,7 +1216,7 @@ export default function SettingsPanel({
                             <div className="pl-4 border-l-2 border-border-color ml-1">
                               <SettingItem
                                 label="High Quality Live Preview"
-                                description="Uses higher resolution and less compression during interaction. Significantly increases GPU load."
+                                description="Uses higher resolution and less compression during interaction."
                               >
                                 <Switch
                                   checked={appSettings?.enableHighQualityLivePreviews ?? false}
@@ -1232,10 +1338,12 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <h3 className="text-lg font-semibold text-text-primary">Self-Hosted (RapidRAW AI Connector)</h3>
+                          <h3 className="text-lg font-semibold text-text-primary">
+                            Self-Hosted (RapidRAW AI Connector)
+                          </h3>
                           <p className="text-sm text-text-secondary mt-1">
-                            For users with a capable GPU who want maximum control, connect RapidRAW to your own local
-                            AI Connector server. This gives you full control for technical workflows.
+                            For users with a capable GPU who want maximum control, connect RapidRAW to your own local AI
+                            Connector server. This gives you full control for technical workflows.
                           </p>
                           <ul className="mt-3 mb-6 space-y-1 list-disc list-inside text-sm text-text-secondary">
                             <li>Use your own ComfyUI instance</li>
@@ -1251,7 +1359,9 @@ export default function SettingsPanel({
                                 <Input
                                   className="flex-grow"
                                   id="ai-connector-address"
-                                  onBlur={() => onSettingsChange({ ...appSettings, aiConnectorAddress: aiConnectorAddress })}
+                                  onBlur={() =>
+                                    onSettingsChange({ ...appSettings, aiConnectorAddress: aiConnectorAddress })
+                                  }
                                   onChange={(e: any) => setAiConnectorAddress(e.target.value)}
                                   onKeyDown={(e: any) => e.stopPropagation()}
                                   placeholder="127.0.0.1:8188"
@@ -1415,7 +1525,10 @@ export default function SettingsPanel({
                         <KeybindItem keys={['Space']} description="Cycle zoom (Fit, 2x Fit, 100%)" />
                         <KeybindItem keys={['←', '→']} description="Previous / Next image" />
                         <KeybindItem keys={['↑', '↓']} description="Zoom in / Zoom out (by step)" />
-                        <KeybindItem keys={['Shift', '+', 'Mouse Wheel']} description="Adjust slider value by 2 steps" />
+                        <KeybindItem
+                          keys={['Shift', '+', 'Mouse Wheel']}
+                          description="Adjust slider value by 2 steps"
+                        />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '+']} description="Zoom in" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '-']} description="Zoom out" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '0']} description="Zoom to fit" />

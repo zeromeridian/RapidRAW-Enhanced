@@ -108,6 +108,7 @@ pub struct CachedPreview {
     transform_hash: u64,
     scale: f32,
     unscaled_crop_offset: (f32, f32),
+    preview_dim: u32,
 }
 
 pub struct GpuImageCache {
@@ -127,6 +128,7 @@ pub struct GpuProcessorState {
 struct PreviewJob {
     adjustments: serde_json::Value,
     is_interactive: bool,
+    target_resolution: Option<u32>,
     responder: tokio::sync::oneshot::Sender<Vec<u8>>,
 }
 
@@ -456,7 +458,7 @@ fn hydrate_adjustments(state: &tauri::State<AppState>, adjustments: &mut serde_j
 fn generate_transformed_preview(
     loaded_image: &LoadedImage,
     adjustments: &serde_json::Value,
-    app_handle: &tauri::AppHandle,
+    preview_dim: u32,
 ) -> Result<(DynamicImage, f32, (f32, f32)), String> {
     let patched_original_image = composite_patches_on_image(&loaded_image.image, adjustments)
         .map_err(|e| format!("Failed to composite AI patches: {}", e))?;
@@ -464,13 +466,10 @@ fn generate_transformed_preview(
     let (transformed_full_res, unscaled_crop_offset) =
         apply_all_transformations(&patched_original_image, adjustments);
 
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let final_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
-
     let (full_res_w, full_res_h) = transformed_full_res.dimensions();
 
-    let final_preview_base = if full_res_w > final_preview_dim || full_res_h > final_preview_dim {
-        downscale_f32_image(&transformed_full_res, final_preview_dim, final_preview_dim)
+    let final_preview_base = if full_res_w > preview_dim || full_res_h > preview_dim {
+        downscale_f32_image(&transformed_full_res, preview_dim, preview_dim)
     } else {
         transformed_full_res
     };
@@ -754,6 +753,7 @@ fn process_preview_job(
     state: tauri::State<AppState>,
     mut adjustments_json: serde_json::Value,
     is_interactive: bool,
+    target_resolution: Option<u32>,
 ) -> Result<Vec<u8>, String> {
     let fn_start = std::time::Instant::now();
     let context = get_or_init_gpu_context(&state)?;
@@ -770,11 +770,14 @@ fn process_preview_job(
     let interactive_divisor = if hq_live { 1.5 } else { 2.0 };
     let interactive_quality = if hq_live { 70 } else { 60 };
 
+    let default_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
+    let preview_dim = target_resolution.unwrap_or(default_preview_dim);
+
     let mut cached_preview_lock = state.cached_preview.lock().unwrap();
 
     let (final_preview_base, small_preview_base, scale_for_gpu, unscaled_crop_offset) =
         if let Some(cached) = &*cached_preview_lock {
-            if cached.transform_hash == new_transform_hash {
+            if cached.transform_hash == new_transform_hash && cached.preview_dim == preview_dim {
                 (
                     cached.image.clone(),
                     cached.small_image.clone(),
@@ -784,10 +787,9 @@ fn process_preview_job(
             } else {
                 *state.gpu_image_cache.lock().unwrap() = None;
                 let (base, scale, offset) =
-                    generate_transformed_preview(&loaded_image, &adjustments_clone, &app_handle)?;
+                    generate_transformed_preview(&loaded_image, &adjustments_clone, preview_dim)?;
 
-                let final_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
-                let target_size = (final_preview_dim as f32 / interactive_divisor) as u32;
+                let target_size = (preview_dim as f32 / interactive_divisor) as u32;
 
                 let (w, h) = base.dimensions();
                 let (small_w, small_h) = if w > h {
@@ -805,16 +807,16 @@ fn process_preview_job(
                     transform_hash: new_transform_hash,
                     scale,
                     unscaled_crop_offset: offset,
+                    preview_dim,
                 });
                 (base, small_base, scale, offset)
             }
         } else {
             *state.gpu_image_cache.lock().unwrap() = None;
             let (base, scale, offset) =
-                generate_transformed_preview(&loaded_image, &adjustments_clone, &app_handle)?;
+                generate_transformed_preview(&loaded_image, &adjustments_clone, preview_dim)?;
 
-            let final_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
-            let target_size = (final_preview_dim as f32 / interactive_divisor) as u32;
+            let target_size = (preview_dim as f32 / interactive_divisor) as u32;
 
             let (w, h) = base.dimensions();
             let (small_w, small_h) = if w > h {
@@ -832,6 +834,7 @@ fn process_preview_job(
                 transform_hash: new_transform_hash,
                 scale,
                 unscaled_crop_offset: offset,
+                preview_dim,
             });
             (base, small_base, scale, offset)
         };
@@ -845,7 +848,7 @@ fn process_preview_job(
         let new_scale = scale_for_gpu * scale_factor;
         (small_preview_base, new_scale, interactive_quality)
     } else {
-        (final_preview_base, scale_for_gpu, 90)
+        (final_preview_base, scale_for_gpu, 95)
     };
 
     let (preview_width, preview_height) = processing_image.dimensions();
@@ -938,7 +941,7 @@ fn start_preview_worker(app_handle: tauri::AppHandle) {
 
             let state = app_handle.state::<AppState>();
             let responder = job.responder;
-            match process_preview_job(&app_handle, state, job.adjustments, job.is_interactive) {
+            match process_preview_job(&app_handle, state, job.adjustments, job.is_interactive, job.target_resolution) {
                 Ok(bytes) => {
                     let _ = responder.send(bytes);
                 }
@@ -954,6 +957,7 @@ fn start_preview_worker(app_handle: tauri::AppHandle) {
 async fn apply_adjustments(
     js_adjustments: serde_json::Value,
     is_interactive: bool,
+    target_resolution: Option<u32>,
     state: tauri::State<'_, AppState>,
 ) -> Result<Response, String> {
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -964,6 +968,7 @@ async fn apply_adjustments(
             let job = PreviewJob {
                 adjustments: js_adjustments,
                 is_interactive,
+                target_resolution,
                 responder: tx,
             };
             worker_tx.send(job).map_err(|e| format!("Failed to send to preview worker: {}", e))?;
@@ -1096,6 +1101,7 @@ fn generate_uncropped_preview(
 #[tauri::command]
 fn generate_original_transformed_preview(
     js_adjustments: serde_json::Value,
+    target_resolution: Option<u32>,
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
@@ -1118,7 +1124,8 @@ fn generate_original_transformed_preview(
         apply_all_transformations(&image_for_preview, &adjustments_clone);
 
     let settings = load_settings(app_handle).unwrap_or_default();
-    let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
+    let default_dim = settings.editor_preview_resolution.unwrap_or(1920);
+    let preview_dim = target_resolution.unwrap_or(default_dim);
 
     let (w, h) = transformed_full_res.dimensions();
     let transformed_image = if w > preview_dim || h > preview_dim {
@@ -1336,77 +1343,6 @@ fn get_full_image_for_processing(
         .as_ref()
         .ok_or("No original image loaded")?;
     Ok((loaded_image.image.clone().as_ref().clone(), loaded_image.is_raw))
-}
-
-#[tauri::command]
-async fn generate_fullscreen_preview(
-    js_adjustments: serde_json::Value,
-    app_handle: tauri::AppHandle,
-) -> Result<Response, String> {
-    let app_handle_clone = app_handle.clone();
-    tokio::task::spawn_blocking(move || {
-        let state = app_handle_clone.state::<AppState>();
-        let context = get_or_init_gpu_context(&state)?;
-
-        let mut adjustments_clone = js_adjustments.clone();
-        hydrate_adjustments(&state, &mut adjustments_clone);
-
-        let (original_image, is_raw) = get_full_image_for_processing(&state)?;
-
-        let path = state
-            .original_image
-            .lock()
-            .unwrap()
-            .as_ref()
-            .ok_or("Original image path not found")?
-            .path
-            .clone();
-
-        let unique_hash = calculate_full_job_hash(&path, &adjustments_clone);
-        let base_image = composite_patches_on_image(&original_image, &adjustments_clone)
-            .map_err(|e| format!("Failed to composite AI patches for fullscreen: {}", e))?;
-
-        let (transformed_image, unscaled_crop_offset) =
-            apply_all_transformations(&base_image, &adjustments_clone);
-        let (img_w, img_h) = transformed_image.dimensions();
-
-        let mask_definitions: Vec<MaskDefinition> = adjustments_clone
-            .get("masks")
-            .and_then(|m| serde_json::from_value(m.clone()).ok())
-            .unwrap_or_else(Vec::new);
-
-        let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-            .iter()
-            .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
-            .collect();
-
-        let all_adjustments = get_all_adjustments_from_json(&adjustments_clone, is_raw);
-        let lut_path = adjustments_clone["lutPath"].as_str();
-        let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
-
-        let final_image = process_and_get_dynamic_image(
-            &context,
-            &state,
-            &transformed_image,
-            unique_hash,
-            all_adjustments,
-            &mask_bitmaps,
-            lut,
-            "generate_fullscreen_preview",
-        )?;
-
-        let (width, height) = final_image.dimensions();
-        let rgb_pixels = final_image.to_rgb8().into_vec();
-
-        let bytes = Encoder::new(Preset::BaselineFastest)
-            .quality(92)
-            .encode_rgb(&rgb_pixels, width as u32, height as u32)
-            .map_err(|e| format!("Failed to encode fullscreen preview with mozjpeg-rs: {}", e))?;
-
-        Ok(Response::new(bytes))
-    })
-    .await
-    .map_err(|e| format!("Task failed: {}", e))?
 }
 
 fn calculate_resize_target(
@@ -2007,9 +1943,12 @@ async fn estimate_export_size(
 
     let new_transform_hash = calculate_transform_hash(&adjustments_clone);
     let cached_preview_lock = state.cached_preview.lock().unwrap();
+    
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
 
     let (preview_image, scale, unscaled_crop_offset) = if let Some(cached) = &*cached_preview_lock {
-        if cached.transform_hash == new_transform_hash {
+        if cached.transform_hash == new_transform_hash && cached.preview_dim == preview_dim {
             (
                 cached.image.clone(),
                 cached.scale,
@@ -2017,11 +1956,11 @@ async fn estimate_export_size(
             )
         } else {
             drop(cached_preview_lock);
-            generate_transformed_preview(&loaded_image, &adjustments_clone, &app_handle)?
+            generate_transformed_preview(&loaded_image, &adjustments_clone, preview_dim)?
         }
     } else {
         drop(cached_preview_lock);
-        generate_transformed_preview(&loaded_image, &adjustments_clone, &app_handle)?
+        generate_transformed_preview(&loaded_image, &adjustments_clone, preview_dim)?
     };
 
     let (img_w, img_h) = preview_image.dimensions();
@@ -3870,7 +3809,6 @@ fn main() {
             cancel_export,
             estimate_export_size,
             estimate_batch_export_size,
-            generate_fullscreen_preview,
             generate_preview_for_path,
             generate_original_transformed_preview,
             generate_preset_preview,

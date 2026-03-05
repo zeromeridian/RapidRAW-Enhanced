@@ -126,6 +126,7 @@ export interface AppSettings {
   decorations?: any;
   editorPreviewResolution?: number;
   enableZoomHifi?: boolean;
+  highResZoomMultiplier?: number;
   enableLivePreviews?: boolean;
   enableHighQualityLivePreviews?: boolean;
   enableAiTagging?: boolean;

@@ -659,7 +659,6 @@ const ImageCanvas = memo(
     const [straightenLine, setStraightenLine] = useState<any>(null);
     const isStraightening = useRef(false);
 
-    // Fade layer logic
     const [displayState, setDisplayState] = useState({
       base: finalPreviewUrl || selectedImage.thumbnailUrl,
       fade: null as string | null,
@@ -689,7 +688,7 @@ const ImageCanvas = memo(
           const timer = setTimeout(() => {
             setDisplayState({ base: newSrc, fade: null });
             setIsFadingIn(false);
-          }, 150); // 100ms transition + 50ms buffer
+          }, 150);
 
           return () => {
             cancelAnimationFrame(frame1);
@@ -1530,8 +1529,7 @@ const ImageCanvas = memo(
               cursor: effectiveCursor,
               left: `${imageRenderSize.offsetX}px`,
               opacity: isShowingOriginal ? 0 : 1,
-              transition: 'opacity 300ms ease-in-out',
-              pointerEvents: showOriginal ? 'none' : 'auto',
+              transition: 'opacity 150ms ease-in-out',
               position: 'absolute',
               top: `${imageRenderSize.offsetY}px`,
               zIndex: 4,
@@ -1540,7 +1538,7 @@ const ImageCanvas = memo(
             }}
             width={imageRenderSize.width}
           >
-            <Layer>
+            <Layer listening={!showOriginal}>
               {(isMasking || isAiEditing) &&
                 activeContainer &&
                 sortedSubMasks.map((subMask: SubMask) => (

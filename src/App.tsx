@@ -414,6 +414,8 @@ function App() {
   const { loading: isThumbnailsLoading } = useThumbnails(imageList, setThumbnails);
   const transformWrapperRef = useRef<any>(null);
   const isProgrammaticZoom = useRef(false);
+  const currentResRef = useRef<number>(1280);
+  const currentOriginalResRef = useRef<number>(0);
   const isInitialMount = useRef(true);
   const currentFolderPathRef = useRef<string>(currentFolderPath);
   const preloadedDataRef = useRef<{
@@ -566,39 +568,6 @@ function App() {
       debouncedSetHistory.cancel();
     }
   }, [canRedo, redoAdjustments, debouncedSetHistory]);
-
-  useEffect(() => {
-    setTransformedOriginalUrl(null);
-  }, [geometricAdjustmentsKey, selectedImage?.path]);
-
-  useEffect(() => {
-    let isEffectActive = true;
-
-    const generate = async () => {
-      if (showOriginal && selectedImage?.path && !transformedOriginalUrl) {
-        try {
-          const base64Data: string = await invoke('generate_original_transformed_preview', {
-            jsAdjustments: adjustments,
-          });
-          if (isEffectActive) {
-            setTransformedOriginalUrl(base64Data);
-          }
-        } catch (e) {
-          if (isEffectActive) {
-            console.error('Failed to generate original preview:', e);
-            setError('Failed to show original image.');
-            setShowOriginal(false);
-          }
-        }
-      }
-    };
-
-    generate();
-
-    return () => {
-      isEffectActive = false;
-    };
-  }, [showOriginal, selectedImage?.path, adjustments, transformedOriginalUrl]);
 
   useEffect(() => {
     if (currentFolderPath) {
@@ -1233,7 +1202,7 @@ function App() {
   }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchCriteria, appSettings]);
 
   const applyAdjustments = useCallback(
-    async (currentAdjustments: Adjustments, dragging: boolean = false) => {
+    async (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
       if (!selectedImage?.isReady) return;
       const currentPath = selectedImage.path;
 
@@ -1273,6 +1242,7 @@ function App() {
         const buffer: ArrayBuffer = await invoke(Invokes.ApplyAdjustments, {
           jsAdjustments: payload,
           isInteractive: dragging,
+          targetResolution: targetRes || null,
         });
 
         if (currentPath !== selectedImagePathRef.current) return;
@@ -1961,7 +1931,6 @@ function App() {
       setActiveAiPatchContainerId(null);
       setActiveAiSubMaskId(null);
       setIsWbPickerActive(false);
-      setIsHighResNeeded(false);
 
       if (transformWrapperRef.current) {
         transformWrapperRef.current.resetTransform(0);
@@ -1970,7 +1939,6 @@ function App() {
       setZoom(1);
       setIsLibraryExportPanelVisible(false);
 
-      fullResCacheKeyRef.current = null;
       setFinalPreviewUrl((prev) => {
         if (prev?.startsWith('blob:')) {
           setTimeout(() => URL.revokeObjectURL(prev), 250);
@@ -2342,83 +2310,115 @@ function App() {
     [copiedFilePaths, currentFolderPath, refreshImageList],
   );
 
-  const requestFullResolution = useCallback(
-    debounce((currentAdjustments: any, key: string) => {
-      if (!selectedImage?.path) return;
+  const calculateTargetRes = useCallback(() => {
+    const baseTargetRes = appSettings?.editorPreviewResolution || 1920;
+    if (!appSettings?.enableZoomHifi || displaySize.width === 0) {
+      return baseTargetRes;
+    }
 
-      const jobId = ++previewJobIdRef.current;
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const sharpnessFactor = 1.15;
+    const zoomMultiplier = appSettings?.highResZoomMultiplier || 1.0;
 
-      invoke<ArrayBuffer>(Invokes.GenerateFullscreenPreview, {
-        jsAdjustments: currentAdjustments,
-      })
-        .then((buffer) => {
-          if (jobId >= latestRenderedJobIdRef.current) {
-            latestRenderedJobIdRef.current = jobId;
-            const blob = new Blob([buffer], { type: 'image/jpeg' });
-            const url = URL.createObjectURL(blob);
+    let targetRes = Math.max(displaySize.width, displaySize.height) * dpr * sharpnessFactor * zoomMultiplier;
+    targetRes = Math.max(targetRes, 512);
 
-            setFinalPreviewUrl((prevUrl) => {
-              if (prevUrl && prevUrl.startsWith('blob:')) {
-                setTimeout(() => URL.revokeObjectURL(prevUrl), 250);
-              }
-              return url;
-            });
+    if (originalSize && originalSize.width > 0 && originalSize.height > 0) {
+      const origMax = Math.max(originalSize.width, originalSize.height);
+      targetRes = Math.min(targetRes, origMax);
+      if (targetRes >= origMax * 0.8) {
+        targetRes = origMax;
+      }
+    }
 
-            fullResCacheKeyRef.current = key;
-            setIsLoadingFullRes(false);
-          }
-        })
-        .catch((error: any) => {
-          if (jobId >= latestRenderedJobIdRef.current) {
-            console.error('Failed to generate high resolution preview:', error);
-            fullResCacheKeyRef.current = null;
-            setIsLoadingFullRes(false);
-          }
-        });
-    }, 100),
-    [selectedImage?.path],
+    if (originalSize && targetRes !== Math.max(originalSize.width, originalSize.height)) {
+      targetRes = Math.ceil(targetRes / 256) * 256;
+    }
+
+    return Math.round(targetRes);
+  }, [
+    appSettings?.enableZoomHifi,
+    appSettings?.editorPreviewResolution,
+    appSettings?.highResZoomMultiplier,
+    displaySize.width,
+    displaySize.height,
+    originalSize,
+  ]);
+
+  const requestHiFiZoom = useCallback(
+    debounce((currentAdjustments: Adjustments, targetRes: number) => {
+      if (targetRes > currentResRef.current) {
+        currentResRef.current = targetRes;
+        applyAdjustments(currentAdjustments, false, targetRes);
+      }
+    }, 200),
+    [applyAdjustments],
   );
 
   useEffect(() => {
-    if ((isFullScreen || isHighResNeeded) && selectedImage?.isReady) {
-      if (fullResCacheKeyRef.current !== visualAdjustmentsKey) {
-        setIsLoadingFullRes(true);
-        requestFullResolution(adjustments, visualAdjustmentsKey);
+    if (selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
+      let targetRes = calculateTargetRes();
+
+      if (isFullScreen && originalSize.width > 0 && originalSize.height > 0) {
+        targetRes = Math.max(originalSize.width, originalSize.height);
       }
-    } else if (!isFullScreen && !isHighResNeeded) {
-      if (requestFullResolution.cancel) {
-        requestFullResolution.cancel();
+
+      if (targetRes > currentResRef.current) {
+        requestHiFiZoom(adjustments, targetRes);
       }
-      setIsLoadingFullRes(false);
     }
-  }, [adjustments, isFullScreen, isHighResNeeded, selectedImage?.isReady, requestFullResolution, visualAdjustmentsKey]);
+    return () => {
+      requestHiFiZoom.cancel();
+    };
+  }, [
+    displaySize.width,
+    displaySize.height,
+    calculateTargetRes,
+    selectedImage?.isReady,
+    isSliderDragging,
+    adjustments,
+    requestHiFiZoom,
+    isFullScreen,
+    originalSize,
+  ]);
 
-  const handleFullResolutionLogic = useCallback(
-    (targetZoomPercent: number) => {
-      if (appSettings?.enableZoomHifi === false) {
-        return;
+  useEffect(() => {
+    if (!selectedImage?.isReady) return;
+
+    if (dragIdleTimer.current) {
+      clearTimeout(dragIdleTimer.current);
+    }
+
+    const targetRes = calculateTargetRes();
+
+    if (isSliderDragging) {
+      if (appSettings?.enableLivePreviews !== false) {
+        applyAdjustments(adjustments, true, targetRes);
       }
 
-      if (!initialFitScale) {
-        return;
-      }
+      dragIdleTimer.current = setTimeout(() => {
+        currentResRef.current = targetRes;
+        applyAdjustments(adjustments, false, targetRes);
+      }, 150);
+    } else {
+      currentResRef.current = targetRes;
+      applyAdjustments(adjustments, false, targetRes);
+      debouncedSave(selectedImage.path, adjustments);
+    }
 
-      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-      const physicalZoomPercent = targetZoomPercent * dpr;
-
-      const highResThreshold = Math.max(initialFitScale * 1.5, 0.5);
-      const needsFullRes = physicalZoomPercent > highResThreshold;
-
-      const previewIsAlreadyFullRes = previewSize.width >= originalSize.width;
-
-      if (needsFullRes && !previewIsAlreadyFullRes) {
-        setIsHighResNeeded(true);
-      } else {
-        setIsHighResNeeded(false);
-      }
-    },
-    [initialFitScale, previewSize.width, originalSize.width, appSettings],
-  );
+    return () => {
+      if (dragIdleTimer.current) clearTimeout(dragIdleTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    adjustments,
+    selectedImage?.path,
+    selectedImage?.isReady,
+    isSliderDragging,
+    applyAdjustments,
+    debouncedSave,
+    appSettings?.enableLivePreviews,
+  ]);
 
   const handleZoomChange = useCallback(
     (zoomValue: number, fitToWindow: boolean = false) => {
@@ -2470,31 +2470,101 @@ function App() {
       }
       isProgrammaticZoom.current = true;
       setZoom(transformZoom);
-      handleFullResolutionLogic(targetZoomPercent);
     },
-    [originalSize, baseRenderSize, handleFullResolutionLogic, adjustments.orientationSteps],
+    [originalSize, baseRenderSize, adjustments.orientationSteps],
   );
 
-  const handleUserTransform = useCallback(
-    (transformState: TransformState) => {
-      if (isProgrammaticZoom.current) {
-        isProgrammaticZoom.current = false;
-        return;
+  const handleUserTransform = useCallback((transformState: TransformState) => {
+    if (isProgrammaticZoom.current) {
+      isProgrammaticZoom.current = false;
+      return;
+    }
+    setZoom(transformState.scale);
+  }, []);
+
+  useEffect(() => {
+    setTransformedOriginalUrl(null);
+    currentOriginalResRef.current = 0;
+  }, [geometricAdjustmentsKey, selectedImage?.path]);
+
+  const requestHiFiOriginalZoom = useCallback(
+    debounce(async (currentAdjustments: Adjustments, targetRes: number) => {
+      if (targetRes > currentOriginalResRef.current) {
+        try {
+          const base64Data: string = await invoke('generate_original_transformed_preview', {
+            jsAdjustments: currentAdjustments,
+            targetResolution: targetRes,
+          });
+          currentOriginalResRef.current = targetRes;
+          setTransformedOriginalUrl(base64Data);
+        } catch (e) {
+          console.error('Failed to generate hi-fi original preview:', e);
+        }
       }
-
-      setZoom(transformState.scale);
-
-      if (originalSize.width > 0 && baseRenderSize.width > 0) {
-        const orientationSteps = adjustments.orientationSteps || 0;
-        const isSwapped = orientationSteps === 1 || orientationSteps === 3;
-        const effectiveOriginalWidth = isSwapped ? originalSize.height : originalSize.width;
-
-        const targetZoomPercent = (baseRenderSize.width * transformState.scale) / effectiveOriginalWidth;
-        handleFullResolutionLogic(targetZoomPercent);
-      }
-    },
-    [originalSize, baseRenderSize, handleFullResolutionLogic, adjustments.orientationSteps],
+    }, 200),
+    [],
   );
+
+  useEffect(() => {
+    if (showOriginal && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
+      let targetRes = calculateTargetRes();
+
+      if (isFullScreen && originalSize.width > 0 && originalSize.height > 0) {
+        targetRes = Math.max(originalSize.width, originalSize.height);
+      }
+
+      if (targetRes > currentOriginalResRef.current) {
+        requestHiFiOriginalZoom(adjustments, targetRes);
+      }
+    }
+    return () => {
+      requestHiFiOriginalZoom.cancel();
+    };
+  }, [
+    showOriginal,
+    displaySize.width,
+    displaySize.height,
+    calculateTargetRes,
+    selectedImage?.isReady,
+    isSliderDragging,
+    adjustments,
+    requestHiFiOriginalZoom,
+    isFullScreen,
+    originalSize,
+  ]);
+
+  useEffect(() => {
+    let isEffectActive = true;
+
+    const generate = async () => {
+      if (showOriginal && selectedImage?.path && !transformedOriginalUrl) {
+        try {
+          const targetRes = calculateTargetRes();
+
+          const base64Data: string = await invoke('generate_original_transformed_preview', {
+            jsAdjustments: adjustments,
+            targetResolution: targetRes,
+          });
+          if (isEffectActive) {
+            currentOriginalResRef.current = targetRes;
+            setTransformedOriginalUrl(base64Data);
+          }
+        } catch (e) {
+          if (isEffectActive) {
+            console.error('Failed to generate original preview:', e);
+            setError('Failed to show original image.');
+            setShowOriginal(false);
+          }
+        }
+      }
+    };
+
+    generate();
+
+    return () => {
+      isEffectActive = false;
+    };
+  }, [showOriginal, selectedImage?.path, adjustments, transformedOriginalUrl, calculateTargetRes]);
 
   const isAnyModalOpen =
     isCreateFolderModalOpen ||
@@ -2992,39 +3062,6 @@ function App() {
       throw err;
     }
   };
-
-  useEffect(() => {
-    if (!selectedImage?.isReady) return;
-
-    if (dragIdleTimer.current) {
-      clearTimeout(dragIdleTimer.current);
-    }
-
-    if (isSliderDragging) {
-      if (appSettings?.enableLivePreviews !== false) {
-        applyAdjustments(adjustments, true);
-      }
-
-      dragIdleTimer.current = setTimeout(() => {
-        applyAdjustments(adjustments, false);
-      }, 150);
-    } else {
-      applyAdjustments(adjustments, false);
-      debouncedSave(selectedImage.path, adjustments);
-    }
-
-    return () => {
-      if (dragIdleTimer.current) clearTimeout(dragIdleTimer.current);
-    };
-  }, [
-    adjustments,
-    selectedImage?.path,
-    selectedImage?.isReady,
-    isSliderDragging,
-    applyAdjustments,
-    debouncedSave,
-    appSettings?.enableLivePreviews,
-  ]);
 
   const handleOpenFolder = async () => {
     try {
