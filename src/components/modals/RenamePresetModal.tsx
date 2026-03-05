@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import Text from '../ui/Text';
+import { TextVariants } from '../../types/typography';
 
 interface RenamePresetProps {
   currentName: string | undefined;
@@ -70,7 +72,9 @@ export default function RenamePresetModal({ isOpen, onClose, onSave, currentName
         `}
         onClick={(e: any) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-semibold text-text-primary mb-4">Rename Preset</h3>
+        <Text variant={TextVariants.title} className="mb-4">
+          Rename Preset
+        </Text>
         <input
           autoFocus
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"

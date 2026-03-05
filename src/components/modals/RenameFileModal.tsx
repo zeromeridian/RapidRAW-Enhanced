@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { FILENAME_VARIABLES } from '../ui/ExportImportProperties';
+import Text from '../ui/Text';
+import { TextVariants } from '../../types/typography';
 
 interface RenameFileModalProps {
   filesToRename: Array<string>;
@@ -101,15 +103,15 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
         onClick={(e: any) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        <h3 className="text-lg font-semibold text-text-primary mb-6">
+        <Text variant={TextVariants.title} className="mb-6">
           {isSingleFile ? 'Rename Image' : `Rename ${fileCount} Images`}
-        </h3>
+        </Text>
 
-        <div className="space-y-6 text-sm">
+        <div className="space-y-8 text-sm">
           <div>
-            <label className="font-semibold text-text-primary block mb-2">
+            <Text variant={TextVariants.heading} className="block mb-2">
               {isSingleFile ? 'New Name' : 'File Naming Template'}
-            </label>
+            </Text>
             <input
               autoFocus
               className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
