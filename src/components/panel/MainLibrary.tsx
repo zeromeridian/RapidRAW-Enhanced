@@ -1021,7 +1021,13 @@ const Row = ({
 }: any) => {
 
   const row = rows[index];
-  const top = parseFloat(style.top) + outerPadding;
+  const shiftedStyle = {
+    ...style,
+    transform: (style.transform as string).replace(
+      /translateY\(([^)]+)\)/,
+      (_: string, y: string) => `translateY(${parseFloat(y) + outerPadding}px)`,
+    ),
+  };
 
   if (row.type === 'header') {
     let displayPath = row.path;
@@ -1036,10 +1042,9 @@ const Row = ({
     return (
       <div
         style={{
-          ...style,
-          top,
+          ...shiftedStyle,
           left: 0,
-          width: style.width,
+          width: '100%',
           paddingLeft: outerPadding,
           paddingRight: outerPadding,
           boxSizing: 'border-box',
@@ -1060,10 +1065,10 @@ const Row = ({
   return (
     <div
       style={{
-        ...style,
-        top,
-        left: style.left + outerPadding,
-        width: style.width - outerPadding * 2,
+        ...shiftedStyle,
+        left: outerPadding,
+        right: outerPadding,
+        width: 'auto',
         display: 'flex',
         gap: gap,
       }}
