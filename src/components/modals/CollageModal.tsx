@@ -594,10 +594,10 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   }, [panningImage, thumbnailDrag, activeLayout, previewSize, spacing, loadedImages, imageStates, hoveredCellIndex]);
 
   const renderControls = () => (
-    <div className="w-80 flex-shrink-0 bg-bg-secondary p-4 flex flex-col gap-6 overflow-y-auto border-l border-surface h-full">
+    <div className="w-80 flex-shrink-0 bg-bg-secondary p-4 flex flex-col gap-8 overflow-y-auto border-l border-surface h-full">
       {loadedImages.length > 1 && (
         <div>
-          <Text variant={TextVariants.heading} className="mb-3 flex items-center justify-between">
+          <Text variant={TextVariants.heading} className="mb-2 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <LayoutTemplate size={16} /> Layout
             </span>
@@ -631,7 +631,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       )}
 
       <div>
-        <Text variant={TextVariants.heading} className="mb-3 flex items-center justify-between">
+        <Text variant={TextVariants.heading} className="mb-2 flex items-center justify-between">
           <span className="flex items-center gap-2">
             <Crop size={16} /> Aspect Ratio
           </span>
@@ -690,8 +690,6 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
           value={spacing}
           onChange={(e) => setSpacing(Number(e.target.value))}
         />
-      </div>
-      <div className="space-y-2">
         <Slider
           label="Border Radius"
           min={0}
@@ -704,7 +702,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       </div>
 
       <div>
-        <Text variant={TextVariants.heading} className="mb-3 flex items-center gap-2">
+        <Text variant={TextVariants.heading} className="mb-2 flex items-center gap-2">
           <Palette size={16} /> Background
         </Text>
         <div className="flex items-center gap-2 bg-surface p-2 rounded-md">
@@ -724,7 +722,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       </div>
 
       <div>
-        <Text variant={TextVariants.heading} className="mb-3 flex items-center gap-2">
+        <Text variant={TextVariants.heading} className="mb-2 flex items-center gap-2">
           <Proportions size={16} /> Export Size (px)
         </Text>
         <div className="flex items-center gap-2">

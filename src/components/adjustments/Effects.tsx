@@ -45,8 +45,8 @@ export default function EffectsPanel({
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
 
   return (
-    <div>
-      <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
+    <div className="space-y-4">
+      <div className="p-2 bg-bg-tertiary rounded-md">
         <Text variant={TextVariants.heading} className="mb-2">
           Creative
         </Text>
@@ -83,8 +83,8 @@ export default function EffectsPanel({
       </div>
 
       {!isForMask && (
-        <>
-          <div className="my-4 p-2 bg-bg-tertiary rounded-md">
+        <div className="space-y-4">
+          <div className="p-2 bg-bg-tertiary rounded-md">
             <Text variant={TextVariants.heading} className="mb-2">
               LUT
             </Text>
@@ -99,7 +99,7 @@ export default function EffectsPanel({
           </div>
 
           {adjustmentVisibility.vignette !== false && (
-            <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
+            <div className="p-2 bg-bg-tertiary rounded-md">
               <Text variant={TextVariants.heading} className="mb-2">
                 Vignette
               </Text>
@@ -180,7 +180,7 @@ export default function EffectsPanel({
               />
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

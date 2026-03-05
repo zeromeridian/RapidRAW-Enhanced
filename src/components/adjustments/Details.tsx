@@ -27,9 +27,9 @@ export default function DetailsPanel({
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
 
   return (
-    <div>
+    <div className="space-y-4">
       {adjustmentVisibility.sharpening !== false && (
-        <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
+        <div className="p-2 bg-bg-tertiary rounded-md">
           <Text variant={TextVariants.heading} className="mb-2">
             Sharpening
           </Text>
@@ -116,7 +116,7 @@ export default function DetailsPanel({
       */}
 
       {adjustmentVisibility.chromaticAberration !== false && (
-        <div className="mt-4 p-2 bg-bg-tertiary rounded-md">
+        <div className="p-2 bg-bg-tertiary rounded-md">
           <Text variant={TextVariants.heading} className="mb-2">
             Chromatic Aberration
           </Text>

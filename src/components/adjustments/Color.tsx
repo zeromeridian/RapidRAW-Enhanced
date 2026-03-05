@@ -323,8 +323,8 @@ export default function ColorPanel({
   const currentHsl = adjustments?.hsl?.[activeColor] || { hue: 0, saturation: 0, luminance: 0 };
 
   return (
-    <div>
-      <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
+    <div className="space-y-4">
+      <div className="p-2 bg-bg-tertiary rounded-md">
         <div className="flex justify-between items-center mb-2">
           <Text variant={TextVariants.heading}>White Balance</Text>
           {!isForMask && toggleWbPicker && (
@@ -359,7 +359,7 @@ export default function ColorPanel({
         />
       </div>
 
-      <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
+      <div className="p-2 bg-bg-tertiary rounded-md">
         <Text variant={TextVariants.heading} className="mb-2">
           Presence
         </Text>
@@ -383,7 +383,7 @@ export default function ColorPanel({
         />
       </div>
 
-      <div className="p-2 bg-bg-tertiary rounded-md mt-4">
+      <div className="p-2 bg-bg-tertiary rounded-md">
         <Text variant={TextVariants.heading} className="mb-3">
           Color Grading
         </Text>
@@ -395,7 +395,7 @@ export default function ColorPanel({
         />
       </div>
 
-      <div className="p-2 bg-bg-tertiary rounded-md mt-4">
+      <div className="p-2 bg-bg-tertiary rounded-md">
         <Text variant={TextVariants.heading} className="mb-3">
           Color Mixer
         </Text>
