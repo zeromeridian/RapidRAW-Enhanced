@@ -25,8 +25,6 @@ struct Bm3dParams {
     sigma: f32,
     hard_th_lambda: f32,
     max_dist_hard: f32,
-    /// Multiplier applied to sigma for chrominance channels (Cb, Cr) in CBM3D mode.
-    /// Set to 1.0 for standard BM3D (all channels equal).
     chroma_sigma_scale: f32,
 }
 
@@ -37,17 +35,11 @@ impl Bm3dParams {
             sigma: val * 80.0,
             hard_th_lambda: 2.0 + (val * 2.5),
             max_dist_hard: 3000.0 + (val * 20000.0),
-            // Chroma channels (Cb, Cr) receive 1.8x stronger smoothing than luma (Y),
-            // suppressing the coarse colour blobs typical of small-sensor chroma noise
-            // without eroding luminance micro-detail.
             chroma_sigma_scale: 1.8,
         }
     }
 }
 
-/// Convert planar RGB channels (0-255 range) to YCbCr using ITU-R BT.601 coefficients.
-/// Y  carries luminance; Cb and Cr carry blue-difference and red-difference chrominance.
-/// Cb/Cr are offset by 128 so they sit in the same 0-255 range as Y.
 fn rgb_to_ycbcr(r: &[f32], g: &[f32], b: &[f32]) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
     let n = r.len();
     let mut y  = vec![0.0f32; n];
@@ -62,7 +54,6 @@ fn rgb_to_ycbcr(r: &[f32], g: &[f32], b: &[f32]) -> (Vec<f32>, Vec<f32>, Vec<f32
     (y, cb, cr)
 }
 
-/// Inverse of `rgb_to_ycbcr`. Converts Y, Cb, Cr (all 0-255, Cb/Cr offset by 128) back to RGB.
 fn ycbcr_to_rgb(y: &[f32], cb: &[f32], cr: &[f32]) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
     let n = y.len();
     let mut r = vec![0.0f32; n];
@@ -120,11 +111,8 @@ pub fn denoise_image(
     let params = Bm3dParams::from_intensity(intensity);
     let dct_tables = Arc::new(DctTables::new());
 
-    // Convert to YCbCr so the denoiser applies stronger smoothing to the
-    // chrominance channels (Cb, Cr) independently of luminance (Y).
     let rgb_channels = split_channels(&rgb_img_for_denoiser);
     let (y, cb, cr) = rgb_to_ycbcr(&rgb_channels[0], &rgb_channels[1], &rgb_channels[2]);
-    // Save original luma before denoising for frequency blending below.
     let original_y = y.clone();
     let channels = vec![y, cb, cr];
 
@@ -146,13 +134,6 @@ pub fn denoise_image(
         &app_handle,
     );
 
-    // Frequency blending: restore high-frequency luma detail from the original.
-    // A Gaussian blur of the original isolates its low-frequency content; the
-    // residual (original − blur) is fine texture plus noise.  Adding a fraction
-    // of this residual back to the denoised luma recovers bark, hair, and similar
-    // micro-detail that BM3D tends to smooth away, at the cost of reintroducing a
-    // small amount of the original noise.  The strength scales with intensity so
-    // that more aggressive denoising gets proportionally more detail restored.
     {
         let _ = app_handle.emit("denoise-progress", "Blending detail...");
         let blurred_y = gaussian_blur_1ch(&original_y, width as usize, height as usize, 3.0);
@@ -164,7 +145,6 @@ pub fn denoise_image(
         }
     }
 
-    // Convert denoised YCbCr back to RGB before building the output image.
     let (r, g, b) = ycbcr_to_rgb(&denoised_channels[0], &denoised_channels[1], &denoised_channels[2]);
 
     let _ = app_handle.emit("denoise-progress", "Finalizing data...");
