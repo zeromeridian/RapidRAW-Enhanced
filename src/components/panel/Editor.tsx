@@ -28,6 +28,7 @@ interface EditorProps {
   finalPreviewUrl: string | null;
   isFullScreen: boolean;
   isLoading: boolean;
+  isSliderDragging: boolean;
   isMaskControlHovered: boolean;
   isStraightenActive: boolean;
   isRotationActive?: boolean;
@@ -83,6 +84,7 @@ export default function Editor({
   finalPreviewUrl,
   isFullScreen,
   isLoading,
+  isSliderDragging,
   isMaskControlHovered,
   isStraightenActive,
   isRotationActive,
@@ -748,6 +750,7 @@ export default function Editor({
               isMasking={isMasking}
               isStraightenActive={isStraightenActive}
               isRotationActive={isRotationActive}
+              isSliderDragging={isSliderDragging}
               maskOverlayUrl={maskOverlayUrl}
               onGenerateAiMask={onGenerateAiMask}
               onLiveMaskPreview={handleLiveMaskPreview}

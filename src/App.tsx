@@ -1283,7 +1283,9 @@ function App() {
           const url = URL.createObjectURL(blob);
 
           setFinalPreviewUrl((prevUrl) => {
-            if (prevUrl && prevUrl.startsWith('blob:')) URL.revokeObjectURL(prevUrl);
+            if (prevUrl && prevUrl.startsWith('blob:')) {
+              setTimeout(() => URL.revokeObjectURL(prevUrl), 250);
+            }
             return url;
           });
         }
@@ -1970,7 +1972,9 @@ function App() {
 
       fullResCacheKeyRef.current = null;
       setFinalPreviewUrl((prev) => {
-        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+        if (prev?.startsWith('blob:')) {
+          setTimeout(() => URL.revokeObjectURL(prev), 250);
+        }
         return null;
       });
     },
@@ -2354,7 +2358,9 @@ function App() {
             const url = URL.createObjectURL(blob);
 
             setFinalPreviewUrl((prevUrl) => {
-              if (prevUrl && prevUrl.startsWith('blob:')) URL.revokeObjectURL(prevUrl);
+              if (prevUrl && prevUrl.startsWith('blob:')) {
+                setTimeout(() => URL.revokeObjectURL(prevUrl), 250);
+              }
               return url;
             });
 
@@ -4462,6 +4468,7 @@ function App() {
               finalPreviewUrl={finalPreviewUrl}
               isFullScreen={isFullScreen}
               isLoading={isViewLoading}
+              isSliderDragging={isSliderDragging}
               isMaskControlHovered={isMaskControlHovered}
               isStraightenActive={isStraightenActive}
               isWaveformVisible={isWaveformVisible}

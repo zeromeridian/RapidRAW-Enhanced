@@ -38,6 +38,7 @@ interface ImageCanvasProps {
   isCropping: boolean;
   isMaskControlHovered: boolean;
   isMasking: boolean;
+  isSliderDragging: boolean;
   isStraightenActive: boolean;
   isRotationActive?: boolean;
   maskOverlayUrl: string | null;
@@ -619,6 +620,7 @@ const ImageCanvas = memo(
     isCropping,
     isMaskControlHovered,
     isMasking,
+    isSliderDragging,
     isStraightenActive,
     isRotationActive,
     maskOverlayUrl,
@@ -656,6 +658,50 @@ const ImageCanvas = memo(
     const [cursorPreview, setCursorPreview] = useState<CursorPreview>({ x: 0, y: 0, visible: false });
     const [straightenLine, setStraightenLine] = useState<any>(null);
     const isStraightening = useRef(false);
+
+    // Fade layer logic
+    const [displayState, setDisplayState] = useState({
+      base: finalPreviewUrl || selectedImage.thumbnailUrl,
+      fade: null as string | null,
+    });
+    const [isFadingIn, setIsFadingIn] = useState(false);
+
+    useEffect(() => {
+      const newSrc = finalPreviewUrl || selectedImage.thumbnailUrl;
+
+      if (isSliderDragging) {
+        setDisplayState({ base: newSrc, fade: null });
+        setIsFadingIn(false);
+      } else {
+        if (displayState.base !== newSrc && displayState.base) {
+          setDisplayState((prev) => ({ base: prev.base, fade: newSrc }));
+          setIsFadingIn(false);
+
+          let frame1: number;
+          let frame2: number;
+
+          frame1 = requestAnimationFrame(() => {
+            frame2 = requestAnimationFrame(() => {
+              setIsFadingIn(true);
+            });
+          });
+
+          const timer = setTimeout(() => {
+            setDisplayState({ base: newSrc, fade: null });
+            setIsFadingIn(false);
+          }, 150); // 100ms transition + 50ms buffer
+
+          return () => {
+            cancelAnimationFrame(frame1);
+            cancelAnimationFrame(frame2);
+            clearTimeout(timer);
+          };
+        } else {
+          setDisplayState({ base: newSrc, fade: null });
+          setIsFadingIn(false);
+        }
+      }
+    }, [finalPreviewUrl, selectedImage.thumbnailUrl, isSliderDragging]);
 
     const activeContainer = useMemo(() => {
       if (isMasking) {
@@ -1259,7 +1305,6 @@ const ImageCanvas = memo(
     };
 
     const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.thumbnailUrl;
-    const editedSrc = finalPreviewUrl || selectedImage.thumbnailUrl;
     const originalSrc = transformedOriginalUrl;
     const isShowingOriginal = showOriginal && !!originalSrc;
 
@@ -1365,15 +1410,15 @@ const ImageCanvas = memo(
             }}
           >
             <div className="absolute inset-0 w-full h-full">
-              {editedSrc && (
+              {displayState.base && (
                 <img
-                  alt="Edited"
+                  alt="Edited Base"
                   className={
                     imageRenderSize.width > 0 && imageRenderSize.height > 0
                       ? 'pointer-events-none'
                       : 'absolute inset-0 w-full h-full object-contain pointer-events-none'
                   }
-                  src={editedSrc}
+                  src={displayState.base}
                   style={
                     imageRenderSize.width > 0 && imageRenderSize.height > 0
                       ? {
@@ -1386,6 +1431,38 @@ const ImageCanvas = memo(
                         }
                       : {
                           imageRendering: isMaxZoom ? 'pixelated' : 'auto',
+                        }
+                  }
+                />
+              )}
+
+              {displayState.fade && (
+                <img
+                  alt="Edited Fade"
+                  className={
+                    imageRenderSize.width > 0 && imageRenderSize.height > 0
+                      ? 'pointer-events-none'
+                      : 'absolute inset-0 w-full h-full object-contain pointer-events-none'
+                  }
+                  src={displayState.fade}
+                  style={
+                    imageRenderSize.width > 0 && imageRenderSize.height > 0
+                      ? {
+                          position: 'absolute',
+                          left: `${imageRenderSize.offsetX}px`,
+                          top: `${imageRenderSize.offsetY}px`,
+                          width: `${imageRenderSize.width}px`,
+                          height: `${imageRenderSize.height}px`,
+                          imageRendering: isMaxZoom ? 'pixelated' : 'auto',
+                          opacity: isFadingIn ? 1 : 0,
+                          transition: 'opacity 150ms ease-in-out',
+                          zIndex: 1,
+                        }
+                      : {
+                          imageRendering: isMaxZoom ? 'pixelated' : 'auto',
+                          opacity: isFadingIn ? 1 : 0,
+                          transition: 'opacity 150ms ease-in-out',
+                          zIndex: 1,
                         }
                   }
                 />
