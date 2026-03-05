@@ -1165,30 +1165,81 @@ export default function SettingsPanel({
                 className="space-y-10"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">Processing Engine</h2>
-                  <div className="space-y-6">
-                    <SettingItem
-                      description="Higher resolutions provide a sharper preview but may impact performance on less powerful systems."
-                      label="Preview Resolution"
-                    >
-                      <Dropdown
-                        onChange={(value: any) => handleProcessingSettingChange('editorPreviewResolution', value)}
-                        options={resolutions}
-                        value={processingSettings.editorPreviewResolution}
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                    Processing Engine
+                  </Text>
+                  <div className="space-y-8">
+                    <div>
+                      <Text variant={TextVariants.heading} className="mb-2">
+                        Preview Rendering Strategy
+                      </Text>
+                      <PreviewModeSwitch
+                        mode={appSettings?.enableZoomHifi ? 'dynamic' : 'static'}
+                        onModeChange={handlePreviewModeChange}
                       />
-                    </SettingItem>
 
-                    <SettingItem
-                      label="High Quality Zoom"
-                      description="Load a higher quality version of the image when zooming in for more detail. Disabling this can improve performance."
-                    >
-                      <Switch
-                        checked={appSettings?.enableZoomHifi ?? true}
-                        id="zoom-hifi-toggle"
-                        label="Enable High Quality Zoom"
-                        onChange={(checked) => onSettingsChange({ ...appSettings, enableZoomHifi: checked })}
-                      />
-                    </SettingItem>
+                      <div className="mt-2">
+                        <AnimatePresence mode="wait">
+                          {!(appSettings?.enableZoomHifi ?? false) ? (
+                            <motion.div
+                              key="static-preview"
+                              initial={{ opacity: 0, x: 10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -10 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <Text variant={TextVariants.small} className="mb-3">
+                                The editor renders the image at a fixed resolution. This mode is the fastest and most
+                                consistent, making it ideal for lower-end hardware where smooth performance is
+                                prioritized over pixel-perfect zoom.
+                              </Text>
+                              <div className="pl-4 border-l-2 border-border-color ml-1">
+                                <SettingItem
+                                  description="Determines the maximum resolution of the preview. Lower values significantly improve performance."
+                                  label="Preview Resolution"
+                                >
+                                  <Dropdown
+                                    onChange={(value: any) =>
+                                      handleProcessingSettingChange('editorPreviewResolution', value)
+                                    }
+                                    options={resolutions}
+                                    value={processingSettings.editorPreviewResolution}
+                                  />
+                                </SettingItem>
+                              </div>
+                            </motion.div>
+                          ) : (
+                            <motion.div
+                              key="dynamic-preview"
+                              initial={{ opacity: 0, x: 10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -10 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <Text variant={TextVariants.small} className="mb-4">
+                                The editor renders the preview to match your display's actual pixel density. This
+                                ensures that every detail is represented with 1:1 pixel accuracy, providing maximum
+                                clarity when zooming and checking focus.
+                              </Text>
+                              <div className="pl-4 border-l-2 border-border-color ml-1">
+                                <SettingItem
+                                  label="Render Resolution Scale"
+                                  description="Controls the pixel density of the zoomed render. A lower value tells the editor to render as if your screen has a lower resolution, dramatically improving performance on 4K/Retina displays."
+                                >
+                                  <Dropdown
+                                    onChange={(value: any) =>
+                                      handleProcessingSettingChange('highResZoomMultiplier', value)
+                                    }
+                                    options={zoomMultiplierOptions}
+                                    value={processingSettings.highResZoomMultiplier}
+                                  />
+                                </SettingItem>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
 
                     <div className="space-y-4">
                       <SettingItem
