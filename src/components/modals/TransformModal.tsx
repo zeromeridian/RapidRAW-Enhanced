@@ -7,6 +7,8 @@ import Slider from '../ui/Slider';
 import throttle from 'lodash.throttle';
 import { Adjustments } from '../../utils/adjustments';
 import clsx from 'clsx';
+import Text from '../ui/Text';
+import { TextColors, TextVariants } from '../../types/typography';
 
 interface GeometryParams {
   distortion: number;
@@ -324,7 +326,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
   const renderControls = () => (
     <div className="w-80 flex-shrink-0 bg-bg-secondary flex flex-col border-l border-surface h-full z-10">
       <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
-        <h2 className="text-xl font-bold text-primary text-shadow-shiny">Transform</h2>
+        <Text variant={TextVariants.title}>Transform</Text>
         <button
           onClick={handleReset}
           data-tooltip="Reset Transform"
@@ -334,105 +336,122 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         </button>
       </div>
 
-      <div
-        className="flex-grow overflow-y-auto p-4 flex flex-col gap-6 text-text-secondary"
-        onPointerDownCapture={handleInteractionStart}
-      >
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-text-primary">Distortion</p>
-          <Slider
-            label="Amount"
-            value={params.distortion}
-            min={-100}
-            max={100}
-            defaultValue={0}
-            onChange={(e) => handleChange('distortion', Number(e.target.value))}
-          />
+      <div className="flex-grow overflow-y-auto p-4 flex flex-col gap-8" onPointerDownCapture={handleInteractionStart}>
+        <div>
+          <Text variant={TextVariants.heading} className="mb-2">
+            Distortion
+          </Text>
+          <div className="space-y-3">
+            <Slider
+              label="Amount"
+              value={params.distortion}
+              min={-100}
+              max={100}
+              defaultValue={0}
+              onChange={(e) => handleChange('distortion', Number(e.target.value))}
+            />
+          </div>
         </div>
 
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-text-primary">Perspective</p>
-          <Slider
-            label="Vertical"
-            value={params.vertical}
-            min={-100}
-            max={100}
-            defaultValue={0}
-            step={1}
-            onChange={(e) => handleChange('vertical', Number(e.target.value))}
-          />
-          <Slider
-            label="Horizontal"
-            value={params.horizontal}
-            min={-100}
-            max={100}
-            defaultValue={0}
-            step={1}
-            onChange={(e) => handleChange('horizontal', Number(e.target.value))}
-          />
+        <div>
+          <Text variant={TextVariants.heading} className="mb-2">
+            Perspective
+          </Text>
+          <div className="space-y-3">
+            <Slider
+              label="Vertical"
+              value={params.vertical}
+              min={-100}
+              max={100}
+              defaultValue={0}
+              step={1}
+              onChange={(e) => handleChange('vertical', Number(e.target.value))}
+            />
+            <Slider
+              label="Horizontal"
+              value={params.horizontal}
+              min={-100}
+              max={100}
+              defaultValue={0}
+              step={1}
+              onChange={(e) => handleChange('horizontal', Number(e.target.value))}
+            />
+          </div>
         </div>
 
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-text-primary">Transform</p>
-          <Slider
-            label="Rotate"
-            value={params.rotate}
-            min={-45}
-            max={45}
-            step={0.1}
-            defaultValue={0}
-            onChange={(e) => handleChange('rotate', Number(e.target.value))}
-          />
-          <Slider
-            label="Aspect"
-            value={params.aspect}
-            min={-100}
-            max={100}
-            defaultValue={0}
-            step={1}
-            onChange={(e) => handleChange('aspect', Number(e.target.value))}
-          />
-          <Slider
-            label="Scale"
-            value={params.scale}
-            min={50}
-            max={150}
-            defaultValue={100}
-            step={1}
-            onChange={(e) => handleChange('scale', Number(e.target.value))}
-          />
+        <div>
+          <Text variant={TextVariants.heading} className="mb-2">
+            Transform
+          </Text>
+          <div className="space-y-3">
+            <Slider
+              label="Rotate"
+              value={params.rotate}
+              min={-45}
+              max={45}
+              step={0.1}
+              defaultValue={0}
+              onChange={(e) => handleChange('rotate', Number(e.target.value))}
+            />
+            <Slider
+              label="Aspect"
+              value={params.aspect}
+              min={-100}
+              max={100}
+              defaultValue={0}
+              step={1}
+              onChange={(e) => handleChange('aspect', Number(e.target.value))}
+            />
+            <Slider
+              label="Scale"
+              value={params.scale}
+              min={50}
+              max={150}
+              defaultValue={100}
+              step={1}
+              onChange={(e) => handleChange('scale', Number(e.target.value))}
+            />
+          </div>
         </div>
 
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-text-primary">Offset</p>
-          <Slider
-            label="X Axis"
-            value={params.x_offset}
-            min={-100}
-            max={100}
-            defaultValue={0}
-            step={1}
-            onChange={(e) => handleChange('x_offset', Number(e.target.value))}
-          />
-          <Slider
-            label="Y Axis"
-            value={params.y_offset}
-            min={-100}
-            max={100}
-            defaultValue={0}
-            step={1}
-            onChange={(e) => handleChange('y_offset', Number(e.target.value))}
-          />
+        <div>
+          <Text variant={TextVariants.heading} className="mb-2">
+            Offset
+          </Text>
+          <div className="space-y-3">
+            <Slider
+              label="X Axis"
+              value={params.x_offset}
+              min={-100}
+              max={100}
+              defaultValue={0}
+              step={1}
+              onChange={(e) => handleChange('x_offset', Number(e.target.value))}
+            />
+            <Slider
+              label="Y Axis"
+              value={params.y_offset}
+              min={-100}
+              max={100}
+              defaultValue={0}
+              step={1}
+              onChange={(e) => handleChange('y_offset', Number(e.target.value))}
+            />
+          </div>
         </div>
 
-        <div className="mt-auto pt-4">
+        <div className="mt-auto">
           {currentAdjustments.masks && currentAdjustments.masks.length > 0 && (
-            <div className="p-3 bg-surface rounded-md border border-surface flex items-center gap-3">
-              <Info size={16} className="text-text-secondary flex-shrink-0" />
-              <p className="text-xs text-text-secondary leading-relaxed">
+            <Text
+              as="div"
+              variant={TextVariants.small}
+              className="p-3 bg-surface rounded-md border border-surface flex items-center gap-3"
+            >
+              <Info size={16} className="flex-shrink-0" />
+              <p className="leading-relaxed">
                 Transforming updates base geometry. Existing masks may shift, and AI masks must be regenerated.
               </p>
-            </div>
+            </Text>
           )}
         </div>
       </div>
@@ -484,9 +503,14 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
                   )}
 
                   {isCompareActive && (
-                    <div className="absolute top-4 left-4 bg-accent text-button-text text-xs px-2 py-1 rounded shadow-lg z-20">
-                      ORIGINAL
-                    </div>
+                    <Text
+                      as="div"
+                      variant={TextVariants.small}
+                      color={TextColors.button}
+                      className="absolute top-4 left-4 bg-accent px-2 py-1 rounded shadow-lg z-20"
+                    >
+                      Original
+                    </Text>
                   )}
                 </div>
               </div>
