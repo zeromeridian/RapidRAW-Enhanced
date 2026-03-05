@@ -25,21 +25,49 @@ struct Bm3dParams {
     sigma: f32,
     hard_th_lambda: f32,
     max_dist_hard: f32,
+    chroma_sigma_scale: f32,
 }
 
 impl Bm3dParams {
     fn from_intensity(i: f32) -> Self {
         let val = i.clamp(0.001, 1.0);
-        let sigma = val * 80.0;
-        let lambda = 2.0 + (val * 2.5);
-        let dist = 3000.0 + (val * 20000.0);
-
         Self {
-            sigma,
-            hard_th_lambda: lambda,
-            max_dist_hard: dist,
+            sigma: val * 80.0,
+            hard_th_lambda: 2.0 + (val * 2.5),
+            max_dist_hard: 3000.0 + (val * 20000.0),
+            chroma_sigma_scale: 1.8,
         }
     }
+}
+
+fn rgb_to_ycbcr(r: &[f32], g: &[f32], b: &[f32]) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
+    let n = r.len();
+    let mut y  = vec![0.0f32; n];
+    let mut cb = vec![0.0f32; n];
+    let mut cr = vec![0.0f32; n];
+    for i in 0..n {
+        let rv = r[i]; let gv = g[i]; let bv = b[i];
+        y[i]  =  0.299    * rv + 0.587    * gv + 0.114    * bv;
+        cb[i] = -0.168736 * rv - 0.331264 * gv + 0.5      * bv + 128.0;
+        cr[i] =  0.5      * rv - 0.418688 * gv - 0.081312 * bv + 128.0;
+    }
+    (y, cb, cr)
+}
+
+fn ycbcr_to_rgb(y: &[f32], cb: &[f32], cr: &[f32]) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
+    let n = y.len();
+    let mut r = vec![0.0f32; n];
+    let mut g = vec![0.0f32; n];
+    let mut b = vec![0.0f32; n];
+    for i in 0..n {
+        let yv  = y[i];
+        let cbv = cb[i] - 128.0;
+        let crv = cr[i] - 128.0;
+        r[i] = yv + 1.402    * crv;
+        g[i] = yv - 0.344136 * cbv - 0.714136 * crv;
+        b[i] = yv + 1.772    * cbv;
+    }
+    (r, g, b)
 }
 
 pub fn denoise_image(
@@ -83,7 +111,10 @@ pub fn denoise_image(
     let params = Bm3dParams::from_intensity(intensity);
     let dct_tables = Arc::new(DctTables::new());
 
-    let channels = split_channels(&rgb_img_for_denoiser);
+    let rgb_channels = split_channels(&rgb_img_for_denoiser);
+    let (y, cb, cr) = rgb_to_ycbcr(&rgb_channels[0], &rgb_channels[1], &rgb_channels[2]);
+    let original_y = y.clone();
+    let channels = vec![y, cb, cr];
 
     let patches_x = (width as usize).saturating_sub(BLOCK_SIZE) / STRIDE + 1;
     let patches_y = (height as usize).saturating_sub(BLOCK_SIZE) / STRIDE + 1;
@@ -92,7 +123,7 @@ pub fn denoise_image(
 
     let _ = app_handle.emit("denoise-progress", "Processing (Step 1/2)...");
 
-    let denoised_channels = bm3d_process_joint(
+    let mut denoised_channels = bm3d_process_joint(
         &channels,
         width,
         height,
@@ -103,8 +134,21 @@ pub fn denoise_image(
         &app_handle,
     );
 
+    {
+        let _ = app_handle.emit("denoise-progress", "Blending detail...");
+        let blurred_y = gaussian_blur_1ch(&original_y, width as usize, height as usize, 3.0);
+        let detail_strength = (intensity * 0.5_f32).clamp(0.0_f32, 0.5_f32);
+        let y_ch = &mut denoised_channels[0];
+        for i in 0..y_ch.len() {
+            let hf = original_y[i] - blurred_y[i];
+            y_ch[i] = (y_ch[i] + detail_strength * hf).clamp(0.0, 255.0);
+        }
+    }
+
+    let (r, g, b) = ycbcr_to_rgb(&denoised_channels[0], &denoised_channels[1], &denoised_channels[2]);
+
     let _ = app_handle.emit("denoise-progress", "Finalizing data...");
-    let out_img_buffer = merge_channels(&denoised_channels, width, height);
+    let out_img_buffer = merge_channels(&vec![r, g, b], width, height);
     let out_dynamic = DynamicImage::ImageRgb32F(out_img_buffer);
 
     let _ = app_handle.emit("denoise-progress", "Generating previews...");
@@ -257,6 +301,14 @@ fn run_bm3d_step_joint(
             let guide_ch = &guide[ch];
             let noisy_ch = &noisy[ch];
 
+            // Channel 0 = luma (Y) or red; channels 1-2 = chroma (Cb/Cr) or green/blue.
+            // chroma_sigma_scale is 1.0 in standard BM3D and ~1.8 in CBM3D mode.
+            let ch_sigma = if ch == 0 {
+                params.sigma
+            } else {
+                params.sigma * params.chroma_sigma_scale
+            };
+
             let mut guide_stack = build_3d_group(guide_ch, w, group_locs);
             let mut noisy_stack = if is_step_1 {
                 guide_stack.clone()
@@ -271,7 +323,7 @@ fn run_bm3d_step_joint(
 
             let weight;
             if is_step_1 {
-                let threshold = params.hard_th_lambda * params.sigma;
+                let threshold = params.hard_th_lambda * ch_sigma;
                 let nonzero = hard_threshold(&mut guide_stack, threshold);
                 weight = if nonzero > 0 {
                     1.0 / (nonzero as f32)
@@ -280,7 +332,7 @@ fn run_bm3d_step_joint(
                 };
                 noisy_stack = guide_stack;
             } else {
-                weight = wiener_filter(&mut noisy_stack, &guide_stack, params.sigma);
+                weight = wiener_filter(&mut noisy_stack, &guide_stack, ch_sigma);
             }
 
             inverse_transform_3d(&mut noisy_stack, group_size, tables);
@@ -309,10 +361,14 @@ fn run_bm3d_step_joint(
     for ch in 0..num_channels {
         let num_vec = numerators[ch].to_vec();
         let den_vec = denominators[ch].to_vec();
+        // For pixels not covered by any block (right/bottom edge remainder),
+        // fall back to the original noisy value. Falling back to zero produces a
+        // visible green fringe after YCbCr→RGB conversion: (Y=0,Cb=0,Cr=0) → ~(0,135,0).
         let final_ch = num_vec
             .iter()
             .zip(den_vec.iter())
-            .map(|(&n, &d)| if d > 1e-6 { n / d } else { n })
+            .zip(noisy[ch].iter())
+            .map(|((&n, &d), &orig)| if d > 1e-6 { n / d } else { orig })
             .collect();
         results.push(final_ch);
     }
@@ -713,3 +769,61 @@ fn prev_power_of_two(x: usize) -> usize {
     }
     p
 }
+
+/// Separable Gaussian blur of a single-channel float image (values in any range).
+/// `sigma` controls the blur radius; kernel half-width = ceil(3 * sigma).
+fn gaussian_blur_1ch(data: &[f32], width: usize, height: usize, sigma: f32) -> Vec<f32> {
+    let radius = (3.0 * sigma).ceil() as usize;
+    let klen = 2 * radius + 1;
+    let mut kernel = vec![0.0f32; klen];
+    let two_s2 = 2.0 * sigma * sigma;
+    for i in 0..klen {
+        let k = i as f32 - radius as f32;
+        kernel[i] = (-k * k / two_s2).exp();
+    }
+    let ksum: f32 = kernel.iter().sum();
+    for k in &mut kernel {
+        *k /= ksum;
+    }
+
+    // Horizontal pass.
+    let mut tmp = vec![0.0f32; width * height];
+    for y in 0..height {
+        let row_in = &data[y * width..(y + 1) * width];
+        let row_out = &mut tmp[y * width..(y + 1) * width];
+        for x in 0..width {
+            let mut val = 0.0f32;
+            let mut wsum = 0.0f32;
+            let x0 = x as isize - radius as isize;
+            for ki in 0..klen {
+                let kx = x0 + ki as isize;
+                if kx >= 0 && kx < width as isize {
+                    val += row_in[kx as usize] * kernel[ki];
+                    wsum += kernel[ki];
+                }
+            }
+            row_out[x] = val / wsum;
+        }
+    }
+
+    // Vertical pass.
+    let mut out = vec![0.0f32; width * height];
+    for y in 0..height {
+        let y0 = y as isize - radius as isize;
+        for x in 0..width {
+            let mut val = 0.0f32;
+            let mut wsum = 0.0f32;
+            for ki in 0..klen {
+                let ky = y0 + ki as isize;
+                if ky >= 0 && ky < height as isize {
+                    val += tmp[ky as usize * width + x] * kernel[ki];
+                    wsum += kernel[ki];
+                }
+            }
+            out[y * width + x] = val / wsum;
+        }
+    }
+
+    out
+}
+

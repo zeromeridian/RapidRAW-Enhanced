@@ -212,8 +212,7 @@ export default function DenoiseModal({
 }: DenoiseModalProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
-  // Initializing at 50 (0-100 range) instead of 0.5 so the Slider displays integer percentages
-  const [intensity, setIntensity] = useState<number>(50);
+  const [intensity, setIntensity] = useState<number>(15);
   const [isSaving, setIsSaving] = useState(false);
   const [savedPath, setSavedPath] = useState<string | null>(null);
 
@@ -363,16 +362,16 @@ export default function DenoiseModal({
     return (
       <div className="w-full flex items-center gap-4">
         <div className={`flex-1 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
-          <Slider
-            label="Strength"
-            value={intensity}
-            min={0}
-            max={100}
-            step={1}
-            defaultValue={50}
-            onChange={(e) => setIntensity(Number(e.target.value))}
-            trackClassName="bg-bg-secondary"
-          />
+            <Slider
+                label="Strength"
+                value={intensity}
+                min={0}
+                max={100}
+                step={1}
+                defaultValue={15}
+                onChange={(e) => setIntensity(Number(e.target.value))}
+                trackClassName="bg-bg-secondary"
+            />
         </div>
 
         <div className="h-8 w-px bg-surface mx-2" />
