@@ -14,6 +14,8 @@ import {
   SlidersHorizontal,
   Keyboard,
   Bookmark,
+  Scaling,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -99,6 +101,13 @@ const resolutions: OptionItem<number>[] = [
   { value: 1920, label: '1920px' },
   { value: 2560, label: '2560px' },
   { value: 3840, label: '3840px' },
+];
+
+const zoomMultiplierOptions: OptionItem<number>[] = [
+  { value: 1.0, label: '1.0x (Native)' },
+  { value: 0.75, label: '0.75x' },
+  { value: 0.5, label: '0.50x (Half)' },
+  { value: 0.25, label: '0.25x' },
 ];
 
 const backendOptions: OptionItem<string>[] = [
@@ -230,6 +239,50 @@ const AiProviderSwitch = ({ selectedProvider, onProviderChange }: AiProviderSwit
   );
 };
 
+const previewModes = [
+  { id: 'static', label: 'Fixed Resolution', icon: ImageIcon },
+  { id: 'dynamic', label: 'Dynamic', icon: Scaling },
+];
+
+interface PreviewModeSwitchProps {
+  mode: 'static' | 'dynamic';
+  onModeChange: (mode: 'static' | 'dynamic') => void;
+}
+
+const PreviewModeSwitch = ({ mode, onModeChange }: PreviewModeSwitchProps) => {
+  return (
+    <div className="relative flex w-full p-1 bg-bg-primary rounded-md border border-border-color">
+      {previewModes.map((item) => (
+        <button
+          key={item.id}
+          onClick={() => onModeChange(item.id as 'static' | 'dynamic')}
+          className={clsx(
+            'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+            {
+              'text-text-primary hover:bg-surface': mode !== item.id,
+              'text-button-text': mode === item.id,
+            },
+          )}
+          style={{ WebkitTapHighlightColor: 'transparent' }}
+        >
+          {mode === item.id && (
+            <motion.span
+              layoutId="preview-mode-switch-bubble"
+              className="absolute inset-0 z-0 bg-accent"
+              style={{ borderRadius: 6 }}
+              transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center">
+            <item.icon size={16} className="mr-2" />
+            {item.label}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+};
+
 export default function SettingsPanel({
   appSettings,
   onBack,
@@ -272,6 +325,7 @@ export default function SettingsPanel({
     rawHighlightCompression: appSettings?.rawHighlightCompression ?? 2.5,
     processingBackend: appSettings?.processingBackend || 'auto',
     linuxGpuOptimization: appSettings?.linuxGpuOptimization ?? false,
+    highResZoomMultiplier: appSettings?.highResZoomMultiplier || 1.0,
   });
   const [restartRequired, setRestartRequired] = useState(false);
   const [activeCategory, setActiveCategory] = useState('general');
@@ -292,6 +346,7 @@ export default function SettingsPanel({
       rawHighlightCompression: appSettings?.rawHighlightCompression ?? 2.5,
       processingBackend: appSettings?.processingBackend || 'auto',
       linuxGpuOptimization: appSettings?.linuxGpuOptimization ?? false,
+      highResZoomMultiplier: appSettings?.highResZoomMultiplier || 1.0,
     });
     setRestartRequired(false);
   }, [appSettings]);
@@ -334,6 +389,11 @@ export default function SettingsPanel({
   const handleProviderChange = (provider: string) => {
     setAiProvider(provider);
     onSettingsChange({ ...appSettings, aiProvider: provider });
+  };
+
+  const handlePreviewModeChange = (mode: 'static' | 'dynamic') => {
+    const enableZoomHifi = mode === 'dynamic';
+    onSettingsChange({ ...appSettings, enableZoomHifi });
   };
 
   const handleTempMakerChange = (maker: string) => {
@@ -834,7 +894,7 @@ export default function SettingsPanel({
                     </div>
 
                     <div>
-                      <Text variant={TextVariants.heading} className="mb-3">
+                      <Text variant={TextVariants.heading} className="mb-2">
                         Saved Lenses
                       </Text>
                       {(!appSettings?.myLenses || appSettings.myLenses.length === 0) && (
@@ -898,7 +958,7 @@ export default function SettingsPanel({
                             transition={{ duration: 0.3, ease: 'easeInOut' }}
                             className="overflow-hidden"
                           >
-                            <div className="pl-4 border-l-2 border-border-color ml-1 space-y-8">
+                            <div className="pl-4 border-l-2 border-border-color ml-1 mt-4 space-y-6">
                               <SettingItem
                                 label="Maximum AI Tags"
                                 description="The maximum number of tags to generate per image."
@@ -1105,10 +1165,8 @@ export default function SettingsPanel({
                 className="space-y-10"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
-                    Processing Engine
-                  </Text>
-                  <div className="space-y-8">
+                  <h2 className="text-xl font-semibold mb-6 text-accent">Processing Engine</h2>
+                  <div className="space-y-6">
                     <SettingItem
                       description="Higher resolutions provide a sharper preview but may impact performance on less powerful systems."
                       label="Preview Resolution"
@@ -1160,7 +1218,7 @@ export default function SettingsPanel({
                             <div className="pl-4 border-l-2 border-border-color ml-1">
                               <SettingItem
                                 label="High Quality Live Preview"
-                                description="Uses higher resolution and less compression during interaction. Significantly increases GPU load."
+                                description="Uses higher resolution and less compression during interaction."
                               >
                                 <Switch
                                   checked={appSettings?.enableHighQualityLivePreviews ?? false}
@@ -1288,19 +1346,19 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <div className="space-y-8">
-                            <div>
-                              <Text variant={TextVariants.heading}>Self-Hosted (RapidRAW AI Connector)</Text>
-                              <Text className="mt-1">
-                                For users with a capable GPU who want maximum control, connect RapidRAW to your own
-                                local AI Connector server. This gives you full control for technical workflows.
-                              </Text>
-                              <Text as="ul" className="mt-3 space-y-1 list-disc list-inside">
-                                <li>Use your own ComfyUI instance</li>
-                                <li>Cost-free advanced generative edits</li>
-                                <li>Custom workflow selection</li>
-                              </Text>
-                            </div>
+                          <h3 className="text-lg font-semibold text-text-primary">
+                            Self-Hosted (RapidRAW AI Connector)
+                          </h3>
+                          <p className="text-sm text-text-secondary mt-1">
+                            For users with a capable GPU who want maximum control, connect RapidRAW to your own local AI
+                            Connector server. This gives you full control for technical workflows.
+                          </p>
+                          <ul className="mt-3 mb-6 space-y-1 list-disc list-inside text-sm text-text-secondary">
+                            <li>Use your own ComfyUI instance</li>
+                            <li>Cost-free advanced generative edits</li>
+                            <li>Custom workflow selection</li>
+                          </ul>
+                          <div className="space-y-6">
                             <SettingItem
                               label="AI Connector Address"
                               description="Enter the address and port of your running AI Connector instance. Required for generative AI features."

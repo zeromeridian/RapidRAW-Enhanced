@@ -28,6 +28,7 @@ interface EditorProps {
   finalPreviewUrl: string | null;
   isFullScreen: boolean;
   isLoading: boolean;
+  isSliderDragging: boolean;
   isMaskControlHovered: boolean;
   isStraightenActive: boolean;
   isRotationActive?: boolean;
@@ -60,7 +61,6 @@ interface EditorProps {
   onDisplaySizeChange?(size: any): void;
   onInitialFitScale?(scale: number): void;
   originalSize?: ImageDimensions;
-  isLoadingFullRes?: boolean;
   isWbPickerActive?: boolean;
   onWbPicked?: () => void;
   overlayMode?: OverlayMode;
@@ -83,6 +83,7 @@ export default function Editor({
   finalPreviewUrl,
   isFullScreen,
   isLoading,
+  isSliderDragging,
   isMaskControlHovered,
   isStraightenActive,
   isRotationActive,
@@ -114,7 +115,6 @@ export default function Editor({
   onDisplaySizeChange,
   onInitialFitScale,
   originalSize,
-  isLoadingFullRes,
   isWbPickerActive = false,
   onWbPicked,
   overlayMode = 'none',
@@ -233,7 +233,7 @@ export default function Editor({
     if (showOriginal) {
       setShowOriginal(false);
     }
-  }, [finalPreviewUrl, setShowOriginal]);
+  }, [adjustments, setShowOriginal]);
 
   const isCropping = activeRightPanel === Panel.Crop;
   const isMasking = activeRightPanel === Panel.Masks;
@@ -663,7 +663,6 @@ export default function Editor({
         <EditorToolbar
           canRedo={canRedo}
           canUndo={canUndo}
-          isFullScreenLoading={isLoadingFullRes ?? false}
           isLoading={isLoading}
           isWaveformVisible={isWaveformVisible}
           onBackToLibrary={onBackToLibrary}
@@ -674,7 +673,6 @@ export default function Editor({
           onUndo={onUndo}
           selectedImage={selectedImage}
           showOriginal={showOriginal}
-          isLoadingFullRes={isLoadingFullRes}
           showDateView={showExifDateView}
           onToggleDateView={() => setShowExifDateView((prev) => !prev)}
           adjustmentsHistory={adjustmentsHistory}
@@ -748,6 +746,7 @@ export default function Editor({
               isMasking={isMasking}
               isStraightenActive={isStraightenActive}
               isRotationActive={isRotationActive}
+              isSliderDragging={isSliderDragging}
               maskOverlayUrl={maskOverlayUrl}
               onGenerateAiMask={onGenerateAiMask}
               onLiveMaskPreview={handleLiveMaskPreview}
