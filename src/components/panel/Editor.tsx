@@ -40,7 +40,7 @@ interface EditorProps {
   onQuickErase(subMaskId: string | null, startPoint: Coord, endpoint: Coord): void;
   onRedo(): void;
   onSelectAiSubMask(id: string | null): void;
-  onSelectMask(id: string): void;
+  onSelectMask(id: string | null): void;
   onStraighten(val: number): void;
   onToggleFullScreen(): void;
   onToggleWaveform(): void;
@@ -621,11 +621,15 @@ export default function Editor({
   const isPanningDisabled =
     isMaskHovered ||
     isCropping ||
-    (isMasking && (activeSubMask?.type === Mask.Brush || activeSubMask?.type === Mask.AiSubject)) ||
+    (isMasking &&
+      (activeSubMask?.type === Mask.Brush ||
+        activeSubMask?.type === Mask.AiSubject ||
+        activeSubMask?.parameters?.isInitialDraw)) ||
     (isAiEditing &&
       (activeSubMask?.type === Mask.Brush ||
         activeSubMask?.type === Mask.AiSubject ||
-        activeSubMask?.type === Mask.QuickEraser));
+        activeSubMask?.type === Mask.QuickEraser ||
+        activeSubMask?.parameters?.isInitialDraw));
 
   const waveFormData: WaveformData = waveform || { blue: [], green: [], height: 0, luma: [], red: [], width: 0 };
   const isZoomActionActive = !isCropping && !isMasking && !isAiEditing && !isWbPickerActive;
