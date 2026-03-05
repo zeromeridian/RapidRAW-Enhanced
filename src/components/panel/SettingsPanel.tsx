@@ -1188,7 +1188,7 @@ export default function SettingsPanel({
                               exit={{ opacity: 0, x: -10 }}
                               transition={{ duration: 0.2 }}
                             >
-                              <Text variant={TextVariants.small} className="mb-3">
+                              <Text className="mb-4">
                                 The editor renders the image at a fixed resolution. This mode is the fastest and most
                                 consistent, making it ideal for lower-end hardware where smooth performance is
                                 prioritized over pixel-perfect zoom.
@@ -1216,7 +1216,7 @@ export default function SettingsPanel({
                               exit={{ opacity: 0, x: -10 }}
                               transition={{ duration: 0.2 }}
                             >
-                              <Text variant={TextVariants.small} className="mb-4">
+                              <Text className="mb-4">
                                 The editor renders the preview to match your display's actual pixel density. This
                                 ensures that every detail is represented with 1:1 pixel accuracy, providing maximum
                                 clarity when zooming and checking focus.
