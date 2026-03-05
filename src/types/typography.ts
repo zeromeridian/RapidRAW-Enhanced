@@ -1,6 +1,6 @@
 export type TextVariant = 'displayLarge' | 'display' | 'headline' | 'title' | 'heading' | 'body' | 'label' | 'small';
 export type TextWeight = 'bold' | 'semibold' | 'medium' | 'normal';
-export type TextColor = 'primary' | 'secondary' | 'accent' | 'info' | 'success' | 'error' | 'white';
+export type TextColor = 'primary' | 'secondary' | 'accent' | 'button' | 'info' | 'success' | 'error' | 'white';
 
 export const TextWeights: Record<TextWeight, TextWeight> = {
   bold: 'bold',
@@ -12,6 +12,7 @@ export const TextColors: Record<TextColor, TextColor> = {
   primary: 'primary',
   secondary: 'secondary',
   accent: 'accent',
+  button: 'button',
   info: 'info',
   success: 'success',
   error: 'error',
@@ -29,6 +30,7 @@ export const TEXT_COLOR_KEYS: Record<TextColor, string> = {
   primary: 'text-text-primary',
   secondary: 'text-text-secondary',
   accent: 'text-accent',
+  button: 'text-button-text',
   info: 'text-blue-300',
   success: 'text-green-400',
   error: 'text-red-400',
