@@ -304,6 +304,8 @@ pub struct AppSettings {
     pub sort_criteria: Option<SortCriteria>,
     pub filter_criteria: Option<FilterCriteria>,
     pub theme: Option<String>,
+    #[serde(default)]
+    pub font_family: Option<String>,
     pub transparent: Option<bool>,
     pub decorations: Option<bool>,
     #[serde(alias = "comfyuiAddress")]
@@ -375,6 +377,7 @@ impl Default for AppSettings {
             sort_criteria: None,
             filter_criteria: None,
             theme: Some("dark".to_string()),
+            font_family: None,
             transparent: Some(true),
             #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
             decorations: Some(true),

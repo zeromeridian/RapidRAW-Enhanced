@@ -703,6 +703,17 @@ export default function SettingsPanel({
                       />
                     </SettingItem>
 
+                    <SettingItem label="Font" description="Change the application font.">
+                      <Dropdown
+                        onChange={(value: any) => onSettingsChange({ ...appSettings, fontFamily: value })}
+                        options={[
+                          { value: 'poppins', label: 'Poppins' },
+                          { value: 'system', label: 'System Default' },
+                        ]}
+                        value={appSettings?.fontFamily || 'poppins'}
+                      />
+                    </SettingItem>
+
                     <SettingItem
                       description="Dynamically changes editor colors based on the current image."
                       label="Editor Theme"
