@@ -4,6 +4,8 @@ import { X, Waves } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { WaveformData } from '../../ui/AppProperties';
 import { DisplayMode } from '../../../utils/adjustments';
+import Text from '../../ui/Text';
+import { TextVariants } from '../../../types/typography';
 
 interface LumaWaveformProps {
   color: Array<number>;
@@ -127,15 +129,16 @@ export default function Waveform({ waveformData, onClose }: WaveformProps) {
       }
     : {};
 
-  const baseButtonClass = 'flex-grow text-center px-2 py-1 text-xs rounded font-medium transition-colors duration-150';
-  const inactiveButtonClass = 'text-text-secondary hover:bg-bg-tertiary';
+  const baseButtonClass =
+    'flex-grow text-center px-2 py-1 text-xs rounded-lg font-medium transition-colors duration-150';
+  const inactiveButtonClass = 'text-text-primary hover:bg-bg-tertiary';
 
   return (
     <Draggable nodeRef={nodeRef} handle=".handle" bounds="parent">
-      <div ref={nodeRef} className="absolute top-20 left-20 w-[280px] z-50">
+      <div ref={nodeRef} className="absolute top-20 left-20 z-50">
         <motion.div
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-bg-secondary/80 backdrop-blur-sm rounded-lg shadow-lg text-text-secondary border border-surface/40 overflow-hidden"
+          className="bg-surface/90 backdrop-blur-md border border-text-secondary/10 shadow-xl rounded-lg overflow-hidden"
           exit={{ opacity: 0, scale: 0.95 }}
           initial={{ opacity: 0, scale: 0.95 }}
           key="waveform-content"
@@ -144,13 +147,11 @@ export default function Waveform({ waveformData, onClose }: WaveformProps) {
         >
           <div className="handle flex items-center justify-between p-2 cursor-move">
             <div className="flex items-center gap-2">
-              <Waves size={16} className="text-text-secondary" />
-              <h3 className="text-sm font-semibold text-text-primary [text-shadow:0_1px_3px_rgba(0,0,0,0.4)]">
-                Waveform
-              </h3>
+              <Waves size={16} />
+              <Text variant={TextVariants.heading}>Waveform</Text>
             </div>
             <button
-              className="p-1 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors"
+              className="p-1 rounded-lg text-text-secondary hover:bg-bg-primary hover:text-text-primary transition-colors"
               onClick={onClose}
             >
               <X size={16} />
@@ -206,11 +207,11 @@ export default function Waveform({ waveformData, onClose }: WaveformProps) {
                   />
                 )}
               </div>
-              <div className="flex justify-center gap-1 mt-2 p-1 bg-surface rounded-lg">
+              <div className="flex justify-center gap-1 mt-2 p-1 bg-bg-primary rounded-lg">
                 <button
                   onClick={() => setDisplayMode(DisplayMode.Luma)}
                   className={`${baseButtonClass} ${
-                    displayMode === DisplayMode.Luma ? 'bg-accent text-black' : inactiveButtonClass
+                    displayMode === DisplayMode.Luma ? 'bg-accent text-button-text' : inactiveButtonClass
                   }`}
                 >
                   Luma
@@ -218,7 +219,7 @@ export default function Waveform({ waveformData, onClose }: WaveformProps) {
                 <button
                   onClick={() => setDisplayMode(DisplayMode.Rgb)}
                   className={`${baseButtonClass} ${
-                    displayMode === DisplayMode.Rgb ? 'bg-accent text-black' : inactiveButtonClass
+                    displayMode === DisplayMode.Rgb ? 'bg-accent text-button-text' : inactiveButtonClass
                   }`}
                 >
                   RGB

@@ -30,6 +30,8 @@ import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import { Invokes } from '../ui/AppProperties';
+import Text from '../ui/Text';
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 
 interface ConfirmModalState {
   confirmText: string;
@@ -131,15 +133,19 @@ const settingCategories = [
 
 const KeybindItem = ({ keys, description }: KeybindItemProps) => (
   <div className="flex justify-between items-center py-2">
-    <span className="text-text-secondary text-sm">{description}</span>
+    <Text variant={TextVariants.label}>{description}</Text>
     <div className="flex items-center gap-1">
       {keys.map((key: string, index: number) => (
-        <kbd
+        <Text
+          as="kbd"
+          variant={TextVariants.small}
+          color={TextColors.primary}
+          weight={TextWeights.semibold}
           key={index}
-          className="px-2 py-1 text-xs font-sans font-semibold text-text-primary bg-bg-primary border border-border-color rounded-md"
+          className="px-2 py-1 font-sans bg-bg-primary border border-border-color rounded-md"
         >
           {key}
-        </kbd>
+        </Text>
       ))}
     </div>
   </div>
@@ -147,9 +153,15 @@ const KeybindItem = ({ keys, description }: KeybindItemProps) => (
 
 const SettingItem = ({ children, description, label }: SettingItemProps) => (
   <div>
-    <label className="block text-sm font-medium text-text-primary mb-2">{label}</label>
+    <Text variant={TextVariants.heading} className="block mb-2">
+      {label}
+    </Text>
     {children}
-    {description && <p className="text-xs text-text-secondary mt-2">{description}</p>}
+    {description && (
+      <Text variant={TextVariants.small} className="mt-2">
+        {description}
+      </Text>
+    )}
   </div>
 );
 
@@ -163,14 +175,22 @@ const DataActionItem = ({
   message,
   title,
 }: DataActionItemProps) => (
-  <div className="pb-6 border-b border-border-color last:border-b-0 last:pb-0">
-    <h3 className="text-sm font-medium text-text-primary mb-2">{title}</h3>
-    <p className="text-xs text-text-secondary mb-3">{description}</p>
+  <div className="pb-8 border-b border-border-color last:border-b-0 last:pb-0">
+    <Text variant={TextVariants.heading} className="mb-2">
+      {title}
+    </Text>
+    <Text variant={TextVariants.small} className="mb-3">
+      {description}
+    </Text>
     <Button variant="destructive" onClick={buttonAction} disabled={isProcessing || disabled}>
       {icon}
       {isProcessing ? 'Processing...' : buttonText}
     </Button>
-    {message && <p className="text-sm text-accent mt-3">{message}</p>}
+    {message && (
+      <Text color={TextColors.accent} className="mt-3">
+        {message}
+      </Text>
+    )}
   </div>
 );
 
@@ -647,7 +667,9 @@ export default function SettingsPanel({
             >
               <ArrowLeft />
             </Button>
-            <h1 className="text-3xl font-bold text-accent text-shadow-shiny whitespace-nowrap">Settings</h1>
+            <Text variant={TextVariants.display} color={TextColors.accent} className="whitespace-nowrap">
+              Settings
+            </Text>
           </div>
 
           <div className="relative flex w-full min-[1200px]:w-[450px] p-2 bg-surface rounded-md">
@@ -690,11 +712,13 @@ export default function SettingsPanel({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-8"
+                className="space-y-10"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">General Settings</h2>
-                  <div className="space-y-6">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                    General Settings
+                  </Text>
+                  <div className="space-y-8">
                     <SettingItem label="Theme" description="Change the look and feel of the application.">
                       <Dropdown
                         onChange={(value: any) => onSettingsChange({ ...appSettings, theme: value })}
@@ -796,11 +820,13 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">Adjustments Visibility</h2>
-                  <p className="text-sm text-text-secondary mb-4">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                    Adjustments Visibility
+                  </Text>
+                  <Text className="mb-4">
                     Hide adjustment sections you don't use often to simplify the editing panel. Your settings will be
                     preserved and applied even when hidden.
-                  </p>
+                  </Text>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <Switch
                       label="Chromatic Aberration"
@@ -845,182 +871,199 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">My Lenses</h2>
-                  <p className="text-sm text-text-secondary mb-6">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                    My Lenses
+                  </Text>
+                  <Text className="mb-6">
                     Create a list of your frequently used lenses to quickly access them in the Lens Correction panel.
-                  </p>
+                  </Text>
 
-                  <div className="bg-bg-primary rounded-lg p-4 border border-border-color mb-6">
-                    <h3 className="text-sm font-medium text-text-primary mb-3">Add New Lens</h3>
-                    <div className="space-y-4">
-                      <Dropdown
-                        options={lensMakers.map((m) => ({ label: m, value: m }))}
-                        value={tempLensMaker}
-                        onChange={handleTempMakerChange}
-                        placeholder="Select Manufacturer"
-                      />
-                      <Dropdown
-                        options={lensModels.map((m) => ({ label: m, value: m }))}
-                        value={tempLensModel}
-                        onChange={setTempLensModel}
-                        placeholder="Select Lens Model"
-                        disabled={!tempLensMaker}
-                      />
-                      <Button onClick={handleAddLens} disabled={!tempLensMaker || !tempLensModel} className="w-full">
-                        <Plus size={16} className="mr-2" />
-                        Add to My Lenses
-                      </Button>
+                  <div className="space-y-8">
+                    <div className="bg-bg-primary rounded-lg p-4 border border-border-color">
+                      <Text variant={TextVariants.heading} className="mb-3">
+                        Add New Lens
+                      </Text>
+                      <div className="space-y-4">
+                        <Dropdown
+                          options={lensMakers.map((m) => ({ label: m, value: m }))}
+                          value={tempLensMaker}
+                          onChange={handleTempMakerChange}
+                          placeholder="Select Manufacturer"
+                        />
+                        <Dropdown
+                          options={lensModels.map((m) => ({ label: m, value: m }))}
+                          value={tempLensModel}
+                          onChange={setTempLensModel}
+                          placeholder="Select Lens Model"
+                          disabled={!tempLensMaker}
+                        />
+                        <Button onClick={handleAddLens} disabled={!tempLensMaker || !tempLensModel} className="w-full">
+                          <Plus size={16} className="mr-1" />
+                          Add to My Lenses
+                        </Button>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium text-text-primary mb-3">Saved Lenses</h3>
-                    {(!appSettings?.myLenses || appSettings.myLenses.length === 0) && (
-                      <p className="text-sm text-text-secondary italic">No lenses added yet.</p>
-                    )}
-                    <div className="divide-y divide-border-color">
-                      {(appSettings?.myLenses || []).map((lens: MyLens, index: number) => (
-                        <div
-                          key={`${lens.maker}-${lens.model}-${index}`}
-                          className="flex justify-between items-center py-3"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-surface rounded-md text-accent">
-                              <Bookmark size={16} />
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-text-primary">{lens.model}</p>
-                              <p className="text-xs text-text-secondary">{lens.maker}</p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleRemoveLens(index)}
-                            className="p-2 text-text-secondary hover:text-red-400 hover:bg-bg-primary rounded-md transition-colors"
-                            data-tooltip="Remove lens"
+                    <div>
+                      <Text variant={TextVariants.heading} className="mb-2">
+                        Saved Lenses
+                      </Text>
+                      {(!appSettings?.myLenses || appSettings.myLenses.length === 0) && (
+                        <Text className="italic">No lenses added yet.</Text>
+                      )}
+                      <div className="divide-y divide-border-color">
+                        {(appSettings?.myLenses || []).map((lens: MyLens, index: number) => (
+                          <div
+                            key={`${lens.maker}-${lens.model}-${index}`}
+                            className="flex justify-between items-center py-3 first:pt-0 last:pb-0"
                           >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      ))}
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-surface rounded-md text-accent">
+                                <Bookmark size={16} />
+                              </div>
+                              <div>
+                                <Text color={TextColors.primary} weight={TextWeights.medium}>
+                                  {lens.model}
+                                </Text>
+                                <Text variant={TextVariants.small}>{lens.maker}</Text>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleRemoveLens(index)}
+                              className="p-2 text-text-secondary hover:text-red-400 hover:bg-bg-primary rounded-md transition-colors"
+                              data-tooltip="Remove lens"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">Tagging</h2>
-                  <div className="space-y-6">
-                    <SettingItem
-                      description="Enables automatic image tagging using an AI (CLIP) model. This will download an additional model and impact performance while browsing folders. Tags are used for searching a folder."
-                      label="AI Tagging"
-                    >
-                      <Switch
-                        checked={appSettings?.enableAiTagging ?? false}
-                        id="ai-tagging-toggle"
-                        label="Automatic AI Tagging"
-                        onChange={(checked) => onSettingsChange({ ...appSettings, enableAiTagging: checked })}
-                      />
-                    </SettingItem>
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                    Tagging
+                  </Text>
+                  <div className="space-y-8">
+                    <div className="space-y-4">
+                      <SettingItem
+                        description="Enables automatic image tagging using an AI (CLIP) model. This will download an additional model and impact performance while browsing folders. Tags are used for searching a folder."
+                        label="AI Tagging"
+                      >
+                        <Switch
+                          checked={appSettings?.enableAiTagging ?? false}
+                          id="ai-tagging-toggle"
+                          label="Automatic AI Tagging"
+                          onChange={(checked) => onSettingsChange({ ...appSettings, enableAiTagging: checked })}
+                        />
+                      </SettingItem>
 
-                    <AnimatePresence>
-                      {(appSettings?.enableAiTagging ?? false) && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.3, ease: 'easeInOut' }}
-                          className="overflow-hidden"
-                        >
-                          <div className="pl-4 border-l-2 border-border-color ml-1 mt-4 space-y-6">
-                            <SettingItem
-                              label="Maximum AI Tags"
-                              description="The maximum number of tags to generate per image."
-                            >
-                              <Slider
-                                label="Amount"
-                                min={1}
-                                max={20}
-                                step={1}
-                                value={appSettings?.aiTagCount ?? 10}
-                                defaultValue={10}
-                                onChange={(e: any) =>
-                                  onSettingsChange({ ...appSettings, aiTagCount: parseInt(e.target.value) })
-                                }
-                              />
-                            </SettingItem>
+                      <AnimatePresence>
+                        {(appSettings?.enableAiTagging ?? false) && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: 'easeInOut' }}
+                            className="overflow-hidden"
+                          >
+                            <div className="pl-4 border-l-2 border-border-color ml-1 space-y-8">
+                              <SettingItem
+                                label="Maximum AI Tags"
+                                description="The maximum number of tags to generate per image."
+                              >
+                                <Slider
+                                  label="Amount"
+                                  min={1}
+                                  max={20}
+                                  step={1}
+                                  value={appSettings?.aiTagCount ?? 10}
+                                  defaultValue={10}
+                                  onChange={(e: any) =>
+                                    onSettingsChange({ ...appSettings, aiTagCount: parseInt(e.target.value) })
+                                  }
+                                />
+                              </SettingItem>
 
-                            <SettingItem
-                              label="Custom AI Tag List"
-                              description="If provided, the AI will ONLY use tags from this list, overriding RapidRAW’s built-in list. Tagging works only in English."
-                            >
-                              <div>
-                                <div className="flex flex-wrap gap-2 p-2 bg-bg-primary rounded-md min-h-[40px] border border-border-color mb-2 items-center">
-                                  <AnimatePresence>
-                                    {customAiTags.length > 0 ? (
-                                      customAiTags.map((tag: string) => (
-                                        <motion.div
-                                          key={tag}
-                                          layout
-                                          variants={shortcutTagVariants}
-                                          initial={false}
-                                          animate="visible"
-                                          exit="exit"
-                                          onClick={() => handleRemoveAiTag(tag)}
-                                          data-tooltip={`Remove tag "${tag}"`}
-                                          className="flex items-center gap-1 bg-surface text-text-primary text-sm font-medium px-2 py-1 rounded group cursor-pointer"
+                              <SettingItem
+                                label="Custom AI Tag List"
+                                description="If provided, the AI will ONLY use tags from this list, overriding RapidRAW’s built-in list. Tagging works only in English."
+                              >
+                                <div>
+                                  <div className="flex flex-wrap gap-2 p-2 bg-bg-primary rounded-md min-h-[40px] border border-border-color mb-2 items-center">
+                                    <AnimatePresence>
+                                      {customAiTags.length > 0 ? (
+                                        customAiTags.map((tag: string) => (
+                                          <motion.div
+                                            key={tag}
+                                            layout
+                                            variants={shortcutTagVariants}
+                                            initial={false}
+                                            animate="visible"
+                                            exit="exit"
+                                            onClick={() => handleRemoveAiTag(tag)}
+                                            data-tooltip={`Remove tag "${tag}"`}
+                                            className="flex items-center gap-1 bg-surface px-2 py-1 rounded group cursor-pointer"
+                                          >
+                                            <Text variant={TextVariants.label} color={TextColors.primary}>
+                                              {tag}
+                                            </Text>
+                                            <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
+                                              <X size={14} />
+                                            </span>
+                                          </motion.div>
+                                        ))
+                                      ) : (
+                                        <motion.span
+                                          key="no-ai-tags-placeholder"
+                                          initial={{ opacity: 0 }}
+                                          animate={{ opacity: 1 }}
+                                          exit={{ opacity: 0 }}
+                                          transition={{ duration: 0.2 }}
                                         >
-                                          <span>{tag}</span>
-                                          <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
-                                            <X size={14} />
-                                          </span>
-                                        </motion.div>
-                                      ))
-                                    ) : (
-                                      <motion.span
-                                        key="no-ai-tags-placeholder"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="text-sm text-text-secondary italic px-1 select-none"
+                                          <Text className="px-1 select-none italic">
+                                            No custom AI tags (Using built-in list)
+                                          </Text>
+                                        </motion.span>
+                                      )}
+                                    </AnimatePresence>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                      <Input
+                                        type="text"
+                                        value={newAiTag}
+                                        onChange={(e) => setNewAiTag(e.target.value)}
+                                        onKeyDown={handleAiTagInputKeyDown}
+                                        placeholder="Add custom AI tags (comma separated)..."
+                                        className="pr-10"
+                                      />
+                                      <button
+                                        onClick={handleAddAiTag}
+                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface"
+                                        data-tooltip="Add AI tag"
                                       >
-                                        No custom AI tags (Using built-in list)
-                                      </motion.span>
-                                    )}
-                                  </AnimatePresence>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="relative flex-1">
-                                    <Input
-                                      type="text"
-                                      value={newAiTag}
-                                      onChange={(e) => setNewAiTag(e.target.value)}
-                                      onKeyDown={handleAiTagInputKeyDown}
-                                      placeholder="Add custom AI tags (comma separated)..."
-                                      className="pr-10"
-                                    />
+                                        <Plus size={18} />
+                                      </button>
+                                    </div>
                                     <button
-                                      onClick={handleAddAiTag}
-                                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface"
-                                      data-tooltip="Add AI tag"
+                                      onClick={() => onSettingsChange({ ...appSettings, customAiTags: [] })}
+                                      disabled={customAiTags.length === 0}
+                                      className="p-2 text-text-secondary hover:text-red-400 hover:bg-surface rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-secondary disabled:hover:bg-transparent"
+                                      data-tooltip="Clear AI Tag List"
                                     >
-                                      <Plus size={18} />
+                                      <Trash2 size={18} />
                                     </button>
                                   </div>
-                                  <button
-                                    onClick={() => onSettingsChange({ ...appSettings, customAiTags: [] })}
-                                    disabled={customAiTags.length === 0}
-                                    className="p-2 text-text-secondary hover:text-red-400 hover:bg-surface rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-secondary disabled:hover:bg-transparent"
-                                    data-tooltip="Clear AI Tag List"
-                                  >
-                                    <Trash2 size={18} />
-                                  </button>
                                 </div>
-                              </div>
-                            </SettingItem>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                              </SettingItem>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
 
                     <SettingItem
                       label="Tagging Shortcuts"
@@ -1040,9 +1083,11 @@ export default function SettingsPanel({
                                   exit="exit"
                                   onClick={() => handleRemoveShortcut(shortcut)}
                                   data-tooltip={`Remove shortcut "${shortcut}"`}
-                                  className="flex items-center gap-1 bg-surface text-text-primary text-sm font-medium px-2 py-1 rounded group cursor-pointer"
+                                  className="flex items-center gap-1 bg-surface px-2 py-1 rounded group cursor-pointer"
                                 >
-                                  <span>{shortcut}</span>
+                                  <Text variant={TextVariants.label} color={TextColors.primary}>
+                                    {shortcut}
+                                  </Text>
                                   <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
                                     <X size={14} />
                                   </span>
@@ -1092,8 +1137,8 @@ export default function SettingsPanel({
                       </div>
                     </SettingItem>
 
-                    <div className="pt-6 border-t border-border-color">
-                      <div className="space-y-6">
+                    <div className="pt-8 border-t border-border-color">
+                      <div className="space-y-8">
                         <DataActionItem
                           buttonAction={handleClearAiTags}
                           buttonText="Clear AI Tags"
@@ -1128,19 +1173,23 @@ export default function SettingsPanel({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-8"
+                className="space-y-10"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">Processing Engine</h2>
-                  <div className="space-y-6">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                    Processing Engine
+                  </Text>
+                  <div className="space-y-8">
                     <div>
-                      <h3 className="text-sm font-medium text-text-primary mb-2">Preview Rendering Strategy</h3>
+                      <Text variant={TextVariants.heading} className="mb-2">
+                        Preview Rendering Strategy
+                      </Text>
                       <PreviewModeSwitch
                         mode={appSettings?.enableZoomHifi ? 'dynamic' : 'static'}
                         onModeChange={handlePreviewModeChange}
                       />
 
-                      <div className="mt-4">
+                      <div className="mt-3">
                         <AnimatePresence mode="wait">
                           {!(appSettings?.enableZoomHifi ?? false) ? (
                             <motion.div
@@ -1150,23 +1199,25 @@ export default function SettingsPanel({
                               exit={{ opacity: 0, x: -10 }}
                               transition={{ duration: 0.2 }}
                             >
-                              <p className="text-sm text-text-secondary mb-4">
+                              <Text className="mb-4">
                                 The editor renders the image at a fixed resolution. This mode is the fastest and most
                                 consistent, making it ideal for lower-end hardware where smooth performance is
                                 prioritized over pixel-perfect zoom.
-                              </p>
-                              <SettingItem
-                                description="Determines the maximum resolution of the preview. Lower values significantly improve performance."
-                                label="Preview Resolution"
-                              >
-                                <Dropdown
-                                  onChange={(value: any) =>
-                                    handleProcessingSettingChange('editorPreviewResolution', value)
-                                  }
-                                  options={resolutions}
-                                  value={processingSettings.editorPreviewResolution}
-                                />
-                              </SettingItem>
+                              </Text>
+                              <div className="pl-4 border-l-2 border-border-color ml-1">
+                                <SettingItem
+                                  description="Determines the maximum resolution of the preview. Lower values significantly improve performance."
+                                  label="Preview Resolution"
+                                >
+                                  <Dropdown
+                                    onChange={(value: any) =>
+                                      handleProcessingSettingChange('editorPreviewResolution', value)
+                                    }
+                                    options={resolutions}
+                                    value={processingSettings.editorPreviewResolution}
+                                  />
+                                </SettingItem>
+                              </div>
                             </motion.div>
                           ) : (
                             <motion.div
@@ -1176,23 +1227,25 @@ export default function SettingsPanel({
                               exit={{ opacity: 0, x: -10 }}
                               transition={{ duration: 0.2 }}
                             >
-                              <p className="text-sm text-text-secondary mb-4">
+                              <Text className="mb-4">
                                 The editor renders the preview to match your display's actual pixel density. This
                                 ensures that every detail is represented with 1:1 pixel accuracy, providing maximum
                                 clarity when zooming and checking focus.
-                              </p>
-                              <SettingItem
-                                label="Render Resolution Scale"
-                                description="Controls the pixel density of the zoomed render. A lower value tells the editor to render as if your screen has a lower resolution, dramatically improving performance on 4K/Retina displays."
-                              >
-                                <Dropdown
-                                  onChange={(value: any) =>
-                                    handleProcessingSettingChange('highResZoomMultiplier', value)
-                                  }
-                                  options={zoomMultiplierOptions}
-                                  value={processingSettings.highResZoomMultiplier}
-                                />
-                              </SettingItem>
+                              </Text>
+                              <div className="pl-4 border-l-2 border-border-color ml-1">
+                                <SettingItem
+                                  label="Render Resolution Scale"
+                                  description="Controls the pixel density of the zoomed render. A lower value tells the editor to render as if your screen has a lower resolution, dramatically improving performance on 4K/Retina displays."
+                                >
+                                  <Dropdown
+                                    onChange={(value: any) =>
+                                      handleProcessingSettingChange('highResZoomMultiplier', value)
+                                    }
+                                    options={zoomMultiplierOptions}
+                                    value={processingSettings.highResZoomMultiplier}
+                                  />
+                                </SettingItem>
+                              </div>
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -1297,10 +1350,14 @@ export default function SettingsPanel({
 
                     {restartRequired && (
                       <>
-                        <div className="p-3 bg-blue-900/20 text-blue-300 border border-blue-500/50 rounded-lg text-sm flex items-center gap-3">
+                        <Text
+                          as="div"
+                          color={TextColors.info}
+                          className="p-3 bg-blue-900/10 border border-blue-500/50 rounded-lg flex items-center gap-3"
+                        >
                           <Info size={18} />
                           <p>Changes to the processing engine require an application restart to take effect.</p>
-                        </div>
+                        </Text>
                         <div className="flex justify-end">
                           <Button onClick={handleSaveAndRelaunch}>Save & Relaunch</Button>
                         </div>
@@ -1310,15 +1367,17 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">Generative AI</h2>
-                  <p className="text-sm text-text-secondary mb-4">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                    Generative AI
+                  </Text>
+                  <Text className="mb-4">
                     RapidRAW's AI is built for flexibility. Choose your ideal workflow, from fast local tools to
                     powerful self-hosting.
-                  </p>
+                  </Text>
 
                   <AiProviderSwitch selectedProvider={aiProvider} onProviderChange={handleProviderChange} />
 
-                  <div className="mt-6">
+                  <div className="mt-8">
                     <AnimatePresence mode="wait">
                       {aiProvider === 'cpu' && (
                         <motion.div
@@ -1328,16 +1387,16 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <h3 className="text-lg font-semibold text-text-primary">Built-in AI (CPU)</h3>
-                          <p className="text-sm text-text-secondary mt-1">
+                          <Text variant={TextVariants.heading}>Built-in AI (CPU)</Text>
+                          <Text className="mt-1">
                             Integrated directly into RapidRAW, these features run entirely on your computer. They are
                             fast, free, and require no setup, making them ideal for everyday workflow acceleration.
-                          </p>
-                          <ul className="mt-3 space-y-1 list-disc list-inside text-sm text-text-secondary">
+                          </Text>
+                          <Text as="ul" className="mt-3 space-y-1 list-disc list-inside">
                             <li>AI Masking (Subject, Sky, Foreground)</li>
                             <li>Automatic Image Tagging</li>
                             <li>Simple CPU-based Generative Replace</li>
-                          </ul>
+                          </Text>
                         </motion.div>
                       )}
 
@@ -1349,19 +1408,19 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <h3 className="text-lg font-semibold text-text-primary">
-                            Self-Hosted (RapidRAW AI Connector)
-                          </h3>
-                          <p className="text-sm text-text-secondary mt-1">
-                            For users with a capable GPU who want maximum control, connect RapidRAW to your own local AI
-                            Connector server. This gives you full control for technical workflows.
-                          </p>
-                          <ul className="mt-3 mb-6 space-y-1 list-disc list-inside text-sm text-text-secondary">
-                            <li>Use your own ComfyUI instance</li>
-                            <li>Cost-free advanced generative edits</li>
-                            <li>Custom workflow selection</li>
-                          </ul>
-                          <div className="space-y-6">
+                          <div className="space-y-8">
+                            <div>
+                              <Text variant={TextVariants.heading}>Self-Hosted (RapidRAW AI Connector)</Text>
+                              <Text className="mt-1">
+                                For users with a capable GPU who want maximum control, connect RapidRAW to your own
+                                Connector server. This gives you full control for technical workflows.
+                              </Text>
+                              <Text as="ul" className="mt-3 space-y-1 list-disc list-inside">
+                                <li>Use your own ComfyUI instance</li>
+                                <li>Cost-free advanced generative edits</li>
+                                <li>Custom workflow selection</li>
+                              </Text>
+                            </div>
                             <SettingItem
                               label="AI Connector Address"
                               description="Enter the address and port of your running AI Connector instance. Required for generative AI features."
@@ -1388,15 +1447,14 @@ export default function SettingsPanel({
                                 </Button>
                               </div>
                               {testStatus.message && (
-                                <p
-                                  className={`text-sm mt-2 flex items-center gap-2 ${
-                                    testStatus.success ? 'text-green-400' : 'text-red-400'
-                                  }`}
+                                <Text
+                                  color={testStatus.success ? TextColors.success : TextColors.error}
+                                  className="mt-2 flex items-center gap-2"
                                 >
                                   {testStatus.success === true && <Wifi size={16} />}
                                   {testStatus.success === false && <WifiOff size={16} />}
                                   {testStatus.message}
-                                </p>
+                                </Text>
                               )}
                             </SettingItem>
                           </div>
@@ -1411,25 +1469,30 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <h3 className="text-lg font-semibold text-text-primary">Cloud Service</h3>
-                          <p className="text-sm text-text-secondary mt-1">
+                          <Text variant={TextVariants.heading}>Cloud Service</Text>
+                          <Text className="mt-1">
                             For those who want a simpler solution, an optional subscription provides the same
                             high-quality results as self-hosting without any hassle. This is the most convenient option
                             and the best way to support the project.
-                          </p>
-                          <ul className="mt-3 space-y-1 list-disc list-inside text-sm text-text-secondary">
+                          </Text>
+                          <Text as="ul" className="mt-3 space-y-1 list-disc list-inside">
                             <li>Maximum convenience, no setup</li>
                             <li>Same results as self-hosting</li>
                             <li>No powerful hardware required</li>
-                          </ul>
+                          </Text>
 
-                          <div className="mt-6 p-4 bg-bg-primary rounded-lg border border-border-color text-center space-y-3">
-                            <span className="inline-block bg-accent text-button-text text-xs font-semibold px-2 py-1 rounded-full">
+                          <div className="mt-8 p-4 bg-bg-primary rounded-lg border border-border-color text-center space-y-3">
+                            <Text
+                              variant={TextVariants.small}
+                              color={TextColors.button}
+                              weight={TextWeights.semibold}
+                              className="inline-block bg-accent px-2 py-1 rounded-full"
+                            >
                               Coming Soon
-                            </span>
-                            <p className="text-sm text-text-secondary">
+                            </Text>
+                            <Text>
                               Keep an eye on the GitHub page to be notified when the cloud service is available.
-                            </p>
+                            </Text>
                           </div>
                         </motion.div>
                       )}
@@ -1438,20 +1501,22 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">Data Management</h2>
-                  <div className="space-y-6">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                    Data Management
+                  </Text>
+                  <div className="space-y-8">
                     <DataActionItem
                       buttonAction={handleClearSidecars}
                       buttonText="Delete All Edits in Folder"
                       description={
-                        <>
+                        <Text as="span" variant={TextVariants.small}>
                           This will delete all{' '}
                           <code className="bg-bg-primary px-1 rounded text-text-primary">.rrdata</code> files
                           (containing your edits) within the current base folder:
-                          <span className="block font-mono text-xs bg-bg-primary p-2 rounded mt-2 break-all border border-border-color">
+                          <span className="block font-mono bg-bg-primary p-2 rounded mt-2 break-all border border-border-color">
                             {effectiveRootPath || 'No folder selected'}
                           </span>
-                        </>
+                        </Text>
                       }
                       disabled={!effectiveRootPath}
                       icon={<Trash2 size={16} className="mr-2" />}
@@ -1478,12 +1543,12 @@ export default function SettingsPanel({
                       }}
                       buttonText="Open Log File"
                       description={
-                        <>
+                        <Text as="span" variant={TextVariants.small}>
                           View the application's log file for troubleshooting. The log is located at:
-                          <span className="block font-mono text-xs bg-bg-primary p-2 rounded mt-2 break-all border border-border-color">
+                          <span className="block font-mono bg-bg-primary p-2 rounded mt-2 break-all border border-border-color">
                             {logPath || 'Loading...'}
                           </span>
-                        </>
+                        </Text>
                       }
                       disabled={!logPath || logPath.startsWith('Could not')}
                       icon={<ExternalLinkIcon size={16} className="mr-2" />}
@@ -1503,13 +1568,15 @@ export default function SettingsPanel({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-8"
+                className="space-y-10"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <h2 className="text-xl font-semibold mb-6 text-accent">Keyboard Shortcuts</h2>
-                  <div className="space-y-4">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                    Keyboard Shortcuts
+                  </Text>
+                  <div className="space-y-8">
                     <div>
-                      <h3 className="text-lg font-semibold pt-3 pb-2 text-accent">General</h3>
+                      <Text variant={TextVariants.heading}>General</Text>
                       <div className="divide-y divide-border-color">
                         <KeybindItem keys={['Space', 'Enter']} description="Open selected image" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', 'C']} description="Copy selected adjustments" />
@@ -1527,7 +1594,7 @@ export default function SettingsPanel({
                       </div>
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold pt-3 pb-2 text-accent">Editor</h3>
+                      <Text variant={TextVariants.heading}>Editor</Text>
                       <div className="divide-y divide-border-color">
                         <KeybindItem keys={['Esc']} description="Deselect mask, exit crop/fullscreen/editor" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', 'Z']} description="Undo adjustment" />

@@ -5,6 +5,8 @@ import ColorWheel from '../ui/ColorWheel';
 import { ColorAdjustment, ColorCalibration, HueSatLum, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import { Adjustments, ColorGrading } from '../../utils/adjustments';
 import { AppSettings } from '../ui/AppProperties';
+import Text from '../ui/Text';
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 
 interface ColorProps {
   color: string;
@@ -231,9 +233,13 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
 
   return (
     <div className="p-2 bg-bg-tertiary rounded-md mt-4">
-      <p className="text-md font-semibold mb-3 text-primary">Color Calibration</p>
+      <Text variant={TextVariants.heading} className="mb-2">
+        Color Calibration
+      </Text>
       <div>
-        <p className="text-sm font-medium mb-1 text-secondary">Shadows</p>
+        <Text color={TextColors.primary} weight={TextWeights.medium} className="mb-1">
+          Shadows
+        </Text>
         <Slider
           label="Tint"
           min={-100}
@@ -246,7 +252,9 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
         />
       </div>
       <div className="mt-3">
-        <p className="text-sm font-medium mb-3 text-secondary">Primaries</p>
+        <Text color={TextColors.primary} weight={TextWeights.medium} className="mb-3">
+          Primaries
+        </Text>
         <div className="flex justify-center gap-6 mb-4 px-1">
           {PRIMARY_COLORS.map(({ name, color }) => (
             <ColorSwatch
@@ -315,10 +323,10 @@ export default function ColorPanel({
   const currentHsl = adjustments?.hsl?.[activeColor] || { hue: 0, saturation: 0, luminance: 0 };
 
   return (
-    <div>
-      <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
+    <div className="space-y-4">
+      <div className="p-2 bg-bg-tertiary rounded-md">
         <div className="flex justify-between items-center mb-2">
-          <p className="text-md font-semibold text-primary">White Balance</p>
+          <Text variant={TextVariants.heading}>White Balance</Text>
           {!isForMask && toggleWbPicker && (
             <button
               onClick={toggleWbPicker}
@@ -351,8 +359,10 @@ export default function ColorPanel({
         />
       </div>
 
-      <div className="mb-4 p-2 bg-bg-tertiary rounded-md">
-        <p className="text-md font-semibold mb-2 text-primary">Presence</p>
+      <div className="p-2 bg-bg-tertiary rounded-md">
+        <Text variant={TextVariants.heading} className="mb-2">
+          Presence
+        </Text>
         <Slider
           label="Vibrance"
           max={100}
@@ -373,8 +383,10 @@ export default function ColorPanel({
         />
       </div>
 
-      <div className="p-2 bg-bg-tertiary rounded-md mt-4">
-        <p className="text-md font-semibold mb-3 text-primary">Color Grading</p>
+      <div className="p-2 bg-bg-tertiary rounded-md">
+        <Text variant={TextVariants.heading} className="mb-3">
+          Color Grading
+        </Text>
         <ColorGradingPanel
           adjustments={adjustments}
           setAdjustments={setAdjustments}
@@ -383,8 +395,10 @@ export default function ColorPanel({
         />
       </div>
 
-      <div className="p-2 bg-bg-tertiary rounded-md mt-4">
-        <p className="text-md font-semibold mb-3 text-primary">Color Mixer</p>
+      <div className="p-2 bg-bg-tertiary rounded-md">
+        <Text variant={TextVariants.heading} className="mb-3">
+          Color Mixer
+        </Text>
         <div className="flex justify-between mb-4 px-1">
           {HSL_COLORS.map(({ name, color }) => (
             <ColorSwatch

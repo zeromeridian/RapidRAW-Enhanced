@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CheckCircle, XCircle, Loader2, Save } from 'lucide-react';
 import Button from '../ui/Button';
+import Text from '../ui/Text';
+import { TextVariants } from '../../types/typography';
 
 interface PanoramaModalProps {
   error: string | null;
@@ -82,10 +84,10 @@ export default function PanoramaModal({
       return (
         <>
           <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-text-primary mb-2 text-center">Panorama Failed</h3>
-          <p className="text-sm text-text-secondary text-center p-2 rounded-md max-h-40 overflow-y-auto">
-            {String(error)}
-          </p>
+          <Text variant={TextVariants.title} className="mb-2 text-center">
+            Panorama Failed
+          </Text>
+          <Text className="text-center p-2 rounded-md max-h-40 overflow-y-auto">{String(error)}</Text>
         </>
       );
     }
@@ -96,7 +98,9 @@ export default function PanoramaModal({
           {savedPath && (
             <>
               <CheckCircle className="w-16 h-16 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-text-primary mb-4 text-center">Panorama Saved!</h3>
+              <Text variant={TextVariants.title} className="mb-4 text-center">
+                Panorama Saved!
+              </Text>
             </>
           )}
           <div className="w-full bg-bg-primary rounded-md overflow-hidden border border-surface">
@@ -111,8 +115,10 @@ export default function PanoramaModal({
         <div className="w-16 h-16 mx-auto mb-4">
           <Loader2 className="w-16 h-16 text-accent animate-spin" />
         </div>
-        <h3 className="text-lg font-semibold text-text-primary mb-2 text-center">Stitching Panorama</h3>
-        <p className="text-sm text-text-secondary text-center min-h-[1.25rem]">{progressMessage}</p>
+        <Text variant={TextVariants.title} className="mb-2 text-center">
+          Stitching Panorama
+        </Text>
+        <Text className="text-center min-h-[1.25rem]">{progressMessage}</Text>
       </>
     );
   };

@@ -41,6 +41,8 @@ import {
 } from '../ui/AppProperties';
 import { Color, COLOR_LABELS } from '../../utils/adjustments';
 import { ImportState, Status } from '../ui/ExportImportProperties';
+import Text from '../ui/Text';
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 
 interface DropdownMenuProps {
   buttonContent: any;
@@ -382,13 +384,15 @@ function SearchInput({ indexingProgress, isIndexing, searchCriteria, setSearchCr
               initial={{ opacity: 0, scale: 0.5 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.5 }}
-              className="flex items-center gap-1 bg-bg-primary text-text-primary text-xs font-medium px-2 py-1 rounded group cursor-pointer flex-shrink-0"
+              className="flex items-center gap-1 bg-bg-primary px-2 py-1 rounded group cursor-pointer flex-shrink-0"
               onClick={(e) => {
                 e.stopPropagation();
                 removeTag(tag);
               }}
             >
-              <span>{tag}</span>
+              <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                {tag}
+              </Text>
               <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
                 <X size={12} />
               </span>
@@ -424,9 +428,11 @@ function SearchInput({ indexingProgress, isIndexing, searchCriteria, setSearchCr
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ duration: 0.15 }}
-              className="flex-shrink-0 bg-bg-primary text-text-secondary text-xs px-2 py-1 rounded-md whitespace-nowrap"
+              className="flex-shrink-0 bg-bg-primary px-2 py-1 rounded-md whitespace-nowrap"
             >
-              Separate tags with <kbd className="font-sans font-semibold">,</kbd>
+              <Text variant={TextVariants.small}>
+                Separate tags with <kbd className="font-sans font-semibold">,</kbd>
+              </Text>
             </motion.div>
           )}
         </AnimatePresence>
@@ -434,10 +440,12 @@ function SearchInput({ indexingProgress, isIndexing, searchCriteria, setSearchCr
         {tags.length > 0 && (
           <button
             onClick={toggleMode}
-            className="p-1.5 rounded-md text-xs font-semibold hover:bg-bg-primary w-10 flex-shrink-0"
+            className="p-1.5 rounded-md hover:bg-bg-primary w-10 flex-shrink-0"
             data-tooltip={`Match ${mode === 'AND' ? 'ALL' : 'ANY'} tags`}
           >
-            {mode}
+            <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.semibold}>
+              {mode}
+            </Text>
           </button>
         )}
         {(tags.length > 0 || text) && !isIndexing && (
@@ -493,7 +501,9 @@ function ColorFilterOptions({ filterCriteria, setFilterCriteria }: FilterOptionP
 
   return (
     <div>
-      <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Filter by Color Label</div>
+      <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+        Filter by Color Label
+      </Text>
       <div className="flex flex-wrap gap-3 px-3 py-2">
         {allColors.map((color: Color) => {
           const isSelected = (filterCriteria.colors || []).includes(color.name);
@@ -573,19 +583,27 @@ function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName =
 function ThumbnailSizeOptions({ selectedSize, onSelectSize }: ThumbnailSizeProps) {
   return (
     <>
-      <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Thumbnail Size</div>
+      <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+        Thumbnail Size
+      </Text>
       {thumbnailSizeOptions.map((option: ThumbnailSizeOption) => {
         const isSelected = selectedSize === option.id;
         return (
           <button
-            className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${
-              isSelected ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'
+            className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
+              isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
             }`}
             key={option.id}
             onClick={() => onSelectSize(option.id)}
             role="menuitem"
           >
-            <span>{option.label}</span>
+            <Text
+              variant={TextVariants.label}
+              color={TextColors.primary}
+              weight={isSelected ? TextWeights.semibold : TextWeights.normal}
+            >
+              {option.label}
+            </Text>
             {isSelected && <Check size={16} />}
           </button>
         );
@@ -597,19 +615,27 @@ function ThumbnailSizeOptions({ selectedSize, onSelectSize }: ThumbnailSizeProps
 function ThumbnailAspectRatioOptions({ selectedAspectRatio, onSelectAspectRatio }: ThumbnailAspectRatioProps) {
   return (
     <>
-      <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Thumbnail Fit</div>
+      <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+        Thumbnail Fit
+      </Text>
       {thumbnailAspectRatioOptions.map((option: ThumbnailAspectRatioOption) => {
         const isSelected = selectedAspectRatio === option.id;
         return (
           <button
-            className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${
-              isSelected ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'
+            className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
+              isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
             }`}
             key={option.id}
             onClick={() => onSelectAspectRatio(option.id)}
             role="menuitem"
           >
-            <span>{option.label}</span>
+            <Text
+              variant={TextVariants.label}
+              color={TextColors.primary}
+              weight={isSelected ? TextWeights.semibold : TextWeights.normal}
+            >
+              {option.label}
+            </Text>
             {isSelected && <Check size={16} />}
           </button>
         );
@@ -631,15 +657,15 @@ function FilterOptions({ filterCriteria, setFilterCriteria }: FilterOptionProps)
     <>
       <div className="space-y-4">
         <div>
-          <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Filter by Rating</div>
+          <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+            Filter by Rating
+          </Text>
           {ratingFilterOptions.map((option: KeyValueLabel) => {
             const isSelected = filterCriteria.rating === option.value;
             return (
               <button
-                className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${
-                  isSelected
-                    ? 'bg-card-active text-text-primary font-semibold'
-                    : 'text-text-primary hover:bg-bg-primary'
+                className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
+                  isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
                 }`}
                 key={option.value}
                 onClick={() => handleRatingFilterChange(option.value)}
@@ -647,7 +673,13 @@ function FilterOptions({ filterCriteria, setFilterCriteria }: FilterOptionProps)
               >
                 <span className="flex items-center gap-2">
                   {option.value && option.value > 0 && <StarIcon size={16} className="text-accent fill-accent" />}
-                  <span>{option.label}</span>
+                  <Text
+                    variant={TextVariants.label}
+                    color={TextColors.primary}
+                    weight={isSelected ? TextWeights.semibold : TextWeights.normal}
+                  >
+                    {option.label}
+                  </Text>
                 </span>
                 {isSelected && <Check size={16} />}
               </button>
@@ -656,21 +688,27 @@ function FilterOptions({ filterCriteria, setFilterCriteria }: FilterOptionProps)
         </div>
 
         <div>
-          <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Filter by File Type</div>
+          <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+            Filter by File Type
+          </Text>
           {rawStatusOptions.map((option: KeyValueLabel) => {
             const isSelected = (filterCriteria.rawStatus || RawStatus.All) === option.key;
             return (
               <button
-                className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${
-                  isSelected
-                    ? 'bg-card-active text-text-primary font-semibold'
-                    : 'text-text-primary hover:bg-bg-primary'
+                className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
+                  isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
                 }`}
                 key={option.key}
                 onClick={() => handleRawStatusChange(option.key as RawStatus)}
                 role="menuitem"
               >
-                <span>{option.label}</span>
+                <Text
+                  variant={TextVariants.label}
+                  color={TextColors.primary}
+                  weight={isSelected ? TextWeights.semibold : TextWeights.normal}
+                >
+                  {option.label}
+                </Text>
                 {isSelected && <Check size={16} />}
               </button>
             );
@@ -698,7 +736,9 @@ function SortOptions({ sortCriteria, setSortCriteria, sortOptions }: SortOptions
   return (
     <>
       <div className="px-3 py-2 relative flex items-center">
-        <div className="text-xs font-semibold text-text-secondary uppercase">Sort by</div>
+        <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="uppercase">
+          Sort by
+        </Text>
         <button
           onClick={handleOrderToggle}
           data-tooltip={`Sort ${sortCriteria.order === SortDirection.Ascending ? 'Descending' : 'Ascending'}`}
@@ -739,8 +779,8 @@ function SortOptions({ sortCriteria, setSortCriteria, sortOptions }: SortOptions
         const isSelected = sortCriteria.key === option.key;
         return (
           <button
-            className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${
-              isSelected ? 'bg-card-active text-text-primary font-semibold' : 'text-text-primary hover:bg-bg-primary'
+            className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
+              isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
             } ${option.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             key={option.key}
             onClick={() => !option.disabled && handleKeyChange(option.key)}
@@ -748,7 +788,13 @@ function SortOptions({ sortCriteria, setSortCriteria, sortOptions }: SortOptions
             disabled={option.disabled}
             data-tooltip={option.disabled ? 'Enable EXIF Reading in Settings to use this option.' : undefined}
           >
-            <span>{option.label}</span>
+            <Text
+              variant={TextVariants.label}
+              color={TextColors.primary}
+              weight={isSelected ? TextWeights.semibold : TextWeights.normal}
+            >
+              {option.label}
+            </Text>
             {isSelected && <Check size={16} />}
           </button>
         );
@@ -760,29 +806,39 @@ function SortOptions({ sortCriteria, setSortCriteria, sortOptions }: SortOptions
 function ViewModeOptions({ mode, setMode }: { mode: LibraryViewMode; setMode: (m: LibraryViewMode) => void }) {
   return (
     <>
-      <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase">Display Mode</div>
+      <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+        Display Mode
+      </Text>
       <button
-        className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${
-          mode === LibraryViewMode.Flat
-            ? 'bg-card-active text-text-primary font-semibold'
-            : 'text-text-primary hover:bg-bg-primary'
+        className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
+          mode === LibraryViewMode.Flat ? 'bg-card-active' : 'hover:bg-bg-primary'
         }`}
         onClick={() => setMode(LibraryViewMode.Flat)}
         role="menuitem"
       >
-        <span>Current Folder</span>
+        <Text
+          variant={TextVariants.label}
+          color={TextColors.primary}
+          weight={mode === LibraryViewMode.Flat ? TextWeights.semibold : TextWeights.normal}
+        >
+          Current Folder
+        </Text>
         {mode === LibraryViewMode.Flat && <Check size={16} />}
       </button>
       <button
-        className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between transition-colors duration-150 ${
-          mode === LibraryViewMode.Recursive
-            ? 'bg-card-active text-text-primary font-semibold'
-            : 'text-text-primary hover:bg-bg-primary'
+        className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
+          mode === LibraryViewMode.Recursive ? 'bg-card-active' : 'hover:bg-bg-primary'
         }`}
         onClick={() => setMode(LibraryViewMode.Recursive)}
         role="menuitem"
       >
-        <span>Recursive</span>
+        <Text
+          variant={TextVariants.label}
+          color={TextColors.primary}
+          weight={mode === LibraryViewMode.Recursive ? TextWeights.semibold : TextWeights.normal}
+        >
+          Recursive
+        </Text>
         {mode === LibraryViewMode.Recursive && <Check size={16} />}
       </button>
     </>
@@ -986,7 +1042,7 @@ function Thumbnail({
       </AnimatePresence>
 
       {(colorLabel || rating > 0) && (
-        <div className="absolute top-1.5 right-1.5 bg-bg-primary/50 rounded-full px-1.5 py-0.5 text-xs text-text-primary flex items-center gap-1 backdrop-blur-sm">
+        <div className="absolute top-1.5 right-1.5 bg-bg-primary/50 rounded-full px-1.5 py-0.5 flex items-center gap-1 backdrop-blur-sm">
           {colorLabel && (
             <div
               className="w-3 h-3 rounded-full ring-1 ring-black/20"
@@ -996,21 +1052,29 @@ function Thumbnail({
           )}
           {rating > 0 && (
             <>
-              <span>{rating}</span>
-              <StarIcon size={12} className="text-accent fill-accent" />
+              <Text variant={TextVariants.label} color={TextColors.primary}>
+                {rating}
+              </Text>
+              <StarIcon size={16} className="text-accent fill-accent" />
             </>
           )}
         </div>
       )}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 flex items-end justify-between">
-        <p className="text-white text-xs truncate pr-2">{baseName}</p>
+        <Text variant={TextVariants.small} color={TextColors.white} className="truncate pr-2">
+          {baseName}
+        </Text>
         {isVirtualCopy && (
-          <div
-            className="flex-shrink-0 bg-bg-primary/50 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full backdrop-blur-sm"
+          <Text
+            as="div"
+            variant={TextVariants.label}
+            color={TextColors.white}
+            weight={TextWeights.bold}
+            className="flex-shrink-0 bg-bg-primary/50 text-[10px] px-1.5 py-0.5 rounded-full backdrop-blur-sm"
             data-tooltip="Virtual Copy"
           >
             VC
-          </div>
+          </Text>
         )}
       </div>
     </div>
@@ -1063,10 +1127,12 @@ const Row = ({ index, style, data }: any) => {
       >
         <div className="flex items-center gap-2 w-full border-b border-border-color pb-1">
           <FolderOpen size={16} className="text-text-secondary" />
-          <span className="text-sm font-semibold text-text-secondary truncate" data-tooltip={row.path}>
+          <Text variant={TextVariants.label} weight={TextWeights.semibold} className="truncate" data-tooltip={row.path}>
             {displayPath}
-          </span>
-          <span className="text-xs text-text-secondary opacity-60 ml-auto">{row.count} images</span>
+          </Text>
+          <Text variant={TextVariants.small} className="opacity-60 ml-auto">
+            {row.count} images
+          </Text>
         </div>
       </div>
     );
@@ -1420,8 +1486,13 @@ export default function MainLibrary({
           ) : (
             <>
               <div className="my-auto text-left">
-                <h1 className="text-5xl font-bold text-text-primary text-shadow-shiny mb-4">RapidRAW</h1>
-                <p className="text-text-secondary mb-10 max-w-md">
+                <Text variant={TextVariants.displayLarge}>RapidRAW</Text>
+                <Text
+                  variant={TextVariants.heading}
+                  color={TextColors.secondary}
+                  weight={TextWeights.normal}
+                  className="mb-10 max-w-md"
+                >
                   {hasLastPath ? (
                     <>
                       Welcome back!
@@ -1431,7 +1502,7 @@ export default function MainLibrary({
                   ) : (
                     'A blazingly fast, GPU-accelerated RAW image editor. Open a folder to begin.'
                   )}
-                </p>
+                </Text>
                 <div className="flex flex-col w-full max-w-xs gap-4">
                   {hasLastPath && (
                     <Button
@@ -1465,7 +1536,7 @@ export default function MainLibrary({
                   </div>
                 </div>
               </div>
-              <div className="absolute bottom-8 left-8 lg:left-16 text-xs text-text-secondary space-y-1">
+              <Text variant={TextVariants.small} as="div" className="absolute bottom-8 left-8 lg:left-16 space-y-1">
                 <p>
                   Images by{' '}
                   <a
@@ -1523,7 +1594,7 @@ export default function MainLibrary({
                     </p>
                   </div>
                 )}
-              </div>
+              </Text>
             </>
           )}
         </div>
@@ -1538,10 +1609,10 @@ export default function MainLibrary({
     >
       <header className="p-4 flex-shrink-0 flex justify-between items-center border-b border-border-color gap-4">
         <div className="min-w-0">
-          <h2 className="text-2xl font-bold text-primary text-shadow-shiny">Library</h2>
+          <Text variant={TextVariants.headline}>Library</Text>
           <div className="flex items-center gap-2">
             {currentFolderPath ? (
-              <p className="text-sm text-text-secondary truncate">{currentFolderPath}</p>
+              <Text className="truncate">{currentFolderPath}</Text>
             ) : (
               <p className="text-sm invisible select-none pointer-events-none h-5 overflow-hidden"></p>
             )}
@@ -1556,24 +1627,24 @@ export default function MainLibrary({
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           {importState.status === Status.Importing && (
-            <div className="flex items-center gap-2 text-sm text-accent animate-pulse">
+            <Text as="div" color={TextColors.accent} className="flex items-center gap-2 animate-pulse">
               <FolderInput size={16} />
               <span>
                 Importing... ({importState.progress?.current}/{importState.progress?.total})
               </span>
-            </div>
+            </Text>
           )}
           {importState.status === Status.Success && (
-            <div className="flex items-center gap-2 text-sm text-green-400">
+            <Text as="div" color={TextColors.success} className="flex items-center gap-2">
               <Check size={16} />
               <span>Import Complete!</span>
-            </div>
+            </Text>
           )}
           {importState.status === Status.Error && (
-            <div className="flex items-center gap-2 text-sm text-red-400">
+            <Text as="div" color={TextColors.error} className="flex items-center gap-2">
               <AlertTriangle size={16} />
               <span>Import Failed!</span>
-            </div>
+            </Text>
           )}
           <SearchInput
             indexingProgress={indexingProgress}
@@ -1698,12 +1769,9 @@ export default function MainLibrary({
           </AutoSizer>
         </div>
       ) : isIndexing || aiModelDownloadStatus || importState.status === Status.Importing ? (
-        <div
-          className="flex-1 flex flex-col items-center justify-center text-text-secondary"
-          onContextMenu={onEmptyAreaContextMenu}
-        >
+        <div className="flex-1 flex flex-col items-center justify-center" onContextMenu={onEmptyAreaContextMenu}>
           <Loader2 className="h-12 w-12 text-secondary animate-spin mb-4" />
-          <p className="text-lg font-semibold">
+          <Text variant={TextVariants.heading} color={TextColors.secondary}>
             {aiModelDownloadStatus
               ? `Downloading ${aiModelDownloadStatus}...`
               : isIndexing && indexingProgress.total > 0
@@ -1713,8 +1781,8 @@ export default function MainLibrary({
                     importState.progress.total > 0
                   ? `Importing images... (${importState.progress?.current}/${importState.progress?.total})`
                   : 'Processing images...'}
-          </p>
-          <p className="text-sm mt-2">This may take a moment.</p>
+          </Text>
+          <Text className="mt-2">This may take a moment.</Text>
         </div>
       ) : searchCriteria.tags.length > 0 || searchCriteria.text ? (
         <div
@@ -1722,19 +1790,18 @@ export default function MainLibrary({
           onContextMenu={onEmptyAreaContextMenu}
         >
           <Search className="h-12 w-12 text-secondary mb-4" />
-          <p className="text-lg font-semibold">No Results Found</p>
-          <p className="text-sm mt-2 max-w-sm">
+          <Text variant={TextVariants.heading} color={TextColors.secondary}>
+            No Results Found
+          </Text>
+          <Text className="mt-2 max-w-sm">
             Could not find an image based on filename or tags.
             {!appSettings?.enableAiTagging && ' For a more comprehensive search, enable automatic tagging in Settings.'}
-          </p>
+          </Text>
         </div>
       ) : (
-        <div
-          className="flex-1 flex flex-col items-center justify-center text-text-secondary"
-          onContextMenu={onEmptyAreaContextMenu}
-        >
-          <SlidersHorizontal className="h-12 w-12 text-secondary mb-4 text-text-secondary" />
-          <p className="text-text-secondary">No images found that match your filter.</p>
+        <div className="flex-1 flex flex-col items-center justify-center" onContextMenu={onEmptyAreaContextMenu}>
+          <SlidersHorizontal className="h-12 w-12 mb-4 text-text-secondary" />
+          <Text>No images found that match your filter.</Text>
         </div>
       )}
     </div>

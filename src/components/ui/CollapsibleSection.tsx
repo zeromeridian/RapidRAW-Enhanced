@@ -1,6 +1,8 @@
 import { useRef, useEffect, useState } from 'react';
 import { ChevronDown, Eye, EyeOff } from 'lucide-react';
 import clsx from 'clsx';
+import Text from './Text';
+import { TextVariants, TextWeights } from '../../types/typography';
 
 interface CollapsibleSectionProps {
   canToggleVisibility?: boolean;
@@ -83,7 +85,9 @@ export default function CollapsibleSection({
         onMouseLeave={handleMouseLeave}
       >
         <div className="flex items-center gap-2">
-          <h3 className="text-lg font-normal text-primary text-shadow-shiny">{title}</h3>
+          <Text variant={TextVariants.title} weight={TextWeights.normal}>
+            {title}
+          </Text>
           {canToggleVisibility && (
             <div className="w-6 h-6 flex items-center justify-center">
               <button

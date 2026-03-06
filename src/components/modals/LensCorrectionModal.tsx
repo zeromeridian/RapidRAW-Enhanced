@@ -25,6 +25,8 @@ import throttle from 'lodash.throttle';
 import { Adjustments } from '../../utils/adjustments';
 import { SelectedImage } from '../ui/AppProperties';
 import clsx from 'clsx';
+import Text from '../ui/Text';
+import { TextColors, TextVariants } from '../../types/typography';
 
 interface GeometryParams {
   distortion: number;
@@ -536,7 +538,7 @@ export default function LensCorrectionModal({
   const renderControls = () => (
     <div className="w-80 flex-shrink-0 bg-bg-secondary flex flex-col border-l border-surface h-full z-10">
       <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
-        <h2 className="text-xl font-bold text-primary text-shadow-shiny">Lens Correction</h2>
+        <Text variant={TextVariants.title}>Lens Correction</Text>
         <button
           onClick={handleReset}
           data-tooltip="Reset Lens Correction"
@@ -545,43 +547,56 @@ export default function LensCorrectionModal({
           <RotateCcw size={18} />
         </button>
       </div>
-      <div className="flex-grow overflow-y-auto p-4 flex flex-col gap-6 text-text-secondary">
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-text-primary">Auto Detection</p>
-          <button
-            onClick={handleAutoDetect}
-            className={clsx(
-              'w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold rounded-md transition-colors',
-              detectionStatus === 'not_found'
-                ? 'bg-red-500/20 text-red-400'
-                : detectionStatus === 'success'
-                  ? 'bg-green-500/20 text-green-400'
-                  : 'bg-surface hover:bg-card-active',
-            )}
-            disabled={detectionStatus === 'detecting'}
-          >
-            {autoDetectButtonContent()}
-          </button>
+      <div className="flex-grow overflow-y-auto p-4 flex flex-col gap-8 text-text-secondary">
+        <div>
+          <Text variant={TextVariants.heading} className="mb-2">
+            Auto Detection
+          </Text>
+          <div className="space-y-3">
+            <button
+              onClick={handleAutoDetect}
+              className={clsx(
+                'w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold rounded-md transition-colors',
+                detectionStatus === 'not_found'
+                  ? 'bg-red-500/20 text-red-400'
+                  : detectionStatus === 'success'
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-surface hover:bg-card-active',
+              )}
+              disabled={detectionStatus === 'detecting'}
+            >
+              {autoDetectButtonContent()}
+            </button>
 
-          <AnimatePresence>
-            {detectionStatus === 'not_found' && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="p-3 bg-red-500/10 border border-red-500/20 rounded-md flex items-center gap-3 text-red-300"
-              >
-                <Info size={16} className="flex-shrink-0" />
-                <p className="text-xs leading-relaxed">
-                  Lens correction may not be available for all lenses. Auto-detection relies on EXIF data.
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+            <AnimatePresence>
+              {detectionStatus === 'not_found' && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="p-3 bg-red-900/10 border border-red-500/20 rounded-md"
+                >
+                  <Text
+                    as="div"
+                    variant={TextVariants.small}
+                    color={TextColors.error}
+                    className="flex items-center gap-3"
+                  >
+                    <Info size={16} className="flex-shrink-0" />
+                    <p className="leading-relaxed">
+                      Lens correction may not be available for all lenses. Auto-detection relies on EXIF data.
+                    </p>
+                  </Text>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-text-primary">Manual Selection</p>
+        <div>
+          <Text variant={TextVariants.heading} className="mb-2">
+            Manual Selection
+          </Text>
 
           <div className="space-y-4">
             <Dropdown options={myLensOptions} value="" onChange={handleMyLensSelect} placeholder="Choose Saved Lens" />
@@ -602,8 +617,10 @@ export default function LensCorrectionModal({
           </div>
         </div>
 
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-text-primary">Corrections</p>
+        <div>
+          <Text variant={TextVariants.heading} className="mb-2">
+            Corrections
+          </Text>
 
           <div className="flex flex-col gap-4">
             <div>
@@ -730,16 +747,24 @@ export default function LensCorrectionModal({
 
         <div className="mt-auto space-y-2">
           {currentAdjustments.masks && currentAdjustments.masks.length > 0 && (
-            <div className="p-3 bg-surface rounded-md border border-surface flex items-center gap-3">
-              <Info size={16} className="text-text-secondary flex-shrink-0" />
-              <p className="text-xs text-text-secondary leading-relaxed">
+            <Text
+              as="div"
+              variant={TextVariants.small}
+              className="p-3 bg-surface rounded-md border border-surface flex items-center gap-3"
+            >
+              <Info size={16} className="flex-shrink-0" />
+              <p className="leading-relaxed">
                 Lens correction updates base geometry. Existing masks may shift, and AI masks must be regenerated.
               </p>
-            </div>
+            </Text>
           )}
-          <div className="p-3 bg-surface rounded-md border border-surface flex items-center gap-3">
-            <Info size={16} className="text-text-secondary flex-shrink-0" />
-            <div className="text-xs text-text-tertiary leading-tight space-y-1">
+          <Text
+            as="div"
+            variant={TextVariants.small}
+            className="p-3 bg-surface rounded-md border border-surface flex items-center gap-3"
+          >
+            <Info size={16} className="flex-shrink-0" />
+            <div className="leading-tight space-y-1">
               <p>
                 Lens database provided by the{' '}
                 <a
@@ -762,7 +787,7 @@ export default function LensCorrectionModal({
                 ).
               </p>
             </div>
-          </div>
+          </Text>
         </div>
       </div>
     </div>
@@ -794,9 +819,14 @@ export default function LensCorrectionModal({
                     draggable={false}
                   />
                   {isCompareActive && (
-                    <div className="absolute top-4 left-4 bg-accent text-button-text text-xs px-2 py-1 rounded shadow-lg z-20">
-                      ORIGINAL
-                    </div>
+                    <Text
+                      as="div"
+                      variant={TextVariants.small}
+                      color={TextColors.button}
+                      className="absolute top-4 left-4 bg-accent px-2 py-1 rounded shadow-lg z-20"
+                    >
+                      Original
+                    </Text>
                   )}
                 </div>
               </div>
