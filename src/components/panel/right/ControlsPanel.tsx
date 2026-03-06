@@ -164,8 +164,8 @@ export default function Controls({
         <h2 className="text-xl font-bold text-primary text-shadow-shiny">Adjustments</h2>
         <div className="flex items-center gap-1">
           <button
-            className="p-2 rounded-full hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            disabled={!selectedImage}
+            className="p-2 rounded-full hover:bg-surface disabled:cursor-not-allowed transition-colors"
+            disabled={!selectedImage?.isReady}
             onClick={handleAutoAdjustments}
             data-tooltip="Auto Adjust Image"
           >
