@@ -109,6 +109,7 @@ pub struct CachedPreview {
     scale: f32,
     unscaled_crop_offset: (f32, f32),
     preview_dim: u32,
+    interactive_divisor: f32,
 }
 
 pub struct GpuImageCache {
@@ -761,36 +762,72 @@ fn process_preview_job(
     let adjustments_clone = adjustments_json;
 
     let loaded_image_guard = state.original_image.lock().unwrap();
-    let loaded_image = loaded_image_guard.as_ref().ok_or("No original image loaded")?.clone();
+    let loaded_image = loaded_image_guard
+        .as_ref()
+        .ok_or("No original image loaded")?
+        .clone();
     drop(loaded_image_guard);
 
     let new_transform_hash = calculate_transform_hash(&adjustments_clone);
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let hq_live = settings.enable_high_quality_live_previews.unwrap_or(false);
-    let interactive_divisor = if hq_live { 1.5 } else { 2.0 };
-    let interactive_quality = if hq_live { 70 } else { 60 };
 
     let default_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
     let preview_dim = target_resolution.unwrap_or(default_preview_dim);
 
+    let preview_dim_f = preview_dim as f32;
+    let max_interactive_dim: f32 = if hq_live { 3072.0 } else { 2048.0 };
+
+    let mut interactive_divisor = if preview_dim <= 1536 {
+        if hq_live { 1.0 } else { 1.5 }
+    } else {
+        let transition_start = 1536.0;
+        let transition_end = max_interactive_dim;
+
+        let (start_div, end_div) = if hq_live {
+            (1.0, 1.5)
+        } else {
+            (1.5, 2.0)
+        };
+
+        if preview_dim_f >= transition_end {
+            end_div
+        } else {
+            let t = (preview_dim_f - transition_start) / (transition_end - transition_start);
+            start_div + t * (end_div - start_div)
+        }
+    };
+
+    if (preview_dim_f / interactive_divisor) > max_interactive_dim {
+        interactive_divisor = preview_dim_f / max_interactive_dim;
+    }
+
+    let interactive_quality: u8 = if hq_live { 72 } else { 60 };
+
     let mut cached_preview_lock = state.cached_preview.lock().unwrap();
 
+    let cache_valid = cached_preview_lock.as_ref().map_or(false, |c| {
+        c.transform_hash == new_transform_hash
+            && c.preview_dim == preview_dim
+            && c.interactive_divisor == interactive_divisor
+    });
+
     let (final_preview_base, small_preview_base, scale_for_gpu, unscaled_crop_offset) =
-        if let Some(cached) = &*cached_preview_lock {
-            if cached.transform_hash == new_transform_hash && cached.preview_dim == preview_dim {
-                (
-                    cached.image.clone(),
-                    cached.small_image.clone(),
-                    cached.scale,
-                    cached.unscaled_crop_offset,
-                )
-            } else {
-                *state.gpu_image_cache.lock().unwrap() = None;
-                let (base, scale, offset) =
-                    generate_transformed_preview(&loaded_image, &adjustments_clone, preview_dim)?;
+        if cache_valid {
+            let cached = cached_preview_lock.as_ref().unwrap();
+            (
+                cached.image.clone(),
+                cached.small_image.clone(),
+                cached.scale,
+                cached.unscaled_crop_offset,
+            )
+        } else {
+            *state.gpu_image_cache.lock().unwrap() = None;
+            let (base, scale, offset) =
+                generate_transformed_preview(&loaded_image, &adjustments_clone, preview_dim)?;
 
+            let small_base = if interactive_divisor > 1.0 {
                 let target_size = (preview_dim as f32 / interactive_divisor) as u32;
-
                 let (w, h) = base.dimensions();
                 let (small_w, small_h) = if w > h {
                     let ratio = h as f32 / w as f32;
@@ -799,34 +836,10 @@ fn process_preview_job(
                     let ratio = w as f32 / h as f32;
                     ((target_size as f32 * ratio) as u32, target_size)
                 };
-                let small_base = image_processing::downscale_f32_image(&base, small_w, small_h);
-
-                *cached_preview_lock = Some(CachedPreview {
-                    image: base.clone(),
-                    small_image: small_base.clone(),
-                    transform_hash: new_transform_hash,
-                    scale,
-                    unscaled_crop_offset: offset,
-                    preview_dim,
-                });
-                (base, small_base, scale, offset)
-            }
-        } else {
-            *state.gpu_image_cache.lock().unwrap() = None;
-            let (base, scale, offset) =
-                generate_transformed_preview(&loaded_image, &adjustments_clone, preview_dim)?;
-
-            let target_size = (preview_dim as f32 / interactive_divisor) as u32;
-
-            let (w, h) = base.dimensions();
-            let (small_w, small_h) = if w > h {
-                let ratio = h as f32 / w as f32;
-                (target_size, (target_size as f32 * ratio) as u32)
+                image_processing::downscale_f32_image(&base, small_w, small_h)
             } else {
-                let ratio = w as f32 / h as f32;
-                ((target_size as f32 * ratio) as u32, target_size)
+                base.clone()
             };
-            let small_base = image_processing::downscale_f32_image(&base, small_w, small_h);
 
             *cached_preview_lock = Some(CachedPreview {
                 image: base.clone(),
@@ -835,6 +848,7 @@ fn process_preview_job(
                 scale,
                 unscaled_crop_offset: offset,
                 preview_dim,
+                interactive_divisor,
             });
             (base, small_base, scale, offset)
         };
@@ -911,13 +925,13 @@ fn process_preview_job(
         let rgb_pixels = final_processed_image.to_rgb8().into_vec();
 
         match Encoder::new(Preset::BaselineFastest)
-            .quality(jpeg_quality as u8)
+            .quality(jpeg_quality)
             .encode_rgb(&rgb_pixels, width as u32, height as u32)
         {
             Ok(bytes) => {
                 log::info!("[process_preview_job] completed in {:?}", fn_start.elapsed());
                 return Ok(bytes);
-            },
+            }
             Err(e) => {
                 return Err(format!("Failed to encode preview: {}", e));
             }
