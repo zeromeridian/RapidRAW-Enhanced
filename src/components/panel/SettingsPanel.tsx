@@ -727,17 +727,6 @@ export default function SettingsPanel({
                       />
                     </SettingItem>
 
-                    <SettingItem label="Font" description="Change the application font.">
-                      <Dropdown
-                        onChange={(value: any) => onSettingsChange({ ...appSettings, fontFamily: value })}
-                        options={[
-                          { value: 'poppins', label: 'Poppins' },
-                          { value: 'system', label: 'System Default' },
-                        ]}
-                        value={appSettings?.fontFamily || 'poppins'}
-                      />
-                    </SettingItem>
-
                     <SettingItem
                       description="Dynamically changes editor colors based on the current image."
                       label="Editor Theme"
@@ -814,6 +803,17 @@ export default function SettingsPanel({
                         id="window-effects-toggle"
                         label="Transparency"
                         onChange={handleSetTransparent}
+                      />
+                    </SettingItem>
+
+                    <SettingItem label="Font" description="Change the application font.">
+                      <Dropdown
+                        onChange={(value: any) => onSettingsChange({ ...appSettings, fontFamily: value })}
+                        options={[
+                          { value: 'poppins', label: 'Poppins' },
+                          { value: 'system', label: 'System Default' },
+                        ]}
+                        value={appSettings?.fontFamily || 'poppins'}
                       />
                     </SettingItem>
                   </div>
@@ -1199,7 +1199,7 @@ export default function SettingsPanel({
                               exit={{ opacity: 0, x: -10 }}
                               transition={{ duration: 0.2 }}
                             >
-                              <Text className="mb-4">
+                              <Text variant={TextVariants.small} className="mb-4">
                                 The editor renders the image at a fixed resolution. This mode is the fastest and most
                                 consistent, making it ideal for lower-end hardware where smooth performance is
                                 prioritized over pixel-perfect zoom.
@@ -1227,7 +1227,7 @@ export default function SettingsPanel({
                               exit={{ opacity: 0, x: -10 }}
                               transition={{ duration: 0.2 }}
                             >
-                              <Text className="mb-4">
+                              <Text variant={TextVariants.small} className="mb-4">
                                 The editor renders the preview to match your display's actual pixel density. This
                                 ensures that every detail is represented with 1:1 pixel accuracy, providing maximum
                                 clarity when zooming and checking focus.

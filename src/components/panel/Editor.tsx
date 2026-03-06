@@ -68,6 +68,7 @@ interface EditorProps {
   adjustmentsHistory: any[];
   adjustmentsHistoryIndex: number;
   goToAdjustmentsHistoryIndex(index: number): void;
+  liveRotation?: number | null;
 }
 
 export default function Editor({
@@ -122,6 +123,7 @@ export default function Editor({
   adjustmentsHistory,
   adjustmentsHistoryIndex,
   goToAdjustmentsHistoryIndex,
+  liveRotation,
 }: EditorProps) {
   const [crop, setCrop] = useState<Crop | null>(null);
   const prevCropParams = useRef<any>(null);
@@ -416,13 +418,17 @@ export default function Editor({
       return;
     }
 
-    const { rotation = 0, aspectRatio, orientationSteps = 0, crop } = adjustments;
+    const { aspectRatio, orientationSteps = 0, crop: currentAdjCrop, rotation = 0 } = adjustments;
+    const effectiveRotation = liveRotation !== null && liveRotation !== undefined ? liveRotation : rotation;
 
-    const needsRecalc =
-      crop === null ||
+    const geometryChanged =
       prevCropParams.current?.rotation !== rotation ||
       prevCropParams.current?.aspectRatio !== aspectRatio ||
       prevCropParams.current?.orientationSteps !== orientationSteps;
+
+    const isDraggingRotation = liveRotation !== null && liveRotation !== undefined;
+
+    const needsRecalc = currentAdjCrop === null || geometryChanged || isDraggingRotation;
 
     if (needsRecalc) {
       const { width: imgWidth, height: imgHeight } = selectedImage;
@@ -430,11 +436,12 @@ export default function Editor({
       const W = isSwapped ? imgHeight : imgWidth;
       const H = isSwapped ? imgWidth : imgHeight;
       const A = aspectRatio || W / H;
+
       if (isNaN(A) || A <= 0) {
         return;
       }
 
-      const angle = Math.abs(rotation);
+      const angle = Math.abs(effectiveRotation);
       const rad = ((angle % 180) * Math.PI) / 180;
       const sin = Math.sin(rad);
       const cos = Math.cos(rad);
@@ -449,9 +456,29 @@ export default function Editor({
         height: Math.round(h_c),
       };
 
-      prevCropParams.current = { rotation, aspectRatio, orientationSteps };
-      if (JSON.stringify(crop) !== JSON.stringify(maxPixelCrop)) {
-        setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, crop: maxPixelCrop }));
+      if (isDraggingRotation) {
+        setCrop({
+          unit: '%',
+          x: (maxPixelCrop.x / W) * 100,
+          y: (maxPixelCrop.y / H) * 100,
+          width: (maxPixelCrop.width / W) * 100,
+          height: (maxPixelCrop.height / H) * 100,
+        });
+      } else {
+        if (currentAdjCrop === null || geometryChanged) {
+          prevCropParams.current = { rotation, aspectRatio, orientationSteps };
+
+          const isDifferent =
+            !currentAdjCrop ||
+            currentAdjCrop.x !== maxPixelCrop.x ||
+            currentAdjCrop.y !== maxPixelCrop.y ||
+            currentAdjCrop.width !== maxPixelCrop.width ||
+            currentAdjCrop.height !== maxPixelCrop.height;
+
+          if (isDifferent) {
+            setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, crop: maxPixelCrop }));
+          }
+        }
       }
     }
   }, [
@@ -459,6 +486,7 @@ export default function Editor({
     adjustments.crop,
     adjustments.orientationSteps,
     adjustments.rotation,
+    liveRotation,
     isCropping,
     selectedImage,
     setAdjustments,
@@ -467,6 +495,10 @@ export default function Editor({
   useEffect(() => {
     if (!isCropping || !selectedImage?.width) {
       setCrop(null);
+      return;
+    }
+
+    if (liveRotation !== null && liveRotation !== undefined) {
       return;
     }
 
@@ -486,7 +518,7 @@ export default function Editor({
         y: (pixelCrop.y / cropBaseHeight) * 100,
       });
     }
-  }, [isCropping, adjustments.crop, adjustments.orientationSteps, selectedImage]);
+  }, [isCropping, adjustments.crop, adjustments.orientationSteps, selectedImage, liveRotation]);
 
   const handleCropChange = useCallback((pixelCrop: Crop, percentCrop: PercentCrop) => {
     setCrop(percentCrop);
@@ -495,6 +527,9 @@ export default function Editor({
   const handleCropComplete = useCallback(
     (_: any, pc: PercentCrop) => {
       if (!pc.width || !pc.height || !selectedImage?.width) {
+        return;
+      }
+      if (liveRotation !== null && liveRotation !== undefined) {
         return;
       }
 
@@ -518,7 +553,7 @@ export default function Editor({
         return prev;
       });
     },
-    [selectedImage, adjustments.orientationSteps, setAdjustments],
+    [selectedImage, adjustments.orientationSteps, setAdjustments, liveRotation],
   );
 
   const toggleShowOriginal = useCallback(() => setShowOriginal((prev: boolean) => !prev), [setShowOriginal]);
@@ -781,6 +816,7 @@ export default function Editor({
               overlayMode={overlayMode}
               cursorStyle={cursorStyle}
               isMaxZoom={isMaxZoom}
+              liveRotation={liveRotation}
             />
           </TransformComponent>
         </TransformWrapper>

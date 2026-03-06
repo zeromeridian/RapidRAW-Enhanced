@@ -62,6 +62,7 @@ interface ImageCanvasProps {
   overlayRotation?: number;
   cursorStyle: string;
   isMaxZoom?: boolean;
+  liveRotation?: number | null;
 }
 
 interface MaskOverlay {
@@ -657,11 +658,12 @@ const ImageCanvas = memo(
     overlayMode,
     cursorStyle,
     isMaxZoom,
+    liveRotation,
   }: ImageCanvasProps) => {
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
     const cropImageRef = useRef<HTMLImageElement>(null);
     const [displayedMaskUrl, setDisplayedMaskUrl] = useState<string | null>(null);
-    const [originalLoaded, setOriginalLoaded] = useState(false);
+    const [originalLoaded, setOriginalLoaded] = useState<false>(false);
     const [localInitialDrawParams, setLocalInitialDrawParams] = useState<any>(null);
     const isDrawing = useRef(false);
     const drawingStageRef = useRef<any>(null);
@@ -1520,9 +1522,10 @@ const ImageCanvas = memo(
     }, [selectedImage?.width, selectedImage?.height, imageRenderSize, adjustments.orientationSteps]);
 
     const cropImageTransforms = useMemo(() => {
-      const transforms = [`rotate(${adjustments.rotation || 0}deg)`];
+      const rotation = liveRotation !== null && liveRotation !== undefined ? liveRotation : adjustments.rotation || 0;
+      const transforms = [`rotate(${rotation}deg)`];
       return transforms.join(' ');
-    }, [adjustments.rotation]);
+    }, [adjustments.rotation, liveRotation]);
 
     const getCropDimensions = () => {
       if (!crop || !uncroppedImageRenderSize?.width || !uncroppedImageRenderSize?.height) {

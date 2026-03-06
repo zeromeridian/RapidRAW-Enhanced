@@ -696,7 +696,7 @@ export default function ExportPanel({
           ) : null}
         </div>
         <Button
-          className={`rounded-md h-11 w-full flex items-center justify-center ${
+          className={`rounded-md h-11 w-full flex items-center text-md !font-bold justify-center ${
             status === Status.Exporting
               ? 'bg-red-600/80 hover:bg-red-600 text-white'
               : status === Status.Success

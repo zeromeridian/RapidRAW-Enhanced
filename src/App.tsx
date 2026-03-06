@@ -283,7 +283,6 @@ function App() {
   const [isSliderDragging, setIsSliderDragging] = useState(false);
   const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isHighResNeeded, setIsHighResNeeded] = useState(false);
   const [isAnimatingTheme, setIsAnimatingTheme] = useState(false);
   const isInitialThemeMount = useRef(true);
   const [theme, setTheme] = useState(DEFAULT_THEME_ID);
@@ -304,7 +303,6 @@ function App() {
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('thirds');
   const [overlayRotation, setOverlayRotation] = useState(0);
   const [transformedOriginalUrl, setTransformedOriginalUrl] = useState<string | null>(null);
-  const fullResCacheKeyRef = useRef<string | null>(null);
   const patchesSentToBackend = useRef<Set<string>>(new Set());
 
   const handleDisplaySizeChange = useCallback((size: ImageDimensions & { scale?: number }) => {
@@ -338,6 +336,7 @@ function App() {
   const [copiedAdjustments, setCopiedAdjustments] = useState<Adjustments | null>(null);
   const [isStraightenActive, setIsStraightenActive] = useState(false);
   const [isWbPickerActive, setIsWbPickerActive] = useState(false);
+  const [liveRotation, setLiveRotation] = useState<number | null>(null);
   const [copiedFilePaths, setCopiedFilePaths] = useState<Array<string>>([]);
   const [aiModelDownloadStatus, setAiModelDownloadStatus] = useState<string | null>(null);
   const [copiedSectionAdjustments, setCopiedSectionAdjustments] = useState(null);
@@ -1573,9 +1572,10 @@ function App() {
     });
 
     const fontFamily = appSettings?.fontFamily || 'poppins';
-    const fontStack = fontFamily === 'system'
-      ? '-apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-      : "'Poppins', system-ui, sans-serif";
+    const fontStack =
+      fontFamily === 'system'
+        ? '-apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+        : "'Poppins', system-ui, sans-serif";
     root.style.setProperty('--font-family', fontStack);
 
     const isLight = [Theme.Light, Theme.Snow, Theme.Arctic].includes(effectThemeForWindow);
@@ -2407,9 +2407,11 @@ function App() {
         applyAdjustments(adjustments, false, targetRes);
       }, 150);
     } else {
-      currentResRef.current = targetRes;
-      applyAdjustments(adjustments, false, targetRes);
-      debouncedSave(selectedImage.path, adjustments);
+      dragIdleTimer.current = setTimeout(() => {
+        currentResRef.current = targetRes;
+        applyAdjustments(adjustments, false, targetRes);
+        debouncedSave(selectedImage.path, adjustments);
+      }, 50);
     }
 
     return () => {
@@ -3326,8 +3328,6 @@ function App() {
           } else {
             setPreviewSize({ width: 0, height: 0 });
           }
-
-          fullResCacheKeyRef.current = null;
 
           setSelectedImage((currentSelected: SelectedImage | null) => {
             if (currentSelected && currentSelected.path === selectedImage.path) {
@@ -4555,6 +4555,7 @@ function App() {
               adjustmentsHistory={adjustmentsHistory}
               adjustmentsHistoryIndex={adjustmentsHistoryIndex}
               goToAdjustmentsHistoryIndex={goToAdjustmentsHistoryIndex}
+              liveRotation={liveRotation}
             />
             <div
               className={clsx(
@@ -4680,6 +4681,7 @@ function App() {
                             overlayRotation={overlayRotation}
                             setOverlayRotation={setOverlayRotation}
                             setOverlayMode={setOverlayMode}
+                            onLiveRotationChange={setLiveRotation}
                           />
                         )}
                         {renderedRightPanel === Panel.Masks && (

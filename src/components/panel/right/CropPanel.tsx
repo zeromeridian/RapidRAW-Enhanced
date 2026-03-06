@@ -10,7 +10,7 @@ import {
   RotateCw,
   Ruler,
   Scan,
-  X
+  X,
 } from 'lucide-react';
 import { Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import clsx from 'clsx';
@@ -35,6 +35,7 @@ interface CropPanelProps {
   setOverlayMode?(mode: OverlayMode): void;
   overlayRotation?: number;
   setOverlayRotation?(rotation: SetStateAction<number>): void;
+  onLiveRotationChange?(rotation: number | null): void;
 }
 
 interface CropPreset {
@@ -48,7 +49,6 @@ interface OverlayOption {
   name: string;
   tooltip: string;
 }
-
 
 const PRESETS: Array<CropPreset> = [
   { name: 'Free', value: null, tooltip: 'Freeform crop' },
@@ -83,6 +83,7 @@ export default function CropPanel({
   setOverlayMode: setPropOverlayMode,
   overlayRotation: _propOverlayRotation,
   setOverlayRotation: propSetOverlayRotation,
+  onLiveRotationChange,
 }: CropPanelProps) {
   const [customW, setCustomW] = useState('');
   const [customH, setCustomH] = useState('');
@@ -94,6 +95,18 @@ export default function CropPanel({
 
   const [internalOverlayMode, setInternalOverlayMode] = useState<OverlayMode>('thirds');
   const [_internalOverlayRotation, setInternalOverlayRotation] = useState(0);
+
+  const [localRotation, setLocalRotation] = useState<number | null>(null);
+  const localRotationRef = useRef<number | null>(null);
+
+  const updateLocalRotation = useCallback(
+    (val: number | null) => {
+      setLocalRotation(val);
+      localRotationRef.current = val;
+      onLiveRotationChange?.(val);
+    },
+    [onLiveRotationChange],
+  );
 
   const activeOverlay = propOverlayMode ?? internalOverlayMode;
   const setOverlay = setPropOverlayMode ?? setInternalOverlayMode;
@@ -132,6 +145,12 @@ export default function CropPanel({
       if (isRotationActive) {
         setIsRotationActive(false);
         setGlobalRotationActive?.(false);
+
+        if (localRotationRef.current !== null) {
+          const finalRot = localRotationRef.current;
+          updateLocalRotation(null);
+          setAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRot }));
+        }
       }
     };
 
@@ -144,7 +163,13 @@ export default function CropPanel({
       window.removeEventListener('mouseup', handleDragEndGlobal);
       window.removeEventListener('touchend', handleDragEndGlobal);
     };
-  }, [isRotationActive, setGlobalRotationActive]);
+  }, [isRotationActive, setGlobalRotationActive, setAdjustments, updateLocalRotation]);
+
+  useEffect(() => {
+    return () => {
+      onLiveRotationChange?.(null);
+    };
+  }, [onLiveRotationChange]);
 
   const getEffectiveOriginalRatio = useCallback(() => {
     if (!selectedImage?.width || !selectedImage?.height) {
@@ -165,8 +190,7 @@ export default function CropPanel({
       (p: CropPreset) =>
         p.value &&
         p.value !== ORIGINAL_RATIO &&
-        (Math.abs(aspectRatio - p.value) < RATIO_TOLERANCE ||
-          Math.abs(aspectRatio - 1 / p.value) < RATIO_TOLERANCE),
+        (Math.abs(aspectRatio - p.value) < RATIO_TOLERANCE || Math.abs(aspectRatio - 1 / p.value) < RATIO_TOLERANCE),
     );
 
     if (numericPresetMatch) {
@@ -219,11 +243,7 @@ export default function CropPanel({
   useEffect(() => {
     if (activePreset?.value === ORIGINAL_RATIO) {
       const newOriginalRatio = getEffectiveOriginalRatio();
-      if (
-        newOriginalRatio !== null &&
-        aspectRatio &&
-        Math.abs(aspectRatio - newOriginalRatio) > RATIO_TOLERANCE
-      ) {
+      if (newOriginalRatio !== null && aspectRatio && Math.abs(aspectRatio - newOriginalRatio) > RATIO_TOLERANCE) {
         setAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newOriginalRatio, crop: null }));
       }
     }
@@ -250,10 +270,7 @@ export default function CropPanel({
     if (numW > 0 && numH > 0) {
       const newAspectRatio = numW / numH;
       lastSyncedRatio.current = newAspectRatio;
-      if (
-        !adjustments?.aspectRatio ||
-        Math.abs(adjustments.aspectRatio - newAspectRatio) > RATIO_TOLERANCE
-      ) {
+      if (!adjustments?.aspectRatio || Math.abs(adjustments.aspectRatio - newAspectRatio) > RATIO_TOLERANCE) {
         setAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newAspectRatio, crop: null }));
       }
     }
@@ -329,6 +346,7 @@ export default function CropPanel({
     setPreferPortrait(false);
     setIsEditingCustom(false);
     lastSyncedRatio.current = null;
+    updateLocalRotation(null);
 
     setOverlay('thirds');
 
@@ -367,9 +385,11 @@ export default function CropPanel({
     return rotation || 0;
   }, [rotation]);
 
+  const displayRotation = localRotation !== null ? localRotation : fineRotation;
+
   const handleFineRotationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newFineRotation = parseFloat(e.target.value);
-    setAdjustments((prev: Adjustments) => ({ ...prev, rotation: newFineRotation }));
+    updateLocalRotation(newFineRotation);
   };
 
   const handleStepRotate = (degrees: number) => {
@@ -387,17 +407,26 @@ export default function CropPanel({
   };
 
   const resetFineRotation = () => {
+    updateLocalRotation(null);
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, rotation: 0 }));
   };
 
   const handleRotationMouseDown = () => {
     setIsRotationActive(true);
     setGlobalRotationActive?.(true);
+    updateLocalRotation(fineRotation);
   };
 
   const handleRotationMouseUp = () => {
-    setIsRotationActive(false);
-    setGlobalRotationActive?.(false);
+    if (isRotationActive) {
+      setIsRotationActive(false);
+      setGlobalRotationActive?.(false);
+      if (localRotationRef.current !== null) {
+        const finalRot = localRotationRef.current;
+        updateLocalRotation(null);
+        setAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRot }));
+      }
+    }
   };
 
   const handleOverlayCycle = () => {
@@ -424,7 +453,11 @@ export default function CropPanel({
     <div className="flex flex-col h-full">
       <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
         <h2 className="text-xl font-bold text-primary text-shadow-shiny">Crop & Transform</h2>
-        <button className="p-2 rounded-full hover:bg-surface transition-colors" onClick={handleReset} data-tooltip="Reset Crop & Transform">
+        <button
+          className="p-2 rounded-full hover:bg-surface transition-colors"
+          onClick={handleReset}
+          data-tooltip="Reset Crop & Transform"
+        >
           <RotateCcw size={18} />
         </button>
       </div>
@@ -537,13 +570,14 @@ export default function CropPanel({
               <p className="text-sm mb-3 font-semibold text-text-primary">Rotation</p>
               <div className="bg-surface px-4 py-3 pb-4 rounded-lg">
                 <div className="flex justify-between items-center mb-3">
-                  <span className="font-mono text-lg text-text-primary">{rotation.toFixed(1)}°</span>
+                  <span className="font-mono text-lg text-text-primary">{displayRotation.toFixed(1)}°</span>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
                         setIsStraightenActive((isActive: boolean) => {
                           const willBeActive = !isActive;
                           if (willBeActive) {
+                            updateLocalRotation(null);
                             setAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
                           }
                           return willBeActive;
@@ -563,7 +597,7 @@ export default function CropPanel({
                       className="p-1.5 rounded-md text-text-secondary transition-colors cursor-pointer hover:bg-card-active hover:text-text-primary"
                       onClick={resetFineRotation}
                       data-tooltip="Reset Fine Rotation"
-                      disabled={rotation === 0}
+                      disabled={displayRotation === 0}
                     >
                       <RotateCcw size={14} />
                     </button>
@@ -587,7 +621,7 @@ export default function CropPanel({
                     onTouchEnd={handleRotationMouseUp}
                     step="0.1"
                     type="range"
-                    value={fineRotation}
+                    value={displayRotation}
                   />
                 </div>
               </div>
@@ -637,9 +671,7 @@ export default function CropPanel({
                       ? 'bg-accent text-button-text'
                       : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
                   )}
-                  onClick={() =>
-                    setAdjustments((prev: Adjustments) => ({ ...prev, flipVertical: !prev.flipVertical }))
-                  }
+                  onClick={() => setAdjustments((prev: Adjustments) => ({ ...prev, flipVertical: !prev.flipVertical }))}
                   data-tooltip="Flip image vertically"
                 >
                   <FlipVertical size={20} className="transition-none" />

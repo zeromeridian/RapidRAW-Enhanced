@@ -207,7 +207,6 @@ const thumbnailAspectRatioOptions: Array<ThumbnailAspectRatioOption> = [
   { id: ThumbnailAspectRatio.Contain, label: 'Original Ratio' },
 ];
 
-
 const groupImagesByFolder = (images: ImageFile[], rootPath: string | null) => {
   const groups: Record<string, ImageFile[]> = {};
 
@@ -1083,7 +1082,6 @@ const Row = ({
   outerPadding,
   gap,
 }: any) => {
-
   const row = rows[index];
   const shiftedStyle = {
     ...style,
@@ -1300,9 +1298,7 @@ export default function MainLibrary({
       const prev = prevScrollState.current;
 
       const shouldScroll =
-        activePath !== prev.path ||
-        Math.abs(targetTop - prev.top) > 1 ||
-        currentFolderPath !== prev.folder;
+        activePath !== prev.path || Math.abs(targetTop - prev.top) > 1 || currentFolderPath !== prev.folder;
 
       if (shouldScroll) {
         const element = listHandle.element;
@@ -1730,10 +1726,7 @@ export default function MainLibrary({
               };
 
               return (
-                <div
-                  key={`${width}-${thumbnailSize}-${libraryViewMode}`}
-                  style={{ height, width }}
-                >
+                <div key={`${width}-${thumbnailSize}-${libraryViewMode}`} style={{ height, width }}>
                   <List
                     listRef={setListHandle}
                     rowCount={rows.length}
