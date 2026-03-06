@@ -22,7 +22,7 @@ const ColorWheel = ({
 }: ColorWheelProps) => {
   const effectiveValue = value || defaultValue;
   const { hue, saturation, luminance } = effectiveValue;
-  const sizerRef = useRef<any>(null);
+  const sizerRef = useRef<HTMLDivElement>(null);
   const [wheelSize, setWheelSize] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isWheelDragging, setIsWheelDragging] = useState(false);
@@ -76,7 +76,7 @@ const ColorWheel = ({
     onChange({ ...effectiveValue, hue: color.hsva.h, saturation: color.hsva.s });
   };
 
-  const handleLumChange = (e: any) => {
+  const handleLumChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange({ ...effectiveValue, luminance: parseFloat(e.target.value) });
   };
 
@@ -96,31 +96,45 @@ const ColorWheel = ({
   const pointerOffset = pointerSize / 2;
 
   return (
-    <div
-      className="relative flex flex-col items-center gap-2"
-      ref={containerRef}
-    >
+    <div className="relative flex flex-col items-center gap-2" ref={containerRef}>
       <div
-        className="relative cursor-pointer h-5 min-w-[60px]"
+        className="relative cursor-pointer h-5 w-full overflow-hidden"
         onClick={handleReset}
         onDoubleClick={handleReset}
         onMouseEnter={() => setIsLabelHovered(true)}
         onMouseLeave={() => setIsLabelHovered(false)}
       >
         <span
-          className={`absolute inset-0 flex items-center justify-center text-sm font-medium text-text-secondary select-none transition-opacity duration-200 ease-in-out ${
-            isLabelHovered ? 'opacity-0' : 'opacity-100'
+          className={`absolute inset-0 flex items-center justify-center text-sm font-medium text-text-secondary whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
+            !isDragging && !isLabelHovered ? 'opacity-100' : 'opacity-0'
           }`}
         >
           {label}
         </span>
+
         <span
-          className={`absolute inset-0 flex items-center justify-center text-sm font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out ${
-            isLabelHovered ? 'opacity-100' : 'opacity-0'
+          className={`absolute inset-0 flex items-center justify-center text-sm font-medium text-text-primary whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
+            !isDragging && isLabelHovered ? 'opacity-100' : 'opacity-0'
           }`}
         >
           Reset
         </span>
+
+        <div
+          className={`absolute inset-0 flex items-center justify-center gap-2 text-sm font-medium text-text-secondary whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
+            isDragging ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <div className="flex items-center tabular-nums">
+            <span className="font-bold">H:</span>
+            <span className="w-8 text-right">{Math.round(hue)}&deg;</span>
+          </div>
+
+          <div className="flex items-center tabular-nums">
+            <span className="font-bold">S:</span>
+            <span className="w-6 text-right">{Math.round(saturation)}</span>
+          </div>
+        </div>
       </div>
 
       <div ref={sizerRef} className="relative w-full aspect-square">
