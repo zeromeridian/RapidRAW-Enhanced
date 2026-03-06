@@ -1572,9 +1572,15 @@ function App() {
       root.style.setProperty(key, value as string);
     });
 
+    const fontFamily = appSettings?.fontFamily || 'poppins';
+    const fontStack = fontFamily === 'system'
+      ? '-apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+      : "'Poppins', system-ui, sans-serif";
+    root.style.setProperty('--font-family', fontStack);
+
     const isLight = [Theme.Light, Theme.Snow, Theme.Arctic].includes(effectThemeForWindow);
     invoke(Invokes.UpdateWindowEffect, { theme: isLight ? Theme.Light : Theme.Dark });
-  }, [theme, adaptivePalette]);
+  }, [theme, adaptivePalette, appSettings?.fontFamily]);
 
   useEffect(() => {
     if (isInitialThemeMount.current) {

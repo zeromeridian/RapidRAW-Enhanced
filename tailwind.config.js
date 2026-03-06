@@ -19,7 +19,7 @@ export default {
         'hover-color': 'rgb(var(--color-hover-color) / <alpha-value>)',
       },
       fontFamily: {
-        sans: ['Poppins', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-family)'],
       },
       boxShadow: {
         'shiny': '0 0 24px rgba(255, 255, 255, 0.12)',
