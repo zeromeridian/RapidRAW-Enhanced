@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, forwardRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
@@ -20,7 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { VariableSizeList as List } from 'react-window';
+import { List, useListCallbackRef } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import Button from '../ui/Button';
 import SettingsPanel from './SettingsPanel';
@@ -207,22 +207,6 @@ const thumbnailAspectRatioOptions: Array<ThumbnailAspectRatioOption> = [
   { id: ThumbnailAspectRatio.Contain, label: 'Original Ratio' },
 ];
 
-const customOuterElement = forwardRef((props: any, ref: any) => (
-  <div ref={ref} {...props} className="custom-scrollbar" />
-));
-customOuterElement.displayName = 'CustomOuterElement';
-
-const InnerGridElement = forwardRef(({ style, ...rest }: any, ref: any) => (
-  <div
-    ref={ref}
-    style={{
-      ...style,
-      height: `${parseFloat(style.height)}px`,
-    }}
-    {...rest}
-  />
-));
-InnerGridElement.displayName = 'InnerGridElement';
 
 const groupImagesByFolder = (images: ImageFile[], rootPath: string | null) => {
   const groups: Record<string, ImageFile[]> = {};
@@ -1081,26 +1065,33 @@ function Thumbnail({
   );
 }
 
-const Row = ({ index, style, data }: any) => {
-  const {
-    rows,
-    activePath,
-    multiSelectedPaths,
-    onContextMenu,
-    onImageClick,
-    onImageDoubleClick,
-    thumbnails,
-    thumbnailAspectRatio,
-    loadedThumbnails,
-    imageRatings,
-    rootPath,
-    itemWidth,
-    outerPadding,
-    gap,
-  } = data;
+const Row = ({
+  index,
+  style,
+  rows,
+  activePath,
+  multiSelectedPaths,
+  onContextMenu,
+  onImageClick,
+  onImageDoubleClick,
+  thumbnails,
+  thumbnailAspectRatio,
+  loadedThumbnails,
+  imageRatings,
+  rootPath,
+  itemWidth,
+  outerPadding,
+  gap,
+}: any) => {
 
   const row = rows[index];
-  const top = parseFloat(style.top) + outerPadding;
+  const shiftedStyle = {
+    ...style,
+    transform: (style.transform as string).replace(
+      /translateY\(([^)]+)\)/,
+      (_: string, y: string) => `translateY(${parseFloat(y) + outerPadding}px)`,
+    ),
+  };
 
   if (row.type === 'header') {
     let displayPath = row.path;
@@ -1115,10 +1106,9 @@ const Row = ({ index, style, data }: any) => {
     return (
       <div
         style={{
-          ...style,
-          top,
+          ...shiftedStyle,
           left: 0,
-          width: style.width,
+          width: '100%',
           paddingLeft: outerPadding,
           paddingRight: outerPadding,
           boxSizing: 'border-box',
@@ -1141,10 +1131,10 @@ const Row = ({ index, style, data }: any) => {
   return (
     <div
       style={{
-        ...style,
-        top,
-        left: style.left + outerPadding,
-        width: style.width - outerPadding * 2,
+        ...shiftedStyle,
+        left: outerPadding,
+        right: outerPadding,
+        width: 'auto',
         display: 'flex',
         gap: gap,
       }}
@@ -1223,8 +1213,7 @@ export default function MainLibrary({
   const [appVersion, setAppVersion] = useState('');
   const [, setSupportedTypes] = useState<SupportedTypes | null>(null);
   const libraryContainerRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<List>(null);
-  const outerRef = useRef<HTMLDivElement>(null);
+  const [listHandle, setListHandle] = useListCallbackRef();
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
   const [latestVersion, setLatestVersion] = useState('');
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
@@ -1307,14 +1296,16 @@ export default function MainLibrary({
       }
     }
 
-    if (found && outerRef.current) {
+    if (found && listHandle?.element) {
       const prev = prevScrollState.current;
 
       const shouldScroll =
-        activePath !== prev.path || Math.abs(targetTop - prev.top) > 1 || currentFolderPath !== prev.folder;
+        activePath !== prev.path ||
+        Math.abs(targetTop - prev.top) > 1 ||
+        currentFolderPath !== prev.folder;
 
       if (shouldScroll) {
-        const element = outerRef.current;
+        const element = listHandle.element;
         const clientHeight = element.clientHeight;
         const scrollTop = element.scrollTop;
         const itemBottom = targetTop + rowHeight;
@@ -1339,7 +1330,13 @@ export default function MainLibrary({
         };
       }
     }
-  }, [activePath, imageList, libraryViewMode, thumbnailSize, currentFolderPath, multiSelectedPaths.length]);
+  }, [activePath, imageList, libraryViewMode, thumbnailSize, currentFolderPath, multiSelectedPaths.length, listHandle]);
+
+  useEffect(() => {
+    if (listHandle?.element && libraryScrollTop > 0) {
+      listHandle.element.scrollTop = libraryScrollTop;
+    }
+  }, [listHandle]);
 
   useEffect(() => {
     const exifEnabled = appSettings?.enableExifReading ?? true;
@@ -1733,37 +1730,35 @@ export default function MainLibrary({
               };
 
               return (
-                <List
-                  ref={listRef}
-                  outerRef={outerRef}
-                  height={height}
-                  itemCount={rows.length}
-                  itemSize={getItemSize}
-                  width={width}
-                  initialScrollOffset={libraryScrollTop}
-                  onScroll={({ scrollOffset }) => setLibraryScrollTop(scrollOffset)}
-                  outerElementType={customOuterElement}
-                  innerElementType={InnerGridElement}
+                <div
                   key={`${width}-${thumbnailSize}-${libraryViewMode}`}
-                  itemData={{
-                    rows,
-                    activePath,
-                    multiSelectedPaths,
-                    onContextMenu,
-                    onImageClick,
-                    onImageDoubleClick,
-                    thumbnails,
-                    thumbnailAspectRatio,
-                    loadedThumbnails: loadedThumbnailsRef.current,
-                    imageRatings,
-                    rootPath: currentFolderPath,
-                    itemWidth,
-                    outerPadding: OUTER_PADDING,
-                    gap: ITEM_GAP,
-                  }}
+                  style={{ height, width }}
                 >
-                  {Row}
-                </List>
+                  <List
+                    listRef={setListHandle}
+                    rowCount={rows.length}
+                    rowHeight={getItemSize}
+                    onScroll={(e: React.UIEvent<HTMLElement>) => setLibraryScrollTop(e.currentTarget.scrollTop)}
+                    className="custom-scrollbar"
+                    rowComponent={Row}
+                    rowProps={{
+                      rows,
+                      activePath,
+                      multiSelectedPaths,
+                      onContextMenu,
+                      onImageClick,
+                      onImageDoubleClick,
+                      thumbnails,
+                      thumbnailAspectRatio,
+                      loadedThumbnails: loadedThumbnailsRef.current,
+                      imageRatings,
+                      rootPath: currentFolderPath,
+                      itemWidth,
+                      outerPadding: OUTER_PADDING,
+                      gap: ITEM_GAP,
+                    }}
+                  />
+                </div>
               );
             }}
           </AutoSizer>
