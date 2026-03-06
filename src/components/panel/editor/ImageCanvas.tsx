@@ -680,9 +680,18 @@ const ImageCanvas = memo(
       fade: null as string | null,
     });
     const [isFadingIn, setIsFadingIn] = useState(false);
+    const prevImageIdentityRef = useRef(selectedImage.thumbnailUrl);
 
     useEffect(() => {
       const newSrc = finalPreviewUrl || selectedImage.thumbnailUrl;
+      const isNewImage = prevImageIdentityRef.current !== selectedImage.thumbnailUrl;
+
+      if (isNewImage) {
+        prevImageIdentityRef.current = selectedImage.thumbnailUrl;
+        setDisplayState({ base: newSrc, fade: null });
+        setIsFadingIn(false);
+        return;
+      }
 
       if (isSliderDragging) {
         setDisplayState({ base: newSrc, fade: null });
