@@ -278,9 +278,11 @@ const FilmstripCell = ({
 
 const FilmstripList = ({
   height,
+  width,
   data,
 }: {
   height: number;
+  width: number;
   data: Omit<ItemData, 'itemHeight' | 'setSize'> & { clickTriggeredScroll: React.RefObject<boolean> };
 }) => {
   const [gridHandle, setGridHandle] = useGridCallbackRef();
@@ -465,9 +467,10 @@ const FilmstripList = ({
   );
 
   return (
-    <div style={{ height }} className="w-full">
+    <div style={{ height, width }}>
       <Grid
         gridRef={setGridHandle}
+        defaultWidth={width}
         rowCount={1}
         rowHeight={itemHeight}
         columnCount={data.imageList.length}
@@ -525,10 +528,11 @@ export default function Filmstrip({
 
   return (
     <div className="h-full w-full" onClick={onClearSelection}>
-      <AutoSizer disableWidth>
-        {({ height }) => (
+      <AutoSizer>
+        {({ height, width }) => (
           <FilmstripList
             height={height}
+            width={width}
             data={{
               imageList,
               imageRatings,
