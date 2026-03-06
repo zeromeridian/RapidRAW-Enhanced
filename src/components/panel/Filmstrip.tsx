@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo, forwardRef } from 'react';
 import { Image as ImageIcon, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
@@ -8,6 +8,7 @@ import { ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppPropert
 import { Color, COLOR_LABELS } from '../../utils/adjustments';
 
 const VERTICAL_PADDING = 20;
+const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;
 
 interface ImageLayer {
@@ -29,204 +30,212 @@ interface ItemData {
   setSize: (index: number, width: number) => void;
 }
 
+const FilmstripThumbnail = memo(
+  ({
+    imageFile,
+    imageRatings,
+    isActive,
+    isSelected,
+    onContextMenu,
+    onImageSelect,
+    thumbData,
+    thumbnailAspectRatio,
+    itemHeight,
+    index,
+    setSize,
+    knownWidth,
+  }: {
+    imageFile: ImageFile;
+    imageRatings: any;
+    isActive: boolean;
+    isSelected: boolean;
+    onContextMenu?: (event: any, path: string) => void;
+    onImageSelect?: (path: string, event: any) => void;
+    thumbData: string | undefined;
+    thumbnailAspectRatio: ThumbnailAspectRatio;
+    itemHeight: number;
+    index: number;
+    setSize: (index: number, width: number) => void;
+    knownWidth: number;
+  }) => {
+    const [layers, setLayers] = useState<ImageLayer[]>(() => {
+      return thumbData ? [{ id: thumbData, url: thumbData, opacity: 1 }] : [];
+    });
 
-const FilmstripThumbnail = memo(({
-  imageFile,
-  imageRatings,
-  isActive,
-  isSelected,
-  onContextMenu,
-  onImageSelect,
-  thumbData,
-  thumbnailAspectRatio,
-  itemHeight,
-  index,
-  setSize,
-  knownWidth
-}: {
-  imageFile: ImageFile;
-  imageRatings: any;
-  isActive: boolean;
-  isSelected: boolean;
-  onContextMenu?: (event: any, path: string) => void;
-  onImageSelect?: (path: string, event: any) => void;
-  thumbData: string | undefined;
-  thumbnailAspectRatio: ThumbnailAspectRatio;
-  itemHeight: number;
-  index: number;
-  setSize: (index: number, width: number) => void;
-  knownWidth: number;
-}) => {
-  const [layers, setLayers] = useState<ImageLayer[]>(() => {
-    return thumbData ? [{ id: thumbData, url: thumbData, opacity: 1 }] : [];
-  });
+    const latestThumbDataRef = useRef<string | undefined>(thumbData);
 
-  const latestThumbDataRef = useRef<string | undefined>(thumbData);
-  
-  const isInitialLoad = useRef(true);
+    const isInitialLoad = useRef(true);
 
-  const { path, tags } = imageFile;
-  const rating = imageRatings?.[path] || 0;
-  const colorTag = tags?.find((t: string) => t.startsWith('color:'))?.substring(6);
-  const colorLabel = COLOR_LABELS.find((c: Color) => c.name === colorTag);
-  const isVirtualCopy = path.includes('?vc=');
+    const { path, tags } = imageFile;
+    const rating = imageRatings?.[path] || 0;
+    const colorTag = tags?.find((t: string) => t.startsWith('color:'))?.substring(6);
+    const colorLabel = COLOR_LABELS.find((c: Color) => c.name === colorTag);
+    const isVirtualCopy = path.includes('?vc=');
 
-  const filename = path.split(/[\\/]/).pop() || '';
-  const truncatedTitle = filename.length > 40 
-    ? filename.substring(0, 20) + '...' + filename.substring(filename.length - 17)
-    : filename;
+    const filename = path.split(/[\\/]/).pop() || '';
+    const truncatedTitle =
+      filename.length > 40 ? filename.substring(0, 20) + '...' + filename.substring(filename.length - 17) : filename;
 
-  useEffect(() => {
-    if (thumbnailAspectRatio === ThumbnailAspectRatio.Contain && thumbData) {
-      const img = new Image();
-      img.onload = () => {
-        const ratio = img.naturalWidth / img.naturalHeight;
-        const calculatedWidth = itemHeight * ratio;
+    useEffect(() => {
+      if (thumbnailAspectRatio === ThumbnailAspectRatio.Contain && thumbData) {
+        const img = new Image();
+        img.onload = () => {
+          const ratio = img.naturalWidth / img.naturalHeight;
+          const calculatedWidth = itemHeight * ratio;
 
-        if (Math.abs(calculatedWidth - knownWidth) > 1) {
+          if (Math.abs(calculatedWidth - knownWidth) > 1) {
             setSize(index, calculatedWidth);
-        }
-        
-        if (isInitialLoad.current) {
-          setTimeout(() => { isInitialLoad.current = false; }, 50);
-        }
-      };
-      img.src = thumbData;
-    } 
-  }, [thumbData, thumbnailAspectRatio, itemHeight, index, setSize, knownWidth]);
+          }
 
-  useEffect(() => {
-    if (!thumbData) {
-      setLayers([]);
-      latestThumbDataRef.current = undefined;
-      return;
-    }
+          if (isInitialLoad.current) {
+            setTimeout(() => {
+              isInitialLoad.current = false;
+            }, 50);
+          }
+        };
+        img.src = thumbData;
+      }
+    }, [thumbData, thumbnailAspectRatio, itemHeight, index, setSize, knownWidth]);
 
-    if (thumbData !== latestThumbDataRef.current) {
-      latestThumbDataRef.current = thumbData;
-
-      if (layers.length === 0) {
-        setLayers([{ id: thumbData, url: thumbData, opacity: 1 }]);
+    useEffect(() => {
+      if (!thumbData) {
+        setLayers([]);
+        latestThumbDataRef.current = undefined;
         return;
       }
 
-      const img = new Image();
-      img.src = thumbData;
-      img.onload = () => {
-        if (img.src === latestThumbDataRef.current) {
-          setLayers((prev) => {
-            if (prev.some((l) => l.id === img.src)) return prev;
-            return [...prev, { id: img.src, url: img.src, opacity: 0 }];
-          });
+      if (thumbData !== latestThumbDataRef.current) {
+        latestThumbDataRef.current = thumbData;
+
+        if (layers.length === 0) {
+          setLayers([{ id: thumbData, url: thumbData, opacity: 1 }]);
+          return;
         }
-      };
-      return () => { img.onload = null; };
-    }
-  }, [thumbData, layers.length]);
 
-  useEffect(() => {
-    const layerToFadeIn = layers.find((l) => l.opacity === 0);
-    if (layerToFadeIn) {
-      const timer = setTimeout(() => {
-        setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
-      }, 10);
-      return () => clearTimeout(timer);
-    }
-  }, [layers]);
+        const img = new Image();
+        img.src = thumbData;
+        img.onload = () => {
+          if (img.src === latestThumbDataRef.current) {
+            setLayers((prev) => {
+              if (prev.some((l) => l.id === img.src)) return prev;
+              return [...prev, { id: img.src, url: img.src, opacity: 0 }];
+            });
+          }
+        };
+        return () => {
+          img.onload = null;
+        };
+      }
+    }, [thumbData, layers.length]);
 
-  const handleTransitionEnd = useCallback((finishedId: string) => {
-    setLayers((prev) => {
-      const finishedIndex = prev.findIndex((l) => l.id === finishedId);
-      if (finishedIndex < 0 || prev.length <= 1) return prev;
-      return prev.slice(finishedIndex);
-    });
-  }, []);
+    useEffect(() => {
+      const layerToFadeIn = layers.find((l) => l.opacity === 0);
+      if (layerToFadeIn) {
+        const timer = setTimeout(() => {
+          setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
+        }, 10);
+        return () => clearTimeout(timer);
+      }
+    }, [layers]);
 
-  const ringClass = isActive
-    ? 'ring-2 ring-accent shadow-md'
-    : isSelected
-    ? 'ring-2 ring-gray-400'
-    : 'hover:ring-2 hover:ring-hover-color';
+    const handleTransitionEnd = useCallback((finishedId: string) => {
+      setLayers((prev) => {
+        const finishedIndex = prev.findIndex((l) => l.id === finishedId);
+        if (finishedIndex < 0 || prev.length <= 1) return prev;
+        return prev.slice(finishedIndex);
+      });
+    }, []);
 
-  const imageClasses = `w-full h-full group-hover:scale-[1.02] transition-transform duration-300`;
+    const ringClass = isActive
+      ? 'ring-2 ring-accent shadow-md'
+      : isSelected
+        ? 'ring-2 ring-gray-400'
+        : 'hover:ring-2 hover:ring-hover-color';
 
-  return (
-    <motion.div
-      className={clsx(
-        'h-full w-full rounded-md overflow-hidden cursor-pointer flex-shrink-0 group relative transition-all duration-150 bg-surface',
-        ringClass,
-      )}
-      onClick={(e: any) => {
-        e.stopPropagation();
-        onImageSelect?.(path, e);
-      }}
-      onContextMenu={(e: any) => onContextMenu?.(e, path)}
-      style={{
-        zIndex: isActive ? 2 : isSelected ? 1 : 'auto',
-      }}
-      data-tooltip={truncatedTitle}
-    >
-      {layers.length > 0 ? (
-        <div className="absolute inset-0 w-full h-full">
-          {layers.map((layer) => (
-            <div
-              key={layer.id}
-              className="absolute inset-0 w-full h-full"
-              style={{
-                opacity: layer.opacity,
-                transition: 'opacity 150ms ease-in-out',
-                willChange: 'opacity',
-              }}
-              onTransitionEnd={() => handleTransitionEnd(layer.id)}
-            >
-              {thumbnailAspectRatio === ThumbnailAspectRatio.Contain && (
-                <img alt="" className="absolute inset-0 w-full h-full object-cover blur-md scale-110 opacity-50" src={layer.url} />
-              )}
-              <img
-                alt={truncatedTitle}
-                className={`${imageClasses} ${
-                  thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
-                } relative`}
-                loading="lazy"
-                decoding="async"
-                src={layer.url}
-              />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="w-full h-full flex items-center justify-center bg-surface">
-          <ImageIcon size={24} className="text-text-secondary animate-pulse" />
-        </div>
-      )}
-      
-      {(colorLabel || rating > 0) && (
-        <div className="absolute top-1 right-1 bg-primary rounded-full px-1.5 py-0.5 text-xs text-white flex items-center gap-1 backdrop-blur-sm shadow-sm z-10">
-          {colorLabel && (
-            <div
-              className="w-3 h-3 rounded-full ring-1 ring-black/20"
-              style={{ backgroundColor: colorLabel.color }}
-              data-tooltip={`Color: ${colorLabel.name}`}
-            />
-          )}
-          {rating > 0 && (
-            <>
-              <span>{rating}</span>
-              <Star size={10} className="fill-white text-white" />
-            </>
-          )}
-        </div>
-      )}
-      {isVirtualCopy && (
-        <div className="absolute bottom-1 right-1 z-10">
-          <div className="bg-bg-primary/70 text-white text-[9px] font-bold px-1 py-0.5 rounded-full backdrop-blur-sm">
-            VC
+    const imageClasses = `w-full h-full group-hover:scale-[1.02] transition-transform duration-300`;
+
+    return (
+      <motion.div
+        className={clsx(
+          'h-full w-full rounded-md overflow-hidden cursor-pointer flex-shrink-0 group relative transition-all duration-150 bg-surface',
+          ringClass,
+        )}
+        onClick={(e: any) => {
+          e.stopPropagation();
+          onImageSelect?.(path, e);
+        }}
+        onContextMenu={(e: any) => onContextMenu?.(e, path)}
+        style={{
+          zIndex: isActive ? 2 : isSelected ? 1 : 'auto',
+        }}
+        data-tooltip={truncatedTitle}
+      >
+        {layers.length > 0 ? (
+          <div className="absolute inset-0 w-full h-full">
+            {layers.map((layer) => (
+              <div
+                key={layer.id}
+                className="absolute inset-0 w-full h-full"
+                style={{
+                  opacity: layer.opacity,
+                  transition: 'opacity 150ms ease-in-out',
+                  willChange: 'opacity',
+                }}
+                onTransitionEnd={() => handleTransitionEnd(layer.id)}
+              >
+                {thumbnailAspectRatio === ThumbnailAspectRatio.Contain && (
+                  <img
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover blur-md scale-110 opacity-50"
+                    src={layer.url}
+                  />
+                )}
+                <img
+                  alt={truncatedTitle}
+                  className={`${imageClasses} ${
+                    thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
+                  } relative`}
+                  loading="lazy"
+                  decoding="async"
+                  src={layer.url}
+                />
+              </div>
+            ))}
           </div>
-        </div>
-      )}
-    </motion.div>
-  );
-});
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-surface">
+            <ImageIcon size={24} className="text-text-secondary animate-pulse" />
+          </div>
+        )}
+
+        {(colorLabel || rating > 0) && (
+          <div className="absolute top-1 right-1 bg-primary rounded-full px-1.5 py-0.5 text-xs text-white flex items-center gap-1 backdrop-blur-sm shadow-sm z-10">
+            {colorLabel && (
+              <div
+                className="w-3 h-3 rounded-full ring-1 ring-black/20"
+                style={{ backgroundColor: colorLabel.color }}
+                data-tooltip={`Color: ${colorLabel.name}`}
+              />
+            )}
+            {rating > 0 && (
+              <>
+                <span>{rating}</span>
+                <Star size={10} className="fill-white text-white" />
+              </>
+            )}
+          </div>
+        )}
+        {isVirtualCopy && (
+          <div className="absolute bottom-1 right-1 z-10">
+            <div className="bg-bg-primary/70 text-white text-[9px] font-bold px-1 py-0.5 rounded-full backdrop-blur-sm">
+              VC
+            </div>
+          </div>
+        )}
+      </motion.div>
+    );
+  },
+);
 
 const FilmstripCell = ({
   columnIndex,
@@ -251,6 +260,7 @@ const FilmstripCell = ({
       style={{
         ...style,
         height: '100%',
+        left: (style.left as number) + HORIZONTAL_PADDING,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'flex-start',
@@ -362,15 +372,12 @@ const FilmstripList = ({
     setSizeMapVersion((v) => v + 1);
   }, [height, data.thumbnailAspectRatio]);
 
-  const onCellsRendered = useCallback(
-    (visibleCells: { columnStartIndex: number; columnStopIndex: number }) => {
-      visibleRange.current = {
-        start: visibleCells.columnStartIndex,
-        stop: visibleCells.columnStopIndex,
-      };
-    },
-    [],
-  );
+  const onCellsRendered = useCallback((visibleCells: { columnStartIndex: number; columnStopIndex: number }) => {
+    visibleRange.current = {
+      start: visibleCells.columnStartIndex,
+      stop: visibleCells.columnStopIndex,
+    };
+  }, []);
 
   const isItemVisible = useCallback((index: number) => {
     const { start, stop } = visibleRange.current;
@@ -472,7 +479,7 @@ const FilmstripList = ({
         gridRef={setGridHandle}
         defaultWidth={width}
         rowCount={1}
-        rowHeight={itemHeight}
+        rowHeight={height}
         columnCount={data.imageList.length}
         columnWidth={getColumnWidth}
         cellComponent={FilmstripCell}
@@ -543,7 +550,7 @@ export default function Filmstrip({
               onContextMenu,
               onImageSelect: handleImageSelect,
               clickTriggeredScroll,
-            }} 
+            }}
           />
         )}
       </AutoSizer>
