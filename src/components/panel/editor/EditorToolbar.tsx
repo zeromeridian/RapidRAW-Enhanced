@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { SelectedImage } from '../../ui/AppProperties';
 import { IconAperture, IconCalendar, IconClock, IconFocalLength, IconIso, IconShutter } from './ExifIcons';
+import Text from '../../ui/Text';
+import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 
 interface EditorToolbarProps {
   canRedo: boolean;
@@ -353,7 +355,7 @@ const EditorToolbar = memo(
         <div className="flex-1 flex justify-center min-w-0 relative h-full">
           <div
             className={clsx(
-              'bg-surface text-text-secondary flex flex-col items-center overflow-hidden transition-all duration-200 ease-out pt-2',
+              'bg-surface flex flex-col items-center overflow-hidden transition-all duration-200 ease-out pt-2',
               isExpanded
                 ? 'h-[4.5rem] px-8 rounded-2xl absolute min-w-[340px] whitespace-nowrap shadow-2xl shadow-black/50'
                 : 'h-9 px-4 rounded-[18px] absolute min-w-0 w-auto max-w-full shadow-none',
@@ -368,11 +370,23 @@ const EditorToolbar = memo(
             }}
           >
             <div className="flex items-center justify-center max-w-full h-5 shrink-0">
-              <span className="font-medium text-text-primary truncate min-w-0 shrink text-xs">{baseName}</span>
+              <Text
+                as="span"
+                variant={TextVariants.small}
+                color={TextColors.primary}
+                weight={TextWeights.medium}
+                className="truncate min-w-0 shrink"
+              >
+                {baseName}
+              </Text>
 
               {isVirtualCopy && (
-                <div
-                  className="ml-2 flex-shrink-0 bg-accent/20 text-accent text-xs font-bold px-2 py-0.5 rounded-full flex items-center overflow-hidden cursor-default"
+                <Text
+                  as="div"
+                  variant={TextVariants.small}
+                  color={TextColors.accent}
+                  weight={TextWeights.bold}
+                  className="ml-2 flex-shrink-0 bg-accent/20 px-2 py-0.5 rounded-full flex items-center overflow-hidden cursor-default"
                   onMouseEnter={() => setIsVcHovered(true)}
                   onMouseLeave={() => setIsVcHovered(false)}
                 >
@@ -385,7 +399,7 @@ const EditorToolbar = memo(
                   >
                     <span>-{vcId}</span>
                   </div>
-                </div>
+                </Text>
               )}
 
               <div
@@ -394,14 +408,16 @@ const EditorToolbar = memo(
                   showResolution ? 'max-w-[10rem] opacity-100 ml-2' : 'max-w-0 opacity-0 ml-0',
                 )}
               >
-                <span
+                <Text
+                  as="span"
+                  variant={TextVariants.small}
                   className={clsx(
-                    'block transition-transform duration-200 delay-100 text-xs',
+                    'block transition-transform duration-200 delay-100',
                     showResolution ? 'scale-100' : 'scale-95',
                   )}
                 >
                   {displayedResolution}
-                </span>
+                </Text>
               </div>
 
               <div
@@ -411,7 +427,7 @@ const EditorToolbar = memo(
                   disableLoaderTransition ? 'transition-none' : 'transition-all duration-300',
                 )}
               >
-                <Loader2 size={12} className="animate-spin" />
+                <Loader2 size={12} className="text-text-secondary animate-spin" />
               </div>
             </div>
 
@@ -425,7 +441,7 @@ const EditorToolbar = memo(
             >
               <div
                 className={clsx(
-                  'absolute inset-0 flex items-center justify-center gap-6 text-xs font-medium transition-opacity duration-200',
+                  'absolute inset-0 flex items-center justify-center gap-6 transition-opacity duration-200',
                   showDateView ? 'opacity-0 pointer-events-none' : 'opacity-100',
                 )}
               >
@@ -434,7 +450,9 @@ const EditorToolbar = memo(
                     <span className="text-text-secondary">
                       <IconShutter />
                     </span>
-                    <span className="text-text-primary">{exifData.shutter}</span>
+                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                      {exifData.shutter}
+                    </Text>
                   </div>
                 )}
                 {exifData.fNumber && (
@@ -442,7 +460,9 @@ const EditorToolbar = memo(
                     <span className="text-text-secondary">
                       <IconAperture />
                     </span>
-                    <span className="text-text-primary">{exifData.fNumber}</span>
+                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                      {exifData.fNumber}
+                    </Text>
                   </div>
                 )}
                 {exifData.iso && (
@@ -450,7 +470,9 @@ const EditorToolbar = memo(
                     <span className="text-text-secondary">
                       <IconIso />
                     </span>
-                    <span className="text-text-primary">{exifData.iso}</span>
+                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                      {exifData.iso}
+                    </Text>
                   </div>
                 )}
                 {exifData.focal && (
@@ -458,16 +480,16 @@ const EditorToolbar = memo(
                     <span className="text-text-secondary">
                       <IconFocalLength />
                     </span>
-                    <span className="text-text-primary">
+                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
                       {String(exifData.focal).endsWith('mm') ? exifData.focal : `${exifData.focal}mm`}
-                    </span>
+                    </Text>
                   </div>
                 )}
               </div>
 
               <div
                 className={clsx(
-                  'absolute inset-0 flex items-center justify-center gap-6 text-xs font-medium transition-opacity duration-200',
+                  'absolute inset-0 flex items-center justify-center gap-6 transition-opacity duration-200',
                   showDateView ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
               >
@@ -476,7 +498,9 @@ const EditorToolbar = memo(
                     <span className="text-text-secondary">
                       <IconCalendar />
                     </span>
-                    <span className="text-text-primary">{exifData.captureDate}</span>
+                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                      {exifData.captureDate}
+                    </Text>
                   </div>
                 )}
                 {exifData.captureTime && (
@@ -484,7 +508,9 @@ const EditorToolbar = memo(
                     <span className="text-text-secondary">
                       <IconClock />
                     </span>
-                    <span className="text-text-primary">{exifData.captureTime}</span>
+                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                      {exifData.captureTime}
+                    </Text>
                   </div>
                 )}
               </div>
@@ -532,23 +558,41 @@ const EditorToolbar = memo(
                   {historyNames.map((name, i) => {
                     const isCurrent = i === adjustmentsHistoryIndex;
                     const isFuture = i > adjustmentsHistoryIndex;
+
+                    const textColor = isCurrent
+                      ? TextColors.button
+                      : isFuture
+                        ? TextColors.secondary
+                        : TextColors.primary;
+                    const textWeight = isCurrent ? TextWeights.medium : TextWeights.normal;
+
                     return (
                       <button
                         key={i}
                         data-active={isCurrent}
                         onClick={() => goToAdjustmentsHistoryIndex(i)}
                         className={clsx(
-                          'text-left px-3 py-2 text-sm transition-colors mx-1 my-0.5 rounded-md',
+                          'text-left px-3 py-2 transition-colors mx-1 my-0.5 rounded-md',
                           isCurrent
-                            ? 'bg-accent text-button-text font-medium'
+                            ? 'bg-accent'
                             : isFuture
-                              ? 'text-text-secondary opacity-50 hover:bg-bg-primary hover:opacity-100'
-                              : 'text-text-primary hover:bg-bg-primary',
+                              ? 'opacity-50 hover:bg-bg-primary hover:opacity-100'
+                              : 'hover:bg-bg-primary',
                         )}
                       >
                         <div className="flex justify-between items-center gap-2">
-                          <span className="truncate">{name}</span>
-                          <span className="text-[10px] opacity-50 flex-shrink-0">{i === 0 ? '' : i}</span>
+                          <Text as="span" color={textColor} weight={textWeight} className="truncate">
+                            {name}
+                          </Text>
+                          <Text
+                            as="span"
+                            variant={TextVariants.small}
+                            color={textColor}
+                            weight={textWeight}
+                            className="opacity-50 flex-shrink-0"
+                          >
+                            {i === 0 ? '' : i}
+                          </Text>
                         </div>
                       </button>
                     );
