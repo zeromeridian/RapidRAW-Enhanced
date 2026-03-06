@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Save, CheckCircle, XCircle, Loader, Ban } from 'lucide-react';
 import debounce from 'lodash.debounce';
 import Switch from '../../ui/Switch';
+import Button from '../../ui/Button';
 import Dropdown from '../../ui/Dropdown';
 import Slider from '../../ui/Slider';
 import ImagePicker from '../../ui/ImagePicker';
@@ -211,26 +212,29 @@ export default function ExportPanel({
   useEffect(() => {
     if (initDone.current || appSettings === null) return;
     initDone.current = true;
-    const lastUsed = appSettings.exportPresets?.find(p => p.id === '__last_used__');
+    const lastUsed = appSettings.exportPresets?.find((p) => p.id === '__last_used__');
     if (lastUsed) {
       handleApplyPreset(lastUsed);
     }
   }, [appSettings, handleApplyPreset]);
 
-  const saveLastUsedPreset = useCallback((exportPath: string) => {
-    if (!appSettings) return;
-    const lastUsedPreset: ExportPreset = {
-      ...currentSettingsObject,
-      id: '__last_used__',
-      name: '__last_used__',
-      lastExportPath: exportPath,
-    };
-    const updatedPresets = [
-      ...(appSettings.exportPresets ?? []).filter(p => p.id !== '__last_used__'),
-      lastUsedPreset,
-    ];
-    onSettingsChange({ ...appSettings, exportPresets: updatedPresets });
-  }, [appSettings, currentSettingsObject, onSettingsChange]);
+  const saveLastUsedPreset = useCallback(
+    (exportPath: string) => {
+      if (!appSettings) return;
+      const lastUsedPreset: ExportPreset = {
+        ...currentSettingsObject,
+        id: '__last_used__',
+        name: '__last_used__',
+        lastExportPath: exportPath,
+      };
+      const updatedPresets = [
+        ...(appSettings.exportPresets ?? []).filter((p) => p.id !== '__last_used__'),
+        lastUsedPreset,
+      ];
+      onSettingsChange({ ...appSettings, exportPresets: updatedPresets });
+    },
+    [appSettings, currentSettingsObject, onSettingsChange],
+  );
 
   const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
@@ -245,8 +249,8 @@ export default function ExportPanel({
     ? multiSelectedPaths.length > 0
       ? multiSelectedPaths
       : selectedImage
-      ? [selectedImage.path]
-      : []
+        ? [selectedImage.path]
+        : []
     : multiSelectedPaths;
   const numImages = pathsToExport.length;
   const isBatchMode = numImages > 1;
@@ -315,7 +319,7 @@ export default function ExportPanel({
           setIsEstimating(false);
         }
       }, 500),
-    [selectedImage?.path]
+    [selectedImage?.path],
   );
 
   useEffect(() => {
@@ -412,7 +416,7 @@ export default function ExportPanel({
           : null,
     };
 
-    const lastExportPath = appSettings?.exportPresets?.find(p => p.id === '__last_used__')?.lastExportPath;
+    const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
 
     try {
       if (isBatchMode || !isEditorContext) {
@@ -444,8 +448,10 @@ export default function ExportPanel({
           defaultPath,
           filters: [
             { name: selectedFormat.name, extensions: selectedFormat.extensions },
-            ...FILE_FORMATS.filter((f: FileFormat) => f.id !== fileFormat)
-              .map((f: FileFormat) => ({ name: f.name, extensions: f.extensions })),
+            ...FILE_FORMATS.filter((f: FileFormat) => f.id !== fileFormat).map((f: FileFormat) => ({
+              name: f.name,
+              extensions: f.extensions,
+            })),
           ],
         });
         if (filePath) {
@@ -483,9 +489,7 @@ export default function ExportPanel({
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
-        <h2 className="text-xl font-bold text-primary text-shadow-shiny">
-          Export
-        </h2>
+        <h2 className="text-xl font-bold text-primary text-shadow-shiny">Export</h2>
       </div>
       <div className="flex-grow overflow-y-auto p-4 text-text-secondary space-y-6">
         {canExport ? (
@@ -691,49 +695,45 @@ export default function ExportPanel({
             <span>Estimated file size: ~{formatBytes(estimatedSize)}</span>
           ) : null}
         </div>
-        {isExporting ? (
-          <button
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600/80 text-white font-bold rounded-lg hover:bg-red-600 transition-all"
-            onClick={handleCancel}
-          >
-            <Ban size={18} />
-            Cancel Export
-          </button>
-        ) : (
-          <button
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent text-button-text font-bold rounded-lg hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            disabled={!canExport || isExporting}
-            onClick={handleExport}
-          >
-            <Save size={18} />
-            Export {numImages > 1 ? `${numImages} Images` : 'Image'}
-          </button>
-        )}
-
-        {status === Status.Exporting && (
-          <div className="flex items-center gap-2 text-accent mt-3 text-sm justify-center">
-            <Loader size={16} className="animate-spin" />
-            <span>{`Exporting... (${progress.current}/${progress.total})`}</span>
-          </div>
-        )}
-        {status === Status.Success && (
-          <div className="flex items-center gap-2 text-green-400 mt-3 text-sm justify-center">
-            <CheckCircle size={16} />
-            <span>Export successful!</span>
-          </div>
-        )}
-        {status === Status.Error && (
-          <div className="flex items-center gap-2 text-red-400 mt-3 text-sm justify-center text-center">
-            <XCircle size={16} />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-        {status === Status.Cancelled && (
-          <div className="flex items-center gap-2 text-yellow-400 mt-3 text-sm justify-center">
-            <Ban size={16} />
-            <span>Export cancelled.</span>
-          </div>
-        )}
+        <Button
+          className={`rounded-md h-11 w-full flex items-center justify-center ${
+            status === Status.Exporting
+              ? 'bg-red-600/80 hover:bg-red-600 text-white'
+              : status === Status.Success
+                ? 'bg-green-500/70 text-white shadow-none'
+                : status === Status.Error
+                  ? 'bg-red-500/20 text-red-400 shadow-none'
+                  : status === Status.Cancelled
+                    ? 'bg-yellow-500/20 text-yellow-400 shadow-none'
+                    : ''
+          }`}
+          disabled={status === Status.Exporting ? false : !canExport}
+          onClick={status === Status.Exporting ? handleCancel : handleExport}
+          size="lg"
+        >
+          {status === Status.Exporting ? (
+            <>
+              <Loader size={18} className="animate-spin mr-2" /> Exporting… ({progress.current}/{progress.total}) —
+              Cancel
+            </>
+          ) : status === Status.Success ? (
+            <>
+              <CheckCircle size={18} className="mr-2" /> Export successful!
+            </>
+          ) : status === Status.Error ? (
+            <>
+              <XCircle size={18} className="mr-2" /> {errorMessage || 'Export failed'}
+            </>
+          ) : status === Status.Cancelled ? (
+            <>
+              <Ban size={18} className="mr-2" /> Export cancelled
+            </>
+          ) : (
+            <>
+              <Save size={18} className="mr-2" /> Export {numImages > 1 ? `${numImages} Images` : 'Image'}
+            </>
+          )}
+        </Button>
       </div>
     </div>
   );
