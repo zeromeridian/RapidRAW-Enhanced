@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::image_processing::downscale_f32_image;
 use crate::AppState;
+use tauri::Emitter;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct NegativeConversionParams {
@@ -118,7 +119,7 @@ fn run_pipeline(
     let mut out_buffer = vec![0.0f32; raw_pixels.len()];
 
     let k = 4.0 * params.contrast.max(0.1); 
-    let x0 = 0.5 - (params.exposure * 0.25);
+    let x0 = 0.6 - (params.exposure * 0.25);
     let gamma_inv = 1.0 / 2.2; 
 
     let y0 = 1.0 / (1.0 + (k * x0).exp());
@@ -246,90 +247,56 @@ pub async fn preview_negative_conversion(
 }
 
 #[tauri::command]
-pub async fn convert_negative_full(
-    path: String,
+pub async fn convert_negatives(
+    paths: Vec<String>,
     params: NegativeConversionParams,
-    state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
-) -> Result<(), String> {
-    let (source_path, _) = parse_virtual_path(&path);
-    let source_path_str = source_path.to_string_lossy().to_string();
+) -> Result<Vec<String>, String> {
+    tokio::task::spawn_blocking(move || {
+        let mut results = Vec::new();
 
-    let original_image = {
-        let original_lock = state.original_image.lock().unwrap();
-        if let Some(loaded) = original_lock.as_ref() {
-            if loaded.path == source_path_str {
-                loaded.image.clone().as_ref().clone()
-            } else {
-                drop(original_lock);
-                let settings = load_settings(app_handle.clone()).unwrap_or_default();
-                let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
-                let linear_mode = settings.linear_raw_mode;
+        for (i, path_str) in paths.iter().enumerate() {
+            let _ = app_handle.emit("negative-batch-progress", serde_json::json!({
+                "current": i + 1,
+                "total": paths.len(),
+                "path": path_str
+            }));
 
-                match read_file_mapped(Path::new(&source_path_str)) {
-                    Ok(mmap) => load_base_image_from_bytes(&mmap, &source_path_str, false, highlight_compression, linear_mode.clone(), None)
-                        .map_err(|e| e.to_string())?,
-                    Err(_e) => {
-                        let bytes = fs::read(&source_path_str).map_err(|io_err| io_err.to_string())?;
-                        load_base_image_from_bytes(&bytes, &source_path_str, false, highlight_compression, linear_mode.clone(), None)
-                            .map_err(|e| e.to_string())?
-                    }
-                }
-            }
-        } else {
-            drop(original_lock);
+            let (source_path, _) = parse_virtual_path(path_str);
+            let real_path = source_path.to_string_lossy().to_string();
+
             let settings = load_settings(app_handle.clone()).unwrap_or_default();
-            let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
-            let linear_mode = settings.linear_raw_mode;
+            let hl_comp = settings.raw_highlight_compression.unwrap_or(2.5);
+            let lin_mode = settings.linear_raw_mode;
 
-            match read_file_mapped(Path::new(&source_path_str)) {
-                Ok(mmap) => load_base_image_from_bytes(&mmap, &source_path_str, false, highlight_compression, linear_mode.clone(), None)
-                    .map_err(|e| e.to_string())?,
-                Err(_e) => {
-                    let bytes = fs::read(&source_path_str).map_err(|io_err| io_err.to_string())?;
-                    load_base_image_from_bytes(&bytes, &source_path_str, false, highlight_compression, linear_mode.clone(), None)
-                        .map_err(|e| e.to_string())?
+            let img = match read_file_mapped(Path::new(&real_path)) {
+                Ok(mmap) => load_base_image_from_bytes(&mmap, &real_path, false, hl_comp, lin_mode.clone(), None),
+                Err(_) => {
+                    let bytes = fs::read(&real_path).unwrap_or_default();
+                    load_base_image_from_bytes(&bytes, &real_path, false, hl_comp, lin_mode, None)
                 }
-            }
+            }.map_err(|e| e.to_string())?;
+
+            let bounds_ref = downscale_f32_image(&img, 1080, 1080);
+            let ref_rgb = bounds_ref.to_rgb32f();
+            let (ref_w, ref_h) = ref_rgb.dimensions();
+            let log_pixels: Vec<f32> = ref_rgb.as_raw().par_iter().map(|&v| -v.clamp(1e-6, 1.0).log10()).collect();
+            let bounds = analyze_bounds(&log_pixels, ref_w as usize, ref_h as usize);
+
+            let processed = run_pipeline(&img, &params, Some(bounds));
+
+            let p = Path::new(&real_path);
+            let parent = p.parent().unwrap_or(Path::new(""));
+            let stem = p.file_stem().unwrap_or_default().to_string_lossy();
+            let filename = format!("{}_Positive.tiff", stem);
+            let out_path = parent.join(&filename); 
+
+            processed.to_rgb16().save(&out_path)
+                .map_err(|e| format!("Failed to save {}: {}", filename, e))?;
+                
+            results.push(out_path.to_string_lossy().to_string());
         }
-    };
 
-    let bounds_reference_img = downscale_f32_image(&original_image, 1080, 1080);
-
-    let ref_rgb = bounds_reference_img.to_rgb32f();
-    let (ref_w, ref_h) = ref_rgb.dimensions();
-    let ref_log_pixels: Vec<f32> = ref_rgb.as_raw().par_iter().map(|&v| {
-        -v.clamp(1e-6, 1.0).log10()
-    }).collect();
-
-    let correct_bounds = analyze_bounds(&ref_log_pixels, ref_w as usize, ref_h as usize);
-    let processed = run_pipeline(&original_image, &params, Some(correct_bounds));
-
-    *state.negative_conversion_result.lock().unwrap() = Some(processed);
-    
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn save_converted_negative(
-    original_path_str: String,
-    state: tauri::State<'_, AppState>,
-) -> Result<String, String> {
-    let processed_image = state
-        .negative_conversion_result
-        .lock()
-        .unwrap()
-        .take()
-        .ok_or("No converted negative found in memory. Please run conversion first.")?;
-
-    let path = std::path::Path::new(&original_path_str);
-    let parent = path.parent().unwrap_or(std::path::Path::new(""));
-    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
-
-    let filename = format!("{}_Positive.tiff", stem);
-    let out_path = parent.join(filename);
-
-    processed_image.to_rgb16().save(&out_path).map_err(|e| e.to_string())?;
-
-    Ok(out_path.to_string_lossy().to_string())
+        Ok(results)
+    }).await.map_err(|e| e.to_string())?
 }

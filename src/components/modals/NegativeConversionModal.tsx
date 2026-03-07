@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { RotateCcw, ZoomIn, ZoomOut, Maximize, Save, Loader2, Eye, EyeOff, Info } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../ui/Button';
@@ -28,20 +29,22 @@ const DEFAULT_PARAMS: NegativeParams = {
 interface NegativeConversionModalProps {
   isOpen: boolean;
   onClose(): void;
-  selectedImagePath: string | null;
-  onSave(savedPath: string): void;
+  targetPaths: string[];
+  onSave(savedPaths: string[]): void;
 }
 
 export default function NegativeConversionModal({
   isOpen,
   onClose,
-  selectedImagePath,
+  targetPaths,
   onSave,
 }: NegativeConversionModalProps) {
   const [params, setParams] = useState<NegativeParams>(DEFAULT_PARAMS);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -51,8 +54,17 @@ export default function NegativeConversionModal({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
-
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
+  const selectedImagePath = targetPaths.length > 0 ? targetPaths[0] : null;
+
+  useEffect(() => {
+    const unlisten = listen('negative-batch-progress', (e: any) => {
+      setProgress(e.payload);
+    });
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, []);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -125,15 +137,18 @@ export default function NegativeConversionModal({
       setIsLoading(true);
       setTimeout(() => setShow(true), 10);
       updatePreview(DEFAULT_PARAMS, true);
-      invoke('generate_preview_for_path', {
-        path: selectedImagePath,
-        jsAdjustments: {},
-      })
-        .then((res: any) => {
-          const blob = new Blob([new Uint8Array(res)], { type: 'image/jpeg' });
-          setOriginalUrl(URL.createObjectURL(blob));
+
+      if (selectedImagePath) {
+        invoke('generate_preview_for_path', {
+          path: selectedImagePath,
+          jsAdjustments: {},
         })
-        .catch(console.error);
+          .then((res: any) => {
+            const blob = new Blob([new Uint8Array(res)], { type: 'image/jpeg' });
+            setOriginalUrl(URL.createObjectURL(blob));
+          })
+          .catch(console.error);
+      }
     } else {
       setShow(false);
       setTimeout(() => {
@@ -144,6 +159,7 @@ export default function NegativeConversionModal({
         setZoom(1);
         setPan({ x: 0, y: 0 });
         setIsLoading(true);
+        setProgress(null);
       }, 300);
     }
   }, [isOpen, selectedImagePath, updatePreview]);
@@ -155,19 +171,21 @@ export default function NegativeConversionModal({
   };
 
   const handleSave = async () => {
-    if (!selectedImagePath) return;
+    if (targetPaths.length === 0) return;
     setIsSaving(true);
+    setProgress(null);
     try {
-      await invoke('convert_negative_full', { path: selectedImagePath, params });
-      const savedPath: string = await invoke('save_converted_negative', {
-        originalPathStr: selectedImagePath,
+      const savedPaths: string[] = await invoke('convert_negatives', {
+        paths: targetPaths,
+        params,
       });
-      onSave(savedPath);
+      onSave(savedPaths);
       onClose();
     } catch (e) {
-      console.error('Failed to save negative', e);
+      console.error('Failed to batch save negatives', e);
     } finally {
       setIsSaving(false);
+      setProgress(null);
     }
   };
 
@@ -186,15 +204,18 @@ export default function NegativeConversionModal({
             setParams(DEFAULT_PARAMS);
             updatePreview(DEFAULT_PARAMS);
           }}
+          disabled={isSaving}
           data-tooltip="Reset"
-          className="p-2 rounded-full hover:bg-surface transition-colors"
+          className="p-2 rounded-full hover:bg-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <RotateCcw size={18} />
         </button>
       </div>
 
       <div className="flex-grow overflow-y-auto p-4 flex flex-col gap-8">
-        <div>
+        <div
+          className={clsx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}
+        >
           <Text variant={TextVariants.heading} className="mb-2">
             Color Timing
           </Text>
@@ -229,7 +250,9 @@ export default function NegativeConversionModal({
           </div>
         </div>
 
-        <div>
+        <div
+          className={clsx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}
+        >
           <Text variant={TextVariants.heading} className="mb-2">
             Print Grade
           </Text>
@@ -393,7 +416,7 @@ export default function NegativeConversionModal({
   return (
     <div
       className={clsx(
-        'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300',
+        'fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300',
         show ? 'opacity-100' : 'opacity-0',
       )}
       onMouseDown={onClose}
@@ -412,14 +435,24 @@ export default function NegativeConversionModal({
 
             <div className="flex-shrink-0 p-4 flex justify-end gap-3 border-t border-surface bg-bg-secondary z-20">
               <button
+                disabled={isSaving}
                 onClick={onClose}
-                className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors"
+                className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <Button onClick={handleSave} disabled={isSaving || isLoading || !previewUrl}>
-                {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : <Save className="mr-2" size={16} />}
-                Convert & Save
+                {isSaving ? (
+                  <>
+                    <Loader2 className="animate-spin mr-2" size={16} />
+                    {progress && progress.total > 1 ? `Converting ${progress.current}/${progress.total}` : 'Converting'}
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2" size={16} />
+                    {targetPaths.length > 1 ? `Convert & Save All (${targetPaths.length})` : 'Convert & Save'}
+                  </>
+                )}
               </Button>
             </div>
           </motion.div>

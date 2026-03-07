@@ -184,7 +184,7 @@ interface DenoiseModalState {
 
 interface NegativeConversionModalState {
   isOpen: boolean;
-  targetPath: string | null;
+  targetPaths: Array<string>;
 }
 
 interface CullingModalState {
@@ -382,7 +382,7 @@ function App() {
   });
   const [negativeModalState, setNegativeModalState] = useState<NegativeConversionModalState>({
     isOpen: false,
-    targetPath: null,
+    targetPaths: [],
   });
   const [denoiseModalState, setDenoiseModalState] = useState<DenoiseModalState>({
     isOpen: false,
@@ -1254,7 +1254,7 @@ function App() {
 
           setFinalPreviewUrl((prevUrl) => {
             if (prevUrl && prevUrl.startsWith('blob:')) {
-              setTimeout(() => URL.revokeObjectURL(prevUrl), 250);
+              setTimeout(() => URL.revokeObjectURL(prevUrl), 200);
             }
             return url;
           });
@@ -3630,7 +3630,7 @@ function App() {
               if (selectedImage) {
                 setNegativeModalState({
                   isOpen: true,
-                  targetPath: selectedImage.path,
+                  targetPaths: [selectedImage.path],
                 });
               }
             },
@@ -3955,11 +3955,11 @@ function App() {
           {
             label: 'Convert Negative',
             icon: Film,
-            disabled: !isSingleSelection,
+            disabled: selectionCount === 0,
             onClick: () => {
               setNegativeModalState({
                 isOpen: true,
-                targetPath: finalSelection[0],
+                targetPaths: finalSelection,
               });
             },
           },
@@ -4902,11 +4902,11 @@ function App() {
       <NegativeConversionModal
         isOpen={negativeModalState.isOpen}
         onClose={() => setNegativeModalState((prev) => ({ ...prev, isOpen: false }))}
-        selectedImagePath={negativeModalState.targetPath}
-        onSave={(savedPath) => {
+        targetPaths={negativeModalState.targetPaths}
+        onSave={(savedPaths) => {
           refreshImageList().then(() => {
-            if (selectedImage?.path === negativeModalState.targetPath) {
-              handleImageSelect(savedPath);
+            if (selectedImage && negativeModalState.targetPaths.includes(selectedImage.path) && savedPaths.length > 0) {
+              handleImageSelect(savedPaths[0]);
             }
           });
         }}

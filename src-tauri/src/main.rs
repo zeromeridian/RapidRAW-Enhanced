@@ -146,7 +146,6 @@ pub struct AppState {
     hdr_result: Arc<Mutex<Option<DynamicImage>>>,
     panorama_result: Arc<Mutex<Option<DynamicImage>>>,
     denoise_result: Arc<Mutex<Option<DynamicImage>>>,
-    negative_conversion_result: Arc<Mutex<Option<DynamicImage>>>,
     indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
     pub lut_cache: Mutex<HashMap<String, Arc<Lut>>>,
     initial_file_path: Mutex<Option<String>>,
@@ -527,7 +526,6 @@ async fn load_image(
         *state.denoise_result.lock().unwrap() = None;
         *state.hdr_result.lock().unwrap() = None;
         *state.panorama_result.lock().unwrap() = None;
-        *state.negative_conversion_result.lock().unwrap() = None;
     }
 
     let (source_path, sidecar_path) = parse_virtual_path(&path);
@@ -3802,7 +3800,6 @@ fn main() {
             hdr_result: Arc::new(Mutex::new(None)),
             panorama_result: Arc::new(Mutex::new(None)),
             denoise_result: Arc::new(Mutex::new(None)),
-            negative_conversion_result: Arc::new(Mutex::new(None)),
             indexing_task_handle: Mutex::new(None),
             lut_cache: Mutex::new(HashMap::new()),
             initial_file_path: Mutex::new(None),
@@ -3902,8 +3899,7 @@ fn main() {
             lens_correction::autodetect_lens,
             lens_correction::get_lens_distortion_params,
             negative_conversion::preview_negative_conversion,
-            negative_conversion::convert_negative_full,
-            negative_conversion::save_converted_negative,
+            negative_conversion::convert_negatives,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
