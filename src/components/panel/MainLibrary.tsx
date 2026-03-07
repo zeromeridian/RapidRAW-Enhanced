@@ -1083,6 +1083,7 @@ const Row = ({
   gap,
 }: any) => {
   const row = rows[index];
+  if (row.type === 'footer') return null;
   const shiftedStyle = {
     ...style,
     transform: (style.transform as string).replace(
@@ -1721,7 +1722,10 @@ export default function MainLibrary({
                 }
               }
 
+              rows.push({ type: 'footer' });
+
               const getItemSize = (index: number) => {
+                if (rows[index].type === 'footer') return OUTER_PADDING;
                 return rows[index].type === 'header' ? headerHeight : rowHeight;
               };
 
