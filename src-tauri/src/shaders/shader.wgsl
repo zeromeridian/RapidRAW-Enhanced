@@ -1318,12 +1318,24 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let tonal_blurred = textureLoad(tonal_blur_texture, id.xy, 0).rgb;
     let clarity_blurred = textureLoad(clarity_blur_texture, id.xy, 0).rgb;
     let structure_blurred = textureLoad(structure_blur_texture, id.xy, 0).rgb;
-    
+
     var locally_contrasted_rgb = initial_linear_rgb;
     locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, sharpness_blurred, adjustments.global.sharpness, adjustments.global.is_raw_image, 0u);
     locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, clarity_blurred, adjustments.global.clarity, adjustments.global.is_raw_image, 1u);
     locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, structure_blurred, adjustments.global.structure, adjustments.global.is_raw_image, 1u);
     locally_contrasted_rgb = apply_centre_local_contrast(locally_contrasted_rgb, adjustments.global.centre, absolute_coord_i, clarity_blurred, adjustments.global.is_raw_image);
+
+    for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
+        let influence = get_mask_influence(i, absolute_coord);
+        if (influence > 0.001) {
+            let mask_adj = adjustments.mask_adjustments[i];
+            var mask_lc = locally_contrasted_rgb;
+            mask_lc = apply_local_contrast(mask_lc, sharpness_blurred, mask_adj.sharpness, adjustments.global.is_raw_image, 0u);
+            mask_lc = apply_local_contrast(mask_lc, clarity_blurred, mask_adj.clarity, adjustments.global.is_raw_image, 1u);
+            mask_lc = apply_local_contrast(mask_lc, structure_blurred, mask_adj.structure, adjustments.global.is_raw_image, 1u);
+            locally_contrasted_rgb = mix(locally_contrasted_rgb, mask_lc, influence);
+        }
+    }
 
     var processed_rgb = apply_linear_exposure(locally_contrasted_rgb, adjustments.global.exposure);
 
@@ -1388,9 +1400,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             let mask_adj = adjustments.mask_adjustments[i];
 
             var mask_base_linear = composite_rgb_linear;
-            mask_base_linear = apply_local_contrast(mask_base_linear, sharpness_blurred, mask_adj.sharpness, adjustments.global.is_raw_image, 0u);
-            mask_base_linear = apply_local_contrast(mask_base_linear, clarity_blurred, mask_adj.clarity, adjustments.global.is_raw_image, 1u);
-            mask_base_linear = apply_local_contrast(mask_base_linear, structure_blurred, mask_adj.structure, adjustments.global.is_raw_image, 1u);
 
             if (mask_adj.glow_amount > 0.0) {
                 mask_base_linear = apply_glow_bloom(
@@ -1477,7 +1486,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     if (adjustments.global.has_lut == 1u) {
         let lut_color = sample_lut_tetrahedral(final_rgb);
-        
         final_rgb = mix(final_rgb, lut_color, adjustments.global.lut_intensity);
     }
 

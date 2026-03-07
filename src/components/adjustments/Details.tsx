@@ -115,7 +115,7 @@ export default function DetailsPanel({
       )}
       */}
 
-      {adjustmentVisibility.chromaticAberration !== false && (
+      {!isForMask && adjustmentVisibility.chromaticAberration !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
           <Text variant={TextVariants.heading} className="mb-2">
             Chromatic Aberration
