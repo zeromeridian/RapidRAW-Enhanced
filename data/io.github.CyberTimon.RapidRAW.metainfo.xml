@@ -38,6 +38,25 @@
   <url type="homepage">https://github.com/CyberTimon/RapidRAW</url>
 
   <releases>
+    <release version="v1.5.1" date="2026-03-07">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.5.1</url>
+        <description translate="no">
+            <p>New Features</p>
+            <ul>
+                <li>Rewritten Rendering Engine: Features a pixel-accurate Dynamic Preview and a performance-focused Static Preview for lower-end devices.</li>
+                <li>Native Fullscreen: A new seamless fullscreen mode where UI panels slide away, allowing full use of zoom and editing tools.</li>
+                <li>Fluid Masking: Real-time calculation for mask overlays and a new intuitive click-and-drag method for drawing masks.</li>
+                <li>True Pixel Peeping: Disables image smoothing at maximum zoom levels for precise analysis of noise and sharpness.</li>
+            </ul>
+            <p>Core Improvements</p>
+            <ul>
+                <li>Added automatic cropping when applying lens corrections to hide distorted edges.</li>
+                <li>The application now remembers previous export settings.</li>
+                <li>Added support for batch converting negative film scans.</li>
+                <li>The histogram now updates instantly and smoothly in real-time.</li>
+            </ul>
+        </description>
+    </release>
     <release version="v1.5.0" date="2026-02-24">
         <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.5.0</url>
         <description translate="no">

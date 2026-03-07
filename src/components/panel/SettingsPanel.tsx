@@ -1269,8 +1269,8 @@ export default function SettingsPanel({
                               </Text>
                               <div className="pl-4 border-l-2 border-border-color ml-1 space-y-3">
                                 <SettingItem
-                                  description="Sets the resolution for fixed previews like crop mode, lens correction, and perspective tools. Does not affect the main editor preview."
-                                  label="Fixed Preview Resolution"
+                                  description="Sets the resolution for static previews like crop mode, lens correction, and perspective tools. Does not affect the main editor preview."
+                                  label="Static Preview Resolution"
                                 >
                                   <Dropdown
                                     onChange={(value: any) =>
