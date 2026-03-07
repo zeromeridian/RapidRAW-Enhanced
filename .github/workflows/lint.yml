@@ -19,6 +19,7 @@ jobs:
         with:
           components: rustfmt
           rustflags: ''
+          rust-src-dir: src-tauri
 
       - name: Check formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
@@ -35,6 +36,7 @@ jobs:
         with:
           components: clippy
           rustflags: ''
+          rust-src-dir: src-tauri
 
       - name: Install system dependencies
         run: |
@@ -44,10 +46,6 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
 
       - name: Clippy
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -W clippy::all
