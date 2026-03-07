@@ -296,6 +296,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub enable_zoom_hifi: Option<bool>,
     #[serde(default)]
+    pub use_full_dpi_rendering: Option<bool>,
+    #[serde(default)]
     pub high_res_zoom_multiplier: Option<f32>,
     #[serde(default)]
     pub enable_live_previews: Option<bool>,
@@ -372,6 +374,7 @@ impl Default for AppSettings {
             pinned_folders: Vec::new(),
             editor_preview_resolution: Some(1920),
             enable_zoom_hifi: Some(true),
+            use_full_dpi_rendering: Some(false),
             enable_live_previews: Some(true),
             enable_high_quality_live_previews: Some(true),
             sort_criteria: None,

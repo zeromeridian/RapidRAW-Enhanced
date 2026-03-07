@@ -326,10 +326,29 @@ export default function SettingsPanel({
     processingBackend: appSettings?.processingBackend || 'auto',
     linuxGpuOptimization: appSettings?.linuxGpuOptimization ?? false,
     highResZoomMultiplier: appSettings?.highResZoomMultiplier || 1.0,
+    useFullDpiRendering: appSettings?.useFullDpiRendering ?? false,
   });
   const [restartRequired, setRestartRequired] = useState(false);
   const [activeCategory, setActiveCategory] = useState('general');
   const [logPath, setLogPath] = useState('');
+
+  const [dpr, setDpr] = useState(() => (typeof window !== 'undefined' ? window.devicePixelRatio : 1));
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const updateDpr = () => setDpr(window.devicePixelRatio);
+
+    const mediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    mediaQuery.addEventListener('change', updateDpr);
+
+    window.addEventListener('resize', updateDpr);
+
+    return () => {
+      mediaQuery.removeEventListener('change', updateDpr);
+      window.removeEventListener('resize', updateDpr);
+    };
+  }, []);
 
   const customAiTags = Array.from(new Set<string>(appSettings?.customAiTags || []));
   const taggingShortcuts = Array.from(new Set<string>(appSettings?.taggingShortcuts || []));
@@ -347,6 +366,7 @@ export default function SettingsPanel({
       processingBackend: appSettings?.processingBackend || 'auto',
       linuxGpuOptimization: appSettings?.linuxGpuOptimization ?? false,
       highResZoomMultiplier: appSettings?.highResZoomMultiplier || 1.0,
+      useFullDpiRendering: appSettings?.useFullDpiRendering ?? false,
     });
     setRestartRequired(false);
   }, [appSettings]);
@@ -1232,10 +1252,23 @@ export default function SettingsPanel({
                                 ensures that every detail is represented with 1:1 pixel accuracy, providing maximum
                                 clarity when zooming and checking focus.
                               </Text>
-                              <div className="pl-4 border-l-2 border-border-color ml-1">
+                              <div className="pl-4 border-l-2 border-border-color ml-1 space-y-3">
+                                <SettingItem
+                                  description="Sets the resolution for fixed previews like crop mode, lens correction, and perspective tools. Does not affect the main editor preview."
+                                  label="Fixed Preview Resolution"
+                                >
+                                  <Dropdown
+                                    onChange={(value: any) =>
+                                      handleProcessingSettingChange('editorPreviewResolution', value)
+                                    }
+                                    options={resolutions}
+                                    value={processingSettings.editorPreviewResolution}
+                                  />
+                                </SettingItem>
+
                                 <SettingItem
                                   label="Render Resolution Scale"
-                                  description="Controls the pixel density of the zoomed render. A lower value tells the editor to render as if your screen has a lower resolution, dramatically improving performance on 4K/Retina displays."
+                                  description="Scales the render resolution relative to your display. Lower values improve performance on high-resolution screens at the cost of some sharpness."
                                 >
                                   <Dropdown
                                     onChange={(value: any) =>
@@ -1243,6 +1276,25 @@ export default function SettingsPanel({
                                     }
                                     options={zoomMultiplierOptions}
                                     value={processingSettings.highResZoomMultiplier}
+                                  />
+                                </SettingItem>
+
+                                <SettingItem
+                                  label="High-DPI Rendering"
+                                  description={
+                                    dpr > 1
+                                      ? `Render previews at your screen's native ${dpr}x physical pixel resolution. Produces the sharpest possible preview but uses significantly more memory.`
+                                      : 'This setting only affects high-DPI displays. Your current display is standard resolution.'
+                                  }
+                                >
+                                  <Switch
+                                    checked={processingSettings.useFullDpiRendering}
+                                    disabled={dpr <= 1}
+                                    id="full-dpi-rendering-toggle"
+                                    label="Render at native DPI"
+                                    onChange={(checked) =>
+                                      handleProcessingSettingChange('useFullDpiRendering', checked)
+                                    }
                                   />
                                 </SettingItem>
                               </div>

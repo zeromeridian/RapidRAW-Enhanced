@@ -126,6 +126,7 @@ export interface AppSettings {
   decorations?: any;
   editorPreviewResolution?: number;
   enableZoomHifi?: boolean;
+  useFullDpiRendering?: boolean;
   highResZoomMultiplier?: number;
   enableLivePreviews?: boolean;
   enableHighQualityLivePreviews?: boolean;

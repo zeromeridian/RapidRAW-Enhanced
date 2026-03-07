@@ -2327,7 +2327,9 @@ function App() {
     const sharpnessFactor = 1.15;
     const zoomMultiplier = appSettings?.highResZoomMultiplier || 1.0;
 
-    let targetRes = Math.max(displaySize.width, displaySize.height) * dpr * sharpnessFactor * zoomMultiplier;
+    const effectiveDpr = appSettings?.useFullDpiRendering ? dpr : 1;
+
+    let targetRes = Math.max(displaySize.width, displaySize.height) * effectiveDpr * sharpnessFactor * zoomMultiplier;
     targetRes = Math.max(targetRes, 512);
 
     if (originalSize && originalSize.width > 0 && originalSize.height > 0) {
@@ -2347,6 +2349,7 @@ function App() {
     appSettings?.enableZoomHifi,
     appSettings?.editorPreviewResolution,
     appSettings?.highResZoomMultiplier,
+    appSettings?.useFullDpiRendering,
     displaySize.width,
     displaySize.height,
     originalSize,

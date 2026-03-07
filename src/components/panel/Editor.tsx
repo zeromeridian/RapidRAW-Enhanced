@@ -763,14 +763,13 @@ export default function Editor({
           customTransform={(x, y, scale) => `translate(${x}px, ${y}px) scale(${scale})`}
         >
           <TransformComponent
-            wrapperStyle={{ width: '100%', height: '100%', willChange: 'transform' }}
+            wrapperStyle={{ width: '100%', height: '100%' }}
             contentStyle={{
               width: '100%',
               height: '100%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              willChange: 'transform',
             }}
             contentProps={{
               onMouseDown: handleMouseDown,
