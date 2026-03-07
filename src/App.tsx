@@ -282,6 +282,7 @@ function App() {
   });
   const [isSliderDragging, setIsSliderDragging] = useState(false);
   const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevAdjustmentsRef = useRef<{ path: string; adjustments: Adjustments } | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isAnimatingTheme, setIsAnimatingTheme] = useState(false);
   const isInitialThemeMount = useRef(true);
@@ -2411,6 +2412,25 @@ function App() {
         currentResRef.current = targetRes;
         applyAdjustments(adjustments, false, targetRes);
         debouncedSave(selectedImage.path, adjustments);
+
+        const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
+        if (otherPaths.length > 0) {
+          const prev = prevAdjustmentsRef.current;
+          if (prev && prev.path === selectedImage.path) {
+            const delta: Partial<Adjustments> = {};
+            for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
+              if (JSON.stringify(adjustments[key]) !== JSON.stringify(prev.adjustments[key])) {
+                (delta as any)[key] = adjustments[key];
+              }
+            }
+            if (Object.keys(delta).length > 0) {
+              invoke(Invokes.ApplyAdjustmentsToPaths, { paths: otherPaths, adjustments: delta }).catch((err) => {
+                console.error('Failed to apply adjustments to multi-selection:', err);
+              });
+            }
+          }
+        }
+        prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
       }, 50);
     }
 
@@ -2423,6 +2443,7 @@ function App() {
     selectedImage?.path,
     selectedImage?.isReady,
     isSliderDragging,
+    multiSelectedPaths,
     applyAdjustments,
     debouncedSave,
     appSettings?.enableLivePreviews,
