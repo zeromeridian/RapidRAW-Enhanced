@@ -1286,6 +1286,51 @@ fn apply_halation(
     return contrast_reduced + halation_glow * amount * 2.5;
 }
 
+fn scale_mask_adjustments(adj: MaskAdjustments, influence: f32) -> MaskAdjustments {
+    var scaled = adj;
+
+    scaled.exposure *= influence;
+    scaled.brightness *= influence;
+    scaled.contrast *= influence;
+    scaled.highlights *= influence;
+    scaled.shadows *= influence;
+    scaled.whites *= influence;
+    scaled.blacks *= influence;
+
+    scaled.saturation *= influence;
+    scaled.temperature *= influence;
+    scaled.tint *= influence;
+    scaled.vibrance *= influence;
+
+    scaled.sharpness *= influence;
+    scaled.luma_noise_reduction *= influence;
+    scaled.color_noise_reduction *= influence;
+    scaled.clarity *= influence;
+    scaled.dehaze *= influence;
+    scaled.structure *= influence;
+
+    scaled.glow_amount *= influence;
+    scaled.halation_amount *= influence;
+    scaled.flare_amount *= influence;
+
+    scaled.color_grading_shadows.saturation *= influence;
+    scaled.color_grading_shadows.luminance *= influence;
+    
+    scaled.color_grading_midtones.saturation *= influence;
+    scaled.color_grading_midtones.luminance *= influence;
+    
+    scaled.color_grading_highlights.saturation *= influence;
+    scaled.color_grading_highlights.luminance *= influence;
+
+    for (var i = 0u; i < 8u; i = i + 1u) {
+        scaled.hsl[i].hue *= influence;
+        scaled.hsl[i].saturation *= influence;
+        scaled.hsl[i].luminance *= influence;
+    }
+
+    return scaled;
+}
+
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let out_dims = vec2<u32>(textureDimensions(output_texture));
@@ -1329,11 +1374,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
             let mask_adj = adjustments.mask_adjustments[i];
-            var mask_lc = locally_contrasted_rgb;
-            mask_lc = apply_local_contrast(mask_lc, sharpness_blurred, mask_adj.sharpness, adjustments.global.is_raw_image, 0u);
-            mask_lc = apply_local_contrast(mask_lc, clarity_blurred, mask_adj.clarity, adjustments.global.is_raw_image, 1u);
-            mask_lc = apply_local_contrast(mask_lc, structure_blurred, mask_adj.structure, adjustments.global.is_raw_image, 1u);
-            locally_contrasted_rgb = mix(locally_contrasted_rgb, mask_lc, influence);
+            locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, sharpness_blurred, mask_adj.sharpness * influence, adjustments.global.is_raw_image, 0u);
+            locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, clarity_blurred, mask_adj.clarity * influence, adjustments.global.is_raw_image, 1u);
+            locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, structure_blurred, mask_adj.structure * influence, adjustments.global.is_raw_image, 1u);
         }
     }
 
@@ -1398,37 +1441,36 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
             let mask_adj = adjustments.mask_adjustments[i];
+            let scaled_adj = scale_mask_adjustments(mask_adj, influence);
 
-            var mask_base_linear = composite_rgb_linear;
-
-            if (mask_adj.glow_amount > 0.0) {
-                mask_base_linear = apply_glow_bloom(
-                    mask_base_linear,
+            if (scaled_adj.glow_amount > 0.0) {
+                composite_rgb_linear = apply_glow_bloom(
+                    composite_rgb_linear,
                     structure_blurred, 
-                    mask_adj.glow_amount, 
+                    scaled_adj.glow_amount, 
                     adjustments.global.is_raw_image,
-                    adjustments.global.exposure + mask_adj.exposure, 
-                    adjustments.global.brightness + mask_adj.brightness, 
-                    adjustments.global.contrast + mask_adj.contrast, 
-                    adjustments.global.whites + mask_adj.whites
+                    adjustments.global.exposure + scaled_adj.exposure, 
+                    adjustments.global.brightness + scaled_adj.brightness, 
+                    adjustments.global.contrast + scaled_adj.contrast, 
+                    adjustments.global.whites + scaled_adj.whites
                 );
             }
-            if (mask_adj.halation_amount > 0.0) {
-                mask_base_linear = apply_halation(
-                    mask_base_linear,
+            if (scaled_adj.halation_amount > 0.0) {
+                composite_rgb_linear = apply_halation(
+                    composite_rgb_linear,
                     clarity_blurred, 
-                    mask_adj.halation_amount, 
+                    scaled_adj.halation_amount, 
                     adjustments.global.is_raw_image,
-                    adjustments.global.exposure + mask_adj.exposure, 
-                    adjustments.global.brightness + mask_adj.brightness, 
-                    adjustments.global.contrast + mask_adj.contrast, 
-                    adjustments.global.whites + mask_adj.whites
+                    adjustments.global.exposure + scaled_adj.exposure, 
+                    adjustments.global.brightness + scaled_adj.brightness, 
+                    adjustments.global.contrast + scaled_adj.contrast, 
+                    adjustments.global.whites + scaled_adj.whites
                 );
             }
 
-            var mask_adjusted_linear = apply_all_mask_adjustments(
-                mask_base_linear, 
-                mask_adj, 
+            composite_rgb_linear = apply_all_mask_adjustments(
+                composite_rgb_linear, 
+                scaled_adj, 
                 absolute_coord_i, 
                 id.xy, 
                 scale, 
@@ -1437,12 +1479,12 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
                 tonal_blurred
             );
 
-            if (mask_adj.flare_amount > 0.0) {
+            if (scaled_adj.flare_amount > 0.0) {
                 let uv = vec2<f32>(absolute_coord) / full_dims;
                 var flare_color = textureSampleLevel(flare_texture, flare_sampler, uv, 0.0).rgb;
                 flare_color *= 1.4;
                 flare_color = flare_color * flare_color;
-                let mask_linear_luma = get_luma(max(mask_adjusted_linear, vec3<f32>(0.0)));
+                let mask_linear_luma = get_luma(max(composite_rgb_linear, vec3<f32>(0.0)));
                 var mask_perceptual_luma: f32;
                 if (mask_linear_luma <= 1.0) {
                     mask_perceptual_luma = pow(max(mask_linear_luma, 0.0), 1.0 / 2.2);
@@ -1450,10 +1492,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
                     mask_perceptual_luma = 1.0 + pow(max(mask_linear_luma - 1.0, 0.0), 1.0 / 2.2);
                 }
                 let protection = 1.0 - smoothstep(0.7, 1.8, mask_perceptual_luma);
-                mask_adjusted_linear += flare_color * mask_adj.flare_amount * protection;
+                composite_rgb_linear += flare_color * scaled_adj.flare_amount * protection;
             }
-
-            composite_rgb_linear = mix(composite_rgb_linear, mask_adjusted_linear, influence);
         }
     }
 

@@ -760,7 +760,6 @@ export default function Editor({
             step: transformState.scale * 0.0013,
             smoothStep: transformState.scale * 0.0013,
           }}
-          customTransform={(x, y, scale) => `translate(${x}px, ${y}px) scale(${scale})`}
         >
           <TransformComponent
             wrapperStyle={{ width: '100%', height: '100%' }}

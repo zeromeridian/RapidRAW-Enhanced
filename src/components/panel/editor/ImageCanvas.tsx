@@ -1601,7 +1601,7 @@ const ImageCanvas = memo(
     );
 
     return (
-      <div className="relative" style={{ width: '100%', height: '100%' }}>
+      <div className="relative" style={{ width: '100%', height: '100%', cursor: effectiveCursor }}>
         <div
           className="absolute inset-0 w-full h-full transition-opacity duration-200 flex items-center justify-center"
           style={{
@@ -1727,82 +1727,84 @@ const ImageCanvas = memo(
             </div>
           </div>
 
-          <Stage
-            height={imageRenderSize.height}
-            onMouseDown={handleMouseDown}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            style={{
-              cursor: effectiveCursor,
-              left: `${imageRenderSize.offsetX}px`,
-              opacity: isShowingOriginal ? 0 : 1,
-              transition: 'opacity 150ms ease-in-out',
-              position: 'absolute',
-              top: `${imageRenderSize.offsetY}px`,
-              zIndex: 4,
-              touchAction: 'none',
-              userSelect: 'none',
-            }}
-            width={imageRenderSize.width}
-          >
-            <Layer listening={!showOriginal}>
-              {(isMasking || isAiEditing) &&
-                activeContainer &&
-                sortedSubMasks.map((subMask: SubMask) => {
-                  const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
-                  const renderSubMask =
-                    subMask.id === activeId && localInitialDrawParams
-                      ? { ...subMask, parameters: localInitialDrawParams }
-                      : subMask;
+          {(isMasking || isAiEditing || isWbPickerActive) && (
+            <Stage
+              height={imageRenderSize.height}
+              onMouseDown={handleMouseDown}
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              style={{
+                cursor: effectiveCursor,
+                left: `${imageRenderSize.offsetX}px`,
+                opacity: isShowingOriginal ? 0 : 1,
+                transition: 'opacity 150ms ease-in-out',
+                position: 'absolute',
+                top: `${imageRenderSize.offsetY}px`,
+                zIndex: 4,
+                touchAction: 'none',
+                userSelect: 'none',
+              }}
+              width={imageRenderSize.width}
+            >
+              <Layer listening={!showOriginal}>
+                {(isMasking || isAiEditing) &&
+                  activeContainer &&
+                  sortedSubMasks.map((subMask: SubMask) => {
+                    const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
+                    const renderSubMask =
+                      subMask.id === activeId && localInitialDrawParams
+                        ? { ...subMask, parameters: localInitialDrawParams }
+                        : subMask;
 
-                  return (
-                    <MaskOverlay
-                      adjustments={adjustments}
-                      imageHeight={effectiveImageDimensions.height}
-                      imageWidth={effectiveImageDimensions.width}
-                      isSelected={renderSubMask.id === (isMasking ? activeMaskId : activeAiSubMaskId)}
-                      isToolActive={isToolActive}
-                      key={renderSubMask.id}
-                      onMaskMouseEnter={() => !isToolActive && setIsMaskHovered(true)}
-                      onMaskMouseLeave={() => !isToolActive && setIsMaskHovered(false)}
-                      onPreviewUpdate={handlePreviewUpdate}
-                      onSelect={() =>
-                        isMasking ? onSelectMask(renderSubMask.id) : onSelectAiSubMask(renderSubMask.id)
-                      }
-                      onUpdate={updateSubMask}
-                      scale={imageRenderSize.scale}
-                      subMask={renderSubMask}
-                    />
-                  );
-                })}
-              {previewLine && previewLine.tool === ToolType.AiSeletor && (
-                <Line
-                  dash={[4, 4]}
-                  lineCap="round"
-                  lineJoin="round"
-                  listening={false}
-                  opacity={0.8}
-                  points={previewLine.points.flatMap((p: Coord) => [p.x, p.y])}
-                  stroke="#0ea5e9"
-                  strokeWidth={2}
-                  tension={0.5}
-                />
-              )}
-              {isBrushActive && cursorPreview.visible && (
-                <Circle
-                  listening={false}
-                  perfectDrawEnabled={false}
-                  stroke={brushSettings?.tool === ToolType.Eraser ? '#f43f5e' : '#0ea5e9'}
-                  radius={brushSettings?.size ? brushSettings.size / 2 : 0}
-                  strokeWidth={1}
-                  x={cursorPreview.x}
-                  y={cursorPreview.y}
-                />
-              )}
-            </Layer>
-          </Stage>
+                    return (
+                      <MaskOverlay
+                        adjustments={adjustments}
+                        imageHeight={effectiveImageDimensions.height}
+                        imageWidth={effectiveImageDimensions.width}
+                        isSelected={renderSubMask.id === (isMasking ? activeMaskId : activeAiSubMaskId)}
+                        isToolActive={isToolActive}
+                        key={renderSubMask.id}
+                        onMaskMouseEnter={() => !isToolActive && setIsMaskHovered(true)}
+                        onMaskMouseLeave={() => !isToolActive && setIsMaskHovered(false)}
+                        onPreviewUpdate={handlePreviewUpdate}
+                        onSelect={() =>
+                          isMasking ? onSelectMask(renderSubMask.id) : onSelectAiSubMask(renderSubMask.id)
+                        }
+                        onUpdate={updateSubMask}
+                        scale={imageRenderSize.scale}
+                        subMask={renderSubMask}
+                      />
+                    );
+                  })}
+                {previewLine && previewLine.tool === ToolType.AiSeletor && (
+                  <Line
+                    dash={[4, 4]}
+                    lineCap="round"
+                    lineJoin="round"
+                    listening={false}
+                    opacity={0.8}
+                    points={previewLine.points.flatMap((p: Coord) => [p.x, p.y])}
+                    stroke="#0ea5e9"
+                    strokeWidth={2}
+                    tension={0.5}
+                  />
+                )}
+                {isBrushActive && cursorPreview.visible && (
+                  <Circle
+                    listening={false}
+                    perfectDrawEnabled={false}
+                    stroke={brushSettings?.tool === ToolType.Eraser ? '#f43f5e' : '#0ea5e9'}
+                    radius={brushSettings?.size ? brushSettings.size / 2 : 0}
+                    strokeWidth={1}
+                    x={cursorPreview.x}
+                    y={cursorPreview.y}
+                  />
+                )}
+              </Layer>
+            </Stage>
+          )}
         </div>
 
         <div

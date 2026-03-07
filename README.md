@@ -60,20 +60,25 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+- **2026-03-07:** Batch negative conversion & various shader improvements
+- **2026-03-06:** Performance optimizations and UI cleanup
+- **2026-03-05:** Initial draw support for linear & radial masks
+- **2026-03-04:** Real-time mask overlay rendering & pixel perfect zooming
+- **2026-03-03:** Instant image rendering & real-time histogram update
 - **2026-03-02:** Remember last export settings & lens correction auto cropping
 - **2026-03-01:** Optimized pixelated interpolation at maximum zoom level
 - **2026-02-27:** Refactored fullscreen handling, smooth and integrated fullscreen viewer
 - **2026-02-24:** Improved tonal adjustments using detail masks, remember zoom level & faster fullscreen preview
 - **2026-02-23:** Custom AI tag lists, clear button for tag settings & improved window state restoration
+
+<details>
+<summary><strong>Expand further</strong></summary>
+
 - **2026-02-23:** Improved RAW processing, incorrect thumbnail crop scaling & improved mask handles
 - **2026-02-21:** XMP metadata read/sync
 - **2026-02-20:** Main window size/position persistence, right-click history dropdown & new library organization panel
 - **2026-02-19:** Exponential zoom scaling, right-click to delete curve points & selected image count display
 - **2026-02-18:** Added a setting for Linear RAW mode for advanced processing & improved right panel switcher
-
-<details>
-<summary><strong>Expand further</strong></summary>
-
 - **2026-02-17:** Display RAW image counts in the folder tree & improved folder reading performance
 - **2026-02-16:** New composition guide overlays for cropping
 - **2026-02-16:** Added the ability to export masks as separate images

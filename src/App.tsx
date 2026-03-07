@@ -3811,7 +3811,8 @@ function App() {
     const renameLabel = isSingleSelection ? 'Rename Image' : `Rename ${selectionCount} Images`;
     const cullLabel = isSingleSelection ? 'Cull Image' : `Cull Images`;
     const collageLabel = isSingleSelection ? 'Frame Image' : 'Create Collage';
-    const stitchLabel = `Stitch Panorama`;
+    const stitchLabel = 'Stitch Panorama';
+    const conversionLabel = 'Convert Negative';
     const mergeLabel = `Merge to HDR`;
 
     const handleCreateVirtualCopy = async (sourcePath: string) => {
@@ -3953,7 +3954,7 @@ function App() {
             },
           },
           {
-            label: 'Convert Negative',
+            label: conversionLabel,
             icon: Film,
             disabled: selectionCount === 0,
             onClick: () => {

@@ -32,6 +32,7 @@ import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import { Invokes } from '../ui/AppProperties';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { platform } from '@tauri-apps/plugin-os';
 
 interface ConfirmModalState {
   confirmText: string;
@@ -331,8 +332,22 @@ export default function SettingsPanel({
   const [restartRequired, setRestartRequired] = useState(false);
   const [activeCategory, setActiveCategory] = useState('general');
   const [logPath, setLogPath] = useState('');
-
   const [dpr, setDpr] = useState(() => (typeof window !== 'undefined' ? window.devicePixelRatio : 1));
+  const [osPlatform, setOsPlatform] = useState('');
+
+  useEffect(() => {
+    try {
+      setOsPlatform(platform());
+    } catch (e) {
+      console.error('Failed to get platform:', e);
+    }
+  }, []);
+
+  const filteredBackendOptions = backendOptions.filter((opt) => {
+    if (opt.value === 'metal' && osPlatform !== 'macos') return false;
+    if (opt.value === 'dx12' && osPlatform === 'macos') return false;
+    return true;
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1383,22 +1398,28 @@ export default function SettingsPanel({
                     >
                       <Dropdown
                         onChange={(value: any) => handleProcessingSettingChange('processingBackend', value)}
-                        options={backendOptions}
-                        value={processingSettings.processingBackend}
+                        options={filteredBackendOptions}
+                        value={
+                          filteredBackendOptions.some((option) => option.value === processingSettings.processingBackend)
+                            ? processingSettings.processingBackend
+                            : 'auto'
+                        }
                       />
                     </SettingItem>
 
-                    <SettingItem
-                      label="Linux Compatibility Mode"
-                      description="Enable workarounds for common GPU driver and display server (e.g., Wayland) issues. May improve stability or performance on some systems."
-                    >
-                      <Switch
-                        checked={processingSettings.linuxGpuOptimization}
-                        id="gpu-compat-toggle"
-                        label="Enable Compatibility Mode"
-                        onChange={(checked) => handleProcessingSettingChange('linuxGpuOptimization', checked)}
-                      />
-                    </SettingItem>
+                    {osPlatform !== 'macos' && osPlatform !== 'windows' && (
+                      <SettingItem
+                        label="Linux Compatibility Mode"
+                        description="Enable workarounds for common GPU driver and display server issues. Disable this to enable full GPU acceleration."
+                      >
+                        <Switch
+                          checked={processingSettings.linuxGpuOptimization}
+                          id="gpu-compat-toggle"
+                          label="Enable Compatibility Mode"
+                          onChange={(checked) => handleProcessingSettingChange('linuxGpuOptimization', checked)}
+                        />
+                      </SettingItem>
+                    )}
 
                     {restartRequired && (
                       <>
