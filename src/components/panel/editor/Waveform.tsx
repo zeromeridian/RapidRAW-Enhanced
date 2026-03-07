@@ -145,7 +145,7 @@ export default function Waveform({ waveformData, onClose }: WaveformProps) {
           style={{ transformOrigin: 'top left' }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
         >
-          <div className="handle flex items-center justify-between p-2 cursor-move">
+          <div className="handle flex items-center justify-between p-3 cursor-move">
             <div className="flex items-center gap-2">
               <Waves size={16} />
               <Text variant={TextVariants.heading}>Waveform</Text>

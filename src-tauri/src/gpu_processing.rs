@@ -848,13 +848,8 @@ pub fn process_and_get_dynamic_image(
     lut: Option<Arc<Lut>>,
     caller_id: &str,
 ) -> Result<DynamicImage, String> {
+    let start_time = Instant::now();
     let (width, height) = base_image.dimensions();
-    log::info!(
-        "[Caller: {}] GPU processing called for {}x{} image.",
-        caller_id,
-        width,
-        height
-    );
     let device = &context.device;
     let queue = &context.queue;
 
@@ -933,7 +928,6 @@ pub fn process_and_get_dynamic_image(
     }
 
     let cache = cache_lock.as_ref().unwrap();
-    let start_time = Instant::now();
 
     let processed_pixels = processor.run(
         &cache.texture_view,
@@ -945,12 +939,8 @@ pub fn process_and_get_dynamic_image(
     )?;
 
     let duration = start_time.elapsed();
-    log::info!(
-        "GPU adjustments for {}x{} image took {:?}",
-        width,
-        height,
-        duration
-    );
+    let fps = 1.0 / duration.as_secs_f64();
+    log::info!("[{}] {}x{} processed on GPU in {:?} ({:.2} FPS)", caller_id, width, height, duration, fps);
 
     let img_buf = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(width, height, processed_pixels)
         .ok_or("Failed to create image buffer from GPU data")?;
