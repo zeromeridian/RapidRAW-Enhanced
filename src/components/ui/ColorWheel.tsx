@@ -149,6 +149,7 @@ const ColorWheel = ({
               color={hsva}
               height={wheelSize}
               onChange={handleWheelChange}
+              angle={0}
               pointer={({ style }) => (
                 <div style={{ ...style, zIndex: 1 }}>
                   <div
