@@ -607,8 +607,40 @@ const MaskOverlay = memo(
 
           {!isSelected && (
             <>
-              <Line points={topRangePts} {...lineProps} opacity={0.7} stroke="white" listening={false} />
-              <Line points={botRangePts} {...lineProps} opacity={0.7} stroke="white" listening={false} />
+              <Line
+                points={topRangePts}
+                {...lineProps}
+                opacity={0.7}
+                stroke="white"
+                listening={true}
+                onClick={handleSelect}
+                onTap={handleSelect}
+                onMouseEnter={(e: any) => {
+                  onMaskMouseEnter();
+                  if (!isToolActive) e.target.getStage().container().style.cursor = 'row-resize';
+                }}
+                onMouseLeave={(e: any) => {
+                  onMaskMouseLeave();
+                  e.target.getStage().container().style.cursor = 'default';
+                }}
+              />
+              <Line
+                points={botRangePts}
+                {...lineProps}
+                opacity={0.7}
+                stroke="white"
+                listening={true}
+                onClick={handleSelect}
+                onTap={handleSelect}
+                onMouseEnter={(e: any) => {
+                  onMaskMouseEnter();
+                  if (!isToolActive) e.target.getStage().container().style.cursor = 'row-resize';
+                }}
+                onMouseLeave={(e: any) => {
+                  onMaskMouseLeave();
+                  e.target.getStage().container().style.cursor = 'default';
+                }}
+              />
             </>
           )}
         </Group>
