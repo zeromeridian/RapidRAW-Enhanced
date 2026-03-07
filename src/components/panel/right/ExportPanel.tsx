@@ -696,7 +696,7 @@ export default function ExportPanel({
           ) : null}
         </div>
         <Button
-          className={`rounded-md h-11 w-full flex items-center text-md !font-bold justify-center ${
+          className={`group rounded-md h-11 w-full flex items-center text-md !font-bold justify-center ${
             status === Status.Exporting
               ? 'bg-red-600/80 hover:bg-red-600 text-white'
               : status === Status.Success
@@ -713,8 +713,14 @@ export default function ExportPanel({
         >
           {status === Status.Exporting ? (
             <>
-              <Loader size={18} className="animate-spin mr-2" /> Exporting… ({progress.current}/{progress.total}) —
-              Cancel
+              <span className="flex items-center group-hover:hidden">
+                <Loader size={18} className="animate-spin mr-2" />
+                Exporting…{progress.total > 1 && ` (${progress.current}/${progress.total})`}
+              </span>
+              <span className="hidden items-center group-hover:flex">
+                <Ban size={18} className="mr-2" />
+                Cancel Export
+              </span>
             </>
           ) : status === Status.Success ? (
             <>
