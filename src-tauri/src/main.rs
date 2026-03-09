@@ -2518,8 +2518,8 @@ fn generate_preset_preview(
 }
 
 #[tauri::command]
-fn update_window_effect(theme: String, window: tauri::Window) {
-    apply_window_effect(theme, window);
+fn update_window_effect(theme: String, window: tauri::WebviewWindow) {
+    apply_window_effect(theme, &window);
 }
 
 #[tauri::command]
@@ -3352,13 +3352,15 @@ async fn load_and_parse_lut(
     Ok(LutParseResult { size: lut_size })
 }
 
-fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowHandle) {
+fn apply_window_effect(theme: String, window: &tauri::WebviewWindow) {
     #[cfg(target_os = "windows")]
     {
+        use tauri::window::{Effect, EffectsBuilder, Color};
+
         let color = match theme.as_str() {
-            "light" => Some((250, 250, 250, 150)),
-            "muted-green" => Some((44, 56, 54, 100)),
-            _ => Some((26, 29, 27, 60)),
+            "light" => Color(250, 250, 250, 150),
+            "muted-green" => Color(44, 56, 54, 100),
+            _ => Color(26, 29, 27, 60),
         };
 
         let info = os_info::get();
@@ -3368,24 +3370,36 @@ fn apply_window_effect(theme: String, window: impl raw_window_handle::HasWindowH
             _ => false,
         };
 
-        if is_win11_or_newer {
-            if let Err(e) = window_vibrancy::apply_acrylic(&window, color) {
-                log::warn!("Failed to apply acrylic effect on Windows 11: {}", e);
-            }
+        let effect = if is_win11_or_newer {
+            Effect::Acrylic
         } else {
-            if let Err(e) = window_vibrancy::apply_blur(&window, color) {
-                log::warn!("Failed to apply blur effect on Windows 10 or older: {}", e);
-            }
+            Effect::Blur
+        };
+
+        let effects = EffectsBuilder::new()
+            .effect(effect)
+            .color(color)
+            .build();
+
+        if let Err(e) = window.set_effects(effects) {
+            log::warn!("Failed to apply window effect on Windows: {}", e);
         }
     }
 
     #[cfg(target_os = "macos")]
     {
-        let material = match theme.as_str() {
-            "light" => window_vibrancy::NSVisualEffectMaterial::ContentBackground,
-            _ => window_vibrancy::NSVisualEffectMaterial::HudWindow,
+        use tauri::window::{Effect, EffectsBuilder};
+
+        let effect = match theme.as_str() {
+            "light" => Effect::ContentBackground,
+            _ => Effect::HudWindow,
         };
-        if let Err(e) = window_vibrancy::apply_vibrancy(&window, material, None, None) {
+
+        let effects = EffectsBuilder::new()
+            .effect(effect)
+            .build();
+
+        if let Err(e) = window.set_effects(effects) {
             log::warn!("Failed to apply macOS vibrancy effect: {}", e);
         }
     }
