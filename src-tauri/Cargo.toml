@@ -19,8 +19,8 @@ rayon = "1.11.0"
 blake3 = "1.8.3"
 wgpu = "28.0"
 pollster = "0.4"
-bytemuck = { version = "1.24", features = ["derive"] }
-anyhow = "1.0.100"
+bytemuck = { version = "1.25", features = ["derive"] }
+anyhow = "1.0.102"
 kamadak-exif = "0.6.1"
 rawler = { path = "rawler/rawler" }
 serde_bytes = "0.11.19"
