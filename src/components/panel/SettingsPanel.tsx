@@ -1176,7 +1176,7 @@ export default function SettingsPanel({
                       <div className="space-y-8">
                         <DataActionItem
                           buttonAction={handleClearAiTags}
-                          buttonText="Clear AI Tags"
+                          buttonText="Clear"
                           description="This will remove all AI-generated tags from your .rrdata files in the current base folder. User-added tags will be kept."
                           disabled={!effectiveRootPath}
                           icon={<Trash2 size={16} className="mr-2" />}
@@ -1186,7 +1186,7 @@ export default function SettingsPanel({
                         />
                         <DataActionItem
                           buttonAction={handleClearTags}
-                          buttonText="Clear All Tags"
+                          buttonText="Clear"
                           description="This will remove all AI-generated and user-added tags from your .rrdata files in the current base folder. Color labels will be kept."
                           disabled={!effectiveRootPath}
                           icon={<Trash2 size={16} className="mr-2" />}
@@ -1580,7 +1580,7 @@ export default function SettingsPanel({
                   <div className="space-y-8">
                     <DataActionItem
                       buttonAction={handleClearSidecars}
-                      buttonText="Delete All Edits in Folder"
+                      buttonText="Clear"
                       description={
                         <Text as="span" variant={TextVariants.small}>
                           This will delete all{' '}
@@ -1600,7 +1600,7 @@ export default function SettingsPanel({
 
                     <DataActionItem
                       buttonAction={handleClearCache}
-                      buttonText="Clear Thumbnail Cache"
+                      buttonText="Clear"
                       description="This will delete all cached thumbnail images. They will be regenerated automatically as you browse your library."
                       icon={<Trash2 size={16} className="mr-2" />}
                       isProcessing={isClearingCache}
@@ -1614,7 +1614,7 @@ export default function SettingsPanel({
                           await invoke(Invokes.ShowInFinder, { path: logPath });
                         }
                       }}
-                      buttonText="Open Log File"
+                      buttonText="Open"
                       description={
                         <Text as="span" variant={TextVariants.small}>
                           View the application's log file for troubleshooting. The log is located at:
