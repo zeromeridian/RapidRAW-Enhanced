@@ -60,6 +60,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+- **2026-03-10:** Implement region of interest rendering to improve performance when zooming in
 - **2026-03-07:** Batch negative conversion & various shader improvements
 - **2026-03-06:** Performance optimizations and UI cleanup
 - **2026-03-05:** Initial draw support for linear & radial masks
@@ -69,11 +70,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 - **2026-03-01:** Optimized pixelated interpolation at maximum zoom level
 - **2026-02-27:** Refactored fullscreen handling, smooth and integrated fullscreen viewer
 - **2026-02-24:** Improved tonal adjustments using detail masks, remember zoom level & faster fullscreen preview
-- **2026-02-23:** Custom AI tag lists, clear button for tag settings & improved window state restoration
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+- **2026-02-23:** Custom AI tag lists, clear button for tag settings & improved window state restoration
 - **2026-02-23:** Improved RAW processing, incorrect thumbnail crop scaling & improved mask handles
 - **2026-02-21:** XMP metadata read/sync
 - **2026-02-20:** Main window size/position persistence, right-click history dropdown & new library organization panel
