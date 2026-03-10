@@ -2478,7 +2478,7 @@ function App() {
       dragIdleTimer.current = setTimeout(() => {
         currentResRef.current = targetRes;
         applyAdjustments(adjustments, false, targetRes);
-      }, 200);
+      }, 350);
     } else {
       dragIdleTimer.current = setTimeout(() => {
         currentResRef.current = targetRes;
@@ -2503,7 +2503,7 @@ function App() {
           }
         }
         prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
-      }, 50);
+      }, 60);
     }
 
     return () => {

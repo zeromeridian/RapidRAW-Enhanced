@@ -776,9 +776,10 @@ fn process_preview_job(
     let preview_dim = target_resolution.unwrap_or(default_preview_dim);
 
     let preview_dim_f = preview_dim as f32;
-    let max_interactive_dim: f32 = if hq_live { preview_dim_f } else { 3072.0 };
+    let image_max_dim = loaded_image.image.width().max(loaded_image.image.height()) as f32;
+    let max_interactive_dim: f32 = if hq_live { image_max_dim } else { 3072.0 };
 
-    let mut interactive_divisor = if preview_dim <= 1536 {
+    let mut interactive_divisor = if preview_dim_f <= 1536.0 || max_interactive_dim <= 1536.0 {
         if hq_live { 1.0 } else { 1.5 }
     } else {
         let transition_start = 1536.0;
