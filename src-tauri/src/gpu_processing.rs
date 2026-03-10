@@ -10,6 +10,14 @@ use crate::image_processing::{AllAdjustments, GpuContext};
 use crate::lut_processing::Lut;
 use crate::{AppState, GpuImageCache};
 
+#[derive(Clone, Copy, Debug)]
+pub struct Roi {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
 pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuContext, String> {
     let mut context_lock = state.gpu_context.lock().unwrap();
     if let Some(context) = &*context_lock {
@@ -486,14 +494,19 @@ impl GpuProcessor {
         input_texture_view: &wgpu::TextureView,
         width: u32,
         height: u32,
+        roi: Option<Roi>,
         adjustments: AllAdjustments,
         mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
         lut: Option<Arc<Lut>>,
-    ) -> Result<Vec<u8>, String> {
+    ) -> Result<(Vec<u8>, u32, u32), String> {
         let device = &self.context.device;
         let queue = &self.context.queue;
         let scale = (width.min(height) as f32) / 1080.0;
         const MAX_MASKS: u32 = 8;
+
+        let bounds = roi.unwrap_or(Roi { x: 0, y: 0, width, height });
+        let out_width = bounds.width;
+        let out_height = bounds.height;
 
         let full_texture_size = wgpu::Extent3d {
             width,
@@ -679,21 +692,30 @@ impl GpuProcessor {
         const TILE_SIZE: u32 = 2048;
         const TILE_OVERLAP: u32 = 128;
 
-        let mut final_pixels = vec![0u8; (width * height * 4) as usize];
-        let tiles_x = (width + TILE_SIZE - 1) / TILE_SIZE;
-        let tiles_y = (height + TILE_SIZE - 1) / TILE_SIZE;
+        let mut final_pixels = vec![0u8; (out_width * out_height * 4) as usize];
 
-        for tile_y in 0..tiles_y {
-            for tile_x in 0..tiles_x {
-                let x_start = tile_x * TILE_SIZE;
-                let y_start = tile_y * TILE_SIZE;
-                let tile_width = (width - x_start).min(TILE_SIZE);
-                let tile_height = (height - y_start).min(TILE_SIZE);
+        let start_tile_x = bounds.x / TILE_SIZE;
+        let start_tile_y = bounds.y / TILE_SIZE;
+        let end_tile_x = (bounds.x + bounds.width + TILE_SIZE - 1) / TILE_SIZE;
+        let end_tile_y = (bounds.y + bounds.height + TILE_SIZE - 1) / TILE_SIZE;
+
+        for tile_y in start_tile_y..end_tile_y {
+            for tile_x in start_tile_x..end_tile_x {
+                let x_start_unclamped = tile_x * TILE_SIZE;
+                let y_start_unclamped = tile_y * TILE_SIZE;
+
+                let x_start = x_start_unclamped.max(bounds.x);
+                let y_start = y_start_unclamped.max(bounds.y);
+                let x_end = (x_start_unclamped + TILE_SIZE).min(bounds.x + bounds.width).min(width);
+                let y_end = (y_start_unclamped + TILE_SIZE).min(bounds.y + bounds.height).min(height);
+
+                let tile_width = x_end - x_start;
+                let tile_height = y_end - y_start;
 
                 let input_x_start = (x_start as i32 - TILE_OVERLAP as i32).max(0) as u32;
                 let input_y_start = (y_start as i32 - TILE_OVERLAP as i32).max(0) as u32;
-                let input_x_end = (x_start + tile_width + TILE_OVERLAP).min(width);
-                let input_y_end = (y_start + tile_height + TILE_OVERLAP).min(height);
+                let input_x_end = (x_end + TILE_OVERLAP).min(width);
+                let input_y_end = (y_end + TILE_OVERLAP).min(height);
                 let input_width = input_x_end - input_x_start;
                 let input_height = input_y_end - input_y_start;
 
@@ -821,8 +843,9 @@ impl GpuProcessor {
                 let crop_y_start = y_start - input_y_start;
 
                 for row in 0..tile_height {
-                    let final_y = y_start + row;
-                    let final_row_offset = (final_y * width + x_start) as usize * 4;
+                    let final_y = y_start + row - bounds.y;
+                    let final_x = x_start - bounds.x;
+                    let final_row_offset = (final_y * out_width + final_x) as usize * 4;
                     let source_y = crop_y_start + row;
                     let source_row_offset = (source_y * input_width + crop_x_start) as usize * 4;
                     let copy_bytes = (tile_width * 4) as usize;
@@ -834,7 +857,7 @@ impl GpuProcessor {
             }
         }
 
-        Ok(final_pixels)
+        Ok((final_pixels, out_width, out_height))
     }
 }
 
@@ -846,6 +869,7 @@ pub fn process_and_get_dynamic_image(
     all_adjustments: AllAdjustments,
     mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
     lut: Option<Arc<Lut>>,
+    roi: Option<Roi>,
     caller_id: &str,
 ) -> Result<DynamicImage, String> {
     let start_time = Instant::now();
@@ -929,10 +953,11 @@ pub fn process_and_get_dynamic_image(
 
     let cache = cache_lock.as_ref().unwrap();
 
-    let processed_pixels = processor.run(
+    let (processed_pixels, out_w, out_h) = processor.run(
         &cache.texture_view,
         cache.width,
         cache.height,
+        roi,
         all_adjustments,
         mask_bitmaps,
         lut,
@@ -940,9 +965,9 @@ pub fn process_and_get_dynamic_image(
 
     let duration = start_time.elapsed();
     let fps = 1.0 / duration.as_secs_f64();
-    log::info!("[{}] {}x{} processed on GPU in {:?} ({:.2} FPS)", caller_id, width, height, duration, fps);
+    log::info!("[{}] {}x{} processed (ROI: {}x{}) on GPU in {:?} ({:.2} FPS)", caller_id, width, height, out_w, out_h, duration, fps);
 
-    let img_buf = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(width, height, processed_pixels)
+    let img_buf = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(out_w, out_h, processed_pixels)
         .ok_or("Failed to create image buffer from GPU data")?;
     Ok(DynamicImage::ImageRgba8(img_buf))
 }

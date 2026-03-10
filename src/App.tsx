@@ -306,15 +306,33 @@ function App() {
   const [transformedOriginalUrl, setTransformedOriginalUrl] = useState<string | null>(null);
   const patchesSentToBackend = useRef<Set<string>>(new Set());
 
-  const handleDisplaySizeChange = useCallback((size: ImageDimensions & { scale?: number }) => {
-    setDisplaySize({ width: size.width, height: size.height });
+  const handleDisplaySizeChange = useCallback(
+    (
+      size: ImageDimensions & {
+        scale?: number;
+        offsetX?: number;
+        offsetY?: number;
+        containerWidth?: number;
+        containerHeight?: number;
+      },
+    ) => {
+      setDisplaySize({ width: size.width, height: size.height });
 
-    if (size.scale) {
-      const baseWidth = size.width / size.scale;
-      const baseHeight = size.height / size.scale;
-      setBaseRenderSize({ width: baseWidth, height: baseHeight });
-    }
-  }, []);
+      if (size.scale) {
+        const baseWidth = size.width / size.scale;
+        const baseHeight = size.height / size.scale;
+        setBaseRenderSize({
+          width: baseWidth,
+          height: baseHeight,
+          offsetX: size.offsetX || 0,
+          offsetY: size.offsetY || 0,
+          containerWidth: size.containerWidth || 0,
+          containerHeight: size.containerHeight || 0,
+        } as any);
+      }
+    },
+    [],
+  );
 
   const [initialFitScale, setInitialFitScale] = useState<number | null>(null);
   const [renderedRightPanel, setRenderedRightPanel] = useState<Panel | null>(activeRightPanel);
@@ -1201,6 +1219,55 @@ function App() {
     return list;
   }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchCriteria, appSettings]);
 
+  const calculateROI = useCallback(() => {
+    if (!transformWrapperRef.current) return null;
+    const state = transformWrapperRef.current.instance.transformState;
+    if (!state) return null;
+
+    const { scale, positionX, positionY } = state;
+    const { width: baseW, height: baseH, offsetX, offsetY, containerWidth, containerHeight } = baseRenderSize as any;
+
+    if (!baseW || !baseH || !containerWidth || !containerHeight) return null;
+
+    if (scale <= 1.01) return null;
+
+    const visibleLeft = -positionX / scale;
+    const visibleTop = -positionY / scale;
+    const visibleRight = visibleLeft + containerWidth / scale;
+    const visibleBottom = visibleTop + containerHeight / scale;
+
+    const imgLeft = offsetX;
+    const imgTop = offsetY;
+    const imgRight = offsetX + baseW;
+    const imgBottom = offsetY + baseH;
+
+    const intersectLeft = Math.max(visibleLeft, imgLeft);
+    const intersectTop = Math.max(visibleTop, imgTop);
+    const intersectRight = Math.min(visibleRight, imgRight);
+    const intersectBottom = Math.min(visibleBottom, imgBottom);
+
+    if (intersectLeft >= intersectRight || intersectTop >= intersectBottom) {
+      return null;
+    }
+
+    let roiX = (intersectLeft - imgLeft) / baseW;
+    let roiY = (intersectTop - imgTop) / baseH;
+    let roiW = (intersectRight - intersectLeft) / baseW;
+    let roiH = (intersectBottom - intersectTop) / baseH;
+
+    const padX = roiW * 0.2;
+    const padY = roiH * 0.2;
+
+    roiX = Math.max(0, roiX - padX);
+    roiY = Math.max(0, roiY - padY);
+    roiW = Math.min(1 - roiX, roiW + padX * 2);
+    roiH = Math.min(1 - roiY, roiH + padY * 2);
+
+    if (roiW > 0.95 && roiH > 0.95) return null;
+
+    return [roiX, roiY, roiW, roiH] as [number, number, number, number];
+  }, [baseRenderSize]);
+
   const applyAdjustments = useCallback(
     async (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
       if (!selectedImage?.isReady) return;
@@ -1237,12 +1304,14 @@ function App() {
       }
 
       const jobId = ++previewJobIdRef.current;
+      const roi = calculateROI();
 
       try {
         const buffer: ArrayBuffer = await invoke(Invokes.ApplyAdjustments, {
           jsAdjustments: payload,
           isInteractive: dragging,
           targetResolution: targetRes || null,
+          roi: roi || null,
         });
 
         if (currentPath !== selectedImagePathRef.current) return;
@@ -1265,7 +1334,7 @@ function App() {
         }
       }
     },
-    [selectedImage?.isReady, selectedImage?.path],
+    [selectedImage?.isReady, selectedImage?.path, calculateROI],
   );
 
   const generateUncroppedPreview = useCallback(
@@ -2409,7 +2478,7 @@ function App() {
       dragIdleTimer.current = setTimeout(() => {
         currentResRef.current = targetRes;
         applyAdjustments(adjustments, false, targetRes);
-      }, 150);
+      }, 200);
     } else {
       dragIdleTimer.current = setTimeout(() => {
         currentResRef.current = targetRes;

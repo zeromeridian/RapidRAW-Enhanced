@@ -282,6 +282,10 @@ export default function Editor({
         width: imageRenderSize.width * transformState.scale,
         height: imageRenderSize.height * transformState.scale,
         scale: transformState.scale,
+        offsetX: imageRenderSize.offsetX,
+        offsetY: imageRenderSize.offsetY,
+        containerWidth: imageContainerRef.current?.clientWidth || 0,
+        containerHeight: imageContainerRef.current?.clientHeight || 0,
       };
       onDisplaySizeChange(currentDisplaySize);
     }
