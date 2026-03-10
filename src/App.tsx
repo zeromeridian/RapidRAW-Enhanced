@@ -3384,8 +3384,6 @@ function App() {
         }
       };
 
-      loadMetadataEarly();
-
       const loadFullImageData = async () => {
         try {
           const loadImageResult: any = await invoke(Invokes.LoadImage, { path: selectedImage.path });
@@ -3447,7 +3445,16 @@ function App() {
           }
         }
       };
-      loadFullImageData();
+
+      const loadAll = async () => {
+        await loadMetadataEarly();
+        if (isEffectActive) {
+          await loadFullImageData();
+        }
+      };
+
+      loadAll();
+
       return () => {
         isEffectActive = false;
       };
