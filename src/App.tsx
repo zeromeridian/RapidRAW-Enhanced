@@ -1971,15 +1971,6 @@ function App() {
       debouncedSave.cancel();
       patchesSentToBackend.current.clear();
 
-      const knownRating = imageRatings[path] ?? 0;
-      const placeholderAdjustments = {
-        ...INITIAL_ADJUSTMENTS,
-        rating: knownRating,
-      };
-
-      setLiveAdjustments(placeholderAdjustments);
-      resetAdjustmentsHistory(placeholderAdjustments);
-
       setSelectedImage({
         exif: null,
         height: 0,
@@ -2022,7 +2013,7 @@ function App() {
         return null;
       });
     },
-    [selectedImage?.path, applyAdjustments, debouncedSave, thumbnails, imageRatings, resetAdjustmentsHistory],
+    [selectedImage?.path, applyAdjustments, debouncedSave, thumbnails],
   );
 
   const executeDelete = useCallback(
