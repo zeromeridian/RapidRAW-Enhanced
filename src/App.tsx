@@ -1448,6 +1448,7 @@ function App() {
       }
       setActiveMaskId(null);
       setActiveAiSubMaskId(null);
+      setIsWbPickerActive(false);
     },
     [activeRightPanel],
   );
