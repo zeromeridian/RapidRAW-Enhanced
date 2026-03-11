@@ -503,6 +503,20 @@ function App() {
     [debouncedSetHistory],
   );
 
+  const handleRotate = useCallback(
+    (degrees: number) => {
+      const increment = degrees > 0 ? 1 : 3;
+      setAdjustments((prev: Adjustments) => ({
+        ...prev,
+        aspectRatio: prev.aspectRatio && prev.aspectRatio !== 0 ? 1 / prev.aspectRatio : null,
+        orientationSteps: ((prev.orientationSteps || 0) + increment) % 4,
+        rotation: 0,
+        crop: null,
+      }));
+    },
+    [setAdjustments],
+  );
+
   const handleStraighten = useCallback(
     (angleCorrection: number) => {
       setAdjustments((prev: Partial<Adjustments>) => {
@@ -2902,6 +2916,7 @@ function App() {
     handlePasteFiles,
     handleRate,
     handleRightPanelSelect,
+    handleRotate,
     handleSetColorLabel,
     handleToggleFullScreen,
     handleZoomChange,
