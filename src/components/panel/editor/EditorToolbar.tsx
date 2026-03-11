@@ -323,6 +323,11 @@ const EditorToolbar = memo(
       }
     }, [isHistoryVisible, adjustmentsHistoryIndex]);
 
+    const handleButtonKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (e.key === 'Tab') return;
+      e.currentTarget.blur();
+    };
+
     const isExpanded = isInfoHovered && (hasExif || isLoading);
 
     return (
@@ -331,6 +336,7 @@ const EditorToolbar = memo(
           <button
             className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors flex-shrink-0"
             onClick={onBackToLibrary}
+            onKeyDown={handleButtonKeyDown}
             data-tooltip="Back to Library"
           >
             <ArrowLeft size={20} />
@@ -524,6 +530,7 @@ const EditorToolbar = memo(
               className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!canUndo}
               onClick={onUndo}
+              onKeyDown={handleButtonKeyDown}
               onContextMenu={(e) => {
                 e.preventDefault();
                 setIsHistoryVisible((prev) => !prev);
@@ -536,6 +543,7 @@ const EditorToolbar = memo(
               className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!canRedo}
               onClick={onRedo}
+              onKeyDown={handleButtonKeyDown}
               onContextMenu={(e) => {
                 e.preventDefault();
                 setIsHistoryVisible((prev) => !prev);
@@ -571,6 +579,7 @@ const EditorToolbar = memo(
                         key={i}
                         data-active={isCurrent}
                         onClick={() => goToAdjustmentsHistoryIndex(i)}
+                        onKeyDown={handleButtonKeyDown}
                         className={clsx(
                           'text-left px-3 py-2 transition-colors mx-1 my-0.5 rounded-md',
                           isCurrent
@@ -610,6 +619,7 @@ const EditorToolbar = memo(
                 : 'bg-surface hover:bg-card-active text-text-primary',
             )}
             onClick={onToggleWaveform}
+            onKeyDown={handleButtonKeyDown}
             data-tooltip="Toggle Waveform (W)"
           >
             <Waves size={20} />
@@ -623,6 +633,7 @@ const EditorToolbar = memo(
                 : 'bg-surface hover:bg-card-active text-text-primary',
             )}
             onClick={onToggleShowOriginal}
+            onKeyDown={handleButtonKeyDown}
             data-tooltip={showOriginal ? 'Show Edited (B)' : 'Show Original (B)'}
           >
             {showOriginal ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -630,6 +641,7 @@ const EditorToolbar = memo(
           <button
             className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
             onClick={onToggleFullScreen}
+            onKeyDown={handleButtonKeyDown}
             data-tooltip="Toggle Fullscreen (F)"
           >
             <div className="relative w-5 h-5 flex items-center justify-center">

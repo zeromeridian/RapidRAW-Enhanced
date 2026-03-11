@@ -2509,7 +2509,7 @@ function App() {
           }
         }
         prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
-      }, 60);
+      }, 50);
     }
 
     return () => {
@@ -4444,6 +4444,7 @@ function App() {
             activeSection={activeTreeSection}
             onActiveSectionChange={handleActiveTreeSectionChange}
             showImageCounts={appSettings?.enableFolderImageCounts ?? false}
+            isInstantTransition={isInstantTransition}
           />
           <Resizer
             direction={Orientation.Vertical}
@@ -4876,7 +4877,11 @@ function App() {
                   activeRightPanel ? 'border-surface' : 'border-transparent',
                 )}
               >
-                <RightPanelSwitcher activePanel={activeRightPanel} onPanelSelect={handleRightPanelSelect} />
+                <RightPanelSwitcher
+                  activePanel={activeRightPanel}
+                  onPanelSelect={handleRightPanelSelect}
+                  isInstantTransition={isInstantTransition}
+                />
               </div>
             </div>
           </div>

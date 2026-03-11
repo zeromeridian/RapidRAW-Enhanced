@@ -11,12 +11,11 @@ interface PanelOptions {
 interface RightPanelSwitcherProps {
   activePanel: Panel | null;
   onPanelSelect(id: Panel): void;
+  isInstantTransition: boolean;
 }
 
 const panelGroups: Array<Array<PanelOptions>> = [
-  [
-    { id: Panel.Metadata, icon: Info, title: 'Info' },
-  ],
+  [{ id: Panel.Metadata, icon: Info, title: 'Info' }],
   [
     { id: Panel.Adjustments, icon: SlidersHorizontal, title: 'Adjust' },
     { id: Panel.Crop, icon: Scaling, title: 'Crop' },
@@ -29,7 +28,11 @@ const panelGroups: Array<Array<PanelOptions>> = [
   ],
 ];
 
-export default function RightPanelSwitcher({ activePanel, onPanelSelect }: RightPanelSwitcherProps) {
+export default function RightPanelSwitcher({
+  activePanel,
+  onPanelSelect,
+  isInstantTransition,
+}: RightPanelSwitcherProps) {
   return (
     <div className="flex flex-col p-1 gap-1 h-full">
       {panelGroups.map((group, groupIndex) => (
@@ -50,7 +53,7 @@ export default function RightPanelSwitcher({ activePanel, onPanelSelect }: Right
                 <motion.div
                   layoutId="active-panel-indicator"
                   className="absolute inset-0 bg-surface rounded-md"
-                  transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
+                  transition={isInstantTransition ? { duration: 0 } : { type: 'spring', bounce: 0.2, duration: 0.4 }}
                 />
               )}
               <Icon size={20} className="relative z-10" />

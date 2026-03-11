@@ -2,7 +2,7 @@ import { ExportPreset } from './ExportImportProperties';
 import { Adjustments } from '../../utils/adjustments';
 import { ToolType } from '../panel/right/Masks';
 
-export const GLOBAL_KEYS = [' ', 'ArrowUp', 'ArrowDown', 'f', 'b', 'w'];
+export const GLOBAL_KEYS = [' ', 'ArrowUp', 'ArrowDown', 'f', 'b', 'w', 'ArrowLeft', 'ArrowRight'];
 export const OPTION_SEPARATOR = 'separator';
 
 export enum Invokes {
