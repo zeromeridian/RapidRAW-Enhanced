@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Crop, PercentCrop } from 'react-image-crop';
 import { Loader2 } from 'lucide-react';
@@ -69,6 +69,7 @@ interface EditorProps {
   adjustmentsHistoryIndex: number;
   goToAdjustmentsHistoryIndex(index: number): void;
   liveRotation?: number | null;
+  isInstantTransition: boolean;
 }
 
 export default function Editor({
@@ -124,6 +125,7 @@ export default function Editor({
   adjustmentsHistoryIndex,
   goToAdjustmentsHistoryIndex,
   liveRotation,
+  isInstantTransition,
 }: EditorProps) {
   const [crop, setCrop] = useState<Crop | null>(null);
   const prevCropParams = useRef<any>(null);
@@ -148,6 +150,19 @@ export default function Editor({
   const [toolbarOverflowVisible, setToolbarOverflowVisible] = useState(!isFullScreen);
   const isGeneratingOverlayRef = useRef(false);
   const pendingOverlayRequestRef = useRef<any>(null);
+  const prevRenderState = useRef({
+    containerLeft: 0,
+    containerTop: 0,
+    offsetX: 0,
+    offsetY: 0,
+    width: 0,
+  });
+  const transitionAnchorRef = useRef<{
+    active: boolean;
+    screenImageLeft: number;
+    screenImageTop: number;
+    physicalImageWidth: number;
+  } | null>(null);
 
   useEffect(() => {
     if (isFullScreen) {
@@ -259,6 +274,61 @@ export default function Editor({
   }, [selectedImage, adjustments.crop, adjustments.orientationSteps]);
 
   const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
+
+  useLayoutEffect(() => {
+    const wrapper = transformWrapperRef.current;
+    const container = imageContainerRef.current;
+
+    if (!wrapper || !container || imageRenderSize.width === 0) return;
+
+    const currentRect = container.getBoundingClientRect();
+    const scaleOld = transformStateRef.current.scale;
+    const posOldX = transformStateRef.current.positionX;
+    const posOldY = transformStateRef.current.positionY;
+
+    if (isInstantTransition && !transitionAnchorRef.current && scaleOld > 1.01) {
+      transitionAnchorRef.current = {
+        active: true,
+        screenImageLeft: prevRenderState.current.containerLeft + posOldX + prevRenderState.current.offsetX * scaleOld,
+        screenImageTop: prevRenderState.current.containerTop + posOldY + prevRenderState.current.offsetY * scaleOld,
+        physicalImageWidth: prevRenderState.current.width * scaleOld,
+      };
+    }
+
+    if (!isInstantTransition && transitionAnchorRef.current) {
+      transitionAnchorRef.current = null;
+    }
+
+    if (transitionAnchorRef.current && transitionAnchorRef.current.active) {
+      const anchor = transitionAnchorRef.current;
+
+      const scaleNew = anchor.physicalImageWidth / imageRenderSize.width;
+
+      const posNewX = anchor.screenImageLeft - currentRect.left - imageRenderSize.offsetX * scaleNew;
+      const posNewY = anchor.screenImageTop - currentRect.top - imageRenderSize.offsetY * scaleNew;
+
+      if (
+        Math.abs(scaleNew - scaleOld) > 0.001 ||
+        Math.abs(posNewX - posOldX) > 0.5 ||
+        Math.abs(posNewY - posOldY) > 0.5
+      ) {
+        wrapper.setTransform(posNewX, posNewY, scaleNew, 0);
+
+        const contentNode = wrapper.instance?.contentComponent;
+        if (contentNode) {
+          contentNode.style.transform = `translate(${posNewX}px, ${posNewY}px) scale(${scaleNew})`;
+        }
+      }
+    }
+
+    prevRenderState.current = {
+      containerLeft: currentRect.left,
+      containerTop: currentRect.top,
+      offsetX: imageRenderSize.offsetX,
+      offsetY: imageRenderSize.offsetY,
+      width: imageRenderSize.width,
+    };
+  }, [isFullScreen, imageRenderSize, isInstantTransition]);
 
   const transformConfig = useMemo(() => {
     if (!selectedImage || !imageRenderSize.scale || !originalSize) {
@@ -697,7 +767,8 @@ export default function Editor({
   return (
     <div
       className={clsx(
-        'flex-1 flex flex-col relative overflow-hidden min-h-0 transition-all duration-300 ease-in-out',
+        'flex-1 flex flex-col relative overflow-hidden min-h-0',
+        !isInstantTransition && 'transition-all duration-300 ease-in-out',
         isFullScreen ? 'bg-black rounded-none p-0 gap-0' : 'bg-bg-secondary rounded-lg p-2 gap-2',
       )}
     >
@@ -707,7 +778,8 @@ export default function Editor({
 
       <div
         className={clsx(
-          'flex-shrink-0 transition-all duration-300 ease-in-out',
+          'flex-shrink-0',
+          !isInstantTransition && 'transition-all duration-300 ease-in-out',
           isFullScreen ? 'max-h-0 opacity-0 m-0' : 'max-h-[100px] opacity-100',
           toolbarOverflowVisible ? 'overflow-visible' : 'overflow-hidden',
         )}

@@ -231,6 +231,7 @@ function App() {
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [activeView, setActiveView] = useState('library');
   const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
+  const [isInstantTransition, setIsInstantTransition] = useState(false);
   const [isLayoutReady, setIsLayoutReady] = useState(false);
   const [currentFolderPath, setCurrentFolderPath] = useState<string | null>(null);
   const [expandedFolders, setExpandedFolders] = useState(new Set<string>());
@@ -2128,6 +2129,9 @@ function App() {
   }, [multiSelectedPaths, executeDelete, imageList]);
 
   const handleToggleFullScreen = useCallback(() => {
+    const currentlyZoomed = zoom > 1.01;
+    setIsInstantTransition(currentlyZoomed);
+
     if (isFullScreen) {
       setIsFullScreen(false);
     } else {
@@ -2136,7 +2140,11 @@ function App() {
       }
       setIsFullScreen(true);
     }
-  }, [isFullScreen, selectedImage]);
+
+    if (currentlyZoomed) {
+      setTimeout(() => setIsInstantTransition(false), 100);
+    }
+  }, [isFullScreen, selectedImage, zoom]);
 
   const handleCopyAdjustments = useCallback(() => {
     const sourceAdjustments = selectedImage ? adjustments : libraryActiveAdjustments;
@@ -4405,7 +4413,7 @@ function App() {
         <div
           className={clsx(
             'flex h-full overflow-hidden flex-shrink-0',
-            !isResizing && 'transition-all duration-300 ease-in-out',
+            !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
           )}
           style={{
             maxWidth: isFullScreen ? '0px' : '1000px',
@@ -4451,6 +4459,7 @@ function App() {
       activeTreeSection,
       copiedFilePaths,
       isFullScreen,
+      isInstantTransition,
     ],
   );
 
@@ -4648,11 +4657,12 @@ function App() {
               adjustmentsHistoryIndex={adjustmentsHistoryIndex}
               goToAdjustmentsHistoryIndex={goToAdjustmentsHistoryIndex}
               liveRotation={liveRotation}
+              isInstantTransition={isInstantTransition}
             />
             <div
               className={clsx(
                 'flex flex-col w-full overflow-hidden flex-shrink-0',
-                !isResizing && 'transition-all duration-300 ease-in-out',
+                !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
               )}
               style={{
                 maxHeight: isFullScreen ? '0px' : '500px',
@@ -4703,7 +4713,7 @@ function App() {
           <div
             className={clsx(
               'flex h-full overflow-hidden flex-shrink-0',
-              !isResizing && 'transition-all duration-300 ease-in-out',
+              !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
             )}
             style={{
               maxWidth: isFullScreen ? '0px' : '1000px',
@@ -4716,7 +4726,10 @@ function App() {
             />
             <div className="flex bg-bg-secondary rounded-lg h-full">
               <div
-                className={clsx('h-full overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}
+                className={clsx(
+                  'h-full overflow-hidden',
+                  !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+                )}
                 style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
               >
                 <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
@@ -4879,7 +4892,8 @@ function App() {
     >
       <div
         className={clsx(
-          'flex-shrink-0 overflow-hidden transition-all duration-300 ease-in-out z-50',
+          'flex-shrink-0 overflow-hidden z-50',
+          !isInstantTransition && 'transition-all duration-300 ease-in-out',
           isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
         )}
       >
@@ -4888,7 +4902,7 @@ function App() {
       <div
         className={clsx(
           'flex-1 flex flex-col min-h-0',
-          isLayoutReady && rootPath && 'transition-all duration-300 ease-in-out',
+          isLayoutReady && rootPath && !isInstantTransition && 'transition-all duration-300 ease-in-out',
           [
             rootPath && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2'),
             !appSettings?.decorations && !isWindowFullScreen && !isFullScreen && (rootPath ? 'pt-12' : 'pt-10'),
@@ -4905,7 +4919,10 @@ function App() {
             />
           )}
           <div
-            className={clsx('flex-shrink-0 overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}
+            className={clsx(
+              'flex-shrink-0 overflow-hidden',
+              !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+            )}
             style={{ width: isLibraryExportPanelVisible && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
           >
             <LibraryExportPanel
