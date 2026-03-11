@@ -299,6 +299,7 @@ function App() {
   const [displaySize, setDisplaySize] = useState<ImageDimensions>({ width: 0, height: 0 });
   const [previewSize, setPreviewSize] = useState<ImageDimensions>({ width: 0, height: 0 });
   const [baseRenderSize, setBaseRenderSize] = useState<ImageDimensions>({ width: 0, height: 0 });
+  const baseRenderSizeRef = useRef<any>(null);
   const [originalSize, setOriginalSize] = useState<ImageDimensions>({ width: 0, height: 0 });
   const [isLoadingFullRes, setIsLoadingFullRes] = useState(false);
   const [isRotationActive, setIsRotationActive] = useState(false);
@@ -322,14 +323,16 @@ function App() {
       if (size.scale) {
         const baseWidth = size.width / size.scale;
         const baseHeight = size.height / size.scale;
-        setBaseRenderSize({
+        const newSize = {
           width: baseWidth,
           height: baseHeight,
           offsetX: size.offsetX || 0,
           offsetY: size.offsetY || 0,
           containerWidth: size.containerWidth || 0,
           containerHeight: size.containerHeight || 0,
-        } as any);
+        };
+        baseRenderSizeRef.current = newSize;
+        setBaseRenderSize(newSize as any);
       }
     },
     [],
@@ -1225,8 +1228,11 @@ function App() {
     const state = transformWrapperRef.current.instance.transformState;
     if (!state) return null;
 
+    const currentBaseSize = baseRenderSizeRef.current;
+    if (!currentBaseSize) return null;
+
     const { scale, positionX, positionY } = state;
-    const { width: baseW, height: baseH, offsetX, offsetY, containerWidth, containerHeight } = baseRenderSize as any;
+    const { width: baseW, height: baseH, offsetX, offsetY, containerWidth, containerHeight } = currentBaseSize;
 
     if (!baseW || !baseH || !containerWidth || !containerHeight) return null;
 
@@ -1267,7 +1273,7 @@ function App() {
     if (roiW > 0.95 && roiH > 0.95) return null;
 
     return [roiX, roiY, roiW, roiH] as [number, number, number, number];
-  }, [baseRenderSize]);
+  }, []);
 
   const applyAdjustments = useCallback(
     async (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
