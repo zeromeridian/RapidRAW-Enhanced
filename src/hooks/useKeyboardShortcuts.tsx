@@ -222,6 +222,15 @@ export const useKeyboardShortcuts = ({
           event.preventDefault();
           setIsWaveformVisible((prev: boolean) => !prev);
         }
+        if (key === 's' && !isCtrl) {
+          event.preventDefault();
+          if (activeRightPanel === Panel.Crop) {
+            setIsStraightenActive((prev: boolean) => !prev);
+          } else {
+            handleRightPanelSelect(Panel.Crop);
+            setIsStraightenActive(true);
+          }
+        }
       } else {
         if ((key === 'enter' || key === ' ') && !isCtrl) {
           event.preventDefault();

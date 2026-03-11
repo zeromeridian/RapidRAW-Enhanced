@@ -117,6 +117,13 @@ export default function CropPanel({
   const { aspectRatio, rotation = 0, flipHorizontal = false, flipVertical = false, orientationSteps = 0 } = adjustments;
 
   useEffect(() => {
+    if (isStraightenActive) {
+      updateLocalRotation(null);
+      setAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
+    }
+  }, [isStraightenActive]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeTag = document.activeElement?.tagName.toLowerCase();
       if (activeTag === 'input' || activeTag === 'textarea') return;
@@ -589,7 +596,7 @@ export default function CropPanel({
                           ? 'bg-accent text-button-text'
                           : 'text-text-secondary hover:bg-card-active hover:text-text-primary',
                       )}
-                      data-tooltip="Straighten Tool"
+                      data-tooltip="Straighten Tool (S)"
                     >
                       <Ruler size={16} />
                     </button>
