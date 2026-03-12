@@ -7,7 +7,7 @@ import { homeDir } from '@tauri-apps/api/path';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import debounce from 'lodash.debounce';
 import throttle from 'lodash.throttle';
-import { ClerkProvider } from '@clerk/clerk-react';
+import { ClerkProvider } from "@clerk/react";
 import { ToastContainer, toast, Slide } from 'react-toastify';
 import clsx from 'clsx';
 import {
