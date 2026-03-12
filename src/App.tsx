@@ -1454,10 +1454,10 @@ function App() {
   );
 
   const handleSettingsChange = useCallback(
-    (newSettings: AppSettings) => {
+    (newSettings: AppSettings): Promise<void> => {
       if (!newSettings) {
         console.error('handleSettingsChange was called with null settings. Aborting save operation.');
-        return;
+        return Promise.resolve();
       }
       if (newSettings.theme && newSettings.theme !== theme) {
         setTheme(newSettings.theme);
@@ -1465,7 +1465,7 @@ function App() {
 
       const { searchCriteria: _searchCriteria, ...settingsToSave } = newSettings as any;
       setAppSettings(newSettings);
-      invoke(Invokes.SaveSettings, { settings: settingsToSave }).catch((err) => {
+      return invoke(Invokes.SaveSettings, { settings: settingsToSave }).then(() => {}).catch((err) => {
         console.error('Failed to save settings:', err);
       });
     },

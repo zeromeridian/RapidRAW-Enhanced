@@ -69,7 +69,7 @@ interface SettingsPanelProps {
   appSettings: any;
   onBack(): void;
   onLibraryRefresh(): void;
-  onSettingsChange(settings: any): void;
+  onSettingsChange(settings: any): Promise<void>;
   rootPath: string | null;
 }
 
@@ -413,11 +413,10 @@ export default function SettingsPanel({
   };
 
   const handleSaveAndRelaunch = async () => {
-    onSettingsChange({
+    await onSettingsChange({
       ...appSettings,
       ...processingSettings,
     });
-    await new Promise((resolve) => setTimeout(resolve, 200));
     await relaunch();
   };
 
