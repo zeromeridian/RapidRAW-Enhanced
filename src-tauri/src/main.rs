@@ -158,6 +158,7 @@ pub struct AppState {
     pub thumbnail_geometry_cache: Mutex<HashMap<String, (u64, DynamicImage, f32)>>,
     pub lens_db: Mutex<Option<lens_correction::LensDatabase>>,
     pub load_image_generation: Arc<AtomicUsize>,
+    pub full_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>, 
 }
 
 #[derive(serde::Serialize)]
@@ -519,6 +520,7 @@ async fn load_image(
         *state.original_image.lock().unwrap() = None;
         *state.cached_preview.lock().unwrap() = None;
         *state.gpu_image_cache.lock().unwrap() = None;
+        *state.full_warped_cache.lock().unwrap() = None;
 
         state.mask_cache.lock().unwrap().clear();
         state.patch_cache.lock().unwrap().clear();
@@ -1430,6 +1432,36 @@ fn get_full_image_for_processing(
     Ok((loaded_image.image.clone().as_ref().clone(), loaded_image.is_raw))
 }
 
+fn get_cached_full_warped_image(
+    state: &tauri::State<AppState>,
+    js_adjustments: &serde_json::Value,
+) -> Result<Arc<DynamicImage>, String> {
+    let geo_hash = calculate_geometry_hash(js_adjustments);
+
+    {
+        let cache_lock = state.full_warped_cache.lock().unwrap();
+        if let Some((hash, img)) = cache_lock.as_ref() {
+            if *hash == geo_hash {
+                return Ok(Arc::clone(img));
+            }
+        }
+    }
+
+    let (mut full_image, is_raw) = get_full_image_for_processing(state)?;
+    if is_raw {
+        apply_cpu_default_raw_processing(&mut full_image);
+    }
+    let warped_image = apply_geometry_warp(&full_image, js_adjustments);
+    let warped_arc = Arc::new(warped_image);
+
+    {
+        let mut cache_lock = state.full_warped_cache.lock().unwrap();
+        *cache_lock = Some((geo_hash, Arc::clone(&warped_arc)));
+    }
+
+    Ok(warped_arc)
+}
+
 fn calculate_resize_target(
     current_w: u32,
     current_h: u32,
@@ -2327,15 +2359,10 @@ async fn generate_ai_foreground_mask(
         .await
         .map_err(|e| e.to_string())?;
 
-    let (mut full_image, is_raw) = get_full_image_for_processing(&state)?;
-
-    if is_raw {
-        apply_cpu_default_raw_processing(&mut full_image);
-    }
-
-    let warped_image = apply_geometry_warp(&full_image, &js_adjustments);
+    let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
+    
     let full_mask_image =
-        run_u2netp_model(&warped_image, &models.u2netp).map_err(|e| e.to_string())?;
+        run_u2netp_model(warped_image.as_ref(), &models.u2netp).map_err(|e| e.to_string())?;
     let base64_data = encode_to_base64_png(&full_mask_image)?;
 
     Ok(AiForegroundMaskParameters {
@@ -2361,14 +2388,10 @@ async fn generate_ai_sky_mask(
         .await
         .map_err(|e| e.to_string())?;
 
-    let (mut full_image, is_raw) = get_full_image_for_processing(&state)?;
-
-    if is_raw {
-        apply_cpu_default_raw_processing(&mut full_image);
-    }
-    let warped_image = apply_geometry_warp(&full_image, &js_adjustments);
+    let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
+    
     let full_mask_image =
-        run_sky_seg_model(&warped_image, &models.sky_seg).map_err(|e| e.to_string())?;
+        run_sky_seg_model(warped_image.as_ref(), &models.sky_seg).map_err(|e| e.to_string())?;
     let base64_data = encode_to_base64_png(&full_mask_image)?;
 
     Ok(AiSkyMaskParameters {
@@ -2397,17 +2420,7 @@ async fn generate_ai_subject_mask(
         .await
         .map_err(|e| e.to_string())?;
 
-    let (mut full_image, is_raw) = get_full_image_for_processing(&state)?;
-
-    if is_raw {
-        apply_cpu_default_raw_processing(&mut full_image);
-    }
-    let warped_image = apply_geometry_warp(&full_image, &js_adjustments);
-
-    let embeddings = {
-        let mut ai_state_lock = state.ai_state.lock().unwrap();
-        let ai_state = ai_state_lock.as_mut().unwrap();
-
+    let path_hash = {
         let mut hasher = blake3::Hasher::new();
         hasher.update(path.as_bytes());
         let mut geo_hasher = DefaultHasher::new();
@@ -2418,25 +2431,30 @@ async fn generate_ai_subject_mask(
             }
         }
         hasher.update(&geo_hasher.finish().to_le_bytes());
+        hasher.finalize().to_hex().to_string()
+    };
 
-
-        let path_hash = hasher.finalize().to_hex().to_string();
+    let embeddings = {
+        let mut ai_state_lock = state.ai_state.lock().unwrap();
+        let ai_state = ai_state_lock.as_mut().unwrap();
 
         if let Some(cached_embeddings) = &ai_state.embeddings {
             if cached_embeddings.path_hash == path_hash {
                 cached_embeddings.clone()
             } else {
+                let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
                 let mut new_embeddings =
-                    generate_image_embeddings(&warped_image, &models.sam_encoder)
+                    generate_image_embeddings(warped_image.as_ref(), &models.sam_encoder)
                         .map_err(|e| e.to_string())?;
-                new_embeddings.path_hash = path_hash;
+                new_embeddings.path_hash = path_hash.clone();
                 ai_state.embeddings = Some(new_embeddings.clone());
                 new_embeddings
             }
         } else {
-            let mut new_embeddings = generate_image_embeddings(&warped_image, &models.sam_encoder)
+            let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
+            let mut new_embeddings = generate_image_embeddings(warped_image.as_ref(), &models.sam_encoder)
                 .map_err(|e| e.to_string())?;
-            new_embeddings.path_hash = path_hash;
+            new_embeddings.path_hash = path_hash.clone();
             ai_state.embeddings = Some(new_embeddings.clone());
             new_embeddings
         }
@@ -3906,6 +3924,7 @@ fn main() {
             thumbnail_geometry_cache: Mutex::new(HashMap::new()),
             lens_db: Mutex::new(None),
             load_image_generation: Arc::new(AtomicUsize::new(0)),
+            full_warped_cache: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             load_image,
