@@ -79,7 +79,11 @@ export default function TaggingSubMenu({
   const shortcuts = appSettings?.taggingShortcuts || [];
 
   return (
-    <div className="bg-surface/90 p-2 w-64 text-text-primary rounded-lg" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="bg-surface/90 p-2 w-64 text-text-primary rounded-lg"
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       <div className="mb-2">
         <div className="flex flex-wrap gap-1 p-1 bg-surface rounded-md min-h-[32px] items-center">
           <AnimatePresence>
