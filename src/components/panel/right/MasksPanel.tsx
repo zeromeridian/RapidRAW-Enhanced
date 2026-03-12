@@ -106,8 +106,20 @@ const SUB_MASK_CONFIG: Record<Mask, any> = {
   },
   [Mask.Brush]: { showBrushTools: true },
   [Mask.Linear]: { parameters: [] },
-  [Mask.Color]: { parameters: [] },
-  [Mask.Luminance]: { parameters: [] },
+  [Mask.Color]: {
+    parameters: [
+      { key: 'tolerance', label: 'Tolerance', min: 1, max: 100, step: 1, defaultValue: 20 },
+      { key: 'grow', label: 'Grow', min: -100, max: 100, step: 1, defaultValue: 0 },
+      { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 35 },
+    ],
+  },
+  [Mask.Luminance]: {
+    parameters: [
+      { key: 'tolerance', label: 'Tolerance', min: 1, max: 100, step: 1, defaultValue: 20 },
+      { key: 'grow', label: 'Grow', min: -100, max: 100, step: 1, defaultValue: 0 },
+      { key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 35 },
+    ],
+  },
   [Mask.All]: { parameters: [] },
   [Mask.AiSubject]: {
     parameters: [
@@ -319,17 +331,24 @@ export default function MasksPanel({
       subMask.parameters.range = Math.min(imgW, imgH) * 0.1;
     }
 
-    if (type === Mask.Linear || type === Mask.Radial) {
+    if (type === Mask.Linear || type === Mask.Radial || type === Mask.Color || type === Mask.Luminance) {
       if (!subMask.parameters) subMask.parameters = {};
       subMask.parameters.isInitialDraw = true;
-      subMask.parameters.startX = -10000;
-      subMask.parameters.startY = -10000;
-      subMask.parameters.endX = -10000;
-      subMask.parameters.endY = -10000;
-      subMask.parameters.centerX = -10000;
-      subMask.parameters.centerY = -10000;
-      subMask.parameters.radiusX = 0;
-      subMask.parameters.radiusY = 0;
+      if (type === Mask.Linear || type === Mask.Radial) {
+        subMask.parameters.startX = -10000;
+        subMask.parameters.startY = -10000;
+        subMask.parameters.endX = -10000;
+        subMask.parameters.endY = -10000;
+        subMask.parameters.centerX = -10000;
+        subMask.parameters.centerY = -10000;
+        subMask.parameters.radiusX = 0;
+        subMask.parameters.radiusY = 0;
+      } else {
+        subMask.parameters.targetX = -10000;
+        subMask.parameters.targetY = -10000;
+        subMask.parameters.tolerance = 20;
+        subMask.parameters.feather = 35;
+      }
     }
     return subMask;
   };

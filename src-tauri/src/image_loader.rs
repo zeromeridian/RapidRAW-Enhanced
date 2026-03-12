@@ -303,7 +303,7 @@ pub fn composite_patches_on_image(
                 sub_masks: patch_info.sub_masks,
             };
 
-            generate_mask_bitmap(&mask_def, base_w, base_h, 1.0, (0.0, 0.0))
+            generate_mask_bitmap(&mask_def, base_w, base_h, 1.0, (0.0, 0.0), None)
                 .context("Failed to generate mask from sub_masks for compositing")?
         };
 

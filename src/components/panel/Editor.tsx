@@ -387,6 +387,7 @@ export default function Editor({
         maskDef,
         scale: renderSize.scale,
         width: Math.round(renderSize.width),
+        jsAdjustments: adjustments,
       });
       if (dataUrl) {
         setMaskOverlayUrl(dataUrl);
@@ -401,7 +402,7 @@ export default function Editor({
         requestAnimationFrame(processOverlayQueue);
       }
     }
-  }, [adjustments.crop]);
+  }, [adjustments]);
 
   const handleLiveMaskPreview = useCallback(
     (maskDef: any) => {
@@ -421,19 +422,20 @@ export default function Editor({
   );
 
   const debouncedGenerateMaskOverlay = useCallback(
-    debounce(async (maskDef, renderSize) => {
+    debounce(async (maskDef, renderSize, currentAdjustments) => {
       if (!maskDef || !maskDef.visible || renderSize.width === 0) {
         setMaskOverlayUrl(null);
         return;
       }
       try {
-        const cropOffset = [adjustments.crop?.x || 0, adjustments.crop?.y || 0];
+        const cropOffset = [currentAdjustments.crop?.x || 0, currentAdjustments.crop?.y || 0];
         const dataUrl: string = await invoke(Invokes.GenerateMaskOverlay, {
           cropOffset,
           height: Math.round(renderSize.height),
           maskDef,
           scale: renderSize.scale,
           width: Math.round(renderSize.width),
+          jsAdjustments: currentAdjustments,
         });
         if (dataUrl) {
           setMaskOverlayUrl(dataUrl);
@@ -445,7 +447,7 @@ export default function Editor({
         setMaskOverlayUrl(null);
       }
     }, 100),
-    [adjustments.crop],
+    [],
   );
 
   useEffect(() => {
@@ -464,15 +466,14 @@ export default function Editor({
       }
     }
 
-    debouncedGenerateMaskOverlay(maskDefForOverlay, imageRenderSize);
+    debouncedGenerateMaskOverlay(maskDefForOverlay, imageRenderSize, adjustments);
 
     return () => debouncedGenerateMaskOverlay.cancel();
   }, [
     activeRightPanel,
     activeMaskContainerId,
     activeAiPatchContainerId,
-    adjustments.masks,
-    adjustments.aiPatches,
+    adjustments,
     imageRenderSize,
     debouncedGenerateMaskOverlay,
   ]);
@@ -742,11 +743,15 @@ export default function Editor({
     (isMasking &&
       (activeSubMask?.type === Mask.Brush ||
         activeSubMask?.type === Mask.AiSubject ||
+        activeSubMask?.type === Mask.Color ||
+        activeSubMask?.type === Mask.Luminance ||
         activeSubMask?.parameters?.isInitialDraw)) ||
     (isAiEditing &&
       (activeSubMask?.type === Mask.Brush ||
         activeSubMask?.type === Mask.AiSubject ||
         activeSubMask?.type === Mask.QuickEraser ||
+        activeSubMask?.type === Mask.Color ||
+        activeSubMask?.type === Mask.Luminance ||
         activeSubMask?.parameters?.isInitialDraw));
 
   const waveFormData: WaveformData = waveform || { blue: [], green: [], height: 0, luma: [], red: [], width: 0 };

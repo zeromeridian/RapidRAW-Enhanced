@@ -1006,6 +1006,7 @@ pub fn generate_thumbnail_data(
                             unscaled_crop_offset.0 * total_scale,
                             unscaled_crop_offset.1 * total_scale,
                         ),
+                        &meta.adjustments,
                     )
                 })
                 .collect();

@@ -9,6 +9,7 @@ import {
   Sparkles,
   TriangleRight,
   User,
+  Sun,
 } from 'lucide-react';
 
 export enum Mask {
@@ -188,6 +189,18 @@ export const SUB_MASK_COMPONENT_TYPES: Array<MaskType> = [
 ];
 
 export const OTHERS_MASK_TYPES: Array<MaskType> = [
+  {
+    disabled: false,
+    icon: Droplet,
+    name: 'Color',
+    type: Mask.Color,
+  },
+  {
+    disabled: false,
+    icon: Sun,
+    name: 'Luminance',
+    type: Mask.Luminance,
+  },
   {
     disabled: false,
     icon: Brush,

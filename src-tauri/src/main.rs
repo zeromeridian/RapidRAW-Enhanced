@@ -709,6 +709,48 @@ fn apply_watermark(
     Ok(())
 }
 
+fn get_cached_full_warped_image(
+    state: &tauri::State<AppState>,
+    js_adjustments: &serde_json::Value,
+) -> Result<Arc<DynamicImage>, String> {
+    let geo_hash = calculate_geometry_hash(js_adjustments);
+
+    {
+        let cache_lock = state.full_warped_cache.lock().unwrap();
+        if let Some((hash, img)) = cache_lock.as_ref() {
+            if *hash == geo_hash {
+                return Ok(Arc::clone(img));
+            }
+        }
+    }
+
+    let (mut full_image, is_raw) = get_full_image_for_processing(state)?;
+    if is_raw {
+        apply_cpu_default_raw_processing(&mut full_image);
+    }
+    let warped_image = apply_geometry_warp(&full_image, js_adjustments);
+    let warped_arc = Arc::new(warped_image);
+
+    {
+        let mut cache_lock = state.full_warped_cache.lock().unwrap();
+        *cache_lock = Some((geo_hash, Arc::clone(&warped_arc)));
+    }
+
+    Ok(warped_arc)
+}
+
+fn resolve_warped_image_for_masks(
+    state: &tauri::State<AppState>,
+    adjustments: &serde_json::Value,
+    masks: &[MaskDefinition],
+) -> Option<Arc<DynamicImage>> {
+    if masks.iter().any(|m| m.requires_warped_image()) {
+        get_cached_full_warped_image(state, adjustments).ok()
+    } else {
+        None
+    }
+}
+
 pub fn get_cached_or_generate_mask(
     state: &tauri::State<AppState>,
     def: &MaskDefinition,
@@ -716,6 +758,7 @@ pub fn get_cached_or_generate_mask(
     height: u32,
     scale: f32,
     crop_offset: (f32, f32),
+    adjustments: &serde_json::Value,
 ) -> Option<GrayImage> {
     let mut hasher = DefaultHasher::new();
 
@@ -737,7 +780,9 @@ pub fn get_cached_or_generate_mask(
         }
     }
 
-    let generated = generate_mask_bitmap(def, width, height, scale, crop_offset);
+    let warped_image = resolve_warped_image_for_masks(state, adjustments, std::slice::from_ref(def));
+
+    let generated = generate_mask_bitmap(def, width, height, scale, crop_offset, warped_image.as_deref());
 
     if let Some(img) = &generated {
         let mut cache = state.mask_cache.lock().unwrap();
@@ -909,6 +954,7 @@ fn process_preview_job(
                 preview_height,
                 effective_scale,
                 scaled_crop_offset,
+                &adjustments_clone
             )
         })
         .collect();
@@ -1144,6 +1190,7 @@ fn generate_uncropped_preview(
                     preview_height,
                     scale_for_gpu,
                     (0.0, 0.0),
+                    &adjustments_clone
                 )
             })
             .collect();
@@ -1432,36 +1479,6 @@ fn get_full_image_for_processing(
     Ok((loaded_image.image.clone().as_ref().clone(), loaded_image.is_raw))
 }
 
-fn get_cached_full_warped_image(
-    state: &tauri::State<AppState>,
-    js_adjustments: &serde_json::Value,
-) -> Result<Arc<DynamicImage>, String> {
-    let geo_hash = calculate_geometry_hash(js_adjustments);
-
-    {
-        let cache_lock = state.full_warped_cache.lock().unwrap();
-        if let Some((hash, img)) = cache_lock.as_ref() {
-            if *hash == geo_hash {
-                return Ok(Arc::clone(img));
-            }
-        }
-    }
-
-    let (mut full_image, is_raw) = get_full_image_for_processing(state)?;
-    if is_raw {
-        apply_cpu_default_raw_processing(&mut full_image);
-    }
-    let warped_image = apply_geometry_warp(&full_image, js_adjustments);
-    let warped_arc = Arc::new(warped_image);
-
-    {
-        let mut cache_lock = state.full_warped_cache.lock().unwrap();
-        *cache_lock = Some((geo_hash, Arc::clone(&warped_arc)));
-    }
-
-    Ok(warped_arc)
-}
-
 fn calculate_resize_target(
     current_w: u32,
     current_h: u32,
@@ -1533,9 +1550,10 @@ fn process_image_for_export_pipeline(
         .and_then(|m| serde_json::from_value(m.clone()).ok())
         .unwrap_or_else(Vec::new);
 
+    let warped_image = resolve_warped_image_for_masks(state, js_adjustments, &mask_definitions);
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
-        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
+        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset, warped_image.as_deref()))
         .collect();
 
     let mut all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw);
@@ -1687,9 +1705,11 @@ fn export_masks_for_image(
         .get("masks")
         .and_then(|m| serde_json::from_value(m.clone()).ok())
         .unwrap_or_else(Vec::new);
+
+    let warped_image = resolve_warped_image_for_masks(state, js_adjustments, &mask_definitions);
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
-        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
+        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset, warped_image.as_deref()))
         .collect();
 
     if !mask_bitmaps.is_empty() {
@@ -2096,7 +2116,7 @@ async fn estimate_export_size(
 
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
-        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, scale, scaled_crop_offset))
+        .filter_map(|def| get_cached_or_generate_mask(&state, def, img_w, img_h, scale, scaled_crop_offset, &adjustments_clone))
         .collect();
 
     let mut all_adjustments = get_all_adjustments_from_json(&adjustments_clone, is_raw);
@@ -2258,7 +2278,7 @@ async fn estimate_batch_export_size(
 
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
-        .filter_map(|def| generate_mask_bitmap(def, preview_w, preview_h, total_scale, scaled_crop_offset))
+        .filter_map(|def| get_cached_or_generate_mask(&state, def, preview_w, preview_h, total_scale, scaled_crop_offset, &scaled_adjustments))
         .collect();
 
     let mut all_adjustments = get_all_adjustments_from_json(&scaled_adjustments, is_raw);
@@ -2318,11 +2338,17 @@ fn generate_mask_overlay(
     height: u32,
     scale: f32,
     crop_offset: (f32, f32),
+    js_adjustments: Option<serde_json::Value>,
+    state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
     let scaled_crop_offset = (crop_offset.0 * scale, crop_offset.1 * scale);
 
+    let warped_image = js_adjustments.as_ref().and_then(|adj| {
+        resolve_warped_image_for_masks(&state, adj, std::slice::from_ref(&mask_def))
+    });
+
     if let Some(gray_mask) =
-        generate_mask_bitmap(&mask_def, width, height, scale, scaled_crop_offset)
+        generate_mask_bitmap(&mask_def, width, height, scale, scaled_crop_offset, warped_image.as_deref())
     {
         let mut rgba_mask = RgbaImage::new(width, height);
         for (x, y, pixel) in gray_mask.enumerate_pixels() {
@@ -2584,9 +2610,10 @@ fn generate_preset_preview(
         .and_then(|m| serde_json::from_value(m.clone()).ok())
         .unwrap_or_else(Vec::new);
 
+    let warped_image = resolve_warped_image_for_masks(&state, &js_adjustments, &mask_definitions);
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
-        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
+        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset, warped_image.as_deref()))
         .collect();
 
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw);
@@ -2687,7 +2714,9 @@ async fn invoke_generative_replace_with_mask_def(
         sub_masks: patch_definition.sub_masks,
     };
 
-    let mask_bitmap = generate_mask_bitmap(&mask_def_for_generation, img_w, img_h, 1.0, (0.0, 0.0))
+    let warped_image = resolve_warped_image_for_masks(&state, &current_adjustments, std::slice::from_ref(&mask_def_for_generation));
+
+    let mask_bitmap = generate_mask_bitmap(&mask_def_for_generation, img_w, img_h, 1.0, (0.0, 0.0), warped_image.as_deref())
         .ok_or("Failed to generate mask bitmap for AI replace")?;
 
     let mask_dynamic = DynamicImage::ImageLuma8(mask_bitmap);
@@ -2905,10 +2934,11 @@ async fn generate_all_community_previews(
                 .and_then(|m| serde_json::from_value(m.clone()).ok())
                 .unwrap_or_else(Vec::new);
 
+            let warped_image = resolve_warped_image_for_masks(&state, js_adjustments, &mask_definitions);
             let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
                 .iter()
                 .filter_map(|def| {
-                    generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset)
+                    generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset, warped_image.as_deref())
                 })
                 .collect();
 
@@ -3407,10 +3437,13 @@ fn generate_preview_for_path(
         .get("masks")
         .and_then(|m| serde_json::from_value(m.clone()).ok())
         .unwrap_or_else(Vec::new);
+        
+    let warped_image = resolve_warped_image_for_masks(&state, &js_adjustments, &mask_definitions);
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
-        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset))
+        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset, warped_image.as_deref()))
         .collect();
+        
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw);
     let lut_path = js_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
