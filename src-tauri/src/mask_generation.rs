@@ -271,7 +271,7 @@ fn draw_feathered_ellipse_mut(
 
             if dist_sq <= radius_sq {
                 let intensity = if dist_sq <= inner_radius_sq {
-                    1.0 
+                    1.0
                 } else {
                     let dist = dist_sq.sqrt();
                     1.0 - (dist - inner_radius) / feather_range
