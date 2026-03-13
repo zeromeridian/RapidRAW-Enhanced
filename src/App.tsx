@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
+import { platform } from '@tauri-apps/plugin-os';
 import { homeDir } from '@tauri-apps/api/path';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import debounce from 'lodash.debounce';
@@ -229,6 +230,7 @@ const getParentDir = (filePath: string): string => {
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [osPlatform, setOsPlatform] = useState('');
   const [activeView, setActiveView] = useState('library');
   const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
   const [isInstantTransition, setIsInstantTransition] = useState(false);
@@ -1473,6 +1475,14 @@ function App() {
   );
 
   useEffect(() => {
+    try {
+      setOsPlatform(platform());
+    } catch (e) {
+      console.error('Failed to get platform:', e);
+    }
+  }, []);
+
+  useEffect(() => {
     invoke(Invokes.LoadSettings)
       .then(async (settings: any) => {
         if (
@@ -2688,6 +2698,7 @@ function App() {
 
   useKeyboardShortcuts({
     isModalOpen: isAnyModalOpen,
+    osPlatform,
     activeAiPatchContainerId,
     activeAiSubMaskId,
     activeMaskContainerId,

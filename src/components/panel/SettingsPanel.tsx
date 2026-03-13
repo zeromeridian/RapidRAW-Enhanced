@@ -1659,7 +1659,7 @@ export default function SettingsPanel({
                           keys={['Ctrl/Cmd', '+', 'Shift', '+', 'V']}
                         />
                         <KeybindItem keys={['Ctrl/Cmd', '+', 'A']} description="Select all images" />
-                        <KeybindItem keys={['Delete']} description="Delete selected file(s)" />
+                        <KeybindItem keys={osPlatform === 'macos' ? ['Cmd', '+', 'Delete'] : ['Delete']} description="Delete selected file(s)" />
                         <KeybindItem keys={['0-5']} description="Set star rating for selected image(s)" />
                         <KeybindItem keys={['Shift', '+', '0-5']} description="Set color label for selected image(s)" />
                         <KeybindItem keys={['↑', '↓', '←', '→']} description="Navigate images in library" />
@@ -1671,7 +1671,7 @@ export default function SettingsPanel({
                         <KeybindItem keys={['Esc']} description="Deselect mask, exit crop/fullscreen/editor" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', 'Z']} description="Undo adjustment" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', 'Y']} description="Redo adjustment" />
-                        <KeybindItem keys={['Delete']} description="Delete selected mask/patch or image" />
+                        <KeybindItem keys={osPlatform === 'macos' ? ['Cmd', '+', 'Delete'] : ['Delete']} description="Delete selected mask/patch or image" />
                         <KeybindItem keys={['Space']} description="Cycle zoom (Fit, 2x Fit, 100%)" />
                         <KeybindItem keys={['←', '→']} description="Previous / Next image" />
                         <KeybindItem keys={['↑', '↓']} description="Zoom in / Zoom out (by step)" />
