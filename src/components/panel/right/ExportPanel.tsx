@@ -516,11 +516,11 @@ export default function ExportPanel({
                   </button>
                 ))}
               </div>
-              {fileFormat === FileFormats.Jpeg && (
+              {[FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl].includes(fileFormat as FileFormats) && (
                 <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
                   <Slider
                     defaultValue={90}
-                    label="Quality"
+                    label={fileFormat === FileFormats.Jxl && jpegQuality === 100 ? 'Quality (Lossless)' : 'Quality'}
                     max={100}
                     min={1}
                     onChange={(e) => setJpegQuality(parseInt(e.target.value))}
@@ -556,131 +556,151 @@ export default function ExportPanel({
               </Section>
             )}
 
-            <Section title="Image Sizing">
-              <Switch label="Resize to Fit" checked={enableResize} onChange={setEnableResize} disabled={isExporting} />
-              {enableResize && (
-                <div className="space-y-4 pl-2 border-l-2 border-surface">
-                  <div className="flex items-center gap-2">
-                    <Dropdown
-                      options={resizeModeOptions}
-                      value={resizeMode}
-                      onChange={setResizeMode}
-                      disabled={isExporting}
-                      className="w-full"
-                    />
-                    <input
-                      className="w-24 bg-bg-primary text-center rounded-md p-2 border border-surface focus:border-accent focus:ring-accent"
-                      disabled={isExporting}
-                      min="1"
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResizeValue(parseInt(e?.target?.value))}
-                      type="number"
-                      value={resizeValue}
-                    />
-                    <span className="text-sm">pixels</span>
-                  </div>
+            {fileFormat !== FileFormats.Cube && (
+              <>
+                <Section title="Image Sizing">
                   <Switch
-                    checked={dontEnlarge}
+                    label="Resize to Fit"
+                    checked={enableResize}
+                    onChange={setEnableResize}
                     disabled={isExporting}
-                    label="Don't Enlarge"
-                    onChange={setDontEnlarge}
                   />
-                </div>
-              )}
-            </Section>
-
-            <Section title="Metadata">
-              <Switch
-                checked={keepMetadata}
-                disabled={isExporting}
-                label="Keep Original Metadata"
-                onChange={setKeepMetadata}
-              />
-              {keepMetadata && (
-                <div className="pl-2 border-l-2 border-surface">
-                  <Switch label="Remove GPS Data" checked={stripGps} onChange={setStripGps} disabled={isExporting} />
-                </div>
-              )}
-            </Section>
-
-            {isEditorContext && (
-              <Section title="Masks">
-                <Switch
-                  label="Export masks as separate files"
-                  checked={exportMasks}
-                  onChange={setExportMasks}
-                  disabled={isExporting}
-                />
-              </Section>
-            )}
-
-            <Section title="Watermark">
-              <Switch
-                label="Add Watermark"
-                checked={enableWatermark}
-                onChange={setEnableWatermark}
-                disabled={isExporting}
-              />
-              {enableWatermark && (
-                <div className="space-y-4 pl-2 border-l-2 border-surface">
-                  <ImagePicker
-                    label="Watermark Image"
-                    imageName={watermarkPath ? watermarkPath.split(/[\\/]/).pop() || null : null}
-                    onImageSelect={setWatermarkPath}
-                    onClear={() => setWatermarkPath(null)}
-                  />
-                  {watermarkPath && (
-                    <>
-                      <Dropdown
-                        options={anchorOptions}
-                        value={watermarkAnchor}
-                        onChange={(val) => setWatermarkAnchor(val)}
+                  {enableResize && (
+                    <div className="space-y-4 pl-2 border-l-2 border-surface">
+                      <div className="flex items-center gap-2">
+                        <Dropdown
+                          options={resizeModeOptions}
+                          value={resizeMode}
+                          onChange={setResizeMode}
+                          disabled={isExporting}
+                          className="w-full"
+                        />
+                        <input
+                          className="w-24 bg-bg-primary text-center rounded-md p-2 border border-surface focus:border-accent focus:ring-accent"
+                          disabled={isExporting}
+                          min="1"
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            setResizeValue(parseInt(e?.target?.value))
+                          }
+                          type="number"
+                          value={resizeValue}
+                        />
+                        <span className="text-sm">pixels</span>
+                      </div>
+                      <Switch
+                        checked={dontEnlarge}
                         disabled={isExporting}
-                        className="w-full"
+                        label="Don't Enlarge"
+                        onChange={setDontEnlarge}
                       />
-                      <Slider
-                        label="Scale"
-                        min={1}
-                        max={50}
-                        step={1}
-                        value={watermarkScale}
-                        onChange={(e) => setWatermarkScale(parseInt(e.target.value))}
-                        disabled={isExporting}
-                        defaultValue={10}
-                      />
-                      <Slider
-                        label="Spacing"
-                        min={0}
-                        max={25}
-                        step={1}
-                        value={watermarkSpacing}
-                        onChange={(e) => setWatermarkSpacing(parseInt(e.target.value))}
-                        disabled={isExporting}
-                        defaultValue={5}
-                      />
-                      <Slider
-                        label="Opacity"
-                        min={0}
-                        max={100}
-                        step={1}
-                        value={watermarkOpacity}
-                        onChange={(e) => setWatermarkOpacity(parseInt(e.target.value))}
-                        disabled={isExporting}
-                        defaultValue={75}
-                      />
-                      <WatermarkPreview
-                        imageAspectRatio={imageAspectRatio}
-                        watermarkImageAspectRatio={watermarkImageAspectRatio}
-                        watermarkPath={watermarkPath}
-                        anchor={watermarkAnchor}
-                        scale={watermarkScale}
-                        spacing={watermarkSpacing}
-                        opacity={watermarkOpacity}
-                      />
-                    </>
+                    </div>
                   )}
-                </div>
-              )}
-            </Section>
+                </Section>
+
+                {fileFormat == FileFormats.Jpeg && (
+                  <>
+                    <Section title="Metadata">
+                      <Switch
+                        checked={keepMetadata}
+                        disabled={isExporting}
+                        label="Keep Original Metadata"
+                        onChange={setKeepMetadata}
+                      />
+                      {keepMetadata && (
+                        <div className="pl-2 border-l-2 border-surface">
+                          <Switch
+                            label="Remove GPS Data"
+                            checked={stripGps}
+                            onChange={setStripGps}
+                            disabled={isExporting}
+                          />
+                        </div>
+                      )}
+                    </Section>
+                  </>
+                )}
+
+                {isEditorContext && (
+                  <Section title="Masks">
+                    <Switch
+                      label="Export masks as separate files"
+                      checked={exportMasks}
+                      onChange={setExportMasks}
+                      disabled={isExporting}
+                    />
+                  </Section>
+                )}
+
+                <Section title="Watermark">
+                  <Switch
+                    label="Add Watermark"
+                    checked={enableWatermark}
+                    onChange={setEnableWatermark}
+                    disabled={isExporting}
+                  />
+                  {enableWatermark && (
+                    <div className="space-y-4 pl-2 border-l-2 border-surface">
+                      <ImagePicker
+                        label="Watermark Image"
+                        imageName={watermarkPath ? watermarkPath.split(/[\\/]/).pop() || null : null}
+                        onImageSelect={setWatermarkPath}
+                        onClear={() => setWatermarkPath(null)}
+                      />
+                      {watermarkPath && (
+                        <>
+                          <Dropdown
+                            options={anchorOptions}
+                            value={watermarkAnchor}
+                            onChange={(val) => setWatermarkAnchor(val)}
+                            disabled={isExporting}
+                            className="w-full"
+                          />
+                          <Slider
+                            label="Scale"
+                            min={1}
+                            max={50}
+                            step={1}
+                            value={watermarkScale}
+                            onChange={(e) => setWatermarkScale(parseInt(e.target.value))}
+                            disabled={isExporting}
+                            defaultValue={10}
+                          />
+                          <Slider
+                            label="Spacing"
+                            min={0}
+                            max={25}
+                            step={1}
+                            value={watermarkSpacing}
+                            onChange={(e) => setWatermarkSpacing(parseInt(e.target.value))}
+                            disabled={isExporting}
+                            defaultValue={5}
+                          />
+                          <Slider
+                            label="Opacity"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={watermarkOpacity}
+                            onChange={(e) => setWatermarkOpacity(parseInt(e.target.value))}
+                            disabled={isExporting}
+                            defaultValue={75}
+                          />
+                          <WatermarkPreview
+                            imageAspectRatio={imageAspectRatio}
+                            watermarkImageAspectRatio={watermarkImageAspectRatio}
+                            watermarkPath={watermarkPath}
+                            anchor={watermarkAnchor}
+                            scale={watermarkScale}
+                            spacing={watermarkSpacing}
+                            opacity={watermarkOpacity}
+                          />
+                        </>
+                      )}
+                    </div>
+                  )}
+                </Section>
+              </>
+            )}
           </>
         ) : (
           <p className="text-center text-text-tertiary mt-4">No image selected for export.</p>

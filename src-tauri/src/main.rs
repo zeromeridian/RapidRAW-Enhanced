@@ -52,6 +52,7 @@ use image_hdr::input::HDRInput;
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
 use imageproc::hough::{LineDetectionOptions, detect_lines};
+use jxl_encoder::{LossyConfig, LosslessConfig, PixelLayout};
 use mozjpeg_rs::{Encoder, Preset};
 use rayon::prelude::*;
 use reqwest;
@@ -80,7 +81,7 @@ use crate::image_processing::{
     apply_unwarp_geometry, downscale_f32_image, get_all_adjustments_from_json,
     get_or_init_gpu_context, process_and_get_dynamic_image, warp_image_geometry,
 };
-use crate::lut_processing::Lut;
+use crate::lut_processing::{Lut, convert_image_to_cube_lut, generate_identity_lut_image};
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
 use tagging_utils::{candidates, hierarchy};
 
@@ -1732,6 +1733,47 @@ fn encode_image_to_bytes(
     let mut cursor = Cursor::new(&mut image_bytes);
 
     match output_format.to_lowercase().as_str() {
+        "jxl" => {
+            let (width, height) = image.dimensions();
+            let has_alpha = image.color().has_alpha();
+            
+            let jxl_data = if jpeg_quality == 100 {
+                if has_alpha {
+                    let rgba = image.to_rgba8();
+                    LosslessConfig::new()
+                        .encode(rgba.as_raw(), width, height, PixelLayout::Rgba8)
+                        .map_err(|e| format!("Failed to encode lossless JXL: {}", e))?
+                } else {
+                    let rgb = image.to_rgb8();
+                    LosslessConfig::new()
+                        .encode(rgb.as_raw(), width, height, PixelLayout::Rgb8)
+                        .map_err(|e| format!("Failed to encode lossless JXL: {}", e))?
+                }
+            } else {
+                let distance = (100.0 - jpeg_quality as f32) / 10.0;
+                let distance = distance.max(0.01);
+                
+                if has_alpha {
+                    let rgba = image.to_rgba8();
+                    LossyConfig::new(distance)
+                        .encode(rgba.as_raw(), width, height, PixelLayout::Rgba8)
+                        .map_err(|e| format!("Failed to encode lossy JXL: {}", e))?
+                } else {
+                    let rgb = image.to_rgb8();
+                    LossyConfig::new(distance)
+                        .encode(rgb.as_raw(), width, height, PixelLayout::Rgb8)
+                        .map_err(|e| format!("Failed to encode lossy JXL: {}", e))?
+                }
+            };
+            
+            return Ok(jxl_data);
+        }
+        "webp" => {
+            let encoder = webp::Encoder::from_image(image)
+                .map_err(|_| "Failed to create WebP encoder".to_string())?;
+            let webp_mem = encoder.encode(jpeg_quality as f32);
+            return Ok(webp_mem.to_vec());
+        }
         "jpg" | "jpeg" => {
             let rgb_image = image.to_rgb8();
             let encoder = JpegEncoder::new_with_quality(&mut cursor, jpeg_quality);
@@ -1855,6 +1897,52 @@ fn export_masks_for_image(
     Ok(())
 }
 
+fn export_adjustments_as_lut(
+    js_adjustments: &Value,
+    source_path_str: &str,
+    context: &Arc<GpuContext>,
+    state: &tauri::State<AppState>,
+) -> Result<Vec<u8>, String> {
+    let lut_size = 33;
+    let identity_image = generate_identity_lut_image(lut_size);
+
+    let mut all_adjustments = get_all_adjustments_from_json(js_adjustments, false);
+
+    all_adjustments.global.show_clipping = 0;
+    all_adjustments.global.vignette_amount = 0.0;
+    all_adjustments.global.grain_amount = 0.0;
+    all_adjustments.global.sharpness = 0.0;
+    all_adjustments.global.clarity = 0.0;
+    all_adjustments.global.dehaze = 0.0;
+    all_adjustments.global.structure = 0.0;
+    all_adjustments.global.centré = 0.0;
+    all_adjustments.global.glow_amount = 0.0;
+    all_adjustments.global.halation_amount = 0.0;
+    all_adjustments.global.flare_amount = 0.0;
+    all_adjustments.global.luma_noise_reduction = 0.0;
+    all_adjustments.global.color_noise_reduction = 0.0;
+    all_adjustments.global.chromatic_aberration_red_cyan = 0.0;
+    all_adjustments.global.chromatic_aberration_blue_yellow = 0.0;
+
+    let lut_path = js_adjustments["lutPath"].as_str();
+    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+    let unique_hash = calculate_full_job_hash(source_path_str, js_adjustments);
+
+    let processed_lut = process_and_get_dynamic_image(
+        context,
+        state,
+        &identity_image,
+        unique_hash,
+        all_adjustments,
+        &[],
+        lut,
+        None,
+        "export_lut",
+    )?;
+
+    convert_image_to_cube_lut(&processed_lut, lut_size)
+}
+
 #[tauri::command]
 async fn export_image(
     original_path: String,
@@ -1864,6 +1952,8 @@ async fn export_image(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
     if state.export_task_handle.lock().unwrap().is_some() {
         return Err("An export is already in progress.".to_string());
     }
@@ -1877,6 +1967,24 @@ async fn export_image(
         let processing_result: Result<(), String> = (|| {
             let (source_path, _) = parse_virtual_path(&original_path);
             let source_path_str = source_path.to_string_lossy().to_string();
+
+            let output_path_obj = std::path::Path::new(&output_path);
+            let extension = output_path_obj
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+
+            if extension == "cube" {
+                let cube_bytes = export_adjustments_as_lut(
+                    &js_adjustments,
+                    &source_path_str,
+                    &context,
+                    &state,
+                )?;
+                fs::write(output_path_obj, cube_bytes).map_err(|e| e.to_string())?;
+                return Ok(());
+            }
 
             let base_image = composite_patches_on_image(&original_image_data, &js_adjustments)
                 .map_err(|e| format!("Failed to composite AI patches for export: {}", e))?;
@@ -1898,7 +2006,6 @@ async fn export_image(
                 is_raw,
             )?;
 
-            let output_path_obj = std::path::Path::new(&output_path);
             save_image_with_metadata(
                 &final_image,
                 output_path_obj,
@@ -1921,6 +2028,8 @@ async fn export_image(
 
             Ok(())
         })();
+
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
 
         if let Err(e) = processing_result {
             let _ = app_handle.emit("export-error", e);
@@ -1948,6 +2057,8 @@ async fn batch_export_images(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
     if state.export_task_handle.lock().unwrap().is_some() {
         return Err("An export is already in progress.".to_string());
     }
@@ -2033,6 +2144,35 @@ async fn batch_export_images(
                         hydrate_adjustments(&state, &mut js_adjustments);
                         let is_raw = is_raw_file(&source_path_str);
 
+                        let original_path = std::path::Path::new(&source_path_str);
+                        let file_date = exif_processing::get_creation_date_from_path(original_path);
+
+                        let filename_template = export_settings
+                            .filename_template
+                            .as_deref()
+                            .unwrap_or("{original_filename}_edited");
+                        let new_stem = crate::file_management::generate_filename_from_template(
+                            filename_template,
+                            original_path,
+                            global_index + 1,
+                            total_paths,
+                            &file_date,
+                        );
+                        let new_filename = format!("{}.{}", new_stem, output_format);
+                        let output_path = output_folder_path.join(new_filename);
+                        let extension = output_format.to_lowercase();
+                        
+                        if extension == "cube" {
+                            let cube_bytes = export_adjustments_as_lut(
+                                &js_adjustments,
+                                &source_path_str,
+                                &context,
+                                &state,
+                            )?;
+                            fs::write(&output_path, cube_bytes).map_err(|e| e.to_string())?;
+                            return Ok(());
+                        }
+
                         let base_image = match read_file_mapped(Path::new(&source_path_str)) {
                             Ok(mmap) => load_and_composite(
                                 &mmap,
@@ -2083,23 +2223,6 @@ async fn batch_export_images(
                             is_raw,
                         )?;
 
-                        let original_path = std::path::Path::new(&source_path_str);
-                        let file_date = exif_processing::get_creation_date_from_path(original_path);
-
-                        let filename_template = export_settings
-                            .filename_template
-                            .as_deref()
-                            .unwrap_or("{original_filename}_edited");
-                        let new_stem = crate::file_management::generate_filename_from_template(
-                            filename_template,
-                            original_path,
-                            global_index + 1,
-                            total_paths,
-                            &file_date,
-                        );
-                        let new_filename = format!("{}.{}", new_stem, output_format);
-                        let output_path = output_folder_path.join(new_filename);
-
                         save_image_with_metadata(&final_image, &output_path, &source_path_str, &export_settings)?;
 
                         if export_settings.export_masks {
@@ -2122,6 +2245,8 @@ async fn batch_export_images(
                 })
                 .collect()
         });
+
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
 
         let mut error_count = 0;
         for result in results {
@@ -2178,6 +2303,10 @@ async fn estimate_export_size(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<usize, String> {
+    if output_format.to_lowercase() == "cube" {
+        return Ok(1_050_000);
+    }
+
     let context = get_or_init_gpu_context(&state)?;
     let loaded_image = state
         .original_image
@@ -2298,6 +2427,10 @@ async fn estimate_batch_export_size(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<usize, String> {
+    if output_format.to_lowercase() == "cube" {
+        return Ok(1_050_000 * paths.len());
+    }
+
     if paths.is_empty() {
         return Ok(0);
     }
@@ -4020,6 +4153,7 @@ fn main() {
             }
 
             start_preview_worker(app_handle.clone());
+            jxl_oxide::integration::register_image_decoding_hook();
 
             let window_cfg = app.config().app.windows.get(0).unwrap().clone();
             let transparent = settings.transparent.unwrap_or(window_cfg.transparent);
