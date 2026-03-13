@@ -8,7 +8,7 @@ import { homeDir } from '@tauri-apps/api/path';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import debounce from 'lodash.debounce';
 import throttle from 'lodash.throttle';
-import { ClerkProvider } from "@clerk/react";
+import { ClerkProvider } from '@clerk/react';
 import { ToastContainer, toast, Slide } from 'react-toastify';
 import clsx from 'clsx';
 import {
@@ -1467,9 +1467,11 @@ function App() {
 
       const { searchCriteria: _searchCriteria, ...settingsToSave } = newSettings as any;
       setAppSettings(newSettings);
-      return invoke(Invokes.SaveSettings, { settings: settingsToSave }).then(() => {}).catch((err) => {
-        console.error('Failed to save settings:', err);
-      });
+      return invoke(Invokes.SaveSettings, { settings: settingsToSave })
+        .then(() => {})
+        .catch((err) => {
+          console.error('Failed to save settings:', err);
+        });
     },
     [theme],
   );
@@ -1625,17 +1627,20 @@ function App() {
   }, [filterCriteria, appSettings, handleSettingsChange]);
 
   useEffect(() => {
-    if (appSettings?.adaptiveEditorTheme && selectedImage && finalPreviewUrl) {
-      generatePaletteFromImage(finalPreviewUrl)
-        .then(setAdaptivePalette)
-        .catch((_err) => {
-          const darkTheme = THEMES.find((t) => t.id === Theme.Dark);
-          setAdaptivePalette(darkTheme ? darkTheme.cssVariables : null);
-        });
-    } else if (!appSettings?.adaptiveEditorTheme || !selectedImage) {
+    if (!appSettings?.adaptiveEditorTheme || !selectedImage) {
       setAdaptivePalette(null);
+      return;
     }
-  }, [appSettings?.adaptiveEditorTheme, selectedImage, finalPreviewUrl]);
+    if (isSliderDragging || !finalPreviewUrl) {
+      return;
+    }
+    generatePaletteFromImage(finalPreviewUrl)
+      .then(setAdaptivePalette)
+      .catch((_err) => {
+        const darkTheme = THEMES.find((t) => t.id === Theme.Dark);
+        setAdaptivePalette(darkTheme ? darkTheme.cssVariables : null);
+      });
+  }, [appSettings?.adaptiveEditorTheme, selectedImage, finalPreviewUrl, isSliderDragging]);
 
   useEffect(() => {
     const root = document.documentElement;
