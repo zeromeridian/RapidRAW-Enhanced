@@ -259,6 +259,9 @@ export default function Editor({
   const showSpinner = isLoading && !hasDisplayableImage;
 
   const croppedDimensions = useMemo<ImageDimensions | null>(() => {
+    if (!selectedImage?.width || !selectedImage?.height) {
+      return null;
+    }
     if (adjustments.crop) {
       return { width: adjustments.crop.width, height: adjustments.crop.height } as ImageDimensions;
     }
