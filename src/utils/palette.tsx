@@ -34,48 +34,70 @@ export const generatePaletteFromImage = (imageUrl: string) => {
       const imageData = ctx.getImageData(0, 0, width, height).data;
       if (!imageData) return reject('No image data');
 
-      let bestAccentCandidate = {
-        score: -Infinity,
-        color: { r: 210, g: 215, b: 220 },
-      };
-
-      const MIN_LIGHTNESS = 0.2;
-      const MAX_LIGHTNESS = 0.9;
-      const MIN_SATURATION = 0.15;
+      let bestScore = -Infinity;
+      let bestR = 210;
+      let bestG = 215;
+      let bestB = 220;
 
       const totalPixels = width * height;
       const pixelStep = Math.max(1, Math.floor(totalPixels / 2000));
       const dataStep = pixelStep * 4;
+      const len = imageData.length;
 
-      for (let i = 0; i < imageData.length; i += dataStep) {
+      for (let i = 0; i < len; i += dataStep) {
         const r = imageData[i];
         const g = imageData[i + 1];
         const b = imageData[i + 2];
 
         const max = Math.max(r, g, b);
         const min = Math.min(r, g, b);
-        const l = (max + min) / 510;
+        const sum = max + min;
+        const l = sum / 510;
 
-        if (l >= MIN_LIGHTNESS && l <= MAX_LIGHTNESS) {
-          const s = max === min ? 0 : l > 0.5 ? (max - min) / (510 - max - min) : (max - min) / (max + min);
+        if (l < 0.2 || l > 0.9) continue;
 
-          if (s >= MIN_SATURATION) {
-            const lightnessPenalty = Math.abs(l - 0.75) * 1.5;
-            const score = s - lightnessPenalty;
+        const s = max === min ? 0 : l > 0.5 ? (max - min) / (510 - sum) : (max - min) / sum;
 
-            if (score > bestAccentCandidate.score) {
-              bestAccentCandidate = { score, color: { r, g, b } };
-            }
-          }
+        if (s < 0.15) continue;
+
+        const score = s - Math.abs(l - 0.75) * 1.5;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestR = r;
+          bestG = g;
+          bestB = b;
         }
       }
 
-      const accentColor = bestAccentCandidate.color;
-      const toRgbSpace = (c: any) => `${Math.round(c.r)} ${Math.round(c.g)} ${Math.round(c.b)}`;
+      let r = bestR;
+      let g = bestG;
+      let b = bestB;
+
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (lum < 140) {
+        const t = (1 - lum / 140) * 0.8;
+        r += (255 - r) * t;
+        g += (255 - g) * t;
+        b += (255 - b) * t;
+      }
+
+      const mx = Math.max(r, g, b);
+      const mn = Math.min(r, g, b);
+      const chroma = mx - mn;
+      if (chroma > 130) {
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        const t = ((chroma - 130) / chroma) * 0.7;
+        r += (gray - r) * t;
+        g += (gray - g) * t;
+        b += (gray - b) * t;
+      }
+
+      const accent = `${Math.round(r)} ${Math.round(g)} ${Math.round(b)}`;
 
       resolve({
-        '--color-accent': toRgbSpace(accentColor),
-        '--color-hover-color': toRgbSpace(accentColor),
+        '--color-accent': accent,
+        '--color-hover-color': accent,
       });
     };
 
