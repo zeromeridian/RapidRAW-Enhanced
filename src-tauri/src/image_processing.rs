@@ -1801,7 +1801,7 @@ pub fn get_all_adjustments_from_json(
         .iter()
         .filter(|m| m.visible)
         .enumerate()
-        .take(14)
+        .take(8)
     {
         mask_adjustments[i] = get_mask_adjustments_from_json(&mask_def.adjustments);
         mask_count += 1;
