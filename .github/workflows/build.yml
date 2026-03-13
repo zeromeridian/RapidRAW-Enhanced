@@ -50,12 +50,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           rustflags: ''
-
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-          key: ${{ inputs.platform }}
+          rust-src-dir: src-tauri
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
