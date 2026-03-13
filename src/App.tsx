@@ -4915,7 +4915,7 @@ function App() {
     <div
       className={clsx(
         'flex flex-col h-screen bg-bg-primary font-sans text-text-primary overflow-hidden select-none',
-        (appSettings?.adaptiveEditorTheme || isAnimatingTheme) && 'enable-color-transitions',
+        (appSettings?.adaptiveEditorTheme || isAnimatingTheme) && !isInstantTransition && 'enable-color-transitions',
       )}
     >
       <div

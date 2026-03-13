@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 
 export interface ImageDimensions {
   height: number;
@@ -47,7 +48,9 @@ export const useImageRenderSize = (containerRef: any, imageDimensions: ImageDime
     };
 
     updateSize();
-    const resizeObserver = new ResizeObserver(updateSize);
+    const resizeObserver = new ResizeObserver(() => {
+      flushSync(updateSize);
+    });
     resizeObserver.observe(container);
     return () => resizeObserver.disconnect();
   }, [containerRef, imageDimensions]);
