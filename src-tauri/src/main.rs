@@ -813,9 +813,17 @@ pub fn get_cached_or_generate_mask(
         }
     }
 
-    let warped_image = resolve_warped_image_for_masks(state, adjustments, std::slice::from_ref(def));
+    let warped_image =
+        resolve_warped_image_for_masks(state, adjustments, std::slice::from_ref(def));
 
-    let generated = generate_mask_bitmap(def, width, height, scale, crop_offset, warped_image.as_deref());
+    let generated = generate_mask_bitmap(
+        def,
+        width,
+        height,
+        scale,
+        crop_offset,
+        warped_image.as_deref(),
+    );
 
     if let Some(img) = &generated {
         let mut cache = state.mask_cache.lock().unwrap();
@@ -981,7 +989,7 @@ fn process_preview_job(
                 preview_height,
                 effective_scale,
                 scaled_crop_offset,
-                &adjustments_clone
+                &adjustments_clone,
             )
         })
         .collect();
@@ -1241,7 +1249,7 @@ fn generate_uncropped_preview(
                     preview_height,
                     scale_for_gpu,
                     (0.0, 0.0),
-                    &adjustments_clone
+                    &adjustments_clone,
                 )
             })
             .collect();
@@ -1609,7 +1617,16 @@ fn process_image_for_export_pipeline(
     let warped_image = resolve_warped_image_for_masks(state, js_adjustments, &mask_definitions);
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
-        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset, warped_image.as_deref()))
+        .filter_map(|def| {
+            generate_mask_bitmap(
+                def,
+                img_w,
+                img_h,
+                1.0,
+                unscaled_crop_offset,
+                warped_image.as_deref(),
+            )
+        })
         .collect();
 
     let mut all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw);
@@ -1764,7 +1781,16 @@ fn export_masks_for_image(
     let warped_image = resolve_warped_image_for_masks(state, js_adjustments, &mask_definitions);
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
-        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset, warped_image.as_deref()))
+        .filter_map(|def| {
+            generate_mask_bitmap(
+                def,
+                img_w,
+                img_h,
+                1.0,
+                unscaled_crop_offset,
+                warped_image.as_deref(),
+            )
+        })
         .collect();
 
     if !mask_bitmaps.is_empty() {
@@ -2200,7 +2226,17 @@ async fn estimate_export_size(
 
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
-        .filter_map(|def| get_cached_or_generate_mask(&state, def, img_w, img_h, scale, scaled_crop_offset, &adjustments_clone))
+        .filter_map(|def| {
+            get_cached_or_generate_mask(
+                &state,
+                def,
+                img_w,
+                img_h,
+                scale,
+                scaled_crop_offset,
+                &adjustments_clone,
+            )
+        })
         .collect();
 
     let mut all_adjustments = get_all_adjustments_from_json(&adjustments_clone, is_raw);
@@ -2369,7 +2405,17 @@ async fn estimate_batch_export_size(
 
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
-        .filter_map(|def| get_cached_or_generate_mask(&state, def, preview_w, preview_h, total_scale, scaled_crop_offset, &scaled_adjustments))
+        .filter_map(|def| {
+            get_cached_or_generate_mask(
+                &state,
+                def,
+                preview_w,
+                preview_h,
+                total_scale,
+                scaled_crop_offset,
+                &scaled_adjustments,
+            )
+        })
         .collect();
 
     let mut all_adjustments = get_all_adjustments_from_json(&scaled_adjustments, is_raw);
@@ -2439,9 +2485,14 @@ fn generate_mask_overlay(
         resolve_warped_image_for_masks(&state, adj, std::slice::from_ref(&mask_def))
     });
 
-    if let Some(gray_mask) =
-        generate_mask_bitmap(&mask_def, width, height, scale, scaled_crop_offset, warped_image.as_deref())
-    {
+    if let Some(gray_mask) = generate_mask_bitmap(
+        &mask_def,
+        width,
+        height,
+        scale,
+        scaled_crop_offset,
+        warped_image.as_deref(),
+    ) {
         let mut rgba_mask = RgbaImage::new(width, height);
         for (x, y, pixel) in gray_mask.enumerate_pixels() {
             let intensity = pixel[0];
@@ -2706,7 +2757,16 @@ fn generate_preset_preview(
     let warped_image = resolve_warped_image_for_masks(&state, &js_adjustments, &mask_definitions);
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
-        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset, warped_image.as_deref()))
+        .filter_map(|def| {
+            generate_mask_bitmap(
+                def,
+                img_w,
+                img_h,
+                1.0,
+                unscaled_crop_offset,
+                warped_image.as_deref(),
+            )
+        })
         .collect();
 
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw);
@@ -2807,10 +2867,21 @@ async fn invoke_generative_replace_with_mask_def(
         sub_masks: patch_definition.sub_masks,
     };
 
-    let warped_image = resolve_warped_image_for_masks(&state, &current_adjustments, std::slice::from_ref(&mask_def_for_generation));
+    let warped_image = resolve_warped_image_for_masks(
+        &state,
+        &current_adjustments,
+        std::slice::from_ref(&mask_def_for_generation),
+    );
 
-    let mask_bitmap = generate_mask_bitmap(&mask_def_for_generation, img_w, img_h, 1.0, (0.0, 0.0), warped_image.as_deref())
-        .ok_or("Failed to generate mask bitmap for AI replace")?;
+    let mask_bitmap = generate_mask_bitmap(
+        &mask_def_for_generation,
+        img_w,
+        img_h,
+        1.0,
+        (0.0, 0.0),
+        warped_image.as_deref(),
+    )
+    .ok_or("Failed to generate mask bitmap for AI replace")?;
 
     let mask_dynamic = DynamicImage::ImageLuma8(mask_bitmap);
     let unwarped_dynamic = apply_unwarp_geometry(&mask_dynamic, &current_adjustments);
@@ -3035,11 +3106,19 @@ async fn generate_all_community_previews(
                 .and_then(|m| serde_json::from_value(m.clone()).ok())
                 .unwrap_or_else(Vec::new);
 
-            let warped_image = resolve_warped_image_for_masks(&state, js_adjustments, &mask_definitions);
+            let warped_image =
+                resolve_warped_image_for_masks(&state, js_adjustments, &mask_definitions);
             let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
                 .iter()
                 .filter_map(|def| {
-                    generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset, warped_image.as_deref())
+                    generate_mask_bitmap(
+                        def,
+                        img_w,
+                        img_h,
+                        1.0,
+                        unscaled_crop_offset,
+                        warped_image.as_deref(),
+                    )
                 })
                 .collect();
 
@@ -3548,13 +3627,22 @@ fn generate_preview_for_path(
         .get("masks")
         .and_then(|m| serde_json::from_value(m.clone()).ok())
         .unwrap_or_else(Vec::new);
-        
+
     let warped_image = resolve_warped_image_for_masks(&state, &js_adjustments, &mask_definitions);
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
-        .filter_map(|def| generate_mask_bitmap(def, img_w, img_h, 1.0, unscaled_crop_offset, warped_image.as_deref()))
+        .filter_map(|def| {
+            generate_mask_bitmap(
+                def,
+                img_w,
+                img_h,
+                1.0,
+                unscaled_crop_offset,
+                warped_image.as_deref(),
+            )
+        })
         .collect();
-        
+
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw);
     let lut_path = js_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
