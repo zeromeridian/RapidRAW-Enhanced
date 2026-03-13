@@ -94,7 +94,7 @@ interface MainLibraryProps {
   onImageDoubleClick(path: string): void;
   onLibraryRefresh(): void;
   onOpenFolder(): void;
-  onSettingsChange(settings: AppSettings): void;
+  onSettingsChange(settings: AppSettings): Promise<void>;
   onThumbnailAspectRatioChange(aspectRatio: ThumbnailAspectRatio): void;
   onThumbnailSizeChange(size: ThumbnailSize): void;
   rootPath: string | null;
