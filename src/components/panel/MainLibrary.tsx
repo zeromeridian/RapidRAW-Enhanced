@@ -1050,10 +1050,10 @@ function Thumbnail({
         {isVirtualCopy && (
           <Text
             as="div"
-            variant={TextVariants.label}
+            variant={TextVariants.small}
             color={TextColors.white}
             weight={TextWeights.bold}
-            className="flex-shrink-0 bg-bg-primary/50 text-[10px] px-1.5 py-0.5 rounded-full backdrop-blur-sm"
+            className="flex-shrink-0 bg-bg-primary/50 px-1.5 py-0.5 rounded-full backdrop-blur-sm"
             data-tooltip="Virtual Copy"
           >
             VC
