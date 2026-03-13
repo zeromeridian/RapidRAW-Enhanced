@@ -4,7 +4,6 @@ import { Crop, PercentCrop } from 'react-image-crop';
 import { Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
-import debounce from 'lodash.debounce';
 import { AnimatePresence } from 'framer-motion';
 import { ImageDimensions, useImageRenderSize } from '../../hooks/useImageRenderSize';
 import { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
@@ -370,7 +369,7 @@ export default function Editor({
   const processOverlayQueue = useCallback(async () => {
     if (isGeneratingOverlayRef.current || !pendingOverlayRequestRef.current) return;
 
-    const { maskDef, renderSize } = pendingOverlayRequestRef.current;
+    const { maskDef, renderSize, jsAdjustments } = pendingOverlayRequestRef.current;
     pendingOverlayRequestRef.current = null;
 
     if (!maskDef || !maskDef.visible || renderSize.width === 0) {
@@ -380,14 +379,14 @@ export default function Editor({
 
     isGeneratingOverlayRef.current = true;
     try {
-      const cropOffset = [adjustments.crop?.x || 0, adjustments.crop?.y || 0];
+      const cropOffset = [jsAdjustments.crop?.x || 0, jsAdjustments.crop?.y || 0];
       const dataUrl: string = await invoke(Invokes.GenerateMaskOverlay, {
         cropOffset,
         height: Math.round(renderSize.height),
         maskDef,
         scale: renderSize.scale,
         width: Math.round(renderSize.width),
-        jsAdjustments: adjustments,
+        jsAdjustments: jsAdjustments,
       });
       if (dataUrl) {
         setMaskOverlayUrl(dataUrl);
@@ -396,13 +395,22 @@ export default function Editor({
       }
     } catch (e) {
       console.error('Failed to generate live mask overlay:', e);
+      setMaskOverlayUrl(null);
     } finally {
       isGeneratingOverlayRef.current = false;
       if (pendingOverlayRequestRef.current) {
         requestAnimationFrame(processOverlayQueue);
       }
     }
-  }, [adjustments]);
+  }, []);
+
+  const requestMaskOverlay = useCallback(
+    (maskDef: any, renderSize: any, currentAdjustments: any) => {
+      pendingOverlayRequestRef.current = { maskDef, renderSize, jsAdjustments: currentAdjustments };
+      processOverlayQueue();
+    },
+    [processOverlayQueue],
+  );
 
   const handleLiveMaskPreview = useCallback(
     (maskDef: any) => {
@@ -415,39 +423,9 @@ export default function Editor({
         };
       }
 
-      pendingOverlayRequestRef.current = { maskDef: normalizedDef, renderSize: imageRenderSize };
-      processOverlayQueue();
+      requestMaskOverlay(normalizedDef, imageRenderSize, adjustments);
     },
-    [imageRenderSize, processOverlayQueue],
-  );
-
-  const debouncedGenerateMaskOverlay = useCallback(
-    debounce(async (maskDef, renderSize, currentAdjustments) => {
-      if (!maskDef || !maskDef.visible || renderSize.width === 0) {
-        setMaskOverlayUrl(null);
-        return;
-      }
-      try {
-        const cropOffset = [currentAdjustments.crop?.x || 0, currentAdjustments.crop?.y || 0];
-        const dataUrl: string = await invoke(Invokes.GenerateMaskOverlay, {
-          cropOffset,
-          height: Math.round(renderSize.height),
-          maskDef,
-          scale: renderSize.scale,
-          width: Math.round(renderSize.width),
-          jsAdjustments: currentAdjustments,
-        });
-        if (dataUrl) {
-          setMaskOverlayUrl(dataUrl);
-        } else {
-          setMaskOverlayUrl(null);
-        }
-      } catch (e) {
-        console.error('Failed to generate mask overlay:', e);
-        setMaskOverlayUrl(null);
-      }
-    }, 100),
-    [],
+    [imageRenderSize, adjustments, requestMaskOverlay],
   );
 
   useEffect(() => {
@@ -466,16 +444,14 @@ export default function Editor({
       }
     }
 
-    debouncedGenerateMaskOverlay(maskDefForOverlay, imageRenderSize, adjustments);
-
-    return () => debouncedGenerateMaskOverlay.cancel();
+    requestMaskOverlay(maskDefForOverlay, imageRenderSize, adjustments);
   }, [
     activeRightPanel,
     activeMaskContainerId,
     activeAiPatchContainerId,
     adjustments,
     imageRenderSize,
-    debouncedGenerateMaskOverlay,
+    requestMaskOverlay,
   ]);
 
   useEffect(() => {
