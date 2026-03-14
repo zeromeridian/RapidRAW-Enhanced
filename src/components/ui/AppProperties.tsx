@@ -34,12 +34,10 @@ export enum Invokes {
   GenerateAiSubjectMask = 'generate_ai_subject_mask',
   GenerateFullscreenPreview = 'generate_fullscreen_preview',
   GeneratePreviewForPath = 'generate_preview_for_path',
-  GenerateHistogram = 'generate_histogram',
   GenerateMaskOverlay = 'generate_mask_overlay',
   GeneratePresetPreview = 'generate_preset_preview',
   GenerateThumbnailsProgressive = 'generate_thumbnails_progressive',
   GenerateUncroppedPreview = 'generate_uncropped_preview',
-  GenerateWaveform = 'image_processing::generate_waveform',
   GetFolderTree = 'get_folder_tree',
   GetLogFilePath = 'get_log_file_path',
   GetPinnedFolderTrees = 'get_pinned_folder_trees',
@@ -153,6 +151,9 @@ export interface AppSettings {
   linearRawMode?: string;
   enableXmpSync?: boolean;
   createXmpIfMissing?: boolean;
+  isWaveformVisible?: boolean;
+  waveformHeight?: number;
+  activeWaveformChannel?: string;
 }
 
 export interface BrushSettings {
@@ -259,12 +260,12 @@ export interface UiVisibility {
 }
 
 export interface WaveformData {
-  [index: string]: Array<number> | number;
-  blue: Array<number>;
-  green: Array<number>;
+  blue: string;
+  green: string;
   height: number;
-  luma: Array<number>;
-  red: Array<number>;
+  luma: string;
+  red: string;
+  rgb: string;
   width: number;
 }
 

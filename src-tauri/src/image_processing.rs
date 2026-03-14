@@ -12,7 +12,8 @@ use std::f32::consts::PI;
 use std::sync::Arc;
 
 pub use crate::gpu_processing::{get_or_init_gpu_context, process_and_get_dynamic_image};
-use crate::{AppState, load_settings, mask_generation::MaskDefinition};
+use crate::{AppState, mask_generation::MaskDefinition};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ImageMetadata {
@@ -2046,33 +2047,6 @@ pub struct HistogramData {
     luma: Vec<f32>,
 }
 
-#[tauri::command]
-pub fn generate_histogram(
-    state: tauri::State<AppState>,
-    app_handle: tauri::AppHandle,
-) -> Result<HistogramData, String> {
-    let cached_preview_lock = state.cached_preview.lock().unwrap();
-
-    if let Some(cached) = &*cached_preview_lock {
-        calculate_histogram_from_image(&cached.image)
-    } else {
-        drop(cached_preview_lock);
-        let image = state
-            .original_image
-            .lock()
-            .unwrap()
-            .as_ref()
-            .ok_or("No image loaded to generate histogram")?
-            .image
-            .clone();
-
-        let settings = load_settings(app_handle).unwrap_or_default();
-        let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
-        let preview = downscale_f32_image(&image, preview_dim, preview_dim);
-        calculate_histogram_from_image(&preview)
-    }
-}
-
 pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramData, String> {
     let init_hist = || ([0u32; 256], [0u32; 256], [0u32; 256], [0u32; 256]);
 
@@ -2221,127 +2195,236 @@ fn normalize_histogram_range(histogram: &mut Vec<f32>, percentile_clip: f32) {
     }
 }
 
-#[derive(Serialize, Clone)]
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct WaveformData {
-    red: Vec<u32>,
-    green: Vec<u32>,
-    blue: Vec<u32>,
-    luma: Vec<u32>,
-    width: u32,
-    height: u32,
+    pub rgb: String,
+    pub luma: String,
+    pub red: String,
+    pub green: String,
+    pub blue: String,
+    pub width: u32,
+    pub height: u32,
 }
 
-#[tauri::command]
-pub fn generate_waveform(
-    state: tauri::State<AppState>,
-    app_handle: tauri::AppHandle,
+pub fn calculate_waveform_from_image(
+    image: &DynamicImage,
+    active_channel: Option<&str>,
 ) -> Result<WaveformData, String> {
-    let cached_preview_lock = state.cached_preview.lock().unwrap();
-
-    if let Some(cached) = &*cached_preview_lock {
-        calculate_waveform_from_image(&cached.image)
-    } else {
-        drop(cached_preview_lock);
-        let image = state
-            .original_image
-            .lock()
-            .unwrap()
-            .as_ref()
-            .ok_or("No image loaded to generate waveform")?
-            .image
-            .clone();
-
-        let settings = load_settings(app_handle).unwrap_or_default();
-        let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
-        let preview = downscale_f32_image(&image, preview_dim, preview_dim);
-        calculate_waveform_from_image(&preview)
-    }
-}
-
-pub fn calculate_waveform_from_image(image: &DynamicImage) -> Result<WaveformData, String> {
-    const WAVEFORM_WIDTH: u32 = 256;
-    const WAVEFORM_HEIGHT: u32 = 256;
+    const W: usize = 256;
+    const H: usize = 256;
 
     let (orig_w, orig_h) = image.dimensions();
     if orig_w == 0 || orig_h == 0 {
         return Err("Image has zero dimensions.".to_string());
     }
 
-    let preview_height = (orig_h as f32 * (WAVEFORM_WIDTH as f32 / orig_w as f32)).round() as u32;
-    if preview_height == 0 {
-        return Err("Image has zero height after scaling for waveform.".to_string());
+    let do_red =
+        active_channel.is_none() || active_channel == Some("red") || active_channel == Some("rgb");
+    let do_green = active_channel.is_none()
+        || active_channel == Some("green")
+        || active_channel == Some("rgb");
+    let do_blue =
+        active_channel.is_none() || active_channel == Some("blue") || active_channel == Some("rgb");
+    let do_luma =
+        active_channel.is_none() || active_channel == Some("luma") || active_channel == Some("rgb");
+    let do_rgb = active_channel.is_none() || active_channel == Some("rgb");
+
+    let mut red_bins = if do_red { vec![0u32; W * H] } else { vec![] };
+    let mut green_bins = if do_green { vec![0u32; W * H] } else { vec![] };
+    let mut blue_bins = if do_blue { vec![0u32; W * H] } else { vec![] };
+    let mut luma_bins = if do_luma { vec![0u32; W * H] } else { vec![] };
+
+    let x_scale = W as f32 / orig_w as f32;
+    let mut x_buckets = vec![0usize; orig_w as usize];
+    for x in 0..(orig_w as usize) {
+        x_buckets[x] = ((x as f32 * x_scale) as usize).min(W - 1);
     }
 
-    let mut red = vec![0; (WAVEFORM_WIDTH * WAVEFORM_HEIGHT) as usize];
-    let mut green = vec![0; (WAVEFORM_WIDTH * WAVEFORM_HEIGHT) as usize];
-    let mut blue = vec![0; (WAVEFORM_WIDTH * WAVEFORM_HEIGHT) as usize];
-    let mut luma = vec![0; (WAVEFORM_WIDTH * WAVEFORM_HEIGHT) as usize];
-
-    let x_ratio = orig_w as f32 / WAVEFORM_WIDTH as f32;
-    let y_ratio = orig_h as f32 / preview_height as f32;
-    let stride = orig_w as usize * 3;
+    let mut process_pixel = |r: u8, g: u8, b: u8, out_x: usize| {
+        if do_red {
+            red_bins[(255 - r as usize) * W + out_x] += 1;
+        }
+        if do_green {
+            green_bins[(255 - g as usize) * W + out_x] += 1;
+        }
+        if do_blue {
+            blue_bins[(255 - b as usize) * W + out_x] += 1;
+        }
+        if do_luma {
+            let l = ((r as u32 * 218 + g as u32 * 732 + b as u32 * 74) >> 10).min(255) as usize;
+            luma_bins[(255 - l) * W + out_x] += 1;
+        }
+    };
 
     match image {
         DynamicImage::ImageRgb32F(f32_img) => {
             let raw = f32_img.as_raw();
-
-            for y_out in 0..preview_height {
-                let y_in = ((y_out as f32 * y_ratio) as usize).min(orig_h as usize - 1);
-                let row_start = y_in * stride;
-
-                for x_out in 0..WAVEFORM_WIDTH {
-                    let x_in = ((x_out as f32 * x_ratio) as usize).min(orig_w as usize - 1);
-                    let idx = row_start + x_in * 3;
-
-                    let r = (raw[idx].clamp(0.0, 1.0) * 255.0) as usize;
-                    let g = (raw[idx + 1].clamp(0.0, 1.0) * 255.0) as usize;
-                    let b = (raw[idx + 2].clamp(0.0, 1.0) * 255.0) as usize;
-
-                    let out_x = x_out as usize;
-                    red[(255 - r) * WAVEFORM_WIDTH as usize + out_x] += 1;
-                    green[(255 - g) * WAVEFORM_WIDTH as usize + out_x] += 1;
-                    blue[(255 - b) * WAVEFORM_WIDTH as usize + out_x] += 1;
-
-                    let luma_val = (r * 218 + g * 732 + b * 74) >> 10;
-                    luma[(255 - luma_val.min(255)) * WAVEFORM_WIDTH as usize + out_x] += 1;
+            let stride = orig_w as usize * 3;
+            for y in 0..(orig_h as usize) {
+                let row = y * stride;
+                for x in 0..(orig_w as usize) {
+                    let i = row + x * 3;
+                    process_pixel(
+                        (raw[i].clamp(0.0, 1.0) * 255.0) as u8,
+                        (raw[i + 1].clamp(0.0, 1.0) * 255.0) as u8,
+                        (raw[i + 2].clamp(0.0, 1.0) * 255.0) as u8,
+                        x_buckets[x],
+                    );
                 }
             }
         }
         _ => {
             let rgb = image.to_rgb8();
             let raw = rgb.as_raw();
-
-            for y_out in 0..preview_height {
-                let y_in = ((y_out as f32 * y_ratio) as usize).min(orig_h as usize - 1);
-                let row_start = y_in * stride;
-
-                for x_out in 0..WAVEFORM_WIDTH {
-                    let x_in = ((x_out as f32 * x_ratio) as usize).min(orig_w as usize - 1);
-                    let idx = row_start + x_in * 3;
-
-                    let r = raw[idx] as usize;
-                    let g = raw[idx + 1] as usize;
-                    let b = raw[idx + 2] as usize;
-
-                    let out_x = x_out as usize;
-                    red[(255 - r) * WAVEFORM_WIDTH as usize + out_x] += 1;
-                    green[(255 - g) * WAVEFORM_WIDTH as usize + out_x] += 1;
-                    blue[(255 - b) * WAVEFORM_WIDTH as usize + out_x] += 1;
-
-                    let luma_val = (r * 218 + g * 732 + b * 74) >> 10;
-                    luma[(255 - luma_val.min(255)) * WAVEFORM_WIDTH as usize + out_x] += 1;
+            let stride = orig_w as usize * 3;
+            for y in 0..(orig_h as usize) {
+                let row = y * stride;
+                for x in 0..(orig_w as usize) {
+                    let i = row + x * 3;
+                    process_pixel(raw[i], raw[i + 1], raw[i + 2], x_buckets[x]);
                 }
             }
         }
     }
 
+    let build_lut = |bins: &[u32], do_calc: bool| -> (Vec<u8>, u32) {
+        if !do_calc {
+            return (vec![0; 1], 0);
+        }
+        let mut max_val = 0;
+        for &v in bins {
+            if v > max_val {
+                max_val = v;
+            }
+        }
+        if max_val == 0 {
+            return (vec![0; 1], 0);
+        }
+        let scale = 255.0 / (1.0 + max_val as f32).ln();
+        let lut = (0..=max_val)
+            .map(|v| {
+                if v == 0 {
+                    0
+                } else {
+                    ((1.0 + v as f32).ln() * scale) as u8
+                }
+            })
+            .collect();
+        (lut, max_val)
+    };
+
+    let (lut_r, max_r) = build_lut(&red_bins, do_red);
+    let (lut_g, max_g) = build_lut(&green_bins, do_green);
+    let (lut_b, max_b) = build_lut(&blue_bins, do_blue);
+    let (lut_l, max_l) = build_lut(&luma_bins, do_luma);
+
+    let pixel_count = W * H;
+    let byte_count = pixel_count * 4;
+
+    let mut rgba_rgb = if do_rgb {
+        vec![0u8; byte_count]
+    } else {
+        vec![]
+    };
+    let mut rgba_luma = if do_luma {
+        vec![0u8; byte_count]
+    } else {
+        vec![]
+    };
+    let mut rgba_red = if do_red {
+        vec![0u8; byte_count]
+    } else {
+        vec![]
+    };
+    let mut rgba_green = if do_green {
+        vec![0u8; byte_count]
+    } else {
+        vec![]
+    };
+    let mut rgba_blue = if do_blue {
+        vec![0u8; byte_count]
+    } else {
+        vec![]
+    };
+
+    for i in 0..pixel_count {
+        let r = if do_red && red_bins[i] <= max_r {
+            lut_r[red_bins[i] as usize]
+        } else {
+            0
+        };
+        let g = if do_green && green_bins[i] <= max_g {
+            lut_g[green_bins[i] as usize]
+        } else {
+            0
+        };
+        let b = if do_blue && blue_bins[i] <= max_b {
+            lut_b[blue_bins[i] as usize]
+        } else {
+            0
+        };
+        let l = if do_luma && luma_bins[i] <= max_l {
+            lut_l[luma_bins[i] as usize]
+        } else {
+            0
+        };
+        let off = i * 4;
+
+        if do_rgb && (r > 0 || g > 0 || b > 0) {
+            rgba_rgb[off] = r;
+            rgba_rgb[off + 1] = g;
+            rgba_rgb[off + 2] = b;
+            rgba_rgb[off + 3] = r.max(g).max(b);
+        }
+        if do_red && r > 0 {
+            rgba_red[off] = 255;
+            rgba_red[off + 3] = r;
+        }
+        if do_green && g > 0 {
+            rgba_green[off + 1] = 255;
+            rgba_green[off + 3] = g;
+        }
+        if do_blue && b > 0 {
+            rgba_blue[off + 2] = 255;
+            rgba_blue[off + 3] = b;
+        }
+        if do_luma && l > 0 {
+            rgba_luma[off] = 255;
+            rgba_luma[off + 1] = 255;
+            rgba_luma[off + 2] = 255;
+            rgba_luma[off + 3] = l;
+        }
+    }
+
     Ok(WaveformData {
-        red,
-        green,
-        blue,
-        luma,
-        width: WAVEFORM_WIDTH,
-        height: WAVEFORM_HEIGHT,
+        rgb: if do_rgb {
+            BASE64.encode(&rgba_rgb)
+        } else {
+            String::new()
+        },
+        luma: if do_luma {
+            BASE64.encode(&rgba_luma)
+        } else {
+            String::new()
+        },
+        red: if do_red {
+            BASE64.encode(&rgba_red)
+        } else {
+            String::new()
+        },
+        green: if do_green {
+            BASE64.encode(&rgba_green)
+        } else {
+            String::new()
+        },
+        blue: if do_blue {
+            BASE64.encode(&rgba_blue)
+        } else {
+            String::new()
+        },
+        width: W as u32,
+        height: H as u32,
     })
 }
 

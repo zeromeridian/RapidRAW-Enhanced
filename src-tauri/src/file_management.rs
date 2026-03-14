@@ -391,6 +391,12 @@ pub struct AppSettings {
     pub enable_xmp_sync: Option<bool>,
     #[serde(default)]
     pub create_xmp_if_missing: Option<bool>,
+    #[serde(default)]
+    pub is_waveform_visible: Option<bool>,
+    #[serde(default)]
+    pub waveform_height: Option<u32>,
+    #[serde(default)]
+    pub active_waveform_channel: Option<String>,
 }
 
 fn default_adjustment_visibility() -> HashMap<String, bool> {
@@ -454,6 +460,9 @@ impl Default for AppSettings {
             linear_raw_mode: default_linear_raw_mode(),
             enable_xmp_sync: Some(true),
             create_xmp_if_missing: Some(false),
+            is_waveform_visible: Some(false),
+            waveform_height: Some(220),
+            active_waveform_channel: Some("luma".to_string()),
         }
     }
 }

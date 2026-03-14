@@ -132,7 +132,15 @@ struct PreviewJob {
     is_interactive: bool,
     target_resolution: Option<u32>,
     roi: Option<(f32, f32, f32, f32)>,
+    compute_waveform: bool,
+    active_waveform_channel: Option<String>,
     responder: tokio::sync::oneshot::Sender<Vec<u8>>,
+}
+
+struct AnalyticsJob {
+    image: Arc<DynamicImage>,
+    compute_waveform: bool,
+    active_waveform_channel: Option<String>,
 }
 
 pub struct AppState {
@@ -153,6 +161,7 @@ pub struct AppState {
     initial_file_path: Mutex<Option<String>>,
     thumbnail_cancellation_token: Arc<AtomicBool>,
     preview_worker_tx: Mutex<Option<Sender<PreviewJob>>>,
+    analytics_worker_tx: Mutex<Option<Sender<AnalyticsJob>>>,
     pub mask_cache: Mutex<HashMap<u64, GrayImage>>,
     pub patch_cache: Mutex<HashMap<String, serde_json::Value>>,
     pub geometry_cache: Mutex<HashMap<u64, DynamicImage>>,
@@ -844,6 +853,8 @@ fn process_preview_job(
     is_interactive: bool,
     target_resolution: Option<u32>,
     roi: Option<(f32, f32, f32, f32)>,
+    compute_waveform: bool,
+    active_waveform_channel: Option<&str>,
 ) -> Result<Vec<u8>, String> {
     let fn_start = std::time::Instant::now();
     let context = get_or_init_gpu_context(&state)?;
@@ -1013,20 +1024,26 @@ fn process_preview_job(
     );
 
     if let Ok(final_processed_image) = final_processed_image_result {
+        let final_processed_image = Arc::new(final_processed_image);
+
         if !(is_interactive && pixel_roi.is_some()) {
-            if let Ok(histogram_data) =
-                image_processing::calculate_histogram_from_image(&final_processed_image)
-            {
-                let _ = app_handle.emit("histogram-update", histogram_data);
+            let channel_filter = if is_interactive {
+                active_waveform_channel.map(|s| s.to_string())
+            } else {
+                None
+            };
+
+            let analytics_job = AnalyticsJob {
+                image: Arc::clone(&final_processed_image),
+                compute_waveform,
+                active_waveform_channel: channel_filter,
+            };
+
+            if let Some(tx) = state.analytics_worker_tx.lock().unwrap().as_ref() {
+                let _ = tx.send(analytics_job);
             }
         }
-        if !is_interactive {
-            if let Ok(waveform_data) =
-                image_processing::calculate_waveform_from_image(&final_processed_image)
-            {
-                let _ = app_handle.emit("waveform-update", waveform_data);
-            }
-        }
+
         if is_interactive && pixel_roi.is_some() {
             let r = pixel_roi.unwrap();
 
@@ -1105,6 +1122,34 @@ fn process_preview_job(
     Err("Processing failed".to_string())
 }
 
+fn start_analytics_worker(app_handle: tauri::AppHandle) {
+    let state = app_handle.state::<AppState>();
+    let (tx, rx): (Sender<AnalyticsJob>, Receiver<AnalyticsJob>) = mpsc::channel();
+    *state.analytics_worker_tx.lock().unwrap() = Some(tx);
+
+    std::thread::spawn(move || {
+        while let Ok(mut job) = rx.recv() {
+            while let Ok(latest) = rx.try_recv() {
+                job = latest;
+            }
+
+            if let Ok(histogram_data) = image_processing::calculate_histogram_from_image(&job.image)
+            {
+                let _ = app_handle.emit("histogram-update", histogram_data);
+            }
+
+            if job.compute_waveform {
+                if let Ok(waveform_data) = image_processing::calculate_waveform_from_image(
+                    &job.image,
+                    job.active_waveform_channel.as_deref(),
+                ) {
+                    let _ = app_handle.emit("waveform-update", waveform_data);
+                }
+            }
+        }
+    });
+}
+
 fn start_preview_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
     let (tx, rx): (Sender<PreviewJob>, Receiver<PreviewJob>) = mpsc::channel();
@@ -1126,6 +1171,8 @@ fn start_preview_worker(app_handle: tauri::AppHandle) {
                 job.is_interactive,
                 job.target_resolution,
                 job.roi,
+                job.compute_waveform,
+                job.active_waveform_channel.as_deref(),
             ) {
                 Ok(bytes) => {
                     let _ = responder.send(bytes);
@@ -1144,6 +1191,8 @@ async fn apply_adjustments(
     is_interactive: bool,
     target_resolution: Option<u32>,
     roi: Option<(f32, f32, f32, f32)>,
+    compute_waveform: bool,
+    active_waveform_channel: Option<String>,
     state: tauri::State<'_, AppState>,
 ) -> Result<Response, String> {
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -1156,6 +1205,8 @@ async fn apply_adjustments(
                 is_interactive,
                 target_resolution,
                 roi,
+                compute_waveform,
+                active_waveform_channel,
                 responder: tx,
             };
             worker_tx
@@ -4149,6 +4200,7 @@ fn main() {
             }
 
             start_preview_worker(app_handle.clone());
+            start_analytics_worker(app_handle.clone());
             jxl_oxide::integration::register_image_decoding_hook();
 
             let window_cfg = app.config().app.windows.get(0).unwrap().clone();
@@ -4298,6 +4350,7 @@ fn main() {
             initial_file_path: Mutex::new(None),
             thumbnail_cancellation_token: Arc::new(AtomicBool::new(false)),
             preview_worker_tx: Mutex::new(None),
+            analytics_worker_tx: Mutex::new(None),
             mask_cache: Mutex::new(HashMap::new()),
             patch_cache: Mutex::new(HashMap::new()),
             geometry_cache: Mutex::new(HashMap::new()),
@@ -4344,8 +4397,6 @@ fn main() {
             get_image_dimensions,
             frontend_ready,
             cancel_thumbnail_generation,
-            image_processing::generate_histogram,
-            image_processing::generate_waveform,
             image_processing::calculate_auto_adjustments,
             file_management::read_exif_for_paths,
             file_management::list_images_in_dir,

@@ -4,14 +4,12 @@ import { Crop, PercentCrop } from 'react-image-crop';
 import { Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
-import { AnimatePresence } from 'framer-motion';
 import { ImageDimensions, useImageRenderSize } from '../../hooks/useImageRenderSize';
 import { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
-import Waveform from './editor/Waveform';
 import { Mask, SubMask } from './right/Masks';
-import { BrushSettings, Invokes, Panel, SelectedImage, TransformState, WaveformData } from '../ui/AppProperties';
+import { BrushSettings, Invokes, Panel, SelectedImage, TransformState } from '../ui/AppProperties';
 import type { OverlayMode } from './right/CropPanel';
 
 interface EditorProps {
@@ -33,7 +31,6 @@ interface EditorProps {
   isRotationActive?: boolean;
   isWaveformVisible: boolean;
   onBackToLibrary(): void;
-  onCloseWaveform(): void;
   onContextMenu(event: any): void;
   onGenerateAiMask(subMaskId: string, startPoint: Coord, endPoint: Coord): void;
   onQuickErase(subMaskId: string | null, startPoint: Coord, endpoint: Coord): void;
@@ -56,7 +53,6 @@ interface EditorProps {
   transformedOriginalUrl: string | null;
   uncroppedAdjustedPreviewUrl: string | null;
   updateSubMask(id: string | null, subMask: Partial<SubMask>): void;
-  waveform: WaveformData | null;
   onDisplaySizeChange?(size: any): void;
   onInitialFitScale?(scale: number): void;
   originalSize?: ImageDimensions;
@@ -90,7 +86,6 @@ export default function Editor({
   isRotationActive,
   isWaveformVisible,
   onBackToLibrary,
-  onCloseWaveform,
   onContextMenu,
   onGenerateAiMask,
   onQuickErase,
@@ -112,7 +107,6 @@ export default function Editor({
   transformedOriginalUrl,
   uncroppedAdjustedPreviewUrl,
   updateSubMask,
-  waveform,
   onDisplaySizeChange,
   onInitialFitScale,
   originalSize,
@@ -733,7 +727,6 @@ export default function Editor({
         activeSubMask?.type === Mask.Luminance ||
         activeSubMask?.parameters?.isInitialDraw));
 
-  const waveFormData: WaveformData = waveform || { blue: [], green: [], height: 0, luma: [], red: [], width: 0 };
   const isZoomActionActive = !isCropping && !isMasking && !isAiEditing && !isWbPickerActive;
   const isMaxZoom = transformState.scale >= transformConfig.maxScale - 0.5;
 
@@ -756,10 +749,6 @@ export default function Editor({
         isFullScreen ? 'bg-black rounded-none p-0 gap-0' : 'bg-bg-secondary rounded-lg p-2 gap-2',
       )}
     >
-      <AnimatePresence>
-        {isWaveformVisible && !isFullScreen && <Waveform waveformData={waveFormData} onClose={onCloseWaveform} />}
-      </AnimatePresence>
-
       <div
         className={clsx(
           'flex-shrink-0',

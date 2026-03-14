@@ -279,6 +279,10 @@ function App() {
   const [histogram, setHistogram] = useState<ChannelConfig | null>(null);
   const [waveform, setWaveform] = useState<WaveformData | null>(null);
   const [isWaveformVisible, setIsWaveformVisible] = useState(false);
+  const [activeWaveformChannel, setActiveWaveformChannel] = useState<string>('luma');
+  const activeWaveformChannelRef = useRef(activeWaveformChannel);
+  activeWaveformChannelRef.current = activeWaveformChannel;
+  const [waveformHeight, setWaveformHeight] = useState<number>(220);
   const [uiVisibility, setUiVisibility] = useState<UiVisibility>({
     folderTree: true,
     filmstrip: true,
@@ -1321,6 +1325,8 @@ function App() {
           isInteractive: dragging,
           targetResolution: targetRes || null,
           roi: roi || null,
+          computeWaveform: !!isWaveformVisible,
+          activeWaveformChannel: activeWaveformChannelRef.current || null,
         });
 
         if (currentPath !== selectedImagePathRef.current) return;
@@ -1343,7 +1349,7 @@ function App() {
         }
       }
     },
-    [selectedImage?.isReady, selectedImage?.path, calculateROI],
+    [selectedImage?.isReady, selectedImage?.path, calculateROI, isWaveformVisible],
   );
 
   const generateUncroppedPreview = useCallback(
@@ -1525,6 +1531,15 @@ function App() {
         if (settings?.activeTreeSection) {
           setActiveTreeSection(settings.activeTreeSection);
         }
+        if (typeof settings?.isWaveformVisible === 'boolean') {
+          setIsWaveformVisible(settings.isWaveformVisible);
+        }
+        if (settings?.activeWaveformChannel) {
+          setActiveWaveformChannel(settings.activeWaveformChannel);
+        }
+        if (settings?.waveformHeight !== undefined) {
+          setWaveformHeight(settings.waveformHeight);
+        }
         if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
           try {
             const trees = await invoke(Invokes.GetPinnedFolderTrees, { paths: settings.pinnedFolders });
@@ -1573,6 +1588,7 @@ function App() {
 
   const handleToggleWaveform = useCallback(() => {
     setIsWaveformVisible((prev: boolean) => !prev);
+    setWaveform(null);
   }, []);
 
   useEffect(() => {
@@ -1625,6 +1641,24 @@ function App() {
       handleSettingsChange({ ...appSettings, filterCriteria });
     }
   }, [filterCriteria, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) {
+      return;
+    }
+    if (
+      appSettings.isWaveformVisible !== isWaveformVisible ||
+      appSettings.activeWaveformChannel !== activeWaveformChannel ||
+      appSettings.waveformHeight !== waveformHeight
+    ) {
+      handleSettingsChange({
+        ...appSettings,
+        isWaveformVisible,
+        activeWaveformChannel,
+        waveformHeight,
+      });
+    }
+  }, [isWaveformVisible, activeWaveformChannel, waveformHeight, appSettings, handleSettingsChange]);
 
   useEffect(() => {
     if (!appSettings?.adaptiveEditorTheme || !selectedImage) {
@@ -1974,7 +2008,6 @@ function App() {
     setUncroppedAdjustedPreviewUrl(null);
     setHistogram(null);
     setWaveform(null);
-    setIsWaveformVisible(false);
     setActiveMaskId(null);
     setActiveMaskContainerId(null);
     setActiveAiPatchContainerId(null);
@@ -2012,6 +2045,7 @@ function App() {
       setIsViewLoading(true);
       setError(null);
       setHistogram(null);
+      setWaveform(null);
       setFinalPreviewUrl(null);
       setUncroppedAdjustedPreviewUrl(null);
       setTransformedOriginalUrl(null);
@@ -2409,7 +2443,7 @@ function App() {
 
   const calculateTargetRes = useCallback(() => {
     const baseTargetRes = appSettings?.editorPreviewResolution || 1920;
-    if (!appSettings?.enableZoomHifi || displaySize.width === 0) {
+    if (!(appSettings?.enableZoomHifi ?? true) || displaySize.width === 0) {
       return baseTargetRes;
     }
 
@@ -3376,21 +3410,6 @@ function App() {
       onSimpleClick: handleImageSelect,
     });
   };
-
-  useEffect(() => {
-    const invokeWaveForm = async () => {
-      const waveForm: any = await invoke(Invokes.GenerateWaveform).catch((err) =>
-        console.error('Failed to generate waveform:', err),
-      );
-      if (waveForm) {
-        setWaveform(waveForm);
-      }
-    };
-
-    if (isWaveformVisible && selectedImage?.isReady && !waveform) {
-      invokeWaveForm();
-    }
-  }, [isWaveformVisible, selectedImage?.isReady, waveform]);
 
   useEffect(() => {
     if (selectedImage && !selectedImage.isReady && selectedImage.path) {
@@ -4642,7 +4661,6 @@ function App() {
               isStraightenActive={isStraightenActive}
               isWaveformVisible={isWaveformVisible}
               onBackToLibrary={handleBackToLibrary}
-              onCloseWaveform={() => setIsWaveformVisible(false)}
               onContextMenu={handleEditorContextMenu}
               onGenerateAiMask={handleGenerateAiMask}
               onQuickErase={handleQuickErase}
@@ -4667,7 +4685,6 @@ function App() {
               transformedOriginalUrl={transformedOriginalUrl}
               uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
               updateSubMask={updateSubMask}
-              waveform={waveform}
               onDisplaySizeChange={handleDisplaySizeChange}
               onInitialFitScale={setInitialFitScale}
               onZoomChange={handleZoomChange}
@@ -4785,6 +4802,12 @@ function App() {
                             isWbPickerActive={isWbPickerActive}
                             toggleWbPicker={toggleWbPicker}
                             onDragStateChange={setIsSliderDragging}
+                            isWaveformVisible={isWaveformVisible}
+                            waveform={waveform}
+                            activeWaveformChannel={activeWaveformChannel}
+                            setActiveWaveformChannel={setActiveWaveformChannel}
+                            waveformHeight={waveformHeight}
+                            setWaveformHeight={setWaveformHeight}
                           />
                         )}
                         {renderedRightPanel === Panel.Metadata && (
