@@ -4658,7 +4658,6 @@ function App() {
               isSliderDragging={isSliderDragging}
               isMaskControlHovered={isMaskControlHovered}
               isStraightenActive={isStraightenActive}
-              isWaveformVisible={isWaveformVisible}
               onBackToLibrary={handleBackToLibrary}
               onContextMenu={handleEditorContextMenu}
               onGenerateAiMask={handleGenerateAiMask}
@@ -4668,7 +4667,6 @@ function App() {
               onSelectMask={setActiveMaskId}
               onStraighten={handleStraighten}
               onToggleFullScreen={handleToggleFullScreen}
-              onToggleWaveform={handleToggleWaveform}
               onUndo={undo}
               onZoomed={handleUserTransform}
               renderedRightPanel={renderedRightPanel}
@@ -4686,7 +4684,6 @@ function App() {
               updateSubMask={updateSubMask}
               onDisplaySizeChange={handleDisplaySizeChange}
               onInitialFitScale={setInitialFitScale}
-              onZoomChange={handleZoomChange}
               originalSize={originalSize}
               baseRenderSize={baseRenderSize}
               isLoadingFullRes={isLoadingFullRes}
@@ -4803,6 +4800,7 @@ function App() {
                             onDragStateChange={setIsSliderDragging}
                             isWaveformVisible={isWaveformVisible}
                             waveform={waveform}
+                            onToggleWaveform={handleToggleWaveform}
                             activeWaveformChannel={activeWaveformChannel}
                             setActiveWaveformChannel={setActiveWaveformChannel}
                             waveformHeight={waveformHeight}
@@ -4856,6 +4854,13 @@ function App() {
                             setCopiedMask={setCopiedMask}
                             setCustomEscapeHandler={setCustomEscapeHandler}
                             onDragStateChange={setIsSliderDragging}
+                            isWaveformVisible={isWaveformVisible}
+                            onToggleWaveform={handleToggleWaveform}
+                            waveform={waveform}
+                            activeWaveformChannel={activeWaveformChannel}
+                            setActiveWaveformChannel={setActiveWaveformChannel}
+                            waveformHeight={waveformHeight}
+                            setWaveformHeight={setWaveformHeight}
                             setIsMaskControlHovered={setIsMaskControlHovered}
                           />
                         )}

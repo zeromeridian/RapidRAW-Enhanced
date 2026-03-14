@@ -220,7 +220,7 @@ export const useKeyboardShortcuts = ({
           event.preventDefault();
           handleRightPanelSelect(Panel.Export);
         }
-        if (key === 'w' && !isCtrl) {
+        if (key === 'a' && !isCtrl) {
           event.preventDefault();
           setIsWaveformVisible((prev: boolean) => !prev);
         }

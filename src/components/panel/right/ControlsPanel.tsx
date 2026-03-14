@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { RotateCcw, Copy, ClipboardPaste, Aperture } from 'lucide-react';
+import { RotateCcw, Copy, ClipboardPaste, Aperture, ChartArea } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import clsx from 'clsx';
 import BasicAdjustments from '../../adjustments/Basic';
 import CurveGraph from '../../adjustments/Curves';
 import ColorPanel from '../../adjustments/Color';
@@ -39,6 +40,7 @@ interface ControlsProps {
   toggleWbPicker?: () => void;
   onDragStateChange?: (isDragging: boolean) => void;
   isWaveformVisible?: boolean;
+  onToggleWaveform?: () => void;
   waveform?: WaveformData | null;
   activeWaveformChannel?: string;
   setActiveWaveformChannel?: (mode: string) => void;
@@ -63,6 +65,7 @@ export default function Controls({
   toggleWbPicker,
   onDragStateChange,
   isWaveformVisible,
+  onToggleWaveform,
   waveform,
   activeWaveformChannel,
   setActiveWaveformChannel,
@@ -208,6 +211,16 @@ export default function Controls({
             data-tooltip="Auto Adjust Image"
           >
             <Aperture size={18} />
+          </button>
+          <button
+            className={clsx(
+              'p-2 rounded-full transition-colors',
+              isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
+            )}
+            onClick={onToggleWaveform}
+            data-tooltip="Toggle Analytics Display"
+          >
+            <ChartArea size={18} />
           </button>
           <button
             className="p-2 rounded-full hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

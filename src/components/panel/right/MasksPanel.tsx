@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DndContext,
@@ -14,6 +15,7 @@ import {
   pointerWithin,
 } from '@dnd-kit/core';
 import {
+  ChartArea,
   Circle,
   ClipboardPaste,
   Copy,
@@ -39,6 +41,8 @@ import CurveGraph from '../../adjustments/Curves';
 import ColorPanel from '../../adjustments/Color';
 import DetailsPanel from '../../adjustments/Details';
 import EffectsPanel from '../../adjustments/Effects';
+import Waveform from '../editor/Waveform';
+import Resizer from '../../ui/Resizer';
 
 import {
   Mask,
@@ -58,7 +62,14 @@ import {
   ADJUSTMENT_SECTIONS,
 } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { AppSettings, BrushSettings, OPTION_SEPARATOR, SelectedImage } from '../../ui/AppProperties';
+import {
+  AppSettings,
+  BrushSettings,
+  OPTION_SEPARATOR,
+  SelectedImage,
+  WaveformData,
+  Orientation,
+} from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
 import { usePresets } from '../../../hooks/usePresets';
 
@@ -83,6 +94,13 @@ interface MasksPanelProps {
   setCustomEscapeHandler(handler: any): void;
   setIsMaskControlHovered(hovered: boolean): void;
   onDragStateChange?: (isDragging: boolean) => void;
+  isWaveformVisible?: boolean;
+  onToggleWaveform?: () => void;
+  waveform?: WaveformData | null;
+  activeWaveformChannel?: string;
+  setActiveWaveformChannel?: (mode: string) => void;
+  waveformHeight?: number;
+  setWaveformHeight?: (height: number) => void;
 }
 
 interface DragData {
@@ -200,6 +218,13 @@ export default function MasksPanel({
   setCustomEscapeHandler,
   setIsMaskControlHovered,
   onDragStateChange,
+  isWaveformVisible,
+  onToggleWaveform,
+  waveform,
+  activeWaveformChannel,
+  setActiveWaveformChannel,
+  waveformHeight,
+  setWaveformHeight,
 }: MasksPanelProps) {
   const [expandedContainers, setExpandedContainers] = useState<Set<string>>(new Set());
   const [activeDragItem, setActiveDragItem] = useState<DragData | null>(null);
@@ -219,6 +244,7 @@ export default function MasksPanel({
   const [isMaskListEmpty, setIsMaskListEmpty] = useState(adjustments.masks.length === 0);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [analyzingSubMaskId, setAnalyzingSubMaskId] = useState<string | null>(null);
+  const [isResizingWaveform, setIsResizingWaveform] = useState<boolean>(false);
 
   const { showContextMenu } = useContextMenu();
   const { presets } = usePresets(adjustments);
@@ -299,6 +325,27 @@ export default function MasksPanel({
     else setCustomEscapeHandler(null);
     return () => setCustomEscapeHandler(null);
   }, [activeMaskContainerId, activeMaskId, renamingId, onSelectContainer, onSelectMask, setCustomEscapeHandler]);
+
+  const handleWaveformResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = waveformHeight || 256;
+    setIsResizingWaveform(true);
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientY - startY;
+      if (setWaveformHeight) setWaveformHeight(Math.max(150, Math.min(450, startHeight + delta)));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingWaveform(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
 
   const handleDeselect = () => {
     onSelectContainer(null);
@@ -631,16 +678,49 @@ export default function MasksPanel({
         onClick={handleDeselect}
         onContextMenu={handlePanelContextMenu}
       >
-        <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface h-[69px]">
+        <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
           <h2 className="text-xl font-bold text-primary text-shadow-shiny">Masking</h2>
-          <button
-            className="p-2 rounded-full hover:bg-surface transition-colors"
-            onClick={handleResetAllMasks}
-            data-tooltip="Reset Masking"
-          >
-            <RotateCcw size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              className={clsx(
+                'p-2 rounded-full transition-colors',
+                isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
+              )}
+              onClick={onToggleWaveform}
+              data-tooltip="Toggle Analytics Display"
+            >
+              <ChartArea size={18} />
+            </button>
+            <button
+              className="p-2 rounded-full hover:bg-surface transition-colors"
+              onClick={handleResetAllMasks}
+              data-tooltip="Reset Masking"
+            >
+              <RotateCcw size={18} />
+            </button>
+          </div>
         </div>
+
+        <AnimatePresence initial={false}>
+          {isWaveformVisible && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: waveformHeight || 256, opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: isResizingWaveform ? 0 : 0.2, ease: 'easeOut' }}
+              className="flex-shrink-0 flex flex-col relative border-b border-surface overflow-hidden"
+            >
+              <div className="flex-grow w-full h-full p-4 pb-2 min-h-0">
+                <Waveform
+                  waveformData={waveform || null}
+                  displayMode={activeWaveformChannel || 'luma'}
+                  setDisplayMode={setActiveWaveformChannel || (() => {})}
+                />
+              </div>
+              <Resizer direction={Orientation.Horizontal} onMouseDown={handleWaveformResize} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0">
           <div className="p-4 pb-2 z-10 flex-shrink-0">
@@ -870,7 +950,7 @@ function DraggableGridItem({ maskType, onClick, isDraggable, activeMaskContainer
       {...attributes}
       disabled={maskType.disabled}
       onClick={onClick}
-      className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors 
+      className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors
                 ${maskType.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'} ${isDragging ? 'opacity-50' : ''}`}
       data-tooltip={
         maskType.disabled
@@ -1029,8 +1109,8 @@ function ContainerRow({
       <div
         {...listeners}
         {...attributes}
-        className={`flex items-center gap-2 p-2 rounded-md transition-colors group 
-             ${isSelected ? 'bg-surface' : 'hover:bg-card-active'} 
+        className={`flex items-center gap-2 p-2 rounded-md transition-colors group
+             ${isSelected ? 'bg-surface' : 'hover:bg-card-active'}
              ${borderClass}`}
         onClick={(e) => {
           e.stopPropagation();
@@ -1223,9 +1303,9 @@ function SubMaskRow({
       {...listeners}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`flex items-center gap-2 p-2 rounded-md transition-colors group mt-0.5 cursor-pointer 
-            ${isActive ? 'bg-surface' : 'hover:bg-card-active'} 
-            ${isOver && !isDraggingContainer ? 'border-t-2 border-accent' : ''} 
+      className={`flex items-center gap-2 p-2 rounded-md transition-colors group mt-0.5 cursor-pointer
+            ${isActive ? 'bg-surface' : 'hover:bg-card-active'}
+            ${isOver && !isDraggingContainer ? 'border-t-2 border-accent' : ''}
             ${isDragging ? 'opacity-40 z-50' : ''}
             ${parentVisible === false ? 'opacity-50' : ''}
             ${isDraggingContainer ? 'opacity-30 pointer-events-none' : ''}

@@ -1697,7 +1697,7 @@ export default function SettingsPanel({
                         <KeybindItem keys={['K']} description="Toggle AI panel" />
                         <KeybindItem keys={['P']} description="Toggle Presets panel" />
                         <KeybindItem keys={['I']} description="Toggle Metadata panel" />
-                        <KeybindItem keys={['W']} description="Toggle Waveform display" />
+                        <KeybindItem keys={['A']} description="Toggle Analytics display" />
                         <KeybindItem keys={['E']} description="Toggle Export panel" />
                       </div>
                     </div>

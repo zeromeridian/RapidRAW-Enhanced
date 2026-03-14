@@ -29,7 +29,6 @@ interface EditorProps {
   isMaskControlHovered: boolean;
   isStraightenActive: boolean;
   isRotationActive?: boolean;
-  isWaveformVisible: boolean;
   onBackToLibrary(): void;
   onContextMenu(event: any): void;
   onGenerateAiMask(subMaskId: string, startPoint: Coord, endPoint: Coord): void;
@@ -39,7 +38,6 @@ interface EditorProps {
   onSelectMask(id: string | null): void;
   onStraighten(val: number): void;
   onToggleFullScreen(): void;
-  onToggleWaveform(): void;
   onUndo(): void;
   onZoomed(state: TransformState): void;
   renderedRightPanel: Panel | null;
@@ -84,7 +82,6 @@ export default function Editor({
   isMaskControlHovered,
   isStraightenActive,
   isRotationActive,
-  isWaveformVisible,
   onBackToLibrary,
   onContextMenu,
   onGenerateAiMask,
@@ -94,7 +91,6 @@ export default function Editor({
   onSelectMask,
   onStraighten,
   onToggleFullScreen,
-  onToggleWaveform,
   onUndo,
   onZoomed,
   selectedImage,
@@ -761,12 +757,10 @@ export default function Editor({
           canRedo={canRedo}
           canUndo={canUndo}
           isLoading={isLoading}
-          isWaveformVisible={isWaveformVisible}
           onBackToLibrary={onBackToLibrary}
           onRedo={onRedo}
           onToggleFullScreen={onToggleFullScreen}
           onToggleShowOriginal={toggleShowOriginal}
-          onToggleWaveform={onToggleWaveform}
           onUndo={onUndo}
           selectedImage={selectedImage}
           showOriginal={showOriginal}

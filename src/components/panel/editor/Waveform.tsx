@@ -77,6 +77,7 @@ const useRawRgbaCanvas = (
 export default function Waveform({ waveformData, displayMode, setDisplayMode }: WaveformProps) {
   const [isHovered, setIsHovered] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hadDataOnMount = useRef(!!waveformData);
 
   const width = waveformData?.width || 256;
   const height = waveformData?.height || 256;
@@ -105,7 +106,7 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <AnimatePresence>
+      <AnimatePresence initial={!hadDataOnMount.current}>
         {waveformData && (
           <motion.div
             key="waveform-canvas"
@@ -153,6 +154,7 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
               <LayoutGroup>
                 {modeButtons.map(({ mode, label, tooltip, bgClass, textActiveClass }) => (
                   <button
+                    key={mode}
                     onClick={() => setDisplayMode(mode)}
                     data-tooltip={tooltip}
                     className={`${baseButtonClass} ${displayMode === mode ? textActiveClass : inactiveButtonClass}`}
