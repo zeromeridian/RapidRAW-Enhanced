@@ -1644,7 +1644,7 @@ export default function SettingsPanel({
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
                   <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
-                    Keyboard & Mouse Shortcuts
+                    Keyboard Shortcuts
                   </Text>
                   <div className="space-y-8">
                     <div>
