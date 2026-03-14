@@ -1681,7 +1681,7 @@ export default function SettingsPanel({
                         />
                         <KeybindItem
                           keys={['Middle Click']}
-                          description="Create a new mask from a mask tool button in the Masks panel"
+                          description="Create a new mask from a mask tool button or Others menu item in the Masks panel"
                         />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '+']} description="Zoom in" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '-']} description="Zoom out" />

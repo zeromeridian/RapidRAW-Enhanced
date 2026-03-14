@@ -416,6 +416,7 @@ export default function MasksPanel({
       label: maskType.name,
       icon: maskType.icon,
       onClick: () => handleGridClick(maskType.type),
+      onMiddleClick: () => handleGridClick(maskType.type, true),
     }));
     showContextMenu(rect.left, rect.bottom + 5, options);
   };
