@@ -52,7 +52,7 @@ use image_hdr::input::HDRInput;
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
 use imageproc::hough::{LineDetectionOptions, detect_lines};
-use jxl_encoder::{LossyConfig, LosslessConfig, PixelLayout};
+use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
 use mozjpeg_rs::{Encoder, Preset};
 use rayon::prelude::*;
 use reqwest;
@@ -1736,7 +1736,7 @@ fn encode_image_to_bytes(
         "jxl" => {
             let (width, height) = image.dimensions();
             let has_alpha = image.color().has_alpha();
-            
+
             let jxl_data = if jpeg_quality == 100 {
                 if has_alpha {
                     let rgba = image.to_rgba8();
@@ -1752,7 +1752,7 @@ fn encode_image_to_bytes(
             } else {
                 let distance = (100.0 - jpeg_quality as f32) / 10.0;
                 let distance = distance.max(0.01);
-                
+
                 if has_alpha {
                     let rgba = image.to_rgba8();
                     LossyConfig::new(distance)
@@ -1765,7 +1765,7 @@ fn encode_image_to_bytes(
                         .map_err(|e| format!("Failed to encode lossy JXL: {}", e))?
                 }
             };
-            
+
             return Ok(jxl_data);
         }
         "webp" => {
@@ -1976,12 +1976,8 @@ async fn export_image(
                 .to_lowercase();
 
             if extension == "cube" {
-                let cube_bytes = export_adjustments_as_lut(
-                    &js_adjustments,
-                    &source_path_str,
-                    &context,
-                    &state,
-                )?;
+                let cube_bytes =
+                    export_adjustments_as_lut(&js_adjustments, &source_path_str, &context, &state)?;
                 fs::write(output_path_obj, cube_bytes).map_err(|e| e.to_string())?;
                 return Ok(());
             }
@@ -2161,7 +2157,7 @@ async fn batch_export_images(
                         let new_filename = format!("{}.{}", new_stem, output_format);
                         let output_path = output_folder_path.join(new_filename);
                         let extension = output_format.to_lowercase();
-                        
+
                         if extension == "cube" {
                             let cube_bytes = export_adjustments_as_lut(
                                 &js_adjustments,
