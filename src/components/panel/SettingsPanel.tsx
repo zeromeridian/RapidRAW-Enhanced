@@ -1644,7 +1644,7 @@ export default function SettingsPanel({
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
                   <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
-                    Keyboard Shortcuts
+                    Keyboard & Mouse Shortcuts
                   </Text>
                   <div className="space-y-8">
                     <div>
@@ -1678,6 +1678,10 @@ export default function SettingsPanel({
                         <KeybindItem
                           keys={['Shift', '+', 'Mouse Wheel']}
                           description="Adjust slider value by 2 steps"
+                        />
+                        <KeybindItem
+                          keys={['Middle Click']}
+                          description="Create a new mask from a mask tool button in the Masks panel"
                         />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '+']} description="Zoom in" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '-']} description="Zoom out" />
