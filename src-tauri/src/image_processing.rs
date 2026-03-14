@@ -2203,6 +2203,8 @@ pub struct WaveformData {
     pub red: String,
     pub green: String,
     pub blue: String,
+    pub parade: String,
+    pub vectorscope: String,
     pub width: u32,
     pub height: u32,
 }
@@ -2229,19 +2231,38 @@ pub fn calculate_waveform_from_image(
     let do_luma =
         active_channel.is_none() || active_channel == Some("luma") || active_channel == Some("rgb");
     let do_rgb = active_channel.is_none() || active_channel == Some("rgb");
+    let do_parade = active_channel.is_none() || active_channel == Some("parade");
+    let do_vectorscope = active_channel.is_none() || active_channel == Some("vectorscope");
 
     let mut red_bins = if do_red { vec![0u32; W * H] } else { vec![] };
     let mut green_bins = if do_green { vec![0u32; W * H] } else { vec![] };
     let mut blue_bins = if do_blue { vec![0u32; W * H] } else { vec![] };
     let mut luma_bins = if do_luma { vec![0u32; W * H] } else { vec![] };
+    let mut parade_bins = if do_parade { vec![0u32; W * H] } else { vec![] };
+    let mut vector_bins = if do_vectorscope {
+        vec![0u32; W * H]
+    } else {
+        vec![]
+    };
 
     let x_scale = W as f32 / orig_w as f32;
     let mut x_buckets = vec![0usize; orig_w as usize];
+
+    let mut x_buckets_parade_r = vec![0usize; orig_w as usize];
+    let mut x_buckets_parade_g = vec![0usize; orig_w as usize];
+    let mut x_buckets_parade_b = vec![0usize; orig_w as usize];
+
     for x in 0..(orig_w as usize) {
         x_buckets[x] = ((x as f32 * x_scale) as usize).min(W - 1);
+        if do_parade {
+            let relative_x = x as f32 / orig_w as f32;
+            x_buckets_parade_r[x] = (relative_x * 82.0) as usize % 82;
+            x_buckets_parade_g[x] = 87 + (relative_x * 82.0) as usize % 82;
+            x_buckets_parade_b[x] = 174 + (relative_x * 82.0) as usize % 82;
+        }
     }
 
-    let mut process_pixel = |r: u8, g: u8, b: u8, out_x: usize| {
+    let mut process_pixel = |r: u8, g: u8, b: u8, out_x: usize, orig_x: usize| {
         if do_red {
             red_bins[(255 - r as usize) * W + out_x] += 1;
         }
@@ -2254,6 +2275,30 @@ pub fn calculate_waveform_from_image(
         if do_luma {
             let l = ((r as u32 * 218 + g as u32 * 732 + b as u32 * 74) >> 10).min(255) as usize;
             luma_bins[(255 - l) * W + out_x] += 1;
+        }
+        if do_parade {
+            parade_bins[(255 - r as usize) * W + x_buckets_parade_r[orig_x]] += 1;
+            parade_bins[(255 - g as usize) * W + x_buckets_parade_g[orig_x]] += 1;
+            parade_bins[(255 - b as usize) * W + x_buckets_parade_b[orig_x]] += 1;
+        }
+        if do_vectorscope {
+            let r_f = r as f32;
+            let g_f = g as f32;
+            let b_f = b as f32;
+
+            let mut cb = (-0.1146 * r_f - 0.3854 * g_f + 0.5 * b_f) * 0.836;
+            let mut cr = (0.5 * r_f - 0.4542 * g_f - 0.0458 * b_f) * 0.836;
+
+            let dist_sq = cb * cb + cr * cr;
+            if dist_sq > 16129.0 {
+                let scale = 127.0 / dist_sq.sqrt();
+                cb *= scale;
+                cr *= scale;
+            }
+
+            let vx = (cb + 128.0).clamp(0.0, 255.0) as usize;
+            let vy = (128.0 - cr).clamp(0.0, 255.0) as usize;
+            vector_bins[vy * W + vx] += 1;
         }
     };
 
@@ -2270,6 +2315,7 @@ pub fn calculate_waveform_from_image(
                         (raw[i + 1].clamp(0.0, 1.0) * 255.0) as u8,
                         (raw[i + 2].clamp(0.0, 1.0) * 255.0) as u8,
                         x_buckets[x],
+                        x,
                     );
                 }
             }
@@ -2282,7 +2328,7 @@ pub fn calculate_waveform_from_image(
                 let row = y * stride;
                 for x in 0..(orig_w as usize) {
                     let i = row + x * 3;
-                    process_pixel(raw[i], raw[i + 1], raw[i + 2], x_buckets[x]);
+                    process_pixel(raw[i], raw[i + 1], raw[i + 2], x_buckets[x], x);
                 }
             }
         }
@@ -2292,12 +2338,7 @@ pub fn calculate_waveform_from_image(
         if !do_calc {
             return (vec![0; 1], 0);
         }
-        let mut max_val = 0;
-        for &v in bins {
-            if v > max_val {
-                max_val = v;
-            }
-        }
+        let max_val = *bins.iter().max().unwrap_or(&0);
         if max_val == 0 {
             return (vec![0; 1], 0);
         }
@@ -2318,6 +2359,8 @@ pub fn calculate_waveform_from_image(
     let (lut_g, max_g) = build_lut(&green_bins, do_green);
     let (lut_b, max_b) = build_lut(&blue_bins, do_blue);
     let (lut_l, max_l) = build_lut(&luma_bins, do_luma);
+    let (lut_p, max_p) = build_lut(&parade_bins, do_parade);
+    let (lut_v, max_v) = build_lut(&vector_bins, do_vectorscope);
 
     let pixel_count = W * H;
     let byte_count = pixel_count * 4;
@@ -2347,53 +2390,113 @@ pub fn calculate_waveform_from_image(
     } else {
         vec![]
     };
+    let mut rgba_parade = if do_parade {
+        vec![0u8; byte_count]
+    } else {
+        vec![]
+    };
+    let mut rgba_vector = if do_vectorscope {
+        vec![0u8; byte_count]
+    } else {
+        vec![]
+    };
 
     for i in 0..pixel_count {
-        let r = if do_red && red_bins[i] <= max_r {
-            lut_r[red_bins[i] as usize]
-        } else {
-            0
-        };
-        let g = if do_green && green_bins[i] <= max_g {
-            lut_g[green_bins[i] as usize]
-        } else {
-            0
-        };
-        let b = if do_blue && blue_bins[i] <= max_b {
-            lut_b[blue_bins[i] as usize]
-        } else {
-            0
-        };
-        let l = if do_luma && luma_bins[i] <= max_l {
-            lut_l[luma_bins[i] as usize]
-        } else {
-            0
-        };
+        let x = i % W;
+        let y = i / W;
         let off = i * 4;
 
-        if do_rgb && (r > 0 || g > 0 || b > 0) {
-            rgba_rgb[off] = r;
-            rgba_rgb[off + 1] = g;
-            rgba_rgb[off + 2] = b;
-            rgba_rgb[off + 3] = r.max(g).max(b);
+        if do_rgb {
+            let r = if do_red && red_bins[i] <= max_r {
+                lut_r[red_bins[i] as usize]
+            } else {
+                0
+            };
+            let g = if do_green && green_bins[i] <= max_g {
+                lut_g[green_bins[i] as usize]
+            } else {
+                0
+            };
+            let b = if do_blue && blue_bins[i] <= max_b {
+                lut_b[blue_bins[i] as usize]
+            } else {
+                0
+            };
+            if r > 0 || g > 0 || b > 0 {
+                rgba_rgb[off] = r;
+                rgba_rgb[off + 1] = g;
+                rgba_rgb[off + 2] = b;
+                rgba_rgb[off + 3] = r.max(g).max(b);
+            }
         }
-        if do_red && r > 0 {
+        if do_red && red_bins[i] > 0 && red_bins[i] <= max_r {
             rgba_red[off] = 255;
-            rgba_red[off + 3] = r;
+            rgba_red[off + 3] = lut_r[red_bins[i] as usize];
         }
-        if do_green && g > 0 {
+        if do_green && green_bins[i] > 0 && green_bins[i] <= max_g {
             rgba_green[off + 1] = 255;
-            rgba_green[off + 3] = g;
+            rgba_green[off + 3] = lut_g[green_bins[i] as usize];
         }
-        if do_blue && b > 0 {
+        if do_blue && blue_bins[i] > 0 && blue_bins[i] <= max_b {
             rgba_blue[off + 2] = 255;
-            rgba_blue[off + 3] = b;
+            rgba_blue[off + 3] = lut_b[blue_bins[i] as usize];
         }
-        if do_luma && l > 0 {
+        if do_luma && luma_bins[i] > 0 && luma_bins[i] <= max_l {
+            let l = lut_l[luma_bins[i] as usize];
             rgba_luma[off] = 255;
             rgba_luma[off + 1] = 255;
             rgba_luma[off + 2] = 255;
             rgba_luma[off + 3] = l;
+        }
+
+        if do_parade && parade_bins[i] > 0 && parade_bins[i] <= max_p {
+            let bright = lut_p[parade_bins[i] as usize];
+            if x < 82 {
+                rgba_parade[off] = 255;
+                rgba_parade[off + 3] = bright;
+            } else if x >= 87 && x < 169 {
+                rgba_parade[off + 1] = 255;
+                rgba_parade[off + 3] = bright;
+            } else if x >= 174 {
+                rgba_parade[off + 2] = 255;
+                rgba_parade[off + 3] = bright;
+            }
+        }
+
+        if do_vectorscope {
+            let val = vector_bins[i];
+
+            let dx = x as f32 - 128.0;
+            let dy = 128.0 - y as f32;
+            let min_d = dx.abs().min(dy.abs());
+            let dist = (dx * dx + dy * dy).sqrt();
+
+            if val > 0 && val <= max_v {
+                let bright = lut_v[val as usize];
+
+                let y_mid = 128.0;
+                rgba_vector[off] = (y_mid + 1.402 * (dy / 0.836)).clamp(0.0, 255.0) as u8;
+                rgba_vector[off + 1] = (y_mid - 0.344136 * (dx / 0.836) - 0.714136 * (dy / 0.836))
+                    .clamp(0.0, 255.0) as u8;
+                rgba_vector[off + 2] = (y_mid + 1.772 * (dx / 0.836)).clamp(0.0, 255.0) as u8;
+                rgba_vector[off + 3] = bright;
+            } else if min_d <= 1.0 {
+                let alpha = (40.0 - min_d * 30.0).clamp(0.0, 255.0) as u8;
+                rgba_vector[off] = 255;
+                rgba_vector[off + 1] = 255;
+                rgba_vector[off + 2] = 255;
+                rgba_vector[off + 3] = alpha;
+            } else if (dist - 127.0).abs() < 0.8 || (dist - 64.0).abs() < 0.8 {
+                rgba_vector[off] = 255;
+                rgba_vector[off + 1] = 255;
+                rgba_vector[off + 2] = 255;
+                rgba_vector[off + 3] = 15;
+            } else if dx < 0.0 && dy > 0.0 && (dy + 1.53 * dx).abs() < 1.0 {
+                rgba_vector[off] = 255;
+                rgba_vector[off + 1] = 200;
+                rgba_vector[off + 2] = 150;
+                rgba_vector[off + 3] = 120;
+            }
         }
     }
 
@@ -2420,6 +2523,16 @@ pub fn calculate_waveform_from_image(
         },
         blue: if do_blue {
             BASE64.encode(&rgba_blue)
+        } else {
+            String::new()
+        },
+        parade: if do_parade {
+            BASE64.encode(&rgba_parade)
+        } else {
+            String::new()
+        },
+        vectorscope: if do_vectorscope {
+            BASE64.encode(&rgba_vector)
         } else {
             String::new()
         },

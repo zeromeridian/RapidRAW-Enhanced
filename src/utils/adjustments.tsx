@@ -15,6 +15,8 @@ export enum DisplayMode {
   Luma = 'luma',
   Red = 'red',
   Rgb = 'rgb',
+  Parade = 'parade',
+  Vectorscope = 'vectorscope',
 }
 
 export enum PasteMode {

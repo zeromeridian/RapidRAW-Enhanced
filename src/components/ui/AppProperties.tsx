@@ -266,6 +266,8 @@ export interface WaveformData {
   luma: string;
   red: string;
   rgb: string;
+  parade: string;
+  vectorscope: string;
   width: number;
 }
 

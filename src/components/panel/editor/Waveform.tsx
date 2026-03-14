@@ -10,11 +10,43 @@ interface WaveformProps {
 }
 
 const modeButtons = [
-  { mode: DisplayMode.Luma, label: 'Luma', bgClass: 'bg-accent', textActiveClass: 'text-button-text' },
-  { mode: DisplayMode.Rgb, label: 'RGB', bgClass: 'bg-accent', textActiveClass: 'text-button-text' },
-  { mode: DisplayMode.Red, label: 'R', bgClass: 'bg-red-500', textActiveClass: 'text-white' },
-  { mode: DisplayMode.Green, label: 'G', bgClass: 'bg-green-500', textActiveClass: 'text-white' },
-  { mode: DisplayMode.Blue, label: 'B', bgClass: 'bg-blue-500', textActiveClass: 'text-white' },
+  { mode: DisplayMode.Luma, label: 'L', tooltip: 'Luma', bgClass: 'bg-accent', textActiveClass: 'text-button-text' },
+  {
+    mode: DisplayMode.Rgb,
+    label: 'RGB',
+    tooltip: 'RGB Overlay',
+    bgClass: 'bg-accent',
+    textActiveClass: 'text-button-text',
+  },
+  {
+    mode: DisplayMode.Parade,
+    label: 'P',
+    tooltip: 'Parade',
+    bgClass: 'bg-accent',
+    textActiveClass: 'text-button-text',
+  },
+  {
+    mode: DisplayMode.Vectorscope,
+    label: 'V',
+    tooltip: 'Vectorscope',
+    bgClass: 'bg-accent',
+    textActiveClass: 'text-button-text',
+  },
+  { mode: DisplayMode.Red, label: 'R', tooltip: 'Red Channel', bgClass: 'bg-red-500', textActiveClass: 'text-white' },
+  {
+    mode: DisplayMode.Green,
+    label: 'G',
+    tooltip: 'Green Channel',
+    bgClass: 'bg-green-500',
+    textActiveClass: 'text-white',
+  },
+  {
+    mode: DisplayMode.Blue,
+    label: 'B',
+    tooltip: 'Blue Channel',
+    bgClass: 'bg-blue-500',
+    textActiveClass: 'text-white',
+  },
 ];
 
 const useRawRgbaCanvas = (
@@ -56,13 +88,15 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
         [DisplayMode.Red]: waveformData.red,
         [DisplayMode.Green]: waveformData.green,
         [DisplayMode.Blue]: waveformData.blue,
+        [DisplayMode.Parade]: waveformData.parade,
+        [DisplayMode.Vectorscope]: waveformData.vectorscope,
       }[displayMode as DisplayMode]
     : '';
 
   useRawRgbaCanvas(canvasRef, activeData || '', width, height);
 
   const baseButtonClass =
-    'relative flex-grow text-center px-2 py-1 text-xs rounded-lg font-medium transition-colors duration-150';
+    'relative flex-grow text-center px-1.5 py-1 text-xs rounded-lg font-medium transition-colors duration-150';
   const inactiveButtonClass = 'text-text-primary hover:bg-bg-tertiary';
 
   return (
@@ -95,13 +129,7 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
             style={{ transformOrigin: 'bottom' }}
             className="absolute inset-0"
           >
-            <canvas
-              ref={canvasRef}
-              width={width}
-              height={height}
-              className="w-full h-full"
-              style={{ imageRendering: 'pixelated' }}
-            />
+            <canvas ref={canvasRef} width={width} height={height} className="w-full h-full" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -120,17 +148,13 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.1, ease: 'easeOut', delay: 0.05 }}
-              className="flex justify-center gap-1 p-1 bg-surface/90 backdrop-blur-md rounded-lg w-full shadow-lg border border-white/5"
+              className="flex justify-center gap-0.5 p-1 bg-surface/90 backdrop-blur-md rounded-lg w-full shadow-lg border border-white/5"
             >
               <LayoutGroup>
-                {modeButtons.map(({ mode, label, bgClass, textActiveClass }, index) => (
-                  <motion.button
-                    key={mode}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 4 }}
-                    transition={{ duration: 0.1, ease: 'easeOut', delay: 0.03 * index }}
+                {modeButtons.map(({ mode, label, tooltip, bgClass, textActiveClass }) => (
+                  <button
                     onClick={() => setDisplayMode(mode)}
+                    data-tooltip={tooltip}
                     className={`${baseButtonClass} ${displayMode === mode ? textActiveClass : inactiveButtonClass}`}
                   >
                     {displayMode === mode && (
@@ -141,7 +165,7 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
                       />
                     )}
                     <span className="relative z-10">{label}</span>
-                  </motion.button>
+                  </button>
                 ))}
               </LayoutGroup>
             </motion.div>

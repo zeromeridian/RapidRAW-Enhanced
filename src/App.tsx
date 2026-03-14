@@ -1588,7 +1588,6 @@ function App() {
 
   const handleToggleWaveform = useCallback(() => {
     setIsWaveformVisible((prev: boolean) => !prev);
-    setWaveform(null);
   }, []);
 
   useEffect(() => {
