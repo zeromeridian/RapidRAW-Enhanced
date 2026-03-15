@@ -1,12 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { AlertOctagon } from 'lucide-react';
 import { WaveformData } from '../../ui/AppProperties';
 import { DisplayMode } from '../../../utils/adjustments';
 
 interface WaveformProps {
   waveformData: WaveformData | null;
+  histogram?: any;
   displayMode: string;
   setDisplayMode: (mode: string) => void;
+  showClipping?: boolean;
+  onToggleClipping?: () => void;
 }
 
 const modeButtons = [
@@ -32,7 +36,132 @@ const modeButtons = [
     bgClass: 'bg-accent',
     textActiveClass: 'text-button-text',
   },
+  {
+    mode: DisplayMode.Histogram,
+    label: 'H',
+    tooltip: 'Histogram',
+    bgClass: 'bg-accent',
+    textActiveClass: 'text-button-text',
+  },
 ];
+
+const HistogramView = ({ histogram }: { histogram: any }) => {
+  if (!histogram || !histogram.red || !histogram.green || !histogram.blue) return null;
+
+  const redMax = Math.max(...(histogram.red || [0]));
+  const greenMax = Math.max(...(histogram.green || [0]));
+  const blueMax = Math.max(...(histogram.blue || [0]));
+  const globalMax = Math.max(redMax, greenMax, blueMax, 1);
+
+  const getFill = (data: number[]) => {
+    const pathData = data.map((val, i) => `${(i / 255) * 255},${255 - (val / globalMax) * 255}`).join(' L');
+    return `M0,255 L${pathData} L255,255 Z`;
+  };
+
+  const getLine = (data: number[]) => {
+    return 'M' + data.map((val, i) => `${(i / 255) * 255},${255 - (val / globalMax) * 255}`).join(' L');
+  };
+
+  const channels = [
+    { key: 'red', color: '#FF6B6B', data: histogram.red },
+    { key: 'green', color: '#6BCB77', data: histogram.green },
+    { key: 'blue', color: '#4D96FF', data: histogram.blue },
+  ];
+
+  return (
+    <svg
+      viewBox="0 0 255 255"
+      className="w-full h-full overflow-visible pointer-events-none"
+      preserveAspectRatio="none"
+    >
+      {channels.map((ch) => {
+        if (!ch.data || ch.data.length === 0) return null;
+        return (
+          <g key={ch.key} style={{ mixBlendMode: 'lighten' }}>
+            <path d={getFill(ch.data)} fill={ch.color} fillOpacity={0.4} />
+            <path
+              d={getLine(ch.data)}
+              fill="none"
+              stroke={ch.color}
+              strokeWidth={1.5}
+              strokeOpacity={1.8}
+              vectorEffect="non-scaling-stroke"
+              strokeLinejoin="round"
+            />
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
+const FakeHistogramLoader = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let time = 0;
+    let lastTime = 0;
+
+    const ANIMATION_SPEED = 1.0;
+
+    const render = (currentTime: number) => {
+      if (lastTime === 0) lastTime = currentTime;
+
+      let dt = (currentTime - lastTime) / 1000;
+      lastTime = currentTime;
+
+      if (dt > 0.05) dt = 0.05;
+
+      time += dt * ANIMATION_SPEED;
+
+      ctx.clearRect(0, 0, 256, 256);
+      ctx.globalCompositeOperation = 'screen';
+
+      const drawChannel = (
+        color: string,
+        strokeColor: string,
+        offset: number,
+        amplitude: number,
+        phaseSpeed: number,
+      ) => {
+        ctx.beginPath();
+        ctx.moveTo(0, 256);
+        for (let x = 0; x <= 256; x += 4) {
+          const noise = Math.sin(x * 0.2 + time * phaseSpeed * 2) * 0.5;
+          const wave = Math.sin(x * 0.03 + time * phaseSpeed + offset) * amplitude;
+
+          const baseHeight = 1;
+
+          const y = 256 - baseHeight - Math.max(0, wave + noise);
+          ctx.lineTo(x, y);
+        }
+        ctx.lineTo(256, 256);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      };
+
+      drawChannel('rgba(255, 107, 107, 0.55)', 'rgba(255, 107, 107, 0.3)', 0, 5, 0.8);
+      drawChannel('rgba(107, 203, 119, 0.55)', 'rgba(107, 203, 119, 0.3)', 2, 4, -1.0);
+      drawChannel('rgba(77, 150, 255, 0.55)', 'rgba(77, 150, 255, 0.3)', 4, 6, 0.6);
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    animationFrameId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []);
+
+  return <canvas ref={canvasRef} width={256} height={256} className="w-full h-full opacity-60" />;
+};
 
 const useRawRgbaCanvas = (
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
@@ -64,7 +193,7 @@ const FakeWaveformLoader = ({ mode }: { mode: string }) => {
   const lastTimeRef = useRef<number>(0);
   const spawnAccumulatorRef = useRef<number>(0);
 
-  const MAX_PARTICLES = 15000;
+  const MAX_PARTICLES = 10000;
   const particles = useRef(
     Array.from({ length: MAX_PARTICLES }, () => ({
       x: 0,
@@ -142,7 +271,7 @@ const FakeWaveformLoader = ({ mode }: { mode: string }) => {
       let frameDt = dt;
 
       if (!isPrewarmed) {
-        frameDt = 0.25;
+        frameDt = 0.5;
         isPrewarmed = true;
       }
 
@@ -161,8 +290,7 @@ const FakeWaveformLoader = ({ mode }: { mode: string }) => {
           if (!p.active) {
             p.active = true;
 
-            if (mode === DisplayMode.Vectorscope) {
-            } else {
+            if (mode !== DisplayMode.Vectorscope) {
               p.x = Math.random() * WIDTH;
               p.targetX = p.x;
 
@@ -283,14 +411,29 @@ const FakeWaveformLoader = ({ mode }: { mode: string }) => {
     return () => cancelAnimationFrame(animationFrameId);
   }, [mode, particles]);
 
-  return <canvas ref={canvasRef} className="w-full h-full" />;
+  return (
+    <canvas ref={canvasRef} className={`w-full h-full ${mode === DisplayMode.Vectorscope ? 'object-contain' : ''}`} />
+  );
 };
 
-export default function Waveform({ waveformData, displayMode, setDisplayMode }: WaveformProps) {
+export default function Waveform({
+  waveformData,
+  histogram,
+  displayMode,
+  setDisplayMode,
+  showClipping,
+  onToggleClipping,
+}: WaveformProps) {
   const [isHovered, setIsHovered] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const hadDataOnMount = useRef(!!waveformData);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isHistogram = displayMode === DisplayMode.Histogram;
+  const isVectorscope = displayMode === DisplayMode.Vectorscope;
+
+  const isReady = isHistogram ? !!(histogram && histogram.red) : !!waveformData;
+
+  const hadDataOnMount = useRef(isReady);
 
   const width = waveformData?.width || 256;
   const height = waveformData?.height || 256;
@@ -301,6 +444,7 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
         [DisplayMode.Luma]: waveformData.luma,
         [DisplayMode.Parade]: waveformData.parade,
         [DisplayMode.Vectorscope]: waveformData.vectorscope,
+        [DisplayMode.Histogram]: undefined,
       }[displayMode as DisplayMode]
     : '';
 
@@ -332,11 +476,13 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
     'relative flex-grow text-center px-1.5 py-1 text-xs rounded-lg font-medium transition-colors duration-150';
   const inactiveButtonClass = 'text-text-primary hover:bg-bg-tertiary';
 
-  const isLoaderMode = [DisplayMode.Luma, DisplayMode.Rgb, DisplayMode.Parade, DisplayMode.Vectorscope].includes(
-    displayMode as DisplayMode,
-  );
-
-  const isVectorscope = displayMode === DisplayMode.Vectorscope;
+  const isLoaderMode = [
+    DisplayMode.Luma,
+    DisplayMode.Rgb,
+    DisplayMode.Parade,
+    DisplayMode.Vectorscope,
+    DisplayMode.Histogram,
+  ].includes(displayMode as DisplayMode);
 
   return (
     <div
@@ -345,22 +491,45 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
       onMouseLeave={handleMouseLeave}
     >
       <AnimatePresence initial={!hadDataOnMount.current} mode="sync">
-        {waveformData ? (
-          <motion.div
-            key="waveform-canvas"
-            initial={{ opacity: 0, ...(isVectorscope ? {} : { scaleY: 0 }) }}
-            animate={{ opacity: 1, ...(isVectorscope ? {} : { scaleY: 1 }) }}
-            exit={{ opacity: 0, ...(isVectorscope ? {} : { scaleY: 0 }) }}
-            transition={{
-              duration: 0.5,
-              ease: [0.22, 1, 0.36, 1],
-              opacity: { duration: 0.4 },
-            }}
-            style={{ transformOrigin: 'bottom' }}
-            className="absolute inset-0 z-10"
-          >
-            <canvas ref={canvasRef} width={width} height={height} className="w-full h-full" />
-          </motion.div>
+        {isReady ? (
+          isHistogram ? (
+            <motion.div
+              key="waveform-histogram"
+              initial={{ opacity: 0, scaleY: 0 }}
+              animate={{ opacity: 1, scaleY: 1 }}
+              exit={{ opacity: 0, scaleY: 0 }}
+              transition={{
+                duration: 0.5,
+                ease: [0.22, 1, 0.36, 1],
+                opacity: { duration: 0.4 },
+              }}
+              style={{ transformOrigin: 'bottom' }}
+              className="absolute inset-0 z-10"
+            >
+              <HistogramView histogram={histogram} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="waveform-canvas"
+              initial={{ opacity: 0, ...(isVectorscope ? {} : { scaleY: 0 }) }}
+              animate={{ opacity: 1, ...(isVectorscope ? {} : { scaleY: 1 }) }}
+              exit={{ opacity: 0, ...(isVectorscope ? {} : { scaleY: 0 }) }}
+              transition={{
+                duration: 0.5,
+                ease: [0.22, 1, 0.36, 1],
+                opacity: { duration: 0.4 },
+              }}
+              style={{ transformOrigin: 'bottom' }}
+              className="absolute inset-0 z-10"
+            >
+              <canvas
+                ref={canvasRef}
+                width={width}
+                height={height}
+                className={`w-full h-full ${isVectorscope ? 'object-contain' : ''}`}
+              />
+            </motion.div>
+          )
         ) : isLoaderMode ? (
           <motion.div
             key="waveform-loader"
@@ -375,7 +544,7 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
             }}
             className="absolute inset-0 pointer-events-none z-0"
           >
-            <FakeWaveformLoader mode={displayMode} />
+            {isHistogram ? <FakeHistogramLoader /> : <FakeWaveformLoader mode={displayMode} />}
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -394,8 +563,23 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.1, ease: 'easeOut', delay: 0.05 }}
-              className="flex justify-center gap-0.5 p-1 bg-surface/90 backdrop-blur-md rounded-lg w-full shadow-lg border border-white/5"
+              className="flex items-center justify-center gap-1 p-1 bg-surface/90 backdrop-blur-md rounded-lg w-full shadow-lg border border-white/5"
             >
+              {onToggleClipping && (
+                <>
+                  <button
+                    onClick={onToggleClipping}
+                    data-tooltip="Toggle Clipping Warnings"
+                    className={`relative flex items-center justify-center w-7 h-7 flex-shrink-0 rounded-lg transition-colors duration-150 ${
+                      showClipping ? 'bg-accent text-button-text' : 'text-text-primary hover:bg-bg-tertiary'
+                    }`}
+                  >
+                    <AlertOctagon size={14} />
+                  </button>
+                  <div className="w-px h-5 bg-white/20 mx-1 flex-shrink-0"></div>
+                </>
+              )}
+
               <LayoutGroup>
                 {modeButtons.map(({ mode, label, tooltip, bgClass, textActiveClass }) => (
                   <button

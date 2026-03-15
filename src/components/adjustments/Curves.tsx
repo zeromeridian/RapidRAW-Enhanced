@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertOctagon, RotateCcw, Copy, ClipboardPaste } from 'lucide-react';
-import clsx from 'clsx';
+import { RotateCcw, Copy, ClipboardPaste } from 'lucide-react';
 import { ActiveChannel, Adjustments, Coord } from '../../utils/adjustments';
 import { Theme, OPTION_SEPARATOR } from '../ui/AppProperties';
 import { useContextMenu } from '../../context/ContextMenuContext';
@@ -301,13 +300,6 @@ export default function CurveGraph({
     );
   }
 
-  const handleToggleClipping = () => {
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      showClipping: !prev.showClipping,
-    }));
-  };
-
   const getMousePos = (e: any) => {
     const svg = svgRef.current;
     if (!svg) {
@@ -479,8 +471,6 @@ export default function CurveGraph({
     showContextMenu(e.clientX, e.clientY, options);
   };
 
-  const shouldShowControls = adjustments.showClipping || isHovered || draggingPointIndex !== null;
-
   return (
     <div className="select-none" ref={containerRef}>
       <div className="flex items-center justify-between gap-1 mb-2 mt-2">
@@ -509,21 +499,6 @@ export default function CurveGraph({
             </button>
           ))}
         </div>
-        {!isForMask && (
-          <button
-            className={clsx('w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all', {
-              'opacity-100 ring-2 ring-offset-2 ring-offset-surface ring-accent bg-accent text-button-text':
-                adjustments.showClipping,
-              'opacity-100 bg-surface-secondary text-text-primary': !adjustments.showClipping && shouldShowControls,
-              'opacity-0': !adjustments.showClipping && !shouldShowControls,
-            })}
-            key="clipping"
-            onClick={handleToggleClipping}
-            data-tooltip="Toggle Clipping Warnings"
-          >
-            <AlertOctagon size={14} />
-          </button>
-        )}
       </div>
 
       <div

@@ -2110,7 +2110,7 @@ pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramD
     let mut blue: Vec<f32> = b_c.into_iter().map(|c| c as f32).collect();
     let mut luma: Vec<f32> = l_c.into_iter().map(|c| c as f32).collect();
 
-    let smoothing_sigma = 2.5;
+    let smoothing_sigma = 2.0;
     apply_gaussian_smoothing(&mut red, smoothing_sigma);
     apply_gaussian_smoothing(&mut green, smoothing_sigma);
     apply_gaussian_smoothing(&mut blue, smoothing_sigma);

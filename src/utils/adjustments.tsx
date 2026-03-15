@@ -14,6 +14,7 @@ export enum DisplayMode {
   Rgb = 'rgb',
   Parade = 'parade',
   Vectorscope = 'vectorscope',
+  Histogram = 'histogram',
 }
 
 export enum PasteMode {

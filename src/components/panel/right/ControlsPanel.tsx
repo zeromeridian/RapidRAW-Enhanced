@@ -245,8 +245,16 @@ export default function Controls({
             <div className="flex-grow w-full h-full p-4 pb-2 min-h-0">
               <Waveform
                 waveformData={waveform || null}
+                histogram={histogram}
                 displayMode={activeWaveformChannel || 'luma'}
                 setDisplayMode={setActiveWaveformChannel || (() => {})}
+                showClipping={adjustments.showClipping || false}
+                onToggleClipping={() => {
+                  setAdjustments((prev: Adjustments) => ({
+                    ...prev,
+                    showClipping: !prev.showClipping,
+                  }));
+                }}
               />
             </div>
             <Resizer direction={Orientation.Horizontal} onMouseDown={handleWaveformResize} />
