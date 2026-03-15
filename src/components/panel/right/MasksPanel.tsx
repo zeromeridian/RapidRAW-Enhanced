@@ -804,6 +804,7 @@ export default function MasksPanel({
                         updateSubMask={updateSubMask}
                         handleDeleteSubMask={handleDeleteSubMask}
                         analyzingSubMaskId={analyzingSubMaskId}
+                        setIsMaskControlHovered={setIsMaskControlHovered}
                       />
                     ))
                   )}
@@ -943,6 +944,15 @@ function DraggableGridItem({ maskType, onClick, isDraggable, activeMaskContainer
     data: { type: 'Creation', maskType: maskType.type },
     disabled: !isDraggable,
   });
+
+  const tooltip = maskType.disabled
+    ? 'Coming Soon'
+    : maskType.id === 'others'
+      ? 'Other Masks'
+      : activeMaskContainerId
+        ? `Add ${maskType.name} to Current Mask`
+        : `Create New ${maskType.name} Mask`;
+
   return (
     <button
       ref={setNodeRef}
@@ -952,13 +962,7 @@ function DraggableGridItem({ maskType, onClick, isDraggable, activeMaskContainer
       onClick={onClick}
       className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors
                 ${maskType.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'} ${isDragging ? 'opacity-50' : ''}`}
-      data-tooltip={
-        maskType.disabled
-          ? 'Coming Soon'
-          : activeMaskContainerId
-            ? `Add ${maskType.name} to Current Mask`
-            : `Create New ${maskType.name} Mask`
-      }
+      data-tooltip={tooltip}
     >
       <maskType.icon size={24} /> <span className="text-xs">{maskType.name}</span>
     </button>
@@ -990,6 +994,7 @@ function ContainerRow({
   updateSubMask,
   handleDeleteSubMask,
   analyzingSubMaskId,
+  setIsMaskControlHovered,
 }: any) {
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
     id: container.id,
@@ -1155,6 +1160,8 @@ function ContainerRow({
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             className="p-1 hover:text-text-primary text-text-secondary"
+            onMouseEnter={() => setIsMaskControlHovered(true)}
+            onMouseLeave={() => setIsMaskControlHovered(false)}
             onClick={(e) => {
               e.stopPropagation();
               updateContainer(container.id, { visible: !container.visible });
@@ -1209,6 +1216,7 @@ function ContainerRow({
                   updateSubMask={updateSubMask}
                   handleDelete={() => handleDeleteSubMask(container.id, subMask.id)}
                   analyzingSubMaskId={analyzingSubMaskId}
+                  setIsMaskControlHovered={setIsMaskControlHovered}
                 />
               ))}
             </AnimatePresence>
@@ -1241,6 +1249,7 @@ function SubMaskRow({
   handleDelete,
   activeDragItem,
   analyzingSubMaskId,
+  setIsMaskControlHovered,
 }: any) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: subMask.id,
@@ -1371,6 +1380,8 @@ function SubMaskRow({
         <button
           className="p-1 hover:bg-bg-primary rounded text-text-secondary"
           data-tooltip={subMask.visible ? 'Hide Component' : 'Show Component'}
+          onMouseEnter={() => setIsMaskControlHovered(true)}
+          onMouseLeave={() => setIsMaskControlHovered(false)}
           onClick={(e) => {
             e.stopPropagation();
             updateSubMask(subMask.id, { visible: !subMask.visible });

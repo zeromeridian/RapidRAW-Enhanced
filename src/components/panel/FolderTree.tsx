@@ -340,35 +340,54 @@ export default function FolderTree({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      <button
-        className="absolute top-1/2 -translate-y-1/2 right-1 w-6 h-10 hover:bg-card-active rounded-md flex items-center justify-center z-30"
-        onClick={() => setIsVisible(!isVisible)}
-        data-tooltip={isVisible ? 'Collapse Folder Tree' : 'Expand Folder Tree'}
-      >
-        {isVisible ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-      </button>
+      {!isVisible && (
+        <button
+          className="absolute top-1/2 -translate-y-1/2 right-1 w-6 h-10 hover:bg-card-active rounded-md flex items-center justify-center z-30"
+          onClick={() => setIsVisible(true)}
+          data-tooltip="Expand"
+        >
+          <ChevronRight size={16} />
+        </button>
+      )}
 
       {isVisible && (
         <div className="p-2 flex flex-col h-full">
           <div className="pt-1 pb-2">
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-              <input
-                type="text"
-                placeholder="Search folders..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-surface border border-transparent rounded-md pl-9 pr-8 py-2 text-sm focus:outline-none"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-card-active"
-                  data-tooltip="Clear search"
-                >
-                  <X size={16} className="text-text-secondary" />
-                </button>
-              )}
+            <div className="flex items-center">
+              <AnimatePresence>
+                {isHovering && (
+                  <motion.button
+                    initial={{ width: 0, padding: 0, marginRight: 0, opacity: 0 }}
+                    animate={{ width: 36, padding: 10, marginRight: 6, opacity: 1 }}
+                    exit={{ width: 0, padding: 0, marginRight: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    className="bg-surface rounded-md hover:bg-card-active flex items-center justify-center flex-shrink-0 overflow-hidden transition-colors"
+                    onClick={() => setIsVisible(false)}
+                    data-tooltip="Collapse"
+                  >
+                    <ChevronLeft size={17.5} className="text-text-secondary flex-shrink-0" />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+              <div className="relative flex-1 min-w-0">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+                <input
+                  type="text"
+                  placeholder="Search folders..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-surface border border-transparent rounded-md pl-9 pr-8 py-2 text-sm focus:outline-none"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-card-active"
+                    data-tooltip="Clear search"
+                  >
+                    <X size={16} className="text-text-secondary" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
