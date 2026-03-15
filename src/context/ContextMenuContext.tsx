@@ -213,11 +213,11 @@ function MenuItem({ option, path, hideContextMenu }: MenuItemProps) {
           }
         }}
         onMouseDown={(event) => {
-          if (event.button !== 1) return;
+          if (event.button !== 2) return;
           event.preventDefault();
           event.stopPropagation();
-          if (!option.disabled && !option.submenu && option.onMiddleClick) {
-            option.onMiddleClick();
+          if (!option.disabled && !option.submenu && option.onRightClick) {
+            option.onRightClick();
             hideContextMenu();
           }
         }}

@@ -401,8 +401,8 @@ export default function MasksPanel({
     else handleAddMaskContainer(type);
   };
 
-  const handleGridMiddleClick = (event: React.MouseEvent, type: Mask | null) => {
-    if (event.button !== 1) return;
+  const handleGridRightClick = (event: React.MouseEvent, type: Mask | null) => {
+    if (event.button !== 2) return;
     event.preventDefault();
     event.stopPropagation();
     if (!type) return;
@@ -416,7 +416,7 @@ export default function MasksPanel({
       label: maskType.name,
       icon: maskType.icon,
       onClick: () => handleGridClick(maskType.type),
-      onMiddleClick: () => handleGridClick(maskType.type, true),
+      onRightClick: () => handleGridClick(maskType.type, true),
     }));
     showContextMenu(rect.left, rect.bottom + 5, options);
   };
@@ -664,7 +664,7 @@ export default function MasksPanel({
                   onClick={(e: any) =>
                     maskType.id === 'others' ? handleAddOthersMask(e) : handleGridClick(maskType.type)
                   }
-                  onMiddleClick={(e: React.MouseEvent) => handleGridMiddleClick(e, maskType.type)}
+                  onRightClick={(e: React.MouseEvent) => handleGridRightClick(e, maskType.type)}
                   isDraggable={maskType.id !== 'others'}
                   activeMaskContainerId={activeMaskContainerId}
                 />
@@ -867,7 +867,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
   );
 }
 
-function DraggableGridItem({ maskType, onClick, onMiddleClick, isDraggable, activeMaskContainerId }: any) {
+function DraggableGridItem({ maskType, onClick, onRightClick, isDraggable, activeMaskContainerId }: any) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `create-${maskType.id || maskType.type}`,
     data: { type: 'Creation', maskType: maskType.type },
@@ -880,9 +880,13 @@ function DraggableGridItem({ maskType, onClick, onMiddleClick, isDraggable, acti
       {...attributes}
       disabled={maskType.disabled}
       onClick={onClick}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
       onMouseDown={(event) => {
-        if (event.button !== 1) return;
-        onMiddleClick(event);
+        if (event.button !== 2) return;
+        onRightClick(event);
       }}
       className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors 
                 ${maskType.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'} ${isDragging ? 'opacity-50' : ''}`}
@@ -892,7 +896,7 @@ function DraggableGridItem({ maskType, onClick, onMiddleClick, isDraggable, acti
           : maskType.id === 'others'
             ? 'Show More Mask Types'
             : activeMaskContainerId
-              ? `Left click adds ${maskType.name} to the current mask. Middle click creates a new ${maskType.name} mask.`
+              ? `Left click adds ${maskType.name} to the current mask. Right click creates a new ${maskType.name} mask.`
               : `Create New ${maskType.name} Mask`
       }
     >

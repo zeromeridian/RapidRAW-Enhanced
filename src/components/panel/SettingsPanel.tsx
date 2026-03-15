@@ -1680,8 +1680,8 @@ export default function SettingsPanel({
                           description="Adjust slider value by 2 steps"
                         />
                         <KeybindItem
-                          keys={['Middle Click']}
-                          description="Create a new mask from a mask tool button or Others menu item in the Masks panel"
+                          keys={['Right Click']}
+                          description="Create a new mask from a mask tool button"
                         />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '+']} description="Zoom in" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '-']} description="Zoom out" />
