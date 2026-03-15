@@ -18,13 +18,13 @@ use tokio::sync::Mutex as TokioMutex;
 
 use crate::file_management;
 
-const ENCODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/vit_t_encoder.onnx?download=true";
-const DECODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/vit_t_decoder.onnx?download=true";
-const ENCODER_FILENAME: &str = "vit_t_encoder.onnx";
-const DECODER_FILENAME: &str = "vit_t_decoder.onnx";
+const ENCODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/sam_hq_vit_b_encoder.onnx?download=true";
+const DECODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/sam_hq_vit_b_decoder.onnx?download=true";
+const ENCODER_FILENAME: &str = "sam_hq_vit_b_encoder.onnx";
+const DECODER_FILENAME: &str = "sam_hq_vit_b_decoder.onnx";
 const SAM_INPUT_SIZE: u32 = 1024;
-const ENCODER_SHA256: &str = "8b8168033ea6687bb55ba242222b67a301ac9da30fd5cbfd04dcebbb180ec2a8";
-const DECODER_SHA256: &str = "1b216fb3b8ceeee00a65f89670c01e4c0d823fcacec39dd9accc233f85341dc4";
+const ENCODER_SHA256: &str = "eccc55c8c1f8f20f227739ca95987ac7b9dbb50fe2a0c4e650dc39276b925c32";
+const DECODER_SHA256: &str = "a98d609b14249021d6a78b20ab2857a45ad775dfc6df1b90dc29d53a839921ff";
 
 const U2NETP_URL: &str =
     "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/u2net.onnx?download=true";
@@ -57,6 +57,7 @@ pub struct AiModels {
 pub struct ImageEmbeddings {
     pub path_hash: String,
     pub embeddings: Array<f32, IxDyn>,
+    pub interm_embeddings: Array<f32, IxDyn>,
     pub original_size: (u32, u32),
 }
 
@@ -267,29 +268,28 @@ pub fn generate_image_embeddings(
 
     let resized_image = image.resize(new_width, new_height, FilterType::Triangle);
 
-    let mut input_tensor: Array<f32, _> =
+    let mut input_tensor: Array<u8, _> =
         Array::zeros((1, 3, SAM_INPUT_SIZE as usize, SAM_INPUT_SIZE as usize));
-    let mean = [123.675, 116.28, 103.53];
-    let std = [58.395, 57.12, 57.375];
 
     for (x, y, pixel) in resized_image.to_rgb8().enumerate_pixels() {
-        input_tensor[[0, 0, y as usize, x as usize]] = (pixel[0] as f32 - mean[0]) / std[0];
-        input_tensor[[0, 1, y as usize, x as usize]] = (pixel[1] as f32 - mean[1]) / std[1];
-        input_tensor[[0, 2, y as usize, x as usize]] = (pixel[2] as f32 - mean[2]) / std[2];
+        input_tensor[[0, 0, y as usize, x as usize]] = pixel[0];
+        input_tensor[[0, 1, y as usize, x as usize]] = pixel[1];
+        input_tensor[[0, 2, y as usize, x as usize]] = pixel[2];
     }
 
     let input_tensor_dyn = input_tensor.into_dyn();
-
     let input_values = input_tensor_dyn.as_standard_layout();
     let input_tensor_ort = Tensor::from_array(input_values.into_owned())?;
     let mut session = encoder.lock().unwrap();
     let outputs = session.run(ort::inputs![input_tensor_ort])?;
 
     let embeddings = outputs[0].try_extract_array::<f32>()?.to_owned();
+    let interm_embeddings = outputs[1].try_extract_array::<f32>()?.to_owned();
 
     Ok(ImageEmbeddings {
         path_hash: "".to_string(),
         embeddings: embeddings.into_dyn(),
+        interm_embeddings: interm_embeddings.into_dyn(),
         original_size: (orig_width, orig_height),
     })
 }
@@ -320,23 +320,23 @@ pub fn run_sam_decoder(
     let orig_im_size =
         Array::from_shape_vec((2,), vec![orig_height as f32, orig_width as f32])?.into_dyn();
 
-    let embeddings_values = embeddings.embeddings.as_standard_layout();
-    let point_coords_values = point_coords.as_standard_layout();
-    let point_labels_values = point_labels.as_standard_layout();
-    let mask_input_values = mask_input.as_standard_layout();
-    let has_mask_input_values = has_mask_input.as_standard_layout();
-    let orig_im_size_values = orig_im_size.as_standard_layout();
-
-    let t_embeddings = Tensor::from_array(embeddings_values.into_owned())?;
-    let t_point_coords = Tensor::from_array(point_coords_values.into_owned())?;
-    let t_point_labels = Tensor::from_array(point_labels_values.into_owned())?;
-    let t_mask_input = Tensor::from_array(mask_input_values.into_owned())?;
-    let t_has_mask = Tensor::from_array(has_mask_input_values.into_owned())?;
-    let t_orig_im_size = Tensor::from_array(orig_im_size_values.into_owned())?;
+    let t_embeddings = Tensor::from_array(embeddings.embeddings.as_standard_layout().into_owned())?;
+    let t_interm = Tensor::from_array(
+        embeddings
+            .interm_embeddings
+            .as_standard_layout()
+            .into_owned(),
+    )?;
+    let t_point_coords = Tensor::from_array(point_coords.as_standard_layout().into_owned())?;
+    let t_point_labels = Tensor::from_array(point_labels.as_standard_layout().into_owned())?;
+    let t_mask_input = Tensor::from_array(mask_input.as_standard_layout().into_owned())?;
+    let t_has_mask = Tensor::from_array(has_mask_input.as_standard_layout().into_owned())?;
+    let t_orig_im_size = Tensor::from_array(orig_im_size.as_standard_layout().into_owned())?;
 
     let mut session = decoder.lock().unwrap();
     let outputs = session.run(ort::inputs![
         t_embeddings,
+        t_interm,
         t_point_coords,
         t_point_labels,
         t_mask_input,
@@ -358,7 +358,7 @@ pub fn run_sam_decoder(
     let gray_mask = GrayImage::from_raw(mask_width as u32, mask_height as u32, mask_data)
         .ok_or_else(|| anyhow::anyhow!("Failed to create mask image from raw data"))?;
 
-    let feathered_mask = image::imageops::blur(&gray_mask, 3.0);
+    let feathered_mask = image::imageops::blur(&gray_mask, 2.0);
 
     Ok(feathered_mask)
 }
