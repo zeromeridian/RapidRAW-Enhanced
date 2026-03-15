@@ -569,7 +569,7 @@ export default function Waveform({
                 <>
                   <button
                     onClick={onToggleClipping}
-                    data-tooltip="Toggle Clipping Warnings"
+                    data-tooltip={showClipping ? 'Hide Clipping Warnings' : 'Show Clipping Warnings'}
                     className={`relative flex items-center justify-center w-7 h-7 flex-shrink-0 rounded-lg transition-colors duration-150 ${
                       showClipping ? 'bg-accent text-button-text' : 'text-text-primary hover:bg-bg-tertiary'
                     }`}
