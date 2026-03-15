@@ -1046,7 +1046,6 @@ fn apply_all_adjustments(
 
     processed_rgb = apply_color_calibration(processed_rgb, adj.color_calibration);
     processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
-    processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_blending, adj.color_grading_balance);
     processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
 
     return processed_rgb;
@@ -1383,16 +1382,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     var processed_rgb = apply_linear_exposure(locally_contrasted_rgb, adjustments.global.exposure);
 
-    if (adjustments.global.is_raw_image == 1u && adjustments.global.tonemapper_mode != 1u) {
-        var srgb_emulated = linear_to_srgb(processed_rgb);
-        const BRIGHTNESS_GAMMA: f32 = 1.1;
-        srgb_emulated = pow(srgb_emulated, vec3<f32>(1.0 / BRIGHTNESS_GAMMA));
-        const CONTRAST_MIX: f32 = 0.75;
-        let contrast_curve = srgb_emulated * srgb_emulated * (3.0 - 2.0 * srgb_emulated);
-        srgb_emulated = mix(srgb_emulated, contrast_curve, CONTRAST_MIX);
-        processed_rgb = srgb_to_linear(srgb_emulated);
-    }
-
     if (adjustments.global.glow_amount > 0.0) {
         processed_rgb = apply_glow_bloom(
             processed_rgb,
@@ -1479,28 +1468,48 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
                 adjustments.global.tonemapper_mode,
                 tonal_blurred
             );
+        }
+    }
 
-            if (scaled_adj.flare_amount > 0.0) {
-                let uv = vec2<f32>(absolute_coord) / full_dims;
-                var flare_color = textureSampleLevel(flare_texture, flare_sampler, uv, 0.0).rgb;
-                flare_color *= 1.4;
-                flare_color = flare_color * flare_color;
-                let mask_linear_luma = get_luma(max(composite_rgb_linear, vec3<f32>(0.0)));
-                var mask_perceptual_luma: f32;
-                if (mask_linear_luma <= 1.0) {
-                    mask_perceptual_luma = pow(max(mask_linear_luma, 0.0), 1.0 / 2.2);
-                } else {
-                    mask_perceptual_luma = 1.0 + pow(max(mask_linear_luma - 1.0, 0.0), 1.0 / 2.2);
-                }
-                let protection = 1.0 - smoothstep(0.7, 1.8, mask_perceptual_luma);
-                composite_rgb_linear += flare_color * scaled_adj.flare_amount * protection;
-            }
+    composite_rgb_linear = apply_color_grading(
+        composite_rgb_linear,
+        adjustments.global.color_grading_shadows,
+        adjustments.global.color_grading_midtones,
+        adjustments.global.color_grading_highlights,
+        adjustments.global.color_grading_blending,
+        adjustments.global.color_grading_balance
+    );
+
+    let g = adjustments.global;
+    if (g.vignette_amount != 0.0) {
+        let full_dims_f = vec2<f32>(textureDimensions(input_texture));
+        let coord_f = vec2<f32>(absolute_coord);
+        let v_amount = g.vignette_amount;
+        let v_mid = g.vignette_midpoint;
+        let v_round = 1.0 - g.vignette_roundness;
+        let v_feather = g.vignette_feather * 0.5;
+        let aspect = full_dims_f.y / full_dims_f.x;
+        let uv_centered = (coord_f / full_dims_f - 0.5) * 2.0;
+        let uv_round = sign(uv_centered) * pow(abs(uv_centered), vec2<f32>(v_round, v_round));
+        let d = length(uv_round * vec2<f32>(1.0, aspect)) * 0.5;
+        let vignette_mask = smoothstep(v_mid - v_feather, v_mid + v_feather, d);
+        if (v_amount < 0.0) {
+            composite_rgb_linear *= (1.0 + v_amount * vignette_mask);
+        } else {
+            composite_rgb_linear = mix(composite_rgb_linear, vec3<f32>(1.0), v_amount * vignette_mask);
         }
     }
 
     var base_srgb: vec3<f32>;
     if (adjustments.global.tonemapper_mode == 1u) {
         base_srgb = agx_full_transform(composite_rgb_linear);
+    } else if (adjustments.global.is_raw_image == 1u) {
+        var srgb_emulated = linear_to_srgb(composite_rgb_linear);
+        const BRIGHTNESS_GAMMA: f32 = 1.1;
+        srgb_emulated = pow(srgb_emulated, vec3<f32>(1.0 / BRIGHTNESS_GAMMA));
+        const CONTRAST_MIX: f32 = 0.75;
+        let contrast_curve = srgb_emulated * srgb_emulated * (3.0 - 2.0 * srgb_emulated);
+        base_srgb = mix(srgb_emulated, contrast_curve, CONTRAST_MIX);
     } else {
         base_srgb = linear_to_srgb(composite_rgb_linear);
     }
@@ -1544,22 +1553,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         let noise_rough = gradient_noise(rough_coord + vec2<f32>(5.2, 1.3));
         let noise_val = mix(noise_base, noise_rough, roughness);
         final_rgb += vec3<f32>(noise_val) * amount * luma_mask;
-    }
-
-    let g = adjustments.global;
-    if (g.vignette_amount != 0.0) {
-        let full_dims_f = vec2<f32>(textureDimensions(input_texture));
-        let coord_f = vec2<f32>(absolute_coord);
-        let v_amount = g.vignette_amount;
-        let v_mid = g.vignette_midpoint;
-        let v_round = 1.0 - g.vignette_roundness;
-        let v_feather = g.vignette_feather * 0.5;
-        let aspect = full_dims_f.y / full_dims_f.x;
-        let uv_centered = (coord_f / full_dims_f - 0.5) * 2.0;
-        let uv_round = sign(uv_centered) * pow(abs(uv_centered), vec2<f32>(v_round, v_round));
-        let d = length(uv_round * vec2<f32>(1.0, aspect)) * 0.5;
-        let vignette_mask = smoothstep(v_mid - v_feather, v_mid + v_feather, d);
-        if (v_amount < 0.0) { final_rgb *= (1.0 + v_amount * vignette_mask); } else { final_rgb = mix(final_rgb, vec3<f32>(1.0), v_amount * vignette_mask); }
     }
 
     if (adjustments.global.show_clipping == 1u) {
