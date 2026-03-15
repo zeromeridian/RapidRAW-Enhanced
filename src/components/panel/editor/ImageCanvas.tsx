@@ -348,20 +348,41 @@ const MaskOverlay = memo(
       strokeWidth: isSelected ? 3 : 2,
     };
 
-    if (subMask.type === Mask.AiSubject) {
+    if (subMask.type === Mask.AiSubject || subMask.type === Mask.QuickEraser) {
       const { startX, startY, endX, endY } = p;
-      if (endX > startX && endY > startY) {
-        return (
-          <Rect
-            height={(endY - startY) * scale}
-            onMouseEnter={onMaskMouseEnter}
-            onMouseLeave={onMaskMouseLeave}
-            width={(endX - startX) * scale}
-            x={(startX - cropX) * scale}
-            y={(startY - cropY) * scale}
-            {...commonProps}
-          />
-        );
+      if (startX !== undefined && startY !== undefined && endX !== undefined && endY !== undefined) {
+        const isPoint = Math.abs(startX - endX) < 1e-6 && Math.abs(startY - endY) < 1e-6;
+        if (isPoint) {
+          return (
+            <Circle
+              x={(startX - cropX) * scale}
+              y={(startY - cropY) * scale}
+              radius={5}
+              stroke={isSelected ? '#0ea5e9' : 'white'}
+              strokeWidth={2}
+              listening={!isToolActive}
+              onClick={handleSelect}
+              onTap={handleSelect}
+              onMouseEnter={onMaskMouseEnter}
+              onMouseLeave={onMaskMouseLeave}
+              shadowColor="black"
+              shadowBlur={2}
+              shadowOpacity={0.8}
+            />
+          );
+        } else {
+          return (
+            <Rect
+              height={Math.abs(endY - startY) * scale}
+              onMouseEnter={onMaskMouseEnter}
+              onMouseLeave={onMaskMouseLeave}
+              width={Math.abs(endX - startX) * scale}
+              x={(Math.min(startX, endX) - cropX) * scale}
+              y={(Math.min(startY, endY) - cropY) * scale}
+              {...commonProps}
+            />
+          );
+        }
       }
       return null;
     }
@@ -723,6 +744,11 @@ const ImageCanvas = memo(
     const lastBrushPoint = useRef<Coord | null>(null);
     const currentLine = useRef<DrawnLine | null>(null);
     const [previewLine, setPreviewLine] = useState<DrawnLine | null>(null);
+
+    // Use a ref to sync drag bounds natively outside of stale closures
+    const previewBoxRef = useRef<{ start: Coord; end: Coord } | null>(null);
+    const [previewBox, setPreviewBox] = useState<{ start: Coord; end: Coord } | null>(null);
+
     const [cursorPreview, setCursorPreview] = useState<CursorPreview>({ x: 0, y: 0, visible: false });
     const [straightenLine, setStraightenLine] = useState<any>(null);
     const isStraightening = useRef(false);
@@ -847,6 +873,8 @@ const ImageCanvas = memo(
       currentLine.current = null;
       lastBrushPoint.current = null;
       setPreviewLine(null);
+      setPreviewBox(null);
+      previewBoxRef.current = null;
       setLocalInitialDrawParams(null);
     }, [isToolActive]);
 
@@ -1045,6 +1073,17 @@ const ImageCanvas = memo(
             isDrawing.current = false;
             currentLine.current = null;
             setPreviewLine(null);
+            setPreviewBox(null);
+            previewBoxRef.current = null;
+            return;
+          }
+
+          if (isAiSubjectActive) {
+            isDrawing.current = true;
+            drawingStageRef.current = stage;
+            const newBox = { start: pos, end: pos };
+            previewBoxRef.current = newBox;
+            setPreviewBox(newBox);
             return;
           }
 
@@ -1109,10 +1148,6 @@ const ImageCanvas = memo(
             tool: toolType,
           };
           currentLine.current = newLine;
-
-          if (isAiSubjectActive) {
-            setPreviewLine(newLine);
-          }
         } else {
           if (e.target === e.target.getStage()) {
             if (isMasking) {
@@ -1174,6 +1209,13 @@ const ImageCanvas = memo(
         }
 
         if (!isDrawing.current || !isToolActive) {
+          return;
+        }
+
+        if (isAiSubjectActive && previewBoxRef.current) {
+          const updatedBox = { ...previewBoxRef.current, end: pos };
+          previewBoxRef.current = updatedBox;
+          setPreviewBox(updatedBox);
           return;
         }
 
@@ -1249,10 +1291,6 @@ const ImageCanvas = memo(
             points: [...currentLine.current.points, pos],
           };
           currentLine.current = updatedLine;
-
-          if (isAiSubjectActive) {
-            setPreviewLine(updatedLine);
-          }
 
           if (onLiveMaskPreview && activeContainer && activeSubMask && isBrushActive) {
             const { scale } = imageRenderSize;
@@ -1344,7 +1382,58 @@ const ImageCanvas = memo(
         return;
       }
 
-      if (!currentLine.current) {
+      if (!currentLine.current && !(isAiSubjectActive && previewBoxRef.current)) {
+        return;
+      }
+
+      if (isAiSubjectActive && previewBoxRef.current) {
+        const wasDrawing = isDrawing.current;
+        isDrawing.current = false;
+        const box = previewBoxRef.current;
+        previewBoxRef.current = null;
+        setPreviewBox(null);
+        drawingStageRef.current = null;
+
+        if (!wasDrawing || !box) {
+          return;
+        }
+
+        const { scale } = imageRenderSize;
+        const crop = adjustments.crop;
+        const isPercent = crop?.unit === '%';
+        const cropX = crop ? (isPercent ? (crop.x / 100) * effectiveImageDimensions.width : crop.x) : 0;
+        const cropY = crop ? (isPercent ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0;
+
+        const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
+
+        let startPoint = { x: box.start.x / scale + cropX, y: box.start.y / scale + cropY };
+        let endPoint = { x: box.end.x / scale + cropX, y: box.end.y / scale + cropY };
+
+        // Threshold check to prevent tiny micro-drags from being parsed as useless boxes. Convert to Point Mask.
+        const dx = box.end.x - box.start.x;
+        const dy = box.end.y - box.start.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 5) {
+          endPoint = { x: startPoint.x, y: startPoint.y };
+        }
+
+        if (activeId) {
+          // Optimistically update the local state so the box/point instantly renders identically to Color/Luminance points
+          updateSubMask(activeId, {
+            parameters: {
+              ...activeSubMask?.parameters,
+              startX: startPoint.x,
+              startY: startPoint.y,
+              endX: endPoint.x,
+              endY: endPoint.y,
+            },
+          });
+        }
+
+        if (activeSubMask?.type === Mask.QuickEraser && onQuickErase) {
+          onQuickErase(activeId, startPoint, endPoint);
+        } else if (activeSubMask?.type === Mask.AiSubject && onGenerateAiMask) {
+          onGenerateAiMask(activeId, startPoint, endPoint);
+        }
         return;
       }
 
@@ -1367,26 +1456,7 @@ const ImageCanvas = memo(
 
       const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
 
-      if (activeSubMask?.type === Mask.AiSubject || activeSubMask?.type === Mask.QuickEraser) {
-        const points = line.points;
-        if (points.length > 1) {
-          const xs = points.map((p: Coord) => p.x);
-          const ys = points.map((p: Coord) => p.y);
-          const minX = Math.min(...xs);
-          const minY = Math.min(...ys);
-          const maxX = Math.max(...xs);
-          const maxY = Math.max(...ys);
-
-          const startPoint = { x: minX / scale + cropX, y: minY / scale + cropY };
-          const endPoint = { x: maxX / scale + cropX, y: maxY / scale + cropY };
-
-          if (activeSubMask.type === Mask.QuickEraser && onQuickErase) {
-            onQuickErase(activeId, startPoint, endPoint);
-          } else if (activeSubMask.type === Mask.AiSubject && onGenerateAiMask) {
-            onGenerateAiMask(activeId, startPoint, endPoint);
-          }
-        }
-      } else if (isBrushActive) {
+      if (isBrushActive) {
         const imageSpaceLine: DrawnLine = {
           brushSize: (brushSettings?.size ?? 0) / scale,
           feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
@@ -1814,7 +1884,7 @@ const ImageCanvas = memo(
                         adjustments={adjustments}
                         imageHeight={effectiveImageDimensions.height}
                         imageWidth={effectiveImageDimensions.width}
-                        isSelected={renderSubMask.id === (isMasking ? activeMaskId : activeAiSubMaskId)}
+                        isSelected={renderSubMask.id === activeId}
                         isToolActive={isToolActive}
                         key={renderSubMask.id}
                         onMaskMouseEnter={() => !isToolActive && setIsMaskHovered(true)}
@@ -1829,17 +1899,18 @@ const ImageCanvas = memo(
                       />
                     );
                   })}
-                {previewLine && previewLine.tool === ToolType.AiSeletor && (
-                  <Line
-                    dash={[4, 4]}
-                    lineCap="round"
-                    lineJoin="round"
-                    listening={false}
-                    opacity={0.8}
-                    points={previewLine.points.flatMap((p: Coord) => [p.x, p.y])}
+
+                {/* Visualizer for drawing new AI Bounding Box */}
+                {previewBox && (
+                  <Rect
+                    x={Math.min(previewBox.start.x, previewBox.end.x)}
+                    y={Math.min(previewBox.start.y, previewBox.end.y)}
+                    width={Math.abs(previewBox.end.x - previewBox.start.x)}
+                    height={Math.abs(previewBox.end.y - previewBox.start.y)}
                     stroke="#0ea5e9"
                     strokeWidth={2}
-                    tension={0.5}
+                    dash={[4, 4]}
+                    listening={false}
                   />
                 )}
                 {isBrushActive && cursorPreview.visible && (

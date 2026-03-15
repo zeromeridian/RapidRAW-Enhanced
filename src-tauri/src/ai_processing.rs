@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use image::imageops::{self, FilterType};
-use image::{DynamicImage, GenericImageView, GrayImage};
+use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, Luma};
 use ndarray::{Array, IxDyn};
 use ort::session::Session;
 use ort::value::Tensor;
@@ -64,6 +64,75 @@ pub struct ImageEmbeddings {
 pub struct AiState {
     pub models: Arc<AiModels>,
     pub embeddings: Option<ImageEmbeddings>,
+}
+
+fn edt_1d(f: &mut [f32]) {
+    let n = f.len();
+    if n == 0 {
+        return;
+    }
+    let mut v = vec![0; n];
+    let mut z = vec![0.0; n + 1];
+    let mut k = 0;
+    v[0] = 0;
+    z[0] = f32::NEG_INFINITY;
+    z[1] = f32::INFINITY;
+    for q in 1..n {
+        let mut s = ((f[q] + (q * q) as f32) - (f[v[k]] + (v[k] * v[k]) as f32))
+            / (2.0 * (q as f32 - v[k] as f32));
+        while s <= z[k] {
+            if k == 0 {
+                break;
+            }
+            k -= 1;
+            s = ((f[q] + (q * q) as f32) - (f[v[k]] + (v[k] * v[k]) as f32))
+                / (2.0 * (q as f32 - v[k] as f32));
+        }
+        k += 1;
+        v[k] = q;
+        z[k] = s;
+        z[k + 1] = f32::INFINITY;
+    }
+    k = 0;
+    let mut d = vec![0.0; n];
+    for q in 0..n {
+        while z[k + 1] < q as f32 {
+            k += 1;
+        }
+        let diff = q as f32 - v[k] as f32;
+        d[q] = diff * diff + f[v[k]];
+    }
+    f.copy_from_slice(&d);
+}
+
+fn edt_2d(grid: &[bool], width: usize, height: usize) -> Vec<f32> {
+    let mut f = vec![0.0; width * height];
+    for i in 0..(width * height) {
+        if grid[i] {
+            f[i] = 1e10;
+        } else {
+            f[i] = 0.0;
+        }
+    }
+
+    for y in 0..height {
+        let start = y * width;
+        let end = start + width;
+        edt_1d(&mut f[start..end]);
+    }
+
+    let mut col = vec![0.0; height];
+    for x in 0..width {
+        for y in 0..height {
+            col[y] = f[y * width + x];
+        }
+        edt_1d(&mut col);
+        for y in 0..height {
+            f[y * width + x] = col[y];
+        }
+    }
+
+    f.into_iter().map(|v| v.sqrt()).collect()
 }
 
 fn get_models_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf> {
@@ -301,61 +370,242 @@ pub fn run_sam_decoder(
     end_point: (f64, f64),
 ) -> Result<GrayImage> {
     let (orig_width, orig_height) = embeddings.original_size;
-
     let long_side = orig_width.max(orig_height) as f64;
     let scale = SAM_INPUT_SIZE as f64 / long_side;
 
-    let x1 = start_point.0.min(end_point.0) * scale;
-    let y1 = start_point.1.min(end_point.1) * scale;
-    let x2 = start_point.0.max(end_point.0) * scale;
-    let y2 = start_point.1.max(end_point.1) * scale;
+    let iters = 2;
 
-    let point_coords =
-        Array::from_shape_vec((1, 2, 2), vec![x1 as f32, y1 as f32, x2 as f32, y2 as f32])?
-            .into_dyn();
-    let point_labels = Array::from_shape_vec((1, 2), vec![2.0f32, 3.0f32])?.into_dyn();
+    let is_point =
+        (start_point.0 - end_point.0).abs() < 1e-6 && (start_point.1 - end_point.1).abs() < 1e-6;
+    let mut point_coords = Vec::new();
+    let mut point_labels = Vec::new();
 
-    let mask_input: Array<f32, IxDyn> = Array::zeros((1, 1, 256, 256)).into_dyn();
-    let has_mask_input = Array::from_elem((1,), 0.0f32).into_dyn();
+    if is_point {
+        point_coords.push((
+            (start_point.0 * scale) as f32,
+            (start_point.1 * scale) as f32,
+        ));
+        point_labels.push(1.0f32);
+    } else {
+        let x1 = (start_point.0.min(end_point.0) * scale) as f32;
+        let y1 = (start_point.1.min(end_point.1) * scale) as f32;
+        let x2 = (start_point.0.max(end_point.0) * scale) as f32;
+        let y2 = (start_point.1.max(end_point.1) * scale) as f32;
+        point_coords.push((x1, y1));
+        point_coords.push((x2, y2));
+        point_labels.push(2.0f32);
+        point_labels.push(3.0f32);
+    }
+
+    let mut mask_input = Array::zeros((1, 1, 256, 256)).into_dyn();
+    let mut has_mask_input = 0.0f32;
+
     let orig_im_size =
         Array::from_shape_vec((2,), vec![orig_height as f32, orig_width as f32])?.into_dyn();
 
-    let t_embeddings = Tensor::from_array(embeddings.embeddings.as_standard_layout().into_owned())?;
-    let t_interm = Tensor::from_array(
-        embeddings
-            .interm_embeddings
-            .as_standard_layout()
-            .into_owned(),
-    )?;
-    let t_point_coords = Tensor::from_array(point_coords.as_standard_layout().into_owned())?;
-    let t_point_labels = Tensor::from_array(point_labels.as_standard_layout().into_owned())?;
-    let t_mask_input = Tensor::from_array(mask_input.as_standard_layout().into_owned())?;
-    let t_has_mask = Tensor::from_array(has_mask_input.as_standard_layout().into_owned())?;
-    let t_orig_im_size = Tensor::from_array(orig_im_size.as_standard_layout().into_owned())?;
+    let mut final_mask_data: Vec<u8> = Vec::new();
+    let mut final_w = 0;
+    let mut final_h = 0;
 
-    let mut session = decoder.lock().unwrap();
-    let outputs = session.run(ort::inputs![
-        t_embeddings,
-        t_interm,
-        t_point_coords,
-        t_point_labels,
-        t_mask_input,
-        t_has_mask,
-        t_orig_im_size
-    ])?;
+    for i in 0..iters {
+        let pc_len = point_coords.len();
+        let pl_len = point_labels.len();
 
-    let mask_tensor = outputs[0].try_extract_array::<f32>()?.to_owned();
+        let coords_flat: Vec<f32> = point_coords.iter().flat_map(|&(x, y)| vec![x, y]).collect();
+        let coords_array = Array::from_shape_vec((1, pc_len, 2), coords_flat)?.into_dyn();
+        let labels_array = Array::from_shape_vec((1, pl_len), point_labels.clone())?.into_dyn();
 
-    let mask_dims = mask_tensor.shape();
-    let mask_height = mask_dims[2];
-    let mask_width = mask_dims[3];
+        let t_embeddings = Tensor::from_array(
+            embeddings
+                .embeddings
+                .clone()
+                .as_standard_layout()
+                .into_owned(),
+        )?;
+        let t_interm = Tensor::from_array(
+            embeddings
+                .interm_embeddings
+                .clone()
+                .as_standard_layout()
+                .into_owned(),
+        )?;
+        let t_point_coords = Tensor::from_array(coords_array.as_standard_layout().into_owned())?;
+        let t_point_labels = Tensor::from_array(labels_array.as_standard_layout().into_owned())?;
+        let t_mask_input =
+            Tensor::from_array(mask_input.clone().as_standard_layout().into_owned())?;
+        let t_has_mask = Tensor::from_array(
+            Array::from_elem((1,), has_mask_input)
+                .into_dyn()
+                .as_standard_layout()
+                .into_owned(),
+        )?;
+        let t_orig_im_size =
+            Tensor::from_array(orig_im_size.clone().as_standard_layout().into_owned())?;
 
-    let mask_data: Vec<u8> = mask_tensor
-        .iter()
-        .map(|&val| if val > 0.0 { 255 } else { 0 })
-        .collect();
+        let mask_tensor = {
+            let mut session = decoder.lock().unwrap();
+            let outputs = session.run(ort::inputs![
+                t_embeddings,
+                t_interm,
+                t_point_coords,
+                t_point_labels,
+                t_mask_input,
+                t_has_mask,
+                t_orig_im_size
+            ])?;
+            outputs[0].try_extract_array::<f32>()?.to_owned()
+        };
 
-    let gray_mask = GrayImage::from_raw(mask_width as u32, mask_height as u32, mask_data)
+        let mask_dims = mask_tensor.shape();
+        let mask_height = mask_dims[2];
+        let mask_width = mask_dims[3];
+
+        if i == iters - 1 {
+            final_mask_data = mask_tensor
+                .iter()
+                .map(|&val| if val > 0.0 { 255 } else { 0 })
+                .collect();
+            final_w = mask_width;
+            final_h = mask_height;
+            break;
+        }
+
+        let mask_slice = mask_tensor.as_slice().unwrap();
+        let w = mask_width;
+        let h = mask_height;
+
+        let mut binary_mask = vec![false; mask_slice.len()];
+        let mut mask_area = 0.0;
+        let mut min_x = w;
+        let mut min_y = h;
+        let mut max_x = 0;
+        let mut max_y = 0;
+
+        for y in 0..h {
+            for x in 0..w {
+                if mask_slice[y * w + x] > 0.0 {
+                    binary_mask[y * w + x] = true;
+                    if x < min_x {
+                        min_x = x;
+                    }
+                    if x > max_x {
+                        max_x = x;
+                    }
+                    if y < min_y {
+                        min_y = y;
+                    }
+                    if y > max_y {
+                        max_y = y;
+                    }
+                    mask_area += 1.0;
+                }
+            }
+        }
+
+        if mask_area == 0.0 || min_x > max_x {
+            final_mask_data = mask_tensor
+                .iter()
+                .map(|&val| if val > 0.0 { 255 } else { 0 })
+                .collect();
+            final_w = mask_width;
+            final_h = mask_height;
+            break;
+        }
+
+        let dt_in = edt_2d(&binary_mask, w, h);
+        let mut max_in = 0.0;
+        let mut pos_idx = 0;
+        for (idx, &v) in dt_in.iter().enumerate() {
+            if v > max_in {
+                max_in = v;
+                pos_idx = idx;
+            }
+        }
+        let pos_y = pos_idx / w;
+        let pos_x = pos_idx % w;
+
+        let mut rev_mask = vec![false; mask_slice.len()];
+        for idx in 0..mask_slice.len() {
+            rev_mask[idx] = !binary_mask[idx];
+        }
+        let mut dt_out = edt_2d(&rev_mask, w, h);
+
+        for y in 0..h {
+            for x in 0..w {
+                if x < min_x || x > max_x || y < min_y || y > max_y {
+                    dt_out[y * w + x] = 0.0;
+                }
+            }
+        }
+
+        let mut max_out = 0.0;
+        let mut neg_idx = 0;
+        for (idx, &v) in dt_out.iter().enumerate() {
+            if v > max_out {
+                max_out = v;
+                neg_idx = idx;
+            }
+        }
+        let neg_y = neg_idx / w;
+        let neg_x = neg_idx % w;
+
+        point_coords.clear();
+        point_labels.clear();
+
+        point_coords.push(((pos_x as f64 * scale) as f32, (pos_y as f64 * scale) as f32));
+        point_labels.push(1.0);
+        point_coords.push(((neg_x as f64 * scale) as f32, (neg_y as f64 * scale) as f32));
+        point_labels.push(0.0);
+        point_coords.push(((min_x as f64 * scale) as f32, (min_y as f64 * scale) as f32));
+        point_labels.push(2.0);
+        point_coords.push(((max_x as f64 * scale) as f32, (max_y as f64 * scale) as f32));
+        point_labels.push(3.0);
+
+        let mut gaus_dt = vec![0.0f32; mask_slice.len()];
+        let variance = (mask_area / 4.0_f32).max(1.0_f32);
+        for idx in 0..mask_slice.len() {
+            if binary_mask[idx] {
+                let diff = dt_in[idx] - max_in;
+                gaus_dt[idx] = (-(diff * diff) / variance).exp();
+            } else {
+                gaus_dt[idx] = 0.0;
+            }
+        }
+
+        let img_mask_f32 = ImageBuffer::<Luma<f32>, Vec<f32>>::from_raw(
+            w as u32,
+            h as u32,
+            mask_slice
+                .iter()
+                .map(|&v| if v > 0.0 { 15.0 } else { -15.0 })
+                .collect(),
+        )
+        .unwrap();
+        let img_gaus_f32 =
+            ImageBuffer::<Luma<f32>, Vec<f32>>::from_raw(w as u32, h as u32, gaus_dt).unwrap();
+
+        let resized_mask = imageops::resize(&img_mask_f32, 256, 256, FilterType::Triangle);
+        let resized_gaus = imageops::resize(&img_gaus_f32, 256, 256, FilterType::Triangle);
+
+        let mut mask_input_flat = vec![0.0f32; 256 * 256];
+        for y in 0..256 {
+            for x in 0..256 {
+                let m_val = resized_mask.get_pixel(x, y)[0];
+                let mut g_val = resized_gaus.get_pixel(x, y)[0];
+                if g_val <= 0.0 {
+                    g_val = 1.0;
+                }
+                mask_input_flat[(y * 256 + x) as usize] = m_val * g_val;
+            }
+        }
+
+        mask_input = Array::from_shape_vec((1, 1, 256, 256), mask_input_flat)
+            .unwrap()
+            .into_dyn();
+        has_mask_input = 1.0;
+    }
+
+    let gray_mask = GrayImage::from_raw(final_w as u32, final_h as u32, final_mask_data)
         .ok_or_else(|| anyhow::anyhow!("Failed to create mask image from raw data"))?;
 
     let feathered_mask = image::imageops::blur(&gray_mask, 2.0);
