@@ -743,9 +743,6 @@ const ImageCanvas = memo(
     const dragStartPointer = useRef<Coord | null>(null);
     const lastBrushPoint = useRef<Coord | null>(null);
     const currentLine = useRef<DrawnLine | null>(null);
-    const [previewLine, setPreviewLine] = useState<DrawnLine | null>(null);
-
-    // Use a ref to sync drag bounds natively outside of stale closures
     const previewBoxRef = useRef<{ start: Coord; end: Coord } | null>(null);
     const [previewBox, setPreviewBox] = useState<{ start: Coord; end: Coord } | null>(null);
 
@@ -872,7 +869,6 @@ const ImageCanvas = memo(
       dragStartPointer.current = null;
       currentLine.current = null;
       lastBrushPoint.current = null;
-      setPreviewLine(null);
       setPreviewBox(null);
       previewBoxRef.current = null;
       setLocalInitialDrawParams(null);
@@ -1072,7 +1068,6 @@ const ImageCanvas = memo(
           if (!pos) {
             isDrawing.current = false;
             currentLine.current = null;
-            setPreviewLine(null);
             setPreviewBox(null);
             previewBoxRef.current = null;
             return;
@@ -1409,7 +1404,6 @@ const ImageCanvas = memo(
         let startPoint = { x: box.start.x / scale + cropX, y: box.start.y / scale + cropY };
         let endPoint = { x: box.end.x / scale + cropX, y: box.end.y / scale + cropY };
 
-        // Threshold check to prevent tiny micro-drags from being parsed as useless boxes. Convert to Point Mask.
         const dx = box.end.x - box.start.x;
         const dy = box.end.y - box.start.y;
         if (Math.sqrt(dx * dx + dy * dy) < 5) {
@@ -1417,7 +1411,6 @@ const ImageCanvas = memo(
         }
 
         if (activeId) {
-          // Optimistically update the local state so the box/point instantly renders identically to Color/Luminance points
           updateSubMask(activeId, {
             parameters: {
               ...activeSubMask?.parameters,
@@ -1441,7 +1434,6 @@ const ImageCanvas = memo(
       isDrawing.current = false;
       const line = currentLine.current;
       currentLine.current = null;
-      setPreviewLine(null);
       drawingStageRef.current = null;
 
       if (!wasDrawing || !line) {

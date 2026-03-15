@@ -615,6 +615,39 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const activeSubMask =
+      adjustments?.masks?.flatMap((m: any) => m.subMasks).find((sm: any) => sm.id === activeMaskId) ||
+      adjustments?.aiPatches?.flatMap((p: any) => p.subMasks).find((sm: any) => sm.id === activeAiSubMaskId);
+
+    if (activeSubMask?.type === 'ai-subject' && selectedImage?.path) {
+      const transformAdjustments = {
+        transformDistortion: adjustments.transformDistortion,
+        transformVertical: adjustments.transformVertical,
+        transformHorizontal: adjustments.transformHorizontal,
+        transformRotate: adjustments.transformRotate,
+        transformAspect: adjustments.transformAspect,
+        transformScale: adjustments.transformScale,
+        transformXOffset: adjustments.transformXOffset,
+        transformYOffset: adjustments.transformYOffset,
+        lensDistortionAmount: adjustments.lensDistortionAmount,
+        lensVignetteAmount: adjustments.lensVignetteAmount,
+        lensTcaAmount: adjustments.lensTcaAmount,
+        lensDistortionParams: adjustments.lensDistortionParams,
+        lensMaker: adjustments.lensMaker,
+        lensModel: adjustments.lensModel,
+        lensDistortionEnabled: adjustments.lensDistortionEnabled,
+        lensTcaEnabled: adjustments.lensTcaEnabled,
+        lensVignetteEnabled: adjustments.lensVignetteEnabled,
+      };
+
+      invoke('precompute_ai_subject_mask', {
+        jsAdjustments: transformAdjustments,
+        path: selectedImage.path,
+      }).catch((err) => console.error('Failed to precompute AI subject mask:', err));
+    }
+  }, [activeMaskId, activeAiSubMaskId, selectedImage?.path]);
+
   const updateSubMask = (subMaskId: string, updatedData: any) => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,

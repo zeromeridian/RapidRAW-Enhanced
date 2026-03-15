@@ -18,13 +18,13 @@ use tokio::sync::Mutex as TokioMutex;
 
 use crate::file_management;
 
-const ENCODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/sam_hq_vit_b_encoder.onnx?download=true";
-const DECODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/sam_hq_vit_b_decoder.onnx?download=true";
-const ENCODER_FILENAME: &str = "sam_hq_vit_b_encoder.onnx";
-const DECODER_FILENAME: &str = "sam_hq_vit_b_decoder.onnx";
+const ENCODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/sam_vit_b_01ec64_encoder.onnx?download=true";
+const DECODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/sam_vit_b_01ec64_decoder.onnx?download=true";
+const ENCODER_FILENAME: &str = "sam_vit_b_01ec64_encoder.onnx";
+const DECODER_FILENAME: &str = "sam_vit_b_01ec64_decoder.onnx";
 const SAM_INPUT_SIZE: u32 = 1024;
-const ENCODER_SHA256: &str = "eccc55c8c1f8f20f227739ca95987ac7b9dbb50fe2a0c4e650dc39276b925c32";
-const DECODER_SHA256: &str = "a98d609b14249021d6a78b20ab2857a45ad775dfc6df1b90dc29d53a839921ff";
+const ENCODER_SHA256: &str = "16ab73d9c824886f0de2938c19df22fb9ec3deebfd0de58e65177e479213d7d1";
+const DECODER_SHA256: &str = "85d0d672cf5b7fe763edcde429e5533e62f674af4b15c7d688b7673b0ef00bf7";
 
 const U2NETP_URL: &str =
     "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/u2net.onnx?download=true";
@@ -57,7 +57,6 @@ pub struct AiModels {
 pub struct ImageEmbeddings {
     pub path_hash: String,
     pub embeddings: Array<f32, IxDyn>,
-    pub interm_embeddings: Array<f32, IxDyn>,
     pub original_size: (u32, u32),
 }
 
@@ -66,13 +65,11 @@ pub struct AiState {
     pub embeddings: Option<ImageEmbeddings>,
 }
 
-fn edt_1d(f: &mut [f32]) {
+fn edt_1d(f: &mut [f32], v: &mut [usize], z: &mut [f32], d: &mut [f32]) {
     let n = f.len();
     if n == 0 {
         return;
     }
-    let mut v = vec![0; n];
-    let mut z = vec![0.0; n + 1];
     let mut k = 0;
     v[0] = 0;
     z[0] = f32::NEG_INFINITY;
@@ -94,7 +91,6 @@ fn edt_1d(f: &mut [f32]) {
         z[k + 1] = f32::INFINITY;
     }
     k = 0;
-    let mut d = vec![0.0; n];
     for q in 0..n {
         while z[k + 1] < q as f32 {
             k += 1;
@@ -102,23 +98,25 @@ fn edt_1d(f: &mut [f32]) {
         let diff = q as f32 - v[k] as f32;
         d[q] = diff * diff + f[v[k]];
     }
-    f.copy_from_slice(&d);
+    f.copy_from_slice(&d[..n]);
 }
 
 fn edt_2d(grid: &[bool], width: usize, height: usize) -> Vec<f32> {
-    let mut f = vec![0.0; width * height];
-    for i in 0..(width * height) {
-        if grid[i] {
-            f[i] = 1e10;
-        } else {
-            f[i] = 0.0;
-        }
+    let area = width * height;
+    let mut f = vec![0.0; area];
+    for i in 0..area {
+        f[i] = if grid[i] { 1e10 } else { 0.0 };
     }
+
+    let max_dim = width.max(height);
+    let mut v = vec![0; max_dim];
+    let mut z = vec![0.0; max_dim + 1];
+    let mut d = vec![0.0; max_dim];
 
     for y in 0..height {
         let start = y * width;
         let end = start + width;
-        edt_1d(&mut f[start..end]);
+        edt_1d(&mut f[start..end], &mut v, &mut z, &mut d);
     }
 
     let mut col = vec![0.0; height];
@@ -126,7 +124,7 @@ fn edt_2d(grid: &[bool], width: usize, height: usize) -> Vec<f32> {
         for y in 0..height {
             col[y] = f[y * width + x];
         }
-        edt_1d(&mut col);
+        edt_1d(&mut col, &mut v, &mut z, &mut d);
         for y in 0..height {
             f[y * width + x] = col[y];
         }
@@ -336,14 +334,20 @@ pub fn generate_image_embeddings(
     let new_height = (orig_height as f32 * scale).round() as u32;
 
     let resized_image = image.resize(new_width, new_height, FilterType::Triangle);
+    let rgb_image = resized_image.into_rgb8();
+    let raw_pixels = rgb_image.as_raw();
 
     let mut input_tensor: Array<u8, _> =
         Array::zeros((1, 3, SAM_INPUT_SIZE as usize, SAM_INPUT_SIZE as usize));
 
-    for (x, y, pixel) in resized_image.to_rgb8().enumerate_pixels() {
-        input_tensor[[0, 0, y as usize, x as usize]] = pixel[0];
-        input_tensor[[0, 1, y as usize, x as usize]] = pixel[1];
-        input_tensor[[0, 2, y as usize, x as usize]] = pixel[2];
+    let w_usize = new_width as usize;
+    for y in 0..(new_height as usize) {
+        for x in 0..w_usize {
+            let idx = (y * w_usize + x) * 3;
+            input_tensor[[0, 0, y, x]] = raw_pixels[idx];
+            input_tensor[[0, 1, y, x]] = raw_pixels[idx + 1];
+            input_tensor[[0, 2, y, x]] = raw_pixels[idx + 2];
+        }
     }
 
     let input_tensor_dyn = input_tensor.into_dyn();
@@ -353,12 +357,10 @@ pub fn generate_image_embeddings(
     let outputs = session.run(ort::inputs![input_tensor_ort])?;
 
     let embeddings = outputs[0].try_extract_array::<f32>()?.to_owned();
-    let interm_embeddings = outputs[1].try_extract_array::<f32>()?.to_owned();
 
     Ok(ImageEmbeddings {
         path_hash: "".to_string(),
         embeddings: embeddings.into_dyn(),
-        interm_embeddings: interm_embeddings.into_dyn(),
         original_size: (orig_width, orig_height),
     })
 }
@@ -422,13 +424,6 @@ pub fn run_sam_decoder(
                 .as_standard_layout()
                 .into_owned(),
         )?;
-        let t_interm = Tensor::from_array(
-            embeddings
-                .interm_embeddings
-                .clone()
-                .as_standard_layout()
-                .into_owned(),
-        )?;
         let t_point_coords = Tensor::from_array(coords_array.as_standard_layout().into_owned())?;
         let t_point_labels = Tensor::from_array(labels_array.as_standard_layout().into_owned())?;
         let t_mask_input =
@@ -446,7 +441,6 @@ pub fn run_sam_decoder(
             let mut session = decoder.lock().unwrap();
             let outputs = session.run(ort::inputs![
                 t_embeddings,
-                t_interm,
                 t_point_coords,
                 t_point_labels,
                 t_mask_input,
@@ -457,58 +451,50 @@ pub fn run_sam_decoder(
         };
 
         let mask_dims = mask_tensor.shape();
-        let mask_height = mask_dims[2];
-        let mask_width = mask_dims[3];
+        let h = mask_dims[2];
+        let w = mask_dims[3];
+        let area = h * w;
+
+        let mask_slice = mask_tensor.as_slice().unwrap();
+        let first_mask_slice = &mask_slice[0..area];
 
         if i == iters - 1 {
-            final_mask_data = mask_tensor
+            final_mask_data = first_mask_slice
                 .iter()
                 .map(|&val| if val > 0.0 { 255 } else { 0 })
                 .collect();
-            final_w = mask_width;
-            final_h = mask_height;
+            final_w = w;
+            final_h = h;
             break;
         }
 
-        let mask_slice = mask_tensor.as_slice().unwrap();
-        let w = mask_width;
-        let h = mask_height;
-
-        let mut binary_mask = vec![false; mask_slice.len()];
+        let mut binary_mask = vec![false; area];
         let mut mask_area = 0.0;
         let mut min_x = w;
         let mut min_y = h;
         let mut max_x = 0;
         let mut max_y = 0;
 
-        for y in 0..h {
-            for x in 0..w {
-                if mask_slice[y * w + x] > 0.0 {
-                    binary_mask[y * w + x] = true;
-                    if x < min_x {
-                        min_x = x;
-                    }
-                    if x > max_x {
-                        max_x = x;
-                    }
-                    if y < min_y {
-                        min_y = y;
-                    }
-                    if y > max_y {
-                        max_y = y;
-                    }
-                    mask_area += 1.0;
-                }
+        for (idx, &val) in first_mask_slice.iter().enumerate() {
+            if val > 0.0 {
+                binary_mask[idx] = true;
+                let x = idx % w;
+                let y = idx / w;
+                min_x = min_x.min(x);
+                max_x = max_x.max(x);
+                min_y = min_y.min(y);
+                max_y = max_y.max(y);
+                mask_area += 1.0;
             }
         }
 
         if mask_area == 0.0 || min_x > max_x {
-            final_mask_data = mask_tensor
+            final_mask_data = first_mask_slice
                 .iter()
                 .map(|&val| if val > 0.0 { 255 } else { 0 })
                 .collect();
-            final_w = mask_width;
-            final_h = mask_height;
+            final_w = w;
+            final_h = h;
             break;
         }
 
@@ -524,9 +510,9 @@ pub fn run_sam_decoder(
         let pos_y = pos_idx / w;
         let pos_x = pos_idx % w;
 
-        let mut rev_mask = vec![false; mask_slice.len()];
-        for idx in 0..mask_slice.len() {
-            rev_mask[idx] = !binary_mask[idx];
+        let mut rev_mask = vec![false; area];
+        for (idx, is_true) in binary_mask.iter().enumerate() {
+            rev_mask[idx] = !is_true;
         }
         let mut dt_out = edt_2d(&rev_mask, w, h);
 
@@ -561,42 +547,39 @@ pub fn run_sam_decoder(
         point_coords.push(((max_x as f64 * scale) as f32, (max_y as f64 * scale) as f32));
         point_labels.push(3.0);
 
-        let mut gaus_dt = vec![0.0f32; mask_slice.len()];
+        let mut gaus_dt = vec![0.0f32; area];
         let variance = (mask_area / 4.0_f32).max(1.0_f32);
-        for idx in 0..mask_slice.len() {
-            if binary_mask[idx] {
+        for (idx, &is_true) in binary_mask.iter().enumerate() {
+            if is_true {
                 let diff = dt_in[idx] - max_in;
                 gaus_dt[idx] = (-(diff * diff) / variance).exp();
-            } else {
-                gaus_dt[idx] = 0.0;
             }
         }
 
-        let img_mask_f32 = ImageBuffer::<Luma<f32>, Vec<f32>>::from_raw(
-            w as u32,
-            h as u32,
-            mask_slice
-                .iter()
-                .map(|&v| if v > 0.0 { 15.0 } else { -15.0 })
-                .collect(),
-        )
-        .unwrap();
+        let mask_f32_vec: Vec<f32> = first_mask_slice
+            .iter()
+            .map(|&v| if v > 0.0 { 15.0 } else { -15.0 })
+            .collect();
+
+        let img_mask_f32 =
+            ImageBuffer::<Luma<f32>, Vec<f32>>::from_raw(w as u32, h as u32, mask_f32_vec).unwrap();
         let img_gaus_f32 =
             ImageBuffer::<Luma<f32>, Vec<f32>>::from_raw(w as u32, h as u32, gaus_dt).unwrap();
 
         let resized_mask = imageops::resize(&img_mask_f32, 256, 256, FilterType::Triangle);
         let resized_gaus = imageops::resize(&img_gaus_f32, 256, 256, FilterType::Triangle);
 
+        let rm_raw = resized_mask.as_raw();
+        let rg_raw = resized_gaus.as_raw();
         let mut mask_input_flat = vec![0.0f32; 256 * 256];
-        for y in 0..256 {
-            for x in 0..256 {
-                let m_val = resized_mask.get_pixel(x, y)[0];
-                let mut g_val = resized_gaus.get_pixel(x, y)[0];
-                if g_val <= 0.0 {
-                    g_val = 1.0;
-                }
-                mask_input_flat[(y * 256 + x) as usize] = m_val * g_val;
+
+        for i in 0..(256 * 256) {
+            let m_val = rm_raw[i];
+            let mut g_val = rg_raw[i];
+            if g_val <= 0.0 {
+                g_val = 1.0;
             }
+            mask_input_flat[i] = m_val * g_val;
         }
 
         mask_input = Array::from_shape_vec((1, 1, 256, 256), mask_input_flat)
@@ -621,68 +604,73 @@ pub fn run_sky_seg_model(
 
     let resized_image = image.resize(SKYSEG_INPUT_SIZE, SKYSEG_INPUT_SIZE, FilterType::Triangle);
     let (resized_w, resized_h) = resized_image.dimensions();
-    let resized_rgb = resized_image.to_rgb8();
+    let resized_rgb = resized_image.into_rgb8();
+    let raw_pixels = resized_rgb.as_raw();
 
-    let mut square_input_image = image::RgbImage::new(SKYSEG_INPUT_SIZE, SKYSEG_INPUT_SIZE);
-    let paste_x = (SKYSEG_INPUT_SIZE - resized_w) / 2;
-    let paste_y = (SKYSEG_INPUT_SIZE - resized_h) / 2;
-    imageops::overlay(
-        &mut square_input_image,
-        &resized_rgb,
-        paste_x.into(),
-        paste_y.into(),
-    );
+    let paste_x = ((SKYSEG_INPUT_SIZE - resized_w) / 2) as usize;
+    let paste_y = ((SKYSEG_INPUT_SIZE - resized_h) / 2) as usize;
 
     let mut input_tensor: Array<f32, _> =
         Array::zeros((1, 3, SKYSEG_INPUT_SIZE as usize, SKYSEG_INPUT_SIZE as usize));
+
     let mean = [0.485, 0.456, 0.406];
     let std = [0.229, 0.224, 0.225];
 
-    for y in 0..SKYSEG_INPUT_SIZE {
-        for x in 0..SKYSEG_INPUT_SIZE {
-            let pixel = square_input_image.get_pixel(x, y);
-            input_tensor[[0, 0, y as usize, x as usize]] =
-                (pixel[0] as f32 / 255.0 - mean[0]) / std[0];
-            input_tensor[[0, 1, y as usize, x as usize]] =
-                (pixel[1] as f32 / 255.0 - mean[1]) / std[1];
-            input_tensor[[0, 2, y as usize, x as usize]] =
-                (pixel[2] as f32 / 255.0 - mean[2]) / std[2];
+    let rw = resized_w as usize;
+    let rh = resized_h as usize;
+
+    for y in 0..rh {
+        for x in 0..rw {
+            let idx = (y * rw + x) * 3;
+            let dest_y = y + paste_y;
+            let dest_x = x + paste_x;
+
+            input_tensor[[0, 0, dest_y, dest_x]] =
+                (raw_pixels[idx] as f32 / 255.0 - mean[0]) / std[0];
+            input_tensor[[0, 1, dest_y, dest_x]] =
+                (raw_pixels[idx + 1] as f32 / 255.0 - mean[1]) / std[1];
+            input_tensor[[0, 2, dest_y, dest_x]] =
+                (raw_pixels[idx + 2] as f32 / 255.0 - mean[2]) / std[2];
         }
     }
 
     let input_tensor_dyn = input_tensor.into_dyn();
-    let input_values = input_tensor_dyn.as_standard_layout();
-    let t_input = Tensor::from_array(input_values.into_owned())?;
+    let t_input = Tensor::from_array(input_tensor_dyn.as_standard_layout().into_owned())?;
 
     let mut session = sky_seg_session.lock().unwrap();
     let outputs = session.run(ort::inputs![t_input])?;
     let output_tensor = outputs[0].try_extract_array::<f32>()?.to_owned();
+    let out_slice = output_tensor.as_slice().unwrap();
 
-    let (min_val, max_val) = output_tensor
-        .iter()
-        .fold((f32::MAX, f32::MIN), |(min, max), &v| {
-            (min.min(v), max.max(v))
-        });
+    let mut min_val = f32::MAX;
+    let mut max_val = f32::MIN;
+    for &v in out_slice {
+        min_val = min_val.min(v);
+        max_val = max_val.max(v);
+    }
+
     let range = max_val - min_val;
+    let scale = if range > 1e-6 { 255.0 / range } else { 0.0 };
 
-    let mask_data: Vec<u8> = output_tensor
-        .iter()
-        .map(|&val| {
-            if range > 1e-6 {
-                (((val - min_val) / range) * 255.0) as u8
+    let usize_size = SKYSEG_INPUT_SIZE as usize;
+    let mut cropped_mask_data = Vec::with_capacity(rw * rh);
+
+    for y in 0..rh {
+        let src_y = y + paste_y;
+        for x in 0..rw {
+            let src_x = x + paste_x;
+            let val = out_slice[src_y * usize_size + src_x];
+            let pixel = if range > 1e-6 {
+                ((val - min_val) * scale) as u8
             } else {
                 0
-            }
-        })
-        .collect();
+            };
+            cropped_mask_data.push(pixel);
+        }
+    }
 
-    let square_mask = GrayImage::from_raw(SKYSEG_INPUT_SIZE, SKYSEG_INPUT_SIZE, mask_data)
-        .ok_or_else(|| {
-            anyhow::anyhow!("Failed to create mask from Sky Segmentation model output")
-        })?;
-
-    let cropped_mask =
-        imageops::crop_imm(&square_mask, paste_x, paste_y, resized_w, resized_h).to_image();
+    let cropped_mask = GrayImage::from_raw(resized_w, resized_h, cropped_mask_data)
+        .ok_or_else(|| anyhow::anyhow!("Failed to create mask from Sky Segmentation output"))?;
 
     let final_mask = imageops::resize(&cropped_mask, orig_width, orig_height, FilterType::Triangle);
 
@@ -697,66 +685,73 @@ pub fn run_u2netp_model(
 
     let resized_image = image.resize(U2NETP_INPUT_SIZE, U2NETP_INPUT_SIZE, FilterType::Triangle);
     let (resized_w, resized_h) = resized_image.dimensions();
-    let resized_rgb = resized_image.to_rgb8();
+    let resized_rgb = resized_image.into_rgb8();
+    let raw_pixels = resized_rgb.as_raw();
 
-    let mut square_input_image = image::RgbImage::new(U2NETP_INPUT_SIZE, U2NETP_INPUT_SIZE);
-    let paste_x = (U2NETP_INPUT_SIZE - resized_w) / 2;
-    let paste_y = (U2NETP_INPUT_SIZE - resized_h) / 2;
-    imageops::overlay(
-        &mut square_input_image,
-        &resized_rgb,
-        paste_x.into(),
-        paste_y.into(),
-    );
+    let paste_x = ((U2NETP_INPUT_SIZE - resized_w) / 2) as usize;
+    let paste_y = ((U2NETP_INPUT_SIZE - resized_h) / 2) as usize;
 
     let mut input_tensor: Array<f32, _> =
         Array::zeros((1, 3, U2NETP_INPUT_SIZE as usize, U2NETP_INPUT_SIZE as usize));
+
     let mean = [0.485, 0.456, 0.406];
     let std = [0.229, 0.224, 0.225];
 
-    for y in 0..U2NETP_INPUT_SIZE {
-        for x in 0..U2NETP_INPUT_SIZE {
-            let pixel = square_input_image.get_pixel(x, y);
-            input_tensor[[0, 0, y as usize, x as usize]] =
-                (pixel[0] as f32 / 255.0 - mean[0]) / std[0];
-            input_tensor[[0, 1, y as usize, x as usize]] =
-                (pixel[1] as f32 / 255.0 - mean[1]) / std[1];
-            input_tensor[[0, 2, y as usize, x as usize]] =
-                (pixel[2] as f32 / 255.0 - mean[2]) / std[2];
+    let rw = resized_w as usize;
+    let rh = resized_h as usize;
+
+    for y in 0..rh {
+        for x in 0..rw {
+            let idx = (y * rw + x) * 3;
+            let dest_y = y + paste_y;
+            let dest_x = x + paste_x;
+
+            input_tensor[[0, 0, dest_y, dest_x]] =
+                (raw_pixels[idx] as f32 / 255.0 - mean[0]) / std[0];
+            input_tensor[[0, 1, dest_y, dest_x]] =
+                (raw_pixels[idx + 1] as f32 / 255.0 - mean[1]) / std[1];
+            input_tensor[[0, 2, dest_y, dest_x]] =
+                (raw_pixels[idx + 2] as f32 / 255.0 - mean[2]) / std[2];
         }
     }
 
     let input_tensor_dyn = input_tensor.into_dyn();
-    let input_values = input_tensor_dyn.as_standard_layout();
-    let t_input = Tensor::from_array(input_values.into_owned())?;
+    let t_input = Tensor::from_array(input_tensor_dyn.as_standard_layout().into_owned())?;
 
     let mut session = u2netp_session.lock().unwrap();
     let outputs = session.run(ort::inputs![t_input])?;
     let output_tensor = outputs[0].try_extract_array::<f32>()?.to_owned();
+    let out_slice = output_tensor.as_slice().unwrap();
 
-    let (min_val, max_val) = output_tensor
-        .iter()
-        .fold((f32::MAX, f32::MIN), |(min, max), &v| {
-            (min.min(v), max.max(v))
-        });
+    let mut min_val = f32::MAX;
+    let mut max_val = f32::MIN;
+    for &v in out_slice {
+        min_val = min_val.min(v);
+        max_val = max_val.max(v);
+    }
+
     let range = max_val - min_val;
+    let scale = if range > 1e-6 { 255.0 / range } else { 0.0 };
 
-    let mask_data: Vec<u8> = output_tensor
-        .iter()
-        .map(|&val| {
-            if range > 1e-6 {
-                (((val - min_val) / range) * 255.0) as u8
+    let usize_size = U2NETP_INPUT_SIZE as usize;
+    let mut cropped_mask_data = Vec::with_capacity(rw * rh);
+
+    for y in 0..rh {
+        let src_y = y + paste_y;
+        for x in 0..rw {
+            let src_x = x + paste_x;
+            let val = out_slice[src_y * usize_size + src_x];
+            let pixel = if range > 1e-6 {
+                ((val - min_val) * scale) as u8
             } else {
                 0
-            }
-        })
-        .collect();
+            };
+            cropped_mask_data.push(pixel);
+        }
+    }
 
-    let square_mask = GrayImage::from_raw(U2NETP_INPUT_SIZE, U2NETP_INPUT_SIZE, mask_data)
+    let cropped_mask = GrayImage::from_raw(resized_w, resized_h, cropped_mask_data)
         .ok_or_else(|| anyhow::anyhow!("Failed to create mask from U-2-Netp output"))?;
-
-    let cropped_mask =
-        imageops::crop_imm(&square_mask, paste_x, paste_y, resized_w, resized_h).to_image();
 
     let final_mask = imageops::resize(&cropped_mask, orig_width, orig_height, FilterType::Triangle);
 

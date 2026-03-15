@@ -2905,6 +2905,50 @@ async fn generate_ai_subject_mask(
 }
 
 #[tauri::command]
+async fn precompute_ai_subject_mask(
+    js_adjustments: serde_json::Value,
+    path: String,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    let models = get_or_init_ai_models(&app_handle, &state.ai_state, &state.ai_init_lock)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let path_hash = {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(path.as_bytes());
+        let mut geo_hasher = DefaultHasher::new();
+        for key in GEOMETRY_KEYS {
+            if let Some(val) = js_adjustments.get(key) {
+                key.hash(&mut geo_hasher);
+                val.to_string().hash(&mut geo_hasher);
+            }
+        }
+        hasher.update(&geo_hasher.finish().to_le_bytes());
+        hasher.finalize().to_hex().to_string()
+    };
+
+    let mut ai_state_lock = state.ai_state.lock().unwrap();
+    let ai_state = ai_state_lock.as_mut().unwrap();
+
+    if let Some(cached_embeddings) = &ai_state.embeddings {
+        if cached_embeddings.path_hash == path_hash {
+            return Ok(());
+        }
+    }
+
+    let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
+    let mut new_embeddings = generate_image_embeddings(warped_image.as_ref(), &models.sam_encoder)
+        .map_err(|e| e.to_string())?;
+
+    new_embeddings.path_hash = path_hash.clone();
+    ai_state.embeddings = Some(new_embeddings);
+
+    Ok(())
+}
+
+#[tauri::command]
 fn generate_preset_preview(
     js_adjustments: serde_json::Value,
     state: tauri::State<AppState>,
@@ -4374,6 +4418,7 @@ fn main() {
             preview_geometry_transform,
             generate_mask_overlay,
             generate_ai_subject_mask,
+            precompute_ai_subject_mask,
             generate_ai_foreground_mask,
             generate_ai_sky_mask,
             update_window_effect,
