@@ -2200,9 +2200,6 @@ fn normalize_histogram_range(histogram: &mut Vec<f32>, percentile_clip: f32) {
 pub struct WaveformData {
     pub rgb: String,
     pub luma: String,
-    pub red: String,
-    pub green: String,
-    pub blue: String,
     pub parade: String,
     pub vectorscope: String,
     pub width: u32,
@@ -2221,22 +2218,15 @@ pub fn calculate_waveform_from_image(
         return Err("Image has zero dimensions.".to_string());
     }
 
-    let do_red =
-        active_channel.is_none() || active_channel == Some("red") || active_channel == Some("rgb");
-    let do_green = active_channel.is_none()
-        || active_channel == Some("green")
-        || active_channel == Some("rgb");
-    let do_blue =
-        active_channel.is_none() || active_channel == Some("blue") || active_channel == Some("rgb");
+    let do_rgb = active_channel.is_none() || active_channel == Some("rgb");
     let do_luma =
         active_channel.is_none() || active_channel == Some("luma") || active_channel == Some("rgb");
-    let do_rgb = active_channel.is_none() || active_channel == Some("rgb");
     let do_parade = active_channel.is_none() || active_channel == Some("parade");
     let do_vectorscope = active_channel.is_none() || active_channel == Some("vectorscope");
 
-    let mut red_bins = if do_red { vec![0u32; W * H] } else { vec![] };
-    let mut green_bins = if do_green { vec![0u32; W * H] } else { vec![] };
-    let mut blue_bins = if do_blue { vec![0u32; W * H] } else { vec![] };
+    let mut red_bins = if do_rgb { vec![0u32; W * H] } else { vec![] };
+    let mut green_bins = if do_rgb { vec![0u32; W * H] } else { vec![] };
+    let mut blue_bins = if do_rgb { vec![0u32; W * H] } else { vec![] };
     let mut luma_bins = if do_luma { vec![0u32; W * H] } else { vec![] };
     let mut parade_bins = if do_parade { vec![0u32; W * H] } else { vec![] };
     let mut vector_bins = if do_vectorscope {
@@ -2263,13 +2253,9 @@ pub fn calculate_waveform_from_image(
     }
 
     let mut process_pixel = |r: u8, g: u8, b: u8, out_x: usize, orig_x: usize| {
-        if do_red {
+        if do_rgb {
             red_bins[(255 - r as usize) * W + out_x] += 1;
-        }
-        if do_green {
             green_bins[(255 - g as usize) * W + out_x] += 1;
-        }
-        if do_blue {
             blue_bins[(255 - b as usize) * W + out_x] += 1;
         }
         if do_luma {
@@ -2355,9 +2341,9 @@ pub fn calculate_waveform_from_image(
         (lut, max_val)
     };
 
-    let (lut_r, max_r) = build_lut(&red_bins, do_red);
-    let (lut_g, max_g) = build_lut(&green_bins, do_green);
-    let (lut_b, max_b) = build_lut(&blue_bins, do_blue);
+    let (lut_r, max_r) = build_lut(&red_bins, do_rgb);
+    let (lut_g, max_g) = build_lut(&green_bins, do_rgb);
+    let (lut_b, max_b) = build_lut(&blue_bins, do_rgb);
     let (lut_l, max_l) = build_lut(&luma_bins, do_luma);
     let (lut_p, max_p) = build_lut(&parade_bins, do_parade);
     let (lut_v, max_v) = build_lut(&vector_bins, do_vectorscope);
@@ -2371,21 +2357,6 @@ pub fn calculate_waveform_from_image(
         vec![]
     };
     let mut rgba_luma = if do_luma {
-        vec![0u8; byte_count]
-    } else {
-        vec![]
-    };
-    let mut rgba_red = if do_red {
-        vec![0u8; byte_count]
-    } else {
-        vec![]
-    };
-    let mut rgba_green = if do_green {
-        vec![0u8; byte_count]
-    } else {
-        vec![]
-    };
-    let mut rgba_blue = if do_blue {
         vec![0u8; byte_count]
     } else {
         vec![]
@@ -2407,17 +2378,17 @@ pub fn calculate_waveform_from_image(
         let off = i * 4;
 
         if do_rgb {
-            let r = if do_red && red_bins[i] <= max_r {
+            let r = if red_bins[i] <= max_r {
                 lut_r[red_bins[i] as usize]
             } else {
                 0
             };
-            let g = if do_green && green_bins[i] <= max_g {
+            let g = if green_bins[i] <= max_g {
                 lut_g[green_bins[i] as usize]
             } else {
                 0
             };
-            let b = if do_blue && blue_bins[i] <= max_b {
+            let b = if blue_bins[i] <= max_b {
                 lut_b[blue_bins[i] as usize]
             } else {
                 0
@@ -2429,18 +2400,7 @@ pub fn calculate_waveform_from_image(
                 rgba_rgb[off + 3] = r.max(g).max(b);
             }
         }
-        if do_red && red_bins[i] > 0 && red_bins[i] <= max_r {
-            rgba_red[off] = 255;
-            rgba_red[off + 3] = lut_r[red_bins[i] as usize];
-        }
-        if do_green && green_bins[i] > 0 && green_bins[i] <= max_g {
-            rgba_green[off + 1] = 255;
-            rgba_green[off + 3] = lut_g[green_bins[i] as usize];
-        }
-        if do_blue && blue_bins[i] > 0 && blue_bins[i] <= max_b {
-            rgba_blue[off + 2] = 255;
-            rgba_blue[off + 3] = lut_b[blue_bins[i] as usize];
-        }
+
         if do_luma && luma_bins[i] > 0 && luma_bins[i] <= max_l {
             let l = lut_l[luma_bins[i] as usize];
             rgba_luma[off] = 255;
@@ -2508,21 +2468,6 @@ pub fn calculate_waveform_from_image(
         },
         luma: if do_luma {
             BASE64.encode(&rgba_luma)
-        } else {
-            String::new()
-        },
-        red: if do_red {
-            BASE64.encode(&rgba_red)
-        } else {
-            String::new()
-        },
-        green: if do_green {
-            BASE64.encode(&rgba_green)
-        } else {
-            String::new()
-        },
-        blue: if do_blue {
-            BASE64.encode(&rgba_blue)
         } else {
             String::new()
         },

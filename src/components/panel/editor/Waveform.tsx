@@ -290,6 +290,7 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
   const [isHovered, setIsHovered] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hadDataOnMount = useRef(!!waveformData);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const width = waveformData?.width || 256;
   const height = waveformData?.height || 256;
@@ -305,6 +306,28 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
 
   useRawRgbaCanvas(canvasRef, activeData || '', width, height);
 
+  const handleMouseEnter = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(true);
+    }, 250);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setIsHovered(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const baseButtonClass =
     'relative flex-grow text-center px-1.5 py-1 text-xs rounded-lg font-medium transition-colors duration-150';
   const inactiveButtonClass = 'text-text-primary hover:bg-bg-tertiary';
@@ -318,8 +341,8 @@ export default function Waveform({ waveformData, displayMode, setDisplayMode }: 
   return (
     <div
       className="relative w-full h-full bg-surface rounded-lg overflow-hidden border-border-color shadow-inner"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <AnimatePresence initial={!hadDataOnMount.current} mode="sync">
         {waveformData ? (
