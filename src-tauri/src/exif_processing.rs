@@ -10,7 +10,6 @@ use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;
 use little_exif::rational::{iR64, uR64};
-use rawler;
 use rawler::decoders::RawMetadata;
 
 fn to_ur64(val: &exif::Rational) -> uR64 {
@@ -50,8 +49,8 @@ pub fn read_raw_metadata(file_bytes: &[u8]) -> Option<RawMetadata> {
 }
 
 pub fn read_exposure_time_secs(path: &str, file_bytes: &[u8]) -> Option<f32> {
-    if is_raw_file(path) {
-        if let Some(meta) = read_raw_metadata(file_bytes) {
+    if is_raw_file(path)
+        && let Some(meta) = read_raw_metadata(file_bytes) {
             if let Some(r) = meta.exif.exposure_time {
                 return if r.d == 0 {
                     return None;
@@ -66,7 +65,6 @@ pub fn read_exposure_time_secs(path: &str, file_bytes: &[u8]) -> Option<f32> {
                 };
             }
         }
-    }
 
     if let Some(exif) = read_exif(file_bytes) {
         if let Some(exposure) = exif.get_field(exif::Tag::ExposureTime, In::PRIMARY) {
@@ -75,7 +73,7 @@ pub fn read_exposure_time_secs(path: &str, file_bytes: &[u8]) -> Option<f32> {
                     return None;
                 }
 
-                let val = r.get(0)?;
+                let val = r.first()?;
 
                 return if val.denom == 0 {
                     None
@@ -85,13 +83,12 @@ pub fn read_exposure_time_secs(path: &str, file_bytes: &[u8]) -> Option<f32> {
             }
         } else if let Some(shutter_speed) =
             exif.get_field(exif::Tag::ShutterSpeedValue, In::PRIMARY)
-        {
-            if let Value::Rational(ref r) = shutter_speed.value {
+            && let Value::Rational(ref r) = shutter_speed.value {
                 if r.is_empty() {
                     return None;
                 }
 
-                let val = r.get(0)?;
+                let val = r.first()?;
 
                 return if val.denom == 0 {
                     None
@@ -99,21 +96,19 @@ pub fn read_exposure_time_secs(path: &str, file_bytes: &[u8]) -> Option<f32> {
                     Some(val.num as f32 / val.denom as f32)
                 };
             }
-        }
     }
     None
 }
 
 pub fn read_iso(path: &str, file_bytes: &[u8]) -> Option<u32> {
-    if is_raw_file(path) {
-        if let Some(meta) = read_raw_metadata(file_bytes) {
+    if is_raw_file(path)
+        && let Some(meta) = read_raw_metadata(file_bytes) {
             if let Some(r) = meta.exif.iso_speed {
                 return Some(r);
             } else if let Some(r) = meta.exif.iso_speed_ratings {
                 return Some(r as u32);
             }
         }
-    }
 
     if let Some(exif) = read_exif(file_bytes) {
         if let Some(r) = exif.get_field(exif::Tag::ISOSpeed, In::PRIMARY) {
@@ -126,11 +121,10 @@ pub fn read_iso(path: &str, file_bytes: &[u8]) -> Option<u32> {
 }
 
 pub fn read_exif_data(path: &str, file_bytes: &[u8]) -> HashMap<String, String> {
-    if is_raw_file(path) {
-        if let Some(map) = extract_metadata(file_bytes) {
+    if is_raw_file(path)
+        && let Some(map) = extract_metadata(file_bytes) {
             return map;
         }
-    }
 
     let mut exif_data = HashMap::new();
     if let Some(exif) = read_exif(file_bytes) {
@@ -151,8 +145,8 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
         for field in exif_obj.fields() {
             match field.tag {
                 exif::Tag::ExposureTime => {
-                    if let exif::Value::Rational(ref v) = field.value {
-                        if !v.is_empty() {
+                    if let exif::Value::Rational(ref v) = field.value
+                        && !v.is_empty() {
                             let r = &v[0];
                             if r.num == 1 && r.denom > 1 {
                                 map.insert("ExposureTime".to_string(), format!("1/{} s", r.denom));
@@ -168,40 +162,35 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
                                 }
                             }
                         }
-                    }
                 }
                 exif::Tag::ShutterSpeedValue => {
-                    if let exif::Value::SRational(ref v) = field.value {
-                        if !v.is_empty() {
+                    if let exif::Value::SRational(ref v) = field.value
+                        && !v.is_empty() {
                             let val = v[0].num as f32 / v[0].denom as f32;
                             map.insert("ShutterSpeedValue".to_string(), val.to_string());
                         }
-                    }
                 }
                 exif::Tag::FNumber => {
-                    if let exif::Value::Rational(ref v) = field.value {
-                        if !v.is_empty() {
+                    if let exif::Value::Rational(ref v) = field.value
+                        && !v.is_empty() {
                             let val = v[0].num as f32 / v[0].denom as f32;
                             map.insert("FNumber".to_string(), format!("f/{}", val));
                         }
-                    }
                 }
                 exif::Tag::ApertureValue => {
-                    if let exif::Value::Rational(ref v) = field.value {
-                        if !v.is_empty() {
+                    if let exif::Value::Rational(ref v) = field.value
+                        && !v.is_empty() {
                             let val = v[0].num as f32 / v[0].denom as f32;
                             map.insert("ApertureValue".to_string(), format!("f/{}", val));
                         }
-                    }
                 }
                 exif::Tag::FocalLength => {
-                    if let exif::Value::Rational(ref v) = field.value {
-                        if !v.is_empty() {
+                    if let exif::Value::Rational(ref v) = field.value
+                        && !v.is_empty() {
                             let val = v[0].num as f32 / v[0].denom as f32;
                             map.insert("FocalLength".to_string(), val.to_string());
                             map.insert("FocalLengthIn35mmFilm".to_string(), val.to_string());
                         }
-                    }
                 }
                 exif::Tag::PhotographicSensitivity | exif::Tag::ISOSpeed => {
                     map.insert(
@@ -496,8 +485,8 @@ pub fn get_creation_date_from_path(path: &Path) -> DateTime<Utc> {
         let mut bufreader = BufReader::new(&file);
         let exifreader = exif::Reader::new();
 
-        if let Ok(exif_obj) = exifreader.read_from_container(&mut bufreader) {
-            if let Some(field) = exif_obj.get_field(exif::Tag::DateTimeOriginal, exif::In::PRIMARY)
+        if let Ok(exif_obj) = exifreader.read_from_container(&mut bufreader)
+            && let Some(field) = exif_obj.get_field(exif::Tag::DateTimeOriginal, exif::In::PRIMARY)
             {
                 let dt_str = field.display_value().to_string();
                 let clean_str = dt_str.replace("\"", "").trim().to_string();
@@ -512,24 +501,19 @@ pub fn get_creation_date_from_path(path: &Path) -> DateTime<Utc> {
                     return DateTime::from_naive_utc_and_offset(dt, Utc);
                 }
             }
-        }
     }
 
-    if is_raw_file(&path.to_string_lossy().as_ref()) {
+    if is_raw_file(path.to_string_lossy().as_ref()) {
         let loader = rawler::RawLoader::new();
-        if let Ok(raw_source) = rawler::rawsource::RawSource::new(path) {
-            if let Ok(decoder) = loader.get_decoder(&raw_source) {
-                if let Ok(metadata) = decoder.raw_metadata(&raw_source, &Default::default()) {
-                    if let Some(date_str) = metadata.exif.date_time_original {
-                        if let Ok(dt) =
+        if let Ok(raw_source) = rawler::rawsource::RawSource::new(path)
+            && let Ok(decoder) = loader.get_decoder(&raw_source)
+                && let Ok(metadata) = decoder.raw_metadata(&raw_source, &Default::default())
+                    && let Some(date_str) = metadata.exif.date_time_original
+                        && let Ok(dt) =
                             chrono::NaiveDateTime::parse_from_str(&date_str, "%Y:%m:%d %H:%M:%S")
                         {
                             return DateTime::from_naive_utc_and_offset(dt, Utc);
                         }
-                    }
-                }
-            }
-        }
     }
 
     fs::metadata(path)
@@ -630,27 +614,21 @@ pub fn write_image_with_metadata(
                 metadata.set_tag(ExifTag::CreateDate(get_string_val(f)));
             }
 
-            if let Some(f) = exif_obj.get_field(exif::Tag::FNumber, exif::In::PRIMARY) {
-                if let exif::Value::Rational(v) = &f.value {
-                    if !v.is_empty() {
+            if let Some(f) = exif_obj.get_field(exif::Tag::FNumber, exif::In::PRIMARY)
+                && let exif::Value::Rational(v) = &f.value
+                    && !v.is_empty() {
                         metadata.set_tag(ExifTag::FNumber(vec![to_ur64(&v[0])]));
                     }
-                }
-            }
-            if let Some(f) = exif_obj.get_field(exif::Tag::ExposureTime, exif::In::PRIMARY) {
-                if let exif::Value::Rational(v) = &f.value {
-                    if !v.is_empty() {
+            if let Some(f) = exif_obj.get_field(exif::Tag::ExposureTime, exif::In::PRIMARY)
+                && let exif::Value::Rational(v) = &f.value
+                    && !v.is_empty() {
                         metadata.set_tag(ExifTag::ExposureTime(vec![to_ur64(&v[0])]));
                     }
-                }
-            }
-            if let Some(f) = exif_obj.get_field(exif::Tag::FocalLength, exif::In::PRIMARY) {
-                if let exif::Value::Rational(v) = &f.value {
-                    if !v.is_empty() {
+            if let Some(f) = exif_obj.get_field(exif::Tag::FocalLength, exif::In::PRIMARY)
+                && let exif::Value::Rational(v) = &f.value
+                    && !v.is_empty() {
                         metadata.set_tag(ExifTag::FocalLength(vec![to_ur64(&v[0])]));
                     }
-                }
-            }
 
             if let Some(f) = exif_obj.get_field(exif::Tag::ExposureBiasValue, exif::In::PRIMARY) {
                 match &f.value {
@@ -673,55 +651,46 @@ pub fn write_image_with_metadata(
                 if let Some(val) = f.value.get_uint(0) {
                     metadata.set_tag(ExifTag::ISO(vec![val as u16]));
                 }
-            } else if let Some(f) = exif_obj.get_field(exif::Tag::ISOSpeed, exif::In::PRIMARY) {
-                if let Some(val) = f.value.get_uint(0) {
+            } else if let Some(f) = exif_obj.get_field(exif::Tag::ISOSpeed, exif::In::PRIMARY)
+                && let Some(val) = f.value.get_uint(0) {
                     metadata.set_tag(ExifTag::ISO(vec![val as u16]));
                 }
-            }
 
             if let Some(f) = exif_obj.get_field(exif::Tag::FocalLengthIn35mmFilm, exif::In::PRIMARY)
-            {
-                if let Some(val) = f.value.get_uint(0) {
+                && let Some(val) = f.value.get_uint(0) {
                     metadata.set_tag(ExifTag::FocalLengthIn35mmFormat(vec![val as u16]));
                 }
-            }
 
             if !strip_gps {
-                if let Some(f) = exif_obj.get_field(exif::Tag::GPSLatitude, exif::In::PRIMARY) {
-                    if let exif::Value::Rational(v) = &f.value {
-                        if v.len() >= 3 {
+                if let Some(f) = exif_obj.get_field(exif::Tag::GPSLatitude, exif::In::PRIMARY)
+                    && let exif::Value::Rational(v) = &f.value
+                        && v.len() >= 3 {
                             metadata.set_tag(ExifTag::GPSLatitude(vec![
                                 to_ur64(&v[0]),
                                 to_ur64(&v[1]),
                                 to_ur64(&v[2]),
                             ]));
                         }
-                    }
-                }
                 if let Some(f) = exif_obj.get_field(exif::Tag::GPSLatitudeRef, exif::In::PRIMARY) {
                     metadata.set_tag(ExifTag::GPSLatitudeRef(get_string_val(f)));
                 }
-                if let Some(f) = exif_obj.get_field(exif::Tag::GPSLongitude, exif::In::PRIMARY) {
-                    if let exif::Value::Rational(v) = &f.value {
-                        if v.len() >= 3 {
+                if let Some(f) = exif_obj.get_field(exif::Tag::GPSLongitude, exif::In::PRIMARY)
+                    && let exif::Value::Rational(v) = &f.value
+                        && v.len() >= 3 {
                             metadata.set_tag(ExifTag::GPSLongitude(vec![
                                 to_ur64(&v[0]),
                                 to_ur64(&v[1]),
                                 to_ur64(&v[2]),
                             ]));
                         }
-                    }
-                }
                 if let Some(f) = exif_obj.get_field(exif::Tag::GPSLongitudeRef, exif::In::PRIMARY) {
                     metadata.set_tag(ExifTag::GPSLongitudeRef(get_string_val(f)));
                 }
-                if let Some(f) = exif_obj.get_field(exif::Tag::GPSAltitude, exif::In::PRIMARY) {
-                    if let exif::Value::Rational(v) = &f.value {
-                        if !v.is_empty() {
+                if let Some(f) = exif_obj.get_field(exif::Tag::GPSAltitude, exif::In::PRIMARY)
+                    && let exif::Value::Rational(v) = &f.value
+                        && !v.is_empty() {
                             metadata.set_tag(ExifTag::GPSAltitude(vec![to_ur64(&v[0])]));
                         }
-                    }
-                }
             }
         }
     }
@@ -730,9 +699,8 @@ pub fn write_image_with_metadata(
         let loader = rawler::RawLoader::new();
         if let Ok(raw_source) =
             rawler::rawsource::RawSource::new(std::path::Path::new(original_path_str))
-        {
-            if let Ok(decoder) = loader.get_decoder(&raw_source) {
-                if let Ok(meta) = decoder.raw_metadata(&raw_source, &Default::default()) {
+            && let Ok(decoder) = loader.get_decoder(&raw_source)
+                && let Ok(meta) = decoder.raw_metadata(&raw_source, &Default::default()) {
                     if !meta.make.is_empty() {
                         metadata.set_tag(ExifTag::Make(meta.make.clone()));
                     }
@@ -788,8 +756,8 @@ pub fn write_image_with_metadata(
 
                     if let Some(ev) = exif.exposure_bias {
                         metadata.set_tag(ExifTag::ExposureCompensation(vec![iR64 {
-                            nominator: ev.n as i32,
-                            denominator: ev.d as i32,
+                            nominator: ev.n,
+                            denominator: ev.d,
                         }]));
                     }
 
@@ -806,8 +774,8 @@ pub fn write_image_with_metadata(
                         metadata.set_tag(ExifTag::ExposureProgram(vec![prog]));
                     }
 
-                    if !strip_gps {
-                        if let Some(gps) = exif.gps {
+                    if !strip_gps
+                        && let Some(gps) = exif.gps {
                             if let Some(lat) = gps.gps_latitude {
                                 metadata.set_tag(ExifTag::GPSLatitude(vec![
                                     uR64 {
@@ -856,10 +824,7 @@ pub fn write_image_with_metadata(
                                 metadata.set_tag(ExifTag::GPSAltitudeRef(vec![alt_ref]));
                             }
                         }
-                    }
                 }
-            }
-        }
     }
 
     metadata.set_tag(ExifTag::Software("RapidRAW".to_string()));

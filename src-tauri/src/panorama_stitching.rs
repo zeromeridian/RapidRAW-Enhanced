@@ -172,8 +172,7 @@ pub fn stitch_images(
 
             if let Some((_h_small, inliers)) =
                 processing::find_homography_ransac(&initial_matches, &keypoints1, &keypoints2)
-            {
-                if inliers.len() >= processing::MIN_INLIERS_FOR_CONNECTION {
+                && inliers.len() >= processing::MIN_INLIERS_FOR_CONNECTION {
                     println!(
                         "  - Good match found: '{}' <-> '{}' ({} inliers)",
                         Path::new(&image_data[i].filename)
@@ -215,7 +214,6 @@ pub fn stitch_images(
                         return Some(((i, j), match_info));
                     }
                 }
-            }
             None
         })
         .collect();

@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use bytemuck;
 use half::f16;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba};
 use wgpu::util::{DeviceExt, TextureDataOrder};
@@ -23,7 +22,7 @@ pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuCont
     if let Some(context) = &*context_lock {
         return Ok(context.clone());
     }
-    let mut instance_desc = wgpu::InstanceDescriptor::from_env_or_default();
+    let instance_desc = wgpu::InstanceDescriptor::from_env_or_default();
 
     #[cfg(target_os = "windows")]
     if std::env::var("WGPU_BACKEND").is_err() {
@@ -964,8 +963,8 @@ impl GpuProcessor {
 
         let start_tile_x = bounds.x / TILE_SIZE;
         let start_tile_y = bounds.y / TILE_SIZE;
-        let end_tile_x = (bounds.x + bounds.width + TILE_SIZE - 1) / TILE_SIZE;
-        let end_tile_y = (bounds.y + bounds.height + TILE_SIZE - 1) / TILE_SIZE;
+        let end_tile_x = (bounds.x + bounds.width).div_ceil(TILE_SIZE);
+        let end_tile_y = (bounds.y + bounds.height).div_ceil(TILE_SIZE);
 
         for tile_y in start_tile_y..end_tile_y {
             for tile_x in start_tile_x..end_tile_x {
@@ -1007,8 +1006,8 @@ impl GpuProcessor {
                         radius,
                         tile_offset_x: input_x_start,
                         tile_offset_y: input_y_start,
-                        input_width: input_width,
-                        input_height: input_height,
+                        input_width,
+                        input_height,
                         _pad1: 0,
                         _pad2: 0,
                         _pad3: 0,
@@ -1040,7 +1039,7 @@ impl GpuProcessor {
                         let mut cpass = blur_encoder.begin_compute_pass(&Default::default());
                         cpass.set_pipeline(&self.h_blur_pipeline);
                         cpass.set_bind_group(0, &h_blur_bg, &[]);
-                        cpass.dispatch_workgroups((input_width + 255) / 256, input_height, 1);
+                        cpass.dispatch_workgroups(input_width.div_ceil(256), input_height, 1);
                     }
 
                     let v_blur_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -1066,7 +1065,7 @@ impl GpuProcessor {
                         let mut cpass = blur_encoder.begin_compute_pass(&Default::default());
                         cpass.set_pipeline(&self.v_blur_pipeline);
                         cpass.set_bind_group(0, &v_blur_bg, &[]);
-                        cpass.dispatch_workgroups(input_width, (input_height + 255) / 256, 1);
+                        cpass.dispatch_workgroups(input_width, input_height.div_ceil(256), 1);
                     }
 
                     queue.submit(Some(blur_encoder.finish()));
@@ -1177,8 +1176,8 @@ impl GpuProcessor {
                     compute_pass.set_pipeline(&self.main_pipeline);
                     compute_pass.set_bind_group(0, &bind_group, &[]);
                     compute_pass.dispatch_workgroups(
-                        (input_width + 7) / 8,
-                        (input_height + 7) / 8,
+                        input_width.div_ceil(8),
+                        input_height.div_ceil(8),
                         1,
                     );
                 }
@@ -1259,12 +1258,11 @@ pub fn process_and_get_dynamic_image(
     let processor = &processor_state.processor;
 
     let mut cache_lock = state.gpu_image_cache.lock().unwrap();
-    if let Some(cache) = &*cache_lock {
-        if cache.transform_hash != transform_hash || cache.width != width || cache.height != height
+    if let Some(cache) = &*cache_lock
+        && (cache.transform_hash != transform_hash || cache.width != width || cache.height != height)
         {
             *cache_lock = None;
         }
-    }
 
     if cache_lock.is_none() {
         let img_rgba_f16 = to_rgba_f16(base_image);
