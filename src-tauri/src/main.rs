@@ -138,6 +138,7 @@ struct PreviewJob {
 }
 
 struct AnalyticsJob {
+    path: String,
     image: Arc<DynamicImage>,
     compute_waveform: bool,
     active_waveform_channel: Option<String>,
@@ -1034,6 +1035,7 @@ fn process_preview_job(
             };
 
             let analytics_job = AnalyticsJob {
+                path: loaded_image.path.clone(),
                 image: Arc::clone(&final_processed_image),
                 compute_waveform,
                 active_waveform_channel: channel_filter,
@@ -1135,7 +1137,10 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
 
             if let Ok(histogram_data) = image_processing::calculate_histogram_from_image(&job.image)
             {
-                let _ = app_handle.emit("histogram-update", histogram_data);
+                let _ = app_handle.emit(
+                    "histogram-update",
+                    serde_json::json!({ "path": job.path, "data": histogram_data }),
+                );
             }
 
             if job.compute_waveform {
@@ -1143,7 +1148,10 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
                     &job.image,
                     job.active_waveform_channel.as_deref(),
                 ) {
-                    let _ = app_handle.emit("waveform-update", waveform_data);
+                    let _ = app_handle.emit(
+                        "waveform-update",
+                        serde_json::json!({ "path": job.path, "data": waveform_data }),
+                    );
                 }
             }
         }

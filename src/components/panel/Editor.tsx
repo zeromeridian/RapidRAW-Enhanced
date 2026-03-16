@@ -52,7 +52,6 @@ interface EditorProps {
   uncroppedAdjustedPreviewUrl: string | null;
   updateSubMask(id: string | null, subMask: Partial<SubMask>): void;
   onDisplaySizeChange?(size: any): void;
-  onInitialFitScale?(scale: number): void;
   originalSize?: ImageDimensions;
   isWbPickerActive?: boolean;
   onWbPicked?: () => void;
@@ -104,7 +103,6 @@ export default function Editor({
   uncroppedAdjustedPreviewUrl,
   updateSubMask,
   onDisplaySizeChange,
-  onInitialFitScale,
   originalSize,
   isWbPickerActive = false,
   onWbPicked,
@@ -352,12 +350,6 @@ export default function Editor({
       onDisplaySizeChange(currentDisplaySize);
     }
   }, [imageRenderSize, transformState.scale, onDisplaySizeChange]);
-
-  useEffect(() => {
-    if (onInitialFitScale && imageRenderSize.scale > 0) {
-      onInitialFitScale(imageRenderSize.scale);
-    }
-  }, [imageRenderSize.scale, onInitialFitScale]);
 
   const processOverlayQueue = useCallback(async () => {
     if (isGeneratingOverlayRef.current || !pendingOverlayRequestRef.current) return;

@@ -11,6 +11,7 @@ interface WaveformProps {
   setDisplayMode: (mode: string) => void;
   showClipping?: boolean;
   onToggleClipping?: () => void;
+  theme?: string;
 }
 
 const modeButtons = [
@@ -186,6 +187,30 @@ const useRawRgbaCanvas = (
     const imageData = new ImageData(bytes, width, height);
     ctx.putImageData(imageData, 0, 0);
   }, [base64Data, width, height, canvasRef]);
+};
+
+const WaveformCanvas = ({
+  base64Data,
+  width,
+  height,
+  isVectorscope,
+}: {
+  base64Data: string;
+  width: number;
+  height: number;
+  isVectorscope: boolean;
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useRawRgbaCanvas(canvasRef, base64Data, width, height);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={width}
+      height={height}
+      className={`w-full h-full ${isVectorscope ? 'object-contain' : ''}`}
+    />
+  );
 };
 
 const FakeWaveformLoader = ({ mode }: { mode: string }) => {
@@ -423,18 +448,16 @@ export default function Waveform({
   setDisplayMode,
   showClipping,
   onToggleClipping,
+  theme,
 }: WaveformProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const isLightTheme = theme ? ['light', 'snow', 'arctic'].includes(theme) : false;
   const isHistogram = displayMode === DisplayMode.Histogram;
   const isVectorscope = displayMode === DisplayMode.Vectorscope;
-
   const isReady = isHistogram ? !!(histogram && histogram.red) : !!waveformData;
-
   const hadDataOnMount = useRef(isReady);
-
   const width = waveformData?.width || 256;
   const height = waveformData?.height || 256;
 
@@ -447,8 +470,6 @@ export default function Waveform({
         [DisplayMode.Histogram]: undefined,
       }[displayMode as DisplayMode]
     : '';
-
-  useRawRgbaCanvas(canvasRef, activeData || '', width, height);
 
   const handleMouseEnter = () => {
     hoverTimeoutRef.current = setTimeout(() => {
@@ -490,64 +511,73 @@ export default function Waveform({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <AnimatePresence initial={!hadDataOnMount.current} mode="sync">
-        {isReady ? (
-          isHistogram ? (
+      <div
+        className="absolute inset-0 z-0 pointer-events-none"
+        style={{
+          isolation: 'isolate',
+          filter: isLightTheme ? 'invert(1) hue-rotate(180deg)' : 'none',
+          transition: 'filter 0.3s ease',
+        }}
+      >
+        <AnimatePresence initial={!hadDataOnMount.current} mode="sync">
+          {isReady ? (
+            isHistogram ? (
+              <motion.div
+                key="waveform-histogram"
+                initial={{ opacity: 0, scaleY: 0 }}
+                animate={{ opacity: 1, scaleY: 1 }}
+                exit={{ opacity: 0, scaleY: 0 }}
+                transition={{
+                  duration: 0.5,
+                  ease: [0.22, 1, 0.36, 1],
+                  opacity: { duration: 0.4 },
+                }}
+                style={{ transformOrigin: 'bottom' }}
+                className="absolute inset-0 z-10"
+              >
+                <HistogramView histogram={histogram} />
+              </motion.div>
+            ) : (
+              <motion.div
+                key={`waveform-canvas-${displayMode}`}
+                initial={{ opacity: 0, ...(isVectorscope ? {} : { scaleY: 0 }) }}
+                animate={{ opacity: 1, ...(isVectorscope ? {} : { scaleY: 1 }) }}
+                exit={{ opacity: 0, ...(isVectorscope ? {} : { scaleY: 0 }) }}
+                transition={{
+                  duration: 0.5,
+                  ease: [0.22, 1, 0.36, 1],
+                  opacity: { duration: 0.4 },
+                }}
+                style={{ transformOrigin: 'bottom' }}
+                className="absolute inset-0 z-10"
+              >
+                <WaveformCanvas
+                  base64Data={activeData || ''}
+                  width={width}
+                  height={height}
+                  isVectorscope={isVectorscope}
+                />
+              </motion.div>
+            )
+          ) : isLoaderMode ? (
             <motion.div
-              key="waveform-histogram"
-              initial={{ opacity: 0, scaleY: 0 }}
-              animate={{ opacity: 1, scaleY: 1 }}
-              exit={{ opacity: 0, scaleY: 0 }}
-              transition={{
-                duration: 0.5,
-                ease: [0.22, 1, 0.36, 1],
-                opacity: { duration: 0.4 },
+              key={`waveform-loader-${displayMode}`}
+              initial={{ opacity: 0 }}
+              animate={{
+                opacity: 1,
+                transition: { duration: 0.6, ease: 'easeOut' },
               }}
-              style={{ transformOrigin: 'bottom' }}
-              className="absolute inset-0 z-10"
-            >
-              <HistogramView histogram={histogram} />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="waveform-canvas"
-              initial={{ opacity: 0, ...(isVectorscope ? {} : { scaleY: 0 }) }}
-              animate={{ opacity: 1, ...(isVectorscope ? {} : { scaleY: 1 }) }}
-              exit={{ opacity: 0, ...(isVectorscope ? {} : { scaleY: 0 }) }}
-              transition={{
-                duration: 0.5,
-                ease: [0.22, 1, 0.36, 1],
-                opacity: { duration: 0.4 },
+              exit={{
+                opacity: 0,
+                transition: { duration: 0.2, ease: 'easeIn' },
               }}
-              style={{ transformOrigin: 'bottom' }}
-              className="absolute inset-0 z-10"
+              className="absolute inset-0 pointer-events-none z-0"
             >
-              <canvas
-                ref={canvasRef}
-                width={width}
-                height={height}
-                className={`w-full h-full ${isVectorscope ? 'object-contain' : ''}`}
-              />
+              {isHistogram ? <FakeHistogramLoader /> : <FakeWaveformLoader mode={displayMode} />}
             </motion.div>
-          )
-        ) : isLoaderMode ? (
-          <motion.div
-            key="waveform-loader"
-            initial={{ opacity: 0 }}
-            animate={{
-              opacity: 1,
-              transition: { duration: 0.6, ease: 'easeOut' },
-            }}
-            exit={{
-              opacity: 0,
-              transition: { duration: 0.2, ease: 'easeIn' },
-            }}
-            className="absolute inset-0 pointer-events-none z-0"
-          >
-            {isHistogram ? <FakeHistogramLoader /> : <FakeWaveformLoader mode={displayMode} />}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+          ) : null}
+        </AnimatePresence>
+      </div>
 
       <AnimatePresence>
         {isHovered && (

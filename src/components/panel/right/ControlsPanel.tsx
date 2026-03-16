@@ -255,6 +255,7 @@ export default function Controls({
                     showClipping: !prev.showClipping,
                   }));
                 }}
+                theme={theme}
               />
             </div>
             <Resizer direction={Orientation.Horizontal} onMouseDown={handleWaveformResize} />
