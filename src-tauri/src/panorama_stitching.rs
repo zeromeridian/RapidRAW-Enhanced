@@ -292,13 +292,13 @@ pub fn stitch_images(
     Ok(DynamicImage::ImageRgb32F(panorama))
 }
 
-struct DSU {
+struct Dsu {
     parent: Vec<usize>,
 }
 
-impl DSU {
+impl Dsu {
     fn new(n: usize) -> Self {
-        DSU {
+        Dsu {
             parent: (0..n).collect(),
         }
     }
@@ -344,7 +344,7 @@ fn build_stitching_order(
     edges.sort_by_key(|&(inliers, _, _)| std::cmp::Reverse(inliers));
 
     let mut mst_adj: HashMap<usize, Vec<usize>> = HashMap::new();
-    let mut dsu = DSU::new(n);
+    let mut dsu = Dsu::new(n);
     let mut num_edges = 0;
 
     for &(_, i, j) in &edges {

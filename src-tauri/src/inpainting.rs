@@ -13,7 +13,7 @@ struct FloatOrd(f32);
 impl Eq for FloatOrd {}
 impl PartialOrd for FloatOrd {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.0.partial_cmp(&other.0)
+        Some(self.cmp(other))
     }
 }
 impl Ord for FloatOrd {
@@ -27,7 +27,7 @@ struct FloatOrdF64(f64);
 impl Eq for FloatOrdF64 {}
 impl PartialOrd for FloatOrdF64 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.0.partial_cmp(&other.0)
+        Some(self.cmp(other))
     }
 }
 impl Ord for FloatOrdF64 {

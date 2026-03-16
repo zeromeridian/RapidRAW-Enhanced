@@ -156,8 +156,7 @@ fn develop_internal(
                     let min_c = r.min(g).min(b);
                     let compression_factor = (1.0
                         - (max_c - 1.0) / (safe_highlight_compression - 1.0))
-                        .max(0.0)
-                        .min(1.0);
+                        .clamp(0.0, 1.0);
                     let compressed_r = min_c + (r - min_c) * compression_factor;
                     let compressed_g = min_c + (g - min_c) * compression_factor;
                     let compressed_b = min_c + (b - min_c) * compression_factor;

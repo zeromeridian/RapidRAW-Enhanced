@@ -1963,7 +1963,7 @@ fn apply_gentle_detail_enhance(
         .enumerate()
         .for_each(|(y, row)| {
             let row_offset = y * w;
-            for x in 0..w {
+            for (x, row_val) in row.iter_mut().enumerate() {
                 let mut sum = 0.0;
                 let mut count = 0;
                 for kx in -radius..=radius {
@@ -1971,7 +1971,7 @@ fn apply_gentle_detail_enhance(
                     sum += ycbcr_source[(row_offset + sx) * 3];
                     count += 1;
                 }
-                row[x] = sum / count as f32;
+                *row_val = sum / count as f32;
             }
         });
 
@@ -2129,7 +2129,7 @@ pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramD
     })
 }
 
-fn apply_gaussian_smoothing(histogram: &mut Vec<f32>, sigma: f32) {
+fn apply_gaussian_smoothing(histogram: &mut [f32], sigma: f32) {
     if sigma <= 0.0 {
         return;
     }
@@ -2144,10 +2144,10 @@ fn apply_gaussian_smoothing(histogram: &mut Vec<f32>, sigma: f32) {
     let mut kernel_sum = 0.0;
 
     let two_sigma_sq = 2.0 * sigma * sigma;
-    for i in 0..kernel_size {
+    for (i, kernel_val) in kernel.iter_mut().enumerate() {
         let x = (i as i32 - kernel_radius as i32) as f32;
         let val = (-x * x / two_sigma_sq).exp();
-        kernel[i] = val;
+        *kernel_val = val;
         kernel_sum += val;
     }
 
@@ -2157,27 +2157,27 @@ fn apply_gaussian_smoothing(histogram: &mut Vec<f32>, sigma: f32) {
         }
     }
 
-    let original = histogram.clone();
+    let original = histogram.to_owned();
     let len = histogram.len();
 
-    for i in 0..len {
+    for (i, hist_val) in histogram.iter_mut().enumerate() {
         let mut smoothed_val = 0.0;
-        for k in 0..kernel_size {
+        for (k, &kernel_val) in kernel.iter().enumerate() {
             let offset = k as i32 - kernel_radius as i32;
             let sample_index = i as i32 + offset;
             let clamped_index = sample_index.clamp(0, len as i32 - 1) as usize;
-            smoothed_val += original[clamped_index] * kernel[k];
+            smoothed_val += original[clamped_index] * kernel_val;
         }
-        histogram[i] = smoothed_val;
+        *hist_val = smoothed_val;
     }
 }
 
-fn normalize_histogram_range(histogram: &mut Vec<f32>, percentile_clip: f32) {
+fn normalize_histogram_range(histogram: &mut [f32], percentile_clip: f32) {
     if histogram.is_empty() {
         return;
     }
 
-    let mut sorted_data = histogram.clone();
+    let mut sorted_data = histogram.to_owned();
     sorted_data.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     let clip_index = ((sorted_data.len() - 1) as f32 * percentile_clip).round() as usize;
@@ -2294,13 +2294,13 @@ pub fn calculate_waveform_from_image(
             let stride = orig_w as usize * 3;
             for y in 0..(orig_h as usize) {
                 let row = y * stride;
-                for x in 0..(orig_w as usize) {
+                for (x, &x_bucket) in x_buckets.iter().enumerate() {
                     let i = row + x * 3;
                     process_pixel(
                         (raw[i].clamp(0.0, 1.0) * 255.0) as u8,
                         (raw[i + 1].clamp(0.0, 1.0) * 255.0) as u8,
                         (raw[i + 2].clamp(0.0, 1.0) * 255.0) as u8,
-                        x_buckets[x],
+                        x_bucket,
                         x,
                     );
                 }
@@ -2312,9 +2312,9 @@ pub fn calculate_waveform_from_image(
             let stride = orig_w as usize * 3;
             for y in 0..(orig_h as usize) {
                 let row = y * stride;
-                for x in 0..(orig_w as usize) {
+                for (x, &x_bucket) in x_buckets.iter().enumerate() {
                     let i = row + x * 3;
-                    process_pixel(raw[i], raw[i + 1], raw[i + 2], x_buckets[x], x);
+                    process_pixel(raw[i], raw[i + 1], raw[i + 2], x_bucket, x);
                 }
             }
         }
@@ -2528,8 +2528,8 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
     let mut white_point = 255;
     let clip_threshold = (total_pixels * 0.001) as u32;
     let mut cumulative_sum = 0u32;
-    for i in 0..256 {
-        cumulative_sum += luma_hist[i];
+    for (i, &hist_val) in luma_hist.iter().enumerate() {
+        cumulative_sum += hist_val;
         if cumulative_sum > clip_threshold {
             black_point = i;
             break;
