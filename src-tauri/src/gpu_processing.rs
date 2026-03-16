@@ -22,15 +22,12 @@ pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuCont
     if let Some(context) = &*context_lock {
         return Ok(context.clone());
     }
-    #[cfg(not(target_os = "windows"))]
-    let instance_desc = wgpu::InstanceDescriptor::from_env_or_default();
+    #[allow(unused_mut)]
+    let mut instance_desc = wgpu::InstanceDescriptor::from_env_or_default();
 
     #[cfg(target_os = "windows")]
-    {
-        let mut instance_desc = wgpu::InstanceDescriptor::from_env_or_default();
-        if std::env::var("WGPU_BACKEND").is_err() {
-            instance_desc.backends = wgpu::Backends::PRIMARY;
-        }
+    if std::env::var("WGPU_BACKEND").is_err() {
+        instance_desc.backends = wgpu::Backends::PRIMARY;
     }
 
     let instance = wgpu::Instance::new(&instance_desc);
