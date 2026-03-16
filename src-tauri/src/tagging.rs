@@ -363,28 +363,28 @@ pub async fn start_background_indexing(
                                         clip_tokenizer,
                                         (*tags_inner).clone(),
                                         ai_tag_count,
-                                    ) {
-                                        println!("Found AI tags for {}: {:?}", path_str, ai_tags);
+                                    )
+                                {
+                                    println!("Found AI tags for {}: {:?}", path_str, ai_tags);
 
-                                        let mut existing_tags: HashSet<String> =
-                                            metadata.tags.unwrap_or_default().into_iter().collect();
+                                    let mut existing_tags: HashSet<String> =
+                                        metadata.tags.unwrap_or_default().into_iter().collect();
 
-                                        for tag in ai_tags {
-                                            existing_tags.insert(tag);
-                                        }
-
-                                        let mut final_tags: Vec<String> =
-                                            existing_tags.into_iter().collect();
-                                        final_tags.sort_unstable();
-
-                                        metadata.tags = Some(final_tags);
-
-                                        if let Ok(json_string) =
-                                            serde_json::to_string_pretty(&metadata)
-                                        {
-                                            let _ = fs::write(sidecar_path, json_string);
-                                        }
+                                    for tag in ai_tags {
+                                        existing_tags.insert(tag);
                                     }
+
+                                    let mut final_tags: Vec<String> =
+                                        existing_tags.into_iter().collect();
+                                    final_tags.sort_unstable();
+
+                                    metadata.tags = Some(final_tags);
+
+                                    if let Ok(json_string) = serde_json::to_string_pretty(&metadata)
+                                    {
+                                        let _ = fs::write(sidecar_path, json_string);
+                                    }
+                                }
                             }
                             Err(e) => {
                                 eprintln!(
@@ -493,26 +493,29 @@ pub fn clear_ai_tags(root_path: String) -> Result<usize, String> {
 
     for entry in walker.filter_map(|e| e.ok()) {
         let path = entry.path();
-        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("rrdata")
+        if path.is_file()
+            && path.extension().and_then(|s| s.to_str()) == Some("rrdata")
             && let Ok(content) = fs::read_to_string(path)
-                && let Ok(mut metadata) = serde_json::from_str::<ImageMetadata>(&content)
-                    && let Some(tags) = &mut metadata.tags {
-                        let original_len = tags.len();
-                        // Keep color tags and user tags, remove others (AI tags)
-                        tags.retain(|tag| {
-                            tag.starts_with(COLOR_TAG_PREFIX) || tag.starts_with(USER_TAG_PREFIX)
-                        });
+            && let Ok(mut metadata) = serde_json::from_str::<ImageMetadata>(&content)
+            && let Some(tags) = &mut metadata.tags
+        {
+            let original_len = tags.len();
+            // Keep color tags and user tags, remove others (AI tags)
+            tags.retain(|tag| {
+                tag.starts_with(COLOR_TAG_PREFIX) || tag.starts_with(USER_TAG_PREFIX)
+            });
 
-                        if tags.len() < original_len {
-                            if tags.is_empty() {
-                                metadata.tags = None;
-                            }
-                            if let Ok(json_string) = serde_json::to_string_pretty(&metadata)
-                                && fs::write(path, json_string).is_ok() {
-                                    updated_count += 1;
-                                }
-                        }
-                    }
+            if tags.len() < original_len {
+                if tags.is_empty() {
+                    metadata.tags = None;
+                }
+                if let Ok(json_string) = serde_json::to_string_pretty(&metadata)
+                    && fs::write(path, json_string).is_ok()
+                {
+                    updated_count += 1;
+                }
+            }
+        }
     }
     Ok(updated_count)
 }
@@ -528,24 +531,27 @@ pub fn clear_all_tags(root_path: String) -> Result<usize, String> {
 
     for entry in walker.filter_map(|e| e.ok()) {
         let path = entry.path();
-        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("rrdata")
+        if path.is_file()
+            && path.extension().and_then(|s| s.to_str()) == Some("rrdata")
             && let Ok(content) = fs::read_to_string(path)
-                && let Ok(mut metadata) = serde_json::from_str::<ImageMetadata>(&content)
-                    && let Some(tags) = &mut metadata.tags {
-                        let original_len = tags.len();
-                        // Keep only color tags, remove AI and user tags
-                        tags.retain(|tag| tag.starts_with(COLOR_TAG_PREFIX));
+            && let Ok(mut metadata) = serde_json::from_str::<ImageMetadata>(&content)
+            && let Some(tags) = &mut metadata.tags
+        {
+            let original_len = tags.len();
+            // Keep only color tags, remove AI and user tags
+            tags.retain(|tag| tag.starts_with(COLOR_TAG_PREFIX));
 
-                        if tags.len() < original_len {
-                            if tags.is_empty() {
-                                metadata.tags = None;
-                            }
-                            if let Ok(json_string) = serde_json::to_string_pretty(&metadata)
-                                && fs::write(path, json_string).is_ok() {
-                                    updated_count += 1;
-                                }
-                        }
-                    }
+            if tags.len() < original_len {
+                if tags.is_empty() {
+                    metadata.tags = None;
+                }
+                if let Ok(json_string) = serde_json::to_string_pretty(&metadata)
+                    && fs::write(path, json_string).is_ok()
+                {
+                    updated_count += 1;
+                }
+            }
+        }
     }
     Ok(updated_count)
 }

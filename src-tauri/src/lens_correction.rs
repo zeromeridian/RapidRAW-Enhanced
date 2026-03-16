@@ -159,12 +159,13 @@ pub struct LensDistortionParams {
 
 fn strip_maker_prefix(name: &str, maker: &str) -> String {
     if name.to_lowercase().starts_with(&maker.to_lowercase())
-        && let Some(rest) = name.get(maker.len()..) {
-            let trimmed = rest.trim();
-            if !trimmed.is_empty() {
-                return trimmed.to_string();
-            }
+        && let Some(rest) = name.get(maker.len()..)
+    {
+        let trimmed = rest.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
         }
+    }
     name.to_string()
 }
 
@@ -192,12 +193,13 @@ impl Lens {
         let maker = self.get_maker();
 
         if raw_name.to_lowercase().starts_with(&maker.to_lowercase())
-            && let Some(rest) = raw_name.get(maker.len()..) {
-                let stripped = rest.trim();
-                if !stripped.is_empty() {
-                    return stripped.to_string();
-                }
+            && let Some(rest) = raw_name.get(maker.len()..)
+        {
+            let stripped = rest.trim();
+            if !stripped.is_empty() {
+                return stripped.to_string();
             }
+        }
 
         raw_name
     }

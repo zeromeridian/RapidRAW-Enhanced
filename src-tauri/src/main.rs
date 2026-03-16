@@ -357,9 +357,10 @@ fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
     flip_v.hash(&mut hasher);
 
     if let Some(crop_val) = adjustments.get("crop")
-        && !crop_val.is_null() {
-            crop_val.to_string().hash(&mut hasher);
-        }
+        && !crop_val.is_null()
+    {
+        crop_val.to_string().hash(&mut hasher);
+    }
 
     for key in GEOMETRY_KEYS {
         if let Some(val) = adjustments.get(key) {
@@ -369,54 +370,55 @@ fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
     }
 
     if let Some(patches_val) = adjustments.get("aiPatches")
-        && let Some(patches_arr) = patches_val.as_array() {
-            patches_arr.len().hash(&mut hasher);
+        && let Some(patches_arr) = patches_val.as_array()
+    {
+        patches_arr.len().hash(&mut hasher);
 
-            for patch in patches_arr {
-                if let Some(id) = patch.get("id").and_then(|v| v.as_str()) {
-                    id.hash(&mut hasher);
-                }
-
-                let is_visible = patch
-                    .get("visible")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(true);
-                is_visible.hash(&mut hasher);
-
-                if let Some(patch_data) = patch.get("patchData") {
-                    let color_len = patch_data
-                        .get("color")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .len();
-                    color_len.hash(&mut hasher);
-
-                    let mask_len = patch_data
-                        .get("mask")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .len();
-                    mask_len.hash(&mut hasher);
-                } else {
-                    let data_len = patch
-                        .get("patchDataBase64")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .len();
-                    data_len.hash(&mut hasher);
-                }
-
-                if let Some(sub_masks_val) = patch.get("subMasks") {
-                    sub_masks_val.to_string().hash(&mut hasher);
-                }
-
-                let invert = patch
-                    .get("invert")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-                invert.hash(&mut hasher);
+        for patch in patches_arr {
+            if let Some(id) = patch.get("id").and_then(|v| v.as_str()) {
+                id.hash(&mut hasher);
             }
+
+            let is_visible = patch
+                .get("visible")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+            is_visible.hash(&mut hasher);
+
+            if let Some(patch_data) = patch.get("patchData") {
+                let color_len = patch_data
+                    .get("color")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .len();
+                color_len.hash(&mut hasher);
+
+                let mask_len = patch_data
+                    .get("mask")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .len();
+                mask_len.hash(&mut hasher);
+            } else {
+                let data_len = patch
+                    .get("patchDataBase64")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .len();
+                data_len.hash(&mut hasher);
+            }
+
+            if let Some(sub_masks_val) = patch.get("subMasks") {
+                sub_masks_val.to_string().hash(&mut hasher);
+            }
+
+            let invert = patch
+                .get("invert")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            invert.hash(&mut hasher);
         }
+    }
 
     hasher.finish()
 }
@@ -478,19 +480,17 @@ fn hydrate_adjustments(state: &tauri::State<AppState>, adjustments: &mut serde_j
                     if let Some(params) = sub_mask
                         .get_mut("parameters")
                         .and_then(|p| p.as_object_mut())
-                        && params.contains_key("mask_data_base64") {
-                            let val = params.get("mask_data_base64").unwrap();
-                            if !val.is_null() {
-                                cache.insert(id.clone(), val.clone());
-                            } else {
-                                if let Some(cached_data) = cache.get(&id) {
-                                    params.insert(
-                                        "mask_data_base64".to_string(),
-                                        cached_data.clone(),
-                                    );
-                                }
+                        && params.contains_key("mask_data_base64")
+                    {
+                        let val = params.get("mask_data_base64").unwrap();
+                        if !val.is_null() {
+                            cache.insert(id.clone(), val.clone());
+                        } else {
+                            if let Some(cached_data) = cache.get(&id) {
+                                params.insert("mask_data_base64".to_string(), cached_data.clone());
                             }
                         }
+                    }
                 }
             }
         }
@@ -756,9 +756,10 @@ fn get_cached_full_warped_image(
     {
         let cache_lock = state.full_warped_cache.lock().unwrap();
         if let Some((hash, img)) = cache_lock.as_ref()
-            && *hash == geo_hash {
-                return Ok(Arc::clone(img));
-            }
+            && *hash == geo_hash
+        {
+            return Ok(Arc::clone(img));
+        }
     }
 
     let (mut full_image, is_raw) = get_full_image_for_processing(state)?;
@@ -1891,9 +1892,7 @@ fn export_masks_for_image(
         let lut_path = js_adjustments["lutPath"].as_str();
         let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
         let unique_hash = calculate_full_job_hash(source_path_str, js_adjustments);
-        let output_dir = output_path_obj
-            .parent()
-            .unwrap_or(output_path_obj);
+        let output_dir = output_path_obj.parent().unwrap_or(output_path_obj);
         let stem = output_path_obj
             .file_stem()
             .and_then(|s| s.to_str())
@@ -2038,9 +2037,10 @@ async fn export_image(
 
             let mut main_export_adjustments = js_adjustments.clone();
             if export_settings.export_masks
-                && let Some(obj) = main_export_adjustments.as_object_mut() {
-                    obj.insert("masks".to_string(), serde_json::json!([]));
-                }
+                && let Some(obj) = main_export_adjustments.as_object_mut()
+            {
+                obj.insert("masks".to_string(), serde_json::json!([]));
+            }
 
             let final_image = process_image_for_export(
                 &source_path_str,
@@ -2541,15 +2541,16 @@ async fn estimate_batch_export_size(
 
     let mut scaled_adjustments = js_adjustments.clone();
     if let Some(crop_val) = scaled_adjustments.get_mut("crop")
-        && let Ok(c) = serde_json::from_value::<Crop>(crop_val.clone()) {
-            *crop_val = serde_json::to_value(Crop {
-                x: c.x * raw_scale_factor as f64,
-                y: c.y * raw_scale_factor as f64,
-                width: c.width * raw_scale_factor as f64,
-                height: c.height * raw_scale_factor as f64,
-            })
-            .unwrap_or(serde_json::Value::Null);
-        }
+        && let Ok(c) = serde_json::from_value::<Crop>(crop_val.clone())
+    {
+        *crop_val = serde_json::to_value(Crop {
+            x: c.x * raw_scale_factor as f64,
+            y: c.y * raw_scale_factor as f64,
+            width: c.width * raw_scale_factor as f64,
+            height: c.height * raw_scale_factor as f64,
+        })
+        .unwrap_or(serde_json::Value::Null);
+    }
 
     let (transformed_shrunk_res, unscaled_crop_offset) =
         apply_all_transformations(&original_image, &scaled_adjustments);
@@ -2930,9 +2931,10 @@ async fn precompute_ai_subject_mask(
     let ai_state = ai_state_lock.as_mut().unwrap();
 
     if let Some(cached_embeddings) = &ai_state.embeddings
-        && cached_embeddings.path_hash == path_hash {
-            return Ok(());
-        }
+        && cached_embeddings.path_hash == path_hash
+    {
+        return Ok(());
+    }
 
     let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
     let mut new_embeddings = generate_image_embeddings(warped_image.as_ref(), &models.sam_encoder)
@@ -4062,9 +4064,10 @@ fn frontend_log(level: String, message: String) -> Result<(), String> {
 
 fn handle_file_open(app_handle: &tauri::AppHandle, path: PathBuf) {
     if let Some(path_str) = path.to_str()
-        && let Err(e) = app_handle.emit("open-with-file", path_str) {
-            log::error!("Failed to emit open-with-file event: {}", e);
-        }
+        && let Err(e) = app_handle.emit("open-with-file", path_str)
+    {
+        log::error!("Failed to emit open-with-file event: {}", e);
+    }
 }
 
 #[tauri::command]
@@ -4079,49 +4082,46 @@ fn frontend_ready(
     let mut should_maximize = false;
     let mut should_fullscreen = false;
 
-    if is_first_run
-        && let Ok(config_dir) = app_handle.path().app_config_dir() {
-            let path = config_dir.join("window_state.json");
+    if is_first_run && let Ok(config_dir) = app_handle.path().app_config_dir() {
+        let path = config_dir.join("window_state.json");
 
-            if let Ok(contents) = std::fs::read_to_string(&path)
-                && let Ok(saved_state) = serde_json::from_str::<WindowState>(&contents) {
-                    #[cfg(any(windows, target_os = "linux"))]
-                    {
-                        should_maximize = saved_state.maximized;
-                        should_fullscreen = saved_state.fullscreen;
-                    }
+        if let Ok(contents) = std::fs::read_to_string(&path)
+            && let Ok(saved_state) = serde_json::from_str::<WindowState>(&contents)
+        {
+            #[cfg(any(windows, target_os = "linux"))]
+            {
+                should_maximize = saved_state.maximized;
+                should_fullscreen = saved_state.fullscreen;
+            }
 
-                    if (should_maximize || should_fullscreen)
-                        && let Some(monitor) = window
-                            .current_monitor()
+            if (should_maximize || should_fullscreen)
+                && let Some(monitor) = window
+                    .current_monitor()
+                    .ok()
+                    .flatten()
+                    .or_else(|| window.primary_monitor().ok().flatten())
+                    .or_else(|| {
+                        window
+                            .available_monitors()
                             .ok()
-                            .flatten()
-                            .or_else(|| window.primary_monitor().ok().flatten())
-                            .or_else(|| {
-                                window
-                                    .available_monitors()
-                                    .ok()
-                                    .and_then(|m| m.into_iter().next())
-                            })
-                        {
-                            let monitor_size = monitor.size();
-                            let monitor_pos = monitor.position();
-                            let default_width = 1280i32;
-                            let default_height = 720i32;
-                            let center_x =
-                                monitor_pos.x + (monitor_size.width as i32 - default_width) / 2;
-                            let center_y =
-                                monitor_pos.y + (monitor_size.height as i32 - default_height) / 2;
+                            .and_then(|m| m.into_iter().next())
+                    })
+            {
+                let monitor_size = monitor.size();
+                let monitor_pos = monitor.position();
+                let default_width = 1280i32;
+                let default_height = 720i32;
+                let center_x = monitor_pos.x + (monitor_size.width as i32 - default_width) / 2;
+                let center_y = monitor_pos.y + (monitor_size.height as i32 - default_height) / 2;
 
-                            let _ = window.set_size(tauri::PhysicalSize::new(
-                                default_width as u32,
-                                default_height as u32,
-                            ));
-                            let _ = window
-                                .set_position(tauri::PhysicalPosition::new(center_x, center_y));
-                        }
-                }
+                let _ = window.set_size(tauri::PhysicalSize::new(
+                    default_width as u32,
+                    default_height as u32,
+                ));
+                let _ = window.set_position(tauri::PhysicalPosition::new(center_x, center_y));
+            }
         }
+    }
 
     if let Err(e) = window.show() {
         log::error!("Failed to show window: {}", e);

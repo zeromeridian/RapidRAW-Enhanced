@@ -54,9 +54,10 @@ fn develop_internal(
 ) -> Result<(DynamicImage, Orientation)> {
     let check_cancel = || -> Result<()> {
         if let Some((tracker, generation)) = &cancel_token
-            && tracker.load(Ordering::SeqCst) != *generation {
-                return Err(anyhow!("Load cancelled"));
-            }
+            && tracker.load(Ordering::SeqCst) != *generation
+        {
+            return Err(anyhow!("Load cancelled"));
+        }
         Ok(())
     };
 
@@ -86,12 +87,14 @@ fn develop_internal(
 
     let original_white_level = raw_image
         .whitelevel
-        .0.first()
+        .0
+        .first()
         .cloned()
         .unwrap_or(u16::MAX as u32) as f32;
     let original_black_level = raw_image
         .blacklevel
-        .levels.first()
+        .levels
+        .first()
         .map(|r| r.as_f32())
         .unwrap_or(0.0);
 
@@ -229,17 +232,18 @@ pub fn get_fast_demosaic_scale_factor(
 ) -> f32 {
     let source = RawSource::new_from_slice(file_bytes);
     if let Ok(decoder) = rawler::get_decoder(&source)
-        && let Ok(raw_img) = decoder.raw_image(&source, &RawDecodeParams::default(), true) {
-            let max_orig = (raw_img.width as f32).max(raw_img.height as f32);
-            let max_comp = (decoded_width as f32).max(decoded_height as f32);
-            if max_orig > 0.0 {
-                let ratio = max_comp / max_orig;
-                if ratio > 0.1 && ratio < 0.35 {
-                    return 0.25;
-                } else if (0.35..0.75).contains(&ratio) {
-                    return 0.5;
-                }
+        && let Ok(raw_img) = decoder.raw_image(&source, &RawDecodeParams::default(), true)
+    {
+        let max_orig = (raw_img.width as f32).max(raw_img.height as f32);
+        let max_comp = (decoded_width as f32).max(decoded_height as f32);
+        if max_orig > 0.0 {
+            let ratio = max_comp / max_orig;
+            if ratio > 0.1 && ratio < 0.35 {
+                return 0.25;
+            } else if (0.35..0.75).contains(&ratio) {
+                return 0.5;
             }
         }
+    }
     1.0
 }

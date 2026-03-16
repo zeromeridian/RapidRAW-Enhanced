@@ -479,15 +479,14 @@ fn block_matching_joint(
             let d_b = compute_ssd_flat(&channels[2], w, x, y, &ref_b, threshold - (d_r + d_g));
             let total_dist = d_r + d_g + d_b;
 
-            if total_dist < threshold
-                && cand_count < MAX_CANDIDATES {
-                    candidates[cand_count] = Match {
-                        dist: total_dist,
-                        x: x as u16,
-                        y: y as u16,
-                    };
-                    cand_count += 1;
-                }
+            if total_dist < threshold && cand_count < MAX_CANDIDATES {
+                candidates[cand_count] = Match {
+                    dist: total_dist,
+                    x: x as u16,
+                    y: y as u16,
+                };
+                cand_count += 1;
+            }
         }
     }
 

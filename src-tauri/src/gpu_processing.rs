@@ -1259,10 +1259,12 @@ pub fn process_and_get_dynamic_image(
 
     let mut cache_lock = state.gpu_image_cache.lock().unwrap();
     if let Some(cache) = &*cache_lock
-        && (cache.transform_hash != transform_hash || cache.width != width || cache.height != height)
-        {
-            *cache_lock = None;
-        }
+        && (cache.transform_hash != transform_hash
+            || cache.width != width
+            || cache.height != height)
+    {
+        *cache_lock = None;
+    }
 
     if cache_lock.is_none() {
         let img_rgba_f16 = to_rgba_f16(base_image);
