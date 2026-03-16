@@ -1041,7 +1041,6 @@ fn process_preview_job(
         }
 
         if let Some(r) = pixel_roi.filter(|_| is_interactive) {
-
             let step_start = std::time::Instant::now();
             let roi_rgb = final_processed_image.to_rgb8();
 
