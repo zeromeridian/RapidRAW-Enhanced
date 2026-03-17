@@ -446,9 +446,9 @@ fn find_pairwise_seam_dp_vertical(
     let mut first_overlap_row = usize::MAX;
     let mut last_overlap_row = 0;
 
-    for y_out in 0..out_height as usize {
+    for (y_out, cost_row) in cost_matrix.iter_mut().enumerate() {
         let mut row_has_overlap = false;
-        for x_out in 0..out_width as usize {
+        for (x_out, cost_val) in cost_row.iter_mut().enumerate() {
             if pano_mask.get_pixel(x_out as u32, y_out as u32)[0] == 0 {
                 continue;
             }
@@ -463,7 +463,7 @@ fn find_pairwise_seam_dp_vertical(
                     + (p_pano[1] as f64 - p_add[1] as f64).powi(2)
                     + (p_pano[2] as f64 - p_add[2] as f64).powi(2))
                 .sqrt();
-                cost_matrix[y_out][x_out] = energy;
+                *cost_val = energy;
                 row_has_overlap = true;
             }
         }
@@ -510,9 +510,9 @@ fn find_pairwise_seam_dp_vertical(
 
     let mut seam = vec![0i32; out_height as usize];
     let (mut min_cost, mut current_x) = (f64::INFINITY, 0);
-    for x in 0..out_width as usize {
-        if cost_matrix[last_overlap_row][x] < min_cost {
-            min_cost = cost_matrix[last_overlap_row][x];
+    for (x, &cost) in cost_matrix[last_overlap_row].iter().enumerate() {
+        if cost < min_cost {
+            min_cost = cost;
             current_x = x as i32;
         }
     }
@@ -552,8 +552,8 @@ fn find_pairwise_seam_dp_horizontal(
     let mut first_overlap_col = usize::MAX;
     let mut last_overlap_col = 0;
 
-    for y_out in 0..out_height as usize {
-        for x_out in 0..out_width as usize {
+    for (y_out, cost_row) in cost_matrix.iter_mut().enumerate() {
+        for (x_out, cost_val) in cost_row.iter_mut().enumerate() {
             if pano_mask.get_pixel(x_out as u32, y_out as u32)[0] == 0 {
                 continue;
             }
@@ -568,7 +568,7 @@ fn find_pairwise_seam_dp_horizontal(
                     + (p_pano[1] as f64 - p_add[1] as f64).powi(2)
                     + (p_pano[2] as f64 - p_add[2] as f64).powi(2))
                 .sqrt();
-                cost_matrix[y_out][x_out] = energy;
+                *cost_val = energy;
                 first_overlap_col = first_overlap_col.min(x_out);
                 last_overlap_col = last_overlap_col.max(x_out);
             }
@@ -610,9 +610,9 @@ fn find_pairwise_seam_dp_horizontal(
 
     let mut seam = vec![0i32; out_width as usize];
     let (mut min_cost, mut current_y) = (f64::INFINITY, 0);
-    for y in 0..out_height as usize {
-        if cost_matrix[y][last_overlap_col] < min_cost {
-            min_cost = cost_matrix[y][last_overlap_col];
+    for (y, cost_row) in cost_matrix.iter().enumerate() {
+        if cost_row[last_overlap_col] < min_cost {
+            min_cost = cost_row[last_overlap_col];
             current_y = y as i32;
         }
     }

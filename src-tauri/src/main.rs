@@ -1040,9 +1040,7 @@ fn process_preview_job(
             }
         }
 
-        if is_interactive && pixel_roi.is_some() {
-            let r = pixel_roi.unwrap();
-
+        if let Some(r) = pixel_roi.filter(|_| is_interactive) {
             let step_start = std::time::Instant::now();
             let roi_rgb = final_processed_image.to_rgb8();
 

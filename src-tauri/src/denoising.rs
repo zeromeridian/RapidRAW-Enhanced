@@ -676,13 +676,13 @@ fn idct_2d_8x8(block: &mut [f32], coeffs: &[f32; 64]) {
 fn dct_1d_8(x: &mut [f32], coeffs: &[f32; 64]) {
     let mut tmp = [0.0; 8];
     tmp.copy_from_slice(x);
-    for k in 0..8 {
+    for (k, x_k) in x[..8].iter_mut().enumerate() {
         let mut s = 0.0;
         let row_start = k * 8;
-        for n in 0..8 {
-            s += tmp[n] * coeffs[row_start + n];
+        for (n, &tmp_n) in tmp.iter().enumerate() {
+            s += tmp_n * coeffs[row_start + n];
         }
-        x[k] = s;
+        *x_k = s;
     }
 }
 
@@ -690,13 +690,13 @@ fn dct_1d_8(x: &mut [f32], coeffs: &[f32; 64]) {
 fn idct_1d_8(x: &mut [f32], coeffs: &[f32; 64]) {
     let mut tmp = [0.0; 8];
     tmp.copy_from_slice(x);
-    for n in 0..8 {
+    for (n, x_n) in x[..8].iter_mut().enumerate() {
         let mut s = 0.0;
         let row_start = n * 8;
-        for k in 0..8 {
-            s += tmp[k] * coeffs[row_start + k];
+        for (k, &tmp_k) in tmp.iter().enumerate() {
+            s += tmp_k * coeffs[row_start + k];
         }
-        x[n] = s;
+        *x_n = s;
     }
 }
 
@@ -773,9 +773,9 @@ fn gaussian_blur_1ch(data: &[f32], width: usize, height: usize, sigma: f32) -> V
     let klen = 2 * radius + 1;
     let mut kernel = vec![0.0f32; klen];
     let two_s2 = 2.0 * sigma * sigma;
-    for i in 0..klen {
+    for (i, kernel_val) in kernel.iter_mut().enumerate() {
         let k = i as f32 - radius as f32;
-        kernel[i] = (-k * k / two_s2).exp();
+        *kernel_val = (-k * k / two_s2).exp();
     }
     let ksum: f32 = kernel.iter().sum();
     for k in &mut kernel {
@@ -787,18 +787,18 @@ fn gaussian_blur_1ch(data: &[f32], width: usize, height: usize, sigma: f32) -> V
     for y in 0..height {
         let row_in = &data[y * width..(y + 1) * width];
         let row_out = &mut tmp[y * width..(y + 1) * width];
-        for x in 0..width {
+        for (x, out_val) in row_out.iter_mut().enumerate() {
             let mut val = 0.0f32;
             let mut wsum = 0.0f32;
             let x0 = x as isize - radius as isize;
-            for ki in 0..klen {
+            for (ki, &kernel_val) in kernel.iter().enumerate() {
                 let kx = x0 + ki as isize;
                 if kx >= 0 && kx < width as isize {
-                    val += row_in[kx as usize] * kernel[ki];
-                    wsum += kernel[ki];
+                    val += row_in[kx as usize] * kernel_val;
+                    wsum += kernel_val;
                 }
             }
-            row_out[x] = val / wsum;
+            *out_val = val / wsum;
         }
     }
 
@@ -809,11 +809,11 @@ fn gaussian_blur_1ch(data: &[f32], width: usize, height: usize, sigma: f32) -> V
         for x in 0..width {
             let mut val = 0.0f32;
             let mut wsum = 0.0f32;
-            for ki in 0..klen {
+            for (ki, &kernel_val) in kernel.iter().enumerate() {
                 let ky = y0 + ki as isize;
                 if ky >= 0 && ky < height as isize {
-                    val += tmp[ky as usize * width + x] * kernel[ki];
-                    wsum += kernel[ki];
+                    val += tmp[ky as usize * width + x] * kernel_val;
+                    wsum += kernel_val;
                 }
             }
             out[y * width + x] = val / wsum;

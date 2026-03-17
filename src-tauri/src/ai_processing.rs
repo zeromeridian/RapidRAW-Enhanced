@@ -91,12 +91,12 @@ fn edt_1d(f: &mut [f32], v: &mut [usize], z: &mut [f32], d: &mut [f32]) {
         z[k + 1] = f32::INFINITY;
     }
     k = 0;
-    for q in 0..n {
+    for (q, d_q) in d[..n].iter_mut().enumerate() {
         while z[k + 1] < q as f32 {
             k += 1;
         }
         let diff = q as f32 - v[k] as f32;
-        d[q] = diff * diff + f[v[k]];
+        *d_q = diff * diff + f[v[k]];
     }
     f.copy_from_slice(&d[..n]);
 }
