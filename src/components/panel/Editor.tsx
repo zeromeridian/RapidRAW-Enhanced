@@ -5,14 +5,8 @@ import { Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import { ImageDimensions, useImageRenderSize } from '../../hooks/useImageRenderSize';
-import {
-  Adjustments,
-  AiPatch,
-  calculateCenteredCrop,
-  getOrientedDimensions,
-  Coord,
-  MaskContainer,
-} from '../../utils/adjustments';
+import { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
+import { calculateCenteredCrop, getOrientedDimensions } from '../../utils/cropUtils';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
 import { Mask, SubMask } from './right/Masks';

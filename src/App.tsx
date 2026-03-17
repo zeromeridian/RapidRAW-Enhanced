@@ -79,7 +79,6 @@ import {
   Color,
   COLOR_LABELS,
   Coord,
-  calculateCenteredCrop,
   COPYABLE_ADJUSTMENT_KEYS,
   INITIAL_ADJUSTMENTS,
   MaskContainer,
@@ -87,6 +86,7 @@ import {
   PasteMode,
   CopyPasteSettings,
 } from './utils/adjustments';
+import { calculateCenteredCrop } from './utils/cropUtils';
 import { generatePaletteFromImage } from './utils/palette';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import GlobalTooltip from './components/ui/GlobalTooltip';
