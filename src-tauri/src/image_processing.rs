@@ -514,7 +514,7 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
     let origin_vec = NaVector3::new(inv[(0, 2)], inv[(1, 2)], inv[(2, 2)]);
 
     let max_radius_sq_inv = 1.0 / ((cx * cx + cy * cy) as f64);
-    let hd = half_diagonal as f64;
+    let hd = half_diagonal;
 
     let k_distortion = (params.distortion as f64 / 100.0) * 2.5;
     let lk1 = params.lens_dist_k1 as f64;
@@ -670,7 +670,7 @@ pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams
     let (forward_transform, cx, cy, half_diagonal) =
         build_transform_matrices(&params, width as f32, height as f32);
     let max_radius_sq_inv = 1.0 / ((cx * cx + cy * cy) as f64);
-    let hd = half_diagonal as f64;
+    let hd = half_diagonal;
 
     let k_distortion = (params.distortion as f64 / 100.0) * 2.5;
     let lk1 = params.lens_dist_k1 as f64;
@@ -1380,9 +1380,9 @@ fn calculate_agx_matrices() -> (GpuMat3, GpuMat3) {
     let xyz_to_base_profile = base_profile_to_xyz.inverse();
     let pipe_to_base = xyz_to_base_profile * pipe_work_profile_to_xyz;
 
-    let inset = [0.29462451, 0.25861925, 0.14641371];
+    let inset = [0.294_624_5, 0.25861925, 0.14641371];
     let rotation = [0.03540329, -0.02108586, -0.06305724];
-    let outset = [0.290776401758, 0.263155400753, 0.045810721815];
+    let outset = [0.290_776_4, 0.263_155_4, 0.045_810_72];
     let unrotation = [0.03540329, -0.02108586, -0.06305724];
     let master_outset_ratio = 1.0;
     let master_unrotation_ratio = 0.0;
@@ -1796,7 +1796,7 @@ pub fn get_all_adjustments_from_json(
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
         .get("masks")
         .and_then(|m| serde_json::from_value(m.clone()).ok())
-        .unwrap_or_else(Vec::new);
+        .unwrap_or_default();
 
     for (i, mask_def) in mask_definitions
         .iter()
@@ -1885,7 +1885,7 @@ pub fn remove_raw_artifacts_and_enhance(image: &mut DynamicImage) {
                 let mut w_sum = 0.0;
 
                 for (ki, &ky) in OFFSETS.iter().enumerate() {
-                    let sy = y_isize + ky as isize;
+                    let sy = y_isize + ky;
                     if sy < 0 || sy >= h_isize {
                         continue;
                     }
@@ -1894,7 +1894,7 @@ pub fn remove_raw_artifacts_and_enhance(image: &mut DynamicImage) {
                     let ky_sq_div_50 = OFFSET_SQUARES[ki] * 0.02;
 
                     for (kj, &kx) in OFFSETS.iter().enumerate() {
-                        let sx = (x as isize) + kx as isize;
+                        let sx = (x as isize) + kx;
                         if sx < 0 || sx >= w_isize {
                             continue;
                         }
@@ -2414,7 +2414,7 @@ pub fn calculate_waveform_from_image(
             if x < 82 {
                 rgba_parade[off] = 255;
                 rgba_parade[off + 3] = bright;
-            } else if x >= 87 && x < 169 {
+            } else if (87..169).contains(&x) {
                 rgba_parade[off + 1] = 255;
                 rgba_parade[off + 3] = bright;
             } else if x >= 174 {

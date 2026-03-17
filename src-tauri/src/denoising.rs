@@ -155,7 +155,7 @@ pub fn denoise_image(
     );
 
     let _ = app_handle.emit("denoise-progress", "Finalizing data...");
-    let out_img_buffer = merge_channels(&vec![r, g, b], width, height);
+    let out_img_buffer = merge_channels(&[r, g, b], width, height);
     let out_dynamic = DynamicImage::ImageRgb32F(out_img_buffer);
 
     let _ = app_handle.emit("denoise-progress", "Generating previews...");
@@ -284,7 +284,7 @@ fn run_bm3d_step_joint(
 
     ref_patches.par_iter().for_each(|&(rx, ry)| {
         let c = counter.fetch_add(1, AtomicOrdering::Relaxed);
-        if c % 200 == 0 {
+        if c.is_multiple_of(200) {
             let pct = (c as f32 / total_work as f32) * 100.0;
             let step_str = if is_step_1 { "Step 1/2" } else { "Step 2/2" };
             let msg = format!("{} - {:.0}%", step_str, pct);
@@ -479,15 +479,13 @@ fn block_matching_joint(
             let d_b = compute_ssd_flat(&channels[2], w, x, y, &ref_b, threshold - (d_r + d_g));
             let total_dist = d_r + d_g + d_b;
 
-            if total_dist < threshold {
-                if cand_count < MAX_CANDIDATES {
-                    candidates[cand_count] = Match {
-                        dist: total_dist,
-                        x: x as u16,
-                        y: y as u16,
-                    };
-                    cand_count += 1;
-                }
+            if total_dist < threshold && cand_count < MAX_CANDIDATES {
+                candidates[cand_count] = Match {
+                    dist: total_dist,
+                    x: x as u16,
+                    y: y as u16,
+                };
+                cand_count += 1;
             }
         }
     }
