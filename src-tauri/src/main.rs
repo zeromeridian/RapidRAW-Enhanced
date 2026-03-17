@@ -1141,12 +1141,13 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
                 && let Ok(waveform_data) = image_processing::calculate_waveform_from_image(
                     &job.image,
                     job.active_waveform_channel.as_deref(),
-                ) {
-                    let _ = app_handle.emit(
-                        "waveform-update",
-                        serde_json::json!({ "path": job.path, "data": waveform_data }),
-                    );
-                }
+                )
+            {
+                let _ = app_handle.emit(
+                    "waveform-update",
+                    serde_json::json!({ "path": job.path, "data": waveform_data }),
+                );
+            }
         }
     });
 }
