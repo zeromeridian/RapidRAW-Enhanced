@@ -2976,13 +2976,15 @@ pub fn sync_metadata_from_xmp(source_path: &Path, metadata: &mut ImageMetadata) 
         if let Ok(content) = fs::read_to_string(&xmp_file) {
             if metadata.rating == 0 {
                 if let Some(rating) = extract_xmp_rating(&content) {
-                    metadata.rating = rating;
-                    if let Some(obj) = metadata.adjustments.as_object_mut() {
-                        obj.insert("rating".to_string(), serde_json::json!(rating));
-                    } else {
-                        metadata.adjustments = serde_json::json!({"rating": rating});
+                    if rating != 0 {
+                        metadata.rating = rating;
+                        if let Some(obj) = metadata.adjustments.as_object_mut() {
+                            obj.insert("rating".to_string(), serde_json::json!(rating));
+                        } else {
+                            metadata.adjustments = serde_json::json!({"rating": rating});
+                        }
+                        changed = true;
                     }
-                    changed = true;
                 }
             }
 
