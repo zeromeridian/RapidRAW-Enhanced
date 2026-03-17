@@ -2961,6 +2961,7 @@ pub fn sync_metadata_from_xmp(source_path: &Path, metadata: &mut ImageMetadata) 
     {
         if metadata.rating == 0
             && let Some(rating) = extract_xmp_rating(&content)
+            && rating != 0 
         {
             metadata.rating = rating;
             if let Some(obj) = metadata.adjustments.as_object_mut() {
@@ -2997,6 +2998,7 @@ pub fn sync_metadata_from_xmp(source_path: &Path, metadata: &mut ImageMetadata) 
             changed = true;
         }
     }
+
     changed
 }
 
