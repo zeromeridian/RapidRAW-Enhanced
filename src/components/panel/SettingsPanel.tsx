@@ -1197,6 +1197,88 @@ export default function SettingsPanel({
                     </div>
                   </div>
                 </div>
+
+                <div className="p-6 bg-surface rounded-xl shadow-md">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-6">
+                    Special Thanks
+                  </Text>
+                  <Text className="mb-4">
+                    A huge thank you to the following projects that were very important in the development of RapidRAW:
+                  </Text>
+                  <Text as="ul" className="space-y-3 list-disc ml-5 pl-1">
+                    <li>
+                      <a
+                        href="https://github.com/dnglab/dnglab/tree/main/rawler"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-accent hover:underline"
+                      >
+                        rawler
+                      </a>
+                      : For the excellent Rust crate that provides the foundation for RAW file processing in this
+                      project.
+                    </li>
+                    <li>
+                      <a
+                        href="https://lensfun.github.io/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-accent hover:underline"
+                      >
+                        lensfun
+                      </a>
+                      : For its invaluable open-source library and comprehensive database for automatic lens correction.
+                    </li>
+                    <li>
+                      <a
+                        href="https://github.com/marcinz606/NegPy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-accent hover:underline"
+                      >
+                        NegPy
+                      </a>
+                      : For the inspiration behind the negative conversion logic.
+                    </li>
+                    <li>
+                      <a
+                        href="https://github.com/facebookresearch/sam2"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-accent hover:underline"
+                      >
+                        SAM 2
+                      </a>
+                      : For providing the foundation model used for the AI subject detection capabilities.
+                    </li>
+                    <li>
+                      <a
+                        href="https://github.com/xuebinqin/U-2-Net"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-accent hover:underline"
+                      >
+                        U-2-Net
+                      </a>
+                      : For providing the robust architecture used for the AI sky and foreground detection capabilities.
+                    </li>
+                    <li>
+                      <a
+                        href="https://github.com/darktable-org/darktable"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-accent hover:underline"
+                      >
+                        darktable & co.
+                      </a>
+                      : For some reference implementations that guided parts of this work.
+                    </li>
+                    <li>
+                      <span className="font-semibold text-accent">You</span>: For using and supporting RapidRAW. Your
+                      interest keeps this project alive and evolving.
+                    </li>
+                  </Text>
+                </div>
               </motion.div>
             )}
 
