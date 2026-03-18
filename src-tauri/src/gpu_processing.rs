@@ -17,6 +17,13 @@ pub struct Roi {
     pub height: u32,
 }
 
+pub struct RenderRequest<'a> {
+    pub adjustments: AllAdjustments,
+    pub mask_bitmaps: &'a [ImageBuffer<Luma<u8>, Vec<u8>>],
+    pub lut: Option<Arc<Lut>>,
+    pub roi: Option<Roi>,
+}
+
 pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuContext, String> {
     let mut context_lock = state.gpu_context.lock().unwrap();
     if let Some(context) = &*context_lock {
@@ -723,17 +730,14 @@ impl GpuProcessor {
         input_texture_view: &wgpu::TextureView,
         width: u32,
         height: u32,
-        roi: Option<Roi>,
-        adjustments: AllAdjustments,
-        mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
-        lut: Option<Arc<Lut>>,
+        request: RenderRequest,
     ) -> Result<(Vec<u8>, u32, u32), String> {
         let device = &self.context.device;
         let queue = &self.context.queue;
         let scale = (width.min(height) as f32) / 1080.0;
         const MAX_MASKS: u32 = 8;
 
-        let bounds = roi.unwrap_or(Roi {
+        let bounds = request.roi.unwrap_or(Roi {
             x: 0,
             y: 0,
             width,
@@ -747,7 +751,7 @@ impl GpuProcessor {
             height,
             depth_or_array_layers: 1,
         };
-        let mask_views: Vec<wgpu::TextureView> = mask_bitmaps
+        let mask_views: Vec<wgpu::TextureView> = request.mask_bitmaps
             .iter()
             .map(|mask_bitmap| {
                 let mask_texture = device.create_texture_with_data(
@@ -769,7 +773,7 @@ impl GpuProcessor {
             })
             .collect();
 
-        let (lut_texture_view, lut_sampler) = if let Some(lut_arc) = &lut {
+        let (lut_texture_view, lut_sampler) = if let Some(lut_arc) = &request.lut {
             let lut_data = &lut_arc.data;
             let size = lut_arc.size;
             let mut rgba_lut_data_f16 = Vec::with_capacity(lut_data.len() / 3 * 4);
@@ -812,6 +816,7 @@ impl GpuProcessor {
             (self.dummy_lut_view.clone(), self.dummy_lut_sampler.clone())
         };
 
+        let adjustments = request.adjustments;
         if adjustments.global.flare_amount > 0.0 {
             let mut encoder = device.create_command_encoder(&Default::default());
 
@@ -1236,10 +1241,7 @@ pub fn process_and_get_dynamic_image(
     state: &tauri::State<AppState>,
     base_image: &DynamicImage,
     transform_hash: u64,
-    all_adjustments: AllAdjustments,
-    mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
-    lut: Option<Arc<Lut>>,
-    roi: Option<Roi>,
+    request: RenderRequest,
     caller_id: &str,
 ) -> Result<DynamicImage, String> {
     let start_time = Instant::now();
@@ -1328,10 +1330,7 @@ pub fn process_and_get_dynamic_image(
         &cache.texture_view,
         cache.width,
         cache.height,
-        roi,
-        all_adjustments,
-        mask_bitmaps,
-        lut,
+        request,
     )?;
 
     let duration = start_time.elapsed();

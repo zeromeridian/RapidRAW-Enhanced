@@ -1105,10 +1105,12 @@ pub fn generate_thumbnail_data(
             &state,
             &cropped_preview,
             unique_hash,
-            gpu_adjustments,
-            &mask_bitmaps,
-            lut,
-            None,
+            gpu_processing::RenderRequest {
+                adjustments: gpu_adjustments,
+                mask_bitmaps: &mask_bitmaps,
+                lut,
+                roi: None,
+            },
             "generate_thumbnail_data",
         ) {
             return Ok(processed_image);
