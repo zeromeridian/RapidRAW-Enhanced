@@ -874,7 +874,7 @@ function DraggableGridItem({ maskType, isGenerating, onClick, onRightClick, acti
         maskType.disabled
           ? 'Coming Soon'
           : activePatchContainerId
-            ? `Left click adds ${maskType.name} to the current edit. Right click creates a new ${maskType.name} edit.`
+            ? `Add ${maskType.name} to Current Edit or Create New (Right-click)`
             : `Create New ${maskType.name} Edit`
       }
     >

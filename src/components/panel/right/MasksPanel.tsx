@@ -968,7 +968,7 @@ function DraggableGridItem({ maskType, onClick, onRightClick, isDraggable, activ
     : maskType.id === 'others'
       ? 'Show More Mask Types'
       : activeMaskContainerId
-        ? `Left click adds ${maskType.name} to the current mask. Right click creates a new ${maskType.name} mask.`
+        ? `Add ${maskType.name} to Current Mask or Create New (Right-click)`
         : `Create New ${maskType.name} Mask`;
 
   return (
@@ -986,7 +986,7 @@ function DraggableGridItem({ maskType, onClick, onRightClick, isDraggable, activ
         if (event.button !== 2) return;
         onRightClick(event);
       }}
-      className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors 
+      className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors
                 ${maskType.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'} ${isDragging ? 'opacity-50' : ''}`}
       data-tooltip={tooltip}
     >

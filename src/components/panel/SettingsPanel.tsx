@@ -1685,16 +1685,13 @@ export default function SettingsPanel({
                           keys={['Shift', '+', 'Mouse Wheel']}
                           description="Adjust slider value by 2 steps"
                         />
-                        <KeybindItem
-                          keys={['Right Click']}
-                          description="Create a new mask/edit from a tool button"
-                        />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '+']} description="Zoom in" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '-']} description="Zoom out" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '0']} description="Zoom to fit" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '1']} description="Zoom to 100%" />
                         <KeybindItem keys={['F']} description="Toggle fullscreen" />
                         <KeybindItem keys={['B']} description="Show original (before/after)" />
+                        <KeybindItem keys={['S']} description="Straighten Image" />
                         <KeybindItem keys={['D']} description="Toggle Adjustments panel" />
                         <KeybindItem keys={['R']} description="Toggle Crop panel" />
                         <KeybindItem keys={['M']} description="Toggle Masks panel" />
