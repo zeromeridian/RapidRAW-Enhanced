@@ -13,8 +13,6 @@ use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering as AtomicOrdering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
-// Notice we no longer import ort modules here at all!
-
 const BLOCK_SIZE: usize = 8;
 const BLOCK_AREA: usize = 64;
 const MAX_GROUP_SIZE: usize = 16;

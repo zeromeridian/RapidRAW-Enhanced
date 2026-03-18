@@ -60,20 +60,21 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+- **2026-03-17:** Implemented AI NIND denoising
 - **2026-03-16:** LRU cache for instant image loading
 - **2026-03-15:** Improved high quality subject mask models, various UI improvements and shader improvements
 - **2026-03-14:** New image analytics panel which can display vectorscopes, waveforms, parades & histograms
 - **2026-03-13:** JPEG XL, WebP, and additional format support, including the ability to export LUTs.
-- **2026-03-12:** Add parametric color & luminance masks
+- **2026-03-12:** Added parametric color & luminance masks
 - **2026-03-10:** Implement region of interest rendering to improve performance when zooming in
 - **2026-03-07:** Batch negative conversion & various shader improvements
 - **2026-03-06:** Performance optimizations and UI cleanup
 - **2026-03-05:** Initial draw support for linear & radial masks
-- **2026-03-04:** Real-time mask overlay rendering & pixel perfect zooming
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+- **2026-03-04:** Real-time mask overlay rendering & pixel perfect zooming
 - **2026-03-03:** Instant image rendering & real-time histogram update
 - **2026-03-02:** Remember last export settings & lens correction auto cropping
 - **2026-03-01:** Optimized pixelated interpolation at maximum zoom level
