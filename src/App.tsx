@@ -7,7 +7,7 @@ import { platform } from '@tauri-apps/plugin-os';
 import { homeDir } from '@tauri-apps/api/path';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import debounce from 'lodash.debounce';
-import throttle from 'lodash.throttle';
+import { ImageLRUCache, ImageCacheEntry } from './utils/ImageLRUCache';
 import { ClerkProvider } from '@clerk/react';
 import { ToastContainer, toast, Slide } from 'react-toastify';
 import clsx from 'clsx';
@@ -279,6 +279,10 @@ function App() {
   const [histogram, setHistogram] = useState<ChannelConfig | null>(null);
   const [waveform, setWaveform] = useState<WaveformData | null>(null);
   const [isWaveformVisible, setIsWaveformVisible] = useState(false);
+  const [activeWaveformChannel, setActiveWaveformChannel] = useState<string>('luma');
+  const activeWaveformChannelRef = useRef(activeWaveformChannel);
+  activeWaveformChannelRef.current = activeWaveformChannel;
+  const [waveformHeight, setWaveformHeight] = useState<number>(220);
   const [uiVisibility, setUiVisibility] = useState<UiVisibility>({
     folderTree: true,
     filmstrip: true,
@@ -303,44 +307,14 @@ function App() {
   const [baseRenderSize, setBaseRenderSize] = useState<ImageDimensions>({ width: 0, height: 0 });
   const baseRenderSizeRef = useRef<any>(null);
   const [originalSize, setOriginalSize] = useState<ImageDimensions>({ width: 0, height: 0 });
-  const [isLoadingFullRes, setIsLoadingFullRes] = useState(false);
   const [isRotationActive, setIsRotationActive] = useState(false);
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('thirds');
   const [overlayRotation, setOverlayRotation] = useState(0);
   const [transformedOriginalUrl, setTransformedOriginalUrl] = useState<string | null>(null);
   const patchesSentToBackend = useRef<Set<string>>(new Set());
-
-  const handleDisplaySizeChange = useCallback(
-    (
-      size: ImageDimensions & {
-        scale?: number;
-        offsetX?: number;
-        offsetY?: number;
-        containerWidth?: number;
-        containerHeight?: number;
-      },
-    ) => {
-      setDisplaySize({ width: size.width, height: size.height });
-
-      if (size.scale) {
-        const baseWidth = size.width / size.scale;
-        const baseHeight = size.height / size.scale;
-        const newSize = {
-          width: baseWidth,
-          height: baseHeight,
-          offsetX: size.offsetX || 0,
-          offsetY: size.offsetY || 0,
-          containerWidth: size.containerWidth || 0,
-          containerHeight: size.containerHeight || 0,
-        };
-        baseRenderSizeRef.current = newSize;
-        setBaseRenderSize(newSize as any);
-      }
-    },
-    [],
-  );
-
-  const [initialFitScale, setInitialFitScale] = useState<number | null>(null);
+  const imageCacheRef = useRef(new ImageLRUCache(20));
+  const isBackendReadyRef = useRef(true);
+  const cachedEditStateRef = useRef<ImageCacheEntry | null>(null);
   const [renderedRightPanel, setRenderedRightPanel] = useState<Panel | null>(activeRightPanel);
   const [collapsibleSectionsState, setCollapsibleSectionsState] = useState<CollapsibleSectionsState>({
     basic: true,
@@ -610,6 +584,39 @@ function App() {
       unlisten.then((f) => f());
     };
   }, []);
+
+  useEffect(() => {
+    const activeSubMask =
+      adjustments?.masks?.flatMap((m: any) => m.subMasks).find((sm: any) => sm.id === activeMaskId) ||
+      adjustments?.aiPatches?.flatMap((p: any) => p.subMasks).find((sm: any) => sm.id === activeAiSubMaskId);
+
+    if (activeSubMask?.type === 'ai-subject' && selectedImage?.path) {
+      const transformAdjustments = {
+        transformDistortion: adjustments.transformDistortion,
+        transformVertical: adjustments.transformVertical,
+        transformHorizontal: adjustments.transformHorizontal,
+        transformRotate: adjustments.transformRotate,
+        transformAspect: adjustments.transformAspect,
+        transformScale: adjustments.transformScale,
+        transformXOffset: adjustments.transformXOffset,
+        transformYOffset: adjustments.transformYOffset,
+        lensDistortionAmount: adjustments.lensDistortionAmount,
+        lensVignetteAmount: adjustments.lensVignetteAmount,
+        lensTcaAmount: adjustments.lensTcaAmount,
+        lensDistortionParams: adjustments.lensDistortionParams,
+        lensMaker: adjustments.lensMaker,
+        lensModel: adjustments.lensModel,
+        lensDistortionEnabled: adjustments.lensDistortionEnabled,
+        lensTcaEnabled: adjustments.lensTcaEnabled,
+        lensVignetteEnabled: adjustments.lensVignetteEnabled,
+      };
+
+      invoke('precompute_ai_subject_mask', {
+        jsAdjustments: transformAdjustments,
+        path: selectedImage.path,
+      }).catch((err) => console.error('Failed to precompute AI subject mask:', err));
+    }
+  }, [activeMaskId, activeAiSubMaskId, selectedImage?.path]);
 
   const updateSubMask = (subMaskId: string, updatedData: any) => {
     setAdjustments((prev: Adjustments) => ({
@@ -1225,6 +1232,62 @@ function App() {
     return list;
   }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchCriteria, appSettings]);
 
+  useEffect(() => {
+    if (selectedImage?.path && selectedImage.isReady && finalPreviewUrl) {
+      cachedEditStateRef.current = {
+        adjustments,
+        histogram,
+        waveform,
+        finalPreviewUrl,
+        uncroppedPreviewUrl: uncroppedAdjustedPreviewUrl,
+        selectedImage,
+        originalSize,
+        previewSize,
+      };
+    } else {
+      cachedEditStateRef.current = null;
+    }
+  }, [
+    selectedImage,
+    adjustments,
+    histogram,
+    waveform,
+    finalPreviewUrl,
+    uncroppedAdjustedPreviewUrl,
+    originalSize,
+    previewSize,
+  ]);
+
+  const handleDisplaySizeChange = useCallback(
+    (
+      size: ImageDimensions & {
+        scale?: number;
+        offsetX?: number;
+        offsetY?: number;
+        containerWidth?: number;
+        containerHeight?: number;
+      },
+    ) => {
+      setDisplaySize({ width: size.width, height: size.height });
+
+      if (size.scale) {
+        const baseWidth = size.width / size.scale;
+        const baseHeight = size.height / size.scale;
+        const newSize = {
+          width: baseWidth,
+          height: baseHeight,
+          offsetX: size.offsetX || 0,
+          offsetY: size.offsetY || 0,
+          containerWidth: size.containerWidth || 0,
+          containerHeight: size.containerHeight || 0,
+        };
+        baseRenderSizeRef.current = newSize;
+        setBaseRenderSize(newSize as any);
+      }
+    },
+    [],
+  );
+
   const calculateROI = useCallback(() => {
     if (!transformWrapperRef.current) return null;
     const state = transformWrapperRef.current.instance.transformState;
@@ -1280,6 +1343,7 @@ function App() {
   const applyAdjustments = useCallback(
     async (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
       if (!selectedImage?.isReady) return;
+      if (!isBackendReadyRef.current) return;
       const currentPath = selectedImage.path;
 
       const payload = JSON.parse(JSON.stringify(currentAdjustments));
@@ -1321,6 +1385,8 @@ function App() {
           isInteractive: dragging,
           targetResolution: targetRes || null,
           roi: roi || null,
+          computeWaveform: !!isWaveformVisible,
+          activeWaveformChannel: activeWaveformChannelRef.current || null,
         });
 
         if (currentPath !== selectedImagePathRef.current) return;
@@ -1330,9 +1396,23 @@ function App() {
           const blob = new Blob([buffer], { type: 'image/jpeg' });
           const url = URL.createObjectURL(blob);
 
+          if (!dragging) {
+            try {
+              const img = new Image();
+              img.src = url;
+              await img.decode();
+            } catch (_) {}
+            if (currentPath !== selectedImagePathRef.current || jobId < latestRenderedJobIdRef.current) {
+              URL.revokeObjectURL(url);
+              return;
+            }
+          }
+
           setFinalPreviewUrl((prevUrl) => {
             if (prevUrl && prevUrl.startsWith('blob:')) {
-              setTimeout(() => URL.revokeObjectURL(prevUrl), 200);
+              if (!imageCacheRef.current.isProtected(prevUrl)) {
+                setTimeout(() => URL.revokeObjectURL(prevUrl), 250);
+              }
             }
             return url;
           });
@@ -1343,7 +1423,7 @@ function App() {
         }
       }
     },
-    [selectedImage?.isReady, selectedImage?.path, calculateROI],
+    [selectedImage?.isReady, selectedImage?.path, calculateROI, isWaveformVisible],
   );
 
   const generateUncroppedPreview = useCallback(
@@ -1359,7 +1439,7 @@ function App() {
   );
 
   useEffect(() => {
-    if (activeRightPanel === Panel.Crop && selectedImage?.isReady) {
+    if (activeRightPanel === Panel.Crop && selectedImage?.isReady && isBackendReadyRef.current) {
       generateUncroppedPreview(adjustments);
     }
   }, [adjustments, activeRightPanel, selectedImage?.isReady, generateUncroppedPreview]);
@@ -1525,6 +1605,15 @@ function App() {
         if (settings?.activeTreeSection) {
           setActiveTreeSection(settings.activeTreeSection);
         }
+        if (typeof settings?.isWaveformVisible === 'boolean') {
+          setIsWaveformVisible(settings.isWaveformVisible);
+        }
+        if (settings?.activeWaveformChannel) {
+          setActiveWaveformChannel(settings.activeWaveformChannel);
+        }
+        if (settings?.waveformHeight !== undefined) {
+          setWaveformHeight(settings.waveformHeight);
+        }
         if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
           try {
             const trees = await invoke(Invokes.GetPinnedFolderTrees, { paths: settings.pinnedFolders });
@@ -1625,6 +1714,24 @@ function App() {
       handleSettingsChange({ ...appSettings, filterCriteria });
     }
   }, [filterCriteria, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) {
+      return;
+    }
+    if (
+      appSettings.isWaveformVisible !== isWaveformVisible ||
+      appSettings.activeWaveformChannel !== activeWaveformChannel ||
+      appSettings.waveformHeight !== waveformHeight
+    ) {
+      handleSettingsChange({
+        ...appSettings,
+        isWaveformVisible,
+        activeWaveformChannel,
+        waveformHeight,
+      });
+    }
+  }, [isWaveformVisible, activeWaveformChannel, waveformHeight, appSettings, handleSettingsChange]);
 
   useEffect(() => {
     if (!appSettings?.adaptiveEditorTheme || !selectedImage) {
@@ -1750,6 +1857,7 @@ function App() {
       setSearchCriteria({ tags: [], text: '', mode: 'OR' });
       setLibraryScrollTop(0);
       setThumbnails({});
+      imageCacheRef.current.clear();
       try {
         setCurrentFolderPath(path);
         setActiveView('library');
@@ -1968,13 +2076,19 @@ function App() {
   }, []);
 
   const handleBackToLibrary = useCallback(() => {
+    if (selectedImage?.path && cachedEditStateRef.current) {
+      imageCacheRef.current.set(selectedImage.path, cachedEditStateRef.current);
+    }
+    if (transformWrapperRef.current) {
+      transformWrapperRef.current.resetTransform(0);
+    }
+    setZoom(1);
     const lastActivePath = selectedImage?.path ?? null;
     setSelectedImage(null);
     setFinalPreviewUrl(null);
     setUncroppedAdjustedPreviewUrl(null);
     setHistogram(null);
     setWaveform(null);
-    setIsWaveformVisible(false);
     setActiveMaskId(null);
     setActiveMaskContainerId(null);
     setActiveAiPatchContainerId(null);
@@ -1984,15 +2098,93 @@ function App() {
     setSlideDirection(1);
     setLiveAdjustments(INITIAL_ADJUSTMENTS);
     resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
-  }, [selectedImage?.path]);
+    isBackendReadyRef.current = true;
+  }, [selectedImage?.path, resetAdjustmentsHistory]);
 
   const handleImageSelect = useCallback(
     (path: string) => {
-      if (selectedImage?.path === path) {
+      if (selectedImage?.path === path) return;
+
+      debouncedSave.cancel();
+
+      if (selectedImage?.path && cachedEditStateRef.current) {
+        imageCacheRef.current.set(selectedImage.path, cachedEditStateRef.current);
+      }
+
+      patchesSentToBackend.current.clear();
+
+      setMultiSelectedPaths([path]);
+      setLibraryActivePath(null);
+      setError(null);
+      setShowOriginal(false);
+      setActiveMaskId(null);
+      setActiveMaskContainerId(null);
+      setActiveAiPatchContainerId(null);
+      setActiveAiSubMaskId(null);
+      setIsWbPickerActive(false);
+      setTransformedOriginalUrl(null);
+      setIsLibraryExportPanelVisible(false);
+
+      const cached = imageCacheRef.current.get(path);
+
+      if (cached?.finalPreviewUrl && cached.selectedImage?.isReady) {
+        setSelectedImage({
+          ...cached.selectedImage,
+          thumbnailUrl: thumbnails[path] || cached.selectedImage.thumbnailUrl,
+        });
+        setOriginalSize(cached.originalSize);
+        setPreviewSize(cached.previewSize);
+
+        setLiveAdjustments(cached.adjustments);
+        resetAdjustmentsHistory(cached.adjustments);
+        prevAdjustmentsRef.current = { path, adjustments: cached.adjustments };
+
+        setHistogram(cached.histogram);
+        setWaveform(cached.waveform);
+        setFinalPreviewUrl(cached.finalPreviewUrl);
+        setUncroppedAdjustedPreviewUrl(cached.uncroppedPreviewUrl);
+        setIsViewLoading(false);
+
+        latestRenderedJobIdRef.current = previewJobIdRef.current;
+        isBackendReadyRef.current = false;
+        currentResRef.current = Infinity;
+
+        invoke('load_image', { path })
+          .then((_result: any) => {
+            if (selectedImagePathRef.current !== path) return;
+            isBackendReadyRef.current = true;
+            currentResRef.current = 0;
+            setOriginalSize({ width: _result.width, height: _result.height });
+          })
+          .catch((err: any) => {
+            if (String(err).includes('cancelled')) return;
+            console.error('Background load_image failed on cache hit:', err);
+            isBackendReadyRef.current = true;
+            currentResRef.current = 0;
+          });
+
+        invoke(Invokes.LoadMetadata, { path })
+          .then((metadata: any) => {
+            if (selectedImagePathRef.current !== path) return;
+            let freshAdjustments: Adjustments;
+            if (metadata.adjustments && !metadata.adjustments.is_null) {
+              freshAdjustments = normalizeLoadedAdjustments(metadata.adjustments);
+            } else {
+              freshAdjustments = { ...INITIAL_ADJUSTMENTS };
+            }
+            if (!isSliderDragging && JSON.stringify(cached.adjustments) !== JSON.stringify(freshAdjustments)) {
+              setLiveAdjustments(freshAdjustments);
+              resetAdjustmentsHistory(freshAdjustments);
+              prevAdjustmentsRef.current = { path, adjustments: freshAdjustments };
+              imageCacheRef.current.set(path, { ...cached, adjustments: freshAdjustments });
+            }
+          })
+          .catch((err) => console.error('Failed background metadata sync on cache hit:', err));
+
         return;
       }
-      debouncedSave.cancel();
-      patchesSentToBackend.current.clear();
+
+      isBackendReadyRef.current = true;
 
       setSelectedImage({
         exif: null,
@@ -2007,36 +2199,19 @@ function App() {
       });
       setOriginalSize({ width: 0, height: 0 });
       setPreviewSize({ width: 0, height: 0 });
-      setMultiSelectedPaths([path]);
-      setLibraryActivePath(null);
       setIsViewLoading(true);
-      setError(null);
       setHistogram(null);
-      setFinalPreviewUrl(null);
+      setWaveform(null);
       setUncroppedAdjustedPreviewUrl(null);
-      setTransformedOriginalUrl(null);
-      setShowOriginal(false);
-      setActiveMaskId(null);
-      setActiveMaskContainerId(null);
-      setActiveAiPatchContainerId(null);
-      setActiveAiSubMaskId(null);
-      setIsWbPickerActive(false);
-
-      if (transformWrapperRef.current) {
-        transformWrapperRef.current.resetTransform(0);
-      }
-
-      setZoom(1);
-      setIsLibraryExportPanelVisible(false);
 
       setFinalPreviewUrl((prev) => {
-        if (prev?.startsWith('blob:')) {
+        if (prev?.startsWith('blob:') && !imageCacheRef.current.isProtected(prev)) {
           setTimeout(() => URL.revokeObjectURL(prev), 250);
         }
         return null;
       });
     },
-    [selectedImage?.path, applyAdjustments, debouncedSave, thumbnails],
+    [selectedImage?.path, debouncedSave, thumbnails, resetAdjustmentsHistory],
   );
 
   const executeDelete = useCallback(
@@ -2216,6 +2391,8 @@ function App() {
         return;
       }
 
+      pathsToUpdate.forEach((p) => imageCacheRef.current.delete(p));
+
       if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
         const newAdjustments = { ...adjustments, ...adjustmentsToApply };
         setAdjustments(newAdjustments);
@@ -2236,6 +2413,7 @@ function App() {
     if (!selectedImage?.isReady) {
       return;
     }
+    imageCacheRef.current.delete(selectedImage.path);
     try {
       const autoAdjustments: Adjustments = await invoke(Invokes.CalculateAutoAdjustments);
       setAdjustments((prev: Adjustments) => {
@@ -2409,7 +2587,7 @@ function App() {
 
   const calculateTargetRes = useCallback(() => {
     const baseTargetRes = appSettings?.editorPreviewResolution || 1920;
-    if (!appSettings?.enableZoomHifi || displaySize.width === 0) {
+    if (!(appSettings?.enableZoomHifi ?? true) || displaySize.width === 0) {
       return baseTargetRes;
     }
 
@@ -2517,6 +2695,7 @@ function App() {
               }
             }
             if (Object.keys(delta).length > 0) {
+              otherPaths.forEach((p) => imageCacheRef.current.delete(p));
               invoke(Invokes.ApplyAdjustmentsToPaths, { paths: otherPaths, adjustments: delta }).catch((err) => {
                 console.error('Failed to apply adjustments to multi-selection:', err);
               });
@@ -2759,8 +2938,8 @@ function App() {
         }
       }),
       listen('histogram-update', (event: any) => {
-        if (isEffectActive) {
-          setHistogram(event.payload);
+        if (isEffectActive && event.payload.path === selectedImagePathRef.current) {
+          setHistogram(event.payload.data);
         }
       }),
       listen('open-with-file', (event: any) => {
@@ -2769,8 +2948,8 @@ function App() {
         }
       }),
       listen('waveform-update', (event: any) => {
-        if (isEffectActive) {
-          setWaveform(event.payload);
+        if (isEffectActive && event.payload.path === selectedImagePathRef.current) {
+          setWaveform(event.payload.data);
         }
       }),
       listen('thumbnail-generated', (event: any) => {
@@ -3378,21 +3557,6 @@ function App() {
   };
 
   useEffect(() => {
-    const invokeWaveForm = async () => {
-      const waveForm: any = await invoke(Invokes.GenerateWaveform).catch((err) =>
-        console.error('Failed to generate waveform:', err),
-      );
-      if (waveForm) {
-        setWaveform(waveForm);
-      }
-    };
-
-    if (isWaveformVisible && selectedImage?.isReady && !waveform) {
-      invokeWaveForm();
-    }
-  }, [isWaveformVisible, selectedImage?.isReady, waveform]);
-
-  useEffect(() => {
     if (selectedImage && !selectedImage.isReady && selectedImage.path) {
       let isEffectActive = true;
 
@@ -3570,6 +3734,7 @@ function App() {
         return;
       }
 
+      pathsToReset.forEach((p) => imageCacheRef.current.delete(p));
       debouncedSetHistory.cancel();
 
       invoke(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset })
@@ -3925,6 +4090,7 @@ function App() {
 
     const handleApplyAutoAdjustmentsToSelection = () => {
       if (finalSelection.length === 0) return;
+      finalSelection.forEach((p) => imageCacheRef.current.delete(p));
 
       invoke(Invokes.ApplyAutoAdjustmentsToPaths, { paths: finalSelection })
         .then(async () => {
@@ -3955,6 +4121,7 @@ function App() {
     };
 
     const onExportClick = () => {
+      setMultiSelectedPaths(finalSelection);
       if (selectedImage) {
         if (selectedImage.path !== path) {
           handleImageSelect(path);
@@ -4019,7 +4186,7 @@ function App() {
         disabled: copiedAdjustments === null,
         icon: ClipboardPaste,
         label: pasteLabel,
-        onClick: handlePasteAdjustments,
+        onClick: () => handlePasteAdjustments(finalSelection),
       },
       {
         label: 'Productivity',
@@ -4640,9 +4807,7 @@ function App() {
               isSliderDragging={isSliderDragging}
               isMaskControlHovered={isMaskControlHovered}
               isStraightenActive={isStraightenActive}
-              isWaveformVisible={isWaveformVisible}
               onBackToLibrary={handleBackToLibrary}
-              onCloseWaveform={() => setIsWaveformVisible(false)}
               onContextMenu={handleEditorContextMenu}
               onGenerateAiMask={handleGenerateAiMask}
               onQuickErase={handleQuickErase}
@@ -4651,7 +4816,6 @@ function App() {
               onSelectMask={setActiveMaskId}
               onStraighten={handleStraighten}
               onToggleFullScreen={handleToggleFullScreen}
-              onToggleWaveform={handleToggleWaveform}
               onUndo={undo}
               onZoomed={handleUserTransform}
               renderedRightPanel={renderedRightPanel}
@@ -4667,13 +4831,8 @@ function App() {
               transformedOriginalUrl={transformedOriginalUrl}
               uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
               updateSubMask={updateSubMask}
-              waveform={waveform}
               onDisplaySizeChange={handleDisplaySizeChange}
-              onInitialFitScale={setInitialFitScale}
-              onZoomChange={handleZoomChange}
               originalSize={originalSize}
-              baseRenderSize={baseRenderSize}
-              isLoadingFullRes={isLoadingFullRes}
               isRotationActive={isRotationActive}
               overlayMode={overlayMode}
               overlayRotation={overlayRotation}
@@ -4785,6 +4944,13 @@ function App() {
                             isWbPickerActive={isWbPickerActive}
                             toggleWbPicker={toggleWbPicker}
                             onDragStateChange={setIsSliderDragging}
+                            isWaveformVisible={isWaveformVisible}
+                            waveform={waveform}
+                            onToggleWaveform={handleToggleWaveform}
+                            activeWaveformChannel={activeWaveformChannel}
+                            setActiveWaveformChannel={setActiveWaveformChannel}
+                            waveformHeight={waveformHeight}
+                            setWaveformHeight={setWaveformHeight}
                           />
                         )}
                         {renderedRightPanel === Panel.Metadata && (
@@ -4834,6 +5000,13 @@ function App() {
                             setCopiedMask={setCopiedMask}
                             setCustomEscapeHandler={setCustomEscapeHandler}
                             onDragStateChange={setIsSliderDragging}
+                            isWaveformVisible={isWaveformVisible}
+                            onToggleWaveform={handleToggleWaveform}
+                            waveform={waveform}
+                            activeWaveformChannel={activeWaveformChannel}
+                            setActiveWaveformChannel={setActiveWaveformChannel}
+                            waveformHeight={waveformHeight}
+                            setWaveformHeight={setWaveformHeight}
                             setIsMaskControlHovered={setIsMaskControlHovered}
                           />
                         )}

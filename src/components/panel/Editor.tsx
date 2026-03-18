@@ -4,14 +4,12 @@ import { Crop, PercentCrop } from 'react-image-crop';
 import { Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
-import { AnimatePresence } from 'framer-motion';
 import { ImageDimensions, useImageRenderSize } from '../../hooks/useImageRenderSize';
 import { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
-import Waveform from './editor/Waveform';
 import { Mask, SubMask } from './right/Masks';
-import { BrushSettings, Invokes, Panel, SelectedImage, TransformState, WaveformData } from '../ui/AppProperties';
+import { BrushSettings, Invokes, Panel, SelectedImage, TransformState } from '../ui/AppProperties';
 import type { OverlayMode } from './right/CropPanel';
 
 interface EditorProps {
@@ -31,9 +29,7 @@ interface EditorProps {
   isMaskControlHovered: boolean;
   isStraightenActive: boolean;
   isRotationActive?: boolean;
-  isWaveformVisible: boolean;
   onBackToLibrary(): void;
-  onCloseWaveform(): void;
   onContextMenu(event: any): void;
   onGenerateAiMask(subMaskId: string, startPoint: Coord, endPoint: Coord): void;
   onQuickErase(subMaskId: string | null, startPoint: Coord, endpoint: Coord): void;
@@ -42,7 +38,6 @@ interface EditorProps {
   onSelectMask(id: string | null): void;
   onStraighten(val: number): void;
   onToggleFullScreen(): void;
-  onToggleWaveform(): void;
   onUndo(): void;
   onZoomed(state: TransformState): void;
   renderedRightPanel: Panel | null;
@@ -56,9 +51,7 @@ interface EditorProps {
   transformedOriginalUrl: string | null;
   uncroppedAdjustedPreviewUrl: string | null;
   updateSubMask(id: string | null, subMask: Partial<SubMask>): void;
-  waveform: WaveformData | null;
   onDisplaySizeChange?(size: any): void;
-  onInitialFitScale?(scale: number): void;
   originalSize?: ImageDimensions;
   isWbPickerActive?: boolean;
   onWbPicked?: () => void;
@@ -88,9 +81,7 @@ export default function Editor({
   isMaskControlHovered,
   isStraightenActive,
   isRotationActive,
-  isWaveformVisible,
   onBackToLibrary,
-  onCloseWaveform,
   onContextMenu,
   onGenerateAiMask,
   onQuickErase,
@@ -99,7 +90,6 @@ export default function Editor({
   onSelectMask,
   onStraighten,
   onToggleFullScreen,
-  onToggleWaveform,
   onUndo,
   onZoomed,
   selectedImage,
@@ -112,9 +102,7 @@ export default function Editor({
   transformedOriginalUrl,
   uncroppedAdjustedPreviewUrl,
   updateSubMask,
-  waveform,
   onDisplaySizeChange,
-  onInitialFitScale,
   originalSize,
   isWbPickerActive = false,
   onWbPicked,
@@ -362,12 +350,6 @@ export default function Editor({
       onDisplaySizeChange(currentDisplaySize);
     }
   }, [imageRenderSize, transformState.scale, onDisplaySizeChange]);
-
-  useEffect(() => {
-    if (onInitialFitScale && imageRenderSize.scale > 0) {
-      onInitialFitScale(imageRenderSize.scale);
-    }
-  }, [imageRenderSize.scale, onInitialFitScale]);
 
   const processOverlayQueue = useCallback(async () => {
     if (isGeneratingOverlayRef.current || !pendingOverlayRequestRef.current) return;
@@ -733,7 +715,6 @@ export default function Editor({
         activeSubMask?.type === Mask.Luminance ||
         activeSubMask?.parameters?.isInitialDraw));
 
-  const waveFormData: WaveformData = waveform || { blue: [], green: [], height: 0, luma: [], red: [], width: 0 };
   const isZoomActionActive = !isCropping && !isMasking && !isAiEditing && !isWbPickerActive;
   const isMaxZoom = transformState.scale >= transformConfig.maxScale - 0.5;
 
@@ -756,10 +737,6 @@ export default function Editor({
         isFullScreen ? 'bg-black rounded-none p-0 gap-0' : 'bg-bg-secondary rounded-lg p-2 gap-2',
       )}
     >
-      <AnimatePresence>
-        {isWaveformVisible && !isFullScreen && <Waveform waveformData={waveFormData} onClose={onCloseWaveform} />}
-      </AnimatePresence>
-
       <div
         className={clsx(
           'flex-shrink-0',
@@ -772,12 +749,10 @@ export default function Editor({
           canRedo={canRedo}
           canUndo={canUndo}
           isLoading={isLoading}
-          isWaveformVisible={isWaveformVisible}
           onBackToLibrary={onBackToLibrary}
           onRedo={onRedo}
           onToggleFullScreen={onToggleFullScreen}
           onToggleShowOriginal={toggleShowOriginal}
-          onToggleWaveform={onToggleWaveform}
           onUndo={onUndo}
           selectedImage={selectedImage}
           showOriginal={showOriginal}

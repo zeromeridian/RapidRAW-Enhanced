@@ -485,6 +485,8 @@ export default function ExportPanel({
   };
 
   const canExport = numImages > 0;
+  const isLut = fileFormat === FileFormats.Cube;
+  const itemLabel = isLut ? 'LUT' : 'Image';
 
   return (
     <div className="flex flex-col h-full">
@@ -756,7 +758,7 @@ export default function ExportPanel({
             </>
           ) : (
             <>
-              <Save size={18} className="mr-2" /> Export {numImages > 1 ? `${numImages} Images` : 'Image'}
+              <Save size={18} className="mr-2" /> Export {numImages > 1 ? `${numImages} ${itemLabel}s` : itemLabel}
             </>
           )}
         </Button>

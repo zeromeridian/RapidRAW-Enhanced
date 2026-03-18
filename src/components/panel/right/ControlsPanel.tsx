@@ -1,13 +1,18 @@
-import { RotateCcw, Copy, ClipboardPaste, Aperture } from 'lucide-react';
+import React, { useState } from 'react';
+import { RotateCcw, Copy, ClipboardPaste, Aperture, ChartArea } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import clsx from 'clsx';
 import BasicAdjustments from '../../adjustments/Basic';
 import CurveGraph from '../../adjustments/Curves';
 import ColorPanel from '../../adjustments/Color';
 import DetailsPanel from '../../adjustments/Details';
 import EffectsPanel from '../../adjustments/Effects';
 import CollapsibleSection from '../../ui/CollapsibleSection';
+import Waveform from '../editor/Waveform';
+import Resizer from '../../ui/Resizer';
 import { Adjustments, SectionVisibility, INITIAL_ADJUSTMENTS, ADJUSTMENT_SECTIONS } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { OPTION_SEPARATOR, SelectedImage, AppSettings } from '../../ui/AppProperties';
+import { OPTION_SEPARATOR, SelectedImage, AppSettings, WaveformData, Orientation } from '../../ui/AppProperties';
 import { ChannelConfig } from '../../adjustments/Curves';
 
 interface ControlsPanelOption {
@@ -34,6 +39,13 @@ interface ControlsProps {
   isWbPickerActive?: boolean;
   toggleWbPicker?: () => void;
   onDragStateChange?: (isDragging: boolean) => void;
+  isWaveformVisible?: boolean;
+  onToggleWaveform?: () => void;
+  waveform?: WaveformData | null;
+  activeWaveformChannel?: string;
+  setActiveWaveformChannel?: (mode: string) => void;
+  waveformHeight?: number;
+  setWaveformHeight?: (height: number) => void;
 }
 
 export default function Controls({
@@ -52,8 +64,37 @@ export default function Controls({
   isWbPickerActive,
   toggleWbPicker,
   onDragStateChange,
+  isWaveformVisible,
+  onToggleWaveform,
+  waveform,
+  activeWaveformChannel,
+  setActiveWaveformChannel,
+  waveformHeight,
+  setWaveformHeight,
 }: ControlsProps) {
   const { showContextMenu } = useContextMenu();
+  const [isResizingWaveform, setIsResizingWaveform] = useState<boolean>(false);
+
+  const handleWaveformResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = waveformHeight || 256;
+    setIsResizingWaveform(true);
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientY - startY;
+      if (setWaveformHeight) setWaveformHeight(Math.max(150, Math.min(450, startHeight + delta)));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingWaveform(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
 
   const handleToggleVisibility = (sectionName: string) => {
     setAdjustments((prev: Adjustments) => {
@@ -172,6 +213,16 @@ export default function Controls({
             <Aperture size={18} />
           </button>
           <button
+            className={clsx(
+              'p-2 rounded-full transition-colors',
+              isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
+            )}
+            onClick={onToggleWaveform}
+            data-tooltip="Toggle Analytics Display"
+          >
+            <ChartArea size={18} />
+          </button>
+          <button
             className="p-2 rounded-full hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             disabled={!selectedImage}
             onClick={handleResetAdjustments}
@@ -181,6 +232,37 @@ export default function Controls({
           </button>
         </div>
       </div>
+
+      <AnimatePresence initial={false}>
+        {isWaveformVisible && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: waveformHeight || 256, opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: isResizingWaveform ? 0 : 0.2, ease: 'easeOut' }}
+            className="flex-shrink-0 flex flex-col relative border-b border-surface overflow-hidden"
+          >
+            <div className="flex-grow w-full h-full p-4 pb-2 min-h-0">
+              <Waveform
+                waveformData={waveform || null}
+                histogram={histogram}
+                displayMode={activeWaveformChannel || 'luma'}
+                setDisplayMode={setActiveWaveformChannel || (() => {})}
+                showClipping={adjustments.showClipping || false}
+                onToggleClipping={() => {
+                  setAdjustments((prev: Adjustments) => ({
+                    ...prev,
+                    showClipping: !prev.showClipping,
+                  }));
+                }}
+                theme={theme}
+              />
+            </div>
+            <Resizer direction={Orientation.Horizontal} onMouseDown={handleWaveformResize} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex-grow overflow-y-auto p-4 flex flex-col gap-2">
         {Object.keys(ADJUSTMENT_SECTIONS).map((sectionName: string) => {
           const SectionComponent: any = {

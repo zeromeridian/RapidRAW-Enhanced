@@ -637,7 +637,7 @@ export default function AIPanel({
       collisionDetection={pointerWithin}
     >
       <div className="flex flex-col h-full select-none overflow-hidden" onClick={handleDeselect}>
-        <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface h-[69px]">
+        <div className="p-4 flex justify-between items-center flex-shrink-0 border-b border-surface">
           <h2 className="text-xl font-bold text-primary text-shadow-shiny">Inpainting</h2>
           <button
             className="p-2 rounded-full hover:bg-surface transition-colors"

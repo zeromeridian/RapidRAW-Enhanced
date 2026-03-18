@@ -13,7 +13,7 @@ struct FloatOrd(f32);
 impl Eq for FloatOrd {}
 impl PartialOrd for FloatOrd {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.0.partial_cmp(&other.0)
+        Some(self.cmp(other))
     }
 }
 impl Ord for FloatOrd {
@@ -27,7 +27,7 @@ struct FloatOrdF64(f64);
 impl Eq for FloatOrdF64 {}
 impl PartialOrd for FloatOrdF64 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.0.partial_cmp(&other.0)
+        Some(self.cmp(other))
     }
 }
 impl Ord for FloatOrdF64 {
@@ -378,8 +378,8 @@ fn calculate_normal(pixel_states: &[u8], width: u32, height: u32, x: u32, y: u32
         }
     };
 
-    let grad_x = (state_at(x_p1, y) as i32 - state_at(x_m1, y) as i32) as f32;
-    let grad_y = (state_at(x, y_p1) as i32 - state_at(x, y_m1) as i32) as f32;
+    let grad_x = (state_at(x_p1, y) - state_at(x_m1, y)) as f32;
+    let grad_y = (state_at(x, y_p1) - state_at(x, y_m1)) as f32;
     let mag = (grad_x * grad_x + grad_y * grad_y).sqrt();
     if mag > 1e-6 {
         (-grad_y / mag, grad_x / mag)
