@@ -444,7 +444,11 @@ fn find_pairwise_seam_dp_vertical(ctx: &SeamContext) -> Vec<i32> {
             if ctx.pano_mask.get_pixel(x_out as u32, y_out as u32)[0] == 0 {
                 continue;
             }
-            let target_p = Point3::new(x_out as f64 - ctx.offset_x, y_out as f64 - ctx.offset_y, 1.0);
+            let target_p = Point3::new(
+                x_out as f64 - ctx.offset_x,
+                y_out as f64 - ctx.offset_y,
+                1.0,
+            );
             let source_p = h_add_inv * target_p;
             let sx = source_p.x / source_p.z;
             let sy = source_p.y / source_p.z;
@@ -542,7 +546,11 @@ fn find_pairwise_seam_dp_horizontal(ctx: &SeamContext) -> Vec<i32> {
             if ctx.pano_mask.get_pixel(x_out as u32, y_out as u32)[0] == 0 {
                 continue;
             }
-            let target_p = Point3::new(x_out as f64 - ctx.offset_x, y_out as f64 - ctx.offset_y, 1.0);
+            let target_p = Point3::new(
+                x_out as f64 - ctx.offset_x,
+                y_out as f64 - ctx.offset_y,
+                1.0,
+            );
             let source_p = h_add_inv * target_p;
             let sx = source_p.x / source_p.z;
             let sy = source_p.y / source_p.z;

@@ -751,7 +751,8 @@ impl GpuProcessor {
             height,
             depth_or_array_layers: 1,
         };
-        let mask_views: Vec<wgpu::TextureView> = request.mask_bitmaps
+        let mask_views: Vec<wgpu::TextureView> = request
+            .mask_bitmaps
             .iter()
             .map(|mask_bitmap| {
                 let mask_texture = device.create_texture_with_data(
@@ -1326,12 +1327,8 @@ pub fn process_and_get_dynamic_image(
 
     let cache = cache_lock.as_ref().unwrap();
 
-    let (processed_pixels, out_w, out_h) = processor.run(
-        &cache.texture_view,
-        cache.width,
-        cache.height,
-        request,
-    )?;
+    let (processed_pixels, out_w, out_h) =
+        processor.run(&cache.texture_view, cache.width, cache.height, request)?;
 
     let duration = start_time.elapsed();
     let fps = 1.0 / duration.as_secs_f64();

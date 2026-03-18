@@ -11,7 +11,9 @@ use serde_json::json;
 use std::f32::consts::PI;
 use std::sync::Arc;
 
-pub use crate::gpu_processing::{RenderRequest, get_or_init_gpu_context, process_and_get_dynamic_image};
+pub use crate::gpu_processing::{
+    RenderRequest, get_or_init_gpu_context, process_and_get_dynamic_image,
+};
 use crate::{AppState, mask_generation::MaskDefinition};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
@@ -632,14 +634,7 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
                     }
 
                     if has_tca {
-                        interpolate_pixel_with_tca(
-                            &tca_ctx,
-                            src_x,
-                            src_y,
-                            vr,
-                            vb,
-                            pixel,
-                        );
+                        interpolate_pixel_with_tca(&tca_ctx, src_x, src_y, vr, vb, pixel);
                     } else {
                         interpolate_pixel(src_raw, width_usize, height_usize, src_x, src_y, pixel);
                     }

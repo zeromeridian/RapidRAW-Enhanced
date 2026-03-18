@@ -186,14 +186,8 @@ fn inpaint_criminisi(source_image: &RgbImage, mask: &GrayImage, patch_radius: u3
                 width,
                 height,
             };
-            let (priority, confidence_term) = calculate_priority(
-                &ip_state,
-                &confidence,
-                x,
-                y,
-                patch_radius,
-                normal,
-            );
+            let (priority, confidence_term) =
+                calculate_priority(&ip_state, &confidence, x, y, patch_radius, normal);
             narrow_band.push(HeapItem {
                 priority: FloatOrd(priority),
                 x,

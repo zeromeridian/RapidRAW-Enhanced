@@ -72,14 +72,8 @@ fn run_bm3d(
         total_work: total_work_units,
         app_handle: &app_handle,
     };
-    let mut denoised_channels = bm3d_process_joint(
-        &channels,
-        width,
-        height,
-        &params,
-        &dct_tables,
-        &progress,
-    );
+    let mut denoised_channels =
+        bm3d_process_joint(&channels, width, height, &params, &dct_tables, &progress);
 
     {
         let _ = app_handle.emit("denoise-progress", "Blending detail...");
