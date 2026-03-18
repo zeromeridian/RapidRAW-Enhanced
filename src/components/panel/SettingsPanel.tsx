@@ -1681,7 +1681,7 @@ export default function SettingsPanel({
                         />
                         <KeybindItem
                           keys={['Right Click']}
-                          description="Create a new mask from a mask tool button"
+                          description="Create a new mask/edit from a tool button"
                         />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '+']} description="Zoom in" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '-']} description="Zoom out" />

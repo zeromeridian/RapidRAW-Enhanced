@@ -454,6 +454,19 @@ export default function AIPanel({
     if (type === Mask.AiForeground) onGenerateAiForegroundMask(subMask.id);
   };
 
+  const handleGridClick = (type: Mask, forceNewPatchContainer: boolean = false) => {
+    if (!forceNewPatchContainer && activePatchContainerId) handleAddSubMask(activePatchContainerId, type);
+    else handleAddAiPatchContainer(type);
+  };
+
+  const handleGridRightClick = (event: React.MouseEvent, type: Mask | null) => {
+    if (event.button !== 2) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!type) return;
+    handleGridClick(type, true);
+  };
+
   const updatePatch = (id: string, data: any) =>
     setAdjustments((prev: Adjustments) => ({
       ...prev,
@@ -660,11 +673,8 @@ export default function AIPanel({
                         maskType={typeToRender}
                         isGenerating={isGeneratingAi}
                         activePatchContainerId={activePatchContainerId}
-                        onClick={() =>
-                          isComponentMode
-                            ? handleAddSubMask(activePatchContainerId, typeToRender.type)
-                            : handleAddAiPatchContainer(typeToRender.type)
-                        }
+                        onClick={() => handleGridClick(typeToRender.type)}
+                        onRightClick={(e) => handleGridRightClick(e, typeToRender.type)}
                       />
                     );
                   })}
@@ -836,7 +846,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
   );
 }
 
-function DraggableGridItem({ maskType, isGenerating, onClick, activePatchContainerId }: any) {
+function DraggableGridItem({ maskType, isGenerating, onClick, onRightClick, activePatchContainerId }: any) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `create-ai-${maskType.type}`,
     data: { type: 'Creation', maskType: maskType.type },
@@ -849,6 +859,14 @@ function DraggableGridItem({ maskType, isGenerating, onClick, activePatchContain
       {...attributes}
       disabled={maskType.disabled || isGenerating}
       onClick={onClick}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onMouseDown={(event) => {
+        if (event.button !== 2) return;
+        onRightClick(event);
+      }}
       className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors
               ${maskType.disabled || isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'}
               ${isDragging ? 'opacity-50' : ''}`}
@@ -856,7 +874,7 @@ function DraggableGridItem({ maskType, isGenerating, onClick, activePatchContain
         maskType.disabled
           ? 'Coming Soon'
           : activePatchContainerId
-            ? `Add ${maskType.name} to Current Edit`
+            ? `Left click adds ${maskType.name} to the current edit. Right click creates a new ${maskType.name} edit.`
             : `Create New ${maskType.name} Edit`
       }
     >
