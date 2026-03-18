@@ -83,6 +83,23 @@ use crate::lut_processing::{Lut, convert_image_to_cube_lut, generate_identity_lu
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
 use tagging_utils::{candidates, hierarchy};
 
+#[cfg(target_os = "macos")]
+extern "C" fn force_exit() {
+    unsafe {
+        libc::_exit(0);
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub fn register_exit_handler() {
+    unsafe {
+        libc::atexit(force_exit);
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn register_exit_handler() {}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 struct WindowState {
     width: u32,
@@ -4360,6 +4377,7 @@ fn main() {
                     _ => {}
                 }
             });
+            crate::register_exit_handler();
             Ok(())
         })
         .manage(AppState {
@@ -4494,6 +4512,10 @@ fn main() {
                     }
                 }
                 tauri::RunEvent::ExitRequested { .. } => {
+                    #[cfg(target_os = "macos")]
+                    unsafe { libc::_exit(0); }
+
+                    #[cfg(not(target_os = "macos"))]
                     std::process::exit(0);
                 }
                 _ => {}

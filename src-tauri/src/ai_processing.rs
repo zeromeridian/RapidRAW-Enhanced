@@ -304,6 +304,8 @@ pub async fn get_or_init_ai_models(
     let u2netp = Session::builder()?.commit_from_file(u2netp_path)?;
     let sky_seg = Session::builder()?.commit_from_file(sky_seg_path)?;
 
+    crate::register_exit_handler();
+
     let models = Arc::new(AiModels {
         sam_encoder: Mutex::new(sam_encoder),
         sam_decoder: Mutex::new(sam_decoder),
