@@ -46,4 +46,4 @@ jobs:
 
       - name: Clippy
         working-directory: src-tauri
-        run: cargo clippy -p RapidRAW --all-targets
+        run: cargo clippy --all-targets --all-features -- -D warnings
