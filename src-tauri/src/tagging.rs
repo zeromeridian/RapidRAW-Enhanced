@@ -14,12 +14,11 @@ use tokenizers::Tokenizer;
 use tokio::task::JoinHandle;
 use walkdir::WalkDir;
 
-use crate::AppState;
-use crate::candidates::TAG_CANDIDATES;
 use crate::file_management::{self, parse_virtual_path};
 use crate::formats::is_supported_image_file;
 use crate::hierarchy::TAG_HIERARCHY;
 use crate::image_processing::ImageMetadata;
+use crate::{AppState, candidates::TAG_CANDIDATES};
 
 pub const COLOR_TAG_PREFIX: &str = "color:";
 pub const USER_TAG_PREFIX: &str = "user:";
@@ -269,7 +268,7 @@ pub async fn start_background_indexing(
     let custom_ai_tags = settings.custom_ai_tags.clone();
     let ai_tag_count = settings.ai_tag_count.unwrap_or(10) as usize;
 
-    let models = crate::ai_processing::get_or_init_ai_models(
+    let clip_models = crate::ai_processing::get_or_init_clip_models(
         &app_handle,
         &state.ai_state,
         &state.ai_init_lock,
@@ -323,7 +322,7 @@ pub async fn start_background_indexing(
         stream::iter(image_paths)
             .for_each_concurrent(max_concurrent_tasks, |path| {
                 let app_handle_inner = app_handle_clone.clone();
-                let models_inner = models.clone();
+                let clip_models_inner = clip_models.clone();
                 let gpu_context_inner = gpu_context.clone();
                 let processed_count_inner = Arc::clone(&processed_count);
                 let tags_inner = Arc::clone(&custom_ai_tags_shared);
@@ -355,16 +354,13 @@ pub async fn start_background_indexing(
                             gpu_context_inner.as_ref(),
                         ) {
                             Ok(image) => {
-                                if let (Some(clip_model), Some(clip_tokenizer)) =
-                                    (&models_inner.clip_model, &models_inner.clip_tokenizer)
-                                    && let Ok(ai_tags) = generate_tags_with_clip(
-                                        &image,
-                                        clip_model,
-                                        clip_tokenizer,
-                                        (*tags_inner).clone(),
-                                        ai_tag_count,
-                                    )
-                                {
+                                if let Ok(ai_tags) = generate_tags_with_clip(
+                                    &image,
+                                    &clip_models_inner.model,
+                                    &clip_models_inner.tokenizer,
+                                    (*tags_inner).clone(),
+                                    ai_tag_count,
+                                ) {
                                     println!("Found AI tags for {}: {:?}", path_str, ai_tags);
 
                                     let mut existing_tags: HashSet<String> =

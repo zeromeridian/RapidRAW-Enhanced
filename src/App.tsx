@@ -161,6 +161,7 @@ interface PanoramaModalState {
   error: string | null;
   finalImageBase64: string | null;
   isOpen: boolean;
+  isProcessing: boolean;
   progressMessage: string | null;
   stitchingSourcePaths: Array<string>;
 }
@@ -169,6 +170,7 @@ interface HdrModalState {
   error: string | null;
   finalImageBase64: string | null;
   isOpen: boolean;
+  isProcessing: boolean;
   progressMessage: string | null;
   stitchingSourcePaths: Array<string>;
 }
@@ -181,6 +183,7 @@ interface DenoiseModalState {
   error: string | null;
   targetPath: string | null;
   progressMessage: string | null;
+  isRaw: boolean;
 }
 
 interface NegativeConversionModalState {
@@ -368,6 +371,7 @@ function App() {
     error: null,
     finalImageBase64: null,
     isOpen: false,
+    isProcessing: false,
     progressMessage: '',
     stitchingSourcePaths: [],
   });
@@ -375,6 +379,7 @@ function App() {
     error: null,
     finalImageBase64: null,
     isOpen: false,
+    isProcessing: false,
     progressMessage: '',
     stitchingSourcePaths: [],
   });
@@ -389,6 +394,7 @@ function App() {
     error: null,
     targetPath: null,
     progressMessage: null,
+    isRaw: false,
   });
   const [cullingModalState, setCullingModalState] = useState<CullingModalState>({
     isOpen: false,
@@ -3146,13 +3152,13 @@ function App() {
 
     const unlistenProgress = listen('panorama-progress', (event: any) => {
       if (isEffectActive) {
-        setPanoramaModalState((prev: PanoramaModalState) => ({
-          ...prev,
-          error: null,
-          finalImageBase64: null,
-          isOpen: true,
-          progressMessage: event.payload,
-        }));
+        setPanoramaModalState((prev: PanoramaModalState) => {
+          if (prev.finalImageBase64 || prev.error) return prev;
+          return {
+            ...prev,
+            progressMessage: event.payload,
+          };
+        });
       }
     });
 
@@ -3163,7 +3169,8 @@ function App() {
           ...prev,
           error: null,
           finalImageBase64: base64,
-          progressMessage: 'Panorama Ready',
+          isProcessing: false,
+          progressMessage: null,
         }));
       }
     });
@@ -3174,7 +3181,8 @@ function App() {
           ...prev,
           error: String(event.payload),
           finalImageBase64: null,
-          progressMessage: 'An error occurred.',
+          isProcessing: false,
+          progressMessage: null,
         }));
       }
     });
@@ -3209,6 +3217,7 @@ function App() {
           ...prev,
           error: null,
           finalImageBase64: base64,
+          isProcessing: false,
           progressMessage: 'Hdr Ready',
         }));
       }
@@ -3220,6 +3229,7 @@ function App() {
           ...prev,
           error: String(event.payload),
           finalImageBase64: null,
+          isProcessing: false,
           progressMessage: 'An error occurred.',
         }));
       }
@@ -3274,6 +3284,23 @@ function App() {
     };
   }, []);
 
+  const handleStartPanorama = (paths: string[]) => {
+    setPanoramaModalState((prev: PanoramaModalState) => ({
+      ...prev,
+      isProcessing: true,
+      error: null,
+      finalImageBase64: null,
+      progressMessage: 'Starting panorama process...',
+    }));
+    invoke(Invokes.StitchPanorama, { paths }).catch((err) => {
+      setPanoramaModalState((prev: PanoramaModalState) => ({
+        ...prev,
+        isProcessing: false,
+        error: String(err),
+      }));
+    });
+  };
+
   const handleSavePanorama = async (): Promise<string> => {
     if (panoramaModalState.stitchingSourcePaths.length === 0) {
       const err = 'Source paths for panorama not found.';
@@ -3292,6 +3319,23 @@ function App() {
       setPanoramaModalState((prev: PanoramaModalState) => ({ ...prev, error: String(err) }));
       throw err;
     }
+  };
+
+  const handleStartHdr = (paths: string[]) => {
+    setHdrModalState((prev: HdrModalState) => ({
+      ...prev,
+      isProcessing: true,
+      error: null,
+      finalImageBase64: null,
+      progressMessage: 'Starting HDR process...',
+    }));
+    invoke(Invokes.MergeHdr, { paths }).catch((err) => {
+      setHdrModalState((prev: HdrModalState) => ({
+        ...prev,
+        isProcessing: false,
+        error: String(err),
+      }));
+    });
   };
 
   const handleSaveHdr = async (): Promise<string> => {
@@ -3315,7 +3359,7 @@ function App() {
   };
 
   const handleApplyDenoise = useCallback(
-    async (intensity: number) => {
+    async (intensity: number, method: 'ai' | 'bm3d') => {
       if (!denoiseModalState.targetPath) return;
 
       setDenoiseModalState((prev) => ({
@@ -3329,6 +3373,7 @@ function App() {
         await invoke(Invokes.ApplyDenoising, {
           path: denoiseModalState.targetPath,
           intensity: intensity,
+          method: method,
         });
       } catch (err) {
         setDenoiseModalState((prev) => ({
@@ -3883,6 +3928,7 @@ function App() {
                 error: null,
                 targetPath: selectedImage.path,
                 progressMessage: null,
+                isRaw: selectedImage?.isRaw,
               });
             },
           },
@@ -4215,6 +4261,7 @@ function App() {
                 error: null,
                 targetPath: finalSelection[0],
                 progressMessage: null,
+                isRaw: selectedImage?.isRaw || false,
               });
             },
           },
@@ -4238,16 +4285,9 @@ function App() {
                 error: null,
                 finalImageBase64: null,
                 isOpen: true,
-                progressMessage: 'Starting panorama process...',
+                isProcessing: false,
+                progressMessage: null,
                 stitchingSourcePaths: finalSelection,
-              });
-              invoke(Invokes.StitchPanorama, { paths: finalSelection }).catch((err) => {
-                setPanoramaModalState((prev: PanoramaModalState) => ({
-                  ...prev,
-                  error: String(err),
-                  isOpen: true,
-                  progressMessage: 'Failed to start.',
-                }));
               });
             },
           },
@@ -4260,16 +4300,9 @@ function App() {
                 error: null,
                 finalImageBase64: null,
                 isOpen: true,
-                progressMessage: 'Starting hdr process...',
+                isProcessing: false,
+                progressMessage: null,
                 stitchingSourcePaths: finalSelection,
-              });
-              invoke(Invokes.MergeHdr, { paths: finalSelection }).catch((err) => {
-                setHdrModalState((prev: HdrModalState) => ({
-                  ...prev,
-                  error: String(err),
-                  isOpen: true,
-                  progressMessage: 'Failed to start.',
-                }));
               });
             },
           },
@@ -5150,29 +5183,48 @@ function App() {
       <PanoramaModal
         error={panoramaModalState.error}
         finalImageBase64={panoramaModalState.finalImageBase64}
+        imageCount={panoramaModalState.stitchingSourcePaths.length}
         isOpen={panoramaModalState.isOpen}
+        isProcessing={panoramaModalState.isProcessing}
+        loadingImageUrl={
+          panoramaModalState.stitchingSourcePaths.length > 0
+            ? thumbnails[
+                panoramaModalState.stitchingSourcePaths[Math.floor(panoramaModalState.stitchingSourcePaths.length / 2)]
+              ] || null
+            : null
+        }
         onClose={() =>
           setPanoramaModalState({
             isOpen: false,
+            isProcessing: false,
             progressMessage: '',
             finalImageBase64: null,
             error: null,
             stitchingSourcePaths: [],
           })
         }
-        onOpenFile={(path: string) => {
-          handleImageSelect(path);
-        }}
+        onOpenFile={(path: string) => handleImageSelect(path)}
         onSave={handleSavePanorama}
+        onStitch={() => handleStartPanorama(panoramaModalState.stitchingSourcePaths)}
         progressMessage={panoramaModalState.progressMessage}
       />
       <HdrModal
         error={hdrModalState.error}
         finalImageBase64={hdrModalState.finalImageBase64}
+        imageCount={hdrModalState.stitchingSourcePaths.length}
         isOpen={hdrModalState.isOpen}
+        isProcessing={hdrModalState.isProcessing}
+        loadingImageUrl={
+          hdrModalState.stitchingSourcePaths.length > 0
+            ? thumbnails[
+                hdrModalState.stitchingSourcePaths[Math.floor(hdrModalState.stitchingSourcePaths.length / 2)]
+              ] || null
+            : null
+        }
         onClose={() =>
           setHdrModalState({
             isOpen: false,
+            isProcessing: false,
             progressMessage: '',
             finalImageBase64: null,
             error: null,
@@ -5183,6 +5235,7 @@ function App() {
           handleImageSelect(path);
         }}
         onSave={handleSaveHdr}
+        onMerge={() => handleStartHdr(hdrModalState.stitchingSourcePaths)}
         progressMessage={hdrModalState.progressMessage}
       />
       <NegativeConversionModal
@@ -5208,6 +5261,13 @@ function App() {
         isProcessing={denoiseModalState.isProcessing}
         error={denoiseModalState.error}
         progressMessage={denoiseModalState.progressMessage}
+        isRaw={denoiseModalState.isRaw}
+        loadingImageUrl={
+          denoiseModalState.targetPath
+            ? thumbnails[denoiseModalState.targetPath] ||
+              (selectedImage?.path === denoiseModalState.targetPath ? finalPreviewUrl : null)
+            : null
+        }
       />
       <CreateFolderModal
         isOpen={isCreateFolderModalOpen}

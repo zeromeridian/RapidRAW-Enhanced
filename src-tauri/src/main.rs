@@ -3719,17 +3719,31 @@ async fn save_hdr(
 async fn apply_denoising(
     path: String,
     intensity: f32,
+    method: String,
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
     let (source_path, _) = parse_virtual_path(&path);
     let path_str = source_path.to_string_lossy().to_string();
 
+    let mut ai_session = None;
+    if method == "ai" {
+        let session = crate::ai_processing::get_or_init_denoise_model(
+            &app_handle,
+            &state.ai_state,
+            &state.ai_init_lock,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+        ai_session = Some(session);
+    }
+
     let denoise_result_handle = state.denoise_result.clone();
 
     tokio::task::spawn_blocking(move || {
-        match denoising::denoise_image(path_str, intensity, app_handle.clone()) {
-            Ok((image, _base64_ignored_in_this_handler_logic)) => {
+        match denoising::denoise_image(path_str, intensity, method, app_handle.clone(), ai_session)
+        {
+            Ok((image, _)) => {
                 *denoise_result_handle.lock().unwrap() = Some(image);
             }
             Err(e) => {

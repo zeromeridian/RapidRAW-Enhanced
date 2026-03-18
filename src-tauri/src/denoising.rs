@@ -9,9 +9,11 @@ use std::cmp::Ordering;
 use std::fs;
 use std::io::Cursor;
 use std::path::Path;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering as AtomicOrdering};
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
+
+// Notice we no longer import ort modules here at all!
 
 const BLOCK_SIZE: usize = 8;
 const BLOCK_AREA: usize = 64;
@@ -40,81 +42,16 @@ impl Bm3dParams {
     }
 }
 
-fn rgb_to_ycbcr(r: &[f32], g: &[f32], b: &[f32]) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
-    let n = r.len();
-    let mut y = vec![0.0f32; n];
-    let mut cb = vec![0.0f32; n];
-    let mut cr = vec![0.0f32; n];
-    for i in 0..n {
-        let rv = r[i];
-        let gv = g[i];
-        let bv = b[i];
-        y[i] = 0.299 * rv + 0.587 * gv + 0.114 * bv;
-        cb[i] = -0.168736 * rv - 0.331264 * gv + 0.5 * bv + 128.0;
-        cr[i] = 0.5 * rv - 0.418688 * gv - 0.081312 * bv + 128.0;
-    }
-    (y, cb, cr)
-}
-
-fn ycbcr_to_rgb(y: &[f32], cb: &[f32], cr: &[f32]) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
-    let n = y.len();
-    let mut r = vec![0.0f32; n];
-    let mut g = vec![0.0f32; n];
-    let mut b = vec![0.0f32; n];
-    for i in 0..n {
-        let yv = y[i];
-        let cbv = cb[i] - 128.0;
-        let crv = cr[i] - 128.0;
-        r[i] = yv + 1.402 * crv;
-        g[i] = yv - 0.344136 * cbv - 0.714136 * crv;
-        b[i] = yv + 1.772 * cbv;
-    }
-    (r, g, b)
-}
-
-pub fn denoise_image(
-    path_str: String,
+fn run_bm3d(
+    rgb_img: &Rgb32FImage,
     intensity: f32,
-    app_handle: AppHandle,
-) -> Result<(DynamicImage, String), String> {
-    let path = Path::new(&path_str);
-    if !path.exists() {
-        return Err("File not found".to_string());
-    }
-
-    let is_raw = is_raw_file(&path_str);
-
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
-    let linear_mode = settings.linear_raw_mode;
-
-    let _ = app_handle.emit("denoise-progress", "Loading image...");
-
-    let file_bytes = fs::read(path).map_err(|e| e.to_string())?;
-
-    let mut dynamic_img = load_base_image_from_bytes(
-        &file_bytes,
-        &path_str,
-        false,
-        highlight_compression,
-        linear_mode,
-        None,
-    )
-    .map_err(|e| e.to_string())?;
-
-    if is_raw {
-        let _ = app_handle.emit("denoise-progress", "Preparing RAW data...");
-        apply_cpu_default_raw_processing(&mut dynamic_img);
-    }
-
-    let rgb_img_for_denoiser = dynamic_img.to_rgb32f();
-
-    let (width, height) = rgb_img_for_denoiser.dimensions();
-
+    app_handle: &AppHandle,
+) -> Result<DynamicImage, String> {
+    let (width, height) = rgb_img.dimensions();
     let params = Bm3dParams::from_intensity(intensity);
     let dct_tables = Arc::new(DctTables::new());
 
-    let rgb_channels = split_channels(&rgb_img_for_denoiser);
+    let rgb_channels = split_channels(rgb_img);
     let (y, cb, cr) = rgb_to_ycbcr(&rgb_channels[0], &rgb_channels[1], &rgb_channels[2]);
     let original_y = y.clone();
     let channels = vec![y, cb, cr];
@@ -134,7 +71,7 @@ pub fn denoise_image(
         &dct_tables,
         &progress_counter,
         total_work_units,
-        &app_handle,
+        app_handle,
     );
 
     {
@@ -154,10 +91,61 @@ pub fn denoise_image(
         &denoised_channels[2],
     );
 
-    let _ = app_handle.emit("denoise-progress", "Finalizing data...");
     let out_img_buffer = merge_channels(&[r, g, b], width, height);
-    let out_dynamic = DynamicImage::ImageRgb32F(out_img_buffer);
+    Ok(DynamicImage::ImageRgb32F(out_img_buffer))
+}
 
+pub fn denoise_image(
+    path_str: String,
+    intensity: f32,
+    method: String,
+    app_handle: AppHandle,
+    ai_session: Option<Arc<Mutex<ort::session::Session>>>,
+) -> Result<(DynamicImage, String), String> {
+    let path = Path::new(&path_str);
+    if !path.exists() {
+        return Err("File not found".to_string());
+    }
+
+    let is_raw = is_raw_file(&path_str);
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
+    let linear_mode = settings.linear_raw_mode;
+
+    let _ = app_handle.emit("denoise-progress", "Loading image...");
+
+    let file_bytes = fs::read(path).map_err(|e| e.to_string())?;
+    let mut dynamic_img = load_base_image_from_bytes(
+        &file_bytes,
+        &path_str,
+        false,
+        highlight_compression,
+        linear_mode,
+        None,
+    )
+    .map_err(|e| e.to_string())?;
+
+    if is_raw {
+        let _ = app_handle.emit("denoise-progress", "Preparing RAW data...");
+        apply_cpu_default_raw_processing(&mut dynamic_img);
+    }
+
+    let rgb_img_for_denoiser = dynamic_img.to_rgb32f();
+
+    let out_dynamic = if method == "ai" {
+        let session_arc = ai_session.ok_or_else(|| "AI Session not provided".to_string())?;
+        crate::ai_processing::run_ai_denoise(
+            &rgb_img_for_denoiser,
+            intensity,
+            &session_arc,
+            &app_handle,
+        )
+        .map_err(|e| e.to_string())?
+    } else {
+        run_bm3d(&rgb_img_for_denoiser, intensity, &app_handle)?
+    };
+
+    let _ = app_handle.emit("denoise-progress", "Finalizing data...");
     let _ = app_handle.emit("denoise-progress", "Generating previews...");
 
     let (w, h) = out_dynamic.dimensions();
@@ -212,6 +200,38 @@ pub fn denoise_image(
     let _ = app_handle.emit("denoise-complete", &payload);
 
     Ok((out_dynamic, data_url_denoised))
+}
+
+fn rgb_to_ycbcr(r: &[f32], g: &[f32], b: &[f32]) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
+    let n = r.len();
+    let mut y = vec![0.0f32; n];
+    let mut cb = vec![0.0f32; n];
+    let mut cr = vec![0.0f32; n];
+    for i in 0..n {
+        let rv = r[i];
+        let gv = g[i];
+        let bv = b[i];
+        y[i] = 0.299 * rv + 0.587 * gv + 0.114 * bv;
+        cb[i] = -0.168736 * rv - 0.331264 * gv + 0.5 * bv + 128.0;
+        cr[i] = 0.5 * rv - 0.418688 * gv - 0.081312 * bv + 128.0;
+    }
+    (y, cb, cr)
+}
+
+fn ycbcr_to_rgb(y: &[f32], cb: &[f32], cr: &[f32]) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
+    let n = y.len();
+    let mut r = vec![0.0f32; n];
+    let mut g = vec![0.0f32; n];
+    let mut b = vec![0.0f32; n];
+    for i in 0..n {
+        let yv = y[i];
+        let cbv = cb[i] - 128.0;
+        let crv = cr[i] - 128.0;
+        r[i] = yv + 1.402 * crv;
+        g[i] = yv - 0.344136 * cbv - 0.714136 * crv;
+        b[i] = yv + 1.772 * cbv;
+    }
+    (r, g, b)
 }
 
 fn bm3d_process_joint(
@@ -300,8 +320,6 @@ fn run_bm3d_step_joint(
             let guide_ch = &guide[ch];
             let noisy_ch = &noisy[ch];
 
-            // Channel 0 = luma (Y) or red; channels 1-2 = chroma (Cb/Cr) or green/blue.
-            // chroma_sigma_scale is 1.0 in standard BM3D and ~1.8 in CBM3D mode.
             let ch_sigma = if ch == 0 {
                 params.sigma
             } else {
@@ -360,9 +378,6 @@ fn run_bm3d_step_joint(
     for ch in 0..num_channels {
         let num_vec = numerators[ch].to_vec();
         let den_vec = denominators[ch].to_vec();
-        // For pixels not covered by any block (right/bottom edge remainder),
-        // fall back to the original noisy value. Falling back to zero produces a
-        // visible green fringe after YCbCr→RGB conversion: (Y=0,Cb=0,Cr=0) → ~(0,135,0).
         let final_ch = num_vec
             .iter()
             .zip(den_vec.iter())
@@ -465,17 +480,14 @@ fn block_matching_joint(
             if x == rx && y == ry {
                 continue;
             }
-
             let d_r = compute_ssd_flat(&channels[0], w, x, y, &ref_r, threshold);
             if d_r > threshold {
                 continue;
             }
-
             let d_g = compute_ssd_flat(&channels[1], w, x, y, &ref_g, threshold - d_r);
             if d_r + d_g > threshold {
                 continue;
             }
-
             let d_b = compute_ssd_flat(&channels[2], w, x, y, &ref_b, threshold - (d_r + d_g));
             let total_dist = d_r + d_g + d_b;
 
@@ -766,8 +778,6 @@ fn prev_power_of_two(x: usize) -> usize {
     p
 }
 
-/// Separable Gaussian blur of a single-channel float image (values in any range).
-/// `sigma` controls the blur radius; kernel half-width = ceil(3 * sigma).
 fn gaussian_blur_1ch(data: &[f32], width: usize, height: usize, sigma: f32) -> Vec<f32> {
     let radius = (3.0 * sigma).ceil() as usize;
     let klen = 2 * radius + 1;
@@ -782,7 +792,6 @@ fn gaussian_blur_1ch(data: &[f32], width: usize, height: usize, sigma: f32) -> V
         *k /= ksum;
     }
 
-    // Horizontal pass.
     let mut tmp = vec![0.0f32; width * height];
     for y in 0..height {
         let row_in = &data[y * width..(y + 1) * width];
@@ -802,7 +811,6 @@ fn gaussian_blur_1ch(data: &[f32], width: usize, height: usize, sigma: f32) -> V
         }
     }
 
-    // Vertical pass.
     let mut out = vec![0.0f32; width * height];
     for y in 0..height {
         let y0 = y as isize - radius as isize;

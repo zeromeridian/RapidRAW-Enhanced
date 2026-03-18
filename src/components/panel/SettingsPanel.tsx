@@ -1264,6 +1264,17 @@ export default function SettingsPanel({
                     </li>
                     <li>
                       <a
+                        href="https://github.com/trougnouf/nind-denoise"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-accent hover:underline"
+                      >
+                        nind-denoise
+                      </a>
+                      : For providing AI models that power the AI noise reduction capabilities in RapidRAW.
+                    </li>
+                    <li>
+                      <a
                         href="https://github.com/darktable-org/darktable"
                         target="_blank"
                         rel="noopener noreferrer"
