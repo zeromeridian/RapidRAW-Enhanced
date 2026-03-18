@@ -180,12 +180,15 @@ fn inpaint_criminisi(source_image: &RgbImage, mask: &GrayImage, patch_radius: u3
                 calculate_normal(&pixel_states, width, height, x, y)
             };
 
-            let (priority, confidence_term) = calculate_priority(
+            let ip_state = InpaintingState {
                 out_slice,
-                &pixel_states,
-                &confidence,
+                pixel_states: &pixel_states,
                 width,
                 height,
+            };
+            let (priority, confidence_term) = calculate_priority(
+                &ip_state,
+                &confidence,
                 x,
                 y,
                 patch_radius,
@@ -218,12 +221,15 @@ fn inpaint_criminisi(source_image: &RgbImage, mask: &GrayImage, patch_radius: u3
                 let search_radius = (patch_radius * 7).max(30);
                 let max_samples = 500;
 
-                let (best_match_x, best_match_y) = find_best_match_local(
-                    output.as_raw(),
-                    &pixel_states,
-                    &num_unknowns,
+                let ip_state = InpaintingState {
+                    out_slice: output.as_raw(),
+                    pixel_states: &pixel_states,
                     width,
                     height,
+                };
+                let (best_match_x, best_match_y) = find_best_match_local(
+                    &ip_state,
+                    &num_unknowns,
                     px,
                     py,
                     patch_radius,
@@ -433,17 +439,23 @@ fn get_gradient_at_point(
     (-grad_y, grad_x)
 }
 
-fn calculate_priority(
-    out_slice: &[u8],
-    pixel_states: &[u8],
-    confidence: &[f32],
+struct InpaintingState<'a> {
+    out_slice: &'a [u8],
+    pixel_states: &'a [u8],
     width: u32,
     height: u32,
+}
+
+fn calculate_priority(
+    state: &InpaintingState,
+    confidence: &[f32],
     px: u32,
     py: u32,
     patch_radius: u32,
     normal: (f32, f32),
 ) -> (f32, f32) {
+    let width = state.width;
+    let height = state.height;
     let r = patch_radius as i32;
     let mut confidence_sum = 0.0;
     let mut count = 0;
@@ -453,7 +465,7 @@ fn calculate_priority(
             let qx = (px as i32 + dx).clamp(0, (width.saturating_sub(1)) as i32) as u32;
             let qy = (py as i32 + dy).clamp(0, (height.saturating_sub(1)) as i32) as u32;
             let idx = (qy * width + qx) as usize;
-            if pixel_states[idx] == PIXEL_KNOWN {
+            if state.pixel_states[idx] == PIXEL_KNOWN {
                 confidence_sum += confidence[idx];
                 count += 1;
             }
@@ -468,7 +480,7 @@ fn calculate_priority(
 
     let (normal_x, normal_y) = normal;
     let (isophote_x, isophote_y) =
-        get_gradient_at_point(out_slice, pixel_states, width, height, px, py);
+        get_gradient_at_point(state.out_slice, state.pixel_states, width, height, px, py);
 
     let data_term = (isophote_x * normal_x + isophote_y * normal_y).abs() / 255.0;
     let priority = confidence_term * data_term + 0.001;
@@ -476,11 +488,8 @@ fn calculate_priority(
 }
 
 fn find_best_match_local(
-    out_slice: &[u8],
-    pixel_states: &[u8],
+    state: &InpaintingState,
     num_unknowns: &[u32],
-    width: u32,
-    height: u32,
     px: u32,
     py: u32,
     patch_radius: u32,
@@ -488,6 +497,10 @@ fn find_best_match_local(
     max_samples: usize,
     kernel: &[f32],
 ) -> (u32, u32) {
+    let out_slice = state.out_slice;
+    let pixel_states = state.pixel_states;
+    let width = state.width;
+    let height = state.height;
     let r = patch_radius as i32;
     let sr = search_radius as i32;
 
