@@ -1685,6 +1685,10 @@ export default function SettingsPanel({
                           keys={['Shift', '+', 'Mouse Wheel']}
                           description="Adjust slider value by 2 steps"
                         />
+                        <KeybindItem
+                          keys={['Right Click']}
+                          description="Create a new mask/edit from a tool button"
+                        />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '+']} description="Zoom in" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '-']} description="Zoom out" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '0']} description="Zoom to fit" />

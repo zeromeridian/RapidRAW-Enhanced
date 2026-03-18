@@ -443,9 +443,17 @@ export default function MasksPanel({
     else if (type === Mask.AiSky) onGenerateAiSkyMask(subMask.id);
   };
 
-  const handleGridClick = (type: Mask) => {
-    if (activeMaskContainerId) handleAddSubMask(activeMaskContainerId, type);
+  const handleGridClick = (type: Mask, forceNewMaskContainer: boolean = false) => {
+    if (!forceNewMaskContainer && activeMaskContainerId) handleAddSubMask(activeMaskContainerId, type);
     else handleAddMaskContainer(type);
+  };
+
+  const handleGridRightClick = (event: React.MouseEvent, type: Mask | null) => {
+    if (event.button !== 2) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!type) return;
+    handleGridClick(type, true);
   };
 
   const handleAddOthersMask = (event: React.MouseEvent) => {
@@ -455,6 +463,7 @@ export default function MasksPanel({
       label: maskType.name,
       icon: maskType.icon,
       onClick: () => handleGridClick(maskType.type),
+      onRightClick: () => handleGridClick(maskType.type, true),
     }));
     showContextMenu(rect.left, rect.bottom + 5, options);
   };
@@ -743,6 +752,7 @@ export default function MasksPanel({
                   onClick={(e: any) =>
                     maskType.id === 'others' ? handleAddOthersMask(e) : handleGridClick(maskType.type)
                   }
+                  onRightClick={(e: React.MouseEvent) => handleGridRightClick(e, maskType.type)}
                   isDraggable={maskType.id !== 'others'}
                   activeMaskContainerId={activeMaskContainerId}
                 />
@@ -946,7 +956,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
   );
 }
 
-function DraggableGridItem({ maskType, onClick, isDraggable, activeMaskContainerId }: any) {
+function DraggableGridItem({ maskType, onClick, onRightClick, isDraggable, activeMaskContainerId }: any) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `create-${maskType.id || maskType.type}`,
     data: { type: 'Creation', maskType: maskType.type },
@@ -956,9 +966,9 @@ function DraggableGridItem({ maskType, onClick, isDraggable, activeMaskContainer
   const tooltip = maskType.disabled
     ? 'Coming Soon'
     : maskType.id === 'others'
-      ? 'Other Masks'
+      ? 'Show More Mask Types'
       : activeMaskContainerId
-        ? `Add ${maskType.name} to Current Mask`
+        ? `Left click adds ${maskType.name} to the current mask. Right click creates a new ${maskType.name} mask.`
         : `Create New ${maskType.name} Mask`;
 
   return (
@@ -968,7 +978,15 @@ function DraggableGridItem({ maskType, onClick, isDraggable, activeMaskContainer
       {...attributes}
       disabled={maskType.disabled}
       onClick={onClick}
-      className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onMouseDown={(event) => {
+        if (event.button !== 2) return;
+        onRightClick(event);
+      }}
+      className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors 
                 ${maskType.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'} ${isDragging ? 'opacity-50' : ''}`}
       data-tooltip={tooltip}
     >

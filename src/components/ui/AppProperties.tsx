@@ -196,6 +196,7 @@ export interface Option {
   isDestructive?: boolean;
   label?: string;
   onClick?(): void;
+  onRightClick?(): void;
   submenu?: any;
   type?: string;
 }

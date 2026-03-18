@@ -212,6 +212,15 @@ function MenuItem({ option, path, hideContextMenu }: MenuItemProps) {
             openSubmenu(path);
           }
         }}
+        onMouseDown={(event) => {
+          if (event.button !== 2) return;
+          event.preventDefault();
+          event.stopPropagation();
+          if (!option.disabled && !option.submenu && option.onRightClick) {
+            option.onRightClick();
+            hideContextMenu();
+          }
+        }}
         ref={itemRef}
         role="menuitem"
       >
