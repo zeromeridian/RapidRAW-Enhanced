@@ -1682,6 +1682,10 @@ export default function SettingsPanel({
                         <KeybindItem keys={['←', '→']} description="Previous / Next image" />
                         <KeybindItem keys={['↑', '↓']} description="Zoom in / Zoom out (by step)" />
                         <KeybindItem
+                          keys={['Shift/Alt', '+', 'Drag Slider']}
+                          description="Fine adjustment mode (0.2× sensitivity)"
+                        />
+                        <KeybindItem
                           keys={['Shift', '+', 'Mouse Wheel']}
                           description="Adjust slider value by 2 steps"
                         />

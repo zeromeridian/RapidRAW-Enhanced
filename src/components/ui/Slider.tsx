@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GLOBAL_KEYS } from './AppProperties';
 
 interface SliderProps {
@@ -14,6 +14,7 @@ interface SliderProps {
 }
 
 const DOUBLE_CLICK_THRESHOLD_MS = 300;
+const FINE_ADJUSTMENT_MULTIPLIER = 0.2;
 
 const Slider = ({
   defaultValue = 0,
@@ -32,11 +33,28 @@ const Slider = ({
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState<string>(String(value));
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const rangeInputRef = useRef<HTMLInputElement | null>(null);
   const [isLabelHovered, setIsLabelHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastUpTime = useRef(0);
+
+  const lastPointerXRef = useRef<number>(0);
+  const accumulatedValueRef = useRef<number>(0);
+
   const fillPercentage = max !== min ? ((displayValue - min) / (max - min)) * 100 : 0;
   const defaultPercentage = max !== min ? ((defaultValue - min) / (max - min)) * 100 : 0;
+
+  const stepStr = String(step);
+  const decimalPlaces = stepStr.includes('.') ? stepStr.split('.')[1].length : 0;
+
+  const snapToStep = useCallback(
+    (val: number): number => {
+      const snapped = Math.round((val - min) / step) * step + min;
+      const clamped = Math.max(min, Math.min(max, snapped));
+      return parseFloat(clamped.toFixed(decimalPlaces));
+    },
+    [min, max, step, decimalPlaces],
+  );
 
   useEffect(() => {
     onDragStateChange(isDragging);
@@ -54,8 +72,6 @@ const Slider = ({
       event.preventDefault();
       const direction = -Math.sign(event.deltaY);
       const newValue = value + direction * step * 2;
-      const stepStr = String(step);
-      const decimalPlaces = stepStr.includes('.') ? stepStr.split('.')[1].length : 0;
       const roundedNewValue = parseFloat(newValue.toFixed(decimalPlaces));
 
       const clampedValue = Math.max(min, Math.min(max, roundedNewValue));
@@ -75,23 +91,60 @@ const Slider = ({
     return () => {
       sliderElement.removeEventListener('wheel', handleWheel);
     };
-  }, [value, min, max, step, onChange]);
+  }, [value, min, max, step, onChange, decimalPlaces]);
 
   useEffect(() => {
-    const handleDragEndGlobal = () => {
+    if (!isDragging) return;
+
+    const inputEl = rangeInputRef.current;
+    if (!inputEl) return;
+    const sliderWidth = inputEl.getBoundingClientRect().width || 1;
+
+    const handlePointerMove = (e: MouseEvent | TouchEvent) => {
+      let clientX: number;
+      let shiftKey: boolean;
+
+      if ('touches' in e) {
+        if (e.touches.length === 0) return;
+        clientX = e.touches[0].clientX;
+        shiftKey = e.shiftKey || e.altKey;
+      } else {
+        clientX = e.clientX;
+        shiftKey = e.shiftKey || e.altKey;
+      }
+
+      const deltaX = clientX - lastPointerXRef.current;
+      lastPointerXRef.current = clientX;
+
+      const multiplier = shiftKey ? FINE_ADJUSTMENT_MULTIPLIER : 1;
+      const deltaValue = (deltaX / sliderWidth) * (max - min) * multiplier;
+
+      accumulatedValueRef.current += deltaValue;
+      accumulatedValueRef.current = Math.max(min, Math.min(max, accumulatedValueRef.current));
+
+      const snappedValue = snapToStep(accumulatedValueRef.current);
+
+      setDisplayValue(snappedValue);
+      onChange({ target: { value: snappedValue } });
+    };
+
+    const handlePointerUp = () => {
+      lastUpTime.current = Date.now();
       setIsDragging(false);
     };
 
-    if (isDragging) {
-      window.addEventListener('mouseup', handleDragEndGlobal);
-      window.addEventListener('touchend', handleDragEndGlobal);
-    }
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    window.addEventListener('touchmove', handlePointerMove);
+    window.addEventListener('touchend', handlePointerUp);
 
     return () => {
-      window.removeEventListener('mouseup', handleDragEndGlobal);
-      window.removeEventListener('touchend', handleDragEndGlobal);
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+      window.removeEventListener('touchmove', handlePointerMove);
+      window.removeEventListener('touchend', handlePointerUp);
     };
-  }, [isDragging]);
+  }, [isDragging, min, max, step, onChange, snapToStep]);
 
   useEffect(() => {
     if (isDragging) {
@@ -156,21 +209,48 @@ const Slider = ({
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDisplayValue(Number(e.target.value));
-    onChange(e);
+    if (!isDragging) {
+      setDisplayValue(Number(e.target.value));
+      onChange(e);
+    }
   };
 
-  const handleDragStart = (e: React.MouseEvent<HTMLInputElement>) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLInputElement>) => {
     if (Date.now() - lastUpTime.current < DOUBLE_CLICK_THRESHOLD_MS) {
       e.preventDefault();
       return;
     }
+
+    e.preventDefault();
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const rawValue = min + fraction * (max - min);
+    const snappedValue = snapToStep(rawValue);
+
+    accumulatedValueRef.current = snappedValue;
+    lastPointerXRef.current = e.clientX;
+
     setIsDragging(true);
+    setDisplayValue(snappedValue);
+    onChange({ target: { value: snappedValue } });
   };
 
-  const handleDragEnd = () => {
-    lastUpTime.current = Date.now();
-    setIsDragging(false);
+  const handleTouchStart = (e: React.TouchEvent<HTMLInputElement>) => {
+    if (e.touches.length === 0) return;
+
+    const touch = e.touches[0];
+    const rect = e.currentTarget.getBoundingClientRect();
+    const fraction = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+    const rawValue = min + fraction * (max - min);
+    const snappedValue = snapToStep(rawValue);
+
+    accumulatedValueRef.current = snappedValue;
+    lastPointerXRef.current = touch.clientX;
+
+    setIsDragging(true);
+    setDisplayValue(snappedValue);
+    onChange({ target: { value: snappedValue } });
   };
 
   const handleValueClick = () => {
@@ -220,8 +300,6 @@ const Slider = ({
     }
   };
 
-  const stepStr = String(step);
-  const decimalPlaces = stepStr.includes('.') ? stepStr.split('.')[1].length : 0;
   const numericValue = isNaN(Number(value)) ? 0 : Number(value);
 
   return (
@@ -295,6 +373,7 @@ const Slider = ({
           }}
         />
         <input
+          ref={rangeInputRef}
           className={`absolute top-1/2 left-0 w-full h-1.5 appearance-none bg-transparent cursor-pointer m-0 p-0 slider-input z-10 ${
             isDragging ? 'slider-thumb-active' : ''
           }`}
@@ -304,10 +383,8 @@ const Slider = ({
           onChange={handleChange}
           onDoubleClick={handleReset}
           onKeyDown={handleRangeKeyDown}
-          onMouseDown={handleDragStart}
-          onMouseUp={handleDragEnd}
-          onTouchEnd={handleDragEnd}
-          onTouchStart={handleDragStart}
+          onMouseDown={handleMouseDown}
+          onTouchStart={handleTouchStart}
           step={String(step)}
           type="range"
           value={displayValue}
