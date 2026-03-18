@@ -272,6 +272,7 @@ fn bm3d_process_joint(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_bm3d_step_joint(
     noisy: &[Vec<f32>],
     guide: &[Vec<f32>],
@@ -429,6 +430,7 @@ struct Match {
     y: u16,
 }
 
+#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn block_matching_joint(
     channels: &[Vec<f32>],

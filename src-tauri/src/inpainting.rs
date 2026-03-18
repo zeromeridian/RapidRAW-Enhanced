@@ -487,6 +487,7 @@ fn calculate_priority(
     (priority, confidence_term)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn find_best_match_local(
     state: &InpaintingState,
     num_unknowns: &[u32],

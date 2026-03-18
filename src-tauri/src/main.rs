@@ -862,6 +862,7 @@ pub fn get_cached_or_generate_mask(
     generated
 }
 
+#[allow(clippy::too_many_arguments)]
 fn process_preview_job(
     app_handle: &tauri::AppHandle,
     state: tauri::State<AppState>,
@@ -1882,6 +1883,7 @@ fn encode_image_to_bytes(
     Ok(image_bytes)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn export_masks_for_image(
     base_image: &DynamicImage,
     js_adjustments: &Value,
@@ -2824,6 +2826,7 @@ async fn generate_ai_sky_mask(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 async fn generate_ai_subject_mask(
     js_adjustments: serde_json::Value,
