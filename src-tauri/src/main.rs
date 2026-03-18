@@ -84,7 +84,7 @@ use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bi
 use tagging_utils::{candidates, hierarchy};
 
 #[cfg(target_os = "macos")]
-extern "C" fn force_exit() {
+extern "C" fn force_exit(_signal: libc::c_int) {
     unsafe {
         libc::_exit(0);
     }
@@ -93,7 +93,7 @@ extern "C" fn force_exit() {
 #[cfg(target_os = "macos")]
 pub fn register_exit_handler() {
     unsafe {
-        libc::atexit(force_exit);
+        libc::signal(libc::SIGABRT, force_exit as libc::sighandler_t);
     }
 }
 
@@ -4511,7 +4511,16 @@ fn main() {
                         }
                     }
                 }
-                tauri::RunEvent::ExitRequested { .. } => {
+                tauri::RunEvent::ExitRequested { api, .. } => {
+                    api.prevent_exit();
+
+                    #[cfg(target_os = "macos")]
+                    unsafe { libc::_exit(0); }
+
+                    #[cfg(not(target_os = "macos"))]
+                    std::process::exit(0);
+                }
+                tauri::RunEvent::Exit => {
                     #[cfg(target_os = "macos")]
                     unsafe { libc::_exit(0); }
 
