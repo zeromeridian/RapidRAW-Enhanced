@@ -68,7 +68,10 @@ use crate::ai_processing::{
     run_u2netp_model,
 };
 use crate::exif_processing::{read_exposure_time_secs, read_iso};
-use crate::file_management::{AppSettings, load_settings, parse_virtual_path, read_file_mapped};
+use crate::file_management::{
+    AppSettings, generate_filename_from_template, load_settings, parse_virtual_path,
+    read_file_mapped,
+};
 use crate::formats::is_raw_file;
 use crate::image_loader::{
     composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
@@ -673,7 +676,7 @@ async fn load_image(
     let (orig_width, orig_height) = pristine_img.dimensions();
 
     *state.original_image.lock().unwrap() = Some(LoadedImage {
-        path: source_path_str.clone(),
+        path: path,
         image: Arc::new(pristine_img),
         is_raw,
     });
@@ -2166,11 +2169,42 @@ async fn batch_export_images(
         }
         let pool = pool_result.unwrap();
 
+        let mut base_path_counts: HashMap<String, usize> = HashMap::new();
+        let mut export_items = Vec::with_capacity(total_paths);
+
+        for (i, path_str) in paths.into_iter().enumerate() {
+            let (source_path, _) = parse_virtual_path(&path_str);
+            let source_str = source_path.to_string_lossy().to_string();
+            let count = base_path_counts.entry(source_str.clone()).or_insert(0);
+            *count += 1;
+
+            let mut explicit_vc = None;
+            if let Some(idx) = path_str.rfind("vc=") {
+                let id_str = path_str[idx + 3..].split('&').next().unwrap_or("");
+                if let Ok(id) = id_str.parse::<u32>() {
+                    explicit_vc = Some(id);
+                }
+            }
+            if explicit_vc.is_none() {
+                let lower = path_str.to_lowercase();
+                if let Some(idx) = lower.rfind("_vc") {
+                    let id_str: String = lower[idx + 3..]
+                        .chars()
+                        .take_while(|c| c.is_ascii_digit())
+                        .collect();
+                    if let Ok(id) = id_str.parse::<u32>() {
+                        explicit_vc = Some(id);
+                    }
+                }
+            }
+
+            export_items.push((i, path_str, *count, explicit_vc));
+        }
+
         let results: Vec<Result<(), String>> = pool.install(|| {
-            paths
-                .par_iter()
-                .enumerate()
-                .map(|(global_index, image_path_str)| {
+            export_items
+                .into_par_iter()
+                .map(|(global_index, image_path_str, appearance_count, explicit_vc)| {
                     if app_handle
                         .state::<AppState>()
                         .export_task_handle
@@ -2187,12 +2221,12 @@ async fn batch_export_images(
                         serde_json::json!({
                             "current": current_progress,
                             "total": total_paths,
-                            "path": image_path_str
+                            "path": &image_path_str
                         }),
                     );
 
                     let result: Result<(), String> = (|| {
-                        let (source_path, sidecar_path) = parse_virtual_path(image_path_str);
+                        let (source_path, sidecar_path) = parse_virtual_path(&image_path_str);
                         let source_path_str = source_path.to_string_lossy().to_string();
 
                         let metadata: ImageMetadata = if sidecar_path.exists() {
@@ -2213,13 +2247,20 @@ async fn batch_export_images(
                             .filename_template
                             .as_deref()
                             .unwrap_or("{original_filename}_edited");
-                        let new_stem = crate::file_management::generate_filename_from_template(
+                        let mut new_stem = generate_filename_from_template(
                             filename_template,
                             original_path,
                             global_index + 1,
                             total_paths,
                             &file_date,
                         );
+
+                        if let Some(vc_id) = explicit_vc {
+                            new_stem = format!("{}_VC{:02}", new_stem, vc_id);
+                        } else if appearance_count > 1 {
+                            new_stem = format!("{}_VC{:02}", new_stem, appearance_count - 1);
+                        }
+
                         let new_filename = format!("{}.{}", new_stem, output_format);
                         let output_path = output_folder_path.join(new_filename);
                         let extension = output_format.to_lowercase();
