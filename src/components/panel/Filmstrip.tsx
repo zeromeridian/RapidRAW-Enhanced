@@ -347,8 +347,9 @@ const FilmstripList = ({
     if (resizeEndTimer.current) clearTimeout(resizeEndTimer.current);
 
     resizeEndTimer.current = window.setTimeout(() => {
-      const { selectedPath, imageList } = currentDataRef.current;
-      if (selectedPath && gridHandle) {
+      const { selectedPath, imageList, multiSelectedPaths } = currentDataRef.current;
+
+      if (selectedPath && gridHandle && multiSelectedPaths.length <= 1) {
         const index = imageList.findIndex((img) => img.path === selectedPath);
         if (index !== -1) {
           gridHandle.scrollToColumn({ index, align: 'center', behavior: 'smooth' });
@@ -429,6 +430,14 @@ const FilmstripList = ({
     const currentPath = data.selectedPath;
 
     if (currentPath && gridHandle) {
+      if (data.multiSelectedPaths.length > 1) {
+        prevSelectedPath.current = currentPath;
+        if (data.clickTriggeredScroll.current) {
+          data.clickTriggeredScroll.current = false;
+        }
+        return;
+      }
+
       const index = data.imageList.findIndex((img) => img.path === currentPath);
 
       if (index !== -1) {
@@ -449,7 +458,15 @@ const FilmstripList = ({
         }
       }
     }
-  }, [data.selectedPath, data.imageList, isItemVisible, data.clickTriggeredScroll, performSafeScroll, gridHandle]);
+  }, [
+    data.selectedPath,
+    data.multiSelectedPaths,
+    data.imageList,
+    isItemVisible,
+    data.clickTriggeredScroll,
+    performSafeScroll,
+    gridHandle,
+  ]);
 
   const setSize = useCallback((index: number, width: number) => {
     if (sizeMapRef.current[index] !== width) {
