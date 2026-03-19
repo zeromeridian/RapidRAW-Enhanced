@@ -86,6 +86,7 @@ import {
   PasteMode,
   CopyPasteSettings,
 } from './utils/adjustments';
+import { calculateCenteredCrop } from './utils/cropUtils';
 import { generatePaletteFromImage } from './utils/palette';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import GlobalTooltip from './components/ui/GlobalTooltip';
@@ -507,6 +508,30 @@ function App() {
       });
     },
     [debouncedSetHistory],
+  );
+
+  const handleRotate = useCallback(
+    (degrees: number) => {
+      const increment = degrees > 0 ? 1 : 3;
+      setAdjustments((prev: Adjustments) => {
+        const newAspectRatio = prev.aspectRatio && prev.aspectRatio !== 0 ? 1 / prev.aspectRatio : null;
+        const newOrientationSteps = ((prev.orientationSteps || 0) + increment) % 4;
+
+        const newCrop =
+          selectedImage?.width && selectedImage?.height
+            ? calculateCenteredCrop(selectedImage.width, selectedImage.height, newOrientationSteps, newAspectRatio)
+            : null;
+
+        return {
+          ...prev,
+          aspectRatio: newAspectRatio,
+          orientationSteps: newOrientationSteps,
+          rotation: 0,
+          crop: newCrop,
+        };
+      });
+    },
+    [setAdjustments, selectedImage],
   );
 
   const handleStraighten = useCallback(
@@ -2908,6 +2933,7 @@ function App() {
     handlePasteFiles,
     handleRate,
     handleRightPanelSelect,
+    handleRotate,
     handleSetColorLabel,
     handleToggleFullScreen,
     handleZoomChange,

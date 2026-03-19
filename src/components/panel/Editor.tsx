@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import { ImageDimensions, useImageRenderSize } from '../../hooks/useImageRenderSize';
 import { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
+import { calculateCenteredCrop, getOrientedDimensions } from '../../utils/cropUtils';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
 import { Mask, SubMask } from './right/Masks';
@@ -467,30 +468,25 @@ export default function Editor({
     const needsRecalc = currentAdjCrop === null || geometryChanged || isDraggingRotation;
 
     if (needsRecalc) {
-      const { width: imgWidth, height: imgHeight } = selectedImage;
-      const isSwapped = orientationSteps === 1 || orientationSteps === 3;
-      const W = isSwapped ? imgHeight : imgWidth;
-      const H = isSwapped ? imgWidth : imgHeight;
+      const { width: W, height: H } = getOrientedDimensions(
+        selectedImage.width,
+        selectedImage.height,
+        orientationSteps,
+      );
       const A = aspectRatio || W / H;
 
       if (isNaN(A) || A <= 0) {
         return;
       }
 
-      const angle = Math.abs(effectiveRotation);
-      const rad = ((angle % 180) * Math.PI) / 180;
-      const sin = Math.sin(rad);
-      const cos = Math.cos(rad);
-
-      const h_c = Math.min(H / (A * sin + cos), W / (A * cos + sin));
-      const w_c = A * h_c;
-
-      const maxPixelCrop = {
-        x: Math.round((W - w_c) / 2),
-        y: Math.round((H - h_c) / 2),
-        width: Math.round(w_c),
-        height: Math.round(h_c),
-      };
+      const maxPixelCrop = calculateCenteredCrop(
+        selectedImage.width,
+        selectedImage.height,
+        orientationSteps,
+        A,
+        effectiveRotation,
+      );
+      if (!maxPixelCrop) return;
 
       if (isDraggingRotation) {
         setCrop({
