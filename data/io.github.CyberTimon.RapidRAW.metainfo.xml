@@ -38,6 +38,28 @@
   <url type="homepage">https://github.com/CyberTimon/RapidRAW</url>
 
   <releases>
+    <release version="v1.5.2" date="2026-03-19">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.5.2</url>
+        <description translate="no">
+            <p>New Features</p>
+            <ul>
+                <li>NIND Denoising: A new AI-powered denoising method based on nind-denoise that naturally removes noise from RAW images while preserving detail, replacing the older BM3D approach.</li>
+                <li>Image Analytics Panel: A switchable analysis panel with Luma Waveform, RGB Waveform, RGB Parade, Vectorscope, and RGB Histogram modes for real-time visual feedback.</li>
+                <li>Parametric Masks: Two new mask types for quickly targeting specific color ranges or luminance zones without manual brushing.</li>
+                <li>Single Point Subject Masks: Updated SAM-2 based subject detection models with single-click selection, removing the need to draw a bounding box.</li>
+                <li>JPEG XL, WebP, and CUBE LUT Export: Added support for new export formats, including the ability to export color grades as CUBE LUTs for use in video editors.</li>
+                <li>LRU Cache: Recently viewed images are now kept in cache for instant and seamless switching, ideal for culling and checking focus.</li>
+                <li>ROI Rendering: The viewport now only processes the visible region when zoomed in, significantly improving slider responsiveness.</li>
+            </ul>
+            <p>Core Improvements</p>
+            <ul>
+                <li>Improved tonemapper and shader, particularly how they behave within masked regions.</li>
+                <li>Refined keybinds across the app for a smoother editing workflow.</li>
+                <li>Various UI polish and visual tweaks.</li>
+                <li>Numerous bug fixes under the hood.</li>
+            </ul>
+        </description>
+    </release>
     <release version="v1.5.1" date="2026-03-07">
         <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.5.1</url>
         <description translate="no">
