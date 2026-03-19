@@ -888,7 +888,11 @@ export default function LensCorrectionModal({
       className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
         show ? 'opacity-100' : 'opacity-0'
       }`}
-      onMouseDown={onClose}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <AnimatePresence>
         {show && (
@@ -898,7 +902,6 @@ export default function LensCorrectionModal({
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
-            onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex-grow min-h-0 overflow-hidden">{renderContent()}</div>
             <div className="flex-shrink-0 p-4 flex justify-end gap-3 border-t border-surface bg-bg-secondary z-20">
