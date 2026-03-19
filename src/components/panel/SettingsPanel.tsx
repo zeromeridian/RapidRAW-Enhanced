@@ -1786,6 +1786,8 @@ export default function SettingsPanel({
                         <KeybindItem keys={['Ctrl/Cmd', '+', '-']} description="Zoom out" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '0']} description="Zoom to fit" />
                         <KeybindItem keys={['Ctrl/Cmd', '+', '1']} description="Zoom to 100%" />
+                        <KeybindItem keys={['[']} description="Rotate 90° counter-clockwise" />
+                        <KeybindItem keys={[']']} description="Rotate 90° clockwise" />
                         <KeybindItem keys={['F']} description="Toggle fullscreen" />
                         <KeybindItem keys={['B']} description="Show original (before/after)" />
                         <KeybindItem keys={['S']} description="Straighten Image" />

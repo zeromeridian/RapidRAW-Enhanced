@@ -3939,11 +3939,6 @@ function App() {
             disabled: !selectedImage?.isReady,
           },
           {
-            icon: CopyPlus,
-            label: 'Create Virtual Copy',
-            onClick: () => handleCreateVirtualCopy(selectedImage.path),
-          },
-          {
             label: 'Denoise',
             icon: Grip,
             onClick: () => {
@@ -4193,14 +4188,15 @@ function App() {
     };
 
     const onExportClick = () => {
-      setMultiSelectedPaths(finalSelection);
       if (selectedImage) {
         if (selectedImage.path !== path) {
           handleImageSelect(path);
         }
+        setMultiSelectedPaths(finalSelection);
         setRenderedRightPanel(Panel.Export);
         setActiveRightPanel(Panel.Export);
       } else {
+        setMultiSelectedPaths(finalSelection);
         setIsLibraryExportPanelVisible(true);
       }
     };
@@ -4268,12 +4264,6 @@ function App() {
             label: autoAdjustLabel,
             icon: Aperture,
             onClick: handleApplyAutoAdjustmentsToSelection,
-          },
-          {
-            disabled: !isSingleSelection,
-            icon: CopyPlus,
-            label: 'Create Virtual Copy',
-            onClick: () => handleCreateVirtualCopy(finalSelection[0]),
           },
           {
             label: 'Denoise',
@@ -4369,18 +4359,29 @@ function App() {
         },
       },
       {
-        disabled: !isSingleSelection,
         icon: CopyPlus,
         label: 'Duplicate Image',
-        onClick: async () => {
-          try {
-            await invoke(Invokes.DuplicateFile, { path: finalSelection[0] });
-            await refreshImageList();
-          } catch (err) {
-            console.error('Failed to duplicate file:', err);
-            setError(`Failed to duplicate file: ${err}`);
-          }
-        },
+        disabled: !isSingleSelection,
+        submenu: [
+          {
+            label: 'Physical Copy',
+            icon: Copy,
+            onClick: async () => {
+              try {
+                await invoke(Invokes.DuplicateFile, { path: finalSelection[0] });
+                await refreshImageList();
+              } catch (err) {
+                console.error('Failed to duplicate file:', err);
+                setError(`Failed to duplicate file: ${err}`);
+              }
+            },
+          },
+          {
+            label: 'Virtual Copy',
+            icon: CopyPlus,
+            onClick: () => handleCreateVirtualCopy(finalSelection[0]),
+          },
+        ],
       },
       { icon: FileEdit, label: renameLabel, onClick: () => handleRenameFiles(finalSelection) },
       { type: OPTION_SEPARATOR },
