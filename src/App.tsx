@@ -3939,7 +3939,7 @@ function App() {
             disabled: !selectedImage?.isReady,
           },
           {
-            label: 'Denoise',
+            label: 'Denoise Image',
             icon: Grip,
             onClick: () => {
               setDenoiseModalState({
@@ -4266,7 +4266,7 @@ function App() {
             onClick: handleApplyAutoAdjustmentsToSelection,
           },
           {
-            label: 'Denoise',
+            label: 'Denoise Image',
             icon: Grip,
             disabled: !isSingleSelection,
             onClick: () => {
