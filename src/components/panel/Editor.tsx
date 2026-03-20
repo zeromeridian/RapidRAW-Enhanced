@@ -735,7 +735,7 @@ export default function Editor({
     >
       <div
         className={clsx(
-          'flex-shrink-0',
+          'shrink-0',
           !isInstantTransition && 'transition-all duration-300 ease-in-out',
           isFullScreen ? 'max-h-0 opacity-0 m-0' : 'max-h-[100px] opacity-100',
           toolbarOverflowVisible ? 'overflow-visible' : 'overflow-hidden',

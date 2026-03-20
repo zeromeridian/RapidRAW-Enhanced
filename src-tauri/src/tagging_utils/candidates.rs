@@ -24,7 +24,7 @@ pub const TAG_CANDIDATES: [&str; 590] = [
     "crying",
     "thinking",
     "silhouette",
-    "shadow",
+    "shadow-sm",
     "hands",
     "feet",
     // --- Animals ---
@@ -507,7 +507,7 @@ pub const TAG_CANDIDATES: [&str; 590] = [
     "macro",
     "close-up",
     "long exposure",
-    "motion blur",
+    "motion blur-sm",
     "light painting",
     "bokeh",
     "depth of field",
