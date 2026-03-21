@@ -481,7 +481,17 @@ struct SeamlessBlend {
 }
 
 fn apply_seamless(tile: &mut Array4<f32>, blend: &SeamlessBlend) {
-    let SeamlessBlend { ud0, ud1, ud2, ud3, absx0, absy0, fswidth, fsheight, overlap } = *blend;
+    let SeamlessBlend {
+        ud0,
+        ud1,
+        ud2,
+        ud3,
+        absx0,
+        absy0,
+        fswidth,
+        fsheight,
+        overlap,
+    } = *blend;
     let ol = overlap;
     if absx0 > 0 {
         for c in 0..3 {
