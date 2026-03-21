@@ -63,6 +63,16 @@
   .slider-input.slider-thumb-active::-moz-range-thumb {
     @apply scale-110;
   }
+
+  /*
+    Color gradients for the temperature and tint slider
+  */
+  .temperature-gradient-track {
+    background: linear-gradient(to right, #0047abd8, #00b7ffd8, #FFFFFFd8, #fffb00d8, #ff8800d8) !important;
+  }
+  .tint-gradient-track {
+    background: linear-gradient(to right, #00FF00d8, #74ff74d8, #FFFFFFd8, #f36ed2d8, #CC0099d8) !important;
+  }
 }
 
 @layer utilities {
