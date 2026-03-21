@@ -114,13 +114,17 @@ const Slider = ({
       }
 
       const deltaX = clientX - lastPointerXRef.current;
-      lastPointerXRef.current = clientX;
 
       const multiplier = shiftKey ? FINE_ADJUSTMENT_MULTIPLIER : 1;
       const deltaValue = (deltaX / sliderWidth) * (max - min) * multiplier;
 
-      accumulatedValueRef.current += deltaValue;
-      accumulatedValueRef.current = Math.max(min, Math.min(max, accumulatedValueRef.current));
+      const prevAccumulated = accumulatedValueRef.current;
+      accumulatedValueRef.current = Math.max(min, Math.min(max, prevAccumulated + deltaValue));
+
+      const actualDeltaValue = accumulatedValueRef.current - prevAccumulated;
+      if (deltaValue !== 0) {
+        lastPointerXRef.current += deltaX * (actualDeltaValue / deltaValue);
+      }
 
       const snappedValue = snapToStep(accumulatedValueRef.current);
 
