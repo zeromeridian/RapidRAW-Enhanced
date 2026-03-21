@@ -86,6 +86,10 @@
 }
 
 @layer base {
+  :where(button, [role='button']):not([disabled]) {
+    cursor: pointer;
+  }
+
   html {
     background-color: transparent;
   }
