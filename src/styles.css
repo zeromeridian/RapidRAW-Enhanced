@@ -68,10 +68,10 @@
     Color gradients for the temperature and tint slider
   */
   .temperature-gradient-track {
-    background: linear-gradient(to right, #0047abd8, #00b7ffd8, #FFFFFFd8, #fffb00d8, #ff8800d8) !important;
+    background: linear-gradient(to right, #2d4a74, #3f94b6, #8a8a8a, #c7c549, #c7863c) !important;
   }
   .tint-gradient-track {
-    background: linear-gradient(to right, #00FF00d8, #74ff74d8, #FFFFFFd8, #f36ed2d8, #CC0099d8) !important;
+    background: linear-gradient(to right, #448d41, #59d459, #8a8a8a, #9c548a, #be409f) !important;
   }
 }
 
