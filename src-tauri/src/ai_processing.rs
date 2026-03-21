@@ -204,16 +204,18 @@ pub async fn get_or_init_ai_models(
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<AiModels>> {
     if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
-        && let Some(models) = &ai_state.models {
-            return Ok(models.clone());
-        }
+        && let Some(models) = &ai_state.models
+    {
+        return Ok(models.clone());
+    }
 
     let _guard = ai_init_lock.lock().await;
 
     if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
-        && let Some(models) = &ai_state.models {
-            return Ok(models.clone());
-        }
+        && let Some(models) = &ai_state.models
+    {
+        return Ok(models.clone());
+    }
 
     let models_dir = get_models_dir(app_handle)?;
 
@@ -296,16 +298,18 @@ pub async fn get_or_init_denoise_model(
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<Mutex<Session>>> {
     if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
-        && let Some(denoise_model) = &ai_state.denoise_model {
-            return Ok(denoise_model.clone());
-        }
+        && let Some(denoise_model) = &ai_state.denoise_model
+    {
+        return Ok(denoise_model.clone());
+    }
 
     let _guard = ai_init_lock.lock().await;
 
     if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
-        && let Some(denoise_model) = &ai_state.denoise_model {
-            return Ok(denoise_model.clone());
-        }
+        && let Some(denoise_model) = &ai_state.denoise_model
+    {
+        return Ok(denoise_model.clone());
+    }
 
     let models_dir = get_models_dir(app_handle)?;
     download_and_verify_model(
@@ -346,16 +350,18 @@ pub async fn get_or_init_clip_models(
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<ClipModels>> {
     if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
-        && let Some(clip_models) = &ai_state.clip_models {
-            return Ok(clip_models.clone());
-        }
+        && let Some(clip_models) = &ai_state.clip_models
+    {
+        return Ok(clip_models.clone());
+    }
 
     let _guard = ai_init_lock.lock().await;
 
     if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
-        && let Some(clip_models) = &ai_state.clip_models {
-            return Ok(clip_models.clone());
-        }
+        && let Some(clip_models) = &ai_state.clip_models
+    {
+        return Ok(clip_models.clone());
+    }
 
     let models_dir = get_models_dir(app_handle)?;
 
