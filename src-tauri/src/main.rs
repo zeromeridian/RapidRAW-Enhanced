@@ -678,7 +678,7 @@ async fn load_image(
     let (orig_width, orig_height) = pristine_img.dimensions();
 
     *state.original_image.lock().unwrap() = Some(LoadedImage {
-        path: path,
+        path,
         image: Arc::new(pristine_img),
         is_raw,
     });

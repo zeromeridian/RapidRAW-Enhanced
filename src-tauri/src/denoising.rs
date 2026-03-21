@@ -70,7 +70,7 @@ fn run_bm3d(
     let progress = ProgressReporter {
         counter: &progress_counter,
         total_work: total_work_units,
-        app_handle: &app_handle,
+        app_handle: app_handle,
     };
     let mut denoised_channels =
         bm3d_process_joint(&channels, width, height, &params, &dct_tables, &progress);
