@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@source not "../src-tauri";
 
 @theme {
   --color-bg-primary: var(--app-bg-primary);
