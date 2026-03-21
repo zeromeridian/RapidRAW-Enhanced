@@ -346,6 +346,7 @@ export default function ColorPanel({
           onChange={(e: any) => handleGlobalChange(ColorAdjustment.Temperature, e.target.value)}
           step={1}
           value={adjustments.temperature || 0}
+          trackClassName='temperature-gradient-track'
           onDragStateChange={onDragStateChange}
         />
         <Slider
@@ -355,6 +356,7 @@ export default function ColorPanel({
           onChange={(e: any) => handleGlobalChange(ColorAdjustment.Tint, e.target.value)}
           step={1}
           value={adjustments.tint || 0}
+          trackClassName='tint-gradient-track'
           onDragStateChange={onDragStateChange}
         />
       </div>
