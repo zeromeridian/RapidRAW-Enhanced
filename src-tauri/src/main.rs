@@ -164,6 +164,7 @@ struct AnalyticsJob {
 
 pub struct AppState {
     window_setup_complete: AtomicBool,
+    pub gpu_crash_flag_path: Mutex<Option<PathBuf>>,
     original_image: Mutex<Option<LoadedImage>>,
     cached_preview: Mutex<Option<CachedPreview>>,
     gpu_context: Mutex<Option<GpuContext>>,
@@ -4255,7 +4256,22 @@ fn main() {
             }
 
             let app_handle = app.handle().clone();
-            let settings: AppSettings = load_settings(app_handle.clone()).unwrap_or_default();
+            let config_dir = app_handle.path().app_config_dir().expect("Failed to get config dir");
+            let crash_flag_path = config_dir.join(".gpu_init_crash_flag");
+
+            {
+                let state = app.state::<AppState>();
+                *state.gpu_crash_flag_path.lock().unwrap() = Some(crash_flag_path.clone());
+            }
+
+            let mut settings: AppSettings = load_settings(app_handle.clone()).unwrap_or_default();
+
+            if crash_flag_path.exists() {
+                log::warn!("GPU Driver crash detected on last run! Falling back to OpenGL backend.");
+                settings.processing_backend = Some("gl".to_string());
+                let _ = crate::file_management::save_settings(settings.clone(), app_handle.clone());
+                let _ = std::fs::remove_file(&crash_flag_path);
+            }
 
             let lens_db = lens_correction::load_lensfun_db(&app_handle);
             let state = app.state::<AppState>();
@@ -4437,6 +4453,7 @@ fn main() {
         })
         .manage(AppState {
             window_setup_complete: AtomicBool::new(false),
+            gpu_crash_flag_path: Mutex::new(None),
             original_image: Mutex::new(None),
             cached_preview: Mutex::new(None),
             gpu_context: Mutex::new(None),

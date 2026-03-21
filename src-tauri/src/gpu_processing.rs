@@ -30,12 +30,25 @@ pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuCont
         instance_desc.backends = wgpu::Backends::PRIMARY;
     }
 
+    let flag_path = state.gpu_crash_flag_path.lock().unwrap().clone();
+    if let Some(p) = &flag_path {
+        if let Some(parent) = p.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(p, "initializing_gpu");
+    }
+
     let instance = wgpu::Instance::new(&instance_desc);
     let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,
         ..Default::default()
     }))
-    .map_err(|e| format!("Failed to find a wgpu adapter: {}", e))?;
+    .map_err(|e| {
+        if let Some(p) = &flag_path {
+            let _ = std::fs::remove_file(p);
+        }
+        format!("Failed to find a wgpu adapter: {}", e)
+    })?;
 
     let mut required_features = wgpu::Features::empty();
     if adapter
@@ -55,7 +68,16 @@ pub fn get_or_init_gpu_context(state: &tauri::State<AppState>) -> Result<GpuCont
         memory_hints: wgpu::MemoryHints::Performance,
         trace: wgpu::Trace::Off,
     }))
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| {
+        if let Some(p) = &flag_path {
+            let _ = std::fs::remove_file(p);
+        }
+        e.to_string()
+    })?;
+
+    if let Some(p) = &flag_path {
+        let _ = std::fs::remove_file(p);
+    }
 
     let new_context = GpuContext {
         device: Arc::new(device),
