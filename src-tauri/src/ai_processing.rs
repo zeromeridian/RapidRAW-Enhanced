@@ -468,8 +468,7 @@ fn extract_tile_mirror(img: &Rgb32FImage, x0: i32, y0: i32, cs: usize) -> Array4
     arr
 }
 
-fn apply_seamless(
-    tile: &mut Array4<f32>,
+struct SeamlessBlend {
     ud0: usize,
     ud1: usize,
     ud2: usize,
@@ -479,7 +478,10 @@ fn apply_seamless(
     fswidth: usize,
     fsheight: usize,
     overlap: usize,
-) {
+}
+
+fn apply_seamless(tile: &mut Array4<f32>, blend: &SeamlessBlend) {
+    let SeamlessBlend { ud0, ud1, ud2, ud3, absx0, absy0, fswidth, fsheight, overlap } = *blend;
     let ol = overlap;
     if absx0 > 0 {
         for c in 0..3 {
@@ -574,15 +576,17 @@ fn run_native_denoise(
         let mut tile = out;
         apply_seamless(
             &mut tile,
-            ud0,
-            ud1,
-            ud2,
-            ud3,
-            absx0,
-            absy0,
-            width,
-            height,
-            params.overlap,
+            &SeamlessBlend {
+                ud0,
+                ud1,
+                ud2,
+                ud3,
+                absx0,
+                absy0,
+                fswidth: width,
+                fsheight: height,
+                overlap: params.overlap,
+            },
         );
 
         for cy in 0..(ud3 - ud1) {
