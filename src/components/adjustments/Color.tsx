@@ -356,7 +356,7 @@ export default function ColorPanel({
           onChange={(e: any) => handleGlobalChange(ColorAdjustment.Tint, e.target.value)}
           step={1}
           value={adjustments.tint || 0}
-          trackClassName='tint-gradient-track '
+          trackClassName='tint-gradient-track'
           onDragStateChange={onDragStateChange}
         />
       </div>
