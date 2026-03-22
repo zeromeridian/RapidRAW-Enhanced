@@ -23,7 +23,7 @@ const Slider = ({
   min,
   onChange,
   onDragStateChange = () => {},
-  step,
+  step = 1,
   value,
   trackClassName,
 }: SliderProps) => {
