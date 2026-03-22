@@ -348,6 +348,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               min={-100}
               max={100}
               defaultValue={0}
+              step={1}
               onChange={(e) => handleChange('distortion', Number(e.target.value))}
             />
           </div>
