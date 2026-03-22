@@ -1500,7 +1500,7 @@ export default function MainLibrary({
                 <div className="flex flex-col w-full max-w-xs gap-4">
                   {hasLastPath && (
                     <Button
-                      className="rounded-md h-11 w-full flex justify-start items-center"
+                      className="rounded-md h-11 w-full flex justify-center items-center"
                       onClick={onContinueSession}
                       size="lg"
                     >
@@ -1509,7 +1509,7 @@ export default function MainLibrary({
                   )}
                   <div className="flex items-center gap-2">
                     <Button
-                      className={`rounded-md grow flex justify-start items-center h-11 ${
+                      className={`rounded-md grow flex justify-center items-center h-11 ${
                         hasLastPath ? 'bg-surface text-text-primary shadow-none' : ''
                       }`}
                       onClick={onOpenFolder}
