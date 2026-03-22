@@ -6,7 +6,7 @@ import { Grid, useGridCallbackRef } from 'react-window';
 import { ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
 import { Color, COLOR_LABELS } from '../../utils/adjustments';
 
-const VERTICAL_PADDING = 20;
+const VERTICAL_PADDING = 24;
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;
 
