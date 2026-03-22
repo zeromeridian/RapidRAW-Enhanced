@@ -3,7 +3,6 @@ import { Image as ImageIcon, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { Grid, useGridCallbackRef } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
 import { ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
 import { Color, COLOR_LABELS } from '../../utils/adjustments';
 
@@ -547,6 +546,22 @@ export default function Filmstrip({
   thumbnailAspectRatio,
 }: FilmStripProps) {
   const clickTriggeredScroll = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ height: 0, width: 0 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        const { height, width } = entry.contentRect;
+        setSize((prev) => (prev.height === height && prev.width === width ? prev : { height, width }));
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const handleImageSelect = (path: string, event: any) => {
     if (path !== selectedImage?.path) {
@@ -556,26 +571,24 @@ export default function Filmstrip({
   };
 
   return (
-    <div className="h-full w-full" onClick={onClearSelection}>
-      <AutoSizer>
-        {({ height, width }) => (
-          <FilmstripList
-            height={height}
-            width={width}
-            data={{
-              imageList,
-              imageRatings,
-              selectedPath: selectedImage?.path,
-              multiSelectedPaths,
-              thumbnails,
-              thumbnailAspectRatio,
-              onContextMenu,
-              onImageSelect: handleImageSelect,
-              clickTriggeredScroll,
-            }}
-          />
-        )}
-      </AutoSizer>
+    <div ref={containerRef} className="h-full w-full" onClick={onClearSelection}>
+      {size.height > 0 && size.width > 0 && (
+        <FilmstripList
+          height={size.height}
+          width={size.width}
+          data={{
+            imageList,
+            imageRatings,
+            selectedPath: selectedImage?.path,
+            multiSelectedPaths,
+            thumbnails,
+            thumbnailAspectRatio,
+            onContextMenu,
+            onImageSelect: handleImageSelect,
+            clickTriggeredScroll,
+          }}
+        />
+      )}
     </div>
   );
 }
