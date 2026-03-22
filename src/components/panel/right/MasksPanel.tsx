@@ -1230,7 +1230,6 @@ function ContainerRow({
           : [{ label: 'No presets', disabled: true }],
       },
       { type: OPTION_SEPARATOR },
-      { label: container.invert ? 'Uninvert Mask' : 'Invert Mask', icon: RotateCcw, onClick: () => updateContainer(container.id, { invert: !container.invert }) },
       {
         label: 'Reset Mask Adjustments',
         icon: RotateCcw,
@@ -1463,11 +1462,6 @@ function SubMaskRow({
       { label: 'Copy Component', icon: Copy, onClick: handleCopy },
       { label: 'Paste Component', icon: ClipboardPaste, disabled: !hasCopiedSubMask, onClick: handlePaste },
       { type: OPTION_SEPARATOR },
-      {
-        label: subMask.invert ? 'Uninvert Component' : 'Invert Component',
-        icon: RotateCcw,
-        onClick: () => updateSubMask(subMask.id, { invert: !subMask.invert }),
-      },
       { label: 'Delete Component', icon: Trash2, isDestructive: true, onClick: handleDelete },
     ]);
   };
