@@ -76,7 +76,7 @@ const ColorSwatch = ({ color, name, isActive, onClick }: ColorSwatchProps) => {
   return (
     <button
       aria-label={`Select ${name} color`}
-      className="relative w-6 h-6 focus:outline-none group"
+      className="relative w-6 h-6 focus:outline-hidden group"
       onClick={handleClick}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}

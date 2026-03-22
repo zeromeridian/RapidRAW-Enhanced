@@ -158,7 +158,7 @@ const FilmstripThumbnail = memo(
     return (
       <motion.div
         className={clsx(
-          'h-full w-full rounded-md overflow-hidden cursor-pointer flex-shrink-0 group relative transition-all duration-150 bg-surface',
+          'h-full w-full rounded-md overflow-hidden cursor-pointer shrink-0 group relative transition-all duration-150 bg-surface',
           ringClass,
         )}
         onClick={(e: any) => {
@@ -210,7 +210,7 @@ const FilmstripThumbnail = memo(
         )}
 
         {(colorLabel || rating > 0) && (
-          <div className="absolute top-1 right-1 bg-primary rounded-full px-1.5 py-0.5 text-xs text-white flex items-center gap-1 backdrop-blur-sm shadow-sm z-10">
+          <div className="absolute top-1 right-1 bg-primary rounded-full px-1.5 py-0.5 text-xs text-white flex items-center gap-1 backdrop-blur-xs shadow-xs z-10">
             {colorLabel && (
               <div
                 className="w-3 h-3 rounded-full ring-1 ring-black/20"
@@ -230,7 +230,7 @@ const FilmstripThumbnail = memo(
           <div className="absolute bottom-1 right-1 z-10">
             <div
               data-tooltip="Virtual Copy"
-              className="bg-bg-primary/70 text-white text-[10px] font-bold px-1 py-0.5 rounded-full backdrop-blur-sm"
+              className="bg-bg-primary/70 text-white text-[10px] font-bold px-1 py-0.5 rounded-full backdrop-blur-xs"
             >
               VC
             </div>
