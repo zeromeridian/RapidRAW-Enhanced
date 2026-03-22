@@ -4662,7 +4662,7 @@ function App() {
       rootPath && (
         <div
           className={clsx(
-            'flex h-full overflow-hidden flex-shrink-0',
+            'flex h-full overflow-hidden shrink-0',
             !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
           )}
           style={{
@@ -4716,7 +4716,7 @@ function App() {
 
   const memoizedLibraryView = useMemo(
     () => (
-      <div className="flex flex-row flex-grow h-full min-h-0">
+      <div className="flex flex-row grow h-full min-h-0">
         <div className="flex-1 flex flex-col min-w-0 gap-2">
           {activeView === 'community' ? (
             <CommunityPage
@@ -4849,7 +4849,7 @@ function App() {
 
     if (selectedImage) {
       return (
-        <div className="flex flex-row flex-grow h-full min-h-0">
+        <div className="flex flex-row grow h-full min-h-0">
           <div className="flex-1 flex flex-col min-w-0">
             <Editor
               activeAiPatchContainerId={activeAiPatchContainerId}
@@ -4904,7 +4904,7 @@ function App() {
             />
             <div
               className={clsx(
-                'flex flex-col w-full overflow-hidden flex-shrink-0',
+                'flex flex-col w-full overflow-hidden shrink-0',
                 !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
               )}
               style={{
@@ -4955,7 +4955,7 @@ function App() {
 
           <div
             className={clsx(
-              'flex h-full overflow-hidden flex-shrink-0',
+              'flex h-full overflow-hidden shrink-0',
               !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
             )}
             style={{
@@ -5153,7 +5153,7 @@ function App() {
     >
       <div
         className={clsx(
-          'flex-shrink-0 overflow-hidden z-50',
+          'shrink-0 overflow-hidden z-50',
           !isInstantTransition && 'transition-all duration-300 ease-in-out',
           isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
         )}
@@ -5170,7 +5170,7 @@ function App() {
           ],
         )}
       >
-        <div className="flex flex-row flex-grow h-full min-h-0">
+        <div className="flex flex-row grow h-full min-h-0">
           {memoizedFolderTree}
           <div className="flex-1 flex flex-col min-w-0">{renderContent()}</div>
           {!selectedImage && isLibraryExportPanelVisible && (
@@ -5181,7 +5181,7 @@ function App() {
           )}
           <div
             className={clsx(
-              'flex-shrink-0 overflow-hidden',
+              'shrink-0 overflow-hidden',
               !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
             )}
             style={{ width: isLibraryExportPanelVisible && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
@@ -5366,7 +5366,7 @@ function App() {
         toastClassName={() =>
           clsx(
             'relative flex min-h-16 p-4 rounded-lg justify-between overflow-hidden cursor-pointer mb-4',
-            '!bg-surface !text-text-primary !border !border-border-color !shadow-2xl !max-w-[420px]',
+            'bg-surface! text-text-primary! border! border-border-color! shadow-2xl! max-w-[420px]!',
           )
         }
       />

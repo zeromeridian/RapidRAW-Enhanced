@@ -690,8 +690,8 @@ export default function SettingsPanel({
     <>
       <ConfirmModal {...confirmModalState} onClose={closeConfirmModal} />
       <div className="flex flex-col h-full w-full text-text-primary">
-        <header className="flex-shrink-0 flex flex-wrap items-center justify-between gap-y-4 mb-8 pt-4">
-          <div className="flex items-center flex-shrink-0">
+        <header className="shrink-0 flex flex-wrap items-center justify-between gap-y-4 mb-8 pt-4">
+          <div className="flex items-center shrink-0">
             <Button
               className="mr-4 hover:bg-surface text-text-primary rounded-full"
               onClick={onBack}
@@ -729,7 +729,7 @@ export default function SettingsPanel({
                   />
                 )}
                 <span className="relative z-10 flex items-center">
-                  <category.icon size={16} className="mr-2 flex-shrink-0" />
+                  <category.icon size={16} className="mr-2 shrink-0" />
                   <span className="truncate">{category.label}</span>
                 </span>
               </button>
@@ -1039,7 +1039,7 @@ export default function SettingsPanel({
                                             exit="exit"
                                             onClick={() => handleRemoveAiTag(tag)}
                                             data-tooltip={`Remove tag "${tag}"`}
-                                            className="flex items-center gap-1 bg-surface px-2 py-1 rounded group cursor-pointer"
+                                            className="flex items-center gap-1 bg-surface px-2 py-1 rounded-sm group cursor-pointer"
                                           >
                                             <Text variant={TextVariants.label} color={TextColors.primary}>
                                               {tag}
@@ -1117,7 +1117,7 @@ export default function SettingsPanel({
                                   exit="exit"
                                   onClick={() => handleRemoveShortcut(shortcut)}
                                   data-tooltip={`Remove shortcut "${shortcut}"`}
-                                  className="flex items-center gap-1 bg-surface px-2 py-1 rounded group cursor-pointer"
+                                  className="flex items-center gap-1 bg-surface px-2 py-1 rounded-sm group cursor-pointer"
                                 >
                                   <Text variant={TextVariants.label} color={TextColors.primary}>
                                     {shortcut}
@@ -1592,7 +1592,7 @@ export default function SettingsPanel({
                             >
                               <div className="flex items-center gap-2">
                                 <Input
-                                  className="flex-grow"
+                                  className="grow"
                                   id="ai-connector-address"
                                   onBlur={() =>
                                     onSettingsChange({ ...appSettings, aiConnectorAddress: aiConnectorAddress })
@@ -1676,9 +1676,9 @@ export default function SettingsPanel({
                       description={
                         <Text as="span" variant={TextVariants.small}>
                           This will delete all{' '}
-                          <code className="bg-bg-primary px-1 rounded text-text-primary">.rrdata</code> files
+                          <code className="bg-bg-primary px-1 rounded-sm text-text-primary">.rrdata</code> files
                           (containing your edits) within the current base folder:
-                          <span className="block font-mono bg-bg-primary p-2 rounded mt-2 break-all border border-border-color">
+                          <span className="block font-mono bg-bg-primary p-2 rounded-sm mt-2 break-all border border-border-color">
                             {effectiveRootPath || 'No folder selected'}
                           </span>
                         </Text>
@@ -1710,7 +1710,7 @@ export default function SettingsPanel({
                       description={
                         <Text as="span" variant={TextVariants.small}>
                           View the application's log file for troubleshooting. The log is located at:
-                          <span className="block font-mono bg-bg-primary p-2 rounded mt-2 break-all border border-border-color">
+                          <span className="block font-mono bg-bg-primary p-2 rounded-sm mt-2 break-all border border-border-color">
                             {logPath || 'Loading...'}
                           </span>
                         </Text>

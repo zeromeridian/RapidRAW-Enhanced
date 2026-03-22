@@ -160,7 +160,7 @@ function TreeNode({
         onContextMenu={(e: any) => onContextMenu(e, node.path, isPinned)}
       >
         <div
-          className={clsx('cursor-pointer p-0.5 rounded transition-colors', {
+          className={clsx('cursor-pointer p-0.5 rounded-sm transition-colors', {
             'cursor-default': !hasChildren,
             'text-primary': isSelected && isExpanded,
             'text-text-secondary': !isSelected || !isExpanded,
@@ -196,11 +196,11 @@ function TreeNode({
         </span>
 
         {hasChildren && (
-          <div className="p-0.5 rounded hover:bg-surface/50 cursor-pointer" onClick={handleFolderIconClick}>
+          <div className="p-0.5 rounded-sm hover:bg-surface/50 cursor-pointer" onClick={handleFolderIconClick}>
             {isExpanded ? (
-              <ChevronUp size={16} className="text-text-secondary flex-shrink-0" />
+              <ChevronUp size={16} className="text-text-secondary shrink-0" />
             ) : (
-              <ChevronDown size={16} className="text-text-secondary flex-shrink-0" />
+              <ChevronDown size={16} className="text-text-secondary shrink-0" />
             )}
           </div>
         )}
@@ -333,7 +333,7 @@ export default function FolderTree({
   return (
     <div
       className={clsx(
-        'relative bg-bg-secondary rounded-lg flex-shrink-0',
+        'relative bg-bg-secondary rounded-lg shrink-0',
         !isResizing && 'transition-[width] duration-300 ease-in-out',
       )}
       style={style}
@@ -361,11 +361,11 @@ export default function FolderTree({
                     animate={{ width: 36, padding: 10, marginRight: 6, opacity: 1 }}
                     exit={{ width: 0, padding: 0, marginRight: 0, opacity: 0 }}
                     transition={{ duration: 0.2, ease: 'easeInOut' }}
-                    className="bg-surface rounded-md hover:bg-card-active flex items-center justify-center flex-shrink-0 overflow-hidden transition-colors"
+                    className="bg-surface rounded-md hover:bg-card-active flex items-center justify-center shrink-0 overflow-hidden transition-colors"
                     onClick={() => setIsVisible(false)}
                     data-tooltip="Collapse"
                   >
-                    <ChevronLeft size={17.5} className="text-text-secondary flex-shrink-0" />
+                    <ChevronLeft size={17.5} className="text-text-secondary shrink-0" />
                   </motion.button>
                 )}
               </AnimatePresence>
@@ -376,7 +376,7 @@ export default function FolderTree({
                   placeholder="Search folders..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-surface border border-transparent rounded-md pl-9 pr-8 py-2 text-sm focus:outline-none"
+                  className="w-full bg-surface border border-transparent rounded-md pl-9 pr-8 py-2 text-sm focus:outline-hidden"
                 />
                 {searchQuery && (
                   <button

@@ -342,7 +342,7 @@ function SearchInput({ indexingProgress, isIndexing, searchCriteria, setSearchCr
       onClick={() => inputRef.current?.focus()}
     >
       <button
-        className="absolute left-0 top-0 h-12 w-12 flex items-center justify-center text-text-primary z-10 flex-shrink-0"
+        className="absolute left-0 top-0 h-12 w-12 flex items-center justify-center text-text-primary z-10 shrink-0"
         onClick={(e) => {
           e.stopPropagation();
           if (!isActive) {
@@ -367,7 +367,7 @@ function SearchInput({ indexingProgress, isIndexing, searchCriteria, setSearchCr
               initial={{ opacity: 0, scale: 0.5 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.5 }}
-              className="flex items-center gap-1 bg-bg-primary px-2 py-1 rounded group cursor-pointer flex-shrink-0"
+              className="flex items-center gap-1 bg-bg-primary px-2 py-1 rounded-sm group cursor-pointer shrink-0"
               onClick={(e) => {
                 e.stopPropagation();
                 removeTag(tag);
@@ -382,7 +382,7 @@ function SearchInput({ indexingProgress, isIndexing, searchCriteria, setSearchCr
             </motion.div>
           ))}
           <input
-            className="flex-grow w-full h-full bg-transparent text-text-primary placeholder-text-secondary border-none focus:outline-none"
+            className="grow w-full h-full bg-transparent text-text-primary placeholder-text-secondary border-none focus:outline-hidden"
             disabled={isIndexing}
             onBlur={() => {
               if (tags.length === 0 && !text) {
@@ -411,7 +411,7 @@ function SearchInput({ indexingProgress, isIndexing, searchCriteria, setSearchCr
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ duration: 0.15 }}
-              className="flex-shrink-0 bg-bg-primary px-2 py-1 rounded-md whitespace-nowrap"
+              className="shrink-0 bg-bg-primary px-2 py-1 rounded-md whitespace-nowrap"
             >
               <Text variant={TextVariants.small}>
                 Separate tags with <kbd className="font-sans font-semibold">,</kbd>
@@ -423,7 +423,7 @@ function SearchInput({ indexingProgress, isIndexing, searchCriteria, setSearchCr
         {tags.length > 0 && (
           <button
             onClick={toggleMode}
-            className="p-1.5 rounded-md hover:bg-bg-primary w-10 flex-shrink-0"
+            className="p-1.5 rounded-md hover:bg-bg-primary w-10 shrink-0"
             data-tooltip={`Match ${mode === 'AND' ? 'ALL' : 'ANY'} tags`}
           >
             <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.semibold}>
@@ -434,14 +434,14 @@ function SearchInput({ indexingProgress, isIndexing, searchCriteria, setSearchCr
         {(tags.length > 0 || text) && !isIndexing && (
           <button
             onClick={clearSearch}
-            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-primary flex-shrink-0"
+            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-primary shrink-0"
             data-tooltip="Clear search"
           >
             <X className="h-5 w-5" />
           </button>
         )}
         {isIndexing && (
-          <div className="flex items-center pr-1 pointer-events-none flex-shrink-0">
+          <div className="flex items-center pr-1 pointer-events-none shrink-0">
             <Loader2 className="h-5 w-5 text-text-secondary animate-spin" />
           </div>
         )}
@@ -496,7 +496,7 @@ function ColorFilterOptions({ filterCriteria, setFilterCriteria }: FilterOptionP
               key={color.name}
               data-tooltip={title}
               onClick={(e: any) => handleColorClick(color.name, e)}
-              className="w-6 h-6 rounded-full focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface transition-transform hover:scale-110"
+              className="w-6 h-6 rounded-full focus:outline-hidden focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface transition-transform hover:scale-110"
               role="menuitem"
             >
               <div className="relative w-full h-full">
@@ -725,7 +725,7 @@ function SortOptions({ sortCriteria, setSortCriteria, sortOptions }: SortOptions
         <button
           onClick={handleOrderToggle}
           data-tooltip={`Sort ${sortCriteria.order === SortDirection.Ascending ? 'Descending' : 'Ascending'}`}
-          className="absolute top-1/2 right-3 -translate-y-1/2 p-1 bg-transparent border-none text-text-secondary hover:text-text-primary focus:outline-none focus:ring-1 focus:ring-accent rounded"
+          className="absolute top-1/2 right-3 -translate-y-1/2 p-1 bg-transparent border-none text-text-secondary hover:text-text-primary focus:outline-hidden focus:ring-1 focus:ring-accent rounded-sm"
         >
           {sortCriteria.order === SortDirection.Ascending ? (
             <svg
@@ -1025,7 +1025,7 @@ function Thumbnail({
       </AnimatePresence>
 
       {(colorLabel || rating > 0) && (
-        <div className="absolute top-1.5 right-1.5 bg-bg-primary/50 rounded-full px-1.5 py-0.5 flex items-center gap-1 backdrop-blur-sm">
+        <div className="absolute top-1.5 right-1.5 bg-bg-primary/50 rounded-full px-1.5 py-0.5 flex items-center gap-1 backdrop-blur-xs">
           {colorLabel && (
             <div
               className="w-3 h-3 rounded-full ring-1 ring-black/20"
@@ -1043,7 +1043,7 @@ function Thumbnail({
           )}
         </div>
       )}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 flex items-end justify-between">
+      <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/70 to-transparent p-2 flex items-end justify-between">
         <Text variant={TextVariants.small} color={TextColors.white} className="truncate pr-2">
           {baseName}
         </Text>
@@ -1053,7 +1053,7 @@ function Thumbnail({
             variant={TextVariants.small}
             color={TextColors.white}
             weight={TextWeights.bold}
-            className="flex-shrink-0 bg-bg-primary/50 px-1.5 py-0.5 rounded-full backdrop-blur-sm"
+            className="shrink-0 bg-bg-primary/50 px-1.5 py-0.5 rounded-full backdrop-blur-xs"
             data-tooltip="Virtual Copy"
           >
             VC
@@ -1509,7 +1509,7 @@ export default function MainLibrary({
                   )}
                   <div className="flex items-center gap-2">
                     <Button
-                      className={`rounded-md flex-grow flex justify-start items-center h-11 ${
+                      className={`rounded-md grow flex justify-start items-center h-11 ${
                         hasLastPath ? 'bg-surface text-text-primary shadow-none' : ''
                       }`}
                       onClick={onOpenFolder}
@@ -1601,7 +1601,7 @@ export default function MainLibrary({
       className="flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden"
       ref={libraryContainerRef}
     >
-      <header className="p-4 flex-shrink-0 flex justify-between items-center border-b border-border-color gap-4">
+      <header className="p-4 shrink-0 flex justify-between items-center border-b border-border-color gap-4">
         <div className="min-w-0">
           <Text variant={TextVariants.headline}>Library</Text>
           <div className="flex items-center gap-2">
@@ -1612,14 +1612,14 @@ export default function MainLibrary({
             )}
             <div
               className={`overflow-hidden transition-all duration-300 ${
-                isLoaderVisible ? 'max-w-[1rem] opacity-100' : 'max-w-0 opacity-0'
+                isLoaderVisible ? 'max-w-4 opacity-100' : 'max-w-0 opacity-0'
               }`}
             >
               <Loader2 size={14} className="animate-spin text-text-secondary" />
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="flex items-center gap-3 shrink-0">
           {importState.status === Status.Importing && (
             <Text as="div" color={TextColors.accent} className="flex items-center gap-2 animate-pulse">
               <FolderInput size={16} />
