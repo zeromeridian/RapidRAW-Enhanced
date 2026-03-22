@@ -56,6 +56,13 @@ const Slider = ({
     [min, max, step, decimalPlaces],
   );
 
+  const onChangeRef = useRef(onChange);
+  const snapToStepRef = useRef(snapToStep);
+  const rangeRef = useRef({ min, max });
+  onChangeRef.current = onChange;
+  snapToStepRef.current = snapToStep;
+  rangeRef.current = { min, max };
+
   useEffect(() => {
     onDragStateChange(isDragging);
   }, [isDragging, onDragStateChange]);
@@ -114,22 +121,23 @@ const Slider = ({
       }
 
       const deltaX = clientX - lastPointerXRef.current;
+      const { min: curMin, max: curMax } = rangeRef.current;
 
       const multiplier = shiftKey ? FINE_ADJUSTMENT_MULTIPLIER : 1;
-      const deltaValue = (deltaX / sliderWidth) * (max - min) * multiplier;
+      const deltaValue = (deltaX / sliderWidth) * (curMax - curMin) * multiplier;
 
       const prevAccumulated = accumulatedValueRef.current;
-      accumulatedValueRef.current = Math.max(min, Math.min(max, prevAccumulated + deltaValue));
+      accumulatedValueRef.current = Math.max(curMin, Math.min(curMax, prevAccumulated + deltaValue));
 
       const actualDeltaValue = accumulatedValueRef.current - prevAccumulated;
       if (deltaValue !== 0) {
         lastPointerXRef.current += deltaX * (actualDeltaValue / deltaValue);
       }
 
-      const snappedValue = snapToStep(accumulatedValueRef.current);
+      const snappedValue = snapToStepRef.current(accumulatedValueRef.current);
 
       setDisplayValue(snappedValue);
-      onChange({ target: { value: snappedValue } });
+      onChangeRef.current({ target: { value: snappedValue } });
     };
 
     const handlePointerUp = () => {
@@ -148,7 +156,7 @@ const Slider = ({
       window.removeEventListener('touchmove', handlePointerMove);
       window.removeEventListener('touchend', handlePointerUp);
     };
-  }, [isDragging, min, max, step, onChange, snapToStep]);
+  }, [isDragging]);
 
   useEffect(() => {
     if (isDragging) {
