@@ -656,6 +656,7 @@ export default function LensCorrectionModal({
                       min={0}
                       max={200}
                       defaultValue={100}
+                      step={1}
                       onChange={(e) => handleAmountChange('lensDistortionAmount', Number(e.target.value))}
                     />
                   </motion.div>
@@ -696,6 +697,7 @@ export default function LensCorrectionModal({
                       min={0}
                       max={200}
                       defaultValue={100}
+                      step={1}
                       onChange={(e) => handleAmountChange('lensTcaAmount', Number(e.target.value))}
                     />
                   </motion.div>
@@ -736,6 +738,7 @@ export default function LensCorrectionModal({
                       min={0}
                       max={200}
                       defaultValue={100}
+                      step={1}
                       onChange={(e) => handleAmountChange('lensVignetteAmount', Number(e.target.value))}
                     />
                   </motion.div>
