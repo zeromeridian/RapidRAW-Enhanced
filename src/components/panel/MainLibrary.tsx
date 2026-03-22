@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { List, useListCallbackRef } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
 import Button from '../ui/Button';
 import SettingsPanel from './SettingsPanel';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
@@ -1212,6 +1211,25 @@ export default function MainLibrary({
   const [appVersion, setAppVersion] = useState('');
   const [, setSupportedTypes] = useState<SupportedTypes | null>(null);
   const libraryContainerRef = useRef<HTMLDivElement>(null);
+  const [gridSize, setGridSize] = useState({ height: 0, width: 0 });
+  const gridObserverRef = useRef<ResizeObserver | null>(null);
+  const gridContainerRef = useCallback((el: HTMLDivElement | null) => {
+    if (gridObserverRef.current) {
+      gridObserverRef.current.disconnect();
+      gridObserverRef.current = null;
+    }
+    if (el) {
+      const ro = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (entry) {
+          const { height, width } = entry.contentRect;
+          setGridSize((prev) => (prev.height === height && prev.width === width ? prev : { height, width }));
+        }
+      });
+      ro.observe(el);
+      gridObserverRef.current = ro;
+    }
+  }, []);
   const [listHandle, setListHandle] = useListCallbackRef();
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
   const [latestVersion, setLatestVersion] = useState('');
@@ -1223,6 +1241,7 @@ export default function MainLibrary({
     top: -1,
     folder: null as string | null,
   });
+
 
   const groups = useMemo(() => {
     if (libraryViewMode === LibraryViewMode.Flat) return null;
@@ -1683,14 +1702,13 @@ export default function MainLibrary({
         </div>
       </header>
       {imageList.length > 0 ? (
-        <div className="flex-1 w-full h-full" onClick={onClearSelection} onContextMenu={onEmptyAreaContextMenu}>
-          <AutoSizer>
-            {({ height, width }) => {
+        <div ref={gridContainerRef} className="flex-1 w-full h-full" onClick={onClearSelection} onContextMenu={onEmptyAreaContextMenu}>
+          {gridSize.height > 0 && gridSize.width > 0 && (() => {
               const OUTER_PADDING = 12;
               const ITEM_GAP = 12;
               const minThumbWidth = thumbnailSizeOptions.find((o) => o.id === thumbnailSize)?.size || 240;
 
-              const availableWidth = width - OUTER_PADDING * 2;
+              const availableWidth = gridSize.width - OUTER_PADDING * 2;
               const columnCount = Math.max(1, Math.floor((availableWidth + ITEM_GAP) / (minThumbWidth + ITEM_GAP)));
               const itemWidth = (availableWidth - ITEM_GAP * (columnCount - 1)) / columnCount;
               const rowHeight = itemWidth + ITEM_GAP;
@@ -1730,7 +1748,7 @@ export default function MainLibrary({
               };
 
               return (
-                <div key={`${width}-${thumbnailSize}-${libraryViewMode}`} style={{ height, width }}>
+                <div key={`${gridSize.width}-${thumbnailSize}-${libraryViewMode}`} style={{ height: gridSize.height, width: gridSize.width }}>
                   <List
                     listRef={setListHandle}
                     rowCount={rows.length}
@@ -1757,8 +1775,7 @@ export default function MainLibrary({
                   />
                 </div>
               );
-            }}
-          </AutoSizer>
+            })()}
         </div>
       ) : isIndexing || aiModelDownloadStatus || importState.status === Status.Importing ? (
         <div className="flex-1 flex flex-col items-center justify-center" onContextMenu={onEmptyAreaContextMenu}>
