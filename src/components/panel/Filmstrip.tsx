@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo, forwardRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { Image as ImageIcon, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
@@ -23,6 +23,7 @@ interface ItemData {
   multiSelectedPaths: string[];
   thumbnails: Record<string, string> | undefined;
   thumbnailAspectRatio: ThumbnailAspectRatio;
+  onRequestThumbnails?: (paths: string[]) => void;
   onContextMenu?: (event: any, path: string) => void;
   onImageSelect?: (path: string, event: any) => void;
   itemHeight: number;
@@ -62,7 +63,6 @@ const FilmstripThumbnail = memo(
     });
 
     const latestThumbDataRef = useRef<string | undefined>(thumbData);
-
     const isInitialLoad = useRef(true);
 
     const { path, tags } = imageFile;
@@ -377,12 +377,34 @@ const FilmstripList = ({
     setSizeMapVersion((v) => v + 1);
   }, [height, data.thumbnailAspectRatio]);
 
-  const onCellsRendered = useCallback((visibleCells: { columnStartIndex: number; columnStopIndex: number }) => {
-    visibleRange.current = {
-      start: visibleCells.columnStartIndex,
-      stop: visibleCells.columnStopIndex,
-    };
-  }, []);
+  const onCellsRendered = useCallback(
+    (
+      visibleCells: { columnStartIndex: number; columnStopIndex: number; rowStartIndex: number; rowStopIndex: number },
+      allCells: { columnStartIndex: number; columnStopIndex: number; rowStartIndex: number; rowStopIndex: number },
+    ) => {
+      visibleRange.current = {
+        start: visibleCells.columnStartIndex,
+        stop: visibleCells.columnStopIndex,
+      };
+
+      const currentData = currentDataRef.current;
+      if (currentData.onRequestThumbnails) {
+        const pathsToRequest: string[] = [];
+
+        for (let i = allCells.columnStartIndex; i <= allCells.columnStopIndex; i++) {
+          const img = currentData.imageList[i];
+          if (img && (!currentData.thumbnails || !currentData.thumbnails[img.path])) {
+            pathsToRequest.push(img.path);
+          }
+        }
+
+        if (pathsToRequest.length > 0) {
+          currentData.onRequestThumbnails(pathsToRequest);
+        }
+      }
+    },
+    [],
+  );
 
   const isItemVisible = useCallback((index: number) => {
     const { start, stop } = visibleRange.current;
@@ -528,6 +550,7 @@ interface FilmStripProps {
   onClearSelection?(): void;
   onContextMenu?(event: any, path: string): void;
   onImageSelect?(path: string, event: any): void;
+  onRequestThumbnails?(paths: string[]): void;
   selectedImage?: SelectedImage;
   thumbnails: Record<string, string> | undefined;
   thumbnailAspectRatio: ThumbnailAspectRatio;
@@ -541,6 +564,7 @@ export default function Filmstrip({
   onClearSelection,
   onContextMenu,
   onImageSelect,
+  onRequestThumbnails,
   selectedImage,
   thumbnails,
   thumbnailAspectRatio,
@@ -584,6 +608,7 @@ export default function Filmstrip({
             thumbnails,
             thumbnailAspectRatio,
             onContextMenu,
+            onRequestThumbnails,
             onImageSelect: handleImageSelect,
             clickTriggeredScroll,
           }}

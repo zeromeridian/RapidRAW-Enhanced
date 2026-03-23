@@ -96,6 +96,7 @@ interface MainLibraryProps {
   onSettingsChange(settings: AppSettings): Promise<void>;
   onThumbnailAspectRatioChange(aspectRatio: ThumbnailAspectRatio): void;
   onThumbnailSizeChange(size: ThumbnailSize): void;
+  onRequestThumbnails?(paths: string[]): void;
   rootPath: string | null;
   searchCriteria: SearchCriteria;
   setFilterCriteria(criteria: FilterCriteria): void;
@@ -1193,6 +1194,7 @@ export default function MainLibrary({
   onSettingsChange,
   onThumbnailAspectRatioChange,
   onThumbnailSizeChange,
+  onRequestThumbnails,
   rootPath,
   searchCriteria,
   setFilterCriteria,
@@ -1241,7 +1243,6 @@ export default function MainLibrary({
     top: -1,
     folder: null as string | null,
   });
-
 
   const groups = useMemo(() => {
     if (libraryViewMode === LibraryViewMode.Flat) return null;
@@ -1702,8 +1703,15 @@ export default function MainLibrary({
         </div>
       </header>
       {imageList.length > 0 ? (
-        <div ref={gridContainerRef} className="flex-1 w-full h-full" onClick={onClearSelection} onContextMenu={onEmptyAreaContextMenu}>
-          {gridSize.height > 0 && gridSize.width > 0 && (() => {
+        <div
+          ref={gridContainerRef}
+          className="flex-1 w-full h-full"
+          onClick={onClearSelection}
+          onContextMenu={onEmptyAreaContextMenu}
+        >
+          {gridSize.height > 0 &&
+            gridSize.width > 0 &&
+            (() => {
               const OUTER_PADDING = 12;
               const ITEM_GAP = 12;
               const minThumbWidth = thumbnailSizeOptions.find((o) => o.id === thumbnailSize)?.size || 240;
@@ -1748,12 +1756,34 @@ export default function MainLibrary({
               };
 
               return (
-                <div key={`${gridSize.width}-${thumbnailSize}-${libraryViewMode}`} style={{ height: gridSize.height, width: gridSize.width }}>
+                <div
+                  key={`${gridSize.width}-${thumbnailSize}-${libraryViewMode}`}
+                  style={{ height: gridSize.height, width: gridSize.width }}
+                >
                   <List
                     listRef={setListHandle}
                     rowCount={rows.length}
                     rowHeight={getItemSize}
                     onScroll={(e: React.UIEvent<HTMLElement>) => setLibraryScrollTop(e.currentTarget.scrollTop)}
+                    onRowsRendered={({ startIndex, stopIndex }) => {
+                      if (!onRequestThumbnails) return;
+                      const pathsToRequest: string[] = [];
+
+                      for (let i = startIndex; i <= stopIndex; i++) {
+                        const row = rows[i];
+                        if (row && row.type === 'images') {
+                          row.images.forEach((img: ImageFile) => {
+                            if (!thumbnails[img.path]) {
+                              pathsToRequest.push(img.path);
+                            }
+                          });
+                        }
+                      }
+
+                      if (pathsToRequest.length > 0) {
+                        onRequestThumbnails(pathsToRequest);
+                      }
+                    }}
                     className="custom-scrollbar"
                     rowComponent={Row}
                     rowProps={{

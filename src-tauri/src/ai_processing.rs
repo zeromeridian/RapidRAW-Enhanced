@@ -666,13 +666,14 @@ pub fn generate_image_embeddings(
 
     let resized_image = image.resize(new_width, new_height, FilterType::Triangle);
     let rgb_image = resized_image.into_rgb8();
+    let (actual_width, actual_height) = rgb_image.dimensions();
     let raw_pixels = rgb_image.as_raw();
 
     let mut input_tensor: Array<u8, _> =
         Array::zeros((1, 3, SAM_INPUT_SIZE as usize, SAM_INPUT_SIZE as usize));
 
-    let w_usize = new_width as usize;
-    for y in 0..(new_height as usize) {
+    let w_usize = actual_width as usize;
+    for y in 0..(actual_height as usize) {
         for x in 0..w_usize {
             let idx = (y * w_usize + x) * 3;
             input_tensor[[0, 0, y, x]] = raw_pixels[idx];

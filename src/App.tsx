@@ -416,7 +416,7 @@ function App() {
   const [libraryScrollTop, setLibraryScrollTop] = useState<number>(0);
   const { showContextMenu } = useContextMenu();
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
-  const { loading: isThumbnailsLoading } = useThumbnails(imageList, setThumbnails);
+  const { loading: isThumbnailsLoading, requestThumbnails, clearThumbnailQueue } = useThumbnails();
   const transformWrapperRef = useRef<any>(null);
   const isProgrammaticZoom = useRef(false);
   const currentResRef = useRef<number>(1280);
@@ -1884,6 +1884,7 @@ function App() {
   const handleSelectSubfolder = useCallback(
     async (path: string | null, isNewRoot = false, preloadedImages?: ImageFile[]) => {
       await invoke('cancel_thumbnail_generation');
+      clearThumbnailQueue();
       setIsViewLoading(true);
       setSearchCriteria({ tags: [], text: '', mode: 'OR' });
       setLibraryScrollTop(0);
@@ -4755,6 +4756,7 @@ function App() {
               onSettingsChange={handleSettingsChange}
               onThumbnailAspectRatioChange={setThumbnailAspectRatio}
               onThumbnailSizeChange={setThumbnailSize}
+              onRequestThumbnails={requestThumbnails}
               rootPath={rootPath}
               searchCriteria={searchCriteria}
               setFilterCriteria={setFilterCriteria}
@@ -4939,6 +4941,7 @@ function App() {
                 onImageSelect={handleImageClick}
                 onPaste={() => handlePasteAdjustments()}
                 onRate={handleRate}
+                onRequestThumbnails={requestThumbnails}
                 onZoomChange={handleZoomChange}
                 rating={adjustments.rating || 0}
                 selectedImage={selectedImage}

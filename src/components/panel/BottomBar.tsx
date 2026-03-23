@@ -27,6 +27,7 @@ interface BottomBarProps {
   onExportClick?(): void;
   onImageSelect?(path: string, event: any): void;
   onOpenCopyPasteSettings?(): void;
+  onRequestThumbnails?(paths: string[]): void;
   onPaste(): void;
   onRate(rate: number): void;
   onReset?(): void;
@@ -102,6 +103,7 @@ export default function BottomBar({
   onExportClick,
   onImageSelect,
   onOpenCopyPasteSettings,
+  onRequestThumbnails,
   onPaste,
   onRate,
   onReset,
@@ -244,6 +246,7 @@ export default function BottomBar({
               onClearSelection={onClearSelection}
               onContextMenu={onContextMenu}
               onImageSelect={onImageSelect}
+              onRequestThumbnails={onRequestThumbnails}
               selectedImage={selectedImage}
               thumbnails={thumbnails}
               thumbnailAspectRatio={thumbnailAspectRatio}
