@@ -772,12 +772,12 @@ pub struct FolderNode {
 fn has_subdirs(path: &Path) -> bool {
     if let Ok(entries) = std::fs::read_dir(path) {
         for entry in entries.filter_map(Result::ok) {
-            if let Ok(file_type) = entry.file_type() {
-                if file_type.is_dir() {
-                    let name = entry.file_name();
-                    if !name.to_string_lossy().starts_with('.') {
-                        return true;
-                    }
+            if let Ok(file_type) = entry.file_type()
+                && file_type.is_dir()
+            {
+                let name = entry.file_name();
+                if !name.to_string_lossy().starts_with('.') {
+                    return true;
                 }
             }
         }
