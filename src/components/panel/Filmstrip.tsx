@@ -472,10 +472,6 @@ const FilmstripList = ({
             performSafeScroll(index);
           }
           prevSelectedPath.current = currentPath;
-        } else {
-          if (!isItemVisible(index)) {
-            performSafeScroll(index, true);
-          }
         }
       }
     }
