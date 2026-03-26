@@ -802,8 +802,6 @@ fn scan_dir_lazy(
         }
     };
 
-    log::info!("scanning!");
-
     for entry in entries.filter_map(Result::ok) {
         let current_path = entry.path();
         let file_type = match entry.file_type() {
