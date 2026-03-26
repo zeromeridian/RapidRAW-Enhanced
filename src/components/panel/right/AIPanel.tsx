@@ -47,6 +47,8 @@ import {
   MASK_ICON_MAP,
   AI_PANEL_CREATION_TYPES,
   AI_SUB_MASK_COMPONENT_TYPES,
+  formatMaskTypeName,
+  getSubMaskName,
 } from './Masks';
 import { Adjustments, AiPatch } from '../../../utils/adjustments';
 import { BrushSettings, OPTION_SEPARATOR, SelectedImage } from '../../ui/AppProperties';
@@ -83,13 +85,6 @@ interface DragData {
   item?: AiPatch | SubMask;
   maskType?: Mask;
   parentId?: string;
-}
-
-function formatMaskTypeName(type: string) {
-  if (type === Mask.AiSubject) return 'AI Subject';
-  if (type === Mask.AiForeground) return 'AI Foreground';
-  if (type === Mask.AiSky) return 'AI Sky';
-  return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
 const PLACEHOLDER_PATCH: AiPatch = {
@@ -519,11 +514,12 @@ export default function AIPanel({
     return clonedContainer;
   };
 
-  const cloneSubMaskData = (subMask: SubMask, options: { invert?: boolean } = {}): SubMask => {
+  const cloneSubMaskData = (subMask: SubMask, options: { invert?: boolean; rename?: boolean } = {}): SubMask => {
     const clonedSubMask = JSON.parse(JSON.stringify(subMask));
 
     clonedSubMask.id = uuidv4();
     clonedSubMask.invert = options.invert ? !clonedSubMask.invert : clonedSubMask.invert;
+    clonedSubMask.name = options.rename === false ? clonedSubMask.name : `${getSubMaskName(subMask)} Copy`;
 
     return clonedSubMask;
   };
@@ -601,12 +597,12 @@ export default function AIPanel({
   };
 
   const handleDuplicateSubMask = (containerId: string, subMask: SubMask, insertIndex?: number) => {
-    const duplicatedSubMask = cloneSubMaskData(subMask);
+    const duplicatedSubMask = cloneSubMaskData(subMask, { rename: true });
     insertSubMaskIntoContainer(containerId, duplicatedSubMask, insertIndex);
   };
 
   const handleDuplicateAndInvertSubMask = (containerId: string, subMask: SubMask, insertIndex?: number) => {
-    const duplicatedSubMask = cloneSubMaskData(subMask, { invert: true });
+    const duplicatedSubMask = cloneSubMaskData(subMask, { invert: true, rename: true });
     insertSubMaskIntoContainer(containerId, duplicatedSubMask, insertIndex);
   };
 
@@ -615,7 +611,7 @@ export default function AIPanel({
       return;
     }
 
-    const pastedSubMask = cloneSubMaskData(copiedSubMask);
+    const pastedSubMask = cloneSubMaskData(copiedSubMask, { rename: false });
     insertSubMaskIntoContainer(containerId, pastedSubMask, insertIndex);
   };
 
@@ -958,7 +954,7 @@ export default function AIPanel({
                   return <Icon size={16} className="text-text-secondary flex-shrink-0 ml-1" />;
                 })()}
                 <span className="text-sm text-text-primary flex-1 truncate">
-                  {formatMaskTypeName((activeDragItem.item as SubMask).type)}
+                  {getSubMaskName(activeDragItem.item as SubMask)}
                 </span>
               </div>
             )}
@@ -1263,6 +1259,10 @@ function ContainerRow({
                   handleCopy={() => copySubMaskToClipboard(subMask)}
                   hasCopiedSubMask={!!copiedSubMask}
                   analyzingSubMaskId={analyzingSubMaskId}
+                  renamingId={renamingId}
+                  setRenamingId={setRenamingId}
+                  tempName={tempName}
+                  setTempName={setTempName}
                   isParentLoading={container.isLoading}
                 />
               ))}
@@ -1301,6 +1301,10 @@ function SubMaskRow({
   hasCopiedSubMask,
   activeDragItem,
   analyzingSubMaskId,
+  renamingId,
+  setRenamingId,
+  tempName,
+  setTempName,
   isParentLoading,
 }: any) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -1338,10 +1342,26 @@ function SubMaskRow({
     };
   }, []);
 
+  const handleRenameSubmit = () => {
+    if (tempName.trim()) {
+      const newName = tempName.trim();
+      updateSubMask(subMask.id, { name: newName });
+    }
+    setRenamingId(null);
+  };
+
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     showContextMenu(e.clientX, e.clientY, [
+      {
+        label: 'Rename',
+        icon: FileEdit,
+        onClick: () => {
+          setRenamingId(subMask.id);
+          setTempName(getSubMaskName(subMask));
+        },
+      },
       { label: 'Duplicate Component', icon: PlusSquare, onClick: handleDuplicate },
       { label: 'Duplicate and Invert Component', icon: RotateCcw, onClick: handleDuplicateAndInvert },
       { label: 'Copy Component', icon: Copy, onClick: handleCopy },
@@ -1414,7 +1434,19 @@ function SubMaskRow({
           )}
         </AnimatePresence>
       </div>
-      <span className="text-sm text-text-primary flex-1 truncate select-none">{formatMaskTypeName(subMask.type)}</span>
+      {renamingId === subMask.id ? (
+        <input
+          autoFocus
+          className="bg-bg-primary text-sm w-full rounded px-1 outline-none border border-accent"
+          value={tempName}
+          onChange={(e) => setTempName(e.target.value)}
+          onBlur={handleRenameSubmit}
+          onKeyDown={(e) => e.key === 'Enter' && handleRenameSubmit()}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <span className="text-sm text-text-primary flex-1 truncate select-none">{getSubMaskName(subMask)}</span>
+      )}
       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           className="p-1 hover:bg-bg-primary rounded text-text-secondary"
@@ -1581,7 +1613,7 @@ function SettingsPanel({
       </CollapsibleSection>
 
       <CollapsibleSection
-        title={isComponentMode ? `${formatMaskTypeName(activeSubMask.type)} Properties` : 'Selection Properties'}
+        title={isComponentMode ? `${getSubMaskName(activeSubMask)} Properties` : 'Selection Properties'}
         isOpen={collapsibleState.properties}
         onToggle={() => handleToggleSection('properties')}
         canToggleVisibility={false}
