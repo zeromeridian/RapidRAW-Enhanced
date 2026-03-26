@@ -4790,6 +4790,7 @@ function App() {
       copiedFilePaths,
       isFullScreen,
       isInstantTransition,
+      appSettings?.enableFolderImageCounts,
     ],
   );
 
