@@ -77,10 +77,11 @@ use crate::image_loader::{
     composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
 };
 use crate::image_processing::{
-    AllAdjustments, Crop, GeometryParams, GpuContext, ImageMetadata, apply_coarse_rotation,
-    apply_cpu_default_raw_processing, apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
-    apply_unwarp_geometry, downscale_f32_image, get_all_adjustments_from_json,
-    get_or_init_gpu_context, process_and_get_dynamic_image, warp_image_geometry,
+    AllAdjustments, Crop, GeometryParams, GpuContext, ImageMetadata, RenderRequest,
+    apply_coarse_rotation, apply_cpu_default_raw_processing, apply_crop, apply_flip,
+    apply_geometry_warp, apply_rotation, apply_unwarp_geometry, downscale_f32_image,
+    get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
+    warp_image_geometry,
 };
 use crate::lut_processing::{Lut, convert_image_to_cube_lut, generate_identity_lut_image};
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
@@ -164,6 +165,7 @@ struct AnalyticsJob {
 
 pub struct AppState {
     window_setup_complete: AtomicBool,
+    pub gpu_crash_flag_path: Mutex<Option<PathBuf>>,
     original_image: Mutex<Option<LoadedImage>>,
     cached_preview: Mutex<Option<CachedPreview>>,
     gpu_context: Mutex<Option<GpuContext>>,
@@ -676,7 +678,7 @@ async fn load_image(
     let (orig_width, orig_height) = pristine_img.dimensions();
 
     *state.original_image.lock().unwrap() = Some(LoadedImage {
-        path: path,
+        path,
         image: Arc::new(pristine_img),
         is_raw,
     });
@@ -861,6 +863,7 @@ pub fn get_cached_or_generate_mask(
     generated
 }
 
+#[allow(clippy::too_many_arguments)]
 fn process_preview_job(
     app_handle: &tauri::AppHandle,
     state: tauri::State<AppState>,
@@ -1031,10 +1034,12 @@ fn process_preview_job(
         &state,
         &processing_image,
         new_transform_hash,
-        final_adjustments,
-        &mask_bitmaps,
-        lut,
-        pixel_roi,
+        RenderRequest {
+            adjustments: final_adjustments,
+            mask_bitmaps: &mask_bitmaps,
+            lut,
+            roi: pixel_roi,
+        },
         "apply_adjustments",
     );
 
@@ -1335,10 +1340,12 @@ fn generate_uncropped_preview(
             &state,
             &processing_base,
             unique_hash,
-            uncropped_adjustments,
-            &mask_bitmaps,
-            lut,
-            None,
+            RenderRequest {
+                adjustments: uncropped_adjustments,
+                mask_bitmaps: &mask_bitmaps,
+                lut,
+                roi: None,
+            },
             "generate_uncropped_preview",
         ) {
             let (width, height) = processed_image.dimensions();
@@ -1496,10 +1503,12 @@ async fn preview_geometry_transform(
                 &state,
                 &preview_base,
                 visual_hash,
-                all_adjustments,
-                &mask_bitmaps,
-                lut,
-                None,
+                RenderRequest {
+                    adjustments: all_adjustments,
+                    mask_bitmaps: &mask_bitmaps,
+                    lut,
+                    roi: None,
+                },
                 "preview_geometry_transform_base_gen",
             )?;
 
@@ -1714,10 +1723,12 @@ fn process_image_for_export_pipeline(
         state,
         &transformed_image,
         unique_hash,
-        all_adjustments,
-        &mask_bitmaps,
-        lut,
-        None,
+        RenderRequest {
+            adjustments: all_adjustments,
+            mask_bitmaps: &mask_bitmaps,
+            lut,
+            roi: None,
+        },
         debug_tag,
     )
 }
@@ -1873,6 +1884,7 @@ fn encode_image_to_bytes(
     Ok(image_bytes)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn export_masks_for_image(
     base_image: &DynamicImage,
     js_adjustments: &Value,
@@ -1931,10 +1943,12 @@ fn export_masks_for_image(
                 state,
                 &transformed_image,
                 unique_hash,
-                single_adjustments,
-                &single_bitmaps,
-                lut.clone(),
-                None,
+                RenderRequest {
+                    adjustments: single_adjustments,
+                    mask_bitmaps: &single_bitmaps,
+                    lut: lut.clone(),
+                    roi: None,
+                },
                 "export_mask_image",
             )?;
 
@@ -2002,10 +2016,12 @@ fn export_adjustments_as_lut(
         state,
         &identity_image,
         unique_hash,
-        all_adjustments,
-        &[],
-        lut,
-        None,
+        RenderRequest {
+            adjustments: all_adjustments,
+            mask_bitmaps: &[],
+            lut,
+            roi: None,
+        },
         "export_lut",
     )?;
 
@@ -2483,10 +2499,12 @@ async fn estimate_export_size(
         &state,
         &preview_image,
         unique_hash,
-        all_adjustments,
-        &mask_bitmaps,
-        lut,
-        None,
+        RenderRequest {
+            adjustments: all_adjustments,
+            mask_bitmaps: &mask_bitmaps,
+            lut,
+            roi: None,
+        },
         "estimate_export_size",
     )?;
 
@@ -2666,10 +2684,12 @@ async fn estimate_batch_export_size(
         &state,
         &preview_base,
         unique_hash,
-        all_adjustments,
-        &mask_bitmaps,
-        lut,
-        None,
+        RenderRequest {
+            adjustments: all_adjustments,
+            mask_bitmaps: &mask_bitmaps,
+            lut,
+            roi: None,
+        },
         "estimate_batch_export_size",
     )?;
 
@@ -2807,6 +2827,7 @@ async fn generate_ai_sky_mask(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 async fn generate_ai_subject_mask(
     js_adjustments: serde_json::Value,
@@ -3057,10 +3078,12 @@ fn generate_preset_preview(
         &state,
         &transformed_image,
         unique_hash,
-        all_adjustments,
-        &mask_bitmaps,
-        lut,
-        None,
+        RenderRequest {
+            adjustments: all_adjustments,
+            mask_bitmaps: &mask_bitmaps,
+            lut,
+            roi: None,
+        },
         "generate_preset_preview",
     )?;
 
@@ -3412,10 +3435,12 @@ async fn generate_all_community_previews(
                 &state,
                 &transformed_image,
                 unique_hash,
-                all_adjustments,
-                &mask_bitmaps,
-                lut,
-                None,
+                RenderRequest {
+                    adjustments: all_adjustments,
+                    mask_bitmaps: &mask_bitmaps,
+                    lut,
+                    roi: None,
+                },
                 "generate_all_community_previews",
             )?;
 
@@ -3945,10 +3970,12 @@ fn generate_preview_for_path(
         &state,
         &transformed_image,
         unique_hash,
-        all_adjustments,
-        &mask_bitmaps,
-        lut,
-        None,
+        RenderRequest {
+            adjustments: all_adjustments,
+            mask_bitmaps: &mask_bitmaps,
+            lut,
+            roi: None,
+        },
         "generate_preview_for_path",
     )?;
     let (width, height) = final_image.dimensions();
@@ -4255,7 +4282,22 @@ fn main() {
             }
 
             let app_handle = app.handle().clone();
-            let settings: AppSettings = load_settings(app_handle.clone()).unwrap_or_default();
+            let config_dir = app_handle.path().app_config_dir().expect("Failed to get config dir");
+            let crash_flag_path = config_dir.join(".gpu_init_crash_flag");
+
+            {
+                let state = app.state::<AppState>();
+                *state.gpu_crash_flag_path.lock().unwrap() = Some(crash_flag_path.clone());
+            }
+
+            let mut settings: AppSettings = load_settings(app_handle.clone()).unwrap_or_default();
+
+            if crash_flag_path.exists() {
+                log::warn!("GPU Driver crash detected on last run! Falling back to OpenGL backend.");
+                settings.processing_backend = Some("gl".to_string());
+                let _ = crate::file_management::save_settings(settings.clone(), app_handle.clone());
+                let _ = std::fs::remove_file(&crash_flag_path);
+            }
 
             let lens_db = lens_correction::load_lensfun_db(&app_handle);
             let state = app.state::<AppState>();
@@ -4437,6 +4479,7 @@ fn main() {
         })
         .manage(AppState {
             window_setup_complete: AtomicBool::new(false),
+            gpu_crash_flag_path: Mutex::new(None),
             original_image: Mutex::new(None),
             cached_preview: Mutex::new(None),
             gpu_context: Mutex::new(None),
@@ -4506,6 +4549,7 @@ fn main() {
             file_management::list_images_in_dir,
             file_management::list_images_recursive,
             file_management::get_folder_tree,
+            file_management::get_folder_children,
             file_management::get_pinned_folder_trees,
             file_management::generate_thumbnails,
             file_management::generate_thumbnails_progressive,

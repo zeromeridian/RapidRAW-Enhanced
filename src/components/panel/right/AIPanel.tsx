@@ -789,7 +789,7 @@ export default function AIPanel({
         </div>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0">
-          <div className="p-4 pb-2 z-10 flex-shrink-0">
+          <div className="p-4 pb-2 z-10 shrink-0">
             {!selectedImage && <p className="text-center text-text-tertiary mt-4">No image selected.</p>}
 
             {selectedImage && (
@@ -935,7 +935,7 @@ export default function AIPanel({
 
       <DragOverlay dropAnimation={{ duration: 150, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
         {activeDragItem ? (
-          <div className="w-[var(--sidebar-width,280px)] pointer-events-none">
+          <div className="w-(--sidebar-width,280px) pointer-events-none">
             {activeDragItem.type === 'Container' && activeDragItem.item && (
               <div className="flex items-center gap-2 p-2 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10">
                 <div className="text-text-secondary">
@@ -951,7 +951,7 @@ export default function AIPanel({
                 {(() => {
                   const sm = activeDragItem.item as SubMask;
                   const Icon = MASK_ICON_MAP[sm.type] || Circle;
-                  return <Icon size={16} className="text-text-secondary flex-shrink-0 ml-1" />;
+                  return <Icon size={16} className="text-text-secondary shrink-0 ml-1" />;
                 })()}
                 <span className="text-sm text-text-primary flex-1 truncate">
                   {getSubMaskName(activeDragItem.item as SubMask)}
@@ -1180,7 +1180,7 @@ function ContainerRow({
           {renamingId === container.id ? (
             <input
               autoFocus
-              className="bg-bg-primary text-sm w-full rounded px-1 outline-none border border-accent"
+              className="bg-bg-primary text-sm w-full rounded-sm px-1 outline-hidden border border-accent"
               value={tempName}
               onChange={(e) => setTempName(e.target.value)}
               onBlur={handleRenameSubmit}
@@ -1396,7 +1396,7 @@ function SubMaskRow({
       }}
       onContextMenu={onContextMenu}
     >
-      <div className="relative w-4 h-4 ml-1 flex-shrink-0 flex items-center justify-center">
+      <div className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center">
         <AnimatePresence mode="wait" initial={false}>
           {isAnalyzing ? (
             <motion.div
@@ -1449,7 +1449,7 @@ function SubMaskRow({
       )}
       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
-          className="p-1 hover:bg-bg-primary rounded text-text-secondary"
+          className="p-1 hover:bg-bg-primary rounded-sm text-text-secondary"
           data-tooltip={subMask.mode === SubMaskMode.Additive ? 'Switch to Subtract' : 'Switch to Add'}
           onClick={(e) => {
             e.stopPropagation();
@@ -1573,7 +1573,7 @@ function SettingsPanel({
               >
                 <div className="flex items-center gap-2">
                   <Input
-                    className="flex-grow"
+                    className="grow"
                     disabled={isGeneratingAi || displayContainer.isLoading}
                     onChange={(e: any) => {
                       setPrompt(e.target.value);
@@ -1634,7 +1634,7 @@ function SettingsPanel({
             <>
               {isAiMask && aiModelDownloadStatus && (
                 <div className="p-3 mb-4 bg-card-active rounded-md border border-surface flex items-center gap-3">
-                  <Loader2 size={16} className="text-accent animate-spin flex-shrink-0" />
+                  <Loader2 size={16} className="text-accent animate-spin shrink-0" />
                   <div className="text-xs text-text-secondary leading-relaxed">
                     AI Model Downloading: <span className="text-accent font-medium">{aiModelDownloadStatus}</span>
                   </div>

@@ -203,18 +203,18 @@ pub async fn get_or_init_ai_models(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<AiModels>> {
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(models) = &ai_state.models {
-            return Ok(models.clone());
-        }
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
+        && let Some(models) = &ai_state.models
+    {
+        return Ok(models.clone());
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(models) = &ai_state.models {
-            return Ok(models.clone());
-        }
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
+        && let Some(models) = &ai_state.models
+    {
+        return Ok(models.clone());
     }
 
     let models_dir = get_models_dir(app_handle)?;
@@ -297,18 +297,18 @@ pub async fn get_or_init_denoise_model(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<Mutex<Session>>> {
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(denoise_model) = &ai_state.denoise_model {
-            return Ok(denoise_model.clone());
-        }
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
+        && let Some(denoise_model) = &ai_state.denoise_model
+    {
+        return Ok(denoise_model.clone());
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(denoise_model) = &ai_state.denoise_model {
-            return Ok(denoise_model.clone());
-        }
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
+        && let Some(denoise_model) = &ai_state.denoise_model
+    {
+        return Ok(denoise_model.clone());
     }
 
     let models_dir = get_models_dir(app_handle)?;
@@ -349,18 +349,18 @@ pub async fn get_or_init_clip_models(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<ClipModels>> {
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(clip_models) = &ai_state.clip_models {
-            return Ok(clip_models.clone());
-        }
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
+        && let Some(clip_models) = &ai_state.clip_models
+    {
+        return Ok(clip_models.clone());
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(clip_models) = &ai_state.clip_models {
-            return Ok(clip_models.clone());
-        }
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
+        && let Some(clip_models) = &ai_state.clip_models
+    {
+        return Ok(clip_models.clone());
     }
 
     let models_dir = get_models_dir(app_handle)?;
@@ -468,8 +468,7 @@ fn extract_tile_mirror(img: &Rgb32FImage, x0: i32, y0: i32, cs: usize) -> Array4
     arr
 }
 
-fn apply_seamless(
-    tile: &mut Array4<f32>,
+struct SeamlessBlend {
     ud0: usize,
     ud1: usize,
     ud2: usize,
@@ -479,7 +478,20 @@ fn apply_seamless(
     fswidth: usize,
     fsheight: usize,
     overlap: usize,
-) {
+}
+
+fn apply_seamless(tile: &mut Array4<f32>, blend: &SeamlessBlend) {
+    let SeamlessBlend {
+        ud0,
+        ud1,
+        ud2,
+        ud3,
+        absx0,
+        absy0,
+        fswidth,
+        fsheight,
+        overlap,
+    } = *blend;
     let ol = overlap;
     if absx0 > 0 {
         for c in 0..3 {
@@ -574,15 +586,17 @@ fn run_native_denoise(
         let mut tile = out;
         apply_seamless(
             &mut tile,
-            ud0,
-            ud1,
-            ud2,
-            ud3,
-            absx0,
-            absy0,
-            width,
-            height,
-            params.overlap,
+            &SeamlessBlend {
+                ud0,
+                ud1,
+                ud2,
+                ud3,
+                absx0,
+                absy0,
+                fswidth: width,
+                fsheight: height,
+                overlap: params.overlap,
+            },
         );
 
         for cy in 0..(ud3 - ud1) {
@@ -652,13 +666,14 @@ pub fn generate_image_embeddings(
 
     let resized_image = image.resize(new_width, new_height, FilterType::Triangle);
     let rgb_image = resized_image.into_rgb8();
+    let (actual_width, actual_height) = rgb_image.dimensions();
     let raw_pixels = rgb_image.as_raw();
 
     let mut input_tensor: Array<u8, _> =
         Array::zeros((1, 3, SAM_INPUT_SIZE as usize, SAM_INPUT_SIZE as usize));
 
-    let w_usize = new_width as usize;
-    for y in 0..(new_height as usize) {
+    let w_usize = actual_width as usize;
+    for y in 0..(actual_height as usize) {
         for x in 0..w_usize {
             let idx = (y * w_usize + x) * 3;
             input_tensor[[0, 0, y, x]] = raw_pixels[idx];

@@ -231,6 +231,31 @@ const getParentDir = (filePath: string): string => {
   return filePath.substring(0, lastSeparatorIndex);
 };
 
+const insertChildrenIntoTree = (node: any, targetPath: string, newChildren: any[]): any => {
+  if (!node) return null;
+
+  if (node.path === targetPath) {
+    const mergedChildren = newChildren.map((newChild: any) => {
+      const existingChild = node.children?.find((c: any) => c.path === newChild.path);
+      if (existingChild && existingChild.children && existingChild.children.length > 0) {
+        return { ...newChild, children: existingChild.children };
+      }
+      return newChild;
+    });
+
+    return { ...node, children: mergedChildren };
+  }
+
+  if (node.children && node.children.length > 0) {
+    return {
+      ...node,
+      children: node.children.map((child: any) => insertChildrenIntoTree(child, targetPath, newChildren)),
+    };
+  }
+
+  return node;
+};
+
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
@@ -416,7 +441,7 @@ function App() {
   const [libraryScrollTop, setLibraryScrollTop] = useState<number>(0);
   const { showContextMenu } = useContextMenu();
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
-  const { loading: isThumbnailsLoading } = useThumbnails(imageList, setThumbnails);
+  const { loading: isThumbnailsLoading, requestThumbnails, clearThumbnailQueue } = useThumbnails();
   const transformWrapperRef = useRef<any>(null);
   const isProgrammaticZoom = useRef(false);
   const currentResRef = useRef<number>(1280);
@@ -1647,7 +1672,11 @@ function App() {
         }
         if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
           try {
-            const trees = await invoke(Invokes.GetPinnedFolderTrees, { paths: settings.pinnedFolders });
+            const trees = await invoke(Invokes.GetPinnedFolderTrees, {
+              paths: settings.pinnedFolders,
+              expandedFolders: settings.lastFolderState?.expandedFolders || [],
+              showImageCounts: settings.enableFolderImageCounts ?? false,
+            });
             setPinnedFolderTrees(trees);
           } catch (err) {
             console.error('Failed to load pinned folder trees:', err);
@@ -1666,7 +1695,11 @@ function App() {
           preloadedDataRef.current = {
             rootPath: root,
             currentPath: currentPath,
-            tree: invoke(Invokes.GetFolderTree, { path: root }),
+            tree: invoke(Invokes.GetFolderTree, {
+              path: root,
+              expandedFolders: settings.lastFolderState?.expandedFolders || [root],
+              showImageCounts: settings.enableFolderImageCounts ?? false,
+            }),
             images: invoke(command, { path: currentPath }),
           };
         }
@@ -1825,27 +1858,42 @@ function App() {
     return () => clearTimeout(timer);
   }, [theme]);
 
-  const refreshAllFolderTrees = useCallback(async () => {
-    if (rootPath) {
-      try {
-        const treeData = await invoke(Invokes.GetFolderTree, { path: rootPath });
-        setFolderTree(treeData);
-      } catch (err) {
-        console.error('Failed to refresh main folder tree:', err);
-        setError(`Failed to refresh folder tree: ${err}.`);
-      }
-    }
+  const refreshAllFolderTrees = useCallback(
+    async (currentExpanded?: Set<string>) => {
+      const activeExpanded = currentExpanded || expandedFolders;
+      const expandedArr = Array.from(activeExpanded);
+      const showCounts = appSettings?.enableFolderImageCounts ?? false;
 
-    const currentPins = appSettings?.pinnedFolders || [];
-    if (currentPins.length > 0) {
-      try {
-        const trees = await invoke(Invokes.GetPinnedFolderTrees, { paths: currentPins });
-        setPinnedFolderTrees(trees);
-      } catch (err) {
-        console.error('Failed to refresh pinned folder trees:', err);
+      if (rootPath) {
+        try {
+          const treeData = await invoke(Invokes.GetFolderTree, {
+            path: rootPath,
+            expandedFolders: expandedArr,
+            showImageCounts: showCounts,
+          });
+          setFolderTree(treeData);
+        } catch (err) {
+          console.error('Failed to refresh main folder tree:', err);
+          setError(`Failed to refresh folder tree: ${err}.`);
+        }
       }
-    }
-  }, [rootPath, appSettings?.pinnedFolders]);
+
+      const currentPins = appSettings?.pinnedFolders || [];
+      if (currentPins.length > 0) {
+        try {
+          const trees = await invoke(Invokes.GetPinnedFolderTrees, {
+            paths: currentPins,
+            expandedFolders: expandedArr,
+            showImageCounts: showCounts,
+          });
+          setPinnedFolderTrees(trees);
+        } catch (err) {
+          console.error('Failed to refresh pinned folder trees:', err);
+        }
+      }
+    },
+    [rootPath, appSettings?.pinnedFolders, appSettings?.enableFolderImageCounts, expandedFolders],
+  );
 
   const pinnedFolders = useMemo(() => appSettings?.pinnedFolders || [], [appSettings]);
 
@@ -1884,6 +1932,7 @@ function App() {
   const handleSelectSubfolder = useCallback(
     async (path: string | null, isNewRoot = false, preloadedImages?: ImageFile[]) => {
       await invoke('cancel_thumbnail_generation');
+      clearThumbnailQueue();
       setIsViewLoading(true);
       setSearchCriteria({ tags: [], text: '', mode: 'OR' });
       setLibraryScrollTop(0);
@@ -1929,7 +1978,11 @@ function App() {
           setIsTreeLoading(true);
           handleSettingsChange({ ...appSettings, lastRootPath: path } as AppSettings);
           try {
-            const treeData = await invoke(Invokes.GetFolderTree, { path });
+            const treeData = await invoke(Invokes.GetFolderTree, {
+              path,
+              expandedFolders: [path],
+              showImageCounts: appSettings?.enableFolderImageCounts ?? false,
+            });
             setFolderTree(treeData);
           } catch (err) {
             console.error('Failed to load folder tree:', err);
@@ -2069,17 +2122,36 @@ function App() {
     }
   }, [currentFolderPath, sortCriteria.key, appSettings?.enableExifReading, libraryViewMode]);
 
-  const handleToggleFolder = useCallback((path: string) => {
-    setExpandedFolders((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(path)) {
-        newSet.delete(path);
-      } else {
-        newSet.add(path);
+  const handleToggleFolder = useCallback(
+    async (path: string) => {
+      const isExpanding = !expandedFolders.has(path);
+      setExpandedFolders((prev) => {
+        const newSet = new Set(prev);
+        if (isExpanding) {
+          newSet.add(path);
+        } else {
+          newSet.delete(path);
+        }
+        return newSet;
+      });
+      if (!isExpanding) return;
+      try {
+        const showCounts = appSettings?.enableFolderImageCounts ?? false;
+        const newChildren: any[] = await invoke(Invokes.GetFolderChildren, {
+          path,
+          showImageCounts: showCounts,
+        });
+        setFolderTree((prevTree: any) => insertChildrenIntoTree(prevTree, path, newChildren));
+        setPinnedFolderTrees((prevTrees: any[]) =>
+          prevTrees.map((tree) => insertChildrenIntoTree(tree, path, newChildren)),
+        );
+      } catch (err) {
+        console.error('Failed to fetch folder children:', err);
+        setError(`Failed to load folder: ${err}`);
       }
-      return newSet;
-    });
-  }, []);
+    },
+    [expandedFolders, appSettings?.enableFolderImageCounts],
+  );
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings || !rootPath) {
@@ -3489,7 +3561,14 @@ function App() {
           treeData = await preloadedDataRef.current.tree;
           console.log('Preload cache hit for folder tree.');
         } else {
-          treeData = await invoke(Invokes.GetFolderTree, { path: root });
+          const expandedArr = folderState?.expandedFolders
+            ? Array.from(new Set([...folderState.expandedFolders, root]))
+            : [root];
+          treeData = await invoke(Invokes.GetFolderTree, {
+            path: root,
+            expandedFolders: expandedArr,
+            showImageCounts: appSettings?.enableFolderImageCounts ?? false,
+          });
         }
         setFolderTree(treeData);
       } catch (err) {
@@ -4662,7 +4741,7 @@ function App() {
       rootPath && (
         <div
           className={clsx(
-            'flex h-full overflow-hidden flex-shrink-0',
+            'flex h-full overflow-hidden shrink-0',
             !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
           )}
           style={{
@@ -4716,7 +4795,7 @@ function App() {
 
   const memoizedLibraryView = useMemo(
     () => (
-      <div className="flex flex-row flex-grow h-full min-h-0">
+      <div className="flex flex-row grow h-full min-h-0">
         <div className="flex-1 flex flex-col min-w-0 gap-2">
           {activeView === 'community' ? (
             <CommunityPage
@@ -4755,6 +4834,7 @@ function App() {
               onSettingsChange={handleSettingsChange}
               onThumbnailAspectRatioChange={setThumbnailAspectRatio}
               onThumbnailSizeChange={setThumbnailSize}
+              onRequestThumbnails={requestThumbnails}
               rootPath={rootPath}
               searchCriteria={searchCriteria}
               setFilterCriteria={setFilterCriteria}
@@ -4849,7 +4929,7 @@ function App() {
 
     if (selectedImage) {
       return (
-        <div className="flex flex-row flex-grow h-full min-h-0">
+        <div className="flex flex-row grow h-full min-h-0">
           <div className="flex-1 flex flex-col min-w-0">
             <Editor
               activeAiPatchContainerId={activeAiPatchContainerId}
@@ -4904,7 +4984,7 @@ function App() {
             />
             <div
               className={clsx(
-                'flex flex-col w-full overflow-hidden flex-shrink-0',
+                'flex flex-col w-full overflow-hidden shrink-0',
                 !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
               )}
               style={{
@@ -4939,6 +5019,7 @@ function App() {
                 onImageSelect={handleImageClick}
                 onPaste={() => handlePasteAdjustments()}
                 onRate={handleRate}
+                onRequestThumbnails={requestThumbnails}
                 onZoomChange={handleZoomChange}
                 rating={adjustments.rating || 0}
                 selectedImage={selectedImage}
@@ -4955,7 +5036,7 @@ function App() {
 
           <div
             className={clsx(
-              'flex h-full overflow-hidden flex-shrink-0',
+              'flex h-full overflow-hidden shrink-0',
               !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
             )}
             style={{
@@ -5153,7 +5234,7 @@ function App() {
     >
       <div
         className={clsx(
-          'flex-shrink-0 overflow-hidden z-50',
+          'shrink-0 overflow-hidden z-50',
           !isInstantTransition && 'transition-all duration-300 ease-in-out',
           isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
         )}
@@ -5170,7 +5251,7 @@ function App() {
           ],
         )}
       >
-        <div className="flex flex-row flex-grow h-full min-h-0">
+        <div className="flex flex-row grow h-full min-h-0">
           {memoizedFolderTree}
           <div className="flex-1 flex flex-col min-w-0">{renderContent()}</div>
           {!selectedImage && isLibraryExportPanelVisible && (
@@ -5181,7 +5262,7 @@ function App() {
           )}
           <div
             className={clsx(
-              'flex-shrink-0 overflow-hidden',
+              'shrink-0 overflow-hidden',
               !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
             )}
             style={{ width: isLibraryExportPanelVisible && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
@@ -5366,7 +5447,7 @@ function App() {
         toastClassName={() =>
           clsx(
             'relative flex min-h-16 p-4 rounded-lg justify-between overflow-hidden cursor-pointer mb-4',
-            '!bg-surface !text-text-primary !border !border-border-color !shadow-2xl !max-w-[420px]',
+            'bg-surface! text-text-primary! border! border-border-color! shadow-2xl! max-w-[420px]!',
           )
         }
       />
