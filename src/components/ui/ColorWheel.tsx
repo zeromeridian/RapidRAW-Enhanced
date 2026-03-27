@@ -76,6 +76,14 @@ const ColorWheel = ({
     onChange({ ...effectiveValue, hue: color.hsva.h, saturation: color.hsva.s });
   };
 
+  const handleHueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  onChange({ ...effectiveValue, hue: parseFloat(e.target.value) });
+  };
+
+  const handleSaturationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  onChange({ ...effectiveValue, saturation: parseFloat(e.target.value) });
+  };
+  
   const handleLumChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange({ ...effectiveValue, luminance: parseFloat(e.target.value) });
   };
@@ -170,6 +178,32 @@ const ColorWheel = ({
             />
           </div>
         )}
+      </div>
+
+      <div className="w-full">
+        <Slider
+          defaultValue={defaultValue.hue}
+          label="Hue"
+          max={180}
+          min={-180}
+          onChange={handleHueChange}
+          onDragStateChange={setIsSliderDragging}
+          step={1}
+          value={hue}
+        />
+      </div>
+      
+      <div className="w-full">
+        <Slider
+          defaultValue={defaultValue.saturation}
+          label="Saturation"
+          max={100}
+          min={-100}
+          onChange={handleSaturationChange}
+          onDragStateChange={setIsSliderDragging}
+          step={1}
+          value={saturation}
+        />
       </div>
 
       <div className="w-full">
