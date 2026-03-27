@@ -184,8 +184,8 @@ const ColorWheel = ({
         <Slider
           defaultValue={defaultValue.hue}
           label="Hue"
-          max={180}
-          min={-180}
+          max={360}
+          min={0}
           onChange={handleHueChange}
           onDragStateChange={setIsSliderDragging}
           step={1}
@@ -198,7 +198,7 @@ const ColorWheel = ({
           defaultValue={defaultValue.saturation}
           label="Saturation"
           max={100}
-          min={-100}
+          min={0}
           onChange={handleSaturationChange}
           onDragStateChange={setIsSliderDragging}
           step={1}
@@ -209,7 +209,7 @@ const ColorWheel = ({
       <div className="w-full">
         <Slider
           defaultValue={defaultValue.luminance}
-          label={<Sun size={16} className="text-text-secondary" />}
+          label="Luminance"
           max={100}
           min={-100}
           onChange={handleLumChange}
