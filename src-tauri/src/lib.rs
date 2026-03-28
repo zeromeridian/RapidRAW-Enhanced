@@ -4191,62 +4191,71 @@ fn frontend_ready(
     let is_first_run = !state
         .window_setup_complete
         .swap(true, std::sync::atomic::Ordering::Relaxed);
-    let mut should_maximize = false;
-    let mut should_fullscreen = false;
+    #[cfg(target_os = "android")]
+    let _ = (is_first_run, &window);
 
-    if is_first_run && let Ok(config_dir) = app_handle.path().app_config_dir() {
-        let path = config_dir.join("window_state.json");
+    #[cfg(not(target_os = "android"))]
+    {
+        let mut should_maximize = false;
+        let mut should_fullscreen = false;
 
-        if let Ok(contents) = std::fs::read_to_string(&path)
-            && let Ok(saved_state) = serde_json::from_str::<WindowState>(&contents)
-        {
-            #[cfg(any(windows, target_os = "linux"))]
+        if is_first_run && let Ok(config_dir) = app_handle.path().app_config_dir() {
+            let path = config_dir.join("window_state.json");
+
+            if let Ok(contents) = std::fs::read_to_string(&path)
+                && let Ok(saved_state) = serde_json::from_str::<WindowState>(&contents)
             {
-                should_maximize = saved_state.maximized;
-                should_fullscreen = saved_state.fullscreen;
-            }
+                #[cfg(any(windows, target_os = "linux"))]
+                {
+                    should_maximize = saved_state.maximized;
+                    should_fullscreen = saved_state.fullscreen;
+                }
 
-            if (should_maximize || should_fullscreen)
-                && let Some(monitor) = window
-                    .current_monitor()
-                    .ok()
-                    .flatten()
-                    .or_else(|| window.primary_monitor().ok().flatten())
-                    .or_else(|| {
-                        window
-                            .available_monitors()
-                            .ok()
-                            .and_then(|m| m.into_iter().next())
-                    })
-            {
-                let monitor_size = monitor.size();
-                let monitor_pos = monitor.position();
-                let default_width = 1280i32;
-                let default_height = 720i32;
-                let center_x = monitor_pos.x + (monitor_size.width as i32 - default_width) / 2;
-                let center_y = monitor_pos.y + (monitor_size.height as i32 - default_height) / 2;
+                if (should_maximize || should_fullscreen)
+                    && let Some(monitor) = window
+                        .current_monitor()
+                        .ok()
+                        .flatten()
+                        .or_else(|| window.primary_monitor().ok().flatten())
+                        .or_else(|| {
+                            window
+                                .available_monitors()
+                                .ok()
+                                .and_then(|m| m.into_iter().next())
+                        })
+                {
+                    let monitor_size = monitor.size();
+                    let monitor_pos = monitor.position();
+                    let default_width = 1280i32;
+                    let default_height = 720i32;
+                    let center_x =
+                        monitor_pos.x + (monitor_size.width as i32 - default_width) / 2;
+                    let center_y =
+                        monitor_pos.y + (monitor_size.height as i32 - default_height) / 2;
 
-                let _ = window.set_size(tauri::PhysicalSize::new(
-                    default_width as u32,
-                    default_height as u32,
-                ));
-                let _ = window.set_position(tauri::PhysicalPosition::new(center_x, center_y));
+                    let _ = window.set_size(tauri::PhysicalSize::new(
+                        default_width as u32,
+                        default_height as u32,
+                    ));
+                    let _ = window
+                        .set_position(tauri::PhysicalPosition::new(center_x, center_y));
+                }
             }
         }
-    }
 
-    if let Err(e) = window.show() {
-        log::error!("Failed to show window: {}", e);
-    }
-    if let Err(e) = window.set_focus() {
-        log::error!("Failed to focus window: {}", e);
-    }
-    if is_first_run {
-        if should_maximize {
-            let _ = window.maximize();
+        if let Err(e) = window.show() {
+            log::error!("Failed to show window: {}", e);
         }
-        if should_fullscreen {
-            let _ = window.set_fullscreen(true);
+        if let Err(e) = window.set_focus() {
+            log::error!("Failed to focus window: {}", e);
+        }
+        if is_first_run {
+            if should_maximize {
+                let _ = window.maximize();
+            }
+            if should_fullscreen {
+                let _ = window.set_fullscreen(true);
+            }
         }
     }
 
@@ -4333,19 +4342,27 @@ pub fn run() {
                     }
                 }
 
-                let resource_path = app_handle
-                    .path()
-                    .resolve("resources", tauri::path::BaseDirectory::Resource)
-                    .expect("failed to resolve resource directory");
+                #[cfg(not(target_os = "android"))]
+                {
+                    let resource_path = app_handle
+                        .path()
+                        .resolve("resources", tauri::path::BaseDirectory::Resource)
+                        .expect("failed to resolve resource directory");
 
-                let ort_library_name = {
-                    #[cfg(target_os = "windows")] { "onnxruntime.dll" }
-                    #[cfg(target_os = "linux")] { "libonnxruntime.so" }
-                    #[cfg(target_os = "macos")] { "libonnxruntime.dylib" }
-                };
-                let ort_library_path = resource_path.join(ort_library_name);
-                std::env::set_var("ORT_DYLIB_PATH", &ort_library_path);
-                println!("Set ORT_DYLIB_PATH to: {}", ort_library_path.display());
+                    let ort_library_name = {
+                        #[cfg(target_os = "windows")]
+                        { "onnxruntime.dll" }
+                        #[cfg(target_os = "linux")]
+                        { "libonnxruntime.so" }
+                        #[cfg(target_os = "macos")]
+                        { "libonnxruntime.dylib" }
+                        #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+                        { "libonnxruntime.so" }
+                    };
+                    let ort_library_path = resource_path.join(ort_library_name);
+                    std::env::set_var("ORT_DYLIB_PATH", &ort_library_path);
+                    println!("Set ORT_DYLIB_PATH to: {}", ort_library_path.display());
+                }
             }
 
             setup_logging(&app_handle);
@@ -4368,22 +4385,34 @@ pub fn run() {
             let window_cfg = app.config().app.windows.first().unwrap().clone();
             let transparent = settings.transparent.unwrap_or(window_cfg.transparent);
             let decorations = settings.decorations.unwrap_or(window_cfg.decorations);
+            #[cfg(target_os = "android")]
+            let _ = decorations;
 
-            let main_window_cfg = app.config().app.windows.iter()
+            let main_window_cfg = app
+                .config()
+                .app
+                .windows
+                .iter()
                 .find(|w| w.label == "main")
                 .expect("Main window config not found")
                 .clone();
 
-            let mut window_builder = tauri::WebviewWindowBuilder::from_config(app.handle(), &main_window_cfg)
-                .unwrap()
-                .transparent(transparent)
-                .decorations(decorations)
-                .visible(false);
+            let mut window_builder =
+                tauri::WebviewWindowBuilder::from_config(app.handle(), &main_window_cfg)
+                    .unwrap()
+                    .transparent(transparent);
+
+            #[cfg(not(target_os = "android"))]
+            {
+                window_builder = window_builder.decorations(decorations).visible(false);
+            }
 
             if !transparent {
-                window_builder = window_builder.background_color(tauri::window::Color(100, 100, 100, 255));
+                window_builder = window_builder
+                    .background_color(tauri::window::Color(100, 100, 100, 255));
             } else {
-                window_builder = window_builder.background_color(tauri::window::Color(0, 0, 0, 0));
+                window_builder =
+                    window_builder.background_color(tauri::window::Color(0, 0, 0, 0));
             }
 
             let window = window_builder.build().expect("Failed to build window");
@@ -4393,62 +4422,80 @@ pub fn run() {
                 apply_window_effect(theme, &window);
             }
 
-            if let Ok(config_dir) = app.path().app_config_dir() {
-                let path = config_dir.join("window_state.json");
-                if let Ok(contents) = std::fs::read_to_string(&path) {
-                    if let Ok(state) = serde_json::from_str::<WindowState>(&contents) {
-                        if state.width >= 200 && state.height >= 150 {
-                            let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(state.width, state.height)));
-                            let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(state.x, state.y)));
+            #[cfg(not(target_os = "android"))]
+            {
+                if let Ok(config_dir) = app.path().app_config_dir() {
+                    let path = config_dir.join("window_state.json");
+                    if let Ok(contents) = std::fs::read_to_string(&path) {
+                        if let Ok(state) = serde_json::from_str::<WindowState>(&contents) {
+                            if state.width >= 200 && state.height >= 150 {
+                                let _ = window.set_size(tauri::Size::Physical(
+                                    tauri::PhysicalSize::new(state.width, state.height),
+                                ));
+                                let _ = window.set_position(tauri::Position::Physical(
+                                    tauri::PhysicalPosition::new(state.x, state.y),
+                                ));
+                            } else {
+                                log::warn!(
+                                    "Saved window state had unreasonable dimensions ({}x{}), centering instead.",
+                                    state.width,
+                                    state.height
+                                );
+                                let _ = window.center();
+                            }
                         } else {
-                            log::warn!("Saved window state had unreasonable dimensions ({}x{}), centering instead.", state.width, state.height);
                             let _ = window.center();
                         }
-                    } else { let _ = window.center(); }
-                } else { let _ = window.center(); }
-            } else { let _ = window.center(); }
-
-            let window_failsafe = window.clone();
-            tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_secs(4)).await;
-                if let Ok(false) = window_failsafe.is_visible() {
-                    log::warn!("Frontend failed to report ready within timeout. Forcing window visibility.");
-                    let _ = window_failsafe.show();
-                    let _ = window_failsafe.set_focus();
+                    } else {
+                        let _ = window.center();
+                    }
+                } else {
+                    let _ = window.center();
                 }
-            });
 
-            let pending_window_state = Arc::new(Mutex::new(None::<WindowState>));
-            let pending_state_for_saver = pending_window_state.clone();
-            let app_handle_for_saver = app.handle().clone();
+                let window_failsafe = window.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+                    if let Ok(false) = window_failsafe.is_visible() {
+                        log::warn!(
+                            "Frontend failed to report ready within timeout. Forcing window visibility."
+                        );
+                        let _ = window_failsafe.show();
+                        let _ = window_failsafe.set_focus();
+                    }
+                });
 
-            tauri::async_runtime::spawn(async move {
-                loop {
-                    tokio::time::sleep(Duration::from_millis(500)).await;
+                let pending_window_state = Arc::new(Mutex::new(None::<WindowState>));
+                let pending_state_for_saver = pending_window_state.clone();
+                let app_handle_for_saver = app.handle().clone();
 
-                    let state_to_save = {
-                        let mut lock = pending_state_for_saver.lock().unwrap();
-                        lock.take()
-                    };
+                tauri::async_runtime::spawn(async move {
+                    loop {
+                        tokio::time::sleep(Duration::from_millis(500)).await;
 
-                    if let Some(state) = state_to_save
-                        && let Ok(config_dir) = app_handle_for_saver.path().app_config_dir() {
+                        let state_to_save = {
+                            let mut lock = pending_state_for_saver.lock().unwrap();
+                            lock.take()
+                        };
+
+                        if let Some(state) = state_to_save
+                            && let Ok(config_dir) =
+                                app_handle_for_saver.path().app_config_dir()
+                        {
                             let path = config_dir.join("window_state.json");
                             let _ = std::fs::create_dir_all(&config_dir);
                             if let Ok(json) = serde_json::to_string(&state) {
                                 let _ = std::fs::write(&path, json);
                             }
                         }
-                }
-            });
+                    }
+                });
 
-            let window_for_handler = window.clone();
-            let pending_state_for_handler = pending_window_state.clone();
+                let window_for_handler = window.clone();
+                let pending_state_for_handler = pending_window_state.clone();
 
-            window.on_window_event(move |event| {
-                match event {
+                window.on_window_event(move |event| match event {
                     tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
-
                         #[cfg(any(windows, target_os = "linux"))]
                         let maximized = window_for_handler.is_maximized().unwrap_or(false);
                         #[cfg(not(any(windows, target_os = "linux")))]
@@ -4477,18 +4524,22 @@ pub fn run() {
                             state.y = position.y;
                         }
 
-                        if !maximized && !fullscreen
+                        if !maximized
+                            && !fullscreen
                             && let Ok(size) = window_for_handler.outer_size()
-                                && size.width >= 200 && size.height >= 150 {
-                                    state.width = size.width;
-                                    state.height = size.height;
-                                }
+                            && size.width >= 200
+                            && size.height >= 150
+                        {
+                            state.width = size.width;
+                            state.height = size.height;
+                        }
 
                         *pending_state_for_handler.lock().unwrap() = Some(state);
                     }
                     _ => {}
-                }
-            });
+                });
+            }
+
             crate::register_exit_handler();
             Ok(())
         })
