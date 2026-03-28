@@ -65,6 +65,38 @@ fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
 
+    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+
+    if target_os == "android" {
+        let abi = match target_arch.as_str() {
+            "aarch64" => "arm64-v8a",
+            "x86_64" => "x86_64",
+            _ => "armeabi-v7a",
+        };
+
+        let lib_src_dir = manifest_dir.join("libs").join(abi);
+        let lib_name = "libonnxruntime.so";
+        let src_path = lib_src_dir.join(lib_name);
+
+        if !src_path.exists() {
+            panic!(
+                "\n\nERROR: Android library not found at {:?}\nPlease ensure you have placed libonnxruntime.so in that folder.\n\n",
+                src_path
+            );
+        }
+
+        println!("cargo:rustc-env=ORT_LIB_LOCATION={}", lib_src_dir.display());
+        println!("cargo:rustc-env=ORT_STRATEGY=manual");
+        println!("cargo:rustc-link-search=native={}", lib_src_dir.display());
+        
+        let jni_libs_dir = manifest_dir.join("gen/android/app/src/main/jniLibs").join(abi);
+        fs::create_dir_all(&jni_libs_dir).unwrap();
+        fs::copy(&src_path, jni_libs_dir.join(lib_name)).unwrap();
+
+        tauri_build::build();
+        return;
+    }
+
     let (download_filename, lib_name, expected_hash) =
         match (target_os.as_str(), target_arch.as_str()) {
             ("windows", "x86_64") => (
