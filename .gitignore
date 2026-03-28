@@ -29,3 +29,4 @@ dist-ssr
 src-tauri/resources/libonnxruntime.so
 src-tauri/resources/libonnxruntime.dylib
 src-tauri/resources/onnxruntime.dll
+src-tauri/gen/
