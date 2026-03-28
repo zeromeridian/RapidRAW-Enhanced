@@ -63,6 +63,7 @@ interface ImageCanvasProps {
   cursorStyle: string;
   isMaxZoom?: boolean;
   liveRotation?: number | null;
+  zoomScale: number;
 }
 
 interface MaskOverlay {
@@ -732,6 +733,7 @@ const ImageCanvas = memo(
     cursorStyle,
     isMaxZoom,
     liveRotation,
+    zoomScale,
   }: ImageCanvasProps) => {
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
     const cropImageRef = useRef<HTMLImageElement>(null);
@@ -841,6 +843,10 @@ const ImageCanvas = memo(
       }
       return { width: w, height: h };
     }, [selectedImage.width, selectedImage.height, adjustments.orientationSteps]);
+
+    const effectiveZoomScale = zoomScale > 0 ? zoomScale : 1;
+    const brushStageSize = (brushSettings?.size ?? 0) / effectiveZoomScale;
+    const brushImageSpaceSize = brushStageSize / (imageRenderSize.scale || 1);
 
     const isBrushActive = (isMasking || isAiEditing) && activeSubMask?.type === Mask.Brush;
     const isAiSubjectActive =
@@ -1112,7 +1118,7 @@ const ImageCanvas = memo(
             }
 
             const imageSpaceLine: DrawnLine = {
-              brushSize: (brushSettings?.size ?? 0) / scale,
+              brushSize: brushImageSpaceSize,
               feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
               points: interpolatedPoints,
               tool: brushSettings?.tool ?? ToolType.Brush,
@@ -1138,7 +1144,7 @@ const ImageCanvas = memo(
           drawingStageRef.current = stage;
 
           const newLine: DrawnLine = {
-            brushSize: isBrushActive && brushSettings?.size ? brushSettings.size : 2,
+            brushSize: isBrushActive && brushSettings?.size ? brushStageSize : 2,
             points: [pos],
             tool: toolType,
           };
@@ -1174,6 +1180,8 @@ const ImageCanvas = memo(
         updateSubMask,
         effectiveImageDimensions,
         isToolActive,
+        brushImageSpaceSize,
+        brushStageSize,
       ],
     );
 
@@ -1295,7 +1303,7 @@ const ImageCanvas = memo(
             const cropY = crop ? (isPercent ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0;
 
             const imageSpaceLine: DrawnLine = {
-              brushSize: (brushSettings?.size ?? 0) / scale,
+              brushSize: brushImageSpaceSize,
               feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
               points: updatedLine.points.map((p: Coord) => ({
                 x: p.x / scale + cropX,
@@ -1342,6 +1350,7 @@ const ImageCanvas = memo(
         brushSettings,
         isMasking,
         localInitialDrawParams,
+        brushImageSpaceSize,
       ],
     );
 
@@ -1450,7 +1459,7 @@ const ImageCanvas = memo(
 
       if (isBrushActive) {
         const imageSpaceLine: DrawnLine = {
-          brushSize: (brushSettings?.size ?? 0) / scale,
+          brushSize: brushImageSpaceSize,
           feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
           points: line.points.map((p: Coord) => ({
             x: p.x / scale + cropX,
@@ -1492,6 +1501,8 @@ const ImageCanvas = memo(
       updateSubMask,
       effectiveImageDimensions,
       localInitialDrawParams,
+      brushImageSpaceSize,
+      brushStageSize,
     ]);
 
     const handleMouseEnter = useCallback(() => {
@@ -1910,7 +1921,7 @@ const ImageCanvas = memo(
                     listening={false}
                     perfectDrawEnabled={false}
                     stroke={brushSettings?.tool === ToolType.Eraser ? '#f43f5e' : '#0ea5e9'}
-                    radius={brushSettings?.size ? brushSettings.size / 2 : 0}
+                    radius={brushStageSize / 2}
                     strokeWidth={1}
                     x={cursorPreview.x}
                     y={cursorPreview.y}
