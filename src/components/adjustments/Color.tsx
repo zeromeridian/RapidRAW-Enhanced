@@ -114,6 +114,7 @@ const ColorSwatch = ({ color, name, isActive, onClick }: ColorSwatchProps) => {
 };
 
 const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: ColorPanelProps) => {
+  const [activeTab, setActiveTab] = useState<ColorGrading>(ColorGrading.Global);
   const colorGrading = adjustments.colorGrading || INITIAL_ADJUSTMENTS.colorGrading;
 
   const handleChange = (grading: ColorGrading, newValue: HueSatLum) => {
@@ -136,37 +137,73 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
     }));
   };
 
+  const tabs = [
+    { id: ColorGrading.Global, label: 'G' },
+    { id: ColorGrading.Shadows, label: 'S' },
+    { id: ColorGrading.Midtones, label: 'M' },
+    { id: ColorGrading.Highlights, label: 'H' },
+  ];
+
   return (
     <div>
-      <div className="flex justify-center mb-4">
-        <div className="w-[calc(50%-0.5rem)]">
-          <ColorWheel
-            defaultValue={INITIAL_ADJUSTMENTS.colorGrading.midtones}
-            label="Midtones"
-            onChange={(val: HueSatLum) => handleChange(ColorGrading.Midtones, val)}
-            value={colorGrading.midtones}
-            onDragStateChange={onDragStateChange}
-          />
-        </div>
+      <div className="flex w-full gap-2 mb-6">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-colors ${
+                isActive
+                  ? 'bg-accent text-button-text shadow-sm z-10 relative'
+                  : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
-      <div className="flex justify-between mb-2 gap-4">
+
+      <div className="flex justify-center mb-6 w-full px-4">
         <div className="w-full">
-          <ColorWheel
-            defaultValue={INITIAL_ADJUSTMENTS.colorGrading.shadows}
-            label="Shadows"
-            onChange={(val: HueSatLum) => handleChange(ColorGrading.Shadows, val)}
-            value={colorGrading.shadows}
-            onDragStateChange={onDragStateChange}
-          />
-        </div>
-        <div className="w-full">
-          <ColorWheel
-            defaultValue={INITIAL_ADJUSTMENTS.colorGrading.highlights}
-            label="Highlights"
-            onChange={(val: HueSatLum) => handleChange(ColorGrading.Highlights, val)}
-            value={colorGrading.highlights}
-            onDragStateChange={onDragStateChange}
-          />
+          {activeTab === ColorGrading.Global && (
+            <ColorWheel
+              defaultValue={INITIAL_ADJUSTMENTS.colorGrading.global}
+              label="Global"
+              onChange={(val: HueSatLum) => handleChange(ColorGrading.Global, val)}
+              value={colorGrading.global || INITIAL_ADJUSTMENTS.colorGrading.global}
+              onDragStateChange={onDragStateChange}
+            />
+          )}
+          {activeTab === ColorGrading.Shadows && (
+            <ColorWheel
+              defaultValue={INITIAL_ADJUSTMENTS.colorGrading.shadows}
+              label="Shadows"
+              onChange={(val: HueSatLum) => handleChange(ColorGrading.Shadows, val)}
+              value={colorGrading.shadows}
+              onDragStateChange={onDragStateChange}
+            />
+          )}
+          {activeTab === ColorGrading.Midtones && (
+            <ColorWheel
+              defaultValue={INITIAL_ADJUSTMENTS.colorGrading.midtones}
+              label="Midtones"
+              onChange={(val: HueSatLum) => handleChange(ColorGrading.Midtones, val)}
+              value={colorGrading.midtones}
+              onDragStateChange={onDragStateChange}
+            />
+          )}
+          {activeTab === ColorGrading.Highlights && (
+            <ColorWheel
+              defaultValue={INITIAL_ADJUSTMENTS.colorGrading.highlights}
+              label="Highlights"
+              onChange={(val: HueSatLum) => handleChange(ColorGrading.Highlights, val)}
+              value={colorGrading.highlights}
+              onDragStateChange={onDragStateChange}
+            />
+          )}
         </div>
       </div>
       <div>
