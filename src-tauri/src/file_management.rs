@@ -677,8 +677,7 @@ pub fn list_images_recursive(
         }
 
         let file_name = entry_path.file_name().unwrap_or_default().to_string_lossy();
-        if file_name.ends_with(".rrdata") {
-            let base = &file_name[..file_name.len() - 7];
+        if let Some(base) = file_name.strip_suffix(".rrdata") {
             let (source_filename, copy_id) =
                 if base.len() >= 7 && base.as_bytes()[base.len() - 7] == b'.' {
                     let id = &base[base.len() - 6..];
