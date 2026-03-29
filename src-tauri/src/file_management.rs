@@ -470,6 +470,7 @@ pub struct ImageFile {
     path: String,
     modified: u64,
     is_edited: bool,
+    rating: u8,
     tags: Option<Vec<String>>,
     exif: Option<HashMap<String, String>>,
     is_virtual_copy: bool,
@@ -614,7 +615,7 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
 
                 let sidecar_path = path_buf.with_file_name(sidecar_filename);
 
-                let (is_edited, tags) = {
+                let (is_edited, tags, rating) = {
                     let mut metadata = if sidecar_path.exists() {
                         if let Ok(content) = fs::read_to_string(&sidecar_path) {
                             serde_json::from_str::<ImageMetadata>(&content).unwrap_or_default()
@@ -635,7 +636,7 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
                     let edited = metadata.adjustments.as_object().is_some_and(|a| {
                         a.keys().len() > 1 || (a.keys().len() == 1 && !a.contains_key("rating"))
                     });
-                    (edited, metadata.tags)
+                    (edited, metadata.tags, metadata.rating)
                 };
 
                 file_results.push(ImageFile {
@@ -645,6 +646,7 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
                     tags,
                     exif: None,
                     is_virtual_copy,
+                    rating,
                 });
             }
 
@@ -740,7 +742,7 @@ pub fn list_images_recursive(
 
                 let sidecar_path = path_buf.with_file_name(sidecar_filename);
 
-                let (is_edited, tags) = {
+                let (is_edited, tags, rating) = {
                     let mut metadata = if sidecar_path.exists() {
                         if let Ok(content) = fs::read_to_string(&sidecar_path) {
                             serde_json::from_str::<ImageMetadata>(&content).unwrap_or_default()
@@ -761,7 +763,7 @@ pub fn list_images_recursive(
                     let edited = metadata.adjustments.as_object().is_some_and(|a| {
                         a.keys().len() > 1 || (a.keys().len() == 1 && !a.contains_key("rating"))
                     });
-                    (edited, metadata.tags)
+                    (edited, metadata.tags, metadata.rating)
                 };
 
                 file_results.push(ImageFile {
@@ -771,6 +773,7 @@ pub fn list_images_recursive(
                     tags,
                     exif: None,
                     is_virtual_copy,
+                    rating,
                 });
             }
 

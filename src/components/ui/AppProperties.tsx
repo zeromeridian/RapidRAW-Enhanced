@@ -209,6 +209,7 @@ export interface ImageFile {
   is_edited: boolean;
   modified: number;
   path: string;
+  rating: number;
   tags: Array<string> | null;
   exif: { [key: string]: string } | null;
   is_virtual_copy: boolean;
