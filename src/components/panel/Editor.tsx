@@ -326,14 +326,15 @@ export default function Editor({
       return { minScale: 0.1, maxScale: 20 };
     }
 
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
     const scaleFor100Percent = 1 / imageRenderSize.scale;
 
-    const minScale = 0.1 * scaleFor100Percent;
-    const maxScale = 2.0 * scaleFor100Percent;
+    const minScale = (0.1 / dpr) * scaleFor100Percent;
+    const maxScale = (2.0 / dpr) * scaleFor100Percent;
 
     return {
-      minScale: Math.max(0.1, minScale),
-      maxScale: Math.max(20, maxScale),
+      minScale,
+      maxScale,
     };
   }, [selectedImage, imageRenderSize.scale, originalSize]);
 
