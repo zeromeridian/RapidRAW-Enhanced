@@ -114,7 +114,7 @@ const ColorSwatch = ({ color, name, isActive, onClick }: ColorSwatchProps) => {
 };
 
 const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: ColorPanelProps) => {
-  const [activeTab, setActiveTab] = useState<ColorGrading>(ColorGrading.Global);
+  const [activeTab, setActiveTab] = useState<ColorGrading | 'allInOne'>(ColorGrading.Shadows);
   const colorGrading = adjustments.colorGrading || INITIAL_ADJUSTMENTS.colorGrading;
 
   const handleChange = (grading: ColorGrading, newValue: HueSatLum) => {
@@ -138,45 +138,38 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
   };
 
   const tabs = [
-    { id: ColorGrading.Global, label: 'G' },
     { id: ColorGrading.Shadows, label: 'S' },
     { id: ColorGrading.Midtones, label: 'M' },
     { id: ColorGrading.Highlights, label: 'H' },
+    { id: ColorGrading.Global, label: 'G' },
+    { id: 'allInOne', label: 'A' },
   ];
 
   return (
     <div>
-      <div className="flex w-full gap-2 mb-6">
+      <div className="flex items-center gap-1 mb-2 mt-2">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
-          
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-colors ${
-                isActive
-                  ? 'bg-accent text-button-text shadow-sm z-10 relative'
-                  : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
-              }`}
+              onClick={() => setActiveTab(tab.id as ColorGrading | 'allInOne')}
+              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all
+                ${isActive 
+                  ? 'ring-2 ring-offset-2 ring-offset-surface ring-accent' 
+                  : 'bg-bg-secondary'
+                }`}
             >
-              {tab.label}
+              <span className="text-xs font-medium text-text-primary">
+                {tab.label}
+              </span>
             </button>
           );
         })}
       </div>
 
-      <div className="flex justify-center mb-6 w-full px-4">
+      <div className="flex justify-center mb-6 w-full">
         <div className="w-full">
-          {activeTab === ColorGrading.Global && (
-            <ColorWheel
-              defaultValue={INITIAL_ADJUSTMENTS.colorGrading.global}
-              label="Global"
-              onChange={(val: HueSatLum) => handleChange(ColorGrading.Global, val)}
-              value={colorGrading.global || INITIAL_ADJUSTMENTS.colorGrading.global}
-              onDragStateChange={onDragStateChange}
-            />
-          )}
           {activeTab === ColorGrading.Shadows && (
             <ColorWheel
               defaultValue={INITIAL_ADJUSTMENTS.colorGrading.shadows}
@@ -203,6 +196,63 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
               value={colorGrading.highlights}
               onDragStateChange={onDragStateChange}
             />
+          )}
+          {activeTab === ColorGrading.Global && (
+            <ColorWheel
+              defaultValue={INITIAL_ADJUSTMENTS.colorGrading.global}
+              label="Global"
+              onChange={(val: HueSatLum) => handleChange(ColorGrading.Global, val)}
+              value={colorGrading.global || INITIAL_ADJUSTMENTS.colorGrading.global}
+              onDragStateChange={onDragStateChange}
+            />
+          )}
+          {activeTab === 'allInOne' && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex flex-col items-center min-w-0">
+                <div className="w-full max-w-[280px] mx-auto">
+                  <ColorWheel
+                    defaultValue={INITIAL_ADJUSTMENTS.colorGrading.shadows}
+                    label="Shadows"
+                    onChange={(val: HueSatLum) => handleChange(ColorGrading.Shadows, val)}
+                    value={colorGrading.shadows}
+                    onDragStateChange={onDragStateChange}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col items-center min-w-0">
+                <div className="w-full max-w-[280px] mx-auto">
+                  <ColorWheel
+                    defaultValue={INITIAL_ADJUSTMENTS.colorGrading.midtones}
+                    label="Midtones"
+                    onChange={(val: HueSatLum) => handleChange(ColorGrading.Midtones, val)}
+                    value={colorGrading.midtones}
+                    onDragStateChange={onDragStateChange}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col items-center min-w-0">
+                <div className="w-full max-w-[280px] mx-auto">
+                  <ColorWheel
+                    defaultValue={INITIAL_ADJUSTMENTS.colorGrading.highlights}
+                    label="Highlights"
+                    onChange={(val: HueSatLum) => handleChange(ColorGrading.Highlights, val)}
+                    value={colorGrading.highlights}
+                    onDragStateChange={onDragStateChange}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col items-center min-w-0">
+                <div className="w-full max-w-[280px] mx-auto">
+                  <ColorWheel
+                    defaultValue={INITIAL_ADJUSTMENTS.colorGrading.global}
+                    label="Global"
+                    onChange={(val: HueSatLum) => handleChange(ColorGrading.Global, val)}
+                    value={colorGrading.global}
+                    onDragStateChange={onDragStateChange}
+                  />
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
