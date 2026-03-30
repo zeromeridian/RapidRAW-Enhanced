@@ -59,7 +59,6 @@ fn main() {
 
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 
-    // 1. Map target OS and Arch to the correct file on HuggingFace
     let (download_filename, lib_name, expected_hash) =
         match (target_os.as_str(), target_arch.as_str()) {
             ("windows", "x86_64") => (
@@ -92,7 +91,6 @@ fn main() {
                 "libonnxruntime.dylib",
                 "2b885992d3d6fa4130d39ec84a80d7504ff52750027c547bb22c86165f19406a",
             ),
-            // --- ANDROID ARM64 ONLY ---
             ("android", "aarch64") => (
                 "libonnxruntime-android-arm64-v8a.so",
                 "libonnxruntime.so",
@@ -101,7 +99,7 @@ fn main() {
             _ => panic!("Unsupported target: {}-{}", target_os, target_arch),
         };
 
-    // 2. Define where the file should be downloaded to
+
     let dest_dir = if target_os == "android" {
         manifest_dir.join("libs").join("arm64-v8a")
     } else {
@@ -111,7 +109,6 @@ fn main() {
     fs::create_dir_all(&dest_dir).unwrap();
     let dest_path = dest_dir.join(lib_name);
 
-    // 3. Verify or Download
     let mut is_valid = false;
     if dest_path.exists() {
         match verify_sha256(&dest_path, expected_hash) {
@@ -140,14 +137,11 @@ fn main() {
         }
     }
 
-    // 4. Android-Specific Environment variables and Gradle Injection
     if target_os == "android" {
-        // Inject the library into the generated Android Studio project
         let jni_libs_dir = manifest_dir.join("gen/android/app/src/main/jniLibs/arm64-v8a");
         fs::create_dir_all(&jni_libs_dir).unwrap();
         fs::copy(&dest_path, jni_libs_dir.join(lib_name)).unwrap();
 
-        // Satisfy the 'ort' crate requirements
         println!("cargo:rustc-env=ORT_LIB_LOCATION={}", dest_dir.display());
         println!("cargo:rustc-env=ORT_STRATEGY=manual");
         println!("cargo:rustc-link-search=native={}", dest_dir.display());
