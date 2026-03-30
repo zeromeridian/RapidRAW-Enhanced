@@ -780,11 +780,12 @@ pub fn run_lama_inpainting(
         (crop_w, crop_h, cropped_img.clone(), cropped_mask.clone())
     };
 
+    let align = 64u32;
     let mut tensor_dim = fw.max(fh);
-    if tensor_dim % 8 != 0 {
-        tensor_dim += 8 - (tensor_dim % 8);
+    if tensor_dim % align != 0 {
+        tensor_dim += align - (tensor_dim % align);
     }
-    let tensor_dim = tensor_dim.max(8) as usize;
+    let tensor_dim = tensor_dim.max(align) as usize;
 
     let mut img_tensor = Array::<f32, _>::zeros((1, 3, tensor_dim, tensor_dim));
     let mut msk_tensor = Array::<f32, _>::zeros((1, 1, tensor_dim, tensor_dim));
