@@ -846,6 +846,7 @@ export default function Editor({
               cursorStyle={cursorStyle}
               isMaxZoom={isMaxZoom}
               liveRotation={liveRotation}
+              zoomScale={transformState.scale}
             />
           </TransformComponent>
         </TransformWrapper>

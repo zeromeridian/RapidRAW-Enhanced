@@ -2000,7 +2000,6 @@ function App() {
         }
 
         setImageList([]);
-        setImageRatings({});
         setMultiSelectedPaths([]);
         setLibraryActivePath(null);
         if (selectedImage) {
@@ -2019,6 +2018,14 @@ function App() {
         } else {
           files = await invoke(command, { path });
         }
+
+        const initialRatings: Record<string, number> = {};
+        files.forEach((f) => {
+          if (f.rating !== undefined) {
+            initialRatings[f.path] = f.rating;
+          }
+        });
+        setImageRatings(initialRatings);
 
         const exifSortKeys = ['date_taken', 'iso', 'shutter_speed', 'aperture', 'focal_length'];
         const isExifSortActive = exifSortKeys.includes(sortCriteria.key);
@@ -2078,6 +2085,17 @@ function App() {
         libraryViewMode === LibraryViewMode.Recursive ? Invokes.ListImagesRecursive : Invokes.ListImagesInDir;
 
       const files: ImageFile[] = await invoke(command, { path: currentFolderPath });
+
+      setImageRatings((prev) => {
+        const newRatings = { ...prev };
+        files.forEach((f) => {
+          if (f.rating !== undefined) {
+            newRatings[f.path] = f.rating;
+          }
+        });
+        return newRatings;
+      });
+
       const exifSortKeys = ['date_taken', 'iso', 'shutter_speed', 'aperture', 'focal_length'];
       const isExifSortActive = exifSortKeys.includes(sortCriteria.key);
       const shouldReadExif = appSettings?.enableExifReading ?? false;
@@ -3105,6 +3123,15 @@ function App() {
                 const list: ImageFile[] = await invoke(Invokes.ListImagesInDir, { path: currentFolderPathRef.current });
                 if (Array.isArray(list)) {
                   setImageList(list);
+                  setImageRatings((prev) => {
+                    const newRatings = { ...prev };
+                    list.forEach((f) => {
+                      if (f.rating !== undefined) {
+                        newRatings[f.path] = f.rating;
+                      }
+                    });
+                    return newRatings;
+                  });
                 }
               } catch (err) {
                 console.error('Failed to refresh after indexing:', err);
