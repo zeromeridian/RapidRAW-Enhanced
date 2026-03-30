@@ -706,7 +706,7 @@ export default function SettingsPanel({
             </Text>
           </div>
 
-          <div className="relative flex w-full min-[1200px]:w-[450px] p-2 bg-surface rounded-md">
+          <div className="relative flex w-full min-[1200px]:w-112.5 p-2 bg-surface rounded-md">
             {settingCategories.map((category) => (
               <button
                 key={category.id}
@@ -1026,7 +1026,7 @@ export default function SettingsPanel({
                                 description="If provided, the AI will ONLY use tags from this list, overriding RapidRAW’s built-in list. Tagging works only in English."
                               >
                                 <div>
-                                  <div className="flex flex-wrap gap-2 p-2 bg-bg-primary rounded-md min-h-[40px] border border-border-color mb-2 items-center">
+                                  <div className="flex flex-wrap gap-2 p-2 bg-bg-primary rounded-md min-h-10 border border-border-color mb-2 items-center">
                                     <AnimatePresence>
                                       {customAiTags.length > 0 ? (
                                         customAiTags.map((tag: string) => (
@@ -1104,7 +1104,7 @@ export default function SettingsPanel({
                       description="A list of tags that will appear as shortcuts in the tagging context menu."
                     >
                       <div>
-                        <div className="flex flex-wrap gap-2 p-2 bg-bg-primary rounded-md min-h-[40px] border border-border-color mb-2 items-center">
+                        <div className="flex flex-wrap gap-2 p-2 bg-bg-primary rounded-md min-h-10 border border-border-color mb-2 items-center">
                           <AnimatePresence>
                             {taggingShortcuts.length > 0 ? (
                               taggingShortcuts.map((shortcut: string) => (
@@ -1239,6 +1239,18 @@ export default function SettingsPanel({
                         NegPy
                       </a>
                       : For the inspiration behind the negative conversion logic.
+                    </li>
+                    <li>
+                      <a
+                        href="https://github.com/advimman/lama"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-accent hover:underline"
+                      >
+                        LaMa
+                      </a>
+                      : For the powerful & simple image inpainting model, which enables content-aware fill and object
+                      removal.
                     </li>
                     <li>
                       <a

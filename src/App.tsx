@@ -1920,13 +1920,17 @@ function App() {
       handleSettingsChange({ ...appSettings, pinnedFolders: newPins });
 
       try {
-        const trees = await invoke(Invokes.GetPinnedFolderTrees, { paths: newPins });
+        const trees = await invoke(Invokes.GetPinnedFolderTrees, {
+          paths: newPins,
+          expandedFolders: Array.from(expandedFolders),
+          showImageCounts: appSettings.enableFolderImageCounts ?? false,
+        });
         setPinnedFolderTrees(trees);
       } catch (err) {
         console.error('Failed to refresh pinned folders:', err);
       }
     },
-    [appSettings, handleSettingsChange],
+    [appSettings, currentFolderPath, expandedFolders, handleSettingsChange],
   );
 
   const handleActiveTreeSectionChange = (section: string | null) => {
@@ -5409,6 +5413,7 @@ function App() {
         isProcessing={denoiseModalState.isProcessing}
         error={denoiseModalState.error}
         progressMessage={denoiseModalState.progressMessage}
+        aiModelDownloadStatus={aiModelDownloadStatus}
         isRaw={denoiseModalState.isRaw}
         loadingImageUrl={
           denoiseModalState.targetPath

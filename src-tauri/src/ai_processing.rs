@@ -5,7 +5,9 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use image::imageops::{self, FilterType};
-use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, Luma, Rgb, Rgb32FImage};
+use image::{
+    DynamicImage, GenericImageView, GrayImage, ImageBuffer, Luma, Rgb, Rgb32FImage, Rgba, RgbaImage,
+};
 use ndarray::{Array, Array4, IxDyn};
 use ort::session::Session;
 use ort::value::Tensor;
@@ -46,6 +48,11 @@ const DENOISE_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/res
 const DENOISE_FILENAME: &str = "nind_denoise_utnet_684.onnx";
 const DENOISE_SHA256: &str = "ee3586279d514df557ff3f7dec6df37fafc51ba5d3a3435b2cc9ac2d9017e7fe";
 
+const LAMA_URL: &str =
+    "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/lama_fp16.onnx?download=true";
+const LAMA_FILENAME: &str = "lama_fp16.onnx";
+const LAMA_SHA256: &str = "2d6be6277c400d6f1b91819737f7c3da935e5c63d1b521d393be1196a2bfa82c";
+
 pub struct AiModels {
     pub sam_encoder: Mutex<Session>,
     pub sam_decoder: Mutex<Session>,
@@ -69,6 +76,7 @@ pub struct AiState {
     pub models: Option<Arc<AiModels>>,
     pub denoise_model: Option<Arc<Mutex<Session>>>,
     pub clip_models: Option<Arc<ClipModels>>,
+    pub lama_model: Option<Arc<Mutex<Session>>>,
     pub embeddings: Option<ImageEmbeddings>,
 }
 
@@ -203,18 +211,18 @@ pub async fn get_or_init_ai_models(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<AiModels>> {
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
-        && let Some(models) = &ai_state.models
-    {
-        return Ok(models.clone());
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
+        if let Some(models) = &ai_state.models {
+            return Ok(models.clone());
+        }
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
-        && let Some(models) = &ai_state.models
-    {
-        return Ok(models.clone());
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
+        if let Some(models) = &ai_state.models {
+            return Ok(models.clone());
+        }
     }
 
     let models_dir = get_models_dir(app_handle)?;
@@ -285,6 +293,7 @@ pub async fn get_or_init_ai_models(
             models: Some(models.clone()),
             denoise_model: None,
             clip_models: None,
+            lama_model: None,
             embeddings: None,
         });
     }
@@ -297,18 +306,18 @@ pub async fn get_or_init_denoise_model(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<Mutex<Session>>> {
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
-        && let Some(denoise_model) = &ai_state.denoise_model
-    {
-        return Ok(denoise_model.clone());
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
+        if let Some(denoise_model) = &ai_state.denoise_model {
+            return Ok(denoise_model.clone());
+        }
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
-        && let Some(denoise_model) = &ai_state.denoise_model
-    {
-        return Ok(denoise_model.clone());
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
+        if let Some(denoise_model) = &ai_state.denoise_model {
+            return Ok(denoise_model.clone());
+        }
     }
 
     let models_dir = get_models_dir(app_handle)?;
@@ -318,11 +327,11 @@ pub async fn get_or_init_denoise_model(
         DENOISE_FILENAME,
         DENOISE_URL,
         DENOISE_SHA256,
-        "AI Denoise Model",
+        "NIND Denoise Model",
     )
     .await?;
 
-    let _ = ort::init().with_name("RapidRAW-Denoise").commit();
+    let _ = ort::init().with_name("AI-Denoise").commit();
     let model_path = models_dir.join(DENOISE_FILENAME);
     let session = Session::builder()?.commit_from_file(model_path)?;
     let denoise_model = Arc::new(Mutex::new(session));
@@ -337,6 +346,7 @@ pub async fn get_or_init_denoise_model(
             models: None,
             denoise_model: Some(denoise_model.clone()),
             clip_models: None,
+            lama_model: None,
             embeddings: None,
         });
     }
@@ -349,18 +359,18 @@ pub async fn get_or_init_clip_models(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<ClipModels>> {
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
-        && let Some(clip_models) = &ai_state.clip_models
-    {
-        return Ok(clip_models.clone());
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
+        if let Some(clip_models) = &ai_state.clip_models {
+            return Ok(clip_models.clone());
+        }
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref()
-        && let Some(clip_models) = &ai_state.clip_models
-    {
-        return Ok(clip_models.clone());
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
+        if let Some(clip_models) = &ai_state.clip_models {
+            return Ok(clip_models.clone());
+        }
     }
 
     let models_dir = get_models_dir(app_handle)?;
@@ -400,11 +410,65 @@ pub async fn get_or_init_clip_models(
             models: None,
             denoise_model: None,
             clip_models: Some(clip_models.clone()),
+            lama_model: None,
             embeddings: None,
         });
     }
 
     Ok(clip_models)
+}
+
+pub async fn get_or_init_lama_model(
+    app_handle: &tauri::AppHandle,
+    ai_state_mutex: &Mutex<Option<AiState>>,
+    ai_init_lock: &TokioMutex<()>,
+) -> Result<Arc<Mutex<Session>>> {
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
+        if let Some(lama_model) = &ai_state.lama_model {
+            return Ok(lama_model.clone());
+        }
+    }
+
+    let _guard = ai_init_lock.lock().await;
+
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
+        if let Some(lama_model) = &ai_state.lama_model {
+            return Ok(lama_model.clone());
+        }
+    }
+
+    let models_dir = get_models_dir(app_handle)?;
+    download_and_verify_model(
+        app_handle,
+        &models_dir,
+        LAMA_FILENAME,
+        LAMA_URL,
+        LAMA_SHA256,
+        "Inpainting Model",
+    )
+    .await?;
+
+    let _ = ort::init().with_name("AI-Inpainting").commit();
+    let model_path = models_dir.join(LAMA_FILENAME);
+    let session = Session::builder()?.commit_from_file(model_path)?;
+    let lama_model = Arc::new(Mutex::new(session));
+
+    crate::register_exit_handler();
+
+    let mut ai_state_lock = ai_state_mutex.lock().unwrap();
+    if let Some(state) = ai_state_lock.as_mut() {
+        state.lama_model = Some(lama_model.clone());
+    } else {
+        *ai_state_lock = Some(AiState {
+            models: None,
+            denoise_model: None,
+            clip_models: None,
+            lama_model: Some(lama_model.clone()),
+            embeddings: None,
+        });
+    }
+
+    Ok(lama_model)
 }
 
 #[derive(Clone, Copy)]
@@ -651,6 +715,143 @@ pub fn run_ai_denoise(
 
     let out_img_buffer = accumulator_to_rgb32f(&accumulator, width, height);
     Ok(DynamicImage::ImageRgb32F(out_img_buffer))
+}
+
+pub fn run_lama_inpainting(
+    image: &DynamicImage,
+    mask: &GrayImage,
+    lama_session: &Mutex<Session>,
+) -> Result<RgbaImage> {
+    let (w, h) = image.dimensions();
+
+    let (mut min_x, mut min_y) = (w, h);
+    let (mut max_x, mut max_y) = (0u32, 0u32);
+    let mut has_mask = false;
+
+    for (x, y, p) in mask.enumerate_pixels() {
+        if p[0] > 0 {
+            min_x = min_x.min(x);
+            min_y = min_y.min(y);
+            max_x = max_x.max(x);
+            max_y = max_y.max(y);
+            has_mask = true;
+        }
+    }
+
+    if !has_mask {
+        return Ok(image.to_rgba8());
+    }
+
+    let mask_w = max_x - min_x + 1;
+    let mask_h = max_y - min_y + 1;
+
+    let pad_x = 64.max((mask_w as f32 * 0.5) as u32);
+    let pad_y = 64.max((mask_h as f32 * 0.5) as u32);
+
+    let x0 = min_x.saturating_sub(pad_x);
+    let y0 = min_y.saturating_sub(pad_y);
+    let x1 = (max_x + pad_x).min(w.saturating_sub(1));
+    let y1 = (max_y + pad_y).min(h.saturating_sub(1));
+
+    let crop_w = x1 - x0 + 1;
+    let crop_h = y1 - y0 + 1;
+
+    let rgba = image.to_rgba8();
+
+    let cropped_img = imageops::crop_imm(&rgba, x0, y0, crop_w, crop_h).to_image();
+    let cropped_mask = imageops::crop_imm(mask, x0, y0, crop_w, crop_h).to_image();
+
+    let max_dim_limit: u32 = 1024;
+    let needs_downscale = crop_w > max_dim_limit || crop_h > max_dim_limit;
+
+    let (fw, fh, inf_img, inf_mask) = if needs_downscale {
+        let scale = max_dim_limit as f32 / crop_w.max(crop_h) as f32;
+
+        let scaled_w = (crop_w as f32 * scale).round().max(1.0) as u32;
+        let scaled_h = (crop_h as f32 * scale).round().max(1.0) as u32;
+
+        (
+            scaled_w,
+            scaled_h,
+            imageops::resize(&cropped_img, scaled_w, scaled_h, FilterType::Lanczos3),
+            imageops::resize(&cropped_mask, scaled_w, scaled_h, FilterType::Triangle),
+        )
+    } else {
+        (crop_w, crop_h, cropped_img.clone(), cropped_mask.clone())
+    };
+
+    let align = 64u32;
+    let mut tensor_dim = fw.max(fh);
+    if tensor_dim % align != 0 {
+        tensor_dim += align - (tensor_dim % align);
+    }
+    let tensor_dim = tensor_dim.max(align) as usize;
+
+    let mut img_tensor = Array::<f32, _>::zeros((1, 3, tensor_dim, tensor_dim));
+    let mut msk_tensor = Array::<f32, _>::zeros((1, 1, tensor_dim, tensor_dim));
+
+    for y in 0..tensor_dim {
+        for x in 0..tensor_dim {
+            let sx = (x as u32).min(fw.saturating_sub(1));
+            let sy = (y as u32).min(fh.saturating_sub(1));
+
+            let p = inf_img.get_pixel(sx, sy);
+            let m = inf_mask.get_pixel(sx, sy)[0];
+
+            img_tensor[[0, 0, y, x]] = p[0] as f32 / 255.0;
+            img_tensor[[0, 1, y, x]] = p[1] as f32 / 255.0;
+            img_tensor[[0, 2, y, x]] = p[2] as f32 / 255.0;
+            msk_tensor[[0, 0, y, x]] = if m > 0 { 1.0 } else { 0.0 };
+        }
+    }
+
+    let t_img = Tensor::from_array(img_tensor.into_dyn().as_standard_layout().into_owned())?;
+    let t_msk = Tensor::from_array(msk_tensor.into_dyn().as_standard_layout().into_owned())?;
+
+    let output_tensor = {
+        let mut session = lama_session.lock().unwrap();
+        let outputs = session.run(ort::inputs!["image" => t_img, "mask" => t_msk])?;
+        outputs[0].try_extract_array::<f32>()?.to_owned()
+    };
+
+    let mut result_inf = RgbaImage::new(fw, fh);
+    for y in 0..fh {
+        for x in 0..fw {
+            let r = output_tensor[[0, 0, y as usize, x as usize]].clamp(0.0, 255.0) as u8;
+            let g = output_tensor[[0, 1, y as usize, x as usize]].clamp(0.0, 255.0) as u8;
+            let b = output_tensor[[0, 2, y as usize, x as usize]].clamp(0.0, 255.0) as u8;
+            result_inf.put_pixel(x, y, Rgba([r, g, b, 255]));
+        }
+    }
+
+    let result_crop = if needs_downscale {
+        imageops::resize(&result_inf, crop_w, crop_h, FilterType::Lanczos3)
+    } else {
+        result_inf
+    };
+
+    let mut final_image = image.to_rgba8();
+
+    for y in 0..crop_h {
+        for x in 0..crop_w {
+            let m = cropped_mask.get_pixel(x, y)[0];
+            if m > 0 {
+                let alpha = m as f32 / 255.0;
+                let p = result_crop.get_pixel(x, y);
+                let gx = x0 + x;
+                let gy = y0 + y;
+                let orig = final_image.get_pixel(gx, gy);
+
+                let r = (p[0] as f32 * alpha + orig[0] as f32 * (1.0 - alpha)) as u8;
+                let g = (p[1] as f32 * alpha + orig[1] as f32 * (1.0 - alpha)) as u8;
+                let b = (p[2] as f32 * alpha + orig[2] as f32 * (1.0 - alpha)) as u8;
+
+                final_image.put_pixel(gx, gy, Rgba([r, g, b, 255]));
+            }
+        }
+    }
+
+    Ok(final_image)
 }
 
 pub fn generate_image_embeddings(
