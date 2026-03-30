@@ -22,12 +22,17 @@ fn download_and_verify(
     let temp_filename = dest_path.file_name().unwrap();
     let temp_path = out_dir.join(temp_filename);
 
-    println!("cargo:warning=Downloading to temporary path: {:?}", temp_path);
+    println!(
+        "cargo:warning=Downloading to temporary path: {:?}",
+         temp_path
+    );
     let mut response = reqwest::blocking::get(url)?;
 
     if !response.status().is_success() {
         let status = response.status();
-        let error_body = response.text().unwrap_or_else(|_| "Could not read error body".to_string());
+        let error_body = response
+            .text()
+            .unwrap_or_else(|_| "Could not read error body".to_string());
         return Err(format!("Download failed with status {}: {}", status, error_body).into());
     }
 
@@ -39,7 +44,10 @@ fn download_and_verify(
         Ok(true) => {
             fs::copy(&temp_path, dest_path)?;
             fs::remove_file(&temp_path)?;
-            println!("cargo:warning=Successfully downloaded and verified {:?}.", dest_path);
+            println!(
+                "cargo:warning=Successfully downloaded and verified {:?}.",
+                 dest_path
+            );
             Ok(())
         }
         Ok(false) => {
@@ -113,21 +121,32 @@ fn main() {
     if dest_path.exists() {
         match verify_sha256(&dest_path, expected_hash) {
             Ok(true) => {
-                println!("cargo:warning=ONNX Runtime library already exists and is valid. Skipping download.");
+                println!(
+                    "cargo:warning=ONNX Runtime library already exists and is valid. Skipping download."
+                );
                 is_valid = true;
             }
             Ok(false) => {
-                println!("cargo:warning=File {:?} exists but has incorrect hash. Deleting and re-downloading.", dest_path);
+                println!(
+                    "cargo:warning=File {:?} exists but has incorrect hash. Deleting and re-downloading.",
+                     dest_path
+                );
                 fs::remove_file(&dest_path).unwrap();
             }
             Err(e) => {
-                println!("cargo:warning=Could not verify file {:?}: {}. Re-downloading.", dest_path, e);
+                println!(
+                    "cargo:warning=Could not verify file {:?}: {}. Re-downloading.",
+                     dest_path, e
+                );
             }
         }
     }
 
     if !is_valid {
-        println!("cargo:warning=Downloading ONNX Runtime library for {}-{}...", target_os, target_arch);
+        println!(
+            "cargo:warning=Downloading ONNX Runtime library for {}-{}...",
+             target_os, target_arch
+        );
         let base_url = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/onnxruntimes-v1.22.0/";
         let download_url = format!("{}{}?download=true", base_url, download_filename);
         println!("cargo:warning=URL: {}", download_url);
@@ -142,9 +161,17 @@ fn main() {
         fs::create_dir_all(&jni_libs_dir).unwrap();
         fs::copy(&dest_path, jni_libs_dir.join(lib_name)).unwrap();
 
-        println!("cargo:rustc-env=ORT_LIB_LOCATION={}", dest_dir.display());
-        println!("cargo:rustc-env=ORT_STRATEGY=manual");
-        println!("cargo:rustc-link-search=native={}", dest_dir.display());
+        println!(
+            "cargo:rustc-env=ORT_LIB_LOCATION={}",
+             dest_dir.display()
+        );
+        println!(
+            "cargo:rustc-env=ORT_STRATEGY=manual"
+    );
+        println!(
+            "cargo:rustc-link-search=native={}",
+             dest_dir.display()
+        );
     }
 
     println!("cargo:rerun-if-changed=build.rs");
