@@ -1540,6 +1540,15 @@ function SettingsPanel({
         isContentVisible={true}
       >
         <div className="space-y-3 pt-2">
+          {aiModelDownloadStatus && aiModelDownloadStatus.includes('Inpainting') && (
+            <div className="p-3 mb-2 bg-card-active rounded-md border border-surface flex items-center gap-3">
+              <Loader2 size={16} className="text-accent animate-spin shrink-0" />
+              <div className="text-xs text-text-secondary leading-relaxed">
+                Downloading: <span className="text-accent font-medium">{aiModelDownloadStatus}</span>
+              </div>
+            </div>
+          )}
+
           <p className="text-xs text-text-secondary">
             {isQuickErasePatch
               ? 'Fill selection to remove the object.'

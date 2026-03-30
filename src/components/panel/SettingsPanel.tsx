@@ -1242,6 +1242,18 @@ export default function SettingsPanel({
                     </li>
                     <li>
                       <a
+                        href="https://github.com/advimman/lama"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-accent hover:underline"
+                      >
+                        LaMa
+                      </a>
+                      : For the powerful & simple image inpainting model, which enables content-aware fill and object
+                      removal.
+                    </li>
+                    <li>
+                      <a
                         href="https://github.com/facebookresearch/sam2"
                         target="_blank"
                         rel="noopener noreferrer"

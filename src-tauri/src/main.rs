@@ -14,7 +14,6 @@ mod formats;
 mod gpu_processing;
 mod image_loader;
 mod image_processing;
-mod inpainting;
 mod lens_correction;
 mod lut_processing;
 mod mask_generation;
@@ -3124,16 +3123,6 @@ async fn test_ai_connector_connection(address: String) -> Result<(), String> {
     }
 }
 
-fn calculate_dynamic_patch_radius(width: u32, height: u32) -> u32 {
-    const MIN_RADIUS: u32 = 2;
-    const MAX_RADIUS: u32 = 32;
-    const BASE_DIMENSION: f32 = 192.0;
-
-    let min_dim = width.min(height) as f32;
-    let scaled_radius = (min_dim / BASE_DIMENSION).round() as u32;
-    scaled_radius.clamp(MIN_RADIUS, MAX_RADIUS)
-}
-
 #[tauri::command]
 async fn invoke_generative_replace_with_mask_def(
     path: String,
@@ -3190,9 +3179,17 @@ async fn invoke_generative_replace_with_mask_def(
     let mask_bitmap = unwarped_dynamic.to_luma8();
 
     let patch_rgba = if use_fast_inpaint {
-        // cpu based inpainting, low quality but no setup required
-        let patch_radius = calculate_dynamic_patch_radius(img_w, img_h);
-        inpainting::perform_fast_inpaint(&source_image, &mask_bitmap, patch_radius)?
+        // simple local ai inpainting
+        let lama_model = ai_processing::get_or_init_lama_model(
+            &app_handle,
+            &state.ai_state,
+            &state.ai_init_lock,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+        ai_processing::run_lama_inpainting(&source_image, &mask_bitmap, &lama_model)
+            .map_err(|e| e.to_string())?
     } else if let Some(address) = settings.ai_connector_address {
         // self hosted generative ai service
         let mut rgba_mask = RgbaImage::new(img_w, img_h);
