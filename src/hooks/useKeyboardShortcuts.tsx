@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { ImageFile, Panel, SelectedImage } from '../components/ui/AppProperties';
+import { BrushSettings } from '../components/ui/AppProperties';
 
 interface KeyboardShortcutsProps {
   activeAiPatchContainerId?: string | null;
@@ -50,6 +51,8 @@ interface KeyboardShortcutsProps {
   displaySize?: { width: number; height: number };
   baseRenderSize?: { width: number; height: number };
   originalSize?: { width: number; height: number };
+  brushSettings: BrushSettings | null;  
+  setBrushSettings: (settings: BrushSettings) => void;  
 }
 
 export const useKeyboardShortcuts = ({
@@ -101,6 +104,8 @@ export const useKeyboardShortcuts = ({
   displaySize,
   baseRenderSize,
   originalSize,
+  brushSettings,  
+  setBrushSettings,  
 }: KeyboardShortcutsProps) => {
   useEffect(() => {
     const handleKeyDown = (event: any) => {
@@ -246,8 +251,9 @@ export const useKeyboardShortcuts = ({
       }
 
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
-        event.preventDefault();
-
+  event.preventDefault();
+  
+      if (!isCtrl) {
         if (selectedImage) {
           if (key === 'arrowup' || key === 'arrowdown') {
             // Calculate current zoom percentage relative to original
@@ -304,6 +310,7 @@ export const useKeyboardShortcuts = ({
           }
         }
       }
+    }
 
       if (code.startsWith('Digit') && !isCtrl) {
         event.preventDefault();
@@ -421,6 +428,20 @@ export const useKeyboardShortcuts = ({
             event.preventDefault();
             handleZoomChange(Math.max(currentPercent / 1.2, 0.1));
             break;
+          case 'arrowup':
+            event.preventDefault();
+            if (brushSettings && activeRightPanel === Panel.Masks) {
+              const newSize = Math.min((brushSettings.size || 50) + 10, 200);
+              setBrushSettings({ ...brushSettings, size: newSize });
+            }
+            break;
+          case 'arrowdown':
+            event.preventDefault();
+            if (brushSettings && activeRightPanel === Panel.Masks) {
+              const newSize = Math.max((brushSettings.size || 50) - 10, 1);
+              setBrushSettings({ ...brushSettings, size: newSize });
+            }
+            break;
           default:
             break;
         }
@@ -478,5 +499,7 @@ export const useKeyboardShortcuts = ({
     displaySize,
     baseRenderSize,
     originalSize,
+    brushSettings,  
+    setBrushSettings,  
   ]);
 };

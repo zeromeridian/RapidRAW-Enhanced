@@ -3056,6 +3056,8 @@ function App() {
     displaySize,
     baseRenderSize,
     originalSize,
+    brushSettings: brushSettings,
+    setBrushSettings: setBrushSettings,
   });
 
   useEffect(() => {
