@@ -22,17 +22,12 @@ fn download_and_verify(
     let temp_filename = dest_path.file_name().unwrap();
     let temp_path = out_dir.join(temp_filename);
 
-    println!(
-        "cargo:warning=Downloading to temporary path: {:?}",
-        temp_path
-    );
+    println!("cargo:warning=Downloading to temporary path: {:?}", temp_path);
     let mut response = reqwest::blocking::get(url)?;
 
     if !response.status().is_success() {
         let status = response.status();
-        let error_body = response
-            .text()
-            .unwrap_or_else(|_| "Could not read error body".to_string());
+        let error_body = response.text().unwrap_or_else(|_| "Could not read error body".to_string());
         return Err(format!("Download failed with status {}: {}", status, error_body).into());
     }
 
@@ -44,10 +39,7 @@ fn download_and_verify(
         Ok(true) => {
             fs::copy(&temp_path, dest_path)?;
             fs::remove_file(&temp_path)?;
-            println!(
-                "cargo:warning=Successfully downloaded and verified {:?}.",
-                dest_path
-            );
+            println!("cargo:warning=Successfully downloaded and verified {:?}.", dest_path);
             Ok(())
         }
         Ok(false) => {
@@ -67,36 +59,7 @@ fn main() {
 
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 
-    if target_os == "android" {
-        let abi = match target_arch.as_str() {
-            "aarch64" => "arm64-v8a",
-            "x86_64" => "x86_64",
-            _ => "armeabi-v7a",
-        };
-
-        let lib_src_dir = manifest_dir.join("libs").join(abi);
-        let lib_name = "libonnxruntime.so";
-        let src_path = lib_src_dir.join(lib_name);
-
-        if !src_path.exists() {
-            panic!(
-                "\n\nERROR: Android library not found at {:?}\nPlease ensure you have placed libonnxruntime.so in that folder.\n\n",
-                src_path
-            );
-        }
-
-        println!("cargo:rustc-env=ORT_LIB_LOCATION={}", lib_src_dir.display());
-        println!("cargo:rustc-env=ORT_STRATEGY=manual");
-        println!("cargo:rustc-link-search=native={}", lib_src_dir.display());
-        
-        let jni_libs_dir = manifest_dir.join("gen/android/app/src/main/jniLibs").join(abi);
-        fs::create_dir_all(&jni_libs_dir).unwrap();
-        fs::copy(&src_path, jni_libs_dir.join(lib_name)).unwrap();
-
-        tauri_build::build();
-        return;
-    }
-
+    // 1. Map target OS and Arch to the correct file on HuggingFace
     let (download_filename, lib_name, expected_hash) =
         match (target_os.as_str(), target_arch.as_str()) {
             ("windows", "x86_64") => (
@@ -129,51 +92,65 @@ fn main() {
                 "libonnxruntime.dylib",
                 "2b885992d3d6fa4130d39ec84a80d7504ff52750027c547bb22c86165f19406a",
             ),
+            // --- ANDROID ARM64 ONLY ---
+            ("android", "aarch64") => (
+                "libonnxruntime-android-arm64-v8a.so",
+                "libonnxruntime.so",
+                "999ecfdb5b5a13e4097487773b6d71ce8a075408a237daab072e8f5e817bd78e",
+            ),
             _ => panic!("Unsupported target: {}-{}", target_os, target_arch),
         };
 
-    let resources_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("resources");
-    fs::create_dir_all(&resources_dir).unwrap();
-    let dest_path = resources_dir.join(lib_name);
+    // 2. Define where the file should be downloaded to
+    let dest_dir = if target_os == "android" {
+        manifest_dir.join("libs").join("arm64-v8a")
+    } else {
+        manifest_dir.join("resources")
+    };
 
+    fs::create_dir_all(&dest_dir).unwrap();
+    let dest_path = dest_dir.join(lib_name);
+
+    // 3. Verify or Download
     let mut is_valid = false;
     if dest_path.exists() {
         match verify_sha256(&dest_path, expected_hash) {
             Ok(true) => {
-                println!(
-                    "cargo:warning=ONNX Runtime library already exists and is valid. Skipping download."
-                );
+                println!("cargo:warning=ONNX Runtime library already exists and is valid. Skipping download.");
                 is_valid = true;
             }
             Ok(false) => {
-                println!(
-                    "cargo:warning=File {:?} exists but has incorrect hash. Deleting and re-downloading.",
-                    dest_path
-                );
+                println!("cargo:warning=File {:?} exists but has incorrect hash. Deleting and re-downloading.", dest_path);
                 fs::remove_file(&dest_path).unwrap();
             }
             Err(e) => {
-                println!(
-                    "cargo:warning=Could not verify file {:?}: {}. Re-downloading.",
-                    dest_path, e
-                );
+                println!("cargo:warning=Could not verify file {:?}: {}. Re-downloading.", dest_path, e);
             }
         }
     }
 
     if !is_valid {
-        println!(
-            "cargo:warning=Downloading ONNX Runtime library for {}-{}...",
-            target_os, target_arch
-        );
-        let base_url =
-            "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/onnxruntimes-v1.22.0/";
+        println!("cargo:warning=Downloading ONNX Runtime library for {}-{}...", target_os, target_arch);
+        let base_url = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/onnxruntimes-v1.22.0/";
         let download_url = format!("{}{}?download=true", base_url, download_filename);
         println!("cargo:warning=URL: {}", download_url);
 
         if let Err(e) = download_and_verify(&download_url, &dest_path, expected_hash) {
             panic!("Failed to download and verify ONNX Runtime library: {}", e);
         }
+    }
+
+    // 4. Android-Specific Environment variables and Gradle Injection
+    if target_os == "android" {
+        // Inject the library into the generated Android Studio project
+        let jni_libs_dir = manifest_dir.join("gen/android/app/src/main/jniLibs/arm64-v8a");
+        fs::create_dir_all(&jni_libs_dir).unwrap();
+        fs::copy(&dest_path, jni_libs_dir.join(lib_name)).unwrap();
+
+        // Satisfy the 'ort' crate requirements
+        println!("cargo:rustc-env=ORT_LIB_LOCATION={}", dest_dir.display());
+        println!("cargo:rustc-env=ORT_STRATEGY=manual");
+        println!("cargo:rustc-link-search=native={}", dest_dir.display());
     }
 
     println!("cargo:rerun-if-changed=build.rs");
