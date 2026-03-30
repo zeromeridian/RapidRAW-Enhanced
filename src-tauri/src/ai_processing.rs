@@ -211,18 +211,24 @@ pub async fn get_or_init_ai_models(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<AiModels>> {
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(models) = &ai_state.models {
-            return Ok(models.clone());
-        }
+    if let Some(models) = ai_state_mutex
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|state| state.models.clone())
+    {
+        return Ok(models);
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(models) = &ai_state.models {
-            return Ok(models.clone());
-        }
+    if let Some(models) = ai_state_mutex
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|state| state.models.clone())
+    {
+        return Ok(models);
     }
 
     let models_dir = get_models_dir(app_handle)?;
@@ -306,18 +312,24 @@ pub async fn get_or_init_denoise_model(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<Mutex<Session>>> {
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(denoise_model) = &ai_state.denoise_model {
-            return Ok(denoise_model.clone());
-        }
+    if let Some(denoise_model) = ai_state_mutex
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|state| state.denoise_model.clone())
+    {
+        return Ok(denoise_model);
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(denoise_model) = &ai_state.denoise_model {
-            return Ok(denoise_model.clone());
-        }
+    if let Some(denoise_model) = ai_state_mutex
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|state| state.denoise_model.clone())
+    {
+        return Ok(denoise_model);
     }
 
     let models_dir = get_models_dir(app_handle)?;
@@ -359,18 +371,24 @@ pub async fn get_or_init_clip_models(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<ClipModels>> {
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(clip_models) = &ai_state.clip_models {
-            return Ok(clip_models.clone());
-        }
+    if let Some(clip_models) = ai_state_mutex
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|state| state.clip_models.clone())
+    {
+        return Ok(clip_models);
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(clip_models) = &ai_state.clip_models {
-            return Ok(clip_models.clone());
-        }
+    if let Some(clip_models) = ai_state_mutex
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|state| state.clip_models.clone())
+    {
+        return Ok(clip_models);
     }
 
     let models_dir = get_models_dir(app_handle)?;
@@ -423,18 +441,24 @@ pub async fn get_or_init_lama_model(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<Mutex<Session>>> {
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(lama_model) = &ai_state.lama_model {
-            return Ok(lama_model.clone());
-        }
+    if let Some(lama_model) = ai_state_mutex
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|state| state.lama_model.clone())
+    {
+        return Ok(lama_model);
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_ref() {
-        if let Some(lama_model) = &ai_state.lama_model {
-            return Ok(lama_model.clone());
-        }
+    if let Some(lama_model) = ai_state_mutex
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|state| state.lama_model.clone())
+    {
+        return Ok(lama_model);
     }
 
     let models_dir = get_models_dir(app_handle)?;
