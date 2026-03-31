@@ -1828,7 +1828,7 @@ export default function MainLibrary({
     let timer: number | undefined;
 
     if (isBusy) {
-      timer = window.setTimeout(() => setIsBusyDelayed(true), 500);
+      timer = window.setTimeout(() => setIsBusyDelayed(true), 1000);
     } else {
       timer = window.setTimeout(() => setIsBusyDelayed(false), 500);
     }
