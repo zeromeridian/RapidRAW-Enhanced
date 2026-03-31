@@ -4271,8 +4271,11 @@ fn frontend_ready(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             log::info!("New instance launched with args: {:?}. Focusing main window.", argv);
             if let Some(window) = app.get_webview_window("main") {
                 if let Err(e) = window.unminimize() {
@@ -4289,7 +4292,10 @@ pub fn run() {
                     log::error!("Failed to emit open-with-file from single-instance handler: {}", e);
                 }
             }
-        }))
+        }));
+    }
+
+    builder
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
