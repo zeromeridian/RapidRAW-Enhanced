@@ -60,6 +60,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+- **2026-03-30:** LaMa inpainting for lightweight local content-aware fill and object removal.
 - **2026-03-26:** Performance improvements & new flat list mode for library
 - **2026-03-25:** Optimize folder loading & tree fetching
 - **2026-03-23:** Generate thumbnails only for visible viewport items
@@ -69,11 +70,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 - **2026-03-16:** LRU cache for instant image loading
 - **2026-03-15:** Improved high quality subject mask models, various UI improvements and shader improvements
 - **2026-03-14:** New image analytics panel which can display vectorscopes, waveforms, parades & histograms
-- **2026-03-13:** JPEG XL, WebP, and additional format support, including the ability to export LUTs.
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+- **2026-03-13:** JPEG XL, WebP, and additional format support, including the ability to export LUTs.
 - **2026-03-12:** Added parametric color & luminance masks
 - **2026-03-10:** Implement region of interest rendering to improve performance when zooming in
 - **2026-03-07:** Batch negative conversion & various shader improvements
@@ -551,6 +552,7 @@ A huge thank you to the following projects and tools that were very important in
 - **[Google AI Studio](https://aistudio.google.com):** For providing amazing assistance in researching, implementing image processing algorithms and giving an overall speed boost.
 - **[rawler](https://github.com/dnglab/dnglab/tree/main/rawler):** For the excellent Rust crate that provides the foundation for RAW file processing in this project.
 - **[lensfun](https://lensfun.github.io/):** For its invaluable open-source library and comprehensive database for automatic lens correction.
+- **[LaMa](https://github.com/advimman/lama):** For the powerful & simple image inpainting model, which enables content-aware fill and object removal.
 - **[NegPy](https://github.com/marcinz606/NegPy):** For the inspiration behind the negative conversion logic, particularly the mathematical approach to film inversion using characteristic curves.
 - **[pixls.us](https://discuss.pixls.us/):** For being an incredible community full of knowledgeable people who offered inspiration, advice, and ideas.
 - **[darktable & co.](https://github.com/darktable-org/darktable):** For some reference implementations that guided parts of this work.

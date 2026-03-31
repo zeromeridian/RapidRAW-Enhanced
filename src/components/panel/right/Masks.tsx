@@ -62,6 +62,7 @@ export function formatMaskTypeName(type: string) {
   if (type === Mask.AiForeground) return 'AI Foreground';
   if (type === Mask.AiSky) return 'AI Sky';
   if (type === Mask.All) return 'Whole Image';
+  if (type === Mask.QuickEraser) return 'Quick Eraser';
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 

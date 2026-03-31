@@ -1913,20 +1913,24 @@ function App() {
         ? currentPins.filter((p) => p !== path)
         : [...currentPins, path].sort((a, b) => a.localeCompare(b));
 
-      if (!isPinned && path === currentFolderPath) {
+      if (!isPinned) {
         handleActiveTreeSectionChange('pinned');
       }
 
       handleSettingsChange({ ...appSettings, pinnedFolders: newPins });
 
       try {
-        const trees = await invoke(Invokes.GetPinnedFolderTrees, { paths: newPins });
+        const trees = await invoke(Invokes.GetPinnedFolderTrees, {
+          paths: newPins,
+          expandedFolders: Array.from(expandedFolders),
+          showImageCounts: appSettings.enableFolderImageCounts ?? false,
+        });
         setPinnedFolderTrees(trees);
       } catch (err) {
         console.error('Failed to refresh pinned folders:', err);
       }
     },
-    [appSettings, handleSettingsChange],
+    [appSettings, expandedFolders, handleSettingsChange],
   );
 
   const handleActiveTreeSectionChange = (section: string | null) => {
@@ -4770,181 +4774,129 @@ function App() {
     showContextMenu(event.clientX, event.clientY, options);
   };
 
-  const memoizedFolderTree = useMemo(
-    () =>
-      rootPath && (
-        <div
-          className={clsx(
-            'flex h-full overflow-hidden shrink-0',
-            !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-          )}
-          style={{
-            maxWidth: isFullScreen ? '0px' : '1000px',
-            opacity: isFullScreen ? 0 : 1,
-          }}
-        >
-          <FolderTree
-            expandedFolders={expandedFolders}
-            isLoading={isTreeLoading}
-            isResizing={isResizing}
-            isVisible={uiVisibility.folderTree}
-            onContextMenu={handleFolderTreeContextMenu}
-            onFolderSelect={(path) => handleSelectSubfolder(path, false)}
-            onToggleFolder={handleToggleFolder}
-            selectedPath={currentFolderPath}
-            setIsVisible={(value: boolean) => setUiVisibility((prev: UiVisibility) => ({ ...prev, folderTree: value }))}
-            style={{ width: uiVisibility.folderTree ? `${leftPanelWidth}px` : '32px' }}
-            tree={folderTree}
-            pinnedFolderTrees={pinnedFolderTrees}
-            pinnedFolders={pinnedFolders}
-            activeSection={activeTreeSection}
-            onActiveSectionChange={handleActiveTreeSectionChange}
-            showImageCounts={appSettings?.enableFolderImageCounts ?? false}
-            isInstantTransition={isInstantTransition}
-          />
-          <Resizer
-            direction={Orientation.Vertical}
-            onMouseDown={createResizeHandler(setLeftPanelWidth, leftPanelWidth)}
-          />
-        </div>
-      ),
-    [
-      rootPath,
-      expandedFolders,
-      isTreeLoading,
-      isResizing,
-      handleSelectSubfolder,
-      uiVisibility.folderTree,
-      currentFolderPath,
-      leftPanelWidth,
-      folderTree,
-      pinnedFolderTrees,
-      pinnedFolders,
-      activeTreeSection,
-      copiedFilePaths,
-      isFullScreen,
-      isInstantTransition,
-      appSettings?.enableFolderImageCounts,
-    ],
-  );
+  const renderFolderTree = () => {
+    if (!rootPath) return null;
 
-  const memoizedLibraryView = useMemo(
-    () => (
-      <div className="flex flex-row grow h-full min-h-0">
-        <div className="flex-1 flex flex-col min-w-0 gap-2">
-          {activeView === 'community' ? (
-            <CommunityPage
-              onBackToLibrary={() => setActiveView('library')}
-              supportedTypes={supportedTypes}
-              imageList={sortedImageList}
-              currentFolderPath={currentFolderPath}
-            />
-          ) : (
-            <MainLibrary
-              activePath={libraryActivePath}
-              aiModelDownloadStatus={aiModelDownloadStatus}
-              appSettings={appSettings}
-              currentFolderPath={currentFolderPath}
-              filterCriteria={filterCriteria}
-              imageList={sortedImageList}
-              imageRatings={imageRatings}
-              importState={importState}
-              indexingProgress={indexingProgress}
-              isIndexing={isIndexing}
-              isThumbnailsLoading={isThumbnailsLoading}
-              isLoading={isViewLoading}
-              isTreeLoading={isTreeLoading}
-              libraryScrollTop={libraryScrollTop}
-              libraryViewMode={libraryViewMode}
-              multiSelectedPaths={multiSelectedPaths}
-              onClearSelection={handleClearSelection}
-              onContextMenu={handleThumbnailContextMenu}
-              onContinueSession={handleContinueSession}
-              onEmptyAreaContextMenu={handleMainLibraryContextMenu}
-              onGoHome={handleGoHome}
-              onImageClick={handleLibraryImageSingleClick}
-              onImageDoubleClick={handleImageSelect}
-              onLibraryRefresh={handleLibraryRefresh}
-              onOpenFolder={handleOpenFolder}
-              onSettingsChange={handleSettingsChange}
-              onThumbnailAspectRatioChange={setThumbnailAspectRatio}
-              onThumbnailSizeChange={setThumbnailSize}
-              onRequestThumbnails={requestThumbnails}
-              rootPath={rootPath}
-              searchCriteria={searchCriteria}
-              setFilterCriteria={setFilterCriteria}
-              setLibraryScrollTop={setLibraryScrollTop}
-              setLibraryViewMode={setLibraryViewMode}
-              setSearchCriteria={setSearchCriteria}
-              setSortCriteria={setSortCriteria}
-              sortCriteria={sortCriteria}
-              theme={theme}
-              thumbnailAspectRatio={thumbnailAspectRatio}
-              thumbnails={thumbnails}
-              thumbnailSize={thumbnailSize}
-              onNavigateToCommunity={() => setActiveView('community')}
-              listColumnWidths={listColumnWidths}
-              setListColumnWidths={setListColumnWidths}
-            />
-          )}
-          {rootPath && (
-            <BottomBar
-              isCopied={isCopied}
-              isCopyDisabled={multiSelectedPaths.length !== 1}
-              isExportDisabled={multiSelectedPaths.length === 0}
-              isLibraryView={true}
-              isPasted={isPasted}
-              isPasteDisabled={copiedAdjustments === null || multiSelectedPaths.length === 0}
-              isRatingDisabled={multiSelectedPaths.length === 0}
-              isResetDisabled={multiSelectedPaths.length === 0}
-              multiSelectedPaths={multiSelectedPaths}
-              onCopy={handleCopyAdjustments}
-              onExportClick={() => setIsLibraryExportPanelVisible((prev) => !prev)}
-              onOpenCopyPasteSettings={() => setIsCopyPasteSettingsModalOpen(true)}
-              onPaste={() => handlePasteAdjustments()}
-              onRate={handleRate}
-              onReset={() => handleResetAdjustments()}
-              rating={libraryActiveAdjustments.rating || 0}
-              thumbnailAspectRatio={thumbnailAspectRatio}
-              totalImages={imageList.length}
-            />
-          )}
-        </div>
+    return (
+      <div
+        className={clsx(
+          'flex h-full overflow-hidden shrink-0',
+          !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+        )}
+        style={{
+          maxWidth: isFullScreen ? '0px' : '1000px',
+          opacity: isFullScreen ? 0 : 1,
+        }}
+      >
+        <FolderTree
+          expandedFolders={expandedFolders}
+          isLoading={isTreeLoading}
+          isResizing={isResizing}
+          isVisible={uiVisibility.folderTree}
+          onContextMenu={handleFolderTreeContextMenu}
+          onFolderSelect={(path) => handleSelectSubfolder(path, false)}
+          onToggleFolder={handleToggleFolder}
+          selectedPath={currentFolderPath}
+          setIsVisible={(value: boolean) => setUiVisibility((prev: UiVisibility) => ({ ...prev, folderTree: value }))}
+          style={{ width: uiVisibility.folderTree ? `${leftPanelWidth}px` : '32px' }}
+          tree={folderTree}
+          pinnedFolderTrees={pinnedFolderTrees}
+          pinnedFolders={pinnedFolders}
+          activeSection={activeTreeSection}
+          onActiveSectionChange={handleActiveTreeSectionChange}
+          showImageCounts={appSettings?.enableFolderImageCounts ?? false}
+          isInstantTransition={isInstantTransition}
+        />
+        <Resizer
+          direction={Orientation.Vertical}
+          onMouseDown={createResizeHandler(setLeftPanelWidth, leftPanelWidth)}
+        />
       </div>
-    ),
-    [
-      activeView,
-      sortedImageList,
-      currentFolderPath,
-      libraryActivePath,
-      aiModelDownloadStatus,
-      appSettings,
-      filterCriteria,
-      imageRatings,
-      importState,
-      indexingProgress,
-      isIndexing,
-      isThumbnailsLoading,
-      isViewLoading,
-      isTreeLoading,
-      libraryScrollTop,
-      libraryViewMode,
-      multiSelectedPaths,
-      rootPath,
-      searchCriteria,
-      sortCriteria,
-      theme,
-      thumbnailAspectRatio,
-      thumbnails,
-      thumbnailSize,
-      isCopied,
-      isPasted,
-      copiedAdjustments,
-      libraryActiveAdjustments,
-      supportedTypes,
-      copiedFilePaths,
-      listColumnWidths,
-    ],
+    );
+  };
+
+  const renderLibraryView = () => (
+    <div className="flex flex-row grow h-full min-h-0">
+      <div className="flex-1 flex flex-col min-w-0 gap-2">
+        {activeView === 'community' ? (
+          <CommunityPage
+            onBackToLibrary={() => setActiveView('library')}
+            supportedTypes={supportedTypes}
+            imageList={sortedImageList}
+            currentFolderPath={currentFolderPath}
+          />
+        ) : (
+          <MainLibrary
+            activePath={libraryActivePath}
+            aiModelDownloadStatus={aiModelDownloadStatus}
+            appSettings={appSettings}
+            currentFolderPath={currentFolderPath}
+            filterCriteria={filterCriteria}
+            imageList={sortedImageList}
+            imageRatings={imageRatings}
+            importState={importState}
+            indexingProgress={indexingProgress}
+            isIndexing={isIndexing}
+            isThumbnailsLoading={isThumbnailsLoading}
+            isLoading={isViewLoading}
+            isTreeLoading={isTreeLoading}
+            libraryScrollTop={libraryScrollTop}
+            libraryViewMode={libraryViewMode}
+            multiSelectedPaths={multiSelectedPaths}
+            onClearSelection={handleClearSelection}
+            onContextMenu={handleThumbnailContextMenu}
+            onContinueSession={handleContinueSession}
+            onEmptyAreaContextMenu={handleMainLibraryContextMenu}
+            onGoHome={handleGoHome}
+            onImageClick={handleLibraryImageSingleClick}
+            onImageDoubleClick={handleImageSelect}
+            onLibraryRefresh={handleLibraryRefresh}
+            onOpenFolder={handleOpenFolder}
+            onSettingsChange={handleSettingsChange}
+            onThumbnailAspectRatioChange={setThumbnailAspectRatio}
+            onThumbnailSizeChange={setThumbnailSize}
+            onRequestThumbnails={requestThumbnails}
+            rootPath={rootPath}
+            searchCriteria={searchCriteria}
+            setFilterCriteria={setFilterCriteria}
+            setLibraryScrollTop={setLibraryScrollTop}
+            setLibraryViewMode={setLibraryViewMode}
+            setSearchCriteria={setSearchCriteria}
+            setSortCriteria={setSortCriteria}
+            sortCriteria={sortCriteria}
+            theme={theme}
+            thumbnailAspectRatio={thumbnailAspectRatio}
+            thumbnails={thumbnails}
+            thumbnailSize={thumbnailSize}
+            onNavigateToCommunity={() => setActiveView('community')}
+            listColumnWidths={listColumnWidths}
+            setListColumnWidths={setListColumnWidths}
+          />
+        )}
+        {rootPath && (
+          <BottomBar
+            isCopied={isCopied}
+            isCopyDisabled={multiSelectedPaths.length !== 1}
+            isExportDisabled={multiSelectedPaths.length === 0}
+            isLibraryView={true}
+            isPasted={isPasted}
+            isPasteDisabled={copiedAdjustments === null || multiSelectedPaths.length === 0}
+            isRatingDisabled={multiSelectedPaths.length === 0}
+            isResetDisabled={multiSelectedPaths.length === 0}
+            multiSelectedPaths={multiSelectedPaths}
+            onCopy={handleCopyAdjustments}
+            onExportClick={() => setIsLibraryExportPanelVisible((prev) => !prev)}
+            onOpenCopyPasteSettings={() => setIsCopyPasteSettingsModalOpen(true)}
+            onPaste={() => handlePasteAdjustments()}
+            onRate={handleRate}
+            onReset={() => handleResetAdjustments()}
+            rating={libraryActiveAdjustments.rating || 0}
+            thumbnailAspectRatio={thumbnailAspectRatio}
+            totalImages={imageList.length}
+          />
+        )}
+      </div>
+    </div>
   );
 
   const renderMainView = () => {
@@ -5256,7 +5208,7 @@ function App() {
         </div>
       );
     }
-    return memoizedLibraryView;
+    return renderLibraryView();
   };
 
   const renderContent = () => {
@@ -5290,7 +5242,7 @@ function App() {
         )}
       >
         <div className="flex flex-row grow h-full min-h-0">
-          {memoizedFolderTree}
+          {renderFolderTree()}
           <div className="flex-1 flex flex-col min-w-0">{renderContent()}</div>
           {!selectedImage && isLibraryExportPanelVisible && (
             <Resizer
@@ -5407,6 +5359,7 @@ function App() {
         isProcessing={denoiseModalState.isProcessing}
         error={denoiseModalState.error}
         progressMessage={denoiseModalState.progressMessage}
+        aiModelDownloadStatus={aiModelDownloadStatus}
         isRaw={denoiseModalState.isRaw}
         loadingImageUrl={
           denoiseModalState.targetPath
