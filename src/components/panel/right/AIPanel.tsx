@@ -205,7 +205,7 @@ const ConnectionStatus = ({ isConnected }: ConnectionStatusProps) => {
           transition={{ duration: 0.2, ease: 'easeInOut' }}
         >
           <p className="text-xs text-text-secondary">
-            Only simple inpainting available. Connect backend for generative features.
+            Only basic inpainting available. Connect backend for generative features.
           </p>
         </motion.div>
       </div>

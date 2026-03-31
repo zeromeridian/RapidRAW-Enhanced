@@ -104,6 +104,13 @@ const resolutions: OptionItem<number>[] = [
   { value: 3840, label: '3840px' },
 ];
 
+const thumbnailResolutions: OptionItem<number>[] = [
+  { value: 640, label: '640px' },
+  { value: 720, label: '720px' },
+  { value: 960, label: '960px' },
+  { value: 1080, label: '1080px' },
+];
+
 const zoomMultiplierOptions: OptionItem<number>[] = [
   { value: 1.0, label: '1.0x (Native)' },
   { value: 0.75, label: '0.75x' },
@@ -323,6 +330,7 @@ export default function SettingsPanel({
 
   const [processingSettings, setProcessingSettings] = useState({
     editorPreviewResolution: appSettings?.editorPreviewResolution || 1920,
+    thumbnailResolution: appSettings?.thumbnailResolution || 720,
     rawHighlightCompression: appSettings?.rawHighlightCompression ?? 2.5,
     processingBackend: appSettings?.processingBackend || 'auto',
     linuxGpuOptimization: appSettings?.linuxGpuOptimization ?? false,
@@ -377,6 +385,7 @@ export default function SettingsPanel({
     }
     setProcessingSettings({
       editorPreviewResolution: appSettings?.editorPreviewResolution || 1920,
+      thumbnailResolution: appSettings?.thumbnailResolution || 720,
       rawHighlightCompression: appSettings?.rawHighlightCompression ?? 2.5,
       processingBackend: appSettings?.processingBackend || 'auto',
       linuxGpuOptimization: appSettings?.linuxGpuOptimization ?? false,
@@ -1467,6 +1476,17 @@ export default function SettingsPanel({
                         )}
                       </AnimatePresence>
                     </div>
+
+                    <SettingItem
+                      description="Determines the resolution of generated library thumbnails. Higher values produce sharper images during loading."
+                      label="Thumbnail Resolution"
+                    >
+                      <Dropdown
+                        onChange={(value: any) => handleProcessingSettingChange('thumbnailResolution', value)}
+                        options={thumbnailResolutions}
+                        value={processingSettings.thumbnailResolution}
+                      />
+                    </SettingItem>
 
                     <SettingItem
                       label="RAW Highlight Recovery"
