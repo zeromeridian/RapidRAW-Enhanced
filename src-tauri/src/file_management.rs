@@ -1063,13 +1063,14 @@ pub fn generate_thumbnail_data(
             let cache = state.thumbnail_geometry_cache.lock().unwrap();
             if let Some((cached_hash, img, scale)) = cache.get(path_str) {
                 let mut sufficient_resolution = true;
-                if let Some(c) = &crop_data {
-                    if c.width > 0.0 && c.height > 0.0 {
-                        let final_crop_max_dim =
-                            (c.width as f32 * *scale).max(c.height as f32 * *scale);
-                        if final_crop_max_dim < (target_res as f32 * 0.95) {
-                            sufficient_resolution = false;
-                        }
+                if let Some(c) = &crop_data
+                    && c.width > 0.0
+                    && c.height > 0.0
+                {
+                    let final_crop_max_dim =
+                        (c.width as f32 * *scale).max(c.height as f32 * *scale);
+                    if final_crop_max_dim < (target_res as f32 * 0.95) {
+                        sufficient_resolution = false;
                     }
                 }
 
@@ -1147,15 +1148,16 @@ pub fn generate_thumbnail_data(
             let (full_w, full_h) = coarse_rotated_image.dimensions();
 
             let mut processing_dim = target_res;
-            if let Some(c) = &crop_data {
-                if c.width > 0.0 && c.height > 0.0 {
-                    let crop_max_dim_loaded = c.width.max(c.height) * raw_scale_factor as f64;
-                    let full_max_dim = full_w.max(full_h) as f64;
-                    if crop_max_dim_loaded > 0.0 {
-                        processing_dim = ((target_res as f64 * full_max_dim / crop_max_dim_loaded)
-                            .round() as u32)
-                            .min(full_w.max(full_h));
-                    }
+            if let Some(c) = &crop_data
+                && c.width > 0.0
+                && c.height > 0.0
+            {
+                let crop_max_dim_loaded = c.width.max(c.height) * raw_scale_factor as f64;
+                let full_max_dim = full_w.max(full_h) as f64;
+                if crop_max_dim_loaded > 0.0 {
+                    processing_dim = ((target_res as f64 * full_max_dim / crop_max_dim_loaded)
+                        .round() as u32)
+                        .min(full_w.max(full_h));
                 }
             }
 
