@@ -88,7 +88,6 @@ interface MainLibraryProps {
   importState: ImportState;
   indexingProgress: Progress;
   isLoading: boolean;
-  isThumbnailsLoading?: boolean;
   isIndexing: boolean;
   isTreeLoading: boolean;
   libraryScrollTop: number;
@@ -118,6 +117,7 @@ interface MainLibraryProps {
   theme: string;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   thumbnails: Record<string, string>;
+  thumbnailProgress: Progress;
   thumbnailSize: ThumbnailSize;
   onNavigateToCommunity(): void;
   listColumnWidths: ColumnWidths;
@@ -1531,7 +1531,6 @@ export default function MainLibrary({
   indexingProgress,
   isIndexing,
   isLoading,
-  isThumbnailsLoading,
   isTreeLoading: _isTreeLoading,
   libraryScrollTop,
   libraryViewMode,
@@ -1560,6 +1559,7 @@ export default function MainLibrary({
   theme,
   thumbnailAspectRatio,
   thumbnails,
+  thumbnailProgress,
   thumbnailSize,
   onNavigateToCommunity,
   listColumnWidths,
@@ -1591,7 +1591,8 @@ export default function MainLibrary({
   const [listHandle, setListHandle] = useListCallbackRef();
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
   const [latestVersion, setLatestVersion] = useState('');
-  const [isLoaderVisible, setIsLoaderVisible] = useState(false);
+  const [isBusyDelayed, setIsBusyDelayed] = useState(false);
+  const [isProgressHovered, setIsProgressHovered] = useState(false);
   const loadedThumbnailsRef = useRef(new Set<string>());
 
   const handleHeaderSort = useCallback(
@@ -1819,24 +1820,21 @@ export default function MainLibrary({
     }
   }, [appSettings?.enableExifReading, sortCriteria.key, setSortCriteria]);
 
-  useEffect(() => {
-    let showTimer: number | undefined;
-    let hideTimer: number | undefined;
+  const isBusy =
+    isLoading ||
+    ((thumbnailProgress?.total ?? 0) > 0 && (thumbnailProgress?.current ?? 0) < (thumbnailProgress?.total ?? 0));
 
-    if (isThumbnailsLoading || isLoading) {
-      showTimer = window.setTimeout(() => {
-        setIsLoaderVisible(true);
-      }, 1000);
+  useEffect(() => {
+    let timer: number | undefined;
+
+    if (isBusy) {
+      timer = window.setTimeout(() => setIsBusyDelayed(true), 1000);
     } else {
-      hideTimer = window.setTimeout(() => {
-        setIsLoaderVisible(false);
-      }, 500);
+      timer = window.setTimeout(() => setIsBusyDelayed(false), 500);
     }
-    return () => {
-      clearTimeout(showTimer);
-      clearTimeout(hideTimer);
-    };
-  }, [isThumbnailsLoading, isLoading]);
+
+    return () => clearTimeout(timer);
+  }, [isBusy]);
 
   useEffect(() => {
     const compareVersions = (v1: string, v2: string) => {
@@ -2075,7 +2073,11 @@ export default function MainLibrary({
       className="flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden"
       ref={libraryContainerRef}
     >
-      <header className="p-4 shrink-0 flex justify-between items-center border-b border-border-color gap-4">
+      <header
+        className="p-4 shrink-0 flex justify-between items-center border-b border-border-color gap-4"
+        onMouseEnter={() => setIsProgressHovered(true)}
+        onMouseLeave={() => setIsProgressHovered(false)}
+      >
         <div className="min-w-0">
           <Text variant={TextVariants.headline}>Library</Text>
           <div className="flex items-center gap-2">
@@ -2085,11 +2087,22 @@ export default function MainLibrary({
               <p className="text-sm invisible select-none pointer-events-none h-5 overflow-hidden"></p>
             )}
             <div
-              className={`overflow-hidden transition-all duration-300 ${
-                isLoaderVisible ? 'max-w-4 opacity-100' : 'max-w-0 opacity-0'
+              className={`flex items-center gap-2 overflow-hidden transition-all duration-300 whitespace-nowrap ${
+                isBusyDelayed ? 'max-w-xs opacity-100' : 'max-w-0 opacity-0'
               }`}
             >
-              <Loader2 size={14} className="animate-spin text-text-secondary" />
+              <Loader2 size={14} className="animate-spin text-text-secondary shrink-0" />
+              <div
+                className={`flex items-center transition-all duration-300 ease-out overflow-hidden ${
+                  isProgressHovered && isBusyDelayed && (thumbnailProgress?.total ?? 0) > 0
+                    ? 'max-w-xs opacity-100'
+                    : 'max-w-0 opacity-0'
+                }`}
+              >
+                <Text variant={TextVariants.small} color={TextColors.secondary} className="whitespace-nowrap">
+                  ({thumbnailProgress?.current ?? 0}/{thumbnailProgress?.total ?? 0})
+                </Text>
+              </div>
             </div>
           </div>
         </div>

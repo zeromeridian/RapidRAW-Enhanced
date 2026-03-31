@@ -448,7 +448,8 @@ function App() {
   });
   const { showContextMenu } = useContextMenu();
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
-  const { loading: isThumbnailsLoading, requestThumbnails, clearThumbnailQueue } = useThumbnails();
+  const { requestThumbnails, clearThumbnailQueue } = useThumbnails();
+  const [thumbnailProgress, setThumbnailProgress] = useState<Progress>({ current: 0, total: 0 });
   const transformWrapperRef = useRef<any>(null);
   const isProgrammaticZoom = useRef(false);
   const currentResRef = useRef<number>(1280);
@@ -1704,7 +1705,7 @@ function App() {
             currentPath: currentPath,
             tree: invoke(Invokes.GetFolderTree, {
               path: root,
-              expandedFolders: settings.lastFolderState?.expandedFolders || [root],
+              expandedFolders: settings.lastFolderState?.expandedFolders ?? [root],
               showImageCounts: settings.enableFolderImageCounts ?? false,
             }),
             images: invoke(command, { path: currentPath }),
@@ -1941,7 +1942,7 @@ function App() {
   };
 
   const handleSelectSubfolder = useCallback(
-    async (path: string | null, isNewRoot = false, preloadedImages?: ImageFile[]) => {
+    async (path: string | null, isNewRoot = false, preloadedImages?: ImageFile[], expandParents = true) => {
       await invoke('cancel_thumbnail_generation');
       clearThumbnailQueue();
       setIsViewLoading(true);
@@ -1954,8 +1955,10 @@ function App() {
         setActiveView('library');
 
         if (isNewRoot) {
-          setExpandedFolders(new Set([path]));
-        } else if (path) {
+          if (path) {
+            setExpandedFolders(new Set([path]));
+          }
+        } else if (path && expandParents) {
           setExpandedFolders((prev) => {
             const newSet = new Set(prev);
             const allRoots = [rootPath, ...pinnedFolders].filter(Boolean) as string[];
@@ -3087,6 +3090,16 @@ function App() {
           setWaveform(event.payload.data);
         }
       }),
+      listen('thumbnail-progress', (event: any) => {
+        if (isEffectActive) {
+          setThumbnailProgress({ current: event.payload.current, total: event.payload.total });
+        }
+      }),
+      listen('thumbnail-generation-complete', () => {
+        if (isEffectActive) {
+          setThumbnailProgress({ current: 0, total: 0 });
+        }
+      }),
       listen('thumbnail-generated', (event: any) => {
         if (isEffectActive) {
           const { path, data, rating } = event.payload;
@@ -3588,7 +3601,6 @@ function App() {
 
       if (folderState?.expandedFolders) {
         const newExpandedFolders = new Set(folderState.expandedFolders);
-        newExpandedFolders.add(root);
         setExpandedFolders(newExpandedFolders);
       } else {
         setExpandedFolders(new Set([root]));
@@ -3601,9 +3613,7 @@ function App() {
           treeData = await preloadedDataRef.current.tree;
           console.log('Preload cache hit for folder tree.');
         } else {
-          const expandedArr = folderState?.expandedFolders
-            ? Array.from(new Set([...folderState.expandedFolders, root]))
-            : [root];
+          const expandedArr = folderState?.expandedFolders ? Array.from(new Set(folderState.expandedFolders)) : [root];
           treeData = await invoke(Invokes.GetFolderTree, {
             path: root,
             expandedFolders: expandedArr,
@@ -3627,7 +3637,7 @@ function App() {
         }
       }
 
-      await handleSelectSubfolder(pathToSelect, false, preloadedImages);
+      await handleSelectSubfolder(pathToSelect, false, preloadedImages, false);
     };
     restore().catch((err) => {
       console.error('Failed to restore session, folder might be missing:', err);
@@ -4839,7 +4849,6 @@ function App() {
             importState={importState}
             indexingProgress={indexingProgress}
             isIndexing={isIndexing}
-            isThumbnailsLoading={isThumbnailsLoading}
             isLoading={isViewLoading}
             isTreeLoading={isTreeLoading}
             libraryScrollTop={libraryScrollTop}
@@ -4869,6 +4878,7 @@ function App() {
             theme={theme}
             thumbnailAspectRatio={thumbnailAspectRatio}
             thumbnails={thumbnails}
+            thumbnailProgress={thumbnailProgress}
             thumbnailSize={thumbnailSize}
             onNavigateToCommunity={() => setActiveView('community')}
             listColumnWidths={listColumnWidths}
