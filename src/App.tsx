@@ -3011,7 +3011,7 @@ function App() {
         targetZoomPercent = zoomValue / dpr;
       }
 
-      targetZoomPercent = Math.max(0.1 / dpr, Math.min(4.0, targetZoomPercent));
+      targetZoomPercent = Math.max(0.1 / dpr, Math.min(2.0 / dpr, targetZoomPercent));
 
       let transformZoom = 1.0;
       if (
@@ -3187,6 +3187,8 @@ function App() {
     displaySize,
     baseRenderSize,
     originalSize,
+    brushSettings: brushSettings,
+    setBrushSettings: setBrushSettings,
   });
 
   useEffect(() => {
