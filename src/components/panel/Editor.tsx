@@ -335,8 +335,8 @@ export default function Editor({
     const maxScale = (2.0 / dpr) * scaleFor100Percent;
 
     return {
-      minScale,
-      maxScale,
+      minScale: Math.max(0.1, minScale),
+      maxScale: Math.max(20, maxScale),
     };
   }, [selectedImage, imageRenderSize.scale, originalSize]);
 
