@@ -912,7 +912,7 @@ fn process_preview_job(
     let (interactive_divisor, interactive_quality) = match live_quality {
         "full" => (1.0_f32, 85_u8),
         "performance" => (1.8_f32, 65_u8),
-        "high" | _ => (1.2_f32, 80_u8),
+        _ => (1.2_f32, 80_u8),
     };
 
     let mut cached_preview_lock = state.cached_preview.lock().unwrap();
@@ -2820,6 +2820,7 @@ async fn generate_ai_sky_mask(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 async fn generate_ai_depth_mask(
     js_adjustments: serde_json::Value,

@@ -60,10 +60,10 @@ export interface SubMask {
 }
 
 export function formatMaskTypeName(type: string) {
-  if (type === Mask.AiDepth) return 'AI Depth';
-  if (type === Mask.AiSubject) return 'AI Subject';
-  if (type === Mask.AiForeground) return 'AI Foreground';
-  if (type === Mask.AiSky) return 'AI Sky';
+  if (type === Mask.AiDepth) return 'Depth';
+  if (type === Mask.AiSubject) return 'Subject';
+  if (type === Mask.AiForeground) return 'Foreground';
+  if (type === Mask.AiSky) return 'Sky';
   if (type === Mask.All) return 'Whole Image';
   if (type === Mask.QuickEraser) return 'Quick Eraser';
   return type.charAt(0).toUpperCase() + type.slice(1);
