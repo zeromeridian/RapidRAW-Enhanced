@@ -24,6 +24,7 @@ interface EditorProps {
   canRedo: boolean;
   canUndo: boolean;
   finalPreviewUrl: string | null;
+  interactivePatch?: { url: string; normX: number; normY: number; normW: number; normH: number } | null;
   isFullScreen: boolean;
   isLoading: boolean;
   isSliderDragging: boolean;
@@ -76,6 +77,7 @@ export default function Editor({
   canRedo,
   canUndo,
   finalPreviewUrl,
+  interactivePatch,
   isFullScreen,
   isLoading,
   isSliderDragging,
@@ -737,7 +739,7 @@ export default function Editor({
         className={clsx(
           'shrink-0',
           !isInstantTransition && 'transition-all duration-300 ease-in-out',
-          isFullScreen ? 'max-h-0 opacity-0 m-0' : 'max-h-[100px] opacity-100',
+          isFullScreen ? 'max-h-0 opacity-0 m-0' : 'max-h-25 opacity-100',
           toolbarOverflowVisible ? 'overflow-visible' : 'overflow-hidden',
         )}
       >
@@ -817,6 +819,7 @@ export default function Editor({
               finalPreviewUrl={finalPreviewUrl}
               handleCropComplete={handleCropComplete}
               imageRenderSize={imageRenderSize}
+              interactivePatch={interactivePatch}
               isAiEditing={isAiEditing}
               isCropping={isCropping}
               isMaskControlHovered={isMaskControlHovered}
