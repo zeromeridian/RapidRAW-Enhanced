@@ -25,6 +25,7 @@ import {
   Images,
   LayoutTemplate,
   Redo,
+  RefreshCw,
   RotateCcw,
   Star,
   Save,
@@ -210,6 +211,14 @@ interface SearchCriteria {
   mode: 'AND' | 'OR';
 }
 
+export interface InteractivePatch {
+  url: string;
+  normX: number;
+  normY: number;
+  normW: number;
+  normH: number;
+}
+
 const RIGHT_PANEL_ORDER = [
   Panel.Metadata,
   Panel.Adjustments,
@@ -317,6 +326,8 @@ function App() {
     filmstrip: true,
   });
   const [isSliderDragging, setIsSliderDragging] = useState(false);
+  const [interactivePatch, setInteractivePatch] = useState<InteractivePatch | null>(null);
+  const lastZoomPatchTime = useRef<number>(0);
   const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevAdjustmentsRef = useRef<{ path: string; adjustments: Adjustments } | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -528,7 +539,7 @@ function App() {
   }, [error]);
 
   const debouncedSetHistory = useMemo(
-    () => debounce((newAdjustments) => setHistoryAdjustments(newAdjustments), 300),
+    () => debounce((newAdjustments) => setHistoryAdjustments(newAdjustments), 500),
     [setHistoryAdjustments],
   );
 
@@ -970,6 +981,61 @@ function App() {
     } catch (error) {
       console.error('Failed to generate AI subject mask:', error);
       setError(`AI Mask Failed: ${error}`);
+    } finally {
+      setIsGeneratingAiMask(false);
+    }
+  };
+
+  const handleGenerateAiDepthMask = async (subMaskId: string, parameters: any) => {
+    if (!selectedImage?.path) return;
+    console.log('trying to generate depth map');
+    setIsGeneratingAiMask(true);
+
+    try {
+      const transformAdjustments = {
+        transformDistortion: adjustments.transformDistortion,
+        transformVertical: adjustments.transformVertical,
+        transformHorizontal: adjustments.transformHorizontal,
+        transformRotate: adjustments.transformRotate,
+        transformAspect: adjustments.transformAspect,
+        transformScale: adjustments.transformScale,
+        transformXOffset: adjustments.transformXOffset,
+        transformYOffset: adjustments.transformYOffset,
+        lensDistortionAmount: adjustments.lensDistortionAmount,
+        lensVignetteAmount: adjustments.lensVignetteAmount,
+        lensTcaAmount: adjustments.lensTcaAmount,
+        lensDistortionParams: adjustments.lensDistortionParams,
+        lensMaker: adjustments.lensMaker,
+        lensModel: adjustments.lensModel,
+        lensDistortionEnabled: adjustments.lensDistortionEnabled,
+        lensTcaEnabled: adjustments.lensTcaEnabled,
+        lensVignetteEnabled: adjustments.lensVignetteEnabled,
+      };
+
+      const newParameters = await invoke('generate_ai_depth_mask', {
+        jsAdjustments: transformAdjustments,
+        path: selectedImage.path,
+        minDepth: parameters.minDepth ?? 20,
+        maxDepth: parameters.maxDepth ?? 100,
+        minFade: parameters.minFade ?? 15,
+        maxFade: parameters.maxFade ?? 15,
+        feather: parameters.feather ?? 10,
+        flipHorizontal: adjustments.flipHorizontal,
+        flipVertical: adjustments.flipVertical,
+        orientationSteps: adjustments.orientationSteps,
+        rotation: adjustments.rotation,
+      });
+
+      const subMask = adjustments.aiPatches
+        ?.flatMap((p: AiPatch) => p.subMasks)
+        .find((sm: SubMask) => sm.id === subMaskId);
+
+      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
+      patchesSentToBackend.current.delete(subMaskId);
+      updateSubMask(subMaskId, { parameters: mergedParameters });
+    } catch (error) {
+      console.error('Failed to generate AI depth mask:', error);
+      setError(`AI Depth Mask Failed: ${error}`);
     } finally {
       setIsGeneratingAiMask(false);
     }
@@ -1457,10 +1523,34 @@ function App() {
 
         if (buffer && buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
           latestRenderedJobIdRef.current = jobId;
-          const blob = new Blob([buffer], { type: 'image/jpeg' });
-          const url = URL.createObjectURL(blob);
 
-          if (!dragging) {
+          if (dragging) {
+            const view = new DataView(buffer);
+            const patchX = view.getUint32(0, true);
+            const patchY = view.getUint32(4, true);
+            const patchW = view.getUint32(8, true);
+            const patchH = view.getUint32(12, true);
+            const fullW = view.getUint32(16, true);
+            const fullH = view.getUint32(20, true);
+
+            const imageBuffer = buffer.slice(24);
+            const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+
+            setInteractivePatch((prev) => {
+              if (prev && prev.url) setTimeout(() => URL.revokeObjectURL(prev.url), 100);
+              return {
+                url,
+                normX: patchX / fullW,
+                normY: patchY / fullH,
+                normW: patchW / fullW,
+                normH: patchH / fullH,
+              };
+            });
+          } else {
+            const blob = new Blob([buffer], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+
             try {
               const img = new Image();
               img.src = url;
@@ -1470,20 +1560,32 @@ function App() {
               URL.revokeObjectURL(url);
               return;
             }
-          }
 
-          setFinalPreviewUrl((prevUrl) => {
-            if (prevUrl && prevUrl.startsWith('blob:')) {
-              if (!imageCacheRef.current.isProtected(prevUrl)) {
+            setFinalPreviewUrl((prevUrl) => {
+              if (prevUrl && prevUrl.startsWith('blob:') && !imageCacheRef.current.isProtected(prevUrl)) {
                 setTimeout(() => URL.revokeObjectURL(prevUrl), 250);
               }
-            }
-            return url;
-          });
+              return url;
+            });
+
+            setInteractivePatch((prev) => {
+              if (prev && prev.url) {
+                setTimeout(() => URL.revokeObjectURL(prev.url), 500);
+              }
+              return null;
+            });
+          }
         }
       } catch (err) {
         if (err !== 'Superseded or worker failed') {
           console.error('Failed to apply adjustments:', err);
+        }
+
+        if (!dragging) {
+          setInteractivePatch((prev) => {
+            if (prev && prev.url) URL.revokeObjectURL(prev.url);
+            return null;
+          });
         }
       }
     },
@@ -2234,6 +2336,10 @@ function App() {
     setLiveAdjustments(INITIAL_ADJUSTMENTS);
     resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
     isBackendReadyRef.current = true;
+    setInteractivePatch((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url);
+      return null;
+    });
   }, [selectedImage?.path, resetAdjustmentsHistory]);
 
   const handleImageSelect = useCallback(
@@ -2343,6 +2449,10 @@ function App() {
         if (prev?.startsWith('blob:') && !imageCacheRef.current.isProtected(prev)) {
           setTimeout(() => URL.revokeObjectURL(prev), 250);
         }
+        return null;
+      });
+      setInteractivePatch((prev) => {
+        if (prev?.url) URL.revokeObjectURL(prev.url);
         return null;
       });
     },
@@ -2764,22 +2874,39 @@ function App() {
         currentResRef.current = targetRes;
         applyAdjustments(currentAdjustments, false, targetRes);
       }
-    }, 200),
+    }, 100),
     [applyAdjustments],
   );
 
   useEffect(() => {
     if (selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
-      let targetRes = calculateTargetRes();
+      let baseRes = calculateTargetRes();
 
       if (isFullScreen && originalSize.width > 0 && originalSize.height > 0) {
-        targetRes = Math.max(originalSize.width, originalSize.height);
+        baseRes = Math.max(originalSize.width, originalSize.height);
       }
 
-      if (targetRes > currentResRef.current) {
-        requestHiFiZoom(adjustments, targetRes);
+      let zoomedRes = baseRes * zoom;
+      if (originalSize.width > 0 && originalSize.height > 0) {
+        const maxRes = Math.max(originalSize.width, originalSize.height);
+        if (zoomedRes > maxRes) {
+          zoomedRes = maxRes;
+        }
+      }
+      const finalRes = Math.round(zoomedRes);
+
+      if (finalRes > currentResRef.current) {
+        if (finalRes > 3072) {
+          const now = Date.now();
+          if (now - lastZoomPatchTime.current > 150) {
+            lastZoomPatchTime.current = now;
+            applyAdjustments(adjustments, true, finalRes);
+          }
+        }
+        requestHiFiZoom(adjustments, finalRes);
       }
     }
+
     return () => {
       requestHiFiZoom.cancel();
     };
@@ -2793,6 +2920,8 @@ function App() {
     requestHiFiZoom,
     isFullScreen,
     originalSize,
+    zoom,
+    applyAdjustments,
   ]);
 
   useEffect(() => {
@@ -2808,11 +2937,6 @@ function App() {
       if (appSettings?.enableLivePreviews !== false) {
         applyAdjustments(adjustments, true, targetRes);
       }
-
-      dragIdleTimer.current = setTimeout(() => {
-        currentResRef.current = targetRes;
-        applyAdjustments(adjustments, false, targetRes);
-      }, 350);
     } else {
       dragIdleTimer.current = setTimeout(() => {
         currentResRef.current = targetRes;
@@ -4745,6 +4869,12 @@ function App() {
 
     const options = [
       {
+        label: 'Refresh Folder',
+        icon: RefreshCw,
+        onClick: handleLibraryRefresh,
+      },
+      { type: OPTION_SEPARATOR },
+      {
         label: 'Paste',
         icon: ClipboardPaste,
         disabled: copiedFilePaths.length === 0,
@@ -4944,6 +5074,7 @@ function App() {
               canRedo={canRedo}
               canUndo={canUndo}
               finalPreviewUrl={finalPreviewUrl}
+              interactivePatch={interactivePatch}
               isFullScreen={isFullScreen}
               isLoading={isViewLoading}
               isSliderDragging={isSliderDragging}
@@ -5133,6 +5264,7 @@ function App() {
                             copiedMask={copiedMask}
                             histogram={histogram}
                             isGeneratingAiMask={isGeneratingAiMask}
+                            onGenerateAiDepthMask={handleGenerateAiDepthMask}
                             onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
                             onGenerateAiSkyMask={handleGenerateAiSkyMask}
                             onSelectContainer={setActiveMaskContainerId}
