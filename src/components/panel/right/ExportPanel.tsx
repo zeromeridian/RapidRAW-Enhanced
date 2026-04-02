@@ -27,6 +27,7 @@ import { useExportSettings } from '../../../hooks/useExportSettings';
 interface ExportPanelProps {
   adjustments: Adjustments;
   exportState: ExportState;
+  isAndroid: boolean;
   multiSelectedPaths: Array<string>;
   selectedImage: SelectedImage;
   setExportState(state: any): void;
@@ -165,6 +166,7 @@ const resizeModeOptions = [
 export default function ExportPanel({
   adjustments,
   exportState,
+  isAndroid,
   multiSelectedPaths,
   selectedImage,
   setExportState,
@@ -420,13 +422,23 @@ export default function ExportPanel({
 
     try {
       if (isBatchMode || !isEditorContext) {
-        const outputFolder = await open({
-          title: `Select Folder to Export ${numImages} Image(s)`,
-          directory: true,
-          defaultPath: lastExportPath ?? undefined,
-        });
+        let outputFolder: string | null = null;
+
+        if (isAndroid) {
+          outputFolder = await invoke<string>(Invokes.GetOrCreateAndroidExportRoot);
+        } else {
+          const selectedFolder = await open({
+            title: `Select Folder to Export ${numImages} Image(s)`,
+            directory: true,
+            defaultPath: lastExportPath ?? undefined,
+          });
+          if (typeof selectedFolder === 'string') {
+            outputFolder = selectedFolder;
+          }
+        }
+
         if (outputFolder) {
-          saveLastUsedPreset(outputFolder as string);
+          saveLastUsedPreset(outputFolder);
           setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
           await invoke(Invokes.BatchExportImages, {
             exportSettings,
@@ -440,23 +452,35 @@ export default function ExportPanel({
         const originalFilename = selectedImage.path.split(/[\\/]/).pop() || '';
         const stem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
         const suggestedName = finalFilenameTemplate.replace('{original_filename}', stem);
-        const defaultPath = lastExportPath
-          ? `${lastExportPath}/${suggestedName}.${selectedFormat.extensions[0]}`
-          : `${suggestedName}.${selectedFormat.extensions[0]}`;
-        const filePath = await save({
-          title: 'Save Edited Image',
-          defaultPath,
-          filters: [
-            { name: selectedFormat.name, extensions: selectedFormat.extensions },
-            ...FILE_FORMATS.filter((f: FileFormat) => f.id !== fileFormat).map((f: FileFormat) => ({
-              name: f.name,
-              extensions: f.extensions,
-            })),
-          ],
-        });
+        let filePath: string | null = null;
+
+        if (isAndroid) {
+          const exportRoot = await invoke<string>(Invokes.GetOrCreateAndroidExportRoot);
+          saveLastUsedPreset(exportRoot);
+          filePath = `${exportRoot}/${suggestedName}.${selectedFormat.extensions[0]}`;
+        } else {
+          const defaultPath = lastExportPath
+            ? `${lastExportPath}/${suggestedName}.${selectedFormat.extensions[0]}`
+            : `${suggestedName}.${selectedFormat.extensions[0]}`;
+          const selectedPath = await save({
+            title: 'Save Edited Image',
+            defaultPath,
+            filters: [
+              { name: selectedFormat.name, extensions: selectedFormat.extensions },
+              ...FILE_FORMATS.filter((f: FileFormat) => f.id !== fileFormat).map((f: FileFormat) => ({
+                name: f.name,
+                extensions: f.extensions,
+              })),
+            ],
+          });
+          if (typeof selectedPath === 'string') {
+            filePath = selectedPath;
+            const dir = selectedPath.substring(0, Math.max(selectedPath.lastIndexOf('/'), selectedPath.lastIndexOf('\\')));
+            if (dir) saveLastUsedPreset(dir);
+          }
+        }
+
         if (filePath) {
-          const dir = filePath.substring(0, Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')));
-          if (dir) saveLastUsedPreset(dir);
           setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
           await invoke(Invokes.ExportImage, {
             exportSettings,

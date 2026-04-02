@@ -25,6 +25,7 @@ import { useExportSettings } from '../../../hooks/useExportSettings';
 
 interface LibraryExportPanelProps {
   exportState: ExportState;
+  isAndroid: boolean;
   isVisible: boolean;
   multiSelectedPaths: Array<string>;
   onClose(): void;
@@ -164,6 +165,7 @@ const resizeModeOptions = [
 
 export default function LibraryExportPanel({
   exportState,
+  isAndroid,
   isVisible,
   multiSelectedPaths,
   onClose,
@@ -446,14 +448,23 @@ export default function LibraryExportPanel({
     const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
 
     try {
-      const outputFolder = await open({
-        directory: true,
-        title: `Select Folder to Export ${numImages} Image(s)`,
-        defaultPath: lastExportPath ?? undefined,
-      });
+      let outputFolder: string | null = null;
+
+      if (isAndroid) {
+        outputFolder = await invoke<string>(Invokes.GetOrCreateAndroidExportRoot);
+      } else {
+        const selectedFolder = await open({
+          directory: true,
+          title: `Select Folder to Export ${numImages} Image(s)`,
+          defaultPath: lastExportPath ?? undefined,
+        });
+        if (typeof selectedFolder === 'string') {
+          outputFolder = selectedFolder;
+        }
+      }
 
       if (outputFolder) {
-        saveLastUsedPreset(outputFolder as string);
+        saveLastUsedPreset(outputFolder);
         setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
         await invoke(Invokes.BatchExportImages, {
           exportSettings,

@@ -461,7 +461,6 @@ function App() {
   const currentResRef = useRef<number>(1280);
   const currentOriginalResRef = useRef<number>(0);
   const isInitialMount = useRef(true);
-  const hasInitializedAndroidLibraryRootRef = useRef(false);
   const currentFolderPathRef = useRef<string>(currentFolderPath);
   const preloadedDataRef = useRef<{
     tree?: Promise<any>;
@@ -3588,37 +3587,6 @@ function App() {
   };
 
   useEffect(() => {
-    if (!isAndroid || !appSettings || hasInitializedAndroidLibraryRootRef.current) {
-      return;
-    }
-
-    let isCancelled = false;
-    hasInitializedAndroidLibraryRootRef.current = true;
-
-    const initializeAndroidLibraryRoot = async () => {
-      try {
-        const libraryRoot = await invoke<string>(Invokes.GetOrCreateInternalLibraryRoot);
-        if (isCancelled) {
-          return;
-        }
-
-        setRootPath(libraryRoot);
-        await handleSelectSubfolder(libraryRoot, true);
-      } catch (err) {
-        hasInitializedAndroidLibraryRootRef.current = false;
-        console.error('Failed to initialize Android library root:', err);
-        setError('Failed to initialize Android library.');
-      }
-    };
-
-    initializeAndroidLibraryRoot();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [appSettings, handleSelectSubfolder, isAndroid]);
-
-  useEffect(() => {
     if (!rootPath) {
       setIsLayoutReady(false);
       return;
@@ -5214,6 +5182,7 @@ function App() {
                           <ExportPanel
                             adjustments={adjustments}
                             exportState={exportState}
+                            isAndroid={isAndroid}
                             multiSelectedPaths={multiSelectedPaths}
                             selectedImage={selectedImage}
                             setExportState={setExportState}
@@ -5317,6 +5286,7 @@ function App() {
             <LibraryExportPanel
               exportState={exportState}
               imageList={sortedImageList}
+              isAndroid={isAndroid}
               isVisible={isLibraryExportPanelVisible}
               multiSelectedPaths={multiSelectedPaths}
               onClose={() => setIsLibraryExportPanelVisible(false)}

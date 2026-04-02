@@ -66,8 +66,8 @@ use crate::ai_processing::{
 };
 use crate::exif_processing::{read_exposure_time_secs, read_iso};
 use crate::file_management::{
-    AppSettings, generate_filename_from_template, load_settings, parse_virtual_path,
-    read_file_mapped,
+    AppSettings, generate_filename_from_template, get_or_create_android_export_root_path,
+    load_settings, parse_virtual_path, read_file_mapped,
 };
 use crate::formats::is_raw_file;
 use crate::image_loader::{
@@ -2059,6 +2059,34 @@ async fn export_image(
         return Err("An export is already in progress.".to_string());
     }
 
+    let resolved_output_path = {
+        #[cfg(target_os = "android")]
+        {
+            let export_root = get_or_create_android_export_root_path(&app_handle)?;
+            let file_name = Path::new(&output_path)
+                .file_name()
+                .ok_or_else(|| "Missing export filename".to_string())?;
+            let output_path = export_root.join(file_name);
+            if let Some(parent) = output_path.parent()
+                && !parent.as_os_str().is_empty()
+            {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            output_path
+        }
+
+        #[cfg(not(target_os = "android"))]
+        {
+            let output_path = PathBuf::from(&output_path);
+            if let Some(parent) = output_path.parent()
+                && !parent.as_os_str().is_empty()
+            {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            output_path
+        }
+    };
+
     let context = get_or_init_gpu_context(&state)?;
     let (original_image_data, is_raw) = get_full_image_for_processing(&state)?;
     let context = Arc::new(context);
@@ -2068,8 +2096,7 @@ async fn export_image(
         let processing_result: Result<(), String> = (|| {
             let (source_path, _) = parse_virtual_path(&original_path);
             let source_path_str = source_path.to_string_lossy().to_string();
-
-            let output_path_obj = std::path::Path::new(&output_path);
+            let output_path_obj = resolved_output_path.as_path();
             let extension = output_path_obj
                 .extension()
                 .and_then(|s| s.to_str())
@@ -2160,6 +2187,19 @@ async fn batch_export_images(
         return Err("An export is already in progress.".to_string());
     }
 
+    let resolved_output_folder = {
+        #[cfg(target_os = "android")]
+        {
+            get_or_create_android_export_root_path(&app_handle)?
+        }
+
+        #[cfg(not(target_os = "android"))]
+        {
+            PathBuf::from(&output_folder)
+        }
+    };
+    fs::create_dir_all(&resolved_output_folder).map_err(|e| e.to_string())?;
+
     let context = get_or_init_gpu_context(&state)?;
     let context = Arc::new(context);
     let progress_counter = Arc::new(AtomicUsize::new(0));
@@ -2177,7 +2217,7 @@ async fn batch_export_images(
 
     let task = tokio::spawn(async move {
         let state = app_handle.state::<AppState>();
-        let output_folder_path = std::path::Path::new(&output_folder);
+        let output_folder_path = resolved_output_folder;
         let total_paths = paths.len();
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
         let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
@@ -4643,6 +4683,7 @@ pub fn run() {
             file_management::save_presets,
             file_management::load_settings,
             file_management::save_settings,
+            file_management::get_or_create_android_export_root,
             file_management::get_or_create_internal_library_root,
             file_management::reset_adjustments_for_paths,
             file_management::apply_auto_adjustments_to_paths,
