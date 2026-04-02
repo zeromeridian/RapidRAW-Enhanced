@@ -259,7 +259,13 @@ const insertChildrenIntoTree = (node: any, targetPath: string, newChildren: any[
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
-  const [osPlatform, setOsPlatform] = useState('');
+  const [osPlatform, setOsPlatform] = useState(() => {
+    try {
+      return platform();
+    } catch (_err) {
+      return '';
+    }
+  });
   const [activeView, setActiveView] = useState('library');
   const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
   const [isInstantTransition, setIsInstantTransition] = useState(false);
@@ -455,6 +461,7 @@ function App() {
   const currentResRef = useRef<number>(1280);
   const currentOriginalResRef = useRef<number>(0);
   const isInitialMount = useRef(true);
+  const hasInitializedAndroidLibraryRootRef = useRef(false);
   const currentFolderPathRef = useRef<string>(currentFolderPath);
   const preloadedDataRef = useRef<{
     tree?: Promise<any>;
@@ -464,6 +471,7 @@ function App() {
   }>({});
   const previewJobIdRef = useRef<number>(0);
   const latestRenderedJobIdRef = useRef<number>(0);
+  const isAndroid = osPlatform === 'android';
 
   useEffect(() => {
     if (currentFolderPath) {
@@ -1691,7 +1699,7 @@ function App() {
           }
         }
 
-        if (settings.lastRootPath) {
+        if (!isAndroid && settings.lastRootPath) {
           const root = settings.lastRootPath;
           const currentPath = settings.lastFolderState?.currentFolderPath || root;
 
@@ -1721,7 +1729,7 @@ function App() {
       .finally(() => {
         isInitialMount.current = false;
       });
-  }, []);
+  }, [isAndroid]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) {
@@ -3561,16 +3569,54 @@ function App() {
 
   const handleOpenFolder = async () => {
     try {
+      if (isAndroid) {
+        const libraryRoot = await invoke<string>(Invokes.GetOrCreateInternalLibraryRoot);
+        setRootPath(libraryRoot);
+        await handleSelectSubfolder(libraryRoot, true);
+        return;
+      }
+
       const selected = await open({ directory: true, multiple: false, defaultPath: await homeDir() });
       if (typeof selected === 'string') {
         setRootPath(selected);
         await handleSelectSubfolder(selected, true);
       }
     } catch (err) {
-      console.error('Failed to open directory dialog:', err);
-      setError('Failed to open folder selection dialog.');
+      console.error(isAndroid ? 'Failed to open Android library root:' : 'Failed to open directory dialog:', err);
+      setError(isAndroid ? 'Failed to open library.' : 'Failed to open folder selection dialog.');
     }
   };
+
+  useEffect(() => {
+    if (!isAndroid || !appSettings || hasInitializedAndroidLibraryRootRef.current) {
+      return;
+    }
+
+    let isCancelled = false;
+    hasInitializedAndroidLibraryRootRef.current = true;
+
+    const initializeAndroidLibraryRoot = async () => {
+      try {
+        const libraryRoot = await invoke<string>(Invokes.GetOrCreateInternalLibraryRoot);
+        if (isCancelled) {
+          return;
+        }
+
+        setRootPath(libraryRoot);
+        await handleSelectSubfolder(libraryRoot, true);
+      } catch (err) {
+        hasInitializedAndroidLibraryRootRef.current = false;
+        console.error('Failed to initialize Android library root:', err);
+        setError('Failed to initialize Android library.');
+      }
+    };
+
+    initializeAndroidLibraryRoot();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [appSettings, handleSelectSubfolder, isAndroid]);
 
   useEffect(() => {
     if (!rootPath) {
@@ -4849,6 +4895,7 @@ function App() {
             isIndexing={isIndexing}
             isLoading={isViewLoading}
             isTreeLoading={isTreeLoading}
+            isAndroid={isAndroid}
             libraryScrollTop={libraryScrollTop}
             libraryViewMode={libraryViewMode}
             multiSelectedPaths={multiSelectedPaths}

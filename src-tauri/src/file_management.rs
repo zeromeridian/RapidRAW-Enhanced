@@ -24,6 +24,12 @@ use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
 use uuid::Uuid;
 use walkdir::WalkDir;
+#[cfg(target_os = "android")]
+use jni::objects::{JObject, JString, JValue};
+#[cfg(target_os = "android")]
+use jni::{JNIEnv, JavaVM};
+#[cfg(target_os = "android")]
+use ndk_context::android_context;
 #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
 use trash;
 
@@ -518,6 +524,240 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
 
     let sidecar_path = source_path.with_file_name(sidecar_filename);
     (source_path, sidecar_path)
+}
+
+fn is_android_content_uri(path: &str) -> bool {
+    path.starts_with("content://")
+}
+
+#[cfg(target_os = "android")]
+fn clear_pending_android_exception(env: &mut JNIEnv<'_>) {
+    if env.exception_check().unwrap_or(false) {
+        let _ = env.exception_describe();
+        let _ = env.exception_clear();
+    }
+}
+
+#[cfg(target_os = "android")]
+fn map_android_jni_error(env: &mut JNIEnv<'_>, err: jni::errors::Error) -> String {
+    clear_pending_android_exception(env);
+    format!("Android JNI error: {}", err)
+}
+
+#[cfg(target_os = "android")]
+fn close_android_closeable(env: &mut JNIEnv<'_>, closeable: &JObject<'_>) {
+    if closeable.is_null() {
+        return;
+    }
+
+    if let Err(err) = env.call_method(closeable, "close", "()V", &[]) {
+        clear_pending_android_exception(env);
+        log::warn!("Failed to close Android Closeable: {}", err);
+    }
+}
+
+#[cfg(target_os = "android")]
+fn get_android_content_resolver<'local>(env: &mut JNIEnv<'local>) -> Result<JObject<'local>, String> {
+    let context = env
+        .new_local_ref(unsafe { JObject::from_raw(android_context().context().cast()) })
+        .map_err(|e| map_android_jni_error(env, e))?;
+
+    let resolver = env
+        .call_method(
+            &context,
+            "getContentResolver",
+            "()Landroid/content/ContentResolver;",
+            &[],
+        )
+        .and_then(|value| value.l())
+        .map_err(|e| map_android_jni_error(env, e))?;
+
+    if resolver.is_null() {
+        return Err("Android ContentResolver was null.".into());
+    }
+
+    Ok(resolver)
+}
+
+#[cfg(target_os = "android")]
+fn parse_android_uri<'local>(env: &mut JNIEnv<'local>, uri_str: &str) -> Result<JObject<'local>, String> {
+    let uri_string = env
+        .new_string(uri_str)
+        .map_err(|e| map_android_jni_error(env, e))?;
+
+    let uri = env
+        .call_static_method(
+            "android/net/Uri",
+            "parse",
+            "(Ljava/lang/String;)Landroid/net/Uri;",
+            &[(&uri_string).into()],
+        )
+        .and_then(|value| value.l())
+        .map_err(|e| map_android_jni_error(env, e))?;
+
+    if uri.is_null() {
+        return Err(format!("Failed to parse Android content URI: {}", uri_str));
+    }
+
+    Ok(uri)
+}
+
+#[cfg(target_os = "android")]
+fn resolve_android_content_uri_name(uri_str: &str) -> Result<String, String> {
+    let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
+        .map_err(|e| format!("Failed to access Android JVM: {}", e))?;
+    let mut env = vm
+        .attach_current_thread()
+        .map_err(|e| format!("Failed to attach current thread to Android JVM: {}", e))?;
+
+    let resolver = get_android_content_resolver(&mut env)?;
+    let uri = parse_android_uri(&mut env, uri_str)?;
+    let null_obj = JObject::null();
+
+    let cursor = env
+        .call_method(
+            &resolver,
+            "query",
+            "(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;",
+            &[
+                (&uri).into(),
+                (&null_obj).into(),
+                (&null_obj).into(),
+                (&null_obj).into(),
+                (&null_obj).into(),
+            ],
+        )
+        .and_then(|value| value.l())
+        .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+    if cursor.is_null() {
+        return Err(format!(
+            "ContentResolver query returned no cursor for URI: {}",
+            uri_str
+        ));
+    }
+
+    let result = (|| -> Result<String, String> {
+        let moved = env
+            .call_method(&cursor, "moveToFirst", "()Z", &[])
+            .and_then(|value| value.z())
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+        if !moved {
+            return Err(format!("No metadata rows found for content URI: {}", uri_str));
+        }
+
+        let display_name_column = env
+            .get_static_field(
+                "android/provider/OpenableColumns",
+                "DISPLAY_NAME",
+                "Ljava/lang/String;",
+            )
+            .and_then(|value| value.l())
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
+        let column_index = env
+            .call_method(
+                &cursor,
+                "getColumnIndex",
+                "(Ljava/lang/String;)I",
+                &[(&display_name_column).into()],
+            )
+            .and_then(|value| value.i())
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+        if column_index < 0 {
+            return Err(format!(
+                "DISPLAY_NAME column was unavailable for content URI: {}",
+                uri_str
+            ));
+        }
+
+        let display_name_obj = env
+            .call_method(
+                &cursor,
+                "getString",
+                "(I)Ljava/lang/String;",
+                &[JValue::from(column_index)],
+            )
+            .and_then(|value| value.l())
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+        if display_name_obj.is_null() {
+            return Err(format!("Display name was null for content URI: {}", uri_str));
+        }
+
+        let display_name = env
+            .get_string(&JString::from(display_name_obj))
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+        Ok(display_name.into())
+    })();
+
+    close_android_closeable(&mut env, &cursor);
+    result
+}
+
+#[cfg(target_os = "android")]
+fn read_android_content_uri(uri_str: &str) -> Result<Vec<u8>, String> {
+    let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
+        .map_err(|e| format!("Failed to access Android JVM: {}", e))?;
+    let mut env = vm
+        .attach_current_thread()
+        .map_err(|e| format!("Failed to attach current thread to Android JVM: {}", e))?;
+
+    let resolver = get_android_content_resolver(&mut env)?;
+    let uri = parse_android_uri(&mut env, uri_str)?;
+    let input_stream = env
+        .call_method(
+            &resolver,
+            "openInputStream",
+            "(Landroid/net/Uri;)Ljava/io/InputStream;",
+            &[(&uri).into()],
+        )
+        .and_then(|value| value.l())
+        .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+    if input_stream.is_null() {
+        return Err(format!(
+            "Failed to open InputStream for Android content URI: {}",
+            uri_str
+        ));
+    }
+
+    let result = (|| -> Result<Vec<u8>, String> {
+        const BUFFER_SIZE: i32 = 8192;
+
+        let java_buffer = env
+            .new_byte_array(BUFFER_SIZE)
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
+        let mut rust_buffer = vec![0i8; BUFFER_SIZE as usize];
+        let mut bytes = Vec::new();
+
+        loop {
+            let read_count = env
+                .call_method(&input_stream, "read", "([B)I", &[(&java_buffer).into()])
+                .and_then(|value| value.i())
+                .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+            if read_count < 0 {
+                break;
+            }
+
+            if read_count == 0 {
+                continue;
+            }
+
+            let read_len = read_count as usize;
+            env.get_byte_array_region(&java_buffer, 0, &mut rust_buffer[..read_len])
+                .map_err(|e| map_android_jni_error(&mut env, e))?;
+            bytes.extend(rust_buffer[..read_len].iter().map(|byte| *byte as u8));
+        }
+
+        Ok(bytes)
+    })();
+
+    close_android_closeable(&mut env, &input_stream);
+    result
 }
 
 #[tauri::command]
@@ -2339,6 +2579,21 @@ fn get_settings_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, Strin
 }
 
 #[tauri::command]
+pub fn get_or_create_internal_library_root(app_handle: AppHandle) -> Result<String, String> {
+    let library_root = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("library");
+
+    if !library_root.exists() {
+        fs::create_dir_all(&library_root).map_err(|e| e.to_string())?;
+    }
+
+    Ok(library_root.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
 pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
     let path = get_settings_path(&app_handle)?;
 
@@ -2890,6 +3145,61 @@ pub async fn import_files(
             );
 
             let import_result: Result<(), String> = (|| {
+                #[cfg(target_os = "android")]
+                if is_android_content_uri(source_path_str) {
+                    let resolved_name = resolve_android_content_uri_name(source_path_str)?;
+                    let source_bytes = read_android_content_uri(source_path_str)?;
+                    let source_name_path = Path::new(&resolved_name);
+                    let file_date =
+                        exif_processing::get_creation_date_from_bytes(&resolved_name, &source_bytes);
+
+                    let mut final_dest_folder = PathBuf::from(&destination_folder);
+                    if settings.organize_by_date {
+                        let date_format_str = settings
+                            .date_folder_format
+                            .replace("YYYY", "%Y")
+                            .replace("MM", "%m")
+                            .replace("DD", "%d");
+                        let subfolder = file_date.format(&date_format_str).to_string();
+                        final_dest_folder.push(subfolder);
+                    }
+
+                    fs::create_dir_all(&final_dest_folder)
+                        .map_err(|e| format!("Failed to create destination folder: {}", e))?;
+
+                    let new_stem = generate_filename_from_template(
+                        &settings.filename_template,
+                        source_name_path,
+                        i + 1,
+                        total_files,
+                        &file_date,
+                    );
+                    let extension = source_name_path
+                        .extension()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("");
+                    let new_filename = format!("{}.{}", new_stem, extension);
+                    let dest_file_path = final_dest_folder.join(new_filename);
+
+                    if dest_file_path.exists() {
+                        return Err(format!(
+                            "File already exists at destination: {}",
+                            dest_file_path.display()
+                        ));
+                    }
+
+                    fs::write(&dest_file_path, source_bytes).map_err(|e| e.to_string())?;
+
+                    if settings.delete_after_import {
+                        log::info!(
+                            "Skipping delete_after_import for Android content URI source: {}",
+                            source_path_str
+                        );
+                    }
+
+                    return Ok(());
+                }
+
                 let (source_path, source_sidecar) = parse_virtual_path(source_path_str);
                 if !source_path.exists() {
                     return Err(format!("Source file not found: {}", source_path_str));
