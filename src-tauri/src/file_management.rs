@@ -2579,40 +2579,42 @@ fn get_settings_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, Strin
     Ok(settings_dir.join("settings.json"))
 }
 
-pub fn get_or_create_android_export_root_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
-    let export_root = app_handle
-        .path()
-        .picture_dir()
-        .map_err(|e| e.to_string())?
-        .join("RapidRaw");
-
-    if !export_root.exists() {
-        fs::create_dir_all(&export_root).map_err(|e| e.to_string())?;
-    }
-
-    Ok(export_root)
-}
-
-#[tauri::command]
-pub fn get_or_create_android_export_root(app_handle: AppHandle) -> Result<String, String> {
-    Ok(get_or_create_android_export_root_path(&app_handle)?
-        .to_string_lossy()
-        .into_owned())
-}
-
-#[tauri::command]
-pub fn get_or_create_internal_library_root(app_handle: AppHandle) -> Result<String, String> {
-    let library_root = app_handle
+fn get_internal_library_root_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, String> {
+    let library_dir = app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
         .join("library");
 
-    if !library_root.exists() {
-        fs::create_dir_all(&library_root).map_err(|e| e.to_string())?;
+    if !library_dir.exists() {
+        fs::create_dir_all(&library_dir).map_err(|e| e.to_string())?;
     }
 
-    Ok(library_root.to_string_lossy().into_owned())
+    Ok(library_dir)
+}
+
+fn get_internal_export_root_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, String> {
+    let export_dir = get_internal_library_root_path(app_handle)?.join("Exports");
+
+    if !export_dir.exists() {
+        fs::create_dir_all(&export_dir).map_err(|e| e.to_string())?;
+    }
+
+    Ok(export_dir)
+}
+
+#[tauri::command]
+pub fn get_or_create_internal_library_root(app_handle: AppHandle) -> Result<String, String> {
+    let library_root = get_internal_library_root_path(&app_handle)?;
+
+    Ok(library_root.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn get_or_create_internal_export_root(app_handle: AppHandle) -> Result<String, String> {
+    let export_dir = get_internal_export_root_path(&app_handle)?;
+
+    Ok(export_dir.to_string_lossy().to_string())
 }
 
 #[tauri::command]

@@ -5182,7 +5182,6 @@ function App() {
                           <ExportPanel
                             adjustments={adjustments}
                             exportState={exportState}
-                            isAndroid={isAndroid}
                             multiSelectedPaths={multiSelectedPaths}
                             selectedImage={selectedImage}
                             setExportState={setExportState}
@@ -5286,7 +5285,6 @@ function App() {
             <LibraryExportPanel
               exportState={exportState}
               imageList={sortedImageList}
-              isAndroid={isAndroid}
               isVisible={isLibraryExportPanelVisible}
               multiSelectedPaths={multiSelectedPaths}
               onClose={() => setIsLibraryExportPanelVisible(false)}

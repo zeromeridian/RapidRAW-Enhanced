@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
+import { platform } from '@tauri-apps/plugin-os';
 import { Save, CheckCircle, XCircle, Loader, X, Ban } from 'lucide-react';
 import debounce from 'lodash.debounce';
 import Switch from '../../ui/Switch';
@@ -25,7 +26,6 @@ import { useExportSettings } from '../../../hooks/useExportSettings';
 
 interface LibraryExportPanelProps {
   exportState: ExportState;
-  isAndroid: boolean;
   isVisible: boolean;
   multiSelectedPaths: Array<string>;
   onClose(): void;
@@ -165,7 +165,6 @@ const resizeModeOptions = [
 
 export default function LibraryExportPanel({
   exportState,
-  isAndroid,
   isVisible,
   multiSelectedPaths,
   onClose,
@@ -250,6 +249,14 @@ export default function LibraryExportPanel({
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
   const [watermarkImageAspectRatio, setWatermarkImageAspectRatio] = useState(1);
   const filenameInputRef = useRef<HTMLInputElement>(null);
+  const isAndroid = useMemo(() => {
+    try {
+      return platform() === 'android';
+    } catch (_error) {
+      return false;
+    }
+  }, []);
+  const ensureInternalExportRoot = useCallback(() => invoke<string>(Invokes.GetOrCreateInternalExportRoot), []);
 
   const { status, progress, errorMessage } = exportState;
   const isExporting = status === Status.Exporting;
@@ -448,27 +455,20 @@ export default function LibraryExportPanel({
     const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
 
     try {
-      let outputFolder: string | null = null;
-
-      if (isAndroid) {
-        outputFolder = await invoke<string>(Invokes.GetOrCreateAndroidExportRoot);
-      } else {
-        const selectedFolder = await open({
-          directory: true,
-          title: `Select Folder to Export ${numImages} Image(s)`,
-          defaultPath: lastExportPath ?? undefined,
-        });
-        if (typeof selectedFolder === 'string') {
-          outputFolder = selectedFolder;
-        }
-      }
+      const outputFolder = isAndroid
+        ? await ensureInternalExportRoot()
+        : await open({
+            directory: true,
+            title: `Select Folder to Export ${numImages} Image(s)`,
+            defaultPath: lastExportPath ?? undefined,
+          });
 
       if (outputFolder) {
-        saveLastUsedPreset(outputFolder);
+        saveLastUsedPreset(outputFolder as string);
         setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
         await invoke(Invokes.BatchExportImages, {
           exportSettings,
-          outputFolder,
+          outputFolder: outputFolder as string,
           outputFormat: FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0],
           paths: multiSelectedPaths,
         });
