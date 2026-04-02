@@ -256,7 +256,7 @@ export default function LibraryExportPanel({
       return false;
     }
   }, []);
-  const ensureInternalExportRoot = useCallback(() => invoke<string>(Invokes.GetOrCreateInternalExportRoot), []);
+  const androidExportRoot = 'RapidRaw';
 
   const { status, progress, errorMessage } = exportState;
   const isExporting = status === Status.Exporting;
@@ -456,7 +456,7 @@ export default function LibraryExportPanel({
 
     try {
       const outputFolder = isAndroid
-        ? await ensureInternalExportRoot()
+        ? androidExportRoot
         : await open({
             directory: true,
             title: `Select Folder to Export ${numImages} Image(s)`,

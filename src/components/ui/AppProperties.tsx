@@ -63,7 +63,6 @@ export enum Invokes {
   GenerateThumbnailsProgressive = 'generate_thumbnails_progressive',
   GenerateUncroppedPreview = 'generate_uncropped_preview',
   GetFolderTree = 'get_folder_tree',
-  GetOrCreateInternalExportRoot = 'get_or_create_internal_export_root',
   GetFolderChildren = 'get_folder_children',
   GetLogFilePath = 'get_log_file_path',
   GetOrCreateInternalLibraryRoot = 'get_or_create_internal_library_root',

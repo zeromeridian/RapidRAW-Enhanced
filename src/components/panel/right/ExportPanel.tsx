@@ -248,7 +248,7 @@ export default function ExportPanel({
       return false;
     }
   }, []);
-  const ensureInternalExportRoot = useCallback(() => invoke<string>(Invokes.GetOrCreateInternalExportRoot), []);
+  const androidExportRoot = 'RapidRaw';
   const joinExportPath = useCallback((dirPath: string, fileName: string) => {
     return `${dirPath.replace(/[\\/]+$/, '')}/${fileName}`;
   }, []);
@@ -433,7 +433,7 @@ export default function ExportPanel({
     try {
       if (isBatchMode || !isEditorContext) {
         const outputFolder = isAndroid
-          ? await ensureInternalExportRoot()
+          ? androidExportRoot
           : await open({
               title: `Select Folder to Export ${numImages} Image(s)`,
               directory: true,
@@ -457,7 +457,7 @@ export default function ExportPanel({
         const suggestedName = finalFilenameTemplate.replace('{original_filename}', stem);
         const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
         const filePath = isAndroid
-          ? joinExportPath(await ensureInternalExportRoot(), outputFileName)
+          ? joinExportPath(androidExportRoot, outputFileName)
           : await save({
               title: 'Save Edited Image',
               defaultPath: lastExportPath ? `${lastExportPath}/${outputFileName}` : outputFileName,
@@ -472,7 +472,7 @@ export default function ExportPanel({
 
         if (filePath) {
           if (isAndroid) {
-            saveLastUsedPreset(await ensureInternalExportRoot());
+            saveLastUsedPreset(androidExportRoot);
           } else {
             const dir = filePath.substring(0, Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')));
             if (dir) saveLastUsedPreset(dir);

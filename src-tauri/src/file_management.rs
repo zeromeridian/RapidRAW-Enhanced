@@ -2593,16 +2593,6 @@ fn get_internal_library_root_path(app_handle: &AppHandle) -> Result<std::path::P
     Ok(library_dir)
 }
 
-fn get_internal_export_root_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, String> {
-    let export_dir = get_internal_library_root_path(app_handle)?.join("Exports");
-
-    if !export_dir.exists() {
-        fs::create_dir_all(&export_dir).map_err(|e| e.to_string())?;
-    }
-
-    Ok(export_dir)
-}
-
 #[tauri::command]
 pub fn get_or_create_internal_library_root(app_handle: AppHandle) -> Result<String, String> {
     let library_root = get_internal_library_root_path(&app_handle)?;
@@ -2610,11 +2600,210 @@ pub fn get_or_create_internal_library_root(app_handle: AppHandle) -> Result<Stri
     Ok(library_root.to_string_lossy().to_string())
 }
 
-#[tauri::command]
-pub fn get_or_create_internal_export_root(app_handle: AppHandle) -> Result<String, String> {
-    let export_dir = get_internal_export_root_path(&app_handle)?;
+#[cfg(target_os = "android")]
+fn put_android_content_value_string<'local>(
+    env: &mut JNIEnv<'local>,
+    content_values: &JObject<'local>,
+    key: &str,
+    value: &str,
+) -> Result<(), String> {
+    let key_java = env
+        .new_string(key)
+        .map_err(|e| map_android_jni_error(env, e))?;
+    let value_java = env
+        .new_string(value)
+        .map_err(|e| map_android_jni_error(env, e))?;
 
-    Ok(export_dir.to_string_lossy().to_string())
+    env.call_method(
+        content_values,
+        "put",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+        &[(&key_java).into(), (&value_java).into()],
+    )
+    .map_err(|e| map_android_jni_error(env, e))?;
+
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+fn put_android_content_value_int<'local>(
+    env: &mut JNIEnv<'local>,
+    content_values: &JObject<'local>,
+    key: &str,
+    value: i32,
+) -> Result<(), String> {
+    let key_java = env
+        .new_string(key)
+        .map_err(|e| map_android_jni_error(env, e))?;
+    let value_java = env
+        .new_object("java/lang/Integer", "(I)V", &[JValue::from(value)])
+        .map_err(|e| map_android_jni_error(env, e))?;
+
+    env.call_method(
+        content_values,
+        "put",
+        "(Ljava/lang/String;Ljava/lang/Integer;)V",
+        &[(&key_java).into(), (&value_java).into()],
+    )
+    .map_err(|e| map_android_jni_error(env, e))?;
+
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+fn delete_android_media_store_item(
+    env: &mut JNIEnv<'_>,
+    resolver: &JObject<'_>,
+    item_uri: &JObject<'_>,
+) {
+    let null_string = JObject::null();
+    let null_args = JObject::null();
+    if let Err(err) = env.call_method(
+        resolver,
+        "delete",
+        "(Landroid/net/Uri;Ljava/lang/String;[Ljava/lang/String;)I",
+        &[
+            item_uri.into(),
+            (&null_string).into(),
+            (&null_args).into(),
+        ],
+    ) {
+        clear_pending_android_exception(env);
+        log::warn!("Failed to delete Android MediaStore item after write error: {}", err);
+    }
+}
+
+#[cfg(target_os = "android")]
+fn save_bytes_to_android_media_store(
+    file_name: &str,
+    mime_type: &str,
+    relative_path: &str,
+    collection_class: &str,
+    bytes: &[u8],
+) -> Result<(), String> {
+    let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
+        .map_err(|e| format!("Failed to access Android JVM: {}", e))?;
+    let mut env = vm
+        .attach_current_thread()
+        .map_err(|e| format!("Failed to attach current thread to Android JVM: {}", e))?;
+    let resolver = get_android_content_resolver(&mut env)?;
+    let content_values = env
+        .new_object("android/content/ContentValues", "()V", &[])
+        .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+    put_android_content_value_string(&mut env, &content_values, "_display_name", file_name)?;
+    put_android_content_value_string(&mut env, &content_values, "mime_type", mime_type)?;
+    put_android_content_value_string(&mut env, &content_values, "relative_path", relative_path)?;
+    put_android_content_value_int(&mut env, &content_values, "is_pending", 1)?;
+
+    let collection_uri = env
+        .get_static_field(collection_class, "EXTERNAL_CONTENT_URI", "Landroid/net/Uri;")
+        .and_then(|value| value.l())
+        .map_err(|e| map_android_jni_error(&mut env, e))?;
+    let item_uri = env
+        .call_method(
+            &resolver,
+            "insert",
+            "(Landroid/net/Uri;Landroid/content/ContentValues;)Landroid/net/Uri;",
+            &[(&collection_uri).into(), (&content_values).into()],
+        )
+        .and_then(|value| value.l())
+        .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+    if item_uri.is_null() {
+        return Err(format!(
+            "Failed to create Android MediaStore item for {}",
+            file_name
+        ));
+    }
+
+    let output_stream = env
+        .call_method(
+            &resolver,
+            "openOutputStream",
+            "(Landroid/net/Uri;)Ljava/io/OutputStream;",
+            &[(&item_uri).into()],
+        )
+        .and_then(|value| value.l())
+        .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+    if output_stream.is_null() {
+        delete_android_media_store_item(&mut env, &resolver, &item_uri);
+        return Err(format!(
+            "Failed to open Android MediaStore output stream for {}",
+            file_name
+        ));
+    }
+
+    let write_result = (|| -> Result<(), String> {
+        let byte_array = env
+            .byte_array_from_slice(bytes)
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
+        env.call_method(&output_stream, "write", "([B)V", &[(&byte_array).into()])
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
+        env.call_method(&output_stream, "flush", "()V", &[])
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
+        Ok(())
+    })();
+
+    close_android_closeable(&mut env, &output_stream);
+
+    if let Err(err) = write_result {
+        delete_android_media_store_item(&mut env, &resolver, &item_uri);
+        return Err(err);
+    }
+
+    let finalized_values = env
+        .new_object("android/content/ContentValues", "()V", &[])
+        .map_err(|e| map_android_jni_error(&mut env, e))?;
+    put_android_content_value_int(&mut env, &finalized_values, "is_pending", 0)?;
+
+    let null_string = JObject::null();
+    let null_args = JObject::null();
+    env.call_method(
+        &resolver,
+        "update",
+        "(Landroid/net/Uri;Landroid/content/ContentValues;Ljava/lang/String;[Ljava/lang/String;)I",
+        &[
+            (&item_uri).into(),
+            (&finalized_values).into(),
+            (&null_string).into(),
+            (&null_args).into(),
+        ],
+    )
+    .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+pub fn save_image_bytes_to_android_gallery(
+    file_name: &str,
+    mime_type: &str,
+    bytes: &[u8],
+) -> Result<(), String> {
+    save_bytes_to_android_media_store(
+        file_name,
+        mime_type,
+        "Pictures/RapidRaw",
+        "android/provider/MediaStore$Images$Media",
+        bytes,
+    )
+}
+
+#[cfg(target_os = "android")]
+pub fn save_file_bytes_to_android_downloads(
+    file_name: &str,
+    mime_type: &str,
+    bytes: &[u8],
+) -> Result<(), String> {
+    save_bytes_to_android_media_store(
+        file_name,
+        mime_type,
+        "Download/RapidRaw",
+        "android/provider/MediaStore$Downloads",
+        bytes,
+    )
 }
 
 #[tauri::command]
