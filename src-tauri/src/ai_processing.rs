@@ -799,8 +799,8 @@ pub fn run_lama_inpainting(
     let mask_w = max_x - min_x + 1;
     let mask_h = max_y - min_y + 1;
 
-    let pad_x = 64.max((mask_w as f32 * 0.5) as u32);
-    let pad_y = 64.max((mask_h as f32 * 0.5) as u32);
+    let pad_x = 128.max((mask_w as f32 * 1.5) as u32);
+    let pad_y = 128.max((mask_h as f32 * 1.5) as u32);
 
     let x0 = min_x.saturating_sub(pad_x);
     let y0 = min_y.saturating_sub(pad_y);
@@ -815,7 +815,7 @@ pub fn run_lama_inpainting(
     let cropped_img = imageops::crop_imm(&rgba, x0, y0, crop_w, crop_h).to_image();
     let cropped_mask = imageops::crop_imm(mask, x0, y0, crop_w, crop_h).to_image();
 
-    let max_dim_limit: u32 = 1024;
+    let max_dim_limit: u32 = 768;
     let needs_downscale = crop_w > max_dim_limit || crop_h > max_dim_limit;
 
     let (fw, fh, inf_img, inf_mask) = if needs_downscale {
