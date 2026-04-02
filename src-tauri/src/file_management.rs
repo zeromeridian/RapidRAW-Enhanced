@@ -686,8 +686,9 @@ fn resolve_android_content_uri_name(uri_str: &str) -> Result<String, String> {
             return Err(format!("Display name was null for content URI: {}", uri_str));
         }
 
+        let display_name_java = JString::from(display_name_obj);
         let display_name = env
-            .get_string(&JString::from(display_name_obj))
+            .get_string(&display_name_java)
             .map_err(|e| map_android_jni_error(&mut env, e))?;
 
         Ok(display_name.into())
