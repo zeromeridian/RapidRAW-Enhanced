@@ -2608,10 +2608,10 @@ pub fn clear_thumbnail_cache(app_handle: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn show_in_finder(path: String) -> Result<(), String> {
     let (source_path, _) = parse_virtual_path(&path);
-    let source_path_str = source_path.to_string_lossy().to_string();
 
     #[cfg(target_os = "windows")]
     {
+        let source_path_str = source_path.to_string_lossy().to_string();
         Command::new("explorer")
             .args(["/select,", &source_path_str])
             .spawn()
@@ -2620,15 +2620,16 @@ pub fn show_in_finder(path: String) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
+        let source_path_str = source_path.to_string_lossy().to_string();
         Command::new("open")
             .args(["-R", &source_path_str])
             .spawn()
             .map_err(|e| e.to_string())?;
     }
 
-    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    #[cfg(target_os = "linux")]
     {
-        if let Some(parent) = Path::new(&source_path_str).parent() {
+        if let Some(parent) = source_path.parent() {
             Command::new("xdg-open")
                 .arg(parent)
                 .spawn()
@@ -2636,6 +2637,16 @@ pub fn show_in_finder(path: String) -> Result<(), String> {
         } else {
             return Err("Could not get parent directory".into());
         }
+    }
+
+    #[cfg(target_os = "android")]
+    {
+        return Err("Show in File Manager is not natively supported via CLI on Android.".into());
+    }
+
+    #[cfg(target_os = "ios")]
+    {
+        return Err("Show in File Manager is not supported on iOS.".into());
     }
 
     Ok(())
