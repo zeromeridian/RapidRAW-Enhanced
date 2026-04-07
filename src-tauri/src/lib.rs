@@ -1872,6 +1872,11 @@ fn encode_image_to_bytes(
                 .write_to(&mut cursor, image::ImageFormat::Tiff)
                 .map_err(|e| e.to_string())?;
         }
+        "avif" => {
+            image
+                .write_to(&mut cursor, image::ImageFormat::Avif)
+                .map_err(|e| e.to_string())?;
+        }
         _ => return Err(format!("Unsupported file format: {}", output_format)),
     };
     Ok(image_bytes)
