@@ -4302,8 +4302,7 @@ fn frontend_ready(
                     let monitor_pos = monitor.position();
                     let default_width = 1280i32;
                     let default_height = 720i32;
-                    let center_x =
-                        monitor_pos.x + (monitor_size.width as i32 - default_width) / 2;
+                    let center_x = monitor_pos.x + (monitor_size.width as i32 - default_width) / 2;
                     let center_y =
                         monitor_pos.y + (monitor_size.height as i32 - default_height) / 2;
 
@@ -4311,8 +4310,7 @@ fn frontend_ready(
                         default_width as u32,
                         default_height as u32,
                     ));
-                    let _ = window
-                        .set_position(tauri::PhysicalPosition::new(center_x, center_y));
+                    let _ = window.set_position(tauri::PhysicalPosition::new(center_x, center_y));
                 }
             }
         }
@@ -4350,7 +4348,10 @@ pub fn run() {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            log::info!("New instance launched with args: {:?}. Focusing main window.", argv);
+            log::info!(
+                "New instance launched with args: {:?}. Focusing main window.",
+                argv
+            );
             if let Some(window) = app.get_webview_window("main") {
                 if let Err(e) = window.unminimize() {
                     log::error!("Failed to unminimize window: {}", e);
@@ -4363,7 +4364,10 @@ pub fn run() {
             if argv.len() > 1 {
                 let path_str = &argv[1];
                 if let Err(e) = app.emit("open-with-file", path_str) {
-                    log::error!("Failed to emit open-with-file from single-instance handler: {}", e);
+                    log::error!(
+                        "Failed to emit open-with-file from single-instance handler: {}",
+                        e
+                    );
                 }
             }
         }));

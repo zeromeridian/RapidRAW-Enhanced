@@ -22,10 +22,9 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
 use uuid::Uuid;
 use walkdir::WalkDir;
-#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
-use trash;
 
 use crate::AppState;
 use crate::calculate_geometry_hash;
@@ -2952,7 +2951,11 @@ pub async fn import_files(
                         }
                     }
 
-                    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+                    #[cfg(not(any(
+                        target_os = "windows",
+                        target_os = "macos",
+                        target_os = "linux"
+                    )))]
                     {
                         fs::remove_file(&source_path).map_err(|e| e.to_string())?;
                         if source_sidecar.exists() {
