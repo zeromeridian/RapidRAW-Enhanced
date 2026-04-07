@@ -2113,10 +2113,14 @@ function App() {
         setMultiSelectedPaths([]);
         setLibraryActivePath(null);
         if (selectedImage) {
+          debouncedSave.flush();
+          debouncedSetHistory.cancel();
           setSelectedImage(null);
           setFinalPreviewUrl(null);
           setUncroppedAdjustedPreviewUrl(null);
           setHistogram(null);
+          setLiveAdjustments(INITIAL_ADJUSTMENTS);
+          resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
         }
 
         const command =
@@ -2181,7 +2185,18 @@ function App() {
         setIsViewLoading(false);
       }
     },
-    [appSettings, handleSettingsChange, selectedImage, rootPath, sortCriteria.key, pinnedFolders, libraryViewMode],
+    [
+      appSettings,
+      handleSettingsChange,
+      selectedImage,
+      rootPath,
+      sortCriteria.key,
+      pinnedFolders,
+      libraryViewMode,
+      debouncedSave,
+      debouncedSetHistory,
+      resetAdjustmentsHistory,
+    ],
   );
 
   const handleLibraryRefresh = useCallback(() => {
@@ -2321,6 +2336,10 @@ function App() {
       transformWrapperRef.current.resetTransform(0);
     }
     setZoom(1);
+
+    debouncedSave.flush();
+    debouncedSetHistory.cancel();
+
     const lastActivePath = selectedImage?.path ?? null;
     setSelectedImage(null);
     setFinalPreviewUrl(null);
@@ -2341,13 +2360,14 @@ function App() {
       if (prev?.url) URL.revokeObjectURL(prev.url);
       return null;
     });
-  }, [selectedImage?.path, resetAdjustmentsHistory]);
+  }, [selectedImage?.path, resetAdjustmentsHistory, debouncedSave, debouncedSetHistory]);
 
   const handleImageSelect = useCallback(
     (path: string) => {
       if (selectedImage?.path === path) return;
 
-      debouncedSave.cancel();
+      debouncedSave.flush();
+      debouncedSetHistory.cancel();
 
       if (selectedImage?.path && cachedEditStateRef.current) {
         imageCacheRef.current.set(selectedImage.path, cachedEditStateRef.current);
@@ -2457,7 +2477,7 @@ function App() {
         return null;
       });
     },
-    [selectedImage?.path, debouncedSave, thumbnails, resetAdjustmentsHistory],
+    [selectedImage?.path, debouncedSave, debouncedSetHistory, thumbnails, resetAdjustmentsHistory],
   );
 
   const executeDelete = useCallback(
@@ -3860,7 +3880,7 @@ function App() {
       }
     } else {
       onSimpleClick(path);
-    setSelectionAnchorPath(path);
+      setSelectionAnchorPath(path);
     }
   };
 
@@ -3871,7 +3891,7 @@ function App() {
       onSimpleClick: (p: any) => {
         setMultiSelectedPaths([p]);
         setLibraryActivePath(p);
-      setSelectionAnchorPath(p);
+        setSelectionAnchorPath(p);
       },
     });
   };
