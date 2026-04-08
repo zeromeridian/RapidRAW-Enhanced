@@ -268,7 +268,13 @@ const insertChildrenIntoTree = (node: any, targetPath: string, newChildren: any[
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
-  const [osPlatform, setOsPlatform] = useState('');
+  const [osPlatform, setOsPlatform] = useState(() => {
+    try {
+      return platform();
+    } catch (_err) {
+      return '';
+    }
+  });
   const [activeView, setActiveView] = useState('library');
   const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
   const [isInstantTransition, setIsInstantTransition] = useState(false);
@@ -476,6 +482,7 @@ function App() {
   }>({});
   const previewJobIdRef = useRef<number>(0);
   const latestRenderedJobIdRef = useRef<number>(0);
+  const isAndroid = osPlatform === 'android';
 
   useEffect(() => {
     if (currentFolderPath) {
@@ -1794,7 +1801,7 @@ function App() {
           }
         }
 
-        if (settings.lastRootPath) {
+        if (!isAndroid && settings.lastRootPath) {
           const root = settings.lastRootPath;
           const currentPath = settings.lastFolderState?.currentFolderPath || root;
 
@@ -1824,7 +1831,7 @@ function App() {
       .finally(() => {
         isInitialMount.current = false;
       });
-  }, []);
+  }, [isAndroid]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) {
@@ -3708,14 +3715,21 @@ function App() {
 
   const handleOpenFolder = async () => {
     try {
+      if (isAndroid) {
+        const libraryRoot = await invoke<string>(Invokes.GetOrCreateInternalLibraryRoot);
+        setRootPath(libraryRoot);
+        await handleSelectSubfolder(libraryRoot, true);
+        return;
+      }
+
       const selected = await open({ directory: true, multiple: false, defaultPath: await homeDir() });
       if (typeof selected === 'string') {
         setRootPath(selected);
         await handleSelectSubfolder(selected, true);
       }
     } catch (err) {
-      console.error('Failed to open directory dialog:', err);
-      setError('Failed to open folder selection dialog.');
+      console.error(isAndroid ? 'Failed to open Android library root:' : 'Failed to open directory dialog:', err);
+      setError(isAndroid ? 'Failed to open library.' : 'Failed to open folder selection dialog.');
     }
   };
 
@@ -5009,6 +5023,7 @@ function App() {
             isIndexing={isIndexing}
             isLoading={isViewLoading}
             isTreeLoading={isTreeLoading}
+            isAndroid={isAndroid}
             libraryScrollTop={libraryScrollTop}
             libraryViewMode={libraryViewMode}
             multiSelectedPaths={multiSelectedPaths}
