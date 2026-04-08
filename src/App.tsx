@@ -2924,13 +2924,6 @@ function App() {
       const finalRes = Math.round(zoomedRes);
 
       if (finalRes > currentResRef.current) {
-        if (finalRes > 3072) {
-          const now = Date.now();
-          if (now - lastZoomPatchTime.current > 150) {
-            lastZoomPatchTime.current = now;
-            applyAdjustments(adjustments, true, finalRes);
-          }
-        }
         requestHiFiZoom(adjustments, finalRes);
       }
     }
