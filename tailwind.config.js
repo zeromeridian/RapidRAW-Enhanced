@@ -4,6 +4,11 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  safelist: [
+    {      
+      pattern: /(hue|sat|lum)-slider-.+/, // Required as these styles get dynamically loaded and are otherwise stripped
+    }
+  ],
   theme: {
     extend: {
       colors: {
