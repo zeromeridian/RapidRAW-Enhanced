@@ -55,6 +55,7 @@ interface ImageCanvasProps {
   transformedOriginalUrl: string | null;
   uncroppedAdjustedPreviewUrl: string | null;
   updateSubMask(id: string | null, subMask: Partial<SubMask>): void;
+  interactivePatch?: { url: string; normX: number; normY: number; normW: number; normH: number } | null;
   isWbPickerActive?: boolean;
   onWbPicked?: () => void;
   setAdjustments(fn: (prev: Adjustments) => Adjustments): void;
@@ -704,6 +705,7 @@ const ImageCanvas = memo(
     finalPreviewUrl,
     handleCropComplete,
     imageRenderSize,
+    interactivePatch,
     isAiEditing,
     isCropping,
     isMaskControlHovered,
@@ -759,6 +761,15 @@ const ImageCanvas = memo(
     const [isFadingIn, setIsFadingIn] = useState(false);
     const prevImageIdentityRef = useRef(selectedImage.thumbnailUrl);
 
+    const [baseTool, setBaseTool] = useState<ToolType>(brushSettings?.tool ?? ToolType.Brush);
+    const retainedPatchRef = useRef<typeof interactivePatch>(null);
+
+    useEffect(() => {
+      if (interactivePatch) {
+        retainedPatchRef.current = interactivePatch;
+      }
+    }, [interactivePatch]);
+
     useEffect(() => {
       const newSrc = finalPreviewUrl || selectedImage.thumbnailUrl;
       const isNewImage = prevImageIdentityRef.current !== selectedImage.thumbnailUrl;
@@ -803,6 +814,32 @@ const ImageCanvas = memo(
         }
       }
     }, [finalPreviewUrl, selectedImage.thumbnailUrl, isSliderDragging]);
+
+    useEffect(() => {
+      setBaseTool(brushSettings?.tool ?? ToolType.Brush);
+    }, [brushSettings?.tool]);
+
+    useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Alt') {
+          e.preventDefault();
+          (window as any).altKeyDown = true;
+        }
+      };
+      const handleKeyUp = (e: KeyboardEvent) => {
+        if (e.key === 'Alt') {
+          e.preventDefault();
+          (window as any).altKeyDown = false;
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('keyup', handleKeyUp);
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('keyup', handleKeyUp);
+        delete (window as any).altKeyDown;
+      };
+    }, []);
 
     const activeContainer = useMemo(() => {
       if (isMasking) {
@@ -1088,7 +1125,16 @@ const ImageCanvas = memo(
             return;
           }
 
-          const toolType = isAiSubjectActive ? ToolType.AiSeletor : ToolType.Brush;
+          const isAltPressed = e.evt.altKey;
+          let effectiveTool;
+
+          if (isAiSubjectActive) {
+            effectiveTool = ToolType.AiSeletor;
+          } else if (isAltPressed) {
+            effectiveTool = baseTool === ToolType.Brush ? ToolType.Eraser : ToolType.Brush;
+          } else {
+            effectiveTool = baseTool;
+          }
           const isShiftClick = isBrushActive && e.evt.shiftKey && lastBrushPoint.current;
 
           if (isShiftClick) {
@@ -1121,7 +1167,7 @@ const ImageCanvas = memo(
               brushSize: brushImageSpaceSize,
               feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
               points: interpolatedPoints,
-              tool: brushSettings?.tool ?? ToolType.Brush,
+              tool: effectiveTool,
             };
 
             const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
@@ -1146,7 +1192,7 @@ const ImageCanvas = memo(
           const newLine: DrawnLine = {
             brushSize: isBrushActive && brushSettings?.size ? brushStageSize : 2,
             points: [pos],
-            tool: toolType,
+            tool: effectiveTool,
           };
           currentLine.current = newLine;
         } else {
@@ -1182,6 +1228,7 @@ const ImageCanvas = memo(
         isToolActive,
         brushImageSpaceSize,
         brushStageSize,
+        baseTool,
       ],
     );
 
@@ -1302,6 +1349,16 @@ const ImageCanvas = memo(
             const cropX = crop ? (isPercent ? (crop.x / 100) * effectiveImageDimensions.width : crop.x) : 0;
             const cropY = crop ? (isPercent ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0;
 
+            const isAltPressedDuringMove = (window as any).altKeyDown || false;
+            let effectiveToolForPreview;
+
+            if (isAltPressedDuringMove) {
+              // Alt toggles: Brush -> Eraser, Eraser -> Brush
+              effectiveToolForPreview = baseTool === ToolType.Brush ? ToolType.Eraser : ToolType.Brush;
+            } else {
+              effectiveToolForPreview = baseTool;
+            }
+
             const imageSpaceLine: DrawnLine = {
               brushSize: brushImageSpaceSize,
               feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
@@ -1309,7 +1366,7 @@ const ImageCanvas = memo(
                 x: p.x / scale + cropX,
                 y: p.y / scale + cropY,
               })),
-              tool: brushSettings?.tool ?? ToolType.Brush,
+              tool: effectiveToolForPreview,
             };
 
             const existingLines = activeSubMask.parameters?.lines || [];
@@ -1351,6 +1408,7 @@ const ImageCanvas = memo(
         isMasking,
         localInitialDrawParams,
         brushImageSpaceSize,
+        baseTool,
       ],
     );
 
@@ -1458,6 +1516,9 @@ const ImageCanvas = memo(
       const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
 
       if (isBrushActive) {
+        const wasAltPressed = (window as any).altKeyDown || false;
+        const effectiveToolForFinal = wasAltPressed ? (baseTool === ToolType.Brush ? ToolType.Eraser : ToolType.Brush) : baseTool;
+
         const imageSpaceLine: DrawnLine = {
           brushSize: brushImageSpaceSize,
           feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
@@ -1465,7 +1526,7 @@ const ImageCanvas = memo(
             x: p.x / scale + cropX,
             y: p.y / scale + cropY,
           })),
-          tool: brushSettings?.tool ?? ToolType.Brush,
+          tool: effectiveToolForFinal,
         };
 
         const existingLines = activeSubMask?.parameters.lines || [];
@@ -1503,6 +1564,7 @@ const ImageCanvas = memo(
       localInitialDrawParams,
       brushImageSpaceSize,
       brushStageSize,
+      baseTool,
     ]);
 
     const handleMouseEnter = useCallback(() => {
@@ -1658,6 +1720,23 @@ const ImageCanvas = memo(
       };
     }, [originalSrc]);
 
+    useEffect(() => {
+      if (interactivePatch) {
+        retainedPatchRef.current = interactivePatch;
+      }
+    }, [interactivePatch]);
+
+    const currentTarget = finalPreviewUrl || selectedImage.thumbnailUrl;
+    const baseIsReady = displayState.base === currentTarget && !displayState.fade;
+
+    const visiblePatch = interactivePatch ?? (baseIsReady ? null : retainedPatchRef.current);
+
+    useEffect(() => {
+      if (baseIsReady && !interactivePatch) {
+        retainedPatchRef.current = null;
+      }
+    }, [baseIsReady, interactivePatch]);
+
     const uncroppedImageRenderSize = useMemo<Partial<RenderSize> | null>(() => {
       if (!selectedImage?.width || !selectedImage?.height || !imageRenderSize?.width || !imageRenderSize?.height) {
         return null;
@@ -1742,63 +1821,66 @@ const ImageCanvas = memo(
             }}
           >
             <div className="absolute inset-0 w-full h-full">
-              {displayState.base && (
-                <img
-                  alt="Edited Base"
-                  className={
-                    imageRenderSize.width > 0 && imageRenderSize.height > 0
-                      ? 'pointer-events-none'
-                      : 'absolute inset-0 w-full h-full object-contain pointer-events-none'
-                  }
-                  src={displayState.base}
-                  style={
-                    imageRenderSize.width > 0 && imageRenderSize.height > 0
-                      ? {
-                          position: 'absolute',
-                          left: `${imageRenderSize.offsetX}px`,
-                          top: `${imageRenderSize.offsetY}px`,
-                          width: `${imageRenderSize.width}px`,
-                          height: `${imageRenderSize.height}px`,
-                          imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                        }
-                      : {
-                          imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                        }
-                  }
-                />
-              )}
+              <svg
+                className="pointer-events-none"
+                style={
+                  imageRenderSize.width > 0 && imageRenderSize.height > 0
+                    ? {
+                        position: 'absolute',
+                        left: `${imageRenderSize.offsetX}px`,
+                        top: `${imageRenderSize.offsetY}px`,
+                        width: `${imageRenderSize.width}px`,
+                        height: `${imageRenderSize.height}px`,
+                        overflow: 'visible',
+                      }
+                    : {
+                        position: 'absolute',
+                        inset: '0px',
+                        width: '100%',
+                        height: '100%',
+                        overflow: 'visible',
+                      }
+                }
+                preserveAspectRatio={imageRenderSize.width > 0 && imageRenderSize.height > 0 ? 'none' : 'xMidYMid meet'}
+              >
+                {displayState.base && (
+                  <image
+                    href={displayState.base}
+                    x="0"
+                    y="0"
+                    width="100%"
+                    height="100%"
+                    style={{ imageRendering: isMaxZoom ? 'pixelated' : 'auto' }}
+                  />
+                )}
 
-              {displayState.fade && (
-                <img
-                  alt="Edited Fade"
-                  className={
-                    imageRenderSize.width > 0 && imageRenderSize.height > 0
-                      ? 'pointer-events-none'
-                      : 'absolute inset-0 w-full h-full object-contain pointer-events-none'
-                  }
-                  src={displayState.fade}
-                  style={
-                    imageRenderSize.width > 0 && imageRenderSize.height > 0
-                      ? {
-                          position: 'absolute',
-                          left: `${imageRenderSize.offsetX}px`,
-                          top: `${imageRenderSize.offsetY}px`,
-                          width: `${imageRenderSize.width}px`,
-                          height: `${imageRenderSize.height}px`,
-                          imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                          opacity: isFadingIn ? 1 : 0,
-                          transition: 'opacity 150ms ease-in-out',
-                          zIndex: 1,
-                        }
-                      : {
-                          imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                          opacity: isFadingIn ? 1 : 0,
-                          transition: 'opacity 150ms ease-in-out',
-                          zIndex: 1,
-                        }
-                  }
-                />
-              )}
+                {displayState.fade && (
+                  <image
+                    href={displayState.fade}
+                    x="0"
+                    y="0"
+                    width="100%"
+                    height="100%"
+                    style={{
+                      imageRendering: isMaxZoom ? 'pixelated' : 'auto',
+                      opacity: isFadingIn ? 1 : 0,
+                      transition: 'opacity 150ms ease-in-out',
+                    }}
+                  />
+                )}
+
+                {visiblePatch && (
+                  <image
+                    href={visiblePatch.url}
+                    x={`${visiblePatch.normX * 100}%`}
+                    y={`${visiblePatch.normY * 100}%`}
+                    width={`${visiblePatch.normW * 100}%`}
+                    height={`${visiblePatch.normH * 100}%`}
+                    preserveAspectRatio="none"
+                    style={{ imageRendering: isMaxZoom ? 'pixelated' : 'auto' }}
+                  />
+                )}
+              </svg>
 
               {originalSrc && (
                 <img
@@ -1903,7 +1985,6 @@ const ImageCanvas = memo(
                     );
                   })}
 
-                {/* Visualizer for drawing new AI Bounding Box */}
                 {previewBox && (
                   <Rect
                     x={Math.min(previewBox.start.x, previewBox.end.x)}
@@ -1920,7 +2001,9 @@ const ImageCanvas = memo(
                   <Circle
                     listening={false}
                     perfectDrawEnabled={false}
-                    stroke={brushSettings?.tool === ToolType.Eraser ? '#f43f5e' : '#0ea5e9'}
+                    stroke={(window as any).altKeyDown ? 
+                      (baseTool === ToolType.Brush ? '#f43f5e' : '#0ea5e9') : 
+                      (baseTool === ToolType.Eraser ? '#f43f5e' : '#0ea5e9')}
                     radius={brushStageSize / 2}
                     strokeWidth={1}
                     x={cursorPreview.x}

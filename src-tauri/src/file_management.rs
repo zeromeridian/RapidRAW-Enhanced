@@ -22,6 +22,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
 use uuid::Uuid;
 use walkdir::WalkDir;
 #[cfg(target_os = "android")]
@@ -346,7 +347,7 @@ pub struct AppSettings {
     #[serde(default)]
     pub enable_live_previews: Option<bool>,
     #[serde(default)]
-    pub enable_high_quality_live_previews: Option<bool>,
+    pub live_preview_quality: Option<String>,
     pub sort_criteria: Option<SortCriteria>,
     pub filter_criteria: Option<FilterCriteria>,
     pub theme: Option<String>,
@@ -427,7 +428,7 @@ impl Default for AppSettings {
             enable_zoom_hifi: Some(true),
             use_full_dpi_rendering: Some(false),
             enable_live_previews: Some(true),
-            enable_high_quality_live_previews: Some(true),
+            live_preview_quality: Some("high".to_string()),
             sort_criteria: None,
             filter_criteria: None,
             theme: Some("dark".to_string()),
@@ -3486,7 +3487,11 @@ pub async fn import_files(
                         }
                     }
 
-                    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+                    #[cfg(not(any(
+                        target_os = "windows",
+                        target_os = "macos",
+                        target_os = "linux"
+                    )))]
                     {
                         fs::remove_file(&source_path).map_err(|e| e.to_string())?;
                         if source_sidecar.exists() {
