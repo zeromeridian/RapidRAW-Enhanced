@@ -1,4 +1,4 @@
-import { act, useState } from 'react';
+import { useState } from 'react';
 import { Pipette } from 'lucide-react';
 import Slider from '../ui/Slider';
 import ColorWheel from '../ui/ColorWheel';
