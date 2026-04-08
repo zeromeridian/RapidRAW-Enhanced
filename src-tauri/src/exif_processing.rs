@@ -26,11 +26,15 @@ fn to_ir64(val: &exif::SRational) -> iR64 {
     }
 }
 
+fn clean_creation_datetime_str(s: &str) -> &str {
+    s.trim().trim_matches('"').trim_matches('\'').trim()
+}
+
 fn fmt_date_str(s: String) -> String {
     if let Some(dt) = parse_creation_datetime(&s) {
         return dt.format("%Y-%m-%d %H:%M:%S").to_string();
     }
-    s.replace("\"", "").trim().to_string()
+    clean_creation_datetime_str(&s).to_string()
 }
 
 fn normalize_creation_datetime(s: &str) -> Option<String> {
@@ -40,7 +44,7 @@ fn normalize_creation_datetime(s: &str) -> Option<String> {
 }
 
 fn parse_creation_datetime(s: &str) -> Option<NaiveDateTime> {
-    let clean = s.trim().trim_matches('"').trim_matches('\'').trim();
+    let clean = clean_creation_datetime_str(s);
     if clean.is_empty() {
         return None;
     }

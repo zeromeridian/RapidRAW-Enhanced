@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
-import { platform } from '@tauri-apps/plugin-os';
 import { Save, CheckCircle, XCircle, Loader, X, Ban } from 'lucide-react';
 import debounce from 'lodash.debounce';
 import Switch from '../../ui/Switch';
@@ -23,6 +22,7 @@ import {
 import { Invokes, ImageFile, AppSettings } from '../../ui/AppProperties';
 import ExportPresetsList from '../../ui/ExportPresetsList';
 import { useExportSettings } from '../../../hooks/useExportSettings';
+import { useOsPlatform } from '../../../hooks/useOsPlatform';
 
 interface LibraryExportPanelProps {
   exportState: ExportState;
@@ -249,14 +249,8 @@ export default function LibraryExportPanel({
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
   const [watermarkImageAspectRatio, setWatermarkImageAspectRatio] = useState(1);
   const filenameInputRef = useRef<HTMLInputElement>(null);
-  const isAndroid = useMemo(() => {
-    try {
-      return platform() === 'android';
-    } catch (_error) {
-      return false;
-    }
-  }, []);
-  const androidExportRoot = 'RapidRaw';
+  const osPlatform = useOsPlatform();
+  const isAndroid = osPlatform === 'android';
 
   const { status, progress, errorMessage } = exportState;
   const isExporting = status === Status.Exporting;
@@ -456,7 +450,7 @@ export default function LibraryExportPanel({
 
     try {
       const outputFolder = isAndroid
-        ? androidExportRoot
+        ? ''
         : await open({
             directory: true,
             title: `Select Folder to Export ${numImages} Image(s)`,
@@ -464,7 +458,9 @@ export default function LibraryExportPanel({
           });
 
       if (outputFolder) {
-        saveLastUsedPreset(outputFolder as string);
+        if (!isAndroid) {
+          saveLastUsedPreset(outputFolder as string);
+        }
         setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
         await invoke(Invokes.BatchExportImages, {
           exportSettings,

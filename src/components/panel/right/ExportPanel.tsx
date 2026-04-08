@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
-import { platform } from '@tauri-apps/plugin-os';
 import { Save, CheckCircle, XCircle, Loader, Ban } from 'lucide-react';
 import debounce from 'lodash.debounce';
 import Switch from '../../ui/Switch';
@@ -24,6 +23,7 @@ import {
 import { Invokes, SelectedImage, AppSettings } from '../../ui/AppProperties';
 import ExportPresetsList from '../../ui/ExportPresetsList';
 import { useExportSettings } from '../../../hooks/useExportSettings';
+import { useOsPlatform } from '../../../hooks/useOsPlatform';
 
 interface ExportPanelProps {
   adjustments: Adjustments;
@@ -241,17 +241,8 @@ export default function ExportPanel({
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
   const [watermarkImageAspectRatio, setWatermarkImageAspectRatio] = useState(1);
   const filenameInputRef = useRef<HTMLInputElement>(null);
-  const isAndroid = useMemo(() => {
-    try {
-      return platform() === 'android';
-    } catch (_error) {
-      return false;
-    }
-  }, []);
-  const androidExportRoot = 'RapidRaw';
-  const joinExportPath = useCallback((dirPath: string, fileName: string) => {
-    return `${dirPath.replace(/[\\/]+$/, '')}/${fileName}`;
-  }, []);
+  const osPlatform = useOsPlatform();
+  const isAndroid = osPlatform === 'android';
 
   const { status, progress, errorMessage } = exportState;
   const isExporting = status === Status.Exporting;
@@ -433,7 +424,7 @@ export default function ExportPanel({
     try {
       if (isBatchMode || !isEditorContext) {
         const outputFolder = isAndroid
-          ? androidExportRoot
+          ? ''
           : await open({
               title: `Select Folder to Export ${numImages} Image(s)`,
               directory: true,
@@ -441,7 +432,9 @@ export default function ExportPanel({
             });
 
         if (outputFolder) {
-          saveLastUsedPreset(outputFolder as string);
+          if (!isAndroid) {
+            saveLastUsedPreset(outputFolder as string);
+          }
           setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
           await invoke(Invokes.BatchExportImages, {
             exportSettings,
@@ -457,7 +450,7 @@ export default function ExportPanel({
         const suggestedName = finalFilenameTemplate.replace('{original_filename}', stem);
         const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
         const filePath = isAndroid
-          ? joinExportPath(androidExportRoot, outputFileName)
+          ? outputFileName
           : await save({
               title: 'Save Edited Image',
               defaultPath: lastExportPath ? `${lastExportPath}/${outputFileName}` : outputFileName,
@@ -471,9 +464,7 @@ export default function ExportPanel({
             });
 
         if (filePath) {
-          if (isAndroid) {
-            saveLastUsedPreset(androidExportRoot);
-          } else {
+          if (!isAndroid) {
             const dir = filePath.substring(0, Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')));
             if (dir) saveLastUsedPreset(dir);
           }
