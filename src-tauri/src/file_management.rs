@@ -22,6 +22,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
 use uuid::Uuid;
 use walkdir::WalkDir;
 
@@ -1587,14 +1588,22 @@ pub fn rename_folder(path: String, new_name: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn delete_folder(path: String) -> Result<(), String> {
-    if let Err(trash_error) = trash::delete(&path) {
-        log::warn!(
-            "Failed to move folder to trash: {}. Falling back to permanent delete.",
-            trash_error
-        );
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    {
+        if let Err(trash_error) = trash::delete(&path) {
+            log::warn!(
+                "Failed to move folder to trash: {}. Falling back to permanent delete.",
+                trash_error
+            );
+            fs::remove_dir_all(&path).map_err(|e| e.to_string())
+        } else {
+            Ok(())
+        }
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
         fs::remove_dir_all(&path).map_err(|e| e.to_string())
-    } else {
-        Ok(())
     }
 }
 
@@ -1791,6 +1800,7 @@ pub fn move_files(source_paths: Vec<String>, destination_folder: String) -> Resu
         all_files_to_trash.extend(files_to_move);
     }
 
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
     if !all_files_to_trash.is_empty()
         && let Err(trash_error) = trash::delete_all(&all_files_to_trash)
     {
@@ -1804,6 +1814,14 @@ pub fn move_files(source_paths: Vec<String>, destination_folder: String) -> Resu
                     format!("Failed to delete source file {}: {}", path.display(), e)
                 })?;
             }
+        }
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    for path in all_files_to_trash {
+        if path.is_file() {
+            fs::remove_file(&path)
+                .map_err(|e| format!("Failed to delete source file {}: {}", path.display(), e))?;
         }
     }
 
@@ -2658,6 +2676,7 @@ pub fn delete_files_from_disk(paths: Vec<String>) -> Result<(), String> {
     }
 
     let final_paths_to_delete: Vec<PathBuf> = files_to_trash.into_iter().collect();
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
     if let Err(trash_error) = trash::delete_all(&final_paths_to_delete) {
         log::warn!(
             "Failed to move files to trash: {}. Falling back to permanent delete.",
@@ -2673,6 +2692,18 @@ pub fn delete_files_from_disk(paths: Vec<String>) -> Result<(), String> {
             }
         }
     }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    for path in final_paths_to_delete {
+        if path.is_file() {
+            fs::remove_file(&path)
+                .map_err(|e| format!("Failed to delete file {}: {}", path.display(), e))?;
+        } else if path.is_dir() {
+            fs::remove_dir_all(&path)
+                .map_err(|e| format!("Failed to delete directory {}: {}", path.display(), e))?;
+        }
+    }
+
     Ok(())
 }
 
@@ -2730,6 +2761,7 @@ pub fn delete_files_with_associated(paths: Vec<String>) -> Result<(), String> {
     }
 
     let final_paths_to_delete: Vec<PathBuf> = files_to_trash.into_iter().collect();
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
     if let Err(trash_error) = trash::delete_all(&final_paths_to_delete) {
         log::warn!(
             "Failed to move files to trash: {}. Falling back to permanent delete.",
@@ -2742,6 +2774,15 @@ pub fn delete_files_with_associated(paths: Vec<String>) -> Result<(), String> {
             }
         }
     }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    for path in final_paths_to_delete {
+        if path.is_file() {
+            fs::remove_file(&path)
+                .map_err(|e| format!("Failed to delete file {}: {}", path.display(), e))?;
+        }
+    }
+
     Ok(())
 }
 
@@ -2888,23 +2929,38 @@ pub async fn import_files(
                 }
 
                 if settings.delete_after_import {
-                    if let Err(trash_error) = trash::delete(&source_path) {
-                        log::warn!(
-                            "Failed to trash source file {}: {}. Deleting permanently.",
-                            source_path.display(),
-                            trash_error
-                        );
-                        fs::remove_file(&source_path).map_err(|e| e.to_string())?;
-                    }
-                    if source_sidecar.exists()
-                        && let Err(trash_error) = trash::delete(&source_sidecar)
+                    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
                     {
-                        log::warn!(
-                            "Failed to trash source sidecar {}: {}. Deleting permanently.",
-                            source_sidecar.display(),
-                            trash_error
-                        );
-                        fs::remove_file(&source_sidecar).map_err(|e| e.to_string())?;
+                        if let Err(trash_error) = trash::delete(&source_path) {
+                            log::warn!(
+                                "Failed to trash source file {}: {}. Deleting permanently.",
+                                source_path.display(),
+                                trash_error
+                            );
+                            fs::remove_file(&source_path).map_err(|e| e.to_string())?;
+                        }
+                        if source_sidecar.exists()
+                            && let Err(trash_error) = trash::delete(&source_sidecar)
+                        {
+                            log::warn!(
+                                "Failed to trash source sidecar {}: {}. Deleting permanently.",
+                                source_sidecar.display(),
+                                trash_error
+                            );
+                            fs::remove_file(&source_sidecar).map_err(|e| e.to_string())?;
+                        }
+                    }
+
+                    #[cfg(not(any(
+                        target_os = "windows",
+                        target_os = "macos",
+                        target_os = "linux"
+                    )))]
+                    {
+                        fs::remove_file(&source_path).map_err(|e| e.to_string())?;
+                        if source_sidecar.exists() {
+                            fs::remove_file(&source_sidecar).map_err(|e| e.to_string())?;
+                        }
                     }
                 }
 
