@@ -133,7 +133,7 @@ const SUB_MASK_CONFIG: any = {
 };
 
 const BrushTools = ({ settings, onSettingsChange }: { settings: any; onSettingsChange: any }) => (
-  <div className="space-y-4 pt-4 border-t border-surface mt-4">
+  <div>
     <Slider
       defaultValue={100}
       label="Brush Size"
@@ -943,8 +943,8 @@ export default function AIPanel({
             {activeDragItem.type === 'Container' && activeDragItem.item && (
               <Text
                 as="div"
-                variant={TextVariants.label}
                 color={TextColors.primary}
+                weight={TextWeights.medium}
                 className="flex items-center gap-2 p-2 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10"
               >
                 <Wand2 size={18} className={TEXT_COLOR_KEYS[TextColors.secondary]} />
@@ -954,14 +954,14 @@ export default function AIPanel({
             {activeDragItem.type === 'SubMask' && activeDragItem.item && (
               <Text
                 as="div"
-                variant={TextVariants.label}
                 color={TextColors.primary}
+                weight={TextWeights.medium}
                 className="flex items-center gap-2 p-2 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10 ml-3.75"
               >
                 {(() => {
                   const sm = activeDragItem.item as SubMask;
                   const Icon = MASK_ICON_MAP[sm.type] || Circle;
-                  return <Icon size={16} className="shrink-0 ml-1" />;
+                  return <Icon size={16} className={`shrink-0 ml-1 ${TEXT_COLOR_KEYS[TextColors.secondary]}`} />;
                 })()}
                 <span className="flex-1 truncate">{getSubMaskName(activeDragItem.item as SubMask)}</span>
               </Text>
@@ -971,7 +971,7 @@ export default function AIPanel({
                 as="div"
                 variant={TextVariants.small}
                 color={TextColors.primary}
-                className="bg-surface rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square w-20 shadow-xl opacity-90"
+                className="bg-surface rounded-lg gap-2 p-2 flex flex-col items-center justify-center aspect-square w-20 shadow-xl opacity-90"
               >
                 {(() => {
                   const maskType = AI_PANEL_CREATION_TYPES.find((m) => m.type === activeDragItem.maskType);
@@ -1004,7 +1004,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
       transition={{ duration: 0.2, ease: 'easeOut' }}
       className={`p-4 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
     >
-      <Text variant={TextVariants.label}>Drop here to create a new edit</Text>
+      <Text weight={TextWeights.medium}>Drop here to create a new edit</Text>
     </motion.div>
   );
 }
@@ -1031,7 +1031,10 @@ function DraggableGridItem({ maskType, isGenerating, onClick }: any) {
             ${isDragging ? 'opacity-50' : ''}`}
       data-tooltip={maskType.disabled ? 'Coming Soon' : `Create New ${maskType.name} Edit`}
     >
-      <maskType.icon size={24} /> <span className="text-xs">{maskType.name}</span>
+      <maskType.icon size={24} />{' '}
+      <Text as="span" variant={TextVariants.small} color={TextColors.primary}>
+        {maskType.name}
+      </Text>
     </button>
   );
 }
@@ -1187,7 +1190,7 @@ function ContainerRow({
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <Text variant={TextVariants.label} color={TextColors.primary} className="truncate select-none">
+            <Text color={TextColors.primary} weight={TextWeights.medium} className="truncate select-none">
               {container.name}
             </Text>
           )}
