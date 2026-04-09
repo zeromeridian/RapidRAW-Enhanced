@@ -35,6 +35,11 @@ const ColorWheel = ({
   const isDragging = isWheelDragging || isSliderDragging;
 
   useEffect(() => {
+    document.documentElement.style.setProperty('--cg-hue', hue.toString());
+    document.documentElement.style.setProperty('--cg-sat', `${saturation}%`);
+  }, [hue, saturation]);
+
+  useEffect(() => {
     const observer = new ResizeObserver((entries) => {
       if (entries[0]) {
         const width = entries[0].contentRect.width;
@@ -206,6 +211,7 @@ const ColorWheel = ({
                 onDragStateChange={setIsSliderDragging}
                 step={1}
                 value={hue}
+                trackClassName="cg-hue-gradient"
               />
             </div>
 
@@ -219,6 +225,7 @@ const ColorWheel = ({
                 onDragStateChange={setIsSliderDragging}
                 step={1}
                 value={saturation}
+                trackClassName="cg-sat-gradient"
               />
             </div>
           </motion.div>
@@ -235,6 +242,7 @@ const ColorWheel = ({
           onDragStateChange={setIsSliderDragging}
           step={1}
           value={luminance}
+          trackClassName="cg-lum-gradient"
         />
       </div>
     </div>
