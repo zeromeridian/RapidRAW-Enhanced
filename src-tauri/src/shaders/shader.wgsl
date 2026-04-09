@@ -85,6 +85,7 @@ struct GlobalAdjustments {
     color_grading_shadows: ColorGradeSettings,
     color_grading_midtones: ColorGradeSettings,
     color_grading_highlights: ColorGradeSettings,
+    color_grading_global: ColorGradeSettings,
     color_grading_blending: f32,
     color_grading_balance: f32,
     _pad2: f32,
@@ -144,6 +145,7 @@ struct MaskAdjustments {
     color_grading_shadows: ColorGradeSettings,
     color_grading_midtones: ColorGradeSettings,
     color_grading_highlights: ColorGradeSettings,
+    color_grading_global: ColorGradeSettings,
     color_grading_blending: f32,
     color_grading_balance: f32,
     _pad5: f32,
@@ -659,7 +661,7 @@ fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>, coords
     return final_color;
 }
 
-fn apply_color_grading(color: vec3<f32>, shadows: ColorGradeSettings, midtones: ColorGradeSettings, highlights: ColorGradeSettings, blending: f32, balance: f32) -> vec3<f32> {
+fn apply_color_grading(color: vec3<f32>, shadows: ColorGradeSettings, midtones: ColorGradeSettings, highlights: ColorGradeSettings, global: ColorGradeSettings, blending: f32, balance: f32) -> vec3<f32> {
     let luma = get_luma(max(vec3(0.0), color));
     let base_shadow_crossover = 0.1;
     let base_highlight_crossover = 0.5;
@@ -671,6 +673,7 @@ fn apply_color_grading(color: vec3<f32>, shadows: ColorGradeSettings, midtones: 
     let shadow_mask = 1.0 - smoothstep(final_shadow_crossover - feather, final_shadow_crossover + feather, luma);
     let highlight_mask = smoothstep(highlight_crossover - feather, highlight_crossover + feather, luma);
     let midtone_mask = max(0.0, 1.0 - shadow_mask - highlight_mask);
+    let global_mask = 1.0;
     var graded_color = color;
     let shadow_sat_strength = 0.3;
     let shadow_lum_strength = 0.5;
@@ -678,12 +681,16 @@ fn apply_color_grading(color: vec3<f32>, shadows: ColorGradeSettings, midtones: 
     let midtone_lum_strength = 0.8;
     let highlight_sat_strength = 0.8;
     let highlight_lum_strength = 1.0;
+    let global_sat_strength = 1.0;
+    let global_lum_strength = 1.0;
     if (shadows.saturation > 0.001) { let tint_rgb = hsv_to_rgb(vec3<f32>(shadows.hue, 1.0, 1.0)); graded_color += (tint_rgb - 0.5) * shadows.saturation * shadow_mask * shadow_sat_strength; }
     graded_color += shadows.luminance * shadow_mask * shadow_lum_strength;
     if (midtones.saturation > 0.001) { let tint_rgb = hsv_to_rgb(vec3<f32>(midtones.hue, 1.0, 1.0)); graded_color += (tint_rgb - 0.5) * midtones.saturation * midtone_mask * midtone_sat_strength; }
     graded_color += midtones.luminance * midtone_mask * midtone_lum_strength;
     if (highlights.saturation > 0.001) { let tint_rgb = hsv_to_rgb(vec3<f32>(highlights.hue, 1.0, 1.0)); graded_color += (tint_rgb - 0.5) * highlights.saturation * highlight_mask * highlight_sat_strength; }
     graded_color += highlights.luminance * highlight_mask * highlight_lum_strength;
+    if (global.saturation > 0.001) { let tint_rgb = hsv_to_rgb(vec3<f32>(global.hue, 1.0, 1.0)); graded_color += (tint_rgb - 0.5) * global.saturation * global_mask * global_sat_strength; }
+    graded_color += global.luminance * global_mask * global_lum_strength;
     return graded_color;
 }
 
@@ -820,21 +827,44 @@ fn apply_centre_tonal_and_color(
     return processed_color;
 }
 
-fn apply_dehaze(color: vec3<f32>, amount: f32) -> vec3<f32> {
+fn apply_dehaze(color: vec3<f32>, blurred_color_input_space: vec3<f32>, is_raw: u32, amount: f32) -> vec3<f32> {
     if (amount == 0.0) { return color; }
-    let atmospheric_light = vec3<f32>(0.95, 0.97, 1.0);
-    if (amount > 0.0) {
-        let dark_channel = min(color.r, min(color.g, color.b));
-        let transmission_estimate = 1.0 - dark_channel;
-        let t = 1.0 - amount * transmission_estimate;
-        let recovered = (color - atmospheric_light) / max(t, 0.1) + atmospheric_light;
-        var result = mix(color, recovered, amount);
-        result = 0.5 + (result - 0.5) * (1.0 + amount * 0.15);
-        let luma = get_luma(result);
-        result = mix(vec3<f32>(luma), result, 1.0 + amount * 0.1);
-        return result;
+
+    var blurred_linear: vec3<f32>;
+    if (is_raw == 1u) {
+        blurred_linear = blurred_color_input_space;
     } else {
-        return mix(color, atmospheric_light, abs(amount) * 0.7);
+        blurred_linear = srgb_to_linear(blurred_color_input_space);
+    }
+
+    let atmospheric_light = vec3<f32>(0.95, 0.97, 1.0);
+
+    if (amount > 0.0) {
+        let pixel_dark = min(color.r, min(color.g, color.b));
+        let regional_dark = min(blurred_linear.r, min(blurred_linear.g, blurred_linear.b));
+        let pixel_luma = get_luma(max(color, vec3<f32>(0.0)));
+        let blurred_luma = get_luma(max(blurred_linear, vec3<f32>(0.0)));
+        let edge_diff = abs(pow(pixel_luma, 0.5) - pow(blurred_luma, 0.5));
+        let halo_protection = smoothstep(0.02, 0.15, edge_diff);
+        let spatial_dark = mix(regional_dark, pixel_dark, halo_protection);
+        let safe_dark = max(spatial_dark - 0.02, 0.0);
+        let mapped_haze = safe_dark / (safe_dark + 0.2);
+        let t = max(1.0 - amount * mapped_haze * 0.85, 0.15);
+        var recovered = (color - atmospheric_light) / t + atmospheric_light;
+        let rec_luma = get_luma(max(recovered, vec3<f32>(0.0)));
+        let shadow_lift = smoothstep(0.1, 0.0, rec_luma) * (1.0 - t) * 0.15;
+        recovered += shadow_lift;
+        let haze_removed = 1.0 - t;
+        let sat_boost = haze_removed * 0.5;
+        let final_luma = get_luma(max(recovered, vec3<f32>(0.0)));
+        recovered = mix(vec3<f32>(final_luma), recovered, 1.0 + sat_boost);
+        return max(recovered, vec3<f32>(0.0));
+    } else {
+        let regional_dark = min(blurred_linear.r, min(blurred_linear.g, blurred_linear.b));
+        let safe_dark = max(regional_dark - 0.02, 0.0);
+        let mapped_depth = safe_dark / (safe_dark + 0.2);
+        let depth_factor = mix(0.4, 1.0, mapped_depth);
+        return mix(color, atmospheric_light, abs(amount) * 0.7 * depth_factor);
     }
 }
 
@@ -1033,11 +1063,12 @@ fn apply_all_adjustments(
     id: vec2<u32>,
     scale: f32,
     tonal_blurred: vec3<f32>,
+    structure_blurred: vec3<f32>,
     is_raw: u32
 ) -> vec3<f32> {
     var processed_rgb = apply_noise_reduction(initial_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction, scale);
 
-    processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);
+    processed_rgb = apply_dehaze(processed_rgb, structure_blurred, is_raw, adj.dehaze);
     processed_rgb = apply_centre_tonal_and_color(processed_rgb, adj.centre, coords_i);
     processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
     processed_rgb = apply_filmic_exposure(processed_rgb, adj.brightness);
@@ -1059,11 +1090,12 @@ fn apply_all_mask_adjustments(
     scale: f32,
     is_raw: u32,
     tonemapper_mode: u32,
-    tonal_blurred: vec3<f32>
+    tonal_blurred: vec3<f32>,
+    structure_blurred: vec3<f32>
 ) -> vec3<f32> {
     var processed_rgb = apply_noise_reduction(initial_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction, scale);
 
-    processed_rgb = apply_dehaze(processed_rgb, adj.dehaze);
+    processed_rgb = apply_dehaze(processed_rgb, structure_blurred, is_raw, adj.dehaze);
     processed_rgb = apply_linear_exposure(processed_rgb, adj.exposure);
     processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
     processed_rgb = apply_filmic_exposure(processed_rgb, adj.brightness);
@@ -1071,7 +1103,7 @@ fn apply_all_mask_adjustments(
     processed_rgb = apply_tonal_adjustments(processed_rgb, tonal_blurred, is_raw, adj.contrast, adj.shadows, adj.whites, adj.blacks);
 
     processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
-    processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_blending, adj.color_grading_balance);
+    processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_global, adj.color_grading_blending, adj.color_grading_balance);
     processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
 
     return processed_rgb;
@@ -1322,6 +1354,9 @@ fn scale_mask_adjustments(adj: MaskAdjustments, influence: f32) -> MaskAdjustmen
     scaled.color_grading_highlights.saturation *= influence;
     scaled.color_grading_highlights.luminance *= influence;
 
+    scaled.color_grading_global.saturation *= influence;
+    scaled.color_grading_global.luminance *= influence;
+
     for (var i = 0u; i < 8u; i = i + 1u) {
         scaled.hsl[i].hue *= influence;
         scaled.hsl[i].saturation *= influence;
@@ -1423,6 +1458,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         id.xy,
         scale,
         tonal_blurred,
+        structure_blurred,
         adjustments.global.is_raw_image
     );
     var composite_rgb_linear = globally_adjusted_linear;
@@ -1466,7 +1502,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
                 scale,
                 adjustments.global.is_raw_image,
                 adjustments.global.tonemapper_mode,
-                tonal_blurred
+                tonal_blurred,
+                structure_blurred
             );
         }
     }
@@ -1476,6 +1513,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         adjustments.global.color_grading_shadows,
         adjustments.global.color_grading_midtones,
         adjustments.global.color_grading_highlights,
+        adjustments.global.color_grading_global,
         adjustments.global.color_grading_blending,
         adjustments.global.color_grading_balance
     );

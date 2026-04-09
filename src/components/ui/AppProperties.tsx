@@ -63,7 +63,9 @@ export enum Invokes {
   GenerateThumbnailsProgressive = 'generate_thumbnails_progressive',
   GenerateUncroppedPreview = 'generate_uncropped_preview',
   GetFolderTree = 'get_folder_tree',
+  GetFolderChildren = 'get_folder_children',
   GetLogFilePath = 'get_log_file_path',
+  GetOrCreateInternalLibraryRoot = 'get_or_create_internal_library_root',
   GetPinnedFolderTrees = 'get_pinned_folder_trees',
   GetSupportedFileTypes = 'get_supported_file_types',
   HandleExportPresetsToFile = 'handle_export_presets_to_file',
@@ -151,7 +153,7 @@ export interface AppSettings {
   useFullDpiRendering?: boolean;
   highResZoomMultiplier?: number;
   enableLivePreviews?: boolean;
-  enableHighQualityLivePreviews?: boolean;
+  livePreviewQuality?: string;
   enableAiTagging?: boolean;
   enableExifReading?: boolean;
   filterCriteria?: FilterCriteria;
@@ -208,6 +210,7 @@ export interface ImageFile {
   is_edited: boolean;
   modified: number;
   path: string;
+  rating: number;
   tags: Array<string> | null;
   exif: { [key: string]: string } | null;
   is_virtual_copy: boolean;
@@ -271,6 +274,7 @@ export enum ThumbnailSize {
   Large = 'large',
   Medium = 'medium',
   Small = 'small',
+  List = 'list',
 }
 
 export interface TransformState {

@@ -11,7 +11,9 @@ use serde_json::json;
 use std::f32::consts::PI;
 use std::sync::Arc;
 
-pub use crate::gpu_processing::{get_or_init_gpu_context, process_and_get_dynamic_image};
+pub use crate::gpu_processing::{
+    RenderRequest, get_or_init_gpu_context, process_and_get_dynamic_image,
+};
 use crate::{AppState, mask_generation::MaskDefinition};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
@@ -319,19 +321,28 @@ fn build_transform_matrices(
     (forward, cx, cy, half_diagonal)
 }
 
-#[inline(always)]
-fn interpolate_pixel_with_tca(
-    src_raw: &[f32],
+struct TcaContext<'a> {
+    src_raw: &'a [f32],
     src_width: usize,
     src_height: usize,
     cx: f32,
     cy: f32,
+}
+
+#[inline(always)]
+fn interpolate_pixel_with_tca(
+    tca: &TcaContext,
     base_x: f32,
     base_y: f32,
     vr: f32,
     vb: f32,
     pixel_out: &mut [f32],
 ) {
+    let src_raw = tca.src_raw;
+    let src_width = tca.src_width;
+    let src_height = tca.src_height;
+    let cx = tca.cx;
+    let cy = tca.cy;
     let gx = base_x;
     let gy = base_y;
 
@@ -555,6 +566,13 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
     let src_raw = src_img.as_raw();
     let width_usize = width as usize;
     let height_usize = height as usize;
+    let tca_ctx = TcaContext {
+        src_raw,
+        src_width: width_usize,
+        src_height: height_usize,
+        cx,
+        cy,
+    };
 
     out_buffer
         .par_chunks_exact_mut(width_usize * 3)
@@ -616,18 +634,7 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
                     }
 
                     if has_tca {
-                        interpolate_pixel_with_tca(
-                            src_raw,
-                            width_usize,
-                            height_usize,
-                            cx,
-                            cy,
-                            src_x,
-                            src_y,
-                            vr,
-                            vb,
-                            pixel,
-                        );
+                        interpolate_pixel_with_tca(&tca_ctx, src_x, src_y, vr, vb, pixel);
                     } else {
                         interpolate_pixel(src_raw, width_usize, height_usize, src_x, src_y, pixel);
                     }
@@ -1078,6 +1085,7 @@ pub struct GlobalAdjustments {
     pub color_grading_shadows: ColorGradeSettings,
     pub color_grading_midtones: ColorGradeSettings,
     pub color_grading_highlights: ColorGradeSettings,
+    pub color_grading_global: ColorGradeSettings,
     pub color_grading_blending: f32,
     pub color_grading_balance: f32,
     _pad2: f32,
@@ -1139,6 +1147,7 @@ pub struct MaskAdjustments {
     pub color_grading_shadows: ColorGradeSettings,
     pub color_grading_midtones: ColorGradeSettings,
     pub color_grading_highlights: ColorGradeSettings,
+    pub color_grading_global: ColorGradeSettings,
     pub color_grading_blending: f32,
     pub color_grading_balance: f32,
     _pad5: f32,
@@ -1618,6 +1627,11 @@ fn get_global_adjustments_from_json(
         } else {
             ColorGradeSettings::default()
         },
+        color_grading_global: if is_visible("color") {
+            parse_color_grade_settings(&cg_obj["global"])
+        } else {
+            ColorGradeSettings::default()
+        },
         color_grading_blending: if is_visible("color") {
             cg_obj["blending"].as_f64().unwrap_or(50.0) as f32 / SCALES.color_grading_blending
         } else {
@@ -1749,6 +1763,11 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         },
         color_grading_highlights: if is_visible("color") {
             parse_color_grade_settings(&cg_obj["highlights"])
+        } else {
+            ColorGradeSettings::default()
+        },
+        color_grading_global: if is_visible("color") {
+            parse_color_grade_settings(&cg_obj["global"])
         } else {
             ColorGradeSettings::default()
         },

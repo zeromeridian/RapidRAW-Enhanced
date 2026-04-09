@@ -25,6 +25,7 @@ import {
   Images,
   LayoutTemplate,
   Redo,
+  RefreshCw,
   RotateCcw,
   Star,
   Save,
@@ -43,7 +44,7 @@ import {
 } from 'lucide-react';
 import TitleBar from './window/TitleBar';
 import CommunityPage from './components/panel/CommunityPage';
-import MainLibrary from './components/panel/MainLibrary';
+import MainLibrary, { ColumnWidths } from './components/panel/MainLibrary';
 import FolderTree from './components/panel/FolderTree';
 import Editor from './components/panel/Editor';
 import Controls from './components/panel/right/ControlsPanel';
@@ -210,6 +211,14 @@ interface SearchCriteria {
   mode: 'AND' | 'OR';
 }
 
+export interface InteractivePatch {
+  url: string;
+  normX: number;
+  normY: number;
+  normW: number;
+  normH: number;
+}
+
 const RIGHT_PANEL_ORDER = [
   Panel.Metadata,
   Panel.Adjustments,
@@ -231,10 +240,41 @@ const getParentDir = (filePath: string): string => {
   return filePath.substring(0, lastSeparatorIndex);
 };
 
+const insertChildrenIntoTree = (node: any, targetPath: string, newChildren: any[]): any => {
+  if (!node) return null;
+
+  if (node.path === targetPath) {
+    const mergedChildren = newChildren.map((newChild: any) => {
+      const existingChild = node.children?.find((c: any) => c.path === newChild.path);
+      if (existingChild && existingChild.children && existingChild.children.length > 0) {
+        return { ...newChild, children: existingChild.children };
+      }
+      return newChild;
+    });
+
+    return { ...node, children: mergedChildren };
+  }
+
+  if (node.children && node.children.length > 0) {
+    return {
+      ...node,
+      children: node.children.map((child: any) => insertChildrenIntoTree(child, targetPath, newChildren)),
+    };
+  }
+
+  return node;
+};
+
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
-  const [osPlatform, setOsPlatform] = useState('');
+  const [osPlatform, setOsPlatform] = useState(() => {
+    try {
+      return platform();
+    } catch (_err) {
+      return '';
+    }
+  });
   const [activeView, setActiveView] = useState('library');
   const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
   const [isInstantTransition, setIsInstantTransition] = useState(false);
@@ -258,6 +298,7 @@ function App() {
     selectedImagePathRef.current = selectedImage?.path ?? null;
   }, [selectedImage?.path]);
   const [multiSelectedPaths, setMultiSelectedPaths] = useState<Array<string>>([]);
+  const [selectionAnchorPath, setSelectionAnchorPath] = useState<string | null>(null);
   const [libraryActivePath, setLibraryActivePath] = useState<string | null>(null);
   const [libraryActiveAdjustments, setLibraryActiveAdjustments] = useState<Adjustments>(INITIAL_ADJUSTMENTS);
   const [finalPreviewUrl, setFinalPreviewUrl] = useState<string | null>(null);
@@ -292,6 +333,8 @@ function App() {
     filmstrip: true,
   });
   const [isSliderDragging, setIsSliderDragging] = useState(false);
+  const [interactivePatch, setInteractivePatch] = useState<InteractivePatch | null>(null);
+  const lastZoomPatchTime = useRef<number>(0);
   const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevAdjustmentsRef = useRef<{ path: string; adjustments: Adjustments } | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -414,9 +457,17 @@ function App() {
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [isMaskControlHovered, setIsMaskControlHovered] = useState(false);
   const [libraryScrollTop, setLibraryScrollTop] = useState<number>(0);
+  const [listColumnWidths, setListColumnWidths] = useState<ColumnWidths>({
+    thumbnail: 4,
+    name: 32,
+    date: 30,
+    rating: 15,
+    color: 15,
+  });
   const { showContextMenu } = useContextMenu();
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
-  const { loading: isThumbnailsLoading } = useThumbnails(imageList, setThumbnails);
+  const { requestThumbnails, clearThumbnailQueue } = useThumbnails();
+  const [thumbnailProgress, setThumbnailProgress] = useState<Progress>({ current: 0, total: 0 });
   const transformWrapperRef = useRef<any>(null);
   const isProgrammaticZoom = useRef(false);
   const currentResRef = useRef<number>(1280);
@@ -431,6 +482,7 @@ function App() {
   }>({});
   const previewJobIdRef = useRef<number>(0);
   const latestRenderedJobIdRef = useRef<number>(0);
+  const isAndroid = osPlatform === 'android';
 
   useEffect(() => {
     if (currentFolderPath) {
@@ -495,7 +547,7 @@ function App() {
   }, [error]);
 
   const debouncedSetHistory = useMemo(
-    () => debounce((newAdjustments) => setHistoryAdjustments(newAdjustments), 300),
+    () => debounce((newAdjustments) => setHistoryAdjustments(newAdjustments), 500),
     [setHistoryAdjustments],
   );
 
@@ -937,6 +989,61 @@ function App() {
     } catch (error) {
       console.error('Failed to generate AI subject mask:', error);
       setError(`AI Mask Failed: ${error}`);
+    } finally {
+      setIsGeneratingAiMask(false);
+    }
+  };
+
+  const handleGenerateAiDepthMask = async (subMaskId: string, parameters: any) => {
+    if (!selectedImage?.path) return;
+    console.log('trying to generate depth map');
+    setIsGeneratingAiMask(true);
+
+    try {
+      const transformAdjustments = {
+        transformDistortion: adjustments.transformDistortion,
+        transformVertical: adjustments.transformVertical,
+        transformHorizontal: adjustments.transformHorizontal,
+        transformRotate: adjustments.transformRotate,
+        transformAspect: adjustments.transformAspect,
+        transformScale: adjustments.transformScale,
+        transformXOffset: adjustments.transformXOffset,
+        transformYOffset: adjustments.transformYOffset,
+        lensDistortionAmount: adjustments.lensDistortionAmount,
+        lensVignetteAmount: adjustments.lensVignetteAmount,
+        lensTcaAmount: adjustments.lensTcaAmount,
+        lensDistortionParams: adjustments.lensDistortionParams,
+        lensMaker: adjustments.lensMaker,
+        lensModel: adjustments.lensModel,
+        lensDistortionEnabled: adjustments.lensDistortionEnabled,
+        lensTcaEnabled: adjustments.lensTcaEnabled,
+        lensVignetteEnabled: adjustments.lensVignetteEnabled,
+      };
+
+      const newParameters = await invoke('generate_ai_depth_mask', {
+        jsAdjustments: transformAdjustments,
+        path: selectedImage.path,
+        minDepth: parameters.minDepth ?? 20,
+        maxDepth: parameters.maxDepth ?? 100,
+        minFade: parameters.minFade ?? 15,
+        maxFade: parameters.maxFade ?? 15,
+        feather: parameters.feather ?? 10,
+        flipHorizontal: adjustments.flipHorizontal,
+        flipVertical: adjustments.flipVertical,
+        orientationSteps: adjustments.orientationSteps,
+        rotation: adjustments.rotation,
+      });
+
+      const subMask = adjustments.aiPatches
+        ?.flatMap((p: AiPatch) => p.subMasks)
+        .find((sm: SubMask) => sm.id === subMaskId);
+
+      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
+      patchesSentToBackend.current.delete(subMaskId);
+      updateSubMask(subMaskId, { parameters: mergedParameters });
+    } catch (error) {
+      console.error('Failed to generate AI depth mask:', error);
+      setError(`AI Depth Mask Failed: ${error}`);
     } finally {
       setIsGeneratingAiMask(false);
     }
@@ -1424,10 +1531,34 @@ function App() {
 
         if (buffer && buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
           latestRenderedJobIdRef.current = jobId;
-          const blob = new Blob([buffer], { type: 'image/jpeg' });
-          const url = URL.createObjectURL(blob);
 
-          if (!dragging) {
+          if (dragging) {
+            const view = new DataView(buffer);
+            const patchX = view.getUint32(0, true);
+            const patchY = view.getUint32(4, true);
+            const patchW = view.getUint32(8, true);
+            const patchH = view.getUint32(12, true);
+            const fullW = view.getUint32(16, true);
+            const fullH = view.getUint32(20, true);
+
+            const imageBuffer = buffer.slice(24);
+            const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+
+            setInteractivePatch((prev) => {
+              if (prev && prev.url) setTimeout(() => URL.revokeObjectURL(prev.url), 100);
+              return {
+                url,
+                normX: patchX / fullW,
+                normY: patchY / fullH,
+                normW: patchW / fullW,
+                normH: patchH / fullH,
+              };
+            });
+          } else {
+            const blob = new Blob([buffer], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+
             try {
               const img = new Image();
               img.src = url;
@@ -1437,20 +1568,32 @@ function App() {
               URL.revokeObjectURL(url);
               return;
             }
-          }
 
-          setFinalPreviewUrl((prevUrl) => {
-            if (prevUrl && prevUrl.startsWith('blob:')) {
-              if (!imageCacheRef.current.isProtected(prevUrl)) {
+            setFinalPreviewUrl((prevUrl) => {
+              if (prevUrl && prevUrl.startsWith('blob:') && !imageCacheRef.current.isProtected(prevUrl)) {
                 setTimeout(() => URL.revokeObjectURL(prevUrl), 250);
               }
-            }
-            return url;
-          });
+              return url;
+            });
+
+            setInteractivePatch((prev) => {
+              if (prev && prev.url) {
+                setTimeout(() => URL.revokeObjectURL(prev.url), 500);
+              }
+              return null;
+            });
+          }
         }
       } catch (err) {
         if (err !== 'Superseded or worker failed') {
           console.error('Failed to apply adjustments:', err);
+        }
+
+        if (!dragging) {
+          setInteractivePatch((prev) => {
+            if (prev && prev.url) URL.revokeObjectURL(prev.url);
+            return null;
+          });
         }
       }
     },
@@ -1647,14 +1790,18 @@ function App() {
         }
         if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
           try {
-            const trees = await invoke(Invokes.GetPinnedFolderTrees, { paths: settings.pinnedFolders });
+            const trees = await invoke(Invokes.GetPinnedFolderTrees, {
+              paths: settings.pinnedFolders,
+              expandedFolders: settings.lastFolderState?.expandedFolders || [],
+              showImageCounts: settings.enableFolderImageCounts ?? false,
+            });
             setPinnedFolderTrees(trees);
           } catch (err) {
             console.error('Failed to load pinned folder trees:', err);
           }
         }
 
-        if (settings.lastRootPath) {
+        if (!isAndroid && settings.lastRootPath) {
           const root = settings.lastRootPath;
           const currentPath = settings.lastFolderState?.currentFolderPath || root;
 
@@ -1666,7 +1813,11 @@ function App() {
           preloadedDataRef.current = {
             rootPath: root,
             currentPath: currentPath,
-            tree: invoke(Invokes.GetFolderTree, { path: root }),
+            tree: invoke(Invokes.GetFolderTree, {
+              path: root,
+              expandedFolders: settings.lastFolderState?.expandedFolders ?? [root],
+              showImageCounts: settings.enableFolderImageCounts ?? false,
+            }),
             images: invoke(command, { path: currentPath }),
           };
         }
@@ -1680,7 +1831,7 @@ function App() {
       .finally(() => {
         isInitialMount.current = false;
       });
-  }, []);
+  }, [isAndroid]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) {
@@ -1825,27 +1976,42 @@ function App() {
     return () => clearTimeout(timer);
   }, [theme]);
 
-  const refreshAllFolderTrees = useCallback(async () => {
-    if (rootPath) {
-      try {
-        const treeData = await invoke(Invokes.GetFolderTree, { path: rootPath });
-        setFolderTree(treeData);
-      } catch (err) {
-        console.error('Failed to refresh main folder tree:', err);
-        setError(`Failed to refresh folder tree: ${err}.`);
-      }
-    }
+  const refreshAllFolderTrees = useCallback(
+    async (currentExpanded?: Set<string>) => {
+      const activeExpanded = currentExpanded || expandedFolders;
+      const expandedArr = Array.from(activeExpanded);
+      const showCounts = appSettings?.enableFolderImageCounts ?? false;
 
-    const currentPins = appSettings?.pinnedFolders || [];
-    if (currentPins.length > 0) {
-      try {
-        const trees = await invoke(Invokes.GetPinnedFolderTrees, { paths: currentPins });
-        setPinnedFolderTrees(trees);
-      } catch (err) {
-        console.error('Failed to refresh pinned folder trees:', err);
+      if (rootPath) {
+        try {
+          const treeData = await invoke(Invokes.GetFolderTree, {
+            path: rootPath,
+            expandedFolders: expandedArr,
+            showImageCounts: showCounts,
+          });
+          setFolderTree(treeData);
+        } catch (err) {
+          console.error('Failed to refresh main folder tree:', err);
+          setError(`Failed to refresh folder tree: ${err}.`);
+        }
       }
-    }
-  }, [rootPath, appSettings?.pinnedFolders]);
+
+      const currentPins = appSettings?.pinnedFolders || [];
+      if (currentPins.length > 0) {
+        try {
+          const trees = await invoke(Invokes.GetPinnedFolderTrees, {
+            paths: currentPins,
+            expandedFolders: expandedArr,
+            showImageCounts: showCounts,
+          });
+          setPinnedFolderTrees(trees);
+        } catch (err) {
+          console.error('Failed to refresh pinned folder trees:', err);
+        }
+      }
+    },
+    [rootPath, appSettings?.pinnedFolders, appSettings?.enableFolderImageCounts, expandedFolders],
+  );
 
   const pinnedFolders = useMemo(() => appSettings?.pinnedFolders || [], [appSettings]);
 
@@ -1858,20 +2024,24 @@ function App() {
         ? currentPins.filter((p) => p !== path)
         : [...currentPins, path].sort((a, b) => a.localeCompare(b));
 
-      if (!isPinned && path === currentFolderPath) {
+      if (!isPinned) {
         handleActiveTreeSectionChange('pinned');
       }
 
       handleSettingsChange({ ...appSettings, pinnedFolders: newPins });
 
       try {
-        const trees = await invoke(Invokes.GetPinnedFolderTrees, { paths: newPins });
+        const trees = await invoke(Invokes.GetPinnedFolderTrees, {
+          paths: newPins,
+          expandedFolders: Array.from(expandedFolders),
+          showImageCounts: appSettings.enableFolderImageCounts ?? false,
+        });
         setPinnedFolderTrees(trees);
       } catch (err) {
         console.error('Failed to refresh pinned folders:', err);
       }
     },
-    [appSettings, handleSettingsChange],
+    [appSettings, expandedFolders, handleSettingsChange],
   );
 
   const handleActiveTreeSectionChange = (section: string | null) => {
@@ -1882,8 +2052,9 @@ function App() {
   };
 
   const handleSelectSubfolder = useCallback(
-    async (path: string | null, isNewRoot = false, preloadedImages?: ImageFile[]) => {
+    async (path: string | null, isNewRoot = false, preloadedImages?: ImageFile[], expandParents = true) => {
       await invoke('cancel_thumbnail_generation');
+      clearThumbnailQueue();
       setIsViewLoading(true);
       setSearchCriteria({ tags: [], text: '', mode: 'OR' });
       setLibraryScrollTop(0);
@@ -1894,8 +2065,10 @@ function App() {
         setActiveView('library');
 
         if (isNewRoot) {
-          setExpandedFolders(new Set([path]));
-        } else if (path) {
+          if (path) {
+            setExpandedFolders(new Set([path]));
+          }
+        } else if (path && expandParents) {
           setExpandedFolders((prev) => {
             const newSet = new Set(prev);
             const allRoots = [rootPath, ...pinnedFolders].filter(Boolean) as string[];
@@ -1929,7 +2102,11 @@ function App() {
           setIsTreeLoading(true);
           handleSettingsChange({ ...appSettings, lastRootPath: path } as AppSettings);
           try {
-            const treeData = await invoke(Invokes.GetFolderTree, { path });
+            const treeData = await invoke(Invokes.GetFolderTree, {
+              path,
+              expandedFolders: [path],
+              showImageCounts: appSettings?.enableFolderImageCounts ?? false,
+            });
             setFolderTree(treeData);
           } catch (err) {
             console.error('Failed to load folder tree:', err);
@@ -1940,14 +2117,17 @@ function App() {
         }
 
         setImageList([]);
-        setImageRatings({});
         setMultiSelectedPaths([]);
         setLibraryActivePath(null);
         if (selectedImage) {
+          debouncedSave.flush();
+          debouncedSetHistory.cancel();
           setSelectedImage(null);
           setFinalPreviewUrl(null);
           setUncroppedAdjustedPreviewUrl(null);
           setHistogram(null);
+          setLiveAdjustments(INITIAL_ADJUSTMENTS);
+          resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
         }
 
         const command =
@@ -1959,6 +2139,14 @@ function App() {
         } else {
           files = await invoke(command, { path });
         }
+
+        const initialRatings: Record<string, number> = {};
+        files.forEach((f) => {
+          if (f.rating !== undefined) {
+            initialRatings[f.path] = f.rating;
+          }
+        });
+        setImageRatings(initialRatings);
 
         const exifSortKeys = ['date_taken', 'iso', 'shutter_speed', 'aperture', 'focal_length'];
         const isExifSortActive = exifSortKeys.includes(sortCriteria.key);
@@ -2004,7 +2192,18 @@ function App() {
         setIsViewLoading(false);
       }
     },
-    [appSettings, handleSettingsChange, selectedImage, rootPath, sortCriteria.key, pinnedFolders, libraryViewMode],
+    [
+      appSettings,
+      handleSettingsChange,
+      selectedImage,
+      rootPath,
+      sortCriteria.key,
+      pinnedFolders,
+      libraryViewMode,
+      debouncedSave,
+      debouncedSetHistory,
+      resetAdjustmentsHistory,
+    ],
   );
 
   const handleLibraryRefresh = useCallback(() => {
@@ -2018,6 +2217,17 @@ function App() {
         libraryViewMode === LibraryViewMode.Recursive ? Invokes.ListImagesRecursive : Invokes.ListImagesInDir;
 
       const files: ImageFile[] = await invoke(command, { path: currentFolderPath });
+
+      setImageRatings((prev) => {
+        const newRatings = { ...prev };
+        files.forEach((f) => {
+          if (f.rating !== undefined) {
+            newRatings[f.path] = f.rating;
+          }
+        });
+        return newRatings;
+      });
+
       const exifSortKeys = ['date_taken', 'iso', 'shutter_speed', 'aperture', 'focal_length'];
       const isExifSortActive = exifSortKeys.includes(sortCriteria.key);
       const shouldReadExif = appSettings?.enableExifReading ?? false;
@@ -2069,17 +2279,36 @@ function App() {
     }
   }, [currentFolderPath, sortCriteria.key, appSettings?.enableExifReading, libraryViewMode]);
 
-  const handleToggleFolder = useCallback((path: string) => {
-    setExpandedFolders((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(path)) {
-        newSet.delete(path);
-      } else {
-        newSet.add(path);
+  const handleToggleFolder = useCallback(
+    async (path: string) => {
+      const isExpanding = !expandedFolders.has(path);
+      setExpandedFolders((prev) => {
+        const newSet = new Set(prev);
+        if (isExpanding) {
+          newSet.add(path);
+        } else {
+          newSet.delete(path);
+        }
+        return newSet;
+      });
+      if (!isExpanding) return;
+      try {
+        const showCounts = appSettings?.enableFolderImageCounts ?? false;
+        const newChildren: any[] = await invoke(Invokes.GetFolderChildren, {
+          path,
+          showImageCounts: showCounts,
+        });
+        setFolderTree((prevTree: any) => insertChildrenIntoTree(prevTree, path, newChildren));
+        setPinnedFolderTrees((prevTrees: any[]) =>
+          prevTrees.map((tree) => insertChildrenIntoTree(tree, path, newChildren)),
+        );
+      } catch (err) {
+        console.error('Failed to fetch folder children:', err);
+        setError(`Failed to load folder: ${err}`);
       }
-      return newSet;
-    });
-  }, []);
+    },
+    [expandedFolders, appSettings?.enableFolderImageCounts],
+  );
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings || !rootPath) {
@@ -2114,6 +2343,10 @@ function App() {
       transformWrapperRef.current.resetTransform(0);
     }
     setZoom(1);
+
+    debouncedSave.flush();
+    debouncedSetHistory.cancel();
+
     const lastActivePath = selectedImage?.path ?? null;
     setSelectedImage(null);
     setFinalPreviewUrl(null);
@@ -2130,13 +2363,18 @@ function App() {
     setLiveAdjustments(INITIAL_ADJUSTMENTS);
     resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
     isBackendReadyRef.current = true;
-  }, [selectedImage?.path, resetAdjustmentsHistory]);
+    setInteractivePatch((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  }, [selectedImage?.path, resetAdjustmentsHistory, debouncedSave, debouncedSetHistory]);
 
   const handleImageSelect = useCallback(
     (path: string) => {
       if (selectedImage?.path === path) return;
 
-      debouncedSave.cancel();
+      debouncedSave.flush();
+      debouncedSetHistory.cancel();
 
       if (selectedImage?.path && cachedEditStateRef.current) {
         imageCacheRef.current.set(selectedImage.path, cachedEditStateRef.current);
@@ -2241,8 +2479,12 @@ function App() {
         }
         return null;
       });
+      setInteractivePatch((prev) => {
+        if (prev?.url) URL.revokeObjectURL(prev.url);
+        return null;
+      });
     },
-    [selectedImage?.path, debouncedSave, thumbnails, resetAdjustmentsHistory],
+    [selectedImage?.path, debouncedSave, debouncedSetHistory, thumbnails, resetAdjustmentsHistory],
   );
 
   const executeDelete = useCallback(
@@ -2660,22 +2902,32 @@ function App() {
         currentResRef.current = targetRes;
         applyAdjustments(currentAdjustments, false, targetRes);
       }
-    }, 200),
+    }, 100),
     [applyAdjustments],
   );
 
   useEffect(() => {
     if (selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
-      let targetRes = calculateTargetRes();
+      let baseRes = calculateTargetRes();
 
       if (isFullScreen && originalSize.width > 0 && originalSize.height > 0) {
-        targetRes = Math.max(originalSize.width, originalSize.height);
+        baseRes = Math.max(originalSize.width, originalSize.height);
       }
 
-      if (targetRes > currentResRef.current) {
-        requestHiFiZoom(adjustments, targetRes);
+      let zoomedRes = baseRes * zoom;
+      if (originalSize.width > 0 && originalSize.height > 0) {
+        const maxRes = Math.max(originalSize.width, originalSize.height);
+        if (zoomedRes > maxRes) {
+          zoomedRes = maxRes;
+        }
+      }
+      const finalRes = Math.round(zoomedRes);
+
+      if (finalRes > currentResRef.current) {
+        requestHiFiZoom(adjustments, finalRes);
       }
     }
+
     return () => {
       requestHiFiZoom.cancel();
     };
@@ -2689,6 +2941,8 @@ function App() {
     requestHiFiZoom,
     isFullScreen,
     originalSize,
+    zoom,
+    applyAdjustments,
   ]);
 
   useEffect(() => {
@@ -2704,11 +2958,6 @@ function App() {
       if (appSettings?.enableLivePreviews !== false) {
         applyAdjustments(adjustments, true, targetRes);
       }
-
-      dragIdleTimer.current = setTimeout(() => {
-        currentResRef.current = targetRes;
-        applyAdjustments(adjustments, false, targetRes);
-      }, 350);
     } else {
       dragIdleTimer.current = setTimeout(() => {
         currentResRef.current = targetRes;
@@ -2783,7 +3032,7 @@ function App() {
         targetZoomPercent = zoomValue / dpr;
       }
 
-      targetZoomPercent = Math.max(0.1 / dpr, Math.min(4.0, targetZoomPercent));
+      targetZoomPercent = Math.max(0.1 / dpr, Math.min(2.0, targetZoomPercent));
 
       let transformZoom = 1.0;
       if (
@@ -2959,6 +3208,8 @@ function App() {
     displaySize,
     baseRenderSize,
     originalSize,
+    brushSettings: brushSettings,
+    setBrushSettings: setBrushSettings,
   });
 
   useEffect(() => {
@@ -2982,6 +3233,16 @@ function App() {
       listen('waveform-update', (event: any) => {
         if (isEffectActive && event.payload.path === selectedImagePathRef.current) {
           setWaveform(event.payload.data);
+        }
+      }),
+      listen('thumbnail-progress', (event: any) => {
+        if (isEffectActive) {
+          setThumbnailProgress({ current: event.payload.current, total: event.payload.total });
+        }
+      }),
+      listen('thumbnail-generation-complete', () => {
+        if (isEffectActive) {
+          setThumbnailProgress({ current: 0, total: 0 });
         }
       }),
       listen('thumbnail-generated', (event: any) => {
@@ -3026,6 +3287,15 @@ function App() {
                 const list: ImageFile[] = await invoke(Invokes.ListImagesInDir, { path: currentFolderPathRef.current });
                 if (Array.isArray(list)) {
                   setImageList(list);
+                  setImageRatings((prev) => {
+                    const newRatings = { ...prev };
+                    list.forEach((f) => {
+                      if (f.rating !== undefined) {
+                        newRatings[f.path] = f.rating;
+                      }
+                    });
+                    return newRatings;
+                  });
                 }
               } catch (err) {
                 console.error('Failed to refresh after indexing:', err);
@@ -3438,14 +3708,21 @@ function App() {
 
   const handleOpenFolder = async () => {
     try {
+      if (isAndroid) {
+        const libraryRoot = await invoke<string>(Invokes.GetOrCreateInternalLibraryRoot);
+        setRootPath(libraryRoot);
+        await handleSelectSubfolder(libraryRoot, true);
+        return;
+      }
+
       const selected = await open({ directory: true, multiple: false, defaultPath: await homeDir() });
       if (typeof selected === 'string') {
         setRootPath(selected);
         await handleSelectSubfolder(selected, true);
       }
     } catch (err) {
-      console.error('Failed to open directory dialog:', err);
-      setError('Failed to open folder selection dialog.');
+      console.error(isAndroid ? 'Failed to open Android library root:' : 'Failed to open directory dialog:', err);
+      setError(isAndroid ? 'Failed to open library.' : 'Failed to open folder selection dialog.');
     }
   };
 
@@ -3476,7 +3753,6 @@ function App() {
 
       if (folderState?.expandedFolders) {
         const newExpandedFolders = new Set(folderState.expandedFolders);
-        newExpandedFolders.add(root);
         setExpandedFolders(newExpandedFolders);
       } else {
         setExpandedFolders(new Set([root]));
@@ -3489,7 +3765,12 @@ function App() {
           treeData = await preloadedDataRef.current.tree;
           console.log('Preload cache hit for folder tree.');
         } else {
-          treeData = await invoke(Invokes.GetFolderTree, { path: root });
+          const expandedArr = folderState?.expandedFolders ? Array.from(new Set(folderState.expandedFolders)) : [root];
+          treeData = await invoke(Invokes.GetFolderTree, {
+            path: root,
+            expandedFolders: expandedArr,
+            showImageCounts: appSettings?.enableFolderImageCounts ?? false,
+          });
         }
         setFolderTree(treeData);
       } catch (err) {
@@ -3508,7 +3789,7 @@ function App() {
         }
       }
 
-      await handleSelectSubfolder(pathToSelect, false, preloadedImages);
+      await handleSelectSubfolder(pathToSelect, false, preloadedImages, false);
     };
     restore().catch((err) => {
       console.error('Failed to restore session, folder might be missing:', err);
@@ -3567,17 +3848,18 @@ function App() {
     const { shiftAnchor, onSimpleClick, updateLibraryActivePath } = options;
 
     if (shiftKey && shiftAnchor) {
-      const lastIndex = sortedImageList.findIndex((f) => f.path === shiftAnchor);
+      const anchorIndex = sortedImageList.findIndex((f) => f.path === shiftAnchor);
       const currentIndex = sortedImageList.findIndex((f) => f.path === path);
 
-      if (lastIndex !== -1 && currentIndex !== -1) {
-        const start = Math.min(lastIndex, currentIndex);
-        const end = Math.max(lastIndex, currentIndex);
+      if (anchorIndex !== -1 && currentIndex !== -1) {
+        const start = Math.min(anchorIndex, currentIndex);
+        const end = Math.max(anchorIndex, currentIndex);
         const range = sortedImageList.slice(start, end + 1).map((f: ImageFile) => f.path);
-        const baseSelection = isCtrlPressed ? multiSelectedPaths : [shiftAnchor];
+        const baseSelection = isCtrlPressed ? multiSelectedPaths : [];
         const newSelection = Array.from(new Set([...baseSelection, ...range]));
 
         setMultiSelectedPaths(newSelection);
+        setSelectionAnchorPath(path);
         if (updateLibraryActivePath) {
           setLibraryActivePath(path);
         }
@@ -3592,6 +3874,7 @@ function App() {
 
       const newSelectionArray = Array.from(newSelection);
       setMultiSelectedPaths(newSelectionArray);
+      setSelectionAnchorPath(path);
 
       if (updateLibraryActivePath) {
         if (newSelectionArray.includes(path)) {
@@ -3604,16 +3887,18 @@ function App() {
       }
     } else {
       onSimpleClick(path);
+      setSelectionAnchorPath(path);
     }
   };
 
   const handleLibraryImageSingleClick = (path: string, event: any) => {
     handleMultiSelectClick(path, event, {
-      shiftAnchor: libraryActivePath,
+      shiftAnchor: selectionAnchorPath ?? libraryActivePath,
       updateLibraryActivePath: true,
       onSimpleClick: (p: any) => {
         setMultiSelectedPaths([p]);
         setLibraryActivePath(p);
+        setSelectionAnchorPath(p);
       },
     });
   };
@@ -3621,9 +3906,12 @@ function App() {
   const handleImageClick = (path: string, event: any) => {
     const inEditor = !!selectedImage;
     handleMultiSelectClick(path, event, {
-      shiftAnchor: inEditor ? selectedImage.path : libraryActivePath,
+      shiftAnchor: selectionAnchorPath ?? (inEditor ? selectedImage.path : libraryActivePath),
       updateLibraryActivePath: !inEditor,
-      onSimpleClick: handleImageSelect,
+      onSimpleClick: (p: string) => {
+        handleImageSelect(p);
+        setSelectionAnchorPath(p);
+      },
     });
   };
 
@@ -4616,6 +4904,12 @@ function App() {
 
     const options = [
       {
+        label: 'Refresh Folder',
+        icon: RefreshCw,
+        onClick: handleLibraryRefresh,
+      },
+      { type: OPTION_SEPARATOR },
+      {
         label: 'Paste',
         icon: ClipboardPaste,
         disabled: copiedFilePaths.length === 0,
@@ -4657,176 +4951,130 @@ function App() {
     showContextMenu(event.clientX, event.clientY, options);
   };
 
-  const memoizedFolderTree = useMemo(
-    () =>
-      rootPath && (
-        <div
-          className={clsx(
-            'flex h-full overflow-hidden flex-shrink-0',
-            !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-          )}
-          style={{
-            maxWidth: isFullScreen ? '0px' : '1000px',
-            opacity: isFullScreen ? 0 : 1,
-          }}
-        >
-          <FolderTree
-            expandedFolders={expandedFolders}
-            isLoading={isTreeLoading}
-            isResizing={isResizing}
-            isVisible={uiVisibility.folderTree}
-            onContextMenu={handleFolderTreeContextMenu}
-            onFolderSelect={(path) => handleSelectSubfolder(path, false)}
-            onToggleFolder={handleToggleFolder}
-            selectedPath={currentFolderPath}
-            setIsVisible={(value: boolean) => setUiVisibility((prev: UiVisibility) => ({ ...prev, folderTree: value }))}
-            style={{ width: uiVisibility.folderTree ? `${leftPanelWidth}px` : '32px' }}
-            tree={folderTree}
-            pinnedFolderTrees={pinnedFolderTrees}
-            pinnedFolders={pinnedFolders}
-            activeSection={activeTreeSection}
-            onActiveSectionChange={handleActiveTreeSectionChange}
-            showImageCounts={appSettings?.enableFolderImageCounts ?? false}
-            isInstantTransition={isInstantTransition}
-          />
-          <Resizer
-            direction={Orientation.Vertical}
-            onMouseDown={createResizeHandler(setLeftPanelWidth, leftPanelWidth)}
-          />
-        </div>
-      ),
-    [
-      rootPath,
-      expandedFolders,
-      isTreeLoading,
-      isResizing,
-      handleSelectSubfolder,
-      uiVisibility.folderTree,
-      currentFolderPath,
-      leftPanelWidth,
-      folderTree,
-      pinnedFolderTrees,
-      pinnedFolders,
-      activeTreeSection,
-      copiedFilePaths,
-      isFullScreen,
-      isInstantTransition,
-    ],
-  );
+  const renderFolderTree = () => {
+    if (!rootPath) return null;
 
-  const memoizedLibraryView = useMemo(
-    () => (
-      <div className="flex flex-row flex-grow h-full min-h-0">
-        <div className="flex-1 flex flex-col min-w-0 gap-2">
-          {activeView === 'community' ? (
-            <CommunityPage
-              onBackToLibrary={() => setActiveView('library')}
-              supportedTypes={supportedTypes}
-              imageList={sortedImageList}
-              currentFolderPath={currentFolderPath}
-            />
-          ) : (
-            <MainLibrary
-              activePath={libraryActivePath}
-              aiModelDownloadStatus={aiModelDownloadStatus}
-              appSettings={appSettings}
-              currentFolderPath={currentFolderPath}
-              filterCriteria={filterCriteria}
-              imageList={sortedImageList}
-              imageRatings={imageRatings}
-              importState={importState}
-              indexingProgress={indexingProgress}
-              isIndexing={isIndexing}
-              isThumbnailsLoading={isThumbnailsLoading}
-              isLoading={isViewLoading}
-              isTreeLoading={isTreeLoading}
-              libraryScrollTop={libraryScrollTop}
-              libraryViewMode={libraryViewMode}
-              multiSelectedPaths={multiSelectedPaths}
-              onClearSelection={handleClearSelection}
-              onContextMenu={handleThumbnailContextMenu}
-              onContinueSession={handleContinueSession}
-              onEmptyAreaContextMenu={handleMainLibraryContextMenu}
-              onGoHome={handleGoHome}
-              onImageClick={handleLibraryImageSingleClick}
-              onImageDoubleClick={handleImageSelect}
-              onLibraryRefresh={handleLibraryRefresh}
-              onOpenFolder={handleOpenFolder}
-              onSettingsChange={handleSettingsChange}
-              onThumbnailAspectRatioChange={setThumbnailAspectRatio}
-              onThumbnailSizeChange={setThumbnailSize}
-              rootPath={rootPath}
-              searchCriteria={searchCriteria}
-              setFilterCriteria={setFilterCriteria}
-              setLibraryScrollTop={setLibraryScrollTop}
-              setLibraryViewMode={setLibraryViewMode}
-              setSearchCriteria={setSearchCriteria}
-              setSortCriteria={setSortCriteria}
-              sortCriteria={sortCriteria}
-              theme={theme}
-              thumbnailAspectRatio={thumbnailAspectRatio}
-              thumbnails={thumbnails}
-              thumbnailSize={thumbnailSize}
-              onNavigateToCommunity={() => setActiveView('community')}
-            />
-          )}
-          {rootPath && (
-            <BottomBar
-              isCopied={isCopied}
-              isCopyDisabled={multiSelectedPaths.length !== 1}
-              isExportDisabled={multiSelectedPaths.length === 0}
-              isLibraryView={true}
-              isPasted={isPasted}
-              isPasteDisabled={copiedAdjustments === null || multiSelectedPaths.length === 0}
-              isRatingDisabled={multiSelectedPaths.length === 0}
-              isResetDisabled={multiSelectedPaths.length === 0}
-              multiSelectedPaths={multiSelectedPaths}
-              onCopy={handleCopyAdjustments}
-              onExportClick={() => setIsLibraryExportPanelVisible((prev) => !prev)}
-              onOpenCopyPasteSettings={() => setIsCopyPasteSettingsModalOpen(true)}
-              onPaste={() => handlePasteAdjustments()}
-              onRate={handleRate}
-              onReset={() => handleResetAdjustments()}
-              rating={libraryActiveAdjustments.rating || 0}
-              thumbnailAspectRatio={thumbnailAspectRatio}
-              totalImages={imageList.length}
-            />
-          )}
-        </div>
+    return (
+      <div
+        className={clsx(
+          'flex h-full overflow-hidden shrink-0',
+          !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+        )}
+        style={{
+          maxWidth: isFullScreen ? '0px' : '1000px',
+          opacity: isFullScreen ? 0 : 1,
+        }}
+      >
+        <FolderTree
+          expandedFolders={expandedFolders}
+          isLoading={isTreeLoading}
+          isResizing={isResizing}
+          isVisible={uiVisibility.folderTree}
+          onContextMenu={handleFolderTreeContextMenu}
+          onFolderSelect={(path) => handleSelectSubfolder(path, false)}
+          onToggleFolder={handleToggleFolder}
+          selectedPath={currentFolderPath}
+          setIsVisible={(value: boolean) => setUiVisibility((prev: UiVisibility) => ({ ...prev, folderTree: value }))}
+          style={{ width: uiVisibility.folderTree ? `${leftPanelWidth}px` : '32px' }}
+          tree={folderTree}
+          pinnedFolderTrees={pinnedFolderTrees}
+          pinnedFolders={pinnedFolders}
+          activeSection={activeTreeSection}
+          onActiveSectionChange={handleActiveTreeSectionChange}
+          showImageCounts={appSettings?.enableFolderImageCounts ?? false}
+          isInstantTransition={isInstantTransition}
+        />
+        <Resizer
+          direction={Orientation.Vertical}
+          onMouseDown={createResizeHandler(setLeftPanelWidth, leftPanelWidth)}
+        />
       </div>
-    ),
-    [
-      activeView,
-      sortedImageList,
-      currentFolderPath,
-      libraryActivePath,
-      aiModelDownloadStatus,
-      appSettings,
-      filterCriteria,
-      imageRatings,
-      importState,
-      indexingProgress,
-      isIndexing,
-      isThumbnailsLoading,
-      isViewLoading,
-      isTreeLoading,
-      libraryScrollTop,
-      libraryViewMode,
-      multiSelectedPaths,
-      rootPath,
-      searchCriteria,
-      sortCriteria,
-      theme,
-      thumbnailAspectRatio,
-      thumbnails,
-      thumbnailSize,
-      isCopied,
-      isPasted,
-      copiedAdjustments,
-      libraryActiveAdjustments,
-      supportedTypes,
-      copiedFilePaths,
-    ],
+    );
+  };
+
+  const renderLibraryView = () => (
+    <div className="flex flex-row grow h-full min-h-0">
+      <div className="flex-1 flex flex-col min-w-0 gap-2">
+        {activeView === 'community' ? (
+          <CommunityPage
+            onBackToLibrary={() => setActiveView('library')}
+            supportedTypes={supportedTypes}
+            imageList={sortedImageList}
+            currentFolderPath={currentFolderPath}
+          />
+        ) : (
+          <MainLibrary
+            activePath={libraryActivePath}
+            aiModelDownloadStatus={aiModelDownloadStatus}
+            appSettings={appSettings}
+            currentFolderPath={currentFolderPath}
+            filterCriteria={filterCriteria}
+            imageList={sortedImageList}
+            imageRatings={imageRatings}
+            importState={importState}
+            indexingProgress={indexingProgress}
+            isIndexing={isIndexing}
+            isLoading={isViewLoading}
+            isTreeLoading={isTreeLoading}
+            isAndroid={isAndroid}
+            libraryScrollTop={libraryScrollTop}
+            libraryViewMode={libraryViewMode}
+            multiSelectedPaths={multiSelectedPaths}
+            onClearSelection={handleClearSelection}
+            onContextMenu={handleThumbnailContextMenu}
+            onContinueSession={handleContinueSession}
+            onEmptyAreaContextMenu={handleMainLibraryContextMenu}
+            onGoHome={handleGoHome}
+            onImageClick={handleLibraryImageSingleClick}
+            onImageDoubleClick={handleImageSelect}
+            onLibraryRefresh={handleLibraryRefresh}
+            onOpenFolder={handleOpenFolder}
+            onSettingsChange={handleSettingsChange}
+            onThumbnailAspectRatioChange={setThumbnailAspectRatio}
+            onThumbnailSizeChange={setThumbnailSize}
+            onRequestThumbnails={requestThumbnails}
+            rootPath={rootPath}
+            searchCriteria={searchCriteria}
+            setFilterCriteria={setFilterCriteria}
+            setLibraryScrollTop={setLibraryScrollTop}
+            setLibraryViewMode={setLibraryViewMode}
+            setSearchCriteria={setSearchCriteria}
+            setSortCriteria={setSortCriteria}
+            sortCriteria={sortCriteria}
+            theme={theme}
+            thumbnailAspectRatio={thumbnailAspectRatio}
+            thumbnails={thumbnails}
+            thumbnailProgress={thumbnailProgress}
+            thumbnailSize={thumbnailSize}
+            onNavigateToCommunity={() => setActiveView('community')}
+            listColumnWidths={listColumnWidths}
+            setListColumnWidths={setListColumnWidths}
+          />
+        )}
+        {rootPath && (
+          <BottomBar
+            isCopied={isCopied}
+            isCopyDisabled={multiSelectedPaths.length !== 1}
+            isExportDisabled={multiSelectedPaths.length === 0}
+            isLibraryView={true}
+            isPasted={isPasted}
+            isPasteDisabled={copiedAdjustments === null || multiSelectedPaths.length === 0}
+            isRatingDisabled={multiSelectedPaths.length === 0}
+            isResetDisabled={multiSelectedPaths.length === 0}
+            multiSelectedPaths={multiSelectedPaths}
+            onCopy={handleCopyAdjustments}
+            onExportClick={() => setIsLibraryExportPanelVisible((prev) => !prev)}
+            onOpenCopyPasteSettings={() => setIsCopyPasteSettingsModalOpen(true)}
+            onPaste={() => handlePasteAdjustments()}
+            onRate={handleRate}
+            onReset={() => handleResetAdjustments()}
+            rating={libraryActiveAdjustments.rating || 0}
+            thumbnailAspectRatio={thumbnailAspectRatio}
+            totalImages={imageList.length}
+          />
+        )}
+      </div>
+    </div>
   );
 
   const renderMainView = () => {
@@ -4849,7 +5097,7 @@ function App() {
 
     if (selectedImage) {
       return (
-        <div className="flex flex-row flex-grow h-full min-h-0">
+        <div className="flex flex-row grow h-full min-h-0">
           <div className="flex-1 flex flex-col min-w-0">
             <Editor
               activeAiPatchContainerId={activeAiPatchContainerId}
@@ -4862,6 +5110,7 @@ function App() {
               canRedo={canRedo}
               canUndo={canUndo}
               finalPreviewUrl={finalPreviewUrl}
+              interactivePatch={interactivePatch}
               isFullScreen={isFullScreen}
               isLoading={isViewLoading}
               isSliderDragging={isSliderDragging}
@@ -4904,7 +5153,7 @@ function App() {
             />
             <div
               className={clsx(
-                'flex flex-col w-full overflow-hidden flex-shrink-0',
+                'flex flex-col w-full overflow-hidden shrink-0',
                 !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
               )}
               style={{
@@ -4939,6 +5188,7 @@ function App() {
                 onImageSelect={handleImageClick}
                 onPaste={() => handlePasteAdjustments()}
                 onRate={handleRate}
+                onRequestThumbnails={requestThumbnails}
                 onZoomChange={handleZoomChange}
                 rating={adjustments.rating || 0}
                 selectedImage={selectedImage}
@@ -4955,7 +5205,7 @@ function App() {
 
           <div
             className={clsx(
-              'flex h-full overflow-hidden flex-shrink-0',
+              'flex h-full overflow-hidden shrink-0',
               !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
             )}
             style={{
@@ -5050,6 +5300,7 @@ function App() {
                             copiedMask={copiedMask}
                             histogram={histogram}
                             isGeneratingAiMask={isGeneratingAiMask}
+                            onGenerateAiDepthMask={handleGenerateAiDepthMask}
                             onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
                             onGenerateAiSkyMask={handleGenerateAiSkyMask}
                             onSelectContainer={setActiveMaskContainerId}
@@ -5137,7 +5388,7 @@ function App() {
         </div>
       );
     }
-    return memoizedLibraryView;
+    return renderLibraryView();
   };
 
   const renderContent = () => {
@@ -5153,7 +5404,7 @@ function App() {
     >
       <div
         className={clsx(
-          'flex-shrink-0 overflow-hidden z-50',
+          'shrink-0 overflow-hidden z-50',
           !isInstantTransition && 'transition-all duration-300 ease-in-out',
           isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
         )}
@@ -5170,8 +5421,8 @@ function App() {
           ],
         )}
       >
-        <div className="flex flex-row flex-grow h-full min-h-0">
-          {memoizedFolderTree}
+        <div className="flex flex-row grow h-full min-h-0">
+          {renderFolderTree()}
           <div className="flex-1 flex flex-col min-w-0">{renderContent()}</div>
           {!selectedImage && isLibraryExportPanelVisible && (
             <Resizer
@@ -5181,7 +5432,7 @@ function App() {
           )}
           <div
             className={clsx(
-              'flex-shrink-0 overflow-hidden',
+              'shrink-0 overflow-hidden',
               !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
             )}
             style={{ width: isLibraryExportPanelVisible && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
@@ -5288,6 +5539,7 @@ function App() {
         isProcessing={denoiseModalState.isProcessing}
         error={denoiseModalState.error}
         progressMessage={denoiseModalState.progressMessage}
+        aiModelDownloadStatus={aiModelDownloadStatus}
         isRaw={denoiseModalState.isRaw}
         loadingImageUrl={
           denoiseModalState.targetPath
@@ -5366,7 +5618,7 @@ function App() {
         toastClassName={() =>
           clsx(
             'relative flex min-h-16 p-4 rounded-lg justify-between overflow-hidden cursor-pointer mb-4',
-            '!bg-surface !text-text-primary !border !border-border-color !shadow-2xl !max-w-[420px]',
+            'bg-surface! text-text-primary! border! border-border-color! shadow-2xl! max-w-[420px]!',
           )
         }
       />
