@@ -125,7 +125,6 @@
     background-clip: padding-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-<<<<<<< HEAD
     background-color: theme('colors.hover-color');
   }
 }
@@ -252,9 +251,6 @@
 @layer utilities {
   .text-shadow-shiny {
     text-shadow: 0 0 18px rgba(255, 255, 255, 0.35);
-=======
-    background-color: var(--color-hover-color);
->>>>>>> main/main
   }
 
 }
