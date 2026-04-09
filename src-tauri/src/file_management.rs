@@ -29,7 +29,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
 #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
-use trash;
 use uuid::Uuid;
 use walkdir::WalkDir;
 
