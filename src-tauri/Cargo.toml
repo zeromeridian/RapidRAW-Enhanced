@@ -87,8 +87,8 @@ reqwest = { version = "0.13", default-features = false, features = ["blocking", 
 hex = "0.4"
 
 [profile.dev]
-opt-level = 3
-debug = true
+opt-level = 2
+debug = 1
 incremental = true
 
 [profile.release]
