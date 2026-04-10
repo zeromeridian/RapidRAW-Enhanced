@@ -5,6 +5,8 @@ import { ColorResult, HsvaColor, hsvaToHex } from '@uiw/color-convert';
 import { Sun } from 'lucide-react';
 import { HueSatLum } from '../../utils/adjustments';
 import { motion, AnimatePresence } from 'framer-motion';
+import Text from './Text';
+import { TextColors, TextVariants } from '../../types/typography';
 
 interface ColorWheelProps {
   defaultValue: HueSatLum;
@@ -115,24 +117,29 @@ const ColorWheel = ({
         onMouseEnter={() => setIsLabelHovered(true)}
         onMouseLeave={() => setIsLabelHovered(false)}
       >
-        <span
-          className={`absolute inset-0 flex items-center justify-center text-sm font-medium text-text-secondary whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
+        <Text
+          variant={TextVariants.label}
+          className={`absolute inset-0 flex items-center justify-center whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
             !isDragging && !isLabelHovered ? 'opacity-100' : 'opacity-0'
           }`}
         >
           {label}
-        </span>
+        </Text>
 
-        <span
-          className={`absolute inset-0 flex items-center justify-center text-sm font-medium text-text-primary whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
+        <Text
+          variant={TextVariants.label}
+          color={TextColors.primary}
+          className={`absolute inset-0 flex items-center justify-center whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
             !isDragging && isLabelHovered ? 'opacity-100' : 'opacity-0'
           }`}
         >
           Reset
-        </span>
+        </Text>
 
-        <div
-          className={`absolute inset-0 flex items-center justify-center gap-2 text-sm font-medium text-text-secondary whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
+        <Text
+          as="div"
+          variant={TextVariants.label}
+          className={`absolute inset-0 flex items-center justify-center gap-2 whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
             isDragging ? 'opacity-100' : 'opacity-0'
           }`}
         >
@@ -145,7 +152,7 @@ const ColorWheel = ({
             <span className="font-bold">S:</span>
             <span className="w-6 text-right">{Math.round(saturation)}</span>
           </div>
-        </div>
+        </Text>
       </div>
 
       <div ref={sizerRef} className="relative w-full aspect-square">

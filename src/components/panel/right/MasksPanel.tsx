@@ -75,6 +75,8 @@ import {
 } from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
 import { usePresets } from '../../../hooks/usePresets';
+import Text from '../../ui/Text';
+import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 
 interface MasksPanelProps {
   activeMaskContainerId: string | null;
@@ -160,7 +162,7 @@ const SUB_MASK_CONFIG: Record<Mask, any> = {
 };
 
 const BrushTools = ({ settings, onSettingsChange }: { settings: any; onSettingsChange: any }) => (
-  <div className="space-y-4 border-t border-surface">
+  <div>
     <Slider
       defaultValue={100}
       label="Brush Size"
@@ -349,29 +351,31 @@ function DepthRangePicker({
   const isDragging = activeHandle !== null;
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       <div
         className="grid w-fit cursor-pointer"
         onClick={handleReset}
         onMouseEnter={() => setIsLabelHovered(true)}
         onMouseLeave={() => setIsLabelHovered(false)}
       >
-        <span
+        <Text
+          variant={TextVariants.label}
           aria-hidden={isLabelHovered}
-          className={`col-start-1 row-start-1 text-sm font-medium text-text-secondary select-none transition-opacity duration-200 ease-in-out ${
+          className={`col-start-1 row-start-1 select-none transition-opacity duration-200 ease-in-out ${
             isLabelHovered ? 'opacity-0' : 'opacity-100'
           }`}
         >
           Depth Range
-        </span>
-        <span
+        </Text>
+        <Text
+          variant={TextVariants.label}
           aria-hidden={!isLabelHovered}
-          className={`col-start-1 row-start-1 text-sm font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none ${
+          className={`col-start-1 row-start-1 select-none transition-opacity duration-200 ease-in-out pointer-events-none ${
             isLabelHovered ? 'opacity-100' : 'opacity-0'
           }`}
         >
           Reset
-        </span>
+        </Text>
       </div>
       <div
         ref={trackRef}
@@ -496,10 +500,10 @@ function DepthRangePicker({
           </div>
         ))}
       </div>
-      <div className="flex justify-between text-xs text-text-secondary select-none px-0.5">
+      <Text as="div" variant={TextVariants.small} className="flex justify-between select-none px-1">
         <span>Near</span>
         <span>Far</span>
-      </div>
+      </Text>
     </div>
   );
 }
@@ -1141,7 +1145,7 @@ export default function MasksPanel({
         onContextMenu={handlePanelContextMenu}
       >
         <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-          <h2 className="text-xl font-bold text-primary text-shadow-shiny">Masking</h2>
+          <Text variant={TextVariants.title}>Masking</Text>
           <div className="flex items-center gap-1">
             <button
               className={clsx(
@@ -1192,7 +1196,7 @@ export default function MasksPanel({
           )}
         </AnimatePresence>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0 p-4 gap-8">
           <AnimatePresence mode="wait">
             {adjustments.masks.length === 0 ? (
               <motion.div
@@ -1201,9 +1205,11 @@ export default function MasksPanel({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="p-4 pb-2 z-10 shrink-0"
+                className="z-10 shrink-0"
               >
-                <p className="text-sm mb-3 font-semibold text-text-primary">Create New Mask</p>
+                <Text variant={TextVariants.heading} className="mb-2">
+                  Create New Mask
+                </Text>
                 <div className="grid grid-cols-3 gap-2" onClick={(e) => e.stopPropagation()}>
                   {MASK_PANEL_CREATION_TYPES.map((maskType: MaskType) => (
                     <DraggableGridItem
@@ -1227,9 +1233,11 @@ export default function MasksPanel({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className={`flex-col px-4 pt-4 pb-2 space-y-1 transition-colors ${isRootOver ? 'bg-surface' : ''}`}
+                className={`flex-col transition-colors ${isRootOver ? 'bg-surface' : ''}`}
               >
-                <p className="text-sm mb-3 font-semibold text-text-primary">Masks</p>
+                <Text variant={TextVariants.heading} className="mb-2">
+                  Masks
+                </Text>
 
                 <AnimatePresence
                   initial={false}
@@ -1290,17 +1298,17 @@ export default function MasksPanel({
                   )}
                 </AnimatePresence>
 
-                <div
-                  className="flex items-center gap-2 p-2 rounded-md transition-colors hover:bg-card-active cursor-pointer mt-1 text-text-secondary hover:text-text-primary group"
+                <Text
+                  as="div"
+                  weight={TextWeights.medium}
+                  className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
                   onClick={(e) => handleAddMaskContextMenu(e, null)}
                 >
-                  <div className="p-0.5 opacity-70 group-hover:opacity-100">
+                  <div className="p-0.5">
                     <Plus size={18} />
                   </div>
-                  <span className="text-sm font-medium opacity-70 group-hover:opacity-100 transition-opacity">
-                    Add New Mask
-                  </span>
-                </div>
+                  <span>Add New Mask</span>
+                </Text>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1315,7 +1323,9 @@ export default function MasksPanel({
                 transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="flex-1 min-h-0"
               >
-                <p className="text-sm my-3 font-semibold text-text-primary px-4">Mask Adjustments</p>
+                <Text variant={TextVariants.heading} className="mb-2">
+                  Mask Adjustments
+                </Text>
                 <SettingsPanel
                   container={activeContainer}
                   activeSubMask={activeSubMaskData || null}
@@ -1348,40 +1358,40 @@ export default function MasksPanel({
         {activeDragItem ? (
           <div className="w-(--sidebar-width,280px) pointer-events-none">
             {activeDragItem.type === 'Container' && activeDragItem.item && (
-              <div className="flex items-center gap-2 p-2 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10">
-                <div className="text-text-secondary">
-                  <FolderIcon size={18} />
-                </div>
-                <span className="text-sm font-medium text-text-primary flex-1 truncate">
-                  {(activeDragItem.item as MaskContainer).name}
-                </span>
-                <div className="flex gap-1.5 opacity-50">
-                  <Eye size={16} className="text-text-secondary" />
-                  <Trash2 size={16} className="text-text-secondary" />
-                </div>
-              </div>
+              <Text
+                as="div"
+                color={TextColors.primary}
+                weight={TextWeights.medium}
+                className="flex items-center gap-2 p-2 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10"
+              >
+                <FolderIcon size={18} className={TEXT_COLOR_KEYS[TextColors.secondary]} />
+                <span className="flex-1 truncate">{(activeDragItem.item as MaskContainer).name}</span>
+              </Text>
             )}
 
             {activeDragItem.type === 'SubMask' && activeDragItem.item && (
-              <div className="flex items-center gap-2 p-2 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10 ml-[15px]">
+              <Text
+                as="div"
+                color={TextColors.primary}
+                weight={TextWeights.medium}
+                className="flex items-center gap-2 p-2 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10 ml-3.75"
+              >
                 {(() => {
                   const sm = activeDragItem.item as SubMask;
                   const Icon = MASK_ICON_MAP[sm.type] || Circle;
-                  return <Icon size={16} className="text-text-secondary shrink-0 ml-1" />;
+                  return <Icon size={16} className={`shrink-0 ml-1 ${TEXT_COLOR_KEYS[TextColors.secondary]}`} />;
                 })()}
-                <span className="text-sm text-text-primary flex-1 truncate">
-                  {getSubMaskName(activeDragItem.item as SubMask)}
-                </span>
-                <div className="flex gap-1.5 opacity-50">
-                  <Plus size={14} className="text-text-secondary" />
-                  <Eye size={14} className="text-text-secondary" />
-                  <Trash2 size={14} className="text-text-secondary" />
-                </div>
-              </div>
+                <span className="flex-1 truncate">{getSubMaskName(activeDragItem.item as SubMask)}</span>
+              </Text>
             )}
 
             {activeDragItem.type === 'Creation' && (
-              <div className="bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square w-20 shadow-xl opacity-90">
+              <Text
+                as="div"
+                variant={TextVariants.small}
+                color={TextColors.primary}
+                className="bg-surface rounded-lg gap-2 p-2 flex flex-col items-center justify-center aspect-square w-20 shadow-xl opacity-90"
+              >
                 {(() => {
                   const maskType =
                     MASK_PANEL_CREATION_TYPES.find((m) => m.type === activeDragItem.maskType) ||
@@ -1390,13 +1400,13 @@ export default function MasksPanel({
                   return (
                     <>
                       <Icon size={24} />
-                      <span className="text-xs text-center">
+                      <span className="text-center">
                         {activeDragItem.maskType ? formatMaskTypeName(activeDragItem.maskType) : 'Mask'}
                       </span>
                     </>
                   );
                 })()}
-              </div>
+              </Text>
             )}
           </div>
         ) : null}
@@ -1415,7 +1425,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
       transition={{ duration: 0.2, ease: 'easeOut' }}
       className={`p-4 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
     >
-      <p className="text-sm font-medium text-text-secondary">Drop here to create a new mask</p>
+      <Text weight={TextWeights.medium}>Drop here to create a new mask</Text>
     </motion.div>
   );
 }
@@ -1450,11 +1460,14 @@ function DraggableGridItem({ maskType, onClick, onRightClick, isDraggable, activ
         if (event.button !== 2) return;
         onRightClick(event);
       }}
-      className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 aspect-square transition-colors
+      className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-2 aspect-square transition-colors
                 ${maskType.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'} ${isDragging ? 'opacity-50' : ''}`}
       data-tooltip={tooltip}
     >
-      <maskType.icon size={24} /> <span className="text-xs">{maskType.name}</span>
+      <maskType.icon size={24} />{' '}
+      <Text as="span" variant={TextVariants.small} color={TextColors.primary}>
+        {maskType.name}
+      </Text>
     </button>
   );
 }
@@ -1609,7 +1622,7 @@ function ContainerRow({
       animate={{ opacity: isDragging ? 0.4 : 1, height: 'auto' }}
       exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
       ref={setCombinedRef}
-      className="mb-0.5 overflow-hidden"
+      className="overflow-hidden"
     >
       <div
         {...listeners}
@@ -1623,15 +1636,17 @@ function ContainerRow({
         }}
         onContextMenu={onContextMenu}
       >
-        <div
+        <Text
+          as="div"
+          color={hasActiveChild || isExpanded ? TextColors.primary : TextColors.secondary}
           onClick={(e) => {
             e.stopPropagation();
             onToggle();
           }}
-          className={`p-0.5 rounded-sm transition-colors cursor-pointer ${hasActiveChild ? 'text-text-primary' : isExpanded ? 'text-primary' : 'text-text-secondary'}`}
+          className="p-0.5 rounded transition-colors cursor-pointer"
         >
           {isExpanded ? <FolderOpen size={18} /> : <FolderIcon size={18} />}
-        </div>
+        </Text>
         <div
           className="flex-1 min-w-0 cursor-pointer"
           onDoubleClick={(e) => {
@@ -1650,14 +1665,12 @@ function ContainerRow({
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <span
-              className={`text-sm font-medium truncate select-none ${isSelected ? 'text-primary' : 'text-text-primary'} ${hasActiveChild ? 'text-text-primary font-bold' : ''}`}
-            >
+            <Text color={TextColors.primary} weight={TextWeights.medium} className="truncate select-none">
               {container.name}
-            </span>
+            </Text>
           )}
         </div>
-        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             className="p-1 hover:text-text-primary text-text-secondary"
             onMouseEnter={() => setIsMaskControlHovered(true)}
@@ -1687,7 +1700,7 @@ function ContainerRow({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden pl-2 border-l border-border-color/20 ml-[15px]"
+            className="overflow-hidden pl-2 border-l border-border-color/20 ml-3.75"
             layout
           >
             <AnimatePresence mode="popLayout" initial={false}>
@@ -1732,20 +1745,20 @@ function ContainerRow({
                   exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div
-                    className="flex items-center gap-2 p-2 rounded-md transition-colors hover:bg-card-active cursor-pointer mt-0.5 text-text-secondary hover:text-text-primary group"
+                  <Text
+                    as="div"
+                    weight={TextWeights.medium}
+                    className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
                     onClick={(e) => {
                       e.stopPropagation();
                       onAddComponent(e);
                     }}
                   >
-                    <div className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center opacity-70 group-hover:opacity-100">
+                    <div className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center">
                       <Plus size={16} />
                     </div>
-                    <span className="text-sm opacity-70 group-hover:opacity-100 transition-opacity select-none">
-                      Add New Component
-                    </span>
-                  </div>
+                    <span className="select-none">Add New Component</span>
+                  </Text>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1861,7 +1874,7 @@ function SubMaskRow({
       {...listeners}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`flex items-center gap-2 p-2 rounded-md transition-colors group mt-0.5 cursor-pointer
+      className={`flex items-center gap-2 p-2 rounded-md transition-colors group cursor-pointer
             ${isActive ? 'bg-surface' : 'hover:bg-card-active'}
             ${isOver && !isDraggingContainer ? 'border-t-2 border-accent' : ''}
             ${isDragging ? 'opacity-40 z-50' : ''}
@@ -1874,7 +1887,12 @@ function SubMaskRow({
       }}
       onContextMenu={onContextMenu}
     >
-      <div className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center">
+      <Text
+        as="div"
+        variant={TextVariants.small}
+        weight={TextWeights.bold}
+        className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center"
+      >
         <AnimatePresence mode="wait" initial={false}>
           {isAnalyzing ? (
             <motion.div
@@ -1885,7 +1903,7 @@ function SubMaskRow({
               transition={{ duration: 0.15 }}
               className="absolute"
             >
-              <Loader2 size={16} className="text-text-secondary animate-spin" />
+              <Loader2 size={16} className="animate-spin" />
             </motion.div>
           ) : showNumber ? (
             <motion.span
@@ -1894,7 +1912,7 @@ function SubMaskRow({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.5 }}
               transition={{ duration: 0.15 }}
-              className="text-xs font-bold text-text-secondary absolute"
+              className="absolute"
             >
               {index}
             </motion.span>
@@ -1907,11 +1925,11 @@ function SubMaskRow({
               transition={{ duration: 0.15 }}
               className="absolute"
             >
-              <MaskIcon size={16} className="text-text-secondary" />
+              <MaskIcon size={16} />
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </Text>
       {renamingId === subMask.id ? (
         <input
           autoFocus
@@ -1923,11 +1941,13 @@ function SubMaskRow({
           onClick={(e) => e.stopPropagation()}
         />
       ) : (
-        <span className="text-sm text-text-primary flex-1 truncate select-none">{getSubMaskName(subMask)}</span>
+        <Text color={TextColors.primary} className="flex-1 truncate select-none">
+          {getSubMaskName(subMask)}
+        </Text>
       )}
-      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
         <button
-          className="p-1 hover:bg-bg-primary rounded-sm text-text-secondary"
+          className="p-1 hover:text-text-primary text-text-secondary"
           data-tooltip={subMask.mode === SubMaskMode.Additive ? 'Switch to Subtract' : 'Switch to Add'}
           onClick={(e) => {
             e.stopPropagation();
@@ -1936,10 +1956,10 @@ function SubMaskRow({
             });
           }}
         >
-          {subMask.mode === SubMaskMode.Additive ? <Plus size={14} /> : <Minus size={14} />}
+          {subMask.mode === SubMaskMode.Additive ? <Plus size={16} /> : <Minus size={16} />}
         </button>
         <button
-          className="p-1 hover:bg-bg-primary rounded-sm text-text-secondary"
+          className="p-1 hover:text-text-primary text-text-secondary"
           data-tooltip={subMask.visible ? 'Hide Component' : 'Show Component'}
           onMouseEnter={() => setIsMaskControlHovered(true)}
           onMouseLeave={() => setIsMaskControlHovered(false)}
@@ -1948,7 +1968,7 @@ function SubMaskRow({
             updateSubMask(subMask.id, { visible: !subMask.visible });
           }}
         >
-          {subMask.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+          {subMask.visible ? <Eye size={16} /> : <EyeOff size={16} />}
         </button>
         <button
           className="p-1 hover:text-red-500 text-text-secondary"
@@ -1958,7 +1978,7 @@ function SubMaskRow({
             handleDelete();
           }}
         >
-          <Trash2 size={14} />
+          <Trash2 size={16} />
         </button>
       </div>
     </motion.div>
@@ -2164,7 +2184,7 @@ function SettingsPanel({
 
   return (
     <div
-      className={`px-4 pb-4 space-y-2 transition-opacity duration-300 ${!isActive ? 'opacity-50 pointer-events-none' : ''}`}
+      className={`space-y-2 transition-opacity duration-300 ${!isActive ? 'opacity-50 pointer-events-none' : ''}`}
       onClick={(e) => e.stopPropagation()}
     >
       <CollapsibleSection
@@ -2185,7 +2205,9 @@ function SettingsPanel({
 
           {!isComponentMode && (
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-text-secondary select-none">Apply Preset</span>
+              <Text variant={TextVariants.label} className="select-none">
+                Apply Preset
+              </Text>
               <button
                 ref={presetButtonRef}
                 onClick={handlePresetSelectClick}
@@ -2214,12 +2236,19 @@ function SettingsPanel({
           {isComponentMode && (
             <>
               {isAiMask && aiModelDownloadStatus && (
-                <div className="p-3 mb-4 bg-card-active rounded-md border border-surface flex items-center gap-3">
-                  <Loader2 size={16} className="text-accent animate-spin shrink-0" />
-                  <div className="text-xs text-text-secondary leading-relaxed">
-                    AI Model Downloading: <span className="text-accent font-medium">{aiModelDownloadStatus}</span>
+                <Text
+                  as="div"
+                  variant={TextVariants.small}
+                  color={TextColors.accent}
+                  weight={TextWeights.medium}
+                  className="p-3 bg-card-active rounded-md border border-surface flex items-center gap-3"
+                >
+                  <Loader2 size={16} className="animate-spin shrink-0" />
+                  <div className="leading-relaxed">
+                    <Text variant={TextVariants.small}>AI Model Downloading: </Text>
+                    <span>{aiModelDownloadStatus}</span>
                   </div>
-                </div>
+                </Text>
               )}
 
               {activeSubMask.type === Mask.AiDepth && (

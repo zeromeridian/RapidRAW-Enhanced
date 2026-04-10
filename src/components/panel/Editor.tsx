@@ -12,6 +12,8 @@ import ImageCanvas from './editor/ImageCanvas';
 import { Mask, SubMask } from './right/Masks';
 import { BrushSettings, Invokes, Panel, SelectedImage, TransformState } from '../ui/AppProperties';
 import type { OverlayMode } from './right/CropPanel';
+import Text from '../ui/Text';
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 
 interface EditorProps {
   activeAiPatchContainerId: string | null;
@@ -675,8 +677,10 @@ export default function Editor({
 
   if (!selectedImage) {
     return (
-      <div className="flex-1 bg-bg-secondary rounded-lg flex items-center justify-center text-text-secondary">
-        <p>Select an image from the library to begin editing.</p>
+      <div className="flex-1 bg-bg-secondary rounded-lg flex items-center justify-center">
+        <Text variant={TextVariants.heading} color={TextColors.secondary} weight={TextWeights.normal}>
+          Select an image from the library to begin editing.
+        </Text>
       </div>
     );
   }
