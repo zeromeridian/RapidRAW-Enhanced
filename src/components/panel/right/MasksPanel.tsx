@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { type ChangeEvent, useState, useEffect, useRef, useMemo } from 'react';
 import debounce from 'lodash.debounce';
 import { v4 as uuidv4 } from 'uuid';
 import clsx from 'clsx';
@@ -119,6 +119,7 @@ const SUB_MASK_CONFIG: Record<Mask, any> = {
     parameters: [{ key: 'feather', label: 'Feather', min: 0, max: 100, step: 1, multiplier: 100, defaultValue: 50 }],
   },
   [Mask.Brush]: { showBrushTools: true },
+  [Mask.Flow]: { showBrushTools: true, showFlowControl: true },
   [Mask.Linear]: { parameters: [] },
   [Mask.Color]: {
     parameters: [
@@ -193,6 +194,31 @@ const BrushTools = ({ settings, onSettingsChange }: { settings: any; onSettingsC
         Eraser
       </button>
     </div>
+  </div>
+);
+
+const FlowBrushTool = ({
+  flow,
+  onFlowChange,
+  settings,
+  onSettingsChange,
+}: {
+  flow: number;
+  onFlowChange: (flow: number) => void;
+  settings: any;
+  onSettingsChange: any;
+}) => (
+  <div className="space-y-4 border-t border-surface">
+    <Slider
+      defaultValue={10}
+      label="Flow"
+      max={100}
+      min={0}
+      onChange={(e: ChangeEvent<HTMLInputElement>) => onFlowChange(Number(e.target.value))}
+      step={1}
+      value={flow}
+    />
+    <BrushTools settings={settings} onSettingsChange={onSettingsChange} />
   </div>
 );
 
@@ -2211,7 +2237,16 @@ function SettingsPanel({
               ))}
 
               {subMaskConfig.showBrushTools && brushSettings && (
-                <BrushTools settings={brushSettings} onSettingsChange={setBrushSettings} />
+                activeSubMask.type === Mask.Flow ? (
+                  <FlowBrushTool
+                    flow={activeSubMask.parameters?.flow ?? 10}
+                    onFlowChange={(flow: number) => handleSubMaskParametersChange({ flow })}
+                    settings={brushSettings}
+                    onSettingsChange={setBrushSettings}
+                  />
+                ) : (
+                  <BrushTools settings={brushSettings} onSettingsChange={setBrushSettings} />
+                )
               )}
             </>
           )}
