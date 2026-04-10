@@ -237,12 +237,19 @@ export default function MetadataPanel({
               <div className="mt-4 bg-surface rounded-md border border-bg-primary overflow-hidden">
                 <button
                   onClick={() => setIsOrganizationExpanded(!isOrganizationExpanded)}
-                  className="w-full flex items-center justify-between p-4 text-xs font-semibold text-text-primary hover:bg-surface/50 transition-colors"
+                  className="w-full flex items-center justify-between p-4 hover:bg-surface/50 transition-colors"
                 >
-                  <span className="flex items-center gap-2">
-                    <Tag size={14} /> Organization
-                  </span>
-                  {isOrganizationExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  <Text
+                    as="span"
+                    variant={TextVariants.label}
+                    color={TextColors.primary}
+                    className="flex items-center gap-2"
+                  >
+                    <Tag size={16} /> Organization
+                  </Text>
+                  <Text color={TextColors.secondary}>
+                    {isOrganizationExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </Text>
                 </button>
 
                 <AnimatePresence initial={false}>
@@ -254,7 +261,7 @@ export default function MetadataPanel({
                       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
                       className="overflow-hidden"
                     >
-                      <div className="p-4 border-t border-surface/50 flex flex-col gap-4">
+                      <div className="px-4 pb-4 pt-2 border-t border-surface/50 flex flex-col gap-4">
                         <div>
                           <Text
                             variant={TextVariants.small}
