@@ -226,9 +226,7 @@ pub fn downscale_f32_image(image: &DynamicImage, nwidth: u32, nheight: u32) -> D
         .for_each(|(y_out, row)| {
             let (y_in_start, y_in_end, y_wt_offset) = y_bounds[y_out];
 
-            for x_out in 0..new_w as usize {
-                let (x_in_start, x_in_end, x_wt_offset) = x_bounds[x_out];
-
+            for (x_out, &(x_in_start, x_in_end, x_wt_offset)) in x_bounds.iter().enumerate() {
                 let mut r_sum = 0.0f32;
                 let mut g_sum = 0.0f32;
                 let mut b_sum = 0.0f32;
@@ -239,33 +237,26 @@ pub fn downscale_f32_image(image: &DynamicImage, nwidth: u32, nheight: u32) -> D
                     if w_y == 0.0 {
                         continue;
                     }
-
                     let row_offset = y_in * width_usize * 3;
-
                     for x_in in x_in_start..x_in_end {
                         let w_x = x_weights[x_wt_offset + (x_in - x_in_start)];
                         let weight = w_x * w_y;
-
                         if weight == 0.0 {
                             continue;
                         }
-
                         let idx = row_offset + x_in * 3;
                         let r = src[idx].max(0.0);
                         let g = src[idx + 1].max(0.0);
                         let b = src[idx + 2].max(0.0);
-
                         r_sum += r * r * weight;
                         g_sum += g * g * weight;
                         b_sum += b * b * weight;
                         weight_sum += weight;
                     }
                 }
-
                 if weight_sum > 0.0 {
                     let inv_w = 1.0 / weight_sum;
                     let out_idx = x_out * 3;
-
                     row[out_idx] = (r_sum * inv_w).sqrt();
                     row[out_idx + 1] = (g_sum * inv_w).sqrt();
                     row[out_idx + 2] = (b_sum * inv_w).sqrt();
