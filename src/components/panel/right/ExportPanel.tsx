@@ -508,7 +508,7 @@ export default function ExportPanel({
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
         <Text variant={TextVariants.title}>Export</Text>
       </div>
-      <div className="grow overflow-y-auto p-4 text-text-secondary space-y-8">
+      <div className="grow overflow-y-auto p-4 space-y-8">
         {canExport ? (
           <>
             <ExportPresetsList
@@ -522,7 +522,7 @@ export default function ExportPanel({
               <div className="grid grid-cols-3 gap-2">
                 {FILE_FORMATS.map((format: FileFormat) => (
                   <button
-                    className={`px-2 py-1.5 text-sm rounded-md transition-colors ${
+                    className={`px-2 py-1.5 rounded-md transition-colors ${
                       fileFormat === format.id ? 'bg-accent' : 'bg-surface hover:bg-card-active'
                     } disabled:opacity-50`}
                     disabled={isExporting}
@@ -595,7 +595,7 @@ export default function ExportPanel({
                           className="w-full"
                         />
                         <input
-                          className="w-24 bg-bg-primary text-center rounded-md p-2 border border-surface focus:border-accent focus:ring-accent"
+                          className="w-24 bg-bg-primary text-center rounded-md p-2 border border-surface focus:border-accent focus:ring-accent text-text-secondary focus:text-text-primary"
                           disabled={isExporting}
                           min="1"
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
