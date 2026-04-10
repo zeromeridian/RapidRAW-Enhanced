@@ -702,12 +702,14 @@ export default function Editor({
     isCropping ||
     (isMasking &&
       (activeSubMask?.type === Mask.Brush ||
+        activeSubMask?.type === Mask.Flow ||
         activeSubMask?.type === Mask.AiSubject ||
         activeSubMask?.type === Mask.Color ||
         activeSubMask?.type === Mask.Luminance ||
         activeSubMask?.parameters?.isInitialDraw)) ||
     (isAiEditing &&
       (activeSubMask?.type === Mask.Brush ||
+        activeSubMask?.type === Mask.Flow ||
         activeSubMask?.type === Mask.AiSubject ||
         activeSubMask?.type === Mask.QuickEraser ||
         activeSubMask?.type === Mask.Color ||
