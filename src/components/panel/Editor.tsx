@@ -135,6 +135,7 @@ export default function Editor({
   const clickAnimationTime = 200;
   const isAnimating = useRef(false);
   const animationTimeoutRef = useRef<number | null>(null);
+  const zoomDebounceTimeoutRef = useRef<number | null>(null);
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
   const savedZoomState = useRef<{ scale: number; positionX: number; positionY: number } | null>(null);
   const focalPointRef = useRef({ x: 0.5, y: 0.5 });
@@ -229,7 +230,12 @@ export default function Editor({
         return;
       }
 
-      onZoomed(state);
+      if (zoomDebounceTimeoutRef.current) {
+        clearTimeout(zoomDebounceTimeoutRef.current);
+      }
+      zoomDebounceTimeoutRef.current = window.setTimeout(() => {
+        onZoomed(state);
+      }, 100);
     },
     [onZoomed],
   );
@@ -343,18 +349,21 @@ export default function Editor({
   }, [selectedImage, imageRenderSize.scale, originalSize]);
 
   useEffect(() => {
-    if (onDisplaySizeChange && imageRenderSize.width > 0) {
-      const currentDisplaySize = {
-        width: imageRenderSize.width * transformState.scale,
-        height: imageRenderSize.height * transformState.scale,
-        scale: transformState.scale,
-        offsetX: imageRenderSize.offsetX,
-        offsetY: imageRenderSize.offsetY,
-        containerWidth: imageContainerRef.current?.clientWidth || 0,
-        containerHeight: imageContainerRef.current?.clientHeight || 0,
-      };
-      onDisplaySizeChange(currentDisplaySize);
-    }
+    const timer = setTimeout(() => {
+      if (onDisplaySizeChange && imageRenderSize.width > 0) {
+        const currentDisplaySize = {
+          width: imageRenderSize.width * transformState.scale,
+          height: imageRenderSize.height * transformState.scale,
+          scale: transformState.scale,
+          offsetX: imageRenderSize.offsetX,
+          offsetY: imageRenderSize.offsetY,
+          containerWidth: imageContainerRef.current?.clientWidth || 0,
+          containerHeight: imageContainerRef.current?.clientHeight || 0,
+        };
+        onDisplaySizeChange(currentDisplaySize);
+      }
+    }, 100);
+    return () => clearTimeout(timer);
   }, [imageRenderSize, transformState.scale, onDisplaySizeChange]);
 
   const processOverlayQueue = useCallback(async () => {
