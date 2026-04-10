@@ -182,40 +182,97 @@ pub fn downscale_f32_image(image: &DynamicImage, nwidth: u32, nheight: u32) -> D
 
     let x_ratio = width as f32 / new_w as f32;
     let y_ratio = height as f32 / new_h as f32;
+    let width_usize = width as usize;
+
+    let mut x_bounds = Vec::with_capacity(new_w as usize);
+    let mut x_weights = Vec::new();
+    for x_out in 0..new_w as usize {
+        let x_start = x_out as f32 * x_ratio;
+        let x_end = (x_out + 1) as f32 * x_ratio;
+        let x_in_start = x_start.floor() as usize;
+        let x_in_end = (x_end.ceil() as usize).min(width as usize);
+
+        let weight_start_idx = x_weights.len();
+        for x_in in x_in_start..x_in_end {
+            let overlap_start = x_start.max(x_in as f32);
+            let overlap_end = x_end.min((x_in + 1) as f32);
+            x_weights.push((overlap_end - overlap_start).max(0.0));
+        }
+        x_bounds.push((x_in_start, x_in_end, weight_start_idx));
+    }
+
+    let mut y_bounds = Vec::with_capacity(new_h as usize);
+    let mut y_weights = Vec::new();
+    for y_out in 0..new_h as usize {
+        let y_start = y_out as f32 * y_ratio;
+        let y_end = (y_out + 1) as f32 * y_ratio;
+        let y_in_start = y_start.floor() as usize;
+        let y_in_end = (y_end.ceil() as usize).min(height as usize);
+
+        let weight_start_idx = y_weights.len();
+        for y_in in y_in_start..y_in_end {
+            let overlap_start = y_start.max(y_in as f32);
+            let overlap_end = y_end.min((y_in + 1) as f32);
+            y_weights.push((overlap_end - overlap_start).max(0.0));
+        }
+        y_bounds.push((y_in_start, y_in_end, weight_start_idx));
+    }
 
     let mut out_buf = vec![0.0f32; (new_w * new_h * 3) as usize];
+
     out_buf
         .par_chunks_exact_mut(new_w as usize * 3)
         .enumerate()
         .for_each(|(y_out, row)| {
-            let y_start = (y_out as f32 * y_ratio).floor() as usize;
-            let y_end = (((y_out + 1) as f32 * y_ratio).ceil() as usize).min(height as usize);
+            let (y_in_start, y_in_end, y_wt_offset) = y_bounds[y_out];
+
             for x_out in 0..new_w as usize {
-                let x_start = (x_out as f32 * x_ratio).floor() as usize;
-                let x_end = (((x_out + 1) as f32 * x_ratio).ceil() as usize).min(width as usize);
+                let (x_in_start, x_in_end, x_wt_offset) = x_bounds[x_out];
+
                 let mut r_sum = 0.0f32;
                 let mut g_sum = 0.0f32;
                 let mut b_sum = 0.0f32;
-                let mut count = 0u32;
-                for y_in in y_start..y_end {
-                    let row_offset = y_in * width as usize * 3;
-                    for x_in in x_start..x_end {
+                let mut weight_sum = 0.0f32;
+
+                for y_in in y_in_start..y_in_end {
+                    let w_y = y_weights[y_wt_offset + (y_in - y_in_start)];
+                    if w_y == 0.0 {
+                        continue;
+                    }
+
+                    let row_offset = y_in * width_usize * 3;
+
+                    for x_in in x_in_start..x_in_end {
+                        let w_x = x_weights[x_wt_offset + (x_in - x_in_start)];
+                        let weight = w_x * w_y;
+
+                        if weight == 0.0 {
+                            continue;
+                        }
+
                         let idx = row_offset + x_in * 3;
-                        r_sum += src[idx];
-                        g_sum += src[idx + 1];
-                        b_sum += src[idx + 2];
-                        count += 1;
+                        let r = src[idx].max(0.0);
+                        let g = src[idx + 1].max(0.0);
+                        let b = src[idx + 2].max(0.0);
+
+                        r_sum += r * r * weight;
+                        g_sum += g * g * weight;
+                        b_sum += b * b * weight;
+                        weight_sum += weight;
                     }
                 }
-                if count > 0 {
-                    let n = count as f32;
+
+                if weight_sum > 0.0 {
+                    let inv_w = 1.0 / weight_sum;
                     let out_idx = x_out * 3;
-                    row[out_idx] = r_sum / n;
-                    row[out_idx + 1] = g_sum / n;
-                    row[out_idx + 2] = b_sum / n;
+
+                    row[out_idx] = (r_sum * inv_w).sqrt();
+                    row[out_idx + 1] = (g_sum * inv_w).sqrt();
+                    row[out_idx + 2] = (b_sum * inv_w).sqrt();
                 }
             }
         });
+
     let out = Rgb32FImage::from_raw(new_w, new_h, out_buf).expect("buffer size mismatch");
     DynamicImage::ImageRgb32F(out)
 }
