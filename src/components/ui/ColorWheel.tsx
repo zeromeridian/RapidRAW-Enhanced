@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import Slider from './Slider';
 import Wheel from '@uiw/react-color-wheel';
 import { ColorResult, HsvaColor, hsvaToHex } from '@uiw/color-convert';
@@ -33,8 +33,14 @@ const ColorWheel = ({
   const [isWheelDragging, setIsWheelDragging] = useState(false);
   const [isSliderDragging, setIsSliderDragging] = useState(false);
   const [isLabelHovered, setIsLabelHovered] = useState(false);
+  const instanceId = useId().replace(/:/g, '');
 
   const isDragging = isWheelDragging || isSliderDragging;
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(`--cg-hue-${instanceId}`, hue.toString());
+    document.documentElement.style.setProperty(`--cg-sat-${instanceId}`, `${saturation}%`);
+  }, [hue, saturation, instanceId]);
 
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
@@ -107,6 +113,12 @@ const ColorWheel = ({
 
   const pointerSize = isWheelDragging ? 14 : 12;
   const pointerOffset = pointerSize / 2;
+
+  const satWrapperStyle = { '--cg-hue': `var(--cg-hue-${instanceId})` } as React.CSSProperties;
+  const lumWrapperStyle = { 
+    '--cg-hue': `var(--cg-hue-${instanceId})`,
+    '--cg-sat': `var(--cg-sat-${instanceId})`
+  } as React.CSSProperties;
 
   return (
     <div className="relative flex flex-col items-center gap-2" ref={containerRef}>
@@ -213,10 +225,11 @@ const ColorWheel = ({
                 onDragStateChange={setIsSliderDragging}
                 step={1}
                 value={hue}
+                trackClassName="cg-hue-gradient"
               />
             </div>
 
-            <div className="w-full">
+            <div className="w-full" style={satWrapperStyle}>
               <Slider
                 defaultValue={defaultValue.saturation}
                 label="Saturation"
@@ -226,13 +239,14 @@ const ColorWheel = ({
                 onDragStateChange={setIsSliderDragging}
                 step={1}
                 value={saturation}
+                trackClassName="cg-sat-gradient"
               />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="w-full">
+      <div className="w-full" style={lumWrapperStyle}>
         <Slider
           defaultValue={defaultValue.luminance}
           label={isExpanded ? 'Luminance' : <Sun size={16} className="text-text-secondary" />}
@@ -242,6 +256,7 @@ const ColorWheel = ({
           onDragStateChange={setIsSliderDragging}
           step={1}
           value={luminance}
+          trackClassName="cg-lum-gradient"
         />
       </div>
     </div>
