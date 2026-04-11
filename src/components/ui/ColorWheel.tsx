@@ -31,9 +31,35 @@ const ColorWheel = ({
   const [isWheelDragging, setIsWheelDragging] = useState(false);
   const [isSliderDragging, setIsSliderDragging] = useState(false);
   const [isLabelHovered, setIsLabelHovered] = useState(false);
+  const [modifierState, setModifierState] = useState({ ctrl: false, shift: false });
   const instanceId = useId().replace(/:/g, '');
+  const lastSaturationRef = useRef(saturation);
 
   const isDragging = isWheelDragging || isSliderDragging;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      setModifierState({
+        ctrl: e.ctrlKey,
+        shift: e.shiftKey,
+      });
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      setModifierState({
+        ctrl: e.ctrlKey,
+        shift: e.shiftKey,
+      });
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   useEffect(() => {
     document.documentElement.style.setProperty(`--cg-hue-${instanceId}`, hue.toString());
@@ -81,9 +107,39 @@ const ColorWheel = ({
     onDragStateChange?.(isDragging);
   }, [isDragging, onDragStateChange]);
 
-  const handleWheelChange = (color: ColorResult) => {
-    onChange({ ...effectiveValue, hue: color.hsva.h, saturation: color.hsva.s });
-  };
+  useEffect(() => {
+    if (isWheelDragging) {
+      lastSaturationRef.current = saturation;
+    }
+  }, [isWheelDragging, saturation]);
+
+const handleWheelChange = (color: ColorResult) => {
+  const { ctrl, shift } = modifierState;
+  const newValues = { ...effectiveValue };
+  
+  if (ctrl && !shift) {
+    newValues.hue = color.hsva.h;
+    newValues.saturation = saturation;
+  } else if (shift && !ctrl) {
+    let newSaturation = color.hsva.s;
+    
+    const hueDelta = Math.abs(color.hsva.h - hue);
+    
+    if (hueDelta > 30) {
+      newSaturation = 0;
+    }
+    
+    newSaturation = Math.max(0, Math.min(100, newSaturation));
+    
+    newValues.saturation = newSaturation;
+    newValues.hue = hue;
+  } else {
+    newValues.hue = color.hsva.h;
+    newValues.saturation = color.hsva.s;
+  }
+  
+  onChange(newValues);
+};
 
   const handleHueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange({ ...effectiveValue, hue: parseFloat(e.target.value) });
@@ -112,6 +168,8 @@ const ColorWheel = ({
   const pointerSize = isWheelDragging ? 14 : 12;
   const pointerOffset = pointerSize / 2;
 
+  const showModifierHint = isWheelDragging && (modifierState.ctrl || modifierState.shift);
+
   const satWrapperStyle = { '--cg-hue': `var(--cg-hue-${instanceId})` } as React.CSSProperties;
   const lumWrapperStyle = { 
     '--cg-hue': `var(--cg-hue-${instanceId})`,
@@ -129,7 +187,7 @@ const ColorWheel = ({
       >
         <span
           className={`absolute inset-0 flex items-center justify-center text-sm font-medium text-text-secondary whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
-            !isDragging && !isLabelHovered ? 'opacity-100' : 'opacity-0'
+            !isDragging && !isLabelHovered && !showModifierHint ? 'opacity-100' : 'opacity-0'
           }`}
         >
           {label}
@@ -137,26 +195,41 @@ const ColorWheel = ({
 
         <span
           className={`absolute inset-0 flex items-center justify-center text-sm font-medium text-text-primary whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
-            !isDragging && isLabelHovered ? 'opacity-100' : 'opacity-0'
+            !isDragging && isLabelHovered && !showModifierHint ? 'opacity-100' : 'opacity-0'
           }`}
         >
           Reset
         </span>
 
         <div
-          className={`absolute inset-0 flex items-center justify-center gap-2 text-sm font-medium text-text-secondary whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
-            isDragging ? 'opacity-100' : 'opacity-0'
+          className={`absolute inset-0 flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
+            isDragging || showModifierHint ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          <div className="flex items-center tabular-nums">
-            <span className="font-bold">H:</span>
-            <span className="w-8 text-right">{Math.round(hue)}&deg;</span>
-          </div>
-
-          <div className="flex items-center tabular-nums">
-            <span className="font-bold">S:</span>
-            <span className="w-6 text-right">{Math.round(saturation)}</span>
-          </div>
+          {showModifierHint ? (
+            <div className="flex items-center gap-3 text-accent">
+              {modifierState.ctrl && !modifierState.shift && (
+                <span className="text-xs">Hue only</span>
+              )}
+              {modifierState.shift && !modifierState.ctrl && (
+                <span className="text-xs">Saturation only</span>
+              )}
+              {modifierState.ctrl && modifierState.shift && (
+                <span className="text-xs">Both</span>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center tabular-nums">
+                <span className="font-bold">H:</span>
+                <span className="w-8 text-right">{Math.round(hue)}&deg;</span>
+              </div>
+              <div className="flex items-center tabular-nums">
+                <span className="font-bold">S:</span>
+                <span className="w-6 text-right">{Math.round(saturation)}</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
