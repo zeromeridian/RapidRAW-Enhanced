@@ -50,9 +50,12 @@ use image_hdr::input::HDRInput;
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
 use imageproc::hough::{LineDetectionOptions, detect_lines};
+use imgref::ImgRef;
 use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
 use mozjpeg_rs::{Encoder, Preset};
 use rayon::prelude::*;
+use rgb::{FromSlice, RGBA8};
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{Emitter, Manager, ipc::Response};
@@ -953,7 +956,7 @@ fn process_preview_job(
     let (interactive_divisor, interactive_quality) = match live_quality {
         "full" => (1.0_f32, 85_u8),
         "performance" => (1.8_f32, 65_u8),
-        _ => (1.2_f32, 80_u8),
+        _ => (1.2_f32, 72_u8),
     };
 
     let mut cached_preview_lock = state.cached_preview.lock().unwrap();
@@ -1106,23 +1109,37 @@ fn process_preview_job(
             }
         }
 
-        if is_interactive {
-            let step_start = std::time::Instant::now();
+        let final_rgba_image = match &*final_processed_image {
+            DynamicImage::ImageRgba8(img) => img,
+            _ => return Err("Expected Rgba8 image from GPU for encoding".to_string()),
+        };
 
-            let roi_rgb = final_processed_image.to_rgb8();
-            let (roi_w, roi_h) = roi_rgb.dimensions();
+        let raw_bytes: &[u8] = final_rgba_image.as_raw();
+        let rgba8_pixels: &[RGBA8] = raw_bytes.as_rgba();
 
-            let (rx, ry) = if let Some(r) = pixel_roi {
-                (r.x, r.y)
-            } else {
-                (0, 0)
-            };
+        let img_ref = ImgRef::new(
+            rgba8_pixels,
+            final_rgba_image.width() as usize,
+            final_rgba_image.height() as usize,
+        );
 
-            match Encoder::new(Preset::BaselineFastest)
-                .quality(jpeg_quality)
-                .encode_rgb(&roi_rgb.into_raw(), roi_w, roi_h)
-            {
-                Ok(jpeg_bytes) => {
+        let step_start = std::time::Instant::now();
+
+        let encode_result = Encoder::new(Preset::BaselineFastest)
+            .quality(jpeg_quality)
+            .fast_color(true)
+            .encode_imgref(img_ref);
+
+        match encode_result {
+            Ok(jpeg_bytes) => {
+                if is_interactive {
+                    let (roi_w, roi_h) = final_rgba_image.dimensions();
+                    let (rx, ry) = if let Some(r) = pixel_roi {
+                        (r.x, r.y)
+                    } else {
+                        (0, 0)
+                    };
+
                     let mut response = Vec::with_capacity(24 + jpeg_bytes.len());
                     response.extend_from_slice(&rx.to_le_bytes());
                     response.extend_from_slice(&ry.to_le_bytes());
@@ -1139,22 +1156,9 @@ fn process_preview_job(
                         step_start.elapsed(),
                         fn_start.elapsed()
                     );
-                    return Ok(response);
-                }
-                Err(e) => {
-                    return Err(format!("Failed to encode preview: {}", e));
-                }
-            }
-        } else {
-            let step_start = std::time::Instant::now();
-            let (width, height) = final_processed_image.dimensions();
-            let rgb_pixels = final_processed_image.to_rgb8().into_vec();
-
-            match Encoder::new(Preset::BaselineFastest)
-                .quality(jpeg_quality)
-                .encode_rgb(&rgb_pixels, width, height)
-            {
-                Ok(bytes) => {
+                    Ok(response)
+                } else {
+                    let (width, height) = final_rgba_image.dimensions();
                     log::info!(
                         "[process_preview_job] full {}x{} q={} encode in {:.2?}, total {:.2?}",
                         width,
@@ -1163,20 +1167,18 @@ fn process_preview_job(
                         step_start.elapsed(),
                         fn_start.elapsed()
                     );
-                    return Ok(bytes);
-                }
-                Err(e) => {
-                    return Err(format!("Failed to encode preview: {}", e));
+                    Ok(jpeg_bytes)
                 }
             }
+            Err(e) => Err(format!("Failed to encode preview: {}", e)),
         }
+    } else {
+        log::error!(
+            "[process_preview_job] processing failed after {:.2?}",
+            fn_start.elapsed()
+        );
+        Err("Processing failed".to_string())
     }
-
-    log::error!(
-        "[process_preview_job] processing failed after {:.2?}",
-        fn_start.elapsed()
-    );
-    Err("Processing failed".to_string())
 }
 
 fn start_analytics_worker(app_handle: tauri::AppHandle) {
