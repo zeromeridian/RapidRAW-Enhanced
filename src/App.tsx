@@ -1559,11 +1559,6 @@ function App() {
             const blob = new Blob([buffer], { type: 'image/jpeg' });
             const url = URL.createObjectURL(blob);
 
-            try {
-              const img = new Image();
-              img.src = url;
-              await img.decode();
-            } catch (_) {}
             if (currentPath !== selectedImagePathRef.current || jobId < latestRenderedJobIdRef.current) {
               URL.revokeObjectURL(url);
               return;

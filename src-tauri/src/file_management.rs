@@ -1,4 +1,5 @@
 use memmap2::{Mmap, MmapOptions};
+use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -1393,7 +1394,8 @@ pub fn generate_thumbnail_data(
                 img
             };
 
-            let warped_image = apply_geometry_warp(&composite_image, &meta.adjustments);
+            let warped_image =
+                apply_geometry_warp(Cow::Borrowed(&composite_image), &meta.adjustments);
             let orientation_steps =
                 meta.adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
             let coarse_rotated_image = apply_coarse_rotation(warped_image, orientation_steps);
@@ -1427,7 +1429,7 @@ pub fn generate_thumbnail_data(
                 };
                 (base, scale)
             } else {
-                (coarse_rotated_image.clone(), 1.0)
+                (coarse_rotated_image.into_owned(), 1.0)
             };
 
             let total_scale = gpu_scale * raw_scale_factor;
@@ -1450,8 +1452,8 @@ pub fn generate_thumbnail_data(
             .unwrap_or(false);
         let flip_vertical = meta.adjustments["flipVertical"].as_bool().unwrap_or(false);
 
-        let flipped_image = apply_flip(processing_base, flip_horizontal, flip_vertical);
-        let rotated_image = apply_rotation(&flipped_image, rotation_degrees);
+        let flipped_image = apply_flip(Cow::Owned(processing_base), flip_horizontal, flip_vertical);
+        let rotated_image = apply_rotation(flipped_image, rotation_degrees);
 
         let scaled_crop_json = if let Some(c) = &crop_data {
             serde_json::to_value(Crop {
@@ -1516,7 +1518,7 @@ pub fn generate_thumbnail_data(
         if let Ok(processed_image) = gpu_processing::process_and_get_dynamic_image(
             context,
             &state,
-            &cropped_preview,
+            cropped_preview.as_ref(),
             unique_hash,
             gpu_processing::RenderRequest {
                 adjustments: gpu_adjustments,
@@ -1528,7 +1530,7 @@ pub fn generate_thumbnail_data(
         ) {
             return Ok(processed_image);
         } else {
-            return Ok(cropped_preview);
+            return Ok(cropped_preview.into_owned());
         }
     }
 
@@ -1570,10 +1572,7 @@ pub fn generate_thumbnail_data(
     }
 
     let fallback_orientation_steps = adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
-    Ok(apply_coarse_rotation(
-        final_image,
-        fallback_orientation_steps,
-    ))
+    Ok(apply_coarse_rotation(Cow::Owned(final_image), fallback_orientation_steps).into_owned())
 }
 
 fn encode_thumbnail(image: &DynamicImage, target_width: u32) -> Result<Vec<u8>> {
