@@ -643,6 +643,15 @@ export default function LibraryExportPanel({
                   />
                 </Section>
 
+                <Section title="Export Options">
+                  <Switch
+                    label="Preserve Folder Structure"
+                    checked={preserveFolders}
+                    onChange={setPreserveFolders}
+                    disabled={isExporting}
+                  />
+                </Section>
+
                 <Section title="Watermark">
                   <Switch
                     label="Add Watermark"

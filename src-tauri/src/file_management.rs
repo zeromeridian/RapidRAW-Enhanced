@@ -257,6 +257,8 @@ pub struct ExportPreset {
     pub watermark_opacity: u32,
     #[serde(default)]
     pub export_masks: Option<bool>,
+    #[serde(default)]
+    pub preserve_folders: Option<bool>,
     /// Last export destination path, stored on the __last_used__ preset only.
     #[serde(default)]
     pub last_export_path: Option<String>,

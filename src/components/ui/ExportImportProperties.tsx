@@ -45,6 +45,7 @@ export interface ExportSettings {
   stripGps: boolean;
   watermark: WatermarkSettings | null;
   exportMasks?: boolean;
+  preserveFolders?: boolean;
 }
 
 export enum WatermarkAnchor {
@@ -107,6 +108,7 @@ export interface ExportPreset {
   keepMetadata: boolean;
   stripGps: boolean;
   exportMasks?: boolean;
+  preserveFolders?: boolean;
   filenameTemplate: string;
   enableWatermark: boolean;
   watermarkPath: string | null;

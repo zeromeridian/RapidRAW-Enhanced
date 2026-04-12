@@ -3,5 +3,7 @@
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
-  }
+  },
+  "snyk.advanced.organization": "b0aa90f9-5656-4cfc-8981-9d9fbe2c1b7a",
+  "snyk.advanced.autoSelectOrganization": true
 }

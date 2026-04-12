@@ -239,6 +239,8 @@ struct ExportSettings {
     watermark: Option<WatermarkSettings>,
     #[serde(default)]
     export_masks: bool,
+    #[serde(default)]
+    preserve_folders: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
