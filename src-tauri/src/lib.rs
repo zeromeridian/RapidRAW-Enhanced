@@ -240,6 +240,8 @@ struct ExportSettings {
     watermark: Option<WatermarkSettings>,
     #[serde(default)]
     export_masks: bool,
+    #[serde(default)]
+    preserve_folders: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -2246,6 +2248,7 @@ async fn export_image(
 #[tauri::command]
 async fn batch_export_images(
     output_folder: String,
+    base_origin_folder: Option<String>,
     paths: Vec<String>,
     export_settings: ExportSettings,
     output_format: String,
@@ -2276,6 +2279,7 @@ async fn batch_export_images(
     let task = tokio::spawn(async move {
         let state = app_handle.state::<AppState>();
         let output_folder_path = std::path::Path::new(&output_folder);
+        let base_origin_path = base_origin_folder.as_ref().map(|s| std::path::Path::new(s));
         let total_paths = paths.len();
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
         let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
@@ -2392,8 +2396,28 @@ async fn batch_export_images(
                         }
 
                         let new_filename = format!("{}.{}", new_stem, output_format);
-                        let output_path = output_folder_path.join(new_filename);
+                        let output_path = if export_settings.preserve_folders {
+                            log::info!("Preserving folder structure for export of '{}' using base origin path '{}'", source_path_str, base_origin_path.unwrap_or_else(|| std::path::Path::new("")).display());
+                            if let Some(base_origin) = base_origin_path {
+                                if let Ok(rel_path) = source_path.strip_prefix(base_origin) {
+                                    let rel_dir = rel_path.parent().unwrap_or_else(|| std::path::Path::new(""));
+                                    let full_dir = output_folder_path.join(rel_dir);
+                                    // Ensure the directory exists
+                                    if let Err(e) = std::fs::create_dir_all(&full_dir) {
+                                        log::warn!("Failed to create export subdirectory: {}", e);
+                                    }
+                                    full_dir.join(&new_filename)
+                                } else {
+                                    output_folder_path.join(&new_filename)
+                                }
+                            } else {
+                                output_folder_path.join(&new_filename)
+                            }
+                        } else {
+                            output_folder_path.join(&new_filename)
+                        };
                         let extension = output_format.to_lowercase();
+                        log::info!("Exporting '{}' to '{}'", source_path_str, output_path.display());
 
                         if extension == "cube" {
                             let cube_bytes = export_adjustments_as_lut(
