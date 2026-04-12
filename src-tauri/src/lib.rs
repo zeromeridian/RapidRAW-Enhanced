@@ -171,6 +171,7 @@ pub struct ThumbnailProgressTracker {
     pub completed: usize,
 }
 
+pub type TransformedImageCache = (u64, Arc<DynamicImage>, (f32, f32));
 pub struct AppState {
     window_setup_complete: AtomicBool,
     pub gpu_crash_flag_path: Mutex<Option<PathBuf>>,
@@ -199,7 +200,7 @@ pub struct AppState {
     pub lens_db: Mutex<Option<lens_correction::LensDatabase>>,
     pub load_image_generation: Arc<AtomicUsize>,
     pub full_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
-    pub full_transformed_cache: Mutex<Option<(u64, Arc<DynamicImage>, (f32, f32))>>,
+    pub full_transformed_cache: Mutex<Option<TransformedImageCache>>,
 }
 
 #[derive(serde::Serialize)]
@@ -301,7 +302,7 @@ fn apply_all_transformations<'a, I: IntoCowImage<'a>>(
     let rotated_image = apply_rotation(flipped_image, rotation_degrees);
 
     let crop_data: Option<Crop> = serde_json::from_value(adjustments["crop"].clone()).ok();
-    let crop_json = serde_json::to_value(&crop_data).unwrap_or(serde_json::Value::Null);
+    let crop_json = serde_json::to_value(crop_data).unwrap_or(serde_json::Value::Null);
     let cropped_image = apply_crop(rotated_image, &crop_json);
 
     let unscaled_crop_offset = crop_data.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
@@ -579,7 +580,7 @@ fn compute_full_transformed_res(
     let has_patches = adjustments
         .get("aiPatches")
         .and_then(|v| v.as_array())
-        .map_or(false, |a| !a.is_empty());
+        .is_some_and(|a| !a.is_empty());
     let patched_original_image = if has_patches {
         Cow::Owned(
             composite_patches_on_image(&loaded_image.image, adjustments)
@@ -1313,7 +1314,7 @@ fn generate_uncropped_preview(
         let has_patches = adjustments_clone
             .get("aiPatches")
             .and_then(|v| v.as_array())
-            .map_or(false, |a| !a.is_empty());
+            .is_some_and(|a| !a.is_empty());
         let patched_image = if has_patches {
             Cow::Owned(
                 composite_patches_on_image(&loaded_image.image, &adjustments_clone).unwrap_or_else(
