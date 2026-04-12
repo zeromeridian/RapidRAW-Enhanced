@@ -9,6 +9,7 @@ export function useExportSettings() {
   const [resizeValue, setResizeValue] = useState(2048);
   const [dontEnlarge, setDontEnlarge] = useState(true);
   const [keepMetadata, setKeepMetadata] = useState(true);
+  const [preserveTimestamps, setPreserveTimestamps] = useState(false);
   const [stripGps, setStripGps] = useState(true);
   const [exportMasks, setExportMasks] = useState(false);
   const [filenameTemplate, setFilenameTemplate] = useState('{original_filename}_edited');
@@ -27,6 +28,7 @@ export function useExportSettings() {
     setResizeValue(preset.resizeValue);
     setDontEnlarge(preset.dontEnlarge);
     setKeepMetadata(preset.keepMetadata);
+    setPreserveTimestamps(preset.preserveTimestamps ?? false);
     setStripGps(preset.stripGps);
     setExportMasks(preset.exportMasks ?? false);
     setFilenameTemplate(preset.filenameTemplate);
@@ -47,6 +49,7 @@ export function useExportSettings() {
       resizeValue,
       dontEnlarge,
       keepMetadata,
+      preserveTimestamps,
       stripGps,
       exportMasks,
       filenameTemplate,
@@ -65,6 +68,7 @@ export function useExportSettings() {
       resizeValue,
       dontEnlarge,
       keepMetadata,
+      preserveTimestamps,
       stripGps,
       exportMasks,
       filenameTemplate,
@@ -92,6 +96,8 @@ export function useExportSettings() {
     setDontEnlarge,
     keepMetadata,
     setKeepMetadata,
+    preserveTimestamps,
+    setPreserveTimestamps,
     stripGps,
     setStripGps,
     exportMasks,

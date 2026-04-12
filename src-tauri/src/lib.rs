@@ -40,6 +40,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose};
+use filetime;
 use image::codecs::jpeg::JpegEncoder;
 use image::{
     DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, Rgb, RgbImage, Rgba,
@@ -234,6 +235,8 @@ struct ExportSettings {
     jpeg_quality: u8,
     resize: Option<ResizeOptions>,
     keep_metadata: bool,
+    #[serde(default)]
+    preserve_timestamps: bool,
     strip_gps: bool,
     filename_template: Option<String>,
     watermark: Option<WatermarkSettings>,
@@ -1784,6 +1787,14 @@ fn process_image_for_export_pipeline(
     )
 }
 
+fn set_timestamps_from_exif(src: &Path, dst: &Path) {
+    let capture_dt = exif_processing::get_creation_date_from_path(src);
+    let ft = filetime::FileTime::from_unix_time(capture_dt.timestamp(), capture_dt.timestamp_subsec_nanos());
+    if let Err(e) = filetime::set_file_times(dst, ft, ft) {
+        log::warn!("Could not set timestamps on '{}': {}", dst.display(), e);
+    }
+}
+
 fn save_image_with_metadata(
     image: &DynamicImage,
     output_path: &std::path::Path,
@@ -2058,6 +2069,10 @@ fn export_masks_for_image(
                 export_settings,
             )?;
 
+            if export_settings.preserve_timestamps {
+                set_timestamps_from_exif(Path::new(source_path_str), &mask_image_path);
+            }
+
             let alpha_bytes = encode_grayscale_to_png(&alpha_resized)?;
             #[cfg(target_os = "android")]
             {
@@ -2206,6 +2221,10 @@ async fn export_image(
                 &source_path_str,
                 &export_settings,
             )?;
+
+            if export_settings.preserve_timestamps {
+                set_timestamps_from_exif(Path::new(&source_path_str), output_path_obj);
+            }
 
             if export_settings.export_masks {
                 export_masks_for_image(
@@ -2470,6 +2489,10 @@ async fn batch_export_images(
                         )?;
 
                         save_image_with_metadata(&final_image, &output_path, &source_path_str, &export_settings)?;
+
+                        if export_settings.preserve_timestamps {
+                            set_timestamps_from_exif(Path::new(&source_path_str), &output_path);
+                        }
 
                         if export_settings.export_masks {
                             export_masks_for_image(

@@ -66,6 +66,7 @@ mozjpeg-rs = "0.9.0"
 webp = "0.3"
 jxl-oxide = { version = "0.12.5", features = ["image"] }
 jxl-encoder = "0.1.3"
+filetime = "0.2"
 libc = "0.2.183"
 rgb = "0.8.53"
 imgref = "1.12.0"

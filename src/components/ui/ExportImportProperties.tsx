@@ -37,6 +37,7 @@ export interface ExportSettings {
   filenameTemplate: string | null;
   jpegQuality: number;
   keepMetadata: boolean;
+  preserveTimestamps: boolean;
   resize: {
     mode: string;
     value: number;
@@ -105,6 +106,7 @@ export interface ExportPreset {
   resizeValue: number;
   dontEnlarge: boolean;
   keepMetadata: boolean;
+  preserveTimestamps: boolean;
   stripGps: boolean;
   exportMasks?: boolean;
   filenameTemplate: string;
