@@ -35,6 +35,7 @@ interface LibraryExportPanelProps {
   imageList: ImageFile[];
   appSettings: AppSettings | null;
   onSettingsChange: (settings: AppSettings) => void;
+  rootPath: string | null;
 }
 
 interface SectionProps {
@@ -176,6 +177,7 @@ export default function LibraryExportPanel({
   imageList: _imageList,
   appSettings,
   onSettingsChange,
+  rootPath,
 }: LibraryExportPanelProps) {
   const {
     fileFormat,
@@ -212,6 +214,8 @@ export default function LibraryExportPanel({
     setWatermarkOpacity,
     handleApplyPreset,
     currentSettingsObject,
+    preserveFolders,
+    setPreserveFolders,
   } = useExportSettings();
 
   const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
@@ -448,6 +452,7 @@ export default function LibraryExportPanel({
               opacity: watermarkOpacity,
             }
           : null,
+      preserveFolders,
     };
 
     const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
@@ -466,11 +471,19 @@ export default function LibraryExportPanel({
           saveLastUsedPreset(outputFolder as string);
         }
         setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
+
+        // Compute baseOriginFolder if preserveFolders is enabled
+        let baseOriginFolder: string | undefined = undefined;
+        if (exportSettings.preserveFolders && rootPath) {
+          baseOriginFolder = rootPath;
+        }
+
         await invoke(Invokes.BatchExportImages, {
           exportSettings,
           outputFolder: outputFolder as string,
           outputFormat: FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0],
           paths: multiSelectedPaths,
+          baseOriginFolder,
         });
       }
     } catch (error) {
@@ -568,6 +581,14 @@ export default function LibraryExportPanel({
                   </button>
                 ))}
               </div>
+              <div className="mt-4">
+                <Switch
+                  label="Preserve Folder Structure"
+                  checked={preserveFolders}
+                  onChange={setPreserveFolders}
+                  disabled={isExporting}
+                />
+              </div>
             </Section>
 
             {fileFormat !== FileFormats.Cube && (
@@ -643,14 +664,7 @@ export default function LibraryExportPanel({
                   />
                 </Section>
 
-                <Section title="Export Options">
-                  <Switch
-                    label="Preserve Folder Structure"
-                    checked={preserveFolders}
-                    onChange={setPreserveFolders}
-                    disabled={isExporting}
-                  />
-                </Section>
+
 
                 <Section title="Watermark">
                   <Switch
@@ -684,7 +698,6 @@ export default function LibraryExportPanel({
                               step={1}
                               value={watermarkScale}
                               onChange={(e) => setWatermarkScale(parseInt(e.target.value))}
-                              disabled={isExporting}
                               defaultValue={10}
                             />
                             <Slider
@@ -694,7 +707,6 @@ export default function LibraryExportPanel({
                               step={1}
                               value={watermarkSpacing}
                               onChange={(e) => setWatermarkSpacing(parseInt(e.target.value))}
-                              disabled={isExporting}
                               defaultValue={5}
                             />
                             <Slider
@@ -704,7 +716,6 @@ export default function LibraryExportPanel({
                               step={1}
                               value={watermarkOpacity}
                               onChange={(e) => setWatermarkOpacity(parseInt(e.target.value))}
-                              disabled={isExporting}
                               defaultValue={75}
                             />
                           </div>

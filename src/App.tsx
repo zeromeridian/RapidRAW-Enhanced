@@ -5439,6 +5439,7 @@ function App() {
               setExportState={setExportState}
               appSettings={appSettings}
               onSettingsChange={handleSettingsChange}
+              rootPath={rootPath}
             />
           </div>
         </div>
