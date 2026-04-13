@@ -696,6 +696,7 @@ export default function ExportPanel({
                               step={1}
                               value={watermarkScale}
                               onChange={(e) => setWatermarkScale(parseInt(e.target.value))}
+                              disabled={isExporting}
                               defaultValue={10}
                             />
                             <Slider
@@ -705,6 +706,7 @@ export default function ExportPanel({
                               step={1}
                               value={watermarkSpacing}
                               onChange={(e) => setWatermarkSpacing(parseInt(e.target.value))}
+                              disabled={isExporting}
                               defaultValue={5}
                             />
                             <Slider
@@ -714,6 +716,7 @@ export default function ExportPanel({
                               step={1}
                               value={watermarkOpacity}
                               onChange={(e) => setWatermarkOpacity(parseInt(e.target.value))}
+                              disabled={isExporting}
                               defaultValue={75}
                             />
                           </div>
