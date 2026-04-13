@@ -1322,11 +1322,13 @@ pub struct MaskAdjustments {
     _pad_end7: f32,
 }
 
+pub const MAX_MASKS: usize = 32;
+
 #[derive(Debug, Clone, Copy, Pod, Zeroable, Default)]
 #[repr(C)]
 pub struct AllAdjustments {
     pub global: GlobalAdjustments,
-    pub mask_adjustments: [MaskAdjustments; 8],
+    pub mask_adjustments: [MaskAdjustments; MAX_MASKS],
     pub mask_count: u32,
     pub tile_offset_x: u32,
     pub tile_offset_y: u32,
@@ -1963,7 +1965,7 @@ pub fn get_all_adjustments_from_json(
     is_raw: bool,
 ) -> AllAdjustments {
     let global = get_global_adjustments_from_json(js_adjustments, is_raw);
-    let mut mask_adjustments = [MaskAdjustments::default(); 8];
+    let mut mask_adjustments = [MaskAdjustments::default(); MAX_MASKS];
     let mut mask_count = 0;
 
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
@@ -1975,7 +1977,7 @@ pub fn get_all_adjustments_from_json(
         .iter()
         .filter(|m| m.visible)
         .enumerate()
-        .take(8)
+        .take(MAX_MASKS)
     {
         mask_adjustments[i] = get_mask_adjustments_from_json(&mask_def.adjustments);
         mask_count += 1;
