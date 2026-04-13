@@ -35,6 +35,7 @@ interface ExportPanelProps {
   setExportState(state: any): void;
   appSettings: AppSettings | null;
   onSettingsChange: (settings: AppSettings) => void;
+  rootPath: string | null;
 }
 
 interface SectionProps {
@@ -175,6 +176,7 @@ export default function ExportPanel({
   setExportState,
   appSettings,
   onSettingsChange,
+  rootPath,
 }: ExportPanelProps) {
   const {
     fileFormat,
@@ -209,6 +211,8 @@ export default function ExportPanel({
     setWatermarkSpacing,
     watermarkOpacity,
     setWatermarkOpacity,
+    preserveFolders,
+    setPreserveFolders,
     handleApplyPreset,
     currentSettingsObject,
   } = useExportSettings();
@@ -421,6 +425,7 @@ export default function ExportPanel({
               opacity: watermarkOpacity,
             }
           : null,
+      preserveFolders,
     };
 
     const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
@@ -445,6 +450,7 @@ export default function ExportPanel({
             outputFolder: outputFolder as string,
             outputFormat: FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0],
             paths: pathsToExport,
+            baseOriginFolder: rootPath,
           });
         }
       } else {
@@ -571,6 +577,14 @@ export default function ExportPanel({
                       {variable}
                     </button>
                   ))}
+                </div>
+                <div className="mt-4">
+                  <Switch
+                    label="Preserve Folder Structure"
+                    checked={preserveFolders}
+                    onChange={setPreserveFolders}
+                    disabled={isExporting}
+                  />
                 </div>
               </Section>
             )}

@@ -5335,6 +5335,7 @@ function App() {
                             setExportState={setExportState}
                             appSettings={appSettings}
                             onSettingsChange={handleSettingsChange}
+                            rootPath={rootPath}
                           />
                         )}
                         {renderedRightPanel === Panel.Ai && (
@@ -5439,6 +5440,7 @@ function App() {
               setExportState={setExportState}
               appSettings={appSettings}
               onSettingsChange={handleSettingsChange}
+              rootPath={rootPath}
             />
           </div>
         </div>

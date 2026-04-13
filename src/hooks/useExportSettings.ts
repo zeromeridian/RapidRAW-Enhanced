@@ -11,6 +11,7 @@ export function useExportSettings() {
   const [keepMetadata, setKeepMetadata] = useState(true);
   const [stripGps, setStripGps] = useState(true);
   const [exportMasks, setExportMasks] = useState(false);
+  const [preserveFolders, setPreserveFolders] = useState(false);
   const [filenameTemplate, setFilenameTemplate] = useState('{original_filename}_edited');
   const [enableWatermark, setEnableWatermark] = useState(false);
   const [watermarkPath, setWatermarkPath] = useState<string | null>(null);
@@ -29,6 +30,7 @@ export function useExportSettings() {
     setKeepMetadata(preset.keepMetadata);
     setStripGps(preset.stripGps);
     setExportMasks(preset.exportMasks ?? false);
+    setPreserveFolders(preset.preserveFolders ?? false);
     setFilenameTemplate(preset.filenameTemplate);
     setEnableWatermark(preset.enableWatermark);
     setWatermarkPath(preset.watermarkPath);
@@ -49,6 +51,7 @@ export function useExportSettings() {
       keepMetadata,
       stripGps,
       exportMasks,
+      preserveFolders,
       filenameTemplate,
       enableWatermark,
       watermarkPath,
@@ -67,6 +70,7 @@ export function useExportSettings() {
       keepMetadata,
       stripGps,
       exportMasks,
+      preserveFolders,
       filenameTemplate,
       enableWatermark,
       watermarkPath,
@@ -96,6 +100,8 @@ export function useExportSettings() {
     setStripGps,
     exportMasks,
     setExportMasks,
+    preserveFolders,
+    setPreserveFolders,
     filenameTemplate,
     setFilenameTemplate,
     enableWatermark,

@@ -257,6 +257,8 @@ pub struct ExportPreset {
     pub watermark_opacity: u32,
     #[serde(default)]
     pub export_masks: Option<bool>,
+    #[serde(default)]
+    pub preserve_folders: Option<bool>,
     /// Last export destination path, stored on the __last_used__ preset only.
     #[serde(default)]
     pub last_export_path: Option<String>,
@@ -283,6 +285,7 @@ fn default_export_presets() -> Vec<ExportPreset> {
             watermark_spacing: 5,
             watermark_opacity: 75,
             export_masks: Some(false),
+            preserve_folders: Some(false),
             last_export_path: None,
         },
         ExportPreset {
@@ -304,6 +307,7 @@ fn default_export_presets() -> Vec<ExportPreset> {
             watermark_spacing: 5,
             watermark_opacity: 75,
             export_masks: Some(false),
+            preserve_folders: Some(false),
             last_export_path: None,
         },
     ]
