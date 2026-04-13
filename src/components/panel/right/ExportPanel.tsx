@@ -35,6 +35,7 @@ interface ExportPanelProps {
   setExportState(state: any): void;
   appSettings: AppSettings | null;
   onSettingsChange: (settings: AppSettings) => void;
+  rootPath: string | null;
 }
 
 interface SectionProps {
@@ -175,6 +176,7 @@ export default function ExportPanel({
   setExportState,
   appSettings,
   onSettingsChange,
+  rootPath,
 }: ExportPanelProps) {
   const {
     fileFormat,
@@ -212,7 +214,7 @@ export default function ExportPanel({
     handleApplyPreset,
     currentSettingsObject,
   } = useExportSettings();
-  // Add preserveFolders state
+  
   const { preserveFolders, setPreserveFolders } = useExportSettings();
 
   const initDone = useRef(false);
@@ -263,23 +265,6 @@ export default function ExportPanel({
     : multiSelectedPaths;
   const numImages = pathsToExport.length;
   const isBatchMode = numImages > 1;
-
-  // Compute baseOriginFolder for batch export if preserveFolders is enabled
-  function getCommonBasePath(paths: string[]): string | null {
-    if (!paths.length) return null;
-    const splitPaths = paths.map((p) => p.split(/[\\/]/));
-    let base: string[] = [];
-    for (let i = 0; i < splitPaths[0].length; i++) {
-      const segment = splitPaths[0][i];
-      if (splitPaths.every((arr) => arr[i] === segment)) {
-        base.push(segment);
-      } else {
-        break;
-      }
-    }
-    return base.length > 0 ? base.join('/') : null;
-  }
-  const baseOriginFolder = preserveFolders ? getCommonBasePath(pathsToExport) : undefined;
 
   const imageAspectRatio = useMemo(() => {
     if (selectedImage && selectedImage.width && selectedImage.height) {
@@ -465,7 +450,7 @@ export default function ExportPanel({
             outputFolder: outputFolder as string,
             outputFormat: FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0],
             paths: pathsToExport,
-            baseOriginFolder: baseOriginFolder,
+            baseOriginFolder: rootPath,
           });
         }
       } else {
