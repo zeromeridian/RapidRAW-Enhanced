@@ -957,7 +957,7 @@ fn process_preview_job(
     let (interactive_divisor, interactive_quality) = match live_quality {
         "full" => (1.0_f32, 85_u8),
         "performance" => (1.8_f32, 65_u8),
-        _ => (1.2_f32, 72_u8),
+        _ => (1.2_f32, 75_u8),
     };
 
     let mut cached_preview_lock = state.cached_preview.lock().unwrap();
@@ -1028,7 +1028,7 @@ fn process_preview_job(
         (img, new_scale, interactive_quality)
     } else {
         let img = Arc::try_unwrap(final_preview_base).unwrap_or_else(|arc| (*arc).clone());
-        (img, scale_for_gpu, 95)
+        (img, scale_for_gpu, 94)
     };
 
     let (preview_width, preview_height) = processing_image.dimensions();
