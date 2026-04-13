@@ -212,6 +212,8 @@ export default function ExportPanel({
     handleApplyPreset,
     currentSettingsObject,
   } = useExportSettings();
+  // Add preserveFolders state
+  const { preserveFolders, setPreserveFolders } = useExportSettings();
 
   const initDone = useRef(false);
   useEffect(() => {
@@ -261,6 +263,23 @@ export default function ExportPanel({
     : multiSelectedPaths;
   const numImages = pathsToExport.length;
   const isBatchMode = numImages > 1;
+
+  // Compute baseOriginFolder for batch export if preserveFolders is enabled
+  function getCommonBasePath(paths: string[]): string | null {
+    if (!paths.length) return null;
+    const splitPaths = paths.map((p) => p.split(/[\\/]/));
+    let base: string[] = [];
+    for (let i = 0; i < splitPaths[0].length; i++) {
+      const segment = splitPaths[0][i];
+      if (splitPaths.every((arr) => arr[i] === segment)) {
+        base.push(segment);
+      } else {
+        break;
+      }
+    }
+    return base.length > 0 ? base.join('/') : null;
+  }
+  const baseOriginFolder = preserveFolders ? getCommonBasePath(pathsToExport) : undefined;
 
   const imageAspectRatio = useMemo(() => {
     if (selectedImage && selectedImage.width && selectedImage.height) {
@@ -421,6 +440,7 @@ export default function ExportPanel({
               opacity: watermarkOpacity,
             }
           : null,
+      preserveFolders,
     };
 
     const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
@@ -445,6 +465,7 @@ export default function ExportPanel({
             outputFolder: outputFolder as string,
             outputFormat: FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0],
             paths: pathsToExport,
+            baseOriginFolder: baseOriginFolder,
           });
         }
       } else {
@@ -572,6 +593,14 @@ export default function ExportPanel({
                     </button>
                   ))}
                 </div>
+                <div className="mt-4">
+                  <Switch
+                    label="Preserve Folder Structure"
+                    checked={preserveFolders}
+                    onChange={setPreserveFolders}
+                    disabled={isExporting}
+                  />
+                </div>
               </Section>
             )}
 
@@ -682,7 +711,6 @@ export default function ExportPanel({
                               step={1}
                               value={watermarkScale}
                               onChange={(e) => setWatermarkScale(parseInt(e.target.value))}
-                              disabled={isExporting}
                               defaultValue={10}
                             />
                             <Slider
@@ -692,7 +720,6 @@ export default function ExportPanel({
                               step={1}
                               value={watermarkSpacing}
                               onChange={(e) => setWatermarkSpacing(parseInt(e.target.value))}
-                              disabled={isExporting}
                               defaultValue={5}
                             />
                             <Slider
@@ -702,7 +729,6 @@ export default function ExportPanel({
                               step={1}
                               value={watermarkOpacity}
                               onChange={(e) => setWatermarkOpacity(parseInt(e.target.value))}
-                              disabled={isExporting}
                               defaultValue={75}
                             />
                           </div>

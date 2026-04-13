@@ -471,7 +471,6 @@ export default function LibraryExportPanel({
           saveLastUsedPreset(outputFolder as string);
         }
         setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
-
         await invoke(Invokes.BatchExportImages, {
           exportSettings,
           outputFolder: outputFolder as string,
