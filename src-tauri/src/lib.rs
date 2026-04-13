@@ -2397,12 +2397,10 @@ async fn batch_export_images(
 
                         let new_filename = format!("{}.{}", new_stem, output_format);
                         let output_path = if export_settings.preserve_folders {
-                            log::info!("Preserving folder structure for export of '{}' using base origin path '{}'", source_path_str, base_origin_path.unwrap_or_else(|| std::path::Path::new("")).display());
                             if let Some(base_origin) = base_origin_path {
                                 if let Ok(rel_path) = source_path.strip_prefix(base_origin) {
                                     let rel_dir = rel_path.parent().unwrap_or_else(|| std::path::Path::new(""));
                                     let full_dir = output_folder_path.join(rel_dir);
-                                    // Ensure the directory exists
                                     if let Err(e) = std::fs::create_dir_all(&full_dir) {
                                         log::warn!("Failed to create export subdirectory: {}", e);
                                     }
@@ -2417,7 +2415,6 @@ async fn batch_export_images(
                             output_folder_path.join(&new_filename)
                         };
                         let extension = output_format.to_lowercase();
-                        log::info!("Exporting '{}' to '{}'", source_path_str, output_path.display());
 
                         if extension == "cube" {
                             let cube_bytes = export_adjustments_as_lut(

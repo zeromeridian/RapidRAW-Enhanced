@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
-import { Save, CheckCircle, XCircle, Loader, X, Ban } from 'lucide-react';
+import { Save, CheckCircle, XCircle, Loader, X, Ban, Info } from 'lucide-react';
 import debounce from 'lodash.debounce';
 import Switch from '../../ui/Switch';
 import Button from '../../ui/Button';
@@ -472,18 +472,12 @@ export default function LibraryExportPanel({
         }
         setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
 
-        // Compute baseOriginFolder if preserveFolders is enabled
-        let baseOriginFolder: string | undefined = undefined;
-        if (exportSettings.preserveFolders && rootPath) {
-          baseOriginFolder = rootPath;
-        }
-
         await invoke(Invokes.BatchExportImages, {
           exportSettings,
           outputFolder: outputFolder as string,
           outputFormat: FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0],
           paths: multiSelectedPaths,
-          baseOriginFolder,
+          baseOriginFolder: rootPath,
         });
       }
     } catch (error) {
@@ -664,8 +658,6 @@ export default function LibraryExportPanel({
                   />
                 </Section>
 
-
-
                 <Section title="Watermark">
                   <Switch
                     label="Add Watermark"
@@ -698,6 +690,7 @@ export default function LibraryExportPanel({
                               step={1}
                               value={watermarkScale}
                               onChange={(e) => setWatermarkScale(parseInt(e.target.value))}
+                              disabled={isExporting}
                               defaultValue={10}
                             />
                             <Slider
@@ -707,6 +700,7 @@ export default function LibraryExportPanel({
                               step={1}
                               value={watermarkSpacing}
                               onChange={(e) => setWatermarkSpacing(parseInt(e.target.value))}
+                              disabled={isExporting}
                               defaultValue={5}
                             />
                             <Slider
@@ -716,6 +710,7 @@ export default function LibraryExportPanel({
                               step={1}
                               value={watermarkOpacity}
                               onChange={(e) => setWatermarkOpacity(parseInt(e.target.value))}
+                              disabled={isExporting}
                               defaultValue={75}
                             />
                           </div>
