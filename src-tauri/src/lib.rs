@@ -2400,11 +2400,27 @@ async fn batch_export_images(
                             if let Some(base_origin) = base_origin_path {
                                 if let Ok(rel_path) = source_path.strip_prefix(base_origin) {
                                     let rel_dir = rel_path.parent().unwrap_or_else(|| std::path::Path::new(""));
-                                    let full_dir = output_folder_path.join(rel_dir);
-                                    if let Err(e) = std::fs::create_dir_all(&full_dir) {
-                                        log::warn!("Failed to create export subdirectory: {}", e);
+                                    let rel_dir_is_safe = rel_dir.components().all(|component| {
+                                        matches!(
+                                            component,
+                                            std::path::Component::Normal(_)
+                                                | std::path::Component::CurDir
+                                        )
+                                    });
+
+                                    if rel_dir_is_safe {
+                                        let full_dir = output_folder_path.join(rel_dir);
+                                        if let Err(e) = std::fs::create_dir_all(&full_dir) {
+                                            log::warn!("Failed to create export subdirectory: {}", e);
+                                        }
+                                        full_dir.join(&new_filename)
+                                    } else {
+                                        log::warn!(
+                                            "Skipping unsafe preserved folder path outside export directory: {}",
+                                            rel_dir.display()
+                                        );
+                                        output_folder_path.join(&new_filename)
                                     }
-                                    full_dir.join(&new_filename)
                                 } else {
                                     output_folder_path.join(&new_filename)
                                 }

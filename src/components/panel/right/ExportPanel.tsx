@@ -211,11 +211,11 @@ export default function ExportPanel({
     setWatermarkSpacing,
     watermarkOpacity,
     setWatermarkOpacity,
+    preserveFolders,
+    setPreserveFolders,
     handleApplyPreset,
     currentSettingsObject,
   } = useExportSettings();
-  
-  const { preserveFolders, setPreserveFolders } = useExportSettings();
 
   const initDone = useRef(false);
   useEffect(() => {
