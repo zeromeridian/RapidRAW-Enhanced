@@ -27,14 +27,14 @@ export const TEXT_WEIGHT_KEYS: Record<TextWeight, string> = {
   normal: 'font-normal',
 };
 export const TEXT_COLOR_KEYS: Record<TextColor, string> = {
-  primary: 'text-text-primary',
-  secondary: 'text-text-secondary',
-  accent: 'text-accent',
-  button: 'text-button-text',
-  info: 'text-blue-400',
-  success: 'text-green-400',
+  primary: 'text-red-400',
+  secondary: 'text-red-400',
+  accent: 'text-red-400',
+  button: 'text-red-400',
+  info: 'text-red-400',
+  success: 'text-red-400',
   error: 'text-red-400',
-  white: 'text-white',
+  white: 'text-red-400',
 };
 
 export interface VariantConfig {

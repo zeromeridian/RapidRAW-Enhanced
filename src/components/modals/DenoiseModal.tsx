@@ -391,7 +391,7 @@ export default function DenoiseModal({
         <Text variant={TextVariants.title} className="mb-3 text-center">
           Denoise Image
         </Text>
-        <Text className="text-center max-w-md leading-relaxed text-text-secondary">
+        <Text className="text-center max-w-md leading-relaxed">
           Remove noise from your image using AI-powered or traditional denoising.
         </Text>
       </div>
