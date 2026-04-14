@@ -742,7 +742,8 @@ impl GpuProcessor {
             height,
             depth_or_array_layers: mask_layer_count,
         };
-        let mut mask_texture_data = Vec::with_capacity((width as usize) * (height as usize) * (mask_layer_count as usize));
+        let mut mask_texture_data =
+            Vec::with_capacity((width as usize) * (height as usize) * (mask_layer_count as usize));
         if request.mask_bitmaps.is_empty() {
             mask_texture_data.resize((width as usize) * (height as usize), 0);
         } else {

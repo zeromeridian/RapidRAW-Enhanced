@@ -2279,7 +2279,7 @@ async fn batch_export_images(
     let task = tokio::spawn(async move {
         let state = app_handle.state::<AppState>();
         let output_folder_path = std::path::Path::new(&output_folder);
-        let base_origin_path = base_origin_folder.as_ref().map(|s| std::path::Path::new(s));
+        let base_origin_path = base_origin_folder.as_ref().map(std::path::Path::new);
         let total_paths = paths.len();
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
         let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
