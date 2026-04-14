@@ -1566,7 +1566,11 @@ function App() {
 
             setFinalPreviewUrl((prevUrl) => {
               if (prevUrl && prevUrl.startsWith('blob:') && !imageCacheRef.current.isProtected(prevUrl)) {
-                setTimeout(() => URL.revokeObjectURL(prevUrl), 250);
+                setTimeout(() => {
+                  if (!imageCacheRef.current.isProtected(prevUrl)) {
+                    URL.revokeObjectURL(prevUrl);
+                  }
+                }, 250);
               }
               return url;
             });
@@ -2470,7 +2474,11 @@ function App() {
 
       setFinalPreviewUrl((prev) => {
         if (prev?.startsWith('blob:') && !imageCacheRef.current.isProtected(prev)) {
-          setTimeout(() => URL.revokeObjectURL(prev), 250);
+          setTimeout(() => {
+            if (!imageCacheRef.current.isProtected(prev)) {
+              URL.revokeObjectURL(prev);
+            }
+          }, 250);
         }
         return null;
       });
