@@ -556,38 +556,41 @@ export default function ExportPanel({
               )}
             </Section>
 
-            {isBatchMode && (
-              <Section title="File Naming">
-                <input
-                  className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
-                  disabled={isExporting}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilenameTemplate(e.target.value)}
-                  ref={filenameInputRef}
-                  type="text"
-                  value={filenameTemplate}
-                />
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {FILENAME_VARIABLES.map((variable: string) => (
-                    <button
-                      className="px-2 py-1 bg-surface text-text-secondary text-xs rounded-md hover:bg-card-active transition-colors disabled:opacity-50"
-                      disabled={isExporting}
-                      key={variable}
-                      onClick={() => handleVariableClick(variable)}
-                    >
-                      {variable}
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-4">
-                  <Switch
-                    label="Preserve Folder Structure"
-                    checked={preserveFolders}
-                    onChange={setPreserveFolders}
+            <Section title="File Naming">
+              {isBatchMode && (
+                <>
+                  <input
+                    className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
                     disabled={isExporting}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilenameTemplate(e.target.value)}
+                    ref={filenameInputRef}
+                    type="text"
+                    value={filenameTemplate}
                   />
-                </div>
-              </Section>
-            )}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {FILENAME_VARIABLES.map((variable: string) => (
+                      <button
+                        className="px-2 py-1 bg-surface text-text-secondary text-xs rounded-md hover:bg-card-active transition-colors disabled:opacity-50"
+                        disabled={isExporting}
+                        key={variable}
+                        onClick={() => handleVariableClick(variable)}
+                      >
+                        {variable}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <div className={isBatchMode ? 'mt-4' : ''}>
+                <Switch
+                  label="Preserve Folder Structure"
+                  checked={preserveFolders}
+                  onChange={setPreserveFolders}
+                  disabled={isExporting}
+                />
+              </div>
+            </Section>
 
             {fileFormat !== FileFormats.Cube && (
               <>
