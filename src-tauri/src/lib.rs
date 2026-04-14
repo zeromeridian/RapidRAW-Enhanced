@@ -1792,7 +1792,10 @@ fn process_image_for_export_pipeline(
 
 fn set_timestamps_from_exif(src: &Path, dst: &Path) {
     let capture_dt = exif_processing::get_creation_date_from_path(src);
-    let ft = filetime::FileTime::from_unix_time(capture_dt.timestamp(), capture_dt.timestamp_subsec_nanos());
+    let ft = filetime::FileTime::from_unix_time(
+        capture_dt.timestamp(),
+        capture_dt.timestamp_subsec_nanos(),
+    );
     if let Err(e) = filetime::set_file_times(dst, ft, ft) {
         log::warn!("Could not set timestamps on '{}': {}", dst.display(), e);
     }
@@ -4102,6 +4105,107 @@ async fn apply_denoising(
 }
 
 #[tauri::command]
+async fn batch_denoise_images(
+    paths: Vec<String>,
+    intensity: f32,
+    method: String,
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<String>, String> {
+    let mut ai_session = None;
+    if method == "ai" {
+        let session = crate::ai_processing::get_or_init_denoise_model(
+            &app_handle,
+            &state.ai_state,
+            &state.ai_init_lock,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+        ai_session = Some(session);
+    }
+
+    tokio::task::spawn_blocking(move || {
+        let mut results = Vec::new();
+
+        for (i, path_str) in paths.iter().enumerate() {
+            let _ = app_handle.emit(
+                "denoise-batch-progress",
+                serde_json::json!({
+                    "current": i + 1,
+                    "total": paths.len(),
+                    "path": path_str
+                }),
+            );
+
+            let (source_path, source_sidecar_path) =
+                crate::file_management::parse_virtual_path(path_str);
+            let real_path = source_path.to_string_lossy().to_string();
+
+            match crate::denoising::denoise_image(
+                real_path.clone(),
+                intensity,
+                method.clone(),
+                app_handle.clone(),
+                ai_session.clone(),
+            ) {
+                Ok((image, _)) => {
+                    let is_raw = crate::formats::is_raw_file(&real_path);
+                    let parent_dir = source_path.parent().unwrap_or(std::path::Path::new(""));
+                    let stem = source_path
+                        .file_stem()
+                        .unwrap_or_default()
+                        .to_string_lossy();
+
+                    let (output_filename, image_to_save) = if is_raw {
+                        (
+                            format!("{}_Denoised.tiff", stem),
+                            DynamicImage::ImageRgb16(image.to_rgb16()),
+                        )
+                    } else {
+                        (
+                            format!("{}_Denoised.png", stem),
+                            DynamicImage::ImageRgb8(image.to_rgb8()),
+                        )
+                    };
+
+                    let output_path = parent_dir.join(output_filename);
+                    if let Err(e) = image_to_save.save(&output_path) {
+                        let _ = app_handle.emit(
+                            "denoise-error",
+                            format!("Failed to save {}: {}", real_path, e),
+                        );
+                        continue;
+                    }
+
+                    if source_sidecar_path.exists() {
+                        if let Some(output_path_str) = output_path.to_str() {
+                            let (_, dest_sidecar_path) =
+                                crate::file_management::parse_virtual_path(output_path_str);
+                            if let Err(e) = std::fs::copy(&source_sidecar_path, &dest_sidecar_path)
+                            {
+                                log::warn!("Failed to copy sidecar file for denoised image: {}", e);
+                            }
+                        }
+                    }
+
+                    results.push(output_path.to_string_lossy().to_string());
+                }
+                Err(e) => {
+                    let _ = app_handle.emit(
+                        "denoise-error",
+                        format!("Failed to denoise {}: {}", real_path, e),
+                    );
+                }
+            }
+        }
+
+        Ok(results)
+    })
+    .await
+    .map_err(|e| format!("Batch denoising task failed: {}", e))?
+}
+
+#[tauri::command]
 async fn save_denoised_image(
     original_path_str: String,
     state: tauri::State<'_, AppState>,
@@ -4113,7 +4217,8 @@ async fn save_denoised_image(
 
     let is_raw = crate::formats::is_raw_file(&original_path_str);
 
-    let (first_path, _) = parse_virtual_path(&original_path_str);
+    let (first_path, source_sidecar_path) =
+        crate::file_management::parse_virtual_path(&original_path_str); // <-- CHANGE
     let parent_dir = first_path
         .parent()
         .ok_or_else(|| "Could not determine parent directory.".to_string())?;
@@ -4138,6 +4243,16 @@ async fn save_denoised_image(
     image_to_save
         .save(&output_path)
         .map_err(|e| format!("Failed to save image: {}", e))?;
+
+    if source_sidecar_path.exists() {
+        if let Some(output_path_str) = output_path.to_str() {
+            let (_, dest_sidecar_path) =
+                crate::file_management::parse_virtual_path(output_path_str);
+            if let Err(e) = std::fs::copy(&source_sidecar_path, &dest_sidecar_path) {
+                log::warn!("Failed to copy sidecar file for denoised image: {}", e);
+            }
+        }
+    }
 
     Ok(output_path.to_string_lossy().to_string())
 }
@@ -4882,6 +4997,7 @@ pub fn run() {
             merge_hdr,
             save_hdr,
             apply_denoising,
+            batch_denoise_images,
             save_denoised_image,
             load_and_parse_lut,
             fetch_community_presets,

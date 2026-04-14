@@ -183,7 +183,7 @@ interface DenoiseModalState {
   previewBase64: string | null;
   originalBase64?: string | null;
   error: string | null;
-  targetPath: string | null;
+  targetPaths: string[];
   progressMessage: string | null;
   isRaw: boolean;
 }
@@ -436,7 +436,7 @@ function App() {
     isProcessing: false,
     previewBase64: null,
     error: null,
-    targetPath: null,
+    targetPaths: [],
     progressMessage: null,
     isRaw: false,
   });
@@ -3649,7 +3649,7 @@ function App() {
 
   const handleApplyDenoise = useCallback(
     async (intensity: number, method: 'ai' | 'bm3d') => {
-      if (!denoiseModalState.targetPath) return;
+      if (denoiseModalState.targetPaths.length === 0) return;
 
       setDenoiseModalState((prev) => ({
         ...prev,
@@ -3660,7 +3660,7 @@ function App() {
 
       try {
         await invoke(Invokes.ApplyDenoising, {
-          path: denoiseModalState.targetPath,
+          path: denoiseModalState.targetPaths[0],
           intensity: intensity,
           method: method,
         });
@@ -3672,13 +3672,34 @@ function App() {
         }));
       }
     },
-    [denoiseModalState.targetPath],
+    [denoiseModalState.targetPaths],
+  );
+
+  const handleBatchDenoise = useCallback(
+    async (intensity: number, method: 'ai' | 'bm3d', paths: string[]) => {
+      try {
+        const savedPaths: string[] = await invoke('batch_denoise_images', {
+          paths,
+          intensity,
+          method,
+        });
+        await refreshImageList();
+        return savedPaths;
+      } catch (err) {
+        setDenoiseModalState((prev) => ({
+          ...prev,
+          error: String(err),
+        }));
+        throw err;
+      }
+    },
+    [refreshImageList],
   );
 
   const handleSaveDenoisedImage = async (): Promise<string> => {
-    if (!denoiseModalState.targetPath) throw new Error('No target path');
+    if (denoiseModalState.targetPaths.length === 0) throw new Error('No target path');
     const savedPath = await invoke<string>(Invokes.SaveDenoisedImage, {
-      originalPathStr: denoiseModalState.targetPath,
+      originalPathStr: denoiseModalState.targetPaths[0],
     });
     await refreshImageList();
     return savedPath;
@@ -4228,7 +4249,7 @@ function App() {
                 isProcessing: false,
                 previewBase64: null,
                 error: null,
-                targetPath: selectedImage.path,
+                targetPaths: [selectedImage.path],
                 progressMessage: null,
                 isRaw: selectedImage?.isRaw,
               });
@@ -4423,7 +4444,8 @@ function App() {
     const cullLabel = isSingleSelection ? 'Cull Image' : `Cull Images`;
     const collageLabel = isSingleSelection ? 'Frame Image' : 'Create Collage';
     const stitchLabel = 'Stitch Panorama';
-    const conversionLabel = 'Convert Negative';
+    const conversionLabel = isSingleSelection ? 'Convert Negative' : 'Convert Negatives';
+    const denoiseLabel = isSingleSelection ? 'Denoise Image' : 'Denoise Images';
     const mergeLabel = `Merge to HDR`;
 
     const handleCreateVirtualCopy = async (sourcePath: string) => {
@@ -4547,16 +4569,16 @@ function App() {
             onClick: handleApplyAutoAdjustmentsToSelection,
           },
           {
-            label: 'Denoise Image',
+            label: denoiseLabel,
             icon: Grip,
-            disabled: !isSingleSelection,
+            disabled: finalSelection.length === 0,
             onClick: () => {
               setDenoiseModalState({
                 isOpen: true,
                 isProcessing: false,
                 previewBase64: null,
                 error: null,
-                targetPath: finalSelection[0],
+                targetPaths: finalSelection,
                 progressMessage: null,
                 isRaw: selectedImage?.isRaw || false,
               });
@@ -5527,6 +5549,7 @@ function App() {
         isOpen={denoiseModalState.isOpen}
         onClose={() => setDenoiseModalState((prev) => ({ ...prev, isOpen: false }))}
         onDenoise={handleApplyDenoise}
+        onBatchDenoise={handleBatchDenoise}
         onSave={handleSaveDenoisedImage}
         onOpenFile={handleImageSelect}
         previewBase64={denoiseModalState.previewBase64}
@@ -5536,10 +5559,11 @@ function App() {
         progressMessage={denoiseModalState.progressMessage}
         aiModelDownloadStatus={aiModelDownloadStatus}
         isRaw={denoiseModalState.isRaw}
+        targetPaths={denoiseModalState.targetPaths}
         loadingImageUrl={
-          denoiseModalState.targetPath
-            ? thumbnails[denoiseModalState.targetPath] ||
-              (selectedImage?.path === denoiseModalState.targetPath ? finalPreviewUrl : null)
+          denoiseModalState.targetPaths.length > 0
+            ? thumbnails[denoiseModalState.targetPaths[0]] ||
+              (selectedImage?.path === denoiseModalState.targetPaths[0] ? finalPreviewUrl : null)
             : null
         }
       />
