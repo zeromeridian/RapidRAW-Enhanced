@@ -4187,14 +4187,13 @@ async fn batch_denoise_images(
 
                     let _ = crate::exif_processing::write_rrexif_sidecar(&real_path, &output_path);
 
-                    if source_sidecar_path.exists() {
-                        if let Some(output_path_str) = output_path.to_str() {
-                            let (_, dest_sidecar_path) =
-                                crate::file_management::parse_virtual_path(output_path_str);
-                            if let Err(e) = std::fs::copy(&source_sidecar_path, &dest_sidecar_path)
-                            {
-                                log::warn!("Failed to copy sidecar file for denoised image: {}", e);
-                            }
+                    if source_sidecar_path.exists()
+                        && let Some(output_path_str) = output_path.to_str()
+                    {
+                        let (_, dest_sidecar_path) =
+                            crate::file_management::parse_virtual_path(output_path_str);
+                        if let Err(e) = std::fs::copy(&source_sidecar_path, &dest_sidecar_path) {
+                            log::warn!("Failed to copy sidecar file for denoised image: {}", e);
                         }
                     }
 
@@ -4258,13 +4257,12 @@ async fn save_denoised_image(
     let _ =
         crate::exif_processing::write_rrexif_sidecar(&real_path.to_string_lossy(), &output_path);
 
-    if source_sidecar_path.exists() {
-        if let Some(output_path_str) = output_path.to_str() {
-            let (_, dest_sidecar_path) =
-                crate::file_management::parse_virtual_path(output_path_str);
-            if let Err(e) = std::fs::copy(&source_sidecar_path, &dest_sidecar_path) {
-                log::warn!("Failed to copy sidecar file for denoised image: {}", e);
-            }
+    if source_sidecar_path.exists()
+        && let Some(output_path_str) = output_path.to_str()
+    {
+        let (_, dest_sidecar_path) = crate::file_management::parse_virtual_path(output_path_str);
+        if let Err(e) = std::fs::copy(&source_sidecar_path, &dest_sidecar_path) {
+            log::warn!("Failed to copy sidecar file for denoised image: {}", e);
         }
     }
 
