@@ -194,6 +194,8 @@ export default function LibraryExportPanel({
     setDontEnlarge,
     keepMetadata,
     setKeepMetadata,
+    preserveTimestamps,
+    setPreserveTimestamps,
     stripGps,
     setStripGps,
     exportMasks,
@@ -360,6 +362,7 @@ export default function LibraryExportPanel({
       filenameTemplate,
       jpegQuality,
       keepMetadata,
+      preserveTimestamps,
       resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
       stripGps,
       watermark:
@@ -388,6 +391,7 @@ export default function LibraryExportPanel({
     resizeValue,
     dontEnlarge,
     keepMetadata,
+    preserveTimestamps,
     stripGps,
     filenameTemplate,
     enableWatermark,
@@ -439,6 +443,7 @@ export default function LibraryExportPanel({
       filenameTemplate: finalFilenameTemplate,
       jpegQuality: jpegQuality,
       keepMetadata,
+      preserveTimestamps,
       resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
       stripGps,
       exportMasks,
@@ -647,6 +652,15 @@ export default function LibraryExportPanel({
                     </Section>
                   </>
                 )}
+
+                <Section title="File Timestamps">
+                  <Switch
+                    checked={preserveTimestamps}
+                    disabled={isExporting}
+                    label="Set File Timestamps from EXIF Capture Date"
+                    onChange={setPreserveTimestamps}
+                  />
+                </Section>
 
                 <Section title="Masks">
                   <Switch
