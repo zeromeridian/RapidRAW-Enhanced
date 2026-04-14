@@ -784,15 +784,25 @@ pub async fn read_exif_for_paths(
         .par_iter()
         .filter_map(|virtual_path| {
             let (source_path, _) = parse_virtual_path(virtual_path);
+            let source_path_str = source_path.to_string_lossy().to_string();
 
-            let exif_map = if let Ok(mmap) = read_file_mapped(&source_path) {
-                exif_processing::extract_metadata(&mmap)
+            let map = if let Some(sidecar_exif) =
+                crate::exif_processing::read_rrexif_sidecar(&source_path)
+            {
+                sidecar_exif
+            } else if let Ok(mmap) = read_file_mapped(&source_path) {
+                crate::exif_processing::read_exif_data(&source_path_str, &mmap)
+            } else if let Ok(bytes) = fs::read(&source_path) {
+                crate::exif_processing::read_exif_data(&source_path_str, &bytes)
             } else {
-                let bytes = fs::read(&source_path).ok()?;
-                exif_processing::extract_metadata(&bytes)
+                HashMap::new()
             };
 
-            exif_map.map(|map| (virtual_path.clone(), map))
+            if map.is_empty() {
+                None
+            } else {
+                Some((virtual_path.clone(), map))
+            }
         })
         .collect();
 
@@ -1905,11 +1915,33 @@ pub fn duplicate_file(path: String) -> Result<(), String> {
         fs::copy(&source_sidecar_path, &dest_sidecar_path).map_err(|e| e.to_string())?;
     }
 
+    let mut source_rrexif_name = source_path.file_name().unwrap().to_os_string();
+    source_rrexif_name.push(".rrexif");
+    let source_rrexif = source_path.with_file_name(source_rrexif_name);
+
+    if source_rrexif.exists() {
+        let mut dest_rrexif_name = dest_path.file_name().unwrap().to_os_string();
+        dest_rrexif_name.push(".rrexif");
+        let dest_rrexif = dest_path.with_file_name(dest_rrexif_name);
+        let _ = fs::copy(&source_rrexif, &dest_rrexif);
+    }
+
     Ok(())
 }
 
 fn find_all_associated_files(source_image_path: &Path) -> Result<Vec<PathBuf>, String> {
     let mut associated_files = vec![source_image_path.to_path_buf()];
+
+    let mut rrexif_name = source_image_path
+        .file_name()
+        .unwrap_or_default()
+        .to_os_string();
+    rrexif_name.push(".rrexif");
+    let rrexif_path = source_image_path.with_file_name(rrexif_name);
+
+    if rrexif_path.exists() {
+        associated_files.push(rrexif_path);
+    }
 
     let parent_dir = source_image_path
         .parent()
@@ -3057,7 +3089,7 @@ pub fn clear_all_sidecars(root_path: String) -> Result<usize, String> {
         let path = entry.path();
         if path.is_file()
             && let Some(extension) = path.extension()
-            && extension == "rrdata"
+            && (extension == "rrdata" || extension == "rrexif")
         {
             if fs::remove_file(path).is_ok() {
                 deleted_count += 1;
@@ -3244,7 +3276,8 @@ pub fn delete_files_with_associated(paths: Vec<String>) -> Result<(), String> {
                 if let Some(base_stem) = entry_filename_str.split('.').next()
                     && stems_to_delete.contains(base_stem)
                     && (is_supported_image_file(entry_filename_str.as_ref())
-                        || entry_filename_str.ends_with(".rrdata"))
+                        || entry_filename_str.ends_with(".rrdata")
+                        || entry_filename_str.ends_with(".rrexif"))
                 {
                     files_to_trash.insert(entry_path);
                 }
@@ -3481,6 +3514,17 @@ pub async fn import_files(
                     fs::copy(&source_sidecar, &dest_sidecar).map_err(|e| e.to_string())?;
                 }
 
+                let mut source_rrexif_name = source_path.file_name().unwrap().to_os_string();
+                source_rrexif_name.push(".rrexif");
+                let source_rrexif = source_path.with_file_name(source_rrexif_name);
+
+                if source_rrexif.exists() {
+                    let mut dest_rrexif_name = dest_file_path.file_name().unwrap().to_os_string();
+                    dest_rrexif_name.push(".rrexif");
+                    let dest_rrexif = dest_file_path.with_file_name(dest_rrexif_name);
+                    let _ = fs::copy(&source_rrexif, &dest_rrexif);
+                }
+
                 if settings.delete_after_import {
                     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
                     {
@@ -3513,6 +3557,9 @@ pub async fn import_files(
                         fs::remove_file(&source_path).map_err(|e| e.to_string())?;
                         if source_sidecar.exists() {
                             fs::remove_file(&source_sidecar).map_err(|e| e.to_string())?;
+                        }
+                        if source_rrexif.exists() {
+                            let _ = fs::remove_file(&source_rrexif);
                         }
                     }
                 }
@@ -3634,10 +3681,24 @@ pub fn rename_files(paths: Vec<String>, name_template: String) -> Result<Vec<Str
                     let new_sidecar_path = parent.join(new_sidecar_filename);
                     sidecar_operations.insert(entry_path, new_sidecar_path);
                 } else if entry_filename == format!("{}.rrdata", original_filename_str) {
-                    let new_sidecar_path = new_path.with_extension("rrdata");
+                    let mut new_sidecar_name = new_path.file_name().unwrap().to_os_string();
+                    new_sidecar_name.push(".rrdata");
+                    let new_sidecar_path = new_path.with_file_name(new_sidecar_name);
+
                     sidecar_operations.insert(entry_path, new_sidecar_path);
                 }
             }
+        }
+
+        let mut old_rrexif_name = original_path.file_name().unwrap().to_os_string();
+        old_rrexif_name.push(".rrexif");
+        let old_rrexif = original_path.with_file_name(old_rrexif_name);
+
+        if old_rrexif.exists() {
+            let mut new_rrexif_name = new_path.file_name().unwrap().to_os_string();
+            new_rrexif_name.push(".rrexif");
+            let new_rrexif = new_path.with_file_name(new_rrexif_name);
+            sidecar_operations.insert(old_rrexif, new_rrexif);
         }
     }
     operations.extend(sidecar_operations);

@@ -3907,6 +3907,10 @@ async fn save_panorama(
         .save(&output_path)
         .map_err(|e| format!("Failed to save panorama image: {}", e))?;
 
+    let (real_path, _) = crate::file_management::parse_virtual_path(&first_path_str);
+    let _ =
+        crate::exif_processing::write_rrexif_sidecar(&real_path.to_string_lossy(), &output_path);
+
     Ok(output_path.to_string_lossy().to_string())
 }
 
@@ -4061,6 +4065,10 @@ async fn save_hdr(
         .save(&output_path)
         .map_err(|e| format!("Failed to save hdr image: {}", e))?;
 
+    let (real_path, _) = crate::file_management::parse_virtual_path(&first_path_str);
+    let _ =
+        crate::exif_processing::write_rrexif_sidecar(&real_path.to_string_lossy(), &output_path);
+
     Ok(output_path.to_string_lossy().to_string())
 }
 
@@ -4177,6 +4185,8 @@ async fn batch_denoise_images(
                         continue;
                     }
 
+                    let _ = crate::exif_processing::write_rrexif_sidecar(&real_path, &output_path);
+
                     if source_sidecar_path.exists() {
                         if let Some(output_path_str) = output_path.to_str() {
                             let (_, dest_sidecar_path) =
@@ -4243,6 +4253,10 @@ async fn save_denoised_image(
     image_to_save
         .save(&output_path)
         .map_err(|e| format!("Failed to save image: {}", e))?;
+
+    let (real_path, _) = crate::file_management::parse_virtual_path(&original_path_str);
+    let _ =
+        crate::exif_processing::write_rrexif_sidecar(&real_path.to_string_lossy(), &output_path);
 
     if source_sidecar_path.exists() {
         if let Some(output_path_str) = output_path.to_str() {
