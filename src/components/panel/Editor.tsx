@@ -428,13 +428,84 @@ export default function Editor({
     [imageRenderSize, adjustments, requestMaskOverlay],
   );
 
+  const overlayTriggerHash = useMemo(() => {
+    let activeMaskDef = null;
+    if (activeRightPanel === Panel.Masks && activeMaskContainerId) {
+      activeMaskDef = adjustments.masks?.find((c: MaskContainer) => c.id === activeMaskContainerId);
+    } else if (activeRightPanel === Panel.Ai && activeAiPatchContainerId) {
+      activeMaskDef = adjustments.aiPatches?.find((p: AiPatch) => p.id === activeAiPatchContainerId);
+    }
+
+    if (!activeMaskDef) return null;
+
+    const geometryKeys = [
+      'crop',
+      'rotation',
+      'flipHorizontal',
+      'flipVertical',
+      'orientationSteps',
+      'transformDistortion',
+      'transformVertical',
+      'transformHorizontal',
+      'transformRotate',
+      'transformAspect',
+      'transformScale',
+      'transformXOffset',
+      'transformYOffset',
+      'lensDistortionAmount',
+      'lensVignetteAmount',
+      'lensTcaAmount',
+      'lensDistortionParams',
+      'lensMaker',
+      'lensModel',
+      'lensDistortionEnabled',
+      'lensTcaEnabled',
+      'lensVignetteEnabled',
+    ];
+
+    const geometry: any = {};
+    geometryKeys.forEach((k) => {
+      geometry[k] = (adjustments as any)[k];
+    });
+
+    const subMasks = activeMaskDef.subMasks?.map((sm: any) => {
+      const { parameters, ...rest } = sm;
+      const cleanParams = { ...parameters };
+      delete cleanParams.mask_data_base64;
+      delete cleanParams.maskDataBase64;
+      return { ...rest, parameters: cleanParams };
+    });
+
+    return JSON.stringify({
+      id: activeMaskDef.id,
+      invert: activeMaskDef.invert,
+      opacity: activeMaskDef.opacity,
+      subMasks,
+      geometry,
+      renderSize: { w: imageRenderSize.width, h: imageRenderSize.height },
+    });
+  }, [
+    activeRightPanel,
+    activeMaskContainerId,
+    activeAiPatchContainerId,
+    adjustments,
+    imageRenderSize.width,
+    imageRenderSize.height,
+  ]);
+
   useEffect(() => {
     let maskDefForOverlay = null;
 
     if (activeRightPanel === Panel.Masks && activeMaskContainerId) {
-      maskDefForOverlay = adjustments.masks.find((c: MaskContainer) => c.id === activeMaskContainerId);
+      const activeMask = adjustments.masks?.find((c: MaskContainer) => c.id === activeMaskContainerId);
+      if (activeMask) {
+        maskDefForOverlay = {
+          ...activeMask,
+          adjustments: {},
+        };
+      }
     } else if (activeRightPanel === Panel.Ai && activeAiPatchContainerId) {
-      const activePatch = adjustments.aiPatches.find((p: AiPatch) => p.id === activeAiPatchContainerId);
+      const activePatch = adjustments.aiPatches?.find((p: AiPatch) => p.id === activeAiPatchContainerId);
       if (activePatch) {
         maskDefForOverlay = {
           ...activePatch,
@@ -445,14 +516,9 @@ export default function Editor({
     }
 
     requestMaskOverlay(maskDefForOverlay, imageRenderSize, adjustments);
-  }, [
-    activeRightPanel,
-    activeMaskContainerId,
-    activeAiPatchContainerId,
-    adjustments,
-    imageRenderSize,
-    requestMaskOverlay,
-  ]);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overlayTriggerHash, requestMaskOverlay]);
 
   useEffect(() => {
     let timer: number;

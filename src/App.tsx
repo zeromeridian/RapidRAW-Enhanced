@@ -1486,6 +1486,28 @@ function App() {
 
       const payload = JSON.parse(JSON.stringify(currentAdjustments));
 
+      const processSubMasks = (subMasks: any[]) => {
+        if (!Array.isArray(subMasks)) return;
+        subMasks.forEach((sm: any) => {
+          if (sm.id && sm.parameters) {
+            const keys = ['mask_data_base64', 'maskDataBase64'];
+            let foundMaskData = false;
+
+            for (const key of keys) {
+              if (sm.parameters[key] !== undefined && sm.parameters[key] !== null) {
+                foundMaskData = true;
+                if (patchesSentToBackend.current.has(sm.id)) {
+                  sm.parameters[key] = null;
+                }
+              }
+            }
+            if (foundMaskData && !patchesSentToBackend.current.has(sm.id)) {
+              patchesSentToBackend.current.add(sm.id);
+            }
+          }
+        });
+      };
+
       if (payload.aiPatches && Array.isArray(payload.aiPatches)) {
         payload.aiPatches.forEach((p: any) => {
           if (p.id && p.patchData && !p.isLoading) {
@@ -1495,21 +1517,16 @@ function App() {
               patchesSentToBackend.current.add(p.id);
             }
           }
+          if (p.subMasks) {
+            processSubMasks(p.subMasks);
+          }
         });
       }
 
       if (payload.masks && Array.isArray(payload.masks)) {
         payload.masks.forEach((container: any) => {
-          if (container.subMasks && Array.isArray(container.subMasks)) {
-            container.subMasks.forEach((sm: any) => {
-              if (sm.id && sm.parameters && sm.parameters.mask_data_base64) {
-                if (patchesSentToBackend.current.has(sm.id)) {
-                  sm.parameters.mask_data_base64 = null;
-                } else {
-                  patchesSentToBackend.current.add(sm.id);
-                }
-              }
-            });
+          if (container.subMasks) {
+            processSubMasks(container.subMasks);
           }
         });
       }

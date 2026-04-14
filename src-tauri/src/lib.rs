@@ -468,6 +468,42 @@ fn calculate_full_job_hash(path: &str, adjustments: &serde_json::Value) -> u64 {
     hasher.finish()
 }
 
+fn hydrate_sub_masks(
+    sub_masks: &mut Vec<serde_json::Value>,
+    cache: &mut HashMap<String, serde_json::Value>,
+) {
+    for sub_mask in sub_masks {
+        let id = sub_mask
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+
+        if id.is_empty() {
+            continue;
+        }
+
+        if let Some(params) = sub_mask
+            .get_mut("parameters")
+            .and_then(|p| p.as_object_mut())
+        {
+            let keys_to_check = ["mask_data_base64", "maskDataBase64"];
+            for key in keys_to_check {
+                if params.contains_key(key) {
+                    let val = params.get(key).unwrap();
+                    if !val.is_null() {
+                        cache.insert(id.clone(), val.clone());
+                    } else {
+                        if let Some(cached_data) = cache.get(&id) {
+                            params.insert(key.to_string(), cached_data.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn hydrate_adjustments(state: &tauri::State<AppState>, adjustments: &mut serde_json::Value) {
     let mut cache = state.patch_cache.lock().unwrap();
 
@@ -481,20 +517,23 @@ fn hydrate_adjustments(state: &tauri::State<AppState>, adjustments: &mut serde_j
                 .and_then(|v| v.as_str())
                 .unwrap_or_default()
                 .to_string();
-            if id.is_empty() {
-                continue;
+
+            if !id.is_empty() {
+                let has_data = patch.get("patchData").is_some_and(|v| !v.is_null());
+
+                if has_data {
+                    if let Some(data) = patch.get("patchData") {
+                        cache.insert(id.clone(), data.clone());
+                    }
+                } else {
+                    if let Some(cached_data) = cache.get(&id) {
+                        patch["patchData"] = cached_data.clone();
+                    }
+                }
             }
 
-            let has_data = patch.get("patchData").is_some_and(|v| !v.is_null());
-
-            if has_data {
-                if let Some(data) = patch.get("patchData") {
-                    cache.insert(id.clone(), data.clone());
-                }
-            } else {
-                if let Some(cached_data) = cache.get(&id) {
-                    patch["patchData"] = cached_data.clone();
-                }
+            if let Some(sub_masks) = patch.get_mut("subMasks").and_then(|v| v.as_array_mut()) {
+                hydrate_sub_masks(sub_masks, &mut cache);
             }
         }
     }
@@ -505,31 +544,7 @@ fn hydrate_adjustments(state: &tauri::State<AppState>, adjustments: &mut serde_j
                 .get_mut("subMasks")
                 .and_then(|v| v.as_array_mut())
             {
-                for sub_mask in sub_masks {
-                    let id = sub_mask
-                        .get("id")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or_default()
-                        .to_string();
-                    if id.is_empty() {
-                        continue;
-                    }
-
-                    if let Some(params) = sub_mask
-                        .get_mut("parameters")
-                        .and_then(|p| p.as_object_mut())
-                        && params.contains_key("mask_data_base64")
-                    {
-                        let val = params.get("mask_data_base64").unwrap();
-                        if !val.is_null() {
-                            cache.insert(id.clone(), val.clone());
-                        } else {
-                            if let Some(cached_data) = cache.get(&id) {
-                                params.insert("mask_data_base64".to_string(), cached_data.clone());
-                            }
-                        }
-                    }
-                }
+                hydrate_sub_masks(sub_masks, &mut cache);
             }
         }
     }
