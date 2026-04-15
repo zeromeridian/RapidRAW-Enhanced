@@ -34,7 +34,7 @@ walkdir = "2.5.0"
 imageproc = "0.26.1"
 ort = { version = "=2.0.0-rc.10", features = ["ndarray", "load-dynamic"] }
 ndarray = "0.16"
-reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "rustls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls-webpki-roots"] }
 tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3"
 tauri-plugin-process = "2.3.1"
@@ -86,7 +86,7 @@ webkit2gtk = "=2.0.2"
 [build-dependencies]
 tauri-build = { version = "2.5", features = [] }
 sha2 = "0.10"
-reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls-webpki-roots"] }
 hex = "0.4"
 
 [profile.dev]
