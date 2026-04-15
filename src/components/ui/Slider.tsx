@@ -12,6 +12,7 @@ interface SliderProps {
   value: number;
   trackClassName?: string;
   fillOrigin?: 'min' | 'default';
+  suffix?: string;
 }
 
 const DOUBLE_CLICK_THRESHOLD_MS = 300;
@@ -28,6 +29,7 @@ const Slider = ({
   value,
   trackClassName,
   fillOrigin = 'default',
+  suffix = '',
 }: SliderProps) => {
   const [displayValue, setDisplayValue] = useState<number>(value);
   const [isDragging, setIsDragging] = useState(false);
@@ -374,6 +376,7 @@ const Slider = ({
               data-tooltip={`Click to edit`}
             >
               {decimalPlaces > 0 && numericValue === 0 ? '0' : numericValue.toFixed(decimalPlaces)}
+              {suffix && <span className="text-[10px] align-top inline-block mt-0.5 ml-0.5">{suffix}</span>}
             </span>
           )}
         </div>

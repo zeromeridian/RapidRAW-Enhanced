@@ -18,6 +18,7 @@ import { Orientation, SelectedImage } from '../../ui/AppProperties';
 import TransformModal from '../../modals/TransformModal';
 import LensCorrectionModal from '../../modals/LensCorrectionModal';
 import Text from '../../ui/Text';
+import Slider from '../../ui/Slider';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 
 const BASE_RATIO = 1.618;
@@ -148,31 +149,6 @@ export default function CropPanel({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeOverlay, setOverlay, setOverlayRotation]);
-
-  useEffect(() => {
-    const handleDragEndGlobal = () => {
-      if (isRotationActive) {
-        setIsRotationActive(false);
-        setGlobalRotationActive?.(false);
-
-        if (localRotationRef.current !== null) {
-          const finalRot = localRotationRef.current;
-          updateLocalRotation(null);
-          setAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRot }));
-        }
-      }
-    };
-
-    if (isRotationActive) {
-      window.addEventListener('mouseup', handleDragEndGlobal);
-      window.addEventListener('touchend', handleDragEndGlobal);
-    }
-
-    return () => {
-      window.removeEventListener('mouseup', handleDragEndGlobal);
-      window.removeEventListener('touchend', handleDragEndGlobal);
-    };
-  }, [isRotationActive, setGlobalRotationActive, setAdjustments, updateLocalRotation]);
 
   useEffect(() => {
     return () => {
@@ -396,9 +372,13 @@ export default function CropPanel({
 
   const displayRotation = localRotation !== null ? localRotation : fineRotation;
 
-  const handleFineRotationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFineRotationChange = (e: any) => {
     const newFineRotation = parseFloat(e.target.value);
-    updateLocalRotation(newFineRotation);
+    if (isRotationActive) {
+      updateLocalRotation(newFineRotation);
+    } else {
+      setAdjustments((prev: Adjustments) => ({ ...prev, rotation: newFineRotation }));
+    }
   };
 
   const handleStepRotate = (degrees: number) => {
@@ -418,24 +398,6 @@ export default function CropPanel({
   const resetFineRotation = () => {
     updateLocalRotation(null);
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, rotation: 0 }));
-  };
-
-  const handleRotationMouseDown = () => {
-    setIsRotationActive(true);
-    setGlobalRotationActive?.(true);
-    updateLocalRotation(fineRotation);
-  };
-
-  const handleRotationMouseUp = () => {
-    if (isRotationActive) {
-      setIsRotationActive(false);
-      setGlobalRotationActive?.(false);
-      if (localRotationRef.current !== null) {
-        const finalRot = localRotationRef.current;
-        updateLocalRotation(null);
-        setAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRot }));
-      }
-    }
   };
 
   const handleOverlayCycle = () => {
@@ -580,61 +542,62 @@ export default function CropPanel({
                 Rotation
               </Text>
               <div className="bg-surface px-4 pt-3 pb-4 rounded-lg">
-                <div className="flex justify-between items-center">
-                  <Text color={TextColors.primary}>{displayRotation.toFixed(1)}°</Text>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        setIsStraightenActive((isActive: boolean) => {
-                          const willBeActive = !isActive;
-                          if (willBeActive) {
-                            updateLocalRotation(null);
-                            setAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
-                          }
-                          return willBeActive;
-                        });
-                      }}
-                      className={clsx(
-                        'p-1.5 rounded-md transition-colors',
-                        isStraightenActive
-                          ? 'bg-accent text-button-text'
-                          : 'text-text-secondary hover:bg-card-active hover:text-text-primary',
-                      )}
-                      data-tooltip="Straighten Tool (S)"
-                    >
-                      <Ruler size={14} />
-                    </button>
-                    <button
-                      className="p-1.5 rounded-md text-text-secondary transition-colors cursor-pointer hover:bg-card-active hover:text-text-primary"
-                      onClick={resetFineRotation}
-                      data-tooltip="Reset Fine Rotation"
-                      disabled={displayRotation === 0}
-                    >
-                      <RotateCcw size={14} />
-                    </button>
-                  </div>
-                </div>
-                <div className="relative w-full h-5">
-                  <div className="absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/4 bg-card-active rounded-full pointer-events-none" />
-                  <input
-                    className={clsx(
-                      'absolute top-1/2 left-0 w-full h-1.5 appearance-none bg-transparent cursor-pointer m-0 p-0 slider-input z-10',
-                      isRotationActive && 'slider-thumb-active',
-                    )}
-                    style={{ margin: 0 }}
-                    max="45"
-                    min="-45"
-                    onChange={handleFineRotationChange}
-                    onDoubleClick={resetFineRotation}
-                    onMouseDown={handleRotationMouseDown}
-                    onMouseUp={handleRotationMouseUp}
-                    onTouchStart={handleRotationMouseDown}
-                    onTouchEnd={handleRotationMouseUp}
-                    step="0.1"
-                    type="range"
-                    value={displayRotation}
-                  />
-                </div>
+                <Slider
+                  label={
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setIsStraightenActive((isActive: boolean) => {
+                            const willBeActive = !isActive;
+                            if (willBeActive) {
+                              updateLocalRotation(null);
+                              setAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
+                            }
+                            return willBeActive;
+                          });
+                        }}
+                        className={clsx(
+                          'p-1.5 rounded-md transition-colors',
+                          isStraightenActive
+                            ? 'bg-accent text-button-text'
+                            : 'text-text-secondary hover:bg-card-active hover:text-text-primary',
+                        )}
+                        data-tooltip="Straighten Tool (S)"
+                      >
+                        <Ruler size={14} />
+                      </button>
+                      <button
+                        className="p-1.5 rounded-md text-text-secondary transition-colors cursor-pointer hover:bg-card-active hover:text-text-primary"
+                        onClick={resetFineRotation}
+                        data-tooltip="Reset Fine Rotation"
+                        disabled={displayRotation === 0}
+                      >
+                        <RotateCcw size={14} />
+                      </button>
+                    </div>
+                  }
+                  min={-45}
+                  max={45}
+                  step={0.1}
+                  value={displayRotation}
+                  defaultValue={0}
+                  suffix="°"
+                  onChange={handleFineRotationChange}
+                  onDragStateChange={(isDragging) => {
+                    if (isDragging) {
+                      setIsRotationActive(true);
+                      setGlobalRotationActive?.(true);
+                    } else {
+                      setIsRotationActive(false);
+                      setGlobalRotationActive?.(false);
+                      if (localRotationRef.current !== null) {
+                        const finalRot = localRotationRef.current;
+                        updateLocalRotation(null);
+                        setAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRot }));
+                      }
+                    }
+                  }}
+                />
               </div>
             </div>
 
