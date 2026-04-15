@@ -2400,6 +2400,7 @@ function App() {
 
       setMultiSelectedPaths([path]);
       setLibraryActivePath(null);
+      setSelectionAnchorPath(path);
       setError(null);
       setShowOriginal(false);
       setActiveMaskId(null);
