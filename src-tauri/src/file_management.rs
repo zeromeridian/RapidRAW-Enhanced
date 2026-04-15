@@ -435,6 +435,9 @@ impl Default for AppSettings {
             filter_criteria: None,
             theme: Some("dark".to_string()),
             font_family: None,
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            transparent: Some(false),
+            #[cfg(not(any(target_os = "linux", target_os = "android")))]
             transparent: Some(true),
             #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
             decorations: Some(true),
