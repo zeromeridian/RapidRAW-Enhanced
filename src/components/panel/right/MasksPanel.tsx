@@ -964,7 +964,8 @@ export default function MasksPanel({
 
   const handleDuplicateAndInvertContainer = (container: MaskContainer) => {
     const containerIndex = adjustments.masks.findIndex((mask) => mask.id === container.id);
-    const duplicatedContainer = cloneMaskContainerData(container, { invert: true, rename: true });
+    const duplicatedContainer = cloneMaskContainerData(container, { invert: true, rename: false });
+    duplicatedContainer.name = `${container.name} Inverted`;
 
     insertMaskContainer(duplicatedContainer, containerIndex >= 0 ? containerIndex + 1 : undefined);
   };
@@ -988,10 +989,19 @@ export default function MasksPanel({
     insertSubMaskIntoContainer(containerId, duplicatedSubMask, insertIndex);
   };
 
-  const handleDuplicateAndInvertSubMask = (containerId: string, subMask: SubMask, insertIndex?: number) => {
-    const duplicatedSubMask = cloneSubMaskData(subMask, { invert: true, rename: true });
+  const handleDuplicateAndInvertSubMask = (containerId: string, subMask: SubMask) => {
+    const parentContainer = adjustments.masks.find((m) => m.id === containerId);
+    if (!parentContainer) return;
 
-    insertSubMaskIntoContainer(containerId, duplicatedSubMask, insertIndex);
+    const duplicatedSubMask = cloneSubMaskData(subMask, { invert: true, rename: false });
+    const newContainer = cloneMaskContainerData(parentContainer, { rename: false });
+
+    newContainer.name = `${getSubMaskName(subMask)} Inverted`;
+    newContainer.subMasks = [duplicatedSubMask];
+    newContainer.invert = false;
+
+    const parentIndex = adjustments.masks.findIndex((m) => m.id === containerId);
+    insertMaskContainer(newContainer, parentIndex >= 0 ? parentIndex + 1 : undefined);
   };
 
   const handlePasteSubMask = (containerId: string, insertIndex?: number) => {
@@ -1747,7 +1757,7 @@ function ContainerRow({
                   updateSubMask={updateSubMask}
                   handleDelete={() => handleDeleteSubMask(container.id, subMask.id)}
                   handleDuplicate={() => handleDuplicateSubMask(container.id, subMask, index + 1)}
-                  handleDuplicateAndInvert={() => handleDuplicateAndInvertSubMask(container.id, subMask, index + 1)}
+                  handleDuplicateAndInvert={() => handleDuplicateAndInvertSubMask(container.id, subMask)}
                   handlePaste={() => handlePasteSubMask(container.id, index + 1)}
                   handleCopy={() => copySubMaskToClipboard(subMask)}
                   hasCopiedSubMask={!!copiedSubMask}
