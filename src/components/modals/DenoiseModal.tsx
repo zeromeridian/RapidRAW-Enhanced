@@ -481,6 +481,7 @@ export default function DenoiseModal({
               defaultValue={method === 'ai' ? 50 : 15}
               onChange={(e) => setIntensity(Number(e.target.value))}
               trackClassName="bg-bg-secondary"
+              fillOrigin="min"
             />
           </div>
         </div>

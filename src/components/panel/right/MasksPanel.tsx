@@ -172,6 +172,7 @@ const BrushTools = ({ settings, onSettingsChange }: { settings: any; onSettingsC
       onChange={(e: any) => onSettingsChange((s: any) => ({ ...s, size: Number(e.target.value) }))}
       step={1}
       value={settings.size}
+      fillOrigin="min"
     />
     <Slider
       defaultValue={50}
@@ -181,6 +182,7 @@ const BrushTools = ({ settings, onSettingsChange }: { settings: any; onSettingsC
       onChange={(e: any) => onSettingsChange((s: any) => ({ ...s, feather: Number(e.target.value) }))}
       step={1}
       value={settings.feather}
+      fillOrigin="min"
     />
     <div className="grid grid-cols-2 gap-2 pt-2">
       <button
@@ -219,6 +221,7 @@ const FlowBrushTool = ({
       onChange={(e: ChangeEvent<HTMLInputElement>) => onFlowChange(Number(e.target.value))}
       step={1}
       value={flow}
+      fillOrigin="min"
     />
     <BrushTools settings={settings} onSettingsChange={onSettingsChange} />
   </div>
@@ -2267,6 +2270,7 @@ function SettingsPanel({
                 : handleMaskPropertyChange('opacity', Number(e.target.value))
             }
             step={1}
+            fillOrigin="min"
           />
 
           {isComponentMode && (
@@ -2309,11 +2313,13 @@ function SettingsPanel({
                   onChange={(e: any) =>
                     handleSubMaskParametersChange({ [param.key]: parseFloat(e.target.value) / (param.multiplier || 1) })
                   }
+                  {...(param.key !== 'grow' && { fillOrigin: 'min' })}
                 />
               ))}
 
-              {subMaskConfig.showBrushTools && brushSettings && (
-                activeSubMask.type === Mask.Flow ? (
+              {subMaskConfig.showBrushTools &&
+                brushSettings &&
+                (activeSubMask.type === Mask.Flow ? (
                   <FlowBrushTool
                     flow={activeSubMask.parameters?.flow ?? 10}
                     onFlowChange={(flow: number) => handleSubMaskParametersChange({ flow })}
@@ -2322,8 +2328,7 @@ function SettingsPanel({
                   />
                 ) : (
                   <BrushTools settings={brushSettings} onSettingsChange={setBrushSettings} />
-                )
-              )}
+                ))}
             </>
           )}
         </div>

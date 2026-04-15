@@ -4846,7 +4846,7 @@ pub fn run() {
                     let path = config_dir.join("window_state.json");
                     if let Ok(contents) = std::fs::read_to_string(&path) {
                         if let Ok(state) = serde_json::from_str::<WindowState>(&contents) {
-                            if state.width >= 200 && state.height >= 150 {
+                            if state.width >= 800  && state.height >= 600 {
                                 let _ = window.set_size(tauri::Size::Physical(
                                     tauri::PhysicalSize::new(state.width, state.height),
                                 ));
@@ -4945,8 +4945,8 @@ pub fn run() {
                         if !maximized
                             && !fullscreen
                             && let Ok(size) = window_for_handler.outer_size()
-                            && size.width >= 200
-                            && size.height >= 150
+                            && size.width >= 800
+                            && size.height >= 600
                         {
                             state.width = size.width;
                             state.height = size.height;

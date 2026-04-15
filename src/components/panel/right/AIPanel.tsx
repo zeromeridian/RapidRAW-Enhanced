@@ -142,6 +142,7 @@ const BrushTools = ({ settings, onSettingsChange }: { settings: any; onSettingsC
       onChange={(e: any) => onSettingsChange((s: any) => ({ ...s, size: Number(e.target.value) }))}
       step={1}
       value={settings.size}
+      fillOrigin="min"
     />
     <Slider
       defaultValue={50}
@@ -151,6 +152,7 @@ const BrushTools = ({ settings, onSettingsChange }: { settings: any; onSettingsC
       onChange={(e: any) => onSettingsChange((s: any) => ({ ...s, feather: Number(e.target.value) }))}
       step={1}
       value={settings.feather}
+      fillOrigin="min"
     />
     <div className="grid grid-cols-2 gap-2 pt-2">
       <button
@@ -1717,6 +1719,7 @@ function SettingsPanel({
                       },
                     })
                   }
+                  {...(param.key !== 'grow' && { fillOrigin: 'min' })}
                 />
               ))}
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GLOBAL_KEYS } from './AppProperties';
 
 interface SliderProps {
@@ -11,6 +11,7 @@ interface SliderProps {
   step: number;
   value: number;
   trackClassName?: string;
+  fillOrigin?: 'min' | 'default';
 }
 
 const DOUBLE_CLICK_THRESHOLD_MS = 300;
@@ -26,6 +27,7 @@ const Slider = ({
   step = 1,
   value,
   trackClassName,
+  fillOrigin = 'default',
 }: SliderProps) => {
   const [displayValue, setDisplayValue] = useState<number>(value);
   const [isDragging, setIsDragging] = useState(false);
@@ -42,7 +44,13 @@ const Slider = ({
   const accumulatedValueRef = useRef<number>(0);
 
   const fillPercentage = max !== min ? ((displayValue - min) / (max - min)) * 100 : 0;
-  const defaultPercentage = max !== min ? ((defaultValue - min) / (max - min)) * 100 : 0;
+
+  const originPercentage = useMemo(() => {
+    if (fillOrigin === 'min') {
+      return 0;
+    }
+    return max !== min ? ((defaultValue - min) / (max - min)) * 100 : 0;
+  }, [fillOrigin, defaultValue, min, max]);
 
   const stepStr = String(step);
   const decimalPlaces = stepStr.includes('.') ? stepStr.split('.')[1].length : 0;
@@ -380,8 +388,8 @@ const Slider = ({
         <div
           className="absolute top-1/2 h-1.5 -translate-y-1/4 rounded-full pointer-events-none bg-accent/25"
           style={{
-            left: `${Math.min(fillPercentage, defaultPercentage)}%`,
-            width: `${Math.abs(fillPercentage - defaultPercentage)}%`,
+            left: `${Math.min(fillPercentage, originPercentage)}%`,
+            width: `${Math.abs(fillPercentage - originPercentage)}%`,
           }}
         />
         <input

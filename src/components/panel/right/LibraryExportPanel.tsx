@@ -553,6 +553,7 @@ export default function LibraryExportPanel({
                     onChange={(e) => setJpegQuality(parseInt(e.target.value))}
                     step={1}
                     value={jpegQuality}
+                    fillOrigin="min"
                   />
                 </div>
               )}
