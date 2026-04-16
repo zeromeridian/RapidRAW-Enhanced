@@ -102,23 +102,40 @@ function PresetItemDisplay({ preset, previewUrl, isGeneratingPreviews }: PresetI
 
   const supportsMasks = preset.includeMasks ?? (preset.adjustments?.masks && preset.adjustments.masks.length > 0);
   const supportsGeometry =
-    preset.includeCropTransform ?? geometryKeys.some((key) => preset.adjustments?.[key] !== undefined);
+    preset.includeCropTransform ??
+    geometryKeys.some((key) => geometryKeys.some((key) => preset.adjustments?.[key] !== undefined));
+
+  const tooltipContent = useMemo(() => {
+    const features = [];
+    if (supportsMasks) features.push('Masks');
+    if (supportsGeometry) features.push('Crop & Transform');
+
+    if (features.length === 0) return undefined;
+    return `Supports ${features.join(' + ')}`;
+  }, [supportsMasks, supportsGeometry]);
 
   return (
     <div className="flex items-center gap-2 p-2 rounded-lg bg-surface cursor-grabbing">
-      <div className="w-20 h-14 bg-bg-tertiary rounded-md flex items-center justify-center shrink-0 relative overflow-hidden">
+      <div
+        className="w-20 h-14 bg-bg-tertiary rounded-md flex items-center justify-center shrink-0 relative overflow-hidden"
+        data-tooltip={tooltipContent}
+      >
         {isGeneratingPreviews && !previewUrl ? (
           <Loader2 size={20} className="animate-spin text-text-secondary" />
         ) : previewUrl ? (
-          <img src={previewUrl} alt={`${preset.name} preview`} className="w-full h-full object-cover rounded-md" />
+          <img
+            src={previewUrl}
+            alt={`${preset.name} preview`}
+            className="w-full h-full object-cover rounded-md pointer-events-none"
+          />
         ) : (
           <Loader2 size={20} className="animate-spin text-text-secondary" />
         )}
 
         {(supportsMasks || supportsGeometry) && (
-          <div className="absolute top-1 right-1 bg-primary rounded-full px-1.5 py-0.5 flex items-center gap-1.5 backdrop-blur-xs shadow-xs z-10">
-            {supportsMasks && <Layers size={11} className="text-white" data-tooltip="Supports Masks" />}
-            {supportsGeometry && <Scaling size={11} className="text-white" data-tooltip="Supports Crop & Transform" />}
+          <div className="absolute top-1 right-1 bg-primary rounded-full px-1.5 py-0.5 flex items-center gap-1.5 backdrop-blur-xs shadow-xs z-10 pointer-events-none">
+            {supportsMasks && <Layers size={11} className="text-white" />}
+            {supportsGeometry && <Scaling size={11} className="text-white" />}
           </div>
         )}
       </div>
@@ -572,8 +589,9 @@ export default function PresetsPanel({
     name: string,
     includeMasks: boolean,
     includeCropTransform: boolean,
+    isAdditive: boolean,
   ) => {
-    const newPreset = addPreset(name, null, includeMasks, includeCropTransform);
+    const newPreset = addPreset(name, null, includeMasks, includeCropTransform, isAdditive);
     setIsAddModalOpen(false);
     if (newPreset) {
       await generateSinglePreview(newPreset);
@@ -777,14 +795,27 @@ export default function PresetsPanel({
       options = [
         {
           icon: RefreshCw,
-          label: 'Overwrite Preset',
-
-          onClick: async () => {
-            const updated = updatePreset(data?.id ?? null);
-            if (updated) {
-              await generateSinglePreview(updated);
-            }
-          },
+          label: 'Update from Current',
+          submenu: [
+            {
+              label: 'Merge',
+              onClick: async () => {
+                const updated = updatePreset(data?.id ?? null, 'merge');
+                if (updated) {
+                  await generateSinglePreview(updated);
+                }
+              },
+            },
+            {
+              label: 'Replace',
+              onClick: async () => {
+                const updated = updatePreset(data?.id ?? null, 'replace');
+                if (updated) {
+                  await generateSinglePreview(updated);
+                }
+              },
+            },
+          ],
         },
         { type: OPTION_SEPARATOR },
         {

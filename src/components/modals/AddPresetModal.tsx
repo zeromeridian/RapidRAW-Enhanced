@@ -6,13 +6,14 @@ import Switch from '../ui/Switch';
 interface PresetModalProps {
   isOpen: boolean;
   onClose(): void;
-  onSave(name: string, includeMasks: boolean, includeCropTransform: boolean): void;
+  onSave(name: string, includeMasks: boolean, includeCropTransform: boolean, isAdditive: boolean): void;
 }
 
 export default function AddPresetModal({ isOpen, onClose, onSave }: PresetModalProps) {
   const [name, setName] = useState('');
   const [includeMasks, setIncludeMasks] = useState(false);
   const [includeCropTransform, setIncludeCropTransform] = useState(false);
+  const [isAdditive, setIsAdditive] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
 
@@ -28,6 +29,7 @@ export default function AddPresetModal({ isOpen, onClose, onSave }: PresetModalP
         setName('');
         setIncludeMasks(false);
         setIncludeCropTransform(false);
+        setIsAdditive(false);
       }, 300);
       return () => clearTimeout(timer);
     }
@@ -35,10 +37,10 @@ export default function AddPresetModal({ isOpen, onClose, onSave }: PresetModalP
 
   const handleSave = useCallback(() => {
     if (name.trim()) {
-      onSave(name.trim(), includeMasks, includeCropTransform);
+      onSave(name.trim(), includeMasks, includeCropTransform, isAdditive);
       onClose();
     }
-  }, [name, includeMasks, includeCropTransform, onSave, onClose]);
+  }, [name, includeMasks, includeCropTransform, isAdditive, onSave, onClose]);
 
   const handleKeyDown = useCallback(
     (e: any) => {
@@ -91,6 +93,12 @@ export default function AddPresetModal({ isOpen, onClose, onSave }: PresetModalP
         <div className="mt-5 space-y-4 p-1">
           <Switch label="Include Masks" checked={includeMasks} onChange={setIncludeMasks} />
           <Switch label="Include Crop & Transform" checked={includeCropTransform} onChange={setIncludeCropTransform} />
+          <Switch
+            label="Merge Changes"
+            data-tooltip="Only save changed adjustments"
+            checked={isAdditive}
+            onChange={setIsAdditive}
+          />
         </div>
 
         <div className="flex justify-end gap-3 mt-6">

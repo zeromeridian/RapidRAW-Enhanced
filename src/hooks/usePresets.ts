@@ -60,6 +60,7 @@ export function usePresets(currentAdjustments: Adjustments) {
     folderId: string | null = null,
     includeMasks: boolean = false,
     includeCropTransform: boolean = false,
+    isAdditive: boolean = false,
   ) => {
     const GEOMETRY_KEYS = ADJUSTMENT_GROUPS.geometry.flatMap((group) => group.keys);
     const MASK_KEYS = ADJUSTMENT_GROUPS.masks.flatMap((group) => group.keys);
@@ -74,7 +75,11 @@ export function usePresets(currentAdjustments: Adjustments) {
         const currentValue = currentAdjustments[key as keyof Adjustments];
         const defaultValue = INITIAL_ADJUSTMENTS[key as keyof Adjustments];
 
-        if (JSON.stringify(currentValue) !== JSON.stringify(defaultValue)) {
+        if (isAdditive) {
+          if (JSON.stringify(currentValue) !== JSON.stringify(defaultValue)) {
+            presetAdjustments[key] = currentValue;
+          }
+        } else {
           presetAdjustments[key] = currentValue;
         }
       }
@@ -174,7 +179,7 @@ export function usePresets(currentAdjustments: Adjustments) {
     savePresetsToBackend(updatedPresets);
   };
 
-  const updatePreset = (id: string | null) => {
+  const updatePreset = (id: string | null, updateMode: 'merge' | 'replace') => {
     let existingPreset: Preset | null = null;
 
     for (const item of presets) {
@@ -213,9 +218,13 @@ export function usePresets(currentAdjustments: Adjustments) {
 
       if (Object.prototype.hasOwnProperty.call(currentAdjustments, key)) {
         const currentValue = currentAdjustments[key as keyof Adjustments];
-        const defaultValue = INITIAL_ADJUSTMENTS[key as keyof Adjustments];
 
-        if (JSON.stringify(currentValue) !== JSON.stringify(defaultValue)) {
+        if (updateMode === 'merge') {
+          const defaultValue = INITIAL_ADJUSTMENTS[key as keyof Adjustments];
+          if (JSON.stringify(currentValue) !== JSON.stringify(defaultValue)) {
+            presetAdjustments[key] = currentValue;
+          }
+        } else {
           presetAdjustments[key] = currentValue;
         }
       }
