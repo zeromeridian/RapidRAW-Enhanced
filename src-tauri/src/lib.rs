@@ -251,6 +251,10 @@ pub struct CommunityPreset {
     pub name: String,
     pub creator: String,
     pub adjustments: Value,
+    #[serde(rename = "includeMasks")]
+    pub include_masks: Option<bool>,
+    #[serde(rename = "includeCropTransform")]
+    pub include_crop_transform: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -3335,34 +3339,37 @@ fn generate_preset_preview(
         .unwrap()
         .clone()
         .ok_or("No original image loaded for preset preview")?;
-    let original_image = loaded_image.image;
-    let path = loaded_image.path;
     let is_raw = loaded_image.is_raw;
-    let unique_hash = calculate_full_job_hash(&path, &js_adjustments);
+    let unique_hash = calculate_full_job_hash(&loaded_image.path, &js_adjustments);
 
-    const PRESET_PREVIEW_DIM: u32 = 200;
-    let preview_base = downscale_f32_image(&original_image, PRESET_PREVIEW_DIM, PRESET_PREVIEW_DIM);
+    const PRESET_PREVIEW_DIM: u32 = 400;
 
-    let (transformed_image, unscaled_crop_offset) =
-        apply_all_transformations(Cow::Borrowed(&preview_base), &js_adjustments);
-    let (img_w, img_h) = transformed_image.dimensions();
+    let (preview_image, scale_for_gpu, unscaled_crop_offset) =
+        generate_transformed_preview(&state, &loaded_image, &js_adjustments, PRESET_PREVIEW_DIM)?;
+
+    let (img_w, img_h) = preview_image.dimensions();
 
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
         .get("masks")
         .and_then(|m| serde_json::from_value(m.clone()).ok())
         .unwrap_or_default();
 
-    let warped_image = resolve_warped_image_for_masks(&state, &js_adjustments, &mask_definitions);
+    let scaled_crop_offset = (
+        unscaled_crop_offset.0 * scale_for_gpu,
+        unscaled_crop_offset.1 * scale_for_gpu,
+    );
+
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
         .iter()
         .filter_map(|def| {
-            generate_mask_bitmap(
+            get_cached_or_generate_mask(
+                &state,
                 def,
                 img_w,
                 img_h,
-                1.0,
-                unscaled_crop_offset,
-                warped_image.as_deref(),
+                scale_for_gpu,
+                scaled_crop_offset,
+                &js_adjustments,
             )
         })
         .collect();
@@ -3374,7 +3381,7 @@ fn generate_preset_preview(
     let processed_image = process_and_get_dynamic_image(
         &context,
         &state,
-        transformed_image.as_ref(),
+        &preview_image,
         unique_hash,
         RenderRequest {
             adjustments: all_adjustments,
@@ -3388,7 +3395,7 @@ fn generate_preset_preview(
     let mut buf = Cursor::new(Vec::new());
     processed_image
         .to_rgb8()
-        .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 50))
+        .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80))
         .map_err(|e| e.to_string())?;
 
     Ok(Response::new(buf.into_inner()))
@@ -3666,7 +3673,7 @@ async fn generate_all_community_previews(
     let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
     let linear_mode = settings.linear_raw_mode;
 
-    let mut base_thumbnails: Vec<(DynamicImage, bool)> = Vec::new();
+    let mut base_thumbnails: Vec<(DynamicImage, bool, f32)> = Vec::new();
     for image_path in image_paths.iter() {
         let (source_path, _) = parse_virtual_path(image_path);
         let source_path_str = source_path.to_string_lossy().to_string();
@@ -3680,11 +3687,18 @@ async fn generate_all_community_previews(
             None,
         )
         .map_err(|e| e.to_string())?;
+
         let is_raw = is_raw_file(&source_path_str);
-        base_thumbnails.push((
-            downscale_f32_image(&original_image, PROCESSING_DIM, PROCESSING_DIM),
-            is_raw,
-        ));
+        let (orig_w, orig_h) = original_image.dimensions();
+        let (base_image, base_scale) = if orig_w > PROCESSING_DIM || orig_h > PROCESSING_DIM {
+            let downscaled = downscale_f32_image(&original_image, PROCESSING_DIM, PROCESSING_DIM);
+            let scale = downscaled.width() as f32 / orig_w as f32;
+            (downscaled, scale)
+        } else {
+            (original_image, 1.0)
+        };
+
+        base_thumbnails.push((base_image, is_raw, base_scale));
     }
 
     for preset in presets.iter() {
@@ -3695,18 +3709,38 @@ async fn generate_all_community_previews(
         preset.name.hash(&mut preset_hasher);
         let preset_hash = preset_hasher.finish();
 
-        for (i, (base_image, is_raw)) in base_thumbnails.iter().enumerate() {
-            let (transformed_image, unscaled_crop_offset) =
-                crate::apply_all_transformations(Cow::Borrowed(base_image), js_adjustments);
+        for (i, (base_image, is_raw, base_scale)) in base_thumbnails.iter().enumerate() {
+            let mut scaled_adjustments = js_adjustments.clone();
+            if let Some(crop_val) = scaled_adjustments.get_mut("crop")
+                && let Ok(c) = serde_json::from_value::<Crop>(crop_val.clone())
+            {
+                *crop_val = serde_json::to_value(Crop {
+                    x: c.x * (*base_scale as f64),
+                    y: c.y * (*base_scale as f64),
+                    width: c.width * (*base_scale as f64),
+                    height: c.height * (*base_scale as f64),
+                })
+                .unwrap_or(serde_json::Value::Null);
+            }
+
+            let (transformed_image, _scaled_crop_offset) =
+                crate::apply_all_transformations(Cow::Borrowed(base_image), &scaled_adjustments);
             let (img_w, img_h) = transformed_image.dimensions();
 
-            let mask_definitions: Vec<MaskDefinition> = js_adjustments
+            let mask_definitions: Vec<MaskDefinition> = scaled_adjustments
                 .get("masks")
                 .and_then(|m| serde_json::from_value(m.clone()).ok())
                 .unwrap_or_else(Vec::new);
 
-            let warped_image =
-                resolve_warped_image_for_masks(&state, js_adjustments, &mask_definitions);
+            let unscaled_crop_offset = js_adjustments
+                .get("crop")
+                .and_then(|c| serde_json::from_value::<Crop>(c.clone()).ok())
+                .map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
+            let actual_scaled_crop_offset = (
+                unscaled_crop_offset.0 * base_scale,
+                unscaled_crop_offset.1 * base_scale,
+            );
+
             let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
                 .iter()
                 .filter_map(|def| {
@@ -3714,14 +3748,14 @@ async fn generate_all_community_previews(
                         def,
                         img_w,
                         img_h,
-                        1.0,
-                        unscaled_crop_offset,
-                        warped_image.as_deref(),
+                        *base_scale,
+                        actual_scaled_crop_offset,
+                        None,
                     )
                 })
                 .collect();
 
-            let all_adjustments = get_all_adjustments_from_json(js_adjustments, *is_raw);
+            let all_adjustments = get_all_adjustments_from_json(&scaled_adjustments, *is_raw);
             let lut_path = js_adjustments["lutPath"].as_str();
             let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
 

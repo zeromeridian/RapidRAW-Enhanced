@@ -26,6 +26,8 @@ import {
   SortAsc,
   Trash2,
   Users,
+  Layers,
+  Scaling,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AddPresetModal from '../../modals/AddPresetModal';
@@ -35,7 +37,7 @@ import RenameFolderModal from '../../modals/RenameFolderModal';
 import Button from '../../ui/Button';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { Adjustments, INITIAL_ADJUSTMENTS, ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
 import { Invokes, OPTION_SEPARATOR, Panel, Preset, SelectedImage } from '../../ui/AppProperties';
 
 interface DroppableFolderItemProps {
@@ -96,9 +98,15 @@ const itemVariants = {
 };
 
 function PresetItemDisplay({ preset, previewUrl, isGeneratingPreviews }: PresetItemDisplayProps) {
+  const geometryKeys = ADJUSTMENT_GROUPS.geometry.flatMap((g) => g.keys);
+
+  const supportsMasks = preset.includeMasks ?? (preset.adjustments?.masks && preset.adjustments.masks.length > 0);
+  const supportsGeometry =
+    preset.includeCropTransform ?? geometryKeys.some((key) => preset.adjustments?.[key] !== undefined);
+
   return (
     <div className="flex items-center gap-2 p-2 rounded-lg bg-surface cursor-grabbing">
-      <div className="w-20 h-14 bg-bg-tertiary rounded-md flex items-center justify-center shrink-0">
+      <div className="w-20 h-14 bg-bg-tertiary rounded-md flex items-center justify-center shrink-0 relative overflow-hidden">
         {isGeneratingPreviews && !previewUrl ? (
           <Loader2 size={20} className="animate-spin text-text-secondary" />
         ) : previewUrl ? (
@@ -106,7 +114,15 @@ function PresetItemDisplay({ preset, previewUrl, isGeneratingPreviews }: PresetI
         ) : (
           <Loader2 size={20} className="animate-spin text-text-secondary" />
         )}
+
+        {(supportsMasks || supportsGeometry) && (
+          <div className="absolute top-1 right-1 bg-primary rounded-full px-1.5 py-0.5 flex items-center gap-1.5 backdrop-blur-xs shadow-xs z-10">
+            {supportsMasks && <Layers size={11} className="text-white" data-tooltip="Supports Masks" />}
+            {supportsGeometry && <Scaling size={11} className="text-white" data-tooltip="Supports Crop & Transform" />}
+          </div>
+        )}
       </div>
+
       <div className="grow min-w-0">
         <Text color={TextColors.primary} weight={TextWeights.medium} className="truncate">
           {preset.name}
@@ -552,8 +568,12 @@ export default function PresetsPanel({
     }));
   };
 
-  const handleSaveCurrentSettingsAsPreset = async (name: string) => {
-    const newPreset = addPreset(name);
+  const handleSaveCurrentSettingsAsPreset = async (
+    name: string,
+    includeMasks: boolean,
+    includeCropTransform: boolean,
+  ) => {
+    const newPreset = addPreset(name, null, includeMasks, includeCropTransform);
     setIsAddModalOpen(false);
     if (newPreset) {
       await generateSinglePreview(newPreset);

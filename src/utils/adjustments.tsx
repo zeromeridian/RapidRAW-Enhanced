@@ -609,24 +609,30 @@ export interface AdjustmentGroup {
 export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
   basic: [
     {
-      label: 'Exposure & Tone',
+      label: 'Tone Mapper',
+      keys: [BasicAdjustment.Exposure, 'toneMapper'],
+    },
+    {
+      label: 'Tone',
       keys: [
-        BasicAdjustment.Exposure,
         BasicAdjustment.Brightness,
         BasicAdjustment.Contrast,
         BasicAdjustment.Highlights,
         BasicAdjustment.Shadows,
         BasicAdjustment.Whites,
         BasicAdjustment.Blacks,
-        'toneMapper',
       ],
+    },
+    {
+      label: 'Curves',
+      keys: ['curves'],
     },
   ],
   color: [
     { label: 'White Balance', keys: [ColorAdjustment.Temperature, ColorAdjustment.Tint] },
-    { label: 'Saturation & Vibrance', keys: [ColorAdjustment.Saturation, ColorAdjustment.Vibrance] },
-    { label: 'HSL', keys: [ColorAdjustment.Hsl] },
+    { label: 'Presence', keys: [ColorAdjustment.Saturation, ColorAdjustment.Vibrance] },
     { label: 'Color Grading', keys: [ColorAdjustment.ColorGrading] },
+    { label: 'Color Mixer', keys: [ColorAdjustment.Hsl] },
     { label: 'Color Calibration', keys: ['colorCalibration'] },
   ],
   details: [

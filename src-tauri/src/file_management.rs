@@ -72,6 +72,13 @@ pub struct Preset {
     pub id: String,
     pub name: String,
     pub adjustments: Value,
+    #[serde(rename = "includeMasks", skip_serializing_if = "Option::is_none")]
+    pub include_masks: Option<bool>,
+    #[serde(
+        rename = "includeCropTransform",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub include_crop_transform: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -171,6 +178,7 @@ fn all_available_adjustments() -> HashSet<String> {
         "exposure",
         "brightness",
         "contrast",
+        "curves",
         "highlights",
         "shadows",
         "whites",
@@ -3084,6 +3092,8 @@ pub fn save_community_preset(
     name: String,
     adjustments: Value,
     app_handle: AppHandle,
+    include_masks: Option<bool>,
+    include_crop_transform: Option<bool>,
 ) -> Result<(), String> {
     let mut current_presets = load_presets(app_handle.clone())?;
 
@@ -3112,6 +3122,8 @@ pub fn save_community_preset(
         id: Uuid::new_v4().to_string(),
         name,
         adjustments,
+        include_masks,
+        include_crop_transform,
     };
 
     if let Some(PresetItem::Folder(folder)) = current_presets.iter_mut().find(|item| {
