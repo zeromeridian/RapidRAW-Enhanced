@@ -346,7 +346,13 @@ const MaskOverlay = memo(
       onClick: handleSelect,
       onTap: handleSelect,
       opacity: isSelected ? 1 : 0.7,
-      stroke: isSelected ? '#0ea5e9' : subMask.mode === SubMaskMode.Subtractive ? '#f43f5e' : 'white',
+      stroke: isSelected
+        ? '#0ea5e9'
+        : subMask.mode === SubMaskMode.Subtractive
+          ? '#f43f5e'
+          : subMask.mode === SubMaskMode.Intersect
+            ? '#a855f7'
+            : 'white',
       strokeScaleEnabled: false,
       strokeWidth: isSelected ? 3 : 2,
     };
