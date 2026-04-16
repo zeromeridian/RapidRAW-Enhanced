@@ -32,6 +32,7 @@ import {
   RotateCcw,
   Trash2,
   Bookmark,
+  Combine,
 } from 'lucide-react';
 
 import CollapsibleSection from '../../ui/CollapsibleSection';
@@ -703,8 +704,8 @@ export default function MasksPanel({
     setAdjustments((prev: any) => ({ ...prev, masks: [] }));
   };
 
-  const createMaskLogic = (type: Mask) => {
-    const subMask = createSubMask(type, selectedImage);
+  const createMaskLogic = (type: Mask, mode: SubMaskMode = SubMaskMode.Additive) => {
+    const subMask = createSubMask(type, selectedImage, mode);
 
     const steps = adjustments?.orientationSteps || 0;
     const isRotated = steps === 1 || steps === 3;
@@ -763,8 +764,8 @@ export default function MasksPanel({
     else if (type === Mask.AiDepth) onGenerateAiDepthMask(subMask.id, subMask.parameters);
   };
 
-  const handleAddSubMask = (containerId: string, type: Mask, insertIndex: number = -1) => {
-    const subMask = createMaskLogic(type);
+  const handleAddSubMask = (containerId: string, type: Mask, mode: SubMaskMode = SubMaskMode.Additive, insertIndex: number = -1) => {
+    const subMask = createMaskLogic(type, mode);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       masks: prev.masks?.map((c: MaskContainer) => {
@@ -818,41 +819,60 @@ export default function MasksPanel({
     event.stopPropagation();
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
 
-    const buildMenu = (types: MaskType[]) =>
+    const buildMenu = (types: MaskType[], mode: SubMaskMode = SubMaskMode.Additive) =>
       types.map((maskType: MaskType) => ({
         label: maskType.name,
         icon: maskType.icon,
         disabled: maskType.disabled,
         onClick: () => {
           if (targetContainerId) {
-            handleAddSubMask(targetContainerId, maskType.type);
+            handleAddSubMask(targetContainerId, maskType.type, mode);
           } else {
             handleAddMaskContainer(maskType.type);
           }
         },
       }));
 
-    const options = MASK_PANEL_CREATION_TYPES.map((maskType: MaskType) => {
-      if (maskType.id === 'others') {
+    const container = targetContainerId ? adjustments.masks.find((m) => m.id === targetContainerId) : null;
+    const hasComponents = container && container.subMasks.length > 0;
+
+    const buildModeSubmenu = (label: string, icon: any, mode: SubMaskMode) => ({
+      label,
+      icon,
+      submenu: MASK_PANEL_CREATION_TYPES.map((maskType) => {
+        if (maskType.id === 'others') {
+          return {
+            label: maskType.name,
+            icon: maskType.icon,
+            submenu: buildMenu(OTHERS_MASK_TYPES, mode),
+          };
+        }
         return {
           label: maskType.name,
           icon: maskType.icon,
-          submenu: buildMenu(OTHERS_MASK_TYPES),
+          disabled: maskType.disabled,
+          onClick: () => handleAddSubMask(targetContainerId!, maskType.type, mode),
         };
-      }
-      return {
-        label: maskType.name,
-        icon: maskType.icon,
-        disabled: maskType.disabled,
-        onClick: () => {
-          if (targetContainerId) {
-            handleAddSubMask(targetContainerId, maskType.type);
-          } else {
-            handleAddMaskContainer(maskType.type);
-          }
-        },
-      };
+      }),
     });
+
+    const options: any[] = buildMenu(MASK_PANEL_CREATION_TYPES.filter((m) => m.id !== 'others'), SubMaskMode.Additive);
+    const others = MASK_PANEL_CREATION_TYPES.find((m) => m.id === 'others');
+    if (others) {
+      options.push({
+        label: others.name,
+        icon: others.icon,
+        submenu: buildMenu(OTHERS_MASK_TYPES, SubMaskMode.Additive),
+      });
+    }
+
+    if (targetContainerId && hasComponents) {
+      options.push(
+        { type: OPTION_SEPARATOR },
+        buildModeSubmenu('Subtract from Mask', Minus, SubMaskMode.Subtractive),
+        buildModeSubmenu('Intersect Mask with', Combine, SubMaskMode.Intersect),
+      );
+    }
 
     showContextMenu(rect.left, rect.bottom + 5, options);
   };
@@ -1985,18 +2005,37 @@ function SubMaskRow({
         </Text>
       )}
       <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          className="p-1 hover:text-text-primary text-text-secondary"
-          data-tooltip={subMask.mode === SubMaskMode.Additive ? 'Switch to Subtract' : 'Switch to Add'}
-          onClick={(e) => {
-            e.stopPropagation();
-            updateSubMask(subMask.id, {
-              mode: subMask.mode === SubMaskMode.Additive ? SubMaskMode.Subtractive : SubMaskMode.Additive,
-            });
-          }}
-        >
-          {subMask.mode === SubMaskMode.Additive ? <Plus size={16} /> : <Minus size={16} />}
-        </button>
+        {index > 1 && (
+          <button
+            className="p-1 hover:text-text-primary text-text-secondary"
+            data-tooltip={
+              subMask.mode === SubMaskMode.Additive
+                ? 'Switch to Subtract'
+                : subMask.mode === SubMaskMode.Subtractive
+                  ? 'Switch to Intersect'
+                  : 'Switch to Add'
+            }
+            onClick={(e) => {
+              e.stopPropagation();
+              updateSubMask(subMask.id, {
+                mode:
+                  subMask.mode === SubMaskMode.Additive
+                    ? SubMaskMode.Subtractive
+                    : subMask.mode === SubMaskMode.Subtractive
+                      ? SubMaskMode.Intersect
+                      : SubMaskMode.Additive,
+              });
+            }}
+          >
+            {subMask.mode === SubMaskMode.Additive ? (
+              <Plus size={16} />
+            ) : subMask.mode === SubMaskMode.Subtractive ? (
+              <Minus size={16} />
+            ) : (
+              <Combine size={16} />
+            )}
+          </button>
+        )}
         <button
           className="p-1 hover:text-text-primary text-text-secondary"
           data-tooltip={subMask.visible ? 'Hide Component' : 'Show Component'}

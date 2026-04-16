@@ -32,6 +32,7 @@ export enum Mask {
 export enum SubMaskMode {
   Additive = 'additive',
   Subtractive = 'subtractive',
+  Intersect = 'intersect',
 }
 
 export enum ToolType {
