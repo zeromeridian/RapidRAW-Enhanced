@@ -29,7 +29,7 @@ import {
   Wand2,
   Send,
   FolderOpen,
-  Combine,
+  SquaresIntersect,
 } from 'lucide-react';
 
 import CollapsibleSection from '../../ui/CollapsibleSection';
@@ -488,7 +488,7 @@ export default function AIPanel({
           },
           {
             label: 'Intersect Edit with',
-            icon: Combine,
+            icon: SquaresIntersect,
             submenu: buildMenu(AI_SUB_MASK_COMPONENT_TYPES, SubMaskMode.Intersect),
           },
         );
@@ -1539,7 +1539,7 @@ function SubMaskRow({
             ) : subMask.mode === SubMaskMode.Subtractive ? (
               <Minus size={16} />
             ) : (
-              <Combine size={16} />
+              <SquaresIntersect size={16} />
             )}
           </button>
         )}

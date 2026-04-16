@@ -32,7 +32,7 @@ import {
   RotateCcw,
   Trash2,
   Bookmark,
-  Combine,
+  SquaresIntersect,
 } from 'lucide-react';
 
 import CollapsibleSection from '../../ui/CollapsibleSection';
@@ -764,7 +764,12 @@ export default function MasksPanel({
     else if (type === Mask.AiDepth) onGenerateAiDepthMask(subMask.id, subMask.parameters);
   };
 
-  const handleAddSubMask = (containerId: string, type: Mask, mode: SubMaskMode = SubMaskMode.Additive, insertIndex: number = -1) => {
+  const handleAddSubMask = (
+    containerId: string,
+    type: Mask,
+    mode: SubMaskMode = SubMaskMode.Additive,
+    insertIndex: number = -1,
+  ) => {
     const subMask = createMaskLogic(type, mode);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
@@ -856,7 +861,10 @@ export default function MasksPanel({
       }),
     });
 
-    const options: any[] = buildMenu(MASK_PANEL_CREATION_TYPES.filter((m) => m.id !== 'others'), SubMaskMode.Additive);
+    const options: any[] = buildMenu(
+      MASK_PANEL_CREATION_TYPES.filter((m) => m.id !== 'others'),
+      SubMaskMode.Additive,
+    );
     const others = MASK_PANEL_CREATION_TYPES.find((m) => m.id === 'others');
     if (others) {
       options.push({
@@ -870,7 +878,7 @@ export default function MasksPanel({
       options.push(
         { type: OPTION_SEPARATOR },
         buildModeSubmenu('Subtract from Mask', Minus, SubMaskMode.Subtractive),
-        buildModeSubmenu('Intersect Mask with', Combine, SubMaskMode.Intersect),
+        buildModeSubmenu('Intersect Mask with', SquaresIntersect, SubMaskMode.Intersect),
       );
     }
 
@@ -2032,7 +2040,7 @@ function SubMaskRow({
             ) : subMask.mode === SubMaskMode.Subtractive ? (
               <Minus size={16} />
             ) : (
-              <Combine size={16} />
+              <SquaresIntersect size={16} />
             )}
           </button>
         )}
