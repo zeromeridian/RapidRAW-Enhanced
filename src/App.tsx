@@ -2640,11 +2640,13 @@ function App() {
   const handleCopyAdjustments = useCallback(() => {
     const sourceAdjustments = selectedImage ? adjustments : libraryActiveAdjustments;
     const adjustmentsToCopy: any = {};
+
     for (const key of COPYABLE_ADJUSTMENT_KEYS) {
       if (Object.prototype.hasOwnProperty.call(sourceAdjustments, key)) {
-        adjustmentsToCopy[key] = sourceAdjustments[key];
+        adjustmentsToCopy[key] = structuredClone(sourceAdjustments[key]);
       }
     }
+
     setCopiedAdjustments(adjustmentsToCopy);
     setIsCopied(true);
   }, [selectedImage, adjustments, libraryActiveAdjustments]);

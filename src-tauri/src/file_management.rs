@@ -166,53 +166,94 @@ pub enum PasteMode {
     Replace,
 }
 
-fn default_included_adjustments() -> HashSet<String> {
+fn all_available_adjustments() -> HashSet<String> {
     [
-        "blacks",
-        "brightness",
-        "clarity",
-        "centré",
-        "chromaticAberrationBlueYellow",
-        "chromaticAberrationRedCyan",
-        "colorCalibration",
-        "colorGrading",
-        "colorNoiseReduction",
-        "contrast",
-        "curves",
-        "dehaze",
         "exposure",
+        "brightness",
+        "contrast",
+        "highlights",
+        "shadows",
+        "whites",
+        "blacks",
+        "toneMapper",
+        "temperature",
+        "tint",
+        "saturation",
+        "vibrance",
+        "hsl",
+        "colorGrading",
+        "colorCalibration",
+        "clarity",
+        "structure",
+        "dehaze",
+        "sharpness",
+        "centré",
+        "lumaNoiseReduction",
+        "colorNoiseReduction",
+        "chromaticAberrationRedCyan",
+        "chromaticAberrationBlueYellow",
+        "vignetteAmount",
+        "vignetteFeather",
+        "vignetteMidpoint",
+        "vignetteRoundness",
         "grainAmount",
         "grainRoughness",
         "grainSize",
-        "highlights",
-        "hsl",
         "lutIntensity",
         "lutName",
         "lutPath",
         "lutSize",
-        "lumaNoiseReduction",
-        "saturation",
-        "sectionVisibility",
-        "shadows",
-        "sharpness",
-        "showClipping",
-        "structure",
-        "temperature",
-        "tint",
-        "toneMapper",
-        "vibrance",
-        "vignetteAmount",
-        "vignetteFeather",
-        "vignetteMidpoint",
-        "flareAmount",
+        "lutData",
         "glowAmount",
         "halationAmount",
-        "vignetteRoundness",
-        "whites",
+        "flareAmount",
+        "crop",
+        "aspectRatio",
+        "rotation",
+        "flipHorizontal",
+        "flipVertical",
+        "orientationSteps",
+        "transformDistortion",
+        "transformVertical",
+        "transformHorizontal",
+        "transformRotate",
+        "transformAspect",
+        "transformScale",
+        "transformXOffset",
+        "transformYOffset",
+        "masks",
     ]
     .iter()
     .map(|s| s.to_string())
     .collect()
+}
+
+fn default_included_adjustments() -> HashSet<String> {
+    let mut defaults = all_available_adjustments();
+
+    let off_by_default = [
+        "crop",
+        "aspectRatio",
+        "rotation",
+        "flipHorizontal",
+        "flipVertical",
+        "orientationSteps",
+        "transformDistortion",
+        "transformVertical",
+        "transformHorizontal",
+        "transformRotate",
+        "transformAspect",
+        "transformScale",
+        "transformXOffset",
+        "transformYOffset",
+        "masks",
+    ];
+
+    for item in off_by_default.iter() {
+        defaults.remove(*item);
+    }
+
+    defaults
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -230,7 +271,7 @@ impl Default for CopyPasteSettings {
         Self {
             mode: PasteMode::Merge,
             included_adjustments: default_included_adjustments(),
-            known_adjustments: default_included_adjustments(),
+            known_adjustments: all_available_adjustments(),
         }
     }
 }
@@ -2868,14 +2909,15 @@ pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
         AppSettings::default()
     };
 
-    let all_current_keys = default_included_adjustments();
+    let all_current_keys = all_available_adjustments();
+    let default_included = default_included_adjustments();
     let mut settings_modified = false;
 
     let is_first_migration = settings.copy_paste_settings.known_adjustments.is_empty();
 
     if is_first_migration {
-        settings.copy_paste_settings.included_adjustments = all_current_keys.clone();
-        settings.copy_paste_settings.known_adjustments = all_current_keys;
+        settings.copy_paste_settings.included_adjustments = default_included;
+        settings.copy_paste_settings.known_adjustments = all_current_keys.clone();
         settings_modified = true;
     } else {
         let new_features: Vec<String> = all_current_keys
@@ -2884,11 +2926,18 @@ pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
             .collect();
 
         if !new_features.is_empty() {
-            settings
-                .copy_paste_settings
-                .included_adjustments
-                .extend(new_features);
-            settings.copy_paste_settings.known_adjustments = all_current_keys;
+            for feature in new_features {
+                if default_included.contains(&feature) {
+                    settings
+                        .copy_paste_settings
+                        .included_adjustments
+                        .insert(feature.clone());
+                }
+                settings
+                    .copy_paste_settings
+                    .known_adjustments
+                    .insert(feature);
+            }
             settings_modified = true;
         }
     }
