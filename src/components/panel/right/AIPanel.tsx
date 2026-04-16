@@ -29,6 +29,7 @@ import {
   Wand2,
   Send,
   FolderOpen,
+  Combine,
 } from 'lucide-react';
 
 import CollapsibleSection from '../../ui/CollapsibleSection';
@@ -349,8 +350,8 @@ export default function AIPanel({
     setAdjustments((prev: Adjustments) => ({ ...prev, aiPatches: [] }));
   };
 
-  const createMaskLogic = (type: Mask) => {
-    const subMask = createSubMask(type, selectedImage);
+  const createMaskLogic = (type: Mask, mode: SubMaskMode = SubMaskMode.Additive) => {
+    const subMask = createSubMask(type, selectedImage, mode);
 
     const steps = adjustments?.orientationSteps || 0;
     const isRotated = steps === 1 || steps === 3;
@@ -418,8 +419,13 @@ export default function AIPanel({
     if (type === Mask.AiForeground) onGenerateAiForegroundMask(subMask.id);
   };
 
-  const handleAddSubMask = (containerId: string, type: Mask, insertIndex: number = -1) => {
-    const subMask = createMaskLogic(type);
+  const handleAddSubMask = (
+    containerId: string,
+    type: Mask,
+    mode: SubMaskMode = SubMaskMode.Additive,
+    insertIndex: number = -1,
+  ) => {
+    const subMask = createMaskLogic(type, mode);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       aiPatches: prev.aiPatches?.map((c: AiPatch) => {
@@ -443,21 +449,49 @@ export default function AIPanel({
     event.stopPropagation();
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
 
-    const types = targetContainerId ? AI_SUB_MASK_COMPONENT_TYPES : AI_PANEL_CREATION_TYPES;
+    const buildMenu = (types: MaskType[], mode: SubMaskMode = SubMaskMode.Additive) =>
+      types
+        .filter((mt) => !mt.disabled)
+        .map((maskType: MaskType) => ({
+          label: maskType.name,
+          icon: maskType.icon,
+          onClick: () => {
+            if (targetContainerId) {
+              handleAddSubMask(targetContainerId, maskType.type, mode);
+            } else {
+              handleAddAiPatchContainer(maskType.type);
+            }
+          },
+        }));
 
-    const options = types
-      .filter((mt) => !mt.disabled)
-      .map((maskType: MaskType) => ({
-        label: maskType.name,
-        icon: maskType.icon,
-        onClick: () => {
-          if (targetContainerId) {
-            handleAddSubMask(targetContainerId, maskType.type);
-          } else {
-            handleAddAiPatchContainer(maskType.type);
-          }
-        },
-      }));
+    const container = targetContainerId ? adjustments.aiPatches.find((m) => m.id === targetContainerId) : null;
+    const hasComponents = container && container.subMasks.length > 0;
+
+    let options: any[];
+
+    if (!targetContainerId) {
+      // For a brand new mask, just show the types directly
+      options = buildMenu(AI_PANEL_CREATION_TYPES, SubMaskMode.Additive);
+    } else {
+      // For an existing mask, show the types directly at the top level
+      options = buildMenu(AI_SUB_MASK_COMPONENT_TYPES, SubMaskMode.Additive);
+
+      if (hasComponents) {
+        options.push(
+          { type: OPTION_SEPARATOR },
+          {
+            label: 'Subtract from Edit',
+            icon: Minus,
+            submenu: buildMenu(AI_SUB_MASK_COMPONENT_TYPES, SubMaskMode.Subtractive),
+          },
+          {
+            label: 'Intersect Edit with',
+            icon: Combine,
+            submenu: buildMenu(AI_SUB_MASK_COMPONENT_TYPES, SubMaskMode.Intersect),
+          },
+        );
+      }
+    }
 
     showContextMenu(rect.left, rect.bottom + 5, options);
   };
@@ -657,7 +691,7 @@ export default function AIPanel({
           const container = adjustments.aiPatches.find((p) => p.id === overData.parentId);
           if (container) {
             const targetIndex = container.subMasks.findIndex((sm) => sm.id === over!.id);
-            handleAddSubMask(overData.parentId!, dragData.maskType!, targetIndex);
+            handleAddSubMask(overData.parentId!, dragData.maskType!, SubMaskMode.Additive, targetIndex);
           }
         } else {
           handleAddAiPatchContainer(dragData.maskType!);
@@ -1476,18 +1510,37 @@ function SubMaskRow({
         </Text>
       )}
       <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          className="p-1 hover:text-text-primary text-text-secondary"
-          data-tooltip={subMask.mode === SubMaskMode.Additive ? 'Switch to Subtract' : 'Switch to Add'}
-          onClick={(e) => {
-            e.stopPropagation();
-            updateSubMask(subMask.id, {
-              mode: subMask.mode === SubMaskMode.Additive ? SubMaskMode.Subtractive : SubMaskMode.Additive,
-            });
-          }}
-        >
-          {subMask.mode === SubMaskMode.Additive ? <Plus size={16} /> : <Minus size={16} />}
-        </button>
+        {index > 1 && (
+          <button
+            className="p-1 hover:text-text-primary text-text-secondary"
+            data-tooltip={
+              subMask.mode === SubMaskMode.Additive
+                ? 'Switch to Subtract'
+                : subMask.mode === SubMaskMode.Subtractive
+                  ? 'Switch to Intersect'
+                  : 'Switch to Add'
+            }
+            onClick={(e) => {
+              e.stopPropagation();
+              updateSubMask(subMask.id, {
+                mode:
+                  subMask.mode === SubMaskMode.Additive
+                    ? SubMaskMode.Subtractive
+                    : subMask.mode === SubMaskMode.Subtractive
+                      ? SubMaskMode.Intersect
+                      : SubMaskMode.Additive,
+              });
+            }}
+          >
+            {subMask.mode === SubMaskMode.Additive ? (
+              <Plus size={16} />
+            ) : subMask.mode === SubMaskMode.Subtractive ? (
+              <Minus size={16} />
+            ) : (
+              <Combine size={16} />
+            )}
+          </button>
+        )}
         <button
           className="p-1 hover:text-red-500 text-text-secondary"
           data-tooltip="Delete Component"

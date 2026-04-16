@@ -14,6 +14,7 @@ use std::f32::consts::PI;
 pub enum SubMaskMode {
     Additive,
     Subtractive,
+    Intersect,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1213,6 +1214,12 @@ pub fn generate_mask_bitmap(
                     for (x, y, pixel) in final_mask.enumerate_pixels_mut() {
                         let sub_pixel = sub_bitmap.get_pixel(x, y);
                         pixel[0] = pixel[0].saturating_sub(sub_pixel[0]);
+                    }
+                }
+                SubMaskMode::Intersect => {
+                    for (x, y, pixel) in final_mask.enumerate_pixels_mut() {
+                        let sub_pixel = sub_bitmap.get_pixel(x, y);
+                        pixel[0] = pixel[0].min(sub_pixel[0]);
                     }
                 }
             }
