@@ -5286,7 +5286,6 @@ function App() {
               setUiVisibility((prev: UiVisibility) => ({ ...prev, filmstrip: value }))
             }
             showFilmstrip={!isCompactPortrait}
-            showZoomControls={!isCompactPortrait}
             thumbnailAspectRatio={thumbnailAspectRatio}
             thumbnails={thumbnails}
             zoom={zoom}
@@ -5445,10 +5444,7 @@ function App() {
       if (isCompactPortrait) {
         return (
           <div className="flex flex-col grow h-full min-h-0 gap-2">
-            <div className="flex-1 flex flex-col min-h-0 min-w-0">
-              {editorNode}
-              {editorBottomBarNode}
-            </div>
+            <div className="flex-1 flex flex-col min-h-0 min-w-0">{editorNode}</div>
 
             <div
               className={clsx(
@@ -5471,6 +5467,8 @@ function App() {
                 />
               </div>
             </div>
+
+            {editorBottomBarNode}
           </div>
         );
       }
@@ -5532,6 +5530,8 @@ function App() {
     return renderMainView();
   };
 
+  const shouldHideFolderTreeInCompactEditor = Boolean(selectedImage && isCompactPortrait);
+
   return (
     <div
       className={clsx(
@@ -5559,7 +5559,7 @@ function App() {
         )}
       >
         <div className="flex flex-row grow h-full min-h-0">
-          {renderFolderTree()}
+          {!shouldHideFolderTreeInCompactEditor && renderFolderTree()}
           <div className="flex-1 flex flex-col min-w-0">{renderContent()}</div>
           {!selectedImage && isLibraryExportPanelVisible && (
             <Resizer

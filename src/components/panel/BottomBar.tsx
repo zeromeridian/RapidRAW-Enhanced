@@ -437,14 +437,18 @@ export default function BottomBar({
                 )}
               </div>
             </div>
-            <div className="h-5 w-px bg-surface"></div>
-            <button
-              className="p-1.5 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors"
-              onClick={() => setIsFilmstripVisible?.(!isFilmstripVisible)}
-              data-tooltip={isFilmstripVisible ? 'Collapse Filmstrip' : 'Expand Filmstrip'}
-            >
-              {isFilmstripVisible ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-            </button>
+            {showFilmstrip && (
+              <>
+                <div className="h-5 w-px bg-surface"></div>
+                <button
+                  className="p-1.5 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors"
+                  onClick={() => setIsFilmstripVisible?.(!isFilmstripVisible)}
+                  data-tooltip={isFilmstripVisible ? 'Collapse Filmstrip' : 'Expand Filmstrip'}
+                >
+                  {isFilmstripVisible ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                </button>
+              </>
+            )}
           </div>
         ) : null}
       </div>
