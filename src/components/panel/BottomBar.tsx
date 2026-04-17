@@ -36,6 +36,8 @@ interface BottomBarProps {
   rating: number;
   selectedImage?: SelectedImage;
   setIsFilmstripVisible?(isVisible: boolean): void;
+  showFilmstrip?: boolean;
+  showZoomControls?: boolean;
   thumbnails?: Record<string, string>;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   zoom?: number;
@@ -112,6 +114,8 @@ export default function BottomBar({
   rating,
   selectedImage,
   setIsFilmstripVisible,
+  showFilmstrip = true,
+  showZoomControls = true,
   thumbnails,
   thumbnailAspectRatio,
   displaySize,
@@ -233,7 +237,7 @@ export default function BottomBar({
 
   return (
     <div className="shrink-0 bg-bg-secondary rounded-lg flex flex-col">
-      {!isLibraryView && (
+      {!isLibraryView && showFilmstrip && (
         <div
           className={clsx('overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}
           style={{ height: isFilmstripVisible ? `${filmstripHeight}px` : '0px' }}
@@ -261,7 +265,7 @@ export default function BottomBar({
         className={clsx(
           'shrink-0 h-10 flex items-center justify-between px-3',
           !isLibraryView && 'border-t',
-          !isLibraryView && isFilmstripVisible ? 'border-surface' : 'border-transparent',
+          !isLibraryView && showFilmstrip && isFilmstripVisible ? 'border-surface' : 'border-transparent',
         )}
       >
         <div className="flex items-center gap-4">
@@ -374,7 +378,7 @@ export default function BottomBar({
               <Save size={18} />
             </button>
           </div>
-        ) : (
+        ) : showZoomControls ? (
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 w-56">
               <div
@@ -442,7 +446,7 @@ export default function BottomBar({
               {isFilmstripVisible ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
             </button>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
