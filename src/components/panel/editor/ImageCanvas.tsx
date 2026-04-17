@@ -457,6 +457,10 @@ const MaskOverlay = memo(
                 e.cancelBubble = true;
                 e.evt.preventDefault();
               }}
+              onTouchStart={(e) => {
+                e.cancelBubble = true;
+                e.evt.preventDefault();
+              }}
               boundBoxFunc={(oldBox, newBox) => {
                 if (Math.abs(newBox.width) < 5 || Math.abs(newBox.height) < 5) {
                   return oldBox;
@@ -747,7 +751,7 @@ const ImageCanvas = memo(
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
     const cropImageRef = useRef<HTMLImageElement>(null);
     const [displayedMaskUrl, setDisplayedMaskUrl] = useState<string | null>(null);
-    const [originalLoaded, setOriginalLoaded] = useState<false>(false);
+    const [originalLoaded, setOriginalLoaded] = useState<boolean>(false);
     const [localInitialDrawParams, setLocalInitialDrawParams] = useState<any>(null);
     const isDrawing = useRef(false);
     const drawingStageRef = useRef<any>(null);
@@ -1035,9 +1039,9 @@ const ImageCanvas = memo(
       [isWbPickerActive, finalPreviewUrl, imageRenderSize, onWbPicked, setAdjustments],
     );
 
-    const handleMouseDown = useCallback(
+    const handleStart = useCallback(
       (e: any) => {
-        e.evt.preventDefault();
+        if (e.evt && e.evt.cancelable) e.evt.preventDefault();
 
         if (isWbPickerActive) {
           handleWbClick(e);
@@ -1243,7 +1247,7 @@ const ImageCanvas = memo(
       ],
     );
 
-    const handleMouseMove = useCallback(
+    const handleMove = useCallback(
       (e: any) => {
         if (isWbPickerActive) {
           return;
@@ -1253,7 +1257,7 @@ const ImageCanvas = memo(
         if (e && typeof e.target?.getStage === 'function') {
           const stage = e.target.getStage();
           pos = stage.getPointerPosition();
-        } else if (e && e.clientX != null && e.clientY != null) {
+        } else if (e && (e.clientX != null || (e.touches && e.touches[0]))) {
           const stage = drawingStageRef.current;
           if (stage) {
             stage.setPointersPositions(e);
@@ -1277,6 +1281,7 @@ const ImageCanvas = memo(
           const updatedBox = { ...previewBoxRef.current, end: pos };
           previewBoxRef.current = updatedBox;
           setPreviewBox(updatedBox);
+          if (e.evt && e.evt.cancelable) e.evt.preventDefault();
           return;
         }
 
@@ -1339,6 +1344,7 @@ const ImageCanvas = memo(
             };
             onLiveMaskPreview(previewContainer);
           }
+          if (e.evt && e.evt.cancelable) e.evt.preventDefault();
           return;
         }
 
@@ -1364,7 +1370,6 @@ const ImageCanvas = memo(
             let effectiveToolForPreview;
 
             if (isAltPressedDuringMove) {
-              // Alt toggles: Brush -> Eraser, Eraser -> Brush
               effectiveToolForPreview = baseTool === ToolType.Brush ? ToolType.Eraser : ToolType.Brush;
             } else {
               effectiveToolForPreview = baseTool;
@@ -1399,6 +1404,7 @@ const ImageCanvas = memo(
 
             onLiveMaskPreview(previewContainer);
           }
+          if (e.evt && e.evt.cancelable) e.evt.preventDefault();
         }
       },
       [
@@ -1425,7 +1431,7 @@ const ImageCanvas = memo(
       ],
     );
 
-    const handleMouseUp = useCallback(() => {
+    const handleUp = useCallback(() => {
       if (!isDrawing.current) {
         return;
       }
@@ -1593,38 +1599,32 @@ const ImageCanvas = memo(
     }, []);
 
     useEffect(() => {
-      if (isToolActive) {
-        setCursorPreview((p: CursorPreview) => ({ ...p, visible: false }));
-      }
-    }, [isToolActive]);
-
-    useEffect(() => {
       if (!isToolActive) return;
 
-      function onMove(e: MouseEvent) {
-        if (!isDrawing.current) {
-          return;
-        }
-        handleMouseMove(e);
+      function onGlobalMove(e: MouseEvent | TouchEvent) {
+        if (!isDrawing.current) return;
+        handleMove(e);
       }
 
-      function onUp() {
-        if (!isDrawing.current) {
-          return;
-        }
-        handleMouseUp();
+      function onGlobalUp() {
+        if (!isDrawing.current) return;
+        handleUp();
       }
 
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
+      window.addEventListener('mousemove', onGlobalMove, { passive: false });
+      window.addEventListener('mouseup', onGlobalUp);
+      window.addEventListener('touchmove', onGlobalMove, { passive: false });
+      window.addEventListener('touchend', onGlobalUp);
       return () => {
-        window.removeEventListener('mousemove', onMove);
-        window.removeEventListener('mouseup', onUp);
+        window.removeEventListener('mousemove', onGlobalMove);
+        window.removeEventListener('mouseup', onGlobalUp);
+        window.removeEventListener('touchmove', onGlobalMove);
+        window.removeEventListener('touchend', onGlobalUp);
       };
-    }, [isToolActive, handleMouseMove, handleMouseUp]);
+    }, [isToolActive, handleMove, handleUp]);
 
     const handleStraightenMouseDown = (e: any) => {
-      if (e.evt.button !== 0) {
+      if (e.evt.button !== 0 && !e.evt.touches) {
         return;
       }
 
@@ -1640,6 +1640,7 @@ const ImageCanvas = memo(
 
       const pos = e.target.getStage().getPointerPosition();
       setStraightenLine((prev: any) => ({ ...prev, end: pos }));
+      if (e.evt && e.evt.cancelable) e.evt.preventDefault();
     };
 
     const handleStraightenMouseUp = () => {
@@ -1735,12 +1736,6 @@ const ImageCanvas = memo(
       };
     }, [originalSrc]);
 
-    useEffect(() => {
-      if (interactivePatch) {
-        retainedPatchRef.current = interactivePatch;
-      }
-    }, [interactivePatch]);
-
     const currentTarget = finalPreviewUrl || selectedImage.thumbnailUrl;
     const baseIsReady = displayState.base === currentTarget && !displayState.fade;
 
@@ -1781,8 +1776,7 @@ const ImageCanvas = memo(
 
     const cropImageTransforms = useMemo(() => {
       const rotation = liveRotation !== null && liveRotation !== undefined ? liveRotation : adjustments.rotation || 0;
-      const transforms = [`rotate(${rotation}deg)`];
-      return transforms.join(' ');
+      return `rotate(${rotation}deg)`;
     }, [adjustments.rotation, liveRotation]);
 
     const getCropDimensions = () => {
@@ -1791,7 +1785,6 @@ const ImageCanvas = memo(
       }
 
       const width = crop.unit === '%' ? uncroppedImageRenderSize.width * (crop.width / 100) : crop.width;
-
       const height = crop.unit === '%' ? uncroppedImageRenderSize.height * (crop.height / 100) : crop.height;
 
       return { width, height };
@@ -1951,11 +1944,14 @@ const ImageCanvas = memo(
           {(isMasking || isAiEditing || isWbPickerActive) && (
             <Stage
               height={imageRenderSize.height}
-              onMouseDown={handleMouseDown}
+              onMouseDown={handleStart}
+              onTouchStart={handleStart}
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
+              onMouseMove={handleMove}
+              onTouchMove={handleMove}
+              onMouseUp={handleUp}
+              onTouchEnd={handleUp}
               style={{
                 cursor: effectiveCursor,
                 left: `${imageRenderSize.offsetX}px`,
@@ -2088,10 +2084,13 @@ const ImageCanvas = memo(
                 <Stage
                   height={uncroppedImageRenderSize.height}
                   onMouseDown={handleStraightenMouseDown}
+                  onTouchStart={handleStraightenMouseDown}
                   onMouseLeave={handleStraightenMouseLeave}
                   onMouseMove={handleStraightenMouseMove}
+                  onTouchMove={handleStraightenMouseMove}
                   onMouseUp={handleStraightenMouseUp}
-                  style={{ position: 'absolute', top: 0, left: 0, zIndex: 10, cursor: 'crosshair' }}
+                  onTouchEnd={handleStraightenMouseUp}
+                  style={{ position: 'absolute', top: 0, left: 0, zIndex: 10, cursor: 'crosshair', touchAction: 'none' }}
                   width={uncroppedImageRenderSize.width}
                 >
                   <Layer>
