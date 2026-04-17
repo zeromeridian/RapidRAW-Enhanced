@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GLOBAL_KEYS } from './AppProperties';
 
+type SliderChangeEvent =
+  | React.ChangeEvent<HTMLInputElement>
+  | {
+      target: {
+        value: number | string;
+      };
+    };
+
 interface SliderProps {
   defaultValue?: number;
-  label: any;
+  label: React.ReactNode;
   max: number;
   min: number;
-  onChange(event: any): void;
+  onChange(event: SliderChangeEvent): void;
   onDragStateChange?(state: boolean): void;
   step: number;
   value: number;
@@ -17,6 +25,7 @@ interface SliderProps {
 
 const DOUBLE_CLICK_THRESHOLD_MS = 300;
 const FINE_ADJUSTMENT_MULTIPLIER = 0.2;
+const TOUCH_DRAG_THRESHOLD_PX = 10;
 
 const Slider = ({
   defaultValue = 0,
@@ -33,7 +42,7 @@ const Slider = ({
 }: SliderProps) => {
   const [displayValue, setDisplayValue] = useState<number>(value);
   const [isDragging, setIsDragging] = useState(false);
-  const animationFrameRef = useRef<any>(undefined);
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState<string>(String(value));
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -43,6 +52,11 @@ const Slider = ({
   const lastUpTime = useRef(0);
   const lastPointerXRef = useRef<number>(0);
   const accumulatedValueRef = useRef<number>(0);
+  const pendingTouchRef = useRef<{
+    startX: number;
+    startY: number;
+    latestX: number;
+  } | null>(null);
 
   const fillPercentage = max !== min ? ((displayValue - min) / (max - min)) * 100 : 0;
   const originPercentage = useMemo(() => {
@@ -263,19 +277,63 @@ const Slider = ({
 
   const handleTouchStart = (e: React.TouchEvent<HTMLInputElement>) => {
     if (e.touches.length === 0) return;
-    
+
     const touch = e.touches[0];
-    const rect = e.currentTarget.getBoundingClientRect();
+    pendingTouchRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      latestX: touch.clientX,
+    };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLInputElement>) => {
+    if (isDragging || !pendingTouchRef.current || e.touches.length === 0) return;
+
+    const touch = e.touches[0];
+    const pendingTouch = pendingTouchRef.current;
+    pendingTouch.latestX = touch.clientX;
+
+    const deltaX = touch.clientX - pendingTouch.startX;
+    const deltaY = touch.clientY - pendingTouch.startY;
+
+    if (
+      Math.abs(deltaY) > TOUCH_DRAG_THRESHOLD_PX &&
+      Math.abs(deltaY) > Math.abs(deltaX)
+    ) {
+      pendingTouchRef.current = null;
+      return;
+    }
+
+    if (
+      Math.abs(deltaX) < TOUCH_DRAG_THRESHOLD_PX ||
+      Math.abs(deltaX) < Math.abs(deltaY)
+    ) {
+      return;
+    }
+
+    const inputEl = rangeInputRef.current;
+    if (!inputEl) return;
+
+    const rect = inputEl.getBoundingClientRect();
     const fraction = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
     const rawValue = min + fraction * (max - min);
     const snappedValue = snapToStep(rawValue);
 
     accumulatedValueRef.current = rawValue;
     lastPointerXRef.current = touch.clientX;
+    pendingTouchRef.current = null;
+
+    if (e.cancelable) {
+      e.preventDefault();
+    }
 
     setIsDragging(true);
     setDisplayValue(snappedValue);
     onChange({ target: { value: snappedValue } });
+  };
+
+  const handleTouchEnd = () => {
+    pendingTouchRef.current = null;
   };
 
   const handleValueClick = () => {
@@ -327,7 +385,7 @@ const Slider = ({
   const numericValue = isNaN(Number(value)) ? 0 : Number(value);
 
   return (
-    <div className="mb-2 group touch-none" ref={containerRef}>
+    <div className="mb-2 group" ref={containerRef}>
       <div className="flex justify-between items-center mb-1">
         <div
           className={`grid ${typeof label === 'string' ? 'cursor-pointer' : ''}`}
@@ -383,7 +441,7 @@ const Slider = ({
         </div>
       </div>
 
-      <div className="relative w-full h-5 touch-none">
+      <div className="relative w-full h-5">
         <div
           className={`absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/4 rounded-full pointer-events-none ${
             trackClassName || 'bg-card-active'
@@ -398,10 +456,10 @@ const Slider = ({
         />
         <input
           ref={rangeInputRef}
-          className={`absolute top-1/2 left-0 w-full h-1.5 appearance-none bg-transparent cursor-pointer m-0 p-0 slider-input z-10 touch-none ${
+          className={`absolute top-1/2 left-0 w-full h-1.5 appearance-none bg-transparent cursor-pointer m-0 p-0 slider-input z-10 ${
             isDragging ? 'slider-thumb-active' : ''
           }`}
-          style={{ margin: 0 }}
+          style={{ margin: 0, touchAction: isDragging ? 'none' : 'pan-y' }}
           max={String(max)}
           min={String(min)}
           onChange={handleChange}
@@ -409,6 +467,9 @@ const Slider = ({
           onKeyDown={handleRangeKeyDown}
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
           step={String(step)}
           type="range"
           value={displayValue}
