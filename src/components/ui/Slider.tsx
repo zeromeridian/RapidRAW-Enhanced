@@ -41,12 +41,10 @@ const Slider = ({
   const [isLabelHovered, setIsLabelHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastUpTime = useRef(0);
-
   const lastPointerXRef = useRef<number>(0);
   const accumulatedValueRef = useRef<number>(0);
 
   const fillPercentage = max !== min ? ((displayValue - min) / (max - min)) * 100 : 0;
-
   const originPercentage = useMemo(() => {
     if (fillOrigin === 'min') {
       return 0;
@@ -69,6 +67,7 @@ const Slider = ({
   const onChangeRef = useRef(onChange);
   const snapToStepRef = useRef(snapToStep);
   const rangeRef = useRef({ min, max });
+
   onChangeRef.current = onChange;
   snapToStepRef.current = snapToStep;
   rangeRef.current = { min, max };
@@ -125,9 +124,10 @@ const Slider = ({
         if (e.touches.length === 0) return;
         clientX = e.touches[0].clientX;
         shiftKey = e.shiftKey || e.altKey;
+        if (e.cancelable) e.preventDefault();
       } else {
-        clientX = e.clientX;
-        shiftKey = e.shiftKey || e.altKey;
+        clientX = (e as MouseEvent).clientX;
+        shiftKey = (e as MouseEvent).shiftKey || (e as MouseEvent).altKey;
       }
 
       const deltaX = clientX - lastPointerXRef.current;
@@ -142,6 +142,8 @@ const Slider = ({
       const actualDeltaValue = accumulatedValueRef.current - prevAccumulated;
       if (deltaValue !== 0) {
         lastPointerXRef.current += deltaX * (actualDeltaValue / deltaValue);
+      } else {
+        lastPointerXRef.current = clientX;
       }
 
       const snappedValue = snapToStepRef.current(accumulatedValueRef.current);
@@ -155,16 +157,18 @@ const Slider = ({
       setIsDragging(false);
     };
 
-    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mousemove', handlePointerMove, { passive: false });
     window.addEventListener('mouseup', handlePointerUp);
-    window.addEventListener('touchmove', handlePointerMove);
+    window.addEventListener('touchmove', handlePointerMove, { passive: false });
     window.addEventListener('touchend', handlePointerUp);
+    window.addEventListener('touchcancel', handlePointerUp);
 
     return () => {
       window.removeEventListener('mousemove', handlePointerMove);
       window.removeEventListener('mouseup', handlePointerUp);
       window.removeEventListener('touchmove', handlePointerMove);
       window.removeEventListener('touchend', handlePointerUp);
+      window.removeEventListener('touchcancel', handlePointerUp);
     };
   }, [isDragging]);
 
@@ -179,11 +183,11 @@ const Slider = ({
     const startValue = displayValue;
     const endValue = value;
     const duration = 300;
-    let startTime: any = null;
+    let startTime: number | null = null;
 
     const easeInOut = (t: number) => t * t * (3 - 2 * t);
 
-    const animate = (timestamp: any) => {
+    const animate = (timestamp: number) => {
       if (!startTime) {
         startTime = timestamp;
       }
@@ -242,7 +246,6 @@ const Slider = ({
       e.preventDefault();
       return;
     }
-
     e.preventDefault();
 
     const rect = e.currentTarget.getBoundingClientRect();
@@ -250,7 +253,7 @@ const Slider = ({
     const rawValue = min + fraction * (max - min);
     const snappedValue = snapToStep(rawValue);
 
-    accumulatedValueRef.current = snappedValue;
+    accumulatedValueRef.current = rawValue;
     lastPointerXRef.current = e.clientX;
 
     setIsDragging(true);
@@ -260,14 +263,14 @@ const Slider = ({
 
   const handleTouchStart = (e: React.TouchEvent<HTMLInputElement>) => {
     if (e.touches.length === 0) return;
-
+    
     const touch = e.touches[0];
     const rect = e.currentTarget.getBoundingClientRect();
     const fraction = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
     const rawValue = min + fraction * (max - min);
     const snappedValue = snapToStep(rawValue);
 
-    accumulatedValueRef.current = snappedValue;
+    accumulatedValueRef.current = rawValue;
     lastPointerXRef.current = touch.clientX;
 
     setIsDragging(true);
@@ -316,7 +319,6 @@ const Slider = ({
       e.currentTarget.blur();
       return;
     }
-
     if (GLOBAL_KEYS.includes(e.key)) {
       e.currentTarget.blur();
     }
@@ -325,7 +327,7 @@ const Slider = ({
   const numericValue = isNaN(Number(value)) ? 0 : Number(value);
 
   return (
-    <div className="mb-2 group" ref={containerRef}>
+    <div className="mb-2 group touch-none" ref={containerRef}>
       <div className="flex justify-between items-center mb-1">
         <div
           className={`grid ${typeof label === 'string' ? 'cursor-pointer' : ''}`}
@@ -342,7 +344,6 @@ const Slider = ({
           >
             {label}
           </span>
-
           {typeof label === 'string' && (
             <span
               aria-hidden={!isLabelHovered}
@@ -357,7 +358,7 @@ const Slider = ({
         <div className="w-12 text-right">
           {isEditing ? (
             <input
-              className="w-full text-sm text-right bg-card-active border border-gray-500 rounded-sm px-1 py-0 outline-hidden focus:ring-1 focus:ring-blue-500 text-text-primary"
+              className="w-full text-sm text-right bg-card-active border border-gray-500 rounded-sm px-1 py-0 outline-none focus:ring-1 focus:ring-blue-500 text-text-primary"
               max={max}
               min={min}
               onBlur={handleInputCommit}
@@ -382,7 +383,7 @@ const Slider = ({
         </div>
       </div>
 
-      <div className="relative w-full h-5">
+      <div className="relative w-full h-5 touch-none">
         <div
           className={`absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/4 rounded-full pointer-events-none ${
             trackClassName || 'bg-card-active'
@@ -397,7 +398,7 @@ const Slider = ({
         />
         <input
           ref={rangeInputRef}
-          className={`absolute top-1/2 left-0 w-full h-1.5 appearance-none bg-transparent cursor-pointer m-0 p-0 slider-input z-10 ${
+          className={`absolute top-1/2 left-0 w-full h-1.5 appearance-none bg-transparent cursor-pointer m-0 p-0 slider-input z-10 touch-none ${
             isDragging ? 'slider-thumb-active' : ''
           }`}
           style={{ margin: 0 }}
