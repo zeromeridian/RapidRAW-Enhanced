@@ -122,6 +122,7 @@ export default function Editor({
   const [crop, setCrop] = useState<Crop | null>(null);
   const prevCropParams = useRef<any>(null);
   const [isMaskHovered, setIsMaskHovered] = useState(false);
+  const [isMaskTouchInteracting, setIsMaskTouchInteracting] = useState(false);
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
   const [showExifDateView, setShowExifDateView] = useState(false);
   const [maskOverlayUrl, setMaskOverlayUrl] = useState<string | null>(null);
@@ -253,6 +254,12 @@ export default function Editor({
   const isCropping = activeRightPanel === Panel.Crop;
   const isMasking = activeRightPanel === Panel.Masks;
   const isAiEditing = activeRightPanel === Panel.Ai;
+
+  useEffect(() => {
+    if (!isMasking && !isAiEditing) {
+      setIsMaskTouchInteracting(false);
+    }
+  }, [isMasking, isAiEditing]);
 
   const hasDisplayableImage = finalPreviewUrl || selectedImage.thumbnailUrl;
   const showSpinner = isLoading && !hasDisplayableImage;
@@ -778,6 +785,7 @@ export default function Editor({
 
   const isPanningDisabled =
     isMaskHovered ||
+    isMaskTouchInteracting ||
     isCropping ||
     (isMasking &&
       (activeSubMask?.type === Mask.Brush ||
@@ -919,6 +927,7 @@ export default function Editor({
               selectedImage={selectedImage}
               setCrop={handleCropChange}
               setIsMaskHovered={setIsMaskHovered}
+              setIsMaskTouchInteracting={setIsMaskTouchInteracting}
               showOriginal={showOriginal}
               transformedOriginalUrl={transformedOriginalUrl}
               uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
