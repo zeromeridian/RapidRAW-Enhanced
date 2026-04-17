@@ -47,7 +47,7 @@ export default function RightPanelSwitcher({
           {group.map(({ id, icon: Icon, title }) => (
             <button
               className={`relative rounded-md transition-colors duration-200 ${
-                isHorizontal ? 'p-2.5 shrink-0' : 'p-2'
+                isHorizontal ? 'p-2 shrink-0' : 'p-2'
               } ${
                 activePanel === id
                   ? 'text-text-primary'
@@ -64,7 +64,7 @@ export default function RightPanelSwitcher({
                   transition={isInstantTransition ? { duration: 0 } : { type: 'spring', bounce: 0.2, duration: 0.4 }}
                 />
               )}
-              <Icon size={isHorizontal ? 24 : 20} className="relative z-10" />
+              <Icon size={20} className="relative z-10" />
             </button>
           ))}
         </div>
