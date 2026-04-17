@@ -339,6 +339,7 @@ export default function PresetsPanel({
   expandedFoldersRef.current = expandedFolders;
   const previewQueue = useRef<Array<any>>([]);
   const isProcessingQueue = useRef(false);
+  const currentImagePathRef = useRef<string | null>(selectedImage?.path || null);
 
   useEffect(() => {
     const allPresetIds = new Set();
@@ -429,8 +430,18 @@ export default function PresetsPanel({
     isProcessingQueue.current = true;
     setIsGeneratingPreviews(true);
 
+    const pathAtStart = currentImagePathRef.current;
+
     while (previewQueue.current.length > 0) {
-      const { preset, folderId } = previewQueue.current.shift();
+      if (pathAtStart !== currentImagePathRef.current) {
+        previewQueue.current = [];
+        break;
+      }
+
+      const item = previewQueue.current.shift();
+      if (!item) break;
+      const { preset, folderId } = item;
+
       if (folderId && !expandedFoldersRef.current.has(folderId)) {
         continue;
       }
@@ -444,6 +455,12 @@ export default function PresetsPanel({
         const imageData: Uint8Array = await invoke(Invokes.GeneratePresetPreview, {
           jsAdjustments: fullPresetAdjustments,
         });
+
+        if (pathAtStart !== currentImagePathRef.current) {
+          previewQueue.current = [];
+          break;
+        }
+
         const blob = new Blob([imageData], { type: 'image/jpeg' });
         const url = URL.createObjectURL(blob);
         setPreviews((prev: Record<string, string | null>) => {
@@ -455,12 +472,13 @@ export default function PresetsPanel({
         });
       } catch (error) {
         console.error(`Failed to generate preview for preset ${preset.name}:`, error);
-        setPreviews((prev: Record<string, string | null>) => ({ ...prev, [preset.id]: null }));
+        if (pathAtStart === currentImagePathRef.current) {
+          setPreviews((prev: Record<string, string | null>) => ({ ...prev, [preset.id]: null }));
+        }
       }
     }
 
     isProcessingQueue.current = false;
-
     setIsGeneratingPreviews(false);
   }, []);
 
@@ -499,11 +517,16 @@ export default function PresetsPanel({
       }
 
       setIsGeneratingPreviews(true);
+      const pathAtStart = currentImagePathRef.current;
+
       try {
         const fullPresetAdjustments: any = { ...INITIAL_ADJUSTMENTS, ...preset.adjustments };
         const imageData: Uint8Array = await invoke(Invokes.GeneratePresetPreview, {
           jsAdjustments: fullPresetAdjustments,
         });
+
+        if (pathAtStart !== currentImagePathRef.current) return;
+
         const blob = new Blob([imageData], { type: 'image/jpeg' });
         const url = URL.createObjectURL(blob);
 
@@ -516,9 +539,13 @@ export default function PresetsPanel({
         });
       } catch (error) {
         console.error(`Failed to generate preview for preset ${preset.name}:`, error);
-        setPreviews((prev: Record<string, string | null>) => ({ ...prev, [preset.id]: null }));
+        if (pathAtStart === currentImagePathRef.current) {
+          setPreviews((prev: Record<string, string | null>) => ({ ...prev, [preset.id]: null }));
+        }
       } finally {
-        setIsGeneratingPreviews(false);
+        if (pathAtStart === currentImagePathRef.current) {
+          setIsGeneratingPreviews(false);
+        }
       }
     },
     [selectedImage?.isReady],
@@ -559,19 +586,36 @@ export default function PresetsPanel({
   }, [selectedImage?.isReady, presets, enqueuePreviews]);
 
   useEffect(() => {
+    const isPathChanged = selectedImage?.path !== currentImagePathRef.current;
+
+    if (isPathChanged || !selectedImage?.isReady) {
+      Object.values(previewsRef.current).forEach((url) => {
+        if (url && url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+
+      previewsRef.current = {};
+      previewQueue.current = [];
+
+      setPreviews({});
+      setFolderPreviewsGenerated(new Set<string>());
+
+      if (isPathChanged && selectedImage?.path) {
+        currentImagePathRef.current = selectedImage.path;
+      }
+    }
+
     if (activePanel === Panel.Presets && selectedImage?.isReady && presets.length > 0) {
       generateRootPreviews();
       expandedFolders.forEach((folderId: string) => {
         generateFolderPreviews(folderId);
       });
-    } else if (!selectedImage?.isReady) {
-      setPreviews({});
-      setFolderPreviewsGenerated(new Set<string>());
-      previewQueue.current = [];
     }
   }, [
     activePanel,
     selectedImage?.isReady,
+    selectedImage?.path,
     presets.length,
     generateRootPreviews,
     generateFolderPreviews,
