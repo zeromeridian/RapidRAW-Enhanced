@@ -381,6 +381,11 @@ export default function Editor({
     };
   }, [selectedImage, imageRenderSize.scale, originalSize]);
 
+  const maxScaleRef = useRef(transformConfig.maxScale);
+  useEffect(() => {
+    maxScaleRef.current = transformConfig.maxScale;
+  }, [transformConfig.maxScale]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       if (onDisplaySizeChange && imageRenderSize.width > 0) {
@@ -621,6 +626,8 @@ export default function Editor({
         lastWgpuTransformRef.current = currentTransform;
         isInvoking = true;
 
+        const isZoomedIn = scale >= maxScaleRef.current - 0.5;
+
         invoke('update_wgpu_transform', {
           payload: {
             windowWidth,
@@ -635,6 +642,7 @@ export default function Editor({
             clipHeight: clipH,
             bgPrimary: state.bgPrimary || [0, 0, 0, 1],
             bgSecondary: state.bgSecondary || [0, 0, 0, 1],
+            pixelated: isZoomedIn,
           },
         })
           .catch((err) => console.warn('WGPU Sync Error:', err))

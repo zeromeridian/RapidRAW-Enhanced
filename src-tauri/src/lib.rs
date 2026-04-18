@@ -307,6 +307,7 @@ pub struct WgpuTransformPayload {
     pub clip_height: f32,
     pub bg_primary: [f32; 4],
     pub bg_secondary: [f32; 4],
+    pub pixelated: bool,
 }
 
 fn apply_all_transformations<'a, I: IntoCowImage<'a>>(
@@ -987,6 +988,7 @@ async fn update_wgpu_transform(
             display.latest_transform.window = [payload.window_width, payload.window_height];
             display.latest_transform.bg_primary = payload.bg_primary;
             display.latest_transform.bg_secondary = payload.bg_secondary;
+            display.latest_transform.pixelated = if payload.pixelated { 1.0 } else { 0.0 };
 
             context.queue.write_buffer(
                 &display.transform_buffer,

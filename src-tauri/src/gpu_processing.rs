@@ -29,14 +29,15 @@ pub struct RenderRequest<'a> {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct DisplayTransform {
-    pub rect: [f32; 4],         // x, y, width, height
-    pub clip: [f32; 4],         // clip_x, clip_y, clip_width, clip_height
-    pub window: [f32; 2],       // window_width, window_height
-    pub image_size: [f32; 2],   // actual image width, height
-    pub texture_size: [f32; 2], // padded texture width, height
-    pub _pad: [f32; 2],         // alignment padding
-    pub bg_primary: [f32; 4],   // primary bg color
-    pub bg_secondary: [f32; 4], // secondary bg color (letterboxes)
+    pub rect: [f32; 4],
+    pub clip: [f32; 4],
+    pub window: [f32; 2],
+    pub image_size: [f32; 2],
+    pub texture_size: [f32; 2],
+    pub pixelated: f32,
+    pub _pad: f32,
+    pub bg_primary: [f32; 4],
+    pub bg_secondary: [f32; 4],
 }
 
 pub struct WgpuDisplay {
@@ -243,6 +244,8 @@ pub fn get_or_init_gpu_context(
             window: vec2<f32>,
             image_size: vec2<f32>,
             texture_size: vec2<f32>,
+            pixelated: f32,
+            _pad: f32,
             bg_primary: vec4<f32>,
             bg_secondary: vec4<f32>,
         };
@@ -295,7 +298,14 @@ pub fn get_or_init_gpu_context(
             }
 
             let adjusted_uv = in.uv * (transform.image_size / transform.texture_size);
-            return textureSample(tex, samp, adjusted_uv);
+
+            if (transform.pixelated > 0.5) {
+                let texel_coords = floor(adjusted_uv * transform.texture_size);
+                let nearest_uv = (texel_coords + vec2<f32>(0.5, 0.5)) / transform.texture_size;
+                return textureSample(tex, samp, nearest_uv);
+            } else {
+                return textureSample(tex, samp, adjusted_uv);
+            }
         }
     ";
 
@@ -390,7 +400,8 @@ pub fn get_or_init_gpu_context(
             window: [1280.0, 720.0],
             image_size: [100.0, 100.0],
             texture_size: [100.0, 100.0],
-            _pad: [0.0; 2],
+            pixelated: 0.0,
+            _pad: 0.0,
             bg_primary: [24.0 / 255.0, 24.0 / 255.0, 24.0 / 255.0, 1.0],
             bg_secondary: [35.0 / 255.0, 35.0 / 255.0, 35.0 / 255.0, 1.0],
         },
