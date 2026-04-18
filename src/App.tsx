@@ -2736,8 +2736,16 @@ function App() {
       }
 
       const activePath = selectedImage?.path || libraryActivePath;
-      const currentRating = activePath ? imageRatings[activePath] || 0 : 0;
-
+      let currentRating = 0;
+      
+      if (selectedImage && pathsToRate.includes(selectedImage.path)) {
+        currentRating = imageRatings[selectedImage.path] || 0;
+      } else if (libraryActivePath && pathsToRate.includes(libraryActivePath)) {
+        currentRating = imageRatings[libraryActivePath] || 0;
+      } else if (pathsToRate.length > 0) {
+        currentRating = imageRatings[pathsToRate[0]] || 0;
+      }
+      
       const finalRating = newRating === currentRating ? 0 : newRating;
 
       setImageRatings((prev: Record<string, number>) => {
