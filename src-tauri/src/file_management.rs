@@ -1592,6 +1592,7 @@ pub fn generate_thumbnail_data(
             },
             "generate_thumbnail_data",
             false,
+            false,
         ) {
             return Ok(processed_image);
         } else {

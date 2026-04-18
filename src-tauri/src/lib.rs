@@ -1153,6 +1153,8 @@ fn process_preview_job(
     let lut_path = adjustments_clone["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
 
+    let force_readback = use_wgpu_renderer && pixel_roi.is_none();
+
     let final_processed_image_result = process_and_get_dynamic_image(
         &context,
         &state,
@@ -1166,16 +1168,14 @@ fn process_preview_job(
         },
         "apply_adjustments",
         use_wgpu_renderer,
+        force_readback,
     );
 
     if let Ok(final_processed_image) = final_processed_image_result {
-        if use_wgpu_renderer {
-            return Ok(b"WGPU_RENDER".to_vec());
-        }
-
+        let has_valid_image = final_processed_image.width() > 0;
         let final_processed_image = Arc::new(final_processed_image);
 
-        if !(is_interactive && pixel_roi.is_some()) {
+        if !(is_interactive && pixel_roi.is_some()) && has_valid_image {
             let channel_filter = if is_interactive {
                 active_waveform_channel.map(|s| s.to_string())
             } else {
@@ -1192,6 +1192,10 @@ fn process_preview_job(
             if let Some(tx) = state.analytics_worker_tx.lock().unwrap().as_ref() {
                 let _ = tx.send(analytics_job);
             }
+        }
+
+        if use_wgpu_renderer {
+            return Ok(b"WGPU_RENDER".to_vec());
         }
 
         let final_rgba_image = match &*final_processed_image {
@@ -1482,6 +1486,7 @@ fn generate_uncropped_preview(
             },
             "generate_uncropped_preview",
             false,
+            false,
         ) {
             let (width, height) = processed_image.dimensions();
             let rgb_pixels = processed_image.to_rgb8().into_vec();
@@ -1645,6 +1650,7 @@ async fn preview_geometry_transform(
                     roi: None,
                 },
                 "preview_geometry_transform_base_gen",
+                false,
                 false,
             )?;
 
@@ -1868,6 +1874,7 @@ fn process_image_for_export_pipeline(
             roi: None,
         },
         debug_tag,
+        false,
         false,
     )
 }
@@ -2135,6 +2142,7 @@ fn export_masks_for_image(
                 },
                 "export_mask_image",
                 false,
+                false,
             )?;
 
             let with_options = apply_export_resize_and_watermark(processed, export_settings)?;
@@ -2226,6 +2234,7 @@ fn export_adjustments_as_lut(
             roi: None,
         },
         "export_lut",
+        false,
         false,
     )?;
 
@@ -2783,6 +2792,7 @@ async fn estimate_export_size(
         },
         "estimate_export_size",
         false,
+        false,
     )?;
 
     let preview_bytes = encode_image_to_bytes(
@@ -2968,6 +2978,7 @@ async fn estimate_batch_export_size(
             roi: None,
         },
         "estimate_batch_export_size",
+        false,
         false,
     )?;
 
@@ -3460,6 +3471,7 @@ fn generate_preset_preview(
         },
         "generate_preset_preview",
         false,
+        false,
     )?;
 
     let mut buf = Cursor::new(Vec::new());
@@ -3838,6 +3850,7 @@ async fn generate_all_community_previews(
                     roi: None,
                 },
                 "generate_all_community_previews",
+                false,
                 false,
             )?;
 
@@ -4498,6 +4511,7 @@ fn generate_preview_for_path(
             roi: None,
         },
         "generate_preview_for_path",
+        false,
         false,
     )?;
     let (width, height) = final_image.dimensions();

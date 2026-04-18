@@ -1063,6 +1063,7 @@ impl GpuProcessor {
         height: u32,
         request: RenderRequest,
         skip_cpu_readback: bool,
+        output_to_display: bool,
     ) -> Result<(Vec<u8>, u32, u32), String> {
         let device = &self.context.device;
         let queue = &self.context.queue;
@@ -1559,7 +1560,7 @@ impl GpuProcessor {
                 let crop_x_start = x_start - input_x_start;
                 let crop_y_start = y_start - input_y_start;
 
-                if skip_cpu_readback {
+                if output_to_display {
                     main_encoder.copy_texture_to_texture(
                         wgpu::TexelCopyTextureInfo {
                             texture: &self.tile_output_texture,
@@ -1633,6 +1634,7 @@ pub fn process_and_get_dynamic_image(
     request: RenderRequest,
     caller_id: &str,
     output_to_display: bool,
+    force_readback: bool,
 ) -> Result<DynamicImage, String> {
     let start_time = Instant::now();
     let (width, height) = base_image.dimensions();
@@ -1715,11 +1717,14 @@ pub fn process_and_get_dynamic_image(
 
     let cache = cache_lock.as_ref().unwrap();
 
+    let skip_readback = output_to_display && !force_readback;
+
     let (processed_pixels, out_w, out_h) = processor.run(
         &cache.texture_view,
         cache.width,
         cache.height,
         request,
+        skip_readback,
         output_to_display,
     )?;
 
@@ -1758,7 +1763,9 @@ pub fn process_and_get_dynamic_image(
             display.current_bind_group = Some(bind_group);
             display.render(device, queue);
         }
+    }
 
+    if skip_readback {
         let duration = start_time.elapsed();
         let fps = 1.0 / duration.as_secs_f64();
         log::info!(
@@ -1769,7 +1776,6 @@ pub fn process_and_get_dynamic_image(
             duration,
             fps
         );
-
         return Ok(DynamicImage::new_rgba8(0, 0));
     }
 
