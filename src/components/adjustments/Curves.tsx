@@ -217,7 +217,7 @@ export default function CurveGraph({
   }, []);
 
   useEffect(() => {
-    const handleMouseMove = (e: any) => {
+    const handleMove = (e: any) => {
       const index = draggingIndexRef.current;
       if (index === null) return;
 
@@ -227,9 +227,12 @@ export default function CurveGraph({
       const svg = svgRef.current;
       if (!svg) return;
 
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
       const rect = svg.getBoundingClientRect();
-      let x = Math.max(0, Math.min(255, ((e.clientX - rect.left) / rect.width) * 255));
-      const y = Math.max(0, Math.min(255, 255 - ((e.clientY - rect.top) / rect.height) * 255));
+      let x = Math.max(0, Math.min(255, ((clientX - rect.left) / rect.width) * 255));
+      const y = Math.max(0, Math.min(255, 255 - ((clientY - rect.top) / rect.height) * 255));
 
       const newPoints = [...currentPoints];
 
@@ -254,9 +257,11 @@ export default function CurveGraph({
         ...prev,
         curves: { ...prev.curves, [activeChannelRef.current]: newPoints },
       }));
+
+      if (e.cancelable) e.preventDefault();
     };
 
-    const handleMouseUp = () => {
+    const handleUp = () => {
       setDraggingPointIndex(null);
       draggingIndexRef.current = null;
       localPointsRef.current = null;
@@ -264,13 +269,19 @@ export default function CurveGraph({
     };
 
     if (draggingPointIndex !== null) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('mousemove', handleMove, { passive: false });
+      window.addEventListener('mouseup', handleUp);
+      window.addEventListener('touchmove', handleMove, { passive: false });
+      window.addEventListener('touchend', handleUp);
+      window.addEventListener('touchcancel', handleUp);
     }
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleUp);
+      window.removeEventListener('touchcancel', handleUp);
     };
   }, [draggingPointIndex, setAdjustments, onDragStateChange]);
 
@@ -300,22 +311,24 @@ export default function CurveGraph({
     );
   }
 
-  const getMousePos = (e: any) => {
+  const getPointerPos = (e: any) => {
     const svg = svgRef.current;
     if (!svg) {
       return { x: 0, y: 0 };
     }
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     const rect = svg.getBoundingClientRect();
-    const x = Math.max(0, Math.min(255, ((e.clientX - rect.left) / rect.width) * 255));
-    const y = Math.max(0, Math.min(255, 255 - ((e.clientY - rect.top) / rect.height) * 255));
+    const x = Math.max(0, Math.min(255, ((clientX - rect.left) / rect.width) * 255));
+    const y = Math.max(0, Math.min(255, 255 - ((clientY - rect.top) / rect.height) * 255));
     return { x, y };
   };
 
-  const handlePointMouseDown = (e: any, index: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-
+  const handlePointStart = (e: any, index: number) => {
     if (e.button === 2) return;
+    
+    if (!e.touches) e.preventDefault();
+    e.stopPropagation();
 
     onDragStateChange?.(true);
 
@@ -342,14 +355,14 @@ export default function CurveGraph({
     }
   };
 
-  const handleContainerMouseDown = (e: any) => {
-    if (e.button !== 0 || e.target.tagName === 'circle') {
+  const handleContainerStart = (e: any) => {
+    if ((!e.touches && e.button !== 0) || e.target.tagName === 'circle') {
       return;
     }
 
     onDragStateChange?.(true);
 
-    const { x, y } = getMousePos(e);
+    const { x, y } = getPointerPos(e);
     const newPoints = [...points, { x, y }].sort((a: Coord, b: Coord) => a.x - b.x);
     const newPointIndex = newPoints.findIndex((p: Coord) => p.x === x && p.y === y);
 
@@ -472,7 +485,7 @@ export default function CurveGraph({
   };
 
   return (
-    <div className="select-none" ref={containerRef}>
+    <div className="select-none touch-none" ref={containerRef}>
       <div className="flex items-center justify-between gap-1 mb-2 mt-2">
         <div className="flex items-center gap-1">
           {Object.keys(channelConfig).map((channel: any) => (
@@ -502,8 +515,9 @@ export default function CurveGraph({
       </div>
 
       <div
-        className="w-full aspect-square bg-surface-secondary p-1 rounded-md relative"
-        onMouseDown={handleContainerMouseDown}
+        className="w-full aspect-square bg-surface-secondary p-1 rounded-md relative touch-none"
+        onMouseDown={handleContainerStart}
+        onTouchStart={handleContainerStart}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
       >
@@ -545,7 +559,8 @@ export default function CurveGraph({
               cy={255 - p.y}
               fill={color}
               key={i}
-              onMouseDown={(e: any) => handlePointMouseDown(e, i)}
+              onMouseDown={(e: any) => handlePointStart(e, i)}
+              onTouchStart={(e: any) => handlePointStart(e, i)}
               onContextMenu={(e: React.MouseEvent) => handlePointContextMenu(e, i)}
               r="6"
               stroke="#1e1e1e"
