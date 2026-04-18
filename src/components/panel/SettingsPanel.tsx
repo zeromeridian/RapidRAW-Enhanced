@@ -342,6 +342,7 @@ export default function SettingsPanel({
     linuxGpuOptimization: appSettings?.linuxGpuOptimization ?? false,
     highResZoomMultiplier: appSettings?.highResZoomMultiplier || 1.0,
     useFullDpiRendering: appSettings?.useFullDpiRendering ?? false,
+    useWgpuRenderer: appSettings?.useWgpuRenderer ?? true,
   });
   const [restartRequired, setRestartRequired] = useState(false);
   const [activeCategory, setActiveCategory] = useState('general');
@@ -389,6 +390,7 @@ export default function SettingsPanel({
       linuxGpuOptimization: appSettings?.linuxGpuOptimization ?? false,
       highResZoomMultiplier: appSettings?.highResZoomMultiplier || 1.0,
       useFullDpiRendering: appSettings?.useFullDpiRendering ?? false,
+      useWgpuRenderer: appSettings?.useWgpuRenderer ?? true,
     });
     setRestartRequired(false);
   }, [appSettings]);
@@ -1522,6 +1524,18 @@ export default function SettingsPanel({
                         onChange={(value: any) => onSettingsChange({ ...appSettings, linearRawMode: value })}
                         options={linearRawOptions}
                         value={appSettings?.linearRawMode || 'auto'}
+                      />
+                    </SettingItem>
+
+                    <SettingItem
+                      label="WGPU Direct Rendering"
+                      description="Bypasses browser encoding for instantly responsive live previews. Highly recommended for performance."
+                    >
+                      <Switch
+                        checked={processingSettings.useWgpuRenderer}
+                        id="wgpu-renderer-toggle"
+                        label="Enable Direct WGPU Render"
+                        onChange={(checked) => handleProcessingSettingChange('useWgpuRenderer', checked)}
                       />
                     </SettingItem>
 

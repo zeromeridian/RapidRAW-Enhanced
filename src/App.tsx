@@ -1441,6 +1441,10 @@ function App() {
 
     if (scale <= 1.01) return null;
 
+    const paddingPixels = 2.0;
+    const paddingX = paddingPixels / baseW;
+    const paddingY = paddingPixels / baseH;
+
     const visibleLeft = -positionX / scale;
     const visibleTop = -positionY / scale;
     const visibleRight = visibleLeft + containerWidth / scale;
@@ -1465,17 +1469,19 @@ function App() {
     let roiW = (intersectRight - intersectLeft) / baseW;
     let roiH = (intersectBottom - intersectTop) / baseH;
 
-    const padX = roiW * 0.2;
-    const padY = roiH * 0.2;
+    const newRoiX = roiX - paddingX;
+    const newRoiY = roiY - paddingY;
+    const newRoiW = roiW + paddingX * 2;
+    const newRoiH = roiH + paddingY * 2;
 
-    roiX = Math.max(0, roiX - padX);
-    roiY = Math.max(0, roiY - padY);
-    roiW = Math.min(1 - roiX, roiW + padX * 2);
-    roiH = Math.min(1 - roiY, roiH + padY * 2);
+    const clampedX = Math.max(0, newRoiX);
+    const clampedY = Math.max(0, newRoiY);
+    const clampedW = Math.min(1 - clampedX, newRoiW);
+    const clampedH = Math.min(1 - clampedY, newRoiH);
 
-    if (roiW > 0.95 && roiH > 0.95) return null;
+    if (clampedW > 0.999 && clampedH > 0.999) return null;
 
-    return [roiX, roiY, roiW, roiH] as [number, number, number, number];
+    return [clampedX, clampedY, clampedW, clampedH] as [number, number, number, number];
   }, []);
 
   const applyAdjustments = useCallback(
@@ -1548,6 +1554,16 @@ function App() {
 
         if (buffer && buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
           latestRenderedJobIdRef.current = jobId;
+
+          const textDecoder = new TextDecoder();
+          const prefix = textDecoder.decode(buffer.slice(0, 11));
+          if (prefix === 'WGPU_RENDER') {
+            setInteractivePatch((prev) => {
+              if (prev && prev.url) URL.revokeObjectURL(prev.url);
+              return null;
+            });
+            return;
+          }
 
           if (dragging) {
             const view = new DataView(buffer);
@@ -2888,7 +2904,7 @@ function App() {
     }
 
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    const sharpnessFactor = 1.15;
+    const sharpnessFactor = 1.25;
     const zoomMultiplier = appSettings?.highResZoomMultiplier || 1.0;
 
     const effectiveDpr = appSettings?.useFullDpiRendering ? dpr : 1;
@@ -5143,6 +5159,7 @@ function App() {
         <div className="flex flex-row grow h-full min-h-0">
           <div className="flex-1 flex flex-col min-w-0">
             <Editor
+              appSettings={appSettings}
               activeAiPatchContainerId={activeAiPatchContainerId}
               activeAiSubMaskId={activeAiSubMaskId}
               activeMaskContainerId={activeMaskContainerId}
@@ -5442,8 +5459,9 @@ function App() {
   return (
     <div
       className={clsx(
-        'flex flex-col h-screen bg-bg-primary font-sans text-text-primary overflow-hidden select-none',
+        'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
         (appSettings?.adaptiveEditorTheme || isAnimatingTheme) && !isInstantTransition && 'enable-color-transitions',
+        appSettings?.useWgpuRenderer !== false ? 'bg-transparent' : 'bg-bg-primary',
       )}
     >
       <div

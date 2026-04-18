@@ -292,6 +292,23 @@ struct ImageDimensions {
     height: u32,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WgpuTransformPayload {
+    pub window_width: f32,
+    pub window_height: f32,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub clip_x: f32,
+    pub clip_y: f32,
+    pub clip_width: f32,
+    pub clip_height: f32,
+    pub bg_primary: [f32; 4],
+    pub bg_secondary: [f32; 4],
+}
+
 fn apply_all_transformations<'a, I: IntoCowImage<'a>>(
     image: I,
     adjustments: &serde_json::Value,
@@ -947,6 +964,44 @@ pub fn get_cached_or_generate_mask(
     generated
 }
 
+#[tauri::command]
+async fn update_wgpu_transform(
+    payload: WgpuTransformPayload,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let context = match state.gpu_context.lock().unwrap().as_ref() {
+        Some(c) => c.clone(),
+        None => return Ok(()),
+    };
+
+    tokio::task::spawn_blocking(move || {
+        let mut display_lock = context.display.lock().unwrap();
+        if let Some(display) = display_lock.as_mut() {
+            display.latest_transform.rect = [payload.x, payload.y, payload.width, payload.height];
+            display.latest_transform.clip = [
+                payload.clip_x,
+                payload.clip_y,
+                payload.clip_width,
+                payload.clip_height,
+            ];
+            display.latest_transform.window = [payload.window_width, payload.window_height];
+            display.latest_transform.bg_primary = payload.bg_primary;
+            display.latest_transform.bg_secondary = payload.bg_secondary;
+
+            context.queue.write_buffer(
+                &display.transform_buffer,
+                0,
+                bytemuck::bytes_of(&display.latest_transform),
+            );
+            display.render(&context.device, &context.queue);
+        }
+    })
+    .await
+    .map_err(|e| format!("Task panicked: {}", e))?;
+
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 fn process_preview_job(
     app_handle: &tauri::AppHandle,
@@ -959,7 +1014,7 @@ fn process_preview_job(
     active_waveform_channel: Option<&str>,
 ) -> Result<Vec<u8>, String> {
     let fn_start = std::time::Instant::now();
-    let context = get_or_init_gpu_context(&state)?;
+    let context = get_or_init_gpu_context(&state, app_handle)?;
     hydrate_adjustments(&state, &mut adjustments_json);
     let adjustments_clone = adjustments_json;
 
@@ -976,6 +1031,7 @@ fn process_preview_job(
 
     let default_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
     let preview_dim = target_resolution.unwrap_or(default_preview_dim);
+    let use_wgpu_renderer = settings.use_wgpu_renderer.unwrap_or(true);
 
     let (interactive_divisor, interactive_quality) = match live_quality {
         "full" => (1.0_f32, 85_u8),
@@ -1109,9 +1165,14 @@ fn process_preview_job(
             roi: pixel_roi,
         },
         "apply_adjustments",
+        use_wgpu_renderer,
     );
 
     if let Ok(final_processed_image) = final_processed_image_result {
+        if use_wgpu_renderer {
+            return Ok(b"WGPU_RENDER".to_vec());
+        }
+
         let final_processed_image = Arc::new(final_processed_image);
 
         if !(is_interactive && pixel_roi.is_some()) {
@@ -1318,7 +1379,7 @@ fn generate_uncropped_preview(
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    let context = get_or_init_gpu_context(&state)?;
+    let context = get_or_init_gpu_context(&state, &app_handle)?;
     let mut adjustments_clone = js_adjustments.clone();
     hydrate_adjustments(&state, &mut adjustments_clone);
 
@@ -1420,6 +1481,7 @@ fn generate_uncropped_preview(
                 roi: None,
             },
             "generate_uncropped_preview",
+            false,
         ) {
             let (width, height) = processed_image.dimensions();
             let rgb_pixels = processed_image.to_rgb8().into_vec();
@@ -1517,7 +1579,7 @@ async fn preview_geometry_transform(
         if let Some(cached_image) = maybe_cached_image {
             cached_image
         } else {
-            let context = get_or_init_gpu_context(&state)?;
+            let context = get_or_init_gpu_context(&state, &app_handle)?;
 
             let original_image = {
                 let guard = state.original_image.lock().unwrap();
@@ -1583,6 +1645,7 @@ async fn preview_geometry_transform(
                     roi: None,
                 },
                 "preview_geometry_transform_base_gen",
+                false,
             )?;
 
             let mut cache = state.geometry_cache.lock().unwrap();
@@ -1805,6 +1868,7 @@ fn process_image_for_export_pipeline(
             roi: None,
         },
         debug_tag,
+        false,
     )
 }
 
@@ -2070,6 +2134,7 @@ fn export_masks_for_image(
                     roi: None,
                 },
                 "export_mask_image",
+                false,
             )?;
 
             let with_options = apply_export_resize_and_watermark(processed, export_settings)?;
@@ -2161,6 +2226,7 @@ fn export_adjustments_as_lut(
             roi: None,
         },
         "export_lut",
+        false,
     )?;
 
     convert_image_to_cube_lut(&processed_lut, lut_size)
@@ -2181,7 +2247,7 @@ async fn export_image(
         return Err("An export is already in progress.".to_string());
     }
 
-    let context = get_or_init_gpu_context(&state)?;
+    let context = get_or_init_gpu_context(&state, &app_handle)?;
     let (original_image_data, is_raw) = get_full_image_for_processing(&state)?;
     let context = Arc::new(context);
 
@@ -2301,7 +2367,7 @@ async fn batch_export_images(
         return Err("An export is already in progress.".to_string());
     }
 
-    let context = get_or_init_gpu_context(&state)?;
+    let context = get_or_init_gpu_context(&state, &app_handle)?;
     let context = Arc::new(context);
     let progress_counter = Arc::new(AtomicUsize::new(0));
 
@@ -2635,7 +2701,7 @@ async fn estimate_export_size(
         return Ok(1_050_000);
     }
 
-    let context = get_or_init_gpu_context(&state)?;
+    let context = get_or_init_gpu_context(&state, &app_handle)?;
     let loaded_image = state
         .original_image
         .lock()
@@ -2716,6 +2782,7 @@ async fn estimate_export_size(
             roi: None,
         },
         "estimate_export_size",
+        false,
     )?;
 
     let preview_bytes = encode_image_to_bytes(
@@ -2764,7 +2831,7 @@ async fn estimate_batch_export_size(
     if paths.is_empty() {
         return Ok(0);
     }
-    let context = get_or_init_gpu_context(&state)?;
+    let context = get_or_init_gpu_context(&state, &app_handle)?;
     let first_path = &paths[0];
     let (source_path, sidecar_path) = parse_virtual_path(first_path);
     let source_path_str = source_path.to_string_lossy().to_string();
@@ -2901,6 +2968,7 @@ async fn estimate_batch_export_size(
             roi: None,
         },
         "estimate_batch_export_size",
+        false,
     )?;
 
     let preview_bytes = encode_image_to_bytes(
@@ -3330,8 +3398,9 @@ async fn precompute_ai_subject_mask(
 fn generate_preset_preview(
     js_adjustments: serde_json::Value,
     state: tauri::State<AppState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
-    let context = get_or_init_gpu_context(&state)?;
+    let context = get_or_init_gpu_context(&state, &app_handle)?;
 
     let loaded_image = state
         .original_image
@@ -3390,6 +3459,7 @@ fn generate_preset_preview(
             roi: None,
         },
         "generate_preset_preview",
+        false,
     )?;
 
     let mut buf = Cursor::new(Vec::new());
@@ -3663,7 +3733,7 @@ async fn generate_all_community_previews(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<HashMap<String, Vec<u8>>, String> {
-    let context = crate::image_processing::get_or_init_gpu_context(&state)?;
+    let context = get_or_init_gpu_context(&state, &app_handle)?;
     let mut results: HashMap<String, Vec<u8>> = HashMap::new();
 
     const TILE_DIM: u32 = 360;
@@ -3773,6 +3843,7 @@ async fn generate_all_community_previews(
                     roi: None,
                 },
                 "generate_all_community_previews",
+                false,
             )?;
 
             let processed_image = processed_image_dynamic.to_rgb8();
@@ -4354,7 +4425,7 @@ fn generate_preview_for_path(
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
-    let context = get_or_init_gpu_context(&state)?;
+    let context = get_or_init_gpu_context(&state, &app_handle)?;
     let (source_path, _) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
     let is_raw = is_raw_file(&source_path_str);
@@ -4432,6 +4503,7 @@ fn generate_preview_for_path(
             roi: None,
         },
         "generate_preview_for_path",
+        false,
     )?;
     let (width, height) = final_image.dimensions();
     let rgb_pixels = final_image.to_rgb8().into_vec();
@@ -4747,6 +4819,22 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(PinchZoomDisablePlugin)
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::Resized(size) => {
+                let state = window.state::<AppState>();
+                if let Some(ctx) = state.gpu_context.lock().unwrap().as_ref() {
+                    if let Ok(mut display_lock) = ctx.display.try_lock() {
+                        if let Some(display) = display_lock.as_mut() {
+                            display.config.width = size.width.max(1);
+                            display.config.height = size.height.max(1);
+                            display.surface.configure(&ctx.device, &display.config);
+                            display.render(&ctx.device, &ctx.queue);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        })
         .setup(|app| {
             #[cfg(any(windows, target_os = "linux"))]
             {
@@ -5066,6 +5154,7 @@ pub fn run() {
             get_image_dimensions,
             frontend_ready,
             cancel_thumbnail_generation,
+            update_wgpu_transform,
             image_processing::calculate_auto_adjustments,
             file_management::read_exif_for_paths,
             file_management::list_images_in_dir,

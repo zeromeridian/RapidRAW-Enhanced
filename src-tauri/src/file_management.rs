@@ -455,6 +455,8 @@ pub struct AppSettings {
     pub waveform_height: Option<u32>,
     #[serde(default)]
     pub active_waveform_channel: Option<String>,
+    #[serde(default)]
+    pub use_wgpu_renderer: Option<bool>,
 }
 
 fn default_adjustment_visibility() -> HashMap<String, bool> {
@@ -525,6 +527,7 @@ impl Default for AppSettings {
             is_waveform_visible: Some(false),
             waveform_height: Some(220),
             active_waveform_channel: Some("luma".to_string()),
+            use_wgpu_renderer: Some(true),
         }
     }
 }
@@ -1593,6 +1596,7 @@ pub fn generate_thumbnail_data(
                 roi: None,
             },
             "generate_thumbnail_data",
+            false,
         ) {
             return Ok(processed_image);
         } else {
@@ -1730,7 +1734,7 @@ pub async fn generate_thumbnails(
         }
 
         let state = app_handle_clone.state::<AppState>();
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
 
         let thumbnails: HashMap<String, String> = paths
             .par_iter()
@@ -1787,7 +1791,7 @@ pub fn generate_thumbnails_progressive(
 
     pool.spawn(move || {
         let state = app_handle_clone.state::<AppState>();
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
 
         let _ = paths.par_iter().try_for_each(|path_str| -> Result<(), ()> {
             if cancellation_token.load(Ordering::Relaxed) {
@@ -2210,7 +2214,7 @@ pub fn save_metadata_and_update_thumbnail(
     };
     drop(loaded_image_lock);
 
-    let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+    let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
     let app_handle_clone = app_handle.clone();
     let path_clone = path.clone();
 
@@ -2322,7 +2326,7 @@ pub async fn apply_adjustments_to_paths(
             }
         };
 
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
 
         paths.par_iter().for_each(|path_str| {
             let result = generate_single_thumbnail_and_cache(
@@ -2404,7 +2408,7 @@ pub async fn reset_adjustments_for_paths(
             }
         };
 
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
 
         paths.par_iter().for_each(|path_str| {
             let result = generate_single_thumbnail_and_cache(
@@ -2533,7 +2537,7 @@ pub async fn apply_auto_adjustments_to_paths(
             }
         };
 
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
 
         paths.par_iter().for_each(|path_str| {
             let result = generate_single_thumbnail_and_cache(

@@ -5,7 +5,7 @@ import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'r
 import { PercentCrop, Crop } from 'react-image-crop';
 import { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
 import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
-import { BrushSettings, SelectedImage } from '../../ui/AppProperties';
+import { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import { RenderSize } from '../../../hooks/useImageRenderSize';
 import type { OverlayMode } from '../right/CropPanel';
 import CompositionOverlays from './overlays/CompositionOverlays';
@@ -25,6 +25,7 @@ interface DrawnLine {
 }
 
 interface ImageCanvasProps {
+  appSettings: AppSettings | null;
   activeAiPatchContainerId: string | null;
   activeAiSubMaskId: string | null;
   activeMaskContainerId: string | null;
@@ -702,6 +703,7 @@ const MaskOverlay = memo(
 
 const ImageCanvas = memo(
   ({
+    appSettings,
     activeAiPatchContainerId,
     activeAiSubMaskId,
     activeMaskContainerId,
@@ -894,7 +896,7 @@ const ImageCanvas = memo(
 
     const isBrushActive =
       (isMasking || isAiEditing) && (activeSubMask?.type === Mask.Brush || activeSubMask?.type === Mask.Flow);
-    const activeLineFlow = activeSubMask?.type === Mask.Flow ? activeSubMask?.parameters?.flow ?? 10 : undefined;
+    const activeLineFlow = activeSubMask?.type === Mask.Flow ? (activeSubMask?.parameters?.flow ?? 10) : undefined;
     const isAiSubjectActive =
       (isMasking || isAiEditing) &&
       (activeSubMask?.type === Mask.AiSubject || activeSubMask?.type === Mask.QuickEraser);
@@ -1530,7 +1532,11 @@ const ImageCanvas = memo(
 
       if (isBrushActive) {
         const wasAltPressed = (window as any).altKeyDown || false;
-        const effectiveToolForFinal = wasAltPressed ? (baseTool === ToolType.Brush ? ToolType.Eraser : ToolType.Brush) : baseTool;
+        const effectiveToolForFinal = wasAltPressed
+          ? baseTool === ToolType.Brush
+            ? ToolType.Eraser
+            : ToolType.Brush
+          : baseTool;
 
         const imageSpaceLine: DrawnLine = {
           brushSize: brushImageSpaceSize,
@@ -1858,7 +1864,7 @@ const ImageCanvas = memo(
                 }
                 preserveAspectRatio={imageRenderSize.width > 0 && imageRenderSize.height > 0 ? 'none' : 'xMidYMid meet'}
               >
-                {displayState.base && (
+                {displayState.base && appSettings?.useWgpuRenderer === false && (
                   <image
                     href={displayState.base}
                     x="0"
@@ -1869,7 +1875,7 @@ const ImageCanvas = memo(
                   />
                 )}
 
-                {displayState.fade && (
+                {displayState.fade && appSettings?.useWgpuRenderer === false && (
                   <image
                     href={displayState.fade}
                     x="0"
@@ -1884,7 +1890,7 @@ const ImageCanvas = memo(
                   />
                 )}
 
-                {visiblePatch && (
+                {visiblePatch && appSettings?.useWgpuRenderer === false && (
                   <image
                     href={visiblePatch.url}
                     x={`${visiblePatch.normX * 100}%`}
@@ -2016,9 +2022,15 @@ const ImageCanvas = memo(
                   <Circle
                     listening={false}
                     perfectDrawEnabled={false}
-                    stroke={(window as any).altKeyDown ? 
-                      (baseTool === ToolType.Brush ? '#f43f5e' : '#0ea5e9') : 
-                      (baseTool === ToolType.Eraser ? '#f43f5e' : '#0ea5e9')}
+                    stroke={
+                      (window as any).altKeyDown
+                        ? baseTool === ToolType.Brush
+                          ? '#f43f5e'
+                          : '#0ea5e9'
+                        : baseTool === ToolType.Eraser
+                          ? '#f43f5e'
+                          : '#0ea5e9'
+                    }
                     radius={brushStageSize / 2}
                     strokeWidth={1}
                     x={cursorPreview.x}
