@@ -4891,6 +4891,17 @@ pub fn run() {
 
             #[cfg(not(target_os = "android"))]
             {
+                // Metal requires creating the window surface on the main thread. Preview and
+                // thumbnail work runs on background threads; initialize once here so they only
+                // clone the cached GpuContext (avoids panic + erroneous OpenGL fallback).
+                let app_state = app.state::<AppState>();
+                if let Err(error) = get_or_init_gpu_context(&app_state, app.handle()) {
+                    log::warn!(
+                        "GPU pre-initialization failed (editing and thumbnails may be degraded): {}",
+                        error
+                    );
+                }
+
                 if let Ok(config_dir) = app.path().app_config_dir() {
                     let path = config_dir.join("window_state.json");
                     if let Ok(contents) = std::fs::read_to_string(&path) {
