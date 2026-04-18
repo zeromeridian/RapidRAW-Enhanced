@@ -26,6 +26,7 @@ const parseRgb = (rgbStr: string): [number, number, number, number] => {
 interface WgpuRenderState {
   useWgpuRenderer: boolean | undefined;
   isReady: boolean;
+  hasRenderedFirstFrame: boolean;
   isCropping: boolean;
   uncroppedAdjustedPreviewUrl: string | null;
   showOriginal: boolean;
@@ -467,7 +468,8 @@ export default function Editor({
 
   const wgpuStateRef = useRef<WgpuRenderState>({
     useWgpuRenderer: appSettings?.useWgpuRenderer,
-    isReady: selectedImage?.isReady,
+    isReady: selectedImage?.isReady ?? false,
+    hasRenderedFirstFrame,
     isCropping,
     uncroppedAdjustedPreviewUrl,
     showOriginal,
@@ -482,7 +484,8 @@ export default function Editor({
 
     wgpuStateRef.current = {
       useWgpuRenderer: appSettings?.useWgpuRenderer,
-      isReady: selectedImage?.isReady,
+      isReady: selectedImage?.isReady ?? false,
+      hasRenderedFirstFrame,
       isCropping,
       uncroppedAdjustedPreviewUrl,
       showOriginal,
@@ -492,6 +495,7 @@ export default function Editor({
   }, [
     appSettings?.useWgpuRenderer,
     selectedImage?.isReady,
+    hasRenderedFirstFrame,
     isCropping,
     uncroppedAdjustedPreviewUrl,
     showOriginal,
@@ -501,33 +505,37 @@ export default function Editor({
 
   useEffect(() => {
     let isEffectActive = true;
+    let isInvoking = false;
 
     const syncWgpu = () => {
       if (!isEffectActive) return;
 
       const state = wgpuStateRef.current;
 
-      if (state.useWgpuRenderer === false || !state.isReady) {
-        if (state.useWgpuRenderer === false) {
-          if (lastWgpuTransformRef.current !== 'hidden') {
-            lastWgpuTransformRef.current = 'hidden';
-            invoke('update_wgpu_transform', {
-              payload: {
-                windowWidth: 1,
-                windowHeight: 1,
-                x: -999999,
-                y: -999999,
-                width: 1,
-                height: 1,
-                clipX: 0,
-                clipY: 0,
-                clipWidth: 1,
-                clipHeight: 1,
-                bgPrimary: state.bgPrimary || [0, 0, 0, 1],
-                bgSecondary: state.bgSecondary || [0, 0, 0, 1],
-              },
-            }).catch(() => {});
-          }
+      if (state.useWgpuRenderer === false || !state.isReady || !state.hasRenderedFirstFrame) {
+        if (lastWgpuTransformRef.current !== 'hidden' && !isInvoking) {
+          lastWgpuTransformRef.current = 'hidden';
+          isInvoking = true;
+          invoke('update_wgpu_transform', {
+            payload: {
+              windowWidth: 1,
+              windowHeight: 1,
+              x: -999999,
+              y: -999999,
+              width: 1,
+              height: 1,
+              clipX: 0,
+              clipY: 0,
+              clipWidth: 1,
+              clipHeight: 1,
+              bgPrimary: state.bgPrimary || [0, 0, 0, 1],
+              bgSecondary: state.bgSecondary || [0, 0, 0, 1],
+            },
+          })
+            .catch(() => {})
+            .finally(() => {
+              isInvoking = false;
+            });
         }
         if (isEffectActive) {
           wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
@@ -602,8 +610,10 @@ export default function Editor({
 
       const currentTransform = `${windowWidth},${windowHeight},${screenX},${screenY},${screenW},${screenH},${clipX},${clipY},${clipW},${clipH},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
 
-      if (lastWgpuTransformRef.current !== currentTransform) {
+      if (lastWgpuTransformRef.current !== currentTransform && !isInvoking) {
         lastWgpuTransformRef.current = currentTransform;
+
+        isInvoking = true;
 
         invoke('update_wgpu_transform', {
           payload: {
@@ -620,7 +630,11 @@ export default function Editor({
             bgPrimary: state.bgPrimary || [0, 0, 0, 1],
             bgSecondary: state.bgSecondary || [0, 0, 0, 1],
           },
-        }).catch((err) => console.warn('WGPU Sync Error:', err));
+        })
+          .catch((err) => console.warn('WGPU Sync Error:', err))
+          .finally(() => {
+            isInvoking = false;
+          });
       }
 
       if (isEffectActive) {

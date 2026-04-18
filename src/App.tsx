@@ -362,6 +362,8 @@ function App() {
   const imageCacheRef = useRef(new ImageLRUCache(20));
   const isBackendReadyRef = useRef(true);
   const cachedEditStateRef = useRef<ImageCacheEntry | null>(null);
+  const inFlightCountRef = useRef(0);
+  const pendingApplyRef = useRef<{ adjustments: Adjustments; targetRes?: number } | null>(null);
   const [renderedRightPanel, setRenderedRightPanel] = useState<Panel | null>(activeRightPanel);
   const [collapsibleSectionsState, setCollapsibleSectionsState] = useState<CollapsibleSectionsState>({
     basic: true,
@@ -1485,11 +1487,10 @@ function App() {
     return [clampedX, clampedY, clampedW, clampedH] as [number, number, number, number];
   }, []);
 
-  const applyAdjustments = useCallback(
+  const executeApplyAdjustments = useCallback(
     async (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
-      if (!selectedImage?.isReady) return;
-      if (!isBackendReadyRef.current) return;
-      const currentPath = selectedImage.path;
+      const currentPath = selectedImage?.path;
+      if (!currentPath) return;
 
       const payload = JSON.parse(JSON.stringify(currentAdjustments));
 
@@ -1632,7 +1633,39 @@ function App() {
         }
       }
     },
-    [selectedImage?.isReady, selectedImage?.path, calculateROI, isWaveformVisible],
+    [selectedImage?.path, calculateROI, isWaveformVisible],
+  );
+
+  const flushPipeline = useCallback(() => {
+    if (inFlightCountRef.current >= 2) return;
+    if (!pendingApplyRef.current) return;
+
+    const { adjustments, targetRes } = pendingApplyRef.current;
+    pendingApplyRef.current = null;
+
+    inFlightCountRef.current += 1;
+
+    executeApplyAdjustments(adjustments, true, targetRes).finally(() => {
+      inFlightCountRef.current -= 1;
+      if (pendingApplyRef.current) {
+        requestAnimationFrame(() => flushPipeline());
+      }
+    });
+  }, [executeApplyAdjustments]);
+
+  const applyAdjustments = useCallback(
+    (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
+      if (!selectedImage?.isReady || !isBackendReadyRef.current) return;
+
+      if (dragging) {
+        pendingApplyRef.current = { adjustments: currentAdjustments, targetRes };
+        flushPipeline();
+      } else {
+        pendingApplyRef.current = null;
+        executeApplyAdjustments(currentAdjustments, false, targetRes);
+      }
+    },
+    [selectedImage?.isReady, flushPipeline, executeApplyAdjustments],
   );
 
   const generateUncroppedPreview = useCallback(
@@ -2451,7 +2484,7 @@ function App() {
         setFinalPreviewUrl(cached.finalPreviewUrl);
         setUncroppedAdjustedPreviewUrl(cached.uncroppedPreviewUrl);
         setIsViewLoading(false);
-        setHasRenderedFirstFrame(true);
+        setHasRenderedFirstFrame(false);
 
         latestRenderedJobIdRef.current = previewJobIdRef.current;
         isBackendReadyRef.current = false;
