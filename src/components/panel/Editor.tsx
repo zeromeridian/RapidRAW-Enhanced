@@ -85,6 +85,7 @@ interface EditorProps {
   goToAdjustmentsHistoryIndex(index: number): void;
   liveRotation?: number | null;
   isInstantTransition: boolean;
+  hasRenderedFirstFrame: boolean;
 }
 
 export default function Editor({
@@ -138,6 +139,7 @@ export default function Editor({
   goToAdjustmentsHistoryIndex,
   liveRotation,
   isInstantTransition,
+  hasRenderedFirstFrame,
 }: EditorProps) {
   const [crop, setCrop] = useState<Crop | null>(null);
   const prevCropParams = useRef<any>(null);
@@ -1001,6 +1003,8 @@ export default function Editor({
     }
   }
 
+  const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
+
   return (
     <div
       className={clsx(
@@ -1042,7 +1046,8 @@ export default function Editor({
         className={clsx(
           'flex-1 relative overflow-hidden',
           isFullScreen ? 'rounded-none' : 'rounded-lg',
-          appSettings?.useWgpuRenderer !== false && !isFullScreen && 'ring-[9999px] ring-bg-secondary',
+          appSettings?.useWgpuRenderer !== false && !isFullScreen && 'ring-[9999px] ring-bg-secondary', // <-- Restored to use appSettings so the ring covers the gaps while loading!
+          !isWgpuActive && 'bg-bg-secondary', // <-- Fills the canvas insert during loading
         )}
         onContextMenu={onContextMenu}
         ref={imageContainerRef}

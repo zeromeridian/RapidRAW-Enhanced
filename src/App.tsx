@@ -483,6 +483,7 @@ function App() {
   const previewJobIdRef = useRef<number>(0);
   const latestRenderedJobIdRef = useRef<number>(0);
   const isAndroid = osPlatform === 'android';
+  const [hasRenderedFirstFrame, setHasRenderedFirstFrame] = useState(false);
 
   useEffect(() => {
     if (currentFolderPath) {
@@ -1558,6 +1559,7 @@ function App() {
           const textDecoder = new TextDecoder();
           const prefix = textDecoder.decode(buffer.slice(0, 11));
           if (prefix === 'WGPU_RENDER') {
+            setHasRenderedFirstFrame(true);
             setInteractivePatch((prev) => {
               if (prev && prev.url) URL.revokeObjectURL(prev.url);
               return null;
@@ -1565,6 +1567,7 @@ function App() {
             return;
           }
 
+          setHasRenderedFirstFrame(true);
           if (dragging) {
             const view = new DataView(buffer);
             const patchX = view.getUint32(0, true);
@@ -2380,6 +2383,7 @@ function App() {
     debouncedSetHistory.cancel();
 
     const lastActivePath = selectedImage?.path ?? null;
+    setHasRenderedFirstFrame(false);
     setSelectedImage(null);
     setFinalPreviewUrl(null);
     setUncroppedAdjustedPreviewUrl(null);
@@ -2414,6 +2418,7 @@ function App() {
 
       patchesSentToBackend.current.clear();
 
+      setHasRenderedFirstFrame(false);
       setMultiSelectedPaths([path]);
       setLibraryActivePath(null);
       setSelectionAnchorPath(path);
@@ -2446,6 +2451,7 @@ function App() {
         setFinalPreviewUrl(cached.finalPreviewUrl);
         setUncroppedAdjustedPreviewUrl(cached.uncroppedPreviewUrl);
         setIsViewLoading(false);
+        setHasRenderedFirstFrame(true);
 
         latestRenderedJobIdRef.current = previewJobIdRef.current;
         isBackendReadyRef.current = false;
@@ -5210,6 +5216,7 @@ function App() {
               goToAdjustmentsHistoryIndex={goToAdjustmentsHistoryIndex}
               liveRotation={liveRotation}
               isInstantTransition={isInstantTransition}
+              hasRenderedFirstFrame={hasRenderedFirstFrame}
             />
             <div
               className={clsx(
@@ -5456,12 +5463,14 @@ function App() {
     return renderMainView();
   };
 
+  const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
+
   return (
     <div
       className={clsx(
         'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
         (appSettings?.adaptiveEditorTheme || isAnimatingTheme) && !isInstantTransition && 'enable-color-transitions',
-        appSettings?.useWgpuRenderer !== false ? 'bg-transparent' : 'bg-bg-primary',
+        isWgpuActive ? 'bg-transparent' : 'bg-bg-primary',
       )}
     >
       <div
