@@ -3472,11 +3472,6 @@ fn generate_preset_preview(
 }
 
 #[tauri::command]
-fn update_window_effect(theme: String, window: tauri::WebviewWindow) {
-    apply_window_effect(theme, &window);
-}
-
-#[tauri::command]
 async fn check_ai_connector_status(app_handle: tauri::AppHandle) {
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let is_connected = if let Some(address) = settings.ai_connector_address {
@@ -4530,59 +4525,6 @@ async fn load_and_parse_lut(
     Ok(LutParseResult { size: lut_size })
 }
 
-fn apply_window_effect(theme: String, window: &tauri::WebviewWindow) {
-    #[cfg(target_os = "windows")]
-    {
-        use tauri::window::{Color, Effect, EffectsBuilder};
-
-        let color = match theme.as_str() {
-            "light" => Color(250, 250, 250, 150),
-            "muted-green" => Color(44, 56, 54, 100),
-            _ => Color(26, 29, 27, 60),
-        };
-
-        let info = os_info::get();
-
-        let is_win11_or_newer = match info.version() {
-            os_info::Version::Semantic(major, _, build) => *major == 10 && *build >= 22000,
-            _ => false,
-        };
-
-        let effect = if is_win11_or_newer {
-            Effect::Acrylic
-        } else {
-            Effect::Blur
-        };
-
-        let effects = EffectsBuilder::new().effect(effect).color(color).build();
-
-        if let Err(e) = window.set_effects(effects) {
-            log::warn!("Failed to apply window effect on Windows: {}", e);
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        use tauri::window::{Effect, EffectsBuilder};
-
-        let effect = match theme.as_str() {
-            "light" => Effect::ContentBackground,
-            _ => Effect::HudWindow,
-        };
-
-        let effects = EffectsBuilder::new().effect(effect).build();
-
-        if let Err(e) = window.set_effects(effects) {
-            log::warn!("Failed to apply macOS vibrancy effect: {}", e);
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        let _ = (theme, window);
-    }
-}
-
 fn setup_logging(app_handle: &tauri::AppHandle) {
     let log_dir = match app_handle.path().app_log_dir() {
         Ok(dir) => dir,
@@ -4923,7 +4865,6 @@ pub fn run() {
             jxl_oxide::integration::register_image_decoding_hook();
 
             let window_cfg = app.config().app.windows.first().unwrap().clone();
-            let transparent = settings.transparent.unwrap_or(window_cfg.transparent);
             let decorations = settings.decorations.unwrap_or(window_cfg.decorations);
             #[cfg(target_os = "android")]
             let _ = decorations;
@@ -4939,28 +4880,14 @@ pub fn run() {
 
             let mut window_builder =
                 tauri::WebviewWindowBuilder::from_config(app.handle(), &main_window_cfg)
-                    .unwrap()
-                    .transparent(transparent);
+                    .unwrap();
 
             #[cfg(not(target_os = "android"))]
             {
                 window_builder = window_builder.decorations(decorations).visible(false);
             }
 
-            if !transparent {
-                window_builder = window_builder
-                    .background_color(tauri::window::Color(100, 100, 100, 255));
-            } else {
-                window_builder =
-                    window_builder.background_color(tauri::window::Color(0, 0, 0, 0));
-            }
-
             let window = window_builder.build().expect("Failed to build window");
-
-            if transparent {
-                let theme = settings.theme.unwrap_or("dark".to_string());
-                apply_window_effect(theme, &window);
-            }
 
             #[cfg(not(target_os = "android"))]
             {
@@ -5132,7 +5059,6 @@ pub fn run() {
             generate_ai_foreground_mask,
             generate_ai_sky_mask,
             generate_ai_depth_mask,
-            update_window_effect,
             check_ai_connector_status,
             test_ai_connector_connection,
             invoke_generative_replace_with_mask_def,

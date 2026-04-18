@@ -67,6 +67,7 @@ interface ImageCanvasProps {
   isMaxZoom?: boolean;
   liveRotation?: number | null;
   zoomScale: number;
+  hasRenderedFirstFrame: boolean;
 }
 
 interface MaskOverlay {
@@ -745,6 +746,7 @@ const ImageCanvas = memo(
     isMaxZoom,
     liveRotation,
     zoomScale,
+    hasRenderedFirstFrame,
   }: ImageCanvasProps) => {
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
     const cropImageRef = useRef<HTMLImageElement>(null);
@@ -772,6 +774,8 @@ const ImageCanvas = memo(
 
     const [baseTool, setBaseTool] = useState<ToolType>(brushSettings?.tool ?? ToolType.Brush);
     const retainedPatchRef = useRef<typeof interactivePatch>(null);
+
+    const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
 
     useEffect(() => {
       if (interactivePatch) {
@@ -1864,7 +1868,7 @@ const ImageCanvas = memo(
                 }
                 preserveAspectRatio={imageRenderSize.width > 0 && imageRenderSize.height > 0 ? 'none' : 'xMidYMid meet'}
               >
-                {displayState.base && appSettings?.useWgpuRenderer === false && (
+                {displayState.base && !isWgpuActive && (
                   <image
                     href={displayState.base}
                     x="0"
@@ -1875,7 +1879,7 @@ const ImageCanvas = memo(
                   />
                 )}
 
-                {displayState.fade && appSettings?.useWgpuRenderer === false && (
+                {displayState.fade && !isWgpuActive && (
                   <image
                     href={displayState.fade}
                     x="0"
@@ -1890,7 +1894,7 @@ const ImageCanvas = memo(
                   />
                 )}
 
-                {visiblePatch && appSettings?.useWgpuRenderer === false && (
+                {visiblePatch && !isWgpuActive && (
                   <image
                     href={visiblePatch.url}
                     x={`${visiblePatch.normX * 100}%`}

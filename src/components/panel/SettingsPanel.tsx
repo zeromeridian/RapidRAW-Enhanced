@@ -577,24 +577,6 @@ export default function SettingsPanel({
     exit: { opacity: 0, scale: 0.8, transition: { duration: 0.15 } },
   };
 
-  const executeSetTransparent = async (transparent: boolean) => {
-    onSettingsChange({ ...appSettings, transparent });
-    await relaunch();
-  };
-
-  const handleSetTransparent = (transparent: boolean) => {
-    setConfirmModalState({
-      confirmText: 'Toggle Transparency',
-      confirmVariant: 'primary',
-      isOpen: true,
-      message: `Are you sure you want to ${transparent ? 'enable' : 'disable'} window transparency effects?\n${
-        transparent ? 'These effects may reduce application performance.' : ''
-      }\nThe application will relaunch to make this change.`,
-      onConfirm: () => executeSetTransparent(transparent),
-      title: 'Confirm Window Transparency',
-    });
-  };
-
   const executeClearCache = async () => {
     setIsClearingCache(true);
     setCacheClearMessage('Clearing thumbnail cache...');
@@ -834,18 +816,6 @@ export default function SettingsPanel({
                         id="folder-image-counts-toggle"
                         label="Show Image Counts"
                         onChange={(checked) => onSettingsChange({ ...appSettings, enableFolderImageCounts: checked })}
-                      />
-                    </SettingItem>
-
-                    <SettingItem
-                      description="Enables or disables transparency effects for the application window. Relaunch required."
-                      label="Window Effects"
-                    >
-                      <Switch
-                        checked={appSettings?.transparent ?? true}
-                        id="window-effects-toggle"
-                        label="Transparency"
-                        onChange={handleSetTransparent}
                       />
                     </SettingItem>
 

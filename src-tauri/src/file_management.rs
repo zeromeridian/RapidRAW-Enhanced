@@ -404,7 +404,6 @@ pub struct AppSettings {
     pub theme: Option<String>,
     #[serde(default)]
     pub font_family: Option<String>,
-    pub transparent: Option<bool>,
     pub decorations: Option<bool>,
     #[serde(alias = "comfyuiAddress")]
     pub ai_connector_address: Option<String>,
@@ -486,10 +485,6 @@ impl Default for AppSettings {
             filter_criteria: None,
             theme: Some("dark".to_string()),
             font_family: None,
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            transparent: Some(false),
-            #[cfg(not(any(target_os = "linux", target_os = "android")))]
-            transparent: Some(true),
             #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
             decorations: Some(true),
             #[cfg(any(target_os = "windows", target_os = "macos"))]

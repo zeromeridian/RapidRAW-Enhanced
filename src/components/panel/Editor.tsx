@@ -1046,8 +1046,8 @@ export default function Editor({
         className={clsx(
           'flex-1 relative overflow-hidden',
           isFullScreen ? 'rounded-none' : 'rounded-lg',
-          appSettings?.useWgpuRenderer !== false && !isFullScreen && 'ring-[9999px] ring-bg-secondary', // <-- Restored to use appSettings so the ring covers the gaps while loading!
-          !isWgpuActive && 'bg-bg-secondary', // <-- Fills the canvas insert during loading
+          appSettings?.useWgpuRenderer !== false && !isFullScreen && 'ring-[9999px] ring-bg-secondary',
+          !isWgpuActive && 'bg-bg-secondary',
         )}
         onContextMenu={onContextMenu}
         ref={imageContainerRef}
@@ -1136,6 +1136,7 @@ export default function Editor({
               isMaxZoom={isMaxZoom}
               liveRotation={liveRotation}
               zoomScale={transformState.scale}
+              hasRenderedFirstFrame={hasRenderedFirstFrame}
             />
           </TransformComponent>
         </TransformWrapper>
