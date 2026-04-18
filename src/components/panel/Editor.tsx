@@ -508,14 +508,14 @@ export default function Editor({
               payload: {
                 windowWidth: 1,
                 windowHeight: 1,
-                x: 0,
-                y: 0,
-                width: 0,
-                height: 0,
+                x: -999999,
+                y: -999999,
+                width: 1,
+                height: 1,
                 clipX: 0,
                 clipY: 0,
-                clipWidth: 0,
-                clipHeight: 0,
+                clipWidth: 1,
+                clipHeight: 1,
                 bgPrimary: state.bgPrimary || [0, 0, 0, 1],
                 bgSecondary: state.bgSecondary || [0, 0, 0, 1],
               },
@@ -565,24 +565,33 @@ export default function Editor({
       }
 
       const dpr = window.devicePixelRatio || 1;
-      const screenX = (currentRect.left + posX + offsetX * scale) * dpr;
-      const screenY = (currentRect.top + posY + offsetY * scale) * dpr;
+      let screenX = (currentRect.left + posX + offsetX * scale) * dpr;
+      let screenY = (currentRect.top + posY + offsetY * scale) * dpr;
       let screenW = baseW * scale * dpr;
       let screenH = baseH * scale * dpr;
 
       const clipX = currentRect.left * dpr;
       const clipY = currentRect.top * dpr;
-      const clipW = currentRect.width * dpr;
-      const clipH = currentRect.height * dpr;
+      let clipW = currentRect.width * dpr;
+      let clipH = currentRect.height * dpr;
+
+      clipW = Math.max(clipW, 1);
+      clipH = Math.max(clipH, 1);
 
       const isCropViewVisible = state.isCropping && state.uncroppedAdjustedPreviewUrl;
-      if (isCropViewVisible || state.showOriginal) {
-        screenW = 0;
-        screenH = 0;
+
+      if (isCropViewVisible) {
+        screenX = -999999;
+        screenY = -999999;
+        screenW = 1;
+        screenH = 1;
+      } else {
+        screenW = Math.max(screenW, 1);
+        screenH = Math.max(screenH, 1);
       }
 
-      const windowWidth = window.innerWidth * dpr;
-      const windowHeight = window.innerHeight * dpr;
+      const windowWidth = Math.max(window.innerWidth * dpr, 1);
+      const windowHeight = Math.max(window.innerHeight * dpr, 1);
 
       const currentTransform = `${windowWidth},${windowHeight},${screenX},${screenY},${screenW},${screenH},${clipX},${clipY},${clipW},${clipH},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
 
