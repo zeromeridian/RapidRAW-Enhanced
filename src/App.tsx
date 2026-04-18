@@ -2757,17 +2757,13 @@ function App() {
         return;
       }
 
-      const activePath = selectedImage?.path || libraryActivePath;
       let currentRating = 0;
-      
       if (selectedImage && pathsToRate.includes(selectedImage.path)) {
-        currentRating = imageRatings[selectedImage.path] || 0;
+        currentRating = adjustments.rating;
       } else if (libraryActivePath && pathsToRate.includes(libraryActivePath)) {
-        currentRating = imageRatings[libraryActivePath] || 0;
-      } else if (pathsToRate.length > 0) {
-        currentRating = imageRatings[pathsToRate[0]] || 0;
+        currentRating = libraryActiveAdjustments.rating;
       }
-      
+
       const finalRating = newRating === currentRating ? 0 : newRating;
 
       setImageRatings((prev: Record<string, number>) => {
@@ -2797,7 +2793,8 @@ function App() {
       multiSelectedPaths,
       selectedImage,
       libraryActivePath,
-      imageRatings,
+      adjustments.rating,
+      libraryActiveAdjustments.rating,
       setAdjustments,
     ],
   );
