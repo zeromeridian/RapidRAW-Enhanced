@@ -511,23 +511,51 @@ export default function Editor({
       if (!isEffectActive) return;
 
       const state = wgpuStateRef.current;
+      const container = imageContainerRef.current;
+
+      if (!container) {
+        if (isEffectActive) {
+          wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
+        }
+        return;
+      }
+
+      const currentRect = container.getBoundingClientRect();
+
+      if (currentRect.width < 10 || currentRect.height < 10) {
+        if (isEffectActive) {
+          wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
+        }
+        return;
+      }
+
+      const dpr = window.devicePixelRatio || 1;
+      const windowWidth = Math.max(window.innerWidth * dpr, 1);
+      const windowHeight = Math.max(window.innerHeight * dpr, 1);
+
+      const clipX = currentRect.left * dpr;
+      const clipY = currentRect.top * dpr;
+      const clipW = Math.max(currentRect.width * dpr, 1);
+      const clipH = Math.max(currentRect.height * dpr, 1);
 
       if (state.useWgpuRenderer === false || !state.isReady || !state.hasRenderedFirstFrame) {
-        if (lastWgpuTransformRef.current !== 'hidden' && !isInvoking) {
-          lastWgpuTransformRef.current = 'hidden';
+        const hiddenTransform = `${windowWidth},${windowHeight},-999999,-999999,1,1,${clipX},${clipY},${clipW},${clipH},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
+
+        if (lastWgpuTransformRef.current !== hiddenTransform && !isInvoking) {
+          lastWgpuTransformRef.current = hiddenTransform;
           isInvoking = true;
           invoke('update_wgpu_transform', {
             payload: {
-              windowWidth: 1,
-              windowHeight: 1,
+              windowWidth,
+              windowHeight,
               x: -999999,
               y: -999999,
               width: 1,
               height: 1,
-              clipX: 0,
-              clipY: 0,
-              clipWidth: 1,
-              clipHeight: 1,
+              clipX,
+              clipY,
+              clipWidth: clipW,
+              clipHeight: clipH,
               bgPrimary: state.bgPrimary || [0, 0, 0, 1],
               bgSecondary: state.bgSecondary || [0, 0, 0, 1],
             },
@@ -543,15 +571,6 @@ export default function Editor({
         return;
       }
 
-      const container = imageContainerRef.current;
-      if (!container) {
-        if (isEffectActive) {
-          wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
-        }
-        return;
-      }
-
-      const currentRect = container.getBoundingClientRect();
       const scale = transformStateRef.current.scale;
       const posX = transformStateRef.current.positionX;
       const posY = transformStateRef.current.positionY;
@@ -579,19 +598,10 @@ export default function Editor({
         offsetX = (cw - baseW) / 2;
       }
 
-      const dpr = window.devicePixelRatio || 1;
       let screenX = (currentRect.left + posX + offsetX * scale) * dpr;
       let screenY = (currentRect.top + posY + offsetY * scale) * dpr;
       let screenW = baseW * scale * dpr;
       let screenH = baseH * scale * dpr;
-
-      const clipX = currentRect.left * dpr;
-      const clipY = currentRect.top * dpr;
-      let clipW = currentRect.width * dpr;
-      let clipH = currentRect.height * dpr;
-
-      clipW = Math.max(clipW, 1);
-      clipH = Math.max(clipH, 1);
 
       const isCropViewVisible = state.isCropping && state.uncroppedAdjustedPreviewUrl;
 
@@ -605,14 +615,10 @@ export default function Editor({
         screenH = Math.max(screenH, 1);
       }
 
-      const windowWidth = Math.max(window.innerWidth * dpr, 1);
-      const windowHeight = Math.max(window.innerHeight * dpr, 1);
-
       const currentTransform = `${windowWidth},${windowHeight},${screenX},${screenY},${screenW},${screenH},${clipX},${clipY},${clipW},${clipH},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
 
       if (lastWgpuTransformRef.current !== currentTransform && !isInvoking) {
         lastWgpuTransformRef.current = currentTransform;
-
         isInvoking = true;
 
         invoke('update_wgpu_transform', {
@@ -1034,7 +1040,7 @@ export default function Editor({
     }
   }
 
-  const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
+  const isWgpuActive = appSettings?.useWgpuRenderer !== false && hasRenderedFirstFrame;
 
   return (
     <div

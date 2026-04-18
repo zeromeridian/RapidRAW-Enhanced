@@ -1568,7 +1568,6 @@ function App() {
             return;
           }
 
-          setHasRenderedFirstFrame(true);
           if (dragging) {
             const view = new DataView(buffer);
             const patchX = view.getUint32(0, true);
