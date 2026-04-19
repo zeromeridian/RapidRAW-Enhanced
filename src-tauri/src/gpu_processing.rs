@@ -29,14 +29,15 @@ pub struct RenderRequest<'a> {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct DisplayTransform {
-    pub rect: [f32; 4],         // x, y, width, height
-    pub clip: [f32; 4],         // clip_x, clip_y, clip_width, clip_height
-    pub window: [f32; 2],       // window_width, window_height
-    pub image_size: [f32; 2],   // actual image width, height
-    pub texture_size: [f32; 2], // padded texture width, height
-    pub _pad: [f32; 2],         // alignment padding
-    pub bg_primary: [f32; 4],   // primary bg color
-    pub bg_secondary: [f32; 4], // secondary bg color (letterboxes)
+    pub rect: [f32; 4],
+    pub clip: [f32; 4],
+    pub window: [f32; 2],
+    pub image_size: [f32; 2],
+    pub texture_size: [f32; 2],
+    pub pixelated: f32,
+    pub _pad: f32,
+    pub bg_primary: [f32; 4],
+    pub bg_secondary: [f32; 4],
 }
 
 pub struct WgpuDisplay {
@@ -243,6 +244,8 @@ pub fn get_or_init_gpu_context(
             window: vec2<f32>,
             image_size: vec2<f32>,
             texture_size: vec2<f32>,
+            pixelated: f32,
+            _pad: f32,
             bg_primary: vec4<f32>,
             bg_secondary: vec4<f32>,
         };
@@ -295,7 +298,14 @@ pub fn get_or_init_gpu_context(
             }
 
             let adjusted_uv = in.uv * (transform.image_size / transform.texture_size);
-            return textureSample(tex, samp, adjusted_uv);
+
+            if (transform.pixelated > 0.5) {
+                let texel_coords = floor(adjusted_uv * transform.texture_size);
+                let nearest_uv = (texel_coords + vec2<f32>(0.5, 0.5)) / transform.texture_size;
+                return textureSample(tex, samp, nearest_uv);
+            } else {
+                return textureSample(tex, samp, adjusted_uv);
+            }
         }
     ";
 
@@ -390,7 +400,8 @@ pub fn get_or_init_gpu_context(
             window: [1280.0, 720.0],
             image_size: [100.0, 100.0],
             texture_size: [100.0, 100.0],
-            _pad: [0.0; 2],
+            pixelated: 0.0,
+            _pad: 0.0,
             bg_primary: [24.0 / 255.0, 24.0 / 255.0, 24.0 / 255.0, 1.0],
             bg_secondary: [35.0 / 255.0, 35.0 / 255.0, 35.0 / 255.0, 1.0],
         },
@@ -1063,6 +1074,7 @@ impl GpuProcessor {
         height: u32,
         request: RenderRequest,
         skip_cpu_readback: bool,
+        output_to_display: bool,
     ) -> Result<(Vec<u8>, u32, u32), String> {
         let device = &self.context.device;
         let queue = &self.context.queue;
@@ -1559,7 +1571,7 @@ impl GpuProcessor {
                 let crop_x_start = x_start - input_x_start;
                 let crop_y_start = y_start - input_y_start;
 
-                if skip_cpu_readback {
+                if output_to_display {
                     main_encoder.copy_texture_to_texture(
                         wgpu::TexelCopyTextureInfo {
                             texture: &self.tile_output_texture,
@@ -1633,6 +1645,7 @@ pub fn process_and_get_dynamic_image(
     request: RenderRequest,
     caller_id: &str,
     output_to_display: bool,
+    force_readback: bool,
 ) -> Result<DynamicImage, String> {
     let start_time = Instant::now();
     let (width, height) = base_image.dimensions();
@@ -1715,11 +1728,14 @@ pub fn process_and_get_dynamic_image(
 
     let cache = cache_lock.as_ref().unwrap();
 
+    let skip_readback = output_to_display && !force_readback;
+
     let (processed_pixels, out_w, out_h) = processor.run(
         &cache.texture_view,
         cache.width,
         cache.height,
         request,
+        skip_readback,
         output_to_display,
     )?;
 
@@ -1758,7 +1774,9 @@ pub fn process_and_get_dynamic_image(
             display.current_bind_group = Some(bind_group);
             display.render(device, queue);
         }
+    }
 
+    if skip_readback {
         let duration = start_time.elapsed();
         let fps = 1.0 / duration.as_secs_f64();
         log::info!(
@@ -1769,7 +1787,6 @@ pub fn process_and_get_dynamic_image(
             duration,
             fps
         );
-
         return Ok(DynamicImage::new_rgba8(0, 0));
     }
 
