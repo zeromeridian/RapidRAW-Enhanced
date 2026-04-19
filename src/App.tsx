@@ -27,7 +27,7 @@ import {
   LayoutTemplate,
   Redo,
   RefreshCw,
-  RotateCcw,
+  Eraser,
   Star,
   SquaresUnite,
   Palette,
@@ -4415,7 +4415,7 @@ function App() {
       { type: OPTION_SEPARATOR },
       {
         label: 'Reset Adjustments',
-        icon: RotateCcw,
+        icon: Eraser,
         onClick: () => {
           debouncedSetHistory.cancel();
           const currentRating = adjustments.rating;
@@ -4816,7 +4816,7 @@ function App() {
           );
         },
       },
-      { label: resetLabel, icon: RotateCcw, onClick: () => handleResetAdjustments(finalSelection) },
+      { label: resetLabel, icon: Eraser, onClick: () => handleResetAdjustments(finalSelection) },
       deleteOption,
     ];
     showContextMenu(event.clientX, event.clientY, options);
