@@ -307,6 +307,7 @@ pub struct WgpuTransformPayload {
     pub clip_height: f32,
     pub bg_primary: [f32; 4],
     pub bg_secondary: [f32; 4],
+    pub pixelated: bool,
 }
 
 fn apply_all_transformations<'a, I: IntoCowImage<'a>>(
@@ -987,6 +988,7 @@ async fn update_wgpu_transform(
             display.latest_transform.window = [payload.window_width, payload.window_height];
             display.latest_transform.bg_primary = payload.bg_primary;
             display.latest_transform.bg_secondary = payload.bg_secondary;
+            display.latest_transform.pixelated = if payload.pixelated { 1.0 } else { 0.0 };
 
             context.queue.write_buffer(
                 &display.transform_buffer,
@@ -1153,6 +1155,8 @@ fn process_preview_job(
     let lut_path = adjustments_clone["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
 
+    let force_readback = use_wgpu_renderer && pixel_roi.is_none();
+
     let final_processed_image_result = process_and_get_dynamic_image(
         &context,
         &state,
@@ -1166,16 +1170,14 @@ fn process_preview_job(
         },
         "apply_adjustments",
         use_wgpu_renderer,
+        force_readback,
     );
 
     if let Ok(final_processed_image) = final_processed_image_result {
-        if use_wgpu_renderer {
-            return Ok(b"WGPU_RENDER".to_vec());
-        }
-
+        let has_valid_image = final_processed_image.width() > 0;
         let final_processed_image = Arc::new(final_processed_image);
 
-        if !(is_interactive && pixel_roi.is_some()) {
+        if !(is_interactive && pixel_roi.is_some()) && has_valid_image {
             let channel_filter = if is_interactive {
                 active_waveform_channel.map(|s| s.to_string())
             } else {
@@ -1192,6 +1194,10 @@ fn process_preview_job(
             if let Some(tx) = state.analytics_worker_tx.lock().unwrap().as_ref() {
                 let _ = tx.send(analytics_job);
             }
+        }
+
+        if use_wgpu_renderer {
+            return Ok(b"WGPU_RENDER".to_vec());
         }
 
         let final_rgba_image = match &*final_processed_image {
@@ -1482,6 +1488,7 @@ fn generate_uncropped_preview(
             },
             "generate_uncropped_preview",
             false,
+            false,
         ) {
             let (width, height) = processed_image.dimensions();
             let rgb_pixels = processed_image.to_rgb8().into_vec();
@@ -1645,6 +1652,7 @@ async fn preview_geometry_transform(
                     roi: None,
                 },
                 "preview_geometry_transform_base_gen",
+                false,
                 false,
             )?;
 
@@ -1868,6 +1876,7 @@ fn process_image_for_export_pipeline(
             roi: None,
         },
         debug_tag,
+        false,
         false,
     )
 }
@@ -2135,6 +2144,7 @@ fn export_masks_for_image(
                 },
                 "export_mask_image",
                 false,
+                false,
             )?;
 
             let with_options = apply_export_resize_and_watermark(processed, export_settings)?;
@@ -2226,6 +2236,7 @@ fn export_adjustments_as_lut(
             roi: None,
         },
         "export_lut",
+        false,
         false,
     )?;
 
@@ -2783,6 +2794,7 @@ async fn estimate_export_size(
         },
         "estimate_export_size",
         false,
+        false,
     )?;
 
     let preview_bytes = encode_image_to_bytes(
@@ -2968,6 +2980,7 @@ async fn estimate_batch_export_size(
             roi: None,
         },
         "estimate_batch_export_size",
+        false,
         false,
     )?;
 
@@ -3460,6 +3473,7 @@ fn generate_preset_preview(
         },
         "generate_preset_preview",
         false,
+        false,
     )?;
 
     let mut buf = Cursor::new(Vec::new());
@@ -3838,6 +3852,7 @@ async fn generate_all_community_previews(
                     roi: None,
                 },
                 "generate_all_community_previews",
+                false,
                 false,
             )?;
 
@@ -4499,6 +4514,7 @@ fn generate_preview_for_path(
         },
         "generate_preview_for_path",
         false,
+        false,
     )?;
     let (width, height) = final_image.dimensions();
     let rgb_pixels = final_image.to_rgb8().into_vec();
@@ -4891,6 +4907,17 @@ pub fn run() {
 
             #[cfg(not(target_os = "android"))]
             {
+                // Metal requires creating the window surface on the main thread. Preview and
+                // thumbnail work runs on background threads; initialize once here so they only
+                // clone the cached GpuContext (avoids panic + erroneous OpenGL fallback).
+                let app_state = app.state::<AppState>();
+                if let Err(error) = get_or_init_gpu_context(&app_state, app.handle()) {
+                    log::warn!(
+                        "GPU pre-initialization failed (editing and thumbnails may be degraded): {}",
+                        error
+                    );
+                }
+
                 if let Ok(config_dir) = app.path().app_config_dir() {
                     let path = config_dir.join("window_state.json");
                     if let Ok(contents) = std::fs::read_to_string(&path) {
