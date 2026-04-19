@@ -26,8 +26,8 @@ import {
   SortAsc,
   Trash2,
   Users,
-  Layers,
-  Scaling,
+  Blend,
+  Crop,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AddPresetModal from '../../modals/AddPresetModal';
@@ -134,8 +134,8 @@ function PresetItemDisplay({ preset, previewUrl, isGeneratingPreviews }: PresetI
 
         {(supportsMasks || supportsGeometry) && (
           <div className="absolute top-1 right-1 bg-primary rounded-full px-1.5 py-0.5 flex items-center gap-1.5 backdrop-blur-xs shadow-xs z-10 pointer-events-none">
-            {supportsMasks && <Layers size={11} className="text-white" />}
-            {supportsGeometry && <Scaling size={11} className="text-white" />}
+            {supportsMasks && <Blend size={11} className="text-white" />}
+            {supportsGeometry && <Crop size={11} className="text-white" />}
           </div>
         )}
       </div>

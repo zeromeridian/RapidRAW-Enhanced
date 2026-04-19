@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { ArrowLeft, CheckCircle2, ChevronDown, Loader2, Search, Users, Layers, Scaling, Github } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ChevronDown, Loader2, Search, Users, Blend, Crop, Github } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -317,8 +317,8 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
 
                       {/* Optional: Add small icons next to the name if the preset supports them */}
                       <div className="flex justify-center gap-2 mt-1 opacity-60">
-                        {preset.includeMasks && <Layers size={12} title="Includes Masks" />}
-                        {preset.includeCropTransform && <Scaling size={12} title="Includes Geometry" />}
+                        {preset.includeMasks && <Blend size={12} title="Includes Masks" />}
+                        {preset.includeCropTransform && <Crop size={12} title="Includes Geometry" />}
                       </div>
                     </div>
                   </motion.div>
