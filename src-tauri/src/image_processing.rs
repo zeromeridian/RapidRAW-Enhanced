@@ -1113,6 +1113,7 @@ pub fn is_geometry_identity(params: &GeometryParams) -> bool {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AutoAdjustmentResults {
     pub exposure: f64,
+    pub brightness: f64,
     pub contrast: f64,
     pub highlights: f64,
     pub shadows: f64,
@@ -2694,8 +2695,6 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
     const HIGHLIGHT_BOOST_SCALE: f64 = 120.0;
     const HIGHLIGHT_MAX: f64 = 70.0;
 
-    const DULL_SAT_THRESHOLD: f32 = 0.1;
-
     const VIBRANCY_SAT_THRESHOLD: f32 = 0.2;
     const VIBRANCY_SCALE: f64 = 120.0;
 
@@ -2717,6 +2716,7 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
     const BLACKS_SCALE: f64 = 0.5;
     const WHITES_SCALE: f64 = 0.2;
     const EXPOSURE_OUTPUT_SCALE: f64 = 20.0;
+    const BRIGHTNESS_SCALE: f64 = 0.007;
 
 
     let analysis_preview = downscale_f32_image(image, ANALYSIS_MAX_DIM, ANALYSIS_MAX_DIM);
@@ -2870,12 +2870,15 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
     }
 
     let adj_p1  = percentile(&adjusted_luma_hist, 0.01);
+    let adj_p50 = percentile(&adjusted_luma_hist, 0.50);
     let adj_p99 = percentile(&adjusted_luma_hist, 0.99);
     let blacks: f64 = -(adj_p1  as f64 * BLACKS_SCALE);
     let whites: f64 =  (adj_p99 as f64 - 255.0) * WHITES_SCALE;
+    let brightness: f64 = (MID_GRAY - adj_p50 as f64) * BRIGHTNESS_SCALE;
 
     AutoAdjustmentResults {
         exposure:        (exposure / EXPOSURE_OUTPUT_SCALE).clamp(-5.0, 5.0),
+        brightness:      brightness.clamp(-5.0, 5.0),
         contrast:        contrast.clamp(-100.0, 100.0),
         highlights:      highlights.clamp(-100.0, 100.0),
         shadows:         shadows.clamp(-100.0, 100.0),
@@ -2895,6 +2898,7 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
 pub fn auto_results_to_json(results: &AutoAdjustmentResults) -> serde_json::Value {
     json!({
         "exposure": results.exposure,
+        "brightness": results.brightness,
         "contrast": results.contrast,
         "highlights": results.highlights,
         "shadows": results.shadows,
