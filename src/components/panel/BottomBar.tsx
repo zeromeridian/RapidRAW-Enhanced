@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Star, Copy, ClipboardPaste, RotateCcw, ChevronUp, ChevronDown, Check, Save, Settings } from 'lucide-react';
+import { Star, Copy, ClipboardPaste, RotateCcw, ChevronUp, ChevronDown, Check, FileInput, Settings } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import Filmstrip from './Filmstrip';
