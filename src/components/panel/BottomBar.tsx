@@ -371,7 +371,7 @@ export default function BottomBar({
               onClick={onExportClick}
               data-tooltip="Export"
             >
-              <Save size={18} />
+              <FileInput size={18} />
             </button>
           </div>
         ) : (

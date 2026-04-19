@@ -19,6 +19,7 @@ import {
   CopyPlus,
   Edit,
   FileEdit,
+  FileInput,
   Folder,
   FolderInput,
   FolderPlus,
@@ -28,7 +29,6 @@ import {
   RefreshCw,
   RotateCcw,
   Star,
-  Save,
   SquaresUnite,
   Palette,
   Tag,
@@ -4295,7 +4295,7 @@ function App() {
     const options: Array<Option> = [
       {
         label: 'Export Image',
-        icon: Save,
+        icon: FileInput,
         onClick: () => {
           setRenderedRightPanel(Panel.Export);
           setActiveRightPanel(Panel.Export);
@@ -4596,7 +4596,7 @@ function App() {
               onClick: () => handleImageSelect(finalSelection[0]),
             },
             {
-              icon: Save,
+              icon: FileInput,
               label: exportLabel,
               onClick: onExportClick,
             },
@@ -4604,7 +4604,7 @@ function App() {
           ]
         : [
             {
-              icon: Save,
+              icon: FileInput,
               label: exportLabel,
               onClick: onExportClick,
             },
