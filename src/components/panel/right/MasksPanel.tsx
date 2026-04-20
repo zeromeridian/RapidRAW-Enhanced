@@ -31,7 +31,7 @@ import {
   PlusSquare,
   RotateCcw,
   Trash2,
-  Bookmark,
+  SwatchBook,
   SquaresIntersect,
 } from 'lucide-react';
 
@@ -1652,7 +1652,7 @@ function ContainerRow({
       },
       {
         label: 'Apply Preset',
-        icon: Bookmark,
+        icon: SwatchBook,
         submenu: generatePresetSubmenu(presets).length
           ? generatePresetSubmenu(presets)
           : [{ label: 'No presets', disabled: true }],

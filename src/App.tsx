@@ -19,6 +19,7 @@ import {
   CopyPlus,
   Edit,
   FileEdit,
+  FileInput,
   Folder,
   FolderInput,
   FolderPlus,
@@ -26,9 +27,8 @@ import {
   LayoutTemplate,
   Redo,
   RefreshCw,
-  RotateCcw,
+  Eraser,
   Star,
-  Save,
   SquaresUnite,
   Palette,
   Tag,
@@ -4287,7 +4287,7 @@ function App() {
     const options: Array<Option> = [
       {
         label: 'Export Image',
-        icon: Save,
+        icon: FileInput,
         onClick: () => {
           setRenderedRightPanel(Panel.Export);
           setActiveRightPanel(Panel.Export);
@@ -4407,7 +4407,7 @@ function App() {
       { type: OPTION_SEPARATOR },
       {
         label: 'Reset Adjustments',
-        icon: RotateCcw,
+        icon: Eraser,
         onClick: () => {
           debouncedSetHistory.cancel();
           const currentRating = adjustments.rating;
@@ -4588,7 +4588,7 @@ function App() {
               onClick: () => handleImageSelect(finalSelection[0]),
             },
             {
-              icon: Save,
+              icon: FileInput,
               label: exportLabel,
               onClick: onExportClick,
             },
@@ -4596,7 +4596,7 @@ function App() {
           ]
         : [
             {
-              icon: Save,
+              icon: FileInput,
               label: exportLabel,
               onClick: onExportClick,
             },
@@ -4808,7 +4808,7 @@ function App() {
           );
         },
       },
-      { label: resetLabel, icon: RotateCcw, onClick: () => handleResetAdjustments(finalSelection) },
+      { label: resetLabel, icon: Eraser, onClick: () => handleResetAdjustments(finalSelection) },
       deleteOption,
     ];
     showContextMenu(event.clientX, event.clientY, options);
