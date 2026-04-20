@@ -2454,7 +2454,7 @@ pub async fn apply_auto_adjustments_to_paths(
                 let image = image_loader::load_base_image_from_bytes(
                     &file_bytes,
                     &source_path_str,
-                    false,
+                    true,
                     highlight_compression,
                     linear_mode.clone(),
                     None,
