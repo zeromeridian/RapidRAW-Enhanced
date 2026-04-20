@@ -21,12 +21,12 @@ import {
   FolderOpen,
   FolderPlus,
   Loader2,
+  Layers,
   Plus,
   RefreshCw,
   SortAsc,
   Trash2,
   Users,
-  Blend,
   Crop,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -134,7 +134,7 @@ function PresetItemDisplay({ preset, previewUrl, isGeneratingPreviews }: PresetI
 
         {(supportsMasks || supportsGeometry) && (
           <div className="absolute top-1 right-1 bg-primary rounded-full px-1.5 py-0.5 flex items-center gap-1.5 backdrop-blur-xs shadow-xs z-10 pointer-events-none">
-            {supportsMasks && <Blend size={11} className="text-white" />}
+            {supportsMasks && <Layers size={11} className="text-white" />}
             {supportsGeometry && <Crop size={11} className="text-white" />}
           </div>
         )}

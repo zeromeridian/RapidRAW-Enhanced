@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { SlidersHorizontal, Info, Crop, Blend, Paintbrush, SwatchBook, FileInput } from 'lucide-react';
+import { SlidersHorizontal, Info, Crop, Layers, Paintbrush, SwatchBook, FileInput } from 'lucide-react';
 import { Panel } from '../../ui/AppProperties';
 
 interface PanelOptions {
@@ -19,7 +19,7 @@ const panelGroups: Array<Array<PanelOptions>> = [
   [
     { id: Panel.Adjustments, icon: SlidersHorizontal, title: 'Adjust' },
     { id: Panel.Crop, icon: Crop, title: 'Crop' },
-    { id: Panel.Masks, icon: Blend, title: 'Masks' },
+    { id: Panel.Masks, icon: Layers, title: 'Masks' },
     { id: Panel.Ai, icon: Paintbrush, title: 'Inpaint' },
   ],
   [
