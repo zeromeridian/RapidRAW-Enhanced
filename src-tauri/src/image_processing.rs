@@ -14,7 +14,8 @@ use std::f32::consts::PI;
 use std::sync::Arc;
 
 pub use crate::gpu_processing::{
-    RenderRequest, get_or_init_gpu_context, process_and_get_dynamic_image, process_and_get_dynamic_image_with_analytics,
+    RenderRequest, get_or_init_gpu_context, process_and_get_dynamic_image,
+    process_and_get_dynamic_image_with_analytics,
 };
 use crate::{AppState, mask_generation::MaskDefinition};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};

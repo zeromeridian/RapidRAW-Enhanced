@@ -1170,31 +1170,37 @@ fn process_preview_job(
     };
 
     let analytics_config = if wants_analytics {
-        state.analytics_worker_tx.lock().unwrap().clone().map(|tx| crate::AnalyticsConfig {
-            path: loaded_image.path.clone(),
-            compute_waveform,
-            active_waveform_channel: channel_filter,
-            sender: tx,
-        })
+        state
+            .analytics_worker_tx
+            .lock()
+            .unwrap()
+            .clone()
+            .map(|tx| crate::AnalyticsConfig {
+                path: loaded_image.path.clone(),
+                compute_waveform,
+                active_waveform_channel: channel_filter,
+                sender: tx,
+            })
     } else {
         None
     };
 
-    let final_processed_image_result = crate::image_processing::process_and_get_dynamic_image_with_analytics(
-        &context,
-        &state,
-        &processing_image,
-        new_transform_hash,
-        RenderRequest {
-            adjustments: final_adjustments,
-            mask_bitmaps: &mask_bitmaps,
-            lut,
-            roi: pixel_roi,
-        },
-        "apply_adjustments",
-        use_wgpu_renderer,
-        analytics_config,
-    );
+    let final_processed_image_result =
+        crate::image_processing::process_and_get_dynamic_image_with_analytics(
+            &context,
+            &state,
+            &processing_image,
+            new_transform_hash,
+            RenderRequest {
+                adjustments: final_adjustments,
+                mask_bitmaps: &mask_bitmaps,
+                lut,
+                roi: pixel_roi,
+            },
+            "apply_adjustments",
+            use_wgpu_renderer,
+            analytics_config,
+        );
 
     if let Ok(final_processed_image) = final_processed_image_result {
         if use_wgpu_renderer {
@@ -4759,21 +4765,16 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(PinchZoomDisablePlugin)
-        .on_window_event(|window, event| match event {
-            tauri::WindowEvent::Resized(size) => {
-                let state = window.state::<AppState>();
-                if let Some(ctx) = state.gpu_context.lock().unwrap().as_ref() {
-                    if let Ok(mut display_lock) = ctx.display.try_lock() {
-                        if let Some(display) = display_lock.as_mut() {
-                            display.config.width = size.width.max(1);
-                            display.config.height = size.height.max(1);
-                            display.surface.configure(&ctx.device, &display.config);
-                            display.render(&ctx.device, &ctx.queue);
-                        }
+        .on_window_event(|window, event| if let tauri::WindowEvent::Resized(size) = event {
+            let state = window.state::<AppState>();
+            if let Some(ctx) = state.gpu_context.lock().unwrap().as_ref()
+                && let Ok(mut display_lock) = ctx.display.try_lock()
+                    && let Some(display) = display_lock.as_mut() {
+                        display.config.width = size.width.max(1);
+                        display.config.height = size.height.max(1);
+                        display.surface.configure(&ctx.device, &display.config);
+                        display.render(&ctx.device, &ctx.queue);
                     }
-                }
-            }
-            _ => {}
         })
         .setup(|app| {
             #[cfg(any(windows, target_os = "linux"))]
