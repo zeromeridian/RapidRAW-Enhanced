@@ -153,16 +153,24 @@ pub fn get_or_init_gpu_context(
 
     let instance = wgpu::Instance::new(&instance_desc);
 
-    let window = app_handle
-        .get_webview_window("main")
-        .ok_or("Failed to get main window")?;
-    let surface = instance
-        .create_surface(window.clone())
-        .map_err(|e| e.to_string())?;
+    #[cfg(not(any(target_os = "android")))]
+    let surface_opt = {
+        let window = app_handle
+            .get_webview_window("main")
+            .ok_or("Failed to get main window")?;
+        Some(
+            instance
+                .create_surface(window.clone())
+                .map_err(|e| e.to_string())?,
+        )
+    };
+
+    #[cfg(any(target_os = "android"))]
+    let surface_opt: Option<wgpu::Surface> = None;
 
     let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,
-        compatible_surface: Some(&surface),
+        compatible_surface: surface_opt.as_ref(),
         ..Default::default()
     }))
     .map_err(|e| {
@@ -201,233 +209,248 @@ pub fn get_or_init_gpu_context(
         let _ = std::fs::remove_file(p);
     }
 
-    let swapchain_caps = surface.get_capabilities(&adapter);
-    let swapchain_format = swapchain_caps
-        .formats
-        .iter()
-        .copied()
-        .find(|f| !f.is_srgb())
-        .unwrap_or(swapchain_caps.formats[0]);
-    let alpha_mode = if swapchain_caps
-        .alpha_modes
-        .contains(&wgpu::CompositeAlphaMode::PreMultiplied)
-    {
-        wgpu::CompositeAlphaMode::PreMultiplied
-    } else if swapchain_caps
-        .alpha_modes
-        .contains(&wgpu::CompositeAlphaMode::PostMultiplied)
-    {
-        wgpu::CompositeAlphaMode::PostMultiplied
-    } else {
-        swapchain_caps.alpha_modes[0]
-    };
+    #[cfg(not(any(target_os = "android")))]
+    let display_opt = {
+        let surface = surface_opt.unwrap();
+        let window = app_handle
+            .get_webview_window("main")
+            .ok_or("Failed to get main window")?;
 
-    let size = window
-        .inner_size()
-        .unwrap_or(tauri::PhysicalSize::new(1280, 720));
-    let config = wgpu::SurfaceConfiguration {
-        width: size.width.max(1),
-        height: size.height.max(1),
-        format: swapchain_format,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        present_mode: wgpu::PresentMode::Fifo,
-        alpha_mode,
-        view_formats: vec![],
-        desired_maximum_frame_latency: 2,
-    };
-    surface.configure(&device, &config);
+        let swapchain_caps = surface.get_capabilities(&adapter);
+        let swapchain_format = swapchain_caps
+            .formats
+            .iter()
+            .copied()
+            .find(|f| !f.is_srgb())
+            .unwrap_or(swapchain_caps.formats[0]);
 
-    let shader_source = "
-        struct Transform {
-            rect: vec4<f32>,
-            clip: vec4<f32>,
-            window: vec2<f32>,
-            image_size: vec2<f32>,
-            texture_size: vec2<f32>,
-            pixelated: f32,
-            _pad: f32,
-            bg_primary: vec4<f32>,
-            bg_secondary: vec4<f32>,
-        };
-        @group(0) @binding(0) var<uniform> transform: Transform;
-        @group(0) @binding(1) var tex: texture_2d<f32>;
-        @group(0) @binding(2) var samp: sampler;
-
-        struct VertexOutput {
-            @builtin(position) pos: vec4<f32>,
-            @location(0) uv: vec2<f32>,
+        let alpha_mode = if swapchain_caps
+            .alpha_modes
+            .contains(&wgpu::CompositeAlphaMode::PreMultiplied)
+        {
+            wgpu::CompositeAlphaMode::PreMultiplied
+        } else if swapchain_caps
+            .alpha_modes
+            .contains(&wgpu::CompositeAlphaMode::PostMultiplied)
+        {
+            wgpu::CompositeAlphaMode::PostMultiplied
+        } else {
+            swapchain_caps.alpha_modes[0]
         };
 
-        @vertex
-        fn vs_main(@builtin(vertex_index) id: u32) -> VertexOutput {
-            let uvs = array<vec2<f32>, 4>(
-                vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0),
-                vec2<f32>(0.0, 1.0), vec2<f32>(1.0, 1.0)
-            );
-            let pos = uvs[id];
+        let size = window
+            .inner_size()
+            .unwrap_or(tauri::PhysicalSize::new(1280, 720));
+        let config = wgpu::SurfaceConfiguration {
+            width: size.width.max(1),
+            height: size.height.max(1),
+            format: swapchain_format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode,
+            view_formats: vec![],
+            desired_maximum_frame_latency: 2,
+        };
+        surface.configure(&device, &config);
 
-            let uv_x = transform.clip.x + pos.x * transform.clip.z;
-            let uv_y = transform.clip.y + pos.y * transform.clip.w;
+        let shader_source = "
+            struct Transform {
+                rect: vec4<f32>,
+                clip: vec4<f32>,
+                window: vec2<f32>,
+                image_size: vec2<f32>,
+                texture_size: vec2<f32>,
+                pixelated: f32,
+                _pad: f32,
+                bg_primary: vec4<f32>,
+                bg_secondary: vec4<f32>,
+            };
+            @group(0) @binding(0) var<uniform> transform: Transform;
+            @group(0) @binding(1) var tex: texture_2d<f32>;
+            @group(0) @binding(2) var samp: sampler;
 
-            let half_pixel_x = 0.5;
-            let half_pixel_y = 0.5;
-            let outset_x = (pos.x * 2.0 - 1.0) * half_pixel_x;
-            let outset_y = (pos.y * 2.0 - 1.0) * half_pixel_y;
+            struct VertexOutput {
+                @builtin(position) pos: vec4<f32>,
+                @location(0) uv: vec2<f32>,
+            };
 
-            let screen_x = uv_x + outset_x;
-            let screen_y = uv_y + outset_y;
+            @vertex
+            fn vs_main(@builtin(vertex_index) id: u32) -> VertexOutput {
+                let uvs = array<vec2<f32>, 4>(
+                    vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0),
+                    vec2<f32>(0.0, 1.0), vec2<f32>(1.0, 1.0)
+                );
+                let pos = uvs[id];
 
-            let ndc_x = (screen_x / transform.window.x) * 2.0 - 1.0;
-            let ndc_y = 1.0 - (screen_y / transform.window.y) * 2.0;
+                let uv_x = transform.clip.x + pos.x * transform.clip.z;
+                let uv_y = transform.clip.y + pos.y * transform.clip.w;
 
-            var out: VertexOutput;
-            out.pos = vec4<f32>(ndc_x, ndc_y, 0.0, 1.0);
+                let half_pixel_x = 0.5;
+                let half_pixel_y = 0.5;
+                let outset_x = (pos.x * 2.0 - 1.0) * half_pixel_x;
+                let outset_y = (pos.y * 2.0 - 1.0) * half_pixel_y;
 
-            out.uv = vec2<f32>(
-                (uv_x - transform.rect.x) / transform.rect.z,
-                (uv_y - transform.rect.y) / transform.rect.w
-            );
+                let screen_x = uv_x + outset_x;
+                let screen_y = uv_y + outset_y;
 
-            return out;
-        }
+                let ndc_x = (screen_x / transform.window.x) * 2.0 - 1.0;
+                let ndc_y = 1.0 - (screen_y / transform.window.y) * 2.0;
 
-        @fragment
-        fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-            if (in.uv.x < 0.0 || in.uv.x > 1.0 || in.uv.y < 0.0 || in.uv.y > 1.0) {
-                return transform.bg_secondary;
+                var out: VertexOutput;
+                out.pos = vec4<f32>(ndc_x, ndc_y, 0.0, 1.0);
+
+                out.uv = vec2<f32>(
+                    (uv_x - transform.rect.x) / transform.rect.z,
+                    (uv_y - transform.rect.y) / transform.rect.w
+                );
+
+                return out;
             }
 
-            let adjusted_uv = in.uv * (transform.image_size / transform.texture_size);
+            @fragment
+            fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+                if (in.uv.x < 0.0 || in.uv.x > 1.0 || in.uv.y < 0.0 || in.uv.y > 1.0) {
+                    return transform.bg_secondary;
+                }
 
-            let half_texel = vec2<f32>(0.5, 0.5) / transform.texture_size;
+                let adjusted_uv = in.uv * (transform.image_size / transform.texture_size);
 
-            let min_uv = half_texel;
-            let max_uv = (transform.image_size / transform.texture_size) - half_texel;
+                let half_texel = vec2<f32>(0.5, 0.5) / transform.texture_size;
 
-            if (transform.pixelated > 0.5) {
-                let texel_coords = floor(adjusted_uv * transform.texture_size);
-                let nearest_uv = (texel_coords + vec2<f32>(0.5, 0.5)) / transform.texture_size;
+                let min_uv = half_texel;
+                let max_uv = (transform.image_size / transform.texture_size) - half_texel;
 
-                let clamped_nearest = clamp(nearest_uv, min_uv, max_uv);
-                return textureSample(tex, samp, clamped_nearest);
-            } else {
-                let clamped_uv = clamp(adjusted_uv, min_uv, max_uv);
-                return textureSample(tex, samp, clamped_uv);
+                if (transform.pixelated > 0.5) {
+                    let texel_coords = floor(adjusted_uv * transform.texture_size);
+                    let nearest_uv = (texel_coords + vec2<f32>(0.5, 0.5)) / transform.texture_size;
+
+                    let clamped_nearest = clamp(nearest_uv, min_uv, max_uv);
+                    return textureSample(tex, samp, clamped_nearest);
+                } else {
+                    let clamped_uv = clamp(adjusted_uv, min_uv, max_uv);
+                    return textureSample(tex, samp, clamped_uv);
+                }
             }
-        }
-    ";
+        ";
 
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("Display Shader"),
-        source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(shader_source)),
-    });
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Display Shader"),
+            source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(shader_source)),
+        });
 
-    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("Display BGL"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                count: None,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Display BGL"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    count: None,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
                 },
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                count: None,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    count: None,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    count: None,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                },
+            ],
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Display Pipeline Layout"),
+            bind_group_layouts: &[&bind_group_layout],
+            immediate_size: 0,
+        });
+
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Display Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[],
+                compilation_options: Default::default(),
             },
-            wgpu::BindGroupLayoutEntry {
-                binding: 2,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                count: None,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: swapchain_format,
+                    blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleStrip,
+                ..Default::default()
             },
-        ],
-    });
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: NonZero::new(0),
+            cache: None,
+        });
 
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("Display Pipeline Layout"),
-        bind_group_layouts: &[&bind_group_layout],
-        immediate_size: 0,
-    });
+        let transform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Transform Buffer"),
+            size: std::mem::size_of::<DisplayTransform>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
 
-    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Display Pipeline"),
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: &shader,
-            entry_point: Some("vs_main"),
-            buffers: &[],
-            compilation_options: Default::default(),
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: &shader,
-            entry_point: Some("fs_main"),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: swapchain_format,
-                blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-            compilation_options: Default::default(),
-        }),
-        primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::TriangleStrip,
-            ..Default::default()
-        },
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: NonZero::new(0),
-        cache: None,
-    });
-
-    let transform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Transform Buffer"),
-        size: std::mem::size_of::<DisplayTransform>() as u64,
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-
-    let display = WgpuDisplay {
-        surface,
-        config,
-        pipeline,
-        bind_group_layout,
-        transform_buffer,
-        latest_transform: DisplayTransform {
-            rect: [0.0, 0.0, 100.0, 100.0],
-            clip: [0.0, 0.0, 10000.0, 10000.0],
-            window: [1280.0, 720.0],
-            image_size: [100.0, 100.0],
-            texture_size: [100.0, 100.0],
-            pixelated: 0.0,
-            _pad: 0.0,
-            bg_primary: [24.0 / 255.0, 24.0 / 255.0, 24.0 / 255.0, 1.0],
-            bg_secondary: [35.0 / 255.0, 35.0 / 255.0, 35.0 / 255.0, 1.0],
-        },
-        sampler: device.create_sampler(&wgpu::SamplerDescriptor {
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Display Sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
-        }),
-        current_bind_group: None,
+        });
+
+        Some(WgpuDisplay {
+            surface,
+            config,
+            pipeline,
+            bind_group_layout,
+            transform_buffer,
+            latest_transform: DisplayTransform {
+                rect: [0.0, 0.0, 100.0, 100.0],
+                clip: [0.0, 0.0, 10000.0, 10000.0],
+                window: [1280.0, 720.0],
+                image_size: [100.0, 100.0],
+                texture_size: [100.0, 100.0],
+                pixelated: 0.0,
+                _pad: 0.0,
+                bg_primary: [24.0 / 255.0, 24.0 / 255.0, 24.0 / 255.0, 1.0],
+                bg_secondary: [35.0 / 255.0, 35.0 / 255.0, 35.0 / 255.0, 1.0],
+            },
+            sampler,
+            current_bind_group: None,
+        })
     };
+
+    #[cfg(any(target_os = "android"))]
+    let display_opt = None;
 
     let new_context = GpuContext {
         device: Arc::new(device),
         queue: Arc::new(queue),
         limits,
-        display: Arc::new(std::sync::Mutex::new(Some(display))),
+        display: Arc::new(std::sync::Mutex::new(display_opt)),
     };
     *context_lock = Some(new_context.clone());
     Ok(new_context)
