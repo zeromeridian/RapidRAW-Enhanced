@@ -159,11 +159,18 @@ struct PreviewJob {
     responder: tokio::sync::oneshot::Sender<Vec<u8>>,
 }
 
-struct AnalyticsJob {
-    path: String,
-    image: Arc<DynamicImage>,
-    compute_waveform: bool,
-    active_waveform_channel: Option<String>,
+pub struct AnalyticsJob {
+    pub path: String,
+    pub image: Arc<DynamicImage>,
+    pub compute_waveform: bool,
+    pub active_waveform_channel: Option<String>,
+}
+
+pub struct AnalyticsConfig {
+    pub path: String,
+    pub compute_waveform: bool,
+    pub active_waveform_channel: Option<String>,
+    pub sender: Sender<AnalyticsJob>,
 }
 
 pub struct ThumbnailProgressTracker {
@@ -1155,9 +1162,25 @@ fn process_preview_job(
     let lut_path = adjustments_clone["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
 
-    let force_readback = use_wgpu_renderer && pixel_roi.is_none();
+    let wants_analytics = !(is_interactive && pixel_roi.is_some());
+    let channel_filter = if is_interactive {
+        active_waveform_channel.map(|s| s.to_string())
+    } else {
+        None
+    };
 
-    let final_processed_image_result = process_and_get_dynamic_image(
+    let analytics_config = if wants_analytics {
+        state.analytics_worker_tx.lock().unwrap().clone().map(|tx| crate::AnalyticsConfig {
+            path: loaded_image.path.clone(),
+            compute_waveform,
+            active_waveform_channel: channel_filter,
+            sender: tx,
+        })
+    } else {
+        None
+    };
+
+    let final_processed_image_result = crate::image_processing::process_and_get_dynamic_image_with_analytics(
         &context,
         &state,
         &processing_image,
@@ -1170,36 +1193,15 @@ fn process_preview_job(
         },
         "apply_adjustments",
         use_wgpu_renderer,
-        force_readback,
+        analytics_config,
     );
 
     if let Ok(final_processed_image) = final_processed_image_result {
-        let has_valid_image = final_processed_image.width() > 0;
-        let final_processed_image = Arc::new(final_processed_image);
-
-        if !(is_interactive && pixel_roi.is_some()) && has_valid_image {
-            let channel_filter = if is_interactive {
-                active_waveform_channel.map(|s| s.to_string())
-            } else {
-                None
-            };
-
-            let analytics_job = AnalyticsJob {
-                path: loaded_image.path.clone(),
-                image: Arc::clone(&final_processed_image),
-                compute_waveform,
-                active_waveform_channel: channel_filter,
-            };
-
-            if let Some(tx) = state.analytics_worker_tx.lock().unwrap().as_ref() {
-                let _ = tx.send(analytics_job);
-            }
-        }
-
         if use_wgpu_renderer {
             return Ok(b"WGPU_RENDER".to_vec());
         }
 
+        let final_processed_image = Arc::new(final_processed_image);
         let final_rgba_image = match &*final_processed_image {
             DynamicImage::ImageRgba8(img) => img,
             _ => return Err("Expected Rgba8 image from GPU for encoding".to_string()),
@@ -1487,8 +1489,6 @@ fn generate_uncropped_preview(
                 roi: None,
             },
             "generate_uncropped_preview",
-            false,
-            false,
         ) {
             let (width, height) = processed_image.dimensions();
             let rgb_pixels = processed_image.to_rgb8().into_vec();
@@ -1652,8 +1652,6 @@ async fn preview_geometry_transform(
                     roi: None,
                 },
                 "preview_geometry_transform_base_gen",
-                false,
-                false,
             )?;
 
             let mut cache = state.geometry_cache.lock().unwrap();
@@ -1876,8 +1874,6 @@ fn process_image_for_export_pipeline(
             roi: None,
         },
         debug_tag,
-        false,
-        false,
     )
 }
 
@@ -2143,8 +2139,6 @@ fn export_masks_for_image(
                     roi: None,
                 },
                 "export_mask_image",
-                false,
-                false,
             )?;
 
             let with_options = apply_export_resize_and_watermark(processed, export_settings)?;
@@ -2236,8 +2230,6 @@ fn export_adjustments_as_lut(
             roi: None,
         },
         "export_lut",
-        false,
-        false,
     )?;
 
     convert_image_to_cube_lut(&processed_lut, lut_size)
@@ -2793,8 +2785,6 @@ async fn estimate_export_size(
             roi: None,
         },
         "estimate_export_size",
-        false,
-        false,
     )?;
 
     let preview_bytes = encode_image_to_bytes(
@@ -2980,8 +2970,6 @@ async fn estimate_batch_export_size(
             roi: None,
         },
         "estimate_batch_export_size",
-        false,
-        false,
     )?;
 
     let preview_bytes = encode_image_to_bytes(
@@ -3472,8 +3460,6 @@ fn generate_preset_preview(
             roi: None,
         },
         "generate_preset_preview",
-        false,
-        false,
     )?;
 
     let mut buf = Cursor::new(Vec::new());
@@ -3852,8 +3838,6 @@ async fn generate_all_community_previews(
                     roi: None,
                 },
                 "generate_all_community_previews",
-                false,
-                false,
             )?;
 
             let processed_image = processed_image_dynamic.to_rgb8();
@@ -4513,8 +4497,6 @@ fn generate_preview_for_path(
             roi: None,
         },
         "generate_preview_for_path",
-        false,
-        false,
     )?;
     let (width, height) = final_image.dimensions();
     let rgb_pixels = final_image.to_rgb8().into_vec();
@@ -4907,9 +4889,6 @@ pub fn run() {
 
             #[cfg(not(target_os = "android"))]
             {
-                // Metal requires creating the window surface on the main thread. Preview and
-                // thumbnail work runs on background threads; initialize once here so they only
-                // clone the cached GpuContext (avoids panic + erroneous OpenGL fallback).
                 let app_state = app.state::<AppState>();
                 if let Err(error) = get_or_init_gpu_context(&app_state, app.handle()) {
                     log::warn!(

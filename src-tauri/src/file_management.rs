@@ -308,7 +308,6 @@ pub struct ExportPreset {
     pub export_masks: Option<bool>,
     #[serde(default)]
     pub preserve_folders: Option<bool>,
-    /// Last export destination path, stored on the __last_used__ preset only.
     #[serde(default)]
     pub last_export_path: Option<String>,
 }
@@ -522,6 +521,9 @@ impl Default for AppSettings {
             is_waveform_visible: Some(false),
             waveform_height: Some(220),
             active_waveform_channel: Some("luma".to_string()),
+            #[cfg(target_os = "linux")]
+            use_wgpu_renderer: Some(false),
+            #[cfg(not(target_os = "linux"))]
             use_wgpu_renderer: Some(true),
         }
     }
@@ -1591,8 +1593,6 @@ pub fn generate_thumbnail_data(
                 roi: None,
             },
             "generate_thumbnail_data",
-            false,
-            false,
         ) {
             return Ok(processed_image);
         } else {

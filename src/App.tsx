@@ -2979,17 +2979,13 @@ function App() {
         currentResRef.current = targetRes;
         applyAdjustments(currentAdjustments, false, targetRes);
       }
-    }, 100),
+    }, 50),
     [applyAdjustments],
   );
 
   useEffect(() => {
     if (selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
       let baseRes = calculateTargetRes();
-
-      if (isFullScreen && originalSize.width > 0 && originalSize.height > 0) {
-        baseRes = Math.max(originalSize.width, originalSize.height);
-      }
 
       if (originalSize.width > 0 && originalSize.height > 0) {
         const maxRes = Math.max(originalSize.width, originalSize.height);
@@ -3164,10 +3160,6 @@ function App() {
   useEffect(() => {
     if (showOriginal && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
       let targetRes = calculateTargetRes();
-
-      if (isFullScreen && originalSize.width > 0 && originalSize.height > 0) {
-        targetRes = Math.max(originalSize.width, originalSize.height);
-      }
 
       if (targetRes > currentOriginalResRef.current) {
         requestHiFiOriginalZoom(adjustments, targetRes);
