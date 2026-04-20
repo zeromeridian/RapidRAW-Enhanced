@@ -5,6 +5,8 @@ import { ColorResult, HsvaColor, hsvaToHex } from '@uiw/color-convert';
 import { Sun } from 'lucide-react';
 import { HueSatLum } from '../../utils/adjustments';
 import { motion, AnimatePresence } from 'framer-motion';
+import Text from './Text';
+import { TextColors, TextVariants } from '../../types/typography';
 
 interface ColorWheelProps {
   defaultValue: HueSatLum;
@@ -23,7 +25,7 @@ const ColorWheel = ({
   onDragStateChange,
   isExpanded = false,
 }: ColorWheelProps) => {
-  const effectiveValue = value || defaultValue;
+  const effectiveValue = { ...defaultValue, ...value };
   const { hue, saturation, luminance } = effectiveValue;
   const sizerRef = useRef<HTMLDivElement>(null);
   const [wheelSize, setWheelSize] = useState(0);
@@ -113,33 +115,33 @@ const ColorWheel = ({
     }
   }, [isWheelDragging, saturation]);
 
-const handleWheelChange = (color: ColorResult) => {
-  const { ctrl, shift } = modifierState;
-  const newValues = { ...effectiveValue };
-  
-  if (ctrl && !shift) {
-    newValues.hue = color.hsva.h;
-    newValues.saturation = saturation;
-  } else if (shift && !ctrl) {
-    let newSaturation = color.hsva.s;
+  const handleWheelChange = (color: ColorResult) => {
+    const { ctrl, shift } = modifierState;
+    const newValues = { ...effectiveValue };
     
-    const hueDelta = Math.abs(color.hsva.h - hue);
-    
-    if (hueDelta > 30) {
-      newSaturation = 0;
+    if (ctrl && !shift) {
+      newValues.hue = color.hsva.h;
+      newValues.saturation = saturation;
+    } else if (shift && !ctrl) {
+      let newSaturation = color.hsva.s;
+      
+      const hueDelta = Math.abs(color.hsva.h - hue);
+      
+      if (hueDelta > 30) {
+        newSaturation = 0;
+      }
+      
+      newSaturation = Math.max(0, Math.min(100, newSaturation));
+      
+      newValues.saturation = newSaturation;
+      newValues.hue = hue;
+    } else {
+      newValues.hue = color.hsva.h;
+      newValues.saturation = color.hsva.s;
     }
     
-    newSaturation = Math.max(0, Math.min(100, newSaturation));
-    
-    newValues.saturation = newSaturation;
-    newValues.hue = hue;
-  } else {
-    newValues.hue = color.hsva.h;
-    newValues.saturation = color.hsva.s;
-  }
-  
-  onChange(newValues);
-};
+    onChange(newValues);
+  };
 
   const handleHueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange({ ...effectiveValue, hue: parseFloat(e.target.value) });
@@ -171,9 +173,9 @@ const handleWheelChange = (color: ColorResult) => {
   const showModifierHint = isWheelDragging && (modifierState.ctrl || modifierState.shift);
 
   const satWrapperStyle = { '--cg-hue': `var(--cg-hue-${instanceId})` } as React.CSSProperties;
-  const lumWrapperStyle = { 
+  const lumWrapperStyle = {
     '--cg-hue': `var(--cg-hue-${instanceId})`,
-    '--cg-sat': `var(--cg-sat-${instanceId})`
+    '--cg-sat': `var(--cg-sat-${instanceId})`,
   } as React.CSSProperties;
 
   return (
@@ -185,21 +187,24 @@ const handleWheelChange = (color: ColorResult) => {
         onMouseEnter={() => setIsLabelHovered(true)}
         onMouseLeave={() => setIsLabelHovered(false)}
       >
-        <span
-          className={`absolute inset-0 flex items-center justify-center text-sm font-medium text-text-secondary whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
+        <Text
+          variant={TextVariants.label}
+          className={`absolute inset-0 flex items-center justify-center whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
             !isDragging && !isLabelHovered && !showModifierHint ? 'opacity-100' : 'opacity-0'
           }`}
         >
           {label}
-        </span>
+        </Text>
 
-        <span
-          className={`absolute inset-0 flex items-center justify-center text-sm font-medium text-text-primary whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
+        <Text
+          variant={TextVariants.label}
+          color={TextColors.primary}
+          className={`absolute inset-0 flex items-center justify-center whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
             !isDragging && isLabelHovered && !showModifierHint ? 'opacity-100' : 'opacity-0'
           }`}
         >
           Reset
-        </span>
+        </Text>
 
         <div
           className={`absolute inset-0 flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
