@@ -183,7 +183,7 @@ interface DenoiseModalState {
   previewBase64: string | null;
   originalBase64?: string | null;
   error: string | null;
-  targetPath: string | null;
+  targetPaths: string[];
   progressMessage: string | null;
   isRaw: boolean;
 }
@@ -362,6 +362,8 @@ function App() {
   const imageCacheRef = useRef(new ImageLRUCache(20));
   const isBackendReadyRef = useRef(true);
   const cachedEditStateRef = useRef<ImageCacheEntry | null>(null);
+  const inFlightCountRef = useRef(0);
+  const pendingApplyRef = useRef<{ adjustments: Adjustments; targetRes?: number } | null>(null);
   const [renderedRightPanel, setRenderedRightPanel] = useState<Panel | null>(activeRightPanel);
   const [collapsibleSectionsState, setCollapsibleSectionsState] = useState<CollapsibleSectionsState>({
     basic: true,
@@ -436,7 +438,7 @@ function App() {
     isProcessing: false,
     previewBase64: null,
     error: null,
-    targetPath: null,
+    targetPaths: [],
     progressMessage: null,
     isRaw: false,
   });
@@ -483,6 +485,7 @@ function App() {
   const previewJobIdRef = useRef<number>(0);
   const latestRenderedJobIdRef = useRef<number>(0);
   const isAndroid = osPlatform === 'android';
+  const [hasRenderedFirstFrame, setHasRenderedFirstFrame] = useState(false);
 
   useEffect(() => {
     if (currentFolderPath) {
@@ -1441,6 +1444,10 @@ function App() {
 
     if (scale <= 1.01) return null;
 
+    const paddingPixels = 2.0;
+    const paddingX = paddingPixels / baseW;
+    const paddingY = paddingPixels / baseH;
+
     const visibleLeft = -positionX / scale;
     const visibleTop = -positionY / scale;
     const visibleRight = visibleLeft + containerWidth / scale;
@@ -1465,26 +1472,49 @@ function App() {
     let roiW = (intersectRight - intersectLeft) / baseW;
     let roiH = (intersectBottom - intersectTop) / baseH;
 
-    const padX = roiW * 0.2;
-    const padY = roiH * 0.2;
+    const newRoiX = roiX - paddingX;
+    const newRoiY = roiY - paddingY;
+    const newRoiW = roiW + paddingX * 2;
+    const newRoiH = roiH + paddingY * 2;
 
-    roiX = Math.max(0, roiX - padX);
-    roiY = Math.max(0, roiY - padY);
-    roiW = Math.min(1 - roiX, roiW + padX * 2);
-    roiH = Math.min(1 - roiY, roiH + padY * 2);
+    const clampedX = Math.max(0, newRoiX);
+    const clampedY = Math.max(0, newRoiY);
+    const clampedW = Math.min(1 - clampedX, newRoiW);
+    const clampedH = Math.min(1 - clampedY, newRoiH);
 
-    if (roiW > 0.95 && roiH > 0.95) return null;
+    if (clampedW > 0.999 && clampedH > 0.999) return null;
 
-    return [roiX, roiY, roiW, roiH] as [number, number, number, number];
+    return [clampedX, clampedY, clampedW, clampedH] as [number, number, number, number];
   }, []);
 
-  const applyAdjustments = useCallback(
+  const executeApplyAdjustments = useCallback(
     async (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
-      if (!selectedImage?.isReady) return;
-      if (!isBackendReadyRef.current) return;
-      const currentPath = selectedImage.path;
+      const currentPath = selectedImage?.path;
+      if (!currentPath) return;
 
       const payload = JSON.parse(JSON.stringify(currentAdjustments));
+
+      const processSubMasks = (subMasks: any[]) => {
+        if (!Array.isArray(subMasks)) return;
+        subMasks.forEach((sm: any) => {
+          if (sm.id && sm.parameters) {
+            const keys = ['mask_data_base64', 'maskDataBase64'];
+            let foundMaskData = false;
+
+            for (const key of keys) {
+              if (sm.parameters[key] !== undefined && sm.parameters[key] !== null) {
+                foundMaskData = true;
+                if (patchesSentToBackend.current.has(sm.id)) {
+                  sm.parameters[key] = null;
+                }
+              }
+            }
+            if (foundMaskData && !patchesSentToBackend.current.has(sm.id)) {
+              patchesSentToBackend.current.add(sm.id);
+            }
+          }
+        });
+      };
 
       if (payload.aiPatches && Array.isArray(payload.aiPatches)) {
         payload.aiPatches.forEach((p: any) => {
@@ -1495,21 +1525,16 @@ function App() {
               patchesSentToBackend.current.add(p.id);
             }
           }
+          if (p.subMasks) {
+            processSubMasks(p.subMasks);
+          }
         });
       }
 
       if (payload.masks && Array.isArray(payload.masks)) {
         payload.masks.forEach((container: any) => {
-          if (container.subMasks && Array.isArray(container.subMasks)) {
-            container.subMasks.forEach((sm: any) => {
-              if (sm.id && sm.parameters && sm.parameters.mask_data_base64) {
-                if (patchesSentToBackend.current.has(sm.id)) {
-                  sm.parameters.mask_data_base64 = null;
-                } else {
-                  patchesSentToBackend.current.add(sm.id);
-                }
-              }
-            });
+          if (container.subMasks) {
+            processSubMasks(container.subMasks);
           }
         });
       }
@@ -1531,6 +1556,17 @@ function App() {
 
         if (buffer && buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
           latestRenderedJobIdRef.current = jobId;
+
+          const textDecoder = new TextDecoder();
+          const prefix = textDecoder.decode(buffer.slice(0, 11));
+          if (prefix === 'WGPU_RENDER') {
+            setHasRenderedFirstFrame(true);
+            setInteractivePatch((prev) => {
+              if (prev && prev.url) URL.revokeObjectURL(prev.url);
+              return null;
+            });
+            return;
+          }
 
           if (dragging) {
             const view = new DataView(buffer);
@@ -1559,11 +1595,6 @@ function App() {
             const blob = new Blob([buffer], { type: 'image/jpeg' });
             const url = URL.createObjectURL(blob);
 
-            try {
-              const img = new Image();
-              img.src = url;
-              await img.decode();
-            } catch (_) {}
             if (currentPath !== selectedImagePathRef.current || jobId < latestRenderedJobIdRef.current) {
               URL.revokeObjectURL(url);
               return;
@@ -1571,7 +1602,11 @@ function App() {
 
             setFinalPreviewUrl((prevUrl) => {
               if (prevUrl && prevUrl.startsWith('blob:') && !imageCacheRef.current.isProtected(prevUrl)) {
-                setTimeout(() => URL.revokeObjectURL(prevUrl), 250);
+                setTimeout(() => {
+                  if (!imageCacheRef.current.isProtected(prevUrl)) {
+                    URL.revokeObjectURL(prevUrl);
+                  }
+                }, 250);
               }
               return url;
             });
@@ -1597,7 +1632,39 @@ function App() {
         }
       }
     },
-    [selectedImage?.isReady, selectedImage?.path, calculateROI, isWaveformVisible],
+    [selectedImage?.path, calculateROI, isWaveformVisible],
+  );
+
+  const flushPipeline = useCallback(() => {
+    if (inFlightCountRef.current >= 2) return;
+    if (!pendingApplyRef.current) return;
+
+    const { adjustments, targetRes } = pendingApplyRef.current;
+    pendingApplyRef.current = null;
+
+    inFlightCountRef.current += 1;
+
+    executeApplyAdjustments(adjustments, true, targetRes).finally(() => {
+      inFlightCountRef.current -= 1;
+      if (pendingApplyRef.current) {
+        requestAnimationFrame(() => flushPipeline());
+      }
+    });
+  }, [executeApplyAdjustments]);
+
+  const applyAdjustments = useCallback(
+    (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
+      if (!selectedImage?.isReady || !isBackendReadyRef.current) return;
+
+      if (dragging) {
+        pendingApplyRef.current = { adjustments: currentAdjustments, targetRes };
+        flushPipeline();
+      } else {
+        pendingApplyRef.current = null;
+        executeApplyAdjustments(currentAdjustments, false, targetRes);
+      }
+    },
+    [selectedImage?.isReady, flushPipeline, executeApplyAdjustments],
   );
 
   const generateUncroppedPreview = useCallback(
@@ -2348,6 +2415,7 @@ function App() {
     debouncedSetHistory.cancel();
 
     const lastActivePath = selectedImage?.path ?? null;
+    setHasRenderedFirstFrame(false);
     setSelectedImage(null);
     setFinalPreviewUrl(null);
     setUncroppedAdjustedPreviewUrl(null);
@@ -2382,8 +2450,10 @@ function App() {
 
       patchesSentToBackend.current.clear();
 
+      setHasRenderedFirstFrame(false);
       setMultiSelectedPaths([path]);
       setLibraryActivePath(null);
+      setSelectionAnchorPath(path);
       setError(null);
       setShowOriginal(false);
       setActiveMaskId(null);
@@ -2413,6 +2483,7 @@ function App() {
         setFinalPreviewUrl(cached.finalPreviewUrl);
         setUncroppedAdjustedPreviewUrl(cached.uncroppedPreviewUrl);
         setIsViewLoading(false);
+        setHasRenderedFirstFrame(false);
 
         latestRenderedJobIdRef.current = previewJobIdRef.current;
         isBackendReadyRef.current = false;
@@ -2475,7 +2546,11 @@ function App() {
 
       setFinalPreviewUrl((prev) => {
         if (prev?.startsWith('blob:') && !imageCacheRef.current.isProtected(prev)) {
-          setTimeout(() => URL.revokeObjectURL(prev), 250);
+          setTimeout(() => {
+            if (!imageCacheRef.current.isProtected(prev)) {
+              URL.revokeObjectURL(prev);
+            }
+          }, 250);
         }
         return null;
       });
@@ -2619,11 +2694,13 @@ function App() {
   const handleCopyAdjustments = useCallback(() => {
     const sourceAdjustments = selectedImage ? adjustments : libraryActiveAdjustments;
     const adjustmentsToCopy: any = {};
+
     for (const key of COPYABLE_ADJUSTMENT_KEYS) {
       if (Object.prototype.hasOwnProperty.call(sourceAdjustments, key)) {
-        adjustmentsToCopy[key] = sourceAdjustments[key];
+        adjustmentsToCopy[key] = structuredClone(sourceAdjustments[key]);
       }
     }
+
     setCopiedAdjustments(adjustmentsToCopy);
     setIsCopied(true);
   }, [selectedImage, adjustments, libraryActiveAdjustments]);
@@ -2865,7 +2942,7 @@ function App() {
     }
 
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    const sharpnessFactor = 1.15;
+    const sharpnessFactor = 1.25;
     const zoomMultiplier = appSettings?.highResZoomMultiplier || 1.0;
 
     const effectiveDpr = appSettings?.useFullDpiRendering ? dpr : 1;
@@ -2914,14 +2991,13 @@ function App() {
         baseRes = Math.max(originalSize.width, originalSize.height);
       }
 
-      let zoomedRes = baseRes * zoom;
       if (originalSize.width > 0 && originalSize.height > 0) {
         const maxRes = Math.max(originalSize.width, originalSize.height);
-        if (zoomedRes > maxRes) {
-          zoomedRes = maxRes;
+        if (baseRes > maxRes) {
+          baseRes = maxRes;
         }
       }
-      const finalRes = Math.round(zoomedRes);
+      const finalRes = Math.round(baseRes);
 
       if (finalRes > currentResRef.current) {
         requestHiFiZoom(adjustments, finalRes);
@@ -2941,7 +3017,6 @@ function App() {
     requestHiFiZoom,
     isFullScreen,
     originalSize,
-    zoom,
     applyAdjustments,
   ]);
 
@@ -3656,7 +3731,7 @@ function App() {
 
   const handleApplyDenoise = useCallback(
     async (intensity: number, method: 'ai' | 'bm3d') => {
-      if (!denoiseModalState.targetPath) return;
+      if (denoiseModalState.targetPaths.length === 0) return;
 
       setDenoiseModalState((prev) => ({
         ...prev,
@@ -3667,7 +3742,7 @@ function App() {
 
       try {
         await invoke(Invokes.ApplyDenoising, {
-          path: denoiseModalState.targetPath,
+          path: denoiseModalState.targetPaths[0],
           intensity: intensity,
           method: method,
         });
@@ -3679,13 +3754,34 @@ function App() {
         }));
       }
     },
-    [denoiseModalState.targetPath],
+    [denoiseModalState.targetPaths],
+  );
+
+  const handleBatchDenoise = useCallback(
+    async (intensity: number, method: 'ai' | 'bm3d', paths: string[]) => {
+      try {
+        const savedPaths: string[] = await invoke('batch_denoise_images', {
+          paths,
+          intensity,
+          method,
+        });
+        await refreshImageList();
+        return savedPaths;
+      } catch (err) {
+        setDenoiseModalState((prev) => ({
+          ...prev,
+          error: String(err),
+        }));
+        throw err;
+      }
+    },
+    [refreshImageList],
   );
 
   const handleSaveDenoisedImage = async (): Promise<string> => {
-    if (!denoiseModalState.targetPath) throw new Error('No target path');
+    if (denoiseModalState.targetPaths.length === 0) throw new Error('No target path');
     const savedPath = await invoke<string>(Invokes.SaveDenoisedImage, {
-      originalPathStr: denoiseModalState.targetPath,
+      originalPathStr: denoiseModalState.targetPaths[0],
     });
     await refreshImageList();
     return savedPath;
@@ -4235,7 +4331,7 @@ function App() {
                 isProcessing: false,
                 previewBase64: null,
                 error: null,
-                targetPath: selectedImage.path,
+                targetPaths: [selectedImage.path],
                 progressMessage: null,
                 isRaw: selectedImage?.isRaw,
               });
@@ -4430,7 +4526,8 @@ function App() {
     const cullLabel = isSingleSelection ? 'Cull Image' : `Cull Images`;
     const collageLabel = isSingleSelection ? 'Frame Image' : 'Create Collage';
     const stitchLabel = 'Stitch Panorama';
-    const conversionLabel = 'Convert Negative';
+    const conversionLabel = isSingleSelection ? 'Convert Negative' : 'Convert Negatives';
+    const denoiseLabel = isSingleSelection ? 'Denoise Image' : 'Denoise Images';
     const mergeLabel = `Merge to HDR`;
 
     const handleCreateVirtualCopy = async (sourcePath: string) => {
@@ -4554,16 +4651,16 @@ function App() {
             onClick: handleApplyAutoAdjustmentsToSelection,
           },
           {
-            label: 'Denoise Image',
+            label: denoiseLabel,
             icon: Grip,
-            disabled: !isSingleSelection,
+            disabled: finalSelection.length === 0,
             onClick: () => {
               setDenoiseModalState({
                 isOpen: true,
                 isProcessing: false,
                 previewBase64: null,
                 error: null,
-                targetPath: finalSelection[0],
+                targetPaths: finalSelection,
                 progressMessage: null,
                 isRaw: selectedImage?.isRaw || false,
               });
@@ -5100,6 +5197,7 @@ function App() {
         <div className="flex flex-row grow h-full min-h-0">
           <div className="flex-1 flex flex-col min-w-0">
             <Editor
+              appSettings={appSettings}
               activeAiPatchContainerId={activeAiPatchContainerId}
               activeAiSubMaskId={activeAiSubMaskId}
               activeMaskContainerId={activeMaskContainerId}
@@ -5150,6 +5248,7 @@ function App() {
               goToAdjustmentsHistoryIndex={goToAdjustmentsHistoryIndex}
               liveRotation={liveRotation}
               isInstantTransition={isInstantTransition}
+              hasRenderedFirstFrame={hasRenderedFirstFrame}
             />
             <div
               className={clsx(
@@ -5342,6 +5441,7 @@ function App() {
                             setExportState={setExportState}
                             appSettings={appSettings}
                             onSettingsChange={handleSettingsChange}
+                            rootPath={rootPath}
                           />
                         )}
                         {renderedRightPanel === Panel.Ai && (
@@ -5395,11 +5495,14 @@ function App() {
     return renderMainView();
   };
 
+  const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
+
   return (
     <div
       className={clsx(
-        'flex flex-col h-screen bg-bg-primary font-sans text-text-primary overflow-hidden select-none',
+        'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
         (appSettings?.adaptiveEditorTheme || isAnimatingTheme) && !isInstantTransition && 'enable-color-transitions',
+        isWgpuActive ? 'bg-transparent' : 'bg-bg-primary',
       )}
     >
       <div
@@ -5446,6 +5549,7 @@ function App() {
               setExportState={setExportState}
               appSettings={appSettings}
               onSettingsChange={handleSettingsChange}
+              rootPath={rootPath}
             />
           </div>
         </div>
@@ -5532,6 +5636,7 @@ function App() {
         isOpen={denoiseModalState.isOpen}
         onClose={() => setDenoiseModalState((prev) => ({ ...prev, isOpen: false }))}
         onDenoise={handleApplyDenoise}
+        onBatchDenoise={handleBatchDenoise}
         onSave={handleSaveDenoisedImage}
         onOpenFile={handleImageSelect}
         previewBase64={denoiseModalState.previewBase64}
@@ -5541,10 +5646,11 @@ function App() {
         progressMessage={denoiseModalState.progressMessage}
         aiModelDownloadStatus={aiModelDownloadStatus}
         isRaw={denoiseModalState.isRaw}
+        targetPaths={denoiseModalState.targetPaths}
         loadingImageUrl={
-          denoiseModalState.targetPath
-            ? thumbnails[denoiseModalState.targetPath] ||
-              (selectedImage?.path === denoiseModalState.targetPath ? finalPreviewUrl : null)
+          denoiseModalState.targetPaths.length > 0
+            ? thumbnails[denoiseModalState.targetPaths[0]] ||
+              (selectedImage?.path === denoiseModalState.targetPaths[0] ? finalPreviewUrl : null)
             : null
         }
       />

@@ -10,10 +10,32 @@ import { calculateCenteredCrop, getOrientedDimensions } from '../../utils/cropUt
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
 import { Mask, SubMask } from './right/Masks';
-import { BrushSettings, Invokes, Panel, SelectedImage, TransformState } from '../ui/AppProperties';
+import { AppSettings, BrushSettings, Invokes, Panel, SelectedImage, TransformState } from '../ui/AppProperties';
 import type { OverlayMode } from './right/CropPanel';
+import Text from '../ui/Text';
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
+
+const parseRgb = (rgbStr: string): [number, number, number, number] => {
+  const match = rgbStr.match(/[\d.]+/g);
+  if (match && match.length >= 3) {
+    return [parseFloat(match[0]) / 255, parseFloat(match[1]) / 255, parseFloat(match[2]) / 255, 1.0];
+  }
+  return [0, 0, 0, 1.0];
+};
+
+interface WgpuRenderState {
+  useWgpuRenderer: boolean | undefined;
+  isReady: boolean;
+  hasRenderedFirstFrame: boolean;
+  isCropping: boolean;
+  uncroppedAdjustedPreviewUrl: string | null;
+  showOriginal: boolean;
+  bgPrimary: [number, number, number, number];
+  bgSecondary: [number, number, number, number];
+}
 
 interface EditorProps {
+  appSettings: AppSettings | null;
   activeAiPatchContainerId: string | null;
   activeAiSubMaskId: string | null;
   activeMaskContainerId: string | null;
@@ -64,9 +86,11 @@ interface EditorProps {
   goToAdjustmentsHistoryIndex(index: number): void;
   liveRotation?: number | null;
   isInstantTransition: boolean;
+  hasRenderedFirstFrame: boolean;
 }
 
 export default function Editor({
+  appSettings,
   activeAiPatchContainerId,
   activeAiSubMaskId,
   activeMaskContainerId,
@@ -116,10 +140,12 @@ export default function Editor({
   goToAdjustmentsHistoryIndex,
   liveRotation,
   isInstantTransition,
+  hasRenderedFirstFrame,
 }: EditorProps) {
   const [crop, setCrop] = useState<Crop | null>(null);
   const prevCropParams = useRef<any>(null);
   const [isMaskHovered, setIsMaskHovered] = useState(false);
+  const [isMaskTouchInteracting, setIsMaskTouchInteracting] = useState(false);
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
   const [showExifDateView, setShowExifDateView] = useState(false);
   const [maskOverlayUrl, setMaskOverlayUrl] = useState<string | null>(null);
@@ -133,6 +159,7 @@ export default function Editor({
   const clickAnimationTime = 200;
   const isAnimating = useRef(false);
   const animationTimeoutRef = useRef<number | null>(null);
+  const zoomDebounceTimeoutRef = useRef<number | null>(null);
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
   const savedZoomState = useRef<{ scale: number; positionX: number; positionY: number } | null>(null);
   const focalPointRef = useRef({ x: 0.5, y: 0.5 });
@@ -153,6 +180,8 @@ export default function Editor({
     screenImageTop: number;
     physicalImageWidth: number;
   } | null>(null);
+  const wgpuSyncRef = useRef<number | null>(null);
+  const lastWgpuTransformRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (isFullScreen) {
@@ -201,6 +230,7 @@ export default function Editor({
 
   const handleTransform = useCallback(
     (ref: any, state: TransformState) => {
+      transformStateRef.current = state;
       setTransformState(state);
 
       if (!isTransitioningRef.current) {
@@ -227,7 +257,12 @@ export default function Editor({
         return;
       }
 
-      onZoomed(state);
+      if (zoomDebounceTimeoutRef.current) {
+        clearTimeout(zoomDebounceTimeoutRef.current);
+      }
+      zoomDebounceTimeoutRef.current = window.setTimeout(() => {
+        onZoomed(state);
+      }, 100);
     },
     [onZoomed],
   );
@@ -245,6 +280,12 @@ export default function Editor({
   const isCropping = activeRightPanel === Panel.Crop;
   const isMasking = activeRightPanel === Panel.Masks;
   const isAiEditing = activeRightPanel === Panel.Ai;
+
+  useEffect(() => {
+    if (!isMasking && !isAiEditing) {
+      setIsMaskTouchInteracting(false);
+    }
+  }, [isMasking, isAiEditing]);
 
   const hasDisplayableImage = finalPreviewUrl || selectedImage.thumbnailUrl;
   const showSpinner = isLoading && !hasDisplayableImage;
@@ -340,19 +381,27 @@ export default function Editor({
     };
   }, [selectedImage, imageRenderSize.scale, originalSize]);
 
+  const maxScaleRef = useRef(transformConfig.maxScale);
   useEffect(() => {
-    if (onDisplaySizeChange && imageRenderSize.width > 0) {
-      const currentDisplaySize = {
-        width: imageRenderSize.width * transformState.scale,
-        height: imageRenderSize.height * transformState.scale,
-        scale: transformState.scale,
-        offsetX: imageRenderSize.offsetX,
-        offsetY: imageRenderSize.offsetY,
-        containerWidth: imageContainerRef.current?.clientWidth || 0,
-        containerHeight: imageContainerRef.current?.clientHeight || 0,
-      };
-      onDisplaySizeChange(currentDisplaySize);
-    }
+    maxScaleRef.current = transformConfig.maxScale;
+  }, [transformConfig.maxScale]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (onDisplaySizeChange && imageRenderSize.width > 0) {
+        const currentDisplaySize = {
+          width: imageRenderSize.width * transformState.scale,
+          height: imageRenderSize.height * transformState.scale,
+          scale: transformState.scale,
+          offsetX: imageRenderSize.offsetX,
+          offsetY: imageRenderSize.offsetY,
+          containerWidth: imageContainerRef.current?.clientWidth || 0,
+          containerHeight: imageContainerRef.current?.clientHeight || 0,
+        };
+        onDisplaySizeChange(currentDisplaySize);
+      }
+    }, 100);
+    return () => clearTimeout(timer);
   }, [imageRenderSize, transformState.scale, onDisplaySizeChange]);
 
   const processOverlayQueue = useCallback(async () => {
@@ -417,13 +466,284 @@ export default function Editor({
     [imageRenderSize, adjustments, requestMaskOverlay],
   );
 
+  const croppedDimensionsRef = useRef(croppedDimensions);
+  useEffect(() => {
+    croppedDimensionsRef.current = croppedDimensions;
+  }, [croppedDimensions]);
+
+  const wgpuStateRef = useRef<WgpuRenderState>({
+    useWgpuRenderer: appSettings?.useWgpuRenderer,
+    isReady: selectedImage?.isReady ?? false,
+    hasRenderedFirstFrame,
+    isCropping,
+    uncroppedAdjustedPreviewUrl,
+    showOriginal,
+    bgPrimary: [24 / 255, 24 / 255, 24 / 255, 1.0],
+    bgSecondary: [35 / 255, 35 / 255, 35 / 255, 1.0],
+  });
+
+  useEffect(() => {
+    const rootStyle = getComputedStyle(document.documentElement);
+    const bgPrimaryStr = rootStyle.getPropertyValue('--app-bg-primary') || 'rgb(24, 24, 24)';
+    const bgSecondaryStr = rootStyle.getPropertyValue('--app-bg-secondary') || 'rgb(35, 35, 35)';
+
+    wgpuStateRef.current = {
+      useWgpuRenderer: appSettings?.useWgpuRenderer,
+      isReady: selectedImage?.isReady ?? false,
+      hasRenderedFirstFrame,
+      isCropping,
+      uncroppedAdjustedPreviewUrl,
+      showOriginal,
+      bgPrimary: parseRgb(bgPrimaryStr),
+      bgSecondary: parseRgb(bgSecondaryStr),
+    };
+  }, [
+    appSettings?.useWgpuRenderer,
+    selectedImage?.isReady,
+    hasRenderedFirstFrame,
+    isCropping,
+    uncroppedAdjustedPreviewUrl,
+    showOriginal,
+    appSettings?.theme,
+    finalPreviewUrl,
+  ]);
+
+  useEffect(() => {
+    let isEffectActive = true;
+    let isInvoking = false;
+
+    const syncWgpu = () => {
+      if (!isEffectActive) return;
+
+      const state = wgpuStateRef.current;
+      const container = imageContainerRef.current;
+
+      if (!container) {
+        if (isEffectActive) {
+          wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
+        }
+        return;
+      }
+
+      const currentRect = container.getBoundingClientRect();
+
+      if (currentRect.width < 10 || currentRect.height < 10) {
+        if (isEffectActive) {
+          wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
+        }
+        return;
+      }
+
+      const dpr = window.devicePixelRatio || 1;
+      const windowWidth = Math.max(window.innerWidth * dpr, 1);
+      const windowHeight = Math.max(window.innerHeight * dpr, 1);
+
+      const clipX = currentRect.left * dpr;
+      const clipY = currentRect.top * dpr;
+      const clipW = Math.max(currentRect.width * dpr, 1);
+      const clipH = Math.max(currentRect.height * dpr, 1);
+
+      if (state.useWgpuRenderer === false || !state.isReady || !state.hasRenderedFirstFrame) {
+        const hiddenTransform = `${windowWidth},${windowHeight},-999999,-999999,1,1,${clipX},${clipY},${clipW},${clipH},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
+
+        if (lastWgpuTransformRef.current !== hiddenTransform && !isInvoking) {
+          lastWgpuTransformRef.current = hiddenTransform;
+          isInvoking = true;
+          invoke('update_wgpu_transform', {
+            payload: {
+              windowWidth,
+              windowHeight,
+              x: -999999,
+              y: -999999,
+              width: 1,
+              height: 1,
+              clipX,
+              clipY,
+              clipWidth: clipW,
+              clipHeight: clipH,
+              bgPrimary: state.bgPrimary || [0, 0, 0, 1],
+              bgSecondary: state.bgSecondary || [0, 0, 0, 1],
+            },
+          })
+            .catch(() => {})
+            .finally(() => {
+              isInvoking = false;
+            });
+        }
+        if (isEffectActive) {
+          wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
+        }
+        return;
+      }
+
+      const scale = transformStateRef.current.scale;
+      const posX = transformStateRef.current.positionX;
+      const posY = transformStateRef.current.positionY;
+
+      const cw = currentRect.width;
+      const ch = currentRect.height;
+      const imgW = croppedDimensionsRef.current?.width || 1;
+      const imgH = croppedDimensionsRef.current?.height || 1;
+
+      const containerRatio = cw / ch;
+      const imgRatio = imgW / imgH;
+
+      let offsetX = 0;
+      let offsetY = 0;
+      let baseW = 0;
+      let baseH = 0;
+
+      if (imgRatio > containerRatio) {
+        baseW = cw;
+        baseH = cw / imgRatio;
+        offsetY = (ch - baseH) / 2;
+      } else {
+        baseH = ch;
+        baseW = ch * imgRatio;
+        offsetX = (cw - baseW) / 2;
+      }
+
+      let screenX = (currentRect.left + posX + offsetX * scale) * dpr;
+      let screenY = (currentRect.top + posY + offsetY * scale) * dpr;
+      let screenW = baseW * scale * dpr;
+      let screenH = baseH * scale * dpr;
+
+      const isCropViewVisible = state.isCropping && state.uncroppedAdjustedPreviewUrl;
+
+      if (isCropViewVisible) {
+        screenX = -999999;
+        screenY = -999999;
+        screenW = 1;
+        screenH = 1;
+      } else {
+        screenW = Math.max(screenW, 1);
+        screenH = Math.max(screenH, 1);
+      }
+
+      const currentTransform = `${windowWidth},${windowHeight},${screenX},${screenY},${screenW},${screenH},${clipX},${clipY},${clipW},${clipH},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
+
+      if (lastWgpuTransformRef.current !== currentTransform && !isInvoking) {
+        lastWgpuTransformRef.current = currentTransform;
+        isInvoking = true;
+
+        const isZoomedIn = scale >= maxScaleRef.current - 0.5;
+
+        invoke('update_wgpu_transform', {
+          payload: {
+            windowWidth,
+            windowHeight,
+            x: screenX,
+            y: screenY,
+            width: screenW,
+            height: screenH,
+            clipX,
+            clipY,
+            clipWidth: clipW,
+            clipHeight: clipH,
+            bgPrimary: state.bgPrimary || [0, 0, 0, 1],
+            bgSecondary: state.bgSecondary || [0, 0, 0, 1],
+            pixelated: isZoomedIn,
+          },
+        })
+          .catch((err) => console.warn('WGPU Sync Error:', err))
+          .finally(() => {
+            isInvoking = false;
+          });
+      }
+
+      if (isEffectActive) {
+        wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
+      }
+    };
+
+    wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
+
+    return () => {
+      isEffectActive = false;
+      if (wgpuSyncRef.current !== null) {
+        cancelAnimationFrame(wgpuSyncRef.current);
+      }
+    };
+  }, []);
+
+  const overlayTriggerHash = useMemo(() => {
+    let activeMaskDef = null;
+    if (activeRightPanel === Panel.Masks && activeMaskContainerId) {
+      activeMaskDef = adjustments.masks?.find((c: MaskContainer) => c.id === activeMaskContainerId);
+    } else if (activeRightPanel === Panel.Ai && activeAiPatchContainerId) {
+      activeMaskDef = adjustments.aiPatches?.find((p: AiPatch) => p.id === activeAiPatchContainerId);
+    }
+
+    if (!activeMaskDef) return null;
+
+    const geometryKeys = [
+      'crop',
+      'rotation',
+      'flipHorizontal',
+      'flipVertical',
+      'orientationSteps',
+      'transformDistortion',
+      'transformVertical',
+      'transformHorizontal',
+      'transformRotate',
+      'transformAspect',
+      'transformScale',
+      'transformXOffset',
+      'transformYOffset',
+      'lensDistortionAmount',
+      'lensVignetteAmount',
+      'lensTcaAmount',
+      'lensDistortionParams',
+      'lensMaker',
+      'lensModel',
+      'lensDistortionEnabled',
+      'lensTcaEnabled',
+      'lensVignetteEnabled',
+    ];
+
+    const geometry: any = {};
+    geometryKeys.forEach((k) => {
+      geometry[k] = (adjustments as any)[k];
+    });
+
+    const subMasks = activeMaskDef.subMasks?.map((sm: any) => {
+      const { parameters, ...rest } = sm;
+      const cleanParams = { ...parameters };
+      delete cleanParams.mask_data_base64;
+      delete cleanParams.maskDataBase64;
+      return { ...rest, parameters: cleanParams };
+    });
+
+    return JSON.stringify({
+      id: activeMaskDef.id,
+      invert: activeMaskDef.invert,
+      opacity: activeMaskDef.opacity,
+      subMasks,
+      geometry,
+      renderSize: { w: imageRenderSize.width, h: imageRenderSize.height },
+    });
+  }, [
+    activeRightPanel,
+    activeMaskContainerId,
+    activeAiPatchContainerId,
+    adjustments,
+    imageRenderSize.width,
+    imageRenderSize.height,
+  ]);
+
   useEffect(() => {
     let maskDefForOverlay = null;
 
     if (activeRightPanel === Panel.Masks && activeMaskContainerId) {
-      maskDefForOverlay = adjustments.masks.find((c: MaskContainer) => c.id === activeMaskContainerId);
+      const activeMask = adjustments.masks?.find((c: MaskContainer) => c.id === activeMaskContainerId);
+      if (activeMask) {
+        maskDefForOverlay = {
+          ...activeMask,
+          adjustments: {},
+        };
+      }
     } else if (activeRightPanel === Panel.Ai && activeAiPatchContainerId) {
-      const activePatch = adjustments.aiPatches.find((p: AiPatch) => p.id === activeAiPatchContainerId);
+      const activePatch = adjustments.aiPatches?.find((p: AiPatch) => p.id === activeAiPatchContainerId);
       if (activePatch) {
         maskDefForOverlay = {
           ...activePatch,
@@ -434,14 +754,9 @@ export default function Editor({
     }
 
     requestMaskOverlay(maskDefForOverlay, imageRenderSize, adjustments);
-  }, [
-    activeRightPanel,
-    activeMaskContainerId,
-    activeAiPatchContainerId,
-    adjustments,
-    imageRenderSize,
-    requestMaskOverlay,
-  ]);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overlayTriggerHash, requestMaskOverlay]);
 
   useEffect(() => {
     let timer: number;
@@ -675,8 +990,10 @@ export default function Editor({
 
   if (!selectedImage) {
     return (
-      <div className="flex-1 bg-bg-secondary rounded-lg flex items-center justify-center text-text-secondary">
-        <p>Select an image from the library to begin editing.</p>
+      <div className="flex-1 bg-bg-secondary rounded-lg flex items-center justify-center">
+        <Text variant={TextVariants.heading} color={TextColors.secondary} weight={TextWeights.normal}>
+          Select an image from the library to begin editing.
+        </Text>
       </div>
     );
   }
@@ -699,15 +1016,18 @@ export default function Editor({
 
   const isPanningDisabled =
     isMaskHovered ||
+    isMaskTouchInteracting ||
     isCropping ||
     (isMasking &&
       (activeSubMask?.type === Mask.Brush ||
+        activeSubMask?.type === Mask.Flow ||
         activeSubMask?.type === Mask.AiSubject ||
         activeSubMask?.type === Mask.Color ||
         activeSubMask?.type === Mask.Luminance ||
         activeSubMask?.parameters?.isInitialDraw)) ||
     (isAiEditing &&
       (activeSubMask?.type === Mask.Brush ||
+        activeSubMask?.type === Mask.Flow ||
         activeSubMask?.type === Mask.AiSubject ||
         activeSubMask?.type === Mask.QuickEraser ||
         activeSubMask?.type === Mask.Color ||
@@ -728,17 +1048,21 @@ export default function Editor({
     }
   }
 
+  const isWgpuActive = appSettings?.useWgpuRenderer !== false && hasRenderedFirstFrame;
+
   return (
     <div
       className={clsx(
         'flex-1 flex flex-col relative overflow-hidden min-h-0',
         !isInstantTransition && 'transition-all duration-300 ease-in-out',
-        isFullScreen ? 'bg-black rounded-none p-0 gap-0' : 'bg-bg-secondary rounded-lg p-2 gap-2',
+        isFullScreen
+          ? 'rounded-none p-0 gap-0'
+          : clsx('rounded-lg p-2 gap-2', appSettings?.useWgpuRenderer !== false ? 'bg-transparent' : 'bg-bg-secondary'),
       )}
     >
       <div
         className={clsx(
-          'shrink-0',
+          'shrink-0 relative z-10',
           !isInstantTransition && 'transition-all duration-300 ease-in-out',
           isFullScreen ? 'max-h-0 opacity-0 m-0' : 'max-h-25 opacity-100',
           toolbarOverflowVisible ? 'overflow-visible' : 'overflow-hidden',
@@ -764,7 +1088,12 @@ export default function Editor({
       </div>
 
       <div
-        className={clsx('flex-1 relative overflow-hidden', isFullScreen ? 'rounded-none' : 'rounded-lg')}
+        className={clsx(
+          'flex-1 relative overflow-hidden',
+          isFullScreen ? 'rounded-none' : 'rounded-lg',
+          appSettings?.useWgpuRenderer !== false && !isFullScreen && 'ring-[9999px] ring-bg-secondary',
+          !isWgpuActive && 'bg-bg-secondary',
+        )}
         onContextMenu={onContextMenu}
         ref={imageContainerRef}
       >
@@ -810,6 +1139,7 @@ export default function Editor({
             }}
           >
             <ImageCanvas
+              appSettings={appSettings}
               activeAiPatchContainerId={activeAiPatchContainerId}
               activeAiSubMaskId={activeAiSubMaskId}
               activeMaskContainerId={activeMaskContainerId}
@@ -838,6 +1168,7 @@ export default function Editor({
               selectedImage={selectedImage}
               setCrop={handleCropChange}
               setIsMaskHovered={setIsMaskHovered}
+              setIsMaskTouchInteracting={setIsMaskTouchInteracting}
               showOriginal={showOriginal}
               transformedOriginalUrl={transformedOriginalUrl}
               uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
@@ -851,6 +1182,7 @@ export default function Editor({
               isMaxZoom={isMaxZoom}
               liveRotation={liveRotation}
               zoomScale={transformState.scale}
+              hasRenderedFirstFrame={hasRenderedFirstFrame}
             />
           </TransformComponent>
         </TransformWrapper>
