@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RotateCcw, Copy, ClipboardPaste, Aperture, ChartArea, Eraser } from 'lucide-react';
+import { RotateCcw, Copy, ClipboardPaste, Aperture, ChartArea } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import BasicAdjustments from '../../adjustments/Basic';
@@ -230,7 +230,7 @@ export default function Controls({
             onClick={handleResetAdjustments}
             data-tooltip="Reset Adjustments"
           >
-            <Eraser size={18} />
+            <RotateCcw size={18} />
           </button>
         </div>
       </div>

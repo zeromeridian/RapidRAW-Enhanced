@@ -79,6 +79,8 @@ pub struct Preset {
         skip_serializing_if = "Option::is_none"
     )]
     pub include_crop_transform: Option<bool>,
+    #[serde(rename = "presetType", skip_serializing_if = "Option::is_none")]
+    pub preset_type: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -3094,6 +3096,7 @@ pub fn save_community_preset(
     app_handle: AppHandle,
     include_masks: Option<bool>,
     include_crop_transform: Option<bool>,
+    preset_type: Option<String>,
 ) -> Result<(), String> {
     let mut current_presets = load_presets(app_handle.clone())?;
 
@@ -3124,6 +3127,7 @@ pub fn save_community_preset(
         adjustments,
         include_masks,
         include_crop_transform,
+        preset_type: preset_type.or(Some("style".to_string())),
     };
 
     if let Some(PresetItem::Folder(folder)) = current_presets.iter_mut().find(|item| {

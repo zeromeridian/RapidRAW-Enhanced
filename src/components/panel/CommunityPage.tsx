@@ -18,6 +18,7 @@ interface CommunityPreset {
   adjustments: Record<string, any>;
   includeMasks?: boolean;
   includeCropTransform?: boolean;
+  presetType?: 'tool' | 'style';
 }
 
 const SORT_METHODS: {
@@ -185,6 +186,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
         adjustments: preset.adjustments,
         includeMasks: preset.includeMasks,
         includeCropTransform: preset.includeCropTransform,
+        presetType: preset.presetType || 'style',
       });
       setDownloadStatus((prev) => ({ ...prev, [preset.name]: 'success' }));
     } catch (error) {
