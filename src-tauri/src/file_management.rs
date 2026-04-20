@@ -409,7 +409,6 @@ pub struct AppSettings {
     #[serde(alias = "comfyuiAddress")]
     pub ai_connector_address: Option<String>,
     pub last_folder_state: Option<LastFolderState>,
-    pub adaptive_editor_theme: Option<bool>,
     pub ui_visibility: Option<Value>,
     pub enable_ai_tagging: Option<bool>,
     pub tagging_thread_count: Option<u32>,
@@ -492,7 +491,6 @@ impl Default for AppSettings {
             decorations: Some(false),
             ai_connector_address: None,
             last_folder_state: None,
-            adaptive_editor_theme: Some(false),
             ui_visibility: None,
             enable_ai_tagging: Some(false),
             tagging_thread_count: Some(3),

@@ -146,7 +146,6 @@ export enum ThumbnailAspectRatio {
 }
 
 export interface AppSettings {
-  adaptiveEditorTheme?: Theme;
   aiConnectorAddress?: string;
   decorations?: any;
   editorPreviewResolution?: number;

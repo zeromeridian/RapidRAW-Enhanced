@@ -753,18 +753,6 @@ export default function SettingsPanel({
                     </SettingItem>
 
                     <SettingItem
-                      description="Dynamically changes editor colors based on the current image."
-                      label="Editor Theme"
-                    >
-                      <Switch
-                        checked={appSettings?.adaptiveEditorTheme ?? false}
-                        id="adaptive-theme-toggle"
-                        label="Adaptive Editor Theme"
-                        onChange={(checked) => onSettingsChange({ ...appSettings, adaptiveEditorTheme: checked })}
-                      />
-                    </SettingItem>
-
-                    <SettingItem
                       label="EXIF Library Sorting"
                       description="Read EXIF data (ISO, aperture, etc.) on folder load at the cost of slower folder loading when using EXIF sorting."
                     >

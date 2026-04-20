@@ -88,7 +88,6 @@ import {
   CopyPasteSettings,
 } from './utils/adjustments';
 import { calculateCenteredCrop } from './utils/cropUtils';
-import { generatePaletteFromImage } from './utils/palette';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import GlobalTooltip from './components/ui/GlobalTooltip';
 import { THEMES, DEFAULT_THEME_ID, ThemeProps } from './utils/themes';
@@ -338,10 +337,7 @@ function App() {
   const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevAdjustmentsRef = useRef<{ path: string; adjustments: Adjustments } | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isAnimatingTheme, setIsAnimatingTheme] = useState(false);
-  const isInitialThemeMount = useRef(true);
   const [theme, setTheme] = useState(DEFAULT_THEME_ID);
-  const [adaptivePalette, setAdaptivePalette] = useState<any>(null);
   const [activeRightPanel, setActiveRightPanel] = useState<Panel | null>(Panel.Adjustments);
   const [slideDirection, setSlideDirection] = useState(1);
   const [activeMaskContainerId, setActiveMaskContainerId] = useState<string | null>(null);
@@ -1983,22 +1979,6 @@ function App() {
   }, [isWaveformVisible, activeWaveformChannel, waveformHeight, appSettings, handleSettingsChange]);
 
   useEffect(() => {
-    if (!appSettings?.adaptiveEditorTheme || !selectedImage) {
-      setAdaptivePalette(null);
-      return;
-    }
-    if (isSliderDragging || !finalPreviewUrl) {
-      return;
-    }
-    generatePaletteFromImage(finalPreviewUrl)
-      .then(setAdaptivePalette)
-      .catch((_err) => {
-        const darkTheme = THEMES.find((t) => t.id === Theme.Dark);
-        setAdaptivePalette(darkTheme ? darkTheme.cssVariables : null);
-      });
-  }, [appSettings?.adaptiveEditorTheme, selectedImage, finalPreviewUrl, isSliderDragging]);
-
-  useEffect(() => {
     const root = document.documentElement;
     const currentThemeId = theme || DEFAULT_THEME_ID;
 
@@ -2011,10 +1991,6 @@ function App() {
 
     let finalCssVariables: any = { ...baseTheme.cssVariables };
     const effectThemeForWindow = baseTheme.id;
-
-    if (adaptivePalette) {
-      finalCssVariables = { ...finalCssVariables, ...adaptivePalette };
-    }
 
     Object.entries(finalCssVariables).forEach(([key, value]) => {
       root.style.setProperty(key, value as string);
@@ -2029,19 +2005,7 @@ function App() {
 
     const isLight = [Theme.Light, Theme.Snow, Theme.Arctic].includes(effectThemeForWindow);
     invoke(Invokes.UpdateWindowEffect, { theme: isLight ? Theme.Light : Theme.Dark });
-  }, [theme, adaptivePalette, appSettings?.fontFamily]);
-
-  useEffect(() => {
-    if (isInitialThemeMount.current) {
-      isInitialThemeMount.current = false;
-      return;
-    }
-
-    setIsAnimatingTheme(true);
-    const timer = setTimeout(() => setIsAnimatingTheme(false), 500);
-
-    return () => clearTimeout(timer);
-  }, [theme]);
+  }, [theme, appSettings?.fontFamily]);
 
   const refreshAllFolderTrees = useCallback(
     async (currentExpanded?: Set<string>) => {
@@ -5493,7 +5457,6 @@ function App() {
     <div
       className={clsx(
         'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
-        (appSettings?.adaptiveEditorTheme || isAnimatingTheme) && !isInstantTransition && 'enable-color-transitions',
         isWgpuActive ? 'bg-transparent' : 'bg-bg-primary',
       )}
     >
