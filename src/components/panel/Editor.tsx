@@ -536,15 +536,19 @@ export default function Editor({
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
       if (physicsFrameId.current) cancelAnimationFrame(physicsFrameId.current);
 
-      if (e.ctrlKey) {
+      const maxDelta = Math.max(Math.abs(e.deltaX), Math.abs(e.deltaY));
+      const isTrackpad = e.deltaMode === 0 && (e.deltaY % 1 !== 0 || e.deltaX % 1 !== 0 || maxDelta < 50);
+
+      const isZoomIntent = isTrackpad ? e.ctrlKey : !e.ctrlKey && !e.shiftKey;
+
+      if (isZoomIntent) {
         const rect = container.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        const magnitude = Math.abs(e.deltaY);
-        const direction = Math.sign(e.deltaY);
-
-        const isTrackpad = e.deltaMode === 0 && (e.deltaY % 1 !== 0 || magnitude < 50);
+        const primaryDelta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+        const magnitude = Math.abs(primaryDelta);
+        const direction = Math.sign(primaryDelta);
 
         let minSpeed, maxSpeed, maxExpectedDelta;
 
@@ -554,7 +558,7 @@ export default function Editor({
           maxExpectedDelta = 30;
         } else {
           minSpeed = 0.001;
-          maxSpeed = 0.006;
+          maxSpeed = 0.005;
           maxExpectedDelta = 150;
         }
 
@@ -580,8 +584,25 @@ export default function Editor({
         const { positionX: curX, positionY: curY, scale } = transformStateRef.current;
         const bounds = getTransformBounds(scale);
 
-        let newX = curX - e.deltaX;
-        let newY = curY - e.deltaY;
+        let dx = e.deltaX;
+        let dy = e.deltaY;
+
+        if (!isTrackpad) {
+          if (e.shiftKey && e.ctrlKey) {
+            const primaryDelta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+            dx = primaryDelta;
+            dy = primaryDelta;
+          } else if (e.shiftKey) {
+            dx = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+            dy = 0;
+          } else if (e.ctrlKey) {
+            dx = 0;
+            dy = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+          }
+        }
+
+        let newX = curX - dx;
+        let newY = curY - dy;
 
         const resistance = 0.5;
 
