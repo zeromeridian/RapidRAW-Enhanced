@@ -99,7 +99,6 @@ export enum Invokes {
   StitchPanorama = 'stitch_panorama',
   MergeHdr = 'merge_hdr',
   TestAIConnectorConnection = 'test_ai_connector_connection',
-  UpdateWindowEffect = 'update_window_effect',
   UpdateWgpuTransform = 'update_wgpu_transform',
   FetchCommunityPresets = 'fetch_community_presets',
   GenerateAllCommunityPreviews = 'generate_all_community_previews',

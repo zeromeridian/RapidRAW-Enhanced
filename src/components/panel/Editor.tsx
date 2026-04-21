@@ -278,10 +278,20 @@ export default function Editor({
 
   const clampToBounds = useCallback(
     (x: number, y: number, scale: number) => {
-      const bounds = getTransformBounds(scale);
-      const newX = Math.min(Math.max(x, bounds.minX), bounds.maxX);
-      const newY = Math.min(Math.max(y, bounds.minY), bounds.maxY);
-      return { x: newX, y: newY, scale };
+      const safeScale = Math.min(
+        Math.max(Number.isFinite(scale) ? scale : 1, minScaleRef.current),
+        maxScaleRef.current,
+      );
+
+      const bounds = getTransformBounds(safeScale);
+
+      const safeX = Number.isFinite(x) ? x : 0;
+      const safeY = Number.isFinite(y) ? y : 0;
+
+      const newX = Math.min(Math.max(safeX, bounds.minX), bounds.maxX);
+      const newY = Math.min(Math.max(safeY, bounds.minY), bounds.maxY);
+
+      return { x: newX, y: newY, scale: safeScale };
     },
     [getTransformBounds],
   );
@@ -478,8 +488,9 @@ export default function Editor({
   );
 
   useEffect(() => {
-    if (!transformWrapperRef.current) return;
-    const currentScale = transformStateRef.current.scale;
+    if (!transformWrapperRef.current || !targetZoom || targetZoom <= 0) return;
+
+    const currentScale = transformStateRef.current.scale || 1; // Fallback to 1
     if (Math.abs(currentScale - targetZoom) < 0.001) return;
 
     const animationTime = 200;
@@ -1056,6 +1067,7 @@ export default function Editor({
               clipHeight: clipH,
               bgPrimary: state.bgPrimary || [0, 0, 0, 1],
               bgSecondary: state.bgSecondary || [0, 0, 0, 1],
+              pixelated: false,
             },
           })
             .catch(() => {})
@@ -1096,10 +1108,10 @@ export default function Editor({
         offsetX = (cw - baseW) / 2;
       }
 
-      let screenX = (currentRect.left + posX + offsetX * scale) * dpr;
-      let screenY = (currentRect.top + posY + offsetY * scale) * dpr;
-      let screenW = baseW * scale * dpr;
-      let screenH = baseH * scale * dpr;
+      let screenX = (currentRect.left + posX + offsetX * scale) * dpr || 0;
+      let screenY = (currentRect.top + posY + offsetY * scale) * dpr || 0;
+      let screenW = baseW * scale * dpr || 1;
+      let screenH = baseH * scale * dpr || 1;
 
       const isCropViewVisible = state.isCropping && state.uncroppedAdjustedPreviewUrl;
 
