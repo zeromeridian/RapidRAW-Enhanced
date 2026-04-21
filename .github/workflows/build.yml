@@ -104,14 +104,6 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
-      - name: Initialize Android project
-        if: inputs.mobile == 'android'
-        shell: bash
-        run: |
-          if [ ! -d "src-tauri/gen/android" ]; then
-            npx tauri android init
-          fi
-
       - name: Setup Android signing
         if: inputs.mobile == 'android'
         run: |
