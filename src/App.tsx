@@ -1556,7 +1556,6 @@ function App() {
           const textDecoder = new TextDecoder();
           const prefix = textDecoder.decode(buffer.slice(0, 11));
           if (prefix === 'WGPU_RENDER') {
-            setHasRenderedFirstFrame(true);
             setInteractivePatch((prev) => {
               if (prev && prev.url) URL.revokeObjectURL(prev.url);
               return null;
@@ -3424,6 +3423,11 @@ function App() {
             error: String(event.payload),
             progressMessage: null,
           }));
+        }
+      }),
+      listen('wgpu-frame-ready', () => {
+        if (isEffectActive) {
+          setHasRenderedFirstFrame(true);
         }
       }),
     ];
