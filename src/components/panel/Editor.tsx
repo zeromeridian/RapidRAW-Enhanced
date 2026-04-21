@@ -222,6 +222,8 @@ export default function Editor({
   }, [selectedImage, adjustments.crop, adjustments.orientationSteps]);
 
   const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
+  const imageRenderSizeRef = useRef(imageRenderSize);
+  imageRenderSizeRef.current = imageRenderSize;
 
   const transformConfig = useMemo(() => {
     if (!selectedImage || !imageRenderSize.scale || !originalSize) {
@@ -1087,26 +1089,12 @@ export default function Editor({
 
       const cw = currentRect.width;
       const ch = currentRect.height;
-      const imgW = croppedDimensionsRef.current?.width || 1;
-      const imgH = croppedDimensionsRef.current?.height || 1;
 
-      const containerRatio = cw / ch;
-      const imgRatio = imgW / imgH;
-
-      let offsetX = 0;
-      let offsetY = 0;
-      let baseW = 0;
-      let baseH = 0;
-
-      if (imgRatio > containerRatio) {
-        baseW = cw;
-        baseH = cw / imgRatio;
-        offsetY = (ch - baseH) / 2;
-      } else {
-        baseH = ch;
-        baseW = ch * imgRatio;
-        offsetX = (cw - baseW) / 2;
-      }
+      const irs = imageRenderSizeRef.current;
+      const offsetX = irs.width > 0 ? irs.offsetX : 0;
+      const offsetY = irs.height > 0 ? irs.offsetY : 0;
+      const baseW = irs.width > 0 ? irs.width : cw;
+      const baseH = irs.height > 0 ? irs.height : ch;
 
       let screenX = (currentRect.left + posX + offsetX * scale) * dpr || 0;
       let screenY = (currentRect.top + posY + offsetY * scale) * dpr || 0;
