@@ -749,6 +749,7 @@ export default function SettingsPanel({
                         onChange={(value: any) => onSettingsChange({ ...appSettings, theme: value })}
                         options={THEMES.map((theme: ThemeProps) => ({ value: theme.id, label: theme.name }))}
                         value={appSettings?.theme || DEFAULT_THEME_ID}
+                        triggerClassName="bg-bg-primary"
                       />
                     </SettingItem>
 
@@ -815,6 +816,7 @@ export default function SettingsPanel({
                           { value: 'system', label: 'System Default' },
                         ]}
                         value={appSettings?.fontFamily || 'poppins'}
+                        triggerClassName="bg-bg-primary"
                       />
                     </SettingItem>
                   </div>
@@ -1040,6 +1042,7 @@ export default function SettingsPanel({
                                         onKeyDown={handleAiTagInputKeyDown}
                                         placeholder="Add custom AI tags (comma separated)..."
                                         className="pr-10"
+                                        bgClassName="bg-bg-primary"
                                       />
                                       <button
                                         onClick={handleAddAiTag}
@@ -1117,6 +1120,7 @@ export default function SettingsPanel({
                               onKeyDown={handleInputKeyDown}
                               placeholder="Add shortcuts (comma separated)..."
                               className="pr-10"
+                              bgClassName="bg-bg-primary"
                             />
                             <button
                               onClick={handleAddShortcut}
@@ -1333,6 +1337,7 @@ export default function SettingsPanel({
                                     }
                                     options={resolutions}
                                     value={processingSettings.editorPreviewResolution}
+                                    triggerClassName="bg-bg-primary"
                                   />
                                 </SettingItem>
                               </div>
@@ -1361,6 +1366,7 @@ export default function SettingsPanel({
                                     }
                                     options={resolutions}
                                     value={processingSettings.editorPreviewResolution}
+                                    triggerClassName="bg-bg-primary"
                                   />
                                 </SettingItem>
 
@@ -1374,6 +1380,7 @@ export default function SettingsPanel({
                                     }
                                     options={zoomMultiplierOptions}
                                     value={processingSettings.highResZoomMultiplier}
+                                    triggerClassName="bg-bg-primary"
                                   />
                                 </SettingItem>
 
@@ -1437,6 +1444,7 @@ export default function SettingsPanel({
                                   }
                                   options={livePreviewQualityOptions}
                                   value={appSettings?.livePreviewQuality || 'high'}
+                                  triggerClassName="bg-bg-primary"
                                 />
                               </SettingItem>
                             </div>
@@ -1453,6 +1461,7 @@ export default function SettingsPanel({
                         onChange={(value: any) => handleProcessingSettingChange('thumbnailResolution', value)}
                         options={thumbnailResolutions}
                         value={processingSettings.thumbnailResolution}
+                        triggerClassName="bg-bg-primary"
                       />
                     </SettingItem>
 
@@ -1482,6 +1491,7 @@ export default function SettingsPanel({
                         onChange={(value: any) => onSettingsChange({ ...appSettings, linearRawMode: value })}
                         options={linearRawOptions}
                         value={appSettings?.linearRawMode || 'auto'}
+                        triggerClassName="bg-bg-primary"
                       />
                     </SettingItem>
 
@@ -1509,6 +1519,7 @@ export default function SettingsPanel({
                             ? processingSettings.processingBackend
                             : 'auto'
                         }
+                        triggerClassName="bg-bg-primary"
                       />
                     </SettingItem>
 
@@ -1615,6 +1626,7 @@ export default function SettingsPanel({
                                   placeholder="127.0.0.1:8188"
                                   type="text"
                                   value={aiConnectorAddress}
+                                  bgClassName="bg-bg-primary"
                                 />
                                 <Button
                                   className="w-32"
