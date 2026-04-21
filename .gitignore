@@ -29,5 +29,10 @@ dist-ssr
 src-tauri/resources/libonnxruntime.so
 src-tauri/resources/libonnxruntime.dylib
 src-tauri/resources/onnxruntime.dll
-src-tauri/gen/
+src-tauri/gen/*
+!src-tauri/gen/android/
 src-tauri/libs/
+
+**/keystore.properties
+**/keystore.jks
+**/key.properties
