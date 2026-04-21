@@ -2445,8 +2445,25 @@ pub async fn apply_auto_adjustments_to_paths(
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
+        let state = app_handle.state::<AppState>();
+        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
+                for path in &paths {
+                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
+                }
+                for _ in 0..paths.len() {
+                    increment_thumbnail_progress(&state, &app_handle);
+                }
+                return;
+            }
+        };
+
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
+
         paths.par_iter().for_each(|path| {
-            let result: Result<(), String> = (|| {
+            let loaded_image: Option<DynamicImage> = (|| -> Result<DynamicImage, String> {
                 let (source_path, sidecar_path) = parse_virtual_path(path);
                 let source_path_str = source_path.to_string_lossy().to_string();
 
@@ -2454,7 +2471,7 @@ pub async fn apply_auto_adjustments_to_paths(
                 let image = image_loader::load_base_image_from_bytes(
                     &file_bytes,
                     &source_path_str,
-                    false,
+                    true,
                     highlight_compression,
                     linear_mode.clone(),
                     None,
@@ -2511,36 +2528,16 @@ pub async fn apply_auto_adjustments_to_paths(
                 if enable_xmp_sync {
                     sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
                 }
-                Ok(())
-            })();
-            if let Err(e) = result {
-                eprintln!("Failed to apply auto adjustments to {}: {}", path, e);
-            }
-        });
+                Ok(image)
+            })()
+            .map_err(|e| eprintln!("Failed to apply auto adjustments to {}: {}", path, e))
+            .ok();
 
-        let state = app_handle.state::<AppState>();
-        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
-            Ok(dir) => dir,
-            Err(e) => {
-                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
-                for path in &paths {
-                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
-                }
-                for _ in 0..paths.len() {
-                    increment_thumbnail_progress(&state, &app_handle);
-                }
-                return;
-            }
-        };
-
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
-
-        paths.par_iter().for_each(|path_str| {
             let result = generate_single_thumbnail_and_cache(
-                path_str,
+                path,
                 &thumb_cache_dir,
                 gpu_context.as_ref(),
-                None,
+                loaded_image.as_ref(),
                 true,
                 &app_handle,
             );
@@ -2548,7 +2545,7 @@ pub async fn apply_auto_adjustments_to_paths(
             if let Some((thumbnail_data, rating)) = result {
                 let _ = app_handle.emit(
                     "thumbnail-generated",
-                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating }),
+                    serde_json::json!({ "path": path, "data": thumbnail_data, "rating": rating }),
                 );
             }
 
