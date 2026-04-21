@@ -1814,6 +1814,27 @@ export default function SettingsPanel({
                         <KeybindItem keys={['E']} description="Toggle Export panel" />
                       </div>
                     </div>
+
+                    <div>
+                      <Text variant={TextVariants.heading}>Mouse Controls</Text>
+                      <div className="divide-y divide-border-color">
+                        <KeybindItem keys={['Scroll Wheel']} description="Zoom In / Out" />
+                        <KeybindItem keys={['Shift', '+', 'Scroll']} description="Pan Horizontally" />
+                        <KeybindItem keys={['Ctrl/Cmd', '+', 'Scroll']} description="Pan Vertically" />
+                        <KeybindItem keys={['Ctrl/Cmd', '+', 'Shift', '+', 'Scroll']} description="Pan Diagonally" />
+                        <KeybindItem keys={['Left Click', '+', 'Drag']} description="Pan Freely" />
+                        <KeybindItem keys={['Left Click']} description="Quick Zoom (Toggle Fit/2x)" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Text variant={TextVariants.heading}>Trackpad Controls</Text>
+                      <div className="divide-y divide-border-color">
+                        <KeybindItem keys={['Pinch']} description="Zoom In / Out" />
+                        <KeybindItem keys={['Two-Finger Swipe']} description="Pan Freely" />
+                        <KeybindItem keys={['Click']} description="Quick Zoom (Toggle Fit/2x)" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </motion.div>

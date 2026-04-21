@@ -2668,8 +2668,6 @@ pub fn calculate_waveform_from_image(
 }
 
 pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
-
-
     const ANALYSIS_MAX_DIM: u32 = 1024;
 
     const LUMA_R: f32 = 0.2126;
@@ -2719,24 +2717,22 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
     const EXPOSURE_OUTPUT_SCALE: f64 = 20.0;
     const BRIGHTNESS_SCALE: f64 = 0.007;
 
-
     let analysis_preview = downscale_f32_image(image, ANALYSIS_MAX_DIM, ANALYSIS_MAX_DIM);
     let rgb_image = analysis_preview.to_rgb8();
     let total_pixels = (rgb_image.width() * rgb_image.height()) as f64;
 
     let (width, height) = rgb_image.dimensions();
-    let cx0 = (width  as f32 * VIGNETTE_CENTER_LOW)  as u32;
-    let cx1 = (width  as f32 * VIGNETTE_CENTER_HIGH) as u32;
-    let cy0 = (height as f32 * VIGNETTE_CENTER_LOW)  as u32;
+    let cx0 = (width as f32 * VIGNETTE_CENTER_LOW) as u32;
+    let cx1 = (width as f32 * VIGNETTE_CENTER_HIGH) as u32;
+    let cy0 = (height as f32 * VIGNETTE_CENTER_LOW) as u32;
     let cy1 = (height as f32 * VIGNETTE_CENTER_HIGH) as u32;
 
-
-    let mut luma_hist    = vec![0u32; 256];
+    let mut luma_hist = vec![0u32; 256];
     let mut mean_saturation = 0.0f32;
-    let mut center_sum   = 0.0f32;
-    let mut edge_sum     = 0.0f32;
-    let mut center_n     = 0u32;
-    let mut edge_n       = 0u32;
+    let mut center_sum = 0.0f32;
+    let mut edge_sum = 0.0f32;
+    let mut center_n = 0u32;
+    let mut edge_n = 0u32;
 
     for (x, y, pixel) in rgb_image.enumerate_pixels() {
         let r = pixel[0] as f32;
@@ -2746,9 +2742,9 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
         let luma_f = LUMA_R * r + LUMA_G * g + LUMA_B * b;
         luma_hist[(luma_f.round() as usize).min(255)] += 1;
 
-        let r_n  = r / 255.0;
-        let g_n  = g / 255.0;
-        let b_n  = b / 255.0;
+        let r_n = r / 255.0;
+        let g_n = g / 255.0;
+        let b_n = b / 255.0;
         let max_c = r_n.max(g_n).max(b_n);
         let min_c = r_n.min(g_n).min(b_n);
         if max_c > 0.0 {
@@ -2759,10 +2755,10 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
         let luma_norm = luma_f / 255.0;
         if x >= cx0 && x < cx1 && y >= cy0 && y < cy1 {
             center_sum += luma_norm;
-            center_n   += 1;
+            center_n += 1;
         } else {
             edge_sum += luma_norm;
-            edge_n   += 1;
+            edge_n += 1;
         }
     }
 
@@ -2780,7 +2776,7 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
         255
     };
 
-    let p1  = percentile(&luma_hist, 0.01);
+    let p1 = percentile(&luma_hist, 0.01);
     let p50 = percentile(&luma_hist, 0.50);
     let p99 = percentile(&luma_hist, 0.99);
 
@@ -2814,8 +2810,7 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
         contrast *= HIGHLIGHT_CONTRAST_REDUCE;
     }
 
-    let shadow_percent =
-        luma_hist[0..SHADOW_LUMA_MAX].iter().sum::<u32>() as f64 / total_pixels;
+    let shadow_percent = luma_hist[0..SHADOW_LUMA_MAX].iter().sum::<u32>() as f64 / total_pixels;
 
     let mut shadows = 0.0f64;
     if shadow_percent > SHADOW_PERCENT_THRESHOLD {
@@ -2847,7 +2842,7 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
 
     if center_n > 0 && edge_n > 0 {
         let c_avg = center_sum / center_n as f32;
-        let e_avg = edge_sum   / edge_n   as f32;
+        let e_avg = edge_sum / edge_n as f32;
 
         if e_avg < c_avg {
             let diff = c_avg - e_avg;
@@ -2870,31 +2865,30 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
         adjusted_luma_hist[luma.clamp(0.0, 255.0).round() as usize] += 1;
     }
 
-    let adj_p1  = percentile(&adjusted_luma_hist, 0.01);
+    let adj_p1 = percentile(&adjusted_luma_hist, 0.01);
     let adj_p50 = percentile(&adjusted_luma_hist, 0.50);
     let adj_p99 = percentile(&adjusted_luma_hist, 0.99);
-    let blacks: f64 = -(adj_p1  as f64 * BLACKS_SCALE);
-    let whites: f64 =  (adj_p99 as f64 - 255.0) * WHITES_SCALE;
+    let blacks: f64 = -(adj_p1 as f64 * BLACKS_SCALE);
+    let whites: f64 = (adj_p99 as f64 - 255.0) * WHITES_SCALE;
     let brightness: f64 = (MID_GRAY - adj_p50 as f64) * BRIGHTNESS_SCALE;
 
     AutoAdjustmentResults {
-        exposure:        (exposure / EXPOSURE_OUTPUT_SCALE).clamp(-5.0, 5.0),
-        brightness:      brightness.clamp(-5.0, 5.0),
-        contrast:        contrast.clamp(-100.0, 100.0),
-        highlights:      highlights.clamp(-100.0, 100.0),
-        shadows:         shadows.clamp(-100.0, 100.0),
-        vibrancy:        vibrancy.clamp(-100.0, 100.0),
+        exposure: (exposure / EXPOSURE_OUTPUT_SCALE).clamp(-5.0, 5.0),
+        brightness: brightness.clamp(-5.0, 5.0),
+        contrast: contrast.clamp(-100.0, 100.0),
+        highlights: highlights.clamp(-100.0, 100.0),
+        shadows: shadows.clamp(-100.0, 100.0),
+        vibrancy: vibrancy.clamp(-100.0, 100.0),
         vignette_amount: vignette_amount.clamp(-100.0, 100.0),
-        temperature:     0.0,
-        tint:            0.0,
-        dehaze:          dehaze.clamp(-100.0, 100.0),
-        clarity:         clarity.clamp(-100.0, 100.0),
-        centre:          centre.clamp(-100.0, 100.0),
-        whites:          whites.clamp(-100.0, 100.0),
-        blacks:          blacks.clamp(-100.0, 100.0),
+        temperature: 0.0,
+        tint: 0.0,
+        dehaze: dehaze.clamp(-100.0, 100.0),
+        clarity: clarity.clamp(-100.0, 100.0),
+        centre: centre.clamp(-100.0, 100.0),
+        whites: whites.clamp(-100.0, 100.0),
+        blacks: blacks.clamp(-100.0, 100.0),
     }
 }
-
 
 pub fn auto_results_to_json(results: &AutoAdjustmentResults) -> serde_json::Value {
     json!({
