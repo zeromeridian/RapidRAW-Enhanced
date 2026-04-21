@@ -27,7 +27,7 @@ import {
   LayoutTemplate,
   Redo,
   RefreshCw,
-  Eraser,
+  RotateCcw,
   Star,
   SquaresUnite,
   Palette,
@@ -4371,21 +4371,27 @@ function App() {
       { type: OPTION_SEPARATOR },
       {
         label: 'Reset Adjustments',
-        icon: Eraser,
-        onClick: () => {
-          debouncedSetHistory.cancel();
-          const currentRating = adjustments.rating;
-
-          const originalAspectRatio =
-            selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
-
-          resetAdjustmentsHistory({
-            ...INITIAL_ADJUSTMENTS,
-            aspectRatio: originalAspectRatio,
-            rating: currentRating,
-            aiPatches: [],
-          });
-        },
+        icon: RotateCcw,
+        submenu: [
+          { label: 'Cancel', icon: X, onClick: () => {} },
+          {
+            label: 'Confirm Reset',
+            icon: Check,
+            isDestructive: true,
+            onClick: () => {
+              debouncedSetHistory.cancel();
+              const currentRating = adjustments.rating;
+              const originalAspectRatio =
+                selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
+              resetAdjustmentsHistory({
+                ...INITIAL_ADJUSTMENTS,
+                aspectRatio: originalAspectRatio,
+                rating: currentRating,
+                aiPatches: [],
+              });
+            },
+          },
+        ],
       },
     ];
     showContextMenu(event.clientX, event.clientY, options);
@@ -4459,7 +4465,7 @@ function App() {
       deleteSubmenu = [
         { label: 'Cancel', icon: X, onClick: () => {} },
         {
-          label: 'Confirm',
+          label: 'Confirm Delete',
           icon: Check,
           isDestructive: true,
           onClick: () => executeDelete(finalSelection, { includeAssociated: false }),
@@ -4772,7 +4778,19 @@ function App() {
           );
         },
       },
-      { label: resetLabel, icon: Eraser, onClick: () => handleResetAdjustments(finalSelection) },
+      {
+        label: resetLabel,
+        icon: RotateCcw,
+        submenu: [
+          { label: 'Cancel', icon: X, onClick: () => {} },
+          {
+            label: 'Confirm Reset',
+            icon: Check,
+            isDestructive: true,
+            onClick: () => handleResetAdjustments(finalSelection),
+          },
+        ],
+      },
       deleteOption,
     ];
     showContextMenu(event.clientX, event.clientY, options);
