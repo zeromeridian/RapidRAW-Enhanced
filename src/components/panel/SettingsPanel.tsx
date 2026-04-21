@@ -1497,10 +1497,21 @@ export default function SettingsPanel({
 
                     <SettingItem
                       label="WGPU Direct Rendering"
-                      description="Bypasses browser encoding for instantly responsive live previews. Highly recommended for performance."
+                      description={
+                        osPlatform === 'linux'
+                          ? 'Bypasses browser encoding for instantly responsive live previews. (Disabled on Linux: Tauri uses GTK for webviews, which conflicts with WGPU on the same X11 surface and causes flickering.)'
+                          : osPlatform === 'android'
+                            ? 'Bypasses browser encoding for instantly responsive live previews. (Disabled on Android: Native WGPU surface creation is currently not supported alongside the mobile webview.)'
+                            : 'Bypasses browser encoding for instantly responsive live previews. Highly recommended for performance.'
+                      }
                     >
                       <Switch
-                        checked={processingSettings.useWgpuRenderer}
+                        checked={
+                          osPlatform === 'linux' || osPlatform === 'android'
+                            ? false
+                            : processingSettings.useWgpuRenderer
+                        }
+                        disabled={osPlatform === 'linux' || osPlatform === 'android'}
                         id="wgpu-renderer-toggle"
                         label="Enable Direct WGPU Render"
                         onChange={(checked) => handleProcessingSettingChange('useWgpuRenderer', checked)}

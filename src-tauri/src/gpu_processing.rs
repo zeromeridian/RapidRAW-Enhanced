@@ -446,9 +446,6 @@ pub fn get_or_init_gpu_context(
     #[cfg(any(target_os = "android", target_os = "linux"))]
     let display_opt = None;
 
-    #[cfg(target_os = "android")]
-    let display_opt = None;
-
     let new_context = GpuContext {
         device: Arc::new(device),
         queue: Arc::new(queue),
