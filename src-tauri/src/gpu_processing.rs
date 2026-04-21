@@ -153,7 +153,7 @@ pub fn get_or_init_gpu_context(
 
     let instance = wgpu::Instance::new(&instance_desc);
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
     let surface_opt = {
         let window = app_handle
             .get_webview_window("main")
@@ -165,7 +165,7 @@ pub fn get_or_init_gpu_context(
         )
     };
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_os = "linux"))]
     let surface_opt: Option<wgpu::Surface> = None;
 
     let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -209,7 +209,7 @@ pub fn get_or_init_gpu_context(
         let _ = std::fs::remove_file(p);
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
     let display_opt = {
         let surface = surface_opt.unwrap();
         let window = app_handle
@@ -442,6 +442,9 @@ pub fn get_or_init_gpu_context(
             current_bind_group: None,
         })
     };
+
+    #[cfg(any(target_os = "android", target_os = "linux"))]
+    let display_opt = None;
 
     #[cfg(target_os = "android")]
     let display_opt = None;
