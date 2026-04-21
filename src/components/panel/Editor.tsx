@@ -1247,13 +1247,13 @@ export default function Editor({
     }
 
     requestMaskOverlay(maskDefForOverlay, imageRenderSize, adjustments);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     overlayTriggerHash,
     requestMaskOverlay,
     activeRightPanel,
     activeMaskContainerId,
     activeAiPatchContainerId,
-    adjustments,
     imageRenderSize,
   ]);
 

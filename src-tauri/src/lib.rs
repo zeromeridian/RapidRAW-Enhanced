@@ -931,7 +931,9 @@ pub fn get_cached_or_generate_mask(
 ) -> Option<GrayImage> {
     let mut hasher = DefaultHasher::new();
 
-    let def_json = serde_json::to_string(&def).unwrap_or_default();
+    let mut def_for_hash = def.clone();
+    def_for_hash.adjustments = serde_json::Value::Null;
+    let def_json = serde_json::to_string(&def_for_hash).unwrap_or_default();
     def_json.hash(&mut hasher);
 
     width.hash(&mut hasher);

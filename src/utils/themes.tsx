@@ -47,7 +47,7 @@ export const THEMES: Array<ThemeProps> = [
     name: 'Grey',
     splashImage: '/splash-grey.jpg',
     cssVariables: {
-      '--app-bg-primary': 'rgb(88, 88, 88)',
+      '--app-bg-primary': 'rgb(84, 84, 84)',
       '--app-bg-secondary': 'rgb(90, 90, 90)',
       '--app-surface': 'rgb(80, 80, 80)',
       '--app-card-active': 'rgb(105, 105, 105)',

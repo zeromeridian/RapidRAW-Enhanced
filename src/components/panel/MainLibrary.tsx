@@ -1346,7 +1346,7 @@ function Thumbnail({
                 <Text variant={TextVariants.small} color={TextColors.white}>
                   {rating}
                 </Text>
-                <StarIcon size={12} className="text-white fill-accent" />
+                <StarIcon size={12} className="text-white fill-white" />
               </>
             )}
           </div>
