@@ -414,7 +414,7 @@ export default function SettingsPanel({
 
   const handleProcessingSettingChange = (key: string, value: any) => {
     setProcessingSettings((prev) => ({ ...prev, [key]: value }));
-    if (key === 'processingBackend' || key === 'linuxGpuOptimization') {
+    if (key === 'processingBackend' || key === 'linuxGpuOptimization' || key === 'useWgpuRenderer') {
       setRestartRequired(true);
     } else {
       onSettingsChange({ ...appSettings, [key]: value });

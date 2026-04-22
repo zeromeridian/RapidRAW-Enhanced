@@ -80,7 +80,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 - **2026-04-01:** Added depth masking with depth anything v2 & improved ROI rendering performance
 
 <details>
-<summary><strong>Expand further</strong\></summary>
+<summary><strong>Expand further</strong></summary>
 
 - **2026-03-30:** LaMa inpainting for lightweight local content-aware fill and object removal
 - **2026-03-26:** Performance improvements & new flat list mode for library
