@@ -183,6 +183,7 @@ export interface AppSettings {
   useWgpuRenderer?: boolean;
   canvasInputMode?: 'mouse' | 'trackpad';
   zoomSpeedMultiplier?: number;
+  keybindings?: { [actionKey: string]: string[] };
 }
 
 export interface BrushSettings {
@@ -333,3 +334,61 @@ export interface CullingSuggestions {
   blurryImages: ImageAnalysisResult[];
   failedPaths: string[];
 }
+
+export interface KeybindingDefinition {
+  actionKey: string;
+  description: string;
+  defaultCombos: string[][];
+  section: 'general' | 'editor';
+}
+
+export interface ActionHandler {
+  shouldFire?: () => boolean;
+  execute: (event: KeyboardEvent) => void;
+}
+
+export const KEYBINDING_DEFINITIONS: KeybindingDefinition[] = [
+  { actionKey: 'open_image', description: 'Open selected image', defaultCombos: [['enter'], ['space']], section: 'general' },
+  { actionKey: 'copy_adjustments', description: 'Copy selected adjustments', defaultCombos: [['ctrl', 'c']], section: 'general' },
+  { actionKey: 'paste_adjustments', description: 'Paste copied adjustments', defaultCombos: [['ctrl', 'v']], section: 'general' },
+  { actionKey: 'copy_files', description: 'Copy selected file(s)', defaultCombos: [['ctrl', 'shift', 'c']], section: 'general' },
+  { actionKey: 'paste_files', description: 'Paste file(s) to current folder', defaultCombos: [['ctrl', 'shift', 'v']], section: 'general' },
+  { actionKey: 'select_all', description: 'Select all images', defaultCombos: [['ctrl', 'a']], section: 'general' },
+  { actionKey: 'delete_selected', description: 'Delete selected file(s)', defaultCombos: [['delete']], section: 'general' },
+  { actionKey: 'prev_next', description: 'Previous / Next image', defaultCombos: [['arrowleft'], ['arrowright']], section: 'editor' },
+  { actionKey: 'zoom_arrow', description: 'Zoom in / Zoom out (by step)', defaultCombos: [['arrowup'], ['arrowdown']], section: 'editor' },
+  { actionKey: 'cycle_zoom', description: 'Cycle zoom (Fit, 2x Fit, 100%)', defaultCombos: [['space']], section: 'editor' },
+  { actionKey: 'zoom_in', description: 'Zoom in', defaultCombos: [['ctrl', '='], ['ctrl', '+']], section: 'editor' },
+  { actionKey: 'zoom_out', description: 'Zoom out', defaultCombos: [['ctrl', '-']], section: 'editor' },
+  { actionKey: 'zoom_fit', description: 'Zoom to fit', defaultCombos: [['ctrl', '0']], section: 'editor' },
+  { actionKey: 'zoom_100', description: 'Zoom to 100%', defaultCombos: [['ctrl', '1']], section: 'editor' },
+  { actionKey: 'rotate_left', description: 'Rotate 90° counter-clockwise', defaultCombos: [['[']], section: 'editor' },
+  { actionKey: 'rotate_right', description: 'Rotate 90° clockwise', defaultCombos: [[']']], section: 'editor' },
+  { actionKey: 'undo', description: 'Undo adjustment', defaultCombos: [['ctrl', 'z']], section: 'editor' },
+  { actionKey: 'redo', description: 'Redo adjustment', defaultCombos: [['ctrl', 'y']], section: 'editor' },
+  { actionKey: 'toggle_fullscreen', description: 'Toggle fullscreen', defaultCombos: [['f']], section: 'editor' },
+  { actionKey: 'show_original', description: 'Show original (before/after)', defaultCombos: [['b']], section: 'editor' },
+  { actionKey: 'toggle_crop', description: 'Straighten Image', defaultCombos: [['s']], section: 'editor' },
+  { actionKey: 'toggle_adjustments', description: 'Toggle Adjustments panel', defaultCombos: [['d']], section: 'editor' },
+  { actionKey: 'toggle_crop_panel', description: 'Toggle Crop panel', defaultCombos: [['r']], section: 'editor' },
+  { actionKey: 'toggle_masks', description: 'Toggle Masks panel', defaultCombos: [['m']], section: 'editor' },
+  { actionKey: 'toggle_ai', description: 'Toggle AI panel', defaultCombos: [['k']], section: 'editor' },
+  { actionKey: 'toggle_presets', description: 'Toggle Presets panel', defaultCombos: [['p']], section: 'editor' },
+  { actionKey: 'toggle_metadata', description: 'Toggle Metadata panel', defaultCombos: [['i']], section: 'editor' },
+  { actionKey: 'toggle_analytics', description: 'Toggle Analytics display', defaultCombos: [['a']], section: 'editor' },
+  { actionKey: 'toggle_export', description: 'Toggle Export panel', defaultCombos: [['e']], section: 'editor' },
+  { actionKey: 'rate_0', description: 'Set star rating: 0', defaultCombos: [['0']], section: 'editor' },
+  { actionKey: 'rate_1', description: 'Set star rating: 1', defaultCombos: [['1']], section: 'editor' },
+  { actionKey: 'rate_2', description: 'Set star rating: 2', defaultCombos: [['2']], section: 'editor' },
+  { actionKey: 'rate_3', description: 'Set star rating: 3', defaultCombos: [['3']], section: 'editor' },
+  { actionKey: 'rate_4', description: 'Set star rating: 4', defaultCombos: [['4']], section: 'editor' },
+  { actionKey: 'rate_5', description: 'Set star rating: 5', defaultCombos: [['5']], section: 'editor' },
+  { actionKey: 'color_label_none', description: 'Clear color label', defaultCombos: [['shift', '0']], section: 'editor' },
+  { actionKey: 'color_label_red', description: 'Set red color label', defaultCombos: [['shift', '1']], section: 'editor' },
+  { actionKey: 'color_label_yellow', description: 'Set yellow color label', defaultCombos: [['shift', '2']], section: 'editor' },
+  { actionKey: 'color_label_green', description: 'Set green color label', defaultCombos: [['shift', '3']], section: 'editor' },
+  { actionKey: 'color_label_blue', description: 'Set blue color label', defaultCombos: [['shift', '4']], section: 'editor' },
+  { actionKey: 'color_label_purple', description: 'Set purple color label', defaultCombos: [['shift', '5']], section: 'editor' },
+  { actionKey: 'brush_size_up', description: 'Increase brush size', defaultCombos: [['ctrl', 'arrowup']], section: 'editor' },
+  { actionKey: 'brush_size_down', description: 'Decrease brush size', defaultCombos: [['ctrl', 'arrowdown']], section: 'editor' },
+];
