@@ -179,7 +179,6 @@ export interface Adjustments {
   lutSize?: number;
   masks: Array<MaskContainer>;
   orientationSteps: number;
-  rating: number;
   rotation: number;
   saturation: number;
   sectionVisibility: SectionVisibility;
@@ -485,7 +484,6 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   lutSize: 0,
   masks: [],
   orientationSteps: 0,
-  rating: 0,
   rotation: 0,
   saturation: 0,
   sectionVisibility: {

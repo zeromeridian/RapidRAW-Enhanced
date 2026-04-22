@@ -2185,7 +2185,6 @@ pub fn save_metadata_and_update_thumbnail(
         ImageMetadata::default()
     };
 
-    metadata.rating = adjustments["rating"].as_u64().unwrap_or(0) as u8;
     metadata.adjustments = adjustments;
 
     let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
@@ -2294,7 +2293,6 @@ pub async fn apply_adjustments_to_paths(
                 }
             }
 
-            existing_metadata.rating = new_adjustments["rating"].as_u64().unwrap_or(0) as u8;
             existing_metadata.adjustments = new_adjustments;
 
             if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
@@ -2373,11 +2371,7 @@ pub async fn reset_adjustments_for_paths(
                 ImageMetadata::default()
             };
 
-            let new_adjustments = serde_json::json!({
-                "rating": existing_metadata.rating
-            });
-
-            existing_metadata.adjustments = new_adjustments;
+            existing_metadata.adjustments = serde_json::json!({});
 
             if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
                 let _ = std::fs::write(&sidecar_path, json_string);
@@ -2517,10 +2511,6 @@ pub async fn apply_auto_adjustments_to_paths(
                     }
                 }
 
-                existing_metadata.rating = existing_metadata.adjustments["rating"]
-                    .as_u64()
-                    .unwrap_or(0) as u8;
-
                 if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
                     let _ = std::fs::write(&sidecar_path, json_string);
                 }
@@ -2592,6 +2582,43 @@ pub fn set_color_label_for_paths(
         } else {
             metadata.tags = Some(tags);
         }
+
+        if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
+            let _ = std::fs::write(&sidecar_path, json_string);
+        }
+
+        if enable_xmp_sync {
+            let source_path = parse_virtual_path(path).0;
+            sync_metadata_to_xmp(&source_path, &metadata, create_xmp_if_missing);
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_rating_for_paths(
+    paths: Vec<String>,
+    rating: u8,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
+    let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
+
+    paths.par_iter().for_each(|path| {
+        let (_, sidecar_path) = parse_virtual_path(path);
+
+        let mut metadata: ImageMetadata = if sidecar_path.exists() {
+            fs::read_to_string(&sidecar_path)
+                .ok()
+                .and_then(|content| serde_json::from_str(&content).ok())
+                .unwrap_or_default()
+        } else {
+            ImageMetadata::default()
+        };
+
+        metadata.rating = rating;
 
         if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
             let _ = std::fs::write(&sidecar_path, json_string);
