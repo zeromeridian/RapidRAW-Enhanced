@@ -1843,8 +1843,8 @@ export default function SettingsPanel({
                       <div className="divide-y divide-border-color">
                         <KeybindItem keys={['Scroll Wheel']} description="Zoom In / Out" />
                         <KeybindItem keys={['Shift', '+', 'Scroll']} description="Pan Horizontally" />
-                        <KeybindItem keys={['Ctrl/Cmd', '+', 'Scroll']} description="Pan Vertically" />
-                        <KeybindItem keys={['Ctrl/Cmd', '+', 'Shift', '+', 'Scroll']} description="Pan Diagonally" />
+                        <KeybindItem keys={['Alt/Option', '+', 'Scroll']} description="Pan Vertically" />
+                        <KeybindItem keys={['Alt/Option', '+', 'Shift', '+', 'Scroll']} description="Pan Diagonally" />
                         <KeybindItem keys={['Left Click', '+', 'Drag']} description="Pan Freely" />
                         <KeybindItem keys={['Left Click']} description="Quick Zoom (Toggle Fit/2x)" />
                       </div>

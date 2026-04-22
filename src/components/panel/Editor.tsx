@@ -551,8 +551,7 @@ export default function Editor({
 
       const maxDelta = Math.max(Math.abs(e.deltaX), Math.abs(e.deltaY));
       const isTrackpad = e.deltaMode === 0 && (e.deltaY % 1 !== 0 || e.deltaX % 1 !== 0 || maxDelta < 50);
-
-      const isZoomIntent = isTrackpad ? e.ctrlKey : !e.ctrlKey && !e.shiftKey;
+      const isZoomIntent = e.ctrlKey || (!isTrackpad && !e.shiftKey && !e.altKey);
 
       if (isZoomIntent) {
         const rect = container.getBoundingClientRect();
@@ -601,14 +600,14 @@ export default function Editor({
         let dy = e.deltaY;
 
         if (!isTrackpad) {
-          if (e.shiftKey && e.ctrlKey) {
+          if (e.shiftKey && e.altKey) {
             const primaryDelta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
             dx = primaryDelta;
             dy = primaryDelta;
           } else if (e.shiftKey) {
             dx = e.deltaX !== 0 ? e.deltaX : e.deltaY;
             dy = 0;
-          } else if (e.ctrlKey) {
+          } else if (e.altKey) {
             dx = 0;
             dy = e.deltaY !== 0 ? e.deltaY : e.deltaX;
           }

@@ -2375,6 +2375,7 @@ function App() {
 
     const lastActivePath = selectedImage?.path ?? null;
     setHasRenderedFirstFrame(false);
+    selectedImagePathRef.current = null;
     setSelectedImage(null);
     setFinalPreviewUrl(null);
     setUncroppedAdjustedPreviewUrl(null);
@@ -2410,6 +2411,7 @@ function App() {
       patchesSentToBackend.current.clear();
 
       setHasRenderedFirstFrame(false);
+      selectedImagePathRef.current = path;
       setMultiSelectedPaths([path]);
       setLibraryActivePath(null);
       setSelectionAnchorPath(path);
@@ -3398,8 +3400,8 @@ function App() {
           }));
         }
       }),
-      listen('wgpu-frame-ready', () => {
-        if (isEffectActive) {
+      listen('wgpu-frame-ready', (event: any) => {
+        if (isEffectActive && event.payload?.path === selectedImagePathRef.current) {
           setHasRenderedFirstFrame(true);
         }
       }),
