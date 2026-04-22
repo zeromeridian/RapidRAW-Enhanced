@@ -153,7 +153,7 @@ pub fn get_or_init_gpu_context(
 
     let instance = wgpu::Instance::new(&instance_desc);
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
     let surface_opt = {
         let window = app_handle
             .get_webview_window("main")
@@ -165,7 +165,7 @@ pub fn get_or_init_gpu_context(
         )
     };
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_os = "linux"))]
     let surface_opt: Option<wgpu::Surface> = None;
 
     let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -209,7 +209,7 @@ pub fn get_or_init_gpu_context(
         let _ = std::fs::remove_file(p);
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
     let display_opt = {
         let surface = surface_opt.unwrap();
         let window = app_handle
@@ -443,7 +443,7 @@ pub fn get_or_init_gpu_context(
         })
     };
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_os = "linux"))]
     let display_opt = None;
 
     let new_context = GpuContext {
@@ -847,7 +847,7 @@ impl GpuProcessor {
                 binding: 2,
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
                     min_binding_size: None,
                 },
@@ -964,7 +964,7 @@ impl GpuProcessor {
         let adjustments_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Adjustments Buffer"),
             size: std::mem::size_of::<AllAdjustments>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
