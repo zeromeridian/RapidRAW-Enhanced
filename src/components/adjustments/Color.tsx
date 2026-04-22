@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Pipette, Sliders } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Slider from '../ui/Slider';
@@ -397,6 +397,35 @@ export default function ColorPanel({
   const [activeColor, setActiveColor] = useState('reds');
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
 
+  const colorHueMap: Record<string, number> = {
+    reds: 0,
+    oranges: 30,
+    yellows: 60,
+    greens: 120,
+    aquas: 180,
+    blues: 240,
+    purples: 300,
+    magentas: 340,
+  };
+
+  const currentHsl = adjustments?.hsl?.[activeColor] || { hue: 0, saturation: 0, luminance: 0 };
+  const baseHue = colorHueMap[activeColor] || 0;
+  const effectiveHue = baseHue + (currentHsl.hue || 0);
+
+  useEffect(() => {
+    const normalizedHue = ((effectiveHue % 360) + 360) % 360;
+    const effectiveSaturation = (currentHsl.saturation + 100) / 2;
+
+    document.documentElement.style.setProperty(
+      `--hsl-mixer-hue-${activeColor}`,
+      normalizedHue.toString()
+    );
+    document.documentElement.style.setProperty(
+      `--hsl-mixer-sat-${activeColor}`,
+      `${effectiveSaturation}%`
+    );
+  }, [effectiveHue, currentHsl.saturation, activeColor]);
+
   const handleGlobalChange = (key: ColorAdjustment, value: string) => {
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: parseFloat(value) }));
   };
@@ -417,8 +446,6 @@ export default function ColorPanel({
   const hue_slider = `hue-slider-${activeColor}`;
   const saturation_slider = `sat-slider-${activeColor}`;
   const luminance_slider = `lum-slider-${activeColor}`;
-
-  const currentHsl = adjustments?.hsl?.[activeColor] || { hue: 0, saturation: 0, luminance: 0 };
 
   return (
     <div className="space-y-4">
