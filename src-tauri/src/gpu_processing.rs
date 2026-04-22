@@ -155,14 +155,27 @@ pub fn get_or_init_gpu_context(
 
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     let surface_opt = {
-        let window = app_handle
-            .get_webview_window("main")
-            .ok_or("Failed to get main window")?;
-        Some(
-            instance
-                .create_surface(window.clone())
-                .map_err(|e| e.to_string())?,
-        )
+        let settings = crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
+        let use_wgpu_renderer = settings.use_wgpu_renderer.unwrap_or(true);
+
+        if use_wgpu_renderer {
+            if let Some(window) = app_handle.get_webview_window("main") {
+                match instance.create_surface(window) {
+                    Ok(surface) => Some(surface),
+                    Err(e) => {
+                        log::warn!("Failed to create surface, falling back to compute-only: {}", e);
+                        if let Some(p) = &flag_path {
+                            let _ = std::fs::remove_file(p);
+                        }
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     };
 
     #[cfg(any(target_os = "android", target_os = "linux"))]
@@ -210,8 +223,7 @@ pub fn get_or_init_gpu_context(
     }
 
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
-    let display_opt = {
-        let surface = surface_opt.unwrap();
+    let display_opt = if let Some(surface) = surface_opt {
         let window = app_handle
             .get_webview_window("main")
             .ok_or("Failed to get main window")?;
@@ -441,6 +453,8 @@ pub fn get_or_init_gpu_context(
             sampler,
             current_bind_group: None,
         })
+    } else {
+        None
     };
 
     #[cfg(any(target_os = "android", target_os = "linux"))]
@@ -1524,7 +1538,7 @@ impl GpuProcessor {
                 bind_group_entries.push(wgpu::BindGroupEntry {
                     binding: 9 + MAX_MASK_BINDINGS,
                     resource: wgpu::BindingResource::TextureView(if use_flare {
-                        &self.flare_final_view
+                        &self.flare_ghosts_view
                     } else {
                         &self.dummy_blur_view
                     }),

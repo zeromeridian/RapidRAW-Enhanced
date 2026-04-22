@@ -1097,13 +1097,6 @@ function ListItem({
                   style={{ opacity: layer.opacity, transition: 'opacity 300ms ease-in-out' }}
                   onTransitionEnd={() => handleTransitionEnd(layer.id)}
                 >
-                  {thumbnailAspectRatio === ThumbnailAspectRatio.Contain && (
-                    <img
-                      alt=""
-                      className="absolute inset-0 w-full h-full object-cover blur-md scale-110 brightness-[0.4]"
-                      src={layer.url}
-                    />
-                  )}
                   <img
                     alt={baseName}
                     className={`w-full h-full relative ${
@@ -1295,13 +1288,6 @@ function Thumbnail({
               }}
               onTransitionEnd={() => handleTransitionEnd(layer.id)}
             >
-              {thumbnailAspectRatio === ThumbnailAspectRatio.Contain && (
-                <img
-                  alt=""
-                  className="absolute inset-0 w-full h-full object-cover blur-md scale-110 brightness-[0.4]"
-                  src={layer.url}
-                />
-              )}
               <img
                 alt={path.split(/[\\/]/).pop()}
                 className={`w-full h-full group-hover:scale-[1.02] transition-transform duration-300 ${
