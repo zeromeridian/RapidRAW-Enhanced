@@ -2689,8 +2689,8 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
 
     const SHADOW_LUMA_MAX: usize = 32;
     const SHADOW_PERCENT_THRESHOLD: f64 = 0.05;
-    const SHADOW_BOOST_SCALE: f64 = 80.0;
-    const SHADOW_MAX: f64 = 70.0;
+    const SHADOW_BOOST_SCALE: f64 = 40.0;
+    const SHADOW_MAX: f64 = 50.0;
     const HIGHLIGHT_BOOST_SCALE: f64 = 120.0;
     const HIGHLIGHT_MAX: f64 = 70.0;
 

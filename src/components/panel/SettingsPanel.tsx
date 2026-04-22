@@ -1851,6 +1851,7 @@ export default function SettingsPanel({
                       <Text variant={TextVariants.heading}>Trackpad Controls</Text>
                       <div className="divide-y divide-border-color">
                         <KeybindItem keys={['Pinch']} description="Zoom In / Out" />
+                        <KeybindItem keys={['Ctrl', '+', 'Two-Finger Swipe']} description="Alternative Zoom In / Out" />
                         <KeybindItem keys={['Two-Finger Swipe']} description="Pan Freely" />
                         <KeybindItem keys={['Click']} description="Quick Zoom (Toggle Fit/2x)" />
                       </div>
