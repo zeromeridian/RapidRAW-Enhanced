@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ImageFile, Panel, SelectedImage } from '../components/ui/AppProperties';
+import { ActionHandler, ImageFile, KeybindingDefinition, Panel, SelectedImage, KEYBINDING_DEFINITIONS } from '../components/ui/AppProperties';
 import { BrushSettings } from '../components/ui/AppProperties';
 
 interface KeyboardShortcutsProps {
@@ -30,7 +30,7 @@ interface KeyboardShortcutsProps {
   isFullScreen: boolean;
   isModalOpen: boolean;
   isStraightenActive: boolean;
-  isViewLoading: boolean;
+  keybindings?: { [actionKey: string]: string[] };
   libraryActivePath: string | null;
   multiSelectedPaths: Array<string>;
   onSelectPatchContainer?(container: string | null): void;
@@ -51,8 +51,8 @@ interface KeyboardShortcutsProps {
   displaySize?: { width: number; height: number };
   baseRenderSize?: { width: number; height: number };
   originalSize?: { width: number; height: number };
-  brushSettings: BrushSettings | null;  
-  setBrushSettings: (settings: BrushSettings) => void;  
+  brushSettings: BrushSettings | null;
+  setBrushSettings: (settings: BrushSettings) => void;
 }
 
 export const useKeyboardShortcuts = ({
@@ -83,7 +83,7 @@ export const useKeyboardShortcuts = ({
   isFullScreen,
   isModalOpen,
   isStraightenActive,
-  isViewLoading,
+  keybindings,
   libraryActivePath,
   multiSelectedPaths,
   onSelectPatchContainer,
@@ -104,10 +104,40 @@ export const useKeyboardShortcuts = ({
   displaySize,
   baseRenderSize,
   originalSize,
-  brushSettings,  
-  setBrushSettings,  
+  brushSettings,
+  setBrushSettings,
 }: KeyboardShortcutsProps) => {
   useEffect(() => {
+    function arraysEqual(a: string[], b: string[]): boolean {
+      return a.length === b.length && a.every((v, i) => v === b[i]);
+    }
+
+    function normalizeCombo(event: KeyboardEvent): string[] {
+      const parts: string[] = [];
+      if (event.ctrlKey || event.metaKey) parts.push('ctrl');
+      if (event.shiftKey) parts.push('shift');
+      if (event.altKey) parts.push('alt');
+      if (event.code === 'BracketLeft') parts.push('[');
+      else if (event.code === 'BracketRight') parts.push(']');
+      else {
+        const k = event.key.toLowerCase();
+        if (!['ctrl', 'shift', 'alt', 'meta'].includes(k))
+          parts.push(k);
+      }
+      return parts;
+    }
+
+    function getEffectiveCombos(def: KeybindingDefinition): string[][] {
+      if (def.actionKey === 'delete_selected') {
+        if (osPlatform === 'macos' && !keybindings?.[def.actionKey]) {
+          return [['ctrl', 'backspace']];
+        }
+      }
+      const userCombo = keybindings?.[def.actionKey];
+      if (userCombo) return [userCombo];
+      return def.defaultCombos;
+    }
+
     const handleKeyDown = (event: any) => {
       if (isModalOpen) {
         return;
@@ -481,7 +511,7 @@ export const useKeyboardShortcuts = ({
     handleZoomChange,
     isFullScreen,
     isStraightenActive,
-    isViewLoading,
+    keybindings,
     libraryActivePath,
     multiSelectedPaths,
     onSelectPatchContainer,

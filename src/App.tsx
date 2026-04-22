@@ -3193,7 +3193,6 @@ function App() {
     handleZoomChange,
     isFullScreen,
     isStraightenActive,
-    isViewLoading,
     libraryActivePath,
     multiSelectedPaths,
     redo,
