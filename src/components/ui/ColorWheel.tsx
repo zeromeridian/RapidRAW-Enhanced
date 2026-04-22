@@ -35,7 +35,6 @@ const ColorWheel = ({
   const [isLabelHovered, setIsLabelHovered] = useState(false);
   const [modifierState, setModifierState] = useState({ ctrl: false, shift: false });
   const instanceId = useId().replace(/:/g, '');
-  const lastSaturationRef = useRef(saturation);
 
   const isDragging = isWheelDragging || isSliderDragging;
 
@@ -109,12 +108,6 @@ const ColorWheel = ({
     onDragStateChange?.(isDragging);
   }, [isDragging, onDragStateChange]);
 
-  useEffect(() => {
-    if (isWheelDragging) {
-      lastSaturationRef.current = saturation;
-    }
-  }, [isWheelDragging, saturation]);
-
   const handleWheelChange = (color: ColorResult) => {
     const { ctrl, shift } = modifierState;
     const newValues = { ...effectiveValue };
@@ -170,8 +163,6 @@ const ColorWheel = ({
   const pointerSize = isWheelDragging ? 14 : 12;
   const pointerOffset = pointerSize / 2;
 
-  const showModifierHint = isWheelDragging && (modifierState.ctrl || modifierState.shift);
-
   const satWrapperStyle = { '--cg-hue': `var(--cg-hue-${instanceId})` } as React.CSSProperties;
   const lumWrapperStyle = {
     '--cg-hue': `var(--cg-hue-${instanceId})`,
@@ -190,7 +181,7 @@ const ColorWheel = ({
         <Text
           variant={TextVariants.label}
           className={`absolute inset-0 flex items-center justify-center whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
-            !isDragging && !isLabelHovered && !showModifierHint ? 'opacity-100' : 'opacity-0'
+            !isDragging && !isLabelHovered ? 'opacity-100' : 'opacity-0'
           }`}
         >
           {label}
@@ -200,42 +191,29 @@ const ColorWheel = ({
           variant={TextVariants.label}
           color={TextColors.primary}
           className={`absolute inset-0 flex items-center justify-center whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
-            !isDragging && isLabelHovered && !showModifierHint ? 'opacity-100' : 'opacity-0'
+            !isDragging && isLabelHovered ? 'opacity-100' : 'opacity-0'
           }`}
         >
           Reset
         </Text>
 
-        <div
-          className={`absolute inset-0 flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
-            isDragging || showModifierHint ? 'opacity-100' : 'opacity-0'
+        <Text
+          as="div"
+          variant={TextVariants.label}
+          className={`absolute inset-0 flex items-center justify-center gap-2 whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
+            isDragging ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          {showModifierHint ? (
-            <div className="flex items-center gap-3 text-accent">
-              {modifierState.ctrl && !modifierState.shift && (
-                <span className="text-xs">Hue only</span>
-              )}
-              {modifierState.shift && !modifierState.ctrl && (
-                <span className="text-xs">Saturation only</span>
-              )}
-              {modifierState.ctrl && modifierState.shift && (
-                <span className="text-xs">Both</span>
-              )}
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center tabular-nums">
-                <span className="font-bold">H:</span>
-                <span className="w-8 text-right">{Math.round(hue)}&deg;</span>
-              </div>
-              <div className="flex items-center tabular-nums">
-                <span className="font-bold">S:</span>
-                <span className="w-6 text-right">{Math.round(saturation)}</span>
-              </div>
-            </>
-          )}
-        </div>
+          <div className="flex items-center tabular-nums">
+            <span className="font-bold">H:</span>
+            <span className="w-8 text-right">{Math.round(hue)}&deg;</span>
+          </div>
+
+          <div className="flex items-center tabular-nums">
+            <span className="font-bold">S:</span>
+            <span className="w-6 text-right">{Math.round(saturation)}</span>
+          </div>
+        </Text>
       </div>
 
       <div ref={sizerRef} className="relative w-full aspect-square">
