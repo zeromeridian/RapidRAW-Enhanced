@@ -160,12 +160,15 @@ const MaskOverlay = memo(
       return this.getAbsolutePosition();
     }, []);
 
-    const handleRadialDragStart = useCallback((e: any) => {
-      isDragging.current = true;
-      onMaskInteractionStart(e);
-      dragStartPointer.current = e.target.getStage().getPointerPosition();
-      dragStartParams.current = { ...pRef.current };
-    }, [onMaskInteractionStart]);
+    const handleRadialDragStart = useCallback(
+      (e: any) => {
+        isDragging.current = true;
+        onMaskInteractionStart(e);
+        dragStartPointer.current = e.target.getStage().getPointerPosition();
+        dragStartParams.current = { ...pRef.current };
+      },
+      [onMaskInteractionStart],
+    );
 
     const handleRadialDragMove = useCallback(
       (e: any) => {
@@ -193,10 +196,13 @@ const MaskOverlay = memo(
       onUpdate(subMask.id, { parameters: pRef.current });
     }, [subMask.id, onMaskInteractionEnd, onUpdate]);
 
-    const handleRadialTransformStart = useCallback((e: any) => {
-      isDragging.current = true;
-      onMaskInteractionStart(e);
-    }, [onMaskInteractionStart]);
+    const handleRadialTransformStart = useCallback(
+      (e: any) => {
+        isDragging.current = true;
+        onMaskInteractionStart(e);
+      },
+      [onMaskInteractionStart],
+    );
 
     const handleRadialTransform = useCallback(() => {
       const node = shapeRef.current;
@@ -257,13 +263,16 @@ const MaskOverlay = memo(
       onUpdate(subMask.id, { parameters: newP });
     }, [scale, cropX, cropY, updateP, onMaskInteractionEnd, onUpdate, subMask.id]);
 
-    const handleLinearGroupDragStart = useCallback((e: any) => {
-      isDragging.current = true;
-      onMaskInteractionStart(e);
-      dragStartPointer.current = e.target.getStage().getPointerPosition();
-      dragStartParams.current = { ...pRef.current };
-      e.cancelBubble = true;
-    }, [onMaskInteractionStart]);
+    const handleLinearGroupDragStart = useCallback(
+      (e: any) => {
+        isDragging.current = true;
+        onMaskInteractionStart(e);
+        dragStartPointer.current = e.target.getStage().getPointerPosition();
+        dragStartParams.current = { ...pRef.current };
+        e.cancelBubble = true;
+      },
+      [onMaskInteractionStart],
+    );
 
     const handleLinearGroupDragMove = useCallback(
       (e: any) => {
@@ -297,11 +306,14 @@ const MaskOverlay = memo(
       [subMask.id, onMaskInteractionEnd, onUpdate],
     );
 
-    const handleLinearPointDragStart = useCallback((e: any) => {
-      isDragging.current = true;
-      onMaskInteractionStart(e);
-      e.cancelBubble = true;
-    }, [onMaskInteractionStart]);
+    const handleLinearPointDragStart = useCallback(
+      (e: any) => {
+        isDragging.current = true;
+        onMaskInteractionStart(e);
+        e.cancelBubble = true;
+      },
+      [onMaskInteractionStart],
+    );
 
     const handleLinearPointDragMove = useCallback(
       (e: any, pointType: string) => {
@@ -2192,7 +2204,14 @@ const ImageCanvas = memo(
                   onTouchMove={handleStraightenMouseMove}
                   onMouseUp={handleStraightenMouseUp}
                   onTouchEnd={handleStraightenMouseUp}
-                  style={{ position: 'absolute', top: 0, left: 0, zIndex: 10, cursor: 'crosshair', touchAction: 'none' }}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    zIndex: 10,
+                    cursor: 'crosshair',
+                    touchAction: 'none',
+                  }}
                   width={uncroppedImageRenderSize.width}
                 >
                   <Layer>

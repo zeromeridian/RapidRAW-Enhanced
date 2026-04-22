@@ -79,6 +79,8 @@ pub struct Preset {
         skip_serializing_if = "Option::is_none"
     )]
     pub include_crop_transform: Option<bool>,
+    #[serde(rename = "presetType", skip_serializing_if = "Option::is_none")]
+    pub preset_type: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -308,7 +310,6 @@ pub struct ExportPreset {
     pub export_masks: Option<bool>,
     #[serde(default)]
     pub preserve_folders: Option<bool>,
-    /// Last export destination path, stored on the __last_used__ preset only.
     #[serde(default)]
     pub last_export_path: Option<String>,
 }
@@ -408,7 +409,6 @@ pub struct AppSettings {
     #[serde(alias = "comfyuiAddress")]
     pub ai_connector_address: Option<String>,
     pub last_folder_state: Option<LastFolderState>,
-    pub adaptive_editor_theme: Option<bool>,
     pub ui_visibility: Option<Value>,
     pub enable_ai_tagging: Option<bool>,
     pub tagging_thread_count: Option<u32>,
@@ -491,7 +491,6 @@ impl Default for AppSettings {
             decorations: Some(false),
             ai_connector_address: None,
             last_folder_state: None,
-            adaptive_editor_theme: Some(false),
             ui_visibility: None,
             enable_ai_tagging: Some(false),
             tagging_thread_count: Some(3),
@@ -522,6 +521,9 @@ impl Default for AppSettings {
             is_waveform_visible: Some(false),
             waveform_height: Some(220),
             active_waveform_channel: Some("luma".to_string()),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            use_wgpu_renderer: Some(false),
+            #[cfg(not(any(target_os = "linux", target_os = "android")))]
             use_wgpu_renderer: Some(true),
         }
     }
@@ -1591,8 +1593,6 @@ pub fn generate_thumbnail_data(
                 roi: None,
             },
             "generate_thumbnail_data",
-            false,
-            false,
         ) {
             return Ok(processed_image);
         } else {
@@ -2445,8 +2445,25 @@ pub async fn apply_auto_adjustments_to_paths(
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
+        let state = app_handle.state::<AppState>();
+        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
+                for path in &paths {
+                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
+                }
+                for _ in 0..paths.len() {
+                    increment_thumbnail_progress(&state, &app_handle);
+                }
+                return;
+            }
+        };
+
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
+
         paths.par_iter().for_each(|path| {
-            let result: Result<(), String> = (|| {
+            let loaded_image: Option<DynamicImage> = (|| -> Result<DynamicImage, String> {
                 let (source_path, sidecar_path) = parse_virtual_path(path);
                 let source_path_str = source_path.to_string_lossy().to_string();
 
@@ -2454,7 +2471,7 @@ pub async fn apply_auto_adjustments_to_paths(
                 let image = image_loader::load_base_image_from_bytes(
                     &file_bytes,
                     &source_path_str,
-                    false,
+                    true,
                     highlight_compression,
                     linear_mode.clone(),
                     None,
@@ -2511,36 +2528,16 @@ pub async fn apply_auto_adjustments_to_paths(
                 if enable_xmp_sync {
                     sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
                 }
-                Ok(())
-            })();
-            if let Err(e) = result {
-                eprintln!("Failed to apply auto adjustments to {}: {}", path, e);
-            }
-        });
+                Ok(image)
+            })()
+            .map_err(|e| eprintln!("Failed to apply auto adjustments to {}: {}", path, e))
+            .ok();
 
-        let state = app_handle.state::<AppState>();
-        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
-            Ok(dir) => dir,
-            Err(e) => {
-                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
-                for path in &paths {
-                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
-                }
-                for _ in 0..paths.len() {
-                    increment_thumbnail_progress(&state, &app_handle);
-                }
-                return;
-            }
-        };
-
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
-
-        paths.par_iter().for_each(|path_str| {
             let result = generate_single_thumbnail_and_cache(
-                path_str,
+                path,
                 &thumb_cache_dir,
                 gpu_context.as_ref(),
-                None,
+                loaded_image.as_ref(),
                 true,
                 &app_handle,
             );
@@ -2548,7 +2545,7 @@ pub async fn apply_auto_adjustments_to_paths(
             if let Some((thumbnail_data, rating)) = result {
                 let _ = app_handle.emit(
                     "thumbnail-generated",
-                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating }),
+                    serde_json::json!({ "path": path, "data": thumbnail_data, "rating": rating }),
                 );
             }
 
@@ -3094,6 +3091,7 @@ pub fn save_community_preset(
     app_handle: AppHandle,
     include_masks: Option<bool>,
     include_crop_transform: Option<bool>,
+    preset_type: Option<String>,
 ) -> Result<(), String> {
     let mut current_presets = load_presets(app_handle.clone())?;
 
@@ -3124,6 +3122,7 @@ pub fn save_community_preset(
         adjustments,
         include_masks,
         include_crop_transform,
+        preset_type: preset_type.or(Some("style".to_string())),
     };
 
     if let Some(PresetItem::Folder(folder)) = current_presets.iter_mut().find(|item| {

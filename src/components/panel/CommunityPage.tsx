@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { ArrowLeft, CheckCircle2, ChevronDown, Loader2, Search, Users, Layers, Scaling, Github } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ChevronDown, Loader2, Search, Users, Layers, Crop, Github } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -18,6 +18,7 @@ interface CommunityPreset {
   adjustments: Record<string, any>;
   includeMasks?: boolean;
   includeCropTransform?: boolean;
+  presetType?: 'tool' | 'style';
 }
 
 const SORT_METHODS: {
@@ -185,6 +186,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
         adjustments: preset.adjustments,
         includeMasks: preset.includeMasks,
         includeCropTransform: preset.includeCropTransform,
+        presetType: preset.presetType || 'style',
       });
       setDownloadStatus((prev) => ({ ...prev, [preset.name]: 'success' }));
     } catch (error) {
@@ -309,17 +311,13 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
                         </Button>
                       </div>
                     </div>
-                    <div className="p-4 text-center relative">
-                      {/* Existing Name and Creator text */}
+                    <div className="p-4 text-center">
                       <Text variant={TextVariants.heading} className="truncate mb-1">
                         {preset.name}
                       </Text>
-
-                      {/* Optional: Add small icons next to the name if the preset supports them */}
-                      <div className="flex justify-center gap-2 mt-1 opacity-60">
-                        {preset.includeMasks && <Layers size={12} title="Includes Masks" />}
-                        {preset.includeCropTransform && <Scaling size={12} title="Includes Geometry" />}
-                      </div>
+                      <Text variant={TextVariants.small} className="font-['cursive'] italic">
+                        by {preset.creator}
+                      </Text>
                     </div>
                   </motion.div>
                 );

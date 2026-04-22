@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
-import { Save, CheckCircle, XCircle, Loader, X, Ban } from 'lucide-react';
+import { FileInput, CheckCircle, XCircle, Loader, X, Ban } from 'lucide-react';
 import debounce from 'lodash.debounce';
 import Switch from '../../ui/Switch';
 import Button from '../../ui/Button';
@@ -132,7 +132,7 @@ function WatermarkPreview({
 
   return (
     <div
-      className="w-full bg-bg-primary rounded-md relative overflow-hidden border border-surface"
+      className="w-full bg-surface rounded-md relative overflow-hidden border border-surface"
       style={{ aspectRatio: imageAspectRatio }}
     >
       <div className="absolute inset-0 flex items-center justify-center">
@@ -561,7 +561,7 @@ export default function LibraryExportPanel({
 
             <Section title="File Naming">
               <input
-                className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
+                className="w-full bg-surface border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
                 disabled={isExporting}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilenameTemplate(e.target.value)}
                 ref={filenameInputRef}
@@ -610,7 +610,7 @@ export default function LibraryExportPanel({
                           className="w-full"
                         />
                         <input
-                          className="w-24 bg-bg-primary text-center rounded-md p-2 border border-surface focus:border-accent focus:ring-accent text-text-secondary focus:text-text-primary"
+                          className="w-24 bg-surface text-center rounded-md p-2 border border-surface focus:border-accent focus:ring-accent text-text-secondary focus:text-text-primary"
                           disabled={isExporting}
                           min="1"
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -809,7 +809,7 @@ export default function LibraryExportPanel({
             </>
           ) : (
             <>
-              <Save size={18} className="mr-2" /> Export {numImages > 1 ? `${numImages} ${itemLabel}s` : itemLabel}
+              <FileInput size={18} className="mr-2" /> Export {numImages > 1 ? `${numImages} ${itemLabel}s` : itemLabel}
             </>
           )}
         </Button>

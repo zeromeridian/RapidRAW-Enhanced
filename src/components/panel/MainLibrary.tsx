@@ -1331,23 +1331,26 @@ function Thumbnail({
       </AnimatePresence>
 
       {(colorLabel || rating > 0) && (
-        <div className="absolute top-1.5 right-1.5 bg-bg-primary/50 rounded-full px-1.5 py-0.5 flex items-center gap-1 backdrop-blur-xs">
-          {colorLabel && (
-            <div
-              className="w-3 h-3 rounded-full ring-1 ring-black/20"
-              style={{ backgroundColor: colorLabel.color }}
-              data-tooltip={`Color: ${colorLabel.name}`}
-            ></div>
-          )}
-          {rating > 0 && (
-            <>
-              <Text variant={TextVariants.label} color={TextColors.primary}>
-                {rating}
-              </Text>
-              <StarIcon size={16} className="text-accent fill-accent" />
-            </>
-          )}
-        </div>
+        <>
+          <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-linear-to-bl from-black/10 via-black/0 to-transparent pointer-events-none z-0" />
+
+          <div className="absolute top-1.5 right-1.5 rounded-full px-1.5 py-0.5 flex items-center gap-1 backdrop-blur-md shadow-md">
+            {colorLabel && (
+              <div
+                className="w-3 h-3 rounded-full ring-1 ring-black/20"
+                style={{ backgroundColor: colorLabel.color }}
+              ></div>
+            )}
+            {rating > 0 && (
+              <>
+                <Text variant={TextVariants.small} color={TextColors.white}>
+                  {rating}
+                </Text>
+                <StarIcon size={12} className="text-white fill-white" />
+              </>
+            )}
+          </div>
+        </>
       )}
       <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/70 to-transparent p-2 flex items-end justify-between">
         <Text variant={TextVariants.small} color={TextColors.white} className="truncate pr-2">
@@ -1359,7 +1362,7 @@ function Thumbnail({
             variant={TextVariants.small}
             color={TextColors.white}
             weight={TextWeights.bold}
-            className="shrink-0 bg-bg-primary/50 px-1.5 py-0.5 rounded-full backdrop-blur-xs"
+            className="shrink-0 shadow-md px-1.5 py-0.5 rounded-full backdrop-blur-xs"
             data-tooltip="Virtual Copy"
           >
             VC

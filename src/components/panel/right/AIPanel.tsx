@@ -1063,11 +1063,10 @@ function DraggableGridItem({ maskType, isGenerating, onClick }: any) {
     disabled: isGenerating,
   });
   return (
-    <button
+    <motion.div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      disabled={maskType.disabled || isGenerating}
       onClick={onClick}
       className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-2 aspect-square transition-colors
             ${
@@ -1077,12 +1076,14 @@ function DraggableGridItem({ maskType, isGenerating, onClick }: any) {
             }
             ${isDragging ? 'opacity-50' : ''}`}
       data-tooltip={maskType.disabled ? 'Coming Soon' : `Create New ${maskType.name} Edit`}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
     >
       <maskType.icon size={24} />{' '}
       <Text as="span" variant={TextVariants.small} color={TextColors.primary}>
         {maskType.name}
       </Text>
-    </button>
+    </motion.div>
   );
 }
 
