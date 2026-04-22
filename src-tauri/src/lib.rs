@@ -342,7 +342,12 @@ impl DecodedImageCache {
         }
     }
 
-    pub fn insert(&mut self, path: String, image: Arc<DynamicImage>, exif: HashMap<String, String>) {
+    pub fn insert(
+        &mut self,
+        path: String,
+        image: Arc<DynamicImage>,
+        exif: HashMap<String, String>,
+    ) {
         if let Some(pos) = self.items.iter().position(|(p, _, _)| *p == path) {
             self.items.remove(pos);
         } else if self.items.len() >= self.capacity {
@@ -740,7 +745,11 @@ async fn load_image(
 
     let path_clone = source_path_str.clone();
 
-    let cached_data = state.decoded_image_cache.lock().unwrap().get(&source_path_str);
+    let cached_data = state
+        .decoded_image_cache
+        .lock()
+        .unwrap()
+        .get(&source_path_str);
 
     let (pristine_arc, exif_data) = if let Some((cached_img, cached_exif)) = cached_data {
         (cached_img, cached_exif)
@@ -1093,9 +1102,9 @@ fn process_preview_job(
 
     let default_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
     let preview_dim = target_resolution.unwrap_or(default_preview_dim);
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
     let use_wgpu_renderer = settings.use_wgpu_renderer.unwrap_or(true);
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     let use_wgpu_renderer = false;
 
     let (interactive_divisor, interactive_quality) = match live_quality {
@@ -1268,7 +1277,10 @@ fn process_preview_job(
                     submission_index: None,
                     timeout: Some(std::time::Duration::from_millis(500)),
                 });
-                let _ = app_clone.emit("wgpu-frame-ready", serde_json::json!({ "path": image_path }));
+                let _ = app_clone.emit(
+                    "wgpu-frame-ready",
+                    serde_json::json!({ "path": image_path }),
+                );
             });
             return Ok(b"WGPU_RENDER".to_vec());
         }

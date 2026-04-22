@@ -4,6 +4,8 @@ use std::time::Instant;
 use half::f16;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba};
 use std::num::NonZero;
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 use tauri::Manager;
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
@@ -128,8 +130,11 @@ impl WgpuDisplay {
 
 pub fn get_or_init_gpu_context(
     state: &tauri::State<AppState>,
-    app_handle: &tauri::AppHandle,
+    _app_handle: &tauri::AppHandle,
 ) -> Result<GpuContext, String> {
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
+    let app_handle = _app_handle;
+
     let mut context_lock = state.gpu_context.lock().unwrap();
     if let Some(context) = &*context_lock {
         return Ok(context.clone());
@@ -155,7 +160,8 @@ pub fn get_or_init_gpu_context(
 
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     let surface_opt = {
-        let settings = crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
+        let settings =
+            crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
         let use_wgpu_renderer = settings.use_wgpu_renderer.unwrap_or(true);
 
         if use_wgpu_renderer {
@@ -163,7 +169,10 @@ pub fn get_or_init_gpu_context(
                 match instance.create_surface(window) {
                     Ok(surface) => Some(surface),
                     Err(e) => {
-                        log::warn!("Failed to create surface, falling back to compute-only: {}", e);
+                        log::warn!(
+                            "Failed to create surface, falling back to compute-only: {}",
+                            e
+                        );
                         if let Some(p) = &flag_path {
                             let _ = std::fs::remove_file(p);
                         }

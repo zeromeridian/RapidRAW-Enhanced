@@ -334,6 +334,7 @@ export default function SettingsPanel({
   const [tempLensMaker, setTempLensMaker] = useState<string>('');
   const [tempLensModel, setTempLensModel] = useState<string>('');
 
+  const osPlatform = useOsPlatform();
   const [processingSettings, setProcessingSettings] = useState({
     editorPreviewResolution: appSettings?.editorPreviewResolution || 1920,
     thumbnailResolution: appSettings?.thumbnailResolution || 720,
@@ -342,13 +343,13 @@ export default function SettingsPanel({
     linuxGpuOptimization: appSettings?.linuxGpuOptimization ?? false,
     highResZoomMultiplier: appSettings?.highResZoomMultiplier || 1.0,
     useFullDpiRendering: appSettings?.useFullDpiRendering ?? false,
-    useWgpuRenderer: appSettings?.useWgpuRenderer ?? true,
+    useWgpuRenderer:
+      appSettings?.useWgpuRenderer ?? (osPlatform === 'linux' || osPlatform === 'android' ? false : true),
   });
   const [restartRequired, setRestartRequired] = useState(false);
   const [activeCategory, setActiveCategory] = useState('general');
   const [logPath, setLogPath] = useState('');
   const [dpr, setDpr] = useState(() => (typeof window !== 'undefined' ? window.devicePixelRatio : 1));
-  const osPlatform = useOsPlatform();
 
   const filteredBackendOptions = backendOptions.filter((opt) => {
     if (opt.value === 'metal' && osPlatform !== 'macos') return false;
@@ -1506,11 +1507,7 @@ export default function SettingsPanel({
                       }
                     >
                       <Switch
-                        checked={
-                          osPlatform === 'linux' || osPlatform === 'android'
-                            ? false
-                            : processingSettings.useWgpuRenderer
-                        }
+                        checked={processingSettings.useWgpuRenderer}
                         disabled={osPlatform === 'linux' || osPlatform === 'android'}
                         id="wgpu-renderer-toggle"
                         label="Enable Direct WGPU Render"
