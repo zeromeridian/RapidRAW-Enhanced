@@ -549,39 +549,27 @@ export default function Editor({
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
       if (physicsFrameId.current) cancelAnimationFrame(physicsFrameId.current);
 
-      const maxDelta = Math.max(Math.abs(e.deltaX), Math.abs(e.deltaY));
-      const isTrackpad = e.deltaMode === 0 && (e.deltaY % 1 !== 0 || e.deltaX % 1 !== 0 || maxDelta < 50);
-      const isZoomIntent = e.ctrlKey || (!isTrackpad && !e.shiftKey && !e.altKey);
+      const isPinch = e.ctrlKey;
+      const hasFractions = e.deltaY % 1 !== 0 || e.deltaX % 1 !== 0;
+
+      const isTypicalMouseWheel =
+        !hasFractions &&
+        ((e.deltaY !== 0 && Math.abs(e.deltaY) >= 25 && e.deltaY % 25 === 0) ||
+          (e.deltaX !== 0 && Math.abs(e.deltaX) >= 25 && e.deltaX % 25 === 0));
+
+      const isTrackpad = hasFractions || !isTypicalMouseWheel;
+      const isZoomIntent = isPinch || (!isTrackpad && !e.shiftKey && !e.altKey);
 
       if (isZoomIntent) {
         const rect = container.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        const primaryDelta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
-        const magnitude = Math.abs(primaryDelta);
-        const direction = Math.sign(primaryDelta);
+        const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+        const zoomSensitivity = isPinch ? 0.015 : 0.002;
+        const exponent = delta * zoomSensitivity;
 
-        let minSpeed, maxSpeed, maxExpectedDelta;
-
-        if (isTrackpad) {
-          minSpeed = 0.005;
-          maxSpeed = 0.02;
-          maxExpectedDelta = 30;
-        } else {
-          minSpeed = 0.001;
-          maxSpeed = 0.005;
-          maxExpectedDelta = 150;
-        }
-
-        const scrollIntensity = Math.min(magnitude / maxExpectedDelta, 1);
-        const dynamicSpeed = minSpeed + (maxSpeed - minSpeed) * scrollIntensity;
-
-        const maxZoomJump = isTrackpad ? 0.15 : 0.25;
-        const exponent = Math.min(magnitude * dynamicSpeed, maxZoomJump);
-
-        let newScale = transformStateRef.current.scale;
-        newScale *= Math.exp(-direction * exponent);
+        let newScale = transformStateRef.current.scale * Math.exp(-exponent);
         newScale = Math.max(minScaleRef.current, Math.min(maxScaleRef.current, newScale));
 
         const ratio = newScale / transformStateRef.current.scale;
@@ -601,11 +589,10 @@ export default function Editor({
 
         if (!isTrackpad) {
           if (e.shiftKey && e.altKey) {
-            const primaryDelta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
-            dx = primaryDelta;
-            dy = primaryDelta;
+            dx = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+            dy = dx;
           } else if (e.shiftKey) {
-            dx = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+            dx = e.deltaY !== 0 ? e.deltaY : e.deltaX;
             dy = 0;
           } else if (e.altKey) {
             dx = 0;
@@ -618,21 +605,11 @@ export default function Editor({
 
         const resistance = 0.5;
 
-        if (newX > bounds.maxX) {
-          const overshoot = newX - bounds.maxX;
-          newX = bounds.maxX + overshoot * resistance;
-        } else if (newX < bounds.minX) {
-          const overshoot = newX - bounds.minX;
-          newX = bounds.minX + overshoot * resistance;
-        }
+        if (newX > bounds.maxX) newX = bounds.maxX + (newX - bounds.maxX) * resistance;
+        else if (newX < bounds.minX) newX = bounds.minX + (newX - bounds.minX) * resistance;
 
-        if (newY > bounds.maxY) {
-          const overshoot = newY - bounds.maxY;
-          newY = bounds.maxY + overshoot * resistance;
-        } else if (newY < bounds.minY) {
-          const overshoot = newY - bounds.minY;
-          newY = bounds.minY + overshoot * resistance;
-        }
+        if (newY > bounds.maxY) newY = bounds.maxY + (newY - bounds.maxY) * resistance;
+        else if (newY < bounds.minY) newY = bounds.minY + (newY - bounds.minY) * resistance;
 
         applyTransform(newX, newY, scale);
 
@@ -1493,7 +1470,10 @@ export default function Editor({
         <div
           ref={contentRef}
           className="w-full h-full flex items-center justify-center touch-none origin-top-left"
-          style={{ transform: `translate(0px, 0px) scale(1)` }}
+          style={{
+            transform: `translate(${transformState.positionX}px, ${transformState.positionY}px) scale(${transformState.scale})`,
+            cursor: cursorStyle,
+          }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
