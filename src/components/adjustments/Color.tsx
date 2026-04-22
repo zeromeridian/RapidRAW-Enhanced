@@ -325,6 +325,8 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
     saturation: colorCalibration[`${activePrimary}Saturation` as keyof ColorCalibration] || 0,
   };
 
+  const trackSuffix = `${activePrimary}s`;
+
   return (
     <div className="p-2 bg-bg-tertiary rounded-md mt-4">
       <Text variant={TextVariants.heading} className="mb-2">
@@ -343,6 +345,7 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
           value={colorCalibration.shadowsTint}
           onChange={(e: any) => handleShadowsChange(e.target.value)}
           onDragStateChange={onDragStateChange}
+          trackClassName="tint-gradient-track"
         />
       </div>
       <div className="mt-3">
@@ -369,6 +372,7 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
           value={currentValues.hue}
           onChange={(e: any) => handlePrimaryChange('Hue', e.target.value)}
           onDragStateChange={onDragStateChange}
+          trackClassName={`hue-slider-${trackSuffix}`}
         />
         <Slider
           label="Saturation"
@@ -379,6 +383,7 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
           value={currentValues.saturation}
           onChange={(e: any) => handlePrimaryChange('Saturation', e.target.value)}
           onDragStateChange={onDragStateChange}
+          trackClassName={`sat-slider-${trackSuffix}`}
         />
       </div>
     </div>
@@ -416,14 +421,8 @@ export default function ColorPanel({
     const normalizedHue = ((effectiveHue % 360) + 360) % 360;
     const effectiveSaturation = (currentHsl.saturation + 100) / 2;
 
-    document.documentElement.style.setProperty(
-      `--hsl-mixer-hue-${activeColor}`,
-      normalizedHue.toString()
-    );
-    document.documentElement.style.setProperty(
-      `--hsl-mixer-sat-${activeColor}`,
-      `${effectiveSaturation}%`
-    );
+    document.documentElement.style.setProperty(`--hsl-mixer-hue-${activeColor}`, normalizedHue.toString());
+    document.documentElement.style.setProperty(`--hsl-mixer-sat-${activeColor}`, `${effectiveSaturation}%`);
   }, [effectiveHue, currentHsl.saturation, activeColor]);
 
   const handleGlobalChange = (key: ColorAdjustment, value: string) => {
