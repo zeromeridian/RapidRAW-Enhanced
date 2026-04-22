@@ -1,12 +1,12 @@
 use crate::AppState;
 use fuzzy_matcher::FuzzyMatcher;
+#[cfg(target_os = "android")]
+use include_dir::{Dir, include_dir};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fs;
 use tauri::{Manager, State};
 use walkdir::WalkDir;
-#[cfg(target_os = "android")]
-use include_dir::{include_dir, Dir};
 #[cfg(target_os = "android")]
 static LENS_DB_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/lensfun_db");
 
@@ -534,11 +534,10 @@ pub fn load_lensfun_db(app_handle: &tauri::AppHandle) -> LensDatabase {
     #[cfg(target_os = "android")]
     {
         log::info!("Loading Lensfun DB from embedded assets (Android path)");
-        
-        // .files() is a built-in recursive iterator for all files in the Dir
+
         for file in LENS_DB_DIR.files() {
-            // Filter for .xml files manually
-            let is_xml = file.path()
+            let is_xml = file
+                .path()
                 .extension()
                 .and_then(|s| s.to_str())
                 .map(|s| s.eq_ignore_ascii_case("xml"))
@@ -551,7 +550,9 @@ pub fn load_lensfun_db(app_handle: &tauri::AppHandle) -> LensDatabase {
                             combined_db.cameras.append(&mut db.cameras);
                             combined_db.lenses.append(&mut db.lenses);
                         }
-                        Err(e) => log::error!("Failed to parse embedded XML {:?}: {}", file.path(), e),
+                        Err(e) => {
+                            log::error!("Failed to parse embedded XML {:?}: {}", file.path(), e)
+                        }
                     }
                 }
             }
