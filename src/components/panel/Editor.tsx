@@ -627,6 +627,7 @@ export default function Editor({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (isPanningDisabled) return;
 
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
       if (physicsFrameId.current) cancelAnimationFrame(physicsFrameId.current);
@@ -637,7 +638,7 @@ export default function Editor({
 
       if (activePointers.current.size === 1) {
         lastPanPos.current = { x: e.clientX, y: e.clientY };
-        if (!isPanningDisabled) setIsPanningState(true);
+        setIsPanningState(true);
       } else if (activePointers.current.size === 2) {
         const pts = Array.from(activePointers.current.values());
         lastPinch.current = {
@@ -651,6 +652,17 @@ export default function Editor({
     },
     [isPanningDisabled],
   );
+
+  useEffect(() => {
+    if (!isPanningDisabled) return;
+
+    activePointers.current.clear();
+    lastPanPos.current = null;
+    lastPinch.current = null;
+    panVelocityHistory.current = [];
+    mouseDownPos.current = null;
+    setIsPanningState(false);
+  }, [isPanningDisabled]);
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
