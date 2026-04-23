@@ -394,16 +394,18 @@ export const useKeyboardShortcuts = ({
         shouldFire: () => !!selectedImage && !!brushSettings && activeRightPanel === Panel.Masks,
         execute: (event) => {
           event.preventDefault();
+          if (!brushSettings) return;
           const newSize = Math.min((brushSettings.size || 50) + 10, 200);
-          setBrushSettings({ ...brushSettings, size: newSize });
+          setBrushSettings({ feather: brushSettings.feather, size: newSize, tool: brushSettings.tool });
         },
       },
       brush_size_down: {
         shouldFire: () => !!selectedImage && !!brushSettings && activeRightPanel === Panel.Masks,
         execute: (event) => {
           event.preventDefault();
+          if (!brushSettings) return;
           const newSize = Math.max((brushSettings.size || 50) - 10, 1);
-          setBrushSettings({ ...brushSettings, size: newSize });
+          setBrushSettings({ feather: brushSettings.feather, size: newSize, tool: brushSettings.tool });
         },
       },
     };

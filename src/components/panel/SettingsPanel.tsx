@@ -31,7 +31,7 @@ import Switch from '../ui/Switch';
 import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
-import { Invokes } from '../ui/AppProperties';
+import { Invokes, KEYBINDING_DEFINITIONS, KeybindingDefinition } from '../ui/AppProperties';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
@@ -56,9 +56,12 @@ interface DataActionItemProps {
   title: string;
 }
 
-interface KeybindItemProps {
-  description: string;
-  keys: Array<string>;
+interface KeybindRowProps {
+  def: KeybindingDefinition;
+  currentCombos: string[][];
+  onSave: (actionKey: string, combo: string[]) => void;
+  recordingAction: string | null;
+  onStartRecording: (actionKey: string) => void;
 }
 
 interface SettingItemProps {
@@ -147,25 +150,92 @@ const settingCategories = [
   { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
 ];
 
-const KeybindItem = ({ keys, description }: KeybindItemProps) => (
-  <div className="flex justify-between items-center py-2">
-    <Text variant={TextVariants.label}>{description}</Text>
-    <div className="flex items-center gap-1">
-      {keys.map((key: string, index: number) => (
-        <Text
-          as="kbd"
-          variant={TextVariants.small}
-          color={TextColors.primary}
-          weight={TextWeights.semibold}
-          key={index}
-          className="px-2 py-1 font-sans bg-bg-primary border border-border-color rounded-md"
+const formatKey = (key: string): string => {
+  const map: Record<string, string> = {
+    ctrl: 'Ctrl', shift: 'Shift', alt: 'Alt', space: 'Space',
+    arrowup: '↑', arrowdown: '↓', arrowleft: '←', arrowright: '→',
+    backspace: '⌫', enter: 'Enter', delete: 'Delete',
+  };
+  return map[key] || (key.length === 1 ? key.toUpperCase() : key);
+};
+
+const formatCombo = (combo: string[]): string => {
+  return combo.map(formatKey).join(' + ');
+};
+
+const KeybindRow = ({ def, currentCombos, onSave, recordingAction, onStartRecording }: KeybindRowProps) => {
+  const recording = recordingAction === def.actionKey;
+
+  useEffect(() => {
+    if (!recording) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onStartRecording('');
+        return;
+      }
+      e.preventDefault();
+      const parts: string[] = [];
+      if (e.ctrlKey || e.metaKey) parts.push('ctrl');
+      if (e.shiftKey) parts.push('shift');
+      if (e.altKey) parts.push('alt');
+
+      let nonModifier = false;
+      if (e.code === 'BracketLeft') { parts.push('['); nonModifier = true; }
+      else if (e.code === 'BracketRight') { parts.push(']'); nonModifier = true; }
+      else {
+        const k = e.key === ' ' ? 'space' : e.key.toLowerCase();
+        if (!['ctrl', 'shift', 'alt', 'meta', 'control', ' '].includes(k)) {
+          parts.push(k);
+          nonModifier = true;
+        }
+      }
+
+      if (nonModifier) {
+        onSave(def.actionKey, parts);
+        onStartRecording('');
+      }
+    };
+    window.addEventListener('keydown', handler, { capture: true });
+    return () => window.removeEventListener('keydown', handler, { capture: true });
+  }, [recording, def.actionKey, onSave, onStartRecording]);
+
+  const displayCombos = currentCombos.length > 0 ? currentCombos : def.defaultCombos;
+
+  return (
+    <div className="flex justify-between items-center py-2">
+      <Text variant={TextVariants.label}>{def.description}</Text>
+     <button
+          onClick={() => onStartRecording(def.actionKey)}
+          className="flex items-center gap-1 flex-wrap shrink-0"
         >
-          {key}
-        </Text>
-      ))}
+         {recording ? (
+           <Text
+             as="kbd"
+             variant={TextVariants.small}
+             color={TextColors.accent}
+             weight={TextWeights.semibold}
+             className="px-2 py-1 font-sans bg-bg-primary border border-accent rounded-md animate-pulse"
+           >
+             Press a key...
+           </Text>
+         ) : (
+           displayCombos.map((combo, ci) => (
+             <Text
+               as="kbd"
+               variant={TextVariants.small}
+               color={TextColors.primary}
+               weight={TextWeights.semibold}
+               key={ci}
+               className="px-2 py-1 font-sans bg-bg-primary border border-border-color rounded-md cursor-pointer hover:border-accent transition-colors"
+             >
+               {combo.map(formatKey).join(' + ')}
+             </Text>
+           ))
+         )}
+       </button>
     </div>
-  </div>
-);
+  );
+};
 
 const SettingItem = ({ children, description, label }: SettingItemProps) => (
   <div>
@@ -369,6 +439,7 @@ export default function SettingsPanel({
   });
   const [testStatus, setTestStatus] = useState<TestStatus>({ message: '', success: null, testing: false });
   const [hasInteractedWithLivePreview, setHasInteractedWithLivePreview] = useState(false);
+  const [recordingAction, setRecordingAction] = useState<string | null>(null);
 
   const [aiProvider, setAiProvider] = useState(appSettings?.aiProvider || 'cpu');
   const [aiConnectorAddress, setAiConnectorAddress] = useState<string>(appSettings?.aiConnectorAddress || '');
@@ -722,6 +793,11 @@ export default function SettingsPanel({
       e.preventDefault();
       handleAddAiTag();
     }
+  };
+
+  const handleKeybindingSave = (actionKey: string, combo: string[]) => {
+    const newKeybindings = { ...(appSettings?.keybindings || {}), [actionKey]: combo };
+    onSettingsChange({ ...appSettings, keybindings: newKeybindings });
   };
 
   return (
@@ -1843,107 +1919,54 @@ export default function SettingsPanel({
               </motion.div>
             )}
 
-            {activeCategory === 'shortcuts' && (
-              <motion.div
-                key="shortcuts"
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-10"
-              >
-                <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
-                    Keyboard Shortcuts
-                  </Text>
-                  <div className="space-y-8">
-                    <div>
-                      <Text variant={TextVariants.heading}>General</Text>
-                      <div className="divide-y divide-border-color">
-                        <KeybindItem keys={['Space', 'Enter']} description="Open selected image" />
-                        <KeybindItem keys={['Ctrl/Cmd', '+', 'C']} description="Copy selected adjustments" />
-                        <KeybindItem keys={['Ctrl/Cmd', '+', 'V']} description="Paste copied adjustments" />
-                        <KeybindItem keys={['Ctrl/Cmd', '+', 'Shift', '+', 'C']} description="Copy selected file(s)" />
-                        <KeybindItem
-                          description="Paste file(s) to current folder"
-                          keys={['Ctrl/Cmd', '+', 'Shift', '+', 'V']}
-                        />
-                        <KeybindItem keys={['Ctrl/Cmd', '+', 'A']} description="Select all images" />
-                        <KeybindItem
-                          keys={osPlatform === 'macos' ? ['Cmd', '+', 'Delete'] : ['Delete']}
-                          description="Delete selected file(s)"
-                        />
-                        <KeybindItem keys={['0-5']} description="Set star rating for selected image(s)" />
-                        <KeybindItem keys={['Shift', '+', '0-5']} description="Set color label for selected image(s)" />
-                        <KeybindItem keys={['↑', '↓', '←', '→']} description="Navigate images in library" />
+           {activeCategory === 'shortcuts' && (
+               <motion.div
+                 key="shortcuts"
+                 initial={{ opacity: 0, x: 10 }}
+                 animate={{ opacity: 1, x: 0 }}
+                 exit={{ opacity: 0, x: -10 }}
+                 transition={{ duration: 0.2 }}
+                 className="space-y-10"
+               >
+                 <div className="p-6 bg-surface rounded-xl shadow-md">
+                   <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                     Keyboard Shortcuts
+                   </Text>
+                   <div className="space-y-8">
+             {(['general', 'editor'] as const).map((section) => {
+                        const sectionDefs = KEYBINDING_DEFINITIONS.filter((d) => d.section === section);
+                        const sectionLabel = section === 'general' ? 'General' : 'Editor';
+                        const userKb = appSettings?.keybindings || {};
+                        return (
+                          <div key={section}>
+                            <Text variant={TextVariants.heading}>{sectionLabel}</Text>
+                            <div className="divide-y divide-border-color">
+                              {sectionDefs.map((def) => (
+                                 <KeybindRow
+                                   key={def.actionKey}
+                                   def={def}
+                                   currentCombos={userKb[def.actionKey] ? [userKb[def.actionKey]] : []}
+                                   onSave={handleKeybindingSave}
+                                   recordingAction={recordingAction}
+                                   onStartRecording={setRecordingAction}
+                                 />
+                               ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div className="flex justify-end mt-6">
+                        <Button
+                          variant="ghost"
+                          onClick={() => onSettingsChange({ ...appSettings, keybindings: {} })}
+                        >
+                          Reset All to Defaults
+                        </Button>
                       </div>
-                    </div>
-                    <div>
-                      <Text variant={TextVariants.heading}>Editor</Text>
-                      <div className="divide-y divide-border-color">
-                        <KeybindItem keys={['Esc']} description="Deselect mask, exit crop/fullscreen/editor" />
-                        <KeybindItem keys={['Ctrl/Cmd', '+', 'Z']} description="Undo adjustment" />
-                        <KeybindItem keys={['Ctrl/Cmd', '+', 'Y']} description="Redo adjustment" />
-                        <KeybindItem
-                          keys={osPlatform === 'macos' ? ['Cmd', '+', 'Delete'] : ['Delete']}
-                          description="Delete selected mask/patch or image"
-                        />
-                        <KeybindItem keys={['Space']} description="Cycle zoom (Fit, 2x Fit, 100%)" />
-                        <KeybindItem keys={['←', '→']} description="Previous / Next image" />
-                        <KeybindItem keys={['↑', '↓']} description="Zoom in / Zoom out (by step)" />
-                        <KeybindItem
-                          keys={['Shift/Alt', '+', 'Drag Slider']}
-                          description="Fine adjustment mode (0.2× sensitivity)"
-                        />
-                        <KeybindItem
-                          keys={['Shift', '+', 'Mouse Wheel']}
-                          description="Adjust slider value by 2 steps"
-                        />
-                        <KeybindItem keys={['Ctrl/Cmd', '+', '+']} description="Zoom in" />
-                        <KeybindItem keys={['Ctrl/Cmd', '+', '-']} description="Zoom out" />
-                        <KeybindItem keys={['Ctrl/Cmd', '+', '0']} description="Zoom to fit" />
-                        <KeybindItem keys={['Ctrl/Cmd', '+', '1']} description="Zoom to 100%" />
-                        <KeybindItem keys={['[']} description="Rotate 90° counter-clockwise" />
-                        <KeybindItem keys={[']']} description="Rotate 90° clockwise" />
-                        <KeybindItem keys={['F']} description="Toggle fullscreen" />
-                        <KeybindItem keys={['B']} description="Show original (before/after)" />
-                        <KeybindItem keys={['S']} description="Straighten Image" />
-                        <KeybindItem keys={['D']} description="Toggle Adjustments panel" />
-                        <KeybindItem keys={['R']} description="Toggle Crop panel" />
-                        <KeybindItem keys={['M']} description="Toggle Masks panel" />
-                        <KeybindItem keys={['K']} description="Toggle AI panel" />
-                        <KeybindItem keys={['P']} description="Toggle Presets panel" />
-                        <KeybindItem keys={['I']} description="Toggle Metadata panel" />
-                        <KeybindItem keys={['A']} description="Toggle Analytics display" />
-                        <KeybindItem keys={['E']} description="Toggle Export panel" />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Text variant={TextVariants.heading}>Mouse Controls</Text>
-                      <div className="divide-y divide-border-color">
-                        <KeybindItem keys={['Scroll Wheel']} description="Zoom In / Out" />
-                        <KeybindItem keys={['Shift', '+', 'Scroll']} description="Pan Horizontally" />
-                        <KeybindItem keys={['Alt/Option', '+', 'Scroll']} description="Pan Vertically" />
-                        <KeybindItem keys={['Alt/Option', '+', 'Shift', '+', 'Scroll']} description="Pan Diagonally" />
-                        <KeybindItem keys={['Left Click', '+', 'Drag']} description="Pan Freely" />
-                        <KeybindItem keys={['Left Click']} description="Quick Zoom (Toggle Fit/2x)" />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Text variant={TextVariants.heading}>Trackpad Controls</Text>
-                      <div className="divide-y divide-border-color">
-                        <KeybindItem keys={['Pinch']} description="Zoom In / Out" />
-                        <KeybindItem keys={['Ctrl', '+', 'Two-Finger Swipe']} description="Alternative Zoom In / Out" />
-                        <KeybindItem keys={['Two-Finger Swipe']} description="Pan Freely" />
-                        <KeybindItem keys={['Click']} description="Quick Zoom (Toggle Fit/2x)" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
+                   </div>
+                 </div>
+               </motion.div>
+             )}
           </AnimatePresence>
         </div>
       </div>
