@@ -3212,6 +3212,7 @@ function App() {
     displaySize,
     baseRenderSize,
     originalSize,
+    keybindings: appSettings?.keybindings,
     brushSettings: brushSettings,
     setBrushSettings: setBrushSettings,
   });
