@@ -58,7 +58,7 @@ interface DataActionItemProps {
 
 interface KeybindRowProps {
   def: KeybindingDefinition;
-  currentCombos: string[][];
+  currentCombo?: string[];
   onSave: (actionKey: string, combo: string[]) => void;
   recordingAction: string | null;
   onStartRecording: (actionKey: string) => void;
@@ -159,12 +159,9 @@ const formatKey = (key: string): string => {
   return map[key] || (key.length === 1 ? key.toUpperCase() : key);
 };
 
-const formatCombo = (combo: string[]): string => {
-  return combo.map(formatKey).join(' + ');
-};
 
-const KeybindRow = ({ def, currentCombos, onSave, recordingAction, onStartRecording }: KeybindRowProps) => {
-  const recording = recordingAction === def.actionKey;
+const KeybindRow = ({ def, currentCombo, onSave, recordingAction, onStartRecording }: KeybindRowProps) => {
+   const recording = recordingAction === def.actionKey;
 
   useEffect(() => {
     if (!recording) return;
@@ -199,43 +196,40 @@ const KeybindRow = ({ def, currentCombos, onSave, recordingAction, onStartRecord
     return () => window.removeEventListener('keydown', handler, { capture: true });
   }, [recording, def.actionKey, onSave, onStartRecording]);
 
-  const displayCombos = currentCombos.length > 0 ? currentCombos : def.defaultCombos;
+ const displayCombo = currentCombo ?? def.defaultCombo;
 
-  return (
-    <div className="flex justify-between items-center py-2">
-      <Text variant={TextVariants.label}>{def.description}</Text>
-     <button
-          onClick={() => onStartRecording(def.actionKey)}
-          className="flex items-center gap-1 flex-wrap shrink-0"
-        >
-         {recording ? (
-           <Text
-             as="kbd"
-             variant={TextVariants.small}
-             color={TextColors.accent}
-             weight={TextWeights.semibold}
-             className="px-2 py-1 font-sans bg-bg-primary border border-accent rounded-md animate-pulse"
-           >
-             Press a key...
-           </Text>
-         ) : (
-           displayCombos.map((combo, ci) => (
-             <Text
-               as="kbd"
-               variant={TextVariants.small}
-               color={TextColors.primary}
-               weight={TextWeights.semibold}
-               key={ci}
-               className="px-2 py-1 font-sans bg-bg-primary border border-border-color rounded-md cursor-pointer hover:border-accent transition-colors"
-             >
-               {combo.map(formatKey).join(' + ')}
-             </Text>
-           ))
-         )}
-       </button>
-    </div>
-  );
-};
+   return (
+     <div className="flex justify-between items-center py-2">
+       <Text variant={TextVariants.label}>{def.description}</Text>
+      <button
+           onClick={() => onStartRecording(def.actionKey)}
+           className="flex items-center gap-1 flex-wrap shrink-0"
+         >
+          {recording ? (
+            <Text
+              as="kbd"
+              variant={TextVariants.small}
+              color={TextColors.accent}
+              weight={TextWeights.semibold}
+              className="px-2 py-1 font-sans bg-bg-primary border border-accent rounded-md animate-pulse"
+            >
+              Press a key...
+            </Text>
+          ) : (
+            <Text
+              as="kbd"
+              variant={TextVariants.small}
+              color={TextColors.primary}
+              weight={TextWeights.semibold}
+              className="px-2 py-1 font-sans bg-bg-primary border border-border-color rounded-md cursor-pointer hover:border-accent transition-colors"
+            >
+              {displayCombo.map(formatKey).join(' + ')}
+            </Text>
+          )}
+        </button>
+     </div>
+   );
+ };
 
 const SettingItem = ({ children, description, label }: SettingItemProps) => (
   <div>
@@ -1945,7 +1939,7 @@ export default function SettingsPanel({
                                  <KeybindRow
                                    key={def.actionKey}
                                    def={def}
-                                   currentCombos={userKb[def.actionKey] ? [userKb[def.actionKey]] : []}
+                                   currentCombo={userKb[def.actionKey]}
                                    onSave={handleKeybindingSave}
                                    recordingAction={recordingAction}
                                    onStartRecording={setRecordingAction}

@@ -127,15 +127,15 @@ export const useKeyboardShortcuts = ({
       return parts;
     }
 
-    function getEffectiveCombos(def: KeybindingDefinition): string[][] {
+    function getEffectiveCombo(def: KeybindingDefinition): string[] {
       if (def.actionKey === 'delete_selected') {
         if (osPlatform === 'macos' && !keybindings?.[def.actionKey]) {
-          return [['ctrl', 'backspace']];
+          return ['ctrl', 'backspace'];
         }
       }
       const userCombo = keybindings?.[def.actionKey];
-      if (userCombo) return [userCombo];
-      return def.defaultCombos;
+      if (userCombo) return userCombo;
+      return def.defaultCombo;
     }
 
     const actions: Record<string, ActionHandler> = {
@@ -198,7 +198,7 @@ export const useKeyboardShortcuts = ({
           handleImageSelect(sortedImageList[nextIndex].path);
         },
       },
-      zoom_arrow: {
+      zoom_in_step: {
         shouldFire: () => !!selectedImage,
         execute: (event) => {
           event.preventDefault();
@@ -207,10 +207,19 @@ export const useKeyboardShortcuts = ({
             originalSize && originalSize.width > 0 && displaySize && displaySize.width > 0
               ? (displaySize.width * dpr) / originalSize.width
               : 1.0;
-          const isZoomIn = event.key === 'ArrowUp';
-          const step = 0.1;
-          const newPercent = isZoomIn ? currentPercent + step : currentPercent - step;
-          handleZoomChange(Math.max(0.1, Math.min(newPercent, 2.0)));
+          handleZoomChange(Math.min(currentPercent + 0.1, 2.0));
+        },
+      },
+      zoom_out_step: {
+        shouldFire: () => !!selectedImage,
+        execute: (event) => {
+          event.preventDefault();
+          const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+          const currentPercent =
+            originalSize && originalSize.width > 0 && displaySize && displaySize.width > 0
+              ? (displaySize.width * dpr) / originalSize.width
+              : 1.0;
+          handleZoomChange(Math.max(currentPercent - 0.1, 0.1));
         },
       },
       cycle_zoom: {
@@ -460,9 +469,8 @@ export const useKeyboardShortcuts = ({
 
       const normalized = normalizeCombo(event);
       for (const def of KEYBINDING_DEFINITIONS) {
-        const effectiveCombos = getEffectiveCombos(def);
-        const matched = effectiveCombos.some((combo) => arraysEqual(combo, normalized));
-        if (matched) {
+        const effectiveCombo = getEffectiveCombo(def);
+        if (arraysEqual(effectiveCombo, normalized)) {
           const handler = actions[def.actionKey];
           if (handler && (!handler.shouldFire || handler.shouldFire())) {
             handler.execute(event);
