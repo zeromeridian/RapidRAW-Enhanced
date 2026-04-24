@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { ActionHandler, ImageFile, KeybindingDefinition, Panel, SelectedImage, KEYBINDING_DEFINITIONS } from '../components/ui/AppProperties';
 import { BrushSettings } from '../components/ui/AppProperties';
+import { normalizeCombo } from '../utils/keyboardUtils';
 
 interface KeyboardShortcutsProps {
   activeAiPatchContainerId?: string | null;
@@ -112,25 +113,10 @@ export const useKeyboardShortcuts = ({
       return a.length === b.length && a.every((v, i) => v === b[i]);
     }
 
-    function normalizeCombo(event: KeyboardEvent): string[] {
-      const parts: string[] = [];
-      if (event.ctrlKey || event.metaKey) parts.push('ctrl');
-      if (event.shiftKey) parts.push('shift');
-      if (event.altKey) parts.push('alt');
-      if (event.code === 'BracketLeft') parts.push('[');
-      else if (event.code === 'BracketRight') parts.push(']');
-      else {
-        const k = event.key.toLowerCase();
-        if (!['ctrl', 'shift', 'alt', 'meta'].includes(k))
-          parts.push(k);
-      }
-      return parts;
-    }
-
     function getEffectiveCombo(def: KeybindingDefinition): string[] {
       if (def.actionKey === 'delete_selected') {
         if (osPlatform === 'macos' && !keybindings?.[def.actionKey]) {
-          return ['ctrl', 'backspace'];
+          return ['ctrl', 'Backspace'];
         }
       }
       const userCombo = keybindings?.[def.actionKey];

@@ -32,6 +32,7 @@ import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import { Invokes, KEYBINDING_DEFINITIONS, KeybindingDefinition } from '../ui/AppProperties';
+import { codeToDisplayLabel, normalizeCombo } from '../../utils/keyboardUtils';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
@@ -59,6 +60,7 @@ interface DataActionItemProps {
 interface KeybindRowProps {
   def: KeybindingDefinition;
   currentCombo?: string[];
+  osPlatform: string;
   onSave: (actionKey: string, combo: string[]) => void;
   recordingAction: string | null;
   onStartRecording: (actionKey: string) => void;
@@ -150,17 +152,17 @@ const settingCategories = [
   { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
 ];
 
-const formatKey = (key: string): string => {
-  const map: Record<string, string> = {
-    ctrl: 'Ctrl', shift: 'Shift', alt: 'Alt', space: 'Space',
-    arrowup: '↑', arrowdown: '↓', arrowleft: '←', arrowright: '→',
-    backspace: '⌫', enter: 'Enter', delete: 'Delete',
-  };
-  return map[key] || (key.length === 1 ? key.toUpperCase() : key);
+const formatKey = (key: string, osPlatform: string): string => {
+  if (key === 'ctrl') return osPlatform === 'macos' ? '⌘' : 'Ctrl';
+  if (key === 'shift') return 'Shift';
+  if (key === 'alt') return osPlatform === 'macos' ? '⌥' : 'Alt';
+
+  const label = codeToDisplayLabel(key);
+  return label || key;
 };
 
 
-const KeybindRow = ({ def, currentCombo, onSave, recordingAction, onStartRecording }: KeybindRowProps) => {
+const KeybindRow = ({ def, currentCombo, osPlatform, onSave, recordingAction, onStartRecording }: KeybindRowProps) => {
    const recording = recordingAction === def.actionKey;
 
   useEffect(() => {
@@ -171,23 +173,8 @@ const KeybindRow = ({ def, currentCombo, onSave, recordingAction, onStartRecordi
         return;
       }
       e.preventDefault();
-      const parts: string[] = [];
-      if (e.ctrlKey || e.metaKey) parts.push('ctrl');
-      if (e.shiftKey) parts.push('shift');
-      if (e.altKey) parts.push('alt');
-
-      let nonModifier = false;
-      if (e.code === 'BracketLeft') { parts.push('['); nonModifier = true; }
-      else if (e.code === 'BracketRight') { parts.push(']'); nonModifier = true; }
-      else {
-        const k = e.key === ' ' ? 'space' : e.key.toLowerCase();
-        if (!['ctrl', 'shift', 'alt', 'meta', 'control', ' '].includes(k)) {
-          parts.push(k);
-          nonModifier = true;
-        }
-      }
-
-      if (nonModifier) {
+      const parts = normalizeCombo(e);
+      if (parts.length > 0 && !['ctrl', 'shift', 'alt'].includes(parts[parts.length - 1])) {
         onSave(def.actionKey, parts);
         onStartRecording('');
       }
@@ -196,40 +183,40 @@ const KeybindRow = ({ def, currentCombo, onSave, recordingAction, onStartRecordi
     return () => window.removeEventListener('keydown', handler, { capture: true });
   }, [recording, def.actionKey, onSave, onStartRecording]);
 
- const displayCombo = currentCombo ?? def.defaultCombo;
+  const displayCombo = currentCombo ?? def.defaultCombo;
 
-   return (
-     <div className="flex justify-between items-center py-2">
-       <Text variant={TextVariants.label}>{def.description}</Text>
-      <button
-           onClick={() => onStartRecording(def.actionKey)}
-           className="flex items-center gap-1 flex-wrap shrink-0"
-         >
-          {recording ? (
-            <Text
-              as="kbd"
-              variant={TextVariants.small}
-              color={TextColors.accent}
-              weight={TextWeights.semibold}
-              className="px-2 py-1 font-sans bg-bg-primary border border-accent rounded-md animate-pulse"
-            >
-              Press a key...
-            </Text>
-          ) : (
-            <Text
-              as="kbd"
-              variant={TextVariants.small}
-              color={TextColors.primary}
-              weight={TextWeights.semibold}
-              className="px-2 py-1 font-sans bg-bg-primary border border-border-color rounded-md cursor-pointer hover:border-accent transition-colors"
-            >
-              {displayCombo.map(formatKey).join(' + ')}
-            </Text>
-          )}
-        </button>
-     </div>
-   );
- };
+    return (
+      <div className="flex justify-between items-center py-2">
+        <Text variant={TextVariants.label}>{def.description}</Text>
+       <button
+            onClick={() => onStartRecording(def.actionKey)}
+            className="flex items-center gap-1 flex-wrap shrink-0"
+          >
+           {recording ? (
+             <Text
+               as="kbd"
+               variant={TextVariants.small}
+               color={TextColors.accent}
+               weight={TextWeights.semibold}
+               className="px-2 py-1 font-sans bg-bg-primary border border-accent rounded-md animate-pulse"
+             >
+               Press a key...
+             </Text>
+           ) : (
+             <Text
+               as="kbd"
+               variant={TextVariants.small}
+               color={TextColors.primary}
+               weight={TextWeights.semibold}
+               className="px-2 py-1 font-sans bg-bg-primary border border-border-color rounded-md cursor-pointer hover:border-accent transition-colors"
+             >
+               {displayCombo.map((k) => formatKey(k, osPlatform)).join(' + ')}
+             </Text>
+           )}
+         </button>
+      </div>
+    );
+  };
 
 const SettingItem = ({ children, description, label }: SettingItemProps) => (
   <div>
@@ -1937,13 +1924,14 @@ export default function SettingsPanel({
                             <div className="divide-y divide-border-color">
                               {sectionDefs.map((def) => (
                                  <KeybindRow
-                                   key={def.actionKey}
-                                   def={def}
-                                   currentCombo={userKb[def.actionKey]}
-                                   onSave={handleKeybindingSave}
-                                   recordingAction={recordingAction}
-                                   onStartRecording={setRecordingAction}
-                                 />
+                                     key={def.actionKey}
+                                     def={def}
+                                     currentCombo={userKb[def.actionKey]}
+                                     osPlatform={osPlatform}
+                                     onSave={handleKeybindingSave}
+                                     recordingAction={recordingAction}
+                                     onStartRecording={setRecordingAction}
+                                   />
                                ))}
                             </div>
                           </div>
