@@ -347,6 +347,19 @@ export interface ActionHandler {
   execute: (event: KeyboardEvent) => void;
 }
 
+export interface KeybindingSection {
+  id: KeybindingDefinition['section'];
+  label: string;
+}
+
+export const KEYBINDING_SECTIONS: KeybindingSection[] = [
+  { id: 'library', label: 'Library' },
+  { id: 'editing', label: 'Editing' },
+  { id: 'view', label: 'View' },
+  { id: 'rating', label: 'Rating & Labels' },
+  { id: 'panels', label: 'Panels' },
+];
+
 export const KEYBINDING_DEFINITIONS: KeybindingDefinition[] = [
   { actionKey: 'open_image', description: 'Open selected image', defaultCombo: ['Enter'], section: 'library' },
   { actionKey: 'copy_files', description: 'Copy selected file(s)', defaultCombo: ['ctrl', 'shift', 'KeyC'], section: 'library' },

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { ActionHandler, ImageFile, KeybindingDefinition, Panel, SelectedImage, KEYBINDING_DEFINITIONS } from '../components/ui/AppProperties';
 import { BrushSettings } from '../components/ui/AppProperties';
-import { normalizeCombo } from '../utils/keyboardUtils';
+import { arraysEqual, normalizeCombo } from '../utils/keyboardUtils';
 
 interface KeyboardShortcutsProps {
   activeAiPatchContainerId?: string | null;
@@ -109,10 +109,6 @@ export const useKeyboardShortcuts = ({
   setBrushSettings,
 }: KeyboardShortcutsProps) => {
   useEffect(() => {
-    function arraysEqual(a: string[], b: string[]): boolean {
-      return a.length === b.length && a.every((v, i) => v === b[i]);
-    }
-
     function getEffectiveCombo(def: KeybindingDefinition): string[] {
       if (def.actionKey === 'delete_selected') {
         if (osPlatform === 'macos' && !keybindings?.[def.actionKey]) {

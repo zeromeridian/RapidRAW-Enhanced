@@ -31,8 +31,8 @@ import Switch from '../ui/Switch';
 import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
-import { Invokes, KEYBINDING_DEFINITIONS, KeybindingDefinition } from '../ui/AppProperties';
-import { codeToDisplayLabel, normalizeCombo } from '../../utils/keyboardUtils';
+import { Invokes, KEYBINDING_DEFINITIONS, KEYBINDING_SECTIONS, KeybindingDefinition } from '../ui/AppProperties';
+import { arraysEqual, codeToDisplayLabel, formatKeyCode, normalizeCombo } from '../../utils/keyboardUtils';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
@@ -149,18 +149,8 @@ const linearRawOptions: OptionItem<string>[] = [
 const settingCategories = [
   { id: 'general', label: 'General', icon: SlidersHorizontal },
   { id: 'processing', label: 'Processing', icon: Cpu },
-  { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
+  { id: 'shortcuts', label: 'Controls', icon: Keyboard },
 ];
-
-const formatKey = (key: string, osPlatform: string): string => {
-  if (key === 'ctrl') return osPlatform === 'macos' ? '⌘' : 'Ctrl';
-  if (key === 'shift') return 'Shift';
-  if (key === 'alt') return osPlatform === 'macos' ? '⌥' : 'Alt';
-
-  const label = codeToDisplayLabel(key);
-  return label || key;
-};
-
 
 const KeybindRow = ({ def, currentCombo, osPlatform, onSave, recordingAction, onStartRecording }: KeybindRowProps) => {
    const recording = recordingAction === def.actionKey;
@@ -210,7 +200,7 @@ const KeybindRow = ({ def, currentCombo, osPlatform, onSave, recordingAction, on
                weight={TextWeights.semibold}
                className="px-2 py-1 font-sans bg-bg-primary border border-border-color rounded-md cursor-pointer hover:border-accent transition-colors"
              >
-               {displayCombo.map((k) => formatKey(k, osPlatform)).join(' + ')}
+               {displayCombo.map((k) => formatKeyCode(k, osPlatform)).join(' + ')}
              </Text>
            )}
          </button>
@@ -1911,17 +1901,14 @@ export default function SettingsPanel({
                >
                  <div className="p-6 bg-surface rounded-xl shadow-md">
                    <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
-                     Keyboard Shortcuts
+                     Keyboard Controls
                    </Text>
-                   <div className="space-y-8">
-{(['library', 'editing', 'view',  'panels', 'rating'] as const).map((section) => {
-                         const sectionDefs = KEYBINDING_DEFINITIONS.filter((d) => d.section === section);
-                         const sectionLabels: Record<string, string> = { library: 'Library', editing: 'Editing', view: 'View', rating: 'Rating & Labels', panels: 'Panels' };
-                         const sectionLabel = sectionLabels[section];
-                        const userKb = appSettings?.keybindings || {};
-                        return (
-                          <div key={section}>
-                            <Text variant={TextVariants.heading}>{sectionLabel}</Text>
+                   <div className="space-y-8"> {KEYBINDING_SECTIONS.map((section) => {
+                          const sectionDefs = KEYBINDING_DEFINITIONS.filter((d) => d.section === section.id);
+                         const userKb = appSettings?.keybindings || {};
+                         return (
+                           <div key={section.id}>
+                             <Text variant={TextVariants.heading}>{section.label}</Text>
                             <div className="divide-y divide-border-color">
                               {sectionDefs.map((def) => (
                                  <KeybindRow
