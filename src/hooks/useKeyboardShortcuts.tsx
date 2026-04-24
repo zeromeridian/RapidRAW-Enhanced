@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ActionHandler, ImageFile, KeybindingDefinition, Panel, SelectedImage, KEYBINDING_DEFINITIONS } from '../components/ui/AppProperties';
 import { BrushSettings } from '../components/ui/AppProperties';
-import { arraysEqual, normalizeCombo } from '../utils/keyboardUtils';
+import { normalizeCombo } from '../utils/keyboardUtils';
 
 interface KeyboardShortcutsProps {
   activeAiPatchContainerId?: string | null;
@@ -108,13 +108,26 @@ export const useKeyboardShortcuts = ({
   brushSettings,
   setBrushSettings,
 }: KeyboardShortcutsProps) => {
-  useEffect(() => {
-    function getEffectiveCombo(def: KeybindingDefinition): string[] {
-      const userCombo = keybindings?.[def.actionKey];
-      if (userCombo?.length) return userCombo;
-      return def.defaultCombo;
+  function getEffectiveCombo(def: KeybindingDefinition): string[] | null {
+    const userCombo = keybindings?.[def.actionKey];
+    if (userCombo !== undefined) {
+      return userCombo.length > 0 ? userCombo : null;
     }
+    return def.defaultCombo;
+  }
 
+  const comboMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const def of KEYBINDING_DEFINITIONS) {
+      const effective = getEffectiveCombo(def);
+      if (effective) {
+        map.set(effective.join('+'), def.actionKey);
+      }
+    }
+    return map;
+  }, [keybindings]);
+
+  useEffect(() => {
     const actions: Record<string, ActionHandler> = {
       open_image: {
         shouldFire: () => !selectedImage && libraryActivePath !== null,
@@ -462,14 +475,12 @@ export const useKeyboardShortcuts = ({
       }
 
       const normalized = normalizeCombo(event, osPlatform);
-      for (const def of KEYBINDING_DEFINITIONS) {
-        const effectiveCombo = getEffectiveCombo(def);
-        if (arraysEqual(effectiveCombo, normalized)) {
-          const handler = actions[def.actionKey];
-          if (handler && (!handler.shouldFire || handler.shouldFire())) {
-            handler.execute(event);
-            return;
-          }
+      const actionKey = comboMap.get(normalized.join('+'));
+      if (actionKey) {
+        const handler = actions[actionKey];
+        if (handler && (!handler.shouldFire || handler.shouldFire())) {
+          handler.execute(event);
+          return;
         }
       }
     };
@@ -525,7 +536,7 @@ export const useKeyboardShortcuts = ({
     displaySize,
     baseRenderSize,
     originalSize,
-    brushSettings,  
-    setBrushSettings,  
+    brushSettings,
+    setBrushSettings,
   ]);
 };

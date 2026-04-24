@@ -382,7 +382,7 @@ export const KEYBINDING_DEFINITIONS: KeybindingDefinition[] = [
   { actionKey: 'rate_2', description: 'Star rating: 2', defaultCombo: ['Digit2'], section: 'rating' },
   { actionKey: 'rate_3', description: 'Star rating: 3', defaultCombo: ['Digit3'], section: 'rating' },
   { actionKey: 'rate_4', description: 'Star rating: 4', defaultCombo: ['Digit4'], section: 'rating' },
-  { actionKey: 'rate_5', description: 'Star rating: 5', defaultCombo: ['Digit5'], section: 'rating' },  
+  { actionKey: 'rate_5', description: 'Star rating: 5', defaultCombo: ['Digit5'], section: 'rating' },
   { actionKey: 'color_label_none', description: 'Color label: None', defaultCombo: ['shift', 'Digit0'], section: 'rating' },
   { actionKey: 'color_label_red', description: 'Color label: Red', defaultCombo: ['shift', 'Digit1'], section: 'rating' },
   { actionKey: 'color_label_yellow', description: 'Color label: Yellow', defaultCombo: ['shift', 'Digit2'], section: 'rating' },
@@ -403,7 +403,7 @@ export const KEYBINDING_DEFINITIONS: KeybindingDefinition[] = [
   { actionKey: 'paste_adjustments', description: 'Paste copied adjustments', defaultCombo: ['ctrl', 'KeyV'], section: 'editing' },
   { actionKey: 'rotate_left', description: 'Rotate 90° counter-clockwise', defaultCombo: ['BracketLeft'], section: 'editing' },
   { actionKey: 'rotate_right', description: 'Rotate 90° clockwise', defaultCombo: ['BracketRight'], section: 'editing' },
-  { actionKey: 'toggle_crop', description: 'Straighten Image', defaultCombo: ['KeyS'], section: 'editing' },
+  { actionKey: 'toggle_crop', description: 'Toggle Crop / Straighten', defaultCombo: ['KeyS'], section: 'editing' },
   { actionKey: 'brush_size_up', description: 'Increase brush size', defaultCombo: ['ctrl', 'ArrowUp'], section: 'editing' },
   { actionKey: 'brush_size_down', description: 'Decrease brush size', defaultCombo: ['ctrl', 'ArrowDown'], section: 'editing' },
 ];

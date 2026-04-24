@@ -154,7 +154,7 @@ const settingCategories = [
 ];
 
 const KeybindRow = ({ def, currentCombo, osPlatform, onSave, recordingAction, onStartRecording, isConflicting }: KeybindRowProps) => {
-    const recording = recordingAction === def.actionKey;
+  const recording = recordingAction === def.actionKey;
 
   useEffect(() => {
     if (!recording) return;
@@ -177,41 +177,41 @@ const KeybindRow = ({ def, currentCombo, osPlatform, onSave, recordingAction, on
 
   const displayCombo = currentCombo !== undefined ? (currentCombo.length ? currentCombo : null) : def.defaultCombo;
 
-    return (
-      <div className="flex justify-between items-center py-2">
-        <Text variant={TextVariants.label}>{def.description}</Text>
-       <div className="flex items-center gap-1">
-          {isConflicting && <span className="text-yellow-400 text-xs">⚠</span>}
-          <button
-            onClick={() => onStartRecording(def.actionKey)}
-            className="flex items-center gap-1 flex-wrap shrink-0"
-          >
-           {recording ? (
-              <Text
-                as="kbd"
-                variant={TextVariants.small}
-                color={TextColors.accent}
-                weight={TextWeights.semibold}
-                className="px-2 py-1 font-sans bg-bg-primary border border-accent rounded-md animate-pulse"
-              >
-                Press a key... (Esc to clear)
-              </Text>
-            ) : (
-              <Text
-                as="kbd"
-                variant={TextVariants.small}
-                color={TextColors.primary}
-                weight={TextWeights.semibold}
-                className={`px-2 py-1 font-sans bg-bg-primary border rounded-md cursor-pointer hover:border-accent transition-colors ${isConflicting ? 'border-yellow-400' : 'border-border-color'}`}
-              >
-                {displayCombo ? displayCombo.map((k) => formatKeyCode(k, osPlatform)).join(' + ') : <span className="text-text-secondary italic">Not assigned</span>}
-              </Text>
-            )}
-          </button>
-        </div>
+  return (
+    <div className="flex justify-between items-center py-2">
+      <Text variant={TextVariants.label}>{def.description}</Text>
+      <div className="flex items-center gap-1">
+        {isConflicting && <span className="text-yellow-400 text-xs">⚠</span>}
+        <button
+          onClick={() => onStartRecording(def.actionKey)}
+          className="flex items-center gap-1 flex-wrap shrink-0"
+        >
+          {recording ? (
+            <Text
+              as="kbd"
+              variant={TextVariants.small}
+              color={TextColors.accent}
+              weight={TextWeights.semibold}
+              className="px-2 py-1 font-sans bg-bg-primary border border-accent rounded-md animate-pulse"
+            >
+              Press a key... (Esc to clear)
+            </Text>
+          ) : (
+            <Text
+              as="kbd"
+              variant={TextVariants.small}
+              color={TextColors.primary}
+              weight={TextWeights.semibold}
+              className={`px-2 py-1 font-sans bg-bg-primary border rounded-md cursor-pointer hover:border-accent transition-colors ${isConflicting ? 'border-yellow-400' : 'border-border-color'}`}
+            >
+              {displayCombo ? displayCombo.map((k) => formatKeyCode(k, osPlatform)).join(' + ') : <span className="text-text-secondary italic">Not assigned</span>}
+            </Text>
+          )}
+        </button>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
 const SettingItem = ({ children, description, label }: SettingItemProps) => (
   <div>
