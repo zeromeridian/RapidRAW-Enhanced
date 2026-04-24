@@ -941,44 +941,6 @@ const handleKeybindSave = (action: string, combo: string[]) => {
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
                   <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
-                    Canvas Interaction
-                  </Text>
-                  <div className="space-y-8">
-                    <div>
-                      <Text variant={TextVariants.heading} className="mb-2">
-                        Input Device Optimization
-                      </Text>
-                      <Text variant={TextVariants.small} className="mb-4">
-                        Choose the primary input device you use to pan and zoom the canvas.
-                      </Text>
-                      <CanvasInputModeSwitch
-                        mode={(appSettings?.canvasInputMode as 'mouse' | 'trackpad') || 'mouse'}
-                        onModeChange={(value) => onSettingsChange({ ...appSettings, canvasInputMode: value })}
-                      />
-                    </div>
-
-                    <SettingItem
-                      label="Zoom Speed Multiplier"
-                      description="Adjust how fast the canvas zooms in and out when using the scroll wheel or pinch gesture."
-                    >
-                      <Slider
-                        label="Speed"
-                        min={0.1}
-                        max={3.0}
-                        step={0.1}
-                        value={appSettings?.zoomSpeedMultiplier ?? 1.0}
-                        defaultValue={1.0}
-                        onChange={(e: any) =>
-                          onSettingsChange({ ...appSettings, zoomSpeedMultiplier: parseFloat(e.target.value) })
-                        }
-                        fillOrigin="min"
-                      />
-                    </SettingItem>
-                  </div>
-                </div>
-
-                <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     Adjustments Visibility
                   </Text>
                   <Text className="mb-4">
@@ -1919,12 +1881,50 @@ const handleKeybindSave = (action: string, combo: string[]) => {
                  initial={{ opacity: 0, x: 10 }}
                  animate={{ opacity: 1, x: 0 }}
                  exit={{ opacity: 0, x: -10 }}
-                 transition={{ duration: 0.2 }}
-                 className="space-y-10"
-               >
-                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                   <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
-                     Keyboard Controls
+               transition={{ duration: 0.2 }}
+                  className="space-y-10"
+                >
+                  <div className="p-6 bg-surface rounded-xl shadow-md">
+                    <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                      Mouse Controls
+                    </Text>
+                    <div className="space-y-8">
+                      <div>
+                        <Text variant={TextVariants.heading} className="mb-2">
+                          Input Device Optimization
+                        </Text>
+                        <Text variant={TextVariants.small} className="mb-4">
+                          Choose the primary input device you use to pan and zoom the canvas.
+                        </Text>
+                        <CanvasInputModeSwitch
+                          mode={(appSettings?.canvasInputMode as 'mouse' | 'trackpad') || 'mouse'}
+                          onModeChange={(value) => onSettingsChange({ ...appSettings, canvasInputMode: value })}
+                        />
+                      </div>
+
+                      <SettingItem
+                        label="Zoom Speed Multiplier"
+                        description="Adjust how fast the canvas zooms in and out when using the scroll wheel or pinch gesture."
+                      >
+                        <Slider
+                          label="Speed"
+                          min={0.1}
+                          max={3.0}
+                          step={0.1}
+                          value={appSettings?.zoomSpeedMultiplier ?? 1.0}
+                          defaultValue={1.0}
+                          onChange={(e: any) =>
+                            onSettingsChange({ ...appSettings, zoomSpeedMultiplier: parseFloat(e.target.value) })
+                          }
+                          fillOrigin="min"
+                        />
+                      </SettingItem>
+                    </div>
+                  </div>
+
+                  <div className="p-6 bg-surface rounded-xl shadow-md">
+                    <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                      Keyboard Controls
                    </Text>
 <div className="space-y-8"> {KEYBIND_SECTIONS.map((section) => {
                             const sectionDefs = KEYBIND_DEFINITIONS.filter((d) => d.section === section.id);

@@ -457,13 +457,11 @@ pub struct AppSettings {
     #[serde(default)]
     pub use_wgpu_renderer: Option<bool>,
     #[serde(default)]
-<<<<<<< HEAD
     pub canvas_input_mode: Option<String>,
     #[serde(default)]
     pub zoom_speed_multiplier: Option<f32>,
-=======
+    #[serde(default)]
     pub keybinds: HashMap<String, Vec<String>>,
->>>>>>> 25a8ddcc (Add data layer)
 }
 
 fn default_adjustment_visibility() -> HashMap<String, bool> {
@@ -533,12 +531,9 @@ impl Default for AppSettings {
             use_wgpu_renderer: Some(false),
             #[cfg(not(any(target_os = "linux", target_os = "android")))]
             use_wgpu_renderer: Some(true),
-<<<<<<< HEAD
             canvas_input_mode: Some("mouse".to_string()),
             zoom_speed_multiplier: Some(1.0),
-=======
             keybinds: HashMap::new(),
->>>>>>> 25a8ddcc (Add data layer)
         }
     }
 }
