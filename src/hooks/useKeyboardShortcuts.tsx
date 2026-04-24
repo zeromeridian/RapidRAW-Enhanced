@@ -110,13 +110,8 @@ export const useKeyboardShortcuts = ({
 }: KeyboardShortcutsProps) => {
   useEffect(() => {
     function getEffectiveCombo(def: KeybindingDefinition): string[] {
-      if (def.actionKey === 'delete_selected') {
-        if (osPlatform === 'macos' && !keybindings?.[def.actionKey]) {
-          return ['ctrl', 'Backspace'];
-        }
-      }
       const userCombo = keybindings?.[def.actionKey];
-      if (userCombo) return userCombo;
+      if (userCombo?.length) return userCombo;
       return def.defaultCombo;
     }
 
@@ -438,7 +433,7 @@ export const useKeyboardShortcuts = ({
       }
 
       const isMacOS = osPlatform === 'macos';
-      const isDeletePressed = isMacOS ? event.key === 'backspace' : event.key === 'delete';
+      const isDeletePressed = isMacOS ? event.key === 'Backspace' : event.key === 'Delete';
       if (isDeletePressed) {
         event.preventDefault();
         if (activeMaskContainerId) {
@@ -449,7 +444,7 @@ export const useKeyboardShortcuts = ({
         return;
       }
 
-      const normalized = normalizeCombo(event);
+      const normalized = normalizeCombo(event, osPlatform);
       for (const def of KEYBINDING_DEFINITIONS) {
         const effectiveCombo = getEffectiveCombo(def);
         if (arraysEqual(effectiveCombo, normalized)) {

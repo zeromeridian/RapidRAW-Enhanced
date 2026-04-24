@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Cloud,
@@ -64,6 +64,7 @@ interface KeybindRowProps {
   onSave: (actionKey: string, combo: string[]) => void;
   recordingAction: string | null;
   onStartRecording: (actionKey: string) => void;
+  isConflicting: boolean;
 }
 
 interface SettingItemProps {
@@ -152,18 +153,19 @@ const settingCategories = [
   { id: 'shortcuts', label: 'Controls', icon: Keyboard },
 ];
 
-const KeybindRow = ({ def, currentCombo, osPlatform, onSave, recordingAction, onStartRecording }: KeybindRowProps) => {
-   const recording = recordingAction === def.actionKey;
+const KeybindRow = ({ def, currentCombo, osPlatform, onSave, recordingAction, onStartRecording, isConflicting }: KeybindRowProps) => {
+    const recording = recordingAction === def.actionKey;
 
   useEffect(() => {
     if (!recording) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        onSave(def.actionKey, []);
         onStartRecording('');
         return;
       }
       e.preventDefault();
-      const parts = normalizeCombo(e);
+      const parts = normalizeCombo(e, osPlatform);
       if (parts.length > 0 && !['ctrl', 'shift', 'alt'].includes(parts[parts.length - 1])) {
         onSave(def.actionKey, parts);
         onStartRecording('');
@@ -173,37 +175,40 @@ const KeybindRow = ({ def, currentCombo, osPlatform, onSave, recordingAction, on
     return () => window.removeEventListener('keydown', handler, { capture: true });
   }, [recording, def.actionKey, onSave, onStartRecording]);
 
-  const displayCombo = currentCombo ?? def.defaultCombo;
+  const displayCombo = currentCombo !== undefined ? (currentCombo.length ? currentCombo : null) : def.defaultCombo;
 
     return (
       <div className="flex justify-between items-center py-2">
         <Text variant={TextVariants.label}>{def.description}</Text>
-       <button
+       <div className="flex items-center gap-1">
+          {isConflicting && <span className="text-yellow-400 text-xs">⚠</span>}
+          <button
             onClick={() => onStartRecording(def.actionKey)}
             className="flex items-center gap-1 flex-wrap shrink-0"
           >
            {recording ? (
-             <Text
-               as="kbd"
-               variant={TextVariants.small}
-               color={TextColors.accent}
-               weight={TextWeights.semibold}
-               className="px-2 py-1 font-sans bg-bg-primary border border-accent rounded-md animate-pulse"
-             >
-               Press a key...
-             </Text>
-           ) : (
-             <Text
-               as="kbd"
-               variant={TextVariants.small}
-               color={TextColors.primary}
-               weight={TextWeights.semibold}
-               className="px-2 py-1 font-sans bg-bg-primary border border-border-color rounded-md cursor-pointer hover:border-accent transition-colors"
-             >
-               {displayCombo.map((k) => formatKeyCode(k, osPlatform)).join(' + ')}
-             </Text>
-           )}
-         </button>
+              <Text
+                as="kbd"
+                variant={TextVariants.small}
+                color={TextColors.accent}
+                weight={TextWeights.semibold}
+                className="px-2 py-1 font-sans bg-bg-primary border border-accent rounded-md animate-pulse"
+              >
+                Press a key... (Esc to clear)
+              </Text>
+            ) : (
+              <Text
+                as="kbd"
+                variant={TextVariants.small}
+                color={TextColors.primary}
+                weight={TextWeights.semibold}
+                className={`px-2 py-1 font-sans bg-bg-primary border rounded-md cursor-pointer hover:border-accent transition-colors ${isConflicting ? 'border-yellow-400' : 'border-border-color'}`}
+              >
+                {displayCombo ? displayCombo.map((k) => formatKeyCode(k, osPlatform)).join(' + ') : <span className="text-text-secondary italic">Not assigned</span>}
+              </Text>
+            )}
+          </button>
+        </div>
       </div>
     );
   };
@@ -770,6 +775,24 @@ export default function SettingsPanel({
     const newKeybindings = { ...(appSettings?.keybindings || {}), [actionKey]: combo };
     onSettingsChange({ ...appSettings, keybindings: newKeybindings });
   };
+
+  const conflictingKeys = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    const userKb = appSettings?.keybindings || {};
+    for (const def of KEYBINDING_DEFINITIONS) {
+      const userCombo = userKb[def.actionKey];
+      const effective = userCombo?.length ? userCombo : (userCombo === undefined ? def.defaultCombo : null);
+      if (!effective) continue;
+      const key = effective.join('+');
+      if (!map.has(key)) map.set(key, new Set());
+      map.get(key)!.add(def.actionKey);
+    }
+    const keys = new Set<string>();
+    for (const [, actions] of map) {
+      if (actions.size > 1) actions.forEach((k) => keys.add(k));
+    }
+    return keys;
+  }, [appSettings?.keybindings]);
 
   return (
     <>
@@ -1903,23 +1926,24 @@ export default function SettingsPanel({
                    <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                      Keyboard Controls
                    </Text>
-                   <div className="space-y-8"> {KEYBINDING_SECTIONS.map((section) => {
-                          const sectionDefs = KEYBINDING_DEFINITIONS.filter((d) => d.section === section.id);
-                         const userKb = appSettings?.keybindings || {};
-                         return (
-                           <div key={section.id}>
-                             <Text variant={TextVariants.heading}>{section.label}</Text>
-                            <div className="divide-y divide-border-color">
-                              {sectionDefs.map((def) => (
-                                 <KeybindRow
-                                     key={def.actionKey}
-                                     def={def}
-                                     currentCombo={userKb[def.actionKey]}
-                                     osPlatform={osPlatform}
-                                     onSave={handleKeybindingSave}
-                                     recordingAction={recordingAction}
-                                     onStartRecording={setRecordingAction}
-                                   />
+<div className="space-y-8"> {KEYBINDING_SECTIONS.map((section) => {
+                           const sectionDefs = KEYBINDING_DEFINITIONS.filter((d) => d.section === section.id);
+                           const userKb = appSettings?.keybindings || {};
+                           return (
+                            <div key={section.id}>
+                              <Text variant={TextVariants.heading}>{section.label}</Text>
+                             <div className="divide-y divide-border-color">
+                               {sectionDefs.map((def) => (
+                                  <KeybindRow
+                                      key={def.actionKey}
+                                      def={def}
+                                      currentCombo={userKb[def.actionKey]}
+                                      osPlatform={osPlatform}
+                                      onSave={handleKeybindingSave}
+                                      recordingAction={recordingAction}
+                                      onStartRecording={setRecordingAction}
+                                      isConflicting={conflictingKeys.has(def.actionKey)}
+                                    />
                                ))}
                             </div>
                           </div>
