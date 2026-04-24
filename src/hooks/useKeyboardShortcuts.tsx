@@ -396,52 +396,69 @@ export const useKeyboardShortcuts = ({
       },
     };
 
-    const handleKeyDown = (event: any) => {
-      if (isModalOpen) {
-        return;
-      }
+    type BuiltInMatch = (e: KeyboardEvent) => boolean;
+    type BuiltInExec = (e: KeyboardEvent) => void;
+
+    const builtinShortcuts: Array<{ match: BuiltInMatch; execute: BuiltInExec }> = [
+      {
+        match: (e) => e.code === 'Escape',
+        execute: (e) => {
+          e.preventDefault();
+          if (isStraightenActive) setIsStraightenActive(false);
+          else if (customEscapeHandler) customEscapeHandler();
+          else if (activeAiSubMaskId) setActiveAiSubMaskId(null);
+          else if (activeAiPatchContainerId && onSelectPatchContainer) onSelectPatchContainer(null);
+          else if (activeMaskId) setActiveMaskId(null);
+          else if (activeMaskContainerId) setActiveMaskContainerId(null);
+          else if (activeRightPanel === Panel.Crop) handleRightPanelSelect(Panel.Adjustments);
+          else if (isFullScreen) handleToggleFullScreen();
+          else if (selectedImage) handleBackToLibrary();
+        },
+      },
+      {
+        match: (e) => {
+          if (osPlatform === 'macos') return e.code === 'Backspace';
+          return e.code === 'Delete';
+        },
+        execute: (e) => {
+          e.preventDefault();
+          if (activeMaskContainerId) handleDeleteMaskContainer(activeMaskContainerId);
+          else if (activeAiPatchContainerId) handleDeleteAiPatch(activeAiPatchContainerId);
+        },
+      },
+      {
+        match: (e) => !selectedImage && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code),
+        execute: (e) => {
+          e.preventDefault();
+          const isNext = e.code === 'ArrowRight' || e.code === 'ArrowDown';
+          const activePath = libraryActivePath;
+          if (!activePath || sortedImageList.length === 0) return;
+          const currentIndex = sortedImageList.findIndex((img: ImageFile) => img.path === activePath);
+          if (currentIndex === -1) return;
+          let nextIndex = isNext ? currentIndex + 1 : currentIndex - 1;
+          if (nextIndex >= sortedImageList.length) nextIndex = 0;
+          if (nextIndex < 0) nextIndex = sortedImageList.length - 1;
+          const nextImage = sortedImageList[nextIndex];
+          if (nextImage) {
+            setLibraryActivePath(nextImage.path);
+            setMultiSelectedPaths([nextImage.path]);
+          }
+        },
+      },
+    ];
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isModalOpen) return;
 
       const isInputFocused =
         document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA';
-      if (isInputFocused) {
-        return;
-      }
+      if (isInputFocused) return;
 
-      // Escape cascade for now still here
-      if (event.key === 'escape') {
-        event.preventDefault();
-        if (isStraightenActive) {
-          setIsStraightenActive(false);
-        } else if (customEscapeHandler) {
-          customEscapeHandler();
-        } else if (activeAiSubMaskId) {
-          setActiveAiSubMaskId(null);
-        } else if (activeAiPatchContainerId && onSelectPatchContainer) {
-          onSelectPatchContainer(null);
-        } else if (activeMaskId) {
-          setActiveMaskId(null);
-        } else if (activeMaskContainerId) {
-          setActiveMaskContainerId(null);
-        } else if (activeRightPanel === Panel.Crop) {
-          handleRightPanelSelect(Panel.Adjustments);
-        } else if (isFullScreen) {
-          handleToggleFullScreen();
-        } else if (selectedImage) {
-          handleBackToLibrary();
+      for (const builtin of builtinShortcuts) {
+        if (builtin.match(event)) {
+          builtin.execute(event);
+          return;
         }
-        return;
-      }
-
-      const isMacOS = osPlatform === 'macos';
-      const isDeletePressed = isMacOS ? event.key === 'Backspace' : event.key === 'Delete';
-      if (isDeletePressed) {
-        event.preventDefault();
-        if (activeMaskContainerId) {
-          handleDeleteMaskContainer(activeMaskContainerId);
-        } else if (activeAiPatchContainerId) {
-          handleDeleteAiPatch(activeAiPatchContainerId);
-        }
-        return;
       }
 
       const normalized = normalizeCombo(event, osPlatform);
@@ -453,24 +470,6 @@ export const useKeyboardShortcuts = ({
             handler.execute(event);
             return;
           }
-        }
-      }
-
-      // Library arrow navigation
-      if (!selectedImage && ['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(event.key.toLowerCase())) {
-        event.preventDefault();
-        const isNext = event.key === 'ArrowRight' || event.key === 'ArrowDown';
-        const activePath = libraryActivePath;
-        if (!activePath || sortedImageList.length === 0) return;
-        const currentIndex = sortedImageList.findIndex((img: ImageFile) => img.path === activePath);
-        if (currentIndex === -1) return;
-        let nextIndex = isNext ? currentIndex + 1 : currentIndex - 1;
-        if (nextIndex >= sortedImageList.length) nextIndex = 0;
-        if (nextIndex < 0) nextIndex = sortedImageList.length - 1;
-        const nextImage = sortedImageList[nextIndex];
-        if (nextImage) {
-          setLibraryActivePath(nextImage.path);
-          setMultiSelectedPaths([nextImage.path]);
         }
       }
     };
