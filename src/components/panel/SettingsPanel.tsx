@@ -1914,9 +1914,10 @@ export default function SettingsPanel({
                      Keyboard Shortcuts
                    </Text>
                    <div className="space-y-8">
-             {(['general', 'editor'] as const).map((section) => {
-                        const sectionDefs = KEYBINDING_DEFINITIONS.filter((d) => d.section === section);
-                        const sectionLabel = section === 'general' ? 'General' : 'Editor';
+{(['library', 'editing', 'view',  'panels', 'rating'] as const).map((section) => {
+                         const sectionDefs = KEYBINDING_DEFINITIONS.filter((d) => d.section === section);
+                         const sectionLabels: Record<string, string> = { library: 'Library', editing: 'Editing', view: 'View', rating: 'Rating & Labels', panels: 'Panels' };
+                         const sectionLabel = sectionLabels[section];
                         const userKb = appSettings?.keybindings || {};
                         return (
                           <div key={section}>
