@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
-import { ActionHandler, ImageFile, KeybindingDefinition, Panel, SelectedImage, KEYBINDING_DEFINITIONS } from '../components/ui/AppProperties';
+import { ActionHandler, ImageFile, Panel, SelectedImage } from '../components/ui/AppProperties';
 import { BrushSettings } from '../components/ui/AppProperties';
-import { normalizeCombo } from '../utils/keyboardUtils';
+import { KeybindingDefinition, KEYBINDING_DEFINITIONS, normalizeCombo } from '../utils/keyboardUtils';
 
 interface KeyboardShortcutsProps {
   activeAiPatchContainerId?: string | null;
