@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
-import { ActionHandler, ImageFile, Panel, SelectedImage } from '../components/ui/AppProperties';
+import { KeybindHandler, ImageFile, Panel, SelectedImage } from '../components/ui/AppProperties';
 import { BrushSettings } from '../components/ui/AppProperties';
-import { KeybindingDefinition, KEYBINDING_DEFINITIONS, normalizeCombo } from '../utils/keyboardUtils';
+import { KeybindDefinition, KEYBIND_DEFINITIONS, normalizeCombo } from '../utils/keyboardUtils';
 
 interface KeyboardShortcutsProps {
   activeAiPatchContainerId?: string | null;
@@ -31,7 +31,7 @@ interface KeyboardShortcutsProps {
   isFullScreen: boolean;
   isModalOpen: boolean;
   isStraightenActive: boolean;
-  keybindings?: { [actionKey: string]: string[] };
+  keybinds?: { [action: string]: string[] };
   libraryActivePath: string | null;
   multiSelectedPaths: Array<string>;
   onSelectPatchContainer?(container: string | null): void;
@@ -84,7 +84,7 @@ export const useKeyboardShortcuts = ({
   isFullScreen,
   isModalOpen,
   isStraightenActive,
-  keybindings,
+  keybinds,
   libraryActivePath,
   multiSelectedPaths,
   onSelectPatchContainer,
@@ -108,8 +108,8 @@ export const useKeyboardShortcuts = ({
   brushSettings,
   setBrushSettings,
 }: KeyboardShortcutsProps) => {
-  function getEffectiveCombo(def: KeybindingDefinition): string[] | null {
-    const userCombo = keybindings?.[def.actionKey];
+  function getEffectiveCombo(def: KeybindDefinition): string[] | null {
+    const userCombo = keybinds?.[def.action];
     if (userCombo !== undefined) {
       return userCombo.length > 0 ? userCombo : null;
     }
@@ -118,17 +118,17 @@ export const useKeyboardShortcuts = ({
 
   const comboMap = useMemo(() => {
     const map = new Map<string, string>();
-    for (const def of KEYBINDING_DEFINITIONS) {
+    for (const def of KEYBIND_DEFINITIONS) {
       const effective = getEffectiveCombo(def);
       if (effective) {
-        map.set(effective.join('+'), def.actionKey);
+        map.set(effective.join('+'), def.action);
       }
     }
     return map;
-  }, [keybindings]);
+  }, [keybinds]);
 
   useEffect(() => {
-    const actions: Record<string, ActionHandler> = {
+    const actions: Record<string, KeybindHandler> = {
       open_image: {
         shouldFire: () => !selectedImage && libraryActivePath !== null,
         execute: (event) => { event.preventDefault(); handleImageSelect(libraryActivePath!); },
@@ -475,9 +475,9 @@ export const useKeyboardShortcuts = ({
       }
 
       const normalized = normalizeCombo(event, osPlatform);
-      const actionKey = comboMap.get(normalized.join('+'));
-      if (actionKey) {
-        const handler = actions[actionKey];
+      const action = comboMap.get(normalized.join('+'));
+      if (action) {
+        const handler = actions[action];
         if (handler && (!handler.shouldFire || handler.shouldFire())) {
           handler.execute(event);
           return;
@@ -515,7 +515,7 @@ export const useKeyboardShortcuts = ({
     handleZoomChange,
     isFullScreen,
     isStraightenActive,
-    keybindings,
+    keybinds,
     libraryActivePath,
     multiSelectedPaths,
     onSelectPatchContainer,

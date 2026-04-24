@@ -32,7 +32,7 @@ import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import { Invokes } from '../ui/AppProperties';
-import { arraysEqual, codeToDisplayLabel, formatKeyCode, KeybindingDefinition, KEYBINDING_DEFINITIONS, KEYBINDING_SECTIONS, normalizeCombo } from '../../utils/keyboardUtils';
+import { arraysEqual, codeToDisplayLabel, formatKeyCode, KeybindDefinition, KEYBIND_DEFINITIONS, KEYBIND_SECTIONS, normalizeCombo } from '../../utils/keyboardUtils';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
@@ -58,12 +58,12 @@ interface DataActionItemProps {
 }
 
 interface KeybindRowProps {
-  def: KeybindingDefinition;
+  def: KeybindDefinition;
   currentCombo?: string[];
   osPlatform: string;
-  onSave: (actionKey: string, combo: string[]) => void;
+  onSave: (action: string, combo: string[]) => void;
   recordingAction: string | null;
-  onStartRecording: (actionKey: string) => void;
+  onStartRecording: (action: string) => void;
   isConflicting: boolean;
 }
 
@@ -154,26 +154,26 @@ const settingCategories = [
 ];
 
 const KeybindRow = ({ def, currentCombo, osPlatform, onSave, recordingAction, onStartRecording, isConflicting }: KeybindRowProps) => {
-  const recording = recordingAction === def.actionKey;
+  const recording = recordingAction === def.action;
 
   useEffect(() => {
     if (!recording) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onSave(def.actionKey, []);
+        onSave(def.action, []);
         onStartRecording('');
         return;
       }
       e.preventDefault();
       const parts = normalizeCombo(e, osPlatform);
       if (parts.length > 0 && !['ctrl', 'shift', 'alt'].includes(parts[parts.length - 1])) {
-        onSave(def.actionKey, parts);
+        onSave(def.action, parts);
         onStartRecording('');
       }
     };
     window.addEventListener('keydown', handler, { capture: true });
     return () => window.removeEventListener('keydown', handler, { capture: true });
-  }, [recording, def.actionKey, onSave, onStartRecording]);
+  }, [recording, def.action, onSave, onStartRecording]);
 
   const displayCombo = currentCombo !== undefined ? (currentCombo.length ? currentCombo : null) : def.defaultCombo;
 
@@ -183,7 +183,7 @@ const KeybindRow = ({ def, currentCombo, osPlatform, onSave, recordingAction, on
       <div className="flex items-center gap-1">
         {isConflicting && <span className="text-yellow-400 text-xs">⚠</span>}
         <button
-          onClick={() => onStartRecording(def.actionKey)}
+          onClick={() => onStartRecording(def.action)}
           className="flex items-center gap-1 flex-wrap shrink-0"
         >
           {recording ? (
@@ -771,28 +771,28 @@ export default function SettingsPanel({
     }
   };
 
-  const handleKeybindingSave = (actionKey: string, combo: string[]) => {
-    const newKeybindings = { ...(appSettings?.keybindings || {}), [actionKey]: combo };
-    onSettingsChange({ ...appSettings, keybindings: newKeybindings });
+const handleKeybindSave = (action: string, combo: string[]) => {
+    const newKeybinds = { ...(appSettings?.keybinds || {}), [action]: combo };
+    onSettingsChange({ ...appSettings, keybinds: newKeybinds });
   };
 
   const conflictingKeys = useMemo(() => {
     const map = new Map<string, Set<string>>();
-    const userKb = appSettings?.keybindings || {};
-    for (const def of KEYBINDING_DEFINITIONS) {
-      const userCombo = userKb[def.actionKey];
+    const userKb = appSettings?.keybinds || {};
+    for (const def of KEYBIND_DEFINITIONS) {
+      const userCombo = userKb[def.action];
       const effective = userCombo?.length ? userCombo : (userCombo === undefined ? def.defaultCombo : null);
       if (!effective) continue;
       const key = effective.join('+');
       if (!map.has(key)) map.set(key, new Set());
-      map.get(key)!.add(def.actionKey);
+      map.get(key)!.add(def.action);
     }
     const keys = new Set<string>();
     for (const [, actions] of map) {
       if (actions.size > 1) actions.forEach((k) => keys.add(k));
     }
     return keys;
-  }, [appSettings?.keybindings]);
+  }, [appSettings?.keybinds]);
 
   return (
     <>
@@ -1926,33 +1926,33 @@ export default function SettingsPanel({
                    <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                      Keyboard Controls
                    </Text>
-<div className="space-y-8"> {KEYBINDING_SECTIONS.map((section) => {
-                           const sectionDefs = KEYBINDING_DEFINITIONS.filter((d) => d.section === section.id);
-                           const userKb = appSettings?.keybindings || {};
-                           return (
-                            <div key={section.id}>
-                              <Text variant={TextVariants.heading}>{section.label}</Text>
-                             <div className="divide-y divide-border-color">
-                               {sectionDefs.map((def) => (
-                                  <KeybindRow
-                                      key={def.actionKey}
-                                      def={def}
-                                      currentCombo={userKb[def.actionKey]}
-                                      osPlatform={osPlatform}
-                                      onSave={handleKeybindingSave}
-                                      recordingAction={recordingAction}
-                                      onStartRecording={setRecordingAction}
-                                      isConflicting={conflictingKeys.has(def.actionKey)}
-                                    />
-                               ))}
-                            </div>
-                          </div>
-                        );
-                      })}
+<div className="space-y-8"> {KEYBIND_SECTIONS.map((section) => {
+                            const sectionDefs = KEYBIND_DEFINITIONS.filter((d) => d.section === section.id);
+                            const userKb = appSettings?.keybinds || {};
+                            return (
+                             <div key={section.id}>
+                               <Text variant={TextVariants.heading}>{section.label}</Text>
+                              <div className="divide-y divide-border-color">
+                                {sectionDefs.map((def) => (
+                                   <KeybindRow
+                                       key={def.action}
+                                       def={def}
+                                       currentCombo={userKb[def.action]}
+                                       osPlatform={osPlatform}
+                                       onSave={handleKeybindSave}
+                                       recordingAction={recordingAction}
+                                       onStartRecording={setRecordingAction}
+                                       isConflicting={conflictingKeys.has(def.action)}
+                                     />
+                                ))}
+                             </div>
+                           </div>
+                         );
+                       })}
                       <div className="flex justify-end mt-6">
                         <Button
                           variant="ghost"
-                          onClick={() => onSettingsChange({ ...appSettings, keybindings: {} })}
+                          onClick={() => onSettingsChange({ ...appSettings, keybinds: {} })}
                         >
                           Reset All to Defaults
                         </Button>

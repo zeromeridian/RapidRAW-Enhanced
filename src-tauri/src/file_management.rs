@@ -462,7 +462,7 @@ pub struct AppSettings {
     #[serde(default)]
     pub zoom_speed_multiplier: Option<f32>,
 =======
-    pub keybindings: HashMap<String, Vec<String>>,
+    pub keybinds: HashMap<String, Vec<String>>,
 >>>>>>> 25a8ddcc (Add data layer)
 }
 
@@ -537,7 +537,7 @@ impl Default for AppSettings {
             canvas_input_mode: Some("mouse".to_string()),
             zoom_speed_multiplier: Some(1.0),
 =======
-            keybindings: HashMap::new(),
+            keybinds: HashMap::new(),
 >>>>>>> 25a8ddcc (Add data layer)
         }
     }
