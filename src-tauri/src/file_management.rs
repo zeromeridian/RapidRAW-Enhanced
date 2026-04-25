@@ -2707,17 +2707,64 @@ fn get_settings_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, Strin
 }
 
 fn get_internal_library_root_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, String> {
-    let library_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("library");
+    #[cfg(not(target_os = "android"))]
+    {
+        let library_dir = app_handle
+            .path()
+            .app_data_dir()
+            .map_err(|e| e.to_string())?
+            .join("library");
 
-    if !library_dir.exists() {
-        fs::create_dir_all(&library_dir).map_err(|e| e.to_string())?;
+        if !library_dir.exists() {
+            fs::create_dir_all(&library_dir).map_err(|e| e.to_string())?;
+        }
+        Ok(library_dir)
     }
+    #[cfg(target_os = "android")]
+    {
+        let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
+            .map_err(|e| format!("Failed to access Android JVM: {}", e))?;
+        let mut env = vm.attach_current_thread()
+            .map_err(|e| format!("Failed to attach current thread: {}", e))?;
+        
+        let context = env.new_local_ref(unsafe { JObject::from_raw(android_context().context().cast()) })
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
 
-    Ok(library_dir)
+        let dirs_array_obj = env.call_method(
+            &context,
+            "getExternalMediaDirs",
+            "()[Ljava/io/File;",
+            &[],
+        ).and_then(|v| v.l()).map_err(|e| map_android_jni_error(&mut env, e))?;
+
+        if dirs_array_obj.is_null() {
+            return Err("External media storage not available".to_string());
+        }
+
+        let dirs_array: jni::objects::JObjectArray = dirs_array_obj.into();
+        
+        let dir_file = env.get_object_array_element(&dirs_array, 0)
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+        if dir_file.is_null() {
+            return Err("Primary external media storage is null".to_string());
+        }
+
+        let path_jstring = env.call_method(&dir_file, "getAbsolutePath", "()Ljava/lang/String;", &[])
+            .and_then(|v| v.l()).map_err(|e| map_android_jni_error(&mut env, e))?;
+        
+        let path: String = env.get_string(&path_jstring.into())
+            .map_err(|e| map_android_jni_error(&mut env, e))?.into();
+        
+        let media_path = PathBuf::from(path);
+        let library_dir = media_path.join(".library");
+        
+        if !library_dir.exists() {
+            fs::create_dir_all(&library_dir).map_err(|e| e.to_string())?;
+        }
+        Ok(library_dir)
+    }
+    
 }
 
 #[tauri::command]
