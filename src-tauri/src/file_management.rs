@@ -587,8 +587,7 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
     (source_path, sidecar_path)
 }
 
-#[cfg(target_os = "android")]
-fn is_android_content_uri(path: &str) -> bool {
+pub fn is_android_content_uri(path: &str) -> bool {
     path.starts_with("content://")
 }
 
@@ -670,7 +669,7 @@ fn parse_android_uri<'local>(
 }
 
 #[cfg(target_os = "android")]
-fn resolve_android_content_uri_name(uri_str: &str) -> Result<String, String> {
+pub fn resolve_android_content_uri_name(uri_str: &str) -> Result<String, String> {
     let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
         .map_err(|e| format!("Failed to access Android JVM: {}", e))?;
     let mut env = vm
@@ -772,7 +771,7 @@ fn resolve_android_content_uri_name(uri_str: &str) -> Result<String, String> {
 }
 
 #[cfg(target_os = "android")]
-fn read_android_content_uri(uri_str: &str) -> Result<Vec<u8>, String> {
+pub fn read_android_content_uri(uri_str: &str) -> Result<Vec<u8>, String> {
     let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
         .map_err(|e| format!("Failed to access Android JVM: {}", e))?;
     let mut env = vm
