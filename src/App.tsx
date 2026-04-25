@@ -4171,9 +4171,10 @@ function App() {
         const processedNonRaw = expandExtensions(nonRaw);
         const processedRaw = expandExtensions(raw);
         const allImageExtensions = [...processedNonRaw, ...processedRaw];
-
-        const selected = await open({
-          filters: [
+        
+        const typeFilters = isAndroid
+        ? [ ] 
+        : [
             {
               name: 'All Supported Images',
               extensions: allImageExtensions,
@@ -4190,13 +4191,32 @@ function App() {
               name: 'All Files',
               extensions: ['*'],
             },
-          ],
+          ];
+        const selected = await open({
+          filters: typeFilters,
           multiple: true,
           title: 'Select files to import',
         });
 
         if (Array.isArray(selected) && selected.length > 0) {
-          setImportSourcePaths(selected);
+          const invalidExtensions = new Set<string>();
+          const allowedExtensions = new Set(allImageExtensions.map(e => e.toLowerCase()));
+          const validFiles = selected.filter((path) => {
+            const ext = path.split('.').pop()?.toLowerCase() || 'unknown';
+            if (!allowedExtensions.has(ext)) {
+              invalidExtensions.add(`.${ext}`);
+              return false;
+            }
+            return true;
+          });
+
+          if (invalidExtensions.size > 0) {
+            const extList = Array.from(invalidExtensions).join(', ');
+            toast.error(`Unsupported file format(s) detected: ${extList}`);
+            return;
+          }
+
+          setImportSourcePaths(validFiles);
           setImportTargetFolder(targetPath);
           setIsImportModalOpen(true);
         }
@@ -4204,7 +4224,7 @@ function App() {
         console.error('Failed to open file dialog for import:', err);
       }
     },
-    [supportedTypes],
+    [supportedTypes, isAndroid],
   );
 
   const handleEditorContextMenu = (event: any) => {
