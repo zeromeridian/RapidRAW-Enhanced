@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import Slider from './Slider';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
 import { toast } from 'react-toastify';
+import { invoke } from '@tauri-apps/api/core';
 
 interface LUTControlProps {
   lutName: string | null;
@@ -44,10 +45,20 @@ export default function LUTControl({
         filters: typeFilters,
       });
       if (typeof selected === 'string') {
+        let fileName = selected;
+        if (isAndroid) {
+          try {
+            fileName = await invoke<string>('resolve_android_content_uri_name', { 
+              uriStr: selected 
+            });
+          } catch (e) {
+            console.error('Failed to resolve Android URI:', e);
+          }
+        }
         const allowedExtensions = new Set(allLutExtensions.map(e => e.toLowerCase()));
-        const ext = selected.split('.').pop()?.toLowerCase() || 'unknown';
+        const ext = fileName.split('.').pop()?.toLowerCase() || 'unknown';
         if (!allowedExtensions.has(ext)) {
-          toast.error(`Unsupported file format(s) detected: ${ext}`);
+          toast.error(`Unsupported file format(s) detected: .${ext}`);
           return;
         }
  

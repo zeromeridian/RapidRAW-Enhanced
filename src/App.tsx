@@ -1734,10 +1734,10 @@ function App() {
       try {
         const result: LutData = await invoke('load_and_parse_lut', { path });
         let name = 'LUT';
-        if (isAndroid && path.startsWith('content://')) {
-          const decodedPath = decodeURIComponent(path);
-          
-          name = decodedPath.split(/[:/]/).pop() || 'LUT';
+        if (isAndroid) {
+          name = await invoke<string>('resolve_android_content_uri_name', { 
+              uriStr: path
+            });
         } else {
           name = path.split(/[\\/]/).pop() || 'LUT';
         }
@@ -4208,8 +4208,23 @@ function App() {
         if (Array.isArray(selected) && selected.length > 0) {
           const invalidExtensions = new Set<string>();
           const allowedExtensions = new Set(allImageExtensions.map(e => e.toLowerCase()));
-          const validFiles = selected.filter((path) => {
-            const ext = path.split('.').pop()?.toLowerCase() || 'unknown';
+          const resolvedFiles = await Promise.all(
+            selected.map(async (path) => {
+              if (isAndroid) {
+                try {
+                  return await invoke<string>('resolve_android_content_uri_name', { uriStr: path });
+                } catch (e) {
+                  console.error("Failed to resolve URI:", e);
+                  return path;
+                }
+              }
+              return path;
+            })
+          );
+          const validFiles = selected.filter((originalPath, index) => {
+            const resolvedName = resolvedFiles[index];
+            const ext = resolvedName.split('.').pop()?.toLowerCase() || 'unknown';
+            
             if (!allowedExtensions.has(ext)) {
               invalidExtensions.add(`.${ext}`);
               return false;

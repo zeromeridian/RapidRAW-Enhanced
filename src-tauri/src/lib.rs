@@ -5206,6 +5206,7 @@ pub fn run() {
             file_management::set_rating_for_paths,
             file_management::import_files,
             file_management::create_virtual_copy,
+            file_management::resolve_android_content_uri_name,
             tagging::start_background_indexing,
             tagging::clear_ai_tags,
             tagging::clear_all_tags,

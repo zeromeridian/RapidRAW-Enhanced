@@ -714,106 +714,113 @@ fn parse_android_uri<'local>(
     Ok(uri)
 }
 
-#[cfg(target_os = "android")]
-fn resolve_android_content_uri_name(uri_str: &str) -> Result<String, String> {
-    let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
-        .map_err(|e| format!("Failed to access Android JVM: {}", e))?;
-    let mut env = vm
-        .attach_current_thread()
-        .map_err(|e| format!("Failed to attach current thread to Android JVM: {}", e))?;
+#[tauri::command]
+pub fn resolve_android_content_uri_name(uri_str: &str) -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    {
+        let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
+            .map_err(|e| format!("Failed to access Android JVM: {}", e))?;
+        let mut env = vm
+            .attach_current_thread()
+            .map_err(|e| format!("Failed to attach current thread to Android JVM: {}", e))?;
 
-    let resolver = get_android_content_resolver(&mut env)?;
-    let uri = parse_android_uri(&mut env, uri_str)?;
-    let null_obj = JObject::null();
+        let resolver = get_android_content_resolver(&mut env)?;
+        let uri = parse_android_uri(&mut env, uri_str)?;
+        let null_obj = JObject::null();
 
-    let cursor = env
-        .call_method(
-            &resolver,
-            "query",
-            "(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;",
-            &[
-                (&uri).into(),
-                (&null_obj).into(),
-                (&null_obj).into(),
-                (&null_obj).into(),
-                (&null_obj).into(),
-            ],
-        )
-        .and_then(|value| value.l())
-        .map_err(|e| map_android_jni_error(&mut env, e))?;
+        let cursor = env
+            .call_method(
+                &resolver,
+                "query",
+                "(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;",
+                &[
+                    (&uri).into(),
+                    (&null_obj).into(),
+                    (&null_obj).into(),
+                    (&null_obj).into(),
+                    (&null_obj).into(),
+                ],
+            )
+            .and_then(|value| value.l())
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
 
-    if cursor.is_null() {
-        return Err(format!(
-            "ContentResolver query returned no cursor for URI: {}",
-            uri_str
-        ));
+        if cursor.is_null() {
+            return Err(format!(
+                "ContentResolver query returned no cursor for URI: {}",
+                uri_str
+            ));
+        }
+
+        let result = (|| -> Result<String, String> {
+            let moved = env
+                .call_method(&cursor, "moveToFirst", "()Z", &[])
+                .and_then(|value| value.z())
+                .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+            if !moved {
+                return Err(format!(
+                    "No metadata rows found for content URI: {}",
+                    uri_str
+                ));
+            }
+
+            let display_name_column = env
+                .get_static_field(
+                    "android/provider/OpenableColumns",
+                    "DISPLAY_NAME",
+                    "Ljava/lang/String;",
+                )
+                .and_then(|value| value.l())
+                .map_err(|e| map_android_jni_error(&mut env, e))?;
+            let column_index = env
+                .call_method(
+                    &cursor,
+                    "getColumnIndex",
+                    "(Ljava/lang/String;)I",
+                    &[(&display_name_column).into()],
+                )
+                .and_then(|value| value.i())
+                .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+            if column_index < 0 {
+                return Err(format!(
+                    "DISPLAY_NAME column was unavailable for content URI: {}",
+                    uri_str
+                ));
+            }
+
+            let display_name_obj = env
+                .call_method(
+                    &cursor,
+                    "getString",
+                    "(I)Ljava/lang/String;",
+                    &[JValue::from(column_index)],
+                )
+                .and_then(|value| value.l())
+                .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+            if display_name_obj.is_null() {
+                return Err(format!(
+                    "Display name was null for content URI: {}",
+                    uri_str
+                ));
+            }
+
+            let display_name_java = JString::from(display_name_obj);
+            let display_name = env
+                .get_string(&display_name_java)
+                .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+            Ok(display_name.into())
+        })();
+
+        close_android_closeable(&mut env, &cursor);
+        result
     }
-
-    let result = (|| -> Result<String, String> {
-        let moved = env
-            .call_method(&cursor, "moveToFirst", "()Z", &[])
-            .and_then(|value| value.z())
-            .map_err(|e| map_android_jni_error(&mut env, e))?;
-
-        if !moved {
-            return Err(format!(
-                "No metadata rows found for content URI: {}",
-                uri_str
-            ));
-        }
-
-        let display_name_column = env
-            .get_static_field(
-                "android/provider/OpenableColumns",
-                "DISPLAY_NAME",
-                "Ljava/lang/String;",
-            )
-            .and_then(|value| value.l())
-            .map_err(|e| map_android_jni_error(&mut env, e))?;
-        let column_index = env
-            .call_method(
-                &cursor,
-                "getColumnIndex",
-                "(Ljava/lang/String;)I",
-                &[(&display_name_column).into()],
-            )
-            .and_then(|value| value.i())
-            .map_err(|e| map_android_jni_error(&mut env, e))?;
-
-        if column_index < 0 {
-            return Err(format!(
-                "DISPLAY_NAME column was unavailable for content URI: {}",
-                uri_str
-            ));
-        }
-
-        let display_name_obj = env
-            .call_method(
-                &cursor,
-                "getString",
-                "(I)Ljava/lang/String;",
-                &[JValue::from(column_index)],
-            )
-            .and_then(|value| value.l())
-            .map_err(|e| map_android_jni_error(&mut env, e))?;
-
-        if display_name_obj.is_null() {
-            return Err(format!(
-                "Display name was null for content URI: {}",
-                uri_str
-            ));
-        }
-
-        let display_name_java = JString::from(display_name_obj);
-        let display_name = env
-            .get_string(&display_name_java)
-            .map_err(|e| map_android_jni_error(&mut env, e))?;
-
-        Ok(display_name.into())
-    })();
-
-    close_android_closeable(&mut env, &cursor);
-    result
+    #[cfg(not(target_os = "android"))]
+    {
+        Ok(uri_str.to_string())
+    }
 }
 
 #[cfg(target_os = "android")]

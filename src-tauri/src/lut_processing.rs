@@ -5,9 +5,11 @@ use std::io::{BufRead, BufReader, Cursor};
 use std::path::Path;
 #[cfg(target_os = "android")]
 use std::fs;
+#[cfg(target_os = "android")]
+use std::hash::{Hash, DefaultHasher, Hasher};
 use crate::file_management::{is_android_content_uri};
 #[cfg(target_os = "android")]
-use crate::file_management::{read_android_content_uri, get_android_cached_lut_path};
+use crate::file_management::{read_android_content_uri, get_android_cached_lut_path, resolve_android_content_uri_name};
 
 #[derive(Debug, Clone)]
 pub struct Lut {
@@ -185,29 +187,54 @@ fn parse_hald(image: DynamicImage) -> Result<Lut> {
 pub fn parse_lut_file(path_str: &str) -> Result<Lut> {
     let (extension, bytes): (String, Option<Vec<u8>>) = if cfg!(target_os = "android") && is_android_content_uri(path_str) {
         #[cfg(target_os = "android")]
+        #[cfg(target_os = "android")]
         {
-            let ext = path_str
-                .rsplit_once('.')
-                .map(|(_, e)| e.to_lowercase())
-                .unwrap_or_else(|| "".to_string());
-
-            let cache_path = get_android_cached_lut_path(path_str, &ext)?;
-            
-            let data = if cache_path.exists() {
-                fs::read(&cache_path).ok()
-            } else {
-                None
-            };
-
-            let actual_data = match data {
-                Some(d) => d,
-                None => {
+            match resolve_android_content_uri_name(path_str) {
+                Ok(resolved_name) => {
+                    let ext = Path::new(&resolved_name)
+                        .extension()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("cube")
+                        .to_lowercase();
+                    
                     let uri_bytes = read_android_content_uri(path_str).map_err(|e| anyhow!(e))?;
-                    let _ = fs::write(&cache_path, &uri_bytes);
-                    uri_bytes
+                    
+                    if let Ok(cache_path) = get_android_cached_lut_path(path_str, &ext) {
+                        let _ = fs::write(cache_path, &uri_bytes);
+                    }
+                    
+                    (ext, Some(uri_bytes))
                 }
-            };
-            (ext, Some(actual_data))
+                Err(_) => {
+                    let mut hasher = DefaultHasher::new();
+                    path_str.hash(&mut hasher);
+                    let hash_prefix = format!("{:x}.", hasher.finish());
+
+                    let cache_dir = get_android_cached_lut_path(path_str, "tmp")?
+                        .parent()
+                        .ok_or_else(|| anyhow!("Invalid cache path"))?
+                        .to_path_buf();
+
+                    let mut found = None;
+                    if let Ok(entries) = fs::read_dir(cache_dir) {
+                        for entry in entries.flatten() {
+                            let fname = entry.file_name().to_string_lossy().into_owned();
+                            if fname.starts_with(&hash_prefix) {
+                                let ext = Path::new(&fname)
+                                    .extension()
+                                    .and_then(|s| s.to_str())
+                                    .unwrap_or("cube")
+                                    .to_string();
+                                if let Ok(bytes) = fs::read(entry.path()) {
+                                    found = Some((ext, Some(bytes)));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    found.ok_or_else(|| anyhow!("LUT not found in cache and permission denied for URI"))?
+                }
+            }
         }
         #[cfg(not(target_os = "android"))]
         { 
