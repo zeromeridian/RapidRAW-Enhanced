@@ -618,6 +618,52 @@ fn close_android_closeable(env: &mut JNIEnv<'_>, closeable: &JObject<'_>) {
 }
 
 #[cfg(target_os = "android")]
+pub fn get_android_cached_lut_path(uri: &str, extension: &str) -> anyhow::Result<PathBuf> {
+    let vm = unsafe { jni::JavaVM::from_raw(ndk_context::android_context().vm().cast()) }
+        .map_err(|e| anyhow::anyhow!("Failed to access Android JVM: {}", e))?;
+    let mut env = vm.attach_current_thread()
+        .map_err(|e| anyhow::anyhow!("Failed to attach current thread: {}", e))?;
+    
+    let context = env.new_local_ref(unsafe { jni::objects::JObject::from_raw(ndk_context::android_context().context().cast()) })
+        .map_err(|e| anyhow::anyhow!(map_android_jni_error(&mut env, e)))?;
+
+    let dirs_array_obj = env.call_method(
+        &context,
+        "getExternalMediaDirs",
+        "()[Ljava/io/File;",
+        &[],
+    ).and_then(|v| v.l()).map_err(|e| anyhow::anyhow!(map_android_jni_error(&mut env, e)))?;
+
+    if dirs_array_obj.is_null() {
+        return Err(anyhow::anyhow!("External media storage not available"));
+    }
+
+    let dirs_array: jni::objects::JObjectArray = dirs_array_obj.into();
+    let dir_file = env.get_object_array_element(&dirs_array, 0)
+        .map_err(|e| anyhow::anyhow!(map_android_jni_error(&mut env, e)))?;
+
+    let path_jstring = env.call_method(&dir_file, "getAbsolutePath", "()Ljava/lang/String;", &[])
+        .and_then(|v| v.l()).map_err(|e| anyhow::anyhow!(map_android_jni_error(&mut env, e)))?;
+    
+    let root_path_str: String = env.get_string(&path_jstring.into())
+        .map_err(|e| anyhow::anyhow!(map_android_jni_error(&mut env, e)))?.into();
+
+    let mut hasher = DefaultHasher::new();
+    uri.hash(&mut hasher);
+    let hash = hasher.finish();
+
+    let mut path = PathBuf::from(root_path_str);
+    path.push(".lut_cache"); 
+    
+    if !path.exists() {
+        fs::create_dir_all(&path)?;
+    }
+    
+    path.push(format!("{:x}.{}", hash, extension));
+    Ok(path)
+}
+
+#[cfg(target_os = "android")]
 fn get_android_content_resolver<'local>(
     env: &mut JNIEnv<'local>,
 ) -> Result<JObject<'local>, String> {
@@ -669,7 +715,7 @@ fn parse_android_uri<'local>(
 }
 
 #[cfg(target_os = "android")]
-pub fn resolve_android_content_uri_name(uri_str: &str) -> Result<String, String> {
+fn resolve_android_content_uri_name(uri_str: &str) -> Result<String, String> {
     let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
         .map_err(|e| format!("Failed to access Android JVM: {}", e))?;
     let mut env = vm

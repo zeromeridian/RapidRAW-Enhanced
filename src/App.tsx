@@ -1733,7 +1733,14 @@ function App() {
     async (path: string) => {
       try {
         const result: LutData = await invoke('load_and_parse_lut', { path });
-        const name = path.split(/[\\/]/).pop() || 'LUT';
+        let name = 'LUT';
+        if (isAndroid && path.startsWith('content://')) {
+          const decodedPath = decodeURIComponent(path);
+          
+          name = decodedPath.split(/[:/]/).pop() || 'LUT';
+        } else {
+          name = path.split(/[\\/]/).pop() || 'LUT';
+        }
         setAdjustments((prev: Partial<Adjustments>) => ({
           ...prev,
           lutPath: path,

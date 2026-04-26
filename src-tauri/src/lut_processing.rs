@@ -3,9 +3,11 @@ use image::{DynamicImage, GenericImageView, Rgb, Rgb32FImage};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor};
 use std::path::Path;
+#[cfg(target_os = "android")]
+use std::fs;
 use crate::file_management::{is_android_content_uri};
 #[cfg(target_os = "android")]
-use crate::file_management::{resolve_android_content_uri_name, read_android_content_uri};
+use crate::file_management::{read_android_content_uri, get_android_cached_lut_path};
 
 #[derive(Debug, Clone)]
 pub struct Lut {
@@ -184,17 +186,33 @@ pub fn parse_lut_file(path_str: &str) -> Result<Lut> {
     let (extension, bytes): (String, Option<Vec<u8>>) = if cfg!(target_os = "android") && is_android_content_uri(path_str) {
         #[cfg(target_os = "android")]
         {
-            let name = resolve_android_content_uri_name(path_str).map_err(|e| anyhow!(e))?;
-            let ext = Path::new(&name)
-                .extension()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_lowercase();
-            let b = Some(read_android_content_uri(path_str).map_err(|e| anyhow!(e))?);
-            (ext, b)
+            let ext = path_str
+                .rsplit_once('.')
+                .map(|(_, e)| e.to_lowercase())
+                .unwrap_or_else(|| "".to_string());
+
+            let cache_path = get_android_cached_lut_path(path_str, &ext)?;
+            
+            let data = if cache_path.exists() {
+                fs::read(&cache_path).ok()
+            } else {
+                None
+            };
+
+            let actual_data = match data {
+                Some(d) => d,
+                None => {
+                    let uri_bytes = read_android_content_uri(path_str).map_err(|e| anyhow!(e))?;
+                    let _ = fs::write(&cache_path, &uri_bytes);
+                    uri_bytes
+                }
+            };
+            (ext, Some(actual_data))
         }
         #[cfg(not(target_os = "android"))]
-        { (String::new(), None) }
+        { 
+            (String::new(), None)
+        }
     } else {
         let ext = Path::new(path_str)
             .extension()
