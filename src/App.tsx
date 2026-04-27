@@ -5316,6 +5316,7 @@ const editorNode = (
             setUiVisibility((prev: UiVisibility) => ({ ...prev, filmstrip: value }))
           }
           showFilmstrip={!isCompactPortrait}
+          showZoomControls={!isAndroid}
           thumbnailAspectRatio={thumbnailAspectRatio}
           thumbnails={thumbnails}
           zoom={zoom}
