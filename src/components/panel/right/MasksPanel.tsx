@@ -31,7 +31,7 @@ import {
   PlusSquare,
   RotateCcw,
   Trash2,
-  Bookmark,
+  SwatchBook,
   SquaresIntersect,
 } from 'lucide-react';
 
@@ -1513,11 +1513,10 @@ function DraggableGridItem({ maskType, onClick, onRightClick, isDraggable, activ
         : `Create New ${maskType.name} Mask`;
 
   return (
-    <button
+    <motion.div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      disabled={maskType.disabled}
       onClick={onClick}
       onContextMenu={(event) => {
         event.preventDefault();
@@ -1530,12 +1529,14 @@ function DraggableGridItem({ maskType, onClick, onRightClick, isDraggable, activ
       className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-2 aspect-square transition-colors
                 ${maskType.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'} ${isDragging ? 'opacity-50' : ''}`}
       data-tooltip={tooltip}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
     >
       <maskType.icon size={24} />{' '}
       <Text as="span" variant={TextVariants.small} color={TextColors.primary}>
         {maskType.name}
       </Text>
-    </button>
+    </motion.div>
   );
 }
 
@@ -1652,7 +1653,7 @@ function ContainerRow({
       },
       {
         label: 'Apply Preset',
-        icon: Bookmark,
+        icon: SwatchBook,
         submenu: generatePresetSubmenu(presets).length
           ? generatePresetSubmenu(presets)
           : [{ label: 'No presets', disabled: true }],

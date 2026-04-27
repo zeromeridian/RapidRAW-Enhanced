@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { SlidersHorizontal, Info, Scaling, BrushCleaning, Bookmark, Save, Layers, type LucideIcon } from 'lucide-react';
+import { SlidersHorizontal, Info, Crop, Layers, Paintbrush, SwatchBook, FileInput, type LucideIcon } from 'lucide-react';
 import { Panel } from '../../ui/AppProperties';
 
 interface PanelOptions {
@@ -19,13 +19,13 @@ const panelGroups: Array<Array<PanelOptions>> = [
   [{ id: Panel.Metadata, icon: Info, title: 'Info' }],
   [
     { id: Panel.Adjustments, icon: SlidersHorizontal, title: 'Adjust' },
-    { id: Panel.Crop, icon: Scaling, title: 'Crop' },
+    { id: Panel.Crop, icon: Crop, title: 'Crop' },
     { id: Panel.Masks, icon: Layers, title: 'Masks' },
-    { id: Panel.Ai, icon: BrushCleaning, title: 'Inpaint' },
+    { id: Panel.Ai, icon: Paintbrush, title: 'Inpaint' },
   ],
   [
-    { id: Panel.Presets, icon: Bookmark, title: 'Presets' },
-    { id: Panel.Export, icon: Save, title: 'Export' },
+    { id: Panel.Presets, icon: SwatchBook, title: 'Presets' },
+    { id: Panel.Export, icon: FileInput, title: 'Export' },
   ],
 ];
 

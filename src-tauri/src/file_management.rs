@@ -79,6 +79,8 @@ pub struct Preset {
         skip_serializing_if = "Option::is_none"
     )]
     pub include_crop_transform: Option<bool>,
+    #[serde(rename = "presetType", skip_serializing_if = "Option::is_none")]
+    pub preset_type: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -308,7 +310,6 @@ pub struct ExportPreset {
     pub export_masks: Option<bool>,
     #[serde(default)]
     pub preserve_folders: Option<bool>,
-    /// Last export destination path, stored on the __last_used__ preset only.
     #[serde(default)]
     pub last_export_path: Option<String>,
 }
@@ -404,12 +405,10 @@ pub struct AppSettings {
     pub theme: Option<String>,
     #[serde(default)]
     pub font_family: Option<String>,
-    pub transparent: Option<bool>,
     pub decorations: Option<bool>,
     #[serde(alias = "comfyuiAddress")]
     pub ai_connector_address: Option<String>,
     pub last_folder_state: Option<LastFolderState>,
-    pub adaptive_editor_theme: Option<bool>,
     pub ui_visibility: Option<Value>,
     pub enable_ai_tagging: Option<bool>,
     pub tagging_thread_count: Option<u32>,
@@ -455,6 +454,14 @@ pub struct AppSettings {
     pub waveform_height: Option<u32>,
     #[serde(default)]
     pub active_waveform_channel: Option<String>,
+    #[serde(default)]
+    pub use_wgpu_renderer: Option<bool>,
+    #[serde(default)]
+    pub canvas_input_mode: Option<String>,
+    #[serde(default)]
+    pub zoom_speed_multiplier: Option<f32>,
+    #[serde(default)]
+    pub keybinds: HashMap<String, Vec<String>>,
 }
 
 fn default_adjustment_visibility() -> HashMap<String, bool> {
@@ -484,17 +491,12 @@ impl Default for AppSettings {
             filter_criteria: None,
             theme: Some("dark".to_string()),
             font_family: None,
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            transparent: Some(false),
-            #[cfg(not(any(target_os = "linux", target_os = "android")))]
-            transparent: Some(true),
             #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
             decorations: Some(true),
             #[cfg(any(target_os = "windows", target_os = "macos"))]
             decorations: Some(false),
             ai_connector_address: None,
             last_folder_state: None,
-            adaptive_editor_theme: Some(false),
             ui_visibility: None,
             enable_ai_tagging: Some(false),
             tagging_thread_count: Some(3),
@@ -525,6 +527,13 @@ impl Default for AppSettings {
             is_waveform_visible: Some(false),
             waveform_height: Some(220),
             active_waveform_channel: Some("luma".to_string()),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            use_wgpu_renderer: Some(false),
+            #[cfg(not(any(target_os = "linux", target_os = "android")))]
+            use_wgpu_renderer: Some(true),
+            canvas_input_mode: Some("mouse".to_string()),
+            zoom_speed_multiplier: Some(1.0),
+            keybinds: HashMap::new(),
         }
     }
 }
@@ -1372,7 +1381,7 @@ pub fn generate_thumbnail_data(
     {
         let state = app_handle.state::<AppState>();
         let settings =
-            crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
+            load_settings(app_handle.clone()).unwrap_or_default();
         let target_res = settings.thumbnail_resolution.unwrap_or(720);
 
         let geometry_hash = calculate_geometry_hash(&meta.adjustments);
@@ -1408,7 +1417,7 @@ pub fn generate_thumbnail_data(
             hit
         } else {
             let settings =
-                crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
+                load_settings(app_handle.clone()).unwrap_or_default();
             let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
             let linear_mode = settings.linear_raw_mode;
             let mut raw_scale_factor = 1.0f32;
@@ -1600,7 +1609,7 @@ pub fn generate_thumbnail_data(
         }
     }
 
-    let settings = crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
     let linear_mode = settings.linear_raw_mode;
 
@@ -1699,7 +1708,7 @@ fn generate_single_thumbnail_and_cache(
         return Some((format!("data:image/jpeg;base64,{}", base64_str), rating));
     }
 
-    let settings = crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let target_width = settings.thumbnail_resolution.unwrap_or(720);
 
     if let Ok(thumb_image) =
@@ -1713,114 +1722,104 @@ fn generate_single_thumbnail_and_cache(
     None
 }
 
-#[tauri::command]
-pub async fn generate_thumbnails(
-    paths: Vec<String>,
-    app_handle: tauri::AppHandle,
-) -> Result<HashMap<String, String>, String> {
-    let app_handle_clone = app_handle.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let cache_dir = app_handle_clone
-            .path()
-            .app_cache_dir()
-            .map_err(|e| e.to_string())?;
-        let thumb_cache_dir = cache_dir.join("thumbnails");
-        if !thumb_cache_dir.exists() {
-            fs::create_dir_all(&thumb_cache_dir).map_err(|e| e.to_string())?;
-        }
+pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
+    let state = app_handle.state::<crate::AppState>();
+    let manager = state.thumbnail_manager.clone();
+    
+    for _ in 0..4 {
+        let app_clone = app_handle.clone();
+        let manager_clone = manager.clone();
+        
+        std::thread::spawn(move || {
+            loop {
+                let path_to_process: String = {
+                    let mut queue = manager_clone.queue.lock().unwrap();
+                    while queue.is_empty() {
+                        queue = manager_clone.cvar.wait(queue).unwrap();
+                    }
+                    let path = queue.pop_back().unwrap(); 
+                    
+                    let mut processing = manager_clone.processing_now.lock().unwrap();
+                    if processing.contains(&path) {
+                        let state = app_clone.state::<crate::AppState>();
+                        increment_thumbnail_progress(&state, &app_clone);
+                        continue; 
+                    }
+                    processing.insert(path.clone());
+                    path
+                };
 
-        let state = app_handle_clone.state::<AppState>();
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+                let state = app_clone.state::<crate::AppState>();
+                let gpu_context = crate::gpu_processing::get_or_init_gpu_context(&state, &app_clone).ok();
+                
+                if let Ok(cache_dir) = get_thumb_cache_dir(&app_clone) {
+                    let result = generate_single_thumbnail_and_cache(
+                        &path_to_process,
+                        &cache_dir,
+                        gpu_context.as_ref(),
+                        None,
+                        false,
+                        &app_clone,
+                    );
 
-        let thumbnails: HashMap<String, String> = paths
-            .par_iter()
-            .filter_map(|path_str| {
-                generate_single_thumbnail_and_cache(
-                    path_str,
-                    &thumb_cache_dir,
-                    gpu_context.as_ref(),
-                    None,
-                    false,
-                    &app_handle_clone,
-                )
-                .map(|(data, _rating)| (path_str.clone(), data))
-            })
-            .collect();
-
-        Ok(thumbnails)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+                    if let Some((thumbnail_data, rating)) = result {
+                        let _ = app_clone.emit(
+                            "thumbnail-generated",
+                            serde_json::json!({ 
+                                "path": path_to_process, 
+                                "data": thumbnail_data, 
+                                "rating": rating 
+                            }),
+                        );
+                    }
+                    increment_thumbnail_progress(&state, &app_clone);
+                }
+                manager_clone.processing_now.lock().unwrap().remove(&path_to_process);
+            }
+        });
+    }
 }
 
 #[tauri::command]
-pub fn generate_thumbnails_progressive(
+pub fn update_thumbnail_queue(
     paths: Vec<String>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    let state = app_handle.state::<AppState>();
+    let state = app_handle.state::<crate::AppState>();
 
-    add_to_thumbnail_queue(&state, paths.len(), &app_handle);
-
-    state
-        .thumbnail_cancellation_token
-        .store(false, Ordering::SeqCst);
-    let cancellation_token = state.thumbnail_cancellation_token.clone();
-
-    const MAX_THUMBNAIL_THREADS: usize = 6;
-    let num_threads = (num_cpus::get_physical().saturating_sub(1)).clamp(1, MAX_THUMBNAIL_THREADS);
-
-    let pool = ThreadPoolBuilder::new()
-        .num_threads(num_threads)
-        .build()
-        .unwrap();
-    let cache_dir = app_handle
-        .path()
-        .app_cache_dir()
-        .map_err(|e| e.to_string())?;
-    let thumb_cache_dir = cache_dir.join("thumbnails");
-    if !thumb_cache_dir.exists() {
-        fs::create_dir_all(&thumb_cache_dir).map_err(|e| e.to_string())?;
+    let mut unique_paths = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for path in paths {
+        if seen.insert(path.clone()) {
+            unique_paths.push(path);
+        }
     }
 
-    let app_handle_clone = app_handle.clone();
+    let mut queue = state.thumbnail_manager.queue.lock().unwrap();
+    queue.clear();
 
-    pool.spawn(move || {
-        let state = app_handle_clone.state::<AppState>();
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+    let path_count = unique_paths.len();
+    for path in unique_paths {
+        queue.push_back(path);
+    }
 
-        let _ = paths.par_iter().try_for_each(|path_str| -> Result<(), ()> {
-            if cancellation_token.load(Ordering::Relaxed) {
-                return Err(());
-            }
+    let mut tracker = state.thumbnail_progress.lock().unwrap();
+    if path_count == 0 {
+        tracker.total = 0;
+        tracker.completed = 0;
+    } else {
+        tracker.total = tracker.completed + path_count;
+    }
 
-            let result = generate_single_thumbnail_and_cache(
-                path_str,
-                &thumb_cache_dir,
-                gpu_context.as_ref(),
-                None,
-                false,
-                &app_handle_clone,
-            );
+    let current = tracker.completed;
+    let total = tracker.total;
+    drop(tracker);
 
-            if let Some((thumbnail_data, rating)) = result {
-                if cancellation_token.load(Ordering::Relaxed) {
-                    return Err(());
-                }
-                let _ = app_handle_clone.emit(
-                    "thumbnail-generated",
-                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating }),
-                );
-            }
-
-            if cancellation_token.load(Ordering::Relaxed) {
-                return Err(());
-            }
-            increment_thumbnail_progress(&state, &app_handle_clone);
-            Ok(())
-        });
-    });
-
+    let _ = app_handle.emit(
+        "thumbnail-progress",
+        serde_json::json!({ "current": current, "total": total }),
+    );
+    state.thumbnail_manager.cvar.notify_all();
     Ok(())
 }
 
@@ -2185,7 +2184,6 @@ pub fn save_metadata_and_update_thumbnail(
         ImageMetadata::default()
     };
 
-    metadata.rating = adjustments["rating"].as_u64().unwrap_or(0) as u8;
     metadata.adjustments = adjustments;
 
     let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
@@ -2210,7 +2208,7 @@ pub fn save_metadata_and_update_thumbnail(
     };
     drop(loaded_image_lock);
 
-    let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+    let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
     let app_handle_clone = app_handle.clone();
     let path_clone = path.clone();
 
@@ -2294,7 +2292,6 @@ pub async fn apply_adjustments_to_paths(
                 }
             }
 
-            existing_metadata.rating = new_adjustments["rating"].as_u64().unwrap_or(0) as u8;
             existing_metadata.adjustments = new_adjustments;
 
             if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
@@ -2322,7 +2319,7 @@ pub async fn apply_adjustments_to_paths(
             }
         };
 
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
 
         paths.par_iter().for_each(|path_str| {
             let result = generate_single_thumbnail_and_cache(
@@ -2373,11 +2370,7 @@ pub async fn reset_adjustments_for_paths(
                 ImageMetadata::default()
             };
 
-            let new_adjustments = serde_json::json!({
-                "rating": existing_metadata.rating
-            });
-
-            existing_metadata.adjustments = new_adjustments;
+            existing_metadata.adjustments = serde_json::json!({});
 
             if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
                 let _ = std::fs::write(&sidecar_path, json_string);
@@ -2404,7 +2397,7 @@ pub async fn reset_adjustments_for_paths(
             }
         };
 
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
 
         paths.par_iter().for_each(|path_str| {
             let result = generate_single_thumbnail_and_cache(
@@ -2445,8 +2438,25 @@ pub async fn apply_auto_adjustments_to_paths(
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
+        let state = app_handle.state::<AppState>();
+        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
+                for path in &paths {
+                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
+                }
+                for _ in 0..paths.len() {
+                    increment_thumbnail_progress(&state, &app_handle);
+                }
+                return;
+            }
+        };
+
+        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
+
         paths.par_iter().for_each(|path| {
-            let result: Result<(), String> = (|| {
+            let loaded_image: Option<DynamicImage> = (|| -> Result<DynamicImage, String> {
                 let (source_path, sidecar_path) = parse_virtual_path(path);
                 let source_path_str = source_path.to_string_lossy().to_string();
 
@@ -2454,7 +2464,7 @@ pub async fn apply_auto_adjustments_to_paths(
                 let image = image_loader::load_base_image_from_bytes(
                     &file_bytes,
                     &source_path_str,
-                    false,
+                    true,
                     highlight_compression,
                     linear_mode.clone(),
                     None,
@@ -2500,10 +2510,6 @@ pub async fn apply_auto_adjustments_to_paths(
                     }
                 }
 
-                existing_metadata.rating = existing_metadata.adjustments["rating"]
-                    .as_u64()
-                    .unwrap_or(0) as u8;
-
                 if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
                     let _ = std::fs::write(&sidecar_path, json_string);
                 }
@@ -2511,36 +2517,16 @@ pub async fn apply_auto_adjustments_to_paths(
                 if enable_xmp_sync {
                     sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
                 }
-                Ok(())
-            })();
-            if let Err(e) = result {
-                eprintln!("Failed to apply auto adjustments to {}: {}", path, e);
-            }
-        });
+                Ok(image)
+            })()
+            .map_err(|e| eprintln!("Failed to apply auto adjustments to {}: {}", path, e))
+            .ok();
 
-        let state = app_handle.state::<AppState>();
-        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
-            Ok(dir) => dir,
-            Err(e) => {
-                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
-                for path in &paths {
-                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
-                }
-                for _ in 0..paths.len() {
-                    increment_thumbnail_progress(&state, &app_handle);
-                }
-                return;
-            }
-        };
-
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state).ok();
-
-        paths.par_iter().for_each(|path_str| {
             let result = generate_single_thumbnail_and_cache(
-                path_str,
+                path,
                 &thumb_cache_dir,
                 gpu_context.as_ref(),
-                None,
+                loaded_image.as_ref(),
                 true,
                 &app_handle,
             );
@@ -2548,7 +2534,7 @@ pub async fn apply_auto_adjustments_to_paths(
             if let Some((thumbnail_data, rating)) = result {
                 let _ = app_handle.emit(
                     "thumbnail-generated",
-                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating }),
+                    serde_json::json!({ "path": path, "data": thumbnail_data, "rating": rating }),
                 );
             }
 
@@ -2595,6 +2581,43 @@ pub fn set_color_label_for_paths(
         } else {
             metadata.tags = Some(tags);
         }
+
+        if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
+            let _ = std::fs::write(&sidecar_path, json_string);
+        }
+
+        if enable_xmp_sync {
+            let source_path = parse_virtual_path(path).0;
+            sync_metadata_to_xmp(&source_path, &metadata, create_xmp_if_missing);
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_rating_for_paths(
+    paths: Vec<String>,
+    rating: u8,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
+    let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
+
+    paths.par_iter().for_each(|path| {
+        let (_, sidecar_path) = parse_virtual_path(path);
+
+        let mut metadata: ImageMetadata = if sidecar_path.exists() {
+            fs::read_to_string(&sidecar_path)
+                .ok()
+                .and_then(|content| serde_json::from_str(&content).ok())
+                .unwrap_or_default()
+        } else {
+            ImageMetadata::default()
+        };
+
+        metadata.rating = rating;
 
         if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
             let _ = std::fs::write(&sidecar_path, json_string);
@@ -3094,6 +3117,7 @@ pub fn save_community_preset(
     app_handle: AppHandle,
     include_masks: Option<bool>,
     include_crop_transform: Option<bool>,
+    preset_type: Option<String>,
 ) -> Result<(), String> {
     let mut current_presets = load_presets(app_handle.clone())?;
 
@@ -3124,6 +3148,7 @@ pub fn save_community_preset(
         adjustments,
         include_masks,
         include_crop_transform,
+        preset_type: preset_type.or(Some("style".to_string())),
     };
 
     if let Some(PresetItem::Folder(folder)) = current_presets.iter_mut().find(|item| {
@@ -3426,7 +3451,7 @@ pub fn get_cached_or_generate_thumbnail_image(
     gpu_context: Option<&GpuContext>,
 ) -> Result<DynamicImage> {
     let thumb_cache_dir = get_thumb_cache_dir(app_handle).map_err(|e| anyhow::anyhow!(e))?;
-    let settings = crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let target_width = settings.thumbnail_resolution.unwrap_or(720);
 
     if let Some(cache_hash) = get_cache_key_hash(path_str) {

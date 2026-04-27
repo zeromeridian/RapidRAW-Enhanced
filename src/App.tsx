@@ -19,6 +19,7 @@ import {
   CopyPlus,
   Edit,
   FileEdit,
+  FileInput,
   Folder,
   FolderInput,
   FolderPlus,
@@ -28,7 +29,6 @@ import {
   RefreshCw,
   RotateCcw,
   Star,
-  Save,
   SquaresUnite,
   Palette,
   Tag,
@@ -88,7 +88,6 @@ import {
   CopyPasteSettings,
 } from './utils/adjustments';
 import { calculateCenteredCrop } from './utils/cropUtils';
-import { generatePaletteFromImage } from './utils/palette';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import GlobalTooltip from './components/ui/GlobalTooltip';
 import { THEMES, DEFAULT_THEME_ID, ThemeProps } from './utils/themes';
@@ -339,10 +338,7 @@ function App() {
   const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevAdjustmentsRef = useRef<{ path: string; adjustments: Adjustments } | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isAnimatingTheme, setIsAnimatingTheme] = useState(false);
-  const isInitialThemeMount = useRef(true);
   const [theme, setTheme] = useState(DEFAULT_THEME_ID);
-  const [adaptivePalette, setAdaptivePalette] = useState<any>(null);
   const [activeRightPanel, setActiveRightPanel] = useState<Panel | null>(Panel.Adjustments);
   const [slideDirection, setSlideDirection] = useState(1);
   const [activeMaskContainerId, setActiveMaskContainerId] = useState<string | null>(null);
@@ -373,6 +369,8 @@ function App() {
   const imageCacheRef = useRef(new ImageLRUCache(20));
   const isBackendReadyRef = useRef(true);
   const cachedEditStateRef = useRef<ImageCacheEntry | null>(null);
+  const inFlightCountRef = useRef(0);
+  const pendingApplyRef = useRef<{ adjustments: Adjustments; targetRes?: number } | null>(null);
   const [renderedRightPanel, setRenderedRightPanel] = useState<Panel | null>(activeRightPanel);
   const [collapsibleSectionsState, setCollapsibleSectionsState] = useState<CollapsibleSectionsState>({
     basic: true,
@@ -477,7 +475,7 @@ function App() {
   });
   const { showContextMenu } = useContextMenu();
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
-  const { requestThumbnails, clearThumbnailQueue } = useThumbnails();
+  const { requestThumbnails, clearThumbnailQueue, markGenerated } = useThumbnails();
   const [thumbnailProgress, setThumbnailProgress] = useState<Progress>({ current: 0, total: 0 });
   const transformWrapperRef = useRef<any>(null);
   const isProgrammaticZoom = useRef(false);
@@ -501,6 +499,7 @@ function App() {
   const compactEditorPanelHeight =
     viewportSize.height > 0 ? Math.max(300, Math.min(Math.round(viewportSize.height * 0.46), 520)) : 340;
   const compactEditorPanelCollapsedHeight = 96;
+  const [hasRenderedFirstFrame, setHasRenderedFirstFrame] = useState(false);
 
   useEffect(() => {
     if (currentFolderPath) {
@@ -1488,6 +1487,10 @@ function App() {
 
     if (scale <= 1.01) return null;
 
+    const paddingPixels = 2.0;
+    const paddingX = paddingPixels / baseW;
+    const paddingY = paddingPixels / baseH;
+
     const visibleLeft = -positionX / scale;
     const visibleTop = -positionY / scale;
     const visibleRight = visibleLeft + containerWidth / scale;
@@ -1512,24 +1515,25 @@ function App() {
     let roiW = (intersectRight - intersectLeft) / baseW;
     let roiH = (intersectBottom - intersectTop) / baseH;
 
-    const padX = roiW * 0.2;
-    const padY = roiH * 0.2;
+    const newRoiX = roiX - paddingX;
+    const newRoiY = roiY - paddingY;
+    const newRoiW = roiW + paddingX * 2;
+    const newRoiH = roiH + paddingY * 2;
 
-    roiX = Math.max(0, roiX - padX);
-    roiY = Math.max(0, roiY - padY);
-    roiW = Math.min(1 - roiX, roiW + padX * 2);
-    roiH = Math.min(1 - roiY, roiH + padY * 2);
+    const clampedX = Math.max(0, newRoiX);
+    const clampedY = Math.max(0, newRoiY);
+    const clampedW = Math.min(1 - clampedX, newRoiW);
+    const clampedH = Math.min(1 - clampedY, newRoiH);
 
-    if (roiW > 0.95 && roiH > 0.95) return null;
+    if (clampedW > 0.999 && clampedH > 0.999) return null;
 
-    return [roiX, roiY, roiW, roiH] as [number, number, number, number];
+    return [clampedX, clampedY, clampedW, clampedH] as [number, number, number, number];
   }, []);
 
-  const applyAdjustments = useCallback(
+  const executeApplyAdjustments = useCallback(
     async (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
-      if (!selectedImage?.isReady) return;
-      if (!isBackendReadyRef.current) return;
-      const currentPath = selectedImage.path;
+      const currentPath = selectedImage?.path;
+      if (!currentPath) return;
 
       const payload = JSON.parse(JSON.stringify(currentAdjustments));
 
@@ -1596,6 +1600,16 @@ function App() {
         if (buffer && buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
           latestRenderedJobIdRef.current = jobId;
 
+          const textDecoder = new TextDecoder();
+          const prefix = textDecoder.decode(buffer.slice(0, 11));
+          if (prefix === 'WGPU_RENDER') {
+            setInteractivePatch((prev) => {
+              if (prev && prev.url) URL.revokeObjectURL(prev.url);
+              return null;
+            });
+            return;
+          }
+
           if (dragging) {
             const view = new DataView(buffer);
             const patchX = view.getUint32(0, true);
@@ -1660,7 +1674,39 @@ function App() {
         }
       }
     },
-    [selectedImage?.isReady, selectedImage?.path, calculateROI, isWaveformVisible],
+    [selectedImage?.path, calculateROI, isWaveformVisible],
+  );
+
+  const flushPipeline = useCallback(() => {
+    if (inFlightCountRef.current >= 2) return;
+    if (!pendingApplyRef.current) return;
+
+    const { adjustments, targetRes } = pendingApplyRef.current;
+    pendingApplyRef.current = null;
+
+    inFlightCountRef.current += 1;
+
+    executeApplyAdjustments(adjustments, true, targetRes).finally(() => {
+      inFlightCountRef.current -= 1;
+      if (pendingApplyRef.current) {
+        requestAnimationFrame(() => flushPipeline());
+      }
+    });
+  }, [executeApplyAdjustments]);
+
+  const applyAdjustments = useCallback(
+    (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
+      if (!selectedImage?.isReady || !isBackendReadyRef.current) return;
+
+      if (dragging) {
+        pendingApplyRef.current = { adjustments: currentAdjustments, targetRes };
+        flushPipeline();
+      } else {
+        pendingApplyRef.current = null;
+        executeApplyAdjustments(currentAdjustments, false, targetRes);
+      }
+    },
+    [selectedImage?.isReady, flushPipeline, executeApplyAdjustments],
   );
 
   const generateUncroppedPreview = useCallback(
@@ -1979,22 +2025,6 @@ function App() {
   }, [isWaveformVisible, activeWaveformChannel, waveformHeight, appSettings, handleSettingsChange]);
 
   useEffect(() => {
-    if (!appSettings?.adaptiveEditorTheme || !selectedImage) {
-      setAdaptivePalette(null);
-      return;
-    }
-    if (isSliderDragging || !finalPreviewUrl) {
-      return;
-    }
-    generatePaletteFromImage(finalPreviewUrl)
-      .then(setAdaptivePalette)
-      .catch((_err) => {
-        const darkTheme = THEMES.find((t) => t.id === Theme.Dark);
-        setAdaptivePalette(darkTheme ? darkTheme.cssVariables : null);
-      });
-  }, [appSettings?.adaptiveEditorTheme, selectedImage, finalPreviewUrl, isSliderDragging]);
-
-  useEffect(() => {
     const root = document.documentElement;
     const currentThemeId = theme || DEFAULT_THEME_ID;
 
@@ -2006,11 +2036,6 @@ function App() {
     }
 
     let finalCssVariables: any = { ...baseTheme.cssVariables };
-    const effectThemeForWindow = baseTheme.id;
-
-    if (adaptivePalette) {
-      finalCssVariables = { ...finalCssVariables, ...adaptivePalette };
-    }
 
     Object.entries(finalCssVariables).forEach(([key, value]) => {
       root.style.setProperty(key, value as string);
@@ -2022,22 +2047,7 @@ function App() {
         ? '-apple-system, BlinkMacSystemFont, system-ui, sans-serif'
         : "'Poppins', system-ui, sans-serif";
     root.style.setProperty('--font-family', fontStack);
-
-    const isLight = [Theme.Light, Theme.Snow, Theme.Arctic].includes(effectThemeForWindow);
-    invoke(Invokes.UpdateWindowEffect, { theme: isLight ? Theme.Light : Theme.Dark });
-  }, [theme, adaptivePalette, appSettings?.fontFamily]);
-
-  useEffect(() => {
-    if (isInitialThemeMount.current) {
-      isInitialThemeMount.current = false;
-      return;
-    }
-
-    setIsAnimatingTheme(true);
-    const timer = setTimeout(() => setIsAnimatingTheme(false), 500);
-
-    return () => clearTimeout(timer);
-  }, [theme]);
+  }, [theme, appSettings?.fontFamily]);
 
   const refreshAllFolderTrees = useCallback(
     async (currentExpanded?: Set<string>) => {
@@ -2411,6 +2421,8 @@ function App() {
     debouncedSetHistory.cancel();
 
     const lastActivePath = selectedImage?.path ?? null;
+    setHasRenderedFirstFrame(false);
+    selectedImagePathRef.current = null;
     setSelectedImage(null);
     setFinalPreviewUrl(null);
     setUncroppedAdjustedPreviewUrl(null);
@@ -2445,6 +2457,8 @@ function App() {
 
       patchesSentToBackend.current.clear();
 
+      setHasRenderedFirstFrame(false);
+      selectedImagePathRef.current = path;
       setMultiSelectedPaths([path]);
       setLibraryActivePath(null);
       setSelectionAnchorPath(path);
@@ -2477,6 +2491,7 @@ function App() {
         setFinalPreviewUrl(cached.finalPreviewUrl);
         setUncroppedAdjustedPreviewUrl(cached.uncroppedPreviewUrl);
         setIsViewLoading(false);
+        setHasRenderedFirstFrame(false);
 
         latestRenderedJobIdRef.current = previewJobIdRef.current;
         isBackendReadyRef.current = false;
@@ -2782,13 +2797,7 @@ function App() {
         return;
       }
 
-      let currentRating = 0;
-      if (selectedImage && pathsToRate.includes(selectedImage.path)) {
-        currentRating = adjustments.rating;
-      } else if (libraryActivePath && pathsToRate.includes(libraryActivePath)) {
-        currentRating = libraryActiveAdjustments.rating;
-      }
-
+      const currentRating = imageRatings[pathsToRate[0]] || 0;
       const finalRating = newRating === currentRating ? 0 : newRating;
 
       setImageRatings((prev: Record<string, number>) => {
@@ -2799,29 +2808,12 @@ function App() {
         return newRatings;
       });
 
-      if (selectedImage && pathsToRate.includes(selectedImage.path)) {
-        setAdjustments((prev: Adjustments) => ({ ...prev, rating: finalRating }));
-      }
-
-      if (libraryActivePath && pathsToRate.includes(libraryActivePath)) {
-        setLibraryActiveAdjustments((prev) => ({ ...prev, rating: finalRating }));
-      }
-
-      invoke(Invokes.ApplyAdjustmentsToPaths, { paths: pathsToRate, adjustments: { rating: finalRating } }).catch(
-        (err) => {
-          console.error('Failed to apply rating to paths:', err);
-          setError(`Failed to apply rating: ${err}`);
-        },
-      );
+      invoke(Invokes.SetRatingForPaths, { paths: pathsToRate, rating: finalRating }).catch((err) => {
+        console.error('Failed to apply rating to paths:', err);
+        setError(`Failed to apply rating: ${err}`);
+      });
     },
-    [
-      multiSelectedPaths,
-      selectedImage,
-      libraryActivePath,
-      adjustments.rating,
-      libraryActiveAdjustments.rating,
-      setAdjustments,
-    ],
+    [multiSelectedPaths, selectedImage, imageRatings],
   );
 
   const handleSetColorLabel = useCallback(
@@ -2935,7 +2927,7 @@ function App() {
     }
 
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    const sharpnessFactor = 1.15;
+    const sharpnessFactor = 1.25;
     const zoomMultiplier = appSettings?.highResZoomMultiplier || 1.0;
 
     const effectiveDpr = appSettings?.useFullDpiRendering ? dpr : 1;
@@ -2972,17 +2964,13 @@ function App() {
         currentResRef.current = targetRes;
         applyAdjustments(currentAdjustments, false, targetRes);
       }
-    }, 100),
+    }, 50),
     [applyAdjustments],
   );
 
   useEffect(() => {
     if (selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
       let baseRes = calculateTargetRes();
-
-      if (isFullScreen && originalSize.width > 0 && originalSize.height > 0) {
-        baseRes = Math.max(originalSize.width, originalSize.height);
-      }
 
       if (originalSize.width > 0 && originalSize.height > 0) {
         const maxRes = Math.max(originalSize.width, originalSize.height);
@@ -3158,10 +3146,6 @@ function App() {
     if (showOriginal && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
       let targetRes = calculateTargetRes();
 
-      if (isFullScreen && originalSize.width > 0 && originalSize.height > 0) {
-        targetRes = Math.max(originalSize.width, originalSize.height);
-      }
-
       if (targetRes > currentOriginalResRef.current) {
         requestHiFiOriginalZoom(adjustments, targetRes);
       }
@@ -3256,7 +3240,6 @@ function App() {
     handleZoomChange,
     isFullScreen,
     isStraightenActive,
-    isViewLoading,
     libraryActivePath,
     multiSelectedPaths,
     redo,
@@ -3276,6 +3259,7 @@ function App() {
     displaySize,
     baseRenderSize,
     originalSize,
+    keybinds: appSettings?.keybinds,
     brushSettings: brushSettings,
     setBrushSettings: setBrushSettings,
   });
@@ -3318,6 +3302,7 @@ function App() {
           const { path, data, rating } = event.payload;
           if (data) {
             setThumbnails((prev) => ({ ...prev, [path]: data }));
+            markGenerated(path);
           }
           if (rating !== undefined) {
             setImageRatings((prev) => ({ ...prev, [path]: rating }));
@@ -3461,6 +3446,11 @@ function App() {
             error: String(event.payload),
             progressMessage: null,
           }));
+        }
+      }),
+      listen('wgpu-frame-ready', (event: any) => {
+        if (isEffectActive && event.payload?.path === selectedImagePathRef.current) {
+          setHasRenderedFirstFrame(true);
         }
       }),
     ];
@@ -4188,18 +4178,15 @@ function App() {
       invoke(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset })
         .then(() => {
           if (libraryActivePath && pathsToReset.includes(libraryActivePath)) {
-            setLibraryActiveAdjustments((prev: Adjustments) => ({ ...INITIAL_ADJUSTMENTS, rating: prev.rating }));
+            setLibraryActiveAdjustments({ ...INITIAL_ADJUSTMENTS });
           }
           if (selectedImage && pathsToReset.includes(selectedImage.path)) {
-            const currentRating = adjustments.rating;
-
             const originalAspectRatio =
               selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
 
             resetAdjustmentsHistory({
               ...INITIAL_ADJUSTMENTS,
               aspectRatio: originalAspectRatio,
-              rating: currentRating,
               aiPatches: [],
             });
           }
@@ -4288,7 +4275,7 @@ function App() {
     const options: Array<Option> = [
       {
         label: 'Export Image',
-        icon: Save,
+        icon: FileInput,
         onClick: () => {
           setRenderedRightPanel(Panel.Export);
           setActiveRightPanel(Panel.Export);
@@ -4409,20 +4396,24 @@ function App() {
       {
         label: 'Reset Adjustments',
         icon: RotateCcw,
-        onClick: () => {
-          debouncedSetHistory.cancel();
-          const currentRating = adjustments.rating;
-
-          const originalAspectRatio =
-            selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
-
-          resetAdjustmentsHistory({
-            ...INITIAL_ADJUSTMENTS,
-            aspectRatio: originalAspectRatio,
-            rating: currentRating,
-            aiPatches: [],
-          });
-        },
+        submenu: [
+          { label: 'Cancel', icon: X, onClick: () => {} },
+          {
+            label: 'Confirm Reset',
+            icon: Check,
+            isDestructive: true,
+            onClick: () => {
+              debouncedSetHistory.cancel();
+              const originalAspectRatio =
+                selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
+              resetAdjustmentsHistory({
+                ...INITIAL_ADJUSTMENTS,
+                aspectRatio: originalAspectRatio,
+                aiPatches: [],
+              });
+            },
+          },
+        ],
       },
     ];
     showContextMenu(event.clientX, event.clientY, options);
@@ -4496,7 +4487,7 @@ function App() {
       deleteSubmenu = [
         { label: 'Cancel', icon: X, onClick: () => {} },
         {
-          label: 'Confirm',
+          label: 'Confirm Delete',
           icon: Check,
           isDestructive: true,
           onClick: () => executeDelete(finalSelection, { includeAssociated: false }),
@@ -4589,7 +4580,7 @@ function App() {
               onClick: () => handleImageSelect(finalSelection[0]),
             },
             {
-              icon: Save,
+              icon: FileInput,
               label: exportLabel,
               onClick: onExportClick,
             },
@@ -4597,7 +4588,7 @@ function App() {
           ]
         : [
             {
-              icon: Save,
+              icon: FileInput,
               label: exportLabel,
               onClick: onExportClick,
             },
@@ -4809,7 +4800,19 @@ function App() {
           );
         },
       },
-      { label: resetLabel, icon: RotateCcw, onClick: () => handleResetAdjustments(finalSelection) },
+      {
+        label: resetLabel,
+        icon: RotateCcw,
+        submenu: [
+          { label: 'Cancel', icon: X, onClick: () => {} },
+          {
+            label: 'Confirm Reset',
+            icon: Check,
+            isDestructive: true,
+            onClick: () => handleResetAdjustments(finalSelection),
+          },
+        ],
+      },
       deleteOption,
     ];
     showContextMenu(event.clientX, event.clientY, options);
@@ -5117,6 +5120,7 @@ function App() {
             onGoHome={handleGoHome}
             onImageClick={handleLibraryImageSingleClick}
             onImageDoubleClick={handleImageSelect}
+            onImportClick={() => handleImportClick(currentFolderPath as string)}
             onLibraryRefresh={handleLibraryRefresh}
             onOpenFolder={handleOpenFolder}
             onSettingsChange={handleSettingsChange}
@@ -5158,7 +5162,7 @@ function App() {
             onPaste={() => handlePasteAdjustments()}
             onRate={handleRate}
             onReset={() => handleResetAdjustments()}
-            rating={libraryActiveAdjustments.rating || 0}
+            rating={imageRatings[libraryActivePath || ''] || 0}
             thumbnailAspectRatio={thumbnailAspectRatio}
             totalImages={imageList.length}
           />
@@ -5186,8 +5190,9 @@ function App() {
     };
 
     if (selectedImage) {
-      const editorNode = (
+const editorNode = (
         <Editor
+          appSettings={appSettings}
           activeAiPatchContainerId={activeAiPatchContainerId}
           activeAiSubMaskId={activeAiSubMaskId}
           activeMaskContainerId={activeMaskContainerId}
@@ -5238,6 +5243,7 @@ function App() {
           goToAdjustmentsHistoryIndex={goToAdjustmentsHistoryIndex}
           liveRotation={liveRotation}
           isInstantTransition={isInstantTransition}
+          hasRenderedFirstFrame={hasRenderedFirstFrame}
         />
       );
 
@@ -5465,7 +5471,7 @@ function App() {
                 opacity: isFullScreen ? 0 : 1,
               }}
             >
-              <div className="min-h-0 flex-1 overflow-hidden">{editorRightPanelContent}</div>
+<div className="min-h-0 flex-1 overflow-hidden">{editorRightPanelContent}</div>
 
               <div className="shrink-0 border-t border-surface">
                 <RightPanelSwitcher
@@ -5512,7 +5518,7 @@ function App() {
                 style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
               >
                 <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
-                  {editorRightPanelContent}
+{editorRightPanelContent}
                 </div>
               </div>
               <div
@@ -5539,13 +5545,14 @@ function App() {
     return renderMainView();
   };
 
-  const shouldHideFolderTreeInCompactEditor = Boolean(selectedImage && isCompactPortrait);
+const shouldHideFolderTreeInCompactEditor = Boolean(selectedImage && isCompactPortrait);
+  const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
 
   return (
     <div
       className={clsx(
-        'flex flex-col h-screen bg-bg-primary font-sans text-text-primary overflow-hidden select-none',
-        (appSettings?.adaptiveEditorTheme || isAnimatingTheme) && !isInstantTransition && 'enable-color-transitions',
+        'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
+        isWgpuActive ? 'bg-transparent' : 'bg-bg-primary',
       )}
     >
       <div

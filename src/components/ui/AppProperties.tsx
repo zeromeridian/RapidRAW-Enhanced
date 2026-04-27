@@ -94,12 +94,13 @@ export enum Invokes {
   SavePresets = 'save_presets',
   SaveSettings = 'save_settings',
   SetColorLabelForPaths = 'set_color_label_for_paths',
+  SetRatingForPaths = 'set_rating_for_paths',
   ShowInFinder = 'show_in_finder',
   StartBackgroundIndexing = 'start_background_indexing',
   StitchPanorama = 'stitch_panorama',
   MergeHdr = 'merge_hdr',
   TestAIConnectorConnection = 'test_ai_connector_connection',
-  UpdateWindowEffect = 'update_window_effect',
+  UpdateWgpuTransform = 'update_wgpu_transform',
   FetchCommunityPresets = 'fetch_community_presets',
   GenerateAllCommunityPreviews = 'generate_all_community_previews',
   SaveCommunityPreset = 'save_community_preset',
@@ -145,7 +146,6 @@ export enum ThumbnailAspectRatio {
 }
 
 export interface AppSettings {
-  adaptiveEditorTheme?: Theme;
   aiConnectorAddress?: string;
   decorations?: any;
   editorPreviewResolution?: number;
@@ -180,6 +180,10 @@ export interface AppSettings {
   isWaveformVisible?: boolean;
   waveformHeight?: number;
   activeWaveformChannel?: string;
+  useWgpuRenderer?: boolean;
+  canvasInputMode?: 'mouse' | 'trackpad';
+  zoomSpeedMultiplier?: number;
+  keybinds?: { [action: string]: string[] };
 }
 
 export interface BrushSettings {
@@ -240,6 +244,7 @@ export interface Preset {
   name: string;
   includeMasks?: boolean;
   includeCropTransform?: boolean;
+  presetType?: 'tool' | 'style';
 }
 
 export interface Progress {
@@ -328,4 +333,9 @@ export interface CullingSuggestions {
   similarGroups: CullGroup[];
   blurryImages: ImageAnalysisResult[];
   failedPaths: string[];
+}
+
+export interface KeybindHandler {
+  shouldFire?: () => boolean;
+  execute: (event: KeyboardEvent) => void;
 }

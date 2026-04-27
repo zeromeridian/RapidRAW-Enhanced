@@ -101,6 +101,7 @@ interface MainLibraryProps {
   onGoHome(): void;
   onImageClick(path: string, event: any): void;
   onImageDoubleClick(path: string): void;
+  onImportClick(): void;
   onLibraryRefresh(): void;
   onOpenFolder(): void;
   onSettingsChange(settings: AppSettings): Promise<void>;
@@ -1097,13 +1098,6 @@ function ListItem({
                   style={{ opacity: layer.opacity, transition: 'opacity 300ms ease-in-out' }}
                   onTransitionEnd={() => handleTransitionEnd(layer.id)}
                 >
-                  {thumbnailAspectRatio === ThumbnailAspectRatio.Contain && (
-                    <img
-                      alt=""
-                      className="absolute inset-0 w-full h-full object-cover blur-md scale-110 brightness-[0.4]"
-                      src={layer.url}
-                    />
-                  )}
                   <img
                     alt={baseName}
                     className={`w-full h-full relative ${
@@ -1295,13 +1289,6 @@ function Thumbnail({
               }}
               onTransitionEnd={() => handleTransitionEnd(layer.id)}
             >
-              {thumbnailAspectRatio === ThumbnailAspectRatio.Contain && (
-                <img
-                  alt=""
-                  className="absolute inset-0 w-full h-full object-cover blur-md scale-110 brightness-[0.4]"
-                  src={layer.url}
-                />
-              )}
               <img
                 alt={path.split(/[\\/]/).pop()}
                 className={`w-full h-full group-hover:scale-[1.02] transition-transform duration-300 ${
@@ -1331,23 +1318,26 @@ function Thumbnail({
       </AnimatePresence>
 
       {(colorLabel || rating > 0) && (
-        <div className="absolute top-1.5 right-1.5 bg-bg-primary/50 rounded-full px-1.5 py-0.5 flex items-center gap-1 backdrop-blur-xs">
-          {colorLabel && (
-            <div
-              className="w-3 h-3 rounded-full ring-1 ring-black/20"
-              style={{ backgroundColor: colorLabel.color }}
-              data-tooltip={`Color: ${colorLabel.name}`}
-            ></div>
-          )}
-          {rating > 0 && (
-            <>
-              <Text variant={TextVariants.label} color={TextColors.primary}>
-                {rating}
-              </Text>
-              <StarIcon size={16} className="text-accent fill-accent" />
-            </>
-          )}
-        </div>
+        <>
+          <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-linear-to-bl from-black/10 via-black/0 to-transparent pointer-events-none z-0" />
+
+          <div className="absolute top-1.5 right-1.5 rounded-full px-1.5 py-0.5 flex items-center gap-1 backdrop-blur-md shadow-md">
+            {colorLabel && (
+              <div
+                className="w-3 h-3 rounded-full ring-1 ring-black/20"
+                style={{ backgroundColor: colorLabel.color }}
+              ></div>
+            )}
+            {rating > 0 && (
+              <>
+                <Text variant={TextVariants.small} color={TextColors.white}>
+                  {rating}
+                </Text>
+                <StarIcon size={12} className="text-white fill-white" />
+              </>
+            )}
+          </div>
+        </>
       )}
       <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/70 to-transparent p-2 flex items-end justify-between">
         <Text variant={TextVariants.small} color={TextColors.white} className="truncate pr-2">
@@ -1359,7 +1349,7 @@ function Thumbnail({
             variant={TextVariants.small}
             color={TextColors.white}
             weight={TextWeights.bold}
-            className="shrink-0 bg-bg-primary/50 px-1.5 py-0.5 rounded-full backdrop-blur-xs"
+            className="shrink-0 shadow-md px-1.5 py-0.5 rounded-full backdrop-blur-xs"
             data-tooltip="Virtual Copy"
           >
             VC
@@ -1516,6 +1506,7 @@ export default function MainLibrary({
   onGoHome,
   onImageClick,
   onImageDoubleClick,
+  onImportClick,
   onLibraryRefresh,
   onOpenFolder,
   onSettingsChange,
@@ -2309,6 +2300,18 @@ export default function MainLibrary({
           <SlidersHorizontal className="h-12 w-12 mb-4 text-text-secondary" />
           <Text>No images found that match your filter.</Text>
         </div>
+      )}
+      {isAndroid && (
+        <Button
+          className="absolute bottom-18 right-8 h-12 w-12 bg-accent text-button-text shadow-lg p-0 flex items-center justify-center z-50 border border-border-color/50"
+          onClick={(e) => {
+            e.stopPropagation();
+            onImportClick();
+          }}
+          data-tooltip="Import Images"
+        >
+          <FolderInput className="w-6 h-6" />
+        </Button>
       )}
     </div>
   );
