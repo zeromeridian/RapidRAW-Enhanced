@@ -5273,7 +5273,7 @@ const editorNode = (
           onRate={handleRate}
           onRequestThumbnails={requestThumbnails}
           onZoomChange={handleZoomChange}
-          rating={adjustments.rating || 0}
+          rating={imageRatings[selectedImage?.path || ''] || 0}
           selectedImage={selectedImage}
           setIsFilmstripVisible={(value: boolean) =>
             setUiVisibility((prev: UiVisibility) => ({ ...prev, filmstrip: value }))
@@ -5348,7 +5348,7 @@ const editorNode = (
               {renderedRightPanel === Panel.Metadata && (
                 <MetadataPanel
                   selectedImage={selectedImage}
-                  rating={adjustments.rating || 0}
+                  rating={imageRatings[selectedImage.path] || 0}
                   tags={imageList.find((img) => img.path === selectedImage.path)?.tags || []}
                   onRate={handleRate}
                   onSetColorLabel={handleSetColorLabel}
