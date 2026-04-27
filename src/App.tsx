@@ -495,9 +495,12 @@ function App() {
   const latestRenderedJobIdRef = useRef<number>(0);
   const isAndroid = osPlatform === 'android';
   const isCompactPortrait =
-    viewportSize.width > 0 && viewportSize.width <= COMPACT_EDITOR_MAX_WIDTH && viewportSize.height > viewportSize.width;
+    viewportSize.width > 0 &&
+    viewportSize.width <= COMPACT_EDITOR_MAX_WIDTH &&
+    viewportSize.height > viewportSize.width;
   const compactEditorPanelHeight =
     viewportSize.height > 0 ? Math.max(300, Math.min(Math.round(viewportSize.height * 0.46), 520)) : 340;
+  const compactEditorPanelCollapsedHeight = 96;
 
   useEffect(() => {
     if (currentFolderPath) {
@@ -5238,6 +5241,45 @@ function App() {
         />
       );
 
+      const editorBottomBarComponent = (
+        <BottomBar
+          filmstripHeight={bottomPanelHeight}
+          imageList={sortedImageList}
+          imageRatings={imageRatings}
+          isCopied={isCopied}
+          isCopyDisabled={!selectedImage}
+          isFilmstripVisible={uiVisibility.filmstrip}
+          isLoading={isViewLoading}
+          isPasted={isPasted}
+          isPasteDisabled={copiedAdjustments === null}
+          isRatingDisabled={!selectedImage}
+          isResizing={isResizing}
+          multiSelectedPaths={multiSelectedPaths}
+          displaySize={displaySize}
+          originalSize={originalSize}
+          baseRenderSize={baseRenderSize}
+          onClearSelection={handleClearSelection}
+          onContextMenu={handleThumbnailContextMenu}
+          onCopy={handleCopyAdjustments}
+          onOpenCopyPasteSettings={() => setIsCopyPasteSettingsModalOpen(true)}
+          onImageSelect={handleImageClick}
+          onPaste={() => handlePasteAdjustments()}
+          onRate={handleRate}
+          onRequestThumbnails={requestThumbnails}
+          onZoomChange={handleZoomChange}
+          rating={adjustments.rating || 0}
+          selectedImage={selectedImage}
+          setIsFilmstripVisible={(value: boolean) =>
+            setUiVisibility((prev: UiVisibility) => ({ ...prev, filmstrip: value }))
+          }
+          showFilmstrip={!isCompactPortrait}
+          thumbnailAspectRatio={thumbnailAspectRatio}
+          thumbnails={thumbnails}
+          zoom={zoom}
+          totalImages={sortedImageList.length}
+        />
+      );
+
       const editorBottomBarNode = (
         <div
           className={clsx(
@@ -5255,42 +5297,7 @@ function App() {
               onMouseDown={createResizeHandler(setBottomPanelHeight, bottomPanelHeight)}
             />
           )}
-          <BottomBar
-            filmstripHeight={bottomPanelHeight}
-            imageList={sortedImageList}
-            imageRatings={imageRatings}
-            isCopied={isCopied}
-            isCopyDisabled={!selectedImage}
-            isFilmstripVisible={uiVisibility.filmstrip}
-            isLoading={isViewLoading}
-            isPasted={isPasted}
-            isPasteDisabled={copiedAdjustments === null}
-            isRatingDisabled={!selectedImage}
-            isResizing={isResizing}
-            multiSelectedPaths={multiSelectedPaths}
-            displaySize={displaySize}
-            originalSize={originalSize}
-            baseRenderSize={baseRenderSize}
-            onClearSelection={handleClearSelection}
-            onContextMenu={handleThumbnailContextMenu}
-            onCopy={handleCopyAdjustments}
-            onOpenCopyPasteSettings={() => setIsCopyPasteSettingsModalOpen(true)}
-            onImageSelect={handleImageClick}
-            onPaste={() => handlePasteAdjustments()}
-            onRate={handleRate}
-            onRequestThumbnails={requestThumbnails}
-            onZoomChange={handleZoomChange}
-            rating={adjustments.rating || 0}
-            selectedImage={selectedImage}
-            setIsFilmstripVisible={(value: boolean) =>
-              setUiVisibility((prev: UiVisibility) => ({ ...prev, filmstrip: value }))
-            }
-            showFilmstrip={!isCompactPortrait}
-            thumbnailAspectRatio={thumbnailAspectRatio}
-            thumbnails={thumbnails}
-            zoom={zoom}
-            totalImages={sortedImageList.length}
-          />
+          {editorBottomBarComponent}
         </div>
       );
 
@@ -5452,7 +5459,9 @@ function App() {
                 !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
               )}
               style={{
-                maxHeight: isFullScreen ? '0px' : `${activeRightPanel ? compactEditorPanelHeight : 56}px`,
+                maxHeight: isFullScreen
+                  ? '0px'
+                  : `${activeRightPanel ? compactEditorPanelHeight : compactEditorPanelCollapsedHeight}px`,
                 opacity: isFullScreen ? 0 : 1,
               }}
             >
@@ -5466,9 +5475,9 @@ function App() {
                   layout="horizontal"
                 />
               </div>
-            </div>
 
-            {editorBottomBarNode}
+              <div className="shrink-0 border-t border-surface">{editorBottomBarComponent}</div>
+            </div>
           </div>
         );
       }
