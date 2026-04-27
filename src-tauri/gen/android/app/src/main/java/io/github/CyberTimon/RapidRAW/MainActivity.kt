@@ -1,5 +1,6 @@
 package io.github.CyberTimon.RapidRAW
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.webkit.WebView
@@ -8,11 +9,14 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : TauriActivity() {
+  private val safeMarginBackgroundColor = Color.rgb(35, 35, 35)
+
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
 
     val rootView: View = findViewById(android.R.id.content)
+    rootView.setBackgroundColor(safeMarginBackgroundColor)
 
     ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, insets ->
       val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -39,7 +43,7 @@ class MainActivity : TauriActivity() {
   override fun onWebViewCreate(webView: WebView) {
     super.onWebViewCreate(webView)
 
-    webView.setBackgroundColor(0x00000000)
+    webView.setBackgroundColor(safeMarginBackgroundColor)
     webView.fitsSystemWindows = true
   }
 }
