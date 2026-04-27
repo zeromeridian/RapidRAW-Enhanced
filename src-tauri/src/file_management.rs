@@ -9,7 +9,6 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 use std::thread;
 
 use anyhow::Result;
@@ -23,7 +22,6 @@ use jni::objects::{JObject, JString, JValue};
 use jni::{JNIEnv, JavaVM};
 #[cfg(target_os = "android")]
 use ndk_context::android_context;
-use rayon::ThreadPoolBuilder;
 use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -1380,8 +1378,7 @@ pub fn generate_thumbnail_data(
         && !meta.adjustments.is_null()
     {
         let state = app_handle.state::<AppState>();
-        let settings =
-            load_settings(app_handle.clone()).unwrap_or_default();
+        let settings = load_settings(app_handle.clone()).unwrap_or_default();
         let target_res = settings.thumbnail_resolution.unwrap_or(720);
 
         let geometry_hash = calculate_geometry_hash(&meta.adjustments);
@@ -1416,8 +1413,7 @@ pub fn generate_thumbnail_data(
         let (processing_base, total_scale) = if let Some(hit) = cached_base {
             hit
         } else {
-            let settings =
-                load_settings(app_handle.clone()).unwrap_or_default();
+            let settings = load_settings(app_handle.clone()).unwrap_or_default();
             let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
             let linear_mode = settings.linear_raw_mode;
             let mut raw_scale_factor = 1.0f32;
@@ -1725,11 +1721,11 @@ fn generate_single_thumbnail_and_cache(
 pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<crate::AppState>();
     let manager = state.thumbnail_manager.clone();
-    
+
     for _ in 0..4 {
         let app_clone = app_handle.clone();
         let manager_clone = manager.clone();
-        
+
         std::thread::spawn(move || {
             loop {
                 let path_to_process: String = {
@@ -1737,21 +1733,22 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                     while queue.is_empty() {
                         queue = manager_clone.cvar.wait(queue).unwrap();
                     }
-                    let path = queue.pop_back().unwrap(); 
-                    
+                    let path = queue.pop_back().unwrap();
+
                     let mut processing = manager_clone.processing_now.lock().unwrap();
                     if processing.contains(&path) {
                         let state = app_clone.state::<crate::AppState>();
                         increment_thumbnail_progress(&state, &app_clone);
-                        continue; 
+                        continue;
                     }
                     processing.insert(path.clone());
                     path
                 };
 
                 let state = app_clone.state::<crate::AppState>();
-                let gpu_context = crate::gpu_processing::get_or_init_gpu_context(&state, &app_clone).ok();
-                
+                let gpu_context =
+                    crate::gpu_processing::get_or_init_gpu_context(&state, &app_clone).ok();
+
                 if let Ok(cache_dir) = get_thumb_cache_dir(&app_clone) {
                     let result = generate_single_thumbnail_and_cache(
                         &path_to_process,
@@ -1765,16 +1762,20 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                     if let Some((thumbnail_data, rating)) = result {
                         let _ = app_clone.emit(
                             "thumbnail-generated",
-                            serde_json::json!({ 
-                                "path": path_to_process, 
-                                "data": thumbnail_data, 
-                                "rating": rating 
+                            serde_json::json!({
+                                "path": path_to_process,
+                                "data": thumbnail_data,
+                                "rating": rating
                             }),
                         );
                     }
                     increment_thumbnail_progress(&state, &app_clone);
                 }
-                manager_clone.processing_now.lock().unwrap().remove(&path_to_process);
+                manager_clone
+                    .processing_now
+                    .lock()
+                    .unwrap()
+                    .remove(&path_to_process);
             }
         });
     }

@@ -24,16 +24,16 @@ mod tagging;
 mod tagging_utils;
 mod window_customizer;
 
-use std::collections::{VecDeque, HashSet, HashMap, hash_map::DefaultHasher};
+use std::collections::{HashMap, HashSet, VecDeque, hash_map::DefaultHasher};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::io::Write;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::sync::Condvar;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::Condvar;
 use std::thread;
 
 use std::borrow::Cow;
@@ -82,9 +82,9 @@ use crate::image_loader::{
 use crate::image_processing::{
     AllAdjustments, Crop, GeometryParams, GpuContext, ImageMetadata, IntoCowImage, RenderRequest,
     apply_coarse_rotation, apply_cpu_default_raw_processing, apply_crop, apply_flip,
-    apply_geometry_warp, apply_rotation, apply_unwarp_geometry, downscale_f32_image,
-    get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
-    warp_image_geometry,
+    apply_geometry_warp, apply_linear_to_srgb, apply_rotation, apply_srgb_to_linear,
+    apply_unwarp_geometry, downscale_f32_image, get_all_adjustments_from_json,
+    get_or_init_gpu_context, process_and_get_dynamic_image, warp_image_geometry,
 };
 use crate::lut_processing::{Lut, convert_image_to_cube_lut, generate_identity_lut_image};
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
@@ -4164,7 +4164,7 @@ async fn merge_hdr(
 
             let file_bytes =
                 fs::read(path).map_err(|e| format!("Failed to read image {}: {}", path, e))?;
-            let dynamic_image = load_base_image_from_bytes(
+            let mut dynamic_image = load_base_image_from_bytes(
                 &file_bytes,
                 path,
                 false,
@@ -4173,6 +4173,10 @@ async fn merge_hdr(
                 None,
             )
             .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
+
+            if !crate::formats::is_raw_file(path) {
+                dynamic_image = apply_srgb_to_linear(dynamic_image);
+            }
 
             let gains = match read_iso(path, &file_bytes) {
                 None => return Err(format!("Image {} is missing ISO/Sensitivity data", path)),
@@ -4221,7 +4225,8 @@ async fn merge_hdr(
         .collect::<Result<Vec<HDRInput>, String>>()?;
 
     log::info!("Starting HDR merge of {} images", images.len());
-    let hdr_merged = hdr_merge_images(&mut images.into()).map_err(|e| e.to_string())?;
+    let mut hdr_merged = hdr_merge_images(&mut images.into()).map_err(|e| e.to_string())?;
+    hdr_merged = apply_linear_to_srgb(hdr_merged);
     log::info!("HDR merge completed");
 
     let mut buf = Cursor::new(Vec::new());
