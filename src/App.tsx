@@ -5632,7 +5632,7 @@ const editorNode = (
     return renderMainView();
   };
 
-const shouldHideFolderTreeInCompactEditor = Boolean(selectedImage && isCompactPortrait);
+  const shouldHideFolderTree = Boolean((selectedImage && isCompactPortrait) || (!selectedImage && isAndroid));
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
 
   return (
@@ -5662,7 +5662,7 @@ const shouldHideFolderTreeInCompactEditor = Boolean(selectedImage && isCompactPo
         )}
       >
         <div className="flex flex-row grow h-full min-h-0">
-          {!shouldHideFolderTreeInCompactEditor && renderFolderTree()}
+          {!shouldHideFolderTree && renderFolderTree()}
           <div className="flex-1 flex flex-col min-w-0">{renderContent()}</div>
           {!selectedImage && isLibraryExportPanelVisible && (
             <Resizer
