@@ -464,7 +464,7 @@ function App() {
   });
   const { showContextMenu } = useContextMenu();
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
-  const { requestThumbnails, clearThumbnailQueue } = useThumbnails();
+  const { requestThumbnails, clearThumbnailQueue, markGenerated } = useThumbnails();
   const [thumbnailProgress, setThumbnailProgress] = useState<Progress>({ current: 0, total: 0 });
   const transformWrapperRef = useRef<any>(null);
   const isProgrammaticZoom = useRef(false);
@@ -3255,6 +3255,7 @@ function App() {
           const { path, data, rating } = event.payload;
           if (data) {
             setThumbnails((prev) => ({ ...prev, [path]: data }));
+            markGenerated(path);
           }
           if (rating !== undefined) {
             setImageRatings((prev) => ({ ...prev, [path]: rating }));

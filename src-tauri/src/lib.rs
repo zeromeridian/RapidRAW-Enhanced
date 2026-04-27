@@ -24,7 +24,7 @@ mod tagging;
 mod tagging_utils;
 mod window_customizer;
 
-use std::collections::{HashMap, hash_map::DefaultHasher};
+use std::collections::{VecDeque, HashSet, HashMap, hash_map::DefaultHasher};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
@@ -33,6 +33,7 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Condvar;
 use std::thread;
 
 use std::borrow::Cow;
@@ -178,6 +179,22 @@ pub struct ThumbnailProgressTracker {
     pub completed: usize,
 }
 
+pub struct ThumbnailManager {
+    pub queue: Mutex<VecDeque<String>>,
+    pub cvar: Condvar,
+    pub processing_now: Mutex<HashSet<String>>,
+}
+
+impl ThumbnailManager {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            queue: Mutex::new(VecDeque::new()),
+            cvar: Condvar::new(),
+            processing_now: Mutex::new(HashSet::new()),
+        })
+    }
+}
+
 pub type TransformedImageCache = (u64, Arc<DynamicImage>, (f32, f32));
 pub struct AppState {
     window_setup_complete: AtomicBool,
@@ -209,6 +226,7 @@ pub struct AppState {
     pub full_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     pub full_transformed_cache: Mutex<Option<TransformedImageCache>>,
     pub decoded_image_cache: Mutex<DecodedImageCache>,
+    pub thumbnail_manager: Arc<ThumbnailManager>,
 }
 
 #[derive(serde::Serialize)]
@@ -575,6 +593,10 @@ fn hydrate_sub_masks(
 
 fn hydrate_adjustments(state: &tauri::State<AppState>, adjustments: &mut serde_json::Value) {
     let mut cache = state.patch_cache.lock().unwrap();
+
+    if cache.len() > 20 {
+        cache.clear();
+    }
 
     if let Some(patches) = adjustments
         .get_mut("aiPatches")
@@ -4939,6 +4961,7 @@ pub fn run() {
 
             start_preview_worker(app_handle.clone());
             start_analytics_worker(app_handle.clone());
+            file_management::start_thumbnail_workers(app_handle.clone());
             jxl_oxide::integration::register_image_decoding_hook();
 
             let window_cfg = app.config().app.windows.first().unwrap().clone();
@@ -5125,6 +5148,7 @@ pub fn run() {
             full_warped_cache: Mutex::new(None),
             full_transformed_cache: Mutex::new(None),
             decoded_image_cache: Mutex::new(DecodedImageCache::new(5)),
+            thumbnail_manager: ThumbnailManager::new(),
         })
         .invoke_handler(tauri::generate_handler![
             load_image,
@@ -5174,8 +5198,7 @@ pub fn run() {
             file_management::get_folder_tree,
             file_management::get_folder_children,
             file_management::get_pinned_folder_trees,
-            file_management::generate_thumbnails,
-            file_management::generate_thumbnails_progressive,
+            file_management::update_thumbnail_queue,
             file_management::create_folder,
             file_management::delete_folder,
             file_management::copy_files,

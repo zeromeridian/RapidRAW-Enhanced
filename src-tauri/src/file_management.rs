@@ -1381,7 +1381,7 @@ pub fn generate_thumbnail_data(
     {
         let state = app_handle.state::<AppState>();
         let settings =
-            crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
+            load_settings(app_handle.clone()).unwrap_or_default();
         let target_res = settings.thumbnail_resolution.unwrap_or(720);
 
         let geometry_hash = calculate_geometry_hash(&meta.adjustments);
@@ -1417,7 +1417,7 @@ pub fn generate_thumbnail_data(
             hit
         } else {
             let settings =
-                crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
+                load_settings(app_handle.clone()).unwrap_or_default();
             let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
             let linear_mode = settings.linear_raw_mode;
             let mut raw_scale_factor = 1.0f32;
@@ -1609,7 +1609,7 @@ pub fn generate_thumbnail_data(
         }
     }
 
-    let settings = crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
     let linear_mode = settings.linear_raw_mode;
 
@@ -1708,7 +1708,7 @@ fn generate_single_thumbnail_and_cache(
         return Some((format!("data:image/jpeg;base64,{}", base64_str), rating));
     }
 
-    let settings = crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let target_width = settings.thumbnail_resolution.unwrap_or(720);
 
     if let Ok(thumb_image) =
@@ -1722,114 +1722,104 @@ fn generate_single_thumbnail_and_cache(
     None
 }
 
-#[tauri::command]
-pub async fn generate_thumbnails(
-    paths: Vec<String>,
-    app_handle: tauri::AppHandle,
-) -> Result<HashMap<String, String>, String> {
-    let app_handle_clone = app_handle.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let cache_dir = app_handle_clone
-            .path()
-            .app_cache_dir()
-            .map_err(|e| e.to_string())?;
-        let thumb_cache_dir = cache_dir.join("thumbnails");
-        if !thumb_cache_dir.exists() {
-            fs::create_dir_all(&thumb_cache_dir).map_err(|e| e.to_string())?;
-        }
+pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
+    let state = app_handle.state::<crate::AppState>();
+    let manager = state.thumbnail_manager.clone();
+    
+    for _ in 0..4 {
+        let app_clone = app_handle.clone();
+        let manager_clone = manager.clone();
+        
+        std::thread::spawn(move || {
+            loop {
+                let path_to_process: String = {
+                    let mut queue = manager_clone.queue.lock().unwrap();
+                    while queue.is_empty() {
+                        queue = manager_clone.cvar.wait(queue).unwrap();
+                    }
+                    let path = queue.pop_back().unwrap(); 
+                    
+                    let mut processing = manager_clone.processing_now.lock().unwrap();
+                    if processing.contains(&path) {
+                        let state = app_clone.state::<crate::AppState>();
+                        increment_thumbnail_progress(&state, &app_clone);
+                        continue; 
+                    }
+                    processing.insert(path.clone());
+                    path
+                };
 
-        let state = app_handle_clone.state::<AppState>();
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
+                let state = app_clone.state::<crate::AppState>();
+                let gpu_context = crate::gpu_processing::get_or_init_gpu_context(&state, &app_clone).ok();
+                
+                if let Ok(cache_dir) = get_thumb_cache_dir(&app_clone) {
+                    let result = generate_single_thumbnail_and_cache(
+                        &path_to_process,
+                        &cache_dir,
+                        gpu_context.as_ref(),
+                        None,
+                        false,
+                        &app_clone,
+                    );
 
-        let thumbnails: HashMap<String, String> = paths
-            .par_iter()
-            .filter_map(|path_str| {
-                generate_single_thumbnail_and_cache(
-                    path_str,
-                    &thumb_cache_dir,
-                    gpu_context.as_ref(),
-                    None,
-                    false,
-                    &app_handle_clone,
-                )
-                .map(|(data, _rating)| (path_str.clone(), data))
-            })
-            .collect();
-
-        Ok(thumbnails)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+                    if let Some((thumbnail_data, rating)) = result {
+                        let _ = app_clone.emit(
+                            "thumbnail-generated",
+                            serde_json::json!({ 
+                                "path": path_to_process, 
+                                "data": thumbnail_data, 
+                                "rating": rating 
+                            }),
+                        );
+                    }
+                    increment_thumbnail_progress(&state, &app_clone);
+                }
+                manager_clone.processing_now.lock().unwrap().remove(&path_to_process);
+            }
+        });
+    }
 }
 
 #[tauri::command]
-pub fn generate_thumbnails_progressive(
+pub fn update_thumbnail_queue(
     paths: Vec<String>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    let state = app_handle.state::<AppState>();
+    let state = app_handle.state::<crate::AppState>();
 
-    add_to_thumbnail_queue(&state, paths.len(), &app_handle);
-
-    state
-        .thumbnail_cancellation_token
-        .store(false, Ordering::SeqCst);
-    let cancellation_token = state.thumbnail_cancellation_token.clone();
-
-    const MAX_THUMBNAIL_THREADS: usize = 6;
-    let num_threads = (num_cpus::get_physical().saturating_sub(1)).clamp(1, MAX_THUMBNAIL_THREADS);
-
-    let pool = ThreadPoolBuilder::new()
-        .num_threads(num_threads)
-        .build()
-        .unwrap();
-    let cache_dir = app_handle
-        .path()
-        .app_cache_dir()
-        .map_err(|e| e.to_string())?;
-    let thumb_cache_dir = cache_dir.join("thumbnails");
-    if !thumb_cache_dir.exists() {
-        fs::create_dir_all(&thumb_cache_dir).map_err(|e| e.to_string())?;
+    let mut unique_paths = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for path in paths {
+        if seen.insert(path.clone()) {
+            unique_paths.push(path);
+        }
     }
 
-    let app_handle_clone = app_handle.clone();
+    let mut queue = state.thumbnail_manager.queue.lock().unwrap();
+    queue.clear();
 
-    pool.spawn(move || {
-        let state = app_handle_clone.state::<AppState>();
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
+    let path_count = unique_paths.len();
+    for path in unique_paths {
+        queue.push_back(path);
+    }
 
-        let _ = paths.par_iter().try_for_each(|path_str| -> Result<(), ()> {
-            if cancellation_token.load(Ordering::Relaxed) {
-                return Err(());
-            }
+    let mut tracker = state.thumbnail_progress.lock().unwrap();
+    if path_count == 0 {
+        tracker.total = 0;
+        tracker.completed = 0;
+    } else {
+        tracker.total = tracker.completed + path_count;
+    }
 
-            let result = generate_single_thumbnail_and_cache(
-                path_str,
-                &thumb_cache_dir,
-                gpu_context.as_ref(),
-                None,
-                false,
-                &app_handle_clone,
-            );
+    let current = tracker.completed;
+    let total = tracker.total;
+    drop(tracker);
 
-            if let Some((thumbnail_data, rating)) = result {
-                if cancellation_token.load(Ordering::Relaxed) {
-                    return Err(());
-                }
-                let _ = app_handle_clone.emit(
-                    "thumbnail-generated",
-                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating }),
-                );
-            }
-
-            if cancellation_token.load(Ordering::Relaxed) {
-                return Err(());
-            }
-            increment_thumbnail_progress(&state, &app_handle_clone);
-            Ok(())
-        });
-    });
-
+    let _ = app_handle.emit(
+        "thumbnail-progress",
+        serde_json::json!({ "current": current, "total": total }),
+    );
+    state.thumbnail_manager.cvar.notify_all();
     Ok(())
 }
 
@@ -3461,7 +3451,7 @@ pub fn get_cached_or_generate_thumbnail_image(
     gpu_context: Option<&GpuContext>,
 ) -> Result<DynamicImage> {
     let thumb_cache_dir = get_thumb_cache_dir(app_handle).map_err(|e| anyhow::anyhow!(e))?;
-    let settings = crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let target_width = settings.thumbnail_resolution.unwrap_or(720);
 
     if let Some(cache_hash) = get_cache_key_hash(path_str) {
