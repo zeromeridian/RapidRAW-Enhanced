@@ -124,6 +124,24 @@ export interface ColorCalibration {
   blueSaturation: number;
 }
 
+export interface ParametricCurveSettings {
+  darks: number;
+  shadows: number;
+  highlights: number;
+  lights: number;
+  split1: number;
+  split2: number;
+  split3: number;
+}
+
+export interface ParametricCurve {
+  [index: string]: ParametricCurveSettings;
+  blue: ParametricCurveSettings;
+  green: ParametricCurveSettings;
+  luma: ParametricCurveSettings;
+  red: ParametricCurveSettings;
+}
+
 export interface Adjustments {
   [index: string]: any;
   aiPatches: Array<AiPatch>;
@@ -139,6 +157,9 @@ export interface Adjustments {
   colorNoiseReduction: number;
   contrast: number;
   curves: Curves;
+  pointCurves?: Curves;
+  parametricCurve?: ParametricCurve;
+  curveMode?: 'point' | 'parametric';
   crop: Crop | null;
   dehaze: number;
   exposure: number;
@@ -271,6 +292,9 @@ export interface MaskAdjustments {
   colorNoiseReduction: number;
   contrast: number;
   curves: Curves;
+  pointCurves?: Curves;
+  parametricCurve?: ParametricCurve;
+  curveMode?: 'point' | 'parametric';
   dehaze: number;
   exposure: number;
   flareAmount: number;
@@ -346,6 +370,42 @@ const INITIAL_COLOR_CALIBRATION: ColorCalibration = {
   blueSaturation: 0,
 };
 
+export const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
+  darks: 0,
+  shadows: 0,
+  highlights: 0,
+  lights: 0,
+  split1: 25,
+  split2: 50,
+  split3: 75,
+};
+
+export const DEFAULT_PARAMETRIC_CURVE: ParametricCurve = {
+  luma: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
+  red: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
+  green: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
+  blue: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
+};
+
+const DEFAULT_CURVES: Curves = {
+  blue: [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ],
+  green: [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ],
+  luma: [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ],
+  red: [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ],
+};
+
 export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   blacks: 0,
   brightness: 0,
@@ -353,24 +413,10 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   colorGrading: { ...INITIAL_COLOR_GRADING },
   colorNoiseReduction: 0,
   contrast: 0,
-  curves: {
-    blue: [
-      { x: 0, y: 0 },
-      { x: 255, y: 255 },
-    ],
-    green: [
-      { x: 0, y: 0 },
-      { x: 255, y: 255 },
-    ],
-    luma: [
-      { x: 0, y: 0 },
-      { x: 255, y: 255 },
-    ],
-    red: [
-      { x: 0, y: 0 },
-      { x: 255, y: 255 },
-    ],
-  },
+  curves: { ...DEFAULT_CURVES },
+  pointCurves: { ...DEFAULT_CURVES },
+  parametricCurve: { ...DEFAULT_PARAMETRIC_CURVE },
+  curveMode: 'point',
   dehaze: 0,
   exposure: 0,
   flareAmount: 0,
@@ -428,24 +474,10 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   colorNoiseReduction: 0,
   contrast: 0,
   crop: null,
-  curves: {
-    blue: [
-      { x: 0, y: 0 },
-      { x: 255, y: 255 },
-    ],
-    green: [
-      { x: 0, y: 0 },
-      { x: 255, y: 255 },
-    ],
-    luma: [
-      { x: 0, y: 0 },
-      { x: 255, y: 255 },
-    ],
-    red: [
-      { x: 0, y: 0 },
-      { x: 255, y: 255 },
-    ],
-  },
+  curves: { ...DEFAULT_CURVES },
+  pointCurves: { ...DEFAULT_CURVES },
+  parametricCurve: { ...DEFAULT_PARAMETRIC_CURVE },
+  curveMode: 'point',
   dehaze: 0,
   exposure: 0,
   flipHorizontal: false,
@@ -548,6 +580,12 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
         colorGrading: { ...INITIAL_MASK_ADJUSTMENTS.colorGrading, ...(containerAdjustments.colorGrading || {}) },
         hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...(containerAdjustments.hsl || {}) },
         curves: { ...INITIAL_MASK_ADJUSTMENTS.curves, ...(containerAdjustments.curves || {}) },
+        pointCurves: { ...INITIAL_MASK_ADJUSTMENTS.pointCurves, ...(containerAdjustments.pointCurves || {}) },
+        parametricCurve: {
+          ...INITIAL_MASK_ADJUSTMENTS.parametricCurve,
+          ...(containerAdjustments.parametricCurve || {}),
+        },
+        curveMode: containerAdjustments.curveMode || INITIAL_MASK_ADJUSTMENTS.curveMode,
         sectionVisibility: {
           ...INITIAL_MASK_ADJUSTMENTS.sectionVisibility,
           ...(containerAdjustments.sectionVisibility || {}),
@@ -590,6 +628,9 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...(loadedAdjustments.colorGrading || {}) },
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
     curves: { ...INITIAL_ADJUSTMENTS.curves, ...(loadedAdjustments.curves || {}) },
+    pointCurves: { ...INITIAL_ADJUSTMENTS.pointCurves, ...(loadedAdjustments.pointCurves || {}) },
+    parametricCurve: { ...INITIAL_ADJUSTMENTS.parametricCurve, ...(loadedAdjustments.parametricCurve || {}) },
+    curveMode: loadedAdjustments.curveMode || INITIAL_ADJUSTMENTS.curveMode,
     masks: normalizedMasks,
     aiPatches: normalizedAiPatches,
     sectionVisibility: {
@@ -623,7 +664,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     },
     {
       label: 'Curves',
-      keys: ['curves'],
+      keys: ['curves', 'pointCurves', 'parametricCurve', 'curveMode'],
     },
   ],
   color: [
@@ -698,7 +739,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     BasicAdjustment.Exposure,
     'toneMapper',
   ],
-  curves: ['curves'],
+  curves: ['curves', 'pointCurves', 'parametricCurve', 'curveMode'],
   color: [
     ColorAdjustment.Saturation,
     ColorAdjustment.Temperature,

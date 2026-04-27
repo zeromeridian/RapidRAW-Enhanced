@@ -407,11 +407,7 @@ function DepthRangePicker({
           Reset
         </Text>
       </div>
-      <div
-        ref={trackRef}
-        className="relative rounded-md overflow-hidden mt-2 select-none border border-white/10"
-        style={{ height: 44 }}
-      >
+      <div ref={trackRef} className="relative rounded-md overflow-hidden mt-2 select-none" style={{ height: 44 }}>
         {isDragging && (
           <div
             className="fixed inset-0 z-[9999]"
