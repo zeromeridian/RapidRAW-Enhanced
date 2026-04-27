@@ -210,6 +210,13 @@ interface SearchCriteria {
   mode: 'AND' | 'OR';
 }
 
+interface ImportSettings {
+  filenameTemplate: string;
+  organizeByDate: boolean;
+  dateFolderFormat: string;
+  deleteAfterImport: boolean;
+}
+
 export interface InteractivePatch {
   url: string;
   normX: number;
@@ -230,6 +237,12 @@ const RIGHT_PANEL_ORDER = [
 
 const DEBUG = false;
 const COMPACT_EDITOR_MAX_WIDTH = 900;
+const DEFAULT_IMPORT_SETTINGS: ImportSettings = {
+  filenameTemplate: '{original_filename}',
+  organizeByDate: false,
+  dateFolderFormat: 'YYYY/MM-DD',
+  deleteAfterImport: false,
+};
 
 const getParentDir = (filePath: string): string => {
   const separator = filePath.includes('/') ? '/' : '\\';
@@ -4189,17 +4202,32 @@ function App() {
     [renameTargetPaths, refreshImageList, selectedImage, libraryActivePath, handleImageSelect, handleBackToLibrary],
   );
 
-  const handleStartImport = async (settings: AppSettings) => {
-    if (importSourcePaths.length > 0 && importTargetFolder) {
-      invoke(Invokes.ImportFiles, {
-        destinationFolder: importTargetFolder,
-        settings: settings,
-        sourcePaths: importSourcePaths,
-      }).catch((err) => {
+  const startImportFiles = useCallback(
+    async (sourcePaths: string[], destinationFolder: string, settings: ImportSettings) => {
+      if (sourcePaths.length === 0 || !destinationFolder) {
+        return;
+      }
+
+      try {
+        await invoke(Invokes.ImportFiles, {
+          destinationFolder,
+          settings,
+          sourcePaths,
+        });
+      } catch (err) {
         console.error('Failed to start import:', err);
         setImportState({ status: Status.Error, errorMessage: `Failed to start import: ${err}` });
-      });
+      }
+    },
+    [],
+  );
+
+  const handleStartImport = async (settings: ImportSettings) => {
+    if (!importTargetFolder) {
+      return;
     }
+
+    await startImportFiles(importSourcePaths, importTargetFolder, settings);
   };
 
   const handleResetAdjustments = useCallback(
@@ -4281,6 +4309,20 @@ function App() {
         });
 
         if (Array.isArray(selected) && selected.length > 0) {
+          if (isAndroid) {
+            let areRawSources = false;
+            try {
+              areRawSources = await invoke<boolean>(Invokes.AreRawImportSources, { sourcePaths: selected });
+            } catch (err) {
+              console.warn('Failed to detect whether Android import sources are RAW:', err);
+            }
+
+            if (areRawSources) {
+              await startImportFiles(selected, targetPath, DEFAULT_IMPORT_SETTINGS);
+              return;
+            }
+          }
+
           setImportSourcePaths(selected);
           setImportTargetFolder(targetPath);
           setIsImportModalOpen(true);
@@ -4289,7 +4331,7 @@ function App() {
         console.error('Failed to open file dialog for import:', err);
       }
     },
-    [supportedTypes],
+    [isAndroid, startImportFiles, supportedTypes],
   );
 
   const handleEditorContextMenu = (event: any) => {
