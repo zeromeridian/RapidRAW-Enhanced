@@ -958,6 +958,66 @@ pub fn apply_cpu_default_raw_processing(image: &mut DynamicImage) {
     *image = DynamicImage::ImageRgb32F(f32_image);
 }
 
+pub fn apply_srgb_to_linear(mut image: DynamicImage) -> DynamicImage {
+    let to_linear = |x: f32| -> f32 {
+        let x = x.max(0.0);
+        if x <= 0.04045 {
+            x / 12.92
+        } else {
+            ((x + 0.055) / 1.055).powf(2.4)
+        }
+    };
+
+    match &mut image {
+        DynamicImage::ImageRgb32F(img) => {
+            for p in img.pixels_mut() {
+                p[0] = to_linear(p[0]);
+                p[1] = to_linear(p[1]);
+                p[2] = to_linear(p[2]);
+            }
+        }
+        DynamicImage::ImageRgba32F(img) => {
+            for p in img.pixels_mut() {
+                p[0] = to_linear(p[0]);
+                p[1] = to_linear(p[1]);
+                p[2] = to_linear(p[2]);
+            }
+        }
+        _ => {}
+    }
+    image
+}
+
+pub fn apply_linear_to_srgb(mut image: DynamicImage) -> DynamicImage {
+    let to_srgb = |x: f32| -> f32 {
+        let x = x.max(0.0);
+        if x <= 0.0031308 {
+            x * 12.92
+        } else {
+            1.055 * x.powf(1.0 / 2.4) - 0.055
+        }
+    };
+
+    match &mut image {
+        DynamicImage::ImageRgb32F(img) => {
+            for p in img.pixels_mut() {
+                p[0] = to_srgb(p[0]);
+                p[1] = to_srgb(p[1]);
+                p[2] = to_srgb(p[2]);
+            }
+        }
+        DynamicImage::ImageRgba32F(img) => {
+            for p in img.pixels_mut() {
+                p[0] = to_srgb(p[0]);
+                p[1] = to_srgb(p[1]);
+                p[2] = to_srgb(p[2]);
+            }
+        }
+        _ => {}
+    }
+    image
+}
+
 pub fn apply_orientation(image: DynamicImage, orientation: Orientation) -> DynamicImage {
     match orientation {
         Orientation::Normal | Orientation::Unknown => image,
