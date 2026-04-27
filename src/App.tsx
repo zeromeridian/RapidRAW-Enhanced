@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { type PointerEvent as ReactPointerEvent, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -384,6 +384,7 @@ function App() {
   const [leftPanelWidth, setLeftPanelWidth] = useState<number>(256);
   const [rightPanelWidth, setRightPanelWidth] = useState<number>(320);
   const [bottomPanelHeight, setBottomPanelHeight] = useState<number>(144);
+  const [compactEditorPanelHeightOverride, setCompactEditorPanelHeightOverride] = useState<number | null>(null);
   const [activeTreeSection, setActiveTreeSection] = useState<string | null>('current');
   const [isResizing, setIsResizing] = useState(false);
   const [thumbnailSize, setThumbnailSize] = useState(ThumbnailSize.Medium);
@@ -496,8 +497,17 @@ function App() {
     viewportSize.width > 0 &&
     viewportSize.width <= COMPACT_EDITOR_MAX_WIDTH &&
     viewportSize.height > viewportSize.width;
-  const compactEditorPanelHeight =
+  const compactEditorPanelDefaultHeight =
     viewportSize.height > 0 ? Math.max(300, Math.min(Math.round(viewportSize.height * 0.46), 520)) : 340;
+  const compactEditorPanelMinHeight = 220;
+  const compactEditorPanelMaxHeight =
+    viewportSize.height > 0
+      ? Math.max(compactEditorPanelMinHeight, Math.min(Math.round(viewportSize.height * 0.72), 620))
+      : 520;
+  const compactEditorPanelHeight = Math.max(
+    compactEditorPanelMinHeight,
+    Math.min(compactEditorPanelHeightOverride ?? compactEditorPanelDefaultHeight, compactEditorPanelMaxHeight),
+  );
   const compactEditorPanelCollapsedHeight = 96;
   const [hasRenderedFirstFrame, setHasRenderedFirstFrame] = useState(false);
 
@@ -1737,29 +1747,56 @@ function App() {
     [],
   );
 
-  const createResizeHandler = (setter: any, startSize: number) => (e: any) => {
+  const createResizeHandler = (setter: any, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
+    e.stopPropagation();
     setIsResizing(true);
+    const pointerId = e.pointerId;
+    const target = e.currentTarget;
     const startX = e.clientX;
     const startY = e.clientY;
-    const doDrag = (moveEvent: any) => {
+    const previousTouchAction = document.documentElement.style.touchAction;
+    const previousUserSelect = document.documentElement.style.userSelect;
+
+    target.setPointerCapture?.(pointerId);
+    document.documentElement.style.touchAction = 'none';
+    document.documentElement.style.userSelect = 'none';
+
+    const doDrag = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      moveEvent.preventDefault();
       if (setter === setLeftPanelWidth) {
         setter(Math.max(200, Math.min(startSize + (moveEvent.clientX - startX), 500)));
       } else if (setter === setRightPanelWidth) {
         setter(Math.max(280, Math.min(startSize - (moveEvent.clientX - startX), 600)));
       } else if (setter === setBottomPanelHeight) {
         setter(Math.max(100, Math.min(startSize - (moveEvent.clientY - startY), 400)));
+      } else if (setter === setCompactEditorPanelHeightOverride) {
+        setter(
+          Math.max(
+            compactEditorPanelMinHeight,
+            Math.min(startSize - (moveEvent.clientY - startY), compactEditorPanelMaxHeight),
+          ),
+        );
       }
     };
-    const stopDrag = () => {
+    const stopDrag = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== pointerId) return;
+      if (target.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId);
       document.documentElement.style.cursor = '';
-      window.removeEventListener('mousemove', doDrag);
-      window.removeEventListener('mouseup', stopDrag);
+      document.documentElement.style.touchAction = previousTouchAction;
+      document.documentElement.style.userSelect = previousUserSelect;
+      window.removeEventListener('pointermove', doDrag);
+      window.removeEventListener('pointerup', stopDrag);
+      window.removeEventListener('pointercancel', stopDrag);
       setIsResizing(false);
     };
-    document.documentElement.style.cursor = setter === setBottomPanelHeight ? 'row-resize' : 'col-resize';
-    window.addEventListener('mousemove', doDrag);
-    window.addEventListener('mouseup', stopDrag);
+    document.documentElement.style.cursor =
+      setter === setBottomPanelHeight || setter === setCompactEditorPanelHeightOverride ? 'row-resize' : 'col-resize';
+    window.addEventListener('pointermove', doDrag, { passive: false });
+    window.addEventListener('pointerup', stopDrag);
+    window.addEventListener('pointercancel', stopDrag);
   };
 
   useEffect(() => {
@@ -5465,13 +5502,20 @@ const editorNode = (
                 !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
               )}
               style={{
-                maxHeight: isFullScreen
+                height: isFullScreen
                   ? '0px'
                   : `${activeRightPanel ? compactEditorPanelHeight : compactEditorPanelCollapsedHeight}px`,
                 opacity: isFullScreen ? 0 : 1,
               }}
             >
-<div className="min-h-0 flex-1 overflow-hidden">{editorRightPanelContent}</div>
+              {activeRightPanel && !isFullScreen && (
+                <Resizer
+                  direction={Orientation.Horizontal}
+                  onMouseDown={createResizeHandler(setCompactEditorPanelHeightOverride, compactEditorPanelHeight)}
+                />
+              )}
+
+              <div className="min-h-0 flex-1 overflow-hidden">{editorRightPanelContent}</div>
 
               <div className="shrink-0 border-t border-surface">
                 <RightPanelSwitcher
