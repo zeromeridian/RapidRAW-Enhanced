@@ -349,6 +349,13 @@ impl DecodedImageCache {
         }
     }
 
+    pub fn set_capacity(&mut self, capacity: usize) {
+        self.capacity = capacity;
+        while self.items.len() > self.capacity {
+            self.items.remove(0);
+        }
+    }
+
     pub fn get(&mut self, path: &str) -> Option<(Arc<DynamicImage>, HashMap<String, String>)> {
         if let Some(pos) = self.items.iter().position(|(p, _, _)| p == path) {
             let item = self.items.remove(pos);
@@ -723,6 +730,13 @@ fn get_or_load_lut(state: &tauri::State<AppState>, path: &str) -> Result<Arc<Lut
     let arc_lut = Arc::new(lut);
     cache.insert(path.to_string(), arc_lut.clone());
     Ok(arc_lut)
+}
+
+#[tauri::command]
+fn is_image_cached(path: String, state: tauri::State<'_, AppState>) -> bool {
+    let (source_path, _) = parse_virtual_path(&path);
+    let source_path_str = source_path.to_string_lossy().to_string();
+    state.decoded_image_cache.lock().unwrap().get(&source_path_str).is_some()
 }
 
 #[tauri::command]
@@ -4902,6 +4916,12 @@ pub fn run() {
 
             let mut settings: AppSettings = load_settings(app_handle.clone()).unwrap_or_default();
 
+            {
+                let state = app.state::<AppState>();
+                let cache_size = settings.image_cache_size.unwrap_or(5) as usize;
+                state.decoded_image_cache.lock().unwrap().set_capacity(cache_size);
+            }
+
             if crash_flag_path.exists() {
                 log::warn!("GPU Driver crash detected on last run! Falling back to OpenGL backend.");
                 settings.processing_backend = Some("gl".to_string());
@@ -5169,6 +5189,7 @@ pub fn run() {
             generate_uncropped_preview,
             preview_geometry_transform,
             generate_mask_overlay,
+            is_image_cached,
             generate_ai_subject_mask,
             precompute_ai_subject_mask,
             generate_ai_foreground_mask,

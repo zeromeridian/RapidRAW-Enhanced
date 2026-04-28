@@ -380,14 +380,14 @@ export const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
   split3: 75,
 };
 
-export const DEFAULT_PARAMETRIC_CURVE: ParametricCurve = {
+export const getDefaultParametricCurve = (): ParametricCurve => ({
   luma: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
   red: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
   green: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
   blue: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
-};
+});
 
-const DEFAULT_CURVES: Curves = {
+export const getDefaultCurves = (): Curves => ({
   blue: [
     { x: 0, y: 0 },
     { x: 255, y: 255 },
@@ -404,7 +404,9 @@ const DEFAULT_CURVES: Curves = {
     { x: 0, y: 0 },
     { x: 255, y: 255 },
   ],
-};
+});
+
+export const DEFAULT_PARAMETRIC_CURVE = getDefaultParametricCurve();
 
 export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   blacks: 0,
@@ -413,9 +415,9 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   colorGrading: { ...INITIAL_COLOR_GRADING },
   colorNoiseReduction: 0,
   contrast: 0,
-  curves: { ...DEFAULT_CURVES },
-  pointCurves: { ...DEFAULT_CURVES },
-  parametricCurve: { ...DEFAULT_PARAMETRIC_CURVE },
+  curves: getDefaultCurves(),
+  pointCurves: getDefaultCurves(),
+  parametricCurve: getDefaultParametricCurve(),
   curveMode: 'point',
   dehaze: 0,
   exposure: 0,
@@ -474,9 +476,9 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   colorNoiseReduction: 0,
   contrast: 0,
   crop: null,
-  curves: { ...DEFAULT_CURVES },
-  pointCurves: { ...DEFAULT_CURVES },
-  parametricCurve: { ...DEFAULT_PARAMETRIC_CURVE },
+  curves: getDefaultCurves(),
+  pointCurves: getDefaultCurves(),
+  parametricCurve: getDefaultParametricCurve(),
   curveMode: 'point',
   dehaze: 0,
   exposure: 0,
@@ -548,6 +550,32 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   whites: 0,
 };
 
+const deepCloneCurves = (curves: any): Curves => ({
+  blue: curves?.blue?.map((p: Coord) => ({ ...p })) || [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ],
+  green: curves?.green?.map((p: Coord) => ({ ...p })) || [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ],
+  luma: curves?.luma?.map((p: Coord) => ({ ...p })) || [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ],
+  red: curves?.red?.map((p: Coord) => ({ ...p })) || [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ],
+});
+
+const deepCloneParametric = (pCurve: any): ParametricCurve => ({
+  luma: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS, ...(pCurve?.luma || {}) },
+  red: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS, ...(pCurve?.red || {}) },
+  green: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS, ...(pCurve?.green || {}) },
+  blue: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS, ...(pCurve?.blue || {}) },
+});
+
 export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any => {
   if (!loadedAdjustments) {
     return INITIAL_ADJUSTMENTS;
@@ -579,12 +607,13 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
         halationAmount: containerAdjustments.halationAmount ?? INITIAL_MASK_ADJUSTMENTS.halationAmount,
         colorGrading: { ...INITIAL_MASK_ADJUSTMENTS.colorGrading, ...(containerAdjustments.colorGrading || {}) },
         hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...(containerAdjustments.hsl || {}) },
-        curves: { ...INITIAL_MASK_ADJUSTMENTS.curves, ...(containerAdjustments.curves || {}) },
-        pointCurves: { ...INITIAL_MASK_ADJUSTMENTS.pointCurves, ...(containerAdjustments.pointCurves || {}) },
-        parametricCurve: {
-          ...INITIAL_MASK_ADJUSTMENTS.parametricCurve,
-          ...(containerAdjustments.parametricCurve || {}),
-        },
+        curves: containerAdjustments.curves ? deepCloneCurves(containerAdjustments.curves) : getDefaultCurves(),
+        pointCurves: containerAdjustments.pointCurves
+          ? deepCloneCurves(containerAdjustments.pointCurves)
+          : getDefaultCurves(),
+        parametricCurve: containerAdjustments.parametricCurve
+          ? deepCloneParametric(containerAdjustments.parametricCurve)
+          : getDefaultParametricCurve(),
         curveMode: containerAdjustments.curveMode || INITIAL_MASK_ADJUSTMENTS.curveMode,
         sectionVisibility: {
           ...INITIAL_MASK_ADJUSTMENTS.sectionVisibility,
@@ -627,9 +656,11 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, ...(loadedAdjustments.colorCalibration || {}) },
     colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...(loadedAdjustments.colorGrading || {}) },
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
-    curves: { ...INITIAL_ADJUSTMENTS.curves, ...(loadedAdjustments.curves || {}) },
-    pointCurves: { ...INITIAL_ADJUSTMENTS.pointCurves, ...(loadedAdjustments.pointCurves || {}) },
-    parametricCurve: { ...INITIAL_ADJUSTMENTS.parametricCurve, ...(loadedAdjustments.parametricCurve || {}) },
+    curves: loadedAdjustments.curves ? deepCloneCurves(loadedAdjustments.curves) : getDefaultCurves(),
+    pointCurves: loadedAdjustments.pointCurves ? deepCloneCurves(loadedAdjustments.pointCurves) : getDefaultCurves(),
+    parametricCurve: loadedAdjustments.parametricCurve
+      ? deepCloneParametric(loadedAdjustments.parametricCurve)
+      : getDefaultParametricCurve(),
     curveMode: loadedAdjustments.curveMode || INITIAL_ADJUSTMENTS.curveMode,
     masks: normalizedMasks,
     aiPatches: normalizedAiPatches,

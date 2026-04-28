@@ -460,6 +460,10 @@ pub struct AppSettings {
     pub zoom_speed_multiplier: Option<f32>,
     #[serde(default)]
     pub keybinds: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub thumbnail_worker_threads: Option<u32>,
+    #[serde(default)]
+    pub image_cache_size: Option<u32>,
 }
 
 fn default_adjustment_visibility() -> HashMap<String, bool> {
@@ -532,6 +536,8 @@ impl Default for AppSettings {
             canvas_input_mode: Some("mouse".to_string()),
             zoom_speed_multiplier: Some(1.0),
             keybinds: HashMap::new(),
+            thumbnail_worker_threads: Some(4),
+            image_cache_size: Some(5),
         }
     }
 }
@@ -1721,8 +1727,10 @@ fn generate_single_thumbnail_and_cache(
 pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<crate::AppState>();
     let manager = state.thumbnail_manager.clone();
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let thread_count = settings.thumbnail_worker_threads.unwrap_or(4).clamp(1, 16);
 
-    for _ in 0..4 {
+    for _ in 0..thread_count {
         let app_clone = app_handle.clone();
         let manager_clone = manager.clone();
 
@@ -2985,7 +2993,11 @@ pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
 pub fn save_settings(settings: AppSettings, app_handle: AppHandle) -> Result<(), String> {
     let path = get_settings_path(&app_handle)?;
     let json_string = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
-    fs::write(path, json_string).map_err(|e| e.to_string())
+    fs::write(path, json_string).map_err(|e| e.to_string())?;
+    let state = app_handle.state::<AppState>();
+    let cache_size = settings.image_cache_size.unwrap_or(5) as usize;
+    state.decoded_image_cache.lock().unwrap().set_capacity(cache_size);
+    Ok(())
 }
 
 #[tauri::command]
