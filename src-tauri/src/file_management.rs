@@ -556,33 +556,6 @@ pub struct ImportSettings {
     pub delete_after_import: bool,
 }
 
-#[tauri::command]
-pub fn are_raw_import_sources(source_paths: Vec<String>) -> Result<bool, String> {
-    if source_paths.is_empty() {
-        return Ok(false);
-    }
-
-    Ok(source_paths.iter().all(|source_path_str| {
-        #[cfg(target_os = "android")]
-        let path_to_check = if is_android_content_uri(source_path_str) {
-            resolve_android_content_uri_name(source_path_str).unwrap_or_else(|err| {
-                log::warn!(
-                    "Failed to resolve Android content URI name for RAW import detection: {}",
-                    err
-                );
-                source_path_str.clone()
-            })
-        } else {
-            source_path_str.clone()
-        };
-
-        #[cfg(not(target_os = "android"))]
-        let path_to_check = source_path_str.clone();
-
-        is_raw_file(Path::new(&path_to_check))
-    }))
-}
-
 pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
     let (source_path_str, copy_id) = if let Some((base, id)) = virtual_path.rsplit_once("?vc=") {
         (base.to_string(), Some(id.to_string()))

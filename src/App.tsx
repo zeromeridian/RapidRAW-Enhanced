@@ -4310,17 +4310,8 @@ function App() {
 
         if (Array.isArray(selected) && selected.length > 0) {
           if (isAndroid) {
-            let areRawSources = false;
-            try {
-              areRawSources = await invoke<boolean>(Invokes.AreRawImportSources, { sourcePaths: selected });
-            } catch (err) {
-              console.warn('Failed to detect whether Android import sources are RAW:', err);
-            }
-
-            if (areRawSources) {
-              await startImportFiles(selected, targetPath, DEFAULT_IMPORT_SETTINGS);
-              return;
-            }
+            await startImportFiles(selected, targetPath, DEFAULT_IMPORT_SETTINGS);
+            return;
           }
 
           setImportSourcePaths(selected);
