@@ -32,7 +32,15 @@ import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import { Invokes } from '../ui/AppProperties';
-import { arraysEqual, codeToDisplayLabel, formatKeyCode, KeybindDefinition, KEYBIND_DEFINITIONS, KEYBIND_SECTIONS, normalizeCombo } from '../../utils/keyboardUtils';
+import {
+  arraysEqual,
+  codeToDisplayLabel,
+  formatKeyCode,
+  KeybindDefinition,
+  KEYBIND_DEFINITIONS,
+  KEYBIND_SECTIONS,
+  normalizeCombo,
+} from '../../utils/keyboardUtils';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
@@ -153,7 +161,15 @@ const settingCategories = [
   { id: 'shortcuts', label: 'Controls', icon: Keyboard },
 ];
 
-const KeybindRow = ({ def, currentCombo, osPlatform, onSave, recordingAction, onStartRecording, isConflicting }: KeybindRowProps) => {
+const KeybindRow = ({
+  def,
+  currentCombo,
+  osPlatform,
+  onSave,
+  recordingAction,
+  onStartRecording,
+  isConflicting,
+}: KeybindRowProps) => {
   const recording = recordingAction === def.action;
 
   useEffect(() => {
@@ -182,10 +198,7 @@ const KeybindRow = ({ def, currentCombo, osPlatform, onSave, recordingAction, on
       <Text variant={TextVariants.label}>{def.description}</Text>
       <div className="flex items-center gap-1">
         {isConflicting && <span className="text-yellow-400 text-xs">⚠</span>}
-        <button
-          onClick={() => onStartRecording(def.action)}
-          className="flex items-center gap-1 flex-wrap shrink-0"
-        >
+        <button onClick={() => onStartRecording(def.action)} className="flex items-center gap-1 flex-wrap shrink-0">
           {recording ? (
             <Text
               as="kbd"
@@ -204,7 +217,11 @@ const KeybindRow = ({ def, currentCombo, osPlatform, onSave, recordingAction, on
               weight={TextWeights.semibold}
               className={`px-2 py-1 font-sans bg-bg-primary border rounded-md cursor-pointer hover:border-accent transition-colors ${isConflicting ? 'border-yellow-400' : 'border-border-color'}`}
             >
-              {displayCombo ? displayCombo.map((k) => formatKeyCode(k, osPlatform)).join(' + ') : <span className="text-text-secondary italic">Not assigned</span>}
+              {displayCombo ? (
+                displayCombo.map((k) => formatKeyCode(k, osPlatform)).join(' + ')
+              ) : (
+                <span className="text-text-secondary italic">Not assigned</span>
+              )}
             </Text>
           )}
         </button>
@@ -438,6 +455,8 @@ export default function SettingsPanel({
     useFullDpiRendering: appSettings?.useFullDpiRendering ?? false,
     useWgpuRenderer:
       appSettings?.useWgpuRenderer ?? (osPlatform === 'linux' || osPlatform === 'android' ? false : true),
+    thumbnailWorkerThreads: appSettings?.thumbnailWorkerThreads ?? 4,
+    imageCacheSize: appSettings?.imageCacheSize ?? 5,
   });
   const [restartRequired, setRestartRequired] = useState(false);
   const [activeCategory, setActiveCategory] = useState('general');
@@ -485,6 +504,8 @@ export default function SettingsPanel({
       highResZoomMultiplier: appSettings?.highResZoomMultiplier || 1.0,
       useFullDpiRendering: appSettings?.useFullDpiRendering ?? false,
       useWgpuRenderer: appSettings?.useWgpuRenderer ?? true,
+      thumbnailWorkerThreads: appSettings?.thumbnailWorkerThreads ?? 4,
+      imageCacheSize: appSettings?.imageCacheSize ?? 5,
     });
     setRestartRequired(false);
   }, [appSettings]);
@@ -508,7 +529,12 @@ export default function SettingsPanel({
 
   const handleProcessingSettingChange = (key: string, value: any) => {
     setProcessingSettings((prev) => ({ ...prev, [key]: value }));
-    if (key === 'processingBackend' || key === 'linuxGpuOptimization' || key === 'useWgpuRenderer') {
+    if (
+      key === 'processingBackend' ||
+      key === 'linuxGpuOptimization' ||
+      key === 'useWgpuRenderer' ||
+      key === 'thumbnailWorkerThreads'
+    ) {
       setRestartRequired(true);
     } else {
       onSettingsChange({ ...appSettings, [key]: value });
@@ -771,7 +797,7 @@ export default function SettingsPanel({
     }
   };
 
-const handleKeybindSave = (action: string, combo: string[]) => {
+  const handleKeybindSave = (action: string, combo: string[]) => {
     const newKeybinds = { ...(appSettings?.keybinds || {}), [action]: combo };
     onSettingsChange({ ...appSettings, keybinds: newKeybinds });
   };
@@ -781,7 +807,7 @@ const handleKeybindSave = (action: string, combo: string[]) => {
     const userKb = appSettings?.keybinds || {};
     for (const def of KEYBIND_DEFINITIONS) {
       const userCombo = userKb[def.action];
-      const effective = userCombo?.length ? userCombo : (userCombo === undefined ? def.defaultCombo : null);
+      const effective = userCombo?.length ? userCombo : userCombo === undefined ? def.defaultCombo : null;
       if (!effective) continue;
       const key = effective.join('+');
       if (!map.has(key)) map.set(key, new Set());
@@ -1601,6 +1627,40 @@ const handleKeybindSave = (action: string, combo: string[]) => {
                     </SettingItem>
 
                     <SettingItem
+                      label="Thumbnail Worker Threads"
+                      description="Number of parallel threads used to generate thumbnails. Higher values speed up library loading but use more CPU & RAM."
+                    >
+                      <Slider
+                        label="Threads"
+                        min={2}
+                        max={10}
+                        step={1}
+                        value={processingSettings.thumbnailWorkerThreads}
+                        defaultValue={4}
+                        onChange={(e: any) =>
+                          handleProcessingSettingChange('thumbnailWorkerThreads', parseInt(e.target.value))
+                        }
+                        fillOrigin="min"
+                      />
+                    </SettingItem>
+
+                    <SettingItem
+                      label="Decoded Image Cache"
+                      description="Maximum number of full-resolution images kept in RAM. Higher values make switching between recently edited images instant, but use significantly more memory."
+                    >
+                      <Slider
+                        label="Images"
+                        min={2}
+                        max={10}
+                        step={1}
+                        value={processingSettings.imageCacheSize}
+                        defaultValue={5}
+                        onChange={(e: any) => handleProcessingSettingChange('imageCacheSize', parseInt(e.target.value))}
+                        fillOrigin="min"
+                      />
+                    </SettingItem>
+
+                    <SettingItem
                       label="Linear RAW Processing"
                       description="Fixes color casts or pink tint in some DNG files. Controls how already processed LinearRAW data is interpreted."
                     >
@@ -1875,92 +1935,91 @@ const handleKeybindSave = (action: string, combo: string[]) => {
               </motion.div>
             )}
 
-           {activeCategory === 'shortcuts' && (
-               <motion.div
-                 key="shortcuts"
-                 initial={{ opacity: 0, x: 10 }}
-                 animate={{ opacity: 1, x: 0 }}
-                 exit={{ opacity: 0, x: -10 }}
-               transition={{ duration: 0.2 }}
-                  className="space-y-10"
-                >
-                  <div className="p-6 bg-surface rounded-xl shadow-md">
-                    <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
-                      Mouse Controls
-                    </Text>
-                    <div className="space-y-8">
-                      <div>
-                        <Text variant={TextVariants.heading} className="mb-2">
-                          Input Device Optimization
-                        </Text>
-                        <Text variant={TextVariants.small} className="mb-4">
-                          Choose the primary input device you use to pan and zoom the canvas.
-                        </Text>
-                        <CanvasInputModeSwitch
-                          mode={(appSettings?.canvasInputMode as 'mouse' | 'trackpad') || 'mouse'}
-                          onModeChange={(value) => onSettingsChange({ ...appSettings, canvasInputMode: value })}
-                        />
-                      </div>
+            {activeCategory === 'shortcuts' && (
+              <motion.div
+                key="shortcuts"
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-10"
+              >
+                <div className="p-6 bg-surface rounded-xl shadow-md">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                    Mouse Controls
+                  </Text>
+                  <div className="space-y-8">
+                    <div>
+                      <Text variant={TextVariants.heading} className="mb-2">
+                        Input Device Optimization
+                      </Text>
+                      <Text variant={TextVariants.small} className="mb-4">
+                        Choose the primary input device you use to pan and zoom the canvas.
+                      </Text>
+                      <CanvasInputModeSwitch
+                        mode={(appSettings?.canvasInputMode as 'mouse' | 'trackpad') || 'mouse'}
+                        onModeChange={(value) => onSettingsChange({ ...appSettings, canvasInputMode: value })}
+                      />
+                    </div>
 
-                      <SettingItem
-                        label="Zoom Speed Multiplier"
-                        description="Adjust how fast the canvas zooms in and out when using the scroll wheel or pinch gesture."
-                      >
-                        <Slider
-                          label="Speed"
-                          min={0.1}
-                          max={3.0}
-                          step={0.1}
-                          value={appSettings?.zoomSpeedMultiplier ?? 1.0}
-                          defaultValue={1.0}
-                          onChange={(e: any) =>
-                            onSettingsChange({ ...appSettings, zoomSpeedMultiplier: parseFloat(e.target.value) })
-                          }
-                          fillOrigin="min"
-                        />
-                      </SettingItem>
+                    <SettingItem
+                      label="Zoom Speed Multiplier"
+                      description="Adjust how fast the canvas zooms in and out when using the scroll wheel or pinch gesture."
+                    >
+                      <Slider
+                        label="Speed"
+                        min={0.1}
+                        max={3.0}
+                        step={0.1}
+                        value={appSettings?.zoomSpeedMultiplier ?? 1.0}
+                        defaultValue={1.0}
+                        onChange={(e: any) =>
+                          onSettingsChange({ ...appSettings, zoomSpeedMultiplier: parseFloat(e.target.value) })
+                        }
+                        fillOrigin="min"
+                      />
+                    </SettingItem>
+                  </div>
+                </div>
+
+                <div className="p-6 bg-surface rounded-xl shadow-md">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                    Keyboard Controls
+                  </Text>
+                  <div className="space-y-8">
+                    {' '}
+                    {KEYBIND_SECTIONS.map((section) => {
+                      const sectionDefs = KEYBIND_DEFINITIONS.filter((d) => d.section === section.id);
+                      const userKb = appSettings?.keybinds || {};
+                      return (
+                        <div key={section.id}>
+                          <Text variant={TextVariants.heading}>{section.label}</Text>
+                          <div className="divide-y divide-border-color">
+                            {sectionDefs.map((def) => (
+                              <KeybindRow
+                                key={def.action}
+                                def={def}
+                                currentCombo={userKb[def.action]}
+                                osPlatform={osPlatform}
+                                onSave={handleKeybindSave}
+                                recordingAction={recordingAction}
+                                onStartRecording={setRecordingAction}
+                                isConflicting={conflictingKeys.has(def.action)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="flex justify-end mt-6">
+                      <Button variant="ghost" onClick={() => onSettingsChange({ ...appSettings, keybinds: {} })}>
+                        Reset All to Defaults
+                      </Button>
                     </div>
                   </div>
-
-                  <div className="p-6 bg-surface rounded-xl shadow-md">
-                    <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
-                      Keyboard Controls
-                   </Text>
-<div className="space-y-8"> {KEYBIND_SECTIONS.map((section) => {
-                            const sectionDefs = KEYBIND_DEFINITIONS.filter((d) => d.section === section.id);
-                            const userKb = appSettings?.keybinds || {};
-                            return (
-                             <div key={section.id}>
-                               <Text variant={TextVariants.heading}>{section.label}</Text>
-                              <div className="divide-y divide-border-color">
-                                {sectionDefs.map((def) => (
-                                   <KeybindRow
-                                       key={def.action}
-                                       def={def}
-                                       currentCombo={userKb[def.action]}
-                                       osPlatform={osPlatform}
-                                       onSave={handleKeybindSave}
-                                       recordingAction={recordingAction}
-                                       onStartRecording={setRecordingAction}
-                                       isConflicting={conflictingKeys.has(def.action)}
-                                     />
-                                ))}
-                             </div>
-                           </div>
-                         );
-                       })}
-                      <div className="flex justify-end mt-6">
-                        <Button
-                          variant="ghost"
-                          onClick={() => onSettingsChange({ ...appSettings, keybinds: {} })}
-                        >
-                          Reset All to Defaults
-                        </Button>
-                      </div>
-                   </div>
-                 </div>
-               </motion.div>
-             )}
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
       </div>

@@ -207,6 +207,25 @@ function getZeroHistogramPath(data: Array<any>) {
   return `M0,255 L${pathData} L255,255 Z`;
 }
 
+function isDefaultCurve(points: Array<Coord> | undefined) {
+  if (!points || points.length !== 2) return false;
+  const [p1, p2] = points;
+  return p1.x === 0 && p1.y === 0 && p2.x === 255 && p2.y === 255;
+}
+
+function isDefaultParametricCurve(settings: ParametricCurveSettings | undefined) {
+  if (!settings) return true;
+  return (
+    settings.darks === DEFAULT_PARAMETRIC_CURVE_SETTINGS.darks &&
+    settings.shadows === DEFAULT_PARAMETRIC_CURVE_SETTINGS.shadows &&
+    settings.lights === DEFAULT_PARAMETRIC_CURVE_SETTINGS.lights &&
+    settings.highlights === DEFAULT_PARAMETRIC_CURVE_SETTINGS.highlights &&
+    settings.split1 === DEFAULT_PARAMETRIC_CURVE_SETTINGS.split1 &&
+    settings.split2 === DEFAULT_PARAMETRIC_CURVE_SETTINGS.split2 &&
+    settings.split3 === DEFAULT_PARAMETRIC_CURVE_SETTINGS.split3
+  );
+}
+
 export default function CurveGraph({
   adjustments,
   setAdjustments,
@@ -221,6 +240,7 @@ export default function CurveGraph({
   const [draggingSplitKey, setDraggingSplitKey] = useState<'split1' | 'split2' | 'split3' | null>(null);
   const [localPoints, setLocalPoints] = useState<Array<Coord> | null>(null);
   const [localParametricSettings, setLocalParametricSettings] = useState<ParametricCurveSettings | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const splitterContainerRef = useRef<HTMLDivElement>(null);
@@ -229,7 +249,13 @@ export default function CurveGraph({
   const localPointsRef = useRef<Array<Coord> | null>(null);
   const localParametricSettingsRef = useRef<ParametricCurveSettings | null>(null);
   const isParametricMode = curveMode === 'parametric';
+
   const parametricCurves = adjustments?.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
+  const parametricCurvesRef = useRef(parametricCurves);
+
+  useEffect(() => {
+    parametricCurvesRef.current = parametricCurves;
+  }, [parametricCurves]);
 
   useEffect(() => {
     setCurveMode(adjustments.curveMode || 'point');
@@ -321,7 +347,8 @@ export default function CurveGraph({
         const minGap = 10;
         let nextValue = Math.max(0, Math.min(100, rawX));
 
-        const currentSettings = localParametricSettingsRef.current || parametricCurves[activeChannel];
+        const currentSettings =
+          localParametricSettingsRef.current || parametricCurvesRef.current[activeChannelRef.current];
 
         if (draggingSplitKey === 'split1') {
           nextValue = Math.max(10, Math.min(nextValue, currentSettings.split2 - minGap));
@@ -343,7 +370,7 @@ export default function CurveGraph({
 
       if (!isParametricMode && draggingIndexRef.current !== null) {
         const index = draggingIndexRef.current;
-        const currentPoints = localPointsRef.current || adjustments?.curves?.[activeChannel];
+        const currentPoints = localPointsRef.current || adjustments?.curves?.[activeChannelRef.current];
         if (!currentPoints) return;
 
         const svg = svgRef.current;
@@ -406,7 +433,7 @@ export default function CurveGraph({
       window.removeEventListener('touchend', handleUp);
       window.removeEventListener('touchcancel', handleUp);
     };
-  }, [draggingPointIndex, draggingSplitKey, isParametricMode, activeChannel, parametricCurves]);
+  }, [draggingPointIndex, draggingSplitKey, isParametricMode]);
 
   const isLightTheme = theme === Theme.Light || theme === Theme.Arctic;
   const histogramOpacity = isLightTheme ? 0.6 : 0.15;
@@ -516,10 +543,13 @@ export default function CurveGraph({
     e.preventDefault();
     e.stopPropagation();
 
+    const channelName = activeChannel.charAt(0).toUpperCase() + activeChannel.slice(1);
+
     if (isParametricMode) {
       const handleCopyParametric = () => {
         parametricClipboard = { ...activeParametricSettings };
       };
+
       const handlePasteParametric = () => {
         if (!parametricClipboard) return;
         setAdjustments((prev: any) => {
@@ -531,6 +561,7 @@ export default function CurveGraph({
           };
         });
       };
+
       const handleResetParametric = () => {
         setAdjustments((prev: any) => {
           const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
@@ -545,17 +576,55 @@ export default function CurveGraph({
         });
       };
 
+      const handleResetAllParametric = () => {
+        setLocalParametricSettings(null);
+        localParametricSettingsRef.current = null;
+        setAdjustments((prev: any) => {
+          return {
+            ...prev,
+            parametricCurve: {
+              luma: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
+              red: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
+              green: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
+              blue: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
+            },
+            curves: {
+              luma: buildParametricPoints(DEFAULT_PARAMETRIC_CURVE_SETTINGS),
+              red: buildParametricPoints(DEFAULT_PARAMETRIC_CURVE_SETTINGS),
+              green: buildParametricPoints(DEFAULT_PARAMETRIC_CURVE_SETTINGS),
+              blue: buildParametricPoints(DEFAULT_PARAMETRIC_CURVE_SETTINGS),
+            },
+          };
+        });
+      };
+
+      const areOtherParametricCurvesDirty = [
+        ActiveChannel.Luma,
+        ActiveChannel.Red,
+        ActiveChannel.Green,
+        ActiveChannel.Blue,
+      ].some((channel) => channel !== activeChannel && !isDefaultParametricCurve(parametricCurves[channel]));
+
       const options = [
-        { label: 'Copy Parametric Curve', icon: Copy, onClick: handleCopyParametric },
+        { label: `Copy ${channelName} Parametric Curve`, icon: Copy, onClick: handleCopyParametric },
         {
-          label: 'Paste Parametric Curve',
+          label: `Paste Parametric Curve`,
           icon: ClipboardPaste,
           onClick: handlePasteParametric,
           disabled: !parametricClipboard,
         },
         { type: OPTION_SEPARATOR },
-        { label: `Reset ${activeChannel} Parametric Curve`, icon: RotateCcw, onClick: handleResetParametric },
+        { label: `Reset ${channelName} Parametric Curve`, icon: RotateCcw, onClick: handleResetParametric },
       ];
+
+      if (areOtherParametricCurvesDirty) {
+        options.push({
+          label: 'Reset All Parametric Curves',
+          icon: RotateCcw,
+          onClick: handleResetAllParametric,
+        });
+      }
+
       showContextMenu(e.clientX, e.clientY, options);
       return;
     }
@@ -563,6 +632,7 @@ export default function CurveGraph({
     const handleCopy = () => {
       curveClipboard = activePoints.map((p) => ({ ...p }));
     };
+
     const handlePaste = () => {
       if (!curveClipboard) return;
       const newPoints = curveClipboard.map((p) => ({ ...p }));
@@ -570,6 +640,7 @@ export default function CurveGraph({
       localPointsRef.current = newPoints;
       setAdjustments((prev: any) => ({ ...prev, curves: { ...prev.curves, [activeChannel]: newPoints } }));
     };
+
     const handleReset = () => {
       const defaultPoints = [
         { x: 0, y: 0 },
@@ -580,12 +651,51 @@ export default function CurveGraph({
       setAdjustments((prev: any) => ({ ...prev, curves: { ...prev.curves, [activeChannel]: defaultPoints } }));
     };
 
+    const handleResetAllPoint = () => {
+      const defaultPoints = [
+        { x: 0, y: 0 },
+        { x: 255, y: 255 },
+      ];
+      setLocalPoints(defaultPoints);
+      localPointsRef.current = defaultPoints;
+      setAdjustments((prev: any) => ({
+        ...prev,
+        curves: {
+          [ActiveChannel.Luma]: [...defaultPoints],
+          [ActiveChannel.Red]: [...defaultPoints],
+          [ActiveChannel.Green]: [...defaultPoints],
+          [ActiveChannel.Blue]: [...defaultPoints],
+        },
+      }));
+    };
+
+    const areOtherPointCurvesDirty = [
+      ActiveChannel.Luma,
+      ActiveChannel.Red,
+      ActiveChannel.Green,
+      ActiveChannel.Blue,
+    ].some((channel) => channel !== activeChannel && !isDefaultCurve(adjustments.curves?.[channel]));
+
     const options = [
-      { label: `Copy ${activeChannel} Point Curve`, icon: Copy, onClick: handleCopy },
-      { label: 'Paste Point Curve', icon: ClipboardPaste, onClick: handlePaste, disabled: !curveClipboard },
+      { label: `Copy ${channelName} Point Curve`, icon: Copy, onClick: handleCopy },
+      {
+        label: `Paste Point Curve`,
+        icon: ClipboardPaste,
+        onClick: handlePaste,
+        disabled: !curveClipboard,
+      },
       { type: OPTION_SEPARATOR },
-      { label: `Reset ${activeChannel} Point Curve`, icon: RotateCcw, onClick: handleReset },
+      { label: `Reset ${channelName} Point Curve`, icon: RotateCcw, onClick: handleReset },
     ];
+
+    if (areOtherPointCurvesDirty) {
+      options.push({
+        label: 'Reset All Point Curves',
+        icon: RotateCcw,
+        onClick: handleResetAllPoint,
+      });
+    }
+
     showContextMenu(e.clientX, e.clientY, options);
   };
 

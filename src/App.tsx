@@ -1438,32 +1438,6 @@ function App() {
     return list;
   }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchCriteria, appSettings]);
 
-  useEffect(() => {
-    if (selectedImage?.path && selectedImage.isReady && finalPreviewUrl) {
-      cachedEditStateRef.current = {
-        adjustments,
-        histogram,
-        waveform,
-        finalPreviewUrl,
-        uncroppedPreviewUrl: uncroppedAdjustedPreviewUrl,
-        selectedImage,
-        originalSize,
-        previewSize,
-      };
-    } else {
-      cachedEditStateRef.current = null;
-    }
-  }, [
-    selectedImage,
-    adjustments,
-    histogram,
-    waveform,
-    finalPreviewUrl,
-    uncroppedAdjustedPreviewUrl,
-    originalSize,
-    previewSize,
-  ]);
-
   const handleDisplaySizeChange = useCallback(
     (
       size: ImageDimensions & {
@@ -2494,7 +2468,7 @@ function App() {
   }, [selectedImage?.path, resetAdjustmentsHistory, debouncedSave, debouncedSetHistory]);
 
   const handleImageSelect = useCallback(
-    (path: string) => {
+    async (path: string) => {
       if (selectedImage?.path === path) return;
 
       debouncedSave.flush();
@@ -2506,7 +2480,20 @@ function App() {
 
       patchesSentToBackend.current.clear();
 
-      setHasRenderedFirstFrame(false);
+      const cached = imageCacheRef.current.get(path);
+      const isFrontendCached = Boolean(cached && cached.selectedImage?.isReady);
+      const isCachedInBackend = isFrontendCached
+        ? await invoke<boolean>('is_image_cached', { path }).catch(() => false)
+        : false;
+
+      const hasDifferentResolution =
+        cached &&
+        (originalSize.width !== cached.originalSize.width || originalSize.height !== cached.originalSize.height);
+
+      if (!isCachedInBackend || hasDifferentResolution) {
+        setHasRenderedFirstFrame(false);
+      }
+
       selectedImagePathRef.current = path;
       setMultiSelectedPaths([path]);
       setLibraryActivePath(null);
@@ -2521,9 +2508,7 @@ function App() {
       setTransformedOriginalUrl(null);
       setIsLibraryExportPanelVisible(false);
 
-      const cached = imageCacheRef.current.get(path);
-
-      if (cached?.finalPreviewUrl && cached.selectedImage?.isReady) {
+      if (isFrontendCached) {
         setSelectedImage({
           ...cached.selectedImage,
           thumbnailUrl: thumbnails[path] || cached.selectedImage.thumbnailUrl,
@@ -2540,13 +2525,12 @@ function App() {
         setFinalPreviewUrl(cached.finalPreviewUrl);
         setUncroppedAdjustedPreviewUrl(cached.uncroppedPreviewUrl);
         setIsViewLoading(false);
-        setHasRenderedFirstFrame(false);
 
         latestRenderedJobIdRef.current = previewJobIdRef.current;
         isBackendReadyRef.current = false;
         currentResRef.current = Infinity;
 
-        invoke('load_image', { path })
+        invoke(Invokes.LoadImage, { path })
           .then((_result: any) => {
             if (selectedImagePathRef.current !== path) return;
             isBackendReadyRef.current = true;
@@ -2616,7 +2600,7 @@ function App() {
         return null;
       });
     },
-    [selectedImage?.path, debouncedSave, debouncedSetHistory, thumbnails, resetAdjustmentsHistory],
+    [selectedImage?.path, debouncedSave, debouncedSetHistory, thumbnails, resetAdjustmentsHistory, isSliderDragging],
   );
 
   const executeDelete = useCallback(
@@ -5624,6 +5608,33 @@ const editorNode = (
 
   const shouldHideFolderTree = isAndroid || isPortraitViewport;
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
+
+  useEffect(() => {
+    if (selectedImage?.path && selectedImage.isReady && (finalPreviewUrl || isWgpuActive)) {
+      cachedEditStateRef.current = {
+        adjustments,
+        histogram,
+        waveform,
+        finalPreviewUrl,
+        uncroppedPreviewUrl: uncroppedAdjustedPreviewUrl,
+        selectedImage,
+        originalSize,
+        previewSize,
+      };
+    } else {
+      cachedEditStateRef.current = null;
+    }
+  }, [
+    selectedImage,
+    adjustments,
+    histogram,
+    waveform,
+    finalPreviewUrl,
+    uncroppedAdjustedPreviewUrl,
+    originalSize,
+    previewSize,
+    isWgpuActive,
+  ]);
 
   return (
     <div
