@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { type PointerEvent as ReactPointerEvent, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -210,6 +210,13 @@ interface SearchCriteria {
   mode: 'AND' | 'OR';
 }
 
+interface ImportSettings {
+  filenameTemplate: string;
+  organizeByDate: boolean;
+  dateFolderFormat: string;
+  deleteAfterImport: boolean;
+}
+
 export interface InteractivePatch {
   url: string;
   normX: number;
@@ -265,6 +272,14 @@ const insertChildrenIntoTree = (node: any, targetPath: string, newChildren: any[
 };
 
 function App() {
+  const COMPACT_EDITOR_MAX_WIDTH = 900;
+  const DEFAULT_IMPORT_SETTINGS: ImportSettings = {
+    filenameTemplate: '{original_filename}',
+    organizeByDate: false,
+    dateFolderFormat: 'YYYY/MM-DD',
+    deleteAfterImport: false,
+  };
+
   const [rootPath, setRootPath] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [osPlatform, setOsPlatform] = useState(() => {
@@ -345,6 +360,16 @@ function App() {
   const [activeAiPatchContainerId, setActiveAiPatchContainerId] = useState<string | null>(null);
   const [activeAiSubMaskId, setActiveAiSubMaskId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [viewportSize, setViewportSize] = useState<ImageDimensions>(() => {
+    if (typeof window === 'undefined') {
+      return { width: 0, height: 0 };
+    }
+
+    return {
+      width: Math.round(window.visualViewport?.width ?? window.innerWidth),
+      height: Math.round(window.visualViewport?.height ?? window.innerHeight),
+    };
+  });
   const [displaySize, setDisplaySize] = useState<ImageDimensions>({ width: 0, height: 0 });
   const [previewSize, setPreviewSize] = useState<ImageDimensions>({ width: 0, height: 0 });
   const [baseRenderSize, setBaseRenderSize] = useState<ImageDimensions>({ width: 0, height: 0 });
@@ -373,6 +398,7 @@ function App() {
   const [leftPanelWidth, setLeftPanelWidth] = useState<number>(256);
   const [rightPanelWidth, setRightPanelWidth] = useState<number>(320);
   const [bottomPanelHeight, setBottomPanelHeight] = useState<number>(144);
+  const [compactEditorPanelHeightOverride, setCompactEditorPanelHeightOverride] = useState<number | null>(null);
   const [activeTreeSection, setActiveTreeSection] = useState<string | null>('current');
   const [isResizing, setIsResizing] = useState(false);
   const [thumbnailSize, setThumbnailSize] = useState(ThumbnailSize.Medium);
@@ -481,6 +507,21 @@ function App() {
   const previewJobIdRef = useRef<number>(0);
   const latestRenderedJobIdRef = useRef<number>(0);
   const isAndroid = osPlatform === 'android';
+  const isPortraitViewport = viewportSize.width > 0 && viewportSize.height > viewportSize.width;
+  const isCompactPortrait =
+    viewportSize.width > 0 && viewportSize.width <= COMPACT_EDITOR_MAX_WIDTH && isPortraitViewport;
+  const compactEditorPanelDefaultHeight =
+    viewportSize.height > 0 ? Math.max(300, Math.min(Math.round(viewportSize.height * 0.46), 520)) : 340;
+  const compactEditorPanelMinHeight = 220;
+  const compactEditorPanelMaxHeight =
+    viewportSize.height > 0
+      ? Math.max(compactEditorPanelMinHeight, Math.min(Math.round(viewportSize.height * 0.72), 620))
+      : 520;
+  const compactEditorPanelHeight = Math.max(
+    compactEditorPanelMinHeight,
+    Math.min(compactEditorPanelHeightOverride ?? compactEditorPanelDefaultHeight, compactEditorPanelMaxHeight),
+  );
+  const compactEditorPanelCollapsedHeight = 96;
   const [hasRenderedFirstFrame, setHasRenderedFirstFrame] = useState(false);
 
   useEffect(() => {
@@ -502,6 +543,35 @@ function App() {
       };
     }
   }, [rootPath, folderTree]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const updateViewportSize = () => {
+      const nextViewportSize = {
+        width: Math.round(window.visualViewport?.width ?? window.innerWidth),
+        height: Math.round(window.visualViewport?.height ?? window.innerHeight),
+      };
+
+      setViewportSize((prev) =>
+        prev.width === nextViewportSize.width && prev.height === nextViewportSize.height ? prev : nextViewportSize,
+      );
+    };
+
+    updateViewportSize();
+
+    window.addEventListener('resize', updateViewportSize);
+    window.addEventListener('orientationchange', updateViewportSize);
+    window.visualViewport?.addEventListener('resize', updateViewportSize);
+
+    return () => {
+      window.removeEventListener('resize', updateViewportSize);
+      window.removeEventListener('orientationchange', updateViewportSize);
+      window.visualViewport?.removeEventListener('resize', updateViewportSize);
+    };
+  }, []);
 
   const [exportState, setExportState] = useState<ExportState>({
     errorMessage: '',
@@ -1664,29 +1734,56 @@ function App() {
     [],
   );
 
-  const createResizeHandler = (setter: any, startSize: number) => (e: any) => {
+  const createResizeHandler = (setter: any, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
+    e.stopPropagation();
     setIsResizing(true);
+    const pointerId = e.pointerId;
+    const target = e.currentTarget;
     const startX = e.clientX;
     const startY = e.clientY;
-    const doDrag = (moveEvent: any) => {
+    const previousTouchAction = document.documentElement.style.touchAction;
+    const previousUserSelect = document.documentElement.style.userSelect;
+
+    target.setPointerCapture?.(pointerId);
+    document.documentElement.style.touchAction = 'none';
+    document.documentElement.style.userSelect = 'none';
+
+    const doDrag = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      moveEvent.preventDefault();
       if (setter === setLeftPanelWidth) {
         setter(Math.max(200, Math.min(startSize + (moveEvent.clientX - startX), 500)));
       } else if (setter === setRightPanelWidth) {
         setter(Math.max(280, Math.min(startSize - (moveEvent.clientX - startX), 600)));
       } else if (setter === setBottomPanelHeight) {
         setter(Math.max(100, Math.min(startSize - (moveEvent.clientY - startY), 400)));
+      } else if (setter === setCompactEditorPanelHeightOverride) {
+        setter(
+          Math.max(
+            compactEditorPanelMinHeight,
+            Math.min(startSize - (moveEvent.clientY - startY), compactEditorPanelMaxHeight),
+          ),
+        );
       }
     };
-    const stopDrag = () => {
+    const stopDrag = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== pointerId) return;
+      if (target.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId);
       document.documentElement.style.cursor = '';
-      window.removeEventListener('mousemove', doDrag);
-      window.removeEventListener('mouseup', stopDrag);
+      document.documentElement.style.touchAction = previousTouchAction;
+      document.documentElement.style.userSelect = previousUserSelect;
+      window.removeEventListener('pointermove', doDrag);
+      window.removeEventListener('pointerup', stopDrag);
+      window.removeEventListener('pointercancel', stopDrag);
       setIsResizing(false);
     };
-    document.documentElement.style.cursor = setter === setBottomPanelHeight ? 'row-resize' : 'col-resize';
-    window.addEventListener('mousemove', doDrag);
-    window.addEventListener('mouseup', stopDrag);
+    document.documentElement.style.cursor =
+      setter === setBottomPanelHeight || setter === setCompactEditorPanelHeightOverride ? 'row-resize' : 'col-resize';
+    window.addEventListener('pointermove', doDrag, { passive: false });
+    window.addEventListener('pointerup', stopDrag);
+    window.addEventListener('pointercancel', stopDrag);
   };
 
   useEffect(() => {
@@ -4089,17 +4186,32 @@ function App() {
     [renameTargetPaths, refreshImageList, selectedImage, libraryActivePath, handleImageSelect, handleBackToLibrary],
   );
 
-  const handleStartImport = async (settings: AppSettings) => {
-    if (importSourcePaths.length > 0 && importTargetFolder) {
-      invoke(Invokes.ImportFiles, {
-        destinationFolder: importTargetFolder,
-        settings: settings,
-        sourcePaths: importSourcePaths,
-      }).catch((err) => {
+  const startImportFiles = useCallback(
+    async (sourcePaths: string[], destinationFolder: string, settings: ImportSettings) => {
+      if (sourcePaths.length === 0 || !destinationFolder) {
+        return;
+      }
+
+      try {
+        await invoke(Invokes.ImportFiles, {
+          destinationFolder,
+          settings,
+          sourcePaths,
+        });
+      } catch (err) {
         console.error('Failed to start import:', err);
         setImportState({ status: Status.Error, errorMessage: `Failed to start import: ${err}` });
-      });
+      }
+    },
+    [],
+  );
+
+  const handleStartImport = async (settings: ImportSettings) => {
+    if (!importTargetFolder) {
+      return;
     }
+
+    await startImportFiles(importSourcePaths, importTargetFolder, settings);
   };
 
   const handleResetAdjustments = useCallback(
@@ -4181,6 +4293,11 @@ function App() {
         });
 
         if (Array.isArray(selected) && selected.length > 0) {
+          if (isAndroid) {
+            await startImportFiles(selected, targetPath, DEFAULT_IMPORT_SETTINGS);
+            return;
+          }
+
           setImportSourcePaths(selected);
           setImportTargetFolder(targetPath);
           setIsImportModalOpen(true);
@@ -4189,7 +4306,7 @@ function App() {
         console.error('Failed to open file dialog for import:', err);
       }
     },
-    [supportedTypes],
+    [isAndroid, startImportFiles, supportedTypes],
   );
 
   const handleEditorContextMenu = (event: any) => {
@@ -5127,113 +5244,317 @@ function App() {
     };
 
     if (selectedImage) {
-      return (
-        <div className="flex flex-row grow h-full min-h-0">
-          <div className="flex-1 flex flex-col min-w-0">
-            <Editor
-              appSettings={appSettings}
-              activeAiPatchContainerId={activeAiPatchContainerId}
-              activeAiSubMaskId={activeAiSubMaskId}
-              activeMaskContainerId={activeMaskContainerId}
-              activeMaskId={activeMaskId}
-              activeRightPanel={activeRightPanel}
-              adjustments={adjustments}
-              brushSettings={brushSettings}
-              canRedo={canRedo}
-              canUndo={canUndo}
-              finalPreviewUrl={finalPreviewUrl}
-              interactivePatch={interactivePatch}
-              isFullScreen={isFullScreen}
-              isLoading={isViewLoading}
-              isSliderDragging={isSliderDragging}
-              isMaskControlHovered={isMaskControlHovered}
-              isStraightenActive={isStraightenActive}
-              onBackToLibrary={handleBackToLibrary}
-              onContextMenu={handleEditorContextMenu}
-              onGenerateAiMask={handleGenerateAiMask}
-              onQuickErase={handleQuickErase}
-              onRedo={redo}
-              onSelectAiSubMask={setActiveAiSubMaskId}
-              onSelectMask={setActiveMaskId}
-              onStraighten={handleStraighten}
-              onToggleFullScreen={handleToggleFullScreen}
-              onUndo={undo}
-              onZoomed={handleUserTransform}
-              renderedRightPanel={renderedRightPanel}
-              selectedImage={selectedImage}
-              isWbPickerActive={isWbPickerActive}
-              onWbPicked={handleWbPicked}
-              setAdjustments={setAdjustments}
-              setShowOriginal={setShowOriginal}
-              showOriginal={showOriginal}
-              targetZoom={zoom}
-              thumbnails={thumbnails}
-              transformWrapperRef={transformWrapperRef}
-              transformedOriginalUrl={transformedOriginalUrl}
-              uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
-              updateSubMask={updateSubMask}
-              onDisplaySizeChange={handleDisplaySizeChange}
-              originalSize={originalSize}
-              isRotationActive={isRotationActive}
-              overlayMode={overlayMode}
-              overlayRotation={overlayRotation}
-              adjustmentsHistory={adjustmentsHistory}
-              adjustmentsHistoryIndex={adjustmentsHistoryIndex}
-              goToAdjustmentsHistoryIndex={goToAdjustmentsHistoryIndex}
-              liveRotation={liveRotation}
-              isInstantTransition={isInstantTransition}
-              hasRenderedFirstFrame={hasRenderedFirstFrame}
+const editorNode = (
+        <Editor
+          appSettings={appSettings}
+          activeAiPatchContainerId={activeAiPatchContainerId}
+          activeAiSubMaskId={activeAiSubMaskId}
+          activeMaskContainerId={activeMaskContainerId}
+          activeMaskId={activeMaskId}
+          activeRightPanel={activeRightPanel}
+          adjustments={adjustments}
+          brushSettings={brushSettings}
+          canRedo={canRedo}
+          canUndo={canUndo}
+          finalPreviewUrl={finalPreviewUrl}
+          interactivePatch={interactivePatch}
+          isFullScreen={isFullScreen}
+          isLoading={isViewLoading}
+          isSliderDragging={isSliderDragging}
+          isMaskControlHovered={isMaskControlHovered}
+          isStraightenActive={isStraightenActive}
+          onBackToLibrary={handleBackToLibrary}
+          onContextMenu={handleEditorContextMenu}
+          onGenerateAiMask={handleGenerateAiMask}
+          onQuickErase={handleQuickErase}
+          onRedo={redo}
+          onSelectAiSubMask={setActiveAiSubMaskId}
+          onSelectMask={setActiveMaskId}
+          onStraighten={handleStraighten}
+          onToggleFullScreen={handleToggleFullScreen}
+          onUndo={undo}
+          onZoomed={handleUserTransform}
+          renderedRightPanel={renderedRightPanel}
+          selectedImage={selectedImage}
+          isWbPickerActive={isWbPickerActive}
+          onWbPicked={handleWbPicked}
+          setAdjustments={setAdjustments}
+          setShowOriginal={setShowOriginal}
+          showOriginal={showOriginal}
+          targetZoom={zoom}
+          thumbnails={thumbnails}
+          transformWrapperRef={transformWrapperRef}
+          transformedOriginalUrl={transformedOriginalUrl}
+          uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
+          updateSubMask={updateSubMask}
+          onDisplaySizeChange={handleDisplaySizeChange}
+          originalSize={originalSize}
+          isRotationActive={isRotationActive}
+          overlayMode={overlayMode}
+          overlayRotation={overlayRotation}
+          adjustmentsHistory={adjustmentsHistory}
+          adjustmentsHistoryIndex={adjustmentsHistoryIndex}
+          goToAdjustmentsHistoryIndex={goToAdjustmentsHistoryIndex}
+          liveRotation={liveRotation}
+          isInstantTransition={isInstantTransition}
+          hasRenderedFirstFrame={hasRenderedFirstFrame}
+        />
+      );
+
+      const editorBottomBarComponent = (
+        <BottomBar
+          filmstripHeight={bottomPanelHeight}
+          imageList={sortedImageList}
+          imageRatings={imageRatings}
+          isCopied={isCopied}
+          isCopyDisabled={!selectedImage}
+          isFilmstripVisible={uiVisibility.filmstrip}
+          isLoading={isViewLoading}
+          isPasted={isPasted}
+          isPasteDisabled={copiedAdjustments === null}
+          isRatingDisabled={!selectedImage}
+          isResizing={isResizing}
+          multiSelectedPaths={multiSelectedPaths}
+          displaySize={displaySize}
+          originalSize={originalSize}
+          baseRenderSize={baseRenderSize}
+          onClearSelection={handleClearSelection}
+          onContextMenu={handleThumbnailContextMenu}
+          onCopy={handleCopyAdjustments}
+          onOpenCopyPasteSettings={() => setIsCopyPasteSettingsModalOpen(true)}
+          onImageSelect={handleImageClick}
+          onPaste={() => handlePasteAdjustments()}
+          onRate={handleRate}
+          onRequestThumbnails={requestThumbnails}
+          onZoomChange={handleZoomChange}
+          rating={imageRatings[selectedImage?.path || ''] || 0}
+          selectedImage={selectedImage}
+          setIsFilmstripVisible={(value: boolean) =>
+            setUiVisibility((prev: UiVisibility) => ({ ...prev, filmstrip: value }))
+          }
+          showFilmstrip={!isCompactPortrait}
+          showZoomControls={!isAndroid}
+          thumbnailAspectRatio={thumbnailAspectRatio}
+          thumbnails={thumbnails}
+          zoom={zoom}
+          totalImages={sortedImageList.length}
+        />
+      );
+
+      const editorBottomBarNode = (
+        <div
+          className={clsx(
+            'flex flex-col w-full overflow-hidden shrink-0',
+            !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+          )}
+          style={{
+            maxHeight: isFullScreen ? '0px' : '500px',
+            opacity: isFullScreen ? 0 : 1,
+          }}
+        >
+          {!isCompactPortrait && (
+            <Resizer
+              direction={Orientation.Horizontal}
+              onMouseDown={createResizeHandler(setBottomPanelHeight, bottomPanelHeight)}
             />
+          )}
+          {editorBottomBarComponent}
+        </div>
+      );
+
+      const editorRightPanelContent = (
+        <AnimatePresence mode="wait" custom={slideDirection}>
+          {activeRightPanel && (
+            <motion.div
+              animate="animate"
+              className="h-full w-full"
+              custom={slideDirection}
+              exit="exit"
+              initial="initial"
+              key={renderedRightPanel}
+              variants={panelVariants}
+            >
+              {renderedRightPanel === Panel.Adjustments && (
+                <Controls
+                  adjustments={adjustments}
+                  collapsibleState={collapsibleSectionsState}
+                  copiedSectionAdjustments={copiedSectionAdjustments}
+                  handleAutoAdjustments={handleAutoAdjustments}
+                  histogram={histogram}
+                  selectedImage={selectedImage}
+                  setAdjustments={setAdjustments}
+                  setCollapsibleState={setCollapsibleSectionsState}
+                  setCopiedSectionAdjustments={setCopiedSectionAdjustments}
+                  theme={theme}
+                  handleLutSelect={handleLutSelect}
+                  appSettings={appSettings}
+                  isWbPickerActive={isWbPickerActive}
+                  toggleWbPicker={toggleWbPicker}
+                  onDragStateChange={setIsSliderDragging}
+                  isWaveformVisible={isWaveformVisible}
+                  waveform={waveform}
+                  onToggleWaveform={handleToggleWaveform}
+                  activeWaveformChannel={activeWaveformChannel}
+                  setActiveWaveformChannel={setActiveWaveformChannel}
+                  waveformHeight={waveformHeight}
+                  setWaveformHeight={setWaveformHeight}
+                />
+              )}
+              {renderedRightPanel === Panel.Metadata && (
+                <MetadataPanel
+                  selectedImage={selectedImage}
+                  rating={imageRatings[selectedImage.path] || 0}
+                  tags={imageList.find((img) => img.path === selectedImage.path)?.tags || []}
+                  onRate={handleRate}
+                  onSetColorLabel={handleSetColorLabel}
+                  onTagsChanged={handleTagsChanged}
+                  appSettings={appSettings}
+                />
+              )}
+              {renderedRightPanel === Panel.Crop && (
+                <CropPanel
+                  adjustments={adjustments}
+                  isStraightenActive={isStraightenActive}
+                  selectedImage={selectedImage}
+                  setAdjustments={setAdjustments}
+                  setIsStraightenActive={setIsStraightenActive}
+                  setIsRotationActive={setIsRotationActive}
+                  overlayMode={overlayMode}
+                  overlayRotation={overlayRotation}
+                  setOverlayRotation={setOverlayRotation}
+                  setOverlayMode={setOverlayMode}
+                  onLiveRotationChange={setLiveRotation}
+                />
+              )}
+              {renderedRightPanel === Panel.Masks && (
+                <MasksPanel
+                  activeMaskContainerId={activeMaskContainerId}
+                  activeMaskId={activeMaskId}
+                  adjustments={adjustments}
+                  aiModelDownloadStatus={aiModelDownloadStatus}
+                  appSettings={appSettings}
+                  brushSettings={brushSettings}
+                  copiedMask={copiedMask}
+                  histogram={histogram}
+                  isGeneratingAiMask={isGeneratingAiMask}
+                  onGenerateAiDepthMask={handleGenerateAiDepthMask}
+                  onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
+                  onGenerateAiSkyMask={handleGenerateAiSkyMask}
+                  onSelectContainer={setActiveMaskContainerId}
+                  onSelectMask={setActiveMaskId}
+                  selectedImage={selectedImage}
+                  setAdjustments={setAdjustments}
+                  setBrushSettings={setBrushSettings}
+                  setCopiedMask={setCopiedMask}
+                  setCustomEscapeHandler={setCustomEscapeHandler}
+                  onDragStateChange={setIsSliderDragging}
+                  isWaveformVisible={isWaveformVisible}
+                  onToggleWaveform={handleToggleWaveform}
+                  waveform={waveform}
+                  activeWaveformChannel={activeWaveformChannel}
+                  setActiveWaveformChannel={setActiveWaveformChannel}
+                  waveformHeight={waveformHeight}
+                  setWaveformHeight={setWaveformHeight}
+                  setIsMaskControlHovered={setIsMaskControlHovered}
+                />
+              )}
+              {renderedRightPanel === Panel.Presets && (
+                <PresetsPanel
+                  activePanel={activeRightPanel}
+                  adjustments={adjustments}
+                  selectedImage={selectedImage}
+                  onNavigateToCommunity={() => {
+                    handleBackToLibrary();
+                    setActiveView('community');
+                  }}
+                  setAdjustments={setAdjustments}
+                />
+              )}
+              {renderedRightPanel === Panel.Export && (
+                <ExportPanel
+                  adjustments={adjustments}
+                  exportState={exportState}
+                  multiSelectedPaths={multiSelectedPaths}
+                  selectedImage={selectedImage}
+                  setExportState={setExportState}
+                  appSettings={appSettings}
+                  onSettingsChange={handleSettingsChange}
+                  rootPath={rootPath}
+                />
+              )}
+              {renderedRightPanel === Panel.Ai && (
+                <AIPanel
+                  activePatchContainerId={activeAiPatchContainerId}
+                  activeSubMaskId={activeAiSubMaskId}
+                  adjustments={adjustments}
+                  aiModelDownloadStatus={aiModelDownloadStatus}
+                  brushSettings={brushSettings}
+                  isAIConnectorConnected={isAIConnectorConnected}
+                  isGeneratingAi={isGeneratingAi}
+                  isGeneratingAiMask={isGeneratingAiMask}
+                  onDeletePatch={handleDeleteAiPatch}
+                  onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
+                  onGenerativeReplace={handleGenerativeReplace}
+                  onSelectPatchContainer={setActiveAiPatchContainerId}
+                  onSelectSubMask={setActiveAiSubMaskId}
+                  onTogglePatchVisibility={handleToggleAiPatchVisibility}
+                  selectedImage={selectedImage}
+                  setAdjustments={setAdjustments}
+                  setBrushSettings={setBrushSettings}
+                  setCustomEscapeHandler={setCustomEscapeHandler}
+                />
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      );
+
+      if (isCompactPortrait) {
+        return (
+          <div className="flex flex-col grow h-full min-h-0 gap-2">
+            <div className="flex-1 flex flex-col min-h-0 min-w-0">{editorNode}</div>
+
             <div
               className={clsx(
-                'flex flex-col w-full overflow-hidden shrink-0',
+                'flex flex-col bg-bg-secondary rounded-lg overflow-hidden shrink-0',
                 !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
               )}
               style={{
-                maxHeight: isFullScreen ? '0px' : '500px',
+                height: isFullScreen
+                  ? '0px'
+                  : `${activeRightPanel ? compactEditorPanelHeight : compactEditorPanelCollapsedHeight}px`,
                 opacity: isFullScreen ? 0 : 1,
               }}
             >
-              <Resizer
-                direction={Orientation.Horizontal}
-                onMouseDown={createResizeHandler(setBottomPanelHeight, bottomPanelHeight)}
-              />
-              <BottomBar
-                filmstripHeight={bottomPanelHeight}
-                imageList={sortedImageList}
-                imageRatings={imageRatings}
-                isCopied={isCopied}
-                isCopyDisabled={!selectedImage}
-                isFilmstripVisible={uiVisibility.filmstrip}
-                isLoading={isViewLoading}
-                isPasted={isPasted}
-                isPasteDisabled={copiedAdjustments === null}
-                isRatingDisabled={!selectedImage}
-                isResizing={isResizing}
-                multiSelectedPaths={multiSelectedPaths}
-                displaySize={displaySize}
-                originalSize={originalSize}
-                baseRenderSize={baseRenderSize}
-                onClearSelection={handleClearSelection}
-                onContextMenu={handleThumbnailContextMenu}
-                onCopy={handleCopyAdjustments}
-                onOpenCopyPasteSettings={() => setIsCopyPasteSettingsModalOpen(true)}
-                onImageSelect={handleImageClick}
-                onPaste={() => handlePasteAdjustments()}
-                onRate={handleRate}
-                onRequestThumbnails={requestThumbnails}
-                onZoomChange={handleZoomChange}
-                rating={imageRatings[selectedImage?.path || ''] || 0}
-                selectedImage={selectedImage}
-                setIsFilmstripVisible={(value: boolean) =>
-                  setUiVisibility((prev: UiVisibility) => ({ ...prev, filmstrip: value }))
-                }
-                thumbnailAspectRatio={thumbnailAspectRatio}
-                thumbnails={thumbnails}
-                zoom={zoom}
-                totalImages={sortedImageList.length}
-              />
+              {activeRightPanel && !isFullScreen && (
+                <Resizer
+                  direction={Orientation.Horizontal}
+                  onMouseDown={createResizeHandler(setCompactEditorPanelHeightOverride, compactEditorPanelHeight)}
+                />
+              )}
+
+              <div className="min-h-0 flex-1 overflow-hidden">{editorRightPanelContent}</div>
+
+              <div className="shrink-0 border-t border-surface">
+                <RightPanelSwitcher
+                  activePanel={activeRightPanel}
+                  onPanelSelect={handleRightPanelSelect}
+                  isInstantTransition={isInstantTransition}
+                  layout="horizontal"
+                />
+              </div>
+
+              <div className="shrink-0 border-t border-surface">{editorBottomBarComponent}</div>
             </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="flex flex-row grow h-full min-h-0">
+          <div className="flex-1 flex flex-col min-w-0">
+            {editorNode}
+            {editorBottomBarNode}
           </div>
 
           <div
@@ -5259,150 +5580,7 @@ function App() {
                 style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
               >
                 <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
-                  <AnimatePresence mode="wait" custom={slideDirection}>
-                    {activeRightPanel && (
-                      <motion.div
-                        animate="animate"
-                        className="h-full w-full"
-                        custom={slideDirection}
-                        exit="exit"
-                        initial="initial"
-                        key={renderedRightPanel}
-                        variants={panelVariants}
-                      >
-                        {renderedRightPanel === Panel.Adjustments && (
-                          <Controls
-                            adjustments={adjustments}
-                            collapsibleState={collapsibleSectionsState}
-                            copiedSectionAdjustments={copiedSectionAdjustments}
-                            handleAutoAdjustments={handleAutoAdjustments}
-                            histogram={histogram}
-                            selectedImage={selectedImage}
-                            setAdjustments={setAdjustments}
-                            setCollapsibleState={setCollapsibleSectionsState}
-                            setCopiedSectionAdjustments={setCopiedSectionAdjustments}
-                            theme={theme}
-                            handleLutSelect={handleLutSelect}
-                            appSettings={appSettings}
-                            isWbPickerActive={isWbPickerActive}
-                            toggleWbPicker={toggleWbPicker}
-                            onDragStateChange={setIsSliderDragging}
-                            isWaveformVisible={isWaveformVisible}
-                            waveform={waveform}
-                            onToggleWaveform={handleToggleWaveform}
-                            activeWaveformChannel={activeWaveformChannel}
-                            setActiveWaveformChannel={setActiveWaveformChannel}
-                            waveformHeight={waveformHeight}
-                            setWaveformHeight={setWaveformHeight}
-                          />
-                        )}
-                        {renderedRightPanel === Panel.Metadata && (
-                          <MetadataPanel
-                            selectedImage={selectedImage}
-                            rating={imageRatings[selectedImage.path] || 0}
-                            tags={imageList.find((img) => img.path === selectedImage.path)?.tags || []}
-                            onRate={handleRate}
-                            onSetColorLabel={handleSetColorLabel}
-                            onTagsChanged={handleTagsChanged}
-                            appSettings={appSettings}
-                          />
-                        )}
-                        {renderedRightPanel === Panel.Crop && (
-                          <CropPanel
-                            adjustments={adjustments}
-                            isStraightenActive={isStraightenActive}
-                            selectedImage={selectedImage}
-                            setAdjustments={setAdjustments}
-                            setIsStraightenActive={setIsStraightenActive}
-                            setIsRotationActive={setIsRotationActive}
-                            overlayMode={overlayMode}
-                            overlayRotation={overlayRotation}
-                            setOverlayRotation={setOverlayRotation}
-                            setOverlayMode={setOverlayMode}
-                            onLiveRotationChange={setLiveRotation}
-                          />
-                        )}
-                        {renderedRightPanel === Panel.Masks && (
-                          <MasksPanel
-                            activeMaskContainerId={activeMaskContainerId}
-                            activeMaskId={activeMaskId}
-                            adjustments={adjustments}
-                            aiModelDownloadStatus={aiModelDownloadStatus}
-                            appSettings={appSettings}
-                            brushSettings={brushSettings}
-                            copiedMask={copiedMask}
-                            histogram={histogram}
-                            isGeneratingAiMask={isGeneratingAiMask}
-                            onGenerateAiDepthMask={handleGenerateAiDepthMask}
-                            onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
-                            onGenerateAiSkyMask={handleGenerateAiSkyMask}
-                            onSelectContainer={setActiveMaskContainerId}
-                            onSelectMask={setActiveMaskId}
-                            selectedImage={selectedImage}
-                            setAdjustments={setAdjustments}
-                            setBrushSettings={setBrushSettings}
-                            setCopiedMask={setCopiedMask}
-                            setCustomEscapeHandler={setCustomEscapeHandler}
-                            onDragStateChange={setIsSliderDragging}
-                            isWaveformVisible={isWaveformVisible}
-                            onToggleWaveform={handleToggleWaveform}
-                            waveform={waveform}
-                            activeWaveformChannel={activeWaveformChannel}
-                            setActiveWaveformChannel={setActiveWaveformChannel}
-                            waveformHeight={waveformHeight}
-                            setWaveformHeight={setWaveformHeight}
-                            setIsMaskControlHovered={setIsMaskControlHovered}
-                          />
-                        )}
-                        {renderedRightPanel === Panel.Presets && (
-                          <PresetsPanel
-                            activePanel={activeRightPanel}
-                            adjustments={adjustments}
-                            selectedImage={selectedImage}
-                            onNavigateToCommunity={() => {
-                              handleBackToLibrary();
-                              setActiveView('community');
-                            }}
-                            setAdjustments={setAdjustments}
-                          />
-                        )}
-                        {renderedRightPanel === Panel.Export && (
-                          <ExportPanel
-                            adjustments={adjustments}
-                            exportState={exportState}
-                            multiSelectedPaths={multiSelectedPaths}
-                            selectedImage={selectedImage}
-                            setExportState={setExportState}
-                            appSettings={appSettings}
-                            onSettingsChange={handleSettingsChange}
-                            rootPath={rootPath}
-                          />
-                        )}
-                        {renderedRightPanel === Panel.Ai && (
-                          <AIPanel
-                            activePatchContainerId={activeAiPatchContainerId}
-                            activeSubMaskId={activeAiSubMaskId}
-                            adjustments={adjustments}
-                            aiModelDownloadStatus={aiModelDownloadStatus}
-                            brushSettings={brushSettings}
-                            isAIConnectorConnected={isAIConnectorConnected}
-                            isGeneratingAi={isGeneratingAi}
-                            isGeneratingAiMask={isGeneratingAiMask}
-                            onDeletePatch={handleDeleteAiPatch}
-                            onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
-                            onGenerativeReplace={handleGenerativeReplace}
-                            onSelectPatchContainer={setActiveAiPatchContainerId}
-                            onSelectSubMask={setActiveAiSubMaskId}
-                            onTogglePatchVisibility={handleToggleAiPatchVisibility}
-                            selectedImage={selectedImage}
-                            setAdjustments={setAdjustments}
-                            setBrushSettings={setBrushSettings}
-                            setCustomEscapeHandler={setCustomEscapeHandler}
-                          />
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+{editorRightPanelContent}
                 </div>
               </div>
               <div
@@ -5429,6 +5607,7 @@ function App() {
     return renderMainView();
   };
 
+  const shouldHideFolderTree = isAndroid;
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
 
   useEffect(() => {
@@ -5485,7 +5664,7 @@ function App() {
         )}
       >
         <div className="flex flex-row grow h-full min-h-0">
-          {renderFolderTree()}
+          {!shouldHideFolderTree && renderFolderTree()}
           <div className="flex-1 flex flex-col min-w-0">{renderContent()}</div>
           {!selectedImage && isLibraryExportPanelVisible && (
             <Resizer
