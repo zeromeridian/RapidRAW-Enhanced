@@ -97,7 +97,8 @@ export default function Controls({
       if (moveEvent.pointerId !== pointerId) return;
       moveEvent.preventDefault();
       const delta = moveEvent.clientY - startY;
-      if (setWaveformHeight) setWaveformHeight(Math.max(150, Math.min(450, startHeight + delta)));
+      const newHeight = Math.round(Math.max(150, Math.min(450, startHeight + delta)));
+      if (setWaveformHeight) setWaveformHeight(newHeight);
     };
 
     const handlePointerUp = (upEvent: PointerEvent) => {

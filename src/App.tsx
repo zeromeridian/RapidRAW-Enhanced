@@ -1739,10 +1739,12 @@ function App() {
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(true);
+
     const pointerId = e.pointerId;
     const target = e.currentTarget;
     const startX = e.clientX;
     const startY = e.clientY;
+
     const previousTouchAction = document.documentElement.style.touchAction;
     const previousUserSelect = document.documentElement.style.userSelect;
 
@@ -1753,27 +1755,33 @@ function App() {
     const doDrag = (moveEvent: PointerEvent) => {
       if (moveEvent.pointerId !== pointerId) return;
       moveEvent.preventDefault();
+
       if (setter === setLeftPanelWidth) {
-        setter(Math.max(200, Math.min(startSize + (moveEvent.clientX - startX), 500)));
+        setter(Math.round(Math.max(200, Math.min(startSize + (moveEvent.clientX - startX), 500))));
       } else if (setter === setRightPanelWidth) {
-        setter(Math.max(280, Math.min(startSize - (moveEvent.clientX - startX), 600)));
+        setter(Math.round(Math.max(280, Math.min(startSize - (moveEvent.clientX - startX), 600))));
       } else if (setter === setBottomPanelHeight) {
-        setter(Math.max(100, Math.min(startSize - (moveEvent.clientY - startY), 400)));
+        setter(Math.round(Math.max(100, Math.min(startSize - (moveEvent.clientY - startY), 400))));
       } else if (setter === setCompactEditorPanelHeightOverride) {
         setter(
-          Math.max(
-            compactEditorPanelMinHeight,
-            Math.min(startSize - (moveEvent.clientY - startY), compactEditorPanelMaxHeight),
+          Math.round(
+            Math.max(
+              compactEditorPanelMinHeight,
+              Math.min(startSize - (moveEvent.clientY - startY), compactEditorPanelMaxHeight),
+            ),
           ),
         );
       }
     };
+
     const stopDrag = (upEvent: PointerEvent) => {
       if (upEvent.pointerId !== pointerId) return;
       if (target.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId);
+
       document.documentElement.style.cursor = '';
       document.documentElement.style.touchAction = previousTouchAction;
       document.documentElement.style.userSelect = previousUserSelect;
+
       window.removeEventListener('pointermove', doDrag);
       window.removeEventListener('pointerup', stopDrag);
       window.removeEventListener('pointercancel', stopDrag);
@@ -1781,6 +1789,7 @@ function App() {
     };
     document.documentElement.style.cursor =
       setter === setBottomPanelHeight || setter === setCompactEditorPanelHeightOverride ? 'row-resize' : 'col-resize';
+
     window.addEventListener('pointermove', doDrag, { passive: false });
     window.addEventListener('pointerup', stopDrag);
     window.addEventListener('pointercancel', stopDrag);
@@ -5244,7 +5253,7 @@ function App() {
     };
 
     if (selectedImage) {
-const editorNode = (
+      const editorNode = (
         <Editor
           appSettings={appSettings}
           activeAiPatchContainerId={activeAiPatchContainerId}
@@ -5580,7 +5589,7 @@ const editorNode = (
                 style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
               >
                 <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
-{editorRightPanelContent}
+                  {editorRightPanelContent}
                 </div>
               </div>
               <div
