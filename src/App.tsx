@@ -236,13 +236,6 @@ const RIGHT_PANEL_ORDER = [
 ];
 
 const DEBUG = false;
-const COMPACT_EDITOR_MAX_WIDTH = 900;
-const DEFAULT_IMPORT_SETTINGS: ImportSettings = {
-  filenameTemplate: '{original_filename}',
-  organizeByDate: false,
-  dateFolderFormat: 'YYYY/MM-DD',
-  deleteAfterImport: false,
-};
 
 const getParentDir = (filePath: string): string => {
   const separator = filePath.includes('/') ? '/' : '\\';
@@ -279,6 +272,14 @@ const insertChildrenIntoTree = (node: any, targetPath: string, newChildren: any[
 };
 
 function App() {
+  const COMPACT_EDITOR_MAX_WIDTH = 900;
+  const DEFAULT_IMPORT_SETTINGS: ImportSettings = {
+    filenameTemplate: '{original_filename}',
+    organizeByDate: false,
+    dateFolderFormat: 'YYYY/MM-DD',
+    deleteAfterImport: false,
+  };
+
   const [rootPath, setRootPath] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [osPlatform, setOsPlatform] = useState(() => {
@@ -5606,7 +5607,7 @@ const editorNode = (
     return renderMainView();
   };
 
-  const shouldHideFolderTree = isAndroid || isPortraitViewport;
+  const shouldHideFolderTree = isAndroid;
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
 
   useEffect(() => {
