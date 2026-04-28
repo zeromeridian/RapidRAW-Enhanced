@@ -5518,93 +5518,84 @@ function App() {
         </AnimatePresence>
       );
 
-      if (isCompactPortrait) {
-        return (
-          <div className="flex flex-col grow h-full min-h-0 gap-2">
-            <div className="flex-1 flex flex-col min-h-0 min-w-0">{editorNode}</div>
-
-            <div
-              className={clsx(
-                'flex flex-col bg-bg-secondary rounded-lg overflow-hidden shrink-0',
-                !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-              )}
-              style={{
-                height: isFullScreen
-                  ? '0px'
-                  : `${activeRightPanel ? compactEditorPanelHeight : compactEditorPanelCollapsedHeight}px`,
-                opacity: isFullScreen ? 0 : 1,
-              }}
-            >
-              {activeRightPanel && !isFullScreen && (
-                <Resizer
-                  direction={Orientation.Horizontal}
-                  onMouseDown={createResizeHandler(setCompactEditorPanelHeightOverride, compactEditorPanelHeight)}
-                />
-              )}
-
-              <div className="min-h-0 flex-1 overflow-hidden">{editorRightPanelContent}</div>
-
-              <div className="shrink-0 border-t border-surface">
-                <RightPanelSwitcher
-                  activePanel={activeRightPanel}
-                  onPanelSelect={handleRightPanelSelect}
-                  isInstantTransition={isInstantTransition}
-                  layout="horizontal"
-                />
-              </div>
-
-              <div className="shrink-0 border-t border-surface">{editorBottomBarComponent}</div>
-            </div>
-          </div>
-        );
-      }
-
       return (
-        <div className="flex flex-row grow h-full min-h-0">
-          <div className="flex-1 flex flex-col min-w-0">
+        <div className={clsx('flex grow h-full min-h-0', isCompactPortrait ? 'flex-col gap-2' : 'flex-row')}>
+          <div className={clsx('flex-1 flex flex-col min-w-0', isCompactPortrait && 'min-h-0')}>
             {editorNode}
-            {editorBottomBarNode}
+            {!isCompactPortrait && editorBottomBarNode}
           </div>
-
           <div
             className={clsx(
-              'flex h-full overflow-hidden shrink-0',
+              'flex overflow-hidden shrink-0',
+              isCompactPortrait ? 'flex-col bg-bg-secondary rounded-lg' : 'h-full bg-transparent',
               !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
             )}
-            style={{
-              maxWidth: isFullScreen ? '0px' : '1000px',
-              opacity: isFullScreen ? 0 : 1,
-            }}
+            style={
+              isCompactPortrait
+                ? {
+                    height: isFullScreen
+                      ? '0px'
+                      : `${activeRightPanel ? compactEditorPanelHeight : compactEditorPanelCollapsedHeight}px`,
+                    opacity: isFullScreen ? 0 : 1,
+                  }
+                : {
+                    maxWidth: isFullScreen ? '0px' : '1000px',
+                    opacity: isFullScreen ? 0 : 1,
+                  }
+            }
           >
-            <Resizer
-              onMouseDown={createResizeHandler(setRightPanelWidth, rightPanelWidth)}
-              direction={Orientation.Vertical}
-            />
-            <div className="flex bg-bg-secondary rounded-lg h-full">
-              <div
-                className={clsx(
-                  'h-full overflow-hidden',
-                  !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+            {isCompactPortrait ? (
+              <>
+                {activeRightPanel && !isFullScreen && (
+                  <Resizer
+                    direction={Orientation.Horizontal}
+                    onMouseDown={createResizeHandler(setCompactEditorPanelHeightOverride, compactEditorPanelHeight)}
+                  />
                 )}
-                style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
-              >
-                <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
-                  {editorRightPanelContent}
+                <div className="min-h-0 flex-1 overflow-hidden">{editorRightPanelContent}</div>
+                <div className="shrink-0 border-t border-surface">
+                  <RightPanelSwitcher
+                    activePanel={activeRightPanel}
+                    onPanelSelect={handleRightPanelSelect}
+                    isInstantTransition={isInstantTransition}
+                    layout="horizontal"
+                  />
                 </div>
-              </div>
-              <div
-                className={clsx(
-                  'h-full border-l transition-colors',
-                  activeRightPanel ? 'border-surface' : 'border-transparent',
-                )}
-              >
-                <RightPanelSwitcher
-                  activePanel={activeRightPanel}
-                  onPanelSelect={handleRightPanelSelect}
-                  isInstantTransition={isInstantTransition}
+                <div className="shrink-0 border-t border-surface">{editorBottomBarComponent}</div>
+              </>
+            ) : (
+              <>
+                <Resizer
+                  direction={Orientation.Vertical}
+                  onMouseDown={createResizeHandler(setRightPanelWidth, rightPanelWidth)}
                 />
-              </div>
-            </div>
+                <div className="flex bg-bg-secondary rounded-lg h-full">
+                  <div
+                    className={clsx(
+                      'h-full overflow-hidden',
+                      !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+                    )}
+                    style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
+                  >
+                    <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
+                      {editorRightPanelContent}
+                    </div>
+                  </div>
+                  <div
+                    className={clsx(
+                      'h-full border-l transition-colors',
+                      activeRightPanel ? 'border-surface' : 'border-transparent',
+                    )}
+                  >
+                    <RightPanelSwitcher
+                      activePanel={activeRightPanel}
+                      onPanelSelect={handleRightPanelSelect}
+                      isInstantTransition={isInstantTransition}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       );
