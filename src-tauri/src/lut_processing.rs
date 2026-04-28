@@ -5,8 +5,6 @@ use std::io::{BufRead, BufReader, Cursor};
 use std::path::Path;
 #[cfg(target_os = "android")]
 use std::fs;
-#[cfg(target_os = "android")]
-use std::hash::{Hash, DefaultHasher, Hasher};
 use crate::file_management::{is_android_content_uri};
 #[cfg(target_os = "android")]
 use crate::file_management::{read_android_content_uri, get_android_cached_lut_path, resolve_android_content_uri_name};
@@ -187,7 +185,6 @@ fn parse_hald(image: DynamicImage) -> Result<Lut> {
 pub fn parse_lut_file(path_str: &str) -> Result<Lut> {
     let (extension, bytes): (String, Option<Vec<u8>>) = if cfg!(target_os = "android") && is_android_content_uri(path_str) {
         #[cfg(target_os = "android")]
-        #[cfg(target_os = "android")]
         {
             match resolve_android_content_uri_name(path_str) {
                 Ok(resolved_name) => {
@@ -206,9 +203,7 @@ pub fn parse_lut_file(path_str: &str) -> Result<Lut> {
                     (ext, Some(uri_bytes))
                 }
                 Err(_) => {
-                    let mut hasher = DefaultHasher::new();
-                    path_str.hash(&mut hasher);
-                    let hash_prefix = format!("{:x}.", hasher.finish());
+                    let hash_prefix = format!("{}.", &blake3::hash(path_str.as_bytes()).to_hex()[..16]);
 
                     let cache_dir = get_android_cached_lut_path(path_str, "tmp")?
                         .parent()

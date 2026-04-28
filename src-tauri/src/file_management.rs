@@ -648,9 +648,7 @@ pub fn get_android_cached_lut_path(uri: &str, extension: &str) -> anyhow::Result
     let root_path_str: String = env.get_string(&path_jstring.into())
         .map_err(|e| anyhow::anyhow!(map_android_jni_error(&mut env, e)))?.into();
 
-    let mut hasher = DefaultHasher::new();
-    uri.hash(&mut hasher);
-    let hash = hasher.finish();
+    let hash = blake3::hash(uri.as_bytes());
 
     let mut path = PathBuf::from(root_path_str);
     path.push(".lut_cache"); 
@@ -659,7 +657,7 @@ pub fn get_android_cached_lut_path(uri: &str, extension: &str) -> anyhow::Result
         fs::create_dir_all(&path)?;
     }
     
-    path.push(format!("{:x}.{}", hash, extension));
+    path.push(format!("{}.{}", &hash.to_hex()[..16], extension));
     Ok(path)
 }
 
