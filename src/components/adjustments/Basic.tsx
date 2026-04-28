@@ -19,16 +19,16 @@ const toneMapperOptions = [
 interface ToneMapperSwitchProps {
   selectedMapper: string;
   onMapperChange: (mapper: string) => void;
-  exposureValue: number;
-  onExposureChange: (value: number) => void;
+  brightnessValue: number;
+  onBrightnessChange: (value: number) => void;
   onDragStateChange?: (isDragging: boolean) => void;
 }
 
 const ToneMapperSwitch = ({
   selectedMapper,
   onMapperChange,
-  exposureValue,
-  onExposureChange,
+  brightnessValue,
+  onBrightnessChange,
   onDragStateChange,
 }: ToneMapperSwitchProps) => {
   const [bubbleStyle, setBubbleStyle] = useState({});
@@ -37,7 +37,7 @@ const ToneMapperSwitch = ({
 
   const handleReset = () => {
     onMapperChange('basic');
-    onExposureChange(0);
+    onBrightnessChange(0);
   };
 
   useEffect(() => {
@@ -125,12 +125,12 @@ const ToneMapperSwitch = ({
         </div>
         <div className="mt-2.5 px-1">
           <Slider
-            label="Exposure"
+            label="Brightness"
             max={5}
             min={-5}
-            onChange={(e: any) => onExposureChange(parseFloat(e.target.value))}
+            onChange={(e: any) => onBrightnessChange(parseFloat(e.target.value))}
             step={0.01}
-            value={exposureValue}
+            value={brightnessValue}
             trackClassName="bg-surface"
             onDragStateChange={onDragStateChange}
           />
@@ -161,12 +161,12 @@ export default function BasicAdjustments({
   return (
     <div>
       <Slider
-        label="Brightness"
+        label="Exposure"
         max={5}
         min={-5}
-        onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Brightness, e.target.value)}
+        onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Exposure, e.target.value)}
         step={0.01}
-        value={adjustments.brightness}
+        value={adjustments.exposure}
         onDragStateChange={onDragStateChange}
       />
       <Slider
@@ -217,20 +217,20 @@ export default function BasicAdjustments({
 
       {isForMask ? (
         <Slider
-          label="Exposure"
+          label="Brightness"
           max={5}
           min={-5}
-          onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Exposure, e.target.value)}
+          onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Brightness, e.target.value)}
           step={0.01}
-          value={adjustments.exposure}
+          value={adjustments.brightness}
           onDragStateChange={onDragStateChange}
         />
       ) : (
         <ToneMapperSwitch
           selectedMapper={adjustments.toneMapper || 'agx'}
           onMapperChange={handleToneMapperChange}
-          exposureValue={adjustments.exposure}
-          onExposureChange={(value) => handleAdjustmentChange(BasicAdjustment.Exposure, value)}
+          brightnessValue={adjustments.brightness}
+          onBrightnessChange={(value) => handleAdjustmentChange(BasicAdjustment.Brightness, value)}
           onDragStateChange={onDragStateChange}
         />
       )}
