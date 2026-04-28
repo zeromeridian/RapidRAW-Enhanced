@@ -506,10 +506,9 @@ function App() {
   const previewJobIdRef = useRef<number>(0);
   const latestRenderedJobIdRef = useRef<number>(0);
   const isAndroid = osPlatform === 'android';
+  const isPortraitViewport = viewportSize.width > 0 && viewportSize.height > viewportSize.width;
   const isCompactPortrait =
-    viewportSize.width > 0 &&
-    viewportSize.width <= COMPACT_EDITOR_MAX_WIDTH &&
-    viewportSize.height > viewportSize.width;
+    viewportSize.width > 0 && viewportSize.width <= COMPACT_EDITOR_MAX_WIDTH && isPortraitViewport;
   const compactEditorPanelDefaultHeight =
     viewportSize.height > 0 ? Math.max(300, Math.min(Math.round(viewportSize.height * 0.46), 520)) : 340;
   const compactEditorPanelMinHeight = 220;
@@ -5623,7 +5622,7 @@ const editorNode = (
     return renderMainView();
   };
 
-  const shouldHideFolderTree = Boolean((selectedImage && isCompactPortrait) || (!selectedImage && isAndroid));
+  const shouldHideFolderTree = isAndroid || isPortraitViewport;
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
 
   return (
