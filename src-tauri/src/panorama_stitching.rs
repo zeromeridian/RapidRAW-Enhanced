@@ -100,7 +100,11 @@ pub fn stitch_images(
             .map_err(|e| format!("Failed to load image {}: {}", filename, e))?;
 
             if is_raw_file(filename) {
-                apply_cpu_default_raw_processing(&mut dynamic_image);
+                let default_tm = settings
+                    .default_raw_tonemapper
+                    .clone()
+                    .unwrap_or_else(|| "agx".to_string());
+                apply_cpu_default_raw_processing(&mut dynamic_image, &default_tm);
             }
 
             let image_f32 = dynamic_image.to_rgb32f();

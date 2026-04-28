@@ -2561,7 +2561,12 @@ function App() {
             if (metadata.adjustments && !metadata.adjustments.is_null) {
               freshAdjustments = normalizeLoadedAdjustments(metadata.adjustments);
             } else {
-              freshAdjustments = { ...INITIAL_ADJUSTMENTS };
+              const ext = path.split('.').pop()?.toLowerCase() || '';
+              const isRaw = supportedTypes?.raw?.includes(ext) || false;
+              const defaultTM = isRaw
+                ? appSettings?.defaultRawTonemapper || 'agx'
+                : appSettings?.defaultNonRawTonemapper || 'basic';
+              freshAdjustments = { ...INITIAL_ADJUSTMENTS, toneMapper: defaultTM as 'agx' | 'basic' };
             }
             if (!isSliderDragging && JSON.stringify(cached.adjustments) !== JSON.stringify(freshAdjustments)) {
               setLiveAdjustments(freshAdjustments);
@@ -4050,7 +4055,12 @@ function App() {
           if (metadata.adjustments && !metadata.adjustments.is_null) {
             initialAdjusts = normalizeLoadedAdjustments(metadata.adjustments);
           } else {
-            initialAdjusts = { ...INITIAL_ADJUSTMENTS };
+            const ext = selectedImage.path.split('.').pop()?.toLowerCase() || '';
+            const isRaw = supportedTypes?.raw?.includes(ext) || false;
+            const defaultTM = isRaw
+              ? appSettings?.defaultRawTonemapper || 'agx'
+              : appSettings?.defaultNonRawTonemapper || 'basic';
+            initialAdjusts = { ...INITIAL_ADJUSTMENTS, toneMapper: defaultTM as 'agx' | 'basic' };
           }
 
           setLiveAdjustments(initialAdjusts);
@@ -4236,15 +4246,25 @@ function App() {
       invoke(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset })
         .then(() => {
           if (libraryActivePath && pathsToReset.includes(libraryActivePath)) {
-            setLibraryActiveAdjustments({ ...INITIAL_ADJUSTMENTS });
+            const ext = libraryActivePath.split('.').pop()?.toLowerCase() || '';
+            const isRaw = supportedTypes?.raw?.includes(ext) || false;
+            const defaultTM = isRaw
+              ? appSettings?.defaultRawTonemapper || 'agx'
+              : appSettings?.defaultNonRawTonemapper || 'basic';
+            setLibraryActiveAdjustments({ ...INITIAL_ADJUSTMENTS, toneMapper: defaultTM as 'agx' | 'basic' });
           }
           if (selectedImage && pathsToReset.includes(selectedImage.path)) {
             const originalAspectRatio =
               selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
-
+            const ext = selectedImage.path.split('.').pop()?.toLowerCase() || '';
+            const isRaw = supportedTypes?.raw?.includes(ext) || false;
+            const defaultTM = isRaw
+              ? appSettings?.defaultRawTonemapper || 'agx'
+              : appSettings?.defaultNonRawTonemapper || 'basic';
             resetAdjustmentsHistory({
               ...INITIAL_ADJUSTMENTS,
               aspectRatio: originalAspectRatio,
+              toneMapper: defaultTM as 'agx' | 'basic',
               aiPatches: [],
             });
           }
@@ -4258,9 +4278,10 @@ function App() {
       multiSelectedPaths,
       libraryActivePath,
       selectedImage,
-      adjustments.rating,
       resetAdjustmentsHistory,
       debouncedSetHistory,
+      appSettings,
+      supportedTypes,
     ],
   );
 

@@ -464,6 +464,10 @@ pub struct AppSettings {
     pub thumbnail_worker_threads: Option<u32>,
     #[serde(default)]
     pub image_cache_size: Option<u32>,
+    #[serde(default)]
+    pub default_raw_tonemapper: Option<String>,
+    #[serde(default)]
+    pub default_non_raw_tonemapper: Option<String>,
 }
 
 fn default_adjustment_visibility() -> HashMap<String, bool> {
@@ -475,6 +479,7 @@ fn default_adjustment_visibility() -> HashMap<String, bool> {
     map.insert("vignette".to_string(), true);
     map.insert("colorCalibration".to_string(), false);
     map.insert("grain".to_string(), true);
+    map.insert("toneMapper".to_string(), true);
     map
 }
 
@@ -538,6 +543,8 @@ impl Default for AppSettings {
             keybinds: HashMap::new(),
             thumbnail_worker_threads: Some(4),
             image_cache_size: Some(5),
+            default_raw_tonemapper: Some("agx".to_string()),
+            default_non_raw_tonemapper: Some("basic".to_string()),
         }
     }
 }
@@ -1645,7 +1652,10 @@ pub fn generate_thumbnail_data(
     };
 
     if is_raw && adjustments.is_null() {
-        apply_cpu_default_raw_processing(&mut final_image);
+        let default_tm = settings
+            .default_raw_tonemapper
+            .unwrap_or_else(|| "agx".to_string());
+        apply_cpu_default_raw_processing(&mut final_image, &default_tm); // FIXME: WE SOMEHOW ALSO NEED TO APPLY AGX FOR NON-RAW NON-ADJUSTED IMAGE THUMBNAILS!!!
     }
 
     let fallback_orientation_steps = adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;

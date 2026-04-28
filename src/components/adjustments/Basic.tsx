@@ -9,6 +9,7 @@ interface BasicAdjustmentsProps {
   setAdjustments(adjustments: Partial<Adjustments>): any;
   isForMask?: boolean;
   onDragStateChange?: (isDragging: boolean) => void;
+  appSettings?: any;
 }
 
 const toneMapperOptions = [
@@ -19,25 +20,15 @@ const toneMapperOptions = [
 interface ToneMapperSwitchProps {
   selectedMapper: string;
   onMapperChange: (mapper: string) => void;
-  brightnessValue: number;
-  onBrightnessChange: (value: number) => void;
-  onDragStateChange?: (isDragging: boolean) => void;
 }
 
-const ToneMapperSwitch = ({
-  selectedMapper,
-  onMapperChange,
-  brightnessValue,
-  onBrightnessChange,
-  onDragStateChange,
-}: ToneMapperSwitchProps) => {
+const ToneMapperSwitch = ({ selectedMapper, onMapperChange }: ToneMapperSwitchProps) => {
   const [bubbleStyle, setBubbleStyle] = useState({});
   const isInitialAnimation = useRef(true);
   const [isLabelHovered, setIsLabelHovered] = useState(false);
 
   const handleReset = () => {
     onMapperChange('basic');
-    onBrightnessChange(0);
   };
 
   useEffect(() => {
@@ -97,7 +88,7 @@ const ToneMapperSwitch = ({
           </span>
         </div>
       </div>
-      <div className="w-full p-2 pb-1 bg-card-active rounded-md">
+      <div className="w-full p-2 bg-card-active rounded-md">
         <div className="relative flex w-full">
           <motion.div
             className="absolute top-0 bottom-0 z-0 bg-accent"
@@ -123,18 +114,6 @@ const ToneMapperSwitch = ({
             </button>
           ))}
         </div>
-        <div className="mt-2.5 px-1">
-          <Slider
-            label="Brightness"
-            max={5}
-            min={-5}
-            onChange={(e: any) => onBrightnessChange(parseFloat(e.target.value))}
-            step={0.01}
-            value={brightnessValue}
-            trackClassName="bg-surface"
-            onDragStateChange={onDragStateChange}
-          />
-        </div>
       </div>
     </div>
   );
@@ -145,6 +124,7 @@ export default function BasicAdjustments({
   setAdjustments,
   isForMask = false,
   onDragStateChange,
+  appSettings,
 }: BasicAdjustmentsProps) {
   const handleAdjustmentChange = (key: BasicAdjustment, value: any) => {
     const numericValue = parseFloat(value);
@@ -176,6 +156,15 @@ export default function BasicAdjustments({
         onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Contrast, e.target.value)}
         step={1}
         value={adjustments.contrast}
+        onDragStateChange={onDragStateChange}
+      />
+      <Slider
+        label="Brightness"
+        max={5}
+        min={-5}
+        onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Brightness, e.target.value)}
+        step={0.01}
+        value={adjustments.brightness}
         onDragStateChange={onDragStateChange}
       />
       <Slider
@@ -214,25 +203,8 @@ export default function BasicAdjustments({
         value={adjustments.blacks}
         onDragStateChange={onDragStateChange}
       />
-
-      {isForMask ? (
-        <Slider
-          label="Brightness"
-          max={5}
-          min={-5}
-          onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Brightness, e.target.value)}
-          step={0.01}
-          value={adjustments.brightness}
-          onDragStateChange={onDragStateChange}
-        />
-      ) : (
-        <ToneMapperSwitch
-          selectedMapper={adjustments.toneMapper || 'agx'}
-          onMapperChange={handleToneMapperChange}
-          brightnessValue={adjustments.brightness}
-          onBrightnessChange={(value) => handleAdjustmentChange(BasicAdjustment.Brightness, value)}
-          onDragStateChange={onDragStateChange}
-        />
+      {!isForMask && (appSettings?.adjustmentVisibility?.toneMapper ?? true) && (
+        <ToneMapperSwitch selectedMapper={adjustments.toneMapper || 'agx'} onMapperChange={handleToneMapperChange} />
       )}
     </div>
   );
