@@ -2996,7 +2996,11 @@ pub fn save_settings(settings: AppSettings, app_handle: AppHandle) -> Result<(),
     fs::write(path, json_string).map_err(|e| e.to_string())?;
     let state = app_handle.state::<AppState>();
     let cache_size = settings.image_cache_size.unwrap_or(5) as usize;
-    state.decoded_image_cache.lock().unwrap().set_capacity(cache_size);
+    state
+        .decoded_image_cache
+        .lock()
+        .unwrap()
+        .set_capacity(cache_size);
     Ok(())
 }
 
