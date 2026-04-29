@@ -5609,6 +5609,8 @@ function App() {
 
   const shouldHideFolderTree = isAndroid;
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
+  const useMacWindowShell =
+    osPlatform === 'macos' && !appSettings?.decorations && !isWindowFullScreen && !isFullScreen;
 
   useEffect(() => {
     if (selectedImage?.path && selectedImage.isReady && (finalPreviewUrl || isWgpuActive)) {
@@ -5641,6 +5643,7 @@ function App() {
     <div
       className={clsx(
         'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
+        useMacWindowShell && 'macos-window-shell',
         isWgpuActive ? 'bg-transparent' : 'bg-bg-primary',
       )}
     >
