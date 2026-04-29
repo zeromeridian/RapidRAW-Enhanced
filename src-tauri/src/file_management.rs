@@ -597,8 +597,7 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
     (source_path, sidecar_path)
 }
 
-#[cfg(target_os = "android")]
-fn is_android_content_uri(path: &str) -> bool {
+pub fn is_android_content_uri(path: &str) -> bool {
     path.starts_with("content://")
 }
 
@@ -626,6 +625,50 @@ fn close_android_closeable(env: &mut JNIEnv<'_>, closeable: &JObject<'_>) {
         clear_pending_android_exception(env);
         log::warn!("Failed to close Android Closeable: {}", err);
     }
+}
+
+#[cfg(target_os = "android")]
+pub fn get_android_cached_lut_path(uri: &str, extension: &str) -> anyhow::Result<PathBuf> {
+    let vm = unsafe { jni::JavaVM::from_raw(ndk_context::android_context().vm().cast()) }
+        .map_err(|e| anyhow::anyhow!("Failed to access Android JVM: {}", e))?;
+    let mut env = vm.attach_current_thread()
+        .map_err(|e| anyhow::anyhow!("Failed to attach current thread: {}", e))?;
+    
+    let context = env.new_local_ref(unsafe { jni::objects::JObject::from_raw(ndk_context::android_context().context().cast()) })
+        .map_err(|e| anyhow::anyhow!(map_android_jni_error(&mut env, e)))?;
+
+    let dirs_array_obj = env.call_method(
+        &context,
+        "getExternalMediaDirs",
+        "()[Ljava/io/File;",
+        &[],
+    ).and_then(|v| v.l()).map_err(|e| anyhow::anyhow!(map_android_jni_error(&mut env, e)))?;
+
+    if dirs_array_obj.is_null() {
+        return Err(anyhow::anyhow!("External media storage not available"));
+    }
+
+    let dirs_array: jni::objects::JObjectArray = dirs_array_obj.into();
+    let dir_file = env.get_object_array_element(&dirs_array, 0)
+        .map_err(|e| anyhow::anyhow!(map_android_jni_error(&mut env, e)))?;
+
+    let path_jstring = env.call_method(&dir_file, "getAbsolutePath", "()Ljava/lang/String;", &[])
+        .and_then(|v| v.l()).map_err(|e| anyhow::anyhow!(map_android_jni_error(&mut env, e)))?;
+    
+    let root_path_str: String = env.get_string(&path_jstring.into())
+        .map_err(|e| anyhow::anyhow!(map_android_jni_error(&mut env, e)))?.into();
+
+    let hash = blake3::hash(uri.as_bytes());
+
+    let mut path = PathBuf::from(root_path_str);
+    path.push(".lut_cache"); 
+    
+    if !path.exists() {
+        fs::create_dir_all(&path)?;
+    }
+    
+    path.push(format!("{}.{}", &hash.to_hex()[..16], extension));
+    Ok(path)
 }
 
 #[cfg(target_os = "android")]
@@ -679,110 +722,117 @@ fn parse_android_uri<'local>(
     Ok(uri)
 }
 
-#[cfg(target_os = "android")]
-fn resolve_android_content_uri_name(uri_str: &str) -> Result<String, String> {
-    let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
-        .map_err(|e| format!("Failed to access Android JVM: {}", e))?;
-    let mut env = vm
-        .attach_current_thread()
-        .map_err(|e| format!("Failed to attach current thread to Android JVM: {}", e))?;
+#[tauri::command]
+pub fn resolve_android_content_uri_name(uri_str: &str) -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    {
+        let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
+            .map_err(|e| format!("Failed to access Android JVM: {}", e))?;
+        let mut env = vm
+            .attach_current_thread()
+            .map_err(|e| format!("Failed to attach current thread to Android JVM: {}", e))?;
 
-    let resolver = get_android_content_resolver(&mut env)?;
-    let uri = parse_android_uri(&mut env, uri_str)?;
-    let null_obj = JObject::null();
+        let resolver = get_android_content_resolver(&mut env)?;
+        let uri = parse_android_uri(&mut env, uri_str)?;
+        let null_obj = JObject::null();
 
-    let cursor = env
-        .call_method(
-            &resolver,
-            "query",
-            "(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;",
-            &[
-                (&uri).into(),
-                (&null_obj).into(),
-                (&null_obj).into(),
-                (&null_obj).into(),
-                (&null_obj).into(),
-            ],
-        )
-        .and_then(|value| value.l())
-        .map_err(|e| map_android_jni_error(&mut env, e))?;
+        let cursor = env
+            .call_method(
+                &resolver,
+                "query",
+                "(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;",
+                &[
+                    (&uri).into(),
+                    (&null_obj).into(),
+                    (&null_obj).into(),
+                    (&null_obj).into(),
+                    (&null_obj).into(),
+                ],
+            )
+            .and_then(|value| value.l())
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
 
-    if cursor.is_null() {
-        return Err(format!(
-            "ContentResolver query returned no cursor for URI: {}",
-            uri_str
-        ));
+        if cursor.is_null() {
+            return Err(format!(
+                "ContentResolver query returned no cursor for URI: {}",
+                uri_str
+            ));
+        }
+
+        let result = (|| -> Result<String, String> {
+            let moved = env
+                .call_method(&cursor, "moveToFirst", "()Z", &[])
+                .and_then(|value| value.z())
+                .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+            if !moved {
+                return Err(format!(
+                    "No metadata rows found for content URI: {}",
+                    uri_str
+                ));
+            }
+
+            let display_name_column = env
+                .get_static_field(
+                    "android/provider/OpenableColumns",
+                    "DISPLAY_NAME",
+                    "Ljava/lang/String;",
+                )
+                .and_then(|value| value.l())
+                .map_err(|e| map_android_jni_error(&mut env, e))?;
+            let column_index = env
+                .call_method(
+                    &cursor,
+                    "getColumnIndex",
+                    "(Ljava/lang/String;)I",
+                    &[(&display_name_column).into()],
+                )
+                .and_then(|value| value.i())
+                .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+            if column_index < 0 {
+                return Err(format!(
+                    "DISPLAY_NAME column was unavailable for content URI: {}",
+                    uri_str
+                ));
+            }
+
+            let display_name_obj = env
+                .call_method(
+                    &cursor,
+                    "getString",
+                    "(I)Ljava/lang/String;",
+                    &[JValue::from(column_index)],
+                )
+                .and_then(|value| value.l())
+                .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+            if display_name_obj.is_null() {
+                return Err(format!(
+                    "Display name was null for content URI: {}",
+                    uri_str
+                ));
+            }
+
+            let display_name_java = JString::from(display_name_obj);
+            let display_name = env
+                .get_string(&display_name_java)
+                .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+            Ok(display_name.into())
+        })();
+
+        close_android_closeable(&mut env, &cursor);
+        result
     }
-
-    let result = (|| -> Result<String, String> {
-        let moved = env
-            .call_method(&cursor, "moveToFirst", "()Z", &[])
-            .and_then(|value| value.z())
-            .map_err(|e| map_android_jni_error(&mut env, e))?;
-
-        if !moved {
-            return Err(format!(
-                "No metadata rows found for content URI: {}",
-                uri_str
-            ));
-        }
-
-        let display_name_column = env
-            .get_static_field(
-                "android/provider/OpenableColumns",
-                "DISPLAY_NAME",
-                "Ljava/lang/String;",
-            )
-            .and_then(|value| value.l())
-            .map_err(|e| map_android_jni_error(&mut env, e))?;
-        let column_index = env
-            .call_method(
-                &cursor,
-                "getColumnIndex",
-                "(Ljava/lang/String;)I",
-                &[(&display_name_column).into()],
-            )
-            .and_then(|value| value.i())
-            .map_err(|e| map_android_jni_error(&mut env, e))?;
-
-        if column_index < 0 {
-            return Err(format!(
-                "DISPLAY_NAME column was unavailable for content URI: {}",
-                uri_str
-            ));
-        }
-
-        let display_name_obj = env
-            .call_method(
-                &cursor,
-                "getString",
-                "(I)Ljava/lang/String;",
-                &[JValue::from(column_index)],
-            )
-            .and_then(|value| value.l())
-            .map_err(|e| map_android_jni_error(&mut env, e))?;
-
-        if display_name_obj.is_null() {
-            return Err(format!(
-                "Display name was null for content URI: {}",
-                uri_str
-            ));
-        }
-
-        let display_name_java = JString::from(display_name_obj);
-        let display_name = env
-            .get_string(&display_name_java)
-            .map_err(|e| map_android_jni_error(&mut env, e))?;
-
-        Ok(display_name.into())
-    })();
-
-    close_android_closeable(&mut env, &cursor);
-    result
+    #[cfg(not(target_os = "android"))]
+    {
+        Ok(uri_str.to_string())
+    }
 }
 
 #[cfg(target_os = "android")]
-fn read_android_content_uri(uri_str: &str) -> Result<Vec<u8>, String> {
+pub fn read_android_content_uri(uri_str: &str) -> Result<Vec<u8>, String> {
     let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
         .map_err(|e| format!("Failed to access Android JVM: {}", e))?;
     let mut env = vm
@@ -2712,17 +2762,64 @@ fn get_settings_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, Strin
 }
 
 fn get_internal_library_root_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, String> {
-    let library_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("library");
+    #[cfg(not(target_os = "android"))]
+    {
+        let library_dir = app_handle
+            .path()
+            .app_data_dir()
+            .map_err(|e| e.to_string())?
+            .join("library");
 
-    if !library_dir.exists() {
-        fs::create_dir_all(&library_dir).map_err(|e| e.to_string())?;
+        if !library_dir.exists() {
+            fs::create_dir_all(&library_dir).map_err(|e| e.to_string())?;
+        }
+        Ok(library_dir)
     }
+    #[cfg(target_os = "android")]
+    {
+        let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
+            .map_err(|e| format!("Failed to access Android JVM: {}", e))?;
+        let mut env = vm.attach_current_thread()
+            .map_err(|e| format!("Failed to attach current thread: {}", e))?;
+        
+        let context = env.new_local_ref(unsafe { JObject::from_raw(android_context().context().cast()) })
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
 
-    Ok(library_dir)
+        let dirs_array_obj = env.call_method(
+            &context,
+            "getExternalMediaDirs",
+            "()[Ljava/io/File;",
+            &[],
+        ).and_then(|v| v.l()).map_err(|e| map_android_jni_error(&mut env, e))?;
+
+        if dirs_array_obj.is_null() {
+            return Err("External media storage not available".to_string());
+        }
+
+        let dirs_array: jni::objects::JObjectArray = dirs_array_obj.into();
+        
+        let dir_file = env.get_object_array_element(&dirs_array, 0)
+            .map_err(|e| map_android_jni_error(&mut env, e))?;
+
+        if dir_file.is_null() {
+            return Err("Primary external media storage is null".to_string());
+        }
+
+        let path_jstring = env.call_method(&dir_file, "getAbsolutePath", "()Ljava/lang/String;", &[])
+            .and_then(|v| v.l()).map_err(|e| map_android_jni_error(&mut env, e))?;
+        
+        let path: String = env.get_string(&path_jstring.into())
+            .map_err(|e| map_android_jni_error(&mut env, e))?.into();
+        
+        let media_path = PathBuf::from(path);
+        let library_dir = media_path.join(".library");
+        
+        if !library_dir.exists() {
+            fs::create_dir_all(&library_dir).map_err(|e| e.to_string())?;
+        }
+        Ok(library_dir)
+    }
+    
 }
 
 #[tauri::command]
