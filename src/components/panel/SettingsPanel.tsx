@@ -1680,7 +1680,7 @@ export default function SettingsPanel({
                     <div className="space-y-4">
                       <SettingItem
                         label="Global Tonemapper Override"
-                        description="Force a specific tonemapper globally for all images, hiding the individual selection switch from the adjustments panel."
+                        description="Force a specific tonemapper globally for all images, hiding the tonemapper switch from the adjustments panel."
                       >
                         <Switch
                           checked={appSettings?.tonemapperOverrideEnabled ?? false}
