@@ -1,4 +1,7 @@
+#[cfg(not(all(target_os = "windows", target_arch = "aarch64")))]
 use mimalloc::MiMalloc;
+
+#[cfg(not(all(target_os = "windows", target_arch = "aarch64")))]
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
@@ -24,13 +27,14 @@ mod tagging;
 mod tagging_utils;
 mod window_customizer;
 
-use std::collections::{HashMap, hash_map::DefaultHasher};
+use std::collections::{HashMap, HashSet, VecDeque, hash_map::DefaultHasher};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::io::Write;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::sync::Condvar;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
@@ -81,9 +85,9 @@ use crate::image_loader::{
 use crate::image_processing::{
     AllAdjustments, Crop, GeometryParams, GpuContext, ImageMetadata, IntoCowImage, RenderRequest,
     apply_coarse_rotation, apply_cpu_default_raw_processing, apply_crop, apply_flip,
-    apply_geometry_warp, apply_rotation, apply_unwarp_geometry, downscale_f32_image,
-    get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
-    warp_image_geometry,
+    apply_geometry_warp, apply_linear_to_srgb, apply_rotation, apply_srgb_to_linear,
+    apply_unwarp_geometry, downscale_f32_image, get_all_adjustments_from_json,
+    get_or_init_gpu_context, process_and_get_dynamic_image, warp_image_geometry,
 };
 use crate::lut_processing::{Lut, convert_image_to_cube_lut, generate_identity_lut_image};
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
@@ -178,6 +182,22 @@ pub struct ThumbnailProgressTracker {
     pub completed: usize,
 }
 
+pub struct ThumbnailManager {
+    pub queue: Mutex<VecDeque<String>>,
+    pub cvar: Condvar,
+    pub processing_now: Mutex<HashSet<String>>,
+}
+
+impl ThumbnailManager {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            queue: Mutex::new(VecDeque::new()),
+            cvar: Condvar::new(),
+            processing_now: Mutex::new(HashSet::new()),
+        })
+    }
+}
+
 pub type TransformedImageCache = (u64, Arc<DynamicImage>, (f32, f32));
 pub struct AppState {
     window_setup_complete: AtomicBool,
@@ -209,6 +229,7 @@ pub struct AppState {
     pub full_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     pub full_transformed_cache: Mutex<Option<TransformedImageCache>>,
     pub decoded_image_cache: Mutex<DecodedImageCache>,
+    pub thumbnail_manager: Arc<ThumbnailManager>,
 }
 
 #[derive(serde::Serialize)]
@@ -328,6 +349,13 @@ impl DecodedImageCache {
         Self {
             capacity,
             items: Vec::with_capacity(capacity),
+        }
+    }
+
+    pub fn set_capacity(&mut self, capacity: usize) {
+        self.capacity = capacity;
+        while self.items.len() > self.capacity {
+            self.items.remove(0);
         }
     }
 
@@ -576,6 +604,10 @@ fn hydrate_sub_masks(
 fn hydrate_adjustments(state: &tauri::State<AppState>, adjustments: &mut serde_json::Value) {
     let mut cache = state.patch_cache.lock().unwrap();
 
+    if cache.len() > 20 {
+        cache.clear();
+    }
+
     if let Some(patches) = adjustments
         .get_mut("aiPatches")
         .and_then(|v| v.as_array_mut())
@@ -701,6 +733,18 @@ fn get_or_load_lut(state: &tauri::State<AppState>, path: &str) -> Result<Arc<Lut
     let arc_lut = Arc::new(lut);
     cache.insert(path.to_string(), arc_lut.clone());
     Ok(arc_lut)
+}
+
+#[tauri::command]
+fn is_image_cached(path: String, state: tauri::State<'_, AppState>) -> bool {
+    let (source_path, _) = parse_virtual_path(&path);
+    let source_path_str = source_path.to_string_lossy().to_string();
+    state
+        .decoded_image_cache
+        .lock()
+        .unwrap()
+        .get(&source_path_str)
+        .is_some()
 }
 
 #[tauri::command]
@@ -4142,7 +4186,7 @@ async fn merge_hdr(
 
             let file_bytes =
                 fs::read(path).map_err(|e| format!("Failed to read image {}: {}", path, e))?;
-            let dynamic_image = load_base_image_from_bytes(
+            let mut dynamic_image = load_base_image_from_bytes(
                 &file_bytes,
                 path,
                 false,
@@ -4151,6 +4195,10 @@ async fn merge_hdr(
                 None,
             )
             .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
+
+            if !crate::formats::is_raw_file(path) {
+                dynamic_image = apply_srgb_to_linear(dynamic_image);
+            }
 
             let gains = match read_iso(path, &file_bytes) {
                 None => return Err(format!("Image {} is missing ISO/Sensitivity data", path)),
@@ -4199,7 +4247,8 @@ async fn merge_hdr(
         .collect::<Result<Vec<HDRInput>, String>>()?;
 
     log::info!("Starting HDR merge of {} images", images.len());
-    let hdr_merged = hdr_merge_images(&mut images.into()).map_err(|e| e.to_string())?;
+    let mut hdr_merged = hdr_merge_images(&mut images.into()).map_err(|e| e.to_string())?;
+    hdr_merged = apply_linear_to_srgb(hdr_merged);
     log::info!("HDR merge completed");
 
     let mut buf = Cursor::new(Vec::new());
@@ -4875,6 +4924,12 @@ pub fn run() {
 
             let mut settings: AppSettings = load_settings(app_handle.clone()).unwrap_or_default();
 
+            {
+                let state = app.state::<AppState>();
+                let cache_size = settings.image_cache_size.unwrap_or(5) as usize;
+                state.decoded_image_cache.lock().unwrap().set_capacity(cache_size);
+            }
+
             if crash_flag_path.exists() {
                 log::warn!("GPU Driver crash detected on last run! Falling back to OpenGL backend.");
                 settings.processing_backend = Some("gl".to_string());
@@ -4939,6 +4994,7 @@ pub fn run() {
 
             start_preview_worker(app_handle.clone());
             start_analytics_worker(app_handle.clone());
+            file_management::start_thumbnail_workers(app_handle.clone());
             jxl_oxide::integration::register_image_decoding_hook();
 
             let window_cfg = app.config().app.windows.first().unwrap().clone();
@@ -5125,6 +5181,7 @@ pub fn run() {
             full_warped_cache: Mutex::new(None),
             full_transformed_cache: Mutex::new(None),
             decoded_image_cache: Mutex::new(DecodedImageCache::new(5)),
+            thumbnail_manager: ThumbnailManager::new(),
         })
         .invoke_handler(tauri::generate_handler![
             load_image,
@@ -5140,6 +5197,7 @@ pub fn run() {
             generate_uncropped_preview,
             preview_geometry_transform,
             generate_mask_overlay,
+            is_image_cached,
             generate_ai_subject_mask,
             precompute_ai_subject_mask,
             generate_ai_foreground_mask,
@@ -5174,8 +5232,7 @@ pub fn run() {
             file_management::get_folder_tree,
             file_management::get_folder_children,
             file_management::get_pinned_folder_trees,
-            file_management::generate_thumbnails,
-            file_management::generate_thumbnails_progressive,
+            file_management::update_thumbnail_queue,
             file_management::create_folder,
             file_management::delete_folder,
             file_management::copy_files,
