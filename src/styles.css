@@ -233,6 +233,29 @@
   }
 }
 
+@media (orientation: portrait) {
+  .modal-preview-adjustments {
+    flex-direction: column;
+  }
+
+  .modal-preview-adjustments > .modal-preview-pane {
+    flex: 1 1 58%;
+    width: 100%;
+    min-height: 0;
+  }
+
+  .modal-preview-adjustments > .modal-adjustments-pane {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    flex: 0 1 42%;
+    min-height: 14rem;
+    max-height: 46%;
+    border-left-width: 0;
+    border-top-width: 1px;
+  }
+}
+
 .cg-hue-gradient {
   background: linear-gradient(
     to right,
