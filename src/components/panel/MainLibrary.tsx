@@ -2047,31 +2047,33 @@ export default function MainLibrary({
       >
         <div className="min-w-0">
           <Text variant={TextVariants.headline}>Library</Text>
-          <div className="flex items-center gap-2">
-            {currentFolderPath ? (
-              <Text className="truncate">{currentFolderPath}</Text>
-            ) : (
-              <p className="text-sm invisible select-none pointer-events-none h-5 overflow-hidden"></p>
-            )}
-            <div
-              className={`flex items-center gap-2 overflow-hidden transition-all duration-300 whitespace-nowrap ${
-                isBusyDelayed ? 'max-w-xs opacity-100' : 'max-w-0 opacity-0'
-              }`}
-            >
-              <Loader2 size={14} className="animate-spin text-text-secondary shrink-0" />
+          {!isAndroid && (
+            <div className="flex items-center gap-2">
+              {currentFolderPath ? (
+                <Text className="truncate">{currentFolderPath}</Text>
+              ) : (
+                <p className="text-sm invisible select-none pointer-events-none h-5 overflow-hidden"></p>
+              )}
               <div
-                className={`flex items-center transition-all duration-300 ease-out overflow-hidden ${
-                  isProgressHovered && isBusyDelayed && (thumbnailProgress?.total ?? 0) > 0
-                    ? 'max-w-xs opacity-100'
-                    : 'max-w-0 opacity-0'
+                className={`flex items-center gap-2 overflow-hidden transition-all duration-300 whitespace-nowrap ${
+                  isBusyDelayed ? 'max-w-xs opacity-100' : 'max-w-0 opacity-0'
                 }`}
               >
-                <Text variant={TextVariants.small} color={TextColors.secondary} className="whitespace-nowrap">
-                  ({thumbnailProgress?.current ?? 0}/{thumbnailProgress?.total ?? 0})
-                </Text>
+                <Loader2 size={14} className="animate-spin text-text-secondary shrink-0" />
+                <div
+                  className={`flex items-center transition-all duration-300 ease-out overflow-hidden ${
+                    isProgressHovered && isBusyDelayed && (thumbnailProgress?.total ?? 0) > 0
+                      ? 'max-w-xs opacity-100'
+                      : 'max-w-0 opacity-0'
+                  }`}
+                >
+                  <Text variant={TextVariants.small} color={TextColors.secondary} className="whitespace-nowrap">
+                    ({thumbnailProgress?.current ?? 0}/{thumbnailProgress?.total ?? 0})
+                  </Text>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {importState.status === Status.Importing && (
