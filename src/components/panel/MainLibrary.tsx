@@ -2113,20 +2113,24 @@ export default function MainLibrary({
             thumbnailSize={thumbnailSize}
             thumbnailAspectRatio={thumbnailAspectRatio}
           />
-          <Button
-            className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
-            onClick={onNavigateToCommunity}
-            data-tooltip="Community Presets"
-          >
-            <Users className="w-8 h-8" />
-          </Button>
-          <Button
-            className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
-            onClick={onOpenFolder}
-            data-tooltip="Open another folder"
-          >
-            <Folder className="w-8 h-8" />
-          </Button>
+          {!isAndroid && (
+            <>
+              <Button
+                className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
+                onClick={onNavigateToCommunity}
+                data-tooltip="Community Presets"
+              >
+                <Users className="w-8 h-8" />
+              </Button>
+              <Button
+                className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
+                onClick={onOpenFolder}
+                data-tooltip="Open another folder"
+              >
+                <Folder className="w-8 h-8" />
+              </Button>
+            </>
+          )}
           <Button
             className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
             onClick={onGoHome}
