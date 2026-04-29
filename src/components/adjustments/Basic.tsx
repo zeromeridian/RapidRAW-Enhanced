@@ -19,16 +19,16 @@ const toneMapperOptions = [
 interface ToneMapperSwitchProps {
   selectedMapper: string;
   onMapperChange: (mapper: string) => void;
-  brightnessValue: number;
-  onBrightnessChange: (value: number) => void;
+  evShiftValue: number;
+  onEvShiftChange: (value: number) => void;
   onDragStateChange?: (isDragging: boolean) => void;
 }
 
 const ToneMapperSwitch = ({
   selectedMapper,
   onMapperChange,
-  brightnessValue,
-  onBrightnessChange,
+  evShiftValue,
+  onEvShiftChange,
   onDragStateChange,
 }: ToneMapperSwitchProps) => {
   const [bubbleStyle, setBubbleStyle] = useState({});
@@ -37,7 +37,7 @@ const ToneMapperSwitch = ({
 
   const handleReset = () => {
     onMapperChange('basic');
-    onBrightnessChange(0);
+    onEvShiftChange(0);
   };
 
   useEffect(() => {
@@ -70,7 +70,7 @@ const ToneMapperSwitch = ({
   }, [selectedMapper]);
 
   return (
-    <div className="group">
+    <div className="group mb-3">
       <div className="flex justify-between items-center mb-2">
         <div
           className="grid cursor-pointer"
@@ -125,12 +125,12 @@ const ToneMapperSwitch = ({
         </div>
         <div className="mt-2.5 px-1">
           <Slider
-            label="Brightness"
+            label="EV Shift"
             max={5}
             min={-5}
-            onChange={(e: any) => onBrightnessChange(parseFloat(e.target.value))}
+            onChange={(e: any) => onEvShiftChange(parseFloat(e.target.value))}
             step={0.01}
-            value={brightnessValue}
+            value={evShiftValue}
             trackClassName="bg-surface"
             onDragStateChange={onDragStateChange}
           />
@@ -160,13 +160,32 @@ export default function BasicAdjustments({
 
   return (
     <div>
+      {isForMask ? (
+        <Slider
+          label="EV Shift"
+          max={5}
+          min={-5}
+          onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Exposure, e.target.value)}
+          step={0.01}
+          value={adjustments.exposure}
+          onDragStateChange={onDragStateChange}
+        />
+      ) : (
+        <ToneMapperSwitch
+          selectedMapper={adjustments.toneMapper || 'agx'}
+          onMapperChange={handleToneMapperChange}
+          evShiftValue={adjustments.exposure}
+          onEvShiftChange={(value) => handleAdjustmentChange(BasicAdjustment.Exposure, value)} // Exposure got renamed to EV Shift in https://github.com/CyberTimon/RapidRAW/issues/1105
+          onDragStateChange={onDragStateChange}
+        />
+      )}
       <Slider
         label="Exposure"
         max={5}
         min={-5}
-        onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Exposure, e.target.value)}
+        onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Brightness, e.target.value)}
         step={0.01}
-        value={adjustments.exposure}
+        value={adjustments.brightness}
         onDragStateChange={onDragStateChange}
       />
       <Slider
@@ -214,26 +233,6 @@ export default function BasicAdjustments({
         value={adjustments.blacks}
         onDragStateChange={onDragStateChange}
       />
-
-      {isForMask ? (
-        <Slider
-          label="Brightness"
-          max={5}
-          min={-5}
-          onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Brightness, e.target.value)}
-          step={0.01}
-          value={adjustments.brightness}
-          onDragStateChange={onDragStateChange}
-        />
-      ) : (
-        <ToneMapperSwitch
-          selectedMapper={adjustments.toneMapper || 'agx'}
-          onMapperChange={handleToneMapperChange}
-          brightnessValue={adjustments.brightness}
-          onBrightnessChange={(value) => handleAdjustmentChange(BasicAdjustment.Brightness, value)}
-          onDragStateChange={onDragStateChange}
-        />
-      )}
     </div>
   );
 }
