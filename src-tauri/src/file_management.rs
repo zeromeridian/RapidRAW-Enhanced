@@ -505,6 +505,9 @@ impl Default for AppSettings {
             tagging_shortcuts: default_tagging_shortcuts_option(),
             custom_ai_tags: Some(Vec::new()),
             ai_tag_count: Some(10),
+            #[cfg(target_os = "android")]
+            thumbnail_size: Some("small".to_string()),
+            #[cfg(not(target_os = "android"))]
             thumbnail_size: Some("medium".to_string()),
             thumbnail_aspect_ratio: Some("cover".to_string()),
             ai_provider: Some("cpu".to_string()),

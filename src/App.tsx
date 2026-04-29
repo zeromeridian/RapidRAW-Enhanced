@@ -289,6 +289,7 @@ function App() {
       return '';
     }
   });
+  const defaultThumbnailSize = osPlatform === 'android' ? ThumbnailSize.Small : ThumbnailSize.Medium;
   const [activeView, setActiveView] = useState('library');
   const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
   const [isInstantTransition, setIsInstantTransition] = useState(false);
@@ -401,7 +402,7 @@ function App() {
   const [compactEditorPanelHeightOverride, setCompactEditorPanelHeightOverride] = useState<number | null>(null);
   const [activeTreeSection, setActiveTreeSection] = useState<string | null>('current');
   const [isResizing, setIsResizing] = useState(false);
-  const [thumbnailSize, setThumbnailSize] = useState(ThumbnailSize.Medium);
+  const [thumbnailSize, setThumbnailSize] = useState(defaultThumbnailSize);
   const [thumbnailAspectRatio, setThumbnailAspectRatio] = useState(ThumbnailAspectRatio.Cover);
   const [copiedAdjustments, setCopiedAdjustments] = useState<Adjustments | null>(null);
   const [isStraightenActive, setIsStraightenActive] = useState(false);
@@ -1912,9 +1913,7 @@ function App() {
         if (settings?.libraryViewMode) {
           setLibraryViewMode(settings.libraryViewMode);
         }
-        if (settings?.thumbnailSize) {
-          setThumbnailSize(settings.thumbnailSize);
-        }
+        setThumbnailSize(settings?.thumbnailSize ?? defaultThumbnailSize);
         if (settings?.thumbnailAspectRatio) {
           setThumbnailAspectRatio(settings.thumbnailAspectRatio);
         }
@@ -1968,7 +1967,7 @@ function App() {
       })
       .catch((err) => {
         console.error('Failed to load settings:', err);
-        setAppSettings({ lastRootPath: null, theme: DEFAULT_THEME_ID });
+        setAppSettings({ lastRootPath: null, theme: DEFAULT_THEME_ID, thumbnailSize: defaultThumbnailSize });
       })
       .finally(() => {
         isInitialMount.current = false;
