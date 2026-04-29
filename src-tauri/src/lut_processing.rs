@@ -1,13 +1,15 @@
+use crate::file_management::is_android_content_uri;
+#[cfg(target_os = "android")]
+use crate::file_management::{
+    get_android_cached_lut_path, read_android_content_uri, resolve_android_content_uri_name,
+};
 use anyhow::{Result, anyhow};
 use image::{DynamicImage, GenericImageView, Rgb, Rgb32FImage};
+#[cfg(target_os = "android")]
+use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor};
 use std::path::Path;
-#[cfg(target_os = "android")]
-use std::fs;
-use crate::file_management::{is_android_content_uri};
-#[cfg(target_os = "android")]
-use crate::file_management::{read_android_content_uri, get_android_cached_lut_path, resolve_android_content_uri_name};
 
 #[derive(Debug, Clone)]
 pub struct Lut {
@@ -183,7 +185,9 @@ fn parse_hald(image: DynamicImage) -> Result<Lut> {
 }
 
 pub fn parse_lut_file(path_str: &str) -> Result<Lut> {
-    let (extension, bytes): (String, Option<Vec<u8>>) = if cfg!(target_os = "android") && is_android_content_uri(path_str) {
+    let (extension, bytes): (String, Option<Vec<u8>>) = if cfg!(target_os = "android")
+        && is_android_content_uri(path_str)
+    {
         #[cfg(target_os = "android")]
         {
             match resolve_android_content_uri_name(path_str) {
@@ -193,17 +197,18 @@ pub fn parse_lut_file(path_str: &str) -> Result<Lut> {
                         .and_then(|s| s.to_str())
                         .unwrap_or("cube")
                         .to_lowercase();
-                    
+
                     let uri_bytes = read_android_content_uri(path_str).map_err(|e| anyhow!(e))?;
-                    
+
                     if let Ok(cache_path) = get_android_cached_lut_path(path_str, &ext) {
                         let _ = fs::write(cache_path, &uri_bytes);
                     }
-                    
+
                     (ext, Some(uri_bytes))
                 }
                 Err(_) => {
-                    let hash_prefix = format!("{}.", &blake3::hash(path_str.as_bytes()).to_hex()[..16]);
+                    let hash_prefix =
+                        format!("{}.", &blake3::hash(path_str.as_bytes()).to_hex()[..16]);
 
                     let cache_dir = get_android_cached_lut_path(path_str, "tmp")?
                         .parent()
@@ -227,12 +232,14 @@ pub fn parse_lut_file(path_str: &str) -> Result<Lut> {
                             }
                         }
                     }
-                    found.ok_or_else(|| anyhow!("LUT not found in cache and permission denied for URI"))?
+                    found.ok_or_else(|| {
+                        anyhow!("LUT not found in cache and permission denied for URI")
+                    })?
                 }
             }
         }
         #[cfg(not(target_os = "android"))]
-        { 
+        {
             (String::new(), None)
         }
     } else {
