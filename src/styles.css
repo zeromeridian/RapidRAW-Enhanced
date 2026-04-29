@@ -86,6 +86,13 @@
   html {
     background-color: transparent;
   }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
   body {
     background-color: transparent;
     @apply text-text-primary font-sans;
@@ -118,6 +125,11 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background-color: theme('colors.hover-color');
+  }
+
+  .macos-window-shell {
+    border-radius: 14px;
+    overflow: hidden;
   }
 }
 
