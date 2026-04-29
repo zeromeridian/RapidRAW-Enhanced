@@ -959,10 +959,10 @@ function ViewOptionsDropdown({
         </>
       }
       buttonTitle="View Options"
-      contentClassName="w-[720px]"
+      contentClassName="library-view-options-menu w-[720px]"
     >
-      <div className="flex">
-        <div className="w-1/4 p-2 border-r border-border-color">
+      <div className="library-view-options-content flex">
+        <div className="library-view-options-section w-1/4 p-2 border-r border-border-color">
           <ThumbnailSizeOptions selectedSize={thumbnailSize} onSelectSize={onSelectSize} />
           <div className="pt-2">
             <ThumbnailAspectRatioOptions
@@ -974,10 +974,10 @@ function ViewOptionsDropdown({
             <ViewModeOptions mode={libraryViewMode} setMode={setLibraryViewMode} />
           </div>
         </div>
-        <div className="w-2/4 p-2 border-r border-border-color">
+        <div className="library-view-options-section w-2/4 p-2 border-r border-border-color">
           <FilterOptions filterCriteria={filterCriteria} setFilterCriteria={setFilterCriteria} />
         </div>
-        <div className="w-1/4 p-2">
+        <div className="library-view-options-section w-1/4 p-2">
           <SortOptions sortCriteria={sortCriteria} setSortCriteria={setSortCriteria} sortOptions={sortOptions} />
         </div>
       </div>
