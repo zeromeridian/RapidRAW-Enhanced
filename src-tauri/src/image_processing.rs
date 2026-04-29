@@ -934,102 +934,25 @@ pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams
     DynamicImage::ImageRgb32F(out_img)
 }
 
-pub fn apply_cpu_default_raw_processing(image: &mut DynamicImage, tone_mapper: &str) {
+pub fn apply_cpu_default_raw_processing(image: &mut DynamicImage) {
     let mut f32_image = image.to_rgb32f();
 
     const GAMMA: f32 = 2.38;
     const INV_GAMMA: f32 = 1.0 / GAMMA;
     const CONTRAST: f32 = 1.28;
 
-    fn agx_apply_curve_channel(x: f32) -> f32 {
-        const AGX_SLOPE: f32 = 2.3843;
-        const AGX_TOE_POWER: f32 = 1.5;
-        const AGX_SHOULDER_POWER: f32 = 1.5;
-        const AGX_TOE_TRANSITION_X: f32 = 0.6060606;
-        const AGX_TOE_TRANSITION_Y: f32 = 0.43446;
-        const AGX_SHOULDER_TRANSITION_X: f32 = 0.6060606;
-        const AGX_SHOULDER_TRANSITION_Y: f32 = 0.43446;
-        const AGX_INTERCEPT: f32 = -1.0112;
-        const AGX_TOE_SCALE: f32 = -1.0359;
-        const AGX_SHOULDER_SCALE: f32 = 1.3475;
-
-        let agx_sigmoid =
-            |x: f32, power: f32| -> f32 { x / (1.0 + x.powf(power)).powf(1.0 / power) };
-
-        let agx_scaled_sigmoid =
-            |x: f32, scale: f32, slope: f32, power: f32, tx: f32, ty: f32| -> f32 {
-                scale * agx_sigmoid(slope * (x - tx) / scale, power) + ty
-            };
-
-        let result = if x < AGX_TOE_TRANSITION_X {
-            agx_scaled_sigmoid(
-                x,
-                AGX_TOE_SCALE,
-                AGX_SLOPE,
-                AGX_TOE_POWER,
-                AGX_TOE_TRANSITION_X,
-                AGX_TOE_TRANSITION_Y,
-            )
-        } else if x <= AGX_SHOULDER_TRANSITION_X {
-            AGX_SLOPE * x + AGX_INTERCEPT
-        } else {
-            agx_scaled_sigmoid(
-                x,
-                AGX_SHOULDER_SCALE,
-                AGX_SLOPE,
-                AGX_SHOULDER_POWER,
-                AGX_SHOULDER_TRANSITION_X,
-                AGX_SHOULDER_TRANSITION_Y,
-            )
-        };
-
-        result.clamp(0.0, 1.0)
-    }
-
-    const LUT_SIZE: usize = 4096;
-    let mut agx_lut = vec![0.0f32; LUT_SIZE];
-
-    if tone_mapper == "agx" {
-        for i in 0..LUT_SIZE {
-            let x = i as f32 / (LUT_SIZE - 1) as f32;
-            agx_lut[i] = agx_apply_curve_channel(x).powf(2.4);
-        }
-    }
-
     f32_image.par_chunks_mut(3).for_each(|pixel_chunk| {
-        if tone_mapper == "agx" {
-            let r = pixel_chunk[0].max(1e-6);
-            let g = pixel_chunk[1].max(1e-6);
-            let b = pixel_chunk[2].max(1e-6);
+        let r_gamma = pixel_chunk[0].powf(INV_GAMMA);
+        let g_gamma = pixel_chunk[1].powf(INV_GAMMA);
+        let b_gamma = pixel_chunk[2].powf(INV_GAMMA);
 
-            let min_ev = -15.2;
-            let range_ev = 5.0 - min_ev;
-            let r_log = ((r / 0.18).log2() - min_ev) / range_ev;
-            let g_log = ((g / 0.18).log2() - min_ev) / range_ev;
-            let b_log = ((b / 0.18).log2() - min_ev) / range_ev;
+        let r_contrast = (r_gamma - 0.5) * CONTRAST + 0.5;
+        let g_contrast = (g_gamma - 0.5) * CONTRAST + 0.5;
+        let b_contrast = (b_gamma - 0.5) * CONTRAST + 0.5;
 
-            let get_lut_val = |val: f32| -> f32 {
-                let clamped = val.clamp(0.0, 1.0);
-                let idx = (clamped * (LUT_SIZE - 1) as f32) as usize;
-                agx_lut[idx]
-            };
-
-            pixel_chunk[0] = get_lut_val(r_log);
-            pixel_chunk[1] = get_lut_val(g_log);
-            pixel_chunk[2] = get_lut_val(b_log);
-        } else {
-            let r_gamma = pixel_chunk[0].max(0.0).powf(INV_GAMMA);
-            let g_gamma = pixel_chunk[1].max(0.0).powf(INV_GAMMA);
-            let b_gamma = pixel_chunk[2].max(0.0).powf(INV_GAMMA);
-
-            let r_contrast = (r_gamma - 0.5) * CONTRAST + 0.5;
-            let g_contrast = (g_gamma - 0.5) * CONTRAST + 0.5;
-            let b_contrast = (b_gamma - 0.5) * CONTRAST + 0.5;
-
-            pixel_chunk[0] = r_contrast.clamp(0.0, 1.0);
-            pixel_chunk[1] = g_contrast.clamp(0.0, 1.0);
-            pixel_chunk[2] = b_contrast.clamp(0.0, 1.0);
-        }
+        pixel_chunk[0] = r_contrast.clamp(0.0, 1.0);
+        pixel_chunk[1] = g_contrast.clamp(0.0, 1.0);
+        pixel_chunk[2] = b_contrast.clamp(0.0, 1.0);
     });
 
     *image = DynamicImage::ImageRgb32F(f32_image);

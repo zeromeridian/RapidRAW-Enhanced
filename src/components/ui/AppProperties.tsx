@@ -184,8 +184,6 @@ export interface AppSettings {
   canvasInputMode?: 'mouse' | 'trackpad';
   zoomSpeedMultiplier?: number;
   keybinds?: { [action: string]: string[] };
-  defaultRawTonemapper?: string;
-  defaultNonRawTonemapper?: string;
 }
 
 export interface BrushSettings {

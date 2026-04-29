@@ -457,8 +457,6 @@ export default function SettingsPanel({
       appSettings?.useWgpuRenderer ?? (osPlatform === 'linux' || osPlatform === 'android' ? false : true),
     thumbnailWorkerThreads: appSettings?.thumbnailWorkerThreads ?? 4,
     imageCacheSize: appSettings?.imageCacheSize ?? 5,
-    defaultRawTonemapper: appSettings?.defaultRawTonemapper || 'agx',
-    defaultNonRawTonemapper: appSettings?.defaultNonRawTonemapper || 'basic',
   });
   const [restartRequired, setRestartRequired] = useState(false);
   const [activeCategory, setActiveCategory] = useState('general');
@@ -508,8 +506,6 @@ export default function SettingsPanel({
       useWgpuRenderer: appSettings?.useWgpuRenderer ?? true,
       thumbnailWorkerThreads: appSettings?.thumbnailWorkerThreads ?? 4,
       imageCacheSize: appSettings?.imageCacheSize ?? 5,
-      defaultRawTonemapper: appSettings?.defaultRawTonemapper || 'agx',
-      defaultNonRawTonemapper: appSettings?.defaultNonRawTonemapper || 'basic',
     });
     setRestartRequired(false);
   }, [appSettings]);
@@ -844,7 +840,7 @@ export default function SettingsPanel({
             </Text>
           </div>
 
-          <div className="relative flex w-full min-[1200px]:w-112.5 p-2 bg-bg-primary rounded-md">
+          <div className="relative flex w-full min-[1200px]:w-112.5 p-2 bg-surface rounded-md">
             {settingCategories.map((category) => (
               <button
                 key={category.id}
@@ -1000,19 +996,6 @@ export default function SettingsPanel({
                           adjustmentVisibility: {
                             ...(appSettings?.adjustmentVisibility || adjustmentVisibilityDefaults),
                             grain: checked,
-                          },
-                        })
-                      }
-                    />
-                    <Switch
-                      label="Tone Mapper"
-                      checked={appSettings?.adjustmentVisibility?.toneMapper ?? true}
-                      onChange={(checked) =>
-                        onSettingsChange({
-                          ...appSettings,
-                          adjustmentVisibility: {
-                            ...(appSettings?.adjustmentVisibility || adjustmentVisibilityDefaults),
-                            toneMapper: checked,
                           },
                         })
                       }
@@ -1640,36 +1623,6 @@ export default function SettingsPanel({
                           handleProcessingSettingChange('rawHighlightCompression', parseFloat(e.target.value))
                         }
                         fillOrigin="min"
-                      />
-                    </SettingItem>
-
-                    <SettingItem
-                      label="Default RAW Tonemapper"
-                      description="The default tonemapper applied to newly imported or unedited RAW images."
-                    >
-                      <Dropdown
-                        onChange={(value: any) => handleProcessingSettingChange('defaultRawTonemapper', value)}
-                        options={[
-                          { value: 'agx', label: 'AgX (Film-like)' },
-                          { value: 'basic', label: 'Basic (Standard)' },
-                        ]}
-                        value={processingSettings.defaultRawTonemapper}
-                        triggerClassName="bg-bg-primary"
-                      />
-                    </SettingItem>
-
-                    <SettingItem
-                      label="Default Non-RAW Tonemapper"
-                      description="The default tonemapper applied to newly imported or unedited non-RAW images (JPEG, PNG, etc)."
-                    >
-                      <Dropdown
-                        onChange={(value: any) => handleProcessingSettingChange('defaultNonRawTonemapper', value)}
-                        options={[
-                          { value: 'agx', label: 'AgX (Film-like)' },
-                          { value: 'basic', label: 'Basic (Standard)' },
-                        ]}
-                        value={processingSettings.defaultNonRawTonemapper}
-                        triggerClassName="bg-bg-primary"
                       />
                     </SettingItem>
 

@@ -999,7 +999,7 @@ fn get_cached_full_warped_image(
 
     let (mut full_image, is_raw) = get_full_image_for_processing(state)?;
     if is_raw {
-        apply_cpu_default_raw_processing(&mut full_image, "agx");
+        apply_cpu_default_raw_processing(&mut full_image);
     }
     let warped_image = apply_geometry_warp(Cow::Borrowed(&full_image), js_adjustments).into_owned();
     let warped_arc = Arc::new(warped_image);
@@ -1658,11 +1658,7 @@ fn generate_original_transformed_preview(
 
     let mut image_for_preview = loaded_image.image.as_ref().clone();
     if loaded_image.is_raw {
-        let settings = load_settings(app_handle.clone()).unwrap_or_default();
-        let default_tm = settings
-            .default_raw_tonemapper
-            .unwrap_or_else(|| "agx".to_string());
-        apply_cpu_default_raw_processing(&mut image_for_preview, &default_tm);
+        apply_cpu_default_raw_processing(&mut image_for_preview);
     }
 
     let (transformed_full_res, _unscaled_crop_offset) =

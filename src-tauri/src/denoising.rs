@@ -128,11 +128,7 @@ pub fn denoise_image(
 
     if is_raw {
         let _ = app_handle.emit("denoise-progress", "Preparing RAW data...");
-        let default_tm = settings
-            .default_raw_tonemapper
-            .clone()
-            .unwrap_or_else(|| "agx".to_string());
-        apply_cpu_default_raw_processing(&mut dynamic_img, &default_tm);
+        apply_cpu_default_raw_processing(&mut dynamic_img);
     }
 
     let rgb_img_for_denoiser = dynamic_img.to_rgb32f();
