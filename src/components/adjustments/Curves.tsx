@@ -41,6 +41,8 @@ const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
   split1: 25,
   split2: 50,
   split3: 75,
+  whiteLevel: 0,
+  blackLevel: 0,
 };
 
 const DEFAULT_PARAMETRIC_CURVE = {
@@ -69,11 +71,29 @@ const DEFAULT_POINT_CURVES = {
   ],
 };
 
+function getSplitterGradient(channel: ActiveChannel) {
+  switch(channel) {
+    case ActiveChannel.Luma:
+      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(64, 64, 64, 0.8) 25%, rgba(105, 101, 101, 0.8) 50%, rgba(158, 154, 154, 0.8) 75%, rgba(198, 195, 197, 0.8) 100%)';
+    case ActiveChannel.Red:
+      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(64, 0, 0, 0.8) 25%, rgba(105, 50, 50, 0.8) 50%, rgba(158, 100, 100, 0.8) 75%, rgba(255, 107, 107, 0.8) 100%)';
+    case ActiveChannel.Green:
+      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(0, 64, 0, 0.8) 25%, rgba(50, 105, 50, 0.8) 50%, rgba(100, 158, 100, 0.8) 75%, rgba(107, 203, 119, 0.8) 100%)';
+    case ActiveChannel.Blue:
+      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 64, 0.8) 25%, rgba(50, 50, 105, 0.8) 50%, rgba(100, 100, 158, 0.8) 75%, rgba(77, 150, 255, 0.8) 100%)';
+    default:
+      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(64, 64, 64, 0.8) 25%, rgba(105, 101, 101, 0.8) 50%, rgba(158, 154, 154, 0.8) 75%, rgba(198, 195, 197, 0.8) 100%)';
+  }
+}
+
 function buildParametricPoints(settings: ParametricCurveSettings): Array<Coord> {
   const vH = settings.highlights / 100;
   const vL = settings.lights / 100;
   const vD = settings.darks / 100;
   const vS = settings.shadows / 100;
+
+  const whiteYOffset = settings.whiteLevel;
+  const blackYOffset = settings.blackLevel;
 
   const s1 = settings.split1 / 100;
   const s2 = settings.split2 / 100;
@@ -105,10 +125,19 @@ function buildParametricPoints(settings: ParametricCurveSettings): Array<Coord> 
 
   const clamp = (v: number) => Math.max(0, Math.min(1, v));
 
-  return xs.map((x, i) => ({
+  let points = xs.map((x, i) => ({
     x: x * 255,
     y: clamp(ys[i]) * 255,
   }));
+
+  if (points.length >= 2) {
+    points[0].y = Math.max(0, Math.min(255, points[0].y + whiteYOffset));
+
+    const lastIndex = points.length - 1;
+    points[lastIndex].y = Math.max(0, Math.min(255, points[lastIndex].y + blackYOffset));
+  }
+  
+  return points;
 }
 
 function getCurvePath(points: Array<Coord>) {
@@ -222,7 +251,9 @@ function isDefaultParametricCurve(settings: ParametricCurveSettings | undefined)
     settings.highlights === DEFAULT_PARAMETRIC_CURVE_SETTINGS.highlights &&
     settings.split1 === DEFAULT_PARAMETRIC_CURVE_SETTINGS.split1 &&
     settings.split2 === DEFAULT_PARAMETRIC_CURVE_SETTINGS.split2 &&
-    settings.split3 === DEFAULT_PARAMETRIC_CURVE_SETTINGS.split3
+    settings.split3 === DEFAULT_PARAMETRIC_CURVE_SETTINGS.split3 &&
+    settings.whiteLevel === DEFAULT_PARAMETRIC_CURVE_SETTINGS.whiteLevel &&
+    settings.blackLevel === DEFAULT_PARAMETRIC_CURVE_SETTINGS.blackLevel
   );
 }
 
@@ -312,6 +343,11 @@ export default function CurveGraph({
       };
     });
   };
+
+const handleSliderChange = (key: keyof ParametricCurveSettings, e: any) => {
+  const value = parseFloat(e.target.value);
+  updateParametricValue(key, value);
+};
 
   useEffect(() => {
     activeChannelRef.current = activeChannel;
@@ -812,6 +848,27 @@ export default function CurveGraph({
 
             <path d={getCurvePath(activePoints)} fill="none" stroke={color} strokeWidth="2.5" />
 
+            {isParametricMode && activePoints.length >= 2 && (
+              <>
+                <circle
+                  cx={activePoints[0]?.x || 0}
+                  cy={255 - (activePoints[0]?.y || 0)}
+                  fill={color}
+                  r="6"
+                  stroke="#1e1e1e"
+                  strokeWidth="2"
+                />
+                <circle
+                  cx={activePoints[activePoints.length - 1]?.x || 255}
+                  cy={255 - (activePoints[activePoints.length - 1]?.y || 255)}
+                  fill={color}
+                  r="6"
+                  stroke="#1e1e1e"
+                  strokeWidth="2"
+                />
+              </>
+            )}
+
             {!isParametricMode &&
               activePoints.map((p: Coord, i: number) => (
                 <circle
@@ -848,7 +905,7 @@ export default function CurveGraph({
                     <div
                       className="absolute inset-0"
                       style={{
-                        background: `linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(64, 64, 64, 0.8) 25%, rgba(105, 101, 101, 0.8) 50%, rgba(158, 154, 154, 0.8) 75%, rgba(198, 195, 197, 0.8) 100%)`,
+                        background: getSplitterGradient(activeChannel),
                       }}
                     />
                     {splitPositions.map(({ key, value }) => (
@@ -885,13 +942,23 @@ export default function CurveGraph({
 
               <div className="flex flex-col gap-2">
                 <Slider
+                  label="White Level"
+                  min={0}
+                  max={100}
+                  step={1}
+                  defaultValue={0}
+                  value={activeParametricSettings.whiteLevel}
+                  onChange={(e: any) => handleSliderChange('whiteLevel', e)}
+                  onDragStateChange={onDragStateChange}
+                />
+                <Slider
                   label="Highlights"
                   min={-100}
                   max={100}
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.highlights}
-                  onChange={(e: any) => updateParametricValue('highlights', parseFloat(e.target.value))}
+                  onChange={(e: any) => handleSliderChange('highlights', e)}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -901,7 +968,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.lights}
-                  onChange={(e: any) => updateParametricValue('lights', parseFloat(e.target.value))}
+                  onChange={(e: any) => handleSliderChange('lights', e)}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -911,7 +978,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.darks}
-                  onChange={(e: any) => updateParametricValue('darks', parseFloat(e.target.value))}
+                  onChange={(e: any) => handleSliderChange('darks', e)}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -921,7 +988,17 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.shadows}
-                  onChange={(e: any) => updateParametricValue('shadows', parseFloat(e.target.value))}
+                  onChange={(e: any) => handleSliderChange('shadows', e)}
+                  onDragStateChange={onDragStateChange}
+                />
+                <Slider
+                  label="Black Level"
+                  min={-100}
+                  max={0}
+                  step={1}
+                  defaultValue={0}
+                  value={activeParametricSettings.blackLevel}
+                  onChange={(e: any) => handleSliderChange('blackLevel', e)}
                   onDragStateChange={onDragStateChange}
                 />
               </div>

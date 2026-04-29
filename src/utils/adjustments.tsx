@@ -132,6 +132,8 @@ export interface ParametricCurveSettings {
   split1: number;
   split2: number;
   split3: number;
+  whiteLevel: number;
+  blackLevel: number
 }
 
 export interface ParametricCurve {
@@ -378,6 +380,8 @@ export const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
   split1: 25,
   split2: 50,
   split3: 75,
+  whiteLevel: 0,
+  blackLevel: 0,
 };
 
 export const getDefaultParametricCurve = (): ParametricCurve => ({
