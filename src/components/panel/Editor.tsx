@@ -76,6 +76,7 @@ interface EditorProps {
   canUndo: boolean;
   finalPreviewUrl: string | null;
   interactivePatch?: { url: string; normX: number; normY: number; normW: number; normH: number } | null;
+  isAndroid: boolean;
   isFullScreen: boolean;
   isLoading: boolean;
   isSliderDragging: boolean;
@@ -131,6 +132,7 @@ export default function Editor({
   canUndo,
   finalPreviewUrl,
   interactivePatch,
+  isAndroid,
   isFullScreen,
   isLoading,
   isSliderDragging,
@@ -1782,6 +1784,7 @@ export default function Editor({
         <EditorToolbar
           canRedo={canRedo}
           canUndo={canUndo}
+          isAndroid={isAndroid}
           isLoading={isLoading}
           onBackToLibrary={onBackToLibrary}
           onRedo={onRedo}

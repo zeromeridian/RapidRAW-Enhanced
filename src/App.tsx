@@ -5266,6 +5266,7 @@ function App() {
           canUndo={canUndo}
           finalPreviewUrl={finalPreviewUrl}
           interactivePatch={interactivePatch}
+          isAndroid={isAndroid}
           isFullScreen={isFullScreen}
           isLoading={isViewLoading}
           isSliderDragging={isSliderDragging}
