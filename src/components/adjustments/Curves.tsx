@@ -92,6 +92,9 @@ function buildParametricPoints(settings: ParametricCurveSettings): Array<Coord> 
   const vD = settings.darks / 100;
   const vS = settings.shadows / 100;
 
+  const blackYOffset = settings.blackLevel;
+  const whiteYOffset = settings.whiteLevel;
+
   const s1 = settings.split1 / 100;
   const s2 = settings.split2 / 100;
   const s3 = settings.split3 / 100;
@@ -127,20 +130,11 @@ function buildParametricPoints(settings: ParametricCurveSettings): Array<Coord> 
     y: clamp(ys[i]) * 255,
   }));
 
-  const blackFactor = settings.blackLevel / 100;
-  if (blackFactor > 0) {
-    points = points.map(point => ({
-      x: point.x,
-      y: Math.max(0, Math.min(255, point.y + (255 - point.y) * blackFactor * 0.39))
-    }));
-  }
+  if (points.length >= 2) {
+    points[0].y = Math.max(0, Math.min(255, points[0].y + blackYOffset));
 
-  const whiteFactor = Math.abs(settings.whiteLevel) / 100;
-  if (whiteFactor > 0) {
-    points = points.map(point => ({
-      x: point.x,
-      y: Math.max(0, Math.min(255, point.y * (1 - whiteFactor * 0.39)))
-    }));
+    const lastIndex = points.length - 1;
+    points[lastIndex].y = Math.max(0, Math.min(255, points[lastIndex].y + whiteYOffset));
   }
   
   return points;
@@ -348,6 +342,19 @@ export default function CurveGraph({
         },
       };
     });
+  };
+
+  const pasteParametricToPointCurve = () => {
+    if (!parametricClipboard) return;
+
+    const convertedPoints = buildParametricPoints(parametricClipboard);
+    
+    setLocalPoints(convertedPoints);
+    localPointsRef.current = convertedPoints;
+    setAdjustments((prev: any) => ({
+      ...prev,
+      curves: { ...prev.curves, [activeChannel]: convertedPoints },
+    }));
   };
 
   useEffect(() => {
@@ -720,6 +727,12 @@ export default function CurveGraph({
         icon: ClipboardPaste,
         onClick: handlePaste,
         disabled: !curveClipboard,
+      },
+      {
+        label: `Paste from Parametric Curve`,
+        icon: Settings2,
+        onClick: pasteParametricToPointCurve,
+        disabled: !parametricClipboard,
       },
       { type: OPTION_SEPARATOR },
       { label: `Reset ${channelName} Point Curve`, icon: RotateCcw, onClick: handleReset },
