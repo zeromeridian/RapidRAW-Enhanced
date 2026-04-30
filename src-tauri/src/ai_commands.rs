@@ -15,9 +15,9 @@ use crate::ai_processing::{
     AiSubjectMaskParameters, CachedDepthMap, generate_image_embeddings, get_or_init_ai_models,
     run_depth_anything_model, run_sam_decoder, run_sky_seg_model, run_u2netp_model,
 };
+use crate::app_settings::load_settings;
 use crate::app_state::AppState;
 use crate::cache_utils::GEOMETRY_KEYS;
-use crate::app_settings::load_settings;
 use crate::image_loader::composite_patches_on_image;
 use crate::image_processing::apply_unwarp_geometry;
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
@@ -365,11 +365,10 @@ pub async fn precompute_ai_subject_mask(
     let mut ai_state_lock = state.ai_state.lock().unwrap();
     let ai_state = ai_state_lock.as_mut().unwrap();
 
-    if let Some(cached_embeddings) = &ai_state.embeddings {
-        if cached_embeddings.path_hash == path_hash {
+    if let Some(cached_embeddings) = &ai_state.embeddings
+        && cached_embeddings.path_hash == path_hash {
             return Ok(());
         }
-    }
 
     let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
     let mut new_embeddings = generate_image_embeddings(warped_image.as_ref(), &models.sam_encoder)

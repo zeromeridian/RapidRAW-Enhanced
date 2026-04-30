@@ -81,11 +81,10 @@ pub fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
     let flip_v = adjustments["flipVertical"].as_bool().unwrap_or(false);
     flip_v.hash(&mut hasher);
 
-    if let Some(crop_val) = adjustments.get("crop") {
-        if !crop_val.is_null() {
+    if let Some(crop_val) = adjustments.get("crop")
+        && !crop_val.is_null() {
             crop_val.to_string().hash(&mut hasher);
         }
-    }
 
     for key in GEOMETRY_KEYS {
         if let Some(val) = adjustments.get(key) {
@@ -94,8 +93,8 @@ pub fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
         }
     }
 
-    if let Some(patches_val) = adjustments.get("aiPatches") {
-        if let Some(patches_arr) = patches_val.as_array() {
+    if let Some(patches_val) = adjustments.get("aiPatches")
+        && let Some(patches_arr) = patches_val.as_array() {
             patches_arr.len().hash(&mut hasher);
 
             for patch in patches_arr {
@@ -143,7 +142,6 @@ pub fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
                 invert.hash(&mut hasher);
             }
         }
-    }
 
     hasher.finish()
 }
