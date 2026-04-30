@@ -660,7 +660,7 @@ function App() {
     (angleCorrection: number) => {
       setAdjustments((prev: Partial<Adjustments>) => {
         const newRotation = (prev.rotation || 0) + angleCorrection;
-        return { ...prev, rotation: newRotation, crop: null };
+        return { ...prev, rotation: newRotation };
       });
 
       setIsStraightenActive(false);
@@ -1816,9 +1816,9 @@ function App() {
         const result: LutData = await invoke('load_and_parse_lut', { path });
         let name = 'LUT';
         if (isAndroid) {
-          name = await invoke<string>('resolve_android_content_uri_name', { 
-              uriStr: path
-            });
+          name = await invoke<string>('resolve_android_content_uri_name', {
+            uriStr: path,
+          });
         } else {
           name = path.split(/[\\/]/).pop() || 'LUT';
         }
@@ -4277,9 +4277,7 @@ function App() {
         const raw = supportedTypes?.raw || [];
 
         const expandExtensions = (exts: string[]) => {
-          return Array.from(
-            new Set(exts.flatMap((ext) => [ext.toLowerCase(), ext.toUpperCase()]))
-          );
+          return Array.from(new Set(exts.flatMap((ext) => [ext.toLowerCase(), ext.toUpperCase()])));
         };
 
         const processedNonRaw = expandExtensions(nonRaw);
@@ -4315,31 +4313,25 @@ function App() {
 
         if (Array.isArray(selected) && selected.length > 0) {
           const invalidExtensions = new Set<string>();
-          const allowedExtensions = new Set(
-            allImageExtensions.map((e) => e.toLowerCase())
-          );
+          const allowedExtensions = new Set(allImageExtensions.map((e) => e.toLowerCase()));
 
           const resolvedFiles = await Promise.all(
             selected.map(async (path) => {
               if (isAndroid) {
                 try {
-                  return await invoke<string>(
-                    'resolve_android_content_uri_name',
-                    { uriStr: path }
-                  );
+                  return await invoke<string>('resolve_android_content_uri_name', { uriStr: path });
                 } catch (e) {
                   console.error('Failed to resolve URI:', e);
                   return path;
                 }
               }
               return path;
-            })
+            }),
           );
 
           const validFiles = selected.filter((originalPath, index) => {
             const resolvedName = resolvedFiles[index];
-            const ext =
-              resolvedName.split('.').pop()?.toLowerCase() || 'unknown';
+            const ext = resolvedName.split('.').pop()?.toLowerCase() || 'unknown';
 
             if (!allowedExtensions.has(ext)) {
               invalidExtensions.add(`.${ext}`);
@@ -4350,18 +4342,12 @@ function App() {
 
           if (invalidExtensions.size > 0) {
             const extList = Array.from(invalidExtensions).join(', ');
-            toast.error(
-              `Unsupported file format(s) detected: ${extList}`
-            );
+            toast.error(`Unsupported file format(s) detected: ${extList}`);
             return;
           }
 
           if (isAndroid) {
-            await startImportFiles(
-              validFiles,
-              targetPath,
-              DEFAULT_IMPORT_SETTINGS
-            );
+            await startImportFiles(validFiles, targetPath, DEFAULT_IMPORT_SETTINGS);
             return;
           }
 
@@ -4373,7 +4359,7 @@ function App() {
         console.error('Failed to open file dialog for import:', err);
       }
     },
-    [supportedTypes, isAndroid, startImportFiles]
+    [supportedTypes, isAndroid, startImportFiles],
   );
 
   const handleEditorContextMenu = (event: any) => {
@@ -5668,8 +5654,7 @@ function App() {
 
   const shouldHideFolderTree = isAndroid;
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
-  const useMacWindowShell =
-    osPlatform === 'macos' && !appSettings?.decorations && !isWindowFullScreen && !isFullScreen;
+  const useMacWindowShell = osPlatform === 'macos' && !appSettings?.decorations && !isWindowFullScreen && !isFullScreen;
 
   useEffect(() => {
     if (selectedImage?.path && selectedImage.isReady && (finalPreviewUrl || isWgpuActive)) {
