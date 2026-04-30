@@ -366,9 +366,10 @@ pub async fn precompute_ai_subject_mask(
     let ai_state = ai_state_lock.as_mut().unwrap();
 
     if let Some(cached_embeddings) = &ai_state.embeddings
-        && cached_embeddings.path_hash == path_hash {
-            return Ok(());
-        }
+        && cached_embeddings.path_hash == path_hash
+    {
+        return Ok(());
+    }
 
     let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
     let mut new_embeddings = generate_image_embeddings(warped_image.as_ref(), &models.sam_encoder)
