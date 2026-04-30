@@ -1652,10 +1652,7 @@ fn calculate_agx_matrices() -> (GpuMat3, GpuMat3) {
     )
 }
 
-pub fn resolve_tonemapper_override(
-    settings: &crate::file_management::AppSettings,
-    is_raw: bool,
-) -> Option<u32> {
+pub fn resolve_tonemapper_override(settings: &crate::AppSettings, is_raw: bool) -> Option<u32> {
     if !settings.tonemapper_override_enabled.unwrap_or(false) {
         return None;
     }
@@ -1674,7 +1671,7 @@ pub fn resolve_tonemapper_override_from_handle(
     app_handle: &tauri::AppHandle,
     is_raw: bool,
 ) -> Option<u32> {
-    let settings = crate::file_management::load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = crate::app_settings::load_settings(app_handle.clone()).unwrap_or_default();
     resolve_tonemapper_override(&settings, is_raw)
 }
 

@@ -2,10 +2,14 @@ use crate::ai_processing::{
     AiDepthMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters, AiSubjectMaskParameters,
 };
 use base64::{Engine as _, engine::general_purpose};
-use image::{DynamicImage, GenericImageView, GrayImage, Luma};
+use image::{DynamicImage, GenericImageView, GrayImage, ImageFormat, Luma, Rgba, RgbaImage};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::f32::consts::PI;
+use std::io::Cursor;
+
+use crate::app_state::AppState;
+use crate::resolve_warped_image_for_masks;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(crate = "serde")]
@@ -1315,4 +1319,49 @@ pub fn generate_mask_bitmap(
     }
 
     Some(final_mask)
+}
+
+#[tauri::command]
+pub fn generate_mask_overlay(
+    mask_def: MaskDefinition,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+    js_adjustments: Option<serde_json::Value>,
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let scaled_crop_offset = (crop_offset.0 * scale, crop_offset.1 * scale);
+
+    let warped_image = js_adjustments.as_ref().and_then(|adj| {
+        resolve_warped_image_for_masks(&state, adj, std::slice::from_ref(&mask_def))
+    });
+
+    if let Some(gray_mask) = generate_mask_bitmap(
+        &mask_def,
+        width,
+        height,
+        scale,
+        scaled_crop_offset,
+        warped_image.as_deref(),
+    ) {
+        let mut rgba_mask = RgbaImage::new(width, height);
+        for (x, y, pixel) in gray_mask.enumerate_pixels() {
+            let intensity = pixel[0];
+            let alpha = (intensity as f32 * 0.5) as u8;
+            rgba_mask.put_pixel(x, y, Rgba([255, 0, 0, alpha]));
+        }
+
+        let mut buf = Cursor::new(Vec::new());
+        rgba_mask
+            .write_to(&mut buf, ImageFormat::Png)
+            .map_err(|e| e.to_string())?;
+
+        let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
+        let data_url = format!("data:image/png;base64,{}", base64_str);
+
+        Ok(data_url)
+    } else {
+        Ok("".to_string())
+    }
 }

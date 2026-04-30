@@ -1,4 +1,4 @@
-use crate::file_management::is_android_content_uri;
+use crate::android_integration::is_android_content_uri;
 #[cfg(target_os = "android")]
 use crate::file_management::{
     get_android_cached_lut_path, read_android_content_uri, resolve_android_content_uri_name,
