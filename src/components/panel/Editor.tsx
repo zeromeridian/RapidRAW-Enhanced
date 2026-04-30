@@ -44,7 +44,6 @@ const checkCropValid = (pixelCrop: Partial<Crop>, imageW: number, imageH: number
     const p = pts[i];
     const nx = cos * (p.x - cx) - sin * (p.y - cy) + cx;
     const ny = sin * (p.x - cx) + cos * (p.y - cy) + cy;
-    // 1px tolerance to prevent micro-stutters during drag
     if (nx < -1 || nx > imageW + 1 || ny < -1 || ny > imageH + 1) {
       return false;
     }
@@ -526,7 +525,7 @@ export default function Editor({
   useEffect(() => {
     if (!transformWrapperRef.current || !targetZoom || targetZoom <= 0) return;
 
-    const currentScale = transformStateRef.current.scale || 1; // Fallback to 1
+    const currentScale = transformStateRef.current.scale || 1;
     if (Math.abs(currentScale - targetZoom) < 0.001) return;
 
     const animationTime = 200;
@@ -1325,8 +1324,6 @@ export default function Editor({
 
       let isMaximized = false;
       if (currentAdjCrop) {
-        // Compare current crop against the maximum possible crop for the *reference* rotation
-        // (the rotation before we started dragging, or the rotation it was previously committed at)
         const referenceRotation = prevCropParams.current?.rotation ?? rotation;
         const maxCropForReference = calculateCenteredCrop(
           selectedImage.width,
@@ -1336,7 +1333,6 @@ export default function Editor({
           referenceRotation,
         );
 
-        // Use a 2-pixel tolerance to safely account for any float rounding differences
         if (
           Math.abs(currentAdjCrop.x - maxCropForReference.x) <= 2 &&
           Math.abs(currentAdjCrop.y - maxCropForReference.y) <= 2 &&
@@ -1347,7 +1343,50 @@ export default function Editor({
         }
       }
 
-      if (!currentAdjCrop || aspectChanged || orientationChanged || (isMaximized && rotationChanged)) {
+      if (!currentAdjCrop || orientationChanged) {
+        nextPixelCrop = calculateCenteredCrop(
+          selectedImage.width,
+          selectedImage.height,
+          orientationSteps,
+          A,
+          effectiveRotation,
+        );
+      } else if (aspectChanged) {
+        if (!aspectRatio) {
+          nextPixelCrop = currentAdjCrop;
+        } else {
+          const curW = currentAdjCrop.width;
+          const curH = currentAdjCrop.height;
+          const curCx = currentAdjCrop.x + curW / 2;
+          const curCy = currentAdjCrop.y + curH / 2;
+
+          let newW = curW;
+          let newH = curW / A;
+
+          if (newH > curH) {
+            newH = curH;
+            newW = curH * A;
+          }
+
+          nextPixelCrop = {
+            unit: 'px',
+            x: Math.round(curCx - newW / 2),
+            y: Math.round(curCy - newH / 2),
+            width: Math.round(newW),
+            height: Math.round(newH),
+          };
+        }
+
+        if (!checkCropValid(nextPixelCrop, W, H, effectiveRotation)) {
+          nextPixelCrop = calculateCenteredCrop(
+            selectedImage.width,
+            selectedImage.height,
+            orientationSteps,
+            A,
+            effectiveRotation,
+          );
+        }
+      } else if (isMaximized && rotationChanged) {
         nextPixelCrop = calculateCenteredCrop(
           selectedImage.width,
           selectedImage.height,
@@ -1481,14 +1520,11 @@ export default function Editor({
       const H = isSwapped ? selectedImage.width : selectedImage.height;
       const rotation = liveRotation !== null && liveRotation !== undefined ? liveRotation : adjustments.rotation || 0;
 
-      // Enforce a uniform minimum crop size across all images (e.g., 64px)
-      // to prevent accidental clicks from collapsing the crop entirely.
       const MIN_CROP_PX = 64;
       const minPctW = (MIN_CROP_PX / W) * 100;
       const minPctH = (MIN_CROP_PX / H) * 100;
 
       if (percentCrop.width < minPctW || percentCrop.height < minPctH) {
-        // Ignore clicks/drags that result in a crop smaller than the uniform minimum size
         return;
       }
 
