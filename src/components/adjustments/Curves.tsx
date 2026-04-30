@@ -92,8 +92,8 @@ function buildParametricPoints(settings: ParametricCurveSettings): Array<Coord> 
   const vD = settings.darks / 100;
   const vS = settings.shadows / 100;
 
-  const whiteYOffset = settings.whiteLevel;
   const blackYOffset = settings.blackLevel;
+  const whiteYOffset = settings.whiteLevel;
 
   const s1 = settings.split1 / 100;
   const s2 = settings.split2 / 100;
@@ -131,10 +131,10 @@ function buildParametricPoints(settings: ParametricCurveSettings): Array<Coord> 
   }));
 
   if (points.length >= 2) {
-    points[0].y = Math.max(0, Math.min(255, points[0].y + whiteYOffset));
+    points[0].y = Math.max(0, Math.min(255, points[0].y + blackYOffset));
 
     const lastIndex = points.length - 1;
-    points[lastIndex].y = Math.max(0, Math.min(255, points[lastIndex].y + blackYOffset));
+    points[lastIndex].y = Math.max(0, Math.min(255, points[lastIndex].y + whiteYOffset));
   }
   
   return points;
@@ -938,8 +938,8 @@ export default function CurveGraph({
               <div className="flex flex-col gap-2">
                 <Slider
                   label="White Level"
-                  min={0}
-                  max={100}
+                  min={-100}
+                  max={0}
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.whiteLevel}
@@ -988,8 +988,8 @@ export default function CurveGraph({
                 />
                 <Slider
                   label="Black Level"
-                  min={-100}
-                  max={0}
+                  min={0}
+                  max={100}
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.blackLevel}
