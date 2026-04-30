@@ -5,11 +5,14 @@ use base64::{Engine as _, engine::general_purpose};
 use image::{DynamicImage, GenericImageView, GrayImage, ImageFormat, Luma, Rgba, RgbaImage};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::hash_map::DefaultHasher;
 use std::f32::consts::PI;
+use std::hash::{Hash, Hasher};
 use std::io::Cursor;
+use std::sync::Arc;
 
 use crate::app_state::AppState;
-use crate::resolve_warped_image_for_masks;
+use crate::get_cached_full_warped_image;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(crate = "serde")]
@@ -1364,4 +1367,70 @@ pub fn generate_mask_overlay(
     } else {
         Ok("".to_string())
     }
+}
+
+pub fn resolve_warped_image_for_masks(
+    state: &tauri::State<AppState>,
+    adjustments: &serde_json::Value,
+    masks: &[MaskDefinition],
+) -> Option<Arc<DynamicImage>> {
+    if masks.iter().any(|m| m.requires_warped_image()) {
+        get_cached_full_warped_image(state, adjustments).ok()
+    } else {
+        None
+    }
+}
+
+pub fn get_cached_or_generate_mask(
+    state: &tauri::State<AppState>,
+    def: &MaskDefinition,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+    adjustments: &serde_json::Value,
+) -> Option<GrayImage> {
+    let mut hasher = DefaultHasher::new();
+
+    let mut def_for_hash = def.clone();
+    def_for_hash.adjustments = serde_json::Value::Null;
+    let def_json = serde_json::to_string(&def_for_hash).unwrap_or_default();
+    def_json.hash(&mut hasher);
+
+    width.hash(&mut hasher);
+    height.hash(&mut hasher);
+    scale.to_bits().hash(&mut hasher);
+    crop_offset.0.to_bits().hash(&mut hasher);
+    crop_offset.1.to_bits().hash(&mut hasher);
+
+    let key = hasher.finish();
+
+    {
+        let cache = state.mask_cache.lock().unwrap();
+        if let Some(img) = cache.get(&key) {
+            return Some(img.clone());
+        }
+    }
+
+    let warped_image =
+        resolve_warped_image_for_masks(state, adjustments, std::slice::from_ref(def));
+
+    let generated = generate_mask_bitmap(
+        def,
+        width,
+        height,
+        scale,
+        crop_offset,
+        warped_image.as_deref(),
+    );
+
+    if let Some(img) = &generated {
+        let mut cache = state.mask_cache.lock().unwrap();
+        if cache.len() > 50 {
+            cache.clear();
+        }
+        cache.insert(key, img.clone());
+    }
+
+    generated
 }

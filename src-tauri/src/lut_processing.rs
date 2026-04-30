@@ -1,8 +1,10 @@
 use crate::android_integration::is_android_content_uri;
 #[cfg(target_os = "android")]
-use crate::file_management::{
+use crate::android_integration::{
     get_android_cached_lut_path, read_android_content_uri, resolve_android_content_uri_name,
 };
+#[cfg(target_os = "android")]
+use anyhow::Context;
 use anyhow::{Result, anyhow};
 use image::{DynamicImage, GenericImageView, Rgb, Rgb32FImage};
 #[cfg(target_os = "android")]
@@ -185,71 +187,71 @@ fn parse_hald(image: DynamicImage) -> Result<Lut> {
 }
 
 pub fn parse_lut_file(path_str: &str) -> Result<Lut> {
-    let (extension, bytes): (String, Option<Vec<u8>>) = if cfg!(target_os = "android")
-        && is_android_content_uri(path_str)
-    {
-        #[cfg(target_os = "android")]
-        {
-            match resolve_android_content_uri_name(path_str) {
-                Ok(resolved_name) => {
-                    let ext = Path::new(&resolved_name)
-                        .extension()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("cube")
-                        .to_lowercase();
+    let (extension, bytes): (String, Option<Vec<u8>>) =
+        if cfg!(target_os = "android") && is_android_content_uri(path_str) {
+            #[cfg(target_os = "android")]
+            {
+                match resolve_android_content_uri_name(path_str) {
+                    Ok(resolved_name) => {
+                        let ext = Path::new(&resolved_name)
+                            .extension()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("cube")
+                            .to_lowercase();
 
-                    let uri_bytes = read_android_content_uri(path_str).map_err(|e| anyhow!(e))?;
+                        let uri_bytes =
+                            read_android_content_uri(path_str).map_err(|e| anyhow!("{}", e))?;
 
-                    if let Ok(cache_path) = get_android_cached_lut_path(path_str, &ext) {
-                        let _ = fs::write(cache_path, &uri_bytes);
+                        if let Ok(cache_path) = get_android_cached_lut_path(path_str, &ext) {
+                            let _ = fs::write(cache_path, &uri_bytes);
+                        }
+
+                        (ext, Some(uri_bytes))
                     }
+                    Err(_) => {
+                        let hash_prefix =
+                            format!("{}.", &blake3::hash(path_str.as_bytes()).to_hex()[..16]);
 
-                    (ext, Some(uri_bytes))
-                }
-                Err(_) => {
-                    let hash_prefix =
-                        format!("{}.", &blake3::hash(path_str.as_bytes()).to_hex()[..16]);
+                        let cache_dir = get_android_cached_lut_path(path_str, "tmp")?
+                            .parent()
+                            .ok_or_else(|| anyhow!("Invalid cache path"))?
+                            .to_path_buf();
 
-                    let cache_dir = get_android_cached_lut_path(path_str, "tmp")?
-                        .parent()
-                        .ok_or_else(|| anyhow!("Invalid cache path"))?
-                        .to_path_buf();
-
-                    let mut found = None;
-                    if let Ok(entries) = fs::read_dir(cache_dir) {
-                        for entry in entries.flatten() {
-                            let fname = entry.file_name().to_string_lossy().into_owned();
-                            if fname.starts_with(&hash_prefix) {
-                                let ext = Path::new(&fname)
-                                    .extension()
-                                    .and_then(|s| s.to_str())
-                                    .unwrap_or("cube")
-                                    .to_string();
-                                if let Ok(bytes) = fs::read(entry.path()) {
-                                    found = Some((ext, Some(bytes)));
-                                    break;
+                        let mut found = None;
+                        if let Ok(entries) = fs::read_dir(cache_dir) {
+                            for entry in entries.flatten() {
+                                let fname = entry.file_name().to_string_lossy().into_owned();
+                                if fname.starts_with(&hash_prefix) {
+                                    let ext = Path::new(&fname)
+                                        .extension()
+                                        .and_then(|s| s.to_str())
+                                        .unwrap_or("cube")
+                                        .to_string();
+                                    if let Ok(bytes) = fs::read(entry.path()) {
+                                        found = Some((ext, Some(bytes)));
+                                        break;
+                                    }
                                 }
                             }
                         }
+                        found.ok_or_else(|| {
+                            anyhow!("LUT not found in cache and permission denied for URI")
+                        })?
                     }
-                    found.ok_or_else(|| {
-                        anyhow!("LUT not found in cache and permission denied for URI")
-                    })?
                 }
             }
-        }
-        #[cfg(not(target_os = "android"))]
-        {
-            (String::new(), None)
-        }
-    } else {
-        let ext = Path::new(path_str)
-            .extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .to_lowercase();
-        (ext, None)
-    };
+            #[cfg(not(target_os = "android"))]
+            {
+                (String::new(), None)
+            }
+        } else {
+            let ext = Path::new(path_str)
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            (ext, None)
+        };
 
     match extension.as_str() {
         "cube" => {
