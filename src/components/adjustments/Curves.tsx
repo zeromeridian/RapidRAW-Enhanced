@@ -344,11 +344,6 @@ export default function CurveGraph({
     });
   };
 
-const handleSliderChange = (key: keyof ParametricCurveSettings, e: any) => {
-  const value = parseFloat(e.target.value);
-  updateParametricValue(key, value);
-};
-
   useEffect(() => {
     activeChannelRef.current = activeChannel;
     setLocalPoints(null);
@@ -948,7 +943,7 @@ const handleSliderChange = (key: keyof ParametricCurveSettings, e: any) => {
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.whiteLevel}
-                  onChange={(e: any) => handleSliderChange('whiteLevel', e)}
+                  onChange={(e: any) => updateParametricValue('whiteLevel', parseFloat(e.target.value))}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -958,7 +953,7 @@ const handleSliderChange = (key: keyof ParametricCurveSettings, e: any) => {
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.highlights}
-                  onChange={(e: any) => handleSliderChange('highlights', e)}
+                  onChange={(e: any) => updateParametricValue('highlights', parseFloat(e.target.value))}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -968,7 +963,7 @@ const handleSliderChange = (key: keyof ParametricCurveSettings, e: any) => {
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.lights}
-                  onChange={(e: any) => handleSliderChange('lights', e)}
+                  onChange={(e: any) => updateParametricValue('lights', parseFloat(e.target.value))}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -978,7 +973,7 @@ const handleSliderChange = (key: keyof ParametricCurveSettings, e: any) => {
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.darks}
-                  onChange={(e: any) => handleSliderChange('darks', e)}
+                  onChange={(e: any) => updateParametricValue('darks', parseFloat(e.target.value))}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -988,7 +983,7 @@ const handleSliderChange = (key: keyof ParametricCurveSettings, e: any) => {
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.shadows}
-                  onChange={(e: any) => handleSliderChange('shadows', e)}
+                  onChange={(e: any) => updateParametricValue('shadows', parseFloat(e.target.value))}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -998,7 +993,7 @@ const handleSliderChange = (key: keyof ParametricCurveSettings, e: any) => {
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.blackLevel}
-                  onChange={(e: any) => handleSliderChange('blackLevel', e)}
+                  onChange={(e: any) => updateParametricValue('blackLevel', parseFloat(e.target.value))}
                   onDragStateChange={onDragStateChange}
                 />
               </div>
