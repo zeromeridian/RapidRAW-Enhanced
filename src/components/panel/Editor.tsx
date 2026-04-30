@@ -1370,10 +1370,10 @@ export default function Editor({
 
           nextPixelCrop = {
             unit: 'px',
-            x: Math.round(curCx - newW / 2),
-            y: Math.round(curCy - newH / 2),
-            width: Math.round(newW),
-            height: Math.round(newH),
+            x: Math.ceil(curCx - newW / 2),
+            y: Math.ceil(curCy - newH / 2),
+            width: Math.floor(newW),
+            height: Math.floor(newH),
           };
         }
 
@@ -1433,10 +1433,10 @@ export default function Editor({
           } else {
             nextPixelCrop = {
               unit: 'px',
-              x: Math.round(bestCrop.x),
-              y: Math.round(bestCrop.y),
-              width: Math.round(bestCrop.width),
-              height: Math.round(bestCrop.height),
+              x: Math.ceil(bestCrop.x),
+              y: Math.ceil(bestCrop.y),
+              width: Math.floor(bestCrop.width),
+              height: Math.floor(bestCrop.height),
             };
           }
         }
@@ -1548,6 +1548,33 @@ export default function Editor({
         return;
       }
 
+      if (!checkCropValid(toPixel(lastValidCropRef.current), W, H, rotation)) {
+        const lv = lastValidCropRef.current;
+        const cx = lv.x + lv.width / 2;
+        const cy = lv.y + lv.height / 2;
+        let lo = 0;
+        let hi = 1;
+        let healed: PercentCrop = lv;
+        for (let i = 0; i < 15; i++) {
+          const mid = (lo + hi) / 2;
+          const factor = 1 - mid;
+          const test: PercentCrop = {
+            unit: '%',
+            x: cx - (lv.width / 2) * factor,
+            y: cy - (lv.height / 2) * factor,
+            width: lv.width * factor,
+            height: lv.height * factor,
+          };
+          if (checkCropValid(toPixel(test), W, H, rotation)) {
+            healed = test;
+            hi = mid;
+          } else {
+            lo = mid;
+          }
+        }
+        lastValidCropRef.current = healed;
+      }
+
       const lastValid = lastValidCropRef.current;
       const oldL = lastValid.x;
       const oldT = lastValid.y;
@@ -1621,11 +1648,15 @@ export default function Editor({
         const dTR = Math.hypot(newR - oldR, newT - oldT);
         const dBL = Math.hypot(newL - oldL, newB - oldB);
         const dBR = Math.hypot(newR - oldR, newB - oldB);
+        const dTC = Math.hypot(newCX - oldCX, newT - oldT);
+        const dBC = Math.hypot(newCX - oldCX, newB - oldB);
+        const dLC = Math.hypot(newL - oldL, newCY - oldCY);
+        const dRC = Math.hypot(newR - oldR, newCY - oldCY);
         const dC = Math.hypot(newCX - oldCX, newCY - oldCY);
 
-        const minD = Math.min(dTL, dTR, dBL, dBR, dC);
+        const minD = Math.min(dTL, dTR, dBL, dBR, dTC, dBC, dLC, dRC, dC);
 
-        let targetCrop = { ...percentCrop };
+        let targetCrop: PercentCrop = { ...percentCrop };
 
         if (minD === dTL) {
           targetCrop = { unit: '%', x: oldL, y: oldT, width: newW, height: newH };
@@ -1635,11 +1666,21 @@ export default function Editor({
           targetCrop = { unit: '%', x: oldL, y: oldB - newH, width: newW, height: newH };
         } else if (minD === dBR) {
           targetCrop = { unit: '%', x: oldR - newW, y: oldB - newH, width: newW, height: newH };
+        } else if (minD === dTC) {
+          targetCrop = { unit: '%', x: oldCX - newW / 2, y: oldT, width: newW, height: newH };
+        } else if (minD === dBC) {
+          targetCrop = { unit: '%', x: oldCX - newW / 2, y: oldB - newH, width: newW, height: newH };
+        } else if (minD === dLC) {
+          targetCrop = { unit: '%', x: oldL, y: oldCY - newH / 2, width: newW, height: newH };
+        } else if (minD === dRC) {
+          targetCrop = { unit: '%', x: oldR - newW, y: oldCY - newH / 2, width: newW, height: newH };
         } else if (minD === dC) {
           targetCrop = { unit: '%', x: oldCX - newW / 2, y: oldCY - newH / 2, width: newW, height: newH };
         }
 
-        if (newW <= oldW && checkCropValid(toPixel(targetCrop), W, H, rotation)) {
+        const isValidInitially = checkCropValid(toPixel(targetCrop), W, H, rotation);
+
+        if (newW <= oldW && isValidInitially) {
           setCrop(targetCrop);
           lastValidCropRef.current = targetCrop;
         } else {
@@ -1711,7 +1752,7 @@ export default function Editor({
           if (edge === 'B') currB = bestVal;
         };
 
-        const expansions = [];
+        const expansions: Array<{ edge: 'L' | 'T' | 'R' | 'B'; target: number; delta: number }> = [];
         if (tgtL < oldL) expansions.push({ edge: 'L', target: tgtL, delta: oldL - tgtL });
         if (tgtT < oldT) expansions.push({ edge: 'T', target: tgtT, delta: oldT - tgtT });
         if (tgtR > oldR) expansions.push({ edge: 'R', target: tgtR, delta: tgtR - oldR });
@@ -1720,7 +1761,7 @@ export default function Editor({
         expansions.sort((a, b) => b.delta - a.delta);
 
         for (const exp of expansions) {
-          expandEdge(exp.edge as 'L' | 'T' | 'R' | 'B', exp.target);
+          expandEdge(exp.edge, exp.target);
         }
 
         const finalCrop: PercentCrop = {
@@ -1755,10 +1796,10 @@ export default function Editor({
 
       const newPixelCrop: Crop = {
         unit: 'px',
-        x: Math.round((pc.x / 100) * baseW),
-        y: Math.round((pc.y / 100) * baseH),
-        width: Math.round((pc.width / 100) * baseW),
-        height: Math.round((pc.height / 100) * baseH),
+        x: Math.ceil((pc.x / 100) * baseW),
+        y: Math.ceil((pc.y / 100) * baseH),
+        width: Math.floor((pc.width / 100) * baseW),
+        height: Math.floor((pc.height / 100) * baseH),
       };
 
       setAdjustments((prev: Adjustments) => {
