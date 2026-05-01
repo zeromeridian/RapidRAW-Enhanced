@@ -718,7 +718,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
       keys: [DetailsAdjustment.Clarity, DetailsAdjustment.Structure, DetailsAdjustment.Dehaze],
     },
     { label: 'Sharpness', keys: [DetailsAdjustment.Sharpness, DetailsAdjustment.Centré] },
-    //{ label: 'Noise Reduction', keys: [DetailsAdjustment.LumaNoiseReduction, DetailsAdjustment.ColorNoiseReduction] },
+    { label: 'Noise Reduction', keys: [DetailsAdjustment.LumaNoiseReduction, DetailsAdjustment.ColorNoiseReduction] },
     {
       label: 'Chromatic Aberration',
       keys: [DetailsAdjustment.ChromaticAberrationRedCyan, DetailsAdjustment.ChromaticAberrationBlueYellow],

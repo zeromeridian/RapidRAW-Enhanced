@@ -102,10 +102,11 @@ export default function DetailsPanel({
         </div>
       )}
 
-      {/* Hide noise reduction to stop people from thinking it exists
       {adjustmentVisibility.noiseReduction !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">Noise Reduction</Text>
+          <Text variant={TextVariants.heading} className="mb-2">
+            Noise Reduction
+          </Text>
           <Slider
             label="Luminance"
             max={100}
@@ -113,6 +114,7 @@ export default function DetailsPanel({
             onChange={(e: any) => handleAdjustmentChange(DetailsAdjustment.LumaNoiseReduction, e.target.value)}
             step={1}
             value={adjustments.lumaNoiseReduction}
+            onDragStateChange={onDragStateChange}
           />
           <Slider
             label="Color"
@@ -121,10 +123,10 @@ export default function DetailsPanel({
             onChange={(e: any) => handleAdjustmentChange(DetailsAdjustment.ColorNoiseReduction, e.target.value)}
             step={1}
             value={adjustments.colorNoiseReduction}
+            onDragStateChange={onDragStateChange}
           />
         </div>
       )}
-      */}
 
       {!isForMask && adjustmentVisibility.chromaticAberration !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
