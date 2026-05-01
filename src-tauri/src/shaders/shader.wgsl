@@ -110,8 +110,7 @@ struct GlobalAdjustments {
     glow_amount: f32,
     halation_amount: f32,
     flare_amount: f32,
-
-    _pad_creative_1: f32,
+    sharpness_threshold: f32,
 }
 
 struct MaskAdjustments {
@@ -137,7 +136,7 @@ struct MaskAdjustments {
     glow_amount: f32,
     halation_amount: f32,
     flare_amount: f32,
-    _pad1: f32,
+    sharpness_threshold: f32,
 
     _pad_cg1: f32,
     _pad_cg2: f32,
@@ -696,7 +695,8 @@ fn apply_local_contrast(
     blurred_color_input_space: vec3<f32>,
     amount: f32,
     is_raw: u32,
-    mode: u32
+    mode: u32,
+    threshold: f32
 ) -> vec3<f32> {
     if (amount == 0.0) {
         return processed_color_linear;
@@ -735,15 +735,14 @@ fn apply_local_contrast(
         final_color = mix(processed_color_linear, blurred_color_projected, blur_amount);
     } else {
         let log_ratio = log2(safe_center_luma / safe_blurred_luma);
-
         var effective_amount = amount;
 
         if (mode == 0u) {
             let edge_magnitude = abs(log_ratio);
             let normalized_edge = clamp(edge_magnitude / 3.0, 0.0, 1.0);
             let edge_dampener = 1.0 - pow(normalized_edge, 0.5);
-
-            effective_amount = amount * edge_dampener * 0.8;
+            let edge_mask = smoothstep(threshold * 0.5, threshold * 1.5, edge_magnitude);
+            effective_amount = amount * edge_dampener * edge_mask * 0.8;
         }
         else {
             effective_amount = amount;
@@ -781,7 +780,7 @@ fn apply_centre_local_contrast(
     let clarity_strength = centre_amount * (2.0 * centre_mask - 1.0) * CLARITY_SCALE;
 
     if (abs(clarity_strength) > 0.001) {
-        processed_color = apply_local_contrast(processed_color, blurred_color_srgb, clarity_strength, is_raw, 1u);
+        processed_color = apply_local_contrast(processed_color, blurred_color_srgb, clarity_strength, is_raw, 1u, 0.0);
     }
 
     return processed_color;
@@ -1387,18 +1386,18 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let structure_blurred = textureLoad(structure_blur_texture, id.xy, 0).rgb;
 
     var locally_contrasted_rgb = initial_linear_rgb;
-    locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, sharpness_blurred, adjustments.global.sharpness, adjustments.global.is_raw_image, 0u);
-    locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, clarity_blurred, adjustments.global.clarity, adjustments.global.is_raw_image, 1u);
-    locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, structure_blurred, adjustments.global.structure, adjustments.global.is_raw_image, 1u);
+    locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, sharpness_blurred, adjustments.global.sharpness, adjustments.global.is_raw_image, 0u, adjustments.global.sharpness_threshold);
+    locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, clarity_blurred, adjustments.global.clarity, adjustments.global.is_raw_image, 1u, 0.0);
+    locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, structure_blurred, adjustments.global.structure, adjustments.global.is_raw_image, 1u, 0.0);
     locally_contrasted_rgb = apply_centre_local_contrast(locally_contrasted_rgb, adjustments.global.centre, absolute_coord_i, clarity_blurred, adjustments.global.is_raw_image);
 
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
             let mask_adj = adjustments.mask_adjustments[i];
-            locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, sharpness_blurred, mask_adj.sharpness * influence, adjustments.global.is_raw_image, 0u);
-            locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, clarity_blurred, mask_adj.clarity * influence, adjustments.global.is_raw_image, 1u);
-            locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, structure_blurred, mask_adj.structure * influence, adjustments.global.is_raw_image, 1u);
+            locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, sharpness_blurred, mask_adj.sharpness * influence, adjustments.global.is_raw_image, 0u, mask_adj.sharpness_threshold);
+            locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, clarity_blurred, mask_adj.clarity * influence, adjustments.global.is_raw_image, 1u, 0.0);
+            locally_contrasted_rgb = apply_local_contrast(locally_contrasted_rgb, structure_blurred, mask_adj.structure * influence, adjustments.global.is_raw_image, 1u, 0.0);
         }
     }
 

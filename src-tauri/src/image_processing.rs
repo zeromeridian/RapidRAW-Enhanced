@@ -1329,8 +1329,7 @@ pub struct GlobalAdjustments {
     pub glow_amount: f32,
     pub halation_amount: f32,
     pub flare_amount: f32,
-
-    _pad_creative_1: f32,
+    pub sharpness_threshold: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
@@ -1358,7 +1357,7 @@ pub struct MaskAdjustments {
     pub glow_amount: f32,
     pub halation_amount: f32,
     pub flare_amount: f32,
-    _pad1: f32,
+    pub sharpness_threshold: f32,
 
     _pad_cg1: f32,
     _pad_cg2: f32,
@@ -1414,6 +1413,7 @@ struct AdjustmentScales {
     vibrance: f32,
 
     sharpness: f32,
+    sharpness_threshold: f32,
     luma_noise_reduction: f32,
     color_noise_reduction: f32,
     clarity: f32,
@@ -1462,6 +1462,7 @@ const SCALES: AdjustmentScales = AdjustmentScales {
     vibrance: 100.0,
 
     sharpness: 40.0,
+    sharpness_threshold: 100.0,
     luma_noise_reduction: 100.0,
     color_noise_reduction: 100.0,
     clarity: 200.0,
@@ -2030,8 +2031,12 @@ fn get_global_adjustments_from_json(
         glow_amount: get_val("effects", "glowAmount", SCALES.glow, None),
         halation_amount: get_val("effects", "halationAmount", SCALES.halation, None),
         flare_amount: get_val("effects", "flareAmount", SCALES.flares, None),
-
-        _pad_creative_1: 0.0,
+        sharpness_threshold: get_val(
+            "details",
+            "sharpnessThreshold",
+            SCALES.sharpness_threshold,
+            Some(10.0),
+        ),
     }
 }
 
@@ -2108,7 +2113,7 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         glow_amount: get_val("effects", "glowAmount", SCALES.glow),
         halation_amount: get_val("effects", "halationAmount", SCALES.halation),
         flare_amount: get_val("effects", "flareAmount", SCALES.flares),
-        _pad1: 0.0,
+        sharpness_threshold: get_val("details", "sharpnessThreshold", SCALES.sharpness_threshold),
 
         _pad_cg1: 0.0,
         _pad_cg2: 0.0,

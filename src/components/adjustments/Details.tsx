@@ -42,6 +42,17 @@ export default function DetailsPanel({
             value={adjustments.sharpness}
             onDragStateChange={onDragStateChange}
           />
+          <Slider
+            label="Threshold"
+            max={80}
+            min={0}
+            onChange={(e: any) => handleAdjustmentChange(DetailsAdjustment.SharpnessThreshold, e.target.value)}
+            step={1}
+            value={adjustments.sharpnessThreshold ?? 10}
+            onDragStateChange={onDragStateChange}
+            defaultValue={10}
+            fillOrigin="min"
+          />
         </div>
       )}
 

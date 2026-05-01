@@ -66,6 +66,7 @@ export enum DetailsAdjustment {
   ColorNoiseReduction = 'colorNoiseReduction',
   LumaNoiseReduction = 'lumaNoiseReduction',
   Sharpness = 'sharpness',
+  SharpnessThreshold = 'sharpnessThreshold',
   ChromaticAberrationRedCyan = 'chromaticAberrationRedCyan',
   ChromaticAberrationBlueYellow = 'chromaticAberrationBlueYellow',
 }
@@ -205,6 +206,7 @@ export interface Adjustments {
   sectionVisibility: SectionVisibility;
   shadows: number;
   sharpness: number;
+  sharpnessThreshold: number;
   showClipping: boolean;
   structure: number;
   temperature: number;
@@ -308,6 +310,7 @@ export interface MaskAdjustments {
   sectionVisibility: SectionVisibility;
   shadows: number;
   sharpness: number;
+  sharpnessThreshold: number;
   structure: number;
   temperature: number;
   tint: number;
@@ -446,6 +449,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   },
   shadows: 0,
   sharpness: 0,
+  sharpnessThreshold: 10,
   structure: 0,
   temperature: 0,
   tint: 0,
@@ -529,6 +533,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   },
   shadows: 0,
   sharpness: 0,
+  sharpnessThreshold: 10,
   showClipping: false,
   structure: 0,
   temperature: 0,
@@ -619,6 +624,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
           ...INITIAL_MASK_ADJUSTMENTS.sectionVisibility,
           ...(containerAdjustments.sectionVisibility || {}),
         },
+        sharpnessThreshold: containerAdjustments.sharpnessThreshold ?? INITIAL_MASK_ADJUSTMENTS.sharpnessThreshold,
       },
       subMasks: normalizedSubMasks,
     };
@@ -668,6 +674,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
       ...INITIAL_ADJUSTMENTS.sectionVisibility,
       ...(loadedAdjustments.sectionVisibility || {}),
     },
+    sharpnessThreshold: loadedAdjustments.sharpnessThreshold ?? INITIAL_ADJUSTMENTS.sharpnessThreshold,
   };
 };
 
@@ -786,6 +793,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     DetailsAdjustment.Structure,
     DetailsAdjustment.Centré,
     DetailsAdjustment.Sharpness,
+    DetailsAdjustment.SharpnessThreshold,
     DetailsAdjustment.LumaNoiseReduction,
     DetailsAdjustment.ColorNoiseReduction,
     DetailsAdjustment.ChromaticAberrationRedCyan,

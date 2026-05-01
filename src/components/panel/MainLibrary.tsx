@@ -1380,8 +1380,18 @@ const Row = ({
   gap,
   isListView,
   columnWidths,
+  queueThumbnailRequest,
 }: any) => {
   const row = rows[index];
+
+  useEffect(() => {
+    if (row && row.type === 'images') {
+      row.images.forEach((img: ImageFile) => {
+        queueThumbnailRequest(img.path);
+      });
+    }
+  }, [row, queueThumbnailRequest]);
+
   if (row.type === 'footer') return null;
   const shiftedStyle = {
     ...style,
@@ -1559,6 +1569,29 @@ export default function MainLibrary({
   const [isBusyDelayed, setIsBusyDelayed] = useState(false);
   const [isProgressHovered, setIsProgressHovered] = useState(false);
   const loadedThumbnailsRef = useRef(new Set<string>());
+  const requestQueueRef = useRef<Set<string>>(new Set());
+  const requestTimeoutRef = useRef<any>(null);
+  const thumbnailsRef = useRef(thumbnails);
+  thumbnailsRef.current = thumbnails;
+
+  const queueThumbnailRequest = useCallback(
+    (path: string) => {
+      if (!onRequestThumbnails || thumbnailsRef.current[path]) return;
+
+      requestQueueRef.current.add(path);
+
+      if (requestTimeoutRef.current) clearTimeout(requestTimeoutRef.current);
+
+      requestTimeoutRef.current = setTimeout(() => {
+        const pathsToRequest = Array.from(requestQueueRef.current);
+        if (pathsToRequest.length > 0) {
+          onRequestThumbnails(pathsToRequest);
+          requestQueueRef.current.clear();
+        }
+      }, 50);
+    },
+    [onRequestThumbnails],
+  );
 
   const handleHeaderSort = useCallback(
     (key: string) => {
@@ -2225,25 +2258,6 @@ export default function MainLibrary({
                       rowCount={rows.length}
                       rowHeight={getItemSize}
                       onScroll={(e: React.UIEvent<HTMLElement>) => setLibraryScrollTop(e.currentTarget.scrollTop)}
-                      onRowsRendered={({ startIndex, stopIndex }) => {
-                        if (!onRequestThumbnails) return;
-                        const pathsToRequest: string[] = [];
-
-                        for (let i = startIndex; i <= stopIndex; i++) {
-                          const row = rows[i];
-                          if (row && row.type === 'images') {
-                            row.images.forEach((img: ImageFile) => {
-                              if (!thumbnails[img.path]) {
-                                pathsToRequest.push(img.path);
-                              }
-                            });
-                          }
-                        }
-
-                        if (pathsToRequest.length > 0) {
-                          onRequestThumbnails(pathsToRequest);
-                        }
-                      }}
                       className="custom-scrollbar"
                       rowComponent={Row}
                       rowProps={{
@@ -2264,6 +2278,7 @@ export default function MainLibrary({
                         gap: ITEM_GAP,
                         isListView,
                         columnWidths: listColumnWidths,
+                        queueThumbnailRequest,
                       }}
                     />
                   </div>

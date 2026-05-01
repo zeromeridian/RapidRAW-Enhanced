@@ -76,6 +76,7 @@ pub fn all_available_adjustments() -> HashSet<String> {
         "structure",
         "dehaze",
         "sharpness",
+        "sharpnessThreshold",
         "centré",
         "lumaNoiseReduction",
         "colorNoiseReduction",
