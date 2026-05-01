@@ -1577,18 +1577,18 @@ export default function MainLibrary({
   const queueThumbnailRequest = useCallback(
     (path: string) => {
       if (!onRequestThumbnails || thumbnailsRef.current[path]) return;
-
       requestQueueRef.current.add(path);
+      if (!requestTimeoutRef.current) {
+        requestTimeoutRef.current = setTimeout(() => {
+          const pathsToRequest = Array.from(requestQueueRef.current);
+          if (pathsToRequest.length > 0) {
+            onRequestThumbnails(pathsToRequest);
+            requestQueueRef.current.clear();
+          }
 
-      if (requestTimeoutRef.current) clearTimeout(requestTimeoutRef.current);
-
-      requestTimeoutRef.current = setTimeout(() => {
-        const pathsToRequest = Array.from(requestQueueRef.current);
-        if (pathsToRequest.length > 0) {
-          onRequestThumbnails(pathsToRequest);
-          requestQueueRef.current.clear();
-        }
-      }, 50);
+          requestTimeoutRef.current = null;
+        }, 50);
+      }
     },
     [onRequestThumbnails],
   );
