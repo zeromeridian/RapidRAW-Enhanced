@@ -371,6 +371,9 @@ impl Default for AppSettings {
             last_root_path: None,
             pinned_folders: Vec::new(),
             thumbnail_resolution: Some(720),
+            #[cfg(target_os = "android")]
+            editor_preview_resolution: Some(1280),
+            #[cfg(not(target_os = "android"))]
             editor_preview_resolution: Some(1920),
             enable_zoom_hifi: Some(true),
             use_full_dpi_rendering: Some(false),
@@ -411,6 +414,9 @@ impl Default for AppSettings {
             library_view_mode: Some("flat".to_string()),
             export_presets: default_export_presets(),
             my_lenses: Some(Vec::new()),
+            #[cfg(target_os = "android")]
+            high_res_zoom_multiplier: Some(0.75),
+            #[cfg(not(target_os = "android"))]
             high_res_zoom_multiplier: Some(1.0),
             enable_folder_image_counts: Some(false),
             linear_raw_mode: default_linear_raw_mode(),
@@ -426,7 +432,13 @@ impl Default for AppSettings {
             canvas_input_mode: Some("mouse".to_string()),
             zoom_speed_multiplier: Some(1.0),
             keybinds: HashMap::new(),
+            #[cfg(target_os = "android")]
+            thumbnail_worker_threads: Some(2),
+            #[cfg(not(target_os = "android"))]
             thumbnail_worker_threads: Some(4),
+            #[cfg(target_os = "android")]
+            image_cache_size: Some(2),
+            #[cfg(not(target_os = "android"))]
             image_cache_size: Some(5),
             tonemapper_override_enabled: Some(false),
             default_raw_tonemapper: Some("agx".to_string()),

@@ -511,13 +511,32 @@ function App() {
   const isPortraitViewport = viewportSize.width > 0 && viewportSize.height > viewportSize.width;
   const isCompactPortrait =
     viewportSize.width > 0 && viewportSize.width <= COMPACT_EDITOR_MAX_WIDTH && isPortraitViewport;
-  const compactEditorPanelDefaultHeight =
-    viewportSize.height > 0 ? Math.max(300, Math.min(Math.round(viewportSize.height * 0.46), 520)) : 340;
   const compactEditorPanelMinHeight = 220;
   const compactEditorPanelMaxHeight =
     viewportSize.height > 0
-      ? Math.max(compactEditorPanelMinHeight, Math.min(Math.round(viewportSize.height * 0.72), 620))
+      ? Math.max(compactEditorPanelMinHeight, Math.min(Math.round(viewportSize.height * 0.85), 850))
       : 520;
+  const getDynamicCompactPanelHeight = () => {
+    const halfScreenHeight = viewportSize.height > 0 ? Math.round(viewportSize.height * 0.5) : 340;
+
+    if (!selectedImage || originalSize.width === 0 || originalSize.height === 0 || viewportSize.width === 0) {
+      return halfScreenHeight;
+    }
+    let effectiveRatio = originalSize.width / originalSize.height;
+    const orientationSteps = adjustments?.orientationSteps || 0;
+    if (orientationSteps % 2 !== 0) {
+      effectiveRatio = originalSize.height / originalSize.width;
+    }
+    if (adjustments?.aspectRatio && adjustments.aspectRatio > 0) {
+      effectiveRatio = adjustments.aspectRatio;
+    }
+    const desiredImageHeight = viewportSize.width / effectiveRatio;
+    const topUiEstimation = !appSettings?.decorations && !isWindowFullScreen ? 110 : 60;
+    const totalDesiredTopHeight = desiredImageHeight + topUiEstimation;
+    const calculatedBottomHeight = Math.round(viewportSize.height - totalDesiredTopHeight);
+    return Math.max(halfScreenHeight, calculatedBottomHeight);
+  };
+  const compactEditorPanelDefaultHeight = getDynamicCompactPanelHeight();
   const compactEditorPanelHeight = Math.max(
     compactEditorPanelMinHeight,
     Math.min(compactEditorPanelHeightOverride ?? compactEditorPanelDefaultHeight, compactEditorPanelMaxHeight),
@@ -2523,6 +2542,7 @@ function App() {
       setIsWbPickerActive(false);
       setTransformedOriginalUrl(null);
       setIsLibraryExportPanelVisible(false);
+      setCompactEditorPanelHeightOverride(null);
 
       if (isFrontendCached) {
         setSelectedImage({
