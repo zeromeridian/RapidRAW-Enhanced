@@ -1020,16 +1020,24 @@ fn no_tonemap(c: vec3<f32>) -> vec3<f32> {
 }
 
 fn is_default_curve(points: array<Point, 16>, count: u32) -> bool {
-    if (count != 2u) {
+    if (count < 2u) {
         return false;
     }
+    
+    var is_identity = true;
+    for (var i = 0u; i < count; i = i + 1u) {
+        if (abs(points[i].x - points[i].y) > 0.5) {
+            is_identity = false;
+            break;
+        }
+    }
+    
     let p0 = points[0];
-    let p1 = points[1];
-
+    let p_last = points[count - 1u];
     let p0_is_origin = abs(p0.x - 0.0) < 0.1 && abs(p0.y - 0.0) < 0.1;
-    let p1_is_end = abs(p1.x - 255.0) < 0.1 && abs(p1.y - 255.0) < 0.1;
-
-    return p0_is_origin && p1_is_end;
+    let p_last_is_end = abs(p_last.x - 255.0) < 0.1 && abs(p_last.y - 255.0) < 0.1;
+    
+    return is_identity && p0_is_origin && p_last_is_end;
 }
 
 fn apply_all_curves(color: vec3<f32>, luma_curve: array<Point, 16>, luma_curve_count: u32, red_curve: array<Point, 16>, red_curve_count: u32, green_curve: array<Point, 16>, green_curve_count: u32, blue_curve: array<Point, 16>, blue_curve_count: u32) -> vec3<f32> {

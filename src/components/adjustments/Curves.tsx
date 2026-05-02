@@ -484,6 +484,16 @@ export default function CurveGraph({
     ? buildParametricPoints(activeParametricSettings)
     : (localPoints ?? adjustments?.curves?.[activeChannel]);
 
+  useEffect(() => {
+    if (adjustments?.curves?.[activeChannel]) {
+      console.log(`[${curveMode.toUpperCase()}] ${activeChannel} curve points:`, 
+        adjustments.curves[activeChannel].map((p: Coord) => `(${p.x.toFixed(1)}, ${p.y.toFixed(1)})`).join(', '),
+        `count: ${adjustments.curves[activeChannel].length}`
+      );
+      console.log(`[${curveMode.toUpperCase()}] ALL counts - luma:${adjustments.curves?.luma?.length}, red:${adjustments.curves?.red?.length}, green:${adjustments.curves?.green?.length}, blue:${adjustments.curves?.blue?.length}`);
+    }
+  }, [adjustments?.curves?.[activeChannel], curveMode, activeChannel]);
+
   const { color, data: histogramData } = channelConfig[activeChannel];
 
   if (!activePoints) {
@@ -679,6 +689,11 @@ export default function CurveGraph({
     const handlePasteFromParametric = () => {
       if (!parametricClipboard) return;
       const newPoints = convertParametricToPoints(parametricClipboard);
+      console.log('Pasting from parametric:', 
+        newPoints.map((p: Coord) => `(${p.x.toFixed(1)}, ${p.y.toFixed(1)})`).join(', '),
+        `count: ${newPoints.length}`
+      );
+      console.log('Parametric clipboard settings:', parametricClipboard);
       setLocalPoints(newPoints);
       localPointsRef.current = newPoints;
       setAdjustments((prev: any) => ({ ...prev, curves: { ...prev.curves, [activeChannel]: newPoints } }));
