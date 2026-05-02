@@ -290,6 +290,7 @@ function App() {
     }
   });
   const defaultThumbnailSize = osPlatform === 'android' ? ThumbnailSize.Small : ThumbnailSize.Medium;
+  const defaultLibraryViewMode = osPlatform === 'android' ? LibraryViewMode.Recursive : LibraryViewMode.Flat;
   const [activeView, setActiveView] = useState('library');
   const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
   const [isInstantTransition, setIsInstantTransition] = useState(false);
@@ -395,7 +396,7 @@ function App() {
     effects: false,
   });
   const [isLibraryExportPanelVisible, setIsLibraryExportPanelVisible] = useState(false);
-  const [libraryViewMode, setLibraryViewMode] = useState<LibraryViewMode>(LibraryViewMode.Flat);
+  const [libraryViewMode, setLibraryViewMode] = useState<LibraryViewMode>(defaultLibraryViewMode);
   const [leftPanelWidth, setLeftPanelWidth] = useState<number>(256);
   const [rightPanelWidth, setRightPanelWidth] = useState<number>(320);
   const [bottomPanelHeight, setBottomPanelHeight] = useState<number>(144);
@@ -1936,9 +1937,7 @@ function App() {
         if (settings?.uiVisibility) {
           setUiVisibility((prev) => ({ ...prev, ...settings.uiVisibility }));
         }
-        if (settings?.libraryViewMode) {
-          setLibraryViewMode(settings.libraryViewMode);
-        }
+        setLibraryViewMode(settings?.libraryViewMode ?? defaultLibraryViewMode);
         setThumbnailSize(settings?.thumbnailSize ?? defaultThumbnailSize);
         if (settings?.thumbnailAspectRatio) {
           setThumbnailAspectRatio(settings.thumbnailAspectRatio);
@@ -1993,7 +1992,12 @@ function App() {
       })
       .catch((err) => {
         console.error('Failed to load settings:', err);
-        setAppSettings({ lastRootPath: null, theme: DEFAULT_THEME_ID, thumbnailSize: defaultThumbnailSize });
+        setAppSettings({
+          lastRootPath: null,
+          theme: DEFAULT_THEME_ID,
+          thumbnailSize: defaultThumbnailSize,
+          libraryViewMode: defaultLibraryViewMode,
+        });
       })
       .finally(() => {
         isInitialMount.current = false;
