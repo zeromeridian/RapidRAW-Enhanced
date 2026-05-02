@@ -38,11 +38,11 @@ const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
   shadows: 0,
   highlights: 0,
   lights: 0,
+  whiteLevel: 0,
+  blackLevel: 0,
   split1: 25,
   split2: 50,
   split3: 75,
-  whiteLevel: 0,
-  blackLevel: 0,
 };
 
 const DEFAULT_PARAMETRIC_CURVE = {
@@ -70,21 +70,6 @@ const DEFAULT_POINT_CURVES = {
     { x: 255, y: 255 },
   ],
 };
-
-function getSplitterGradient(channel: ActiveChannel) {
-  switch(channel) {
-    case ActiveChannel.Luma:
-      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(64, 64, 64, 0.8) 25%, rgba(105, 101, 101, 0.8) 50%, rgba(158, 154, 154, 0.8) 75%, rgba(198, 195, 197, 0.8) 100%)';
-    case ActiveChannel.Red:
-      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(64, 0, 0, 0.8) 25%, rgba(105, 50, 50, 0.8) 50%, rgba(158, 100, 100, 0.8) 75%, rgba(255, 107, 107, 0.8) 100%)';
-    case ActiveChannel.Green:
-      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(0, 64, 0, 0.8) 25%, rgba(50, 105, 50, 0.8) 50%, rgba(100, 158, 100, 0.8) 75%, rgba(107, 203, 119, 0.8) 100%)';
-    case ActiveChannel.Blue:
-      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 64, 0.8) 25%, rgba(50, 50, 105, 0.8) 50%, rgba(100, 100, 158, 0.8) 75%, rgba(77, 150, 255, 0.8) 100%)';
-    default:
-      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(64, 64, 64, 0.8) 25%, rgba(105, 101, 101, 0.8) 50%, rgba(158, 154, 154, 0.8) 75%, rgba(198, 195, 197, 0.8) 100%)';
-  }
-}
 
 function buildParametricPoints(settings: ParametricCurveSettings): Array<Coord> {
   const vH = settings.highlights / 100;
@@ -249,12 +234,31 @@ function isDefaultParametricCurve(settings: ParametricCurveSettings | undefined)
     settings.shadows === DEFAULT_PARAMETRIC_CURVE_SETTINGS.shadows &&
     settings.lights === DEFAULT_PARAMETRIC_CURVE_SETTINGS.lights &&
     settings.highlights === DEFAULT_PARAMETRIC_CURVE_SETTINGS.highlights &&
+    settings.whiteLevel === DEFAULT_PARAMETRIC_CURVE_SETTINGS.whiteLevel &&
+    settings.blackLevel === DEFAULT_PARAMETRIC_CURVE_SETTINGS.blackLevel &&
     settings.split1 === DEFAULT_PARAMETRIC_CURVE_SETTINGS.split1 &&
     settings.split2 === DEFAULT_PARAMETRIC_CURVE_SETTINGS.split2 &&
-    settings.split3 === DEFAULT_PARAMETRIC_CURVE_SETTINGS.split3 &&
-    settings.whiteLevel === DEFAULT_PARAMETRIC_CURVE_SETTINGS.whiteLevel &&
-    settings.blackLevel === DEFAULT_PARAMETRIC_CURVE_SETTINGS.blackLevel
+    settings.split3 === DEFAULT_PARAMETRIC_CURVE_SETTINGS.split3
   );
+}
+
+function getSplitterGradient(channel: ActiveChannel) {
+  switch(channel) {
+    case ActiveChannel.Luma:
+      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(64, 64, 64, 0.8) 25%, rgba(105, 101, 101, 0.8) 50%, rgba(158, 154, 154, 0.8) 75%, rgba(198, 195, 197, 0.8) 100%)';
+    case ActiveChannel.Red:
+      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(64, 0, 0, 0.8) 25%, rgba(105, 50, 50, 0.8) 50%, rgba(158, 100, 100, 0.8) 75%, rgba(255, 107, 107, 0.8) 100%)';
+    case ActiveChannel.Green:
+      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(0, 64, 0, 0.8) 25%, rgba(50, 105, 50, 0.8) 50%, rgba(100, 158, 100, 0.8) 75%, rgba(107, 203, 119, 0.8) 100%)';
+    case ActiveChannel.Blue:
+      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 64, 0.8) 25%, rgba(50, 50, 105, 0.8) 50%, rgba(100, 100, 158, 0.8) 75%, rgba(77, 150, 255, 0.8) 100%)';
+    default:
+      return 'linear-gradient(to right, rgba(0, 0, 0, 0.8) 0%, rgba(64, 64, 64, 0.8) 25%, rgba(105, 101, 101, 0.8) 50%, rgba(158, 154, 154, 0.8) 75%, rgba(198, 195, 197, 0.8) 100%)';
+  }
+}
+
+function convertParametricToPoints(settings: ParametricCurveSettings): Array<Coord> {
+  return buildParametricPoints(settings);
 }
 
 export default function CurveGraph({
@@ -342,19 +346,6 @@ export default function CurveGraph({
         },
       };
     });
-  };
-
-  const pasteParametricToPointCurve = () => {
-    if (!parametricClipboard) return;
-
-    const convertedPoints = buildParametricPoints(parametricClipboard);
-    
-    setLocalPoints(convertedPoints);
-    localPointsRef.current = convertedPoints;
-    setAdjustments((prev: any) => ({
-      ...prev,
-      curves: { ...prev.curves, [activeChannel]: convertedPoints },
-    }));
   };
 
   useEffect(() => {
@@ -685,6 +676,14 @@ export default function CurveGraph({
       setAdjustments((prev: any) => ({ ...prev, curves: { ...prev.curves, [activeChannel]: newPoints } }));
     };
 
+    const handlePasteFromParametric = () => {
+      if (!parametricClipboard) return;
+      const newPoints = convertParametricToPoints(parametricClipboard);
+      setLocalPoints(newPoints);
+      localPointsRef.current = newPoints;
+      setAdjustments((prev: any) => ({ ...prev, curves: { ...prev.curves, [activeChannel]: newPoints } }));
+    };
+
     const handleReset = () => {
       const defaultPoints = [
         { x: 0, y: 0 },
@@ -729,9 +728,9 @@ export default function CurveGraph({
         disabled: !curveClipboard,
       },
       {
-        label: `Paste from Parametric Curve`,
-        icon: Settings2,
-        onClick: pasteParametricToPointCurve,
+        label: 'Paste from Parametric Curve',
+        icon: ClipboardPaste,
+        onClick: handlePasteFromParametric,
         disabled: !parametricClipboard,
       },
       { type: OPTION_SEPARATOR },

@@ -129,11 +129,11 @@ export interface ParametricCurveSettings {
   shadows: number;
   highlights: number;
   lights: number;
+  whiteLevel: number;
+  blackLevel: number;
   split1: number;
   split2: number;
   split3: number;
-  whiteLevel: number;
-  blackLevel: number
 }
 
 export interface ParametricCurve {
@@ -377,11 +377,11 @@ export const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
   shadows: 0,
   highlights: 0,
   lights: 0,
+  whiteLevel: 0,
+  blackLevel: 0,
   split1: 25,
   split2: 50,
   split3: 75,
-  whiteLevel: 0,
-  blackLevel: 0,
 };
 
 export const getDefaultParametricCurve = (): ParametricCurve => ({
