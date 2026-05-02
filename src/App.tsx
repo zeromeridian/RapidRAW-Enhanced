@@ -2,8 +2,10 @@ import { type PointerEvent as ReactPointerEvent, useState, useEffect, useCallbac
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { onBackButtonPress } from '@tauri-apps/api/app';
 import { open } from '@tauri-apps/plugin-dialog';
 import { platform } from '@tauri-apps/plugin-os';
+import { exit } from '@tauri-apps/plugin-process';
 import { homeDir } from '@tauri-apps/api/path';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import debounce from 'lodash.debounce';
@@ -2771,6 +2773,51 @@ function App() {
       setTimeout(() => setIsInstantTransition(false), 100);
     }
   }, [isFullScreen, selectedImage, zoom]);
+
+  useEffect(() => {
+    if (!isAndroid) {
+      return;
+    }
+
+    let isDisposed = false;
+    let listener: { unregister: () => Promise<void> } | null = null;
+    const isEditorOpen = !!selectedImage;
+
+    onBackButtonPress(() => {
+      if (isFullScreen) {
+        setIsFullScreen(false);
+        return;
+      }
+
+      if (isEditorOpen) {
+        handleBackToLibrary();
+        return;
+      }
+
+      void exit(0).catch((err) => {
+        console.error('Failed to exit app from Android back gesture:', err);
+      });
+    })
+      .then((registeredListener) => {
+        if (isDisposed) {
+          void registeredListener.unregister().catch((err) => {
+            console.error('Failed to unregister stale Android back gesture handler:', err);
+          });
+          return;
+        }
+        listener = registeredListener;
+      })
+      .catch((err) => {
+        console.error('Failed to register Android back gesture handler:', err);
+      });
+
+    return () => {
+      isDisposed = true;
+      void listener?.unregister().catch((err) => {
+        console.error('Failed to unregister Android back gesture handler:', err);
+      });
+    };
+  }, [isAndroid, isFullScreen, selectedImage?.path, handleBackToLibrary]);
 
   const handleCopyAdjustments = useCallback(() => {
     const sourceAdjustments = selectedImage ? adjustments : libraryActiveAdjustments;
