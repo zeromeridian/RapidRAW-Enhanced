@@ -496,7 +496,7 @@ fn apply_filmic_exposure(color_in: vec3<f32>, brightness_adj: f32) -> vec3<f32> 
     }
     const RATIONAL_CURVE_MIX: f32 = 0.95;
     const MIDTONE_STRENGTH: f32 = 1.2;
-    const TOP_ANCHOR: f32 = 1.1;
+    const TOP_ANCHOR: f32 = 1.07;
     let original_luma = get_luma(color_in);
     if (abs(original_luma) < 0.00001) {
         return color_in;
@@ -1173,7 +1173,7 @@ fn is_default_curve(points: array<Point, 16>, count: u32) -> bool {
     if (count < 2u) {
         return false;
     }
-    
+
     var is_identity = true;
     for (var i = 0u; i < count; i = i + 1u) {
         if (abs(points[i].x - points[i].y) > 0.5) {
@@ -1181,12 +1181,12 @@ fn is_default_curve(points: array<Point, 16>, count: u32) -> bool {
             break;
         }
     }
-    
+
     let p0 = points[0];
     let p_last = points[count - 1u];
     let p0_is_origin = abs(p0.x - 0.0) < 0.1 && abs(p0.y - 0.0) < 0.1;
     let p_last_is_end = abs(p_last.x - 255.0) < 0.1 && abs(p_last.y - 255.0) < 0.1;
-    
+
     return is_identity && p0_is_origin && p_last_is_end;
 }
 
