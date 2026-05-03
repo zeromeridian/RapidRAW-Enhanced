@@ -5779,10 +5779,7 @@ function App() {
         className={clsx(
           'flex-1 flex flex-col min-h-0',
           isLayoutReady && rootPath && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-          [
-            rootPath && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2'),
-            !appSettings?.decorations && !isWindowFullScreen && !isFullScreen && (rootPath ? 'pt-12' : 'pt-10'),
-          ],
+          [rootPath && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2')],
         )}
       >
         <div className="flex flex-row grow h-full min-h-0">

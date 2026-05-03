@@ -84,100 +84,104 @@ export default function TitleBar() {
   const isWindows = osPlatform === 'windows';
 
   if (!osPlatform) {
-    return <div className="h-10 fixed top-0 left-0 right-0 z-50" data-tauri-drag-region />;
+    return (
+      <div className="pt-2 px-2 w-full z-50 bg-transparent" data-tauri-drag-region>
+        <div className="h-10 rounded-lg" data-tauri-drag-region />
+      </div>
+    );
   }
 
   return (
-    <div
-      className="h-10 bg-bg-secondary border-white/5 flex justify-between items-center select-none fixed top-0 left-0 right-0 z-50"
-      data-tauri-drag-region
-    >
-      <div className="flex items-center h-full">
-        {isMac && (
-          <div className="flex items-center h-full px-4 space-x-2">
-            <button
-              aria-label="Close window"
-              className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors duration-150"
-              onClick={handleClose}
-            />
-            <button
-              aria-label="Minimize window"
-              className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-colors duration-150"
-              onClick={handleMinimize}
-            />
-            <button
-              aria-label="Maximize window"
-              className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600 transition-colors duration-150"
-              onClick={handleMaximize}
-            />
+    <div className="relative pt-2 px-2 w-full z-50 bg-transparent" data-tauri-drag-region>
+      <div
+        className="h-10 bg-bg-secondary flex justify-between items-center select-none rounded-lg overflow-hidden shadow-sm"
+        data-tauri-drag-region
+      >
+        <div className="flex items-center h-full">
+          {isMac && (
+            <div className="flex items-center h-full px-4 space-x-2">
+              <button
+                aria-label="Close window"
+                className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors duration-150"
+                onClick={handleClose}
+              />
+              <button
+                aria-label="Minimize window"
+                className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-colors duration-150"
+                onClick={handleMinimize}
+              />
+              <button
+                aria-label="Maximize window"
+                className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600 transition-colors duration-150"
+                onClick={handleMaximize}
+              />
+            </div>
+          )}
+          <div data-tauri-drag-region className={`flex items-center h-full ${isMac ? '' : 'px-4'}`}>
+            <p className="text-sm font-semibold text-text-secondary pointer-events-none">RapidRAW</p>
           </div>
-        )}
-        <div data-tauri-drag-region className={`flex items-center h-full ${isMac ? '' : 'px-4'}`}>
-          <p className="text-sm font-semibold text-text-secondary pointer-events-none">RapidRAW</p>
+        </div>
+
+        <div className="flex items-center h-full">
+          {isLinux && (
+            <div className="flex items-center gap-2 pr-2 h-full">
+              <button
+                aria-label="Minimize window"
+                className="w-7 h-7 rounded-full inline-flex justify-center items-center hover:bg-white/10 transition-colors duration-150"
+                onClick={handleMinimize}
+              >
+                <Minus size={16} className="text-text-secondary" />
+              </button>
+              <button
+                aria-label="Maximize window"
+                className="w-7 h-7 rounded-full inline-flex justify-center items-center hover:bg-white/10 transition-colors duration-150"
+                onClick={handleMaximize}
+              >
+                {isMaximized ? (
+                  <RestoreDownIcon size={13} className="text-text-secondary" />
+                ) : (
+                  <Square size={13} className="text-text-secondary" />
+                )}
+              </button>
+              <button
+                aria-label="Close window"
+                className="w-7 h-7 rounded-full inline-flex justify-center items-center hover:bg-red-500 hover:text-white transition-colors duration-150"
+                onClick={handleClose}
+              >
+                <X size={16} className="text-text-secondary hover:text-white" />
+              </button>
+            </div>
+          )}
+
+          {isWindows && <div className="w-36 shrink-0 pointer-events-none" />}
         </div>
       </div>
 
-      <div className="flex items-center h-full">
-        {isLinux && (
-          <div className="flex items-center gap-2 pr-2 h-full">
-            <button
-              aria-label="Minimize window"
-              className="w-7 h-7 rounded-full inline-flex justify-center items-center hover:bg-white/10 transition-colors duration-150"
-              onClick={handleMinimize}
-            >
+      {isWindows && (
+        <div className="absolute top-0 right-0 flex h-12 z-20">
+          <button aria-label="Minimize window" className="relative w-12 group outline-none" onClick={handleMinimize}>
+            <div className="absolute bottom-0 left-0 w-12 h-10 flex justify-center items-center group-hover:bg-white/10 group-active:bg-white/20 transition-colors duration-150">
               <Minus size={16} className="text-text-secondary" />
-            </button>
-            <button
-              aria-label="Maximize window"
-              className="w-7 h-7 rounded-full inline-flex justify-center items-center hover:bg-white/10 transition-colors duration-150"
-              onClick={handleMaximize}
-            >
-              {isMaximized ? (
-                <RestoreDownIcon size={13} className="text-text-secondary" />
-              ) : (
-                <Square size={13} className="text-text-secondary" />
-              )}
-            </button>
-            <button
-              aria-label="Close window"
-              className="w-7 h-7 rounded-full inline-flex justify-center items-center hover:bg-red-500 hover:text-white transition-colors duration-150"
-              onClick={handleClose}
-            >
-              <X size={16} className="text-text-secondary hover:text-white" />
-            </button>
-          </div>
-        )}
+            </div>
+          </button>
 
-        {isWindows && (
-          <>
-            <button
-              aria-label="Minimize window"
-              className="w-12 h-full inline-flex justify-center items-center hover:bg-white/10 transition-colors duration-150"
-              onClick={handleMinimize}
-            >
-              <Minus size={16} className="text-text-secondary" />
-            </button>
-            <button
-              aria-label="Maximize window"
-              className="w-12 h-full inline-flex justify-center items-center hover:bg-white/10 transition-colors duration-150"
-              onClick={handleMaximize}
-            >
+          <button aria-label="Maximize window" className="relative w-12 group outline-none" onClick={handleMaximize}>
+            <div className="absolute bottom-0 left-0 w-12 h-10 flex justify-center items-center group-hover:bg-white/10 group-active:bg-white/20 transition-colors duration-150">
               {isMaximized ? (
                 <RestoreDownIcon size={12} className="text-text-secondary" />
               ) : (
                 <Square size={12} className="text-text-secondary" />
               )}
-            </button>
-            <button
-              aria-label="Close window"
-              className="w-12 h-full inline-flex justify-center items-center hover:bg-red-500 transition-colors duration-150 group"
-              onClick={handleClose}
-            >
-              <X size={16} className="text-text-secondary group-hover:text-white" />
-            </button>
-          </>
-        )}
-      </div>
+            </div>
+          </button>
+
+          <button aria-label="Close window" className="relative w-14 group outline-none" onClick={handleClose}>
+            <div className="absolute bottom-0 left-0 w-12 h-10 flex justify-center items-center group-hover:bg-red-500 group-active:bg-red-600 transition-colors duration-150 rounded-r-lg">
+              <X size={16} className="text-text-secondary group-hover:text-white transition-colors duration-150" />
+            </div>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1938,7 +1938,7 @@ export default function MainLibrary({
 
   if (!rootPath) {
     if (!appSettings) {
-      return;
+      return null;
     }
     const hasLastPath = !!appSettings.lastRootPath;
     const currentThemeId = theme || DEFAULT_THEME_ID;
@@ -1947,146 +1947,150 @@ export default function MainLibrary({
       THEMES.find((t: ThemeProps) => t.id === DEFAULT_THEME_ID);
     const splashImage = selectedTheme?.splashImage;
     return (
-      <div className={`flex-1 flex h-full bg-bg-secondary overflow-hidden shadow-lg`}>
-        <div className="w-1/2 hidden md:block relative">
-          <AnimatePresence>
-            <motion.img
-              alt="Splash screen background"
-              animate={{ opacity: 1 }}
-              className="absolute inset-0 w-full h-full object-cover"
-              exit={{ opacity: 0 }}
-              initial={{ opacity: 0 }}
-              key={splashImage}
-              src={splashImage}
-              transition={{ duration: 0.5, ease: 'easeInOut' }}
-            />
-          </AnimatePresence>
-        </div>
-        <div className="w-full md:w-1/2 flex flex-col p-8 lg:p-16 relative">
-          {showSettings ? (
-            <SettingsPanel
-              appSettings={appSettings}
-              onBack={() => setShowSettings(false)}
-              onLibraryRefresh={onLibraryRefresh}
-              onSettingsChange={onSettingsChange}
-              rootPath={rootPath}
-            />
-          ) : (
-            <>
-              <div className="my-auto text-left">
-                <Text variant={TextVariants.displayLarge}>RapidRAW</Text>
-                <Text
-                  variant={TextVariants.heading}
-                  color={TextColors.secondary}
-                  weight={TextWeights.normal}
-                  className="mb-10 max-w-md"
-                >
-                  {hasLastPath ? (
-                    <>
-                      Welcome back!
-                      <br />
-                      Continue where you left off or start a new session.
-                    </>
-                  ) : (
-                    `A blazingly fast, GPU-accelerated RAW image editor. ${
-                      isAndroid ? 'Open the library to begin.' : 'Open a folder to begin.'
-                    }`
-                  )}
-                </Text>
-                <div className="flex flex-col w-full max-w-xs gap-4">
-                  {hasLastPath && (
-                    <Button
-                      className="rounded-md h-11 w-full flex justify-center items-center"
-                      onClick={onContinueSession}
-                      size="lg"
-                    >
-                      <RefreshCw size={20} className="mr-2" /> Continue Session
-                    </Button>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <Button
-                      className={`rounded-md grow flex justify-center items-center h-11 ${
-                        hasLastPath ? 'bg-surface text-text-primary shadow-none' : ''
-                      }`}
-                      onClick={onOpenFolder}
-                      size="lg"
-                    >
-                      <Folder size={20} className="mr-2" />
-                      {isAndroid ? 'Open Library' : hasLastPath ? 'Change Folder' : 'Open Folder'}
-                    </Button>
-                    <Button
-                      className="px-3 bg-surface text-text-primary shadow-none h-11"
-                      onClick={() => setShowSettings(true)}
-                      size="lg"
-                      data-tooltip="Go to Settings"
-                      variant="ghost"
-                    >
-                      <Settings size={20} />
-                    </Button>
+      <div className="flex-1 flex h-full p-2 bg-transparent">
+        <div className="flex w-full h-full bg-bg-secondary rounded-lg border border-border-color/50 shadow-sm overflow-hidden">
+          <div className="w-1/2 hidden md:block relative overflow-hidden">
+            <AnimatePresence>
+              <motion.img
+                alt="Splash screen background"
+                animate={{ opacity: 1 }}
+                className="absolute inset-0 w-full h-full object-cover"
+                exit={{ opacity: 0 }}
+                initial={{ opacity: 0 }}
+                key={splashImage}
+                src={splashImage}
+                transition={{ duration: 0.5, ease: 'easeInOut' }}
+              />
+            </AnimatePresence>
+          </div>
+          <div className="w-full md:w-1/2 flex flex-col p-8 lg:p-16 relative overflow-y-auto custom-scrollbar">
+            {showSettings ? (
+              <SettingsPanel
+                appSettings={appSettings}
+                onBack={() => setShowSettings(false)}
+                onLibraryRefresh={onLibraryRefresh}
+                onSettingsChange={onSettingsChange}
+                rootPath={rootPath}
+              />
+            ) : (
+              <>
+                <div className="my-auto text-left">
+                  <Text variant={TextVariants.displayLarge}>RapidRAW</Text>
+                  <Text
+                    variant={TextVariants.heading}
+                    color={TextColors.secondary}
+                    weight={TextWeights.normal}
+                    className="mb-10 max-w-md"
+                  >
+                    {hasLastPath ? (
+                      <>
+                        Welcome back!
+                        <br />
+                        Continue where you left off or start a new session.
+                      </>
+                    ) : (
+                      `A blazingly fast, GPU-accelerated RAW image editor. ${
+                        isAndroid ? 'Open the library to begin.' : 'Open a folder to begin.'
+                      }`
+                    )}
+                  </Text>
+                  <div className="flex flex-col w-full max-w-xs gap-4">
+                    {hasLastPath && (
+                      <Button
+                        className="rounded-md h-11 w-full flex justify-center items-center"
+                        onClick={onContinueSession}
+                        size="lg"
+                      >
+                        <RefreshCw size={20} className="mr-2" /> Continue Session
+                      </Button>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        className={`rounded-md grow flex justify-center items-center h-11 ${
+                          hasLastPath ? 'bg-surface text-text-primary shadow-none' : ''
+                        }`}
+                        onClick={onOpenFolder}
+                        size="lg"
+                      >
+                        <Folder size={20} className="mr-2" />
+                        {isAndroid ? 'Open Library' : hasLastPath ? 'Change Folder' : 'Open Folder'}
+                      </Button>
+                      <Button
+                        className="px-3 bg-surface text-text-primary shadow-none h-11"
+                        onClick={() => setShowSettings(true)}
+                        size="lg"
+                        data-tooltip="Go to Settings"
+                        variant="ghost"
+                      >
+                        <Settings size={20} />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <Text variant={TextVariants.small} as="div" className="absolute bottom-8 left-8 lg:left-16 space-y-1">
-                <p>
-                  Images by{' '}
-                  <a
-                    href="https://instagram.com/timonkaech.photography"
-                    className="hover:underline"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Timon Käch
-                  </a>
-                </p>
-                {appVersion && (
-                  <div className="flex items-center space-x-2">
-                    <p>
-                      <span
-                        className={`group transition-all duration-300 ease-in-out rounded-md py-1 ${
-                          isUpdateAvailable ? 'cursor-pointer border border-yellow-500 px-2 hover:bg-yellow-500/20' : ''
-                        }`}
-                        onClick={() => {
-                          if (isUpdateAvailable) {
-                            open('https://github.com/CyberTimon/RapidRAW/releases/latest');
+                <Text variant={TextVariants.small} as="div" className="absolute bottom-8 left-8 lg:left-16 space-y-1">
+                  <p>
+                    Images by{' '}
+                    <a
+                      href="https://instagram.com/timonkaech.photography"
+                      className="hover:underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Timon Käch
+                    </a>
+                  </p>
+                  {appVersion && (
+                    <div className="flex items-center space-x-2">
+                      <p>
+                        <span
+                          className={`group transition-all duration-300 ease-in-out rounded-md py-1 ${
+                            isUpdateAvailable
+                              ? 'cursor-pointer border border-yellow-500 px-2 hover:bg-yellow-500/20'
+                              : ''
+                          }`}
+                          onClick={() => {
+                            if (isUpdateAvailable) {
+                              open('https://github.com/CyberTimon/RapidRAW/releases/latest');
+                            }
+                          }}
+                          data-tooltip={
+                            isUpdateAvailable
+                              ? `Click to download version ${latestVersion}`
+                              : `You are on the latest version`
                           }
-                        }}
-                        data-tooltip={
-                          isUpdateAvailable
-                            ? `Click to download version ${latestVersion}`
-                            : `You are on the latest version`
-                        }
-                      >
-                        <span className={isUpdateAvailable ? 'group-hover:hidden' : ''}>Version {appVersion}</span>
-                        {isUpdateAvailable && (
-                          <span className="hidden group-hover:inline text-yellow-400">New version available!</span>
-                        )}
-                      </span>
-                    </p>
-                    <span>-</span>
-                    <p>
-                      <a
-                        href="https://ko-fi.com/cybertimon"
-                        className="hover:underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Donate on Ko-Fi
-                      </a>
-                      <span className="mx-1">or</span>
-                      <a
-                        href="https://github.com/CyberTimon/RapidRAW"
-                        className="hover:underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Contribute on GitHub
-                      </a>
-                    </p>
-                  </div>
-                )}
-              </Text>
-            </>
-          )}
+                        >
+                          <span className={isUpdateAvailable ? 'group-hover:hidden' : ''}>Version {appVersion}</span>
+                          {isUpdateAvailable && (
+                            <span className="hidden group-hover:inline text-yellow-400">New version available!</span>
+                          )}
+                        </span>
+                      </p>
+                      <span>-</span>
+                      <p>
+                        <a
+                          href="https://ko-fi.com/cybertimon"
+                          className="hover:underline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Donate on Ko-Fi
+                        </a>
+                        <span className="mx-1">or</span>
+                        <a
+                          href="https://github.com/CyberTimon/RapidRAW"
+                          className="hover:underline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Contribute on GitHub
+                        </a>
+                      </p>
+                    </div>
+                  )}
+                </Text>
+              </>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -2094,7 +2098,7 @@ export default function MainLibrary({
 
   return (
     <div
-      className="flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden"
+      className="flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden border border-border-color/50 shadow-sm"
       ref={libraryContainerRef}
     >
       <header
