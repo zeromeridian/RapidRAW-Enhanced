@@ -1818,7 +1818,7 @@ function ContainerRow({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden pl-2 border-l border-border-color/20 ml-3.75"
+            className="overflow-hidden pl-2 border-l-[1.5px] border-border-color/50 ml-3.75"
             layout
           >
             <AnimatePresence mode="popLayout" initial={false}>
