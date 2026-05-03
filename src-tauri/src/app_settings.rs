@@ -386,9 +386,6 @@ impl Default for AppSettings {
             filter_criteria: None,
             theme: Some("dark".to_string()),
             font_family: None,
-            #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-            decorations: Some(true),
-            #[cfg(any(target_os = "windows", target_os = "macos"))]
             decorations: Some(false),
             ai_connector_address: None,
             last_folder_state: None,
