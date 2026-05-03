@@ -2102,7 +2102,7 @@ export default function MainLibrary({
       ref={libraryContainerRef}
     >
       <header
-        className="p-4 shrink-0 flex justify-between items-center border-b border-border-color gap-4"
+        className="p-4 shrink-0 flex justify-between items-center border-b border-surface gap-4"
         onMouseEnter={() => setIsProgressHovered(true)}
         onMouseLeave={() => setIsProgressHovered(false)}
       >
