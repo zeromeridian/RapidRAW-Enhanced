@@ -110,7 +110,7 @@ export default function DetailsPanel({
           <Slider
             label="Luminance"
             max={100}
-            min={0}
+            min={isForMask ? -100 : 0}
             onChange={(e: any) => handleAdjustmentChange(DetailsAdjustment.LumaNoiseReduction, e.target.value)}
             step={1}
             value={adjustments.lumaNoiseReduction}
@@ -119,7 +119,7 @@ export default function DetailsPanel({
           <Slider
             label="Color"
             max={100}
-            min={0}
+            min={isForMask ? -100 : 0}
             onChange={(e: any) => handleAdjustmentChange(DetailsAdjustment.ColorNoiseReduction, e.target.value)}
             step={1}
             value={adjustments.colorNoiseReduction}
