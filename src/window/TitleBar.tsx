@@ -94,7 +94,7 @@ export default function TitleBar() {
   return (
     <div className="relative pt-2 px-2 w-full z-50 bg-transparent" data-tauri-drag-region>
       <div
-        className="h-10 bg-bg-secondary flex justify-between items-center select-none rounded-lg overflow-hidden shadow-sm"
+        className="h-10 bg-bg-secondary flex justify-between items-center select-none rounded-lg overflow-hidden"
         data-tauri-drag-region
       >
         <div className="flex items-center h-full">

@@ -1948,7 +1948,7 @@ export default function MainLibrary({
     const splashImage = selectedTheme?.splashImage;
     return (
       <div className="flex-1 flex h-full p-2 bg-transparent">
-        <div className="flex w-full h-full bg-bg-secondary rounded-lg border border-border-color/50 shadow-sm overflow-hidden">
+        <div className="flex w-full h-full bg-bg-secondary rounded-lg border border-border-color/25 overflow-hidden">
           <div className="w-1/2 hidden md:block relative overflow-hidden">
             <AnimatePresence>
               <motion.img
@@ -2098,7 +2098,7 @@ export default function MainLibrary({
 
   return (
     <div
-      className="flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden border border-border-color/50 shadow-sm"
+      className="flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden"
       ref={libraryContainerRef}
     >
       <header
