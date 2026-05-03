@@ -2233,8 +2233,21 @@ function SettingsPanel({
     updateContainer(container.id, { adjustments: newAdjustments });
   };
 
-  const handleToggleSection = (section: string) =>
-    setCollapsibleState((prev: any) => ({ ...prev, [section]: !prev[section] }));
+  const handleToggleSection = (section: string) => {
+    setCollapsibleState((prev: any) => {
+      const isOpening = !prev[section];
+      if (appSettings?.enableFocusMode && isOpening) {
+        setSettingsSectionOpen(false);
+        const newState = { ...prev };
+        Object.keys(newState).forEach((key) => {
+          newState[key] = false;
+        });
+        newState[section] = true;
+        return newState;
+      }
+      return { ...prev, [section]: !prev[section] };
+    });
+  };
 
   const handleToggleVisibility = (sectionName: string) => {
     if (!isActive) return;
@@ -2327,7 +2340,19 @@ function SettingsPanel({
       <CollapsibleSection
         title={isComponentMode ? `${getSubMaskName(activeSubMask)} Properties` : 'Mask Properties'}
         isOpen={isSettingsSectionOpen}
-        onToggle={() => setSettingsSectionOpen(!isSettingsSectionOpen)}
+        onToggle={() => {
+          const isOpening = !isSettingsSectionOpen;
+          setSettingsSectionOpen(isOpening);
+          if (appSettings?.enableFocusMode && isOpening) {
+            setCollapsibleState((prev: any) => {
+              const newState = { ...prev };
+              Object.keys(newState).forEach((key) => {
+                newState[key] = false;
+              });
+              return newState;
+            });
+          }
+        }}
         canToggleVisibility={false}
         isContentVisible={true}
       >

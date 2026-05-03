@@ -144,7 +144,18 @@ export default function Controls({
   };
 
   const handleToggleSection = (section: string) => {
-    setCollapsibleState((prev: any) => ({ ...prev, [section]: !prev[section] }));
+    setCollapsibleState((prev: any) => {
+      const isOpening = !prev[section];
+      if (appSettings?.enableFocusMode && isOpening) {
+        const newState = { ...prev };
+        Object.keys(newState).forEach((key) => {
+          newState[key] = false;
+        });
+        newState[section] = true;
+        return newState;
+      }
+      return { ...prev, [section]: !prev[section] };
+    });
   };
 
   const handleSectionContextMenu = (event: any, sectionName: string) => {

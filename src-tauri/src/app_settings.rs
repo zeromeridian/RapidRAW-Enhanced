@@ -364,6 +364,8 @@ pub struct AppSettings {
     pub default_raw_tonemapper: Option<String>,
     #[serde(default)]
     pub default_non_raw_tonemapper: Option<String>,
+    #[serde(default)]
+    pub enable_focus_mode: Option<bool>,
 }
 
 impl Default for AppSettings {
@@ -444,6 +446,7 @@ impl Default for AppSettings {
             tonemapper_override_enabled: Some(false),
             default_raw_tonemapper: Some("agx".to_string()),
             default_non_raw_tonemapper: Some("basic".to_string()),
+            enable_focus_mode: Some(false),
         }
     }
 }

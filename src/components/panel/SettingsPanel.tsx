@@ -956,6 +956,18 @@ export default function SettingsPanel({
                       />
                     </SettingItem>
 
+                    <SettingItem
+                      label="Focus Mode"
+                      description="Helps you focus by automatically closing other panels when you open a new one."
+                    >
+                      <Switch
+                        checked={appSettings?.enableFocusMode ?? false}
+                        id="focus-mode-toggle"
+                        label="Enable Focus Mode"
+                        onChange={(checked) => onSettingsChange({ ...appSettings, enableFocusMode: checked })}
+                      />
+                    </SettingItem>
+
                     <SettingItem label="Font" description="Change the application font.">
                       <Dropdown
                         onChange={(value: any) => onSettingsChange({ ...appSettings, fontFamily: value })}

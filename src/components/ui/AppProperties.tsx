@@ -188,6 +188,7 @@ export interface AppSettings {
   defaultRawTonemapper?: string;
   defaultNonRawTonemapper?: string;
   copyPasteSettings?: CopyPasteSettings;
+  enableFocusMode?: boolean;
 }
 
 export interface BrushSettings {
