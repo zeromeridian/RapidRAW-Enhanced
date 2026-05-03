@@ -48,9 +48,9 @@ export default function DetailsPanel({
             min={0}
             onChange={(e: any) => handleAdjustmentChange(DetailsAdjustment.SharpnessThreshold, e.target.value)}
             step={1}
-            value={adjustments.sharpnessThreshold ?? 10}
+            value={adjustments.sharpnessThreshold ?? 15}
             onDragStateChange={onDragStateChange}
-            defaultValue={10}
+            defaultValue={15}
             fillOrigin="min"
           />
         </div>

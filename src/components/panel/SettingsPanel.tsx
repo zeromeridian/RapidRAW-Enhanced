@@ -1018,6 +1018,19 @@ export default function SettingsPanel({
                         })
                       }
                     />
+                    <Switch
+                      label="Noise Reduction"
+                      checked={appSettings?.adjustmentVisibility?.noiseReduction ?? true}
+                      onChange={(checked) =>
+                        onSettingsChange({
+                          ...appSettings,
+                          adjustmentVisibility: {
+                            ...(appSettings?.adjustmentVisibility || adjustmentVisibilityDefaults),
+                            noiseReduction: checked,
+                          },
+                        })
+                      }
+                    />
                   </div>
                 </div>
 

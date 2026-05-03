@@ -449,7 +449,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   },
   shadows: 0,
   sharpness: 0,
-  sharpnessThreshold: 10,
+  sharpnessThreshold: 15,
   structure: 0,
   temperature: 0,
   tint: 0,
@@ -533,7 +533,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   },
   shadows: 0,
   sharpness: 0,
-  sharpnessThreshold: 10,
+  sharpnessThreshold: 15,
   showClipping: false,
   structure: 0,
   temperature: 0,
@@ -715,9 +715,14 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
   details: [
     {
       label: 'Clarity & Dehaze',
-      keys: [DetailsAdjustment.Clarity, DetailsAdjustment.Structure, DetailsAdjustment.Dehaze],
+      keys: [
+        DetailsAdjustment.Clarity,
+        DetailsAdjustment.Structure,
+        DetailsAdjustment.Dehaze,
+        DetailsAdjustment.Centré,
+      ],
     },
-    { label: 'Sharpness', keys: [DetailsAdjustment.Sharpness, DetailsAdjustment.Centré] },
+    { label: 'Sharpness', keys: [DetailsAdjustment.Sharpness, DetailsAdjustment.SharpnessThreshold] },
     { label: 'Noise Reduction', keys: [DetailsAdjustment.LumaNoiseReduction, DetailsAdjustment.ColorNoiseReduction] },
     {
       label: 'Chromatic Aberration',

@@ -496,6 +496,7 @@ fn apply_filmic_exposure(color_in: vec3<f32>, brightness_adj: f32) -> vec3<f32> 
     }
     const RATIONAL_CURVE_MIX: f32 = 0.95;
     const MIDTONE_STRENGTH: f32 = 1.2;
+    const TOP_ANCHOR: f32 = 1.1;
     let original_luma = get_luma(color_in);
     if (abs(original_luma) < 0.00001) {
         return color_in;
@@ -505,10 +506,10 @@ fn apply_filmic_exposure(color_in: vec3<f32>, brightness_adj: f32) -> vec3<f32> 
     let scale = pow(2.0, direct_adj);
     let k = pow(2.0, -rational_adj * MIDTONE_STRENGTH);
     let luma_abs = abs(original_luma);
-    let luma_floor = floor(luma_abs);
-    let luma_fract = luma_abs - luma_floor;
-    let shaped_fract = luma_fract / (luma_fract + (1.0 - luma_fract) * k);
-    let shaped_luma_abs = luma_floor + shaped_fract;
+    let luma_floor = floor(luma_abs / TOP_ANCHOR) * TOP_ANCHOR;
+    let luma_norm = (luma_abs - luma_floor) / TOP_ANCHOR;
+    let shaped_norm = luma_norm / (luma_norm + (1.0 - luma_norm) * k);
+    let shaped_luma_abs = luma_floor + (shaped_norm * TOP_ANCHOR);
     let new_luma = sign(original_luma) * shaped_luma_abs * scale;
     let chroma = color_in - vec3<f32>(original_luma);
     let total_luma_scale = new_luma / original_luma;
@@ -702,6 +703,21 @@ fn apply_local_contrast(
         return processed_color_linear;
     }
 
+    var blurred_color_linear: vec3<f32>;
+    if (is_raw == 1u) {
+        blurred_color_linear = blurred_color_input_space;
+    } else {
+        blurred_color_linear = srgb_to_linear(blurred_color_input_space);
+    }
+
+    if (amount < 0.0) {
+        var blur_amount = -amount;
+        if (mode == 0u) {
+            blur_amount = blur_amount * 0.5;
+        }
+        return mix(processed_color_linear, blurred_color_linear, blur_amount);
+    }
+
     let center_luma = get_luma(processed_color_linear);
 
     let shadow_threshold = select(0.03, 0.1, is_raw == 1u);
@@ -713,44 +729,25 @@ fn apply_local_contrast(
         return processed_color_linear;
     }
 
-    var blurred_color_linear: vec3<f32>;
-    if (is_raw == 1u) {
-        blurred_color_linear = blurred_color_input_space;
-    } else {
-        blurred_color_linear = srgb_to_linear(blurred_color_input_space);
-    }
-
     let blurred_luma = get_luma(blurred_color_linear);
     let safe_center_luma = max(center_luma, 0.0001);
     let safe_blurred_luma = max(blurred_luma, 0.0001);
 
-    var final_color: vec3<f32>;
+    let log_ratio = log2(safe_center_luma / safe_blurred_luma);
+    var effective_amount = amount;
 
-    if (amount < 0.0) {
-        let blurred_color_projected = processed_color_linear * (safe_blurred_luma / safe_center_luma);
-        var blur_amount = -amount;
-        if (mode == 0u) {
-            blur_amount = blur_amount * 0.5;
-        }
-        final_color = mix(processed_color_linear, blurred_color_projected, blur_amount);
+    if (mode == 0u) {
+        let edge_magnitude = abs(log_ratio);
+        let normalized_edge = clamp(edge_magnitude / 3.0, 0.0, 1.0);
+        let edge_dampener = 1.0 - pow(normalized_edge, 0.5);
+        let edge_mask = smoothstep(threshold * 0.5, threshold * 1.5, edge_magnitude);
+        effective_amount = amount * edge_dampener * edge_mask * 0.8;
     } else {
-        let log_ratio = log2(safe_center_luma / safe_blurred_luma);
-        var effective_amount = amount;
-
-        if (mode == 0u) {
-            let edge_magnitude = abs(log_ratio);
-            let normalized_edge = clamp(edge_magnitude / 3.0, 0.0, 1.0);
-            let edge_dampener = 1.0 - pow(normalized_edge, 0.5);
-            let edge_mask = smoothstep(threshold * 0.5, threshold * 1.5, edge_magnitude);
-            effective_amount = amount * edge_dampener * edge_mask * 0.8;
-        }
-        else {
-            effective_amount = amount;
-        }
-
-        let contrast_factor = exp2(log_ratio * effective_amount);
-        final_color = processed_color_linear * contrast_factor;
+        effective_amount = amount;
     }
+
+    let contrast_factor = exp2(log_ratio * effective_amount);
+    let final_color = processed_color_linear * contrast_factor;
 
     return mix(processed_color_linear, final_color, midtone_mask);
 }
@@ -865,7 +862,7 @@ fn apply_dehaze(color: vec3<f32>, blurred_color_input_space: vec3<f32>, is_raw: 
 }
 
 fn apply_noise_reduction(
-    color: vec3<f32>,
+    center_linear: vec3<f32>,
     coords_i: vec2<i32>,
     luma_amount: f32,
     color_amount: f32,
@@ -875,111 +872,178 @@ fn apply_noise_reduction(
     let luma_a  = clamp(luma_amount,  0.0, 1.0);
     let color_a = clamp(color_amount, 0.0, 1.0);
     if (luma_a < 0.001 && color_a < 0.001) {
-        return color;
+        return center_linear;
     }
 
     let dims = vec2<i32>(textureDimensions(input_texture));
     let max_idx = dims - vec2<i32>(1);
-
-    let center_coord = clamp(coords_i, vec2<i32>(0), max_idx);
-    var center = textureLoad(input_texture, vec2<u32>(center_coord), 0).rgb;
-    if (is_raw == 0u) {
-        center = srgb_to_linear(center);
-    }
-    let center_safe   = max(center, vec3<f32>(0.0));
+    let center_safe   = max(center_linear, vec3<f32>(0.0));
     let center_luma   = get_luma(center_safe);
-    let center_chroma = center - vec3<f32>(center_luma);
-
-    let color_safe     = max(color, vec3<f32>(0.0));
-    let color_luma_val = get_luma(color_safe);
-    let color_chroma   = color - vec3<f32>(color_luma_val);
-
-    let safe_center_luma = max(center_luma, 1.0e-3);
-    let local_amp = clamp(color_luma_val / safe_center_luma, 0.25, 8.0);
+    let center_chroma = center_linear - vec3<f32>(center_luma);
 
     let res_factor = clamp(sqrt(scale), 0.5, 2.0);
 
-    var new_luma   = color_luma_val;
-    var new_chroma = color_chroma;
+    var new_luma   = center_luma;
+    var new_chroma = center_chroma;
 
+    // --- LUMA NOISE REDUCTION ---
     if (luma_a > 0.001) {
         let l_curve = sqrt(luma_a);
 
-        let l_spatial       = mix(0.9, 1.6, l_curve) * res_factor;
+        let stride_f = mix(1.0, 2.0, smoothstep(0.45, 0.95, luma_a)) * res_factor;
+        let extra    = clamp(stride_f - 1.0, 0.0, 1.0);
 
-        let l_range_display = mix(0.018, 0.055, l_curve);
-        let l_range         = l_range_display / local_amp;
+        let l_spatial = mix(1.0, 1.5, l_curve);
+        let l_spat_n  = -1.0 / max(2.0 * l_spatial * l_spatial, 1e-6);
 
-        let l_spat_n = -1.0 / max(2.0 * l_spatial * l_spatial, 1e-6);
-        let l_rng_n  = -1.0 / max(2.0 * l_range   * l_range,   1e-6);
+        let h1 = hash(vec2<f32>(coords_i));
+        let h2 = hash(vec2<f32>(coords_i) + vec2<f32>(17.31, 71.13));
 
-        var l_acc: f32 = 0.0;
-        var l_w:   f32 = 0.0;
+        var samp_luma: array<f32, 25>;
+        var samp_spat: array<f32, 25>;
+        var lmin: f32 = center_luma;
+        var lmax: f32 = center_luma;
+
+        samp_luma[0] = center_luma;
+        samp_spat[0] = 1.0;
+
+        var idx: u32 = 1u;
         for (var dy: i32 = -2; dy <= 2; dy = dy + 1) {
             for (var dx: i32 = -2; dx <= 2; dx = dx + 1) {
-                let coord = clamp(coords_i + vec2<i32>(dx, dy), vec2<i32>(0), max_idx);
+                if (dx == 0 && dy == 0) { continue; }
+
+                let ring = max(abs(dx), abs(dy));
+                let ring_factor = select(0.5, 1.0, ring == 2);
+                let grow = 1.0 + extra * ring_factor;
+
+                let jx = (h1 - 0.5) * 2.0 * extra;
+                let jy = (h2 - 0.5) * 2.0 * extra;
+
+                let off_f = vec2<f32>(f32(dx) * grow + jx, f32(dy) * grow + jy);
+                let off   = vec2<i32>(i32(round(off_f.x)), i32(round(off_f.y)));
+                let coord = clamp(coords_i + off, vec2<i32>(0), max_idx);
+
                 var s = textureLoad(input_texture, vec2<u32>(coord), 0).rgb;
                 if (is_raw == 0u) { s = srgb_to_linear(s); }
-                let s_luma  = get_luma(max(s, vec3<f32>(0.0)));
-                let dist_sq = f32(dx * dx + dy * dy);
-                let diff    = s_luma - center_luma;
-                let w       = exp(dist_sq * l_spat_n + diff * diff * l_rng_n);
-                l_acc += s_luma * w;
-                l_w   += w;
+                let s_luma = get_luma(max(s, vec3<f32>(0.0)));
+                samp_luma[idx] = s_luma;
+                samp_spat[idx] = exp(f32(dx * dx + dy * dy) * l_spat_n);
+                lmin = min(lmin, s_luma);
+                lmax = max(lmax, s_luma);
+                idx = idx + 1u;
             }
         }
-        let smoothed_input_luma = l_acc / max(l_w, 1e-4);
 
-        let raw_ratio          = smoothed_input_luma / safe_center_luma;
-        let safe_ratio         = clamp(raw_ratio, 0.25, 4.0);
-        let smoothed_color_lum = color_luma_val * safe_ratio;
-        new_luma = mix(color_luma_val, smoothed_color_lum, luma_a);
+        let luma_range    = lmax - lmin;
+        let edge_strength = smoothstep(0.04, 0.20, luma_range);
+        let edge_midpoint = (lmin + lmax) * 0.5;
+        let center_side   = center_luma > edge_midpoint;
+
+        let l_range_tol = mix(
+            mix(0.025, 0.075, l_curve),
+            mix(0.010, 0.025, l_curve),
+            edge_strength
+        );
+
+        var samp_gate: array<f32, 25>;
+        var sum_a: f32 = 0.0;
+        var w_a:   f32 = 0.0;
+        for (var k: u32 = 0u; k < 25u; k = k + 1u) {
+            let diff = abs(samp_luma[k] - center_luma);
+            let g_range = 1.0 - smoothstep(l_range_tol * 0.6, l_range_tol, diff);
+            let s_side  = samp_luma[k] > edge_midpoint;
+            let g_side  = select(0.0, 1.0, s_side == center_side);
+            let g_edge  = mix(1.0, g_side, edge_strength);
+            let w = samp_spat[k] * g_range * g_edge;
+            samp_gate[k] = w;
+            sum_a += samp_luma[k] * w;
+            w_a   += w;
+        }
+        let initial_mean = sum_a / max(w_a, 1e-4);
+
+        let outlier_tol = mix(0.07, 0.025, edge_strength);
+        var sum_b: f32 = 0.0;
+        var w_b:   f32 = 0.0;
+        for (var k: u32 = 0u; k < 25u; k = k + 1u) {
+            let init_w = samp_gate[k];
+            if (init_w > 0.0001) {
+                let d = samp_luma[k] - initial_mean;
+                let r = abs(d) / outlier_tol;
+                let bisq = max(0.0, 1.0 - r * r);
+                let outlier_w = bisq * bisq;
+                let w = init_w * outlier_w;
+                sum_b += samp_luma[k] * w;
+                w_b   += w;
+            }
+        }
+        let robust_luma = select(initial_mean, sum_b / max(w_b, 1e-6), w_b > 0.01);
+
+        let strength = luma_a * mix(1.0, 0.6, edge_strength);
+        new_luma = mix(center_luma, robust_luma, strength);
     }
 
     if (color_a > 0.001) {
-        let c_stride_f = clamp(mix(2.5, 5.0, color_a) * res_factor, 2.0, 9.0);
-        let c_stride:  i32 = i32(round(c_stride_f));
+        let center_r_y = center_linear.r - center_luma;
+        let center_b_y = center_linear.b - center_luma;
+        let c_curve = sqrt(color_a);
+        let stride_f = mix(2.0, 3.5, c_curve) * res_factor;
 
-        let c_spatial       = 4.0;
-        let c_range_display = mix(0.06, 0.20, color_a);
-        let c_range         = c_range_display / local_amp;
+        let c_spatial = mix(2.0, 3.5, c_curve);
+        let c_spat_n  = -1.0 / max(2.0 * c_spatial * c_spatial, 1e-6);
 
-        let c_chroma_range  = mix(0.04, 0.10, color_a) / local_amp;
+        let luma_tol = mix(0.12, 0.04, c_curve);
+        let luma_n   = -1.0 / max(2.0 * luma_tol * luma_tol, 1e-6);
 
-        let c_spat_n = -1.0 / max(2.0 * c_spatial      * c_spatial,      1e-6);
-        let c_rng_n  = -1.0 / max(2.0 * c_range        * c_range,        1e-6);
-        let c_chr_n  = -1.0 / max(2.0 * c_chroma_range * c_chroma_range, 1e-6);
+        let chroma_tol = mix(0.20, 0.08, c_curve);
+        let chroma_n   = -1.0 / max(2.0 * chroma_tol * chroma_tol, 1e-6);
 
-        var c_acc: vec3<f32> = vec3<f32>(0.0);
-        var c_w:   f32       = 0.0;
+        let jh1 = hash(vec2<f32>(coords_i) + vec2<f32>(43.7, 91.1));
+        let jh2 = hash(vec2<f32>(coords_i) + vec2<f32>(73.3, 17.9));
+        let jx  = (jh1 - 0.5) * stride_f * 0.5;
+        let jy  = (jh2 - 0.5) * stride_f * 0.5;
+
+        var sum_r: f32 = center_r_y;
+        var sum_b: f32 = center_b_y;
+        var w_sum: f32 = 1.0;
+
         for (var dy: i32 = -2; dy <= 2; dy = dy + 1) {
             for (var dx: i32 = -2; dx <= 2; dx = dx + 1) {
-                let coord = clamp(
-                    coords_i + vec2<i32>(dx * c_stride, dy * c_stride),
-                    vec2<i32>(0), max_idx
-                );
+                if (dx == 0 && dy == 0) { continue; }
+                let off_f = vec2<f32>(f32(dx) * stride_f + jx, f32(dy) * stride_f + jy);
+                let off   = vec2<i32>(i32(round(off_f.x)), i32(round(off_f.y)));
+                let coord = clamp(coords_i + off, vec2<i32>(0), max_idx);
                 var s = textureLoad(input_texture, vec2<u32>(coord), 0).rgb;
+
                 if (is_raw == 0u) { s = srgb_to_linear(s); }
-                let s_safe   = max(s, vec3<f32>(0.0));
-                let s_luma   = get_luma(s_safe);
-                let s_chroma = s - vec3<f32>(s_luma);
-                let dist_sq  = f32(dx * dx + dy * dy);
-                let luma_diff      = s_luma   - center_luma;
-                let chroma_diff    = s_chroma - center_chroma;
-                let chroma_diff_sq = dot(chroma_diff, chroma_diff);
-                let w = exp(
-                    dist_sq            * c_spat_n +
-                    luma_diff * luma_diff * c_rng_n +
-                    chroma_diff_sq     * c_chr_n
-                );
-                c_acc += s_chroma * w;
-                c_w   += w;
+
+                let s_safe = max(s, vec3<f32>(0.0));
+                let s_luma = get_luma(s_safe);
+                let s_r_y  = s.r - s_luma;
+                let s_b_y  = s.b - s_luma;
+
+                let r2  = f32(dx * dx + dy * dy);
+                let w_s = exp(r2 * c_spat_n);
+                let dl  = s_luma - center_luma;
+                let w_l = exp(dl * dl * luma_n);
+                let dr  = s_r_y - center_r_y;
+                let db  = s_b_y - center_b_y;
+                let dc2 = dr * dr + db * db;
+                let w_c = exp(dc2 * chroma_n);
+                let w = w_s * w_l * w_c;
+
+                sum_r += s_r_y * w;
+                sum_b += s_b_y * w;
+                w_sum += w;
             }
         }
-        let smoothed_input_chroma = c_acc / max(c_w, 1e-4);
+        let filtered_r_y = sum_r / max(w_sum, 1e-6);
+        let filtered_b_y = sum_b / max(w_sum, 1e-6);
 
-        let chroma_delta = (smoothed_input_chroma - center_chroma) * local_amp;
-        new_chroma = color_chroma + chroma_delta * color_a;
+        let new_r_y = mix(center_r_y, filtered_r_y, color_a);
+        let new_b_y = mix(center_b_y, filtered_b_y, color_a);
+        let new_g_y = -(LUMA_COEFF.r * new_r_y + LUMA_COEFF.b * new_b_y) / LUMA_COEFF.g;
+
+        new_chroma = vec3<f32>(new_r_y, new_g_y, new_b_y);
     }
 
     return vec3<f32>(new_luma) + new_chroma;
@@ -1149,19 +1213,15 @@ fn apply_all_adjustments(
     structure_blurred: vec3<f32>,
     is_raw: u32
 ) -> vec3<f32> {
-    var processed_rgb = apply_noise_reduction(initial_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction, scale, is_raw);
-
-    processed_rgb = apply_dehaze(processed_rgb, structure_blurred, is_raw, adj.dehaze);
+    var processed_rgb = apply_dehaze(initial_rgb, structure_blurred, is_raw, adj.dehaze);
     processed_rgb = apply_centre_tonal_and_color(processed_rgb, adj.centre, coords_i);
     processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
     processed_rgb = apply_filmic_exposure(processed_rgb, adj.brightness);
     processed_rgb = apply_tonal_adjustments(processed_rgb, tonal_blurred, is_raw, adj.contrast, adj.shadows, adj.whites, adj.blacks);
     processed_rgb = apply_highlights_adjustment(processed_rgb, tonal_blurred, is_raw, adj.highlights);
-
     processed_rgb = apply_color_calibration(processed_rgb, adj.color_calibration);
     processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
     processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
-
     return processed_rgb;
 }
 
@@ -1176,19 +1236,15 @@ fn apply_all_mask_adjustments(
     tonal_blurred: vec3<f32>,
     structure_blurred: vec3<f32>
 ) -> vec3<f32> {
-    var processed_rgb = apply_noise_reduction(initial_rgb, coords_i, adj.luma_noise_reduction, adj.color_noise_reduction, scale, is_raw);
-
-    processed_rgb = apply_dehaze(processed_rgb, structure_blurred, is_raw, adj.dehaze);
+    var processed_rgb = apply_dehaze(initial_rgb, structure_blurred, is_raw, adj.dehaze);
     processed_rgb = apply_linear_exposure(processed_rgb, adj.exposure);
     processed_rgb = apply_white_balance(processed_rgb, adj.temperature, adj.tint);
     processed_rgb = apply_filmic_exposure(processed_rgb, adj.brightness);
     processed_rgb = apply_highlights_adjustment(processed_rgb, tonal_blurred, is_raw, adj.highlights);
     processed_rgb = apply_tonal_adjustments(processed_rgb, tonal_blurred, is_raw, adj.contrast, adj.shadows, adj.whites, adj.blacks);
-
     processed_rgb = apply_hsl_panel(processed_rgb, adj.hsl, coords_i);
     processed_rgb = apply_color_grading(processed_rgb, adj.color_grading_shadows, adj.color_grading_midtones, adj.color_grading_highlights, adj.color_grading_global, adj.color_grading_blending, adj.color_grading_balance);
     processed_rgb = apply_creative_color(processed_rgb, adj.saturation, adj.vibrance);
-
     return processed_rgb;
 }
 
@@ -1408,8 +1464,6 @@ fn scale_mask_adjustments(adj: MaskAdjustments, influence: f32) -> MaskAdjustmen
     scaled.vibrance *= influence;
 
     scaled.sharpness *= influence;
-    scaled.luma_noise_reduction *= influence;
-    scaled.color_noise_reduction *= influence;
     scaled.clarity *= influence;
     scaled.dehaze *= influence;
     scaled.structure *= influence;
@@ -1466,6 +1520,24 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     } else {
         initial_linear_rgb = color_from_texture;
     }
+
+    var luma_nr  = adjustments.global.luma_noise_reduction;
+    var color_nr = adjustments.global.color_noise_reduction;
+    for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
+        let influence = get_mask_influence(i, absolute_coord);
+        if (influence > 0.001) {
+            luma_nr  += adjustments.mask_adjustments[i].luma_noise_reduction  * influence;
+            color_nr += adjustments.mask_adjustments[i].color_noise_reduction * influence;
+        }
+    }
+    initial_linear_rgb = apply_noise_reduction(
+        initial_linear_rgb,
+        absolute_coord_i,
+        luma_nr,
+        color_nr,
+        scale,
+        adjustments.global.is_raw_image
+    );
 
     let sharpness_blurred = textureLoad(sharpness_blur_texture, id.xy, 0).rgb;
     let tonal_blurred = textureLoad(tonal_blur_texture, id.xy, 0).rgb;
