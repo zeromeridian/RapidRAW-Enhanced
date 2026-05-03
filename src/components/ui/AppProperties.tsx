@@ -1,5 +1,5 @@
 import { ExportPreset } from './ExportImportProperties';
-import { Adjustments } from '../../utils/adjustments';
+import { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
 import { ToolType } from '../panel/right/Masks';
 
 export const GLOBAL_KEYS = [
@@ -187,6 +187,7 @@ export interface AppSettings {
   tonemapperOverrideEnabled?: boolean;
   defaultRawTonemapper?: string;
   defaultNonRawTonemapper?: string;
+  copyPasteSettings?: CopyPasteSettings;
 }
 
 export interface BrushSettings {

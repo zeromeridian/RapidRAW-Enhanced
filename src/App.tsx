@@ -3094,9 +3094,12 @@ function App() {
           const prev = prevAdjustmentsRef.current;
           if (prev && prev.path === selectedImage.path) {
             const delta: Partial<Adjustments> = {};
+            const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
             for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
-              if (JSON.stringify(adjustments[key]) !== JSON.stringify(prev.adjustments[key])) {
-                (delta as any)[key] = adjustments[key];
+              if (includedKeys.includes(key as string)) {
+                if (JSON.stringify(adjustments[key]) !== JSON.stringify(prev.adjustments[key])) {
+                  (delta as any)[key] = adjustments[key];
+                }
               }
             }
             if (Object.keys(delta).length > 0) {
@@ -3124,6 +3127,7 @@ function App() {
     applyAdjustments,
     debouncedSave,
     appSettings?.enableLivePreviews,
+    appSettings?.copyPasteSettings?.includedAdjustments,
   ]);
 
   const handleZoomChange = useCallback(
