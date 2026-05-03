@@ -1381,6 +1381,7 @@ const Row = ({
   isListView,
   columnWidths,
   queueThumbnailRequest,
+  onToggleRecursiveFolder,
 }: any) => {
   const row = rows[index];
 
@@ -1424,7 +1425,17 @@ const Row = ({
         className="flex items-end pb-2 pt-2"
       >
         <div className="flex items-center gap-2 w-full border-b border-border-color/50 pb-1">
-          <FolderOpen size={16} className={TEXT_COLOR_KEYS[TextColors.secondary]} />
+          <button
+            type="button"
+            className={`${TEXT_COLOR_KEYS[TextColors.secondary]} p-0.5 rounded transition-colors hover:bg-surface-hover cursor-pointer`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleRecursiveFolder(row.path);
+            }}
+            data-tooltip={row.isExpanded ? 'Collapse Folder' : 'Expand Folder'}
+          >
+            {row.isExpanded ? <FolderOpen size={16} /> : <Folder size={16} />}
+          </button>
           <Text variant={TextVariants.label} weight={TextWeights.semibold} className="truncate" data-tooltip={row.path}>
             {displayPath}
           </Text>
@@ -1568,6 +1579,7 @@ export default function MainLibrary({
   const [latestVersion, setLatestVersion] = useState('');
   const [isBusyDelayed, setIsBusyDelayed] = useState(false);
   const [isProgressHovered, setIsProgressHovered] = useState(false);
+  const [collapsedRecursiveFolders, setCollapsedRecursiveFolders] = useState<Set<string>>(new Set());
   const loadedThumbnailsRef = useRef(new Set<string>());
   const requestQueueRef = useRef<Set<string>>(new Set());
   const requestTimeoutRef = useRef<any>(null);
@@ -1620,6 +1632,18 @@ export default function MainLibrary({
     if (libraryViewMode === LibraryViewMode.Flat) return null;
     return groupImagesByFolder(imageList, currentFolderPath);
   }, [imageList, currentFolderPath, libraryViewMode]);
+
+  const handleToggleRecursiveFolder = useCallback((path: string) => {
+    setCollapsedRecursiveFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }, []);
 
   const handleSortChange = useCallback(
     (criteria: SortCriteria | ((prev: SortCriteria) => SortCriteria)) => {
@@ -2208,14 +2232,17 @@ export default function MainLibrary({
                 groups.forEach((group) => {
                   if (group.images.length === 0) return;
 
-                  rows.push({ type: 'header', path: group.path, count: group.images.length });
+                  const isExpanded = !collapsedRecursiveFolders.has(group.path);
+                  rows.push({ type: 'header', path: group.path, count: group.images.length, isExpanded });
 
-                  for (let i = 0; i < group.images.length; i += columnCount) {
-                    rows.push({
-                      type: 'images',
-                      images: group.images.slice(i, i + columnCount),
-                      startIndex: i,
-                    });
+                  if (isExpanded) {
+                    for (let i = 0; i < group.images.length; i += columnCount) {
+                      rows.push({
+                        type: 'images',
+                        images: group.images.slice(i, i + columnCount),
+                        startIndex: i,
+                      });
+                    }
                   }
                 });
               } else {
@@ -2279,6 +2306,7 @@ export default function MainLibrary({
                         isListView,
                         columnWidths: listColumnWidths,
                         queueThumbnailRequest,
+                        onToggleRecursiveFolder: handleToggleRecursiveFolder,
                       }}
                     />
                   </div>
