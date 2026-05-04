@@ -1555,7 +1555,26 @@ function App() {
       const currentPath = selectedImage?.path;
       if (!currentPath) return;
 
-      const payload = JSON.parse(JSON.stringify(currentAdjustments));
+      const payload = {
+        ...currentAdjustments,
+        masks: currentAdjustments.masks?.map((m: any) => ({
+          ...m,
+          subMasks:
+            m.subMasks?.map((sm: any) => ({
+              ...sm,
+              parameters: sm.parameters ? { ...sm.parameters, mask_data_base64: null, maskDataBase64: null } : null,
+            })) || [],
+        })),
+        aiPatches: currentAdjustments.aiPatches?.map((p: any) => ({
+          ...p,
+          patchData: null,
+          subMasks:
+            p.subMasks?.map((sm: any) => ({
+              ...sm,
+              parameters: sm.parameters ? { ...sm.parameters, mask_data_base64: null, maskDataBase64: null } : null,
+            })) || [],
+        })),
+      };
 
       const processSubMasks = (subMasks: any[]) => {
         if (!Array.isArray(subMasks)) return;
@@ -1698,7 +1717,7 @@ function App() {
   );
 
   const flushPipeline = useCallback(() => {
-    if (inFlightCountRef.current >= 2) return;
+    if (inFlightCountRef.current >= 3) return;
     if (!pendingApplyRef.current) return;
 
     const { adjustments, targetRes } = pendingApplyRef.current;
