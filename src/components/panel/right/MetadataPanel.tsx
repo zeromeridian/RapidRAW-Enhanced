@@ -277,7 +277,10 @@ export default function MetadataPanel({
   }, [tags]);
 
   const hasGps = gpsData.lat !== null && gpsData.lon !== null;
-  const fileName = selectedImage?.path.split(/[\\/]/).pop() || '';
+  const fullPath = selectedImage?.path || '';
+  const isVirtualCopy = fullPath.includes('?vc=');
+  const basePath = fullPath.split('?vc=')[0];
+  const fileName = basePath.split(/[\\/]/).pop() || '';
   const fileExtension = fileName.split('.').pop()?.toUpperCase() || 'FILE';
   const megapixels =
     selectedImage?.width && selectedImage?.height
@@ -353,8 +356,18 @@ export default function MetadataPanel({
                   <Text weight={TextWeights.semibold} color={TextColors.primary} className="truncate drop-shadow-sm">
                     {fileName || '-'}
                   </Text>
-                  <div className="bg-bg-primary/80 backdrop-blur-md text-text-secondary font-bold text-[10px] rounded-md px-2 py-1 shrink-0 tracking-wider uppercase shadow-sm border border-surface/50">
-                    {fileExtension}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isVirtualCopy && (
+                      <div
+                        className="bg-bg-primary/80 backdrop-blur-md text-text-secondary font-bold text-[10px] rounded-md px-2 py-1 tracking-wider uppercase shadow-sm border border-surface/50"
+                        data-tooltip="Virtual Copy"
+                      >
+                        VC
+                      </div>
+                    )}
+                    <div className="bg-bg-primary/80 backdrop-blur-md text-text-secondary font-bold text-[10px] rounded-md px-2 py-1 tracking-wider uppercase shadow-sm border border-surface/50">
+                      {fileExtension}
+                    </div>
                   </div>
                 </div>
 
