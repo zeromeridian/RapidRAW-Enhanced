@@ -2936,6 +2936,70 @@ function App() {
     [multiSelectedPaths, selectedImage, imageRatings],
   );
 
+  const handleUpdateExif = useCallback(
+    async (paths: Array<string> | undefined, updates: Record<string, string>) => {
+      const pathsToUpdate =
+        paths && paths.length > 0
+          ? paths
+          : multiSelectedPaths.length > 0
+            ? multiSelectedPaths
+            : selectedImage
+              ? [selectedImage.path]
+              : [];
+      if (pathsToUpdate.length === 0) return;
+
+      const physicalPathsSet = new Set(pathsToUpdate.map((p) => p.split('?vc=')[0]));
+      const physicalPathsArray = Array.from(physicalPathsSet);
+
+      try {
+        await invoke(Invokes.UpdateExifFields, {
+          paths: physicalPathsArray,
+          updates,
+        });
+
+        setSelectedImage((prev) => {
+          if (!prev || !physicalPathsSet.has(prev.path.split('?vc=')[0])) return prev;
+          return {
+            ...prev,
+            exif: {
+              ...(prev.exif || {}),
+              ...updates,
+            },
+          };
+        });
+
+        setImageList((prev) =>
+          prev.map((img) => {
+            if (physicalPathsSet.has(img.path.split('?vc=')[0])) {
+              return {
+                ...img,
+                exif: { ...(img.exif || {}), ...updates },
+              };
+            }
+            return img;
+          }),
+        );
+
+        pathsToUpdate.forEach((p) => {
+          const cached = imageCacheRef.current.get(p);
+          if (cached && cached.selectedImage) {
+            imageCacheRef.current.set(p, {
+              ...cached,
+              selectedImage: {
+                ...cached.selectedImage,
+                exif: { ...(cached.selectedImage.exif || {}), ...updates },
+              },
+            });
+          }
+        });
+      } catch (err) {
+        console.error('Failed to update EXIF data:', err);
+        setError(`Failed to update metadata: ${err}`);
+      }
+    },
+    [multiSelectedPaths, selectedImage],
+  );
+
   const handleSetColorLabel = useCallback(
     async (color: string | null, paths?: Array<string>) => {
       const pathsToUpdate =
@@ -5532,12 +5596,15 @@ function App() {
               {renderedRightPanel === Panel.Metadata && (
                 <MetadataPanel
                   selectedImage={selectedImage}
+                  multiSelectedPaths={multiSelectedPaths}
                   rating={imageRatings[selectedImage.path] || 0}
                   tags={imageList.find((img) => img.path === selectedImage.path)?.tags || []}
                   onRate={handleRate}
+                  onUpdateExif={handleUpdateExif}
                   onSetColorLabel={handleSetColorLabel}
                   onTagsChanged={handleTagsChanged}
                   appSettings={appSettings}
+                  liveThumbnailUrl={thumbnails[selectedImage.path]}
                 />
               )}
               {renderedRightPanel === Panel.Crop && (

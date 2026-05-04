@@ -2275,6 +2275,7 @@ pub fn run() {
             export_processing::estimate_batch_export_size,
             image_processing::calculate_auto_adjustments,
             mask_generation::generate_mask_overlay,
+            file_management::update_exif_fields,
             file_management::get_supported_file_types,
             file_management::read_exif_for_paths,
             file_management::list_images_in_dir,

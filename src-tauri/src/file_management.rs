@@ -210,6 +210,42 @@ pub async fn read_exif_for_paths(
 }
 
 #[tauri::command]
+pub async fn update_exif_fields(paths: Vec<String>, updates: HashMap<String, String>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        paths.par_iter().for_each(|path| {
+            let original_path = Path::new(&path);
+            let rrexif_path = crate::exif_processing::get_rrexif_path(original_path);
+
+            let mut exif_data = if let Some(sidecar) = crate::exif_processing::read_rrexif_sidecar(original_path) {
+                sidecar
+            } else if let Ok(mmap) = read_file_mapped(original_path) {
+                crate::exif_processing::read_exif_data(path, &mmap)
+            } else if let Ok(bytes) = fs::read(original_path) {
+                crate::exif_processing::read_exif_data(path, &bytes)
+            } else {
+                HashMap::new()
+            };
+
+            for (k, v) in &updates {
+                let trimmed = v.trim();
+                if trimmed.is_empty() {
+                    exif_data.remove(k);
+                } else {
+                    exif_data.insert(k.clone(), trimmed.to_string());
+                }
+            }
+
+            if let Ok(json) = serde_json::to_string_pretty(&exif_data) {
+                let _ = std::fs::write(&rrexif_path, json);
+            }
+        });
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
 pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<ImageFile>, String> {
     let settings = load_settings(app_handle).unwrap_or_default();
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
