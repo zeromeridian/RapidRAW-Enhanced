@@ -1967,12 +1967,12 @@ export default function MainLibrary({
                   <motion.img
                     key={splashImage + '-ambient'}
                     src={splashImage}
-                    className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-50 pointer-events-none"
+                    className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-50 pointer-events-none"
                     aria-hidden="true"
                   />
                 )}
               </AnimatePresence>
-              <div className="absolute inset-0 bg-bg-secondary/60"></div>
+              <div className="absolute inset-0 bg-bg-secondary/90"></div>
             </div>
 
             <div className="w-full h-full flex flex-col p-8 lg:p-16 overflow-y-auto custom-scrollbar relative z-10">
