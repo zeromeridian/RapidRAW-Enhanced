@@ -116,6 +116,9 @@ import { useLibraryStore } from './store/useLibraryStore';
 import { useEditorStore } from './store/useEditorStore';
 import { useProcessStore } from './store/useProcessStore';
 import { useTauriListeners } from './hooks/useTauriListeners';
+import { useShallow } from 'zustand/react/shallow';
+import { useAiMasking } from './hooks/useAiMasking';
+import { useImageProcessing } from './hooks/useImageProcessing';
 
 const CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA'; // local dev key
 
@@ -208,7 +211,19 @@ function App() {
     setSupportedTypes,
     initPlatform,
     handleSettingsChange,
-  } = useSettingsStore();
+  } = useSettingsStore(
+    useShallow((state) => ({
+      appSettings: state.appSettings,
+      theme: state.theme,
+      supportedTypes: state.supportedTypes,
+      osPlatform: state.osPlatform,
+      setAppSettings: state.setAppSettings,
+      setTheme: state.setTheme,
+      setSupportedTypes: state.setSupportedTypes,
+      initPlatform: state.initPlatform,
+      handleSettingsChange: state.handleSettingsChange,
+    })),
+  );
 
   const {
     activeView,
@@ -243,7 +258,42 @@ function App() {
     collageModalState,
     setUI,
     setRightPanel,
-  } = useUIStore();
+  } = useUIStore(
+    useShallow((state) => ({
+      activeView: state.activeView,
+      isFullScreen: state.isFullScreen,
+      isWindowFullScreen: state.isWindowFullScreen,
+      isInstantTransition: state.isInstantTransition,
+      isLayoutReady: state.isLayoutReady,
+      uiVisibility: state.uiVisibility,
+      isLibraryExportPanelVisible: state.isLibraryExportPanelVisible,
+      leftPanelWidth: state.leftPanelWidth,
+      rightPanelWidth: state.rightPanelWidth,
+      bottomPanelHeight: state.bottomPanelHeight,
+      compactEditorPanelHeightOverride: state.compactEditorPanelHeightOverride,
+      activeRightPanel: state.activeRightPanel,
+      renderedRightPanel: state.renderedRightPanel,
+      slideDirection: state.slideDirection,
+      isCreateFolderModalOpen: state.isCreateFolderModalOpen,
+      isRenameFolderModalOpen: state.isRenameFolderModalOpen,
+      isRenameFileModalOpen: state.isRenameFileModalOpen,
+      renameTargetPaths: state.renameTargetPaths,
+      isImportModalOpen: state.isImportModalOpen,
+      isCopyPasteSettingsModalOpen: state.isCopyPasteSettingsModalOpen,
+      importTargetFolder: state.importTargetFolder,
+      importSourcePaths: state.importSourcePaths,
+      folderActionTarget: state.folderActionTarget,
+      confirmModalState: state.confirmModalState,
+      panoramaModalState: state.panoramaModalState,
+      hdrModalState: state.hdrModalState,
+      negativeModalState: state.negativeModalState,
+      denoiseModalState: state.denoiseModalState,
+      cullingModalState: state.cullingModalState,
+      collageModalState: state.collageModalState,
+      setUI: state.setUI,
+      setRightPanel: state.setRightPanel,
+    })),
+  );
 
   const {
     rootPath,
@@ -266,7 +316,30 @@ function App() {
     setFilterCriteria,
     setSearchCriteria,
     setSortCriteria,
-  } = useLibraryStore();
+  } = useLibraryStore(
+    useShallow((state) => ({
+      rootPath: state.rootPath,
+      currentFolderPath: state.currentFolderPath,
+      expandedFolders: state.expandedFolders,
+      folderTree: state.folderTree,
+      pinnedFolderTrees: state.pinnedFolderTrees,
+      imageList: state.imageList,
+      imageRatings: state.imageRatings,
+      multiSelectedPaths: state.multiSelectedPaths,
+      selectionAnchorPath: state.selectionAnchorPath,
+      libraryActivePath: state.libraryActivePath,
+      libraryActiveAdjustments: state.libraryActiveAdjustments,
+      sortCriteria: state.sortCriteria,
+      filterCriteria: state.filterCriteria,
+      searchCriteria: state.searchCriteria,
+      isTreeLoading: state.isTreeLoading,
+      isViewLoading: state.isViewLoading,
+      setLibrary: state.setLibrary,
+      setFilterCriteria: state.setFilterCriteria,
+      setSearchCriteria: state.setSearchCriteria,
+      setSortCriteria: state.setSortCriteria,
+    })),
+  );
 
   const {
     selectedImage,
@@ -305,7 +378,46 @@ function App() {
     undo,
     redo,
     resetHistory,
-  } = useEditorStore();
+  } = useEditorStore(
+    useShallow((state) => ({
+      selectedImage: state.selectedImage,
+      adjustments: state.adjustments,
+      history: state.history,
+      historyIndex: state.historyIndex,
+      finalPreviewUrl: state.finalPreviewUrl,
+      uncroppedAdjustedPreviewUrl: state.uncroppedAdjustedPreviewUrl,
+      showOriginal: state.showOriginal,
+      histogram: state.histogram,
+      waveform: state.waveform,
+      isWaveformVisible: state.isWaveformVisible,
+      activeWaveformChannel: state.activeWaveformChannel,
+      waveformHeight: state.waveformHeight,
+      isSliderDragging: state.isSliderDragging,
+      activeMaskContainerId: state.activeMaskContainerId,
+      activeMaskId: state.activeMaskId,
+      activeAiPatchContainerId: state.activeAiPatchContainerId,
+      activeAiSubMaskId: state.activeAiSubMaskId,
+      zoom: state.zoom,
+      displaySize: state.displaySize,
+      previewSize: state.previewSize,
+      baseRenderSize: state.baseRenderSize,
+      originalSize: state.originalSize,
+      overlayMode: state.overlayMode,
+      overlayRotation: state.overlayRotation,
+      transformedOriginalUrl: state.transformedOriginalUrl,
+      isStraightenActive: state.isStraightenActive,
+      brushSettings: state.brushSettings,
+      isGeneratingAiMask: state.isGeneratingAiMask,
+      isAIConnectorConnected: state.isAIConnectorConnected,
+      isGeneratingAi: state.isGeneratingAi,
+      hasRenderedFirstFrame: state.hasRenderedFirstFrame,
+      setEditor: state.setEditor,
+      pushHistory: state.pushHistory,
+      undo: state.undo,
+      redo: state.redo,
+      resetHistory: state.resetHistory,
+    })),
+  );
 
   const setLiveAdjustments = useCallback((adj: Adjustments) => setEditor({ adjustments: adj }), [setEditor]);
 
@@ -324,7 +436,24 @@ function App() {
     setProcess,
     setExportState,
     setImportState,
-  } = useProcessStore();
+  } = useProcessStore(
+    useShallow((state) => ({
+      exportState: state.exportState,
+      importState: state.importState,
+      isIndexing: state.isIndexing,
+      indexingProgress: state.indexingProgress,
+      thumbnails: state.thumbnails,
+      thumbnailProgress: state.thumbnailProgress,
+      aiModelDownloadStatus: state.aiModelDownloadStatus,
+      copiedFilePaths: state.copiedFilePaths,
+      isCopied: state.isCopied,
+      isPasted: state.isPasted,
+      initialFileToOpen: state.initialFileToOpen,
+      setProcess: state.setProcess,
+      setExportState: state.setExportState,
+      setImportState: state.setImportState,
+    })),
+  );
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
@@ -339,10 +468,6 @@ function App() {
 
   const [error, setError] = useState<string | null>(null);
 
-  const activeWaveformChannelRef = useRef(activeWaveformChannel);
-  activeWaveformChannelRef.current = activeWaveformChannel;
-
-  const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevAdjustmentsRef = useRef<{ path: string; adjustments: Adjustments } | null>(null);
 
   const [viewportSize, setViewportSize] = useState<ImageDimensions>(() => {
@@ -356,13 +481,10 @@ function App() {
     };
   });
 
-  const baseRenderSizeRef = useRef<any>(null);
   const patchesSentToBackend = useRef<Set<string>>(new Set());
   const imageCacheRef = useRef(new ImageLRUCache(20));
   const isBackendReadyRef = useRef(true);
   const cachedEditStateRef = useRef<ImageCacheEntry | null>(null);
-  const inFlightCountRef = useRef(0);
-  const pendingApplyRef = useRef<{ adjustments: Adjustments; targetRes?: number } | null>(null);
 
   const [libraryViewMode, setLibraryViewMode] = useState<LibraryViewMode>(defaultLibraryViewMode);
   const [activeTreeSection, setActiveTreeSection] = useState<string | null>('current');
@@ -377,8 +499,6 @@ function App() {
   const { requestThumbnails, clearThumbnailQueue, markGenerated } = useThumbnails();
 
   const transformWrapperRef = useRef<any>(null);
-  const currentResRef = useRef<number>(1280);
-  const currentOriginalResRef = useRef<number>(0);
   const isInitialMount = useRef(true);
   const currentFolderPathRef = useRef<string | null>(currentFolderPath);
   const preloadedDataRef = useRef<{
@@ -387,8 +507,6 @@ function App() {
     rootPath?: string;
     currentPath?: string;
   }>({});
-  const previewJobIdRef = useRef<number>(0);
-  const latestRenderedJobIdRef = useRef<number>(0);
   const isAndroid = osPlatform === 'android';
   const isPortraitViewport = viewportSize.width > 0 && viewportSize.height > viewportSize.width;
   const isCompactPortrait =
@@ -553,24 +671,6 @@ function App() {
     }
   }, [activeRightPanel, activeMaskContainerId, activeAiPatchContainerId, setEditor]);
 
-  const geometricAdjustmentsKey = useMemo(() => {
-    if (!adjustments) return '';
-    const { crop, rotation, flipHorizontal, flipVertical, orientationSteps } = adjustments;
-    return JSON.stringify({ crop, rotation, flipHorizontal, flipVertical, orientationSteps });
-  }, [
-    adjustments?.crop,
-    adjustments?.rotation,
-    adjustments?.flipHorizontal,
-    adjustments?.flipVertical,
-    adjustments?.orientationSteps,
-  ]);
-
-  const visualAdjustmentsKey = useMemo(() => {
-    if (!adjustments) return '';
-    const { rating: _rating, sectionVisibility: _sectionVisibility, ...visualAdjustments } = adjustments;
-    return JSON.stringify(visualAdjustments);
-  }, [adjustments]);
-
   useEffect(() => {
     if (currentFolderPath) {
       refreshImageList();
@@ -589,726 +689,6 @@ function App() {
     };
   }, [setEditor]);
 
-  useEffect(() => {
-    const activeSubMask =
-      adjustments?.masks?.flatMap((m: any) => m.subMasks).find((sm: any) => sm.id === activeMaskId) ||
-      adjustments?.aiPatches?.flatMap((p: any) => p.subMasks).find((sm: any) => sm.id === activeAiSubMaskId);
-
-    if (activeSubMask?.type === 'ai-subject' && selectedImage?.path) {
-      const transformAdjustments = {
-        transformDistortion: adjustments.transformDistortion,
-        transformVertical: adjustments.transformVertical,
-        transformHorizontal: adjustments.transformHorizontal,
-        transformRotate: adjustments.transformRotate,
-        transformAspect: adjustments.transformAspect,
-        transformScale: adjustments.transformScale,
-        transformXOffset: adjustments.transformXOffset,
-        transformYOffset: adjustments.transformYOffset,
-        lensDistortionAmount: adjustments.lensDistortionAmount,
-        lensVignetteAmount: adjustments.lensVignetteAmount,
-        lensTcaAmount: adjustments.lensTcaAmount,
-        lensDistortionParams: adjustments.lensDistortionParams,
-        lensMaker: adjustments.lensMaker,
-        lensModel: adjustments.lensModel,
-        lensDistortionEnabled: adjustments.lensDistortionEnabled,
-        lensTcaEnabled: adjustments.lensTcaEnabled,
-        lensVignetteEnabled: adjustments.lensVignetteEnabled,
-      };
-
-      invoke('precompute_ai_subject_mask', {
-        jsAdjustments: transformAdjustments,
-        path: selectedImage.path,
-      }).catch((err) => console.error('Failed to precompute AI subject mask:', err));
-    }
-  }, [activeMaskId, activeAiSubMaskId, selectedImage?.path]);
-
-  const updateSubMask = (subMaskId: string, updatedData: any) => {
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      masks: prev.masks.map((c: MaskContainer) => ({
-        ...c,
-        subMasks: c.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
-      })),
-      aiPatches: (prev.aiPatches || []).map((p: AiPatch) => ({
-        ...p,
-        subMasks: p.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
-      })),
-    }));
-  };
-
-  const handleGenerativeReplace = useCallback(
-    async (patchId: string, prompt: string, useFastInpaint: boolean) => {
-      if (!selectedImage?.path || isGeneratingAi) {
-        return;
-      }
-
-      const patch: AiPatch | undefined = adjustments.aiPatches.find((p: AiPatch) => p.id === patchId);
-      if (!patch) {
-        console.error('Could not find AI patch to generate for:', patchId);
-        return;
-      }
-
-      const patchDefinition = { ...patch, prompt };
-
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        aiPatches: prev.aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: true, prompt } : p)),
-      }));
-
-      setEditor({ isGeneratingAi: true });
-
-      try {
-        const newPatchDataJson: any = await invoke(Invokes.InvokeGenerativeReplaseWithMaskDef, {
-          currentAdjustments: adjustments,
-          patchDefinition: patchDefinition,
-          path: selectedImage.path,
-          useFastInpaint: useFastInpaint,
-        });
-
-        const newPatchData = JSON.parse(newPatchDataJson);
-        patchesSentToBackend.current.delete(patchId);
-        setAdjustments((prev: Adjustments) => ({
-          ...prev,
-          aiPatches: prev.aiPatches.map((p: AiPatch) =>
-            p.id === patchId
-              ? {
-                  ...p,
-                  patchData: newPatchData,
-                  isLoading: false,
-                  name: useFastInpaint ? 'Inpaint' : prompt && prompt.trim() ? prompt.trim() : p.name,
-                }
-              : p,
-          ),
-        }));
-        setEditor({ activeAiPatchContainerId: null, activeAiSubMaskId: null });
-      } catch (err) {
-        console.error('Generative replace failed:', err);
-        setError(`AI Replace Failed: ${err}`);
-        setAdjustments((prev: Adjustments) => ({
-          ...prev,
-          aiPatches: prev.aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: false } : p)),
-        }));
-      } finally {
-        setEditor({ isGeneratingAi: false });
-      }
-    },
-    [selectedImage?.path, isGeneratingAi, adjustments, setAdjustments, setEditor],
-  );
-
-  const handleQuickErase = useCallback(
-    async (subMaskId: string | null, startPoint: Coord, endPoint: Coord) => {
-      if (!selectedImage?.path || isGeneratingAi) {
-        return;
-      }
-
-      const patchId = adjustments.aiPatches.find((p: AiPatch) =>
-        p.subMasks.some((sm: SubMask) => sm.id === subMaskId),
-      )?.id;
-      if (!patchId) {
-        console.error('Could not find AI patch container for Quick Erase.');
-        return;
-      }
-
-      setEditor({ isGeneratingAi: true });
-      setAdjustments((prev: Partial<Adjustments>) => ({
-        ...prev,
-        aiPatches: prev.aiPatches?.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: true } : p)),
-      }));
-
-      try {
-        const transformAdjustments = {
-          transformDistortion: adjustments.transformDistortion,
-          transformVertical: adjustments.transformVertical,
-          transformHorizontal: adjustments.transformHorizontal,
-          transformRotate: adjustments.transformRotate,
-          transformAspect: adjustments.transformAspect,
-          transformScale: adjustments.transformScale,
-          transformXOffset: adjustments.transformXOffset,
-          transformYOffset: adjustments.transformYOffset,
-          lensDistortionAmount: adjustments.lensDistortionAmount,
-          lensVignetteAmount: adjustments.lensVignetteAmount,
-          lensTcaAmount: adjustments.lensTcaAmount,
-          lensDistortionParams: adjustments.lensDistortionParams,
-          lensMaker: adjustments.lensMaker,
-          lensModel: adjustments.lensModel,
-          lensDistortionEnabled: adjustments.lensDistortionEnabled,
-          lensTcaEnabled: adjustments.lensTcaEnabled,
-          lensVignetteEnabled: adjustments.lensVignetteEnabled,
-        };
-
-        const newMaskParams: any = await invoke(Invokes.GenerateAiSubjectMask, {
-          jsAdjustments: transformAdjustments,
-          endPoint: [endPoint.x, endPoint.y],
-          flipHorizontal: adjustments.flipHorizontal,
-          flipVertical: adjustments.flipVertical,
-          orientationSteps: adjustments.orientationSteps,
-          path: selectedImage.path,
-          rotation: adjustments.rotation,
-          startPoint: [startPoint.x, startPoint.y],
-        });
-
-        const subMaskToUpdate = adjustments.aiPatches
-          ?.find((p: AiPatch) => p.id === patchId)
-          ?.subMasks.find((sm: SubMask) => sm.id === subMaskId);
-        const finalSubMaskParams: any = { ...subMaskToUpdate?.parameters, ...newMaskParams };
-        const updatedAdjustmentsForBackend = {
-          ...adjustments,
-          aiPatches: adjustments.aiPatches.map((p: AiPatch) =>
-            p.id === patchId
-              ? {
-                  ...p,
-                  subMasks: p.subMasks.map((sm: SubMask) =>
-                    sm.id === subMaskId ? { ...sm, parameters: finalSubMaskParams } : sm,
-                  ),
-                }
-              : p,
-          ),
-        };
-
-        const patchDefinitionForBackend = updatedAdjustmentsForBackend.aiPatches.find((p: AiPatch) => p.id === patchId);
-        const newPatchDataJson: any = await invoke(Invokes.InvokeGenerativeReplaseWithMaskDef, {
-          currentAdjustments: updatedAdjustmentsForBackend,
-          patchDefinition: { ...patchDefinitionForBackend, prompt: '' },
-          path: selectedImage.path,
-          useFastInpaint: true,
-        });
-
-        const newPatchData = JSON.parse(newPatchDataJson);
-        if (!newPatchData?.color || !newPatchData?.mask) {
-          throw new Error('Inpainting failed to return a valid result.');
-        }
-        patchesSentToBackend.current.delete(patchId);
-
-        setAdjustments((prev: Partial<Adjustments>) => ({
-          ...prev,
-          aiPatches: prev.aiPatches?.map((p: AiPatch) =>
-            p.id === patchId
-              ? {
-                  ...p,
-                  patchData: newPatchData,
-                  isLoading: false,
-                  subMasks: p.subMasks.map((sm: SubMask) =>
-                    sm.id === subMaskId ? { ...sm, parameters: finalSubMaskParams } : sm,
-                  ),
-                }
-              : p,
-          ),
-        }));
-        setEditor({ activeAiPatchContainerId: null, activeAiSubMaskId: null });
-      } catch (err: any) {
-        console.error('Quick Erase failed:', err);
-        setError(`Quick Erase Failed: ${err.message || String(err)}`);
-        setAdjustments((prev: Partial<Adjustments>) => ({
-          ...prev,
-          aiPatches: prev.aiPatches?.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: false } : p)),
-        }));
-      } finally {
-        setEditor({ isGeneratingAi: false });
-      }
-    },
-    [selectedImage?.path, isGeneratingAi, adjustments, setAdjustments, setEditor],
-  );
-
-  const handleDeleteMaskContainer = useCallback(
-    (containerId: string) => {
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        masks: (prev.masks || []).filter((c) => c.id !== containerId),
-      }));
-      if (activeMaskContainerId === containerId) {
-        setEditor({ activeMaskContainerId: null, activeMaskId: null });
-      }
-    },
-    [setAdjustments, activeMaskContainerId, setEditor],
-  );
-
-  const handleDeleteAiPatch = useCallback(
-    (patchId: string) => {
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        aiPatches: (prev.aiPatches || []).filter((p) => p.id !== patchId),
-      }));
-      if (activeAiPatchContainerId === patchId) {
-        setEditor({ activeAiPatchContainerId: null, activeAiSubMaskId: null });
-      }
-    },
-    [setAdjustments, activeAiPatchContainerId, setEditor],
-  );
-
-  const handleToggleAiPatchVisibility = useCallback(
-    (patchId: string) => {
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        aiPatches: (prev.aiPatches || []).map((p: AiPatch) => (p.id === patchId ? { ...p, visible: !p.visible } : p)),
-      }));
-    },
-    [setAdjustments],
-  );
-
-  const handleGenerateAiMask = async (subMaskId: string, startPoint: Coord, endPoint: Coord) => {
-    if (!selectedImage?.path) {
-      console.error('Cannot generate AI mask: No image selected.');
-      return;
-    }
-    setEditor({ isGeneratingAiMask: true });
-    try {
-      const transformAdjustments = {
-        transformDistortion: adjustments.transformDistortion,
-        transformVertical: adjustments.transformVertical,
-        transformHorizontal: adjustments.transformHorizontal,
-        transformRotate: adjustments.transformRotate,
-        transformAspect: adjustments.transformAspect,
-        transformScale: adjustments.transformScale,
-        transformXOffset: adjustments.transformXOffset,
-        transformYOffset: adjustments.transformYOffset,
-        lensDistortionAmount: adjustments.lensDistortionAmount,
-        lensVignetteAmount: adjustments.lensVignetteAmount,
-        lensTcaAmount: adjustments.lensTcaAmount,
-        lensDistortionParams: adjustments.lensDistortionParams,
-        lensMaker: adjustments.lensMaker,
-        lensModel: adjustments.lensModel,
-        lensDistortionEnabled: adjustments.lensDistortionEnabled,
-        lensTcaEnabled: adjustments.lensTcaEnabled,
-        lensVignetteEnabled: adjustments.lensVignetteEnabled,
-      };
-      const newParameters = await invoke(Invokes.GenerateAiSubjectMask, {
-        jsAdjustments: transformAdjustments,
-        endPoint: [endPoint.x, endPoint.y],
-        flipHorizontal: adjustments.flipHorizontal,
-        flipVertical: adjustments.flipVertical,
-        orientationSteps: adjustments.orientationSteps,
-        path: selectedImage.path,
-        rotation: adjustments.rotation,
-        startPoint: [startPoint.x, startPoint.y],
-      });
-
-      const subMask = adjustments.aiPatches
-        ?.flatMap((p: AiPatch) => p.subMasks)
-        .find((sm: SubMask) => sm.id === subMaskId);
-
-      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
-      patchesSentToBackend.current.delete(subMaskId);
-      updateSubMask(subMaskId, { parameters: mergedParameters });
-    } catch (error) {
-      console.error('Failed to generate AI subject mask:', error);
-      setError(`AI Mask Failed: ${error}`);
-    } finally {
-      setEditor({ isGeneratingAiMask: false });
-    }
-  };
-
-  const handleGenerateAiDepthMask = async (subMaskId: string, parameters: any) => {
-    if (!selectedImage?.path) return;
-    console.log('trying to generate depth map');
-    setEditor({ isGeneratingAiMask: true });
-
-    try {
-      const transformAdjustments = {
-        transformDistortion: adjustments.transformDistortion,
-        transformVertical: adjustments.transformVertical,
-        transformHorizontal: adjustments.transformHorizontal,
-        transformRotate: adjustments.transformRotate,
-        transformAspect: adjustments.transformAspect,
-        transformScale: adjustments.transformScale,
-        transformXOffset: adjustments.transformXOffset,
-        transformYOffset: adjustments.transformYOffset,
-        lensDistortionAmount: adjustments.lensDistortionAmount,
-        lensVignetteAmount: adjustments.lensVignetteAmount,
-        lensTcaAmount: adjustments.lensTcaAmount,
-        lensDistortionParams: adjustments.lensDistortionParams,
-        lensMaker: adjustments.lensMaker,
-        lensModel: adjustments.lensModel,
-        lensDistortionEnabled: adjustments.lensDistortionEnabled,
-        lensTcaEnabled: adjustments.lensTcaEnabled,
-        lensVignetteEnabled: adjustments.lensVignetteEnabled,
-      };
-
-      const newParameters = await invoke('generate_ai_depth_mask', {
-        jsAdjustments: transformAdjustments,
-        path: selectedImage.path,
-        minDepth: parameters.minDepth ?? 20,
-        maxDepth: parameters.maxDepth ?? 100,
-        minFade: parameters.minFade ?? 15,
-        maxFade: parameters.maxFade ?? 15,
-        feather: parameters.feather ?? 10,
-        flipHorizontal: adjustments.flipHorizontal,
-        flipVertical: adjustments.flipVertical,
-        orientationSteps: adjustments.orientationSteps,
-        rotation: adjustments.rotation,
-      });
-
-      const subMask = adjustments.aiPatches
-        ?.flatMap((p: AiPatch) => p.subMasks)
-        .find((sm: SubMask) => sm.id === subMaskId);
-
-      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
-      patchesSentToBackend.current.delete(subMaskId);
-      updateSubMask(subMaskId, { parameters: mergedParameters });
-    } catch (error) {
-      console.error('Failed to generate AI depth mask:', error);
-      setError(`AI Depth Mask Failed: ${error}`);
-    } finally {
-      setEditor({ isGeneratingAiMask: false });
-    }
-  };
-
-  const handleGenerateAiForegroundMask = async (subMaskId: string) => {
-    if (!selectedImage?.path) {
-      console.error('Cannot generate AI mask: No image selected.');
-      return;
-    }
-    setEditor({ isGeneratingAiMask: true });
-    try {
-      const transformAdjustments = {
-        transformDistortion: adjustments.transformDistortion,
-        transformVertical: adjustments.transformVertical,
-        transformHorizontal: adjustments.transformHorizontal,
-        transformRotate: adjustments.transformRotate,
-        transformAspect: adjustments.transformAspect,
-        transformScale: adjustments.transformScale,
-        transformXOffset: adjustments.transformXOffset,
-        transformYOffset: adjustments.transformYOffset,
-        lensDistortionAmount: adjustments.lensDistortionAmount,
-        lensVignetteAmount: adjustments.lensVignetteAmount,
-        lensTcaAmount: adjustments.lensTcaAmount,
-        lensDistortionParams: adjustments.lensDistortionParams,
-        lensMaker: adjustments.lensMaker,
-        lensModel: adjustments.lensModel,
-        lensDistortionEnabled: adjustments.lensDistortionEnabled,
-        lensTcaEnabled: adjustments.lensTcaEnabled,
-        lensVignetteEnabled: adjustments.lensVignetteEnabled,
-      };
-      const newParameters = await invoke(Invokes.GenerateAiForegroundMask, {
-        jsAdjustments: transformAdjustments,
-        flipHorizontal: adjustments.flipHorizontal,
-        flipVertical: adjustments.flipVertical,
-        orientationSteps: adjustments.orientationSteps,
-        rotation: adjustments.rotation,
-      });
-
-      const subMask = adjustments.aiPatches
-        ?.flatMap((p: AiPatch) => p.subMasks)
-        .find((sm: SubMask) => sm.id === subMaskId);
-
-      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
-      patchesSentToBackend.current.delete(subMaskId);
-      updateSubMask(subMaskId, { parameters: mergedParameters });
-    } catch (error) {
-      console.error('Failed to generate AI foreground mask:', error);
-      setError(`AI Mask Failed: ${error}`);
-    } finally {
-      setEditor({ isGeneratingAiMask: false });
-    }
-  };
-
-  const handleGenerateAiSkyMask = async (subMaskId: string) => {
-    if (!selectedImage?.path) {
-      console.error('Cannot generate AI mask: No image selected.');
-      return;
-    }
-    setEditor({ isGeneratingAiMask: true });
-    try {
-      const transformAdjustments = {
-        transformDistortion: adjustments.transformDistortion,
-        transformVertical: adjustments.transformVertical,
-        transformHorizontal: adjustments.transformHorizontal,
-        transformRotate: adjustments.transformRotate,
-        transformAspect: adjustments.transformAspect,
-        transformScale: adjustments.transformScale,
-        transformXOffset: adjustments.transformXOffset,
-        transformYOffset: adjustments.transformYOffset,
-        lensDistortionAmount: adjustments.lensDistortionAmount,
-        lensVignetteAmount: adjustments.lensVignetteAmount,
-        lensTcaAmount: adjustments.lensTcaAmount,
-        lensDistortionParams: adjustments.lensDistortionParams,
-        lensMaker: adjustments.lensMaker,
-        lensModel: adjustments.lensModel,
-        lensDistortionEnabled: adjustments.lensDistortionEnabled,
-        lensTcaEnabled: adjustments.lensTcaEnabled,
-        lensVignetteEnabled: adjustments.lensVignetteEnabled,
-      };
-      const newParameters = await invoke(Invokes.GenerateAiSkyMask, {
-        jsAdjustments: transformAdjustments,
-        flipHorizontal: adjustments.flipHorizontal,
-        flipVertical: adjustments.flipVertical,
-        orientationSteps: adjustments.orientationSteps,
-        rotation: adjustments.rotation,
-      });
-
-      const subMask = adjustments.aiPatches
-        ?.flatMap((p: AiPatch) => p.subMasks)
-        .find((sm: SubMask) => sm.id === subMaskId);
-
-      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
-      patchesSentToBackend.current.delete(subMaskId);
-      updateSubMask(subMaskId, { parameters: mergedParameters });
-    } catch (error) {
-      console.error('Failed to generate AI sky mask:', error);
-      setError(`AI Mask Failed: ${error}`);
-    } finally {
-      setEditor({ isGeneratingAiMask: false });
-    }
-  };
-
-  const calculateROI = useCallback(() => {
-    if (!transformWrapperRef.current) return null;
-    const state = transformWrapperRef.current.instance.transformState;
-    if (!state) return null;
-
-    const currentBaseSize = baseRenderSizeRef.current;
-    if (!currentBaseSize) return null;
-
-    const { scale, positionX, positionY } = state;
-    const { width: baseW, height: baseH, offsetX, offsetY, containerWidth, containerHeight } = currentBaseSize;
-
-    if (!baseW || !baseH || !containerWidth || !containerHeight) return null;
-
-    if (scale <= 1.01) return null;
-
-    const paddingPixels = 2.0;
-    const paddingX = paddingPixels / baseW;
-    const paddingY = paddingPixels / baseH;
-
-    const visibleLeft = -positionX / scale;
-    const visibleTop = -positionY / scale;
-    const visibleRight = visibleLeft + containerWidth / scale;
-    const visibleBottom = visibleTop + containerHeight / scale;
-
-    const imgLeft = offsetX;
-    const imgTop = offsetY;
-    const imgRight = offsetX + baseW;
-    const imgBottom = offsetY + baseH;
-
-    const intersectLeft = Math.max(visibleLeft, imgLeft);
-    const intersectTop = Math.max(visibleTop, imgTop);
-    const intersectRight = Math.min(visibleRight, imgRight);
-    const intersectBottom = Math.min(visibleBottom, imgBottom);
-
-    if (intersectLeft >= intersectRight || intersectTop >= intersectBottom) {
-      return null;
-    }
-
-    let roiX = (intersectLeft - imgLeft) / baseW;
-    let roiY = (intersectTop - imgTop) / baseH;
-    let roiW = (intersectRight - intersectLeft) / baseW;
-    let roiH = (intersectBottom - intersectTop) / baseH;
-
-    const newRoiX = roiX - paddingX;
-    const newRoiY = roiY - paddingY;
-    const newRoiW = roiW + paddingX * 2;
-    const newRoiH = roiH + paddingY * 2;
-
-    const clampedX = Math.max(0, newRoiX);
-    const clampedY = Math.max(0, newRoiY);
-    const clampedW = Math.min(1 - clampedX, newRoiW);
-    const clampedH = Math.min(1 - clampedY, newRoiH);
-
-    if (clampedW > 0.999 && clampedH > 0.999) return null;
-
-    return [clampedX, clampedY, clampedW, clampedH] as [number, number, number, number];
-  }, []);
-
-  const executeApplyAdjustments = useCallback(
-    async (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
-      const currentPath = selectedImage?.path;
-      if (!currentPath) return;
-
-      const payload = JSON.parse(JSON.stringify(currentAdjustments));
-
-      const processSubMasks = (subMasks: any[]) => {
-        if (!Array.isArray(subMasks)) return;
-        subMasks.forEach((sm: any) => {
-          if (sm.id && sm.parameters) {
-            const keys = ['mask_data_base64', 'maskDataBase64'];
-            let foundMaskData = false;
-
-            for (const key of keys) {
-              if (sm.parameters[key] !== undefined && sm.parameters[key] !== null) {
-                foundMaskData = true;
-                if (patchesSentToBackend.current.has(sm.id)) {
-                  sm.parameters[key] = null;
-                }
-              }
-            }
-            if (foundMaskData && !patchesSentToBackend.current.has(sm.id)) {
-              patchesSentToBackend.current.add(sm.id);
-            }
-          }
-        });
-      };
-
-      if (payload.aiPatches && Array.isArray(payload.aiPatches)) {
-        payload.aiPatches.forEach((p: any) => {
-          if (p.id && p.patchData && !p.isLoading) {
-            if (patchesSentToBackend.current.has(p.id)) {
-              p.patchData = null;
-            } else {
-              patchesSentToBackend.current.add(p.id);
-            }
-          }
-          if (p.subMasks) {
-            processSubMasks(p.subMasks);
-          }
-        });
-      }
-
-      if (payload.masks && Array.isArray(payload.masks)) {
-        payload.masks.forEach((container: any) => {
-          if (container.subMasks) {
-            processSubMasks(container.subMasks);
-          }
-        });
-      }
-
-      const jobId = ++previewJobIdRef.current;
-      const roi = calculateROI();
-
-      try {
-        const buffer: ArrayBuffer = await invoke(Invokes.ApplyAdjustments, {
-          jsAdjustments: payload,
-          isInteractive: dragging,
-          targetResolution: targetRes || null,
-          roi: roi || null,
-          computeWaveform: !!isWaveformVisible,
-          activeWaveformChannel: activeWaveformChannelRef.current || null,
-        });
-
-        if (currentPath !== selectedImagePathRef.current) return;
-
-        if (buffer && buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
-          latestRenderedJobIdRef.current = jobId;
-
-          const textDecoder = new TextDecoder();
-          const prefix = textDecoder.decode(buffer.slice(0, 11));
-          if (prefix === 'WGPU_RENDER') {
-            setEditor((state) => {
-              if (state.interactivePatch && state.interactivePatch.url) URL.revokeObjectURL(state.interactivePatch.url);
-              return { interactivePatch: null };
-            });
-            return;
-          }
-
-          if (dragging) {
-            const view = new DataView(buffer);
-            const patchX = view.getUint32(0, true);
-            const patchY = view.getUint32(4, true);
-            const patchW = view.getUint32(8, true);
-            const patchH = view.getUint32(12, true);
-            const fullW = view.getUint32(16, true);
-            const fullH = view.getUint32(20, true);
-
-            const imageBuffer = buffer.slice(24);
-            const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
-            const url = URL.createObjectURL(blob);
-
-            setEditor((state) => {
-              if (state.interactivePatch && state.interactivePatch.url)
-                setTimeout(() => URL.revokeObjectURL(state.interactivePatch.url), 100);
-              return {
-                interactivePatch: {
-                  url,
-                  normX: patchX / fullW,
-                  normY: patchY / fullH,
-                  normW: patchW / fullW,
-                  normH: patchH / fullH,
-                },
-              };
-            });
-          } else {
-            const blob = new Blob([buffer], { type: 'image/jpeg' });
-            const url = URL.createObjectURL(blob);
-
-            if (currentPath !== selectedImagePathRef.current || jobId < latestRenderedJobIdRef.current) {
-              URL.revokeObjectURL(url);
-              return;
-            }
-
-            setEditor((state) => {
-              const prevUrl = state.finalPreviewUrl;
-              if (prevUrl && prevUrl.startsWith('blob:') && !imageCacheRef.current.isProtected(prevUrl)) {
-                setTimeout(() => {
-                  if (!imageCacheRef.current.isProtected(prevUrl)) {
-                    URL.revokeObjectURL(prevUrl);
-                  }
-                }, 250);
-              }
-              return { finalPreviewUrl: url };
-            });
-
-            setEditor((state) => {
-              if (state.interactivePatch && state.interactivePatch.url) {
-                setTimeout(() => URL.revokeObjectURL(state.interactivePatch.url), 500);
-              }
-              return { interactivePatch: null };
-            });
-          }
-        }
-      } catch (err) {
-        if (err !== 'Superseded or worker failed') {
-          console.error('Failed to apply adjustments:', err);
-        }
-
-        if (!dragging) {
-          setEditor((state) => {
-            if (state.interactivePatch && state.interactivePatch.url) URL.revokeObjectURL(state.interactivePatch.url);
-            return { interactivePatch: null };
-          });
-        }
-      }
-    },
-    [selectedImage?.path, calculateROI, isWaveformVisible, setEditor],
-  );
-
-  const flushPipeline = useCallback(() => {
-    if (inFlightCountRef.current >= 3) return;
-    if (!pendingApplyRef.current) return;
-
-    const { adjustments, targetRes } = pendingApplyRef.current;
-    pendingApplyRef.current = null;
-
-    inFlightCountRef.current += 1;
-
-    executeApplyAdjustments(adjustments, true, targetRes).finally(() => {
-      inFlightCountRef.current -= 1;
-      if (pendingApplyRef.current) {
-        requestAnimationFrame(() => flushPipeline());
-      }
-    });
-  }, [executeApplyAdjustments]);
-
-  const applyAdjustments = useCallback(
-    (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
-      if (!selectedImage?.isReady || !isBackendReadyRef.current) return;
-
-      if (dragging) {
-        pendingApplyRef.current = { adjustments: currentAdjustments, targetRes };
-        flushPipeline();
-      } else {
-        pendingApplyRef.current = null;
-        executeApplyAdjustments(currentAdjustments, false, targetRes);
-      }
-    },
-    [selectedImage?.isReady, flushPipeline, executeApplyAdjustments],
-  );
-
-  const generateUncroppedPreview = useCallback(
-    (currentAdjustments: Adjustments) => {
-      if (!selectedImage?.isReady) {
-        return;
-      }
-      invoke(Invokes.GenerateUncroppedPreview, { jsAdjustments: currentAdjustments }).catch((err) =>
-        console.error('Failed to generate uncropped preview:', err),
-      );
-    },
-    [selectedImage?.isReady],
-  );
-
-  useEffect(() => {
-    if (activeRightPanel === Panel.Crop && selectedImage?.isReady && isBackendReadyRef.current) {
-      generateUncroppedPreview(adjustments);
-    }
-  }, [adjustments, activeRightPanel, selectedImage?.isReady, generateUncroppedPreview]);
-
   const debouncedSave = useCallback(
     debounce((path, adjustmentsToSave) => {
       invoke(Invokes.SaveMetadataAndUpdateThumbnail, { path, adjustments: adjustmentsToSave }).catch((err) => {
@@ -1317,6 +697,26 @@ function App() {
       });
     }, 300),
     [],
+  );
+
+  const {
+    handleGenerativeReplace,
+    handleQuickErase,
+    handleDeleteMaskContainer,
+    handleDeleteAiPatch,
+    handleToggleAiPatchVisibility,
+    handleGenerateAiMask,
+    handleGenerateAiDepthMask,
+    handleGenerateAiForegroundMask,
+    handleGenerateAiSkyMask,
+  } = useAiMasking(setError, setAdjustments, patchesSentToBackend);
+
+  const { applyAdjustments, currentResRef } = useImageProcessing(
+    transformWrapperRef,
+    imageCacheRef,
+    patchesSentToBackend,
+    debouncedSave,
+    prevAdjustmentsRef,
   );
 
   const createResizeHandler = (stateKey: string, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -3015,147 +2415,6 @@ function App() {
     [copiedFilePaths, currentFolderPath, refreshImageList, setProcess],
   );
 
-  const calculateTargetRes = useCallback(() => {
-    const baseTargetRes = appSettings?.editorPreviewResolution || 1920;
-    if (!(appSettings?.enableZoomHifi ?? true) || displaySize.width === 0) {
-      return baseTargetRes;
-    }
-
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    const sharpnessFactor = 1.25;
-    const zoomMultiplier = appSettings?.highResZoomMultiplier || 1.0;
-
-    const effectiveDpr = appSettings?.useFullDpiRendering ? dpr : 1;
-
-    let targetRes = Math.max(displaySize.width, displaySize.height) * effectiveDpr * sharpnessFactor * zoomMultiplier;
-    targetRes = Math.max(targetRes, 512);
-
-    if (originalSize && originalSize.width > 0 && originalSize.height > 0) {
-      const origMax = Math.max(originalSize.width, originalSize.height);
-      targetRes = Math.min(targetRes, origMax);
-      if (targetRes >= origMax * 0.8) {
-        targetRes = origMax;
-      }
-    }
-
-    if (originalSize && targetRes !== Math.max(originalSize.width, originalSize.height)) {
-      targetRes = Math.ceil(targetRes / 256) * 256;
-    }
-
-    return Math.round(targetRes);
-  }, [
-    appSettings?.enableZoomHifi,
-    appSettings?.editorPreviewResolution,
-    appSettings?.highResZoomMultiplier,
-    appSettings?.useFullDpiRendering,
-    displaySize.width,
-    displaySize.height,
-    originalSize,
-  ]);
-
-  const requestHiFiZoom = useCallback(
-    debounce((currentAdjustments: Adjustments, targetRes: number) => {
-      if (targetRes > currentResRef.current) {
-        currentResRef.current = targetRes;
-        applyAdjustments(currentAdjustments, false, targetRes);
-      }
-    }, 50),
-    [applyAdjustments],
-  );
-
-  useEffect(() => {
-    if (selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
-      let baseRes = calculateTargetRes();
-
-      if (originalSize.width > 0 && originalSize.height > 0) {
-        const maxRes = Math.max(originalSize.width, originalSize.height);
-        if (baseRes > maxRes) {
-          baseRes = maxRes;
-        }
-      }
-      const finalRes = Math.round(baseRes);
-
-      if (finalRes > currentResRef.current) {
-        requestHiFiZoom(adjustments, finalRes);
-      }
-    }
-
-    return () => {
-      requestHiFiZoom.cancel();
-    };
-  }, [
-    displaySize.width,
-    displaySize.height,
-    calculateTargetRes,
-    selectedImage?.isReady,
-    isSliderDragging,
-    adjustments,
-    requestHiFiZoom,
-    isFullScreen,
-    originalSize,
-    applyAdjustments,
-  ]);
-
-  useEffect(() => {
-    if (!selectedImage?.isReady) return;
-
-    if (dragIdleTimer.current) {
-      clearTimeout(dragIdleTimer.current);
-    }
-
-    const targetRes = calculateTargetRes();
-
-    if (isSliderDragging) {
-      if (appSettings?.enableLivePreviews !== false) {
-        applyAdjustments(adjustments, true, targetRes);
-      }
-    } else {
-      dragIdleTimer.current = setTimeout(() => {
-        currentResRef.current = targetRes;
-        applyAdjustments(adjustments, false, targetRes);
-        debouncedSave(selectedImage.path, adjustments);
-
-        const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
-        if (otherPaths.length > 0) {
-          const prev = prevAdjustmentsRef.current;
-          if (prev && prev.path === selectedImage.path) {
-            const delta: Partial<Adjustments> = {};
-            const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
-            for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
-              if (includedKeys.includes(key as string)) {
-                if (JSON.stringify(adjustments[key]) !== JSON.stringify(prev.adjustments[key])) {
-                  (delta as any)[key] = adjustments[key];
-                }
-              }
-            }
-            if (Object.keys(delta).length > 0) {
-              otherPaths.forEach((p) => imageCacheRef.current.delete(p));
-              invoke(Invokes.ApplyAdjustmentsToPaths, { paths: otherPaths, adjustments: delta }).catch((err) => {
-                console.error('Failed to apply adjustments to multi-selection:', err);
-              });
-            }
-          }
-        }
-        prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
-      }, 50);
-    }
-
-    return () => {
-      if (dragIdleTimer.current) clearTimeout(dragIdleTimer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    adjustments,
-    selectedImage?.path,
-    selectedImage?.isReady,
-    isSliderDragging,
-    multiSelectedPaths,
-    applyAdjustments,
-    debouncedSave,
-    appSettings?.enableLivePreviews,
-    appSettings?.copyPasteSettings?.includedAdjustments,
-  ]);
-
   const handleZoomChange = useCallback(
     (zoomValue: number, fitToWindow: boolean = false) => {
       const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
@@ -3208,86 +2467,6 @@ function App() {
     },
     [originalSize, baseRenderSize, adjustments.orientationSteps, setEditor],
   );
-
-  useEffect(() => {
-    setEditor({ transformedOriginalUrl: null });
-    currentOriginalResRef.current = 0;
-  }, [geometricAdjustmentsKey, selectedImage?.path, setEditor]);
-
-  const requestHiFiOriginalZoom = useCallback(
-    debounce(async (currentAdjustments: Adjustments, targetRes: number) => {
-      if (targetRes > currentOriginalResRef.current) {
-        try {
-          const base64Data: string = await invoke('generate_original_transformed_preview', {
-            jsAdjustments: currentAdjustments,
-            targetResolution: targetRes,
-          });
-          currentOriginalResRef.current = targetRes;
-          setEditor({ transformedOriginalUrl: base64Data });
-        } catch (e) {
-          console.error('Failed to generate hi-fi original preview:', e);
-        }
-      }
-    }, 200),
-    [setEditor],
-  );
-
-  useEffect(() => {
-    if (showOriginal && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
-      let targetRes = calculateTargetRes();
-
-      if (targetRes > currentOriginalResRef.current) {
-        requestHiFiOriginalZoom(adjustments, targetRes);
-      }
-    }
-    return () => {
-      requestHiFiOriginalZoom.cancel();
-    };
-  }, [
-    showOriginal,
-    displaySize.width,
-    displaySize.height,
-    calculateTargetRes,
-    selectedImage?.isReady,
-    isSliderDragging,
-    adjustments,
-    requestHiFiOriginalZoom,
-    isFullScreen,
-    originalSize,
-  ]);
-
-  useEffect(() => {
-    let isEffectActive = true;
-
-    const generate = async () => {
-      if (showOriginal && selectedImage?.path && !transformedOriginalUrl) {
-        try {
-          const targetRes = calculateTargetRes();
-
-          const base64Data: string = await invoke('generate_original_transformed_preview', {
-            jsAdjustments: adjustments,
-            targetResolution: targetRes,
-          });
-          if (isEffectActive) {
-            currentOriginalResRef.current = targetRes;
-            setEditor({ transformedOriginalUrl: base64Data });
-          }
-        } catch (e) {
-          if (isEffectActive) {
-            console.error('Failed to generate original preview:', e);
-            setError('Failed to show original image.');
-            setEditor({ showOriginal: false });
-          }
-        }
-      }
-    };
-
-    generate();
-
-    return () => {
-      isEffectActive = false;
-    };
-  }, [showOriginal, selectedImage?.path, adjustments, transformedOriginalUrl, calculateTargetRes, setEditor]);
 
   const isAnyModalOpen =
     isCreateFolderModalOpen ||

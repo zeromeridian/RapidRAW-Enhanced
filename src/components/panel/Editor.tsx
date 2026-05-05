@@ -16,6 +16,7 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { useShallow } from 'zustand/react/shallow';
 
 const parseRgb = (rgbStr: string): [number, number, number, number] => {
   const match = rgbStr.match(/[\d.]+/g);
@@ -82,11 +83,28 @@ export default function Editor({
   setAdjustments,
   transformWrapperRef,
 }: EditorProps) {
-  const { appSettings, osPlatform } = useSettingsStore();
+  const { appSettings, osPlatform } = useSettingsStore(
+    useShallow((state) => ({
+      appSettings: state.appSettings,
+      osPlatform: state.osPlatform,
+    })),
+  );
   const isAndroid = osPlatform === 'android';
 
-  const { isFullScreen, activeRightPanel, isInstantTransition, setUI } = useUIStore();
-  const { isViewLoading: isLoading } = useLibraryStore();
+  const { isFullScreen, activeRightPanel, isInstantTransition, setUI } = useUIStore(
+    useShallow((state) => ({
+      isFullScreen: state.isFullScreen,
+      activeRightPanel: state.activeRightPanel,
+      isInstantTransition: state.isInstantTransition,
+      setUI: state.setUI,
+    })),
+  );
+
+  const { isViewLoading: isLoading } = useLibraryStore(
+    useShallow((state) => ({
+      isViewLoading: state.isViewLoading,
+    })),
+  );
 
   const {
     selectedImage,
@@ -118,7 +136,39 @@ export default function Editor({
     undo,
     redo,
     goToHistoryIndex,
-  } = useEditorStore();
+  } = useEditorStore(
+    useShallow((state) => ({
+      selectedImage: state.selectedImage,
+      adjustments: state.adjustments,
+      history: state.history,
+      historyIndex: state.historyIndex,
+      finalPreviewUrl: state.finalPreviewUrl,
+      uncroppedAdjustedPreviewUrl: state.uncroppedAdjustedPreviewUrl,
+      transformedOriginalUrl: state.transformedOriginalUrl,
+      interactivePatch: state.interactivePatch,
+      showOriginal: state.showOriginal,
+      isSliderDragging: state.isSliderDragging,
+      zoom: state.zoom,
+      originalSize: state.originalSize,
+      isRotationActive: state.isRotationActive,
+      overlayMode: state.overlayMode,
+      overlayRotation: state.overlayRotation,
+      isStraightenActive: state.isStraightenActive,
+      isWbPickerActive: state.isWbPickerActive,
+      liveRotation: state.liveRotation,
+      brushSettings: state.brushSettings,
+      activeMaskContainerId: state.activeMaskContainerId,
+      activeMaskId: state.activeMaskId,
+      activeAiPatchContainerId: state.activeAiPatchContainerId,
+      activeAiSubMaskId: state.activeAiSubMaskId,
+      isMaskControlHovered: state.isMaskControlHovered,
+      hasRenderedFirstFrame: state.hasRenderedFirstFrame,
+      setEditor: state.setEditor,
+      undo: state.undo,
+      redo: state.redo,
+      goToHistoryIndex: state.goToHistoryIndex,
+    })),
+  );
 
   const canUndo = adjustmentsHistoryIndex > 0;
   const canRedo = adjustmentsHistoryIndex < adjustmentsHistory.length - 1;
