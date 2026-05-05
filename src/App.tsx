@@ -4,7 +4,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { onBackButtonPress } from '@tauri-apps/api/app';
 import { open } from '@tauri-apps/plugin-dialog';
-import { platform } from '@tauri-apps/plugin-os';
 import { exit } from '@tauri-apps/plugin-process';
 import { homeDir } from '@tauri-apps/api/path';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -46,7 +45,7 @@ import {
 } from 'lucide-react';
 import TitleBar from './window/TitleBar';
 import CommunityPage from './components/panel/CommunityPage';
-import MainLibrary, { ColumnWidths } from './components/panel/MainLibrary';
+import MainLibrary from './components/panel/MainLibrary';
 import FolderTree from './components/panel/FolderTree';
 import Editor from './components/panel/Editor';
 import Controls from './components/panel/right/ControlsPanel';
@@ -54,7 +53,7 @@ import { useThumbnails } from './hooks/useThumbnails';
 import { ImageDimensions } from './hooks/useImageRenderSize';
 import RightPanelSwitcher from './components/panel/right/RightPanelSwitcher';
 import MetadataPanel from './components/panel/right/MetadataPanel';
-import CropPanel, { type OverlayMode } from './components/panel/right/CropPanel';
+import CropPanel from './components/panel/right/CropPanel';
 import PresetsPanel from './components/panel/right/PresetsPanel';
 import AIPanel from './components/panel/right/AIPanel';
 import ExportPanel from './components/panel/right/ExportPanel';
@@ -74,7 +73,6 @@ import DenoiseModal from './components/modals/DenoiseModal';
 import CollageModal from './components/modals/CollageModal';
 import CopyPasteSettingsModal from './components/modals/CopyPasteSettingsModal';
 import CullingModal from './components/modals/CullingModal';
-import { useHistoryState } from './hooks/useHistoryState';
 import Resizer from './components/ui/Resizer';
 import {
   Adjustments,
@@ -93,11 +91,10 @@ import { calculateCenteredCrop } from './utils/cropUtils';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import GlobalTooltip from './components/ui/GlobalTooltip';
 import { THEMES, DEFAULT_THEME_ID, ThemeProps } from './utils/themes';
-import { SubMask, ToolType } from './components/panel/right/Masks';
-import { ExportState, IMPORT_TIMEOUT, ImportState, Status } from './components/ui/ExportImportProperties';
+import { SubMask } from './components/panel/right/Masks';
+import { IMPORT_TIMEOUT, Status } from './components/ui/ExportImportProperties';
 import {
   AppSettings,
-  BrushSettings,
   FilterCriteria,
   Invokes,
   ImageFile,
@@ -105,42 +102,22 @@ import {
   OPTION_SEPARATOR,
   LibraryViewMode,
   Panel,
-  Progress,
   RawStatus,
-  SelectedImage,
-  SortCriteria,
   SortDirection,
-  SupportedTypes,
   Theme,
-  TransformState,
-  UiVisibility,
-  WaveformData,
   Orientation,
   ThumbnailSize,
   ThumbnailAspectRatio,
-  CullingSuggestions,
 } from './components/ui/AppProperties';
-import { ChannelConfig } from './components/adjustments/Curves';
 import HdrModal from './components/modals/HdrModal';
+import { useSettingsStore } from './store/useSettingsStore';
+import { useUIStore } from './store/useUIStore';
+import { useLibraryStore } from './store/useLibraryStore';
+import { useEditorStore } from './store/useEditorStore';
+import { useProcessStore } from './store/useProcessStore';
+import { useTauriListeners } from './hooks/useTauriListeners';
 
 const CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA'; // local dev key
-
-interface CollapsibleSectionsState {
-  basic: boolean;
-  color: boolean;
-  curves: boolean;
-  details: boolean;
-  effects: boolean;
-}
-
-interface ConfirmModalState {
-  confirmText?: string;
-  confirmVariant?: string;
-  isOpen: boolean;
-  message?: string;
-  onConfirm?(): void;
-  title?: string;
-}
 
 interface Metadata {
   adjustments: Adjustments;
@@ -155,61 +132,8 @@ interface MultiSelectOptions {
   shiftAnchor: string | null;
 }
 
-interface CollageModalState {
-  isOpen: boolean;
-  sourceImages: ImageFile[];
-}
-
-interface PanoramaModalState {
-  error: string | null;
-  finalImageBase64: string | null;
-  isOpen: boolean;
-  isProcessing: boolean;
-  progressMessage: string | null;
-  stitchingSourcePaths: Array<string>;
-}
-
-interface HdrModalState {
-  error: string | null;
-  finalImageBase64: string | null;
-  isOpen: boolean;
-  isProcessing: boolean;
-  progressMessage: string | null;
-  stitchingSourcePaths: Array<string>;
-}
-
-interface DenoiseModalState {
-  isOpen: boolean;
-  isProcessing: boolean;
-  previewBase64: string | null;
-  originalBase64?: string | null;
-  error: string | null;
-  targetPaths: string[];
-  progressMessage: string | null;
-  isRaw: boolean;
-}
-
-interface NegativeConversionModalState {
-  isOpen: boolean;
-  targetPaths: Array<string>;
-}
-
-interface CullingModalState {
-  isOpen: boolean;
-  suggestions: CullingSuggestions | null;
-  progress: { current: number; total: number; stage: string } | null;
-  error: string | null;
-  pathsToCull: Array<string>;
-}
-
 interface LutData {
   size: number;
-}
-
-interface SearchCriteria {
-  tags: string[];
-  text: string;
-  mode: 'AND' | 'OR';
 }
 
 interface ImportSettings {
@@ -217,14 +141,6 @@ interface ImportSettings {
   organizeByDate: boolean;
   dateFolderFormat: string;
   deleteAfterImport: boolean;
-}
-
-export interface InteractivePatch {
-  url: string;
-  normX: number;
-  normY: number;
-  normW: number;
-  normH: number;
 }
 
 const RIGHT_PANEL_ORDER = [
@@ -282,88 +198,153 @@ function App() {
     deleteAfterImport: false,
   };
 
-  const [rootPath, setRootPath] = useState<string | null>(null);
-  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
-  const [osPlatform, setOsPlatform] = useState(() => {
-    try {
-      return platform();
-    } catch (_err) {
-      return '';
-    }
-  });
+  const {
+    appSettings,
+    theme,
+    supportedTypes,
+    osPlatform,
+    setAppSettings,
+    setTheme,
+    setSupportedTypes,
+    initPlatform,
+    handleSettingsChange,
+  } = useSettingsStore();
+
+  const {
+    activeView,
+    isFullScreen,
+    isWindowFullScreen,
+    isInstantTransition,
+    isLayoutReady,
+    uiVisibility,
+    isLibraryExportPanelVisible,
+    leftPanelWidth,
+    rightPanelWidth,
+    bottomPanelHeight,
+    compactEditorPanelHeightOverride,
+    activeRightPanel,
+    renderedRightPanel,
+    slideDirection,
+    isCreateFolderModalOpen,
+    isRenameFolderModalOpen,
+    isRenameFileModalOpen,
+    renameTargetPaths,
+    isImportModalOpen,
+    isCopyPasteSettingsModalOpen,
+    importTargetFolder,
+    importSourcePaths,
+    folderActionTarget,
+    confirmModalState,
+    panoramaModalState,
+    hdrModalState,
+    negativeModalState,
+    denoiseModalState,
+    cullingModalState,
+    collageModalState,
+    setUI,
+    setRightPanel,
+  } = useUIStore();
+
+  const {
+    rootPath,
+    currentFolderPath,
+    expandedFolders,
+    folderTree,
+    pinnedFolderTrees,
+    imageList,
+    imageRatings,
+    multiSelectedPaths,
+    selectionAnchorPath,
+    libraryActivePath,
+    libraryActiveAdjustments,
+    sortCriteria,
+    filterCriteria,
+    searchCriteria,
+    isTreeLoading,
+    isViewLoading,
+    setLibrary,
+    setFilterCriteria,
+    setSearchCriteria,
+    setSortCriteria,
+  } = useLibraryStore();
+
+  const {
+    selectedImage,
+    adjustments,
+    history,
+    historyIndex,
+    finalPreviewUrl,
+    uncroppedAdjustedPreviewUrl,
+    showOriginal,
+    histogram,
+    waveform,
+    isWaveformVisible,
+    activeWaveformChannel,
+    waveformHeight,
+    isSliderDragging,
+    activeMaskContainerId,
+    activeMaskId,
+    activeAiPatchContainerId,
+    activeAiSubMaskId,
+    zoom,
+    displaySize,
+    previewSize,
+    baseRenderSize,
+    originalSize,
+    overlayMode,
+    overlayRotation,
+    transformedOriginalUrl,
+    isStraightenActive,
+    brushSettings,
+    isGeneratingAiMask,
+    isAIConnectorConnected,
+    isGeneratingAi,
+    hasRenderedFirstFrame,
+    setEditor,
+    pushHistory,
+    undo,
+    redo,
+    resetHistory,
+  } = useEditorStore();
+
+  const setLiveAdjustments = useCallback((adj: Adjustments) => setEditor({ adjustments: adj }), [setEditor]);
+
+  const {
+    exportState,
+    importState,
+    isIndexing,
+    indexingProgress,
+    thumbnails,
+    thumbnailProgress,
+    aiModelDownloadStatus,
+    copiedFilePaths,
+    isCopied,
+    isPasted,
+    initialFileToOpen,
+    setProcess,
+    setExportState,
+    setImportState,
+  } = useProcessStore();
+
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
+
   const defaultThumbnailSize = osPlatform === 'android' ? ThumbnailSize.Small : ThumbnailSize.Medium;
   const defaultLibraryViewMode = osPlatform === 'android' ? LibraryViewMode.Recursive : LibraryViewMode.Flat;
-  const [activeView, setActiveView] = useState('library');
-  const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
-  const [isInstantTransition, setIsInstantTransition] = useState(false);
-  const [isLayoutReady, setIsLayoutReady] = useState(false);
-  const [currentFolderPath, setCurrentFolderPath] = useState<string | null>(null);
-  const [expandedFolders, setExpandedFolders] = useState(new Set<string>());
-  const [folderTree, setFolderTree] = useState<any>(null);
-  const [pinnedFolderTrees, setPinnedFolderTrees] = useState<any[]>([]);
-  const [imageList, setImageList] = useState<Array<ImageFile>>([]);
-  const [imageRatings, setImageRatings] = useState<Record<string, number>>({});
-  const [sortCriteria, setSortCriteria] = useState<SortCriteria>({ key: 'name', order: SortDirection.Ascending });
-  const [filterCriteria, setFilterCriteria] = useState<FilterCriteria>({
-    colors: [],
-    rating: 0,
-    rawStatus: RawStatus.All,
-  });
-  const [supportedTypes, setSupportedTypes] = useState<SupportedTypes | null>(null);
-  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
+
   const selectedImagePathRef = useRef<string | null>(null);
   useEffect(() => {
     selectedImagePathRef.current = selectedImage?.path ?? null;
   }, [selectedImage?.path]);
-  const [multiSelectedPaths, setMultiSelectedPaths] = useState<Array<string>>([]);
-  const [selectionAnchorPath, setSelectionAnchorPath] = useState<string | null>(null);
-  const [libraryActivePath, setLibraryActivePath] = useState<string | null>(null);
-  const [libraryActiveAdjustments, setLibraryActiveAdjustments] = useState<Adjustments>(INITIAL_ADJUSTMENTS);
-  const [finalPreviewUrl, setFinalPreviewUrl] = useState<string | null>(null);
-  const [uncroppedAdjustedPreviewUrl, setUncroppedAdjustedPreviewUrl] = useState<string | null>(null);
-  const {
-    state: historyAdjustments,
-    setState: setHistoryAdjustments,
-    undo: undoAdjustments,
-    redo: redoAdjustments,
-    canUndo,
-    canRedo,
-    resetHistory: resetAdjustmentsHistory,
-    history: adjustmentsHistory,
-    historyIndex: adjustmentsHistoryIndex,
-    goToIndex: goToAdjustmentsHistoryIndex,
-  } = useHistoryState(INITIAL_ADJUSTMENTS);
-  const [adjustments, setLiveAdjustments] = useState<Adjustments>(INITIAL_ADJUSTMENTS);
-  const [showOriginal, setShowOriginal] = useState(false);
-  const [isTreeLoading, setIsTreeLoading] = useState(false);
-  const [isViewLoading, setIsViewLoading] = useState(false);
-  const [initialFileToOpen, setInitialFileToOpen] = useState<string | null>(null);
+
   const [error, setError] = useState<string | null>(null);
-  const [histogram, setHistogram] = useState<ChannelConfig | null>(null);
-  const [waveform, setWaveform] = useState<WaveformData | null>(null);
-  const [isWaveformVisible, setIsWaveformVisible] = useState(false);
-  const [activeWaveformChannel, setActiveWaveformChannel] = useState<string>('luma');
+
   const activeWaveformChannelRef = useRef(activeWaveformChannel);
   activeWaveformChannelRef.current = activeWaveformChannel;
-  const [waveformHeight, setWaveformHeight] = useState<number>(220);
-  const [uiVisibility, setUiVisibility] = useState<UiVisibility>({
-    folderTree: true,
-    filmstrip: true,
-  });
-  const [isSliderDragging, setIsSliderDragging] = useState(false);
-  const [interactivePatch, setInteractivePatch] = useState<InteractivePatch | null>(null);
-  const lastZoomPatchTime = useRef<number>(0);
+
   const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevAdjustmentsRef = useRef<{ path: string; adjustments: Adjustments } | null>(null);
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const [theme, setTheme] = useState(DEFAULT_THEME_ID);
-  const [activeRightPanel, setActiveRightPanel] = useState<Panel | null>(Panel.Adjustments);
-  const [slideDirection, setSlideDirection] = useState(1);
-  const [activeMaskContainerId, setActiveMaskContainerId] = useState<string | null>(null);
-  const [activeMaskId, setActiveMaskId] = useState<string | null>(null);
-  const [activeAiPatchContainerId, setActiveAiPatchContainerId] = useState<string | null>(null);
-  const [activeAiSubMaskId, setActiveAiSubMaskId] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
+
   const [viewportSize, setViewportSize] = useState<ImageDimensions>(() => {
     if (typeof window === 'undefined') {
       return { width: 0, height: 0 };
@@ -374,134 +355,32 @@ function App() {
       height: Math.round(window.visualViewport?.height ?? window.innerHeight),
     };
   });
-  const [displaySize, setDisplaySize] = useState<ImageDimensions>({ width: 0, height: 0 });
-  const [previewSize, setPreviewSize] = useState<ImageDimensions>({ width: 0, height: 0 });
-  const [baseRenderSize, setBaseRenderSize] = useState<ImageDimensions>({ width: 0, height: 0 });
+
   const baseRenderSizeRef = useRef<any>(null);
-  const [originalSize, setOriginalSize] = useState<ImageDimensions>({ width: 0, height: 0 });
-  const [isRotationActive, setIsRotationActive] = useState(false);
-  const [overlayMode, setOverlayMode] = useState<OverlayMode>('thirds');
-  const [overlayRotation, setOverlayRotation] = useState(0);
-  const [transformedOriginalUrl, setTransformedOriginalUrl] = useState<string | null>(null);
   const patchesSentToBackend = useRef<Set<string>>(new Set());
   const imageCacheRef = useRef(new ImageLRUCache(20));
   const isBackendReadyRef = useRef(true);
   const cachedEditStateRef = useRef<ImageCacheEntry | null>(null);
   const inFlightCountRef = useRef(0);
   const pendingApplyRef = useRef<{ adjustments: Adjustments; targetRes?: number } | null>(null);
-  const [renderedRightPanel, setRenderedRightPanel] = useState<Panel | null>(activeRightPanel);
-  const [collapsibleSectionsState, setCollapsibleSectionsState] = useState<CollapsibleSectionsState>({
-    basic: true,
-    color: false,
-    curves: true,
-    details: false,
-    effects: false,
-  });
-  const [isLibraryExportPanelVisible, setIsLibraryExportPanelVisible] = useState(false);
+
   const [libraryViewMode, setLibraryViewMode] = useState<LibraryViewMode>(defaultLibraryViewMode);
-  const [leftPanelWidth, setLeftPanelWidth] = useState<number>(256);
-  const [rightPanelWidth, setRightPanelWidth] = useState<number>(320);
-  const [bottomPanelHeight, setBottomPanelHeight] = useState<number>(144);
-  const [compactEditorPanelHeightOverride, setCompactEditorPanelHeightOverride] = useState<number | null>(null);
   const [activeTreeSection, setActiveTreeSection] = useState<string | null>('current');
   const [isResizing, setIsResizing] = useState(false);
   const [thumbnailSize, setThumbnailSize] = useState(defaultThumbnailSize);
   const [thumbnailAspectRatio, setThumbnailAspectRatio] = useState(ThumbnailAspectRatio.Cover);
   const [copiedAdjustments, setCopiedAdjustments] = useState<Adjustments | null>(null);
-  const [isStraightenActive, setIsStraightenActive] = useState(false);
-  const [isWbPickerActive, setIsWbPickerActive] = useState(false);
-  const [liveRotation, setLiveRotation] = useState<number | null>(null);
-  const [copiedFilePaths, setCopiedFilePaths] = useState<Array<string>>([]);
-  const [aiModelDownloadStatus, setAiModelDownloadStatus] = useState<string | null>(null);
-  const [copiedSectionAdjustments, setCopiedSectionAdjustments] = useState(null);
-  const [copiedMask, setCopiedMask] = useState<MaskContainer | null>(null);
-  const [isCopied, setIsCopied] = useState(false);
-  const [isPasted, setIsPasted] = useState(false);
-  const [isIndexing, setIsIndexing] = useState(false);
-  const [indexingProgress, setIndexingProgress] = useState<Progress>({ current: 0, total: 0 });
-  const [searchCriteria, setSearchCriteria] = useState<SearchCriteria>({
-    tags: [],
-    text: '',
-    mode: 'OR',
-  });
-  const [brushSettings, setBrushSettings] = useState<BrushSettings | null>({
-    size: 50,
-    feather: 50,
-    tool: ToolType.Brush,
-  });
-  const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
-  const [isRenameFolderModalOpen, setIsRenameFolderModalOpen] = useState(false);
-  const [isRenameFileModalOpen, setIsRenameFileModalOpen] = useState(false);
-  const [renameTargetPaths, setRenameTargetPaths] = useState<Array<string>>([]);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isCopyPasteSettingsModalOpen, setIsCopyPasteSettingsModalOpen] = useState(false);
-  const [importTargetFolder, setImportTargetFolder] = useState<string | null>(null);
-  const [importSourcePaths, setImportSourcePaths] = useState<Array<string>>([]);
-  const [folderActionTarget, setFolderActionTarget] = useState<string | null>(null);
-  const [confirmModalState, setConfirmModalState] = useState<ConfirmModalState>({ isOpen: false });
-  const [panoramaModalState, setPanoramaModalState] = useState<PanoramaModalState>({
-    error: null,
-    finalImageBase64: null,
-    isOpen: false,
-    isProcessing: false,
-    progressMessage: '',
-    stitchingSourcePaths: [],
-  });
-  const [hdrModalState, setHdrModalState] = useState<HdrModalState>({
-    error: null,
-    finalImageBase64: null,
-    isOpen: false,
-    isProcessing: false,
-    progressMessage: '',
-    stitchingSourcePaths: [],
-  });
-  const [negativeModalState, setNegativeModalState] = useState<NegativeConversionModalState>({
-    isOpen: false,
-    targetPaths: [],
-  });
-  const [denoiseModalState, setDenoiseModalState] = useState<DenoiseModalState>({
-    isOpen: false,
-    isProcessing: false,
-    previewBase64: null,
-    error: null,
-    targetPaths: [],
-    progressMessage: null,
-    isRaw: false,
-  });
-  const [cullingModalState, setCullingModalState] = useState<CullingModalState>({
-    isOpen: false,
-    suggestions: null,
-    progress: null,
-    error: null,
-    pathsToCull: [],
-  });
-  const [collageModalState, setCollageModalState] = useState<CollageModalState>({
-    isOpen: false,
-    sourceImages: [],
-  });
+
   const [customEscapeHandler, setCustomEscapeHandler] = useState(null);
-  const [isGeneratingAiMask, setIsGeneratingAiMask] = useState(false);
-  const [isAIConnectorConnected, setisAIConnectorConnected] = useState(false);
-  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
-  const [isMaskControlHovered, setIsMaskControlHovered] = useState(false);
-  const [libraryScrollTop, setLibraryScrollTop] = useState<number>(0);
-  const [listColumnWidths, setListColumnWidths] = useState<ColumnWidths>({
-    thumbnail: 4,
-    name: 32,
-    date: 30,
-    rating: 15,
-    color: 15,
-  });
+
   const { showContextMenu } = useContextMenu();
-  const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   const { requestThumbnails, clearThumbnailQueue, markGenerated } = useThumbnails();
-  const [thumbnailProgress, setThumbnailProgress] = useState<Progress>({ current: 0, total: 0 });
+
   const transformWrapperRef = useRef<any>(null);
-  const isProgrammaticZoom = useRef(false);
   const currentResRef = useRef<number>(1280);
   const currentOriginalResRef = useRef<number>(0);
   const isInitialMount = useRef(true);
-  const currentFolderPathRef = useRef<string>(currentFolderPath);
+  const currentFolderPathRef = useRef<string | null>(currentFolderPath);
   const preloadedDataRef = useRef<{
     tree?: Promise<any>;
     images?: Promise<ImageFile[]>;
@@ -545,7 +424,6 @@ function App() {
     Math.min(compactEditorPanelHeightOverride ?? compactEditorPanelDefaultHeight, compactEditorPanelMaxHeight),
   );
   const compactEditorPanelCollapsedHeight = 96;
-  const [hasRenderedFirstFrame, setHasRenderedFirstFrame] = useState(false);
 
   useEffect(() => {
     if (currentFolderPath) {
@@ -596,19 +474,6 @@ function App() {
     };
   }, []);
 
-  const [exportState, setExportState] = useState<ExportState>({
-    errorMessage: '',
-    progress: { current: 0, total: 0 },
-    status: Status.Idle,
-  });
-
-  const [importState, setImportState] = useState<ImportState>({
-    errorMessage: '',
-    path: '',
-    progress: { current: 0, total: 0 },
-    status: Status.Idle,
-  });
-
   useEffect(() => {
     currentFolderPathRef.current = currentFolderPath;
   }, [currentFolderPath]);
@@ -617,17 +482,17 @@ function App() {
     if (!isCopied) {
       return;
     }
-    const timer = setTimeout(() => setIsCopied(false), 1000);
+    const timer = setTimeout(() => setProcess({ isCopied: false }), 1000);
     return () => clearTimeout(timer);
-  }, [isCopied]);
+  }, [isCopied, setProcess]);
 
   useEffect(() => {
     if (!isPasted) {
       return;
     }
-    const timer = setTimeout(() => setIsPasted(false), 1000);
+    const timer = setTimeout(() => setProcess({ isPasted: false }), 1000);
     return () => clearTimeout(timer);
-  }, [isPasted]);
+  }, [isPasted, setProcess]);
 
   const isLightTheme = useMemo(() => [Theme.Light, Theme.Snow, Theme.Arctic].includes(theme as Theme), [theme]);
 
@@ -639,19 +504,20 @@ function App() {
   }, [error]);
 
   const debouncedSetHistory = useMemo(
-    () => debounce((newAdjustments) => setHistoryAdjustments(newAdjustments), 500),
-    [setHistoryAdjustments],
+    () => debounce((newAdjustments) => pushHistory(newAdjustments), 500),
+    [pushHistory],
   );
 
   const setAdjustments = useCallback(
     (value: any) => {
-      setLiveAdjustments((prevAdjustments: Adjustments) => {
+      setEditor((state) => {
+        const prevAdjustments = state.adjustments;
         const newAdjustments = typeof value === 'function' ? value(prevAdjustments) : value;
         debouncedSetHistory(newAdjustments);
-        return newAdjustments;
+        return { adjustments: newAdjustments };
       });
     },
-    [debouncedSetHistory],
+    [debouncedSetHistory, setEditor],
   );
 
   const handleRotate = useCallback(
@@ -678,38 +544,14 @@ function App() {
     [setAdjustments, selectedImage],
   );
 
-  const handleStraighten = useCallback(
-    (angleCorrection: number) => {
-      setAdjustments((prev: Partial<Adjustments>) => {
-        const newRotation = (prev.rotation || 0) + angleCorrection;
-        return { ...prev, rotation: newRotation };
-      });
-
-      setIsStraightenActive(false);
-    },
-    [setAdjustments],
-  );
-
-  const toggleWbPicker = useCallback(() => {
-    setIsWbPickerActive((prev) => !prev);
-  }, []);
-
-  const handleWbPicked = useCallback(() => {
-    //setIsWbPickerActive(false); // lets keep it active
-  }, []);
-
-  useEffect(() => {
-    setLiveAdjustments(historyAdjustments);
-  }, [historyAdjustments]);
-
   useEffect(() => {
     if (
       (activeRightPanel !== Panel.Masks || !activeMaskContainerId) &&
       (activeRightPanel !== Panel.Ai || !activeAiPatchContainerId)
     ) {
-      setIsMaskControlHovered(false);
+      setEditor({ isMaskControlHovered: false });
     }
-  }, [activeRightPanel, activeMaskContainerId, activeAiPatchContainerId]);
+  }, [activeRightPanel, activeMaskContainerId, activeAiPatchContainerId, setEditor]);
 
   const geometricAdjustmentsKey = useMemo(() => {
     if (!adjustments) return '';
@@ -729,19 +571,6 @@ function App() {
     return JSON.stringify(visualAdjustments);
   }, [adjustments]);
 
-  const undo = useCallback(() => {
-    if (canUndo) {
-      undoAdjustments();
-      debouncedSetHistory.cancel();
-    }
-  }, [canUndo, undoAdjustments, debouncedSetHistory]);
-  const redo = useCallback(() => {
-    if (canRedo) {
-      redoAdjustments();
-      debouncedSetHistory.cancel();
-    }
-  }, [canRedo, redoAdjustments, debouncedSetHistory]);
-
   useEffect(() => {
     if (currentFolderPath) {
       refreshImageList();
@@ -750,7 +579,7 @@ function App() {
 
   useEffect(() => {
     const unlisten = listen('ai-connector-status-update', (event: any) => {
-      setisAIConnectorConnected(event.payload.connected);
+      setEditor({ isAIConnectorConnected: event.payload.connected });
     });
     invoke(Invokes.CheckAIConnectorStatus);
     const interval = setInterval(() => invoke(Invokes.CheckAIConnectorStatus), 10000);
@@ -758,7 +587,7 @@ function App() {
       clearInterval(interval);
       unlisten.then((f) => f());
     };
-  }, []);
+  }, [setEditor]);
 
   useEffect(() => {
     const activeSubMask =
@@ -826,7 +655,7 @@ function App() {
         aiPatches: prev.aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: true, prompt } : p)),
       }));
 
-      setIsGeneratingAi(true);
+      setEditor({ isGeneratingAi: true });
 
       try {
         const newPatchDataJson: any = await invoke(Invokes.InvokeGenerativeReplaseWithMaskDef, {
@@ -851,8 +680,7 @@ function App() {
               : p,
           ),
         }));
-        setActiveAiPatchContainerId(null);
-        setActiveAiSubMaskId(null);
+        setEditor({ activeAiPatchContainerId: null, activeAiSubMaskId: null });
       } catch (err) {
         console.error('Generative replace failed:', err);
         setError(`AI Replace Failed: ${err}`);
@@ -861,17 +689,10 @@ function App() {
           aiPatches: prev.aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: false } : p)),
         }));
       } finally {
-        setIsGeneratingAi(false);
+        setEditor({ isGeneratingAi: false });
       }
     },
-    [
-      selectedImage?.path,
-      isGeneratingAi,
-      adjustments,
-      setAdjustments,
-      setActiveAiPatchContainerId,
-      setActiveAiSubMaskId,
-    ],
+    [selectedImage?.path, isGeneratingAi, adjustments, setAdjustments, setEditor],
   );
 
   const handleQuickErase = useCallback(
@@ -888,7 +709,7 @@ function App() {
         return;
       }
 
-      setIsGeneratingAi(true);
+      setEditor({ isGeneratingAi: true });
       setAdjustments((prev: Partial<Adjustments>) => ({
         ...prev,
         aiPatches: prev.aiPatches?.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: true } : p)),
@@ -973,8 +794,7 @@ function App() {
               : p,
           ),
         }));
-        setActiveAiPatchContainerId(null);
-        setActiveAiSubMaskId(null);
+        setEditor({ activeAiPatchContainerId: null, activeAiSubMaskId: null });
       } catch (err: any) {
         console.error('Quick Erase failed:', err);
         setError(`Quick Erase Failed: ${err.message || String(err)}`);
@@ -983,17 +803,10 @@ function App() {
           aiPatches: prev.aiPatches?.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: false } : p)),
         }));
       } finally {
-        setIsGeneratingAi(false);
+        setEditor({ isGeneratingAi: false });
       }
     },
-    [
-      selectedImage?.path,
-      isGeneratingAi,
-      adjustments,
-      setAdjustments,
-      setActiveAiPatchContainerId,
-      setActiveAiSubMaskId,
-    ],
+    [selectedImage?.path, isGeneratingAi, adjustments, setAdjustments, setEditor],
   );
 
   const handleDeleteMaskContainer = useCallback(
@@ -1003,11 +816,10 @@ function App() {
         masks: (prev.masks || []).filter((c) => c.id !== containerId),
       }));
       if (activeMaskContainerId === containerId) {
-        setActiveMaskContainerId(null);
-        setActiveMaskId(null);
+        setEditor({ activeMaskContainerId: null, activeMaskId: null });
       }
     },
-    [setAdjustments, activeMaskContainerId],
+    [setAdjustments, activeMaskContainerId, setEditor],
   );
 
   const handleDeleteAiPatch = useCallback(
@@ -1017,11 +829,10 @@ function App() {
         aiPatches: (prev.aiPatches || []).filter((p) => p.id !== patchId),
       }));
       if (activeAiPatchContainerId === patchId) {
-        setActiveAiPatchContainerId(null);
-        setActiveAiSubMaskId(null);
+        setEditor({ activeAiPatchContainerId: null, activeAiSubMaskId: null });
       }
     },
-    [setAdjustments, activeAiPatchContainerId],
+    [setAdjustments, activeAiPatchContainerId, setEditor],
   );
 
   const handleToggleAiPatchVisibility = useCallback(
@@ -1039,7 +850,7 @@ function App() {
       console.error('Cannot generate AI mask: No image selected.');
       return;
     }
-    setIsGeneratingAiMask(true);
+    setEditor({ isGeneratingAiMask: true });
     try {
       const transformAdjustments = {
         transformDistortion: adjustments.transformDistortion,
@@ -1082,14 +893,14 @@ function App() {
       console.error('Failed to generate AI subject mask:', error);
       setError(`AI Mask Failed: ${error}`);
     } finally {
-      setIsGeneratingAiMask(false);
+      setEditor({ isGeneratingAiMask: false });
     }
   };
 
   const handleGenerateAiDepthMask = async (subMaskId: string, parameters: any) => {
     if (!selectedImage?.path) return;
     console.log('trying to generate depth map');
-    setIsGeneratingAiMask(true);
+    setEditor({ isGeneratingAiMask: true });
 
     try {
       const transformAdjustments = {
@@ -1137,7 +948,7 @@ function App() {
       console.error('Failed to generate AI depth mask:', error);
       setError(`AI Depth Mask Failed: ${error}`);
     } finally {
-      setIsGeneratingAiMask(false);
+      setEditor({ isGeneratingAiMask: false });
     }
   };
 
@@ -1146,7 +957,7 @@ function App() {
       console.error('Cannot generate AI mask: No image selected.');
       return;
     }
-    setIsGeneratingAiMask(true);
+    setEditor({ isGeneratingAiMask: true });
     try {
       const transformAdjustments = {
         transformDistortion: adjustments.transformDistortion,
@@ -1186,7 +997,7 @@ function App() {
       console.error('Failed to generate AI foreground mask:', error);
       setError(`AI Mask Failed: ${error}`);
     } finally {
-      setIsGeneratingAiMask(false);
+      setEditor({ isGeneratingAiMask: false });
     }
   };
 
@@ -1195,7 +1006,7 @@ function App() {
       console.error('Cannot generate AI mask: No image selected.');
       return;
     }
-    setIsGeneratingAiMask(true);
+    setEditor({ isGeneratingAiMask: true });
     try {
       const transformAdjustments = {
         transformDistortion: adjustments.transformDistortion,
@@ -1235,9 +1046,1281 @@ function App() {
       console.error('Failed to generate AI sky mask:', error);
       setError(`AI Mask Failed: ${error}`);
     } finally {
-      setIsGeneratingAiMask(false);
+      setEditor({ isGeneratingAiMask: false });
     }
   };
+
+  const calculateROI = useCallback(() => {
+    if (!transformWrapperRef.current) return null;
+    const state = transformWrapperRef.current.instance.transformState;
+    if (!state) return null;
+
+    const currentBaseSize = baseRenderSizeRef.current;
+    if (!currentBaseSize) return null;
+
+    const { scale, positionX, positionY } = state;
+    const { width: baseW, height: baseH, offsetX, offsetY, containerWidth, containerHeight } = currentBaseSize;
+
+    if (!baseW || !baseH || !containerWidth || !containerHeight) return null;
+
+    if (scale <= 1.01) return null;
+
+    const paddingPixels = 2.0;
+    const paddingX = paddingPixels / baseW;
+    const paddingY = paddingPixels / baseH;
+
+    const visibleLeft = -positionX / scale;
+    const visibleTop = -positionY / scale;
+    const visibleRight = visibleLeft + containerWidth / scale;
+    const visibleBottom = visibleTop + containerHeight / scale;
+
+    const imgLeft = offsetX;
+    const imgTop = offsetY;
+    const imgRight = offsetX + baseW;
+    const imgBottom = offsetY + baseH;
+
+    const intersectLeft = Math.max(visibleLeft, imgLeft);
+    const intersectTop = Math.max(visibleTop, imgTop);
+    const intersectRight = Math.min(visibleRight, imgRight);
+    const intersectBottom = Math.min(visibleBottom, imgBottom);
+
+    if (intersectLeft >= intersectRight || intersectTop >= intersectBottom) {
+      return null;
+    }
+
+    let roiX = (intersectLeft - imgLeft) / baseW;
+    let roiY = (intersectTop - imgTop) / baseH;
+    let roiW = (intersectRight - intersectLeft) / baseW;
+    let roiH = (intersectBottom - intersectTop) / baseH;
+
+    const newRoiX = roiX - paddingX;
+    const newRoiY = roiY - paddingY;
+    const newRoiW = roiW + paddingX * 2;
+    const newRoiH = roiH + paddingY * 2;
+
+    const clampedX = Math.max(0, newRoiX);
+    const clampedY = Math.max(0, newRoiY);
+    const clampedW = Math.min(1 - clampedX, newRoiW);
+    const clampedH = Math.min(1 - clampedY, newRoiH);
+
+    if (clampedW > 0.999 && clampedH > 0.999) return null;
+
+    return [clampedX, clampedY, clampedW, clampedH] as [number, number, number, number];
+  }, []);
+
+  const executeApplyAdjustments = useCallback(
+    async (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
+      const currentPath = selectedImage?.path;
+      if (!currentPath) return;
+
+      const payload = JSON.parse(JSON.stringify(currentAdjustments));
+
+      const processSubMasks = (subMasks: any[]) => {
+        if (!Array.isArray(subMasks)) return;
+        subMasks.forEach((sm: any) => {
+          if (sm.id && sm.parameters) {
+            const keys = ['mask_data_base64', 'maskDataBase64'];
+            let foundMaskData = false;
+
+            for (const key of keys) {
+              if (sm.parameters[key] !== undefined && sm.parameters[key] !== null) {
+                foundMaskData = true;
+                if (patchesSentToBackend.current.has(sm.id)) {
+                  sm.parameters[key] = null;
+                }
+              }
+            }
+            if (foundMaskData && !patchesSentToBackend.current.has(sm.id)) {
+              patchesSentToBackend.current.add(sm.id);
+            }
+          }
+        });
+      };
+
+      if (payload.aiPatches && Array.isArray(payload.aiPatches)) {
+        payload.aiPatches.forEach((p: any) => {
+          if (p.id && p.patchData && !p.isLoading) {
+            if (patchesSentToBackend.current.has(p.id)) {
+              p.patchData = null;
+            } else {
+              patchesSentToBackend.current.add(p.id);
+            }
+          }
+          if (p.subMasks) {
+            processSubMasks(p.subMasks);
+          }
+        });
+      }
+
+      if (payload.masks && Array.isArray(payload.masks)) {
+        payload.masks.forEach((container: any) => {
+          if (container.subMasks) {
+            processSubMasks(container.subMasks);
+          }
+        });
+      }
+
+      const jobId = ++previewJobIdRef.current;
+      const roi = calculateROI();
+
+      try {
+        const buffer: ArrayBuffer = await invoke(Invokes.ApplyAdjustments, {
+          jsAdjustments: payload,
+          isInteractive: dragging,
+          targetResolution: targetRes || null,
+          roi: roi || null,
+          computeWaveform: !!isWaveformVisible,
+          activeWaveformChannel: activeWaveformChannelRef.current || null,
+        });
+
+        if (currentPath !== selectedImagePathRef.current) return;
+
+        if (buffer && buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
+          latestRenderedJobIdRef.current = jobId;
+
+          const textDecoder = new TextDecoder();
+          const prefix = textDecoder.decode(buffer.slice(0, 11));
+          if (prefix === 'WGPU_RENDER') {
+            setEditor((state) => {
+              if (state.interactivePatch && state.interactivePatch.url) URL.revokeObjectURL(state.interactivePatch.url);
+              return { interactivePatch: null };
+            });
+            return;
+          }
+
+          if (dragging) {
+            const view = new DataView(buffer);
+            const patchX = view.getUint32(0, true);
+            const patchY = view.getUint32(4, true);
+            const patchW = view.getUint32(8, true);
+            const patchH = view.getUint32(12, true);
+            const fullW = view.getUint32(16, true);
+            const fullH = view.getUint32(20, true);
+
+            const imageBuffer = buffer.slice(24);
+            const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+
+            setEditor((state) => {
+              if (state.interactivePatch && state.interactivePatch.url)
+                setTimeout(() => URL.revokeObjectURL(state.interactivePatch.url), 100);
+              return {
+                interactivePatch: {
+                  url,
+                  normX: patchX / fullW,
+                  normY: patchY / fullH,
+                  normW: patchW / fullW,
+                  normH: patchH / fullH,
+                },
+              };
+            });
+          } else {
+            const blob = new Blob([buffer], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+
+            if (currentPath !== selectedImagePathRef.current || jobId < latestRenderedJobIdRef.current) {
+              URL.revokeObjectURL(url);
+              return;
+            }
+
+            setEditor((state) => {
+              const prevUrl = state.finalPreviewUrl;
+              if (prevUrl && prevUrl.startsWith('blob:') && !imageCacheRef.current.isProtected(prevUrl)) {
+                setTimeout(() => {
+                  if (!imageCacheRef.current.isProtected(prevUrl)) {
+                    URL.revokeObjectURL(prevUrl);
+                  }
+                }, 250);
+              }
+              return { finalPreviewUrl: url };
+            });
+
+            setEditor((state) => {
+              if (state.interactivePatch && state.interactivePatch.url) {
+                setTimeout(() => URL.revokeObjectURL(state.interactivePatch.url), 500);
+              }
+              return { interactivePatch: null };
+            });
+          }
+        }
+      } catch (err) {
+        if (err !== 'Superseded or worker failed') {
+          console.error('Failed to apply adjustments:', err);
+        }
+
+        if (!dragging) {
+          setEditor((state) => {
+            if (state.interactivePatch && state.interactivePatch.url) URL.revokeObjectURL(state.interactivePatch.url);
+            return { interactivePatch: null };
+          });
+        }
+      }
+    },
+    [selectedImage?.path, calculateROI, isWaveformVisible, setEditor],
+  );
+
+  const flushPipeline = useCallback(() => {
+    if (inFlightCountRef.current >= 3) return;
+    if (!pendingApplyRef.current) return;
+
+    const { adjustments, targetRes } = pendingApplyRef.current;
+    pendingApplyRef.current = null;
+
+    inFlightCountRef.current += 1;
+
+    executeApplyAdjustments(adjustments, true, targetRes).finally(() => {
+      inFlightCountRef.current -= 1;
+      if (pendingApplyRef.current) {
+        requestAnimationFrame(() => flushPipeline());
+      }
+    });
+  }, [executeApplyAdjustments]);
+
+  const applyAdjustments = useCallback(
+    (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
+      if (!selectedImage?.isReady || !isBackendReadyRef.current) return;
+
+      if (dragging) {
+        pendingApplyRef.current = { adjustments: currentAdjustments, targetRes };
+        flushPipeline();
+      } else {
+        pendingApplyRef.current = null;
+        executeApplyAdjustments(currentAdjustments, false, targetRes);
+      }
+    },
+    [selectedImage?.isReady, flushPipeline, executeApplyAdjustments],
+  );
+
+  const generateUncroppedPreview = useCallback(
+    (currentAdjustments: Adjustments) => {
+      if (!selectedImage?.isReady) {
+        return;
+      }
+      invoke(Invokes.GenerateUncroppedPreview, { jsAdjustments: currentAdjustments }).catch((err) =>
+        console.error('Failed to generate uncropped preview:', err),
+      );
+    },
+    [selectedImage?.isReady],
+  );
+
+  useEffect(() => {
+    if (activeRightPanel === Panel.Crop && selectedImage?.isReady && isBackendReadyRef.current) {
+      generateUncroppedPreview(adjustments);
+    }
+  }, [adjustments, activeRightPanel, selectedImage?.isReady, generateUncroppedPreview]);
+
+  const debouncedSave = useCallback(
+    debounce((path, adjustmentsToSave) => {
+      invoke(Invokes.SaveMetadataAndUpdateThumbnail, { path, adjustments: adjustmentsToSave }).catch((err) => {
+        console.error('Auto-save failed:', err);
+        setError(`Failed to save changes: ${err}`);
+      });
+    }, 300),
+    [],
+  );
+
+  const createResizeHandler = (stateKey: string, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+
+    const pointerId = e.pointerId;
+    const target = e.currentTarget;
+    const startX = e.clientX;
+    const startY = e.clientY;
+
+    const previousTouchAction = document.documentElement.style.touchAction;
+    const previousUserSelect = document.documentElement.style.userSelect;
+
+    target.setPointerCapture?.(pointerId);
+    document.documentElement.style.touchAction = 'none';
+    document.documentElement.style.userSelect = 'none';
+
+    const doDrag = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      moveEvent.preventDefault();
+
+      if (stateKey === 'left') {
+        setUI({ leftPanelWidth: Math.round(Math.max(200, Math.min(startSize + (moveEvent.clientX - startX), 500))) });
+      } else if (stateKey === 'right') {
+        setUI({ rightPanelWidth: Math.round(Math.max(280, Math.min(startSize - (moveEvent.clientX - startX), 600))) });
+      } else if (stateKey === 'bottom') {
+        setUI({
+          bottomPanelHeight: Math.round(Math.max(100, Math.min(startSize - (moveEvent.clientY - startY), 400))),
+        });
+      } else if (stateKey === 'compact') {
+        setUI({
+          compactEditorPanelHeightOverride: Math.round(
+            Math.max(
+              compactEditorPanelMinHeight,
+              Math.min(startSize - (moveEvent.clientY - startY), compactEditorPanelMaxHeight),
+            ),
+          ),
+        });
+      }
+    };
+
+    const stopDrag = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== pointerId) return;
+      if (target.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId);
+
+      document.documentElement.style.cursor = '';
+      document.documentElement.style.touchAction = previousTouchAction;
+      document.documentElement.style.userSelect = previousUserSelect;
+
+      window.removeEventListener('pointermove', doDrag);
+      window.removeEventListener('pointerup', stopDrag);
+      window.removeEventListener('pointercancel', stopDrag);
+      setIsResizing(false);
+    };
+    document.documentElement.style.cursor =
+      stateKey === 'bottom' || stateKey === 'compact' ? 'row-resize' : 'col-resize';
+
+    window.addEventListener('pointermove', doDrag, { passive: false });
+    window.addEventListener('pointerup', stopDrag);
+    window.addEventListener('pointercancel', stopDrag);
+  };
+
+  useEffect(() => {
+    const appWindow = getCurrentWindow();
+    const checkFullscreen = async () => {
+      setUI({ isWindowFullScreen: await appWindow.isFullscreen() });
+    };
+    checkFullscreen();
+
+    const unlistenPromise = appWindow.onResized(checkFullscreen);
+
+    return () => {
+      unlistenPromise.then((unlisten: any) => unlisten());
+    };
+  }, [setUI]);
+
+  const handleLutSelect = useCallback(
+    async (path: string) => {
+      try {
+        const result: LutData = await invoke('load_and_parse_lut', { path });
+        let name = 'LUT';
+        if (isAndroid) {
+          name = await invoke<string>('resolve_android_content_uri_name', {
+            uriStr: path,
+          });
+        } else {
+          name = path.split(/[\\/]/).pop() || 'LUT';
+        }
+        setAdjustments((prev: Partial<Adjustments>) => ({
+          ...prev,
+          lutPath: path,
+          lutName: name,
+          lutSize: result.size,
+          lutIntensity: 100,
+          sectionVisibility: {
+            ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility),
+            effects: true,
+          },
+        }));
+      } catch (err) {
+        console.error('Failed to load or parse LUT:', err);
+        setError(`Failed to load LUT: ${err}`);
+      }
+    },
+    [setAdjustments, isAndroid],
+  );
+
+  const handleRightPanelSelect = useCallback(
+    (panelId: Panel) => {
+      setRightPanel(panelId, RIGHT_PANEL_ORDER);
+      setEditor({ activeMaskId: null, activeAiSubMaskId: null, isWbPickerActive: false });
+    },
+    [setRightPanel, setEditor],
+  );
+
+  useEffect(() => {
+    initPlatform();
+  }, [initPlatform]);
+
+  useEffect(() => {
+    invoke(Invokes.LoadSettings)
+      .then(async (settings: any) => {
+        if (
+          !settings.copyPasteSettings ||
+          !settings.copyPasteSettings.includedAdjustments ||
+          settings.copyPasteSettings.includedAdjustments.length === 0
+        ) {
+          settings.copyPasteSettings = {
+            mode: 'merge',
+            includedAdjustments: COPYABLE_ADJUSTMENT_KEYS,
+          };
+        }
+        setAppSettings(settings);
+        if (settings?.sortCriteria) setSortCriteria(settings.sortCriteria);
+        if (settings?.filterCriteria) {
+          setFilterCriteria((prev: FilterCriteria) => ({
+            ...prev,
+            ...settings.filterCriteria,
+            rawStatus: settings.filterCriteria.rawStatus || RawStatus.All,
+            colors: settings.filterCriteria.colors || [],
+          }));
+        }
+        if (settings?.theme) {
+          setTheme(settings.theme);
+        }
+        if (settings?.uiVisibility) {
+          setUI((state) => ({ uiVisibility: { ...state.uiVisibility, ...settings.uiVisibility } }));
+        }
+        setLibraryViewMode(settings?.libraryViewMode ?? defaultLibraryViewMode);
+        setThumbnailSize(settings?.thumbnailSize ?? defaultThumbnailSize);
+        if (settings?.thumbnailAspectRatio) {
+          setThumbnailAspectRatio(settings.thumbnailAspectRatio);
+        }
+        if (settings?.activeTreeSection) {
+          setActiveTreeSection(settings.activeTreeSection);
+        }
+        if (typeof settings?.isWaveformVisible === 'boolean') {
+          setEditor({ isWaveformVisible: settings.isWaveformVisible });
+        }
+        if (settings?.activeWaveformChannel) {
+          setEditor({ activeWaveformChannel: settings.activeWaveformChannel });
+        }
+        if (settings?.waveformHeight !== undefined) {
+          setEditor({ waveformHeight: settings.waveformHeight });
+        }
+        if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
+          try {
+            const trees = await invoke(Invokes.GetPinnedFolderTrees, {
+              paths: settings.pinnedFolders,
+              expandedFolders: settings.lastFolderState?.expandedFolders || [],
+              showImageCounts: settings.enableFolderImageCounts ?? false,
+            });
+            setLibrary({ pinnedFolderTrees: trees });
+          } catch (err) {
+            console.error('Failed to load pinned folder trees:', err);
+          }
+        }
+
+        if (!isAndroid && settings.lastRootPath) {
+          const root = settings.lastRootPath;
+          const currentPath = settings.lastFolderState?.currentFolderPath || root;
+
+          const command =
+            settings.libraryViewMode === LibraryViewMode.Recursive
+              ? Invokes.ListImagesRecursive
+              : Invokes.ListImagesInDir;
+
+          preloadedDataRef.current = {
+            rootPath: root,
+            currentPath: currentPath,
+            tree: invoke(Invokes.GetFolderTree, {
+              path: root,
+              expandedFolders: settings.lastFolderState?.expandedFolders ?? [root],
+              showImageCounts: settings.enableFolderImageCounts ?? false,
+            }),
+            images: invoke(command, { path: currentPath }),
+          };
+        }
+
+        invoke('frontend_ready').catch((e) => console.error('Failed to notify backend of readiness:', e));
+      })
+      .catch((err) => {
+        console.error('Failed to load settings:', err);
+        setAppSettings({
+          lastRootPath: null,
+          theme: DEFAULT_THEME_ID as Theme,
+          thumbnailSize: defaultThumbnailSize,
+          libraryViewMode: defaultLibraryViewMode,
+        });
+      })
+      .finally(() => {
+        isInitialMount.current = false;
+      });
+  }, [
+    isAndroid,
+    setAppSettings,
+    setTheme,
+    setUI,
+    defaultLibraryViewMode,
+    defaultThumbnailSize,
+    setSortCriteria,
+    setFilterCriteria,
+    setEditor,
+    setLibrary,
+  ]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) {
+      return;
+    }
+    if (JSON.stringify(appSettings.uiVisibility) !== JSON.stringify(uiVisibility)) {
+      handleSettingsChange({ ...appSettings, uiVisibility });
+    }
+  }, [uiVisibility, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) {
+      return;
+    }
+    if (appSettings.thumbnailSize !== thumbnailSize) {
+      handleSettingsChange({ ...appSettings, thumbnailSize });
+    }
+  }, [thumbnailSize, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) {
+      return;
+    }
+    if (appSettings.thumbnailAspectRatio !== thumbnailAspectRatio) {
+      handleSettingsChange({ ...appSettings, thumbnailAspectRatio });
+    }
+  }, [thumbnailAspectRatio, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) {
+      return;
+    }
+    if (appSettings.libraryViewMode !== libraryViewMode) {
+      handleSettingsChange({ ...appSettings, libraryViewMode });
+    }
+  }, [libraryViewMode, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    invoke(Invokes.GetSupportedFileTypes)
+      .then((types: any) => setSupportedTypes(types))
+      .catch((err) => console.error('Failed to load supported file types:', err));
+  }, [setSupportedTypes]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) {
+      return;
+    }
+    if (JSON.stringify(appSettings.sortCriteria) !== JSON.stringify(sortCriteria)) {
+      handleSettingsChange({ ...appSettings, sortCriteria });
+    }
+  }, [sortCriteria, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) {
+      return;
+    }
+    if (JSON.stringify(appSettings.filterCriteria) !== JSON.stringify(filterCriteria)) {
+      handleSettingsChange({ ...appSettings, filterCriteria });
+    }
+  }, [filterCriteria, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) {
+      return;
+    }
+    if (
+      appSettings.isWaveformVisible !== isWaveformVisible ||
+      appSettings.activeWaveformChannel !== activeWaveformChannel ||
+      appSettings.waveformHeight !== waveformHeight
+    ) {
+      handleSettingsChange({
+        ...appSettings,
+        isWaveformVisible,
+        activeWaveformChannel,
+        waveformHeight,
+      });
+    }
+  }, [isWaveformVisible, activeWaveformChannel, waveformHeight, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const currentThemeId = theme || DEFAULT_THEME_ID;
+
+    const baseTheme =
+      THEMES.find((t: ThemeProps) => t.id === currentThemeId) ||
+      THEMES.find((t: ThemeProps) => t.id === DEFAULT_THEME_ID);
+    if (!baseTheme) {
+      return;
+    }
+
+    let finalCssVariables: any = { ...baseTheme.cssVariables };
+
+    Object.entries(finalCssVariables).forEach(([key, value]) => {
+      root.style.setProperty(key, value as string);
+    });
+
+    const fontFamily = appSettings?.fontFamily || 'poppins';
+    const fontStack =
+      fontFamily === 'system'
+        ? '-apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+        : "'Poppins', system-ui, sans-serif";
+    root.style.setProperty('--font-family', fontStack);
+  }, [theme, appSettings?.fontFamily]);
+
+  const refreshAllFolderTrees = useCallback(
+    async (currentExpanded?: Set<string>) => {
+      const activeExpanded = currentExpanded || expandedFolders;
+      const expandedArr = Array.from(activeExpanded);
+      const showCounts = appSettings?.enableFolderImageCounts ?? false;
+
+      if (rootPath) {
+        try {
+          const treeData = await invoke(Invokes.GetFolderTree, {
+            path: rootPath,
+            expandedFolders: expandedArr,
+            showImageCounts: showCounts,
+          });
+          setLibrary({ folderTree: treeData });
+        } catch (err) {
+          console.error('Failed to refresh main folder tree:', err);
+          setError(`Failed to refresh folder tree: ${err}.`);
+        }
+      }
+
+      const currentPins = appSettings?.pinnedFolders || [];
+      if (currentPins.length > 0) {
+        try {
+          const trees = await invoke(Invokes.GetPinnedFolderTrees, {
+            paths: currentPins,
+            expandedFolders: expandedArr,
+            showImageCounts: showCounts,
+          });
+          setLibrary({ pinnedFolderTrees: trees });
+        } catch (err) {
+          console.error('Failed to refresh pinned folder trees:', err);
+        }
+      }
+    },
+    [rootPath, appSettings?.pinnedFolders, appSettings?.enableFolderImageCounts, expandedFolders, setLibrary],
+  );
+
+  const pinnedFolders = useMemo(() => appSettings?.pinnedFolders || [], [appSettings]);
+
+  const handleTogglePinFolder = useCallback(
+    async (path: string) => {
+      if (!appSettings) return;
+      const currentPins = appSettings.pinnedFolders || [];
+      const isPinned = currentPins.includes(path);
+      const newPins = isPinned
+        ? currentPins.filter((p: string) => p !== path)
+        : [...currentPins, path].sort((a, b) => a.localeCompare(b));
+
+      if (!isPinned) {
+        handleActiveTreeSectionChange('pinned');
+      }
+
+      handleSettingsChange({ ...appSettings, pinnedFolders: newPins });
+
+      try {
+        const trees = await invoke(Invokes.GetPinnedFolderTrees, {
+          paths: newPins,
+          expandedFolders: Array.from(expandedFolders),
+          showImageCounts: appSettings.enableFolderImageCounts ?? false,
+        });
+        setLibrary({ pinnedFolderTrees: trees });
+      } catch (err) {
+        console.error('Failed to refresh pinned folders:', err);
+      }
+    },
+    [appSettings, expandedFolders, handleSettingsChange, setLibrary],
+  );
+
+  const handleActiveTreeSectionChange = (section: string | null) => {
+    setActiveTreeSection(section);
+    if (appSettings) {
+      handleSettingsChange({ ...appSettings, activeTreeSection: section });
+    }
+  };
+
+  const handleSelectSubfolder = useCallback(
+    async (path: string | null, isNewRoot = false, preloadedImages?: ImageFile[], expandParents = true) => {
+      await invoke('cancel_thumbnail_generation');
+      clearThumbnailQueue();
+      setLibrary({ isViewLoading: true });
+      setSearchCriteria({ tags: [], text: '', mode: 'OR' });
+      setLibrary({ libraryScrollTop: 0 });
+      setProcess({ thumbnails: {} });
+      imageCacheRef.current.clear();
+      try {
+        setLibrary({ currentFolderPath: path });
+        setUI({ activeView: 'library' });
+
+        if (isNewRoot) {
+          if (path) {
+            setLibrary({ expandedFolders: new Set([path]) });
+          }
+        } else if (path && expandParents) {
+          setLibrary((state) => {
+            const newSet = new Set(state.expandedFolders);
+            const allRoots = [state.rootPath, ...pinnedFolders].filter(Boolean) as string[];
+            const relevantRoot = allRoots.find((r) => path.startsWith(r));
+
+            if (relevantRoot) {
+              const separator = path.includes('/') ? '/' : '\\';
+              const parentSeparatorIndex = path.lastIndexOf(separator);
+
+              if (parentSeparatorIndex > -1 && path.length > relevantRoot.length) {
+                let current = path.substring(0, parentSeparatorIndex);
+                while (current && current.length >= relevantRoot.length) {
+                  newSet.add(current);
+                  const nextParentIndex = current.lastIndexOf(separator);
+                  if (nextParentIndex === -1 || current === relevantRoot) {
+                    break;
+                  }
+                  current = current.substring(0, nextParentIndex);
+                }
+              }
+              newSet.add(relevantRoot);
+            }
+            return { expandedFolders: newSet };
+          });
+        }
+
+        if (isNewRoot) {
+          if (path && !pinnedFolders.includes(path)) {
+            handleActiveTreeSectionChange('current');
+          }
+          setLibrary({ isTreeLoading: true });
+          handleSettingsChange({ ...appSettings, lastRootPath: path } as AppSettings);
+          try {
+            const treeData = await invoke(Invokes.GetFolderTree, {
+              path,
+              expandedFolders: [path],
+              showImageCounts: appSettings?.enableFolderImageCounts ?? false,
+            });
+            setLibrary({ folderTree: treeData });
+          } catch (err) {
+            console.error('Failed to load folder tree:', err);
+            setError(`Failed to load folder tree: ${err}. Some sub-folders might be inaccessible.`);
+          } finally {
+            setLibrary({ isTreeLoading: false });
+          }
+        }
+
+        setLibrary({ imageList: [], multiSelectedPaths: [], libraryActivePath: null });
+        if (selectedImage) {
+          debouncedSave.flush();
+          debouncedSetHistory.cancel();
+          setEditor({ selectedImage: null, finalPreviewUrl: null, uncroppedAdjustedPreviewUrl: null, histogram: null });
+          setLiveAdjustments(INITIAL_ADJUSTMENTS);
+          resetHistory(INITIAL_ADJUSTMENTS);
+        }
+
+        const command =
+          libraryViewMode === LibraryViewMode.Recursive ? Invokes.ListImagesRecursive : Invokes.ListImagesInDir;
+
+        let files: ImageFile[];
+        if (preloadedImages) {
+          files = preloadedImages;
+        } else {
+          files = await invoke(command, { path });
+        }
+
+        const initialRatings: Record<string, number> = {};
+        files.forEach((f) => {
+          if (f.rating !== undefined) {
+            initialRatings[f.path] = f.rating;
+          }
+        });
+        setLibrary({ imageRatings: initialRatings });
+
+        const exifSortKeys = ['date_taken', 'iso', 'shutter_speed', 'aperture', 'focal_length'];
+        const isExifSortActive = exifSortKeys.includes(sortCriteria.key);
+        const shouldReadExif = appSettings?.enableExifReading ?? false;
+
+        if (shouldReadExif && files.length > 0) {
+          const paths = files.map((f: ImageFile) => f.path);
+
+          if (isExifSortActive) {
+            const exifDataMap: Record<string, any> = await invoke(Invokes.ReadExifForPaths, { paths });
+            const finalImageList = files.map((image) => ({
+              ...image,
+              exif: exifDataMap[image.path] || image.exif || null,
+            }));
+            setLibrary({ imageList: finalImageList });
+          } else {
+            setLibrary({ imageList: files });
+            invoke(Invokes.ReadExifForPaths, { paths })
+              .then((exifDataMap: any) => {
+                setLibrary((state) => ({
+                  imageList: state.imageList.map((image) => ({
+                    ...image,
+                    exif: exifDataMap[image.path] || image.exif || null,
+                  })),
+                }));
+              })
+              .catch((err) => {
+                console.error('Failed to read EXIF data in background:', err);
+              });
+          }
+        } else {
+          setLibrary({ imageList: files });
+        }
+
+        invoke(Invokes.StartBackgroundIndexing, { folderPath: path }).catch((err) => {
+          console.error('Failed to start background indexing:', err);
+        });
+      } catch (err) {
+        console.error('Failed to load folder contents:', err);
+        setError('Failed to load images from the selected folder.');
+        setLibrary({ isTreeLoading: false });
+      } finally {
+        setLibrary({ isViewLoading: false });
+      }
+    },
+    [
+      appSettings,
+      handleSettingsChange,
+      selectedImage,
+      rootPath,
+      sortCriteria.key,
+      pinnedFolders,
+      libraryViewMode,
+      debouncedSave,
+      debouncedSetHistory,
+      resetHistory,
+      setUI,
+      clearThumbnailQueue,
+      setLibrary,
+      setSearchCriteria,
+      setEditor,
+      setProcess,
+    ],
+  );
+
+  const handleLibraryRefresh = useCallback(() => {
+    if (currentFolderPath) handleSelectSubfolder(currentFolderPath, false);
+  }, [currentFolderPath, handleSelectSubfolder]);
+
+  const refreshImageList = useCallback(async () => {
+    if (!currentFolderPath) return;
+    try {
+      const command =
+        libraryViewMode === LibraryViewMode.Recursive ? Invokes.ListImagesRecursive : Invokes.ListImagesInDir;
+
+      const files: ImageFile[] = await invoke(command, { path: currentFolderPath });
+
+      setLibrary((state) => {
+        const newRatings = { ...state.imageRatings };
+        files.forEach((f) => {
+          if (f.rating !== undefined) {
+            newRatings[f.path] = f.rating;
+          }
+        });
+        return { imageRatings: newRatings };
+      });
+
+      const exifSortKeys = ['date_taken', 'iso', 'shutter_speed', 'aperture', 'focal_length'];
+      const isExifSortActive = exifSortKeys.includes(sortCriteria.key);
+      const shouldReadExif = appSettings?.enableExifReading ?? false;
+
+      let freshExifData: Record<string, any> | null = null;
+
+      if (shouldReadExif && files.length > 0 && isExifSortActive) {
+        const paths = files.map((f: ImageFile) => f.path);
+        freshExifData = await invoke(Invokes.ReadExifForPaths, { paths });
+      }
+
+      setLibrary((state) => {
+        const prevMap = new Map(state.imageList.map((img) => [img.path, img]));
+
+        const newImageList = files.map((newFile) => {
+          if (freshExifData && freshExifData[newFile.path]) {
+            newFile.exif = freshExifData[newFile.path];
+            return newFile;
+          }
+          const existing = prevMap.get(newFile.path);
+          if (existing && existing.modified === newFile.modified) {
+            return existing;
+          }
+
+          return newFile;
+        });
+        return { imageList: newImageList };
+      });
+
+      if (shouldReadExif && files.length > 0 && !isExifSortActive) {
+        const paths = files.map((f: ImageFile) => f.path);
+        invoke(Invokes.ReadExifForPaths, { paths })
+          .then((exifDataMap: any) => {
+            setLibrary((state) => ({
+              imageList: state.imageList.map((image) => {
+                if (exifDataMap[image.path] && !image.exif) {
+                  return { ...image, exif: exifDataMap[image.path] };
+                }
+                return image;
+              }),
+            }));
+          })
+          .catch((err) => {
+            console.error('Failed to read EXIF data in background:', err);
+          });
+      }
+    } catch (err) {
+      console.error('Failed to refresh image list:', err);
+      setError('Failed to refresh image list.');
+    }
+  }, [currentFolderPath, sortCriteria.key, appSettings?.enableExifReading, libraryViewMode, setLibrary]);
+
+  useTauriListeners({
+    refreshAllFolderTrees,
+    handleSelectSubfolder,
+    refreshImageList,
+    markGenerated,
+  });
+
+  const handleToggleFolder = useCallback(
+    async (path: string) => {
+      const isExpanding = !expandedFolders.has(path);
+      setLibrary((state) => {
+        const newSet = new Set(state.expandedFolders);
+        if (isExpanding) {
+          newSet.add(path);
+        } else {
+          newSet.delete(path);
+        }
+        return { expandedFolders: newSet };
+      });
+      if (!isExpanding) return;
+      try {
+        const showCounts = appSettings?.enableFolderImageCounts ?? false;
+        const newChildren: any[] = await invoke(Invokes.GetFolderChildren, {
+          path,
+          showImageCounts: showCounts,
+        });
+        setLibrary((state) => ({ folderTree: insertChildrenIntoTree(state.folderTree, path, newChildren) }));
+        setLibrary((state) => ({
+          pinnedFolderTrees: state.pinnedFolderTrees.map((tree) => insertChildrenIntoTree(tree, path, newChildren)),
+        }));
+      } catch (err) {
+        console.error('Failed to fetch folder children:', err);
+        setError(`Failed to load folder: ${err}`);
+      }
+    },
+    [expandedFolders, appSettings?.enableFolderImageCounts, setLibrary],
+  );
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings || !rootPath) {
+      return;
+    }
+
+    const newFolderState = {
+      currentFolderPath,
+      expandedFolders: Array.from(expandedFolders),
+    };
+
+    if (JSON.stringify(appSettings.lastFolderState) === JSON.stringify(newFolderState)) {
+      return;
+    }
+
+    handleSettingsChange({ ...appSettings, lastFolderState: newFolderState });
+  }, [currentFolderPath, expandedFolders, rootPath, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    const handleGlobalContextMenu = (event: any) => {
+      if (!DEBUG) event.preventDefault();
+    };
+    window.addEventListener('contextmenu', handleGlobalContextMenu);
+    return () => window.removeEventListener('contextmenu', handleGlobalContextMenu);
+  }, []);
+
+  const handleBackToLibrary = useCallback(() => {
+    if (selectedImage?.path && cachedEditStateRef.current) {
+      imageCacheRef.current.set(selectedImage.path, cachedEditStateRef.current);
+    }
+    if (transformWrapperRef.current) {
+      transformWrapperRef.current.resetTransform(0);
+    }
+    setEditor({ zoom: 1 });
+
+    debouncedSave.flush();
+    debouncedSetHistory.cancel();
+
+    const lastActivePath = selectedImage?.path ?? null;
+
+    setEditor({
+      hasRenderedFirstFrame: false,
+      selectedImage: null,
+      finalPreviewUrl: null,
+      uncroppedAdjustedPreviewUrl: null,
+      histogram: null,
+      waveform: null,
+      activeMaskId: null,
+      activeMaskContainerId: null,
+      activeAiPatchContainerId: null,
+      isWbPickerActive: false,
+      activeAiSubMaskId: null,
+    });
+
+    selectedImagePathRef.current = null;
+
+    setLibrary({ libraryActivePath: lastActivePath });
+    setUI({ slideDirection: 1 });
+
+    setLiveAdjustments(INITIAL_ADJUSTMENTS);
+    resetHistory(INITIAL_ADJUSTMENTS);
+
+    isBackendReadyRef.current = true;
+    setEditor((state) => {
+      if (state.interactivePatch?.url) URL.revokeObjectURL(state.interactivePatch.url);
+      return { interactivePatch: null };
+    });
+  }, [selectedImage?.path, resetHistory, debouncedSave, debouncedSetHistory, setUI, setLibrary, setEditor]);
+
+  const handleImageSelect = useCallback(
+    async (path: string) => {
+      if (selectedImage?.path === path) return;
+
+      debouncedSave.flush();
+      debouncedSetHistory.cancel();
+
+      if (selectedImage?.path && cachedEditStateRef.current) {
+        imageCacheRef.current.set(selectedImage.path, cachedEditStateRef.current);
+      }
+
+      patchesSentToBackend.current.clear();
+
+      const cached = imageCacheRef.current.get(path);
+      const isFrontendCached = Boolean(cached && cached.selectedImage?.isReady);
+      const isCachedInBackend = isFrontendCached
+        ? await invoke<boolean>('is_image_cached', { path }).catch(() => false)
+        : false;
+
+      const hasDifferentResolution =
+        cached &&
+        (originalSize.width !== cached.originalSize.width || originalSize.height !== cached.originalSize.height);
+
+      if (!isCachedInBackend || hasDifferentResolution) {
+        setEditor({ hasRenderedFirstFrame: false });
+      }
+
+      selectedImagePathRef.current = path;
+      setLibrary({ multiSelectedPaths: [path], libraryActivePath: null, selectionAnchorPath: path });
+      setError(null);
+
+      setEditor({
+        showOriginal: false,
+        activeMaskId: null,
+        activeMaskContainerId: null,
+        activeAiPatchContainerId: null,
+        activeAiSubMaskId: null,
+        isWbPickerActive: false,
+        transformedOriginalUrl: null,
+      });
+
+      setUI({
+        isLibraryExportPanelVisible: false,
+        compactEditorPanelHeightOverride: null,
+      });
+
+      if (isFrontendCached) {
+        setEditor({
+          selectedImage: {
+            ...cached.selectedImage,
+            thumbnailUrl: useProcessStore.getState().thumbnails[path] || cached.selectedImage.thumbnailUrl,
+          },
+          originalSize: cached.originalSize,
+          previewSize: cached.previewSize,
+          histogram: cached.histogram,
+          waveform: cached.waveform,
+          finalPreviewUrl: cached.finalPreviewUrl,
+          uncroppedAdjustedPreviewUrl: cached.uncroppedPreviewUrl,
+        });
+
+        setLiveAdjustments(cached.adjustments);
+        resetHistory(cached.adjustments);
+        prevAdjustmentsRef.current = { path, adjustments: cached.adjustments };
+
+        setLibrary({ isViewLoading: false });
+
+        latestRenderedJobIdRef.current = previewJobIdRef.current;
+        isBackendReadyRef.current = false;
+        currentResRef.current = Infinity;
+
+        invoke(Invokes.LoadImage, { path })
+          .then((_result: any) => {
+            if (selectedImagePathRef.current !== path) return;
+            isBackendReadyRef.current = true;
+            currentResRef.current = 0;
+            setEditor({ originalSize: { width: _result.width, height: _result.height } });
+          })
+          .catch((err: any) => {
+            if (String(err).includes('cancelled')) return;
+            console.error('Background load_image failed on cache hit:', err);
+            isBackendReadyRef.current = true;
+            currentResRef.current = 0;
+          });
+
+        invoke(Invokes.LoadMetadata, { path })
+          .then((metadata: any) => {
+            if (selectedImagePathRef.current !== path) return;
+            let freshAdjustments: Adjustments;
+            if (metadata.adjustments && !metadata.adjustments.is_null) {
+              freshAdjustments = normalizeLoadedAdjustments(metadata.adjustments);
+            } else {
+              freshAdjustments = { ...INITIAL_ADJUSTMENTS };
+            }
+            if (!isSliderDragging && JSON.stringify(cached.adjustments) !== JSON.stringify(freshAdjustments)) {
+              setLiveAdjustments(freshAdjustments);
+              resetHistory(freshAdjustments);
+              prevAdjustmentsRef.current = { path, adjustments: freshAdjustments };
+              imageCacheRef.current.set(path, { ...cached, adjustments: freshAdjustments });
+            }
+          })
+          .catch((err) => console.error('Failed background metadata sync on cache hit:', err));
+
+        return;
+      }
+
+      isBackendReadyRef.current = true;
+
+      setEditor({
+        selectedImage: {
+          exif: null,
+          height: 0,
+          isRaw: false,
+          isReady: false,
+          metadata: null,
+          originalUrl: null,
+          path,
+          thumbnailUrl: useProcessStore.getState().thumbnails[path],
+          width: 0,
+        },
+        originalSize: { width: 0, height: 0 },
+        previewSize: { width: 0, height: 0 },
+        histogram: null,
+        waveform: null,
+        uncroppedAdjustedPreviewUrl: null,
+      });
+
+      setLibrary({ isViewLoading: true });
+
+      setEditor((state) => {
+        const prev = state.finalPreviewUrl;
+        if (prev?.startsWith('blob:') && !imageCacheRef.current.isProtected(prev)) {
+          setTimeout(() => {
+            if (!imageCacheRef.current.isProtected(prev)) {
+              URL.revokeObjectURL(prev);
+            }
+          }, 250);
+        }
+        return { finalPreviewUrl: null };
+      });
+
+      setEditor((state) => {
+        if (state.interactivePatch?.url) URL.revokeObjectURL(state.interactivePatch.url);
+        return { interactivePatch: null };
+      });
+    },
+    [
+      selectedImage?.path,
+      debouncedSave,
+      debouncedSetHistory,
+      resetHistory,
+      isSliderDragging,
+      setUI,
+      setLibrary,
+      setEditor,
+      originalSize,
+    ],
+  );
+
+  useEffect(() => {
+    if (selectedImage && !selectedImage.isReady && selectedImage.path) {
+      let isEffectActive = true;
+
+      const loadMetadataEarly = async () => {
+        try {
+          const metadata: any = await invoke(Invokes.LoadMetadata, { path: selectedImage.path });
+          if (!isEffectActive) return;
+
+          let initialAdjusts;
+          if (metadata.adjustments && !metadata.adjustments.is_null) {
+            initialAdjusts = normalizeLoadedAdjustments(metadata.adjustments);
+          } else {
+            initialAdjusts = { ...INITIAL_ADJUSTMENTS };
+          }
+
+          setEditor({ adjustments: initialAdjusts });
+          resetHistory(initialAdjusts);
+        } catch (err) {
+          console.error('Failed to load metadata early:', err);
+        }
+      };
+
+      const loadFullImageData = async () => {
+        try {
+          const loadImageResult: any = await invoke(Invokes.LoadImage, { path: selectedImage.path });
+          if (!isEffectActive) {
+            return;
+          }
+
+          const { width, height } = loadImageResult;
+          setEditor({ originalSize: { width, height } });
+
+          if (appSettings?.editorPreviewResolution) {
+            const maxSize = appSettings.editorPreviewResolution;
+            const aspectRatio = width / height;
+
+            if (width > height) {
+              const pWidth = Math.min(width, maxSize);
+              const pHeight = Math.round(pWidth / aspectRatio);
+              setEditor({ previewSize: { width: pWidth, height: pHeight } });
+            } else {
+              const pHeight = Math.min(height, maxSize);
+              const pWidth = Math.round(pHeight * aspectRatio);
+              setEditor({ previewSize: { width: pWidth, height: pHeight } });
+            }
+          } else {
+            setEditor({ previewSize: { width: 0, height: 0 } });
+          }
+
+          setEditor((state) => {
+            if (state.selectedImage && state.selectedImage.path === selectedImage.path) {
+              return {
+                selectedImage: {
+                  ...state.selectedImage,
+                  exif: loadImageResult.exif,
+                  height: loadImageResult.height,
+                  isRaw: loadImageResult.is_raw,
+                  isReady: true,
+                  metadata: loadImageResult.metadata,
+                  originalUrl: null,
+                  width: loadImageResult.width,
+                },
+              };
+            }
+            return state;
+          });
+
+          setEditor((state) => {
+            if (!state.adjustments.aspectRatio && !state.adjustments.crop) {
+              return {
+                adjustments: { ...state.adjustments, aspectRatio: loadImageResult.width / loadImageResult.height },
+              };
+            }
+            return state;
+          });
+        } catch (err) {
+          if (isEffectActive) {
+            console.error('Failed to load image:', err);
+            setError(`Failed to load image: ${err}`);
+            setEditor({ selectedImage: null });
+          }
+        } finally {
+          if (isEffectActive) {
+            setLibrary({ isViewLoading: false });
+          }
+        }
+      };
+
+      const loadAll = async () => {
+        await loadMetadataEarly();
+        if (isEffectActive) {
+          await loadFullImageData();
+        }
+      };
+
+      loadAll();
+
+      return () => {
+        isEffectActive = false;
+      };
+    }
+  }, [selectedImage?.path, selectedImage?.isReady, appSettings?.editorPreviewResolution]);
 
   const sortedImageList = useMemo(() => {
     let processedList = imageList;
@@ -1462,1189 +2545,6 @@ function App() {
     return list;
   }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchCriteria, appSettings]);
 
-  const handleDisplaySizeChange = useCallback(
-    (
-      size: ImageDimensions & {
-        scale?: number;
-        offsetX?: number;
-        offsetY?: number;
-        containerWidth?: number;
-        containerHeight?: number;
-      },
-    ) => {
-      setDisplaySize({ width: size.width, height: size.height });
-
-      if (size.scale) {
-        const baseWidth = size.width / size.scale;
-        const baseHeight = size.height / size.scale;
-        const newSize = {
-          width: baseWidth,
-          height: baseHeight,
-          offsetX: size.offsetX || 0,
-          offsetY: size.offsetY || 0,
-          containerWidth: size.containerWidth || 0,
-          containerHeight: size.containerHeight || 0,
-        };
-        baseRenderSizeRef.current = newSize;
-        setBaseRenderSize(newSize as any);
-      }
-    },
-    [],
-  );
-
-  const calculateROI = useCallback(() => {
-    if (!transformWrapperRef.current) return null;
-    const state = transformWrapperRef.current.instance.transformState;
-    if (!state) return null;
-
-    const currentBaseSize = baseRenderSizeRef.current;
-    if (!currentBaseSize) return null;
-
-    const { scale, positionX, positionY } = state;
-    const { width: baseW, height: baseH, offsetX, offsetY, containerWidth, containerHeight } = currentBaseSize;
-
-    if (!baseW || !baseH || !containerWidth || !containerHeight) return null;
-
-    if (scale <= 1.01) return null;
-
-    const paddingPixels = 2.0;
-    const paddingX = paddingPixels / baseW;
-    const paddingY = paddingPixels / baseH;
-
-    const visibleLeft = -positionX / scale;
-    const visibleTop = -positionY / scale;
-    const visibleRight = visibleLeft + containerWidth / scale;
-    const visibleBottom = visibleTop + containerHeight / scale;
-
-    const imgLeft = offsetX;
-    const imgTop = offsetY;
-    const imgRight = offsetX + baseW;
-    const imgBottom = offsetY + baseH;
-
-    const intersectLeft = Math.max(visibleLeft, imgLeft);
-    const intersectTop = Math.max(visibleTop, imgTop);
-    const intersectRight = Math.min(visibleRight, imgRight);
-    const intersectBottom = Math.min(visibleBottom, imgBottom);
-
-    if (intersectLeft >= intersectRight || intersectTop >= intersectBottom) {
-      return null;
-    }
-
-    let roiX = (intersectLeft - imgLeft) / baseW;
-    let roiY = (intersectTop - imgTop) / baseH;
-    let roiW = (intersectRight - intersectLeft) / baseW;
-    let roiH = (intersectBottom - intersectTop) / baseH;
-
-    const newRoiX = roiX - paddingX;
-    const newRoiY = roiY - paddingY;
-    const newRoiW = roiW + paddingX * 2;
-    const newRoiH = roiH + paddingY * 2;
-
-    const clampedX = Math.max(0, newRoiX);
-    const clampedY = Math.max(0, newRoiY);
-    const clampedW = Math.min(1 - clampedX, newRoiW);
-    const clampedH = Math.min(1 - clampedY, newRoiH);
-
-    if (clampedW > 0.999 && clampedH > 0.999) return null;
-
-    return [clampedX, clampedY, clampedW, clampedH] as [number, number, number, number];
-  }, []);
-
-  const executeApplyAdjustments = useCallback(
-    async (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
-      const currentPath = selectedImage?.path;
-      if (!currentPath) return;
-
-      const payload = JSON.parse(JSON.stringify(currentAdjustments));
-
-      const processSubMasks = (subMasks: any[]) => {
-        if (!Array.isArray(subMasks)) return;
-        subMasks.forEach((sm: any) => {
-          if (sm.id && sm.parameters) {
-            const keys = ['mask_data_base64', 'maskDataBase64'];
-            let foundMaskData = false;
-
-            for (const key of keys) {
-              if (sm.parameters[key] !== undefined && sm.parameters[key] !== null) {
-                foundMaskData = true;
-                if (patchesSentToBackend.current.has(sm.id)) {
-                  sm.parameters[key] = null;
-                }
-              }
-            }
-            if (foundMaskData && !patchesSentToBackend.current.has(sm.id)) {
-              patchesSentToBackend.current.add(sm.id);
-            }
-          }
-        });
-      };
-
-      if (payload.aiPatches && Array.isArray(payload.aiPatches)) {
-        payload.aiPatches.forEach((p: any) => {
-          if (p.id && p.patchData && !p.isLoading) {
-            if (patchesSentToBackend.current.has(p.id)) {
-              p.patchData = null;
-            } else {
-              patchesSentToBackend.current.add(p.id);
-            }
-          }
-          if (p.subMasks) {
-            processSubMasks(p.subMasks);
-          }
-        });
-      }
-
-      if (payload.masks && Array.isArray(payload.masks)) {
-        payload.masks.forEach((container: any) => {
-          if (container.subMasks) {
-            processSubMasks(container.subMasks);
-          }
-        });
-      }
-
-      const jobId = ++previewJobIdRef.current;
-      const roi = calculateROI();
-
-      try {
-        const buffer: ArrayBuffer = await invoke(Invokes.ApplyAdjustments, {
-          jsAdjustments: payload,
-          isInteractive: dragging,
-          targetResolution: targetRes || null,
-          roi: roi || null,
-          computeWaveform: !!isWaveformVisible,
-          activeWaveformChannel: activeWaveformChannelRef.current || null,
-        });
-
-        if (currentPath !== selectedImagePathRef.current) return;
-
-        if (buffer && buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
-          latestRenderedJobIdRef.current = jobId;
-
-          const textDecoder = new TextDecoder();
-          const prefix = textDecoder.decode(buffer.slice(0, 11));
-          if (prefix === 'WGPU_RENDER') {
-            setInteractivePatch((prev) => {
-              if (prev && prev.url) URL.revokeObjectURL(prev.url);
-              return null;
-            });
-            return;
-          }
-
-          if (dragging) {
-            const view = new DataView(buffer);
-            const patchX = view.getUint32(0, true);
-            const patchY = view.getUint32(4, true);
-            const patchW = view.getUint32(8, true);
-            const patchH = view.getUint32(12, true);
-            const fullW = view.getUint32(16, true);
-            const fullH = view.getUint32(20, true);
-
-            const imageBuffer = buffer.slice(24);
-            const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
-            const url = URL.createObjectURL(blob);
-
-            setInteractivePatch((prev) => {
-              if (prev && prev.url) setTimeout(() => URL.revokeObjectURL(prev.url), 100);
-              return {
-                url,
-                normX: patchX / fullW,
-                normY: patchY / fullH,
-                normW: patchW / fullW,
-                normH: patchH / fullH,
-              };
-            });
-          } else {
-            const blob = new Blob([buffer], { type: 'image/jpeg' });
-            const url = URL.createObjectURL(blob);
-
-            if (currentPath !== selectedImagePathRef.current || jobId < latestRenderedJobIdRef.current) {
-              URL.revokeObjectURL(url);
-              return;
-            }
-
-            setFinalPreviewUrl((prevUrl) => {
-              if (prevUrl && prevUrl.startsWith('blob:') && !imageCacheRef.current.isProtected(prevUrl)) {
-                setTimeout(() => {
-                  if (!imageCacheRef.current.isProtected(prevUrl)) {
-                    URL.revokeObjectURL(prevUrl);
-                  }
-                }, 250);
-              }
-              return url;
-            });
-
-            setInteractivePatch((prev) => {
-              if (prev && prev.url) {
-                setTimeout(() => URL.revokeObjectURL(prev.url), 500);
-              }
-              return null;
-            });
-          }
-        }
-      } catch (err) {
-        if (err !== 'Superseded or worker failed') {
-          console.error('Failed to apply adjustments:', err);
-        }
-
-        if (!dragging) {
-          setInteractivePatch((prev) => {
-            if (prev && prev.url) URL.revokeObjectURL(prev.url);
-            return null;
-          });
-        }
-      }
-    },
-    [selectedImage?.path, calculateROI, isWaveformVisible],
-  );
-
-  const flushPipeline = useCallback(() => {
-    if (inFlightCountRef.current >= 3) return;
-    if (!pendingApplyRef.current) return;
-
-    const { adjustments, targetRes } = pendingApplyRef.current;
-    pendingApplyRef.current = null;
-
-    inFlightCountRef.current += 1;
-
-    executeApplyAdjustments(adjustments, true, targetRes).finally(() => {
-      inFlightCountRef.current -= 1;
-      if (pendingApplyRef.current) {
-        requestAnimationFrame(() => flushPipeline());
-      }
-    });
-  }, [executeApplyAdjustments]);
-
-  const applyAdjustments = useCallback(
-    (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
-      if (!selectedImage?.isReady || !isBackendReadyRef.current) return;
-
-      if (dragging) {
-        pendingApplyRef.current = { adjustments: currentAdjustments, targetRes };
-        flushPipeline();
-      } else {
-        pendingApplyRef.current = null;
-        executeApplyAdjustments(currentAdjustments, false, targetRes);
-      }
-    },
-    [selectedImage?.isReady, flushPipeline, executeApplyAdjustments],
-  );
-
-  const generateUncroppedPreview = useCallback(
-    (currentAdjustments: Adjustments) => {
-      if (!selectedImage?.isReady) {
-        return;
-      }
-      invoke(Invokes.GenerateUncroppedPreview, { jsAdjustments: currentAdjustments }).catch((err) =>
-        console.error('Failed to generate uncropped preview:', err),
-      );
-    },
-    [selectedImage?.isReady],
-  );
-
-  useEffect(() => {
-    if (activeRightPanel === Panel.Crop && selectedImage?.isReady && isBackendReadyRef.current) {
-      generateUncroppedPreview(adjustments);
-    }
-  }, [adjustments, activeRightPanel, selectedImage?.isReady, generateUncroppedPreview]);
-
-  const debouncedSave = useCallback(
-    debounce((path, adjustmentsToSave) => {
-      invoke(Invokes.SaveMetadataAndUpdateThumbnail, { path, adjustments: adjustmentsToSave }).catch((err) => {
-        console.error('Auto-save failed:', err);
-        setError(`Failed to save changes: ${err}`);
-      });
-    }, 300),
-    [],
-  );
-
-  const createResizeHandler = (setter: any, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setIsResizing(true);
-
-    const pointerId = e.pointerId;
-    const target = e.currentTarget;
-    const startX = e.clientX;
-    const startY = e.clientY;
-
-    const previousTouchAction = document.documentElement.style.touchAction;
-    const previousUserSelect = document.documentElement.style.userSelect;
-
-    target.setPointerCapture?.(pointerId);
-    document.documentElement.style.touchAction = 'none';
-    document.documentElement.style.userSelect = 'none';
-
-    const doDrag = (moveEvent: PointerEvent) => {
-      if (moveEvent.pointerId !== pointerId) return;
-      moveEvent.preventDefault();
-
-      if (setter === setLeftPanelWidth) {
-        setter(Math.round(Math.max(200, Math.min(startSize + (moveEvent.clientX - startX), 500))));
-      } else if (setter === setRightPanelWidth) {
-        setter(Math.round(Math.max(280, Math.min(startSize - (moveEvent.clientX - startX), 600))));
-      } else if (setter === setBottomPanelHeight) {
-        setter(Math.round(Math.max(100, Math.min(startSize - (moveEvent.clientY - startY), 400))));
-      } else if (setter === setCompactEditorPanelHeightOverride) {
-        setter(
-          Math.round(
-            Math.max(
-              compactEditorPanelMinHeight,
-              Math.min(startSize - (moveEvent.clientY - startY), compactEditorPanelMaxHeight),
-            ),
-          ),
-        );
-      }
-    };
-
-    const stopDrag = (upEvent: PointerEvent) => {
-      if (upEvent.pointerId !== pointerId) return;
-      if (target.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId);
-
-      document.documentElement.style.cursor = '';
-      document.documentElement.style.touchAction = previousTouchAction;
-      document.documentElement.style.userSelect = previousUserSelect;
-
-      window.removeEventListener('pointermove', doDrag);
-      window.removeEventListener('pointerup', stopDrag);
-      window.removeEventListener('pointercancel', stopDrag);
-      setIsResizing(false);
-    };
-    document.documentElement.style.cursor =
-      setter === setBottomPanelHeight || setter === setCompactEditorPanelHeightOverride ? 'row-resize' : 'col-resize';
-
-    window.addEventListener('pointermove', doDrag, { passive: false });
-    window.addEventListener('pointerup', stopDrag);
-    window.addEventListener('pointercancel', stopDrag);
-  };
-
-  useEffect(() => {
-    const appWindow = getCurrentWindow();
-    const checkFullscreen = async () => {
-      setIsWindowFullScreen(await appWindow.isFullscreen());
-    };
-    checkFullscreen();
-
-    const unlistenPromise = appWindow.onResized(checkFullscreen);
-
-    return () => {
-      unlistenPromise.then((unlisten: any) => unlisten());
-    };
-  }, []);
-
-  const handleLutSelect = useCallback(
-    async (path: string) => {
-      try {
-        const result: LutData = await invoke('load_and_parse_lut', { path });
-        let name = 'LUT';
-        if (isAndroid) {
-          name = await invoke<string>('resolve_android_content_uri_name', {
-            uriStr: path,
-          });
-        } else {
-          name = path.split(/[\\/]/).pop() || 'LUT';
-        }
-        setAdjustments((prev: Partial<Adjustments>) => ({
-          ...prev,
-          lutPath: path,
-          lutName: name,
-          lutSize: result.size,
-          lutIntensity: 100,
-          sectionVisibility: {
-            ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility),
-            effects: true,
-          },
-        }));
-      } catch (err) {
-        console.error('Failed to load or parse LUT:', err);
-        setError(`Failed to load LUT: ${err}`);
-      }
-    },
-    [setAdjustments],
-  );
-
-  const handleRightPanelSelect = useCallback(
-    (panelId: Panel) => {
-      if (panelId === activeRightPanel) {
-        setActiveRightPanel(null);
-      } else {
-        const currentIndex = activeRightPanel ? RIGHT_PANEL_ORDER.indexOf(activeRightPanel) : -1;
-        const newIndex = RIGHT_PANEL_ORDER.indexOf(panelId);
-        setSlideDirection(newIndex > currentIndex ? 1 : -1);
-        setActiveRightPanel(panelId);
-        setRenderedRightPanel(panelId);
-      }
-      setActiveMaskId(null);
-      setActiveAiSubMaskId(null);
-      setIsWbPickerActive(false);
-    },
-    [activeRightPanel],
-  );
-
-  const handleSettingsChange = useCallback(
-    (newSettings: AppSettings): Promise<void> => {
-      if (!newSettings) {
-        console.error('handleSettingsChange was called with null settings. Aborting save operation.');
-        return Promise.resolve();
-      }
-      if (newSettings.theme && newSettings.theme !== theme) {
-        setTheme(newSettings.theme);
-      }
-
-      const { searchCriteria: _searchCriteria, ...settingsToSave } = newSettings as any;
-      setAppSettings(newSettings);
-      return invoke(Invokes.SaveSettings, { settings: settingsToSave })
-        .then(() => {})
-        .catch((err) => {
-          console.error('Failed to save settings:', err);
-        });
-    },
-    [theme],
-  );
-
-  useEffect(() => {
-    try {
-      setOsPlatform(platform());
-    } catch (e) {
-      console.error('Failed to get platform:', e);
-    }
-  }, []);
-
-  useEffect(() => {
-    invoke(Invokes.LoadSettings)
-      .then(async (settings: any) => {
-        if (
-          !settings.copyPasteSettings ||
-          !settings.copyPasteSettings.includedAdjustments ||
-          settings.copyPasteSettings.includedAdjustments.length === 0
-        ) {
-          settings.copyPasteSettings = {
-            mode: 'merge',
-            includedAdjustments: COPYABLE_ADJUSTMENT_KEYS,
-          };
-        }
-        setAppSettings(settings);
-        if (settings?.sortCriteria) setSortCriteria(settings.sortCriteria);
-        if (settings?.filterCriteria) {
-          setFilterCriteria((prev: FilterCriteria) => ({
-            ...prev,
-            ...settings.filterCriteria,
-            rawStatus: settings.filterCriteria.rawStatus || RawStatus.All,
-            colors: settings.filterCriteria.colors || [],
-          }));
-        }
-        if (settings?.theme) {
-          setTheme(settings.theme);
-        }
-        if (settings?.uiVisibility) {
-          setUiVisibility((prev) => ({ ...prev, ...settings.uiVisibility }));
-        }
-        setLibraryViewMode(settings?.libraryViewMode ?? defaultLibraryViewMode);
-        setThumbnailSize(settings?.thumbnailSize ?? defaultThumbnailSize);
-        if (settings?.thumbnailAspectRatio) {
-          setThumbnailAspectRatio(settings.thumbnailAspectRatio);
-        }
-        if (settings?.activeTreeSection) {
-          setActiveTreeSection(settings.activeTreeSection);
-        }
-        if (typeof settings?.isWaveformVisible === 'boolean') {
-          setIsWaveformVisible(settings.isWaveformVisible);
-        }
-        if (settings?.activeWaveformChannel) {
-          setActiveWaveformChannel(settings.activeWaveformChannel);
-        }
-        if (settings?.waveformHeight !== undefined) {
-          setWaveformHeight(settings.waveformHeight);
-        }
-        if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
-          try {
-            const trees = await invoke(Invokes.GetPinnedFolderTrees, {
-              paths: settings.pinnedFolders,
-              expandedFolders: settings.lastFolderState?.expandedFolders || [],
-              showImageCounts: settings.enableFolderImageCounts ?? false,
-            });
-            setPinnedFolderTrees(trees);
-          } catch (err) {
-            console.error('Failed to load pinned folder trees:', err);
-          }
-        }
-
-        if (!isAndroid && settings.lastRootPath) {
-          const root = settings.lastRootPath;
-          const currentPath = settings.lastFolderState?.currentFolderPath || root;
-
-          const command =
-            settings.libraryViewMode === LibraryViewMode.Recursive
-              ? Invokes.ListImagesRecursive
-              : Invokes.ListImagesInDir;
-
-          preloadedDataRef.current = {
-            rootPath: root,
-            currentPath: currentPath,
-            tree: invoke(Invokes.GetFolderTree, {
-              path: root,
-              expandedFolders: settings.lastFolderState?.expandedFolders ?? [root],
-              showImageCounts: settings.enableFolderImageCounts ?? false,
-            }),
-            images: invoke(command, { path: currentPath }),
-          };
-        }
-
-        invoke('frontend_ready').catch((e) => console.error('Failed to notify backend of readiness:', e));
-      })
-      .catch((err) => {
-        console.error('Failed to load settings:', err);
-        setAppSettings({
-          lastRootPath: null,
-          theme: DEFAULT_THEME_ID,
-          thumbnailSize: defaultThumbnailSize,
-          libraryViewMode: defaultLibraryViewMode,
-        });
-      })
-      .finally(() => {
-        isInitialMount.current = false;
-      });
-  }, [isAndroid]);
-
-  useEffect(() => {
-    if (isInitialMount.current || !appSettings) {
-      return;
-    }
-    if (JSON.stringify(appSettings.uiVisibility) !== JSON.stringify(uiVisibility)) {
-      handleSettingsChange({ ...appSettings, uiVisibility });
-    }
-  }, [uiVisibility, appSettings, handleSettingsChange]);
-
-  const handleToggleWaveform = useCallback(() => {
-    setIsWaveformVisible((prev: boolean) => !prev);
-  }, []);
-
-  useEffect(() => {
-    if (isInitialMount.current || !appSettings) {
-      return;
-    }
-    if (appSettings.thumbnailSize !== thumbnailSize) {
-      handleSettingsChange({ ...appSettings, thumbnailSize });
-    }
-  }, [thumbnailSize, appSettings, handleSettingsChange]);
-
-  useEffect(() => {
-    if (isInitialMount.current || !appSettings) {
-      return;
-    }
-    if (appSettings.thumbnailAspectRatio !== thumbnailAspectRatio) {
-      handleSettingsChange({ ...appSettings, thumbnailAspectRatio });
-    }
-  }, [thumbnailAspectRatio, appSettings, handleSettingsChange]);
-
-  useEffect(() => {
-    if (isInitialMount.current || !appSettings) {
-      return;
-    }
-    if (appSettings.libraryViewMode !== libraryViewMode) {
-      handleSettingsChange({ ...appSettings, libraryViewMode });
-    }
-  }, [libraryViewMode, appSettings, handleSettingsChange]);
-
-  useEffect(() => {
-    invoke(Invokes.GetSupportedFileTypes)
-      .then((types: any) => setSupportedTypes(types))
-      .catch((err) => console.error('Failed to load supported file types:', err));
-  }, []);
-
-  useEffect(() => {
-    if (isInitialMount.current || !appSettings) {
-      return;
-    }
-    if (JSON.stringify(appSettings.sortCriteria) !== JSON.stringify(sortCriteria)) {
-      handleSettingsChange({ ...appSettings, sortCriteria });
-    }
-  }, [sortCriteria, appSettings, handleSettingsChange]);
-
-  useEffect(() => {
-    if (isInitialMount.current || !appSettings) {
-      return;
-    }
-    if (JSON.stringify(appSettings.filterCriteria) !== JSON.stringify(filterCriteria)) {
-      handleSettingsChange({ ...appSettings, filterCriteria });
-    }
-  }, [filterCriteria, appSettings, handleSettingsChange]);
-
-  useEffect(() => {
-    if (isInitialMount.current || !appSettings) {
-      return;
-    }
-    if (
-      appSettings.isWaveformVisible !== isWaveformVisible ||
-      appSettings.activeWaveformChannel !== activeWaveformChannel ||
-      appSettings.waveformHeight !== waveformHeight
-    ) {
-      handleSettingsChange({
-        ...appSettings,
-        isWaveformVisible,
-        activeWaveformChannel,
-        waveformHeight,
-      });
-    }
-  }, [isWaveformVisible, activeWaveformChannel, waveformHeight, appSettings, handleSettingsChange]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const currentThemeId = theme || DEFAULT_THEME_ID;
-
-    const baseTheme =
-      THEMES.find((t: ThemeProps) => t.id === currentThemeId) ||
-      THEMES.find((t: ThemeProps) => t.id === DEFAULT_THEME_ID);
-    if (!baseTheme) {
-      return;
-    }
-
-    let finalCssVariables: any = { ...baseTheme.cssVariables };
-
-    Object.entries(finalCssVariables).forEach(([key, value]) => {
-      root.style.setProperty(key, value as string);
-    });
-
-    const fontFamily = appSettings?.fontFamily || 'poppins';
-    const fontStack =
-      fontFamily === 'system'
-        ? '-apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-        : "'Poppins', system-ui, sans-serif";
-    root.style.setProperty('--font-family', fontStack);
-  }, [theme, appSettings?.fontFamily]);
-
-  const refreshAllFolderTrees = useCallback(
-    async (currentExpanded?: Set<string>) => {
-      const activeExpanded = currentExpanded || expandedFolders;
-      const expandedArr = Array.from(activeExpanded);
-      const showCounts = appSettings?.enableFolderImageCounts ?? false;
-
-      if (rootPath) {
-        try {
-          const treeData = await invoke(Invokes.GetFolderTree, {
-            path: rootPath,
-            expandedFolders: expandedArr,
-            showImageCounts: showCounts,
-          });
-          setFolderTree(treeData);
-        } catch (err) {
-          console.error('Failed to refresh main folder tree:', err);
-          setError(`Failed to refresh folder tree: ${err}.`);
-        }
-      }
-
-      const currentPins = appSettings?.pinnedFolders || [];
-      if (currentPins.length > 0) {
-        try {
-          const trees = await invoke(Invokes.GetPinnedFolderTrees, {
-            paths: currentPins,
-            expandedFolders: expandedArr,
-            showImageCounts: showCounts,
-          });
-          setPinnedFolderTrees(trees);
-        } catch (err) {
-          console.error('Failed to refresh pinned folder trees:', err);
-        }
-      }
-    },
-    [rootPath, appSettings?.pinnedFolders, appSettings?.enableFolderImageCounts, expandedFolders],
-  );
-
-  const pinnedFolders = useMemo(() => appSettings?.pinnedFolders || [], [appSettings]);
-
-  const handleTogglePinFolder = useCallback(
-    async (path: string) => {
-      if (!appSettings) return;
-      const currentPins = appSettings.pinnedFolders || [];
-      const isPinned = currentPins.includes(path);
-      const newPins = isPinned
-        ? currentPins.filter((p) => p !== path)
-        : [...currentPins, path].sort((a, b) => a.localeCompare(b));
-
-      if (!isPinned) {
-        handleActiveTreeSectionChange('pinned');
-      }
-
-      handleSettingsChange({ ...appSettings, pinnedFolders: newPins });
-
-      try {
-        const trees = await invoke(Invokes.GetPinnedFolderTrees, {
-          paths: newPins,
-          expandedFolders: Array.from(expandedFolders),
-          showImageCounts: appSettings.enableFolderImageCounts ?? false,
-        });
-        setPinnedFolderTrees(trees);
-      } catch (err) {
-        console.error('Failed to refresh pinned folders:', err);
-      }
-    },
-    [appSettings, expandedFolders, handleSettingsChange],
-  );
-
-  const handleActiveTreeSectionChange = (section: string | null) => {
-    setActiveTreeSection(section);
-    if (appSettings) {
-      handleSettingsChange({ ...appSettings, activeTreeSection: section });
-    }
-  };
-
-  const handleSelectSubfolder = useCallback(
-    async (path: string | null, isNewRoot = false, preloadedImages?: ImageFile[], expandParents = true) => {
-      await invoke('cancel_thumbnail_generation');
-      clearThumbnailQueue();
-      setIsViewLoading(true);
-      setSearchCriteria({ tags: [], text: '', mode: 'OR' });
-      setLibraryScrollTop(0);
-      setThumbnails({});
-      imageCacheRef.current.clear();
-      try {
-        setCurrentFolderPath(path);
-        setActiveView('library');
-
-        if (isNewRoot) {
-          if (path) {
-            setExpandedFolders(new Set([path]));
-          }
-        } else if (path && expandParents) {
-          setExpandedFolders((prev) => {
-            const newSet = new Set(prev);
-            const allRoots = [rootPath, ...pinnedFolders].filter(Boolean) as string[];
-            const relevantRoot = allRoots.find((r) => path.startsWith(r));
-
-            if (relevantRoot) {
-              const separator = path.includes('/') ? '/' : '\\';
-              const parentSeparatorIndex = path.lastIndexOf(separator);
-
-              if (parentSeparatorIndex > -1 && path.length > relevantRoot.length) {
-                let current = path.substring(0, parentSeparatorIndex);
-                while (current && current.length >= relevantRoot.length) {
-                  newSet.add(current);
-                  const nextParentIndex = current.lastIndexOf(separator);
-                  if (nextParentIndex === -1 || current === relevantRoot) {
-                    break;
-                  }
-                  current = current.substring(0, nextParentIndex);
-                }
-              }
-              newSet.add(relevantRoot);
-            }
-            return newSet;
-          });
-        }
-
-        if (isNewRoot) {
-          if (path && !pinnedFolders.includes(path)) {
-            handleActiveTreeSectionChange('current');
-          }
-          setIsTreeLoading(true);
-          handleSettingsChange({ ...appSettings, lastRootPath: path } as AppSettings);
-          try {
-            const treeData = await invoke(Invokes.GetFolderTree, {
-              path,
-              expandedFolders: [path],
-              showImageCounts: appSettings?.enableFolderImageCounts ?? false,
-            });
-            setFolderTree(treeData);
-          } catch (err) {
-            console.error('Failed to load folder tree:', err);
-            setError(`Failed to load folder tree: ${err}. Some sub-folders might be inaccessible.`);
-          } finally {
-            setIsTreeLoading(false);
-          }
-        }
-
-        setImageList([]);
-        setMultiSelectedPaths([]);
-        setLibraryActivePath(null);
-        if (selectedImage) {
-          debouncedSave.flush();
-          debouncedSetHistory.cancel();
-          setSelectedImage(null);
-          setFinalPreviewUrl(null);
-          setUncroppedAdjustedPreviewUrl(null);
-          setHistogram(null);
-          setLiveAdjustments(INITIAL_ADJUSTMENTS);
-          resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
-        }
-
-        const command =
-          libraryViewMode === LibraryViewMode.Recursive ? Invokes.ListImagesRecursive : Invokes.ListImagesInDir;
-
-        let files: ImageFile[];
-        if (preloadedImages) {
-          files = preloadedImages;
-        } else {
-          files = await invoke(command, { path });
-        }
-
-        const initialRatings: Record<string, number> = {};
-        files.forEach((f) => {
-          if (f.rating !== undefined) {
-            initialRatings[f.path] = f.rating;
-          }
-        });
-        setImageRatings(initialRatings);
-
-        const exifSortKeys = ['date_taken', 'iso', 'shutter_speed', 'aperture', 'focal_length'];
-        const isExifSortActive = exifSortKeys.includes(sortCriteria.key);
-        const shouldReadExif = appSettings?.enableExifReading ?? false;
-
-        if (shouldReadExif && files.length > 0) {
-          const paths = files.map((f: ImageFile) => f.path);
-
-          if (isExifSortActive) {
-            const exifDataMap: Record<string, any> = await invoke(Invokes.ReadExifForPaths, { paths });
-            const finalImageList = files.map((image) => ({
-              ...image,
-              exif: exifDataMap[image.path] || image.exif || null,
-            }));
-            setImageList(finalImageList);
-          } else {
-            setImageList(files);
-            invoke(Invokes.ReadExifForPaths, { paths })
-              .then((exifDataMap: any) => {
-                setImageList((currentImageList) =>
-                  currentImageList.map((image) => ({
-                    ...image,
-                    exif: exifDataMap[image.path] || image.exif || null,
-                  })),
-                );
-              })
-              .catch((err) => {
-                console.error('Failed to read EXIF data in background:', err);
-              });
-          }
-        } else {
-          setImageList(files);
-        }
-
-        invoke(Invokes.StartBackgroundIndexing, { folderPath: path }).catch((err) => {
-          console.error('Failed to start background indexing:', err);
-        });
-      } catch (err) {
-        console.error('Failed to load folder contents:', err);
-        setError('Failed to load images from the selected folder.');
-        setIsTreeLoading(false);
-      } finally {
-        setIsViewLoading(false);
-      }
-    },
-    [
-      appSettings,
-      handleSettingsChange,
-      selectedImage,
-      rootPath,
-      sortCriteria.key,
-      pinnedFolders,
-      libraryViewMode,
-      debouncedSave,
-      debouncedSetHistory,
-      resetAdjustmentsHistory,
-    ],
-  );
-
-  const handleLibraryRefresh = useCallback(() => {
-    if (currentFolderPath) handleSelectSubfolder(currentFolderPath, false);
-  }, [currentFolderPath, handleSelectSubfolder]);
-
-  const refreshImageList = useCallback(async () => {
-    if (!currentFolderPath) return;
-    try {
-      const command =
-        libraryViewMode === LibraryViewMode.Recursive ? Invokes.ListImagesRecursive : Invokes.ListImagesInDir;
-
-      const files: ImageFile[] = await invoke(command, { path: currentFolderPath });
-
-      setImageRatings((prev) => {
-        const newRatings = { ...prev };
-        files.forEach((f) => {
-          if (f.rating !== undefined) {
-            newRatings[f.path] = f.rating;
-          }
-        });
-        return newRatings;
-      });
-
-      const exifSortKeys = ['date_taken', 'iso', 'shutter_speed', 'aperture', 'focal_length'];
-      const isExifSortActive = exifSortKeys.includes(sortCriteria.key);
-      const shouldReadExif = appSettings?.enableExifReading ?? false;
-
-      let freshExifData: Record<string, any> | null = null;
-
-      if (shouldReadExif && files.length > 0 && isExifSortActive) {
-        const paths = files.map((f: ImageFile) => f.path);
-        freshExifData = await invoke(Invokes.ReadExifForPaths, { paths });
-      }
-
-      setImageList((prevList) => {
-        const prevMap = new Map(prevList.map((img) => [img.path, img]));
-
-        return files.map((newFile) => {
-          if (freshExifData && freshExifData[newFile.path]) {
-            newFile.exif = freshExifData[newFile.path];
-            return newFile;
-          }
-          const existing = prevMap.get(newFile.path);
-          if (existing && existing.modified === newFile.modified) {
-            return existing;
-          }
-
-          return newFile;
-        });
-      });
-
-      if (shouldReadExif && files.length > 0 && !isExifSortActive) {
-        const paths = files.map((f: ImageFile) => f.path);
-        invoke(Invokes.ReadExifForPaths, { paths })
-          .then((exifDataMap: any) => {
-            setImageList((currentImageList) =>
-              currentImageList.map((image) => {
-                if (exifDataMap[image.path] && !image.exif) {
-                  return { ...image, exif: exifDataMap[image.path] };
-                }
-                return image;
-              }),
-            );
-          })
-          .catch((err) => {
-            console.error('Failed to read EXIF data in background:', err);
-          });
-      }
-    } catch (err) {
-      console.error('Failed to refresh image list:', err);
-      setError('Failed to refresh image list.');
-    }
-  }, [currentFolderPath, sortCriteria.key, appSettings?.enableExifReading, libraryViewMode]);
-
-  const handleToggleFolder = useCallback(
-    async (path: string) => {
-      const isExpanding = !expandedFolders.has(path);
-      setExpandedFolders((prev) => {
-        const newSet = new Set(prev);
-        if (isExpanding) {
-          newSet.add(path);
-        } else {
-          newSet.delete(path);
-        }
-        return newSet;
-      });
-      if (!isExpanding) return;
-      try {
-        const showCounts = appSettings?.enableFolderImageCounts ?? false;
-        const newChildren: any[] = await invoke(Invokes.GetFolderChildren, {
-          path,
-          showImageCounts: showCounts,
-        });
-        setFolderTree((prevTree: any) => insertChildrenIntoTree(prevTree, path, newChildren));
-        setPinnedFolderTrees((prevTrees: any[]) =>
-          prevTrees.map((tree) => insertChildrenIntoTree(tree, path, newChildren)),
-        );
-      } catch (err) {
-        console.error('Failed to fetch folder children:', err);
-        setError(`Failed to load folder: ${err}`);
-      }
-    },
-    [expandedFolders, appSettings?.enableFolderImageCounts],
-  );
-
-  useEffect(() => {
-    if (isInitialMount.current || !appSettings || !rootPath) {
-      return;
-    }
-
-    const newFolderState = {
-      currentFolderPath,
-      expandedFolders: Array.from(expandedFolders),
-    };
-
-    if (JSON.stringify(appSettings.lastFolderState) === JSON.stringify(newFolderState)) {
-      return;
-    }
-
-    handleSettingsChange({ ...appSettings, lastFolderState: newFolderState });
-  }, [currentFolderPath, expandedFolders, rootPath, appSettings, handleSettingsChange]);
-
-  useEffect(() => {
-    const handleGlobalContextMenu = (event: any) => {
-      if (!DEBUG) event.preventDefault();
-    };
-    window.addEventListener('contextmenu', handleGlobalContextMenu);
-    return () => window.removeEventListener('contextmenu', handleGlobalContextMenu);
-  }, []);
-
-  const handleBackToLibrary = useCallback(() => {
-    if (selectedImage?.path && cachedEditStateRef.current) {
-      imageCacheRef.current.set(selectedImage.path, cachedEditStateRef.current);
-    }
-    if (transformWrapperRef.current) {
-      transformWrapperRef.current.resetTransform(0);
-    }
-    setZoom(1);
-
-    debouncedSave.flush();
-    debouncedSetHistory.cancel();
-
-    const lastActivePath = selectedImage?.path ?? null;
-    setHasRenderedFirstFrame(false);
-    selectedImagePathRef.current = null;
-    setSelectedImage(null);
-    setFinalPreviewUrl(null);
-    setUncroppedAdjustedPreviewUrl(null);
-    setHistogram(null);
-    setWaveform(null);
-    setActiveMaskId(null);
-    setActiveMaskContainerId(null);
-    setActiveAiPatchContainerId(null);
-    setIsWbPickerActive(false);
-    setActiveAiSubMaskId(null);
-    setLibraryActivePath(lastActivePath);
-    setSlideDirection(1);
-    setLiveAdjustments(INITIAL_ADJUSTMENTS);
-    resetAdjustmentsHistory(INITIAL_ADJUSTMENTS);
-    isBackendReadyRef.current = true;
-    setInteractivePatch((prev) => {
-      if (prev?.url) URL.revokeObjectURL(prev.url);
-      return null;
-    });
-  }, [selectedImage?.path, resetAdjustmentsHistory, debouncedSave, debouncedSetHistory]);
-
-  const handleImageSelect = useCallback(
-    async (path: string) => {
-      if (selectedImage?.path === path) return;
-
-      debouncedSave.flush();
-      debouncedSetHistory.cancel();
-
-      if (selectedImage?.path && cachedEditStateRef.current) {
-        imageCacheRef.current.set(selectedImage.path, cachedEditStateRef.current);
-      }
-
-      patchesSentToBackend.current.clear();
-
-      const cached = imageCacheRef.current.get(path);
-      const isFrontendCached = Boolean(cached && cached.selectedImage?.isReady);
-      const isCachedInBackend = isFrontendCached
-        ? await invoke<boolean>('is_image_cached', { path }).catch(() => false)
-        : false;
-
-      const hasDifferentResolution =
-        cached &&
-        (originalSize.width !== cached.originalSize.width || originalSize.height !== cached.originalSize.height);
-
-      if (!isCachedInBackend || hasDifferentResolution) {
-        setHasRenderedFirstFrame(false);
-      }
-
-      selectedImagePathRef.current = path;
-      setMultiSelectedPaths([path]);
-      setLibraryActivePath(null);
-      setSelectionAnchorPath(path);
-      setError(null);
-      setShowOriginal(false);
-      setActiveMaskId(null);
-      setActiveMaskContainerId(null);
-      setActiveAiPatchContainerId(null);
-      setActiveAiSubMaskId(null);
-      setIsWbPickerActive(false);
-      setTransformedOriginalUrl(null);
-      setIsLibraryExportPanelVisible(false);
-      setCompactEditorPanelHeightOverride(null);
-
-      if (isFrontendCached) {
-        setSelectedImage({
-          ...cached.selectedImage,
-          thumbnailUrl: thumbnails[path] || cached.selectedImage.thumbnailUrl,
-        });
-        setOriginalSize(cached.originalSize);
-        setPreviewSize(cached.previewSize);
-
-        setLiveAdjustments(cached.adjustments);
-        resetAdjustmentsHistory(cached.adjustments);
-        prevAdjustmentsRef.current = { path, adjustments: cached.adjustments };
-
-        setHistogram(cached.histogram);
-        setWaveform(cached.waveform);
-        setFinalPreviewUrl(cached.finalPreviewUrl);
-        setUncroppedAdjustedPreviewUrl(cached.uncroppedPreviewUrl);
-        setIsViewLoading(false);
-
-        latestRenderedJobIdRef.current = previewJobIdRef.current;
-        isBackendReadyRef.current = false;
-        currentResRef.current = Infinity;
-
-        invoke(Invokes.LoadImage, { path })
-          .then((_result: any) => {
-            if (selectedImagePathRef.current !== path) return;
-            isBackendReadyRef.current = true;
-            currentResRef.current = 0;
-            setOriginalSize({ width: _result.width, height: _result.height });
-          })
-          .catch((err: any) => {
-            if (String(err).includes('cancelled')) return;
-            console.error('Background load_image failed on cache hit:', err);
-            isBackendReadyRef.current = true;
-            currentResRef.current = 0;
-          });
-
-        invoke(Invokes.LoadMetadata, { path })
-          .then((metadata: any) => {
-            if (selectedImagePathRef.current !== path) return;
-            let freshAdjustments: Adjustments;
-            if (metadata.adjustments && !metadata.adjustments.is_null) {
-              freshAdjustments = normalizeLoadedAdjustments(metadata.adjustments);
-            } else {
-              freshAdjustments = { ...INITIAL_ADJUSTMENTS };
-            }
-            if (!isSliderDragging && JSON.stringify(cached.adjustments) !== JSON.stringify(freshAdjustments)) {
-              setLiveAdjustments(freshAdjustments);
-              resetAdjustmentsHistory(freshAdjustments);
-              prevAdjustmentsRef.current = { path, adjustments: freshAdjustments };
-              imageCacheRef.current.set(path, { ...cached, adjustments: freshAdjustments });
-            }
-          })
-          .catch((err) => console.error('Failed background metadata sync on cache hit:', err));
-
-        return;
-      }
-
-      isBackendReadyRef.current = true;
-
-      setSelectedImage({
-        exif: null,
-        height: 0,
-        isRaw: false,
-        isReady: false,
-        metadata: null,
-        originalUrl: null,
-        path,
-        thumbnailUrl: thumbnails[path],
-        width: 0,
-      });
-      setOriginalSize({ width: 0, height: 0 });
-      setPreviewSize({ width: 0, height: 0 });
-      setIsViewLoading(true);
-      setHistogram(null);
-      setWaveform(null);
-      setUncroppedAdjustedPreviewUrl(null);
-
-      setFinalPreviewUrl((prev) => {
-        if (prev?.startsWith('blob:') && !imageCacheRef.current.isProtected(prev)) {
-          setTimeout(() => {
-            if (!imageCacheRef.current.isProtected(prev)) {
-              URL.revokeObjectURL(prev);
-            }
-          }, 250);
-        }
-        return null;
-      });
-      setInteractivePatch((prev) => {
-        if (prev?.url) URL.revokeObjectURL(prev.url);
-        return null;
-      });
-    },
-    [selectedImage?.path, debouncedSave, debouncedSetHistory, thumbnails, resetAdjustmentsHistory, isSliderDragging],
-  );
-
   const executeDelete = useCallback(
     async (pathsToDelete: Array<string>, options = { includeAssociated: false }) => {
       if (!pathsToDelete || pathsToDelete.length === 0) {
@@ -2702,11 +2602,9 @@ function App() {
           }
         } else {
           if (nextImagePath) {
-            setMultiSelectedPaths([nextImagePath]);
-            setLibraryActivePath(nextImagePath);
+            setLibrary({ multiSelectedPaths: [nextImagePath], libraryActivePath: nextImagePath });
           } else {
-            setMultiSelectedPaths([]);
-            setLibraryActivePath(null);
+            setLibrary({ multiSelectedPaths: [], libraryActivePath: null });
           }
         }
       } catch (err) {
@@ -2714,7 +2612,15 @@ function App() {
         setError(`Failed to delete files: ${err}`);
       }
     },
-    [refreshImageList, selectedImage, handleBackToLibrary, libraryActivePath, sortedImageList, handleImageSelect],
+    [
+      refreshImageList,
+      selectedImage,
+      handleBackToLibrary,
+      libraryActivePath,
+      sortedImageList,
+      handleImageSelect,
+      setLibrary,
+    ],
   );
 
   const handleDeleteSelected = useCallback(() => {
@@ -2746,33 +2652,35 @@ function App() {
       confirmText = 'Delete Selected Only';
     }
 
-    setConfirmModalState({
-      confirmText,
-      confirmVariant: 'destructive',
-      isOpen: true,
-      message: modalMessage,
-      onConfirm: () => executeDelete(pathsToDelete, { includeAssociated: false }),
-      title: modalTitle,
+    setUI({
+      confirmModalState: {
+        confirmText,
+        confirmVariant: 'destructive',
+        isOpen: true,
+        message: modalMessage,
+        onConfirm: () => executeDelete(pathsToDelete, { includeAssociated: false }),
+        title: modalTitle,
+      },
     });
-  }, [multiSelectedPaths, executeDelete, imageList]);
+  }, [multiSelectedPaths, executeDelete, imageList, setUI]);
 
   const handleToggleFullScreen = useCallback(() => {
     const currentlyZoomed = zoom > 1.01;
-    setIsInstantTransition(currentlyZoomed);
+    setUI({ isInstantTransition: currentlyZoomed });
 
     if (isFullScreen) {
-      setIsFullScreen(false);
+      setUI({ isFullScreen: false });
     } else {
       if (!selectedImage) {
         return;
       }
-      setIsFullScreen(true);
+      setUI({ isFullScreen: true });
     }
 
     if (currentlyZoomed) {
-      setTimeout(() => setIsInstantTransition(false), 100);
+      setTimeout(() => setUI({ isInstantTransition: false }), 100);
     }
-  }, [isFullScreen, selectedImage, zoom]);
+  }, [isFullScreen, selectedImage, zoom, setUI]);
 
   useEffect(() => {
     if (!isAndroid) {
@@ -2785,7 +2693,7 @@ function App() {
 
     onBackButtonPress(() => {
       if (isFullScreen) {
-        setIsFullScreen(false);
+        setUI({ isFullScreen: false });
         return;
       }
 
@@ -2817,7 +2725,7 @@ function App() {
         console.error('Failed to unregister Android back gesture handler:', err);
       });
     };
-  }, [isAndroid, isFullScreen, selectedImage?.path, handleBackToLibrary]);
+  }, [isAndroid, isFullScreen, selectedImage?.path, handleBackToLibrary, setUI]);
 
   const handleCopyAdjustments = useCallback(() => {
     const sourceAdjustments = selectedImage ? adjustments : libraryActiveAdjustments;
@@ -2830,8 +2738,8 @@ function App() {
     }
 
     setCopiedAdjustments(adjustmentsToCopy);
-    setIsCopied(true);
-  }, [selectedImage, adjustments, libraryActiveAdjustments]);
+    setProcess({ isCopied: true });
+  }, [selectedImage, adjustments, libraryActiveAdjustments, setProcess]);
 
   const handlePasteAdjustments = useCallback(
     (paths?: Array<string>) => {
@@ -2859,7 +2767,7 @@ function App() {
       }
 
       if (Object.keys(adjustmentsToApply).length === 0) {
-        setIsPasted(true);
+        setProcess({ isPasted: true });
         return;
       }
 
@@ -2882,9 +2790,9 @@ function App() {
           setError(`Failed to paste adjustments: ${err}`);
         },
       );
-      setIsPasted(true);
+      setProcess({ isPasted: true });
     },
-    [copiedAdjustments, appSettings, multiSelectedPaths, selectedImage, adjustments, setAdjustments],
+    [copiedAdjustments, appSettings, multiSelectedPaths, selectedImage, adjustments, setAdjustments, setProcess],
   );
 
   const handleAutoAdjustments = async () => {
@@ -2920,12 +2828,12 @@ function App() {
       const currentRating = imageRatings[pathsToRate[0]] || 0;
       const finalRating = newRating === currentRating ? 0 : newRating;
 
-      setImageRatings((prev: Record<string, number>) => {
-        const newRatings = { ...prev };
+      setLibrary((state) => {
+        const newRatings = { ...state.imageRatings };
         pathsToRate.forEach((path: string) => {
           newRatings[path] = finalRating;
         });
-        return newRatings;
+        return { imageRatings: newRatings };
       });
 
       invoke(Invokes.SetRatingForPaths, { paths: pathsToRate, rating: finalRating }).catch((err) => {
@@ -2933,7 +2841,7 @@ function App() {
         setError(`Failed to apply rating: ${err}`);
       });
     },
-    [multiSelectedPaths, selectedImage, imageRatings],
+    [multiSelectedPaths, selectedImage, imageRatings, setLibrary],
   );
 
   const handleUpdateExif = useCallback(
@@ -2957,19 +2865,21 @@ function App() {
           updates,
         });
 
-        setSelectedImage((prev) => {
-          if (!prev || !physicalPathsSet.has(prev.path.split('?vc=')[0])) return prev;
+        setEditor((state) => {
+          if (!state.selectedImage || !physicalPathsSet.has(state.selectedImage.path.split('?vc=')[0])) return state;
           return {
-            ...prev,
-            exif: {
-              ...(prev.exif || {}),
-              ...updates,
+            selectedImage: {
+              ...state.selectedImage,
+              exif: {
+                ...(state.selectedImage.exif || {}),
+                ...updates,
+              },
             },
           };
         });
 
-        setImageList((prev) =>
-          prev.map((img) => {
+        setLibrary((state) => ({
+          imageList: state.imageList.map((img) => {
             if (physicalPathsSet.has(img.path.split('?vc=')[0])) {
               return {
                 ...img,
@@ -2978,7 +2888,7 @@ function App() {
             }
             return img;
           }),
-        );
+        }));
 
         pathsToUpdate.forEach((p) => {
           const cached = imageCacheRef.current.get(p);
@@ -2997,7 +2907,7 @@ function App() {
         setError(`Failed to update metadata: ${err}`);
       }
     },
-    [multiSelectedPaths, selectedImage],
+    [multiSelectedPaths, selectedImage, setLibrary, setEditor],
   );
 
   const handleSetColorLabel = useCallback(
@@ -3020,8 +2930,8 @@ function App() {
       try {
         await invoke(Invokes.SetColorLabelForPaths, { paths: pathsToUpdate, color: finalColor });
 
-        setImageList((prevList: Array<ImageFile>) =>
-          prevList.map((image: ImageFile) => {
+        setLibrary((state) => ({
+          imageList: state.imageList.map((image: ImageFile) => {
             if (pathsToUpdate.includes(image.path)) {
               const otherTags = (image.tags || []).filter((tag: string) => !tag.startsWith('color:'));
               const newTags = finalColor ? [...otherTags, `color:${finalColor}`] : otherTags;
@@ -3029,13 +2939,13 @@ function App() {
             }
             return image;
           }),
-        );
+        }));
       } catch (err) {
         console.error('Failed to set color label:', err);
         setError(`Failed to set color label: ${err}`);
       }
     },
-    [multiSelectedPaths, selectedImage, libraryActivePath, imageList],
+    [multiSelectedPaths, selectedImage, libraryActivePath, imageList, setLibrary],
   );
 
   const getCommonTags = useCallback(
@@ -3067,8 +2977,8 @@ function App() {
 
   const handleTagsChanged = useCallback(
     (changedPaths: string[], newTags: { tag: string; isUser: boolean }[]) => {
-      setImageList((prevList) =>
-        prevList.map((image) => {
+      setLibrary((state) => ({
+        imageList: state.imageList.map((image) => {
           if (changedPaths.includes(image.path)) {
             const colorTags = (image.tags || []).filter((t) => t.startsWith('color:'));
             const prefixedNewTags = newTags.map((t) => (t.isUser ? `user:${t.tag}` : t.tag));
@@ -3077,12 +2987,13 @@ function App() {
           }
           return image;
         }),
-      );
+      }));
     },
-    [setImageList],
+    [setLibrary],
   );
 
-  const closeConfirmModal = () => setConfirmModalState({ ...confirmModalState, isOpen: false });
+  const closeConfirmModal = () =>
+    setUI((state) => ({ confirmModalState: { ...state.confirmModalState, isOpen: false } }));
 
   const handlePasteFiles = useCallback(
     async (mode = 'copy') => {
@@ -3094,14 +3005,14 @@ function App() {
           await invoke(Invokes.CopyFiles, { sourcePaths: copiedFilePaths, destinationFolder: currentFolderPath });
         else {
           await invoke(Invokes.MoveFiles, { sourcePaths: copiedFilePaths, destinationFolder: currentFolderPath });
-          setCopiedFilePaths([]);
+          setProcess({ copiedFilePaths: [] });
         }
         await refreshImageList();
       } catch (err) {
         setError(`Failed to ${mode} files: ${err}`);
       }
     },
-    [copiedFilePaths, currentFolderPath, refreshImageList],
+    [copiedFilePaths, currentFolderPath, refreshImageList, setProcess],
   );
 
   const calculateTargetRes = useCallback(() => {
@@ -3293,24 +3204,15 @@ function App() {
           transformZoom = (targetZoomPercent * effectiveOriginalHeight) / baseRenderSize.height;
         }
       }
-      isProgrammaticZoom.current = true;
-      setZoom(transformZoom);
+      setEditor({ zoom: transformZoom });
     },
-    [originalSize, baseRenderSize, adjustments.orientationSteps],
+    [originalSize, baseRenderSize, adjustments.orientationSteps, setEditor],
   );
 
-  const handleUserTransform = useCallback((transformState: TransformState) => {
-    if (isProgrammaticZoom.current) {
-      isProgrammaticZoom.current = false;
-      return;
-    }
-    setZoom(transformState.scale);
-  }, []);
-
   useEffect(() => {
-    setTransformedOriginalUrl(null);
+    setEditor({ transformedOriginalUrl: null });
     currentOriginalResRef.current = 0;
-  }, [geometricAdjustmentsKey, selectedImage?.path]);
+  }, [geometricAdjustmentsKey, selectedImage?.path, setEditor]);
 
   const requestHiFiOriginalZoom = useCallback(
     debounce(async (currentAdjustments: Adjustments, targetRes: number) => {
@@ -3321,13 +3223,13 @@ function App() {
             targetResolution: targetRes,
           });
           currentOriginalResRef.current = targetRes;
-          setTransformedOriginalUrl(base64Data);
+          setEditor({ transformedOriginalUrl: base64Data });
         } catch (e) {
           console.error('Failed to generate hi-fi original preview:', e);
         }
       }
     }, 200),
-    [],
+    [setEditor],
   );
 
   useEffect(() => {
@@ -3368,13 +3270,13 @@ function App() {
           });
           if (isEffectActive) {
             currentOriginalResRef.current = targetRes;
-            setTransformedOriginalUrl(base64Data);
+            setEditor({ transformedOriginalUrl: base64Data });
           }
         } catch (e) {
           if (isEffectActive) {
             console.error('Failed to generate original preview:', e);
             setError('Failed to show original image.');
-            setShowOriginal(false);
+            setEditor({ showOriginal: false });
           }
         }
       }
@@ -3385,7 +3287,7 @@ function App() {
     return () => {
       isEffectActive = false;
     };
-  }, [showOriginal, selectedImage?.path, adjustments, transformedOriginalUrl, calculateTargetRes]);
+  }, [showOriginal, selectedImage?.path, adjustments, transformedOriginalUrl, calculateTargetRes, setEditor]);
 
   const isAnyModalOpen =
     isCreateFolderModalOpen ||
@@ -3432,15 +3334,15 @@ function App() {
     multiSelectedPaths,
     redo,
     selectedImage,
-    setActiveAiSubMaskId,
-    setActiveMaskContainerId,
-    setActiveMaskId,
-    setCopiedFilePaths,
-    setIsStraightenActive,
-    setIsWaveformVisible,
-    setLibraryActivePath,
-    setMultiSelectedPaths,
-    setShowOriginal,
+    setActiveAiSubMaskId: (id) => setEditor({ activeAiSubMaskId: id }),
+    setActiveMaskContainerId: (id) => setEditor({ activeMaskContainerId: id }),
+    setActiveMaskId: (id) => setEditor({ activeMaskId: id }),
+    setCopiedFilePaths: (paths) => setProcess({ copiedFilePaths: paths }),
+    setIsStraightenActive: (v) => setEditor({ isStraightenActive: v }),
+    setIsWaveformVisible: (v) => setEditor({ isWaveformVisible: v }),
+    setLibraryActivePath: (path) => setLibrary({ libraryActivePath: path }),
+    setMultiSelectedPaths: (paths) => setLibrary({ multiSelectedPaths: paths }),
+    setShowOriginal: (v) => setEditor({ showOriginal: v }),
     sortedImageList,
     undo,
     zoom,
@@ -3449,396 +3351,26 @@ function App() {
     originalSize,
     keybinds: appSettings?.keybinds,
     brushSettings: brushSettings,
-    setBrushSettings: setBrushSettings,
+    setBrushSettings: (s) => setEditor({ brushSettings: s }),
   });
 
-  useEffect(() => {
-    let isEffectActive = true;
-    const listeners = [
-      listen('preview-update-uncropped', (event: any) => {
-        if (isEffectActive) {
-          setUncroppedAdjustedPreviewUrl(event.payload);
-        }
-      }),
-      listen('histogram-update', (event: any) => {
-        if (isEffectActive && event.payload.path === selectedImagePathRef.current) {
-          setHistogram(event.payload.data);
-        }
-      }),
-      listen('open-with-file', (event: any) => {
-        if (isEffectActive) {
-          setInitialFileToOpen(event.payload as string);
-        }
-      }),
-      listen('waveform-update', (event: any) => {
-        if (isEffectActive && event.payload.path === selectedImagePathRef.current) {
-          setWaveform(event.payload.data);
-        }
-      }),
-      listen('thumbnail-progress', (event: any) => {
-        if (isEffectActive) {
-          setThumbnailProgress({ current: event.payload.current, total: event.payload.total });
-        }
-      }),
-      listen('thumbnail-generation-complete', () => {
-        if (isEffectActive) {
-          setThumbnailProgress({ current: 0, total: 0 });
-        }
-      }),
-      listen('thumbnail-generated', (event: any) => {
-        if (isEffectActive) {
-          const { path, data, rating } = event.payload;
-          if (data) {
-            setThumbnails((prev) => ({ ...prev, [path]: data }));
-            markGenerated(path);
-          }
-          if (rating !== undefined) {
-            setImageRatings((prev) => ({ ...prev, [path]: rating }));
-          }
-        }
-      }),
-      listen('ai-model-download-start', (event: any) => {
-        if (isEffectActive) {
-          setAiModelDownloadStatus(event.payload);
-        }
-      }),
-      listen('ai-model-download-finish', () => {
-        if (isEffectActive) {
-          setAiModelDownloadStatus(null);
-        }
-      }),
-      listen('indexing-started', () => {
-        if (isEffectActive) {
-          setIsIndexing(true);
-          setIndexingProgress({ current: 0, total: 0 });
-        }
-      }),
-      listen('indexing-progress', (event: any) => {
-        if (isEffectActive) {
-          setIndexingProgress(event.payload);
-        }
-      }),
-      listen('indexing-finished', () => {
-        if (isEffectActive) {
-          setIsIndexing(false);
-          setIndexingProgress({ current: 0, total: 0 });
-          if (currentFolderPathRef.current) {
-            const refreshImageList = async () => {
-              try {
-                const list: ImageFile[] = await invoke(Invokes.ListImagesInDir, { path: currentFolderPathRef.current });
-                if (Array.isArray(list)) {
-                  setImageList(list);
-                  setImageRatings((prev) => {
-                    const newRatings = { ...prev };
-                    list.forEach((f) => {
-                      if (f.rating !== undefined) {
-                        newRatings[f.path] = f.rating;
-                      }
-                    });
-                    return newRatings;
-                  });
-                }
-              } catch (err) {
-                console.error('Failed to refresh after indexing:', err);
-              }
-            };
-            refreshImageList();
-          }
-        }
-      }),
-      listen('batch-export-progress', (event: any) => {
-        if (isEffectActive) {
-          setExportState((prev: ExportState) => ({ ...prev, progress: event.payload }));
-        }
-      }),
-      listen('export-complete', () => {
-        if (isEffectActive) {
-          setExportState((prev: ExportState) => ({ ...prev, status: Status.Success }));
-        }
-      }),
-      listen('export-error', (event) => {
-        if (isEffectActive) {
-          setExportState((prev: ExportState) => ({
-            ...prev,
-            status: Status.Error,
-            errorMessage: typeof event.payload === 'string' ? event.payload : 'An unknown export error occurred.',
-          }));
-        }
-      }),
-      listen('export-cancelled', () => {
-        if (isEffectActive) {
-          setExportState((prev: ExportState) => ({ ...prev, status: Status.Cancelled }));
-        }
-      }),
-      listen('import-start', (event: any) => {
-        if (isEffectActive) {
-          setImportState({
-            errorMessage: '',
-            path: '',
-            progress: { current: 0, total: event.payload.total },
-            status: Status.Importing,
-          });
-        }
-      }),
-      listen('import-progress', (event: any) => {
-        if (isEffectActive) {
-          setImportState((prev: ImportState) => ({
-            ...prev,
-            path: event.payload.path,
-            progress: { current: event.payload.current, total: event.payload.total },
-          }));
-        }
-      }),
-      listen('import-complete', () => {
-        if (isEffectActive) {
-          setImportState((prev: ImportState) => ({ ...prev, status: Status.Success }));
-          refreshAllFolderTrees();
-          if (currentFolderPathRef.current) {
-            handleSelectSubfolder(currentFolderPathRef.current, false);
-          }
-        }
-      }),
-      listen('import-error', (event) => {
-        if (isEffectActive) {
-          setImportState((prev: ImportState) => ({
-            ...prev,
-            errorMessage: typeof event.payload === 'string' ? event.payload : 'An unknown import error occurred.',
-            status: Status.Error,
-          }));
-        }
-      }),
-      listen('denoise-progress', (event: any) => {
-        if (isEffectActive) {
-          setDenoiseModalState((prev) => ({ ...prev, progressMessage: event.payload as string }));
-        }
-      }),
-      listen('denoise-complete', (event: any) => {
-        if (isEffectActive) {
-          const payload = event.payload;
-          const isObject = typeof payload === 'object' && payload !== null;
-
-          setDenoiseModalState((prev) => ({
-            ...prev,
-            isProcessing: false,
-            previewBase64: isObject ? payload.denoised : payload,
-            originalBase64: isObject ? payload.original : null,
-            progressMessage: null,
-          }));
-        }
-      }),
-      listen('denoise-error', (event: any) => {
-        if (isEffectActive) {
-          setDenoiseModalState((prev) => ({
-            ...prev,
-            isProcessing: false,
-            error: String(event.payload),
-            progressMessage: null,
-          }));
-        }
-      }),
-      listen('wgpu-frame-ready', (event: any) => {
-        if (isEffectActive && event.payload?.path === selectedImagePathRef.current) {
-          setHasRenderedFirstFrame(true);
-        }
-      }),
-    ];
-    return () => {
-      isEffectActive = false;
-      listeners.forEach((p) => p.then((unlisten) => unlisten()));
-    };
-  }, [refreshAllFolderTrees, handleSelectSubfolder]);
-
-  useEffect(() => {
-    if ([Status.Success, Status.Error, Status.Cancelled].includes(exportState.status)) {
-      const timeoutDuration = exportState.status === Status.Success ? 5000 : 3000;
-
-      const timer = setTimeout(() => {
-        setExportState({ status: Status.Idle, progress: { current: 0, total: 0 }, errorMessage: '' });
-      }, timeoutDuration);
-      return () => clearTimeout(timer);
-    }
-  }, [exportState.status]);
-
-  useEffect(() => {
-    if ([Status.Success, Status.Error].includes(importState.status)) {
-      const timer = setTimeout(() => {
-        setImportState({ status: Status.Idle, progress: { current: 0, total: 0 }, path: '', errorMessage: '' });
-      }, IMPORT_TIMEOUT);
-
-      return () => clearTimeout(timer);
-    }
-  }, [importState.status]);
-
-  useEffect(() => {
-    if (libraryActivePath) {
-      invoke(Invokes.LoadMetadata, { path: libraryActivePath })
-        .then((metadata: any) => {
-          if (metadata.adjustments && !metadata.adjustments.is_null) {
-            const normalized: Adjustments = normalizeLoadedAdjustments(metadata.adjustments);
-            setLibraryActiveAdjustments(normalized);
-          } else {
-            setLibraryActiveAdjustments(INITIAL_ADJUSTMENTS);
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to load metadata for library active image', err);
-          setLibraryActiveAdjustments(INITIAL_ADJUSTMENTS);
-        });
-    } else {
-      setLibraryActiveAdjustments(INITIAL_ADJUSTMENTS);
-    }
-  }, [libraryActivePath]);
-
-  useEffect(() => {
-    let isEffectActive = true;
-
-    const unlistenProgress = listen('panorama-progress', (event: any) => {
-      if (isEffectActive) {
-        setPanoramaModalState((prev: PanoramaModalState) => {
-          if (prev.finalImageBase64 || prev.error) return prev;
-          return {
-            ...prev,
-            progressMessage: event.payload,
-          };
-        });
-      }
-    });
-
-    const unlistenComplete = listen('panorama-complete', (event: any) => {
-      if (isEffectActive) {
-        const { base64 } = event.payload;
-        setPanoramaModalState((prev: PanoramaModalState) => ({
-          ...prev,
-          error: null,
-          finalImageBase64: base64,
-          isProcessing: false,
-          progressMessage: null,
-        }));
-      }
-    });
-
-    const unlistenError = listen('panorama-error', (event: any) => {
-      if (isEffectActive) {
-        setPanoramaModalState((prev: PanoramaModalState) => ({
-          ...prev,
-          error: String(event.payload),
-          finalImageBase64: null,
-          isProcessing: false,
-          progressMessage: null,
-        }));
-      }
-    });
-
-    return () => {
-      isEffectActive = false;
-      unlistenProgress.then((f: any) => f());
-      unlistenComplete.then((f: any) => f());
-      unlistenError.then((f: any) => f());
-    };
-  }, []);
-
-  useEffect(() => {
-    let isEffectActive = true;
-
-    const unlistenProgress = listen('hdr-progress', (event: any) => {
-      if (isEffectActive) {
-        setHdrModalState((prev: HdrModalState) => ({
-          ...prev,
-          error: null,
-          finalImageBase64: null,
-          isOpen: true,
-          progressMessage: event.payload,
-        }));
-      }
-    });
-
-    const unlistenComplete = listen('hdr-complete', (event: any) => {
-      if (isEffectActive) {
-        const { base64 } = event.payload;
-        setHdrModalState((prev: HdrModalState) => ({
-          ...prev,
-          error: null,
-          finalImageBase64: base64,
-          isProcessing: false,
-          progressMessage: 'Hdr Ready',
-        }));
-      }
-    });
-
-    const unlistenError = listen('hdr-error', (event: any) => {
-      if (isEffectActive) {
-        setHdrModalState((prev: HdrModalState) => ({
-          ...prev,
-          error: String(event.payload),
-          finalImageBase64: null,
-          isProcessing: false,
-          progressMessage: 'An error occurred.',
-        }));
-      }
-    });
-
-    return () => {
-      isEffectActive = false;
-      unlistenProgress.then((f: any) => f());
-      unlistenComplete.then((f: any) => f());
-      unlistenError.then((f: any) => f());
-    };
-  }, []);
-
-  useEffect(() => {
-    let isEffectActive = true;
-
-    const unlistenStart = listen('culling-start', (event: any) => {
-      if (isEffectActive) {
-        setCullingModalState({
-          isOpen: true,
-          progress: { current: 0, total: event.payload, stage: 'Initializing...' },
-          suggestions: null,
-          error: null,
-        });
-      }
-    });
-
-    const unlistenProgress = listen('culling-progress', (event: any) => {
-      if (isEffectActive) {
-        setCullingModalState((prev) => ({ ...prev, progress: event.payload }));
-      }
-    });
-
-    const unlistenComplete = listen('culling-complete', (event: any) => {
-      if (isEffectActive) {
-        setCullingModalState((prev) => ({ ...prev, progress: null, suggestions: event.payload }));
-      }
-    });
-
-    const unlistenError = listen('culling-error', (event: any) => {
-      if (isEffectActive) {
-        setCullingModalState((prev) => ({ ...prev, progress: null, error: String(event.payload) }));
-      }
-    });
-
-    return () => {
-      isEffectActive = false;
-      unlistenStart.then((f) => f());
-      unlistenProgress.then((f) => f());
-      unlistenComplete.then((f) => f());
-      unlistenError.then((f) => f());
-    };
-  }, []);
-
   const handleStartPanorama = (paths: string[]) => {
-    setPanoramaModalState((prev: PanoramaModalState) => ({
-      ...prev,
-      isProcessing: true,
-      error: null,
-      finalImageBase64: null,
-      progressMessage: 'Starting panorama process...',
+    setUI((state) => ({
+      panoramaModalState: {
+        ...state.panoramaModalState,
+        isProcessing: true,
+        error: null,
+        finalImageBase64: null,
+        progressMessage: 'Starting panorama process...',
+      },
     }));
     invoke(Invokes.StitchPanorama, { paths }).catch((err) => {
-      setPanoramaModalState((prev: PanoramaModalState) => ({
-        ...prev,
-        isProcessing: false,
-        error: String(err),
+      setUI((state) => ({
+        panoramaModalState: {
+          ...state.panoramaModalState,
+          isProcessing: false,
+          error: String(err),
+        },
       }));
     });
   };
@@ -3846,7 +3378,7 @@ function App() {
   const handleSavePanorama = async (): Promise<string> => {
     if (panoramaModalState.stitchingSourcePaths.length === 0) {
       const err = 'Source paths for panorama not found.';
-      setPanoramaModalState((prev: PanoramaModalState) => ({ ...prev, error: err }));
+      setUI((state) => ({ panoramaModalState: { ...state.panoramaModalState, error: err } }));
       throw new Error(err);
     }
 
@@ -3858,24 +3390,28 @@ function App() {
       return savedPath;
     } catch (err) {
       console.error('Failed to save panorama:', err);
-      setPanoramaModalState((prev: PanoramaModalState) => ({ ...prev, error: String(err) }));
+      setUI((state) => ({ panoramaModalState: { ...state.panoramaModalState, error: String(err) } }));
       throw err;
     }
   };
 
   const handleStartHdr = (paths: string[]) => {
-    setHdrModalState((prev: HdrModalState) => ({
-      ...prev,
-      isProcessing: true,
-      error: null,
-      finalImageBase64: null,
-      progressMessage: 'Starting HDR process...',
+    setUI((state) => ({
+      hdrModalState: {
+        ...state.hdrModalState,
+        isProcessing: true,
+        error: null,
+        finalImageBase64: null,
+        progressMessage: 'Starting HDR process...',
+      },
     }));
     invoke(Invokes.MergeHdr, { paths }).catch((err) => {
-      setHdrModalState((prev: HdrModalState) => ({
-        ...prev,
-        isProcessing: false,
-        error: String(err),
+      setUI((state) => ({
+        hdrModalState: {
+          ...state.hdrModalState,
+          isProcessing: false,
+          error: String(err),
+        },
       }));
     });
   };
@@ -3883,7 +3419,7 @@ function App() {
   const handleSaveHdr = async (): Promise<string> => {
     if (hdrModalState.stitchingSourcePaths.length === 0) {
       const err = 'Source paths for HDR not found.';
-      setHdrModalState((prev: HdrModalState) => ({ ...prev, error: err }));
+      setUI((state) => ({ hdrModalState: { ...state.hdrModalState, error: err } }));
       throw new Error(err);
     }
 
@@ -3895,7 +3431,7 @@ function App() {
       return savedPath;
     } catch (err) {
       console.error('Failed to save HDR image:', err);
-      setHdrModalState((prev: HdrModalState) => ({ ...prev, error: String(err) }));
+      setUI((state) => ({ hdrModalState: { ...state.hdrModalState, error: String(err) } }));
       throw err;
     }
   };
@@ -3904,11 +3440,13 @@ function App() {
     async (intensity: number, method: 'ai' | 'bm3d') => {
       if (denoiseModalState.targetPaths.length === 0) return;
 
-      setDenoiseModalState((prev) => ({
-        ...prev,
-        isProcessing: true,
-        error: null,
-        progressMessage: 'Starting engine...',
+      setUI((state) => ({
+        denoiseModalState: {
+          ...state.denoiseModalState,
+          isProcessing: true,
+          error: null,
+          progressMessage: 'Starting engine...',
+        },
       }));
 
       try {
@@ -3918,14 +3456,16 @@ function App() {
           method: method,
         });
       } catch (err) {
-        setDenoiseModalState((prev) => ({
-          ...prev,
-          isProcessing: false,
-          error: String(err),
+        setUI((state) => ({
+          denoiseModalState: {
+            ...state.denoiseModalState,
+            isProcessing: false,
+            error: String(err),
+          },
         }));
       }
     },
-    [denoiseModalState.targetPaths],
+    [denoiseModalState.targetPaths, setUI],
   );
 
   const handleBatchDenoise = useCallback(
@@ -3939,14 +3479,16 @@ function App() {
         await refreshImageList();
         return savedPaths;
       } catch (err) {
-        setDenoiseModalState((prev) => ({
-          ...prev,
-          error: String(err),
+        setUI((state) => ({
+          denoiseModalState: {
+            ...state.denoiseModalState,
+            error: String(err),
+          },
         }));
         throw err;
       }
     },
-    [refreshImageList],
+    [refreshImageList, setUI],
   );
 
   const handleSaveDenoisedImage = async (): Promise<string> => {
@@ -3977,14 +3519,14 @@ function App() {
     try {
       if (isAndroid) {
         const libraryRoot = await invoke<string>(Invokes.GetOrCreateInternalLibraryRoot);
-        setRootPath(libraryRoot);
+        setLibrary({ rootPath: libraryRoot });
         await handleSelectSubfolder(libraryRoot, true);
         return;
       }
 
       const selected = await open({ directory: true, multiple: false, defaultPath: await homeDir() });
       if (typeof selected === 'string') {
-        setRootPath(selected);
+        setLibrary({ rootPath: selected });
         await handleSelectSubfolder(selected, true);
       }
     } catch (err) {
@@ -3995,16 +3537,16 @@ function App() {
 
   useEffect(() => {
     if (!rootPath) {
-      setIsLayoutReady(false);
+      setUI({ isLayoutReady: false });
       return;
     }
 
     const timer = setTimeout(() => {
-      setIsLayoutReady(true);
+      setUI({ isLayoutReady: true });
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [rootPath]);
+  }, [rootPath, setUI]);
 
   const handleContinueSession = () => {
     const restore = async () => {
@@ -4016,16 +3558,16 @@ function App() {
       const folderState = appSettings.lastFolderState;
       const pathToSelect = folderState?.currentFolderPath || root;
 
-      setRootPath(root);
+      setLibrary({ rootPath: root });
 
       if (folderState?.expandedFolders) {
-        const newExpandedFolders = new Set(folderState.expandedFolders);
-        setExpandedFolders(newExpandedFolders);
+        const newExpandedFolders = new Set<string>(folderState.expandedFolders);
+        setLibrary({ expandedFolders: newExpandedFolders });
       } else {
-        setExpandedFolders(new Set([root]));
+        setLibrary({ expandedFolders: new Set([root]) });
       }
 
-      setIsTreeLoading(true);
+      setLibrary({ isTreeLoading: true });
       try {
         let treeData;
         if (preloadedDataRef.current.rootPath === root && preloadedDataRef.current.tree) {
@@ -4039,11 +3581,11 @@ function App() {
             showImageCounts: appSettings?.enableFolderImageCounts ?? false,
           });
         }
-        setFolderTree(treeData);
+        setLibrary({ folderTree: treeData });
       } catch (err) {
         console.error('Failed to restore folder tree:', err);
       } finally {
-        setIsTreeLoading(false);
+        setLibrary({ isTreeLoading: false });
       }
 
       let preloadedImages: ImageFile[] | undefined = undefined;
@@ -4065,7 +3607,7 @@ function App() {
         handleSettingsChange({ ...appSettings, lastRootPath: null, lastFolderState: null });
       }
       handleGoHome();
-      setIsTreeLoading(false);
+      setLibrary({ isTreeLoading: false });
     });
   };
 
@@ -4075,17 +3617,17 @@ function App() {
     }
     const parentDir = getParentDir(initialFileToOpen);
     if (currentFolderPath !== parentDir) {
-      setRootPath(parentDir);
+      setLibrary({ rootPath: parentDir });
       handleSelectSubfolder(parentDir, true);
       return;
     }
     const isImageInList = imageList.some((image) => image.path === initialFileToOpen);
     if (isImageInList) {
       handleImageSelect(initialFileToOpen);
-      setInitialFileToOpen(null);
+      setProcess({ initialFileToOpen: null });
     } else if (!isViewLoading) {
       console.warn(`'open-with-file' target ${initialFileToOpen} not found in its directory after loading. Aborting.`);
-      setInitialFileToOpen(null);
+      setProcess({ initialFileToOpen: null });
     }
   }, [
     initialFileToOpen,
@@ -4095,18 +3637,22 @@ function App() {
     isViewLoading,
     handleSelectSubfolder,
     handleImageSelect,
+    setLibrary,
+    setProcess,
   ]);
 
   const handleGoHome = () => {
-    setRootPath(null);
-    setCurrentFolderPath(null);
-    setImageList([]);
-    setImageRatings({});
-    setFolderTree(null);
-    setMultiSelectedPaths([]);
-    setLibraryActivePath(null);
-    setIsLibraryExportPanelVisible(false);
-    setExpandedFolders(new Set());
+    setLibrary({
+      rootPath: null,
+      currentFolderPath: null,
+      imageList: [],
+      imageRatings: {},
+      folderTree: null,
+      multiSelectedPaths: [],
+      libraryActivePath: null,
+      expandedFolders: new Set(),
+    });
+    setUI({ isLibraryExportPanelVisible: false });
   };
 
   const handleMultiSelectClick = (path: string, event: any, options: MultiSelectOptions) => {
@@ -4125,10 +3671,9 @@ function App() {
         const baseSelection = isCtrlPressed ? multiSelectedPaths : [];
         const newSelection = Array.from(new Set([...baseSelection, ...range]));
 
-        setMultiSelectedPaths(newSelection);
-        setSelectionAnchorPath(path);
+        setLibrary({ multiSelectedPaths: newSelection, selectionAnchorPath: path });
         if (updateLibraryActivePath) {
-          setLibraryActivePath(path);
+          setLibrary({ libraryActivePath: path });
         }
       }
     } else if (isCtrlPressed) {
@@ -4140,21 +3685,20 @@ function App() {
       }
 
       const newSelectionArray = Array.from(newSelection);
-      setMultiSelectedPaths(newSelectionArray);
-      setSelectionAnchorPath(path);
+      setLibrary({ multiSelectedPaths: newSelectionArray, selectionAnchorPath: path });
 
       if (updateLibraryActivePath) {
         if (newSelectionArray.includes(path)) {
-          setLibraryActivePath(path);
+          setLibrary({ libraryActivePath: path });
         } else if (newSelectionArray.length > 0) {
-          setLibraryActivePath(newSelectionArray[newSelectionArray.length - 1]);
+          setLibrary({ libraryActivePath: newSelectionArray[newSelectionArray.length - 1] });
         } else {
-          setLibraryActivePath(null);
+          setLibrary({ libraryActivePath: null });
         }
       }
     } else {
       onSimpleClick(path);
-      setSelectionAnchorPath(path);
+      setLibrary({ selectionAnchorPath: path });
     }
   };
 
@@ -4163,9 +3707,7 @@ function App() {
       shiftAnchor: selectionAnchorPath ?? libraryActivePath,
       updateLibraryActivePath: true,
       onSimpleClick: (p: any) => {
-        setMultiSelectedPaths([p]);
-        setLibraryActivePath(p);
-        setSelectionAnchorPath(p);
+        setLibrary({ multiSelectedPaths: [p], libraryActivePath: p, selectionAnchorPath: p });
       },
     });
   };
@@ -4177,126 +3719,27 @@ function App() {
       updateLibraryActivePath: !inEditor,
       onSimpleClick: (p: string) => {
         handleImageSelect(p);
-        setSelectionAnchorPath(p);
+        setLibrary({ selectionAnchorPath: p });
       },
     });
   };
 
-  useEffect(() => {
-    if (selectedImage && !selectedImage.isReady && selectedImage.path) {
-      let isEffectActive = true;
-
-      const loadMetadataEarly = async () => {
-        try {
-          const metadata: any = await invoke(Invokes.LoadMetadata, { path: selectedImage.path });
-          if (!isEffectActive) return;
-
-          let initialAdjusts;
-          if (metadata.adjustments && !metadata.adjustments.is_null) {
-            initialAdjusts = normalizeLoadedAdjustments(metadata.adjustments);
-          } else {
-            initialAdjusts = { ...INITIAL_ADJUSTMENTS };
-          }
-
-          setLiveAdjustments(initialAdjusts);
-          resetAdjustmentsHistory(initialAdjusts);
-        } catch (err) {
-          console.error('Failed to load metadata early:', err);
-        }
-      };
-
-      const loadFullImageData = async () => {
-        try {
-          const loadImageResult: any = await invoke(Invokes.LoadImage, { path: selectedImage.path });
-          if (!isEffectActive) {
-            return;
-          }
-
-          const { width, height } = loadImageResult;
-          setOriginalSize({ width, height });
-
-          if (appSettings?.editorPreviewResolution) {
-            const maxSize = appSettings.editorPreviewResolution;
-            const aspectRatio = width / height;
-
-            if (width > height) {
-              const pWidth = Math.min(width, maxSize);
-              const pHeight = Math.round(pWidth / aspectRatio);
-              setPreviewSize({ width: pWidth, height: pHeight });
-            } else {
-              const pHeight = Math.min(height, maxSize);
-              const pWidth = Math.round(pHeight * aspectRatio);
-              setPreviewSize({ width: pWidth, height: pHeight });
-            }
-          } else {
-            setPreviewSize({ width: 0, height: 0 });
-          }
-
-          setSelectedImage((currentSelected: SelectedImage | null) => {
-            if (currentSelected && currentSelected.path === selectedImage.path) {
-              return {
-                ...currentSelected,
-                exif: loadImageResult.exif,
-                height: loadImageResult.height,
-                isRaw: loadImageResult.is_raw,
-                isReady: true,
-                metadata: loadImageResult.metadata,
-                originalUrl: null,
-                width: loadImageResult.width,
-              };
-            }
-            return currentSelected;
-          });
-
-          setLiveAdjustments((prev: Adjustments) => {
-            if (!prev.aspectRatio && !prev.crop) {
-              return { ...prev, aspectRatio: loadImageResult.width / loadImageResult.height };
-            }
-            return prev;
-          });
-        } catch (err) {
-          if (isEffectActive) {
-            console.error('Failed to load image:', err);
-            setError(`Failed to load image: ${err}`);
-            setSelectedImage(null);
-          }
-        } finally {
-          if (isEffectActive) {
-            setIsViewLoading(false);
-          }
-        }
-      };
-
-      const loadAll = async () => {
-        await loadMetadataEarly();
-        if (isEffectActive) {
-          await loadFullImageData();
-        }
-      };
-
-      loadAll();
-
-      return () => {
-        isEffectActive = false;
-      };
-    }
-  }, [selectedImage?.path, selectedImage?.isReady, resetAdjustmentsHistory, appSettings?.editorPreviewResolution]);
-
   const handleClearSelection = () => {
     if (selectedImage) {
-      setMultiSelectedPaths([selectedImage.path]);
+      setLibrary({ multiSelectedPaths: [selectedImage.path] });
     } else {
-      setMultiSelectedPaths([]);
-      setLibraryActivePath(null);
+      setLibrary({ multiSelectedPaths: [], libraryActivePath: null });
     }
   };
 
-  const handleRenameFiles = useCallback(async (paths: Array<string>) => {
-    if (paths && paths.length > 0) {
-      setRenameTargetPaths(paths);
-      setIsRenameFileModalOpen(true);
-    }
-  }, []);
+  const handleRenameFiles = useCallback(
+    async (paths: Array<string>) => {
+      if (paths && paths.length > 0) {
+        setUI({ renameTargetPaths: paths, isRenameFileModalOpen: true });
+      }
+    },
+    [setUI],
+  );
 
   const handleSaveRename = useCallback(
     async (nameTemplate: string) => {
@@ -4323,21 +3766,30 @@ function App() {
             const oldPathIndex = renameTargetPaths.indexOf(libraryActivePath);
 
             if (newPaths[oldPathIndex]) {
-              setLibraryActivePath(newPaths[oldPathIndex]);
+              setLibrary({ libraryActivePath: newPaths[oldPathIndex] });
             } else {
-              setLibraryActivePath(null);
+              setLibrary({ libraryActivePath: null });
             }
           }
 
-          setMultiSelectedPaths(newPaths);
+          setLibrary({ multiSelectedPaths: newPaths });
         } catch (err) {
           setError(`Failed to rename files: ${err}`);
         }
       }
 
-      setRenameTargetPaths([]);
+      setUI({ renameTargetPaths: [] });
     },
-    [renameTargetPaths, refreshImageList, selectedImage, libraryActivePath, handleImageSelect, handleBackToLibrary],
+    [
+      renameTargetPaths,
+      refreshImageList,
+      selectedImage,
+      libraryActivePath,
+      handleImageSelect,
+      handleBackToLibrary,
+      setUI,
+      setLibrary,
+    ],
   );
 
   const startImportFiles = useCallback(
@@ -4357,7 +3809,7 @@ function App() {
         setImportState({ status: Status.Error, errorMessage: `Failed to start import: ${err}` });
       }
     },
-    [],
+    [setImportState],
   );
 
   const handleStartImport = async (settings: ImportSettings) => {
@@ -4381,13 +3833,13 @@ function App() {
       invoke(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset })
         .then(() => {
           if (libraryActivePath && pathsToReset.includes(libraryActivePath)) {
-            setLibraryActiveAdjustments({ ...INITIAL_ADJUSTMENTS });
+            setLibrary({ libraryActiveAdjustments: { ...INITIAL_ADJUSTMENTS } });
           }
           if (selectedImage && pathsToReset.includes(selectedImage.path)) {
             const originalAspectRatio =
               selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
 
-            resetAdjustmentsHistory({
+            resetHistory({
               ...INITIAL_ADJUSTMENTS,
               aspectRatio: originalAspectRatio,
               aiPatches: [],
@@ -4399,14 +3851,7 @@ function App() {
           setError(`Failed to reset adjustments: ${err}`);
         });
     },
-    [
-      multiSelectedPaths,
-      libraryActivePath,
-      selectedImage,
-      adjustments.rating,
-      resetAdjustmentsHistory,
-      debouncedSetHistory,
-    ],
+    [multiSelectedPaths, libraryActivePath, selectedImage, resetHistory, debouncedSetHistory, setLibrary],
   );
 
   const handleImportClick = useCallback(
@@ -4490,15 +3935,13 @@ function App() {
             return;
           }
 
-          setImportSourcePaths(validFiles);
-          setImportTargetFolder(targetPath);
-          setIsImportModalOpen(true);
+          setUI({ importSourcePaths: validFiles, importTargetFolder: targetPath, isImportModalOpen: true });
         }
       } catch (err) {
         console.error('Failed to open file dialog for import:', err);
       }
     },
-    [supportedTypes, isAndroid, startImportFiles],
+    [supportedTypes, isAndroid, startImportFiles, setUI],
   );
 
   const handleEditorContextMenu = (event: any) => {
@@ -4523,8 +3966,7 @@ function App() {
         label: 'Export Image',
         icon: FileInput,
         onClick: () => {
-          setRenderedRightPanel(Panel.Export);
-          setActiveRightPanel(Panel.Export);
+          setRightPanel(Panel.Export, RIGHT_PANEL_ORDER);
         },
       },
       { type: OPTION_SEPARATOR },
@@ -4552,14 +3994,16 @@ function App() {
             label: 'Denoise Image',
             icon: Grip,
             onClick: () => {
-              setDenoiseModalState({
-                isOpen: true,
-                isProcessing: false,
-                previewBase64: null,
-                error: null,
-                targetPaths: [selectedImage.path],
-                progressMessage: null,
-                isRaw: selectedImage?.isRaw,
+              setUI({
+                denoiseModalState: {
+                  isOpen: true,
+                  isProcessing: false,
+                  previewBase64: null,
+                  error: null,
+                  targetPaths: [selectedImage.path],
+                  progressMessage: null,
+                  isRaw: selectedImage?.isRaw || false,
+                },
               });
             },
           },
@@ -4568,10 +4012,7 @@ function App() {
             icon: Film,
             onClick: () => {
               if (selectedImage) {
-                setNegativeModalState({
-                  isOpen: true,
-                  targetPaths: [selectedImage.path],
-                });
+                setUI({ negativeModalState: { isOpen: true, targetPaths: [selectedImage.path] } });
               }
             },
           },
@@ -4589,10 +4030,7 @@ function App() {
             icon: LayoutTemplate,
             label: 'Frame Image',
             onClick: () => {
-              setCollageModalState({
-                isOpen: true,
-                sourceImages: [selectedImage],
-              });
+              setUI({ collageModalState: { isOpen: true, sourceImages: [selectedImage] } });
             },
           },
           {
@@ -4652,7 +4090,7 @@ function App() {
               debouncedSetHistory.cancel();
               const originalAspectRatio =
                 selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
-              resetAdjustmentsHistory({
+              resetHistory({
                 ...INITIAL_ADJUSTMENTS,
                 aspectRatio: originalAspectRatio,
                 aiPatches: [],
@@ -4674,9 +4112,9 @@ function App() {
 
     if (!isTargetInSelection) {
       finalSelection = [path];
-      setMultiSelectedPaths([path]);
+      setLibrary({ multiSelectedPaths: [path] });
       if (!selectedImage) {
-        setLibraryActivePath(path);
+        setLibrary({ libraryActivePath: path });
       }
     } else {
       finalSelection = multiSelectedPaths;
@@ -4783,7 +4221,7 @@ function App() {
             if (metadata.adjustments && !metadata.adjustments.is_null) {
               const normalized = normalizeLoadedAdjustments(metadata.adjustments);
               setLiveAdjustments(normalized);
-              resetAdjustmentsHistory(normalized);
+              resetHistory(normalized);
             }
           }
           if (libraryActivePath && finalSelection.includes(libraryActivePath)) {
@@ -4792,7 +4230,7 @@ function App() {
             });
             if (metadata.adjustments && !metadata.adjustments.is_null) {
               const normalized = normalizeLoadedAdjustments(metadata.adjustments);
-              setLibraryActiveAdjustments(normalized);
+              setLibrary({ libraryActiveAdjustments: normalized });
             }
           }
         })
@@ -4807,12 +4245,11 @@ function App() {
         if (selectedImage.path !== path) {
           handleImageSelect(path);
         }
-        setMultiSelectedPaths(finalSelection);
-        setRenderedRightPanel(Panel.Export);
-        setActiveRightPanel(Panel.Export);
+        setLibrary({ multiSelectedPaths: finalSelection });
+        setRightPanel(Panel.Export, RIGHT_PANEL_ORDER);
       } else {
-        setMultiSelectedPaths(finalSelection);
-        setIsLibraryExportPanelVisible(true);
+        setLibrary({ multiSelectedPaths: finalSelection });
+        setUI({ isLibraryExportPanelVisible: true });
       }
     };
 
@@ -4858,7 +4295,7 @@ function App() {
               }
             }
             setCopiedAdjustments(adjustmentsToCopy);
-            setIsCopied(true);
+            setProcess({ isCopied: true });
           } catch (err) {
             console.error('Failed to load metadata for copy:', err);
             setError(`Failed to copy adjustments: ${err}`);
@@ -4885,14 +4322,16 @@ function App() {
             icon: Grip,
             disabled: finalSelection.length === 0,
             onClick: () => {
-              setDenoiseModalState({
-                isOpen: true,
-                isProcessing: false,
-                previewBase64: null,
-                error: null,
-                targetPaths: finalSelection,
-                progressMessage: null,
-                isRaw: selectedImage?.isRaw || false,
+              setUI({
+                denoiseModalState: {
+                  isOpen: true,
+                  isProcessing: false,
+                  previewBase64: null,
+                  error: null,
+                  targetPaths: finalSelection,
+                  progressMessage: null,
+                  isRaw: selectedImage?.isRaw || false,
+                },
               });
             },
           },
@@ -4901,10 +4340,7 @@ function App() {
             icon: Film,
             disabled: selectionCount === 0,
             onClick: () => {
-              setNegativeModalState({
-                isOpen: true,
-                targetPaths: finalSelection,
-              });
+              setUI({ negativeModalState: { isOpen: true, targetPaths: finalSelection } });
             },
           },
           {
@@ -4912,13 +4348,15 @@ function App() {
             icon: SquaresUnite,
             label: stitchLabel,
             onClick: () => {
-              setPanoramaModalState({
-                error: null,
-                finalImageBase64: null,
-                isOpen: true,
-                isProcessing: false,
-                progressMessage: null,
-                stitchingSourcePaths: finalSelection,
+              setUI({
+                panoramaModalState: {
+                  error: null,
+                  finalImageBase64: null,
+                  isOpen: true,
+                  isProcessing: false,
+                  progressMessage: null,
+                  stitchingSourcePaths: finalSelection,
+                },
               });
             },
           },
@@ -4927,13 +4365,15 @@ function App() {
             icon: Images,
             label: mergeLabel,
             onClick: () => {
-              setHdrModalState({
-                error: null,
-                finalImageBase64: null,
-                isOpen: true,
-                isProcessing: false,
-                progressMessage: null,
-                stitchingSourcePaths: finalSelection,
+              setUI({
+                hdrModalState: {
+                  error: null,
+                  finalImageBase64: null,
+                  isOpen: true,
+                  isProcessing: false,
+                  progressMessage: null,
+                  stitchingSourcePaths: finalSelection,
+                },
               });
             },
           },
@@ -4942,10 +4382,7 @@ function App() {
             label: collageLabel,
             onClick: () => {
               const imagesForCollage = imageList.filter((img) => finalSelection.includes(img.path));
-              setCollageModalState({
-                isOpen: true,
-                sourceImages: imagesForCollage,
-              });
+              setUI({ collageModalState: { isOpen: true, sourceImages: imagesForCollage } });
             },
             disabled: selectionCount === 0 || selectionCount > 9,
           },
@@ -4953,12 +4390,14 @@ function App() {
             label: cullLabel,
             icon: Users,
             onClick: () =>
-              setCullingModalState({
-                isOpen: true,
-                progress: null,
-                suggestions: null,
-                error: null,
-                pathsToCull: finalSelection,
+              setUI({
+                cullingModalState: {
+                  isOpen: true,
+                  progress: null,
+                  suggestions: null,
+                  error: null,
+                  pathsToCull: finalSelection,
+                },
               }),
             disabled: selectionCount < 2,
           },
@@ -4969,8 +4408,7 @@ function App() {
         label: copyLabel,
         icon: Copy,
         onClick: () => {
-          setCopiedFilePaths(finalSelection);
-          setIsCopied(true);
+          setProcess({ copiedFilePaths: finalSelection, isCopied: true });
         },
       },
       {
@@ -5091,13 +4529,13 @@ function App() {
         let settingsChanged = false;
 
         if (rootPath === oldPath) {
-          setRootPath(newPath);
+          setLibrary({ rootPath: newPath });
           newAppSettings.lastRootPath = newPath;
           settingsChanged = true;
         }
         if (currentFolderPath?.startsWith(oldPath)) {
           const newCurrentPath = currentFolderPath.replace(oldPath, newPath);
-          setCurrentFolderPath(newCurrentPath);
+          setLibrary({ currentFolderPath: newCurrentPath });
         }
 
         const currentPins = appSettings?.pinnedFolders || [];
@@ -5149,8 +4587,7 @@ function App() {
         icon: FolderPlus,
         label: 'New Folder',
         onClick: () => {
-          setFolderActionTarget(targetPath);
-          setIsCreateFolderModalOpen(true);
+          setUI({ folderActionTarget: targetPath, isCreateFolderModalOpen: true });
         },
       },
       {
@@ -5158,8 +4595,7 @@ function App() {
         icon: FileEdit,
         label: 'Rename Folder',
         onClick: () => {
-          setFolderActionTarget(targetPath);
-          setIsRenameFolderModalOpen(true);
+          setUI({ folderActionTarget: targetPath, isRenameFolderModalOpen: true });
         },
       },
       { type: OPTION_SEPARATOR },
@@ -5184,8 +4620,8 @@ function App() {
             onClick: async () => {
               try {
                 await invoke(Invokes.MoveFiles, { sourcePaths: copiedFilePaths, destinationFolder: targetPath });
-                setCopiedFilePaths([]);
-                setMultiSelectedPaths([]);
+                setProcess({ copiedFilePaths: [] });
+                setLibrary({ multiSelectedPaths: [] });
                 refreshAllFolderTrees();
                 handleLibraryRefresh();
               } catch (err) {
@@ -5269,8 +4705,8 @@ function App() {
             onClick: async () => {
               try {
                 await invoke(Invokes.MoveFiles, { sourcePaths: copiedFilePaths, destinationFolder: currentFolderPath });
-                setCopiedFilePaths([]);
-                setMultiSelectedPaths([]);
+                setProcess({ copiedFilePaths: [] });
+                setLibrary({ multiSelectedPaths: [] });
                 refreshAllFolderTrees();
                 handleLibraryRefresh();
               } catch (err) {
@@ -5313,7 +4749,9 @@ function App() {
           onFolderSelect={(path) => handleSelectSubfolder(path, false)}
           onToggleFolder={handleToggleFolder}
           selectedPath={currentFolderPath}
-          setIsVisible={(value: boolean) => setUiVisibility((prev: UiVisibility) => ({ ...prev, folderTree: value }))}
+          setIsVisible={(value: boolean) =>
+            setUI((state) => ({ uiVisibility: { ...state.uiVisibility, folderTree: value } }))
+          }
           style={{ width: uiVisibility.folderTree ? `${leftPanelWidth}px` : '32px' }}
           tree={folderTree}
           pinnedFolderTrees={pinnedFolderTrees}
@@ -5323,10 +4761,7 @@ function App() {
           showImageCounts={appSettings?.enableFolderImageCounts ?? false}
           isInstantTransition={isInstantTransition}
         />
-        <Resizer
-          direction={Orientation.Vertical}
-          onMouseDown={createResizeHandler(setLeftPanelWidth, leftPanelWidth)}
-        />
+        <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('left', leftPanelWidth)} />
       </div>
     );
   };
@@ -5336,7 +4771,7 @@ function App() {
       <div className="flex-1 flex flex-col min-w-0 gap-2">
         {activeView === 'community' ? (
           <CommunityPage
-            onBackToLibrary={() => setActiveView('library')}
+            onBackToLibrary={() => setUI({ activeView: 'library' })}
             supportedTypes={supportedTypes}
             imageList={sortedImageList}
             currentFolderPath={currentFolderPath}
@@ -5347,7 +4782,6 @@ function App() {
             aiModelDownloadStatus={aiModelDownloadStatus}
             appSettings={appSettings}
             currentFolderPath={currentFolderPath}
-            filterCriteria={filterCriteria}
             imageList={sortedImageList}
             imageRatings={imageRatings}
             importState={importState}
@@ -5356,7 +4790,6 @@ function App() {
             isLoading={isViewLoading}
             isTreeLoading={isTreeLoading}
             isAndroid={isAndroid}
-            libraryScrollTop={libraryScrollTop}
             libraryViewMode={libraryViewMode}
             multiSelectedPaths={multiSelectedPaths}
             onClearSelection={handleClearSelection}
@@ -5374,21 +4807,13 @@ function App() {
             onThumbnailSizeChange={setThumbnailSize}
             onRequestThumbnails={requestThumbnails}
             rootPath={rootPath}
-            searchCriteria={searchCriteria}
-            setFilterCriteria={setFilterCriteria}
-            setLibraryScrollTop={setLibraryScrollTop}
             setLibraryViewMode={setLibraryViewMode}
-            setSearchCriteria={setSearchCriteria}
-            setSortCriteria={setSortCriteria}
-            sortCriteria={sortCriteria}
             theme={theme}
             thumbnailAspectRatio={thumbnailAspectRatio}
             thumbnails={thumbnails}
             thumbnailProgress={thumbnailProgress}
             thumbnailSize={thumbnailSize}
-            onNavigateToCommunity={() => setActiveView('community')}
-            listColumnWidths={listColumnWidths}
-            setListColumnWidths={setListColumnWidths}
+            onNavigateToCommunity={() => setUI({ activeView: 'community' })}
           />
         )}
         {rootPath && (
@@ -5403,8 +4828,10 @@ function App() {
             isResetDisabled={multiSelectedPaths.length === 0}
             multiSelectedPaths={multiSelectedPaths}
             onCopy={handleCopyAdjustments}
-            onExportClick={() => setIsLibraryExportPanelVisible((prev) => !prev)}
-            onOpenCopyPasteSettings={() => setIsCopyPasteSettingsModalOpen(true)}
+            onExportClick={() =>
+              setUI((state) => ({ isLibraryExportPanelVisible: !state.isLibraryExportPanelVisible }))
+            }
+            onOpenCopyPasteSettings={() => setUI({ isCopyPasteSettingsModalOpen: true })}
             onPaste={() => handlePasteAdjustments()}
             onRate={handleRate}
             onReset={() => handleResetAdjustments()}
@@ -5416,6 +4843,33 @@ function App() {
       </div>
     </div>
   );
+
+  const handleSetIsStraighten = useCallback((v: boolean) => setEditor({ isStraightenActive: v }), [setEditor]);
+  const handleSetIsRotation = useCallback((v: boolean) => setEditor({ isRotationActive: v }), [setEditor]);
+  const handleSetOverlayRotation = useCallback(
+    (v: any) =>
+      setEditor((state) => ({
+        overlayRotation: typeof v === 'function' ? v(state.overlayRotation) : v,
+      })),
+    [setEditor],
+  );
+  const handleSetOverlayMode = useCallback((v: OverlayMode) => setEditor({ overlayMode: v }), [setEditor]);
+  const handleLiveRotationChange = useCallback((v: number | null) => setEditor({ liveRotation: v }), [setEditor]);
+
+  const handleSelectContainer = useCallback(
+    (id: string | null) => setEditor({ activeMaskContainerId: id }),
+    [setEditor],
+  );
+  const handleSelectMask = useCallback((id: string | null) => setEditor({ activeMaskId: id }), [setEditor]);
+  const handleSetBrushSettings = useCallback((v: any) => setEditor({ brushSettings: v }), [setEditor]);
+  const handleSetCopiedMask = useCallback((v: any) => setEditor({ copiedMask: v }), [setEditor]);
+  const handleSetMaskControlHovered = useCallback((v: boolean) => setEditor({ isMaskControlHovered: v }), [setEditor]);
+
+  const handleSelectAiPatch = useCallback(
+    (id: string | null) => setEditor({ activeAiPatchContainerId: id }),
+    [setEditor],
+  );
+  const handleSelectAiSubMask = useCallback((id: string | null) => setEditor({ activeAiSubMaskId: id }), [setEditor]);
 
   const renderMainView = () => {
     const panelVariants: any = {
@@ -5438,59 +4892,12 @@ function App() {
     if (selectedImage) {
       const editorNode = (
         <Editor
-          appSettings={appSettings}
-          activeAiPatchContainerId={activeAiPatchContainerId}
-          activeAiSubMaskId={activeAiSubMaskId}
-          activeMaskContainerId={activeMaskContainerId}
-          activeMaskId={activeMaskId}
-          activeRightPanel={activeRightPanel}
-          adjustments={adjustments}
-          brushSettings={brushSettings}
-          canRedo={canRedo}
-          canUndo={canUndo}
-          finalPreviewUrl={finalPreviewUrl}
-          interactivePatch={interactivePatch}
-          isAndroid={isAndroid}
-          isFullScreen={isFullScreen}
-          isLoading={isViewLoading}
-          isSliderDragging={isSliderDragging}
-          isMaskControlHovered={isMaskControlHovered}
-          isStraightenActive={isStraightenActive}
           onBackToLibrary={handleBackToLibrary}
           onContextMenu={handleEditorContextMenu}
           onGenerateAiMask={handleGenerateAiMask}
           onQuickErase={handleQuickErase}
-          onRedo={redo}
-          onSelectAiSubMask={setActiveAiSubMaskId}
-          onSelectMask={setActiveMaskId}
-          onStraighten={handleStraighten}
-          onToggleFullScreen={handleToggleFullScreen}
-          onUndo={undo}
-          onZoomed={handleUserTransform}
-          renderedRightPanel={renderedRightPanel}
-          selectedImage={selectedImage}
-          isWbPickerActive={isWbPickerActive}
-          onWbPicked={handleWbPicked}
           setAdjustments={setAdjustments}
-          setShowOriginal={setShowOriginal}
-          showOriginal={showOriginal}
-          targetZoom={zoom}
-          thumbnails={thumbnails}
           transformWrapperRef={transformWrapperRef}
-          transformedOriginalUrl={transformedOriginalUrl}
-          uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
-          updateSubMask={updateSubMask}
-          onDisplaySizeChange={handleDisplaySizeChange}
-          originalSize={originalSize}
-          isRotationActive={isRotationActive}
-          overlayMode={overlayMode}
-          overlayRotation={overlayRotation}
-          adjustmentsHistory={adjustmentsHistory}
-          adjustmentsHistoryIndex={adjustmentsHistoryIndex}
-          goToAdjustmentsHistoryIndex={goToAdjustmentsHistoryIndex}
-          liveRotation={liveRotation}
-          isInstantTransition={isInstantTransition}
-          hasRenderedFirstFrame={hasRenderedFirstFrame}
         />
       );
 
@@ -5514,7 +4921,7 @@ function App() {
           onClearSelection={handleClearSelection}
           onContextMenu={handleThumbnailContextMenu}
           onCopy={handleCopyAdjustments}
-          onOpenCopyPasteSettings={() => setIsCopyPasteSettingsModalOpen(true)}
+          onOpenCopyPasteSettings={() => setUI({ isCopyPasteSettingsModalOpen: true })}
           onImageSelect={handleImageClick}
           onPaste={() => handlePasteAdjustments()}
           onRate={handleRate}
@@ -5523,7 +4930,7 @@ function App() {
           rating={imageRatings[selectedImage?.path || ''] || 0}
           selectedImage={selectedImage}
           setIsFilmstripVisible={(value: boolean) =>
-            setUiVisibility((prev: UiVisibility) => ({ ...prev, filmstrip: value }))
+            setUI((state) => ({ uiVisibility: { ...state.uiVisibility, filmstrip: value } }))
           }
           showFilmstrip={!isCompactPortrait}
           showZoomControls={!isAndroid}
@@ -5548,7 +4955,7 @@ function App() {
           {!isCompactPortrait && (
             <Resizer
               direction={Orientation.Horizontal}
-              onMouseDown={createResizeHandler(setBottomPanelHeight, bottomPanelHeight)}
+              onMouseDown={createResizeHandler('bottom', bottomPanelHeight)}
             />
           )}
           {editorBottomBarComponent}
@@ -5569,28 +4976,9 @@ function App() {
             >
               {renderedRightPanel === Panel.Adjustments && (
                 <Controls
-                  adjustments={adjustments}
-                  collapsibleState={collapsibleSectionsState}
-                  copiedSectionAdjustments={copiedSectionAdjustments}
                   handleAutoAdjustments={handleAutoAdjustments}
-                  histogram={histogram}
-                  selectedImage={selectedImage}
-                  setAdjustments={setAdjustments}
-                  setCollapsibleState={setCollapsibleSectionsState}
-                  setCopiedSectionAdjustments={setCopiedSectionAdjustments}
-                  theme={theme}
                   handleLutSelect={handleLutSelect}
-                  appSettings={appSettings}
-                  isWbPickerActive={isWbPickerActive}
-                  toggleWbPicker={toggleWbPicker}
-                  onDragStateChange={setIsSliderDragging}
-                  isWaveformVisible={isWaveformVisible}
-                  waveform={waveform}
-                  onToggleWaveform={handleToggleWaveform}
-                  activeWaveformChannel={activeWaveformChannel}
-                  setActiveWaveformChannel={setActiveWaveformChannel}
-                  waveformHeight={waveformHeight}
-                  setWaveformHeight={setWaveformHeight}
+                  setAdjustments={setAdjustments}
                 />
               )}
               {renderedRightPanel === Panel.Metadata && (
@@ -5613,45 +5001,22 @@ function App() {
                   isStraightenActive={isStraightenActive}
                   selectedImage={selectedImage}
                   setAdjustments={setAdjustments}
-                  setIsStraightenActive={setIsStraightenActive}
-                  setIsRotationActive={setIsRotationActive}
+                  setIsStraightenActive={handleSetIsStraighten}
+                  setIsRotationActive={handleSetIsRotation}
                   overlayMode={overlayMode}
                   overlayRotation={overlayRotation}
-                  setOverlayRotation={setOverlayRotation}
-                  setOverlayMode={setOverlayMode}
-                  onLiveRotationChange={setLiveRotation}
+                  setOverlayRotation={handleSetOverlayRotation}
+                  setOverlayMode={handleSetOverlayMode}
+                  onLiveRotationChange={handleLiveRotationChange}
                 />
               )}
               {renderedRightPanel === Panel.Masks && (
                 <MasksPanel
-                  activeMaskContainerId={activeMaskContainerId}
-                  activeMaskId={activeMaskId}
-                  adjustments={adjustments}
-                  aiModelDownloadStatus={aiModelDownloadStatus}
-                  appSettings={appSettings}
-                  brushSettings={brushSettings}
-                  copiedMask={copiedMask}
-                  histogram={histogram}
-                  isGeneratingAiMask={isGeneratingAiMask}
                   onGenerateAiDepthMask={handleGenerateAiDepthMask}
                   onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
                   onGenerateAiSkyMask={handleGenerateAiSkyMask}
-                  onSelectContainer={setActiveMaskContainerId}
-                  onSelectMask={setActiveMaskId}
-                  selectedImage={selectedImage}
                   setAdjustments={setAdjustments}
-                  setBrushSettings={setBrushSettings}
-                  setCopiedMask={setCopiedMask}
                   setCustomEscapeHandler={setCustomEscapeHandler}
-                  onDragStateChange={setIsSliderDragging}
-                  isWaveformVisible={isWaveformVisible}
-                  onToggleWaveform={handleToggleWaveform}
-                  waveform={waveform}
-                  activeWaveformChannel={activeWaveformChannel}
-                  setActiveWaveformChannel={setActiveWaveformChannel}
-                  waveformHeight={waveformHeight}
-                  setWaveformHeight={setWaveformHeight}
-                  setIsMaskControlHovered={setIsMaskControlHovered}
                 />
               )}
               {renderedRightPanel === Panel.Presets && (
@@ -5661,7 +5026,7 @@ function App() {
                   selectedImage={selectedImage}
                   onNavigateToCommunity={() => {
                     handleBackToLibrary();
-                    setActiveView('community');
+                    setUI({ activeView: 'community' });
                   }}
                   setAdjustments={setAdjustments}
                 />
@@ -5691,12 +5056,12 @@ function App() {
                   onDeletePatch={handleDeleteAiPatch}
                   onGenerateAiForegroundMask={handleGenerateAiForegroundMask}
                   onGenerativeReplace={handleGenerativeReplace}
-                  onSelectPatchContainer={setActiveAiPatchContainerId}
-                  onSelectSubMask={setActiveAiSubMaskId}
+                  onSelectPatchContainer={handleSelectAiPatch}
+                  onSelectSubMask={handleSelectAiSubMask}
                   onTogglePatchVisibility={handleToggleAiPatchVisibility}
                   selectedImage={selectedImage}
                   setAdjustments={setAdjustments}
-                  setBrushSettings={setBrushSettings}
+                  setBrushSettings={handleSetBrushSettings}
                   setCustomEscapeHandler={setCustomEscapeHandler}
                 />
               )}
@@ -5736,7 +5101,7 @@ function App() {
                 {activeRightPanel && !isFullScreen && (
                   <Resizer
                     direction={Orientation.Horizontal}
-                    onMouseDown={createResizeHandler(setCompactEditorPanelHeightOverride, compactEditorPanelHeight)}
+                    onMouseDown={createResizeHandler('compact', compactEditorPanelHeight)}
                   />
                 )}
                 <div className="min-h-0 flex-1 overflow-hidden">{editorRightPanelContent}</div>
@@ -5752,10 +5117,7 @@ function App() {
               </>
             ) : (
               <>
-                <Resizer
-                  direction={Orientation.Vertical}
-                  onMouseDown={createResizeHandler(setRightPanelWidth, rightPanelWidth)}
-                />
+                <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
                 <div className="flex bg-bg-secondary rounded-lg h-full">
                   <div
                     className={clsx(
@@ -5853,10 +5215,7 @@ function App() {
           {!shouldHideFolderTree && renderFolderTree()}
           <div className="flex-1 flex flex-col min-w-0">{renderContent()}</div>
           {!selectedImage && isLibraryExportPanelVisible && (
-            <Resizer
-              direction={Orientation.Vertical}
-              onMouseDown={createResizeHandler(setRightPanelWidth, rightPanelWidth)}
-            />
+            <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
           )}
           <div
             className={clsx(
@@ -5870,7 +5229,7 @@ function App() {
               imageList={sortedImageList}
               isVisible={isLibraryExportPanelVisible}
               multiSelectedPaths={multiSelectedPaths}
-              onClose={() => setIsLibraryExportPanelVisible(false)}
+              onClose={() => setUI({ isLibraryExportPanelVisible: false })}
               setExportState={setExportState}
               appSettings={appSettings}
               onSettingsChange={handleSettingsChange}
@@ -5881,7 +5240,7 @@ function App() {
       </div>
       <CopyPasteSettingsModal
         isOpen={isCopyPasteSettingsModalOpen}
-        onClose={() => setIsCopyPasteSettingsModalOpen(false)}
+        onClose={() => setUI({ isCopyPasteSettingsModalOpen: false })}
         settings={appSettings?.copyPasteSettings as CopyPasteSettings}
         onSave={(newSettings) =>
           handleSettingsChange({ ...appSettings, copyPasteSettings: newSettings } as AppSettings)
@@ -5901,13 +5260,15 @@ function App() {
             : null
         }
         onClose={() =>
-          setPanoramaModalState({
-            isOpen: false,
-            isProcessing: false,
-            progressMessage: '',
-            finalImageBase64: null,
-            error: null,
-            stitchingSourcePaths: [],
+          setUI({
+            panoramaModalState: {
+              isOpen: false,
+              isProcessing: false,
+              progressMessage: '',
+              finalImageBase64: null,
+              error: null,
+              stitchingSourcePaths: [],
+            },
           })
         }
         onOpenFile={(path: string) => handleImageSelect(path)}
@@ -5929,13 +5290,15 @@ function App() {
             : null
         }
         onClose={() =>
-          setHdrModalState({
-            isOpen: false,
-            isProcessing: false,
-            progressMessage: '',
-            finalImageBase64: null,
-            error: null,
-            stitchingSourcePaths: [],
+          setUI({
+            hdrModalState: {
+              isOpen: false,
+              isProcessing: false,
+              progressMessage: '',
+              finalImageBase64: null,
+              error: null,
+              stitchingSourcePaths: [],
+            },
           })
         }
         onOpenFile={(path: string) => {
@@ -5947,7 +5310,7 @@ function App() {
       />
       <NegativeConversionModal
         isOpen={negativeModalState.isOpen}
-        onClose={() => setNegativeModalState((prev) => ({ ...prev, isOpen: false }))}
+        onClose={() => setUI((state) => ({ negativeModalState: { ...state.negativeModalState, isOpen: false } }))}
         targetPaths={negativeModalState.targetPaths}
         onSave={(savedPaths) => {
           refreshImageList().then(() => {
@@ -5959,7 +5322,7 @@ function App() {
       />
       <DenoiseModal
         isOpen={denoiseModalState.isOpen}
-        onClose={() => setDenoiseModalState((prev) => ({ ...prev, isOpen: false }))}
+        onClose={() => setUI((state) => ({ denoiseModalState: { ...state.denoiseModalState, isOpen: false } }))}
         onDenoise={handleApplyDenoise}
         onBatchDenoise={handleBatchDenoise}
         onSave={handleSaveDenoisedImage}
@@ -5981,32 +5344,34 @@ function App() {
       />
       <CreateFolderModal
         isOpen={isCreateFolderModalOpen}
-        onClose={() => setIsCreateFolderModalOpen(false)}
+        onClose={() => setUI({ isCreateFolderModalOpen: false })}
         onSave={handleCreateFolder}
       />
       <RenameFolderModal
         currentName={folderActionTarget ? folderActionTarget.split(/[\\/]/).pop() : ''}
         isOpen={isRenameFolderModalOpen}
-        onClose={() => setIsRenameFolderModalOpen(false)}
+        onClose={() => setUI({ isRenameFolderModalOpen: false })}
         onSave={handleRenameFolder}
       />
       <RenameFileModal
         filesToRename={renameTargetPaths}
         isOpen={isRenameFileModalOpen}
-        onClose={() => setIsRenameFileModalOpen(false)}
+        onClose={() => setUI({ isRenameFileModalOpen: false })}
         onSave={handleSaveRename}
       />
       <ConfirmModal {...confirmModalState} onClose={closeConfirmModal} />
       <ImportSettingsModal
         fileCount={importSourcePaths.length}
         isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
+        onClose={() => setUI({ isImportModalOpen: false })}
         onSave={handleStartImport}
       />
       <CullingModal
         isOpen={cullingModalState.isOpen}
         onClose={() =>
-          setCullingModalState({ isOpen: false, progress: null, suggestions: null, error: null, pathsToCull: [] })
+          setUI({
+            cullingModalState: { isOpen: false, progress: null, suggestions: null, error: null, pathsToCull: [] },
+          })
         }
         progress={cullingModalState.progress}
         suggestions={cullingModalState.suggestions}
@@ -6021,15 +5386,17 @@ function App() {
           } else if (action === 'delete') {
             executeDelete(paths, { includeAssociated: false });
           }
-          setCullingModalState({ isOpen: false, progress: null, suggestions: null, error: null, pathsToCull: [] });
+          setUI({
+            cullingModalState: { isOpen: false, progress: null, suggestions: null, error: null, pathsToCull: [] },
+          });
         }}
         onError={(err) => {
-          setCullingModalState((prev) => ({ ...prev, error: err, progress: null }));
+          setUI((state) => ({ cullingModalState: { ...state.cullingModalState, error: err, progress: null } }));
         }}
       />
       <CollageModal
         isOpen={collageModalState.isOpen}
-        onClose={() => setCollageModalState({ isOpen: false, sourceImages: [] })}
+        onClose={() => setUI({ collageModalState: { isOpen: false, sourceImages: [] } })}
         onSave={handleSaveCollage}
         sourceImages={collageModalState.sourceImages}
         thumbnails={thumbnails}

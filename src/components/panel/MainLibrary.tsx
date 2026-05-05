@@ -44,6 +44,7 @@ import { Color, COLOR_LABELS } from '../../utils/adjustments';
 import { ImportState, Status } from '../ui/ExportImportProperties';
 import Text from '../ui/Text';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { useLibraryStore } from '../../store/useLibraryStore';
 
 export interface ColumnWidths {
   thumbnail: number;
@@ -82,7 +83,6 @@ interface MainLibraryProps {
   aiModelDownloadStatus: string | null;
   appSettings: AppSettings | null;
   currentFolderPath: string | null;
-  filterCriteria: FilterCriteria;
   imageList: Array<ImageFile>;
   imageRatings: Record<string, number>;
   importState: ImportState;
@@ -91,7 +91,6 @@ interface MainLibraryProps {
   isIndexing: boolean;
   isAndroid: boolean;
   isTreeLoading: boolean;
-  libraryScrollTop: number;
   libraryViewMode: LibraryViewMode;
   multiSelectedPaths: Array<string>;
   onClearSelection(): void;
@@ -109,21 +108,13 @@ interface MainLibraryProps {
   onThumbnailSizeChange(size: ThumbnailSize): void;
   onRequestThumbnails?(paths: string[]): void;
   rootPath: string | null;
-  searchCriteria: SearchCriteria;
-  setFilterCriteria(criteria: FilterCriteria): void;
-  setLibraryScrollTop(scrollTop: number): void;
   setLibraryViewMode(mode: LibraryViewMode): void;
-  setSearchCriteria(criteria: SearchCriteria | ((prev: SearchCriteria) => SearchCriteria)): void;
-  setSortCriteria(criteria: SortCriteria | ((prev: SortCriteria) => SortCriteria)): void;
-  sortCriteria: SortCriteria;
   theme: string;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   thumbnails: Record<string, string>;
   thumbnailProgress: Progress;
   thumbnailSize: ThumbnailSize;
   onNavigateToCommunity(): void;
-  listColumnWidths: ColumnWidths;
-  setListColumnWidths: React.Dispatch<React.SetStateAction<ColumnWidths>>;
 }
 
 interface SearchInputProps {
@@ -1508,16 +1499,14 @@ export default function MainLibrary({
   aiModelDownloadStatus,
   appSettings,
   currentFolderPath,
-  filterCriteria,
   imageList,
   imageRatings,
   importState,
   indexingProgress,
+  isLoading,
   isIndexing,
   isAndroid,
-  isLoading,
   isTreeLoading: _isTreeLoading,
-  libraryScrollTop,
   libraryViewMode,
   multiSelectedPaths,
   onClearSelection,
@@ -1535,21 +1524,13 @@ export default function MainLibrary({
   onThumbnailSizeChange,
   onRequestThumbnails,
   rootPath,
-  searchCriteria,
-  setFilterCriteria,
-  setLibraryScrollTop,
   setLibraryViewMode,
-  setSearchCriteria,
-  setSortCriteria,
-  sortCriteria,
   theme,
   thumbnailAspectRatio,
   thumbnails,
   thumbnailProgress,
   thumbnailSize,
   onNavigateToCommunity,
-  listColumnWidths,
-  setListColumnWidths,
 }: MainLibraryProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [appVersion, setAppVersion] = useState('');
@@ -1585,6 +1566,24 @@ export default function MainLibrary({
   const requestTimeoutRef = useRef<any>(null);
   const thumbnailsRef = useRef(thumbnails);
   thumbnailsRef.current = thumbnails;
+
+  const {
+    filterCriteria,
+    setFilterCriteria,
+    searchCriteria,
+    setSearchCriteria,
+    sortCriteria,
+    setSortCriteria,
+    libraryScrollTop,
+    listColumnWidths,
+    setLibrary,
+  } = useLibraryStore();
+
+  const setLibraryScrollTop = (top: number) => setLibrary({ libraryScrollTop: top });
+  const setListColumnWidths = (widths: any) =>
+    setLibrary((state) => ({
+      listColumnWidths: typeof widths === 'function' ? widths(state.listColumnWidths) : widths,
+    }));
 
   const queueThumbnailRequest = useCallback(
     (path: string) => {

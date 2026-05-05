@@ -416,6 +416,23 @@ export default function CropPanel({
     }
     return orientation === Orientation.Vertical ? 'Switch to landscape' : 'Switch to portrait';
   };
+  const handleDragStateChange = useCallback(
+    (isDragging: boolean) => {
+      if (isDragging) {
+        setIsRotationActive(true);
+        setGlobalRotationActive?.(true);
+      } else {
+        setIsRotationActive(false);
+        setGlobalRotationActive?.(false);
+        if (localRotationRef.current !== null) {
+          const finalRot = localRotationRef.current;
+          updateLocalRotation(null);
+          setAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRot }));
+        }
+      }
+    },
+    [setGlobalRotationActive, updateLocalRotation, setAdjustments],
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -583,20 +600,7 @@ export default function CropPanel({
                   defaultValue={0}
                   suffix="°"
                   onChange={handleFineRotationChange}
-                  onDragStateChange={(isDragging) => {
-                    if (isDragging) {
-                      setIsRotationActive(true);
-                      setGlobalRotationActive?.(true);
-                    } else {
-                      setIsRotationActive(false);
-                      setGlobalRotationActive?.(false);
-                      if (localRotationRef.current !== null) {
-                        const finalRot = localRotationRef.current;
-                        updateLocalRotation(null);
-                        setAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRot }));
-                      }
-                    }
-                  }}
+                  onDragStateChange={handleDragStateChange}
                 />
               </div>
             </div>
