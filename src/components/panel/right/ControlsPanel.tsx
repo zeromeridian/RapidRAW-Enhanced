@@ -15,8 +15,7 @@ import { useContextMenu } from '../../../context/ContextMenuContext';
 import { OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextVariants } from '../../../types/typography';
-
-// Zustand Stores
+import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
@@ -39,9 +38,20 @@ export default function Controls({ handleAutoAdjustments, handleLutSelect, setAd
   const { showContextMenu } = useContextMenu();
   const [isResizingWaveform, setIsResizingWaveform] = useState<boolean>(false);
 
-  // --- Zustand Store Hooks ---
-  const { appSettings, theme } = useSettingsStore();
-  const { collapsibleSectionsState, setUI } = useUIStore();
+  const { appSettings, theme } = useSettingsStore(
+    useShallow((state) => ({
+      appSettings: state.appSettings,
+      theme: state.theme,
+    })),
+  );
+
+  const { collapsibleSectionsState, setUI } = useUIStore(
+    useShallow((state) => ({
+      collapsibleSectionsState: state.collapsibleSectionsState,
+      setUI: state.setUI,
+    })),
+  );
+
   const {
     adjustments,
     copiedSectionAdjustments,
@@ -53,7 +63,20 @@ export default function Controls({ handleAutoAdjustments, handleLutSelect, setAd
     activeWaveformChannel,
     waveformHeight,
     setEditor,
-  } = useEditorStore();
+  } = useEditorStore(
+    useShallow((state) => ({
+      adjustments: state.adjustments,
+      copiedSectionAdjustments: state.copiedSectionAdjustments,
+      histogram: state.histogram,
+      selectedImage: state.selectedImage,
+      isWbPickerActive: state.isWbPickerActive,
+      isWaveformVisible: state.isWaveformVisible,
+      waveform: state.waveform,
+      activeWaveformChannel: state.activeWaveformChannel,
+      waveformHeight: state.waveformHeight,
+      setEditor: state.setEditor,
+    })),
+  );
 
   const setCopiedSectionAdjustments = useCallback(
     (val: any) => setEditor({ copiedSectionAdjustments: val }),

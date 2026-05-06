@@ -4,10 +4,9 @@ import {
   useState,
   useEffect,
   useRef,
-  useMemo,
   useCallback,
 } from 'react';
-import debounce from 'lodash.debounce';
+import { useShallow } from 'zustand/react/shallow';
 import { v4 as uuidv4 } from 'uuid';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -557,8 +556,18 @@ export default function MasksPanel({
   setAdjustments,
   setCustomEscapeHandler,
 }: MasksPanelProps) {
-  const { appSettings } = useSettingsStore();
-  const { aiModelDownloadStatus } = useProcessStore();
+  const { appSettings } = useSettingsStore(
+    useShallow((state) => ({
+      appSettings: state.appSettings,
+    })),
+  );
+
+  const { aiModelDownloadStatus } = useProcessStore(
+    useShallow((state) => ({
+      aiModelDownloadStatus: state.aiModelDownloadStatus,
+    })),
+  );
+
   const {
     activeMaskContainerId,
     activeMaskId,
@@ -573,7 +582,23 @@ export default function MasksPanel({
     activeWaveformChannel,
     waveformHeight,
     setEditor,
-  } = useEditorStore();
+  } = useEditorStore(
+    useShallow((state) => ({
+      activeMaskContainerId: state.activeMaskContainerId,
+      activeMaskId: state.activeMaskId,
+      adjustments: state.adjustments,
+      brushSettings: state.brushSettings,
+      copiedMask: state.copiedMask,
+      histogram: state.histogram,
+      isGeneratingAiMask: state.isGeneratingAiMask,
+      selectedImage: state.selectedImage,
+      isWaveformVisible: state.isWaveformVisible,
+      waveform: state.waveform,
+      activeWaveformChannel: state.activeWaveformChannel,
+      waveformHeight: state.waveformHeight,
+      setEditor: state.setEditor,
+    })),
+  );
 
   const setBrushSettings = useCallback(
     (updater: any) => {
