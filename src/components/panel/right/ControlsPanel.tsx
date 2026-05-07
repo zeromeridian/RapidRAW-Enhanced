@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { RotateCcw, Copy, ClipboardPaste, Aperture, ChartArea } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -20,10 +20,12 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
+import { useWaveformControls } from '../../../hooks/useWaveformControls';
 
 export default function Controls() {
   const { showContextMenu } = useContextMenu();
-  const [isResizingWaveform, setIsResizingWaveform] = useState<boolean>(false);
+  const { isResizingWaveform, onToggleWaveform, setActiveWaveformChannel, handleWaveformResize } =
+    useWaveformControls();
   const { setAdjustments, handleAutoAdjustments, handleLutSelect } = useEditorActions();
 
   const { appSettings, theme } = useSettingsStore(
@@ -81,31 +83,6 @@ export default function Controls() {
     [setEditor],
   );
 
-  const onToggleWaveform = useCallback(() => {
-    setEditor((state) => {
-      const newVal = !state.isWaveformVisible;
-      const { appSettings, handleSettingsChange } = useSettingsStore.getState();
-      if (appSettings) handleSettingsChange({ ...appSettings, isWaveformVisible: newVal });
-      return { isWaveformVisible: newVal };
-    });
-  }, [setEditor]);
-
-  const setActiveWaveformChannel = useCallback(
-    (mode: string) => {
-      setEditor({ activeWaveformChannel: mode });
-      const { appSettings, handleSettingsChange } = useSettingsStore.getState();
-      if (appSettings) handleSettingsChange({ ...appSettings, activeWaveformChannel: mode });
-    },
-    [setEditor],
-  );
-
-  const setWaveformHeight = useCallback(
-    (height: number) => {
-      setEditor({ waveformHeight: height });
-    },
-    [setEditor],
-  );
-
   const setCollapsibleState = useCallback(
     (updater: any) =>
       setUI((state) => ({
@@ -113,49 +90,6 @@ export default function Controls() {
       })),
     [setUI],
   );
-
-  const handleWaveformResize = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const pointerId = e.pointerId;
-    const target = e.currentTarget;
-    const startY = e.clientY;
-    const startHeight = waveformHeight || 256;
-    const previousTouchAction = document.documentElement.style.touchAction;
-    const previousUserSelect = document.documentElement.style.userSelect;
-    setIsResizingWaveform(true);
-
-    target.setPointerCapture?.(pointerId);
-    document.documentElement.style.touchAction = 'none';
-    document.documentElement.style.userSelect = 'none';
-
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      if (moveEvent.pointerId !== pointerId) return;
-      moveEvent.preventDefault();
-      const delta = moveEvent.clientY - startY;
-      const newHeight = Math.round(Math.max(150, Math.min(450, startHeight + delta)));
-      setWaveformHeight(newHeight);
-    };
-
-    const handlePointerUp = (upEvent: PointerEvent) => {
-      if (upEvent.pointerId !== pointerId) return;
-      if (target.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId);
-      setIsResizingWaveform(false);
-      document.documentElement.style.touchAction = previousTouchAction;
-      document.documentElement.style.userSelect = previousUserSelect;
-      document.removeEventListener('pointermove', handlePointerMove);
-      document.removeEventListener('pointerup', handlePointerUp);
-      document.removeEventListener('pointercancel', handlePointerUp);
-      const { appSettings, handleSettingsChange } = useSettingsStore.getState();
-      if (appSettings)
-        handleSettingsChange({ ...appSettings, waveformHeight: useEditorStore.getState().waveformHeight });
-    };
-
-    document.addEventListener('pointermove', handlePointerMove, { passive: false });
-    document.addEventListener('pointerup', handlePointerUp);
-    document.addEventListener('pointercancel', handlePointerUp);
-  };
 
   const handleToggleVisibility = (sectionName: string) => {
     setAdjustments((prev: Adjustments) => {
