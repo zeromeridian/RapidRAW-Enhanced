@@ -5,8 +5,8 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { Invokes, ImageFile } from '../components/ui/AppProperties';
 import { globalImageCache } from '../utils/ImageLRUCache';
-import { useSortedLibrary } from './useSortedLibrary';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { computeSortedLibrary } from './useSortedLibrary';
 
 export function useLibraryActions(handleImageSelect?: (path: string) => void) {
   const handleRate = useCallback((newRating: number, paths?: string[]) => {
@@ -139,20 +139,20 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     }
   }, []);
 
-  const sortedImageList = useSortedLibrary();
-
   const handleMultiSelectClick = useCallback(
     (
       path: string,
       event: any,
       options: { onSimpleClick(p: any): void; updateLibraryActivePath: boolean; shiftAnchor: string | null },
     ) => {
-      const { multiSelectedPaths, setLibrary } = useLibraryStore.getState();
+      const libraryState = useLibraryStore.getState();
+      const { multiSelectedPaths, setLibrary } = libraryState;
       const { ctrlKey, metaKey, shiftKey } = event;
       const isCtrlPressed = ctrlKey || metaKey;
       const { shiftAnchor, onSimpleClick, updateLibraryActivePath } = options;
 
       if (shiftKey && shiftAnchor) {
+        const sortedImageList = computeSortedLibrary(libraryState, useSettingsStore.getState());
         const anchorIndex = sortedImageList.findIndex((f) => f.path === shiftAnchor);
         const currentIndex = sortedImageList.findIndex((f) => f.path === path);
 
@@ -185,7 +185,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
         setLibrary({ selectionAnchorPath: path });
       }
     },
-    [sortedImageList],
+    [],
   );
 
   const handleLibraryImageSingleClick = useCallback(

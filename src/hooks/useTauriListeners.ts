@@ -25,6 +25,10 @@ export function useTauriListeners({
     refs.current = { refreshAllFolderTrees, handleSelectSubfolder, refreshImageList, markGenerated };
   });
 
+  const thumbnailBatch = useRef<Record<string, string>>({});
+  const ratingBatch = useRef<Record<string, number>>({});
+  const batchTimeout = useRef<any>(null);
+
   useEffect(() => {
     let isEffectActive = true;
 

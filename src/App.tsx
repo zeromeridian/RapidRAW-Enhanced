@@ -63,7 +63,8 @@ import {
   ThumbnailAspectRatio,
 } from './components/ui/AppProperties';
 
-import { useImageLoader } from './hooks/useImageLoader';
+import ImageProcessingManager from './components/managers/ImageProcessingManager';
+import ImageLoaderManager from './components/managers/ImageLoaderManager';
 
 const CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA'; // local dev key
 
@@ -200,37 +201,16 @@ function App() {
     })),
   );
 
-  const {
-    selectedImage,
-    adjustments,
-    isWaveformVisible,
-    activeWaveformChannel,
-    waveformHeight,
-    activeMaskContainerId,
-    activeAiPatchContainerId,
-    zoom,
-    displaySize,
-    baseRenderSize,
-    originalSize,
-    hasRenderedFirstFrame,
-    setEditor,
-  } = useEditorStore(
-    useShallow((state) => ({
-      selectedImage: state.selectedImage,
-      adjustments: state.adjustments,
-      isWaveformVisible: state.isWaveformVisible,
-      activeWaveformChannel: state.activeWaveformChannel,
-      waveformHeight: state.waveformHeight,
-      activeMaskContainerId: state.activeMaskContainerId,
-      activeAiPatchContainerId: state.activeAiPatchContainerId,
-      zoom: state.zoom,
-      displaySize: state.displaySize,
-      baseRenderSize: state.baseRenderSize,
-      originalSize: state.originalSize,
-      hasRenderedFirstFrame: state.hasRenderedFirstFrame,
-      setEditor: state.setEditor,
-    })),
-  );
+  const { selectedImage, activeMaskContainerId, activeAiPatchContainerId, hasRenderedFirstFrame, setEditor } =
+    useEditorStore(
+      useShallow((state) => ({
+        selectedImage: state.selectedImage,
+        activeMaskContainerId: state.activeMaskContainerId,
+        activeAiPatchContainerId: state.activeAiPatchContainerId,
+        hasRenderedFirstFrame: state.hasRenderedFirstFrame,
+        setEditor: state.setEditor,
+      })),
+    );
 
   const {
     exportState,
@@ -315,6 +295,7 @@ function App() {
       : 520;
 
   const getDynamicCompactPanelHeight = () => {
+    const { originalSize, adjustments } = useEditorStore.getState();
     const halfScreenHeight = viewportSize.height > 0 ? Math.round(viewportSize.height * 0.5) : 340;
 
     if (!selectedImage || originalSize.width === 0 || originalSize.height === 0 || viewportSize.width === 0) {
@@ -444,6 +425,7 @@ function App() {
   });
 
   const handleToggleFullScreen = useCallback(() => {
+    const { zoom, selectedImage } = useEditorStore.getState();
     const currentlyZoomed = zoom > 1.01;
     setUI({ isInstantTransition: currentlyZoomed });
 
@@ -457,15 +439,7 @@ function App() {
     if (currentlyZoomed) {
       setTimeout(() => setUI({ isInstantTransition: false }), 100);
     }
-  }, [isFullScreen, selectedImage, zoom, setUI]);
-
-  useImageProcessing(transformWrapperRef, prevAdjustmentsRef, {
-    previewJobIdRef,
-    latestRenderedJobIdRef,
-    currentResRef,
-  });
-
-  useImageLoader(cachedEditStateRef);
+  }, [isFullScreen, setUI]);
 
   useKeyboardShortcuts({
     sortedImageList,
@@ -652,10 +626,6 @@ function App() {
         setLibraryViewMode(settings?.libraryViewMode ?? defaultLibraryViewMode);
         setThumbnailSize(settings?.thumbnailSize ?? defaultThumbnailSize);
         if (settings?.thumbnailAspectRatio) setThumbnailAspectRatio(settings.thumbnailAspectRatio);
-        if (typeof settings?.isWaveformVisible === 'boolean')
-          setEditor({ isWaveformVisible: settings.isWaveformVisible });
-        if (settings?.activeWaveformChannel) setEditor({ activeWaveformChannel: settings.activeWaveformChannel });
-        if (settings?.waveformHeight !== undefined) setEditor({ waveformHeight: settings.waveformHeight });
 
         if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
           try {
@@ -764,22 +734,6 @@ function App() {
       handleSettingsChange({ ...appSettings, filterCriteria });
     }
   }, [filterCriteria, appSettings, handleSettingsChange]);
-
-  useEffect(() => {
-    if (isInitialMount.current || !appSettings) return;
-    if (
-      appSettings.isWaveformVisible !== isWaveformVisible ||
-      appSettings.activeWaveformChannel !== activeWaveformChannel ||
-      appSettings.waveformHeight !== waveformHeight
-    ) {
-      handleSettingsChange({
-        ...appSettings,
-        isWaveformVisible,
-        activeWaveformChannel,
-        waveformHeight,
-      });
-    }
-  }, [isWaveformVisible, activeWaveformChannel, waveformHeight, appSettings, handleSettingsChange]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -944,6 +898,8 @@ function App() {
   );
 
   const renderMainView = () => {
+    const { displaySize, originalSize, baseRenderSize, zoom, adjustments } = useEditorStore.getState();
+
     const panelVariants: any = {
       animate: (direction: number) => ({
         opacity: 1,
@@ -1164,95 +1120,105 @@ function App() {
   const useMacWindowShell = osPlatform === 'macos' && !appSettings?.decorations && !isWindowFullScreen && !isFullScreen;
 
   return (
-    <div
-      className={clsx(
-        'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
-        useMacWindowShell && 'macos-window-shell',
-        isWgpuActive ? 'bg-transparent' : 'bg-bg-primary',
-      )}
-    >
+    <>
+      <ImageProcessingManager
+        transformWrapperRef={transformWrapperRef}
+        prevAdjustmentsRef={prevAdjustmentsRef}
+        previewJobIdRef={previewJobIdRef}
+        latestRenderedJobIdRef={latestRenderedJobIdRef}
+        currentResRef={currentResRef}
+      />
+      <ImageLoaderManager cachedEditStateRef={cachedEditStateRef} />
       <div
         className={clsx(
-          'shrink-0 overflow-hidden z-50',
-          !isInstantTransition && 'transition-all duration-300 ease-in-out',
-          isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
+          'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
+          useMacWindowShell && 'macos-window-shell',
+          isWgpuActive ? 'bg-transparent' : 'bg-bg-primary',
         )}
       >
-        {appSettings?.decorations || (!isWindowFullScreen && <TitleBar />)}
-      </div>
-      <div
-        className={clsx(
-          'flex-1 flex flex-col min-h-0',
-          isLayoutReady && rootPath && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-          [rootPath && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2')],
-        )}
-      >
-        <div className="flex flex-row grow h-full min-h-0">
-          {!shouldHideFolderTree && renderFolderTree()}
-          <div className="flex-1 flex flex-col min-w-0">{renderContent()}</div>
-          {!selectedImage && isLibraryExportPanelVisible && (
-            <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
+        <div
+          className={clsx(
+            'shrink-0 overflow-hidden z-50',
+            !isInstantTransition && 'transition-all duration-300 ease-in-out',
+            isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
           )}
-          <div
-            className={clsx(
-              'shrink-0 overflow-hidden',
-              !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+        >
+          {appSettings?.decorations || (!isWindowFullScreen && <TitleBar />)}
+        </div>
+        <div
+          className={clsx(
+            'flex-1 flex flex-col min-h-0',
+            isLayoutReady && rootPath && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+            [rootPath && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2')],
+          )}
+        >
+          <div className="flex flex-row grow h-full min-h-0">
+            {!shouldHideFolderTree && renderFolderTree()}
+            <div className="flex-1 flex flex-col min-w-0">{renderContent()}</div>
+            {!selectedImage && isLibraryExportPanelVisible && (
+              <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
             )}
-            style={{ width: isLibraryExportPanelVisible && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
-          >
-            <LibraryExportPanel
-              exportState={exportState}
-              imageList={sortedImageList}
-              isVisible={isLibraryExportPanelVisible}
-              multiSelectedPaths={multiSelectedPaths}
-              onClose={() => setUI({ isLibraryExportPanelVisible: false })}
-              setExportState={setExportState}
-              appSettings={appSettings}
-              onSettingsChange={handleSettingsChange}
-              rootPath={rootPath}
-            />
+            <div
+              className={clsx(
+                'shrink-0 overflow-hidden',
+                !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+              )}
+              style={{ width: isLibraryExportPanelVisible && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
+            >
+              <LibraryExportPanel
+                exportState={exportState}
+                imageList={sortedImageList}
+                isVisible={isLibraryExportPanelVisible}
+                multiSelectedPaths={multiSelectedPaths}
+                onClose={() => setUI({ isLibraryExportPanelVisible: false })}
+                setExportState={setExportState}
+                appSettings={appSettings}
+                onSettingsChange={handleSettingsChange}
+                rootPath={rootPath}
+              />
+            </div>
           </div>
         </div>
+        <AppModals
+          handleImageSelect={handleImageSelect}
+          handleSavePanorama={handleSavePanorama}
+          handleStartPanorama={handleStartPanorama}
+          handleSaveHdr={handleSaveHdr}
+          handleStartHdr={handleStartHdr}
+          refreshImageList={handleLibraryRefresh}
+          handleApplyDenoise={handleApplyDenoise}
+          handleBatchDenoise={handleBatchDenoise}
+          handleSaveDenoisedImage={handleSaveDenoisedImage}
+          handleCreateFolder={handleCreateFolder}
+          handleRenameFolder={handleRenameFolder}
+          handleSaveRename={handleSaveRename}
+          handleStartImport={handleStartImport}
+          handleSetColorLabel={handleSetColorLabel}
+          handleRate={handleRate}
+          executeDelete={executeDelete}
+          handleSaveCollage={handleSaveCollage}
+        />
+        <ToastContainer
+          position="bottom-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable={false}
+          pauseOnHover
+          theme={isLightTheme ? 'light' : 'dark'}
+          transition={Slide}
+          toastClassName={() =>
+            clsx(
+              'relative flex min-h-16 p-4 rounded-lg justify-between overflow-hidden cursor-pointer mb-4',
+              'bg-surface! text-text-primary! border! border-border-color! shadow-2xl! max-w-[420px]!',
+            )
+          }
+        />
       </div>
-      <AppModals
-        handleImageSelect={handleImageSelect}
-        handleSavePanorama={handleSavePanorama}
-        handleStartPanorama={handleStartPanorama}
-        handleSaveHdr={handleSaveHdr}
-        handleStartHdr={handleStartHdr}
-        refreshImageList={handleLibraryRefresh}
-        handleApplyDenoise={handleApplyDenoise}
-        handleBatchDenoise={handleBatchDenoise}
-        handleSaveDenoisedImage={handleSaveDenoisedImage}
-        handleCreateFolder={handleCreateFolder}
-        handleRenameFolder={handleRenameFolder}
-        handleSaveRename={handleSaveRename}
-        handleStartImport={handleStartImport}
-        handleSetColorLabel={handleSetColorLabel}
-        handleRate={handleRate}
-        executeDelete={executeDelete}
-        handleSaveCollage={handleSaveCollage}
-      />
-      <ToastContainer
-        position="bottom-right"
-        autoClose={5000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable={false}
-        pauseOnHover
-        theme={isLightTheme ? 'light' : 'dark'}
-        transition={Slide}
-        toastClassName={() =>
-          clsx(
-            'relative flex min-h-16 p-4 rounded-lg justify-between overflow-hidden cursor-pointer mb-4',
-            'bg-surface! text-text-primary! border! border-border-color! shadow-2xl! max-w-[420px]!',
-          )
-        }
-      />
-    </div>
+    </>
   );
 }
 

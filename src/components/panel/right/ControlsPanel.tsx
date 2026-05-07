@@ -81,17 +81,30 @@ export default function Controls() {
     [setEditor],
   );
 
-  const onToggleWaveform = useCallback(
-    () => setEditor((state) => ({ isWaveformVisible: !state.isWaveformVisible })),
-    [setEditor],
-  );
+  const onToggleWaveform = useCallback(() => {
+    setEditor((state) => {
+      const newVal = !state.isWaveformVisible;
+      const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+      if (appSettings) handleSettingsChange({ ...appSettings, isWaveformVisible: newVal });
+      return { isWaveformVisible: newVal };
+    });
+  }, [setEditor]);
 
   const setActiveWaveformChannel = useCallback(
-    (mode: string) => setEditor({ activeWaveformChannel: mode }),
+    (mode: string) => {
+      setEditor({ activeWaveformChannel: mode });
+      const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+      if (appSettings) handleSettingsChange({ ...appSettings, activeWaveformChannel: mode });
+    },
     [setEditor],
   );
 
-  const setWaveformHeight = useCallback((height: number) => setEditor({ waveformHeight: height }), [setEditor]);
+  const setWaveformHeight = useCallback(
+    (height: number) => {
+      setEditor({ waveformHeight: height });
+    },
+    [setEditor],
+  );
 
   const setCollapsibleState = useCallback(
     (updater: any) =>
@@ -134,6 +147,9 @@ export default function Controls() {
       document.removeEventListener('pointermove', handlePointerMove);
       document.removeEventListener('pointerup', handlePointerUp);
       document.removeEventListener('pointercancel', handlePointerUp);
+      const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+      if (appSettings)
+        handleSettingsChange({ ...appSettings, waveformHeight: useEditorStore.getState().waveformHeight });
     };
 
     document.addEventListener('pointermove', handlePointerMove, { passive: false });
@@ -237,7 +253,7 @@ export default function Controls() {
         } Settings`
       : 'Paste Settings';
 
-    const options: Array<ControlsPanelOption> = [
+    const options: any = [
       {
         label: `Copy ${sectionName.charAt(0).toUpperCase() + sectionName.slice(1)} Settings`,
         icon: Copy,
