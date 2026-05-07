@@ -1,11 +1,11 @@
 import { useImageProcessing } from '../../hooks/useImageProcessing';
 
 interface Props {
-  transformWrapperRef: React.MutableRefObject<any>;
-  prevAdjustmentsRef: React.MutableRefObject<any>;
-  previewJobIdRef: React.MutableRefObject<number>;
-  latestRenderedJobIdRef: React.MutableRefObject<number>;
-  currentResRef: React.MutableRefObject<number>;
+  transformWrapperRef: React.RefObject<any>;
+  prevAdjustmentsRef: React.RefObject<any>;
+  previewJobIdRef: React.RefObject<number>;
+  latestRenderedJobIdRef: React.RefObject<number>;
+  currentResRef: React.RefObject<number>;
 }
 
 export default function ImageProcessingManager(props: Props) {

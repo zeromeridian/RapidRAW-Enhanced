@@ -8,23 +8,14 @@ import { ToastContainer, toast, Slide } from 'react-toastify';
 import clsx from 'clsx';
 
 import TitleBar from './window/TitleBar';
-import CommunityPage from './components/panel/CommunityPage';
-import MainLibrary from './components/panel/MainLibrary';
 import FolderTree from './components/panel/FolderTree';
-import Editor from './components/panel/Editor';
-import Controls from './components/panel/right/ControlsPanel';
-import RightPanelSwitcher from './components/panel/right/RightPanelSwitcher';
-import MetadataPanel from './components/panel/right/MetadataPanel';
-import CropPanel from './components/panel/right/CropPanel';
-import PresetsPanel from './components/panel/right/PresetsPanel';
-import AIPanel from './components/panel/right/AIPanel';
-import ExportPanel from './components/panel/right/ExportPanel';
 import LibraryExportPanel from './components/panel/right/LibraryExportPanel';
-import MasksPanel from './components/panel/right/MasksPanel';
-import BottomBar from './components/panel/BottomBar';
 import Resizer from './components/ui/Resizer';
 import GlobalTooltip from './components/ui/GlobalTooltip';
 import AppModals from './components/modals/AppModals';
+
+import EditorView from './components/views/EditorView';
+import LibraryView from './components/views/LibraryView';
 
 import { ContextMenuProvider } from './context/ContextMenuContext';
 import { useSettingsStore } from './store/useSettingsStore';
@@ -129,7 +120,6 @@ function App() {
   );
 
   const {
-    activeView,
     isFullScreen,
     isWindowFullScreen,
     isInstantTransition,
@@ -138,16 +128,12 @@ function App() {
     isLibraryExportPanelVisible,
     leftPanelWidth,
     rightPanelWidth,
-    bottomPanelHeight,
     compactEditorPanelHeightOverride,
     activeRightPanel,
-    renderedRightPanel,
-    slideDirection,
     setUI,
     setRightPanel,
   } = useUIStore(
     useShallow((state) => ({
-      activeView: state.activeView,
       isFullScreen: state.isFullScreen,
       isWindowFullScreen: state.isWindowFullScreen,
       isInstantTransition: state.isInstantTransition,
@@ -156,11 +142,8 @@ function App() {
       isLibraryExportPanelVisible: state.isLibraryExportPanelVisible,
       leftPanelWidth: state.leftPanelWidth,
       rightPanelWidth: state.rightPanelWidth,
-      bottomPanelHeight: state.bottomPanelHeight,
       compactEditorPanelHeightOverride: state.compactEditorPanelHeightOverride,
       activeRightPanel: state.activeRightPanel,
-      renderedRightPanel: state.renderedRightPanel,
-      slideDirection: state.slideDirection,
       setUI: state.setUI,
       setRightPanel: state.setRightPanel,
     })),
@@ -170,14 +153,9 @@ function App() {
     rootPath,
     currentFolderPath,
     expandedFolders,
-    imageList,
-    imageRatings,
     multiSelectedPaths,
-    libraryActivePath,
     sortCriteria,
     filterCriteria,
-    isTreeLoading,
-    isViewLoading,
     setLibrary,
     setFilterCriteria,
     setSortCriteria,
@@ -186,14 +164,9 @@ function App() {
       rootPath: state.rootPath,
       currentFolderPath: state.currentFolderPath,
       expandedFolders: state.expandedFolders,
-      imageList: state.imageList,
-      imageRatings: state.imageRatings,
       multiSelectedPaths: state.multiSelectedPaths,
-      libraryActivePath: state.libraryActivePath,
       sortCriteria: state.sortCriteria,
       filterCriteria: state.filterCriteria,
-      isTreeLoading: state.isTreeLoading,
-      isViewLoading: state.isViewLoading,
       setLibrary: state.setLibrary,
       setFilterCriteria: state.setFilterCriteria,
       setSortCriteria: state.setSortCriteria,
@@ -211,25 +184,9 @@ function App() {
       })),
     );
 
-  const {
-    exportState,
-    importState,
-    isIndexing,
-    indexingProgress,
-    thumbnailProgress,
-    aiModelDownloadStatus,
-    isCopied,
-    isPasted,
-    setProcess,
-    setExportState,
-  } = useProcessStore(
+  const { exportState, isCopied, isPasted, setProcess, setExportState } = useProcessStore(
     useShallow((state) => ({
       exportState: state.exportState,
-      importState: state.importState,
-      isIndexing: state.isIndexing,
-      indexingProgress: state.indexingProgress,
-      thumbnailProgress: state.thumbnailProgress,
-      aiModelDownloadStatus: state.aiModelDownloadStatus,
       isCopied: state.isCopied,
       isPasted: state.isPasted,
       setProcess: state.setProcess,
@@ -383,7 +340,6 @@ function App() {
     sortedImageList,
   );
 
-  // PRODUCTIVITY (Modals & Async heavy-lifters)
   const {
     handleStartPanorama,
     handleSavePanorama,
@@ -817,300 +773,6 @@ function App() {
     );
   };
 
-  const renderLibraryView = () => (
-    <div className="flex flex-row grow h-full min-h-0">
-      <div className="flex-1 flex flex-col min-w-0 gap-2">
-        {activeView === 'community' ? (
-          <CommunityPage
-            onBackToLibrary={() => setUI({ activeView: 'library' })}
-            supportedTypes={supportedTypes}
-            imageList={sortedImageList}
-            currentFolderPath={currentFolderPath}
-          />
-        ) : (
-          <MainLibrary
-            activePath={libraryActivePath}
-            aiModelDownloadStatus={aiModelDownloadStatus}
-            appSettings={appSettings}
-            currentFolderPath={currentFolderPath}
-            imageList={sortedImageList}
-            imageRatings={imageRatings}
-            importState={importState}
-            indexingProgress={indexingProgress}
-            isIndexing={isIndexing}
-            isLoading={isViewLoading}
-            isTreeLoading={isTreeLoading}
-            isAndroid={isAndroid}
-            libraryViewMode={libraryViewMode}
-            multiSelectedPaths={multiSelectedPaths}
-            onClearSelection={handleClearSelection}
-            onContextMenu={handleThumbnailContextMenu}
-            onContinueSession={handleContinueSession}
-            onEmptyAreaContextMenu={handleMainLibraryContextMenu}
-            onGoHome={handleGoHome}
-            onImageClick={handleLibraryImageSingleClick}
-            onImageDoubleClick={handleImageSelect}
-            onImportClick={() => handleImportClick(currentFolderPath as string)}
-            onLibraryRefresh={handleLibraryRefresh}
-            onOpenFolder={handleOpenFolder}
-            onSettingsChange={handleSettingsChange}
-            onThumbnailAspectRatioChange={setThumbnailAspectRatio}
-            onThumbnailSizeChange={setThumbnailSize}
-            onRequestThumbnails={requestThumbnails}
-            rootPath={rootPath}
-            setLibraryViewMode={setLibraryViewMode}
-            theme={theme}
-            thumbnailAspectRatio={thumbnailAspectRatio}
-            thumbnailProgress={thumbnailProgress}
-            thumbnailSize={thumbnailSize}
-            onNavigateToCommunity={() => setUI({ activeView: 'community' })}
-          />
-        )}
-        {rootPath && (
-          <BottomBar
-            isCopied={isCopied}
-            isCopyDisabled={multiSelectedPaths.length !== 1}
-            isExportDisabled={multiSelectedPaths.length === 0}
-            isLibraryView={true}
-            isPasted={isPasted}
-            isPasteDisabled={useEditorStore.getState().copiedAdjustments === null || multiSelectedPaths.length === 0}
-            isRatingDisabled={multiSelectedPaths.length === 0}
-            isResetDisabled={multiSelectedPaths.length === 0}
-            multiSelectedPaths={multiSelectedPaths}
-            onCopy={handleCopyAdjustments}
-            onExportClick={() =>
-              setUI((state) => ({ isLibraryExportPanelVisible: !state.isLibraryExportPanelVisible }))
-            }
-            onOpenCopyPasteSettings={() => setUI({ isCopyPasteSettingsModalOpen: true })}
-            onPaste={() => handlePasteAdjustments()}
-            onRate={handleRate}
-            onReset={() => handleResetAdjustments()}
-            rating={imageRatings[libraryActivePath || ''] || 0}
-            thumbnailAspectRatio={thumbnailAspectRatio}
-            totalImages={imageList.length}
-          />
-        )}
-      </div>
-    </div>
-  );
-
-  const renderMainView = () => {
-    const { displaySize, originalSize, baseRenderSize, zoom, adjustments } = useEditorStore.getState();
-
-    const panelVariants: any = {
-      animate: (direction: number) => ({
-        opacity: 1,
-        y: 0,
-        transition: { duration: direction === 0 ? 0 : 0.2, ease: 'circOut' },
-      }),
-      exit: (direction: number) => ({
-        opacity: direction === 0 ? 1 : 0.2,
-        y: direction === 0 ? 0 : direction > 0 ? -20 : 20,
-        transition: { duration: direction === 0 ? 0 : 0.1, ease: 'circIn' },
-      }),
-      initial: (direction: number) => ({
-        opacity: direction === 0 ? 1 : 0.2,
-        y: direction === 0 ? 0 : direction > 0 ? 20 : -20,
-      }),
-    };
-
-    if (selectedImage) {
-      const editorNode = (
-        <Editor
-          onBackToLibrary={handleBackToLibrary}
-          onContextMenu={handleEditorContextMenu}
-          transformWrapperRef={transformWrapperRef}
-        />
-      );
-
-      const editorBottomBarComponent = (
-        <BottomBar
-          filmstripHeight={bottomPanelHeight}
-          imageList={sortedImageList}
-          imageRatings={imageRatings}
-          isCopied={isCopied}
-          isCopyDisabled={!selectedImage}
-          isFilmstripVisible={uiVisibility.filmstrip}
-          isLoading={isViewLoading}
-          isPasted={isPasted}
-          isPasteDisabled={useEditorStore.getState().copiedAdjustments === null}
-          isRatingDisabled={!selectedImage}
-          isResizing={isResizing}
-          multiSelectedPaths={multiSelectedPaths}
-          displaySize={displaySize}
-          originalSize={originalSize}
-          baseRenderSize={baseRenderSize}
-          onClearSelection={handleClearSelection}
-          onContextMenu={handleThumbnailContextMenu}
-          onCopy={handleCopyAdjustments}
-          onOpenCopyPasteSettings={() => setUI({ isCopyPasteSettingsModalOpen: true })}
-          onImageSelect={handleImageClick}
-          onPaste={() => handlePasteAdjustments()}
-          onRate={handleRate}
-          onRequestThumbnails={requestThumbnails}
-          onZoomChange={handleZoomChange}
-          rating={imageRatings[selectedImage?.path || ''] || 0}
-          selectedImage={selectedImage}
-          setIsFilmstripVisible={(value: boolean) =>
-            setUI((state) => ({ uiVisibility: { ...state.uiVisibility, filmstrip: value } }))
-          }
-          showFilmstrip={!isCompactPortrait}
-          showZoomControls={!isAndroid}
-          thumbnailAspectRatio={thumbnailAspectRatio}
-          zoom={zoom}
-          totalImages={sortedImageList.length}
-        />
-      );
-
-      const editorBottomBarNode = (
-        <div
-          className={clsx(
-            'flex flex-col w-full overflow-hidden shrink-0',
-            !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-          )}
-          style={{
-            maxHeight: isFullScreen ? '0px' : '500px',
-            opacity: isFullScreen ? 0 : 1,
-          }}
-        >
-          {!isCompactPortrait && (
-            <Resizer
-              direction={Orientation.Horizontal}
-              onMouseDown={createResizeHandler('bottom', bottomPanelHeight)}
-            />
-          )}
-          {editorBottomBarComponent}
-        </div>
-      );
-
-      const editorRightPanelContent = (
-        <AnimatePresence mode="wait" custom={slideDirection}>
-          {activeRightPanel && (
-            <motion.div
-              animate="animate"
-              className="h-full w-full"
-              custom={slideDirection}
-              exit="exit"
-              initial="initial"
-              key={renderedRightPanel}
-              variants={panelVariants}
-            >
-              {renderedRightPanel === Panel.Adjustments && <Controls />}
-              {renderedRightPanel === Panel.Metadata && <MetadataPanel />}
-              {renderedRightPanel === Panel.Crop && <CropPanel />}
-              {renderedRightPanel === Panel.Masks && <MasksPanel />}
-              {renderedRightPanel === Panel.Presets && (
-                <PresetsPanel
-                  onNavigateToCommunity={() => {
-                    handleBackToLibrary();
-                    setUI({ activeView: 'community' });
-                  }}
-                />
-              )}
-              {renderedRightPanel === Panel.Export && (
-                <ExportPanel
-                  adjustments={adjustments}
-                  exportState={exportState}
-                  multiSelectedPaths={multiSelectedPaths}
-                  selectedImage={selectedImage}
-                  setExportState={setExportState}
-                  appSettings={appSettings}
-                  onSettingsChange={handleSettingsChange}
-                  rootPath={rootPath}
-                />
-              )}
-              {renderedRightPanel === Panel.Ai && <AIPanel />}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      );
-
-      return (
-        <div className={clsx('flex grow h-full min-h-0', isCompactPortrait ? 'flex-col gap-2' : 'flex-row')}>
-          <div className={clsx('flex-1 flex flex-col min-w-0', isCompactPortrait && 'min-h-0')}>
-            {editorNode}
-            {!isCompactPortrait && editorBottomBarNode}
-          </div>
-          <div
-            className={clsx(
-              'flex overflow-hidden shrink-0',
-              isCompactPortrait ? 'flex-col bg-bg-secondary rounded-lg' : 'h-full bg-transparent',
-              !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-            )}
-            style={
-              isCompactPortrait
-                ? {
-                    height: isFullScreen
-                      ? '0px'
-                      : `${activeRightPanel ? compactEditorPanelHeight : compactEditorPanelCollapsedHeight}px`,
-                    opacity: isFullScreen ? 0 : 1,
-                  }
-                : {
-                    maxWidth: isFullScreen ? '0px' : '1000px',
-                    opacity: isFullScreen ? 0 : 1,
-                  }
-            }
-          >
-            {isCompactPortrait ? (
-              <>
-                {activeRightPanel && !isFullScreen && (
-                  <Resizer
-                    direction={Orientation.Horizontal}
-                    onMouseDown={createResizeHandler('compact', compactEditorPanelHeight)}
-                  />
-                )}
-                <div className="min-h-0 flex-1 overflow-hidden">{editorRightPanelContent}</div>
-                <div className="shrink-0 border-t border-surface">
-                  <RightPanelSwitcher
-                    activePanel={activeRightPanel}
-                    onPanelSelect={handleRightPanelSelect}
-                    isInstantTransition={isInstantTransition}
-                    layout="horizontal"
-                  />
-                </div>
-                <div className="shrink-0 border-t border-surface">{editorBottomBarComponent}</div>
-              </>
-            ) : (
-              <>
-                <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
-                <div className="flex bg-bg-secondary rounded-lg h-full">
-                  <div
-                    className={clsx(
-                      'h-full overflow-hidden',
-                      !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-                    )}
-                    style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
-                  >
-                    <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
-                      {editorRightPanelContent}
-                    </div>
-                  </div>
-                  <div
-                    className={clsx(
-                      'h-full border-l transition-colors',
-                      activeRightPanel ? 'border-surface' : 'border-transparent',
-                    )}
-                  >
-                    <RightPanelSwitcher
-                      activePanel={activeRightPanel}
-                      onPanelSelect={handleRightPanelSelect}
-                      isInstantTransition={isInstantTransition}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      );
-    }
-    return renderLibraryView();
-  };
-
-  const renderContent = () => {
-    return renderMainView();
-  };
-
   const shouldHideFolderTree = isAndroid;
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
   const useMacWindowShell = osPlatform === 'macos' && !appSettings?.decorations && !isWindowFullScreen && !isFullScreen;
@@ -1150,7 +812,58 @@ function App() {
         >
           <div className="flex flex-row grow h-full min-h-0">
             {!shouldHideFolderTree && renderFolderTree()}
-            <div className="flex-1 flex flex-col min-w-0">{renderContent()}</div>
+            <div className="flex-1 flex flex-col min-w-0">
+              {selectedImage ? (
+                <EditorView
+                  transformWrapperRef={transformWrapperRef}
+                  isResizing={isResizing}
+                  isCompactPortrait={isCompactPortrait}
+                  isAndroid={isAndroid}
+                  compactEditorPanelHeight={compactEditorPanelHeight}
+                  compactEditorPanelCollapsedHeight={compactEditorPanelCollapsedHeight}
+                  thumbnailAspectRatio={thumbnailAspectRatio}
+                  sortedImageList={sortedImageList}
+                  createResizeHandler={createResizeHandler}
+                  handleBackToLibrary={handleBackToLibrary}
+                  handleEditorContextMenu={handleEditorContextMenu}
+                  handleThumbnailContextMenu={handleThumbnailContextMenu}
+                  handleImageClick={handleImageClick}
+                  handleClearSelection={handleClearSelection}
+                  handleCopyAdjustments={handleCopyAdjustments}
+                  handlePasteAdjustments={handlePasteAdjustments}
+                  handleRate={handleRate}
+                  handleZoomChange={handleZoomChange}
+                  handleRightPanelSelect={handleRightPanelSelect}
+                  requestThumbnails={requestThumbnails}
+                />
+              ) : (
+                <LibraryView
+                  sortedImageList={sortedImageList}
+                  thumbnailSize={thumbnailSize}
+                  thumbnailAspectRatio={thumbnailAspectRatio}
+                  libraryViewMode={libraryViewMode}
+                  isAndroid={isAndroid}
+                  setThumbnailSize={setThumbnailSize}
+                  setThumbnailAspectRatio={setThumbnailAspectRatio}
+                  setLibraryViewMode={setLibraryViewMode}
+                  handleClearSelection={handleClearSelection}
+                  handleLibraryImageSingleClick={handleLibraryImageSingleClick}
+                  handleImageSelect={handleImageSelect}
+                  handleRate={handleRate}
+                  handleThumbnailContextMenu={handleThumbnailContextMenu}
+                  handleMainLibraryContextMenu={handleMainLibraryContextMenu}
+                  handleContinueSession={handleContinueSession}
+                  handleGoHome={handleGoHome}
+                  handleOpenFolder={handleOpenFolder}
+                  handleImportClick={handleImportClick}
+                  handleLibraryRefresh={handleLibraryRefresh}
+                  handleCopyAdjustments={handleCopyAdjustments}
+                  handlePasteAdjustments={handlePasteAdjustments}
+                  handleResetAdjustments={handleResetAdjustments}
+                  requestThumbnails={requestThumbnails}
+                />
+              )}
+            </div>
             {!selectedImage && isLibraryExportPanelVisible && (
               <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
             )}

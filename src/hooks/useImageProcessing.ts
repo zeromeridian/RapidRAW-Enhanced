@@ -12,11 +12,11 @@ import { globalImageCache } from '../utils/ImageLRUCache';
 
 export function useImageProcessing(
   transformWrapperRef: any,
-  prevAdjustmentsRef: React.MutableRefObject<any>,
+  prevAdjustmentsRef: React.RefObject<any>,
   renderRefs: {
-    previewJobIdRef: React.MutableRefObject<number>;
-    latestRenderedJobIdRef: React.MutableRefObject<number>;
-    currentResRef: React.MutableRefObject<number>;
+    previewJobIdRef: React.RefObject<number>;
+    latestRenderedJobIdRef: React.RefObject<number>;
+    currentResRef: React.RefObject<number>;
   },
 ) {
   const { previewJobIdRef, latestRenderedJobIdRef, currentResRef } = renderRefs;

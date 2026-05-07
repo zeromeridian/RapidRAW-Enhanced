@@ -1,7 +1,7 @@
 import { useImageLoader } from '../../hooks/useImageLoader';
 
 interface Props {
-  cachedEditStateRef: React.MutableRefObject<any>;
+  cachedEditStateRef: React.RefObject<any>;
 }
 
 export default function ImageLoaderManager({ cachedEditStateRef }: Props) {
