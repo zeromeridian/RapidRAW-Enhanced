@@ -81,14 +81,9 @@ import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../..
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useProcessStore } from '../../../store/useProcessStore';
-
-interface MasksPanelProps {
-  onGenerateAiDepthMask(id: string, parameters: any): void;
-  onGenerateAiForegroundMask(id: string): void;
-  onGenerateAiSkyMask(id: string): void;
-  setAdjustments(updater: any): void;
-  setCustomEscapeHandler(handler: any): void;
-}
+import { useAiMasking } from '../../../hooks/useAiMasking';
+import { useEditorActions } from '../../../hooks/useEditorActions';
+import { useUIStore } from '../../../store/useUIStore';
 
 interface DragData {
   type: 'Container' | 'SubMask' | 'Creation';
@@ -549,13 +544,10 @@ function DepthRangePicker({
   );
 }
 
-export default function MasksPanel({
-  onGenerateAiDepthMask,
-  onGenerateAiForegroundMask,
-  onGenerateAiSkyMask,
-  setAdjustments,
-  setCustomEscapeHandler,
-}: MasksPanelProps) {
+export default function MasksPanel() {
+  const { setAdjustments } = useEditorActions();
+  const { handleGenerateAiDepthMask, handleGenerateAiForegroundMask, handleGenerateAiSkyMask } = useAiMasking();
+  const setCustomEscapeHandler = useUIStore((s) => s.setCustomEscapeHandler);
   const { appSettings } = useSettingsStore(
     useShallow((state) => ({
       appSettings: state.appSettings,
@@ -839,9 +831,9 @@ export default function MasksPanel({
     onSelectContainer(newContainer.id);
     onSelectMask(subMask.id);
     setExpandedContainers((prev) => new Set(prev).add(newContainer.id));
-    if (type === Mask.AiForeground) onGenerateAiForegroundMask(subMask.id);
-    else if (type === Mask.AiSky) onGenerateAiSkyMask(subMask.id);
-    else if (type === Mask.AiDepth) onGenerateAiDepthMask(subMask.id, subMask.parameters);
+    if (type === Mask.AiForeground) handleGenerateAiForegroundMask(subMask.id);
+    else if (type === Mask.AiSky) handleGenerateAiSkyMask(subMask.id);
+    else if (type === Mask.AiDepth) handleGenerateAiDepthMask(subMask.id, subMask.parameters);
   };
 
   const handleAddSubMask = (
@@ -869,9 +861,9 @@ export default function MasksPanel({
     onSelectContainer(containerId);
     onSelectMask(subMask.id);
     setExpandedContainers((prev) => new Set(prev).add(containerId));
-    if (type === Mask.AiForeground) onGenerateAiForegroundMask(subMask.id);
-    else if (type === Mask.AiSky) onGenerateAiSkyMask(subMask.id);
-    else if (type === Mask.AiDepth) onGenerateAiDepthMask(subMask.id, subMask.parameters);
+    if (type === Mask.AiForeground) handleGenerateAiForegroundMask(subMask.id);
+    else if (type === Mask.AiSky) handleGenerateAiSkyMask(subMask.id);
+    else if (type === Mask.AiDepth) handleGenerateAiDepthMask(subMask.id, subMask.parameters);
   };
 
   const handleGridClick = (type: Mask, forceNewMaskContainer: boolean = false) => {
@@ -1493,7 +1485,7 @@ export default function MasksPanel({
                   isSettingsSectionOpen={isSettingsSectionOpen}
                   setSettingsSectionOpen={setSettingsSectionOpen}
                   presets={presets}
-                  onGenerateAiDepthMask={onGenerateAiDepthMask}
+                  handleGenerateAiDepthMask={handleGenerateAiDepthMask}
                 />
               </motion.div>
             )}
@@ -2172,7 +2164,7 @@ function SettingsPanel({
   isSettingsSectionOpen,
   setSettingsSectionOpen,
   presets,
-  onGenerateAiDepthMask,
+  handleGenerateAiDepthMask,
 }: any) {
   const { showContextMenu } = useContextMenu();
   const isActive = !!container;

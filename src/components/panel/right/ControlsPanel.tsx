@@ -19,24 +19,12 @@ import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
+import { useEditorActions } from '../../../hooks/useEditorActions';
 
-interface ControlsPanelOption {
-  disabled?: boolean;
-  icon?: any;
-  label?: string;
-  onClick?(): void;
-  type?: string;
-}
-
-interface ControlsProps {
-  handleAutoAdjustments(): void;
-  handleLutSelect(path: string): void;
-  setAdjustments(updater: Partial<Adjustments> | ((prev: Adjustments) => Adjustments)): void;
-}
-
-export default function Controls({ handleAutoAdjustments, handleLutSelect, setAdjustments }: ControlsProps) {
+export default function Controls() {
   const { showContextMenu } = useContextMenu();
   const [isResizingWaveform, setIsResizingWaveform] = useState<boolean>(false);
+  const { setAdjustments, handleAutoAdjustments, handleLutSelect } = useEditorActions();
 
   const { appSettings, theme } = useSettingsStore(
     useShallow((state) => ({
