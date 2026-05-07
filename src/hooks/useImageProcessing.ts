@@ -462,6 +462,7 @@ export function useImageProcessing(
     multiSelectedPaths,
     appSettings?.enableLivePreviews,
     appSettings?.copyPasteSettings?.includedAdjustments,
+    isWaveformVisible,
   ]);
 
   useEffect(() => {

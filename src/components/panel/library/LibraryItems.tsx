@@ -7,6 +7,7 @@ import { ThumbnailAspectRatio, ImageFile } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { ColumnWidths } from '../MainLibrary';
+import { useProcessStore } from '../../../store/useProcessStore';
 
 interface ImageLayer {
   id: string;
@@ -15,7 +16,6 @@ interface ImageLayer {
 }
 
 const ThumbnailComponent = ({
-  data,
   isActive,
   isSelected,
   onContextMenu,
@@ -27,6 +27,8 @@ const ThumbnailComponent = ({
   tags,
   aspectRatio: thumbnailAspectRatio,
 }: any) => {
+  const data = useProcessStore((s) => s.thumbnails[path]);
+
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
   const latestThumbDataRef = useRef<string | undefined>(undefined);
@@ -194,7 +196,6 @@ const ThumbnailComponent = ({
 };
 
 const ListItemComponent = ({
-  data,
   isActive,
   isSelected,
   onContextMenu,
@@ -208,6 +209,8 @@ const ListItemComponent = ({
   aspectRatio: thumbnailAspectRatio,
   columnWidths,
 }: any) => {
+  const data = useProcessStore((s) => s.thumbnails[path]);
+
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
   const latestThumbDataRef = useRef<string | undefined>(undefined);
@@ -401,7 +404,6 @@ const RowComponent = ({
   onContextMenu,
   onImageClick,
   onImageDoubleClick,
-  thumbnails,
   thumbnailAspectRatio,
   loadedThumbnails,
   imageRatings,
@@ -500,7 +502,6 @@ const RowComponent = ({
         >
           {isListView ? (
             <ListItem
-              data={thumbnails[imageFile.path]}
               isActive={activePath === imageFile.path}
               isSelected={multiSelectedPaths.includes(imageFile.path)}
               onContextMenu={onContextMenu}
@@ -516,7 +517,6 @@ const RowComponent = ({
             />
           ) : (
             <Thumbnail
-              data={thumbnails[imageFile.path]}
               isActive={activePath === imageFile.path}
               isSelected={multiSelectedPaths.includes(imageFile.path)}
               onContextMenu={onContextMenu}
@@ -553,7 +553,6 @@ function rowAreEqual(prev: any, next: any) {
     if (prevRow.images.length !== nextRow.images.length) return false;
     for (let i = 0; i < nextRow.images.length; i++) {
       const path = nextRow.images[i].path;
-      if (prev.thumbnails[path] !== next.thumbnails[path]) return false;
       if ((prev.activePath === path) !== (next.activePath === path)) return false;
       if (prev.multiSelectedPaths.includes(path) !== next.multiSelectedPaths.includes(path)) return false;
       if (prev.imageRatings?.[path] !== next.imageRatings?.[path]) return false;

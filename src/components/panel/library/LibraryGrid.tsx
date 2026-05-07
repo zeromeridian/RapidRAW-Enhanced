@@ -8,6 +8,7 @@ import { LibraryViewMode, SortDirection, ThumbnailSize } from '../../ui/AppPrope
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { ColumnWidths } from '../MainLibrary';
+import { useProcessStore } from '../../../store/useProcessStore';
 
 function ListHeader({
   widths,
@@ -159,7 +160,6 @@ export default function LibraryGrid(props: any) {
     onContextMenu,
     onImageClick,
     onImageDoubleClick,
-    thumbnails,
     thumbnailAspectRatio,
     imageRatings,
     onRequestThumbnails,
@@ -240,20 +240,21 @@ export default function LibraryGrid(props: any) {
 
   const queueThumbnailRequest = useCallback(
     (path: string) => {
-      if (!onRequestThumbnails || thumbnails[path]) return;
+      if (!onRequestThumbnails) return;
+      if (useProcessStore.getState().thumbnails[path]) return;
       requestQueueRef.current.add(path);
       if (!requestTimeoutRef.current) {
         requestTimeoutRef.current = setTimeout(() => {
-          const pathsToRequest = Array.from(requestQueueRef.current);
-          if (pathsToRequest.length > 0) {
-            onRequestThumbnails(pathsToRequest);
+          const paths = Array.from(requestQueueRef.current);
+          if (paths.length > 0) {
+            onRequestThumbnails(paths);
             requestQueueRef.current.clear();
           }
           requestTimeoutRef.current = null;
         }, 50);
       }
     },
-    [onRequestThumbnails, thumbnails],
+    [onRequestThumbnails],
   );
 
   const gridData = useMemo(() => {
@@ -519,7 +520,6 @@ export default function LibraryGrid(props: any) {
               onContextMenu,
               onImageClick,
               onImageDoubleClick,
-              thumbnails,
               thumbnailAspectRatio,
               loadedThumbnails: loadedThumbnailsRef.current,
               imageRatings,

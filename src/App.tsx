@@ -38,7 +38,6 @@ import { useThumbnails } from './hooks/useThumbnails';
 import { ImageDimensions } from './hooks/useImageRenderSize';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTauriListeners } from './hooks/useTauriListeners';
-import { useImageProcessing } from './hooks/useImageProcessing';
 import { useFileOperations } from './hooks/useFileOperations';
 import { useAppContextMenus } from './hooks/useAppContextMenus';
 import { useSortedLibrary } from './hooks/useSortedLibrary';
@@ -217,7 +216,6 @@ function App() {
     importState,
     isIndexing,
     indexingProgress,
-    thumbnails,
     thumbnailProgress,
     aiModelDownloadStatus,
     isCopied,
@@ -230,7 +228,6 @@ function App() {
       importState: state.importState,
       isIndexing: state.isIndexing,
       indexingProgress: state.indexingProgress,
-      thumbnails: state.thumbnails,
       thumbnailProgress: state.thumbnailProgress,
       aiModelDownloadStatus: state.aiModelDownloadStatus,
       isCopied: state.isCopied,
@@ -323,21 +320,9 @@ function App() {
   );
   const compactEditorPanelCollapsedHeight = 96;
 
-  // IMPORT OUR GLOBAL ACTIONS
   const { handleCopyAdjustments, handlePasteAdjustments, handleResetAdjustments, handleZoomChange } =
     useEditorActions();
 
-  const {
-    handleRate,
-    handleClearSelection,
-    handleLibraryImageSingleClick,
-    handleImageClick,
-    handleSetColorLabel,
-    refreshAllFolderTrees,
-    handleTogglePinFolder,
-  } = useLibraryActions();
-
-  // APP NAVIGATION
   const navigationRefs = {
     transformWrapperRef,
     preloadedDataRef,
@@ -361,6 +346,16 @@ function App() {
     clearThumbnailQueue,
     refs: navigationRefs,
   });
+
+  const {
+    handleRate,
+    handleClearSelection,
+    handleLibraryImageSingleClick,
+    handleImageClick,
+    handleSetColorLabel,
+    refreshAllFolderTrees,
+    handleTogglePinFolder,
+  } = useLibraryActions(handleImageSelect);
 
   const sortedImageList = useSortedLibrary();
 
@@ -863,7 +858,6 @@ function App() {
             setLibraryViewMode={setLibraryViewMode}
             theme={theme}
             thumbnailAspectRatio={thumbnailAspectRatio}
-            thumbnails={thumbnails}
             thumbnailProgress={thumbnailProgress}
             thumbnailSize={thumbnailSize}
             onNavigateToCommunity={() => setUI({ activeView: 'community' })}
@@ -960,7 +954,6 @@ function App() {
           showFilmstrip={!isCompactPortrait}
           showZoomControls={!isAndroid}
           thumbnailAspectRatio={thumbnailAspectRatio}
-          thumbnails={thumbnails}
           zoom={zoom}
           totalImages={sortedImageList.length}
         />

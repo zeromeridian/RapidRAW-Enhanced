@@ -25,12 +25,42 @@ export function useTauriListeners({
     refs.current = { refreshAllFolderTrees, handleSelectSubfolder, refreshImageList, markGenerated };
   });
 
-  const thumbnailBatch = useRef<Record<string, string>>({});
-  const ratingBatch = useRef<Record<string, number>>({});
-  const batchTimeout = useRef<any>(null);
+  const thumbnailBuffer = useRef<Record<string, string>>({});
+  const ratingBuffer = useRef<Record<string, number>>({});
+  const flushHandle = useRef<number | null>(null);
 
   useEffect(() => {
     let isEffectActive = true;
+
+    const flushThumbnailBatch = () => {
+      flushHandle.current = null;
+      if (!isEffectActive) return;
+
+      const pendingThumbs = thumbnailBuffer.current;
+      const pendingRatings = ratingBuffer.current;
+      thumbnailBuffer.current = {};
+      ratingBuffer.current = {};
+
+      const thumbKeys = Object.keys(pendingThumbs);
+      const ratingKeys = Object.keys(pendingRatings);
+
+      if (thumbKeys.length > 0) {
+        useProcessStore.getState().setProcess((state) => ({
+          thumbnails: { ...state.thumbnails, ...pendingThumbs },
+        }));
+      }
+
+      if (ratingKeys.length > 0) {
+        useLibraryStore.getState().setLibrary((state) => ({
+          imageRatings: { ...state.imageRatings, ...pendingRatings },
+        }));
+      }
+    };
+
+    const scheduleFlush = () => {
+      if (flushHandle.current !== null) return;
+      flushHandle.current = requestAnimationFrame(flushThumbnailBatch);
+    };
 
     const listeners = [
       listen('preview-update-uncropped', (event: any) => {
@@ -59,17 +89,17 @@ export function useTauriListeners({
         if (isEffectActive) useProcessStore.getState().setProcess({ thumbnailProgress: { current: 0, total: 0 } });
       }),
       listen('thumbnail-generated', (event: any) => {
-        if (isEffectActive) {
-          const { path, data, rating } = event.payload;
-          if (data) {
-            useProcessStore.getState().setProcess((state) => ({ thumbnails: { ...state.thumbnails, [path]: data } }));
-            refs.current.markGenerated(path);
-          }
-          if (rating !== undefined) {
-            useLibraryStore
-              .getState()
-              .setLibrary((state) => ({ imageRatings: { ...state.imageRatings, [path]: rating } }));
-          }
+        if (!isEffectActive) return;
+        const { path, data, rating } = event.payload;
+        if (data) {
+          thumbnailBuffer.current[path] = data;
+          refs.current.markGenerated(path);
+        }
+        if (rating !== undefined) {
+          ratingBuffer.current[path] = rating;
+        }
+        if (data || rating !== undefined) {
+          scheduleFlush();
         }
       }),
       listen('ai-model-download-start', (event: any) => {
@@ -298,6 +328,12 @@ export function useTauriListeners({
 
     return () => {
       isEffectActive = false;
+      if (flushHandle.current !== null) {
+        cancelAnimationFrame(flushHandle.current);
+        flushHandle.current = null;
+      }
+      thumbnailBuffer.current = {};
+      ratingBuffer.current = {};
       listeners.forEach((p) => p.then((unlisten) => unlisten()));
     };
   }, []);
