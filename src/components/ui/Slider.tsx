@@ -103,7 +103,9 @@ const Slider = ({
       }
 
       event.preventDefault();
-      const direction = -Math.sign(event.deltaY);
+      // macOS/Linux shift+scroll moves delta to deltaX,
+      // Windows keeps it in deltaY — handle both
+      const direction = -Math.sign(event.deltaY || event.deltaX);
       const newValue = value + direction * step * 2;
       const roundedNewValue = parseFloat(newValue.toFixed(decimalPlaces));
 
