@@ -339,7 +339,7 @@ fn apply_grow_and_feather(mask: &mut GrayImage, grow: f32, feather: f32, width: 
 
 fn draw_feathered_ellipse_mut(
     mask: &mut GrayImage,
-    center: (i32, i32),
+    center: (f32, f32),
     radius: f32,
     feather: f32,
     color_value: u8,
@@ -360,21 +360,21 @@ fn draw_feathered_ellipse_mut(
     let width = mask.width() as i32;
     let height = mask.height() as i32;
 
-    let left = ((cx as f32 - radius).ceil() as i32).max(0);
-    let right = ((cx as f32 + radius).floor() as i32).min(width - 1);
-    let top = ((cy as f32 - radius).ceil() as i32).max(0);
-    let bottom = ((cy as f32 + radius).floor() as i32).min(height - 1);
+    let left = ((cx - radius).floor() as i32).max(0);
+    let right = ((cx + radius).ceil() as i32).min(width - 1);
+    let top = ((cy - radius).floor() as i32).max(0);
+    let bottom = ((cy + radius).ceil() as i32).min(height - 1);
 
     if left > right || top > bottom {
         return;
     }
 
     for y in top..=bottom {
-        let dy = y as f32 - cy as f32;
+        let dy = y as f32 - cy;
         let dy_sq = dy * dy;
 
         for x in left..=right {
-            let dx = x as f32 - cx as f32;
+            let dx = x as f32 - cx;
             let dist_sq = dx * dx + dy_sq;
 
             if dist_sq <= radius_sq {
@@ -382,10 +382,11 @@ fn draw_feathered_ellipse_mut(
                     1.0
                 } else {
                     let dist = dist_sq.sqrt();
-                    1.0 - (dist - inner_radius) / feather_range
+                    let t = ((dist - inner_radius) / feather_range).clamp(0.0, 1.0);
+                    1.0 - (t * t * (3.0 - 2.0 * t))
                 };
 
-                let final_value = (intensity * color_value as f32) as u8;
+                let final_value = (intensity * color_value as f32).round() as u8;
 
                 if final_value > 0 {
                     let current_pixel = mask.get_pixel_mut(x as u32, y as u32);
@@ -534,14 +535,14 @@ fn generate_brush_bitmap(
                 let y2_f = p2.y as f32 * scale - crop_offset.1;
 
                 let dist = ((x2_f - x1_f).powi(2) + (y2_f - y1_f).powi(2)).sqrt();
-                let step_size = (radius * (1.0 - feather) / 2.0).max(1.0);
+                let step_size = (radius * 0.15).max(1.0);
                 let steps = (dist / step_size).ceil() as i32;
 
                 if steps > 1 {
                     for i in 0..=steps {
                         let t = i as f32 / steps as f32;
-                        let interp_x = (x1_f + t * (x2_f - x1_f)) as i32;
-                        let interp_y = (y1_f + t * (y2_f - y1_f)) as i32;
+                        let interp_x = x1_f + t * (x2_f - x1_f);
+                        let interp_y = y1_f + t * (y2_f - y1_f);
                         draw_feathered_ellipse_mut(
                             &mut mask,
                             (interp_x, interp_y),
@@ -554,7 +555,7 @@ fn generate_brush_bitmap(
                 } else {
                     draw_feathered_ellipse_mut(
                         &mut mask,
-                        (x1_f as i32, y1_f as i32),
+                        (x1_f, y1_f),
                         radius,
                         feather,
                         color_value,
@@ -562,7 +563,7 @@ fn generate_brush_bitmap(
                     );
                     draw_feathered_ellipse_mut(
                         &mut mask,
-                        (x2_f as i32, y2_f as i32),
+                        (x2_f, y2_f),
                         radius,
                         feather,
                         color_value,
@@ -572,8 +573,8 @@ fn generate_brush_bitmap(
             }
         } else {
             let p1 = &line.points[0];
-            let x1 = (p1.x as f32 * scale - crop_offset.0) as i32;
-            let y1 = (p1.y as f32 * scale - crop_offset.1) as i32;
+            let x1 = p1.x as f32 * scale - crop_offset.0;
+            let y1 = p1.y as f32 * scale - crop_offset.1;
             draw_feathered_ellipse_mut(
                 &mut mask,
                 (x1, y1),
@@ -615,14 +616,14 @@ fn generate_flow_stroke_coverage(
             let y2_f = p2.y as f32 * scale - crop_offset.1;
 
             let dist = ((x2_f - x1_f).powi(2) + (y2_f - y1_f).powi(2)).sqrt();
-            let step_size = (radius * (1.0 - feather) / 2.0).max(1.0);
+            let step_size = (radius * 0.15).max(1.0);
             let steps = (dist / step_size).ceil() as i32;
 
             if steps > 1 {
                 for i in 0..=steps {
                     let t = i as f32 / steps as f32;
-                    let interp_x = (x1_f + t * (x2_f - x1_f)) as i32;
-                    let interp_y = (y1_f + t * (y2_f - y1_f)) as i32;
+                    let interp_x = x1_f + t * (x2_f - x1_f);
+                    let interp_y = y1_f + t * (y2_f - y1_f);
                     draw_feathered_ellipse_mut(
                         &mut stroke_mask,
                         (interp_x, interp_y),
@@ -635,7 +636,7 @@ fn generate_flow_stroke_coverage(
             } else {
                 draw_feathered_ellipse_mut(
                     &mut stroke_mask,
-                    (x1_f as i32, y1_f as i32),
+                    (x1_f, y1_f),
                     radius,
                     feather,
                     color_value,
@@ -643,7 +644,7 @@ fn generate_flow_stroke_coverage(
                 );
                 draw_feathered_ellipse_mut(
                     &mut stroke_mask,
-                    (x2_f as i32, y2_f as i32),
+                    (x2_f, y2_f),
                     radius,
                     feather,
                     color_value,
@@ -653,8 +654,8 @@ fn generate_flow_stroke_coverage(
         }
     } else {
         let p1 = &line.points[0];
-        let x1 = (p1.x as f32 * scale - crop_offset.0) as i32;
-        let y1 = (p1.y as f32 * scale - crop_offset.1) as i32;
+        let x1 = p1.x as f32 * scale - crop_offset.0;
+        let y1 = p1.y as f32 * scale - crop_offset.1;
         draw_feathered_ellipse_mut(
             &mut stroke_mask,
             (x1, y1),
