@@ -503,110 +503,64 @@ fn generate_linear_bitmap(
     mask
 }
 
-fn generate_brush_bitmap(
-    params_value: &Value,
+fn stroke_bounds(
+    points: &[Point],
     width: u32,
     height: u32,
+    radius: f32,
     scale: f32,
     crop_offset: (f32, f32),
-) -> GrayImage {
-    let params: BrushMaskParameters =
-        serde_json::from_value(params_value.clone()).unwrap_or_default();
-    let mut mask = GrayImage::new(width, height);
-
-    for line in &params.lines {
-        if line.points.is_empty() {
-            continue;
-        }
-
-        let is_eraser = line.tool == "eraser";
-        let color_value = 255u8;
-        let radius = (line.brush_size * scale / 2.0).max(0.0);
-        let feather = line.feather.clamp(0.0, 1.0);
-
-        if line.points.len() > 1 {
-            for points_pair in line.points.windows(2) {
-                let p1 = &points_pair[0];
-                let p2 = &points_pair[1];
-
-                let x1_f = p1.x as f32 * scale - crop_offset.0;
-                let y1_f = p1.y as f32 * scale - crop_offset.1;
-                let x2_f = p2.x as f32 * scale - crop_offset.0;
-                let y2_f = p2.y as f32 * scale - crop_offset.1;
-
-                let dist = ((x2_f - x1_f).powi(2) + (y2_f - y1_f).powi(2)).sqrt();
-                let step_size = (radius * 0.15).max(1.0);
-                let steps = (dist / step_size).ceil() as i32;
-
-                if steps > 1 {
-                    for i in 0..=steps {
-                        let t = i as f32 / steps as f32;
-                        let interp_x = x1_f + t * (x2_f - x1_f);
-                        let interp_y = y1_f + t * (y2_f - y1_f);
-                        draw_feathered_ellipse_mut(
-                            &mut mask,
-                            (interp_x, interp_y),
-                            radius,
-                            feather,
-                            color_value,
-                            is_eraser,
-                        );
-                    }
-                } else {
-                    draw_feathered_ellipse_mut(
-                        &mut mask,
-                        (x1_f, y1_f),
-                        radius,
-                        feather,
-                        color_value,
-                        is_eraser,
-                    );
-                    draw_feathered_ellipse_mut(
-                        &mut mask,
-                        (x2_f, y2_f),
-                        radius,
-                        feather,
-                        color_value,
-                        is_eraser,
-                    );
-                }
-            }
-        } else {
-            let p1 = &line.points[0];
-            let x1 = p1.x as f32 * scale - crop_offset.0;
-            let y1 = p1.y as f32 * scale - crop_offset.1;
-            draw_feathered_ellipse_mut(
-                &mut mask,
-                (x1, y1),
-                radius,
-                feather,
-                color_value,
-                is_eraser,
-            );
-        }
+) -> Option<(u32, u32, u32, u32)> {
+    if width == 0 || height == 0 || points.is_empty() {
+        return None;
     }
-    mask
+
+    let mut min_x = f32::INFINITY;
+    let mut min_y = f32::INFINITY;
+    let mut max_x = f32::NEG_INFINITY;
+    let mut max_y = f32::NEG_INFINITY;
+    let r_pad = radius.ceil() + 2.0;
+
+    for p in points {
+        let px = p.x as f32 * scale - crop_offset.0;
+        let py = p.y as f32 * scale - crop_offset.1;
+
+        min_x = min_x.min(px - r_pad);
+        min_y = min_y.min(py - r_pad);
+        max_x = max_x.max(px + r_pad);
+        max_y = max_y.max(py + r_pad);
+    }
+
+    if max_x < 0.0 || max_y < 0.0 || min_x > (width - 1) as f32 || min_y > (height - 1) as f32 {
+        return None;
+    }
+
+    let min_x = min_x.floor().max(0.0).min((width - 1) as f32) as u32;
+    let min_y = min_y.floor().max(0.0).min((height - 1) as f32) as u32;
+    let max_x = max_x.ceil().max(0.0).min((width - 1) as f32) as u32;
+    let max_y = max_y.ceil().max(0.0).min((height - 1) as f32) as u32;
+
+    if min_x > max_x || min_y > max_y {
+        None
+    } else {
+        Some((min_x, min_y, max_x, max_y))
+    }
 }
 
-fn generate_flow_stroke_coverage(
-    line: &FlowLine,
-    width: u32,
-    height: u32,
+fn draw_stroke_layer_mut(
+    line_mask: &mut GrayImage,
+    points: &[Point],
+    radius: f32,
+    feather: f32,
     scale: f32,
     crop_offset: (f32, f32),
-) -> GrayImage {
-    let mut stroke_mask = GrayImage::new(width, height);
-
-    if line.points.is_empty() {
-        return stroke_mask;
-    }
-
-    let radius = (line.brush_size * scale / 2.0).max(0.0);
-    let feather = line.feather.clamp(0.0, 1.0);
+    layer_offset: (f32, f32),
+) {
     let color_value = 255u8;
+    let (offset_x, offset_y) = layer_offset;
 
-    if line.points.len() > 1 {
-        for points_pair in line.points.windows(2) {
+    if points.len() > 1 {
+        for points_pair in points.windows(2) {
             let p1 = &points_pair[0];
             let p2 = &points_pair[1];
 
@@ -625,8 +579,8 @@ fn generate_flow_stroke_coverage(
                     let interp_x = x1_f + t * (x2_f - x1_f);
                     let interp_y = y1_f + t * (y2_f - y1_f);
                     draw_feathered_ellipse_mut(
-                        &mut stroke_mask,
-                        (interp_x, interp_y),
+                        line_mask,
+                        (interp_x - offset_x, interp_y - offset_y),
                         radius,
                         feather,
                         color_value,
@@ -635,16 +589,16 @@ fn generate_flow_stroke_coverage(
                 }
             } else {
                 draw_feathered_ellipse_mut(
-                    &mut stroke_mask,
-                    (x1_f, y1_f),
+                    line_mask,
+                    (x1_f - offset_x, y1_f - offset_y),
                     radius,
                     feather,
                     color_value,
                     false,
                 );
                 draw_feathered_ellipse_mut(
-                    &mut stroke_mask,
-                    (x2_f, y2_f),
+                    line_mask,
+                    (x2_f - offset_x, y2_f - offset_y),
                     radius,
                     feather,
                     color_value,
@@ -652,21 +606,85 @@ fn generate_flow_stroke_coverage(
                 );
             }
         }
-    } else {
-        let p1 = &line.points[0];
+    } else if let Some(p1) = points.first() {
         let x1 = p1.x as f32 * scale - crop_offset.0;
         let y1 = p1.y as f32 * scale - crop_offset.1;
         draw_feathered_ellipse_mut(
-            &mut stroke_mask,
-            (x1, y1),
+            line_mask,
+            (x1 - offset_x, y1 - offset_y),
             radius,
             feather,
             color_value,
             false,
         );
     }
+}
 
-    stroke_mask
+fn generate_brush_bitmap(
+    params_value: &Value,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+) -> GrayImage {
+    let params: BrushMaskParameters =
+        serde_json::from_value(params_value.clone()).unwrap_or_default();
+    let mut final_mask = GrayImage::new(width, height);
+
+    for line in &params.lines {
+        if line.points.is_empty() {
+            continue;
+        }
+
+        let is_eraser = line.tool == "eraser";
+        let radius = (line.brush_size * scale / 2.0).max(0.0);
+        let feather = line.feather.clamp(0.0, 1.0);
+
+        let Some((min_x, min_y, max_x, max_y)) =
+            stroke_bounds(&line.points, width, height, radius, scale, crop_offset)
+        else {
+            continue;
+        };
+
+        let bb_w = max_x - min_x + 1;
+        let bb_h = max_y - min_y + 1;
+        let mut line_mask = GrayImage::new(bb_w, bb_h);
+        let layer_offset = (min_x as f32, min_y as f32);
+
+        draw_stroke_layer_mut(
+            &mut line_mask,
+            &line.points,
+            radius,
+            feather,
+            scale,
+            crop_offset,
+            layer_offset,
+        );
+
+        for y in 0..bb_h {
+            for x in 0..bb_w {
+                let src_val = line_mask.get_pixel(x, y)[0] as f32 / 255.0;
+                if src_val <= 0.0 {
+                    continue;
+                }
+
+                let abs_x = min_x + x;
+                let abs_y = min_y + y;
+                let dst_pixel = final_mask.get_pixel_mut(abs_x, abs_y);
+                let dst_val = dst_pixel[0] as f32 / 255.0;
+
+                let blended = if is_eraser {
+                    dst_val * (1.0 - src_val)
+                } else {
+                    dst_val + src_val - dst_val * src_val
+                };
+
+                dst_pixel[0] = (blended.clamp(0.0, 1.0) * 255.0).round() as u8;
+            }
+        }
+    }
+
+    final_mask
 }
 
 fn generate_flow_bitmap(
@@ -678,36 +696,66 @@ fn generate_flow_bitmap(
 ) -> GrayImage {
     let params: FlowMaskParameters =
         serde_json::from_value(params_value.clone()).unwrap_or_default();
-    let mut mask = GrayImage::new(width, height);
+    let mut final_mask = GrayImage::new(width, height);
 
     for line in &params.lines {
         if line.points.is_empty() {
             continue;
         }
 
-        let flow_per_stroke = (line.flow.clamp(0.0, 100.0) / 100.0) * 255.0;
         let is_eraser = line.tool == "eraser";
-        let stroke_coverage =
-            generate_flow_stroke_coverage(line, width, height, scale, crop_offset);
+        let flow_per_stroke = (line.flow.clamp(0.0, 100.0) / 100.0) * 255.0;
+        let radius = (line.brush_size * scale / 2.0).max(0.0);
+        let feather = line.feather.clamp(0.0, 1.0);
 
-        for (x, y, pixel) in mask.enumerate_pixels_mut() {
-            let stroke_pixel = stroke_coverage.get_pixel(x, y)[0] as f32;
-            if stroke_pixel <= 0.0 {
-                continue;
+        let Some((min_x, min_y, max_x, max_y)) =
+            stroke_bounds(&line.points, width, height, radius, scale, crop_offset)
+        else {
+            continue;
+        };
+
+        let bb_w = max_x - min_x + 1;
+        let bb_h = max_y - min_y + 1;
+        let mut line_mask = GrayImage::new(bb_w, bb_h);
+        let layer_offset = (min_x as f32, min_y as f32);
+
+        draw_stroke_layer_mut(
+            &mut line_mask,
+            &line.points,
+            radius,
+            feather,
+            scale,
+            crop_offset,
+            layer_offset,
+        );
+
+        for y in 0..bb_h {
+            for x in 0..bb_w {
+                let stroke_pixel = line_mask.get_pixel(x, y)[0] as f32;
+                if stroke_pixel <= 0.0 {
+                    continue;
+                }
+
+                let abs_x = min_x + x;
+                let abs_y = min_y + y;
+                let pixel = final_mask.get_pixel_mut(abs_x, abs_y);
+
+                let c_norm = pixel[0] as f32 / 255.0;
+                let delta = ((stroke_pixel / 255.0) * flow_per_stroke).round();
+                let d_norm = (delta / 255.0).clamp(0.0, 1.0);
+
+                let next = if is_eraser {
+                    c_norm * (1.0 - d_norm)
+                } else {
+                    c_norm + d_norm - c_norm * d_norm
+                };
+
+                pixel[0] = (next.clamp(0.0, 1.0) * 255.0).round() as u8;
             }
-
-            let delta = ((stroke_pixel / 255.0) * flow_per_stroke).round();
-            let current = pixel[0] as f32;
-            let next = if is_eraser {
-                (current - delta).max(0.0)
-            } else {
-                (current + delta).min(255.0)
-            };
-            pixel[0] = next as u8;
         }
     }
 
-    mask
+    final_mask
 }
 
 struct TransformParams {
