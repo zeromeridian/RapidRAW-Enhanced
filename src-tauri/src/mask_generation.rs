@@ -337,45 +337,59 @@ fn apply_grow_and_feather(mask: &mut GrayImage, grow: f32, feather: f32, width: 
     }
 }
 
-fn draw_feathered_ellipse_mut(
-    mask: &mut GrayImage,
-    center: (f32, f32),
+fn draw_feathered_segment_max(
+    line_mask: &mut GrayImage,
+    layer_offset: (f32, f32),
+    p1: (f32, f32),
+    p2: (f32, f32),
     radius: f32,
     feather: f32,
-    color_value: u8,
-    is_eraser: bool,
 ) {
     if radius <= 0.0 {
         return;
     }
 
-    let (cx, cy) = center;
     let feather_amount = feather.clamp(0.0, 1.0);
     let inner_radius = radius * (1.0 - feather_amount);
-
+    let feather_range = (radius - inner_radius).max(0.01);
     let radius_sq = radius * radius;
     let inner_radius_sq = inner_radius * inner_radius;
-    let feather_range = (radius - inner_radius).max(0.01);
 
-    let width = mask.width() as i32;
-    let height = mask.height() as i32;
+    let (offset_x, offset_y) = layer_offset;
+    let x1 = p1.0 - offset_x;
+    let y1 = p1.1 - offset_y;
+    let x2 = p2.0 - offset_x;
+    let y2 = p2.1 - offset_y;
 
-    let left = ((cx - radius).floor() as i32).max(0);
-    let right = ((cx + radius).ceil() as i32).min(width - 1);
-    let top = ((cy - radius).floor() as i32).max(0);
-    let bottom = ((cy + radius).ceil() as i32).min(height - 1);
+    let width = line_mask.width() as i32;
+    let height = line_mask.height() as i32;
+
+    let left = ((x1.min(x2) - radius).floor() as i32).max(0);
+    let right = ((x1.max(x2) + radius).ceil() as i32).min(width - 1);
+    let top = ((y1.min(y2) - radius).floor() as i32).max(0);
+    let bottom = ((y1.max(y2) + radius).ceil() as i32).min(height - 1);
 
     if left > right || top > bottom {
         return;
     }
 
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    let length_sq = dx * dx + dy * dy;
+
     for y in top..=bottom {
-        let dy = y as f32 - cy;
-        let dy_sq = dy * dy;
+        let py = y as f32;
 
         for x in left..=right {
-            let dx = x as f32 - cx;
-            let dist_sq = dx * dx + dy_sq;
+            let px = x as f32;
+            let dist_sq = if length_sq < 0.0001 {
+                (px - x1) * (px - x1) + (py - y1) * (py - y1)
+            } else {
+                let t = (((px - x1) * dx + (py - y1) * dy) / length_sq).clamp(0.0, 1.0);
+                let proj_x = x1 + t * dx;
+                let proj_y = y1 + t * dy;
+                (px - proj_x) * (px - proj_x) + (py - proj_y) * (py - proj_y)
+            };
 
             if dist_sq <= radius_sq {
                 let intensity = if dist_sq <= inner_radius_sq {
@@ -386,18 +400,12 @@ fn draw_feathered_ellipse_mut(
                     1.0 - (t * t * (3.0 - 2.0 * t))
                 };
 
-                let final_value = (intensity * color_value as f32).round() as u8;
+                let final_value = (intensity * 255.0).round() as u8;
 
                 if final_value > 0 {
-                    let current_pixel = mask.get_pixel_mut(x as u32, y as u32);
-
-                    if is_eraser {
-                        let ceiling = 255u8.saturating_sub(final_value);
-                        current_pixel[0] = current_pixel[0].min(ceiling);
-                    } else {
-                        if final_value > current_pixel[0] {
-                            current_pixel[0] = final_value;
-                        }
+                    let current_pixel = line_mask.get_pixel_mut(x as u32, y as u32);
+                    if final_value > current_pixel[0] {
+                        current_pixel[0] = final_value;
                     }
                 }
             }
@@ -556,9 +564,6 @@ fn draw_stroke_layer_mut(
     crop_offset: (f32, f32),
     layer_offset: (f32, f32),
 ) {
-    let color_value = 255u8;
-    let (offset_x, offset_y) = layer_offset;
-
     if points.len() > 1 {
         for points_pair in points.windows(2) {
             let p1 = &points_pair[0];
@@ -569,54 +574,19 @@ fn draw_stroke_layer_mut(
             let x2_f = p2.x as f32 * scale - crop_offset.0;
             let y2_f = p2.y as f32 * scale - crop_offset.1;
 
-            let dist = ((x2_f - x1_f).powi(2) + (y2_f - y1_f).powi(2)).sqrt();
-            let step_size = (radius * 0.15).max(1.0);
-            let steps = (dist / step_size).ceil() as i32;
-
-            if steps > 1 {
-                for i in 0..=steps {
-                    let t = i as f32 / steps as f32;
-                    let interp_x = x1_f + t * (x2_f - x1_f);
-                    let interp_y = y1_f + t * (y2_f - y1_f);
-                    draw_feathered_ellipse_mut(
-                        line_mask,
-                        (interp_x - offset_x, interp_y - offset_y),
-                        radius,
-                        feather,
-                        color_value,
-                        false,
-                    );
-                }
-            } else {
-                draw_feathered_ellipse_mut(
-                    line_mask,
-                    (x1_f - offset_x, y1_f - offset_y),
-                    radius,
-                    feather,
-                    color_value,
-                    false,
-                );
-                draw_feathered_ellipse_mut(
-                    line_mask,
-                    (x2_f - offset_x, y2_f - offset_y),
-                    radius,
-                    feather,
-                    color_value,
-                    false,
-                );
-            }
+            draw_feathered_segment_max(
+                line_mask,
+                layer_offset,
+                (x1_f, y1_f),
+                (x2_f, y2_f),
+                radius,
+                feather,
+            );
         }
     } else if let Some(p1) = points.first() {
         let x1 = p1.x as f32 * scale - crop_offset.0;
         let y1 = p1.y as f32 * scale - crop_offset.1;
-        draw_feathered_ellipse_mut(
-            line_mask,
-            (x1 - offset_x, y1 - offset_y),
-            radius,
-            feather,
-            color_value,
-            false,
-        );
+        draw_feathered_segment_max(line_mask, layer_offset, (x1, y1), (x1, y1), radius, feather);
     }
 }
 
