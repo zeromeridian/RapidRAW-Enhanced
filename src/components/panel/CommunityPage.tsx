@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { ArrowLeft, CheckCircle2, ChevronDown, Loader2, Search, Users, Layers, Crop, Github } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ChevronDown, Loader2, Search, Users, Layers, Crop } from 'lucide-react';
+import { siGithub } from 'simple-icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -333,14 +334,14 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
             className="text-center mt-8 py-4"
           >
             <Text>
-              <p>Want to get your preset featured?</p>
+              Want to get your preset featured?<br />
               <a
                 href="https://github.com/CyberTimon/RapidRAW-Presets/issues/new?assignees=&labels=preset-submission&template=preset_submission.md&title=Preset+Submission%3A+%5BYour+Preset+Name%5D"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-accent hover:underline inline-flex items-center gap-2"
               >
-                <Github size={14} />
+                <span dangerouslySetInnerHTML={{ __html: siGithub.svg.replace('xmlns="http://www.w3.org/2000/svg"', 'xmlns="http://www.w3.org/2000/svg" fill="currentColor"') }} style={{ display: 'inline-block', width: 14, height: 14 }} />
                 Create an issue on GitHub
               </a>
             </Text>
