@@ -27,14 +27,12 @@ bytemuck = { version = "1.25", features = ["derive"] }
 anyhow = "1.0.102"
 kamadak-exif = "0.6.1"
 rawler = { git = "https://github.com/CyberTimon/RapidRAW-DngLab.git" }
-serde_bytes = "0.11.19"
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1.23", features = ["v4", "serde"] }
 walkdir = "2.5.0"
 imageproc = "0.26.2"
 ort = { version = "=2.0.0-rc.10", features = ["ndarray", "load-dynamic"] }
 ndarray = "0.16"
-tokio-tungstenite = { version = "0.29", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-os = "2.3.2"
@@ -52,7 +50,6 @@ hex = "0.4"
 rand = "0.10"
 tauri-plugin-shell = "2.3.5"
 tempfile = "3.27.0"
-num_cpus = "1.17.0"
 mimalloc = "0.1.50"
 image_hasher = "3.1.1"
 regex = "1.12.3"
