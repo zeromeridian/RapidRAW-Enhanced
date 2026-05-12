@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "types": [],
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
