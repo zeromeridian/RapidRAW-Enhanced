@@ -326,27 +326,25 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
             </AnimatePresence>
           </motion.div>
         )}
-        {allPreviewsLoaded && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="text-center mt-8 py-4"
-          >
-            <Text>
-              Want to get your preset featured?<br />
-              <a
-                href="https://github.com/CyberTimon/RapidRAW-Presets/issues/new?assignees=&labels=preset-submission&template=preset_submission.md&title=Preset+Submission%3A+%5BYour+Preset+Name%5D"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-accent hover:underline inline-flex items-center gap-2"
-              >
-                <span dangerouslySetInnerHTML={{ __html: siGithub.svg.replace('xmlns="http://www.w3.org/2000/svg"', 'xmlns="http://www.w3.org/2000/svg" fill="currentColor"') }} style={{ display: 'inline-block', width: 14, height: 14 }} />
-                Create an issue on GitHub
-              </a>
-            </Text>
-          </motion.div>
-        )}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="text-center mt-8 py-4"
+        >
+          <Text>
+            Want to get your preset featured?<br />
+            <a
+              href="https://github.com/CyberTimon/RapidRAW-Presets/issues/new?assignees=&labels=preset-submission&template=preset_submission.md&title=Preset+Submission%3A+%5BYour+Preset+Name%5D"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent hover:underline inline-flex items-center gap-2"
+            >
+              <span dangerouslySetInnerHTML={{ __html: siGithub.svg.replace('xmlns="http://www.w3.org/2000/svg"', 'xmlns="http://www.w3.org/2000/svg" fill="currentColor"') }} style={{ display: 'inline-block', width: 14, height: 14 }} />
+              Create an issue on GitHub
+            </a>
+          </Text>
+        </motion.div>
       </div>
     </div>
   );
