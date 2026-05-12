@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, Cursor};
+use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -184,9 +184,16 @@ fn verify_sha256(path: &Path, expected_hash: &str) -> Result<bool> {
     }
     let mut file = fs::File::open(path)?;
     let mut hasher = Sha256::new();
-    io::copy(&mut file, &mut hasher)?;
+    let mut buffer = [0; 8192];
+    loop {
+        let n = file.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buffer[..n]);
+    }
     let hash = hasher.finalize();
-    let hex_hash = format!("{:x}", hash);
+    let hex_hash = hex::encode(hash);
     Ok(hex_hash == expected_hash)
 }
 
