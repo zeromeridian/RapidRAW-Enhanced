@@ -382,6 +382,7 @@ fn stroke_bounds(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_stroke_layer_parallel(
     points: &[Point],
     radius: f32,
@@ -485,7 +486,7 @@ fn render_stroke_layer_parallel(
                 return;
             }
 
-            for x in 0..(bb_w as usize) {
+            for (x, pixel) in row.iter_mut().enumerate() {
                 let px = x as f32;
                 let x_i32 = x as i32;
 
@@ -527,7 +528,7 @@ fn render_stroke_layer_parallel(
                         let t = ((dist - inner_radius) / feather_range).clamp(0.0, 1.0);
                         1.0 - (t * t * (3.0 - 2.0 * t))
                     };
-                    row[x] = (intensity * 255.0).round() as u8;
+                    *pixel = (intensity * 255.0).round() as u8;
                 }
             }
         });

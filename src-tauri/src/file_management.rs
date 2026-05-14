@@ -521,7 +521,7 @@ fn get_albums_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
     Ok(albums_dir.join("albums.json"))
 }
 
-pub fn sort_album_tree(items: &mut Vec<AlbumItem>) {
+pub fn sort_album_tree(items: &mut [AlbumItem]) {
     items.sort_by(|a, b| {
         let get_sort_key = |item: &AlbumItem| match item {
             AlbumItem::Group { name, .. } => (0, name.to_lowercase()),
@@ -569,12 +569,9 @@ pub fn add_to_album(
 ) -> Result<(), String> {
     let mut tree = get_albums(app_handle.clone())?;
 
-    fn add_recursive(
-        items: &mut Vec<AlbumItem>,
-        target_id: &str,
-        paths_to_add: &Vec<String>,
-    ) -> bool {
+    fn add_recursive(items: &mut [AlbumItem], target_id: &str, paths_to_add: &Vec<String>) -> bool {
         for item in items.iter_mut() {
+            #[allow(clippy::collapsible_match)]
             match item {
                 AlbumItem::Album { id, images, .. } if id == target_id => {
                     for p in paths_to_add {
@@ -611,7 +608,7 @@ fn sync_album_path_changes(
         let mut changed = false;
 
         fn process_nodes(
-            nodes: &mut Vec<AlbumItem>,
+            nodes: &mut [AlbumItem],
             renames: Option<&HashMap<String, String>>,
             deletions: Option<&HashSet<String>>,
             folder_rename: Option<(&str, &str)>,
@@ -639,15 +636,12 @@ fn sync_album_path_changes(
                                 if let Some(new_path) = r.get(&current_img) {
                                     current_img = new_path.clone();
                                     *changed = true;
-                                } else {
-                                    if let Some((base_path, vc_id)) =
-                                        current_img.rsplit_once("?vc=")
-                                    {
-                                        if let Some(new_base) = r.get(base_path) {
-                                            current_img = format!("{}?vc={}", new_base, vc_id);
-                                            *changed = true;
-                                        }
-                                    }
+                                } else if let Some((base_path, vc_id)) =
+                                    current_img.rsplit_once("?vc=")
+                                    && let Some(new_base) = r.get(base_path)
+                                {
+                                    current_img = format!("{}?vc={}", new_base, vc_id);
+                                    *changed = true;
                                 }
                             }
 
@@ -666,11 +660,10 @@ fn sync_album_path_changes(
 
                                         if let Some((base_path, _)) =
                                             current_img.rsplit_once("?vc=")
+                                            && base_path == del_path_str
                                         {
-                                            if base_path == del_path_str {
-                                                is_deleted = true;
-                                                break;
-                                            }
+                                            is_deleted = true;
+                                            break;
                                         }
                                     }
                                 }
