@@ -131,9 +131,9 @@ function App() {
     })),
   );
 
-  const { rootPath, currentFolderPath, expandedFolders, multiSelectedPaths, setLibrary } = useLibraryStore(
+  const { rootPaths, currentFolderPath, expandedFolders, multiSelectedPaths, setLibrary } = useLibraryStore(
     useShallow((state) => ({
-      rootPath: state.rootPath,
+      rootPaths: state.rootPaths,
       currentFolderPath: state.currentFolderPath,
       expandedFolders: state.expandedFolders,
       multiSelectedPaths: state.multiSelectedPaths,
@@ -198,9 +198,9 @@ function App() {
 
   const transformWrapperRef = useRef<any>(null);
   const preloadedDataRef = useRef<{
-    tree?: Promise<any>;
+    trees?: Promise<any>;
     images?: Promise<ImageFile[]>;
-    rootPath?: string;
+    rootPaths?: string[];
     currentPath?: string;
   }>({});
 
@@ -274,6 +274,7 @@ function App() {
     handleBackToLibrary,
     handleImageSelect,
     handleSelectSubfolder,
+    handleSelectAlbum,
     handleOpenFolder,
     handleContinueSession,
   } = useAppNavigation({
@@ -289,15 +290,35 @@ function App() {
     handleSetColorLabel,
     refreshAllFolderTrees,
     handleTogglePinFolder,
+    handleCreateAlbumItem,
+    handleRenameAlbumItem,
   } = useLibraryActions(handleImageSelect);
 
   const sortedImageList = useSortedLibrary();
 
   const handleLibraryRefresh = useCallback(async () => {
     if (currentFolderPath) {
-      await handleSelectSubfolder(currentFolderPath, false);
+      if (currentFolderPath.startsWith('Album: ')) {
+        const { activeAlbumId, albumTree } = useLibraryStore.getState();
+        if (activeAlbumId) {
+          const findObj = (nodes: any[]): any => {
+            for (const n of nodes) {
+              if (n.id === activeAlbumId) return n;
+              if (n.type === 'group') {
+                const f = findObj(n.children);
+                if (f) return f;
+              }
+            }
+            return null;
+          };
+          const album = findObj(albumTree);
+          if (album) await handleSelectAlbum(album.id, album.name, album.images);
+        }
+      } else {
+        await handleSelectSubfolder(currentFolderPath, false);
+      }
     }
-  }, [currentFolderPath, handleSelectSubfolder]);
+  }, [currentFolderPath, handleSelectSubfolder, handleSelectAlbum]);
 
   const {
     executeDelete,
@@ -332,6 +353,7 @@ function App() {
     handleEditorContextMenu,
     handleThumbnailContextMenu,
     handleFolderTreeContextMenu,
+    handleAlbumTreeContextMenu,
     handleMainLibraryContextMenu,
   } = useAppContextMenus({
     handleImageSelect,
@@ -551,7 +573,9 @@ function App() {
           path,
           showImageCounts: showCounts,
         });
-        setLibrary((state) => ({ folderTree: insertChildrenIntoTree(state.folderTree, path, newChildren) }));
+        setLibrary((state) => ({
+          folderTrees: state.folderTrees.map((t: any) => insertChildrenIntoTree(t, path, newChildren)),
+        }));
         setLibrary((state) => ({
           pinnedFolderTrees: state.pinnedFolderTrees.map((tree) => insertChildrenIntoTree(tree, path, newChildren)),
         }));
@@ -562,8 +586,10 @@ function App() {
     [expandedFolders, appSettings?.enableFolderImageCounts, setLibrary],
   );
 
+  const hasRoots = rootPaths && rootPaths.length > 0;
+
   const renderFolderTree = () => {
-    if (!rootPath) return null;
+    if (!hasRoots) return null;
 
     return (
       <div
@@ -580,8 +606,11 @@ function App() {
           isResizing={isResizing}
           isVisible={uiVisibility.folderTree}
           onContextMenu={handleFolderTreeContextMenu}
+          onAlbumContextMenu={handleAlbumTreeContextMenu}
+          onSelectAlbum={handleSelectAlbum}
           onFolderSelect={(path) => handleSelectSubfolder(path, false)}
           onToggleFolder={handleToggleFolder}
+          onOpenFolder={handleOpenFolder}
           setIsVisible={(value: boolean) =>
             setUI((state) => ({ uiVisibility: { ...state.uiVisibility, folderTree: value } }))
           }
@@ -626,8 +655,8 @@ function App() {
         <div
           className={clsx(
             'flex-1 flex flex-col min-h-0',
-            isLayoutReady && rootPath && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-            [rootPath && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2')],
+            isLayoutReady && hasRoots && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+            [hasRoots && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2')],
           )}
         >
           <div className="flex flex-row grow h-full min-h-0">
@@ -703,7 +732,7 @@ function App() {
                 setExportState={setExportState}
                 appSettings={appSettings}
                 onSettingsChange={handleSettingsChange}
-                rootPath={rootPath}
+                rootPaths={rootPaths}
               />
             </div>
           </div>
@@ -726,6 +755,8 @@ function App() {
           handleRate={handleRate}
           executeDelete={executeDelete}
           handleSaveCollage={handleSaveCollage}
+          handleCreateAlbumItem={handleCreateAlbumItem}
+          handleRenameAlbumItem={handleRenameAlbumItem}
         />
         <ToastContainer
           position="bottom-right"

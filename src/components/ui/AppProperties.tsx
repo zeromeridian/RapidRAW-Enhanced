@@ -106,6 +106,10 @@ export enum Invokes {
   GenerateAllCommunityPreviews = 'generate_all_community_previews',
   SaveCommunityPreset = 'save_community_preset',
   SaveTempFile = 'save_temp_file',
+  GetAlbums = 'get_albums',
+  SaveAlbums = 'save_albums',
+  AddToAlbum = 'add_to_album',
+  GetAlbumImages = 'get_album_images',
 }
 
 export enum Panel {
@@ -168,7 +172,6 @@ export interface AppSettings {
   thumbnailAspectRatio?: ThumbnailAspectRatio;
   uiVisibility?: UiVisibility;
   adjustmentVisibility?: { [key: string]: boolean };
-  activeTreeSection?: string | null;
   rawHighlightCompression?: number;
   processingBackend?: string;
   linuxGpuOptimization?: boolean;
@@ -190,6 +193,7 @@ export interface AppSettings {
   defaultNonRawTonemapper?: string;
   copyPasteSettings?: CopyPasteSettings;
   enableFocusMode?: boolean;
+  openTreeSections?: string[];
 }
 
 export interface BrushSettings {
@@ -344,4 +348,22 @@ export interface CullingSuggestions {
 export interface KeybindHandler {
   shouldFire?: () => boolean;
   execute: (event: KeyboardEvent) => void;
+}
+
+export type AlbumItem = Album | AlbumGroup;
+
+export interface Album {
+  type: 'album';
+  id: string;
+  name: string;
+  icon?: string;
+  images: string[];
+}
+
+export interface AlbumGroup {
+  type: 'group';
+  id: string;
+  name: string;
+  icon?: string;
+  children: AlbumItem[];
 }

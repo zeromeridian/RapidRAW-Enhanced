@@ -68,7 +68,7 @@ interface MainLibraryProps {
   onThumbnailAspectRatioChange(aspectRatio: ThumbnailAspectRatio): void;
   onThumbnailSizeChange(size: ThumbnailSize): void;
   onRequestThumbnails?(paths: string[]): void;
-  rootPath: string | null;
+  rootPaths: string[];
   setLibraryViewMode(mode: LibraryViewMode): void;
   theme: string;
   thumbnailAspectRatio: ThumbnailAspectRatio;
@@ -188,11 +188,11 @@ export default function MainLibrary(props: MainLibraryProps) {
     checkVersion();
   }, []);
 
-  if (!props.rootPath) {
+  if (!props.rootPaths || props.rootPaths.length === 0) {
     if (!props.appSettings) {
       return null;
     }
-    const hasLastPath = !!props.appSettings.lastRootPath;
+    const hasLastPath = !!props.appSettings.lastRootPath || !!props.appSettings.rootFolders?.length;
     const currentThemeId = props.theme || DEFAULT_THEME_ID;
     const selectedTheme: ThemeProps | undefined =
       THEMES.find((t: ThemeProps) => t.id === currentThemeId) ||
@@ -235,7 +235,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                   onBack={() => setShowSettings(false)}
                   onLibraryRefresh={props.onLibraryRefresh}
                   onSettingsChange={props.onSettingsChange}
-                  rootPath={props.rootPath}
+                  rootPaths={props.rootPaths}
                 />
               ) : (
                 <>
@@ -278,7 +278,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                           size="lg"
                         >
                           <Folder size={20} className="mr-2" />
-                          {props.isAndroid ? 'Open Library' : hasLastPath ? 'Change Folder' : 'Open Folder'}
+                          {props.isAndroid ? 'Open Library' : hasLastPath ? 'Open Another Folder' : 'Open Folder'}
                         </Button>
                         <Button
                           className="px-3 bg-surface text-text-primary shadow-md h-11"
