@@ -1345,22 +1345,34 @@ pub fn generate_mask_bitmap(
 
 #[tauri::command]
 pub fn generate_mask_overlay(
-    mask_def: MaskDefinition,
+    mut mask_def: serde_json::Value,
     width: u32,
     height: u32,
     scale: f32,
     crop_offset: (f32, f32),
-    js_adjustments: Option<serde_json::Value>,
+    mut js_adjustments: Option<serde_json::Value>,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
+    if let Some(ref mut adj) = js_adjustments {
+        crate::adjustment_utils::hydrate_adjustments(&state, adj);
+    }
+
+    if let Some(sub_masks) = mask_def.get_mut("subMasks").and_then(|v| v.as_array_mut()) {
+        let mut cache = state.patch_cache.lock().unwrap();
+        crate::adjustment_utils::hydrate_sub_masks(sub_masks, &mut cache);
+    }
+
+    let parsed_mask_def: MaskDefinition = serde_json::from_value(mask_def)
+        .map_err(|e| format!("Failed to parse hydrated mask_def: {}", e))?;
+
     let scaled_crop_offset = (crop_offset.0 * scale, crop_offset.1 * scale);
 
     let warped_image = js_adjustments.as_ref().and_then(|adj| {
-        resolve_warped_image_for_masks(&state, adj, std::slice::from_ref(&mask_def))
+        resolve_warped_image_for_masks(&state, adj, std::slice::from_ref(&parsed_mask_def))
     });
 
     if let Some(gray_mask) = generate_mask_bitmap(
-        &mask_def,
+        &parsed_mask_def,
         width,
         height,
         scale,

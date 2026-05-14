@@ -88,6 +88,32 @@ interface MaskOverlay {
   subMask: SubMask;
 }
 
+const OptimizedBrushLine = memo(
+  ({ line, scale, cropX, cropY }: { line: DrawnLine; scale: number; cropX: number; cropY: number }) => {
+    const flattenedPoints = useMemo(() => {
+      const pts = new Float32Array(line.points.length * 2);
+      for (let i = 0; i < line.points.length; i++) {
+        pts[i * 2] = (line.points[i].x - cropX) * scale;
+        pts[i * 2 + 1] = (line.points[i].y - cropY) * scale;
+      }
+      return Array.from(pts);
+    }, [line.points, scale, cropX, cropY]);
+
+    return (
+      <Line
+        hitStrokeWidth={line.brushSize * scale}
+        lineCap="round"
+        lineJoin="round"
+        points={flattenedPoints}
+        stroke="transparent"
+        strokeScaleEnabled={false}
+        perfectDrawEnabled={false}
+        shadowForStrokeEnabled={false}
+      />
+    );
+  },
+);
+
 const MaskOverlay = memo(
   ({
     adjustments,
@@ -450,16 +476,7 @@ const MaskOverlay = memo(
           onTouchStart={handleMaskTouchStart}
         >
           {lines.map((line: DrawnLine, i: number) => (
-            <Line
-              hitStrokeWidth={line.brushSize * scale}
-              key={i}
-              lineCap="round"
-              lineJoin="round"
-              points={line.points.flatMap((p: Coord) => [(p.x - cropX) * scale, (p.y - cropY) * scale])}
-              stroke="transparent"
-              strokeScaleEnabled={false}
-              tension={0.5}
-            />
+            <OptimizedBrushLine key={i} line={line} scale={scale} cropX={cropX} cropY={cropY} />
           ))}
         </Group>
       );
@@ -1493,6 +1510,16 @@ const ImageCanvas = memo(
         }
 
         if (currentLine.current) {
+          const lastPoint = currentLine.current.points[currentLine.current.points.length - 1];
+          if (lastPoint) {
+            const dx = pos.x - lastPoint.x;
+            const dy = pos.y - lastPoint.y;
+            if (dx * dx + dy * dy < 4) {
+              if (e.evt && e.evt.cancelable) e.evt.preventDefault();
+              return;
+            }
+          }
+
           const updatedLine = {
             ...currentLine.current,
             points: [...currentLine.current.points, pos],

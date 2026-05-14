@@ -2251,6 +2251,7 @@ pub fn run() {
             cancel_thumbnail_generation,
             update_wgpu_transform,
             android_integration::resolve_android_content_uri_name,
+            adjustment_utils::clear_session_caches,
             app_settings::load_settings,
             app_settings::save_settings,
             ai_commands::generate_ai_subject_mask,
