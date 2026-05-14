@@ -727,7 +727,7 @@ export default function FolderTree({
                                 <div className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center">
                                   <Plus size={16} />
                                 </div>
-                                <span className="select-none">Open another folder</span>
+                                <span className="select-none">Add folder</span>
                               </Text>
                             </motion.div>
                           )}

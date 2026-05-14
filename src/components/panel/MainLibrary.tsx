@@ -278,7 +278,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                           size="lg"
                         >
                           <Folder size={20} className="mr-2" />
-                          {props.isAndroid ? 'Open Library' : hasLastPath ? 'Open Another Folder' : 'Open Folder'}
+                          {props.isAndroid ? 'Open Library' : hasLastPath ? 'Add Folder' : 'Open Folder'}
                         </Button>
                         <Button
                           className="px-3 bg-surface text-text-primary shadow-md h-11"
@@ -447,13 +447,6 @@ export default function MainLibrary(props: MainLibraryProps) {
                 data-tooltip="Community Presets"
               >
                 <Users className="w-8 h-8" />
-              </Button>
-              <Button
-                className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
-                onClick={props.onOpenFolder}
-                data-tooltip="Open another folder"
-              >
-                <Folder className="w-8 h-8" />
               </Button>
             </>
           )}
