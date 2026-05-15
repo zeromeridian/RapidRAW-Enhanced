@@ -65,6 +65,7 @@ interface TreeNodeProps {
   pinnedFolders: string[];
   showImageCounts: boolean;
   isInstantTransition: boolean;
+  folderIcons: Record<string, string>;
 }
 
 interface VisibleProps {
@@ -157,6 +158,7 @@ function AlbumTreeNode({
   if (item.icon && ALBUM_ICONS[item.icon]) {
     ItemIcon = ALBUM_ICONS[item.icon];
   }
+  const iconKey = item.icon || (isGroup ? (isExpanded ? 'group-open' : 'group-closed') : 'album');
 
   return (
     <Text as="div" color={TextColors.primary} weight={TextWeights.medium}>
@@ -168,8 +170,19 @@ function AlbumTreeNode({
         onClick={() => (isGroup ? onToggle(item.id) : onSelectAlbum(item.id, item.name, (item as Album).images))}
         onContextMenu={(e) => onContextMenu(e, item)}
       >
-        <div className="p-0.5 rounded-sm text-text-secondary">
-          <ItemIcon size={16} />
+        <div className="relative w-5 h-5 flex items-center justify-center p-0.5 rounded-sm text-text-secondary shrink-0">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={iconKey}
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              transition={{ duration: 0.15 }}
+              className="absolute"
+            >
+              <ItemIcon size={16} />
+            </motion.div>
+          </AnimatePresence>
         </div>
         <span onDoubleClick={() => isGroup && onToggle(item.id)} className="truncate flex-1 select-none">
           {item.name}
@@ -235,6 +248,7 @@ function TreeNode({
   pinnedFolders,
   showImageCounts,
   isInstantTransition,
+  folderIcons,
 }: TreeNodeProps) {
   const hasChildren = node.hasSubdirs || (node.children && node.children.length > 0);
   const isSelected = node.path === selectedPath;
@@ -275,6 +289,13 @@ function TreeNode({
     exit: { opacity: 0, x: -15, transition: { duration: 0.2 } },
   };
 
+  const currentFolderIconKey = folderIcons[node.path];
+  let ResolvedIcon = isExpanded ? FolderOpen : Folder;
+  if (currentFolderIconKey && ALBUM_ICONS[currentFolderIconKey]) {
+    ResolvedIcon = ALBUM_ICONS[currentFolderIconKey];
+  }
+  const iconKey = currentFolderIconKey || (isExpanded ? 'folder-open' : 'folder-closed');
+
   return (
     <Text as="div" color={TextColors.primary} weight={TextWeights.medium}>
       <div
@@ -286,13 +307,27 @@ function TreeNode({
         onContextMenu={(e: any) => onContextMenu(e, node.path, isPinned)}
       >
         <div
-          className={clsx('p-0.5 rounded-sm transition-colors', {
-            [TEXT_COLOR_KEYS[TextColors.secondary]]: !isExpanded,
-            'hover:bg-surface-hover': !isSelected && hasChildren,
-          })}
+          className={clsx(
+            'relative w-5 h-5 flex items-center justify-center p-0.5 rounded-sm transition-colors shrink-0',
+            {
+              [TEXT_COLOR_KEYS[TextColors.secondary]]: !isExpanded,
+              'hover:bg-surface-hover': !isSelected && hasChildren,
+            },
+          )}
           onClick={handleFolderIconClick}
         >
-          {isExpanded ? <FolderOpen size={16} /> : <Folder size={16} />}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={iconKey}
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              transition={{ duration: 0.15 }}
+              className="absolute"
+            >
+              <ResolvedIcon size={16} />
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         <span onDoubleClick={handleNameDoubleClick} className="truncate select-none flex-1">
@@ -357,6 +392,7 @@ function TreeNode({
                       pinnedFolders={pinnedFolders}
                       showImageCounts={showImageCounts}
                       isInstantTransition={isInstantTransition}
+                      folderIcons={folderIcons}
                     />
                   </motion.div>
                 ))}
@@ -399,6 +435,7 @@ export default function FolderTree({
   const pinnedFolders = appSettings?.pinnedFolders || [];
   const openSections = appSettings?.openTreeSections ?? ['current'];
   const showImageCounts = appSettings?.enableFolderImageCounts ?? false;
+  const folderIcons = appSettings?.folderIcons || {};
 
   useEffect(() => {
     invoke(Invokes.GetAlbums).then((res: any) => useLibraryStore.getState().setLibrary({ albumTree: res }));
@@ -591,6 +628,7 @@ export default function FolderTree({
                                 pinnedFolders={pinnedFolders}
                                 showImageCounts={showImageCounts && isHovering}
                                 isInstantTransition={isInstantTransition}
+                                folderIcons={folderIcons}
                               />
                             </motion.div>
                           ))}
@@ -701,6 +739,7 @@ export default function FolderTree({
                                 pinnedFolders={pinnedFolders}
                                 showImageCounts={showImageCounts && isHovering}
                                 isInstantTransition={isInstantTransition}
+                                folderIcons={folderIcons}
                               />
                             </motion.div>
                           ))}

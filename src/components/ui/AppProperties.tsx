@@ -194,6 +194,7 @@ export interface AppSettings {
   copyPasteSettings?: CopyPasteSettings;
   enableFocusMode?: boolean;
   openTreeSections?: string[];
+  folderIcons?: Record<string, string>;
 }
 
 export interface BrushSettings {
