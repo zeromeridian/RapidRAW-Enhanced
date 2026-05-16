@@ -1376,10 +1376,7 @@ fn generate_single_thumbnail_and_cache(
         (0, Vec::new())
     };
 
-    let cache_hash = match compute_thumbnail_cache_hash(path_str, &adjustments_bytes) {
-        Some(h) => h,
-        None => return None,
-    };
+    let cache_hash = compute_thumbnail_cache_hash(path_str, &adjustments_bytes)?;
 
     let cache_filename = format!("{}.jpg", cache_hash);
     let cache_path = thumb_cache_dir.join(cache_filename);
