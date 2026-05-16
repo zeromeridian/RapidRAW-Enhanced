@@ -514,7 +514,7 @@ fn process_preview_job(
         crate::image_processing::process_and_get_dynamic_image_with_analytics(
             &context,
             &state,
-            &*processing_image,
+            &processing_image,
             new_transform_hash,
             RenderRequest {
                 adjustments: final_adjustments,
@@ -529,19 +529,14 @@ fn process_preview_job(
 
     if let Ok(final_processed_image) = final_processed_image_result {
         if use_wgpu_renderer {
-            let app_clone = app_handle.clone();
-            let device = context.device.clone();
-            let image_path = loaded_image.path.clone();
-            std::thread::spawn(move || {
-                let _ = device.poll(wgpu::PollType::Wait {
-                    submission_index: None,
-                    timeout: Some(std::time::Duration::from_millis(500)),
-                });
-                let _ = app_clone.emit(
-                    "wgpu-frame-ready",
-                    serde_json::json!({ "path": image_path }),
-                );
+            let _ = context.device.poll(wgpu::PollType::Wait {
+                submission_index: None,
+                timeout: Some(std::time::Duration::from_millis(500)),
             });
+            let _ = app_handle.emit(
+                "wgpu-frame-ready",
+                serde_json::json!({ "path": loaded_image.path }),
+            );
             return Ok(b"WGPU_RENDER".to_vec());
         }
 
