@@ -56,17 +56,13 @@ import { OPTION_SEPARATOR } from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
 import Text from '../../ui/Text';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
-
-// NEW IMPORTS
+import { useUser, useAuth } from '@clerk/react';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useAiMasking } from '../../../hooks/useAiMasking';
-
-interface ConnectionStatusProps {
-  isConnected: boolean;
-}
 
 interface DragData {
   type: 'Container' | 'SubMask' | 'Creation';
@@ -165,44 +161,116 @@ const BrushTools = ({ settings, onSettingsChange }: { settings: any; onSettingsC
   </div>
 );
 
-const ConnectionStatus = ({ isConnected }: ConnectionStatusProps) => {
+interface ConnectionStatusProps {
+  aiProvider: string;
+  isAIConnectorConnected: boolean;
+  isSignedIn: boolean;
+  isPro: boolean;
+  cloudUsage: { requests: number; limit: number; month: string } | null;
+}
+
+const ConnectionStatus = ({
+  aiProvider,
+  isAIConnectorConnected,
+  isSignedIn,
+  isPro,
+  cloudUsage,
+}: ConnectionStatusProps) => {
   const [isHovered, setIsHovered] = useState(false);
-  if (isConnected) {
-    return (
-      <div className="flex items-center gap-2 px-4 py-2 bg-surface rounded-lg">
-        <div className={'w-2.5 h-2.5 rounded-full bg-green-500'} />
-        <Text variant={TextVariants.label}>AI Connector:</Text>
-        <Text variant={TextVariants.label} weight={TextWeights.bold} color={TextColors.success}>
-          Ready
-        </Text>
-      </div>
+
+  let statusColor = 'bg-green-500';
+  let statusText = 'Ready';
+  let titleText = 'AI Backend:';
+  let hoverContent: React.ReactNode = null;
+
+  if (aiProvider === 'cloud') {
+    titleText = 'Cloud AI:';
+    if (isSignedIn && isPro) {
+      statusColor = 'bg-green-500';
+      statusText = 'Ready';
+
+      const reqs = cloudUsage?.requests ?? 0;
+      const limit = cloudUsage?.limit ?? 500;
+      const percent = Math.min(100, (reqs / limit) * 100);
+
+      hoverContent = (
+        <div className="w-full mt-1">
+          <div className="flex justify-between items-center mb-1.5">
+            <Text variant={TextVariants.small}>Monthly Usage</Text>
+            <Text variant={TextVariants.small}>
+              {reqs} / {limit}
+            </Text>
+          </div>
+          <div className="w-full bg-bg-tertiary rounded-full h-1.5 border border-border-color">
+            <div
+              className="bg-accent h-1.5 rounded-full transition-all duration-500"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        </div>
+      );
+    } else if (isSignedIn && !isPro) {
+      statusColor = 'bg-red-500';
+      statusText = 'Upgrade Required';
+      hoverContent = <Text variant={TextVariants.small}>Pro subscription required. Upgrade in Settings.</Text>;
+    } else {
+      statusColor = 'bg-red-500';
+      statusText = 'Not Logged In';
+      hoverContent = <Text variant={TextVariants.small}>Log in via Settings to use Cloud AI.</Text>;
+    }
+  } else if (aiProvider === 'ai-connector') {
+    titleText = 'AI Connector:';
+    if (isAIConnectorConnected) {
+      statusColor = 'bg-green-500';
+      statusText = 'Ready';
+      hoverContent = <Text variant={TextVariants.small}>Connected to local generative backend.</Text>;
+    } else {
+      statusColor = 'bg-red-500';
+      statusText = 'Not Detected';
+      hoverContent = (
+        <Text variant={TextVariants.small}>Only simple inpainting available. Start your local backend.</Text>
+      );
+    }
+  } else {
+    titleText = 'Built-in AI:';
+    statusColor = 'bg-green-500';
+    statusText = 'Ready';
+    hoverContent = (
+      <Text variant={TextVariants.small}>
+        Using basic local CPU. Select Cloud or AI Connector in settings for generative replace.
+      </Text>
     );
   }
+
   return (
     <div
       className="bg-surface rounded-lg"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="flex items-center gap-2 px-4 pt-2">
-        <div className={'w-2.5 h-2.5 rounded-full bg-red-500'} />
-        <Text variant={TextVariants.label}>AI Connector:</Text>
-        <Text variant={TextVariants.label} weight={TextWeights.bold} color={TextColors.error}>
-          Not Detected
+      <div className={`flex items-center gap-2 px-4 ${hoverContent ? 'pt-2' : 'py-2'}`}>
+        <div className={`w-2.5 h-2.5 rounded-full ${statusColor}`} />
+        <Text variant={TextVariants.label}>{titleText}</Text>
+        <Text
+          variant={TextVariants.label}
+          weight={TextWeights.bold}
+          className={statusColor === 'bg-green-500' ? 'text-green-500' : 'text-red-500'}
+        >
+          {statusText}
         </Text>
       </div>
-      <div className="px-4 pb-2">
-        <motion.div
-          animate={{ height: isHovered ? 'auto' : 0, opacity: isHovered ? 1 : 0, marginTop: isHovered ? '2px' : 0 }}
-          className="overflow-hidden"
-          initial={{ height: 0, opacity: 0, marginTop: 0 }}
-          transition={{ duration: 0.2, ease: 'easeInOut' }}
-        >
-          <Text variant={TextVariants.small}>
-            Only simple inpainting available. Connect backend for generative features.
-          </Text>
-        </motion.div>
-      </div>
+      {hoverContent && (
+        <div className="px-4 pb-3">
+          <motion.div
+            animate={{ height: isHovered ? 'auto' : 0, opacity: isHovered ? 1 : 0, marginTop: isHovered ? '2px' : 0 }}
+            className="overflow-hidden"
+            initial={{ height: 0, opacity: 0, marginTop: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+          >
+            {hoverContent}
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
@@ -223,6 +291,38 @@ export default function AIPanel() {
 
   const { setAdjustments } = useEditorActions();
   const { handleGenerativeReplace, handleDeleteAiPatch, handleGenerateAiForegroundMask } = useAiMasking();
+  const appSettings = useSettingsStore((s) => s.appSettings);
+  const aiProvider = appSettings?.aiProvider || 'cpu';
+
+  const { user, isSignedIn } = useUser();
+  const { getToken } = useAuth();
+  const isPro = user?.publicMetadata?.plan === 'pro';
+  const [cloudUsage, setCloudUsage] = useState<{ requests: number; limit: number; month: string } | null>(null);
+
+  const isGenerativeAvailable =
+    (aiProvider === 'cloud' && !!isSignedIn && !!isPro) || (aiProvider === 'ai-connector' && isAIConnectorConnected);
+
+  useEffect(() => {
+    if (aiProvider !== 'cloud' || !isSignedIn || !isPro) return;
+
+    const fetchUsage = async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+
+        const res = await fetch('https://getrapidraw.com/api/usage', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          setCloudUsage(await res.json());
+        }
+      } catch (e) {
+        console.error('Failed to fetch cloud usage', e);
+      }
+    };
+
+    fetchUsage();
+  }, [aiProvider, isSignedIn, isPro, getToken]);
 
   const setBrushSettings = useCallback(
     (updater: any) =>
@@ -851,7 +951,13 @@ export default function AIPanel() {
                   </Text>
                 ) : (
                   <>
-                    <ConnectionStatus isConnected={isAIConnectorConnected} />
+                    <ConnectionStatus
+                      aiProvider={aiProvider}
+                      isAIConnectorConnected={isAIConnectorConnected}
+                      isSignedIn={!!isSignedIn}
+                      isPro={!!isPro}
+                      cloudUsage={cloudUsage}
+                    />
                     <Text variant={TextVariants.heading} className="mb-2 mt-8">
                       Create New Generative Edit
                     </Text>
@@ -977,12 +1083,12 @@ export default function AIPanel() {
                   setBrushSettings={setBrushSettings}
                   updateContainer={updatePatch}
                   updateSubMask={updateSubMask}
-                  isAIConnectorConnected={isAIConnectorConnected}
                   isGeneratingAi={isGeneratingAi}
                   isGeneratingAiMask={isGeneratingAiMask}
                   onGenerativeReplace={handleGenerativeReplace}
                   collapsibleState={collapsibleState}
                   setCollapsibleState={setCollapsibleState}
+                  isGenerativeAvailable={isGenerativeAvailable}
                 />
               </motion.div>
             )}
@@ -1573,21 +1679,18 @@ function SettingsPanel({
   setBrushSettings,
   updateContainer,
   updateSubMask,
-  isAIConnectorConnected,
   isGeneratingAi,
   isGeneratingAiMask: _isGeneratingAiMask,
   onGenerativeReplace,
   collapsibleState,
   setCollapsibleState,
+  isGenerativeAvailable,
 }: any) {
   const isActive = !!container;
   const isComponentMode = !!activeSubMask;
-
   const displayContainer = container || PLACEHOLDER_PATCH;
-
   const [prompt, setPrompt] = useState(displayContainer.prompt || '');
-  const [useFastInpaint, setUseFastInpaint] = useState(!isAIConnectorConnected);
-
+  const [useFastInpaint, setUseFastInpaint] = useState(!isGenerativeAvailable);
   const prevContainerId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -1598,7 +1701,7 @@ function SettingsPanel({
 
   useEffect(() => {
     if (container) {
-      if (!isAIConnectorConnected) {
+      if (!isGenerativeAvailable) {
         setUseFastInpaint(true);
       } else if (container.id !== prevContainerId.current) {
         setUseFastInpaint(isQuickErasePatch);
@@ -1607,7 +1710,7 @@ function SettingsPanel({
     } else {
       prevContainerId.current = null;
     }
-  }, [isAIConnectorConnected, container, isQuickErasePatch]);
+  }, [isGenerativeAvailable, container, isQuickErasePatch]);
 
   const subMaskConfig = activeSubMask ? SUB_MASK_CONFIG[activeSubMask.type] || {} : {};
   const isAiMask =
@@ -1665,13 +1768,13 @@ function SettingsPanel({
           <div>
             <Switch
               checked={useFastInpaint}
-              disabled={!isAIConnectorConnected}
+              disabled={!isGenerativeAvailable}
               label="Use basic inpainting"
               onChange={setUseFastInpaint}
               tooltip={
-                !isAIConnectorConnected
-                  ? 'AI Connector not connected, basic inpainting is required.'
-                  : 'Basic inpainting is quicker but not generative. Uncheck to use AI Connector with a text prompt.'
+                !isGenerativeAvailable
+                  ? 'Generative backend not available or not configured. Basic inpainting is required.'
+                  : 'Basic inpainting is quicker but not generative. Uncheck to use Generative AI with a text prompt.'
               }
             />
 

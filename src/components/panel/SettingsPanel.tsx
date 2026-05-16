@@ -24,7 +24,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
-import { useUser } from '@clerk/react';
+import { Show, SignIn, useUser, useAuth, useClerk } from '@clerk/react';
 import Button from '../ui/Button';
 import ConfirmModal from '../modals/ConfirmModal';
 import Dropdown, { OptionItem } from '../ui/Dropdown';
@@ -34,8 +34,6 @@ import Slider from '../ui/Slider';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import { Invokes } from '../ui/AppProperties';
 import {
-  arraysEqual,
-  codeToDisplayLabel,
   formatKeyCode,
   KeybindDefinition,
   KEYBIND_DEFINITIONS,
@@ -45,6 +43,7 @@ import {
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
+import { open } from '@tauri-apps/plugin-shell';
 
 interface ConfirmModalState {
   confirmText: string;
@@ -320,6 +319,87 @@ const AiProviderSwitch = ({ selectedProvider, onProviderChange }: AiProviderSwit
           </span>
         </button>
       ))}
+    </div>
+  );
+};
+
+const CloudDashboard = () => {
+  const { user } = useUser();
+  const { getToken } = useAuth();
+  const { signOut } = useClerk();
+  const [usage, setUsage] = useState<{ requests: number; limit: number; month: string } | null>(null);
+
+  useEffect(() => {
+    const fetchUsage = async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await fetch('https://getrapidraw.com/api/usage', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          setUsage(await res.json());
+        }
+      } catch (e) {
+        console.error('Failed to fetch cloud usage', e);
+      }
+    };
+    fetchUsage();
+  }, [getToken]);
+
+  const isPro = user?.publicMetadata?.plan === 'pro';
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between border-b border-border-color pb-4">
+        <div className="flex items-center gap-3">
+          <div>
+            <Text variant={TextVariants.heading}>{user?.fullName || user?.primaryEmailAddress?.emailAddress}</Text>
+            <Text variant={TextVariants.small} color={isPro ? TextColors.success : TextColors.error}>
+              {isPro ? 'Cloud Subscription Active' : 'No Active Subscription'}
+            </Text>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            className="bg-transparent text-text-secondary hover:text-text-primary hover:bg-surface border-none shadow-none"
+            onClick={() => open('https://www.getrapidraw.com/dashboard')}
+          >
+            Manage <ExternalLinkIcon size={14} className="ml-1" />
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={async () => {
+              await signOut();
+            }}
+          >
+            Log Out
+          </Button>
+        </div>
+      </div>
+
+      {isPro ? (
+        <div className="bg-surface p-4 rounded-md">
+          <div className="flex justify-between items-center mb-2">
+            <Text variant={TextVariants.label}>Monthly Usage</Text>
+            <Text variant={TextVariants.small}>
+              {usage?.requests ?? 0} / {usage?.limit ?? 500} requests
+            </Text>
+          </div>
+          <div className="w-full bg-bg-primary rounded-full h-2">
+            <div
+              className="bg-accent h-2 rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(100, ((usage?.requests ?? 0) / (usage?.limit ?? 500)) * 100)}%` }}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="bg-red-900/10 border border-red-500/50 p-4 rounded-md text-center">
+          <Text className="mb-3">To use Cloud AI features, you need a Cloud subscription.</Text>
+          <Button onClick={() => open('https://www.getrapidraw.com/cloud')}>Upgrade on Website</Button>
+        </div>
+      )}
     </div>
   );
 };
@@ -1960,18 +2040,74 @@ export default function SettingsPanel({
                             <li>No powerful hardware required</li>
                           </Text>
 
-                          <div className="mt-8 p-4 bg-bg-primary rounded-lg border border-border-color text-center space-y-3">
-                            <Text
-                              variant={TextVariants.small}
-                              color={TextColors.button}
-                              weight={TextWeights.semibold}
-                              className="inline-block bg-accent px-2 py-1 rounded-full"
-                            >
-                              Coming Soon
-                            </Text>
-                            <Text>
-                              Keep an eye on the GitHub page to be notified when the cloud service is available.
-                            </Text>
+                          <div className="mt-8">
+                            <Show when="signed-in">
+                              <div className="p-6 bg-bg-primary rounded-xl border border-border-color shadow-inner">
+                                <CloudDashboard />
+                              </div>
+                            </Show>
+                            <Show when="signed-out">
+                              <div className="w-full max-w-md">
+                                <SignIn
+                                  routing="hash"
+                                  fallbackRedirectUrl="/"
+                                  forceRedirectUrl="/"
+                                  appearance={{
+                                    variables: {
+                                      colorBackground: 'transparent',
+                                      colorInput: 'transparent',
+                                      colorForeground: 'inherit',
+                                      colorInputForeground: 'inherit',
+                                      colorTextOnPrimaryBackground: 'inherit',
+                                      colorPrimaryForeground: 'inherit',
+                                      colorBorder: 'transparent',
+                                      colorShadow: 'none',
+                                      colorNeutral: 'inherit',
+                                    },
+                                    elements: {
+                                      rootBox: '',
+
+                                      cardBox: '!shadow-none !m-0 !p-0 !rounded-none',
+
+                                      card: '!bg-transparent !border-none !shadow-none !py-0 !px-1 !rounded-none',
+
+                                      header: '!hidden',
+
+                                      formFieldLabel: '!text-base !font-semibold !text-text-primary !block !mb-2',
+
+                                      formFieldAction:
+                                        '!text-text-secondary hover:!text-text-primary !transition-colors !no-underline hover:!underline',
+
+                                      formFieldInput:
+                                        '!bg-bg-primary !border !border-border-color !text-text-primary focus:!border-accent focus:!ring-1 focus:!ring-accent !rounded-md !px-3 !py-2',
+
+                                      formButtonPrimary:
+                                        '!bg-accent !text-button-text hover:!bg-accent/90 !shadow-none !transition-colors !rounded-md !mt-4 !py-2',
+
+                                      footer:
+                                        '!bg-transparent !p-0 !mt-4 opacity-50 hover:opacity-100 transition-opacity',
+                                      footerAction: '!hidden',
+
+                                      identityPreview: '!bg-bg-primary !border !border-border-color !rounded-md !mb-4',
+                                      identityPreviewText: '!text-text-primary !font-medium',
+                                      identityPreviewEditButtonIcon:
+                                        '!text-text-secondary hover:!text-text-primary !transition-colors',
+                                    },
+                                  }}
+                                />
+                                <div className="mt-6">
+                                  <Text variant={TextVariants.small}>
+                                    Don't have an account?{' '}
+                                    <button
+                                      onClick={() => open('https://www.getrapidraw.com/dashboard')}
+                                      className="text-accent hover:underline focus:outline-none"
+                                    >
+                                      Sign up on the website
+                                    </button>
+                                  </Text>
+                                </div>
+                              </div>
+                            </Show>
                           </div>
                         </motion.div>
                       )}
