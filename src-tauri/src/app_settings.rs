@@ -327,7 +327,6 @@ pub struct AppSettings {
     pub ai_provider: Option<String>,
     #[serde(default = "default_adjustment_visibility")]
     pub adjustment_visibility: HashMap<String, bool>,
-    pub enable_exif_reading: Option<bool>,
     #[serde(default = "default_open_tree_sections")]
     pub open_tree_sections: Vec<String>,
     #[serde(default)]
@@ -417,7 +416,6 @@ impl Default for AppSettings {
             thumbnail_aspect_ratio: Some("cover".to_string()),
             ai_provider: Some("cpu".to_string()),
             adjustment_visibility: default_adjustment_visibility(),
-            enable_exif_reading: Some(false),
             open_tree_sections: default_open_tree_sections(),
             copy_paste_settings: CopyPasteSettings::default(),
             raw_highlight_compression: Some(2.5),

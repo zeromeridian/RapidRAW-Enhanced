@@ -74,6 +74,12 @@ pub fn load_base_image_from_bytes(
     linear_mode: String,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<DynamicImage> {
+    crate::exif_processing::persist_exif_if_missing(
+        Path::new(path_for_ext_check),
+        path_for_ext_check,
+        bytes,
+    );
+
     if is_raw_file(path_for_ext_check) {
         match panic::catch_unwind(move || {
             develop_raw_image(

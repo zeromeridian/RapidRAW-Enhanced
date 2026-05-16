@@ -160,7 +160,6 @@ export interface AppSettings {
   enableLivePreviews?: boolean;
   livePreviewQuality?: string;
   enableAiTagging?: boolean;
-  enableExifReading?: boolean;
   filterCriteria?: FilterCriteria;
   lastFolderState?: any;
   pinnedFolders?: any;

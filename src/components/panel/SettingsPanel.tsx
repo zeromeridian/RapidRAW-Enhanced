@@ -915,18 +915,6 @@ export default function SettingsPanel({
                     </SettingItem>
 
                     <SettingItem
-                      label="EXIF Library Sorting"
-                      description="Read EXIF data (ISO, aperture, etc.) on folder load at the cost of slower folder loading when using EXIF sorting."
-                    >
-                      <Switch
-                        checked={appSettings?.enableExifReading ?? false}
-                        id="exif-reading-toggle"
-                        label="EXIF Reading"
-                        onChange={(checked) => onSettingsChange({ ...appSettings, enableExifReading: checked })}
-                      />
-                    </SettingItem>
-
-                    <SettingItem
                       label="XMP Metadata Sync"
                       description="Sync ratings, color labels and tags to standard XMP sidecar files for compatibility with other photo editors."
                     >
