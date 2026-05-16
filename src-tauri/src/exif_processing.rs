@@ -1037,8 +1037,7 @@ fn load_primary_metadata(image_path: &Path) -> ImageMetadata {
 
 fn save_primary_metadata(image_path: &Path, metadata: &ImageMetadata) -> std::io::Result<()> {
     let primary = get_primary_sidecar_path(image_path);
-    let json = serde_json::to_string_pretty(metadata)
-        .map_err(|e| std::io::Error::other(e))?;
+    let json = serde_json::to_string_pretty(metadata).map_err(std::io::Error::other)?;
     fs::write(&primary, json)
 }
 
