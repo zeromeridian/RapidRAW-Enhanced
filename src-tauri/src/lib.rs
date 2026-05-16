@@ -360,68 +360,76 @@ fn process_preview_job(
     #[cfg(any(target_os = "linux", target_os = "android"))]
     let use_wgpu_renderer = false;
 
+    let has_roi = roi.is_some();
     let (interactive_divisor, interactive_quality) = match live_quality {
         "full" => (1.0_f32, 85_u8),
-        "performance" => (1.8_f32, 65_u8),
-        _ => (1.2_f32, 75_u8),
+        "performance" => (if has_roi { 1.8_f32 } else { 1.5_f32 }, 65_u8),
+        _ => (if has_roi { 1.4_f32 } else { 1.0_f32 }, 75_u8),
     };
 
     let mut cached_preview_lock = state.cached_preview.lock().unwrap();
 
-    let cache_valid = cached_preview_lock.as_ref().is_some_and(|c| {
-        c.transform_hash == new_transform_hash
-            && c.preview_dim == preview_dim
-            && c.interactive_divisor == interactive_divisor
-    });
+    let base_valid = cached_preview_lock
+        .as_ref()
+        .is_some_and(|c| c.transform_hash == new_transform_hash && c.preview_dim == preview_dim);
+    let small_valid = base_valid
+        && cached_preview_lock
+            .as_ref()
+            .is_some_and(|c| c.interactive_divisor == interactive_divisor);
 
-    let (final_preview_base, small_preview_base, scale_for_gpu, unscaled_crop_offset) =
-        if cache_valid {
-            let cached = cached_preview_lock.as_ref().unwrap();
-            (
-                Arc::clone(&cached.image),
-                Arc::clone(&cached.small_image),
-                cached.scale,
-                cached.unscaled_crop_offset,
-            )
-        } else {
-            *state.gpu_image_cache.lock().unwrap() = None;
+    let (final_preview_base, scale_for_gpu, unscaled_crop_offset) = if base_valid {
+        let cached = cached_preview_lock.as_ref().unwrap();
+        (
+            Arc::clone(&cached.image),
+            cached.scale,
+            cached.unscaled_crop_offset,
+        )
+    } else {
+        *state.gpu_image_cache.lock().unwrap() = None;
 
-            let (base, scale, offset) = generate_transformed_preview(
-                &state,
-                &loaded_image,
-                &adjustments_clone,
-                preview_dim,
-            )?;
+        let (base, scale, offset) =
+            generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
+        (Arc::new(base), scale, offset)
+    };
 
-            let small_base = if interactive_divisor > 1.0 {
-                let target_size = (preview_dim as f32 / interactive_divisor) as u32;
-                let (w, h) = base.dimensions();
-                let (small_w, small_h) = if w > h {
-                    let ratio = h as f32 / w as f32;
-                    (target_size, (target_size as f32 * ratio) as u32)
-                } else {
-                    let ratio = w as f32 / h as f32;
-                    ((target_size as f32 * ratio) as u32, target_size)
-                };
-                image_processing::downscale_f32_image(&base, small_w, small_h)
+    let small_preview_base = if small_valid {
+        Arc::clone(&cached_preview_lock.as_ref().unwrap().small_image)
+    } else {
+        let small = if interactive_divisor > 1.0 {
+            let target_size = (preview_dim as f32 / interactive_divisor) as u32;
+            let (w, h) = final_preview_base.dimensions();
+            let (small_w, small_h) = if w > h {
+                let ratio = h as f32 / w as f32;
+                (target_size, (target_size as f32 * ratio) as u32)
             } else {
-                base.clone()
+                let ratio = w as f32 / h as f32;
+                ((target_size as f32 * ratio) as u32, target_size)
             };
-
-            let base_arc = Arc::new(base);
-            let small_base_arc = Arc::new(small_base);
-
-            *cached_preview_lock = Some(CachedPreview {
-                image: Arc::clone(&base_arc),
-                small_image: Arc::clone(&small_base_arc),
-                transform_hash: new_transform_hash,
-                scale,
-                unscaled_crop_offset: offset,
-                preview_dim,
-                interactive_divisor,
-            });
-            (base_arc, small_base_arc, scale, offset)
+            Arc::new(image_processing::downscale_f32_image(
+                &final_preview_base,
+                small_w,
+                small_h,
+            ))
+        } else {
+            Arc::clone(&final_preview_base)
         };
+
+        if is_interactive && base_valid {
+            *state.gpu_image_cache.lock().unwrap() = None;
+        }
+
+        small
+    };
+
+    *cached_preview_lock = Some(CachedPreview {
+        image: Arc::clone(&final_preview_base),
+        small_image: Arc::clone(&small_preview_base),
+        transform_hash: new_transform_hash,
+        scale: scale_for_gpu,
+        unscaled_crop_offset,
+        preview_dim,
+        interactive_divisor,
+    });
 
     drop(cached_preview_lock);
 
@@ -430,11 +438,9 @@ fn process_preview_job(
         let small_w = small_preview_base.width() as f32;
         let scale_factor = if orig_w > 0.0 { small_w / orig_w } else { 1.0 };
         let new_scale = scale_for_gpu * scale_factor;
-        let img = Arc::try_unwrap(small_preview_base).unwrap_or_else(|arc| (*arc).clone());
-        (img, new_scale, interactive_quality)
+        (small_preview_base, new_scale, interactive_quality)
     } else {
-        let img = Arc::try_unwrap(final_preview_base).unwrap_or_else(|arc| (*arc).clone());
-        (img, scale_for_gpu, 94)
+        (final_preview_base, scale_for_gpu, 94)
     };
 
     let (preview_width, preview_height) = processing_image.dimensions();
@@ -508,7 +514,7 @@ fn process_preview_job(
         crate::image_processing::process_and_get_dynamic_image_with_analytics(
             &context,
             &state,
-            &processing_image,
+            &*processing_image,
             new_transform_hash,
             RenderRequest {
                 adjustments: final_adjustments,
