@@ -312,14 +312,9 @@ fn denoise_image(
     let _ = app_handle.emit("denoise-progress", "Loading image...");
 
     let file_bytes = fs::read(path).map_err(|e| e.to_string())?;
-    let mut dynamic_img = load_base_image_from_bytes(
-        &file_bytes,
-        &path_str,
-        false,
-        &settings,
-        None,
-    )
-    .map_err(|e| e.to_string())?;
+    let mut dynamic_img =
+        load_base_image_from_bytes(&file_bytes, &path_str, false, &settings, None)
+            .map_err(|e| e.to_string())?;
 
     if is_raw {
         let _ = app_handle.emit("denoise-progress", "Preparing RAW data...");

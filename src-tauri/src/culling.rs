@@ -129,14 +129,8 @@ fn analyze_image(
     const ANALYSIS_DIM: u32 = 720; // FIXME: How should we calculate good focus if it's downscaled?!?
     let file_bytes = std::fs::read(path).map_err(|e| e.to_string())?;
 
-    let img = image_loader::load_base_image_from_bytes(
-        &file_bytes,
-        path,
-        true,
-        settings,
-        None,
-    )
-    .map_err(|e| e.to_string())?;
+    let img = image_loader::load_base_image_from_bytes(&file_bytes, path, true, settings, None)
+        .map_err(|e| e.to_string())?;
 
     let (width, height) = img.dimensions();
     let thumbnail = img.thumbnail(ANALYSIS_DIM, ANALYSIS_DIM);

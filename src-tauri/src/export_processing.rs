@@ -1283,14 +1283,9 @@ pub async fn estimate_batch_export_size(
         }
     };
 
-    let original_image = load_base_image_from_bytes(
-        file_slice,
-        &source_path_str,
-        true,
-        &settings,
-        None,
-    )
-    .map_err(|e| e.to_string())?;
+    let original_image =
+        load_base_image_from_bytes(file_slice, &source_path_str, true, &settings, None)
+            .map_err(|e| e.to_string())?;
 
     let raw_scale_factor = if is_raw {
         crate::raw_processing::get_fast_demosaic_scale_factor(

@@ -619,8 +619,9 @@ export default function SettingsPanel({
       .catch(console.error);
   }, []);
 
-  const handleProcessingSettingChange = (key: string, value: any) => {
+  const handleProcessingSettingChange = async (key: string, value: any) => {
     setProcessingSettings((prev) => ({ ...prev, [key]: value }));
+
     if (
       key === 'processingBackend' ||
       key === 'linuxGpuOptimization' ||
@@ -629,7 +630,15 @@ export default function SettingsPanel({
     ) {
       setRestartRequired(true);
     } else {
-      onSettingsChange({ ...appSettings, [key]: value });
+      await onSettingsChange({ ...appSettings, [key]: value });
+      if (
+        key === 'rawHighlightCompression' ||
+        key === 'rawPreprocessingColorNr' ||
+        key === 'rawPreprocessingSharpening' ||
+        key === 'applyPreprocessingToNonRaws'
+      ) {
+        await invoke('clear_image_caches');
+      }
     }
   };
 

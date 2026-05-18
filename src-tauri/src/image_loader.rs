@@ -1,5 +1,5 @@
 use crate::Cursor;
-use crate::app_settings::{load_settings, AppSettings};
+use crate::app_settings::{AppSettings, load_settings};
 use crate::app_state::{AppState, LoadedImage};
 use crate::exif_processing;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
@@ -54,13 +54,8 @@ pub fn load_and_composite(
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<DynamicImage> {
-    let base_image = load_base_image_from_bytes(
-        base_image,
-        path,
-        use_fast_raw_dev,
-        settings,
-        cancel_token,
-    )?;
+    let base_image =
+        load_base_image_from_bytes(base_image, path, use_fast_raw_dev, settings, cancel_token)?;
     composite_patches_on_image(&base_image, adjustments)
 }
 
@@ -102,7 +97,11 @@ pub fn load_base_image_from_bytes(
             Ok(Ok(mut image)) => {
                 if !use_fast_raw_dev && (color_nr_amount > 0.0 || sharpening_amount > 0.0) {
                     let start = Instant::now();
-                    remove_raw_artifacts_and_enhance(&mut image, color_nr_amount, sharpening_amount);
+                    remove_raw_artifacts_and_enhance(
+                        &mut image,
+                        color_nr_amount,
+                        sharpening_amount,
+                    );
                     let duration = start.elapsed();
                     log::info!(
                         "Raw enhancing for '{}' took {:?}",
@@ -131,12 +130,19 @@ pub fn load_base_image_from_bytes(
         }
     } else {
         let mut image = load_image_with_orientation(bytes, cancel_token)?;
-        
-        if apply_to_non_raws && !use_fast_raw_dev && (color_nr_amount > 0.0 || sharpening_amount > 0.0) {
+
+        if apply_to_non_raws
+            && !use_fast_raw_dev
+            && (color_nr_amount > 0.0 || sharpening_amount > 0.0)
+        {
             let start = Instant::now();
             remove_raw_artifacts_and_enhance(&mut image, color_nr_amount, sharpening_amount);
             let duration = start.elapsed();
-            log::info!("Enhancing non-RAW '{}' took {:?}", path_for_ext_check, duration);
+            log::info!(
+                "Enhancing non-RAW '{}' took {:?}",
+                path_for_ext_check,
+                duration
+            );
         }
 
         Ok(image)

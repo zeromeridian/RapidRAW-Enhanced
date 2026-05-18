@@ -305,13 +305,7 @@ pub async fn convert_negatives(
             let settings = load_settings(app_handle.clone()).unwrap_or_default();
 
             let img = match read_file_mapped(Path::new(&real_path)) {
-                Ok(mmap) => load_base_image_from_bytes(
-                    &mmap,
-                    &real_path,
-                    false,
-                    &settings,
-                    None,
-                ),
+                Ok(mmap) => load_base_image_from_bytes(&mmap, &real_path, false, &settings, None),
                 Err(_) => {
                     let bytes = fs::read(&real_path).unwrap_or_default();
                     load_base_image_from_bytes(&bytes, &real_path, false, &settings, None)

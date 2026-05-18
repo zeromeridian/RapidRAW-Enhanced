@@ -1425,14 +1425,9 @@ async fn merge_hdr(
 
             let file_bytes =
                 fs::read(path).map_err(|e| format!("Failed to read image {}: {}", path, e))?;
-            let mut dynamic_image = load_base_image_from_bytes(
-                &file_bytes,
-                path,
-                false,
-                &settings,
-                None,
-            )
-            .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
+            let mut dynamic_image =
+                load_base_image_from_bytes(&file_bytes, path, false, &settings, None)
+                    .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
 
             if !crate::formats::is_raw_file(path) {
                 dynamic_image = apply_srgb_to_linear(dynamic_image);
@@ -2242,7 +2237,8 @@ pub fn run() {
             cancel_thumbnail_generation,
             update_wgpu_transform,
             android_integration::resolve_android_content_uri_name,
-            adjustment_utils::clear_session_caches,
+            cache_utils::clear_session_caches,
+            cache_utils::clear_image_caches,
             app_settings::load_settings,
             app_settings::save_settings,
             ai_commands::generate_ai_subject_mask,
