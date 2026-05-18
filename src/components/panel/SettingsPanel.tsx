@@ -543,6 +543,9 @@ export default function SettingsPanel({
       appSettings?.useWgpuRenderer ?? (osPlatform === 'linux' || osPlatform === 'android' ? false : true),
     thumbnailWorkerThreads: appSettings?.thumbnailWorkerThreads ?? 4,
     imageCacheSize: appSettings?.imageCacheSize ?? 5,
+    rawPreprocessingColorNr: appSettings?.rawPreprocessingColorNr ?? 0.5,
+    rawPreprocessingSharpening: appSettings?.rawPreprocessingSharpening ?? 0.35,
+    applyPreprocessingToNonRaws: appSettings?.applyPreprocessingToNonRaws ?? false,
   });
   const [restartRequired, setRestartRequired] = useState(false);
   const [activeCategory, setActiveCategory] = useState('general');
@@ -592,6 +595,9 @@ export default function SettingsPanel({
       useWgpuRenderer: appSettings?.useWgpuRenderer ?? true,
       thumbnailWorkerThreads: appSettings?.thumbnailWorkerThreads ?? 4,
       imageCacheSize: appSettings?.imageCacheSize ?? 5,
+      rawPreprocessingColorNr: appSettings?.rawPreprocessingColorNr ?? 0.5,
+      rawPreprocessingSharpening: appSettings?.rawPreprocessingSharpening ?? 0.35,
+      applyPreprocessingToNonRaws: appSettings?.applyPreprocessingToNonRaws ?? false,
     });
     setRestartRequired(false);
   }, [appSettings]);
@@ -994,36 +1000,53 @@ export default function SettingsPanel({
                       />
                     </SettingItem>
 
-                    <SettingItem
-                      label="XMP Metadata Sync"
-                      description="Sync ratings, color labels and tags to standard XMP sidecar files for compatibility with other photo editors."
-                    >
-                      <Switch
-                        checked={appSettings?.enableXmpSync ?? true}
-                        id="enable-xmp-sync-toggle"
-                        label="Enable XMP Sync"
-                        onChange={(checked) => {
-                          const newSettings = { ...appSettings, enableXmpSync: checked };
-                          if (!checked) {
-                            newSettings.createXmpIfMissing = false;
-                          }
-                          onSettingsChange(newSettings);
-                        }}
-                      />
-                    </SettingItem>
+                    <div className="space-y-4">
+                      <SettingItem
+                        label="XMP Metadata Sync"
+                        description="Sync ratings, color labels and tags to standard XMP sidecar files for compatibility with other photo editors."
+                      >
+                        <Switch
+                          checked={appSettings?.enableXmpSync ?? true}
+                          id="enable-xmp-sync-toggle"
+                          label="Enable XMP Sync"
+                          onChange={(checked) => {
+                            const newSettings = { ...appSettings, enableXmpSync: checked };
+                            if (!checked) {
+                              newSettings.createXmpIfMissing = false;
+                            }
+                            onSettingsChange(newSettings);
+                          }}
+                        />
+                      </SettingItem>
 
-                    <SettingItem
-                      label="Create Missing XMP Files"
-                      description="Automatically create a new XMP sidecar file if one does not exist for an image. (Requires XMP Sync)"
-                    >
-                      <Switch
-                        disabled={!appSettings?.enableXmpSync}
-                        checked={appSettings?.createXmpIfMissing ?? false}
-                        id="create-xmp-missing-toggle"
-                        label="Create XMP if missing"
-                        onChange={(checked) => onSettingsChange({ ...appSettings, createXmpIfMissing: checked })}
-                      />
-                    </SettingItem>
+                      <AnimatePresence initial={false}>
+                        {(appSettings?.enableXmpSync ?? true) && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: 'easeInOut' }}
+                            className="overflow-hidden"
+                          >
+                            <div className="pl-4 border-l-2 border-border-color ml-1">
+                              <SettingItem
+                                label="Create Missing XMP Files"
+                                description="Automatically create a new XMP sidecar file if one does not exist for an image."
+                              >
+                                <Switch
+                                  checked={appSettings?.createXmpIfMissing ?? false}
+                                  id="create-xmp-missing-toggle"
+                                  label="Create XMP if missing"
+                                  onChange={(checked) =>
+                                    onSettingsChange({ ...appSettings, createXmpIfMissing: checked })
+                                  }
+                                />
+                              </SettingItem>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
 
                     <SettingItem
                       label="Folder Image Counts"
@@ -1558,7 +1581,6 @@ export default function SettingsPanel({
                 </div>
               </motion.div>
             )}
-
             {activeCategory === 'processing' && (
               <motion.div
                 key="processing"
@@ -1737,24 +1759,6 @@ export default function SettingsPanel({
                     </SettingItem>
 
                     <SettingItem
-                      label="RAW Highlight Recovery"
-                      description="Controls how much detail is recovered from clipped highlights in RAW files. Higher values recover more detail but can introduce purple artefacts."
-                    >
-                      <Slider
-                        label="Amount"
-                        min={1}
-                        max={10}
-                        step={0.1}
-                        value={processingSettings.rawHighlightCompression}
-                        defaultValue={2.5}
-                        onChange={(e: any) =>
-                          handleProcessingSettingChange('rawHighlightCompression', parseFloat(e.target.value))
-                        }
-                        fillOrigin="min"
-                      />
-                    </SettingItem>
-
-                    <SettingItem
                       label="Thumbnail Worker Threads"
                       description="Number of parallel threads used to generate thumbnails. Higher values speed up library loading but use more CPU & RAM."
                     >
@@ -1785,6 +1789,144 @@ export default function SettingsPanel({
                         defaultValue={5}
                         onChange={(e: any) => handleProcessingSettingChange('imageCacheSize', parseInt(e.target.value))}
                         fillOrigin="min"
+                      />
+                    </SettingItem>
+
+                    <SettingItem
+                      label="WGPU Direct Rendering"
+                      description={
+                        osPlatform === 'linux'
+                          ? 'Bypasses browser encoding for instantly responsive live previews. (Disabled on Linux: Tauri uses GTK for webviews, which conflicts with WGPU on the same X11 surface and causes flickering.)'
+                          : osPlatform === 'android'
+                            ? 'Bypasses browser encoding for instantly responsive live previews. (Disabled on Android: Native WGPU surface creation is currently not supported alongside the mobile webview.)'
+                            : 'Bypasses browser encoding for instantly responsive live previews. Highly recommended for performance.'
+                      }
+                    >
+                      <Switch
+                        checked={processingSettings.useWgpuRenderer}
+                        disabled={osPlatform === 'linux' || osPlatform === 'android'}
+                        id="wgpu-renderer-toggle"
+                        label="Enable Direct WGPU Render"
+                        onChange={(checked) => handleProcessingSettingChange('useWgpuRenderer', checked)}
+                      />
+                    </SettingItem>
+
+                    <SettingItem
+                      label="Processing Backend"
+                      description="Select the graphics API. 'Auto' is recommended. May fix crashes on some systems."
+                    >
+                      <Dropdown
+                        onChange={(value: any) => handleProcessingSettingChange('processingBackend', value)}
+                        options={filteredBackendOptions}
+                        value={
+                          filteredBackendOptions.some((option) => option.value === processingSettings.processingBackend)
+                            ? processingSettings.processingBackend
+                            : 'auto'
+                        }
+                        triggerClassName="bg-bg-primary"
+                      />
+                    </SettingItem>
+
+                    {osPlatform !== 'macos' && osPlatform !== 'windows' && (
+                      <SettingItem
+                        label="Linux Compatibility Mode"
+                        description="Enable workarounds for common GPU driver and display server issues. Disable this to enable full GPU acceleration."
+                      >
+                        <Switch
+                          checked={processingSettings.linuxGpuOptimization}
+                          id="gpu-compat-toggle"
+                          label="Enable Compatibility Mode"
+                          onChange={(checked) => handleProcessingSettingChange('linuxGpuOptimization', checked)}
+                        />
+                      </SettingItem>
+                    )}
+
+                    {restartRequired && (
+                      <>
+                        <Text
+                          as="div"
+                          color={TextColors.info}
+                          className="p-3 bg-blue-900/10 border border-blue-500/50 rounded-lg flex items-center gap-3"
+                        >
+                          <Info size={18} />
+                          <p>Changes to the processing engine require an application restart to take effect.</p>
+                        </Text>
+                        <div className="flex justify-end">
+                          <Button onClick={handleSaveAndRelaunch}>Save & Relaunch</Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-6 bg-surface rounded-xl shadow-md">
+                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                    Image Preprocessing
+                  </Text>
+                  <div className="space-y-8">
+                    <SettingItem
+                      label="RAW Highlight Recovery"
+                      description="Controls how much detail is recovered from clipped highlights in RAW files. Higher values recover more detail but can introduce purple artefacts."
+                    >
+                      <Slider
+                        label="Amount"
+                        min={1}
+                        max={10}
+                        step={0.1}
+                        value={processingSettings.rawHighlightCompression}
+                        defaultValue={2.5}
+                        onChange={(e: any) =>
+                          handleProcessingSettingChange('rawHighlightCompression', parseFloat(e.target.value))
+                        }
+                        fillOrigin="min"
+                      />
+                    </SettingItem>
+
+                    <SettingItem
+                      label="Base Color Noise Reduction"
+                      description="Applies a cross-bilateral filter early in the pipeline to remove chroma noise. Higher value = Stronger NR."
+                    >
+                      <Slider
+                        label="Amount"
+                        min={0}
+                        max={1.0}
+                        step={0.05}
+                        value={processingSettings.rawPreprocessingColorNr}
+                        defaultValue={0.5}
+                        onChange={(e: any) =>
+                          handleProcessingSettingChange('rawPreprocessingColorNr', parseFloat(e.target.value))
+                        }
+                        fillOrigin="min"
+                      />
+                    </SettingItem>
+
+                    <SettingItem
+                      label="Base Pre-Sharpening"
+                      description="Applies gentle detail enhancement early in the pipeline. Higher value = More sharpening."
+                    >
+                      <Slider
+                        label="Amount"
+                        min={0}
+                        max={1.0}
+                        step={0.05}
+                        value={processingSettings.rawPreprocessingSharpening}
+                        defaultValue={0.35}
+                        onChange={(e: any) =>
+                          handleProcessingSettingChange('rawPreprocessingSharpening', parseFloat(e.target.value))
+                        }
+                        fillOrigin="min"
+                      />
+                    </SettingItem>
+
+                    <SettingItem
+                      label="Apply Preprocessing to Non-RAWs"
+                      description="If enabled, the base color noise reduction and pre-sharpening above will also be applied to standard formats."
+                    >
+                      <Switch
+                        checked={processingSettings.applyPreprocessingToNonRaws}
+                        id="preprocessing-non-raws-toggle"
+                        label="Enable for Non-RAWs"
+                        onChange={(checked) => handleProcessingSettingChange('applyPreprocessingToNonRaws', checked)}
                       />
                     </SettingItem>
 
@@ -1856,71 +1998,6 @@ export default function SettingsPanel({
                         )}
                       </AnimatePresence>
                     </div>
-
-                    <SettingItem
-                      label="WGPU Direct Rendering"
-                      description={
-                        osPlatform === 'linux'
-                          ? 'Bypasses browser encoding for instantly responsive live previews. (Disabled on Linux: Tauri uses GTK for webviews, which conflicts with WGPU on the same X11 surface and causes flickering.)'
-                          : osPlatform === 'android'
-                            ? 'Bypasses browser encoding for instantly responsive live previews. (Disabled on Android: Native WGPU surface creation is currently not supported alongside the mobile webview.)'
-                            : 'Bypasses browser encoding for instantly responsive live previews. Highly recommended for performance.'
-                      }
-                    >
-                      <Switch
-                        checked={processingSettings.useWgpuRenderer}
-                        disabled={osPlatform === 'linux' || osPlatform === 'android'}
-                        id="wgpu-renderer-toggle"
-                        label="Enable Direct WGPU Render"
-                        onChange={(checked) => handleProcessingSettingChange('useWgpuRenderer', checked)}
-                      />
-                    </SettingItem>
-
-                    <SettingItem
-                      label="Processing Backend"
-                      description="Select the graphics API. 'Auto' is recommended. May fix crashes on some systems."
-                    >
-                      <Dropdown
-                        onChange={(value: any) => handleProcessingSettingChange('processingBackend', value)}
-                        options={filteredBackendOptions}
-                        value={
-                          filteredBackendOptions.some((option) => option.value === processingSettings.processingBackend)
-                            ? processingSettings.processingBackend
-                            : 'auto'
-                        }
-                        triggerClassName="bg-bg-primary"
-                      />
-                    </SettingItem>
-
-                    {osPlatform !== 'macos' && osPlatform !== 'windows' && (
-                      <SettingItem
-                        label="Linux Compatibility Mode"
-                        description="Enable workarounds for common GPU driver and display server issues. Disable this to enable full GPU acceleration."
-                      >
-                        <Switch
-                          checked={processingSettings.linuxGpuOptimization}
-                          id="gpu-compat-toggle"
-                          label="Enable Compatibility Mode"
-                          onChange={(checked) => handleProcessingSettingChange('linuxGpuOptimization', checked)}
-                        />
-                      </SettingItem>
-                    )}
-
-                    {restartRequired && (
-                      <>
-                        <Text
-                          as="div"
-                          color={TextColors.info}
-                          className="p-3 bg-blue-900/10 border border-blue-500/50 rounded-lg flex items-center gap-3"
-                        >
-                          <Info size={18} />
-                          <p>Changes to the processing engine require an application restart to take effect.</p>
-                        </Text>
-                        <div className="flex justify-end">
-                          <Button onClick={handleSaveAndRelaunch}>Save & Relaunch</Button>
-                        </div>
-                      </>
-                    )}
                   </div>
                 </div>
 

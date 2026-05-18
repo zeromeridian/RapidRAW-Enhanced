@@ -552,6 +552,7 @@ function rowAreEqual(prev: any, next: any) {
   if (prevRow.type === 'images') {
     if (prevRow.images.length !== nextRow.images.length) return false;
     for (let i = 0; i < nextRow.images.length; i++) {
+      if (prevRow.images[i].path !== nextRow.images[i].path) return false;
       const path = nextRow.images[i].path;
       if ((prev.activePath === path) !== (next.activePath === path)) return false;
       if (prev.multiSelectedPaths.includes(path) !== next.multiSelectedPaths.includes(path)) return false;

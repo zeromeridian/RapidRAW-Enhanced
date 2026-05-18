@@ -1226,8 +1226,6 @@ async fn generate_all_community_previews(
     const PROCESSING_DIM: u32 = TILE_DIM * 2;
 
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
-    let linear_mode = settings.linear_raw_mode;
 
     let mut base_thumbnails: Vec<(DynamicImage, bool, f32)> = Vec::new();
     for image_path in image_paths.iter() {
@@ -1238,8 +1236,7 @@ async fn generate_all_community_previews(
             &image_bytes,
             &source_path_str,
             true,
-            highlight_compression,
-            linear_mode.clone(),
+            &settings,
             None,
         )
         .map_err(|e| e.to_string())?;
@@ -1411,8 +1408,6 @@ async fn merge_hdr(
 
     let hdr_result_handle = state.hdr_result.clone();
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
-    let linear_mode = settings.linear_raw_mode;
 
     let loaded_items: Vec<(String, DynamicImage, Duration, f32)> = paths
         .iter()
@@ -1434,8 +1429,7 @@ async fn merge_hdr(
                 &file_bytes,
                 path,
                 false,
-                highlight_compression,
-                linear_mode.clone(),
+                &settings,
                 None,
             )
             .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
@@ -1604,8 +1598,6 @@ fn generate_preview_for_path(
     let source_path_str = source_path.to_string_lossy().to_string();
     let is_raw = is_raw_file(&source_path_str);
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
-    let linear_mode = settings.linear_raw_mode.clone();
 
     let base_image = match read_file_mapped(&source_path) {
         Ok(mmap) => load_and_composite(
@@ -1613,8 +1605,7 @@ fn generate_preview_for_path(
             &source_path_str,
             &js_adjustments,
             false,
-            highlight_compression,
-            linear_mode.clone(),
+            &settings,
             None,
         )
         .map_err(|e| e.to_string())?,
@@ -1630,8 +1621,7 @@ fn generate_preview_for_path(
                 &source_path_str,
                 &js_adjustments,
                 false,
-                highlight_compression,
-                linear_mode.clone(),
+                &settings,
                 None,
             )
             .map_err(|e| e.to_string())?

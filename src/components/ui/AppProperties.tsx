@@ -131,7 +131,7 @@ export enum RawStatus {
 
 export enum SortDirection {
   Ascending = 'asc',
-  Descening = 'desc',
+  Descending = 'desc',
 }
 
 export enum Theme {

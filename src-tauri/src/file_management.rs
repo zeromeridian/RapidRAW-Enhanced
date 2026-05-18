@@ -1097,8 +1097,6 @@ pub fn generate_thumbnail_data(
             hit
         } else {
             let settings = load_settings(app_handle.clone()).unwrap_or_default();
-            let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
-            let linear_mode = settings.linear_raw_mode;
             let mut raw_scale_factor = 1.0f32;
 
             let composite_image = if let Some(img) = preloaded_image {
@@ -1133,8 +1131,7 @@ pub fn generate_thumbnail_data(
                     &source_path_str,
                     &adjustments,
                     true,
-                    highlight_compression,
-                    linear_mode.clone(),
+                    &settings,
                     None,
                 )?;
 
@@ -1290,8 +1287,6 @@ pub fn generate_thumbnail_data(
     }
 
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
-    let linear_mode = settings.linear_raw_mode;
 
     let mut final_image = if let Some(img) = preloaded_image {
         image_loader::composite_patches_on_image(img, &adjustments)?
@@ -1302,8 +1297,7 @@ pub fn generate_thumbnail_data(
                 &source_path_str,
                 &adjustments,
                 true,
-                highlight_compression,
-                linear_mode.clone(),
+                &settings,
                 None,
             )?,
             Err(e) => {
@@ -1314,8 +1308,7 @@ pub fn generate_thumbnail_data(
                     &source_path_str,
                     &adjustments,
                     true,
-                    highlight_compression,
-                    linear_mode.clone(),
+                    &settings,
                     None,
                 )?
             }
@@ -2168,8 +2161,6 @@ pub async fn apply_auto_adjustments_to_paths(
 
     tauri::async_runtime::spawn_blocking(move || {
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
-        let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
-        let linear_mode = settings.linear_raw_mode;
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
@@ -2200,8 +2191,7 @@ pub async fn apply_auto_adjustments_to_paths(
                     &file_bytes,
                     &source_path_str,
                     true,
-                    highlight_compression,
-                    linear_mode.clone(),
+                    &settings,
                     None,
                 )
                 .map_err(|e| e.to_string())?;
