@@ -263,6 +263,81 @@ pub struct ImageFile {
     exif: Option<HashMap<String, String>>,
     is_virtual_copy: bool,
     is_cloud_placeholder: bool,
+    is_raw: bool,
+    group_id: Option<String>,
+}
+
+/// Build a grouping key from a source image path: "{parent_dir}/{stem}".
+/// Files sharing this key in the same directory are variants of the same shot.
+fn make_group_key(source_path: &Path) -> String {
+    let parent = source_path.parent().unwrap_or(Path::new(""));
+    let stem = source_path.file_stem().unwrap_or_default();
+    format!("{}/{}", parent.to_string_lossy(), stem.to_string_lossy())
+}
+
+/// Assign `group_id` to files that share a stem with another file in the same
+/// directory. Virtual copies are excluded from counting (so one file + its VC
+/// don't form a false group) but included in assignment (they inherit the
+/// group_id of their source).
+///
+/// When `require_matching_exif` is true, a group is only formed if all
+/// non-virtual-copy files in the stem set have EXIF creation dates that match
+/// exactly. Files without EXIF data are excluded from grouping entirely.
+fn assign_group_ids(files: &mut Vec<ImageFile>, require_matching_exif: bool) {
+    let mut stem_sources: HashMap<String, HashSet<PathBuf>> = HashMap::new();
+
+    for file in files.iter() {
+        if file.is_virtual_copy {
+            continue;
+        }
+        let (source_path, _) = parse_virtual_path(&file.path);
+        let key = make_group_key(&source_path);
+        stem_sources.entry(key).or_default().insert(source_path);
+    }
+
+    // Pre-compute EXIF dates keyed by source path when required.
+    let exif_dates: Option<HashMap<PathBuf, Option<chrono::DateTime<chrono::Utc>>>> =
+        if require_matching_exif {
+            let mut dates = HashMap::new();
+            for file in files.iter() {
+                let (source_path, _) = parse_virtual_path(&file.path);
+                dates.insert(source_path.clone(), crate::exif_processing::try_get_exif_creation_date(&source_path));
+            }
+            Some(dates)
+        } else {
+            None
+        };
+
+    // Determine which keys actually form valid groups (>=2 files, matching EXIF if required)
+    let mut valid_group_keys: HashSet<String> = HashSet::new();
+    for (key, paths) in &stem_sources {
+        if paths.len() < 2 {
+            continue;
+        }
+        if require_matching_exif {
+            let dates: Vec<_> = paths
+                .iter()
+                .map(|p| exif_dates.as_ref().unwrap().get(p).copied().flatten())
+                .collect();
+            // All files must have EXIF data, and all dates must match exactly
+            if dates.len() != paths.len() || dates.iter().any(|d| d.is_none()) {
+                continue;
+            }
+            let first = dates[0];
+            if !dates.iter().all(|d| *d == first) {
+                continue;
+            }
+        }
+        valid_group_keys.insert(key.clone());
+    }
+
+    for file in files.iter_mut() {
+        let (source_path, _) = parse_virtual_path(&file.path);
+        let key = make_group_key(&source_path);
+        if valid_group_keys.contains(&key) {
+            file.group_id = Some(key);
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -495,7 +570,7 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
         })
         .collect();
 
-    let result_list: Vec<ImageFile> = tasks
+    let mut result_list: Vec<ImageFile> = tasks
         .into_par_iter()
         .flat_map(|(path_str, file_name, path_buf, sidecars)| {
             let modified = fs::metadata(&path_buf)
@@ -547,6 +622,8 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
                     tags,
                     exif: None,
                     is_virtual_copy,
+                    is_raw: is_raw_file(&path_str),
+                    group_id: None,
                     rating,
                     is_cloud_placeholder,
                 });
@@ -556,6 +633,8 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
         })
         .collect();
 
+    let require_exif = settings.require_matching_exif.unwrap_or(false);
+    assign_group_ids(&mut result_list, require_exif);
     Ok(result_list)
 }
 
@@ -621,7 +700,7 @@ pub fn list_images_recursive(
         })
         .collect();
 
-    let result_list: Vec<ImageFile> = tasks
+    let mut result_list: Vec<ImageFile> = tasks
         .into_par_iter()
         .flat_map(|(path_str, file_name, path_buf, sidecars)| {
             let modified = fs::metadata(&path_buf)
@@ -673,6 +752,8 @@ pub fn list_images_recursive(
                     tags,
                     exif: None,
                     is_virtual_copy,
+                    is_raw: is_raw_file(&path_str),
+                    group_id: None,
                     rating,
                     is_cloud_placeholder,
                 });
@@ -682,6 +763,8 @@ pub fn list_images_recursive(
         })
         .collect();
 
+    let require_exif = settings.require_matching_exif.unwrap_or(false);
+    assign_group_ids(&mut result_list, require_exif);
     Ok(result_list)
 }
 
@@ -931,12 +1014,14 @@ pub fn get_album_images(
             };
 
             Some(ImageFile {
-                path: virtual_path,
+                path: virtual_path.clone(),
                 modified,
                 is_edited,
                 tags,
                 exif: None,
                 is_virtual_copy,
+                is_raw: is_raw_file(&virtual_path),
+                group_id: None,
                 rating,
                 is_cloud_placeholder,
             })
