@@ -43,6 +43,14 @@ import SettingsPanel from './SettingsPanel';
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 
+export interface ColumnWidths {
+  thumbnail: number;
+  name: number;
+  date: number;
+  rating: number;
+  color: number;
+}
+
 interface MainLibraryProps {
   activePath: string | null;
   aiModelDownloadStatus: string | null;
@@ -199,7 +207,6 @@ export default function MainLibrary(props: MainLibraryProps) {
       { key: RawStatus.All, label: t('library.filters.raw.all') },
       { key: RawStatus.RawOnly, label: t('library.filters.raw.rawOnly') },
       { key: RawStatus.NonRawOnly, label: t('library.filters.raw.nonRawOnly') },
-      { key: RawStatus.RawOverNonRaw, label: t('library.filters.raw.preferRaw') },
     ],
     [t],
   );

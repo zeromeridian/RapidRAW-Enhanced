@@ -22,6 +22,7 @@ import {
   SortCriteria,
   SortDirection,
   ExifOverlay,
+  GroupingMode,
 } from '../../ui/AppProperties';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import Text from '../../ui/Text';
@@ -308,6 +309,12 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
   );
 }
 
+const groupingOptions = [
+  { key: 'off' as GroupingMode, label: 'Off' },
+  { key: 'raw' as GroupingMode, label: 'JPEG behind RAW' },
+  { key: 'jpeg' as GroupingMode, label: 'JPEG over RAW' },
+];
+
 export function ViewOptionsDropdown({
   libraryViewMode,
   onSelectSize,
@@ -338,6 +345,9 @@ export function ViewOptionsDropdown({
       handleSettingsChange: state.handleSettingsChange,
     })),
   );
+
+  const groupingMode: GroupingMode = appSettings?.grouping ?? 'off';
+  const requireMatchingExif = appSettings?.requireMatchingExif ?? false;
 
   const isFilterActive =
     filterCriteria.rating !== 0 ||
@@ -664,6 +674,59 @@ export function ViewOptionsDropdown({
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="py-2"></div>
+
+          <div className="space-y-4">
+            <div>
+              <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+                Group RAW + JPEG
+              </Text>
+              {groupingOptions.map((option) => {
+                const isSelected = groupingMode === option.key;
+                return (
+                  <button
+                    className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
+                      isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
+                    }`}
+                    key={option.key}
+                    onClick={() => {
+                      if (appSettings) {
+                        handleSettingsChange({ ...appSettings, grouping: option.key });
+                      }
+                    }}
+                    role="menuitem"
+                  >
+                    <Text
+                      variant={TextVariants.label}
+                      color={TextColors.primary}
+                      weight={isSelected ? TextWeights.semibold : TextWeights.normal}
+                    >
+                      {option.label}
+                    </Text>
+                    {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
+                  </button>
+                );
+              })}
+              {groupingMode !== 'off' && (
+                <label className="mt-2 px-3 flex items-center gap-2 cursor-pointer py-1">
+                  <input
+                    type="checkbox"
+                    checked={requireMatchingExif}
+                    onChange={(e) => {
+                      if (appSettings) {
+                        handleSettingsChange({ ...appSettings, requireMatchingExif: e.target.checked });
+                      }
+                    }}
+                    className="rounded border-border-color"
+                  />
+                  <Text variant={TextVariants.small} color={TextColors.secondary}>
+                    Require matching metadata
+                  </Text>
+                </label>
+              )}
             </div>
           </div>
 

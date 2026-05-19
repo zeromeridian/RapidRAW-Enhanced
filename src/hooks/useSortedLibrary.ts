@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { RawStatus, EditedStatus, SortDirection, ImageFile } from '../components/ui/AppProperties';
+import { RawStatus, EditedStatus, SortDirection, ImageFile, GroupingMode } from '../components/ui/AppProperties';
+import { buildImageGroups } from '../utils/imageGrouping';
 
 export const ADVANCED_QUERY_REGEX =
   /^(iso|aperture|f|shutter|s|focal|mm|rating|color|camera|make|model|lens)\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
@@ -38,55 +39,14 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
   const { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria } = libraryState;
   const { appSettings, supportedTypes } = settingsState;
 
-  const getParentDir = (filePath: string): string => {
-    const separator = filePath.includes('/') ? '/' : '\\';
-    const lastSeparatorIndex = filePath.lastIndexOf(separator);
-    if (lastSeparatorIndex === -1) {
-      return '';
-    }
-    return filePath.substring(0, lastSeparatorIndex);
-  };
+  const groupingMode: GroupingMode = appSettings?.grouping ?? 'off';
+  const isGroupingActive = groupingMode !== 'off';
 
   let processedList = imageList;
 
-  if (filterCriteria.rawStatus === RawStatus.RawOverNonRaw && supportedTypes) {
-    const rawBaseNames = new Set<string>();
-
-    for (const image of imageList) {
-      const pathWithoutVC = image.path.split('?vc=')[0];
-      const filename = pathWithoutVC.split(/[\\/]/).pop() || '';
-      const lastDotIndex = filename.lastIndexOf('.');
-      const extension = lastDotIndex !== -1 ? filename.substring(lastDotIndex + 1).toLowerCase() : '';
-
-      if (extension && supportedTypes.raw.includes(extension)) {
-        const baseName = lastDotIndex !== -1 ? filename.substring(0, lastDotIndex) : filename;
-        const parentDir = getParentDir(pathWithoutVC);
-        const uniqueKey = `${parentDir}/${baseName}`;
-        rawBaseNames.add(uniqueKey);
-      }
-    }
-
-    if (rawBaseNames.size > 0) {
-      processedList = imageList.filter((image: ImageFile) => {
-        const pathWithoutVC = image.path.split('?vc=')[0];
-        const filename = pathWithoutVC.split(/[\\/]/).pop() || '';
-        const lastDotIndex = filename.lastIndexOf('.');
-        const extension = lastDotIndex !== -1 ? filename.substring(lastDotIndex + 1).toLowerCase() : '';
-
-        const isNonRaw = extension && supportedTypes.nonRaw.includes(extension);
-
-        if (isNonRaw) {
-          const baseName = lastDotIndex !== -1 ? filename.substring(0, lastDotIndex) : filename;
-          const parentDir = getParentDir(pathWithoutVC);
-          const uniqueKey = `${parentDir}/${baseName}`;
-
-          if (rawBaseNames.has(uniqueKey)) {
-            return false;
-          }
-        }
-        return true;
-      });
-    }
+  if (isGroupingActive) {
+    const groupingResult = buildImageGroups(imageList, groupingMode);
+    processedList = groupingResult.displayList;
   }
 
   const filteredList = processedList.filter((image: ImageFile) => {
@@ -100,7 +60,6 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
     if (
       filterCriteria.rawStatus &&
       filterCriteria.rawStatus !== RawStatus.All &&
-      filterCriteria.rawStatus !== RawStatus.RawOverNonRaw &&
       supportedTypes
     ) {
       const pathWithoutVC = image.path.split('?vc=')[0];
