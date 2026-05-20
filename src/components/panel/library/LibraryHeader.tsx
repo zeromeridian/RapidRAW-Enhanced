@@ -3,11 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Loader2, X, SlidersHorizontal, Check, Star as StarIcon, ChevronUp, ChevronDown } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useLibraryStore } from '../../../store/useLibraryStore';
-import { FilterCriteria, RawStatus, LibraryViewMode, SortCriteria, SortDirection } from '../../ui/AppProperties';
+import {
+  FilterCriteria,
+  RawStatus,
+  LibraryViewMode,
+  SortCriteria,
+  SortDirection,
+  ExifOverlay,
+} from '../../ui/AppProperties';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import Button from '../../ui/Button';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 
 function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName = 'w-56' }: any) {
   const [isOpen, setIsOpen] = useState(false);
@@ -298,6 +306,13 @@ export function ViewOptionsDropdown({
     })),
   );
 
+  const { appSettings, handleSettingsChange } = useSettingsStore(
+    useShallow((state) => ({
+      appSettings: state.appSettings,
+      handleSettingsChange: state.handleSettingsChange,
+    })),
+  );
+
   const isFilterActive =
     filterCriteria.rating > 0 ||
     (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) ||
@@ -447,6 +462,37 @@ export function ViewOptionsDropdown({
                 )}
               </button>
             </>
+          </div>
+
+          <div className="pt-2">
+            <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+              EXIF Overlay
+            </Text>
+            {[
+              { id: ExifOverlay.Off, label: 'Off' },
+              { id: ExifOverlay.Hover, label: 'On Hover' },
+              { id: ExifOverlay.Always, label: 'Always' },
+            ].map((option) => {
+              const isSelected = (appSettings?.exifOverlay || ExifOverlay.Off) === option.id;
+              return (
+                <button
+                  key={option.id}
+                  className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
+                    isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
+                  }`}
+                  onClick={() => handleSettingsChange({ ...appSettings!, exifOverlay: option.id })}
+                >
+                  <Text
+                    variant={TextVariants.label}
+                    color={TextColors.primary}
+                    weight={isSelected ? TextWeights.semibold : TextWeights.normal}
+                  >
+                    {option.label}
+                  </Text>
+                  {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
+                </button>
+              );
+            })}
           </div>
         </div>
 

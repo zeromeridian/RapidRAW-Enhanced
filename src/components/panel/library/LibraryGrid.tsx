@@ -9,21 +9,21 @@ import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { ColumnWidths } from '../MainLibrary';
 import { useProcessStore } from '../../../store/useProcessStore';
+import { ExifOverlay } from '../../ui/AppProperties';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 
-function ListHeader({
-  widths,
-  setWidths,
-  containerRef,
-  sortCriteria,
-  onSortChange,
-}: {
-  widths: ColumnWidths;
-  setWidths: React.Dispatch<React.SetStateAction<ColumnWidths>>;
-  containerRef: React.RefObject<HTMLDivElement>;
-  sortCriteria: any;
-  onSortChange: (key: string) => void;
-}) {
-  const handleResize = (e: React.MouseEvent, leftCol: keyof ColumnWidths, rightCol: keyof ColumnWidths) => {
+function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: any) {
+  const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
+  const showExifCols = exifOverlay !== ExifOverlay.Off;
+  const totalRawWidth =
+    widths.thumbnail +
+    widths.name +
+    widths.date +
+    widths.rating +
+    widths.color +
+    (showExifCols ? widths.shutter + widths.aperture + widths.iso + widths.focal : 0);
+
+  const handleResize = (e: React.MouseEvent, leftCol: string, rightCol: string) => {
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
@@ -63,23 +63,14 @@ function ListHeader({
     document.addEventListener('mouseup', onMouseUp);
   };
 
-  const Column = ({
-    title,
-    widthKey,
-    nextKey,
-    sortKey,
-  }: {
-    title: string;
-    widthKey: keyof ColumnWidths;
-    nextKey?: keyof ColumnWidths;
-    sortKey?: string;
-  }) => {
+  const Column = ({ title, widthKey, nextKey, sortKey }: any) => {
     const isSorted = sortCriteria.key === sortKey;
     const isAsc = sortCriteria.order === SortDirection.Ascending;
+    const actualWidth = `${(widths[widthKey] / totalRawWidth) * 100}%`;
 
     return (
       <div
-        style={{ width: `${widths[widthKey]}%` }}
+        style={{ width: actualWidth }}
         className={`relative flex items-center px-3 h-full select-none ${
           sortKey ? 'cursor-pointer hover:bg-bg-primary/50 transition-colors' : ''
         }`}
@@ -101,7 +92,6 @@ function ListHeader({
         {nextKey && (
           <div
             className="absolute right-[-3px] top-1.5 bottom-1.5 w-[6px] cursor-col-resize z-10 group flex items-center justify-center"
-            onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => handleResize(e, widthKey, nextKey)}
           >
             <div className="w-px h-full bg-border-color/40 group-hover:bg-accent transition-colors" />
@@ -117,7 +107,17 @@ function ListHeader({
       <Column title="Name" widthKey="name" nextKey="date" sortKey="name" />
       <Column title="Modified" widthKey="date" nextKey="rating" sortKey="date" />
       <Column title="Rating" widthKey="rating" nextKey="color" sortKey="rating" />
-      <Column title="Label" widthKey="color" />
+      {showExifCols ? (
+        <>
+          <Column title="Label" widthKey="color" nextKey="shutter" />
+          <Column title="Shutter" widthKey="shutter" nextKey="aperture" sortKey="shutter_speed" />
+          <Column title="Aperture" widthKey="aperture" nextKey="iso" sortKey="aperture" />
+          <Column title="ISO" widthKey="iso" nextKey="focal" sortKey="iso" />
+          <Column title="Focal" widthKey="focal" sortKey="focal_length" />
+        </>
+      ) : (
+        <Column title="Label" widthKey="color" />
+      )}
     </div>
   );
 }

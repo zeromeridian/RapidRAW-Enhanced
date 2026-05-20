@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Image as ImageIcon, Folder, FolderOpen } from 'lucide-react';
-import { Star as StarIcon } from 'lucide-react';
+import { Image as ImageIcon, Folder, FolderOpen, Star as StarIcon } from 'lucide-react';
+import clsx from 'clsx';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
-import { ThumbnailAspectRatio, ImageFile } from '../../ui/AppProperties';
+import { ThumbnailAspectRatio, ImageFile, ExifOverlay } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { ColumnWidths } from '../MainLibrary';
 import { useProcessStore } from '../../../store/useProcessStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
+import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
 
 interface ImageLayer {
   id: string;
@@ -26,8 +28,10 @@ const ThumbnailComponent = ({
   rating,
   tags,
   aspectRatio: thumbnailAspectRatio,
+  exif,
 }: any) => {
   const data = useProcessStore((s) => s.thumbnails[path]);
+  const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
 
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
@@ -41,6 +45,18 @@ const ThumbnailComponent = ({
       isVirtualCopy: parts.length > 1,
     };
   }, [path]);
+
+  const { shutter, fNumber, iso, focal } = useMemo(() => {
+    const e = exif || {};
+    let fNum = e.FNumber ? String(e.FNumber) : '';
+    if (fNum && !fNum.toLowerCase().startsWith('f')) fNum = `f/${fNum}`;
+    return {
+      shutter: e.ExposureTime || '',
+      fNumber: fNum,
+      iso: e.PhotographicSensitivity || e.ISOSpeedRatings || '',
+      focal: e.FocalLengthIn35mmFilm || e.FocalLength || '',
+    };
+  }, [exif]);
 
   useEffect(() => {
     if (data) {
@@ -95,16 +111,21 @@ const ThumbnailComponent = ({
   }, []);
 
   const ringClass = isActive
-    ? 'ring-2 ring-accent'
+    ? 'ring-2 ring-inset ring-accent'
     : isSelected
-      ? 'ring-2 ring-gray-400'
-      : 'hover:ring-2 hover:ring-hover-color';
+      ? 'ring-2 ring-inset ring-gray-400'
+      : 'group-hover:ring-2 group-hover:ring-inset group-hover:ring-hover-color';
+
   const colorTag = tags?.find((t: string) => t.startsWith('color:'))?.substring(6);
   const colorLabel = COLOR_LABELS.find((c: Color) => c.name === colorTag);
 
+  const isAlways = exifOverlay === ExifOverlay.Always;
+  const isHover = exifOverlay === ExifOverlay.Hover;
+  const isOff = exifOverlay === ExifOverlay.Off;
+
   return (
     <div
-      className={`aspect-square bg-surface rounded-md overflow-hidden cursor-pointer group relative transition-all duration-150 ${ringClass}`}
+      className="aspect-square bg-surface rounded-md overflow-hidden cursor-pointer group relative transition-all duration-150 transform-gpu [-webkit-mask-image:-webkit-radial-gradient(white,black)]"
       onClick={(e: any) => {
         e.stopPropagation();
         onImageClick(path, e);
@@ -113,7 +134,12 @@ const ThumbnailComponent = ({
       onDoubleClick={() => onImageDoubleClick(path)}
     >
       {layers.length > 0 && (
-        <div className="absolute inset-0 w-full h-full">
+        <div
+          className={clsx(
+            'absolute top-0 left-0 right-0 transition-all duration-300',
+            isAlways ? 'bottom-[58px]' : 'bottom-0',
+          )}
+        >
           {layers.map((layer) => (
             <div
               key={layer.id}
@@ -141,7 +167,10 @@ const ThumbnailComponent = ({
       <AnimatePresence>
         {layers.length === 0 && showPlaceholder && (
           <motion.div
-            className="absolute inset-0 w-full h-full flex items-center justify-center bg-surface"
+            className={clsx(
+              'absolute top-0 left-0 right-0 flex items-center justify-center bg-surface transition-all duration-300',
+              isAlways ? 'bottom-[58px]' : 'bottom-0',
+            )}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -154,14 +183,14 @@ const ThumbnailComponent = ({
 
       {(colorLabel || rating > 0) && (
         <>
-          <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-linear-to-bl from-black/10 via-black/0 to-transparent pointer-events-none z-0" />
+          <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-linear-to-bl from-black/20 via-black/0 to-transparent pointer-events-none z-0" />
 
           <div className="absolute top-1.5 right-1.5 rounded-full px-1.5 py-0.5 flex items-center gap-1 backdrop-blur-md shadow-md">
             {colorLabel && (
               <div
                 className="w-3 h-3 rounded-full ring-1 ring-black/20"
                 style={{ backgroundColor: colorLabel.color }}
-              ></div>
+              />
             )}
             {rating > 0 && (
               <>
@@ -174,7 +203,14 @@ const ThumbnailComponent = ({
           </div>
         </>
       )}
-      <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/70 to-transparent p-2 flex items-end justify-between">
+
+      <div
+        className={clsx(
+          'absolute bottom-0 left-0 right-0 p-2 flex items-end justify-between transition-opacity duration-300 pointer-events-none z-10',
+          'bg-linear-to-t from-black/70 to-transparent',
+          isAlways ? 'opacity-0' : isHover ? 'group-hover:opacity-0' : 'opacity-100',
+        )}
+      >
         <Text variant={TextVariants.small} color={TextColors.white} className="truncate pr-2">
           {baseName}
         </Text>
@@ -191,6 +227,72 @@ const ThumbnailComponent = ({
           </Text>
         )}
       </div>
+
+      <div
+        className={clsx(
+          'absolute bottom-0 left-0 right-0 h-[58px] flex flex-col p-2 pb-1.5 transition-all duration-300 z-20 pointer-events-none opacity-100',
+          'bg-surface/95 backdrop-blur-md border-t border-border-color/50',
+          isOff
+            ? 'translate-y-full'
+            : isHover
+              ? 'translate-y-full group-hover:translate-y-0 group-hover:pointer-events-auto'
+              : 'translate-y-0 pointer-events-auto',
+        )}
+      >
+        <div className="flex items-end justify-between">
+          <Text
+            variant={TextVariants.small}
+            weight={TextWeights.semibold}
+            color={TextColors.primary}
+            className="truncate pr-2"
+          >
+            {baseName}
+          </Text>
+          {isVirtualCopy && (
+            <Text
+              as="div"
+              variant={TextVariants.small}
+              color={TextColors.primary}
+              weight={TextWeights.bold}
+              className="shrink-0 shadow-md px-1.5 py-0.5 rounded-full bg-border-color/30"
+              data-tooltip="Virtual Copy"
+            >
+              VC
+            </Text>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-2.5 mt-1 pt-1">
+          <div className="flex items-center gap-1 text-text-secondary" data-tooltip="Shutter Speed">
+            <IconShutter className="w-2.5 h-2.5" />
+            <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+              {shutter || '-'}
+            </Text>
+          </div>
+          <div className="flex items-center gap-1 text-text-secondary" data-tooltip="Aperture">
+            <IconAperture className="w-2.5 h-2.5" />
+            <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+              {fNumber || '-'}
+            </Text>
+          </div>
+          <div className="flex items-center gap-1 text-text-secondary" data-tooltip="ISO">
+            <IconIso className="w-2.5 h-2.5" />
+            <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+              {iso || '-'}
+            </Text>
+          </div>
+          <div className="flex items-center gap-1 text-text-secondary" data-tooltip="Focal Length">
+            <IconFocalLength className="w-2.5 h-2.5" />
+            <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+              {focal ? (String(focal).endsWith('mm') ? focal : `${focal}mm`) : '-'}
+            </Text>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={clsx('absolute inset-0 rounded-md pointer-events-none z-30 transition-all duration-150', ringClass)}
+      />
     </div>
   );
 };
@@ -208,8 +310,10 @@ const ListItemComponent = ({
   modified,
   aspectRatio: thumbnailAspectRatio,
   columnWidths,
+  exif,
 }: any) => {
   const data = useProcessStore((s) => s.thumbnails[path]);
+  const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
 
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
@@ -223,6 +327,28 @@ const ListItemComponent = ({
       isVirtualCopy: parts.length > 1,
     };
   }, [path]);
+
+  const { shutter, fNumber, iso, focal } = useMemo(() => {
+    const e = exif || {};
+    let fNum = e.FNumber ? String(e.FNumber) : '';
+    if (fNum && !fNum.toLowerCase().startsWith('f')) fNum = `f/${fNum}`;
+    return {
+      shutter: e.ExposureTime || '',
+      fNumber: fNum,
+      iso: e.PhotographicSensitivity || e.ISOSpeedRatings || '',
+      focal: e.FocalLengthIn35mmFilm || e.FocalLength || '',
+    };
+  }, [exif]);
+
+  const showExifCols = exifOverlay !== ExifOverlay.Off;
+  const totalBase =
+    columnWidths.thumbnail +
+    columnWidths.name +
+    columnWidths.date +
+    columnWidths.rating +
+    columnWidths.color +
+    (showExifCols ? columnWidths.shutter + columnWidths.aperture + columnWidths.iso + columnWidths.focal : 0);
+  const getW = (key: keyof ColumnWidths) => `${(columnWidths[key] / totalBase) * 100}%`;
 
   useEffect(() => {
     if (data) {
@@ -296,7 +422,7 @@ const ListItemComponent = ({
       onDoubleClick={() => onImageDoubleClick(path)}
     >
       <div
-        style={{ width: `${columnWidths.thumbnail}%` }}
+        style={{ width: getW('thumbnail') }}
         className="flex items-center justify-center p-1.5 h-full overflow-hidden"
       >
         <div className="w-full h-full relative overflow-hidden rounded-sm bg-surface flex items-center justify-center">
@@ -322,7 +448,6 @@ const ListItemComponent = ({
               ))}
             </div>
           )}
-
           <AnimatePresence>
             {layers.length === 0 && showPlaceholder && (
               <motion.div
@@ -339,8 +464,7 @@ const ListItemComponent = ({
         </div>
       </div>
 
-      {/* Name */}
-      <div style={{ width: `${columnWidths.name}%` }} className="flex items-center gap-2 px-3 h-full overflow-hidden">
+      <div style={{ width: getW('name') }} className="flex items-center gap-2 px-3 h-full overflow-hidden">
         <Text variant={TextVariants.small} className="truncate" weight={TextWeights.medium} color={TextColors.primary}>
           {baseName}
         </Text>
@@ -358,13 +482,13 @@ const ListItemComponent = ({
         )}
       </div>
 
-      <div style={{ width: `${columnWidths.date}%` }} className="flex items-center px-3 h-full overflow-hidden">
+      <div style={{ width: getW('date') }} className="flex items-center px-3 h-full overflow-hidden">
         <Text variant={TextVariants.small} color={TextColors.secondary} className="truncate">
           {dateStr}
         </Text>
       </div>
 
-      <div style={{ width: `${columnWidths.rating}%` }} className="flex items-center px-3 h-full overflow-hidden">
+      <div style={{ width: getW('rating') }} className="flex items-center px-3 h-full overflow-hidden">
         {rating > 0 && (
           <div className="flex items-center gap-1">
             <StarIcon size={12} className="text-accent fill-accent" />
@@ -375,7 +499,7 @@ const ListItemComponent = ({
         )}
       </div>
 
-      <div style={{ width: `${columnWidths.color}%` }} className="flex items-center px-3 h-full overflow-hidden">
+      <div style={{ width: getW('color') }} className="flex items-center px-3 h-full overflow-hidden">
         {colorLabel && (
           <div className="flex items-center gap-1.5">
             <div
@@ -388,6 +512,31 @@ const ListItemComponent = ({
           </div>
         )}
       </div>
+
+      {showExifCols && (
+        <>
+          <div style={{ width: getW('shutter') }} className="flex items-center px-3 h-full overflow-hidden">
+            <Text variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+              {shutter}
+            </Text>
+          </div>
+          <div style={{ width: getW('aperture') }} className="flex items-center px-3 h-full overflow-hidden">
+            <Text variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+              {fNumber}
+            </Text>
+          </div>
+          <div style={{ width: getW('iso') }} className="flex items-center px-3 h-full overflow-hidden">
+            <Text variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+              {iso}
+            </Text>
+          </div>
+          <div style={{ width: getW('focal') }} className="flex items-center px-3 h-full overflow-hidden">
+            <Text variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+              {focal ? (String(focal).endsWith('mm') ? focal : `${focal}mm`) : ''}
+            </Text>
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -511,6 +660,7 @@ const RowComponent = ({
               path={imageFile.path}
               rating={imageRatings?.[imageFile.path] || 0}
               tags={imageFile.tags || []}
+              exif={imageFile.exif}
               aspectRatio={thumbnailAspectRatio}
               modified={imageFile.modified}
               columnWidths={columnWidths}
@@ -526,6 +676,7 @@ const RowComponent = ({
               path={imageFile.path}
               rating={imageRatings?.[imageFile.path] || 0}
               tags={imageFile.tags || []}
+              exif={imageFile.exif}
               aspectRatio={thumbnailAspectRatio}
             />
           )}
@@ -552,6 +703,7 @@ function rowAreEqual(prev: any, next: any) {
   if (prevRow.type === 'images') {
     if (prevRow.images.length !== nextRow.images.length) return false;
     for (let i = 0; i < nextRow.images.length; i++) {
+      if (prevRow.images[i] !== nextRow.images[i]) return false;
       if (prevRow.images[i].path !== nextRow.images[i].path) return false;
       const path = nextRow.images[i].path;
       if ((prev.activePath === path) !== (next.activePath === path)) return false;

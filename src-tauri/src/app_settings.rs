@@ -385,6 +385,8 @@ pub struct AppSettings {
     pub raw_preprocessing_sharpening: Option<f32>,
     #[serde(default)]
     pub apply_preprocessing_to_non_raws: Option<bool>,
+    #[serde(default)]
+    pub exif_overlay: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -467,6 +469,7 @@ impl Default for AppSettings {
             raw_preprocessing_color_nr: Some(0.5),
             raw_preprocessing_sharpening: Some(0.35),
             apply_preprocessing_to_non_raws: Some(false),
+            exif_overlay: Some("off".to_string()),
         }
     }
 }

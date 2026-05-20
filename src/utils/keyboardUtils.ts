@@ -90,6 +90,7 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
   { action: 'toggle_metadata', description: 'Toggle Metadata panel', defaultCombo: ['KeyI'], section: 'panels' },
   { action: 'toggle_analytics', description: 'Toggle Analytics display', defaultCombo: ['KeyA'], section: 'panels' },
   { action: 'toggle_export', description: 'Toggle Export panel', defaultCombo: ['KeyE'], section: 'panels' },
+  { action: 'toggle_library_exif', description: 'Toggle EXIF overlay', defaultCombo: ['KeyT'], section: 'library' },
   { action: 'undo', description: 'Undo adjustment', defaultCombo: ['ctrl', 'KeyZ'], section: 'editing' },
   { action: 'redo', description: 'Redo adjustment', defaultCombo: ['ctrl', 'KeyY'], section: 'editing' },
   {

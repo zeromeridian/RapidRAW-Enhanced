@@ -105,6 +105,18 @@ const thumbnailAspectRatioOptions = [
   { id: ThumbnailAspectRatio.Contain, label: 'Original Ratio' },
 ];
 
+export interface ColumnWidths {
+  thumbnail: number;
+  name: number;
+  date: number;
+  rating: number;
+  color: number;
+  shutter: number;
+  aperture: number;
+  iso: number;
+  focal: number;
+}
+
 export default function MainLibrary(props: MainLibraryProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [appVersion, setAppVersion] = useState('');

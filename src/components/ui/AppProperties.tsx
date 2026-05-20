@@ -112,6 +112,12 @@ export enum Invokes {
   GetAlbumImages = 'get_album_images',
 }
 
+export enum ExifOverlay {
+  Off = 'off',
+  Hover = 'hover',
+  Always = 'always',
+}
+
 export enum Panel {
   Adjustments = 'adjustments',
   Ai = 'ai',
@@ -195,6 +201,7 @@ export interface AppSettings {
   enableFocusMode?: boolean;
   openTreeSections?: string[];
   folderIcons?: Record<string, string>;
+  exifOverlay?: ExifOverlay;
 }
 
 export interface BrushSettings {
