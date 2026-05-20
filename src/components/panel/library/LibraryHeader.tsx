@@ -466,7 +466,7 @@ export function ViewOptionsDropdown({
 
           <div className="pt-2">
             <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
-              EXIF Overlay
+              Show Metadata
             </Text>
             {[
               { id: ExifOverlay.Off, label: 'Off' },

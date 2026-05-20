@@ -152,7 +152,7 @@ const ThumbnailComponent = ({
             >
               <img
                 alt={path.split(/[\\/]/).pop()}
-                className={`w-full h-full group-hover:scale-[1.02] transition-transform duration-300 ${
+                className={`w-full h-full group-hover:scale-[1.02] transition-transform duration-300 will-change-transform ${
                   thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
                 } relative`}
                 decoding="async"
@@ -206,45 +206,29 @@ const ThumbnailComponent = ({
 
       <div
         className={clsx(
-          'absolute bottom-0 left-0 right-0 p-2 flex items-end justify-between transition-opacity duration-300 pointer-events-none z-10',
+          'absolute bottom-0 left-0 right-0 h-16 transition-opacity duration-300 pointer-events-none z-10',
           'bg-linear-to-t from-black/70 to-transparent',
-          isAlways ? 'opacity-0' : isHover ? 'group-hover:opacity-0' : 'opacity-100',
+          isAlways ? 'opacity-0' : isHover ? 'opacity-100 group-hover:opacity-0' : 'opacity-100',
         )}
-      >
-        <Text variant={TextVariants.small} color={TextColors.white} className="truncate pr-2">
-          {baseName}
-        </Text>
-        {isVirtualCopy && (
-          <Text
-            as="div"
-            variant={TextVariants.small}
-            color={TextColors.white}
-            weight={TextWeights.bold}
-            className="shrink-0 shadow-md px-1.5 py-0.5 rounded-full backdrop-blur-xs"
-            data-tooltip="Virtual Copy"
-          >
-            VC
-          </Text>
-        )}
-      </div>
+      />
 
       <div
         className={clsx(
-          'absolute bottom-0 left-0 right-0 h-[58px] flex flex-col p-2 pb-1.5 transition-all duration-300 z-20 pointer-events-none opacity-100',
-          'bg-surface/95 backdrop-blur-md border-t border-border-color/50',
-          isOff
-            ? 'translate-y-full'
+          'absolute bottom-0 left-0 right-0 h-[58px] flex flex-col p-2 pb-1.5 transition-all duration-300 z-20',
+          isAlways
+            ? 'translate-y-0 bg-surface/95 border-t border-border-color/50 pointer-events-auto'
             : isHover
-              ? 'translate-y-full group-hover:translate-y-0 group-hover:pointer-events-auto'
-              : 'translate-y-0 pointer-events-auto',
+              ? 'translate-y-7 group-hover:translate-y-0 bg-transparent group-hover:bg-surface/95 backdrop-blur-none group-hover:backdrop-blur-md border-t border-transparent group-hover:border-border-color/50 pointer-events-none group-hover:pointer-events-auto'
+              : 'translate-y-7 bg-transparent border-t border-transparent pointer-events-none',
         )}
       >
-        <div className="flex items-end justify-between">
+        <div className="flex items-end justify-between shrink-0">
           <Text
             variant={TextVariants.small}
-            weight={TextWeights.semibold}
-            color={TextColors.primary}
-            className="truncate pr-2"
+            className={clsx(
+              'truncate pr-2 transition-colors duration-300',
+              isAlways ? 'text-white' : isHover ? 'text-white group-hover:text-white' : 'text-white',
+            )}
           >
             {baseName}
           </Text>
@@ -252,9 +236,14 @@ const ThumbnailComponent = ({
             <Text
               as="div"
               variant={TextVariants.small}
-              color={TextColors.primary}
-              weight={TextWeights.bold}
-              className="shrink-0 shadow-md px-1.5 py-0.5 rounded-full bg-border-color/30"
+              className={clsx(
+                'shrink-0 px-1.5 py-0.5 rounded-full transition-colors duration-300 font-bold',
+                isAlways
+                  ? 'bg-border-color/30 text-text-primary shadow-none'
+                  : isHover
+                    ? 'bg-black/30 text-white backdrop-blur-xs shadow-md group-hover:bg-border-color/30 group-hover:text-text-primary group-hover:shadow-none group-hover:backdrop-blur-none'
+                    : 'bg-black/30 text-white backdrop-blur-xs shadow-md',
+              )}
               data-tooltip="Virtual Copy"
             >
               VC
@@ -262,7 +251,12 @@ const ThumbnailComponent = ({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-2.5 mt-1 pt-1">
+        <div
+          className={clsx(
+            'flex flex-wrap items-center gap-x-2.5 mt-1 pt-1 transition-opacity duration-300 shrink-0',
+            isAlways ? 'opacity-100' : isHover ? 'opacity-0 group-hover:opacity-100' : 'opacity-0 hidden',
+          )}
+        >
           <div className="flex items-center gap-1 text-text-secondary" data-tooltip="Shutter Speed">
             <IconShutter className="w-2.5 h-2.5" />
             <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
