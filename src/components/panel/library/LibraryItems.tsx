@@ -121,11 +121,10 @@ const ThumbnailComponent = ({
 
   const isAlways = exifOverlay === ExifOverlay.Always;
   const isHover = exifOverlay === ExifOverlay.Hover;
-  const isOff = exifOverlay === ExifOverlay.Off;
 
   return (
     <div
-      className="aspect-square bg-surface rounded-md overflow-hidden cursor-pointer group relative transition-all duration-150 transform-gpu [-webkit-mask-image:-webkit-radial-gradient(white,black)]"
+      className="aspect-square bg-surface rounded-md overflow-hidden cursor-pointer group relative flex flex-col transition-all duration-150 transform-gpu [-webkit-mask-image:-webkit-radial-gradient(white,black)]"
       onClick={(e: any) => {
         e.stopPropagation();
         onImageClick(path, e);
@@ -133,53 +132,47 @@ const ThumbnailComponent = ({
       onContextMenu={(e: any) => onContextMenu(e, path)}
       onDoubleClick={() => onImageDoubleClick(path)}
     >
-      {layers.length > 0 && (
-        <div
-          className={clsx(
-            'absolute top-0 left-0 right-0 transition-all duration-300',
-            isAlways ? 'bottom-[58px]' : 'bottom-0',
-          )}
-        >
-          {layers.map((layer) => (
-            <div
-              key={layer.id}
-              className="absolute inset-0 w-full h-full"
-              style={{
-                opacity: layer.opacity,
-                transition: 'opacity 300ms ease-in-out',
-              }}
-              onTransitionEnd={() => handleTransitionEnd(layer.id)}
-            >
-              <img
-                alt={path.split(/[\\/]/).pop()}
-                className={`w-full h-full group-hover:scale-[1.02] transition-transform duration-300 will-change-transform ${
-                  thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
-                } relative`}
-                decoding="async"
-                loading="lazy"
-                src={layer.url}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      <AnimatePresence>
-        {layers.length === 0 && showPlaceholder && (
-          <motion.div
-            className={clsx(
-              'absolute top-0 left-0 right-0 flex items-center justify-center bg-surface transition-all duration-300',
-              isAlways ? 'bottom-[58px]' : 'bottom-0',
-            )}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-          >
-            <ImageIcon className="text-text-secondary animate-pulse" />
-          </motion.div>
+      <div className="relative w-full flex-1 min-h-0 transition-all duration-300 z-0">
+        {layers.length > 0 && (
+          <div className="absolute inset-0 w-full h-full">
+            {layers.map((layer) => (
+              <div
+                key={layer.id}
+                className="absolute inset-0 w-full h-full"
+                style={{
+                  opacity: layer.opacity,
+                  transition: 'opacity 300ms ease-in-out',
+                }}
+                onTransitionEnd={() => handleTransitionEnd(layer.id)}
+              >
+                <img
+                  alt={path.split(/[\\/]/).pop()}
+                  className={`w-full h-full group-hover:scale-[1.02] transition-transform duration-300 will-change-transform ${
+                    thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
+                  } relative`}
+                  decoding="async"
+                  loading="lazy"
+                  src={layer.url}
+                />
+              </div>
+            ))}
+          </div>
         )}
-      </AnimatePresence>
+
+        <AnimatePresence>
+          {layers.length === 0 && showPlaceholder && (
+            <motion.div
+              className="absolute inset-0 w-full h-full flex items-center justify-center bg-surface transition-all duration-300"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+            >
+              <ImageIcon className="text-text-secondary animate-pulse" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {(colorLabel || rating > 0) && (
         <>
@@ -214,12 +207,61 @@ const ThumbnailComponent = ({
 
       <div
         className={clsx(
-          'absolute bottom-0 left-0 right-0 h-[58px] flex flex-col p-2 pb-1.5 transition-all duration-300 z-20',
+          'w-full transition-[grid-template-rows] duration-300 ease-in-out grid shrink-0 z-0',
+          isAlways ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+        )}
+        aria-hidden="true"
+      >
+        <div className="min-h-0 overflow-hidden pointer-events-none invisible">
+          <div className="flex flex-col p-2 pb-1.5">
+            <div className="flex items-end justify-between shrink-0">
+              <Text variant={TextVariants.small} className="truncate pr-2">
+                {baseName}
+              </Text>
+              {isVirtualCopy && (
+                <Text variant={TextVariants.small} className="px-1.5 py-0.5 font-bold">
+                  VC
+                </Text>
+              )}
+            </div>
+            <div className="pt-1.5 pb-1 flex flex-wrap items-center gap-x-2.5 shrink-0">
+              <div className="flex items-center gap-1">
+                <IconShutter className="w-2.5 h-2.5" />
+                <Text variant={TextVariants.small} className="text-[9px]">
+                  {shutter || '-'}
+                </Text>
+              </div>
+              <div className="flex items-center gap-1">
+                <IconAperture className="w-2.5 h-2.5" />
+                <Text variant={TextVariants.small} className="text-[9px]">
+                  {fNumber || '-'}
+                </Text>
+              </div>
+              <div className="flex items-center gap-1">
+                <IconIso className="w-2.5 h-2.5" />
+                <Text variant={TextVariants.small} className="text-[9px]">
+                  {iso || '-'}
+                </Text>
+              </div>
+              <div className="flex items-center gap-1">
+                <IconFocalLength className="w-2.5 h-2.5" />
+                <Text variant={TextVariants.small} className="text-[9px]">
+                  {focal ? (String(focal).endsWith('mm') ? focal : `${focal}mm`) : '-'}
+                </Text>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={clsx(
+          'absolute bottom-0 left-0 right-0 flex flex-col p-2 pb-1.5 transition-all duration-300 ease-in-out z-20',
           isAlways
-            ? 'translate-y-0 bg-surface/95 border-t border-border-color/50 pointer-events-auto'
+            ? 'bg-surface/95 border-t border-border-color/50 pointer-events-auto'
             : isHover
-              ? 'translate-y-7 group-hover:translate-y-0 bg-transparent group-hover:bg-surface/95 backdrop-blur-none group-hover:backdrop-blur-md border-t border-transparent group-hover:border-border-color/50 pointer-events-none group-hover:pointer-events-auto'
-              : 'translate-y-7 bg-transparent border-t border-transparent pointer-events-none',
+              ? 'bg-transparent group-hover:bg-surface/60 backdrop-blur-none group-hover:backdrop-blur-md border-t border-transparent group-hover:border-border-color/50 pointer-events-none group-hover:pointer-events-auto'
+              : 'bg-transparent border-t border-transparent pointer-events-none',
         )}
       >
         <div className="flex items-end justify-between shrink-0">
@@ -253,33 +295,46 @@ const ThumbnailComponent = ({
 
         <div
           className={clsx(
-            'flex flex-wrap items-center gap-x-2.5 mt-1 pt-1 transition-opacity duration-300 shrink-0',
-            isAlways ? 'opacity-100' : isHover ? 'opacity-0 group-hover:opacity-100' : 'opacity-0 hidden',
+            'grid transition-[grid-template-rows,opacity] duration-300 ease-in-out shrink-0',
+            isAlways
+              ? 'grid-rows-[1fr] opacity-100'
+              : isHover
+                ? 'grid-rows-[0fr] opacity-0 group-hover:grid-rows-[1fr] group-hover:opacity-100'
+                : 'grid-rows-[0fr] opacity-0',
           )}
         >
-          <div className="flex items-center gap-1 text-text-secondary" data-tooltip="Shutter Speed">
-            <IconShutter className="w-2.5 h-2.5" />
-            <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
-              {shutter || '-'}
-            </Text>
-          </div>
-          <div className="flex items-center gap-1 text-text-secondary" data-tooltip="Aperture">
-            <IconAperture className="w-2.5 h-2.5" />
-            <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
-              {fNumber || '-'}
-            </Text>
-          </div>
-          <div className="flex items-center gap-1 text-text-secondary" data-tooltip="ISO">
-            <IconIso className="w-2.5 h-2.5" />
-            <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
-              {iso || '-'}
-            </Text>
-          </div>
-          <div className="flex items-center gap-1 text-text-secondary" data-tooltip="Focal Length">
-            <IconFocalLength className="w-2.5 h-2.5" />
-            <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
-              {focal ? (String(focal).endsWith('mm') ? focal : `${focal}mm`) : '-'}
-            </Text>
+          <div className="overflow-hidden min-h-0">
+            <div
+              className={clsx(
+                'pt-1.5 pb-0.5 flex flex-wrap items-center gap-x-2.5 shrink-0 transition-transform duration-300 ease-in-out',
+                isAlways ? 'translate-y-0' : isHover ? 'translate-y-3 group-hover:translate-y-0' : 'translate-y-3',
+              )}
+            >
+              <div className="flex items-center gap-1 text-text-secondary" data-tooltip="Shutter Speed">
+                <IconShutter className="w-2.5 h-2.5" />
+                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                  {shutter || '-'}
+                </Text>
+              </div>
+              <div className="flex items-center gap-1 text-text-secondary" data-tooltip="Aperture">
+                <IconAperture className="w-2.5 h-2.5" />
+                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                  {fNumber || '-'}
+                </Text>
+              </div>
+              <div className="flex items-center gap-1 text-text-secondary" data-tooltip="ISO">
+                <IconIso className="w-2.5 h-2.5" />
+                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                  {iso || '-'}
+                </Text>
+              </div>
+              <div className="flex items-center gap-1 text-text-secondary" data-tooltip="Focal Length">
+                <IconFocalLength className="w-2.5 h-2.5" />
+                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                  {focal ? (String(focal).endsWith('mm') ? focal : `${focal}mm`) : '-'}
+                </Text>
+              </div>
+            </div>
           </div>
         </div>
       </div>
