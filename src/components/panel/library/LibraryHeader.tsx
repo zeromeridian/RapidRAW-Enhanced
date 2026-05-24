@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Loader2, X, SlidersHorizontal, Check, Star as StarIcon, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+  Search,
+  Loader2,
+  X,
+  SlidersHorizontal,
+  Check,
+  Star as StarIcon,
+  ChevronUp,
+  ChevronDown,
+  HelpCircle,
+} from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import {
@@ -16,6 +26,7 @@ import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import Button from '../../ui/Button';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+import { ADVANCED_QUERY_REGEX } from '../../../hooks/useSortedLibrary';
 
 function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName = 'w-56' }: any) {
   const [isOpen, setIsOpen] = useState(false);
@@ -156,72 +167,78 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
       : isIndexing
         ? 'Indexing Images...'
         : tags.length > 0
-          ? 'Add another tag...'
-          : 'Search by tag or filename...';
+          ? 'Add filter or search...'
+          : 'Search or add query';
 
   const INACTIVE_WIDTH = 48;
-  const PADDING_AND_ICONS_WIDTH = 105;
-  const MAX_WIDTH = 640;
+  const PADDING_AND_ICONS_WIDTH = 100;
+  const MAX_WIDTH = 680;
 
   const calculatedWidth = Math.min(MAX_WIDTH, contentWidth + PADDING_AND_ICONS_WIDTH);
 
   return (
     <motion.div
       animate={{ width: isActive ? calculatedWidth : INACTIVE_WIDTH }}
-      className="relative flex items-center bg-surface rounded-md h-12"
+      className="relative flex items-center bg-surface rounded-md h-12 overflow-hidden"
       initial={false}
-      layout
-      ref={containerRef}
       transition={{ type: 'spring', stiffness: 400, damping: 35 }}
       onClick={() => inputRef.current?.focus()}
     >
       <button
-        className="absolute left-0 top-0 h-12 w-12 flex items-center justify-center text-text-primary z-10 shrink-0"
+        className="h-12 w-12 flex items-center justify-center text-text-primary z-10 shrink-0 bg-surface outline-hidden"
         onClick={(e) => {
           e.stopPropagation();
-          if (!isActive) {
-            setIsSearchActive(true);
-          }
+          if (!isActive) setIsSearchActive(true);
           inputRef.current?.focus();
         }}
-        data-tooltip="Search"
+        data-tooltip="Search or Filter"
       >
         <Search className="w-4 h-4" />
       </button>
-
       <div
-        className="flex items-center gap-1 pl-12 pr-16 w-full h-full overflow-x-hidden"
+        className="flex-1 min-w-0 h-full overflow-hidden flex items-center pl-1"
         style={{ opacity: isActive ? 1 : 0, pointerEvents: isActive ? 'auto' : 'none', transition: 'opacity 0.2s' }}
       >
-        <div ref={contentRef} className="flex items-center gap-2 h-full flex-nowrap min-w-[300px]">
-          {tags.map((tag) => (
-            <motion.div
-              key={tag}
-              layout
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.5 }}
-              className="flex items-center gap-1 bg-bg-primary px-2 py-1 rounded-sm group cursor-pointer shrink-0"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeTag(tag);
-              }}
-            >
-              <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
-                {tag}
-              </Text>
-              <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
-                <X size={12} />
-              </span>
-            </motion.div>
-          ))}
+        <div ref={contentRef} className="flex items-center gap-2 h-full flex-nowrap min-w-[250px] pr-2">
+          {tags.map((tag) => {
+            const match = tag.match(ADVANCED_QUERY_REGEX);
+            const isQuery = !!match;
+
+            return (
+              <motion.div
+                key={tag}
+                layout
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                className="flex items-center gap-1 bg-bg-primary px-2 py-1 rounded-sm group cursor-pointer shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeTag(tag);
+                }}
+              >
+                <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                  {isQuery ? (
+                    <span className="flex gap-0.5">
+                      <span className="uppercase opacity-70">{match[1]}</span>
+                      <span>{match[2] || ':'}</span>
+                      <span>{match[3]}</span>
+                    </span>
+                  ) : (
+                    tag
+                  )}
+                </Text>
+                <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
+                  <X size={12} />
+                </span>
+              </motion.div>
+            );
+          })}
           <input
-            className="grow w-full h-full bg-transparent text-text-primary placeholder-text-secondary border-none focus:outline-hidden"
+            className="grow w-full h-full bg-transparent text-text-primary placeholder-text-secondary border-none focus:outline-hidden min-w-[150px]"
             disabled={isIndexing}
             onBlur={() => {
-              if (tags.length === 0 && !text) {
-                setIsSearchActive(false);
-              }
+              if (tags.length === 0 && !text) setIsSearchActive(false);
             }}
             onChange={handleInputChange}
             onFocus={() => setIsSearchActive(true)}
@@ -233,31 +250,15 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
           />
         </div>
       </div>
-
       <div
-        className="absolute inset-y-0 right-0 flex items-center gap-1 pr-2"
+        className="shrink-0 flex items-center gap-1 pr-2 bg-surface z-10"
         style={{ opacity: isActive ? 1 : 0, pointerEvents: isActive ? 'auto' : 'none', transition: 'opacity 0.2s' }}
       >
-        <AnimatePresence>
-          {text.trim().length > 0 && tags.length === 0 && text.trim().length < 6 && !isIndexing && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.15 }}
-              className="shrink-0 bg-bg-primary px-2 py-1 rounded-md whitespace-nowrap"
-            >
-              <Text variant={TextVariants.small}>
-                Separate tags with <kbd className="font-sans font-semibold">,</kbd>
-              </Text>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {tags.length > 0 && (
           <button
+            onMouseDown={(e) => e.preventDefault()}
             onClick={toggleMode}
-            className="p-1.5 rounded-md hover:bg-bg-primary w-10 shrink-0"
+            className="p-1.5 rounded-md hover:bg-bg-primary w-10 shrink-0 flex items-center justify-center outline-hidden"
             data-tooltip={`Match ${mode === 'AND' ? 'ALL' : 'ANY'} tags`}
           >
             <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.semibold}>
@@ -265,10 +266,17 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
             </Text>
           </button>
         )}
+        <div
+          className="p-1.5 rounded-md text-text-secondary hover:text-text-primary transition-colors cursor-help shrink-0 outline-hidden"
+          data-tooltip="Advanced Queries: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony"
+        >
+          <HelpCircle size={16} />
+        </div>
         {(tags.length > 0 || text) && !isIndexing && (
           <button
+            onMouseDown={(e) => e.preventDefault()}
             onClick={clearSearch}
-            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-primary shrink-0"
+            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-primary shrink-0 outline-hidden"
             data-tooltip="Clear search"
           >
             <X className="h-5 w-5" />
@@ -314,7 +322,7 @@ export function ViewOptionsDropdown({
   );
 
   const isFilterActive =
-    filterCriteria.rating > 0 ||
+    filterCriteria.rating !== 0 ||
     (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) ||
     (filterCriteria.colors && filterCriteria.colors.length > 0);
 
@@ -516,7 +524,7 @@ export function ViewOptionsDropdown({
                     role="menuitem"
                   >
                     <span className="flex items-center gap-2">
-                      {option.value && option.value > 0 && <StarIcon size={16} className="text-accent fill-accent" />}
+                      {option.value > 0 && <StarIcon size={16} className="text-accent fill-accent" />}
                       <Text
                         variant={TextVariants.label}
                         color={TextColors.primary}

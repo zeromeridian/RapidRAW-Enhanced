@@ -79,6 +79,7 @@ interface MainLibraryProps {
 
 const ratingFilterOptions = [
   { value: 0, label: 'Show All' },
+  { value: -1, label: 'Unrated Only' },
   { value: 1, label: '1 & up' },
   { value: 2, label: '2 & up' },
   { value: 3, label: '3 & up' },
