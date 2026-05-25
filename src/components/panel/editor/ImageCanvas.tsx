@@ -88,6 +88,7 @@ interface MaskOverlay {
   subMask: SubMask;
   offsetX: number;
   offsetY: number;
+  stageScale: number;
 }
 
 const OptimizedBrushLine = memo(
@@ -134,6 +135,7 @@ const MaskOverlay = memo(
     subMask,
     offsetX,
     offsetY,
+    stageScale, // <-- Add this here
   }: MaskOverlay) => {
     const shapeRef = useRef<any>(null);
     const trRef = useRef<any>(null);
@@ -157,9 +159,9 @@ const MaskOverlay = memo(
       (stage: any) => {
         const pos = stage.getPointerPosition();
         if (!pos) return null;
-        return { x: pos.x - offsetX, y: pos.y - offsetY };
+        return { x: pos.x / stageScale - offsetX, y: pos.y / stageScale - offsetY };
       },
-      [offsetX, offsetY],
+      [offsetX, offsetY, stageScale],
     );
 
     useEffect(() => {
@@ -1034,16 +1036,27 @@ const ImageCanvas = memo(
     const groupOffsetX = paddingX;
     const groupOffsetY = paddingY;
 
+    const [settledScale, setSettledScale] = useState(transformState.scale);
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        setSettledScale(transformState.scale);
+      }, 150);
+      return () => clearTimeout(timer);
+    }, [transformState.scale]);
+
+    const maxDimension = Math.max(stageWidth, stageHeight, 1);
+    const maxSafeScale = Math.max(1, Math.min(settledScale, 4092 / maxDimension));
+
     const getCanvasPointer = useCallback(
       (stage: any) => {
         const pos = stage.getPointerPosition();
         if (!pos) return null;
         return {
-          x: pos.x - groupOffsetX,
-          y: pos.y - groupOffsetY,
+          x: pos.x / maxSafeScale - groupOffsetX,
+          y: pos.y / maxSafeScale - groupOffsetY,
         };
       },
-      [groupOffsetX, groupOffsetY],
+      [groupOffsetX, groupOffsetY, maxSafeScale],
     );
 
     useEffect(() => {
@@ -2328,98 +2341,108 @@ const ImageCanvas = memo(
           </div>
 
           {(isMasking || isAiEditing || isWbPickerActive) && (
-            <Stage
-              width={stageWidth}
-              height={stageHeight}
-              onMouseDown={handleStart}
-              onTouchStart={handleStart}
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={handleMouseLeave}
-              onMouseMove={handleMove}
-              onTouchMove={handleMove}
-              onMouseUp={handleUp}
-              onTouchEnd={handleUp}
+            <div
               style={{
-                cursor: effectiveCursor,
-                left: stageLeft,
-                opacity: isShowingOriginal ? 0 : 1,
-                transition: 'opacity 150ms ease-in-out',
                 position: 'absolute',
                 top: stageTop,
+                left: stageLeft,
+                transformOrigin: '0 0',
+                transform: `scale(${1 / maxSafeScale})`,
+                width: stageWidth * maxSafeScale,
+                height: stageHeight * maxSafeScale,
                 zIndex: 4,
                 touchAction: 'none',
                 userSelect: 'none',
+                opacity: isShowingOriginal ? 0 : 1,
+                transition: 'opacity 150ms ease-in-out',
               }}
             >
-              <Layer listening={!showOriginal}>
-                <Group x={groupOffsetX} y={groupOffsetY}>
-                  {(isMasking || isAiEditing) &&
-                    activeContainer &&
-                    sortedSubMasks.map((subMask: SubMask) => {
-                      const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
-                      const renderSubMask =
-                        subMask.id === activeId && localInitialDrawParams
-                          ? { ...subMask, parameters: localInitialDrawParams }
-                          : subMask;
+              <Stage
+                width={stageWidth * maxSafeScale}
+                height={stageHeight * maxSafeScale}
+                onMouseDown={handleStart}
+                onTouchStart={handleStart}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+                onMouseMove={handleMove}
+                onTouchMove={handleMove}
+                onMouseUp={handleUp}
+                onTouchEnd={handleUp}
+                style={{ cursor: effectiveCursor }}
+              >
+                <Layer listening={!showOriginal}>
+                  <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
+                    <Group x={groupOffsetX} y={groupOffsetY}>
+                      {(isMasking || isAiEditing) &&
+                        activeContainer &&
+                        sortedSubMasks.map((subMask: SubMask) => {
+                          const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
+                          const renderSubMask =
+                            subMask.id === activeId && localInitialDrawParams
+                              ? { ...subMask, parameters: localInitialDrawParams }
+                              : subMask;
 
-                      return (
-                        <MaskOverlay
-                          adjustments={adjustments}
-                          imageHeight={effectiveImageDimensions.height}
-                          imageWidth={effectiveImageDimensions.width}
-                          isSelected={renderSubMask.id === activeId}
-                          isToolActive={isToolActive}
-                          key={renderSubMask.id}
-                          onMaskInteractionEnd={handleMaskInteractionEnd}
-                          onMaskInteractionStart={handleMaskInteractionStart}
-                          onMaskMouseEnter={() => !isToolActive && setIsMaskHovered(true)}
-                          onMaskMouseLeave={() => !isToolActive && setIsMaskHovered(false)}
-                          onPreviewUpdate={handlePreviewUpdate}
-                          onSelect={() =>
-                            isMasking ? onSelectMask(renderSubMask.id) : onSelectAiSubMask(renderSubMask.id)
-                          }
-                          onUpdate={updateSubMask}
-                          scale={imageRenderSize.scale}
-                          subMask={renderSubMask}
-                          offsetX={groupOffsetX}
-                          offsetY={groupOffsetY}
+                          return (
+                            <MaskOverlay
+                              adjustments={adjustments}
+                              imageHeight={effectiveImageDimensions.height}
+                              imageWidth={effectiveImageDimensions.width}
+                              isSelected={renderSubMask.id === activeId}
+                              isToolActive={isToolActive}
+                              key={renderSubMask.id}
+                              onMaskInteractionEnd={handleMaskInteractionEnd}
+                              onMaskInteractionStart={handleMaskInteractionStart}
+                              onMaskMouseEnter={() => !isToolActive && setIsMaskHovered(true)}
+                              onMaskMouseLeave={() => !isToolActive && setIsMaskHovered(false)}
+                              onPreviewUpdate={handlePreviewUpdate}
+                              onSelect={() =>
+                                isMasking ? onSelectMask(renderSubMask.id) : onSelectAiSubMask(renderSubMask.id)
+                              }
+                              onUpdate={updateSubMask}
+                              scale={imageRenderSize.scale}
+                              subMask={renderSubMask}
+                              offsetX={groupOffsetX}
+                              offsetY={groupOffsetY}
+                              stageScale={maxSafeScale}
+                            />
+                          );
+                        })}
+
+                      {previewBox && (
+                        <Rect
+                          x={Math.min(previewBox.start.x, previewBox.end.x)}
+                          y={Math.min(previewBox.start.y, previewBox.end.y)}
+                          width={Math.abs(previewBox.end.x - previewBox.start.x)}
+                          height={Math.abs(previewBox.end.y - previewBox.start.y)}
+                          stroke="#0ea5e9"
+                          strokeWidth={2}
+                          dash={[4, 4]}
+                          listening={false}
                         />
-                      );
-                    })}
-
-                  {previewBox && (
-                    <Rect
-                      x={Math.min(previewBox.start.x, previewBox.end.x)}
-                      y={Math.min(previewBox.start.y, previewBox.end.y)}
-                      width={Math.abs(previewBox.end.x - previewBox.start.x)}
-                      height={Math.abs(previewBox.end.y - previewBox.start.y)}
-                      stroke="#0ea5e9"
-                      strokeWidth={2}
-                      dash={[4, 4]}
-                      listening={false}
-                    />
-                  )}
-                  {isBrushActive && cursorPreview.visible && (
-                    <Circle
-                      {...(brushCursorPreview.colorStops
-                        ? {
-                            fillRadialGradientColorStops: brushCursorPreview.colorStops,
-                            fillRadialGradientEndPoint: { x: 0, y: 0 },
-                            fillRadialGradientEndRadius: brushCursorPreview.radius,
-                            fillRadialGradientStartPoint: { x: 0, y: 0 },
-                            fillRadialGradientStartRadius: 0,
-                          }
-                        : { fill: brushCursorPreview.fill })}
-                      listening={false}
-                      perfectDrawEnabled={false}
-                      radius={brushCursorPreview.radius}
-                      x={cursorPreview.x}
-                      y={cursorPreview.y}
-                    />
-                  )}
-                </Group>
-              </Layer>
-            </Stage>
+                      )}
+                      {isBrushActive && cursorPreview.visible && (
+                        <Circle
+                          {...(brushCursorPreview.colorStops
+                            ? {
+                                fillRadialGradientColorStops: brushCursorPreview.colorStops,
+                                fillRadialGradientEndPoint: { x: 0, y: 0 },
+                                fillRadialGradientEndRadius: brushCursorPreview.radius,
+                                fillRadialGradientStartPoint: { x: 0, y: 0 },
+                                fillRadialGradientStartRadius: 0,
+                              }
+                            : { fill: brushCursorPreview.fill })}
+                          listening={false}
+                          perfectDrawEnabled={false}
+                          radius={brushCursorPreview.radius}
+                          x={cursorPreview.x}
+                          y={cursorPreview.y}
+                        />
+                      )}
+                    </Group>
+                  </Group>
+                </Layer>
+              </Stage>
+            </div>
           )}
         </div>
 
