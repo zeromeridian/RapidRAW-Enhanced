@@ -91,6 +91,19 @@ interface MaskOverlay {
   stageScale: number;
 }
 
+const getEdgeFadeStyle = (fadeDistancePx: number = 128): React.CSSProperties => ({
+  WebkitMaskImage: `
+    linear-gradient(to right, transparent, black ${fadeDistancePx}px, black calc(100% - ${fadeDistancePx}px), transparent),
+    linear-gradient(to bottom, transparent, black ${fadeDistancePx}px, black calc(100% - ${fadeDistancePx}px), transparent)
+  `,
+  WebkitMaskComposite: 'source-in',
+  maskImage: `
+    linear-gradient(to right, transparent, black ${fadeDistancePx}px, black calc(100% - ${fadeDistancePx}px), transparent),
+    linear-gradient(to bottom, transparent, black ${fadeDistancePx}px, black calc(100% - ${fadeDistancePx}px), transparent)
+  `,
+  maskComposite: 'intersect',
+});
+
 const OptimizedBrushLine = memo(
   ({ line, scale, cropX, cropY }: { line: DrawnLine; scale: number; cropX: number; cropY: number }) => {
     const flattenedPoints = useMemo(() => {
@@ -228,8 +241,10 @@ const MaskOverlay = memo(
 
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
+
+        onUpdate(subMask.id, { parameters: newP });
       },
-      [scale, updateP, onPreviewUpdate, subMask.id, getPointer],
+      [scale, updateP, onPreviewUpdate, subMask.id, getPointer, onUpdate],
     );
 
     const handleRadialDragEnd = useCallback(() => {
@@ -261,21 +276,24 @@ const MaskOverlay = memo(
         node.lastValidScaleY = scaleY;
       }
 
+      const newRadiusX = pRef.current.radiusX * node.scaleX();
+      const newRadiusY = pRef.current.radiusY * node.scaleY();
+
+      const newP = {
+        ...pRef.current,
+        centerX: node.x() / scale + cropX,
+        centerY: node.y() / scale + cropY,
+        radiusX: newRadiusX,
+        radiusY: newRadiusY,
+        rotation: node.rotation(),
+      };
+
       if (onPreviewUpdate) {
-        const newRadiusX = pRef.current.radiusX * node.scaleX();
-        const newRadiusY = pRef.current.radiusY * node.scaleY();
-        onPreviewUpdate(subMask.id, {
-          parameters: {
-            ...pRef.current,
-            centerX: node.x() / scale + cropX,
-            centerY: node.y() / scale + cropY,
-            radiusX: newRadiusX,
-            radiusY: newRadiusY,
-            rotation: node.rotation(),
-          },
-        });
+        onPreviewUpdate(subMask.id, { parameters: newP });
       }
-    }, [onPreviewUpdate, scale, cropX, cropY, subMask.id]);
+
+      onUpdate(subMask.id, { parameters: newP });
+    }, [onPreviewUpdate, scale, cropX, cropY, subMask.id, onUpdate]);
 
     const handleRadialTransformEnd = useCallback(() => {
       const node = shapeRef.current;
@@ -372,8 +390,9 @@ const MaskOverlay = memo(
 
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
+        onUpdate(subMask.id, { parameters: newP });
       },
-      [cropX, cropY, scale, updateP, onPreviewUpdate, subMask.id, setRotateCursor, getPointer],
+      [cropX, cropY, scale, updateP, onPreviewUpdate, subMask.id, setRotateCursor, getPointer, onUpdate],
     );
 
     const handleRotateEnd = useCallback(
@@ -452,8 +471,9 @@ const MaskOverlay = memo(
 
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
+        onUpdate(subMask.id, { parameters: newP });
       },
-      [scale, updateP, onPreviewUpdate, subMask.id, getPointer],
+      [scale, updateP, onPreviewUpdate, subMask.id, getPointer, onUpdate],
     );
 
     const handleLinearGroupDragEnd = useCallback(
@@ -494,8 +514,9 @@ const MaskOverlay = memo(
         }
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
+        onUpdate(subMask.id, { parameters: newP });
       },
-      [scale, cropX, cropY, updateP, onPreviewUpdate, subMask.id, getPointer],
+      [scale, cropX, cropY, updateP, onPreviewUpdate, subMask.id, getPointer, onUpdate],
     );
 
     const handleLinearRangeDragMove = useCallback(
@@ -523,8 +544,10 @@ const MaskOverlay = memo(
         const newP = { ...pRef.current, range: newRange };
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
+
+        onUpdate(subMask.id, { parameters: newP });
       },
-      [scale, cropX, cropY, updateP, onPreviewUpdate, subMask.id, getPointer],
+      [scale, cropX, cropY, updateP, onPreviewUpdate, subMask.id, getPointer, onUpdate],
     );
 
     const handleLinearPointDragEnd = useCallback(
@@ -1711,6 +1734,12 @@ const ImageCanvas = memo(
             };
             onLiveMaskPreview(previewContainer);
           }
+
+          const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
+          if (activeId) {
+            updateSubMask(activeId, { parameters: updatedParams });
+          }
+
           if (e.evt && e.evt.cancelable) e.evt.preventDefault();
           return;
         }
@@ -2355,6 +2384,7 @@ const ImageCanvas = memo(
                 userSelect: 'none',
                 opacity: isShowingOriginal ? 0 : 1,
                 transition: 'opacity 150ms ease-in-out',
+                ...getEdgeFadeStyle(128),
               }}
             >
               <Stage
