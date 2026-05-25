@@ -104,6 +104,7 @@ export enum TransformAdjustment {
 }
 
 export enum LensAdjustment {
+  LensCorrectionMode = 'lensCorrectionMode',
   LensMaker = 'lensMaker',
   LensModel = 'lensModel',
   LensDistortionAmount = 'lensDistortionAmount',
@@ -176,6 +177,7 @@ export interface Adjustments {
   halationAmount: number;
   highlights: number;
   hsl: Hsl;
+  lensCorrectionMode: 'auto' | 'manual';
   lensDistortionAmount: number;
   lensVignetteAmount: number;
   lensTcaAmount: number;
@@ -509,6 +511,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
     reds: { hue: 0, saturation: 0, luminance: 0 },
     yellows: { hue: 0, saturation: 0, luminance: 0 },
   },
+  lensCorrectionMode: 'manual',
   lensDistortionAmount: 100,
   lensVignetteAmount: 100,
   lensTcaAmount: 100,
@@ -646,6 +649,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     flareAmount: loadedAdjustments.flareAmount ?? INITIAL_ADJUSTMENTS.flareAmount,
     glowAmount: loadedAdjustments.glowAmount ?? INITIAL_ADJUSTMENTS.glowAmount,
     halationAmount: loadedAdjustments.halationAmount ?? INITIAL_ADJUSTMENTS.halationAmount,
+    lensCorrectionMode: loadedAdjustments.lensCorrectionMode || 'manual',
     lensMaker: loadedAdjustments.lensMaker ?? INITIAL_ADJUSTMENTS.lensMaker,
     lensModel: loadedAdjustments.lensModel ?? INITIAL_ADJUSTMENTS.lensModel,
     lensDistortionAmount: loadedAdjustments.lensDistortionAmount ?? INITIAL_ADJUSTMENTS.lensDistortionAmount,
@@ -765,6 +769,20 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         TransformAdjustment.TransformScale,
         TransformAdjustment.TransformXOffset,
         TransformAdjustment.TransformYOffset,
+      ],
+    },
+    {
+      label: 'Lens Correction',
+      keys: [
+        LensAdjustment.LensCorrectionMode,
+        LensAdjustment.LensMaker,
+        LensAdjustment.LensModel,
+        LensAdjustment.LensDistortionAmount,
+        LensAdjustment.LensVignetteAmount,
+        LensAdjustment.LensTcaAmount,
+        LensAdjustment.LensDistortionEnabled,
+        LensAdjustment.LensTcaEnabled,
+        LensAdjustment.LensVignetteEnabled,
       ],
     },
   ],

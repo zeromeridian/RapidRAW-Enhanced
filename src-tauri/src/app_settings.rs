@@ -118,6 +118,15 @@ pub fn all_available_adjustments() -> HashSet<String> {
         "transformXOffset",
         "transformYOffset",
         "masks",
+        "lensCorrectionMode",
+        "lensMaker",
+        "lensModel",
+        "lensDistortionAmount",
+        "lensVignetteAmount",
+        "lensTcaAmount",
+        "lensDistortionEnabled",
+        "lensTcaEnabled",
+        "lensVignetteEnabled",
     ]
     .iter()
     .map(|s| s.to_string())
@@ -143,6 +152,15 @@ pub fn default_included_adjustments() -> HashSet<String> {
         "transformXOffset",
         "transformYOffset",
         "masks",
+        "lensCorrectionMode",
+        "lensMaker",
+        "lensModel",
+        "lensDistortionAmount",
+        "lensVignetteAmount",
+        "lensTcaAmount",
+        "lensDistortionEnabled",
+        "lensTcaEnabled",
+        "lensVignetteEnabled",
     ];
 
     for item in off_by_default.iter() {

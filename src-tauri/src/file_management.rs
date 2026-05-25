@@ -1560,6 +1560,102 @@ pub fn increment_thumbnail_progress(state: &AppState, app_handle: &AppHandle) {
     }
 }
 
+pub fn resolve_lens_params_in_adjustments(
+    adjustments: &mut Value,
+    exif_data: &Option<HashMap<String, String>>,
+    lens_db: Option<&crate::lens_correction::LensDatabase>,
+) {
+    if let Some(map) = adjustments.as_object_mut() {
+        let mode = map
+            .get("lensCorrectionMode")
+            .and_then(|v| v.as_str())
+            .unwrap_or("manual");
+
+        if mode == "auto" {
+            if let Some(exif) = exif_data {
+                let exif_maker = exif.get("Make").map(|s| s.as_str()).unwrap_or("");
+                let exif_model = exif.get("LensModel").map(|s| s.as_str()).unwrap_or("");
+                if let Some(db) = lens_db {
+                    if let Some((detected_maker, detected_model)) =
+                        crate::lens_correction::find_best_lens_match(db, exif_maker, exif_model)
+                    {
+                        map.insert(
+                            "lensMaker".to_string(),
+                            serde_json::to_value(&detected_maker).unwrap(),
+                        );
+                        map.insert(
+                            "lensModel".to_string(),
+                            serde_json::to_value(&detected_model).unwrap(),
+                        );
+                    } else {
+                        map.remove("lensMaker");
+                        map.remove("lensModel");
+                    }
+                }
+            } else {
+                map.remove("lensMaker");
+                map.remove("lensModel");
+            }
+        }
+
+        if let Some(db) = lens_db {
+            let has_valid_lens = match (
+                map.get("lensMaker").and_then(|v| v.as_str()),
+                map.get("lensModel").and_then(|v| v.as_str()),
+            ) {
+                (Some(maker), Some(model)) if !maker.is_empty() && !model.is_empty() => {
+                    let mut focal_length = 50.0;
+                    let mut aperture = None;
+                    let mut distance = None;
+
+                    if let Some(exif) = exif_data {
+                        if let Some(fl_str) = exif
+                            .get("FocalLength")
+                            .or(exif.get("FocalLengthIn35mmFilm"))
+                        {
+                            if let Ok(fl) = fl_str.replace(" mm", "").trim().parse::<f32>() {
+                                focal_length = fl;
+                            }
+                        }
+                        if let Some(ap_str) = exif.get("ApertureValue").or(exif.get("FNumber")) {
+                            if let Ok(ap) = ap_str.replace("f/", "").trim().parse::<f32>() {
+                                aperture = Some(ap);
+                            }
+                        }
+                        if let Some(dist_str) = exif.get("SubjectDistance") {
+                            if let Ok(dist) = dist_str.replace(" m", "").trim().parse::<f32>() {
+                                distance = Some(dist);
+                            }
+                        }
+                    }
+
+                    if let Some(params) = crate::lens_correction::resolve_lens_params(
+                        db,
+                        maker,
+                        model,
+                        focal_length,
+                        aperture,
+                        distance,
+                    ) {
+                        map.insert(
+                            "lensDistortionParams".to_string(),
+                            serde_json::to_value(params).unwrap(),
+                        );
+                        true
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            };
+
+            if !has_valid_lens {
+                map.remove("lensDistortionParams");
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub fn get_supported_file_types() -> Result<serde_json::Value, String> {
     let raw_extensions: Vec<&str> = crate::formats::RAW_EXTENSIONS
@@ -1930,7 +2026,17 @@ pub fn save_metadata_and_update_thumbnail(
         ImageMetadata::default()
     };
 
-    metadata.adjustments = adjustments;
+    let mut final_adjustments = adjustments;
+    {
+        let lens_db_guard = state.lens_db.lock().unwrap();
+        resolve_lens_params_in_adjustments(
+            &mut final_adjustments,
+            &metadata.exif,
+            lens_db_guard.as_deref(),
+        );
+    }
+
+    metadata.adjustments = final_adjustments;
 
     let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
     std::fs::write(&sidecar_path, json_string).map_err(|e| e.to_string())?;
@@ -2013,6 +2119,13 @@ pub async fn apply_adjustments_to_paths(
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
+        let lens_db = app_handle
+            .state::<AppState>()
+            .lens_db
+            .lock()
+            .unwrap()
+            .clone();
+
         paths.par_iter().for_each(|path| {
             let (_, sidecar_path) = parse_virtual_path(path);
 
@@ -2037,6 +2150,12 @@ pub async fn apply_adjustments_to_paths(
                     new_map.insert(k.clone(), v.clone());
                 }
             }
+
+            resolve_lens_params_in_adjustments(
+                &mut new_adjustments,
+                &existing_metadata.exif,
+                lens_db.as_deref(),
+            );
 
             existing_metadata.adjustments = new_adjustments;
 

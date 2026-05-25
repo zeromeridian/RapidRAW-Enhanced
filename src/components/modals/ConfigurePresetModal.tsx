@@ -5,6 +5,7 @@ import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 import Switch from '../ui/Switch';
 import { Preset } from '../ui/AppProperties';
+import { ADJUSTMENT_GROUPS } from '../../utils/adjustments';
 
 interface ConfigurePresetModalProps {
   isOpen: boolean;
@@ -110,11 +111,9 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
           false,
       );
 
+      const GEOMETRY_KEYS = ADJUSTMENT_GROUPS.geometry.flatMap((group) => group.keys);
       const hasGeometry =
-        initialPreset?.adjustments &&
-        Object.keys(initialPreset.adjustments).some((key) =>
-          ['crop', 'rotation', 'flipHorizontal', 'flipVertical', 'transformDistortion'].includes(key),
-        );
+        initialPreset?.adjustments && Object.keys(initialPreset.adjustments).some((key) => GEOMETRY_KEYS.includes(key));
       setIncludeCropTransform(initialPreset?.includeCropTransform ?? hasGeometry ?? false);
 
       setPresetType(initialPreset?.presetType || 'style');

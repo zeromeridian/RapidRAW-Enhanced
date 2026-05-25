@@ -1972,7 +1972,7 @@ pub fn run() {
 
             let lens_db = lens_correction::load_lensfun_db(&app_handle);
             let state = app.state::<AppState>();
-            *state.lens_db.lock().unwrap() = Some(lens_db);
+            *state.lens_db.lock().unwrap() = Some(Arc::new(lens_db));
 
             unsafe {
                 if let Some(backend) = &settings.processing_backend
