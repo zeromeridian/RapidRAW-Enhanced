@@ -152,12 +152,9 @@ function App() {
       })),
     );
 
-  const { exportState, isCopied, isPasted, setProcess, setExportState } = useProcessStore(
+  const { exportState, setExportState } = useProcessStore(
     useShallow((state) => ({
       exportState: state.exportState,
-      isCopied: state.isCopied,
-      isPasted: state.isPasted,
-      setProcess: state.setProcess,
       setExportState: state.setExportState,
     })),
   );
@@ -435,18 +432,6 @@ function App() {
     window.addEventListener('contextmenu', handleGlobalContextMenu);
     return () => window.removeEventListener('contextmenu', handleGlobalContextMenu);
   }, []);
-
-  useEffect(() => {
-    if (!isCopied) return;
-    const timer = setTimeout(() => setProcess({ isCopied: false }), 1000);
-    return () => clearTimeout(timer);
-  }, [isCopied, setProcess]);
-
-  useEffect(() => {
-    if (!isPasted) return;
-    const timer = setTimeout(() => setProcess({ isPasted: false }), 1000);
-    return () => clearTimeout(timer);
-  }, [isPasted, setProcess]);
 
   const isLightTheme = useMemo(() => [Theme.Light, Theme.Snow, Theme.Arctic].includes(theme as Theme), [theme]);
 
