@@ -133,6 +133,7 @@ const MaskOverlay = memo(
   }: MaskOverlay) => {
     const shapeRef = useRef<any>(null);
     const trRef = useRef<any>(null);
+    const rotateStartRef = useRef<any>(null);
 
     const crop = adjustments.crop;
     const isPercent = crop?.unit === '%';
@@ -288,6 +289,124 @@ const MaskOverlay = memo(
       onMaskInteractionEnd();
       onUpdate(subMask.id, { parameters: newP });
     }, [scale, cropX, cropY, updateP, onMaskInteractionEnd, onUpdate, subMask.id]);
+
+    const setRotateCursor = useCallback(
+      (stage: any, pointerPos: any) => {
+        const cx = (pRef.current.centerX - cropX) * scale;
+        const cy = (pRef.current.centerY - cropY) * scale;
+        const angle = Math.atan2(pointerPos.y - cy, pointerPos.x - cx) * (180 / Math.PI);
+
+        const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.8));">
+          <g transform="rotate(${Math.round(angle)} 16 16)">
+            <path d="M 23 9 A 10 10 0 0 1 23 23" />
+            <path d="M 28 9 L 23 9 L 23 14" />
+            <path d="M 28 23 L 23 23 L 23 18" />
+          </g>
+        </svg>`;
+        const encodedSvg = encodeURIComponent(svgStr);
+        stage.container().style.cursor = `url('data:image/svg+xml;utf8,${encodedSvg}') 16 16, crosshair`;
+      },
+      [cropX, cropY, scale],
+    );
+
+    const handleRotateStart = useCallback(
+      (e: any) => {
+        isDragging.current = true;
+        onMaskInteractionStart(e);
+        e.cancelBubble = true;
+        if (e.evt && e.evt.cancelable) e.evt.preventDefault();
+
+        const stage = e.target.getStage();
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return;
+
+        const cx = (pRef.current.centerX - cropX) * scale;
+        const cy = (pRef.current.centerY - cropY) * scale;
+
+        const startAngle = Math.atan2(pointer.y - cy, pointer.x - cx);
+        rotateStartRef.current = {
+          angle: startAngle,
+          rotation: pRef.current.rotation || 0,
+        };
+      },
+      [onMaskInteractionStart, cropX, cropY, scale],
+    );
+
+    const handleRotateMove = useCallback(
+      (e: any) => {
+        if (!rotateStartRef.current) return;
+        const stage = e.target.getStage();
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return;
+
+        setRotateCursor(stage, pointer);
+
+        const cx = (pRef.current.centerX - cropX) * scale;
+        const cy = (pRef.current.centerY - cropY) * scale;
+
+        const currentAngle = Math.atan2(pointer.y - cy, pointer.x - cx);
+        const angleDiff = currentAngle - rotateStartRef.current.angle;
+        const angleDiffDeg = (angleDiff * 180) / Math.PI;
+
+        const newRotation = rotateStartRef.current.rotation + angleDiffDeg;
+
+        const newP = {
+          ...pRef.current,
+          rotation: newRotation,
+        };
+
+        updateP(newP);
+        if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
+      },
+      [cropX, cropY, scale, updateP, onPreviewUpdate, subMask.id, setRotateCursor],
+    );
+
+    const handleRotateEnd = useCallback(
+      (e: any) => {
+        isDragging.current = false;
+        rotateStartRef.current = null;
+        onMaskInteractionEnd();
+        onUpdate(subMask.id, { parameters: pRef.current });
+
+        if (e?.target?.getStage) {
+          e.target.getStage().container().style.cursor = 'default';
+        }
+      },
+      [subMask.id, onMaskInteractionEnd, onUpdate],
+    );
+
+    const handleRotateHoverMove = useCallback(
+      (e: any) => {
+        if (isToolActive || isDragging.current) return;
+        const stage = e.target.getStage();
+        const pointer = stage.getPointerPosition();
+        if (pointer) setRotateCursor(stage, pointer);
+      },
+      [isToolActive, setRotateCursor],
+    );
+
+    const handleRotateMouseEnter = useCallback(
+      (e: any) => {
+        onMaskMouseEnter();
+        if (!isToolActive && !isDragging.current) {
+          const stage = e.target.getStage();
+          const pointer = stage.getPointerPosition();
+          if (pointer) setRotateCursor(stage, pointer);
+        }
+      },
+      [onMaskMouseEnter, isToolActive, setRotateCursor],
+    );
+
+    const handleRotateMouseLeave = useCallback(
+      (e: any) => {
+        onMaskMouseLeave();
+        if (!isDragging.current) {
+          const stage = e.target.getStage();
+          stage.container().style.cursor = 'default';
+        }
+      },
+      [onMaskMouseLeave],
+    );
 
     const handleLinearGroupDragStart = useCallback(
       (e: any) => {
@@ -487,10 +606,33 @@ const MaskOverlay = memo(
       if (p.isInitialDraw && (radiusX < 1 || radiusY < 2)) return null;
 
       return (
-        <>
+        <Group>
+          {isSelected && !isToolActive && (
+            <Ellipse
+              x={(centerX - cropX) * scale}
+              y={(centerY - cropY) * scale}
+              radiusX={radiusX * scale + 35}
+              radiusY={radiusY * scale + 35}
+              rotation={rotation}
+              fill="transparent"
+              draggable
+              dragBoundFunc={lockDragBoundFunc}
+              onDragStart={handleRotateStart}
+              onDragMove={handleRotateMove}
+              onDragEnd={handleRotateEnd}
+              onMouseEnter={handleRotateMouseEnter}
+              onMouseMove={handleRotateHoverMove}
+              onMouseLeave={handleRotateMouseLeave}
+              onTouchStart={handleRotateStart}
+              onTouchMove={handleRotateMove}
+              onTouchEnd={handleRotateEnd}
+            />
+          )}
+
           <Ellipse
             {...commonProps}
             ref={shapeRef}
+            fill="transparent"
             draggable={!isToolActive}
             dragBoundFunc={lockDragBoundFunc}
             onDragStart={handleRadialDragStart}
@@ -510,7 +652,7 @@ const MaskOverlay = memo(
             <Transformer
               ref={trRef}
               centeredScaling={true}
-              rotateEnabled={true}
+              rotateEnabled={false}
               enabledAnchors={[
                 'top-left',
                 'top-right',
@@ -544,7 +686,7 @@ const MaskOverlay = memo(
               onMouseLeave={onMaskMouseLeave}
             />
           )}
-        </>
+        </Group>
       );
     }
 
