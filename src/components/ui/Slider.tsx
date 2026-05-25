@@ -388,17 +388,30 @@ const Slider = ({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
+    const textVal = e.target.value;
+    if (!/^[0-9.,\-]*$/.test(textVal)) {
+      return;
+    }
+    setInputValue(textVal);
+    const parseableText = textVal.replace(',', '.');
+    const parsedValue = parseFloat(parseableText);
+    if (!isNaN(parsedValue)) {
+      const clampedValue = Math.max(min, Math.min(max, parsedValue));
+      onChange({
+        target: {
+          value: clampedValue,
+        },
+      });
+    }
   };
 
   const handleInputCommit = () => {
-    let newValue = parseFloat(inputValue);
+    let newValue = parseFloat(inputValue.replace(',', '.'));
     if (isNaN(newValue)) {
       newValue = value;
     } else {
       newValue = Math.max(min, Math.min(max, newValue));
     }
-
     const syntheticEvent = {
       target: {
         value: newValue,
@@ -416,6 +429,21 @@ const Slider = ({
       setInputValue(String(value));
       setIsEditing(false);
       e.currentTarget.blur();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      let currentNum = parseFloat(inputValue.replace(',', '.'));
+      if (isNaN(currentNum)) {
+        currentNum = value;
+      }
+      const direction = e.key === 'ArrowUp' ? 1 : -1;
+      const newValue = currentNum + direction * step;
+      const snappedNewValue = snapToStep(newValue);
+      setInputValue(String(snappedNewValue));
+      onChange({
+        target: {
+          value: snappedNewValue,
+        },
+      });
     }
   };
 
@@ -471,7 +499,7 @@ const Slider = ({
               onKeyDown={handleInputKeyDown}
               ref={inputRef}
               step={step}
-              type="number"
+              type="text"
               value={inputValue}
             />
           ) : (
