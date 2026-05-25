@@ -57,17 +57,14 @@ impl WgpuDisplay {
     pub fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
         if let Some(bind_group) = &self.current_bind_group {
             let output = match self.surface.get_current_texture() {
-                wgpu::CurrentSurfaceTexture::Success(tex)
-                | wgpu::CurrentSurfaceTexture::Suboptimal(tex) => tex,
-                wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
+                Ok(tex) => tex,
+                Err(wgpu::SurfaceError::Outdated) | Err(wgpu::SurfaceError::Lost) => {
                     self.surface.configure(device, &self.config);
-                    match self.surface.get_current_texture() {
-                        wgpu::CurrentSurfaceTexture::Success(tex)
-                        | wgpu::CurrentSurfaceTexture::Suboptimal(tex) => tex,
-                        _ => panic!("Failed to acquire surface texture"),
-                    }
+                    self.surface
+                        .get_current_texture()
+                        .unwrap_or_else(|_| panic!("Failed to acquire surface texture"))
                 }
-                _ => return,
+                Err(_) => return,
             };
             let view = output
                 .texture
@@ -144,7 +141,7 @@ pub fn get_or_init_gpu_context(
     }
 
     #[allow(unused_mut)]
-    let mut instance_desc = wgpu::InstanceDescriptor::new_without_display_handle_from_env();
+    let mut instance_desc = wgpu::InstanceDescriptor::from_env_or_default();
 
     #[cfg(target_os = "windows")]
     if std::env::var("WGPU_BACKEND").is_err() {
@@ -159,7 +156,7 @@ pub fn get_or_init_gpu_context(
         let _ = std::fs::write(p, "initializing_gpu");
     }
 
-    let instance = wgpu::Instance::new(instance_desc);
+    let instance = wgpu::Instance::new(&instance_desc);
 
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     let surface_opt = {
@@ -321,7 +318,7 @@ pub fn get_or_init_gpu_context(
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Display Pipeline Layout"),
-            bind_group_layouts: &[Some(&bind_group_layout)],
+            bind_group_layouts: &[&bind_group_layout],
             immediate_size: 0,
         });
 
@@ -595,7 +592,7 @@ impl GpuProcessor {
 
         let blur_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Blur Pipeline Layout"),
-            bind_group_layouts: &[Some(&blur_bgl)],
+            bind_group_layouts: &[&blur_bgl],
             immediate_size: 0,
         });
 
@@ -700,13 +697,13 @@ impl GpuProcessor {
         let flare_threshold_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Flare Threshold Layout"),
-                bind_group_layouts: &[Some(&flare_bgl_0)],
+                bind_group_layouts: &[&flare_bgl_0],
                 immediate_size: 0,
             });
 
         let flare_ghosts_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Flare Ghosts Layout"),
-            bind_group_layouts: &[Some(&flare_bgl_0), Some(&flare_bgl_1)],
+            bind_group_layouts: &[&flare_bgl_0, &flare_bgl_1],
             immediate_size: 0,
         });
 
@@ -899,7 +896,7 @@ impl GpuProcessor {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Pipeline Layout"),
-            bind_group_layouts: &[Some(&main_bgl)],
+            bind_group_layouts: &[&main_bgl],
             immediate_size: 0,
         });
 
@@ -1775,8 +1772,6 @@ fn process_and_get_dynamic_image_inner(
 
     let cache = cache_lock.as_ref().unwrap();
 
-    // The only deciding factor of whether we block and read memory back synchronously
-    // is if we are outputting to display (canvas rendering).
     let skip_readback = output_to_display;
 
     let (processed_pixels, out_w, out_h, out_x, out_y) = processor.run(
@@ -1788,13 +1783,11 @@ fn process_and_get_dynamic_image_inner(
         output_to_display,
     )?;
 
-    // Start consolidated final transfers
     let mut final_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("Final Passes Encoder"),
     });
     let mut submit_final_encoder = false;
 
-    // 1. Queue Async Analytics Buffer Prep
     let mut async_readback_buffer: Option<wgpu::Buffer> = None;
     let mut async_padded_bpr: u32 = 0;
     let mut async_unpadded_bpr: u32 = 0;
@@ -1844,7 +1837,6 @@ fn process_and_get_dynamic_image_inner(
         submit_final_encoder = true;
     }
 
-    // 2. Queue Display Texture Protection (Double Buffering)
     if output_to_display {
         final_encoder.copy_texture_to_texture(
             wgpu::TexelCopyTextureInfo {
@@ -1876,15 +1868,12 @@ fn process_and_get_dynamic_image_inner(
         submit_final_encoder = true;
     }
 
-    // Submit both data transfers concurrently
     if submit_final_encoder {
         queue.submit(Some(final_encoder.finish()));
     }
 
-    // Spawn Async Analytics Execution Thread (Zero Main Thread Blocking)
     if let Some(analytics) = analytics_config {
         if let Some(buffer) = async_readback_buffer {
-            // Strictly type everything to avoid compiler inference issues
             let output_buffer: wgpu::Buffer = buffer;
             let padded_bytes_per_row: u32 = async_padded_bpr;
             let unpadded_bytes_per_row: u32 = async_unpadded_bpr;
@@ -1935,7 +1924,6 @@ fn process_and_get_dynamic_image_inner(
                 }
             });
         } else {
-            // Fallback if we actually processed synchronously (e.g. CPU fallback or Exports)
             let pixels_clone = processed_pixels.clone();
             std::thread::spawn(move || {
                 if let Some(img_buf) =
@@ -1953,7 +1941,6 @@ fn process_and_get_dynamic_image_inner(
         }
     }
 
-    // Refresh display
     if output_to_display
         && let Ok(mut display_lock) = context.display.lock()
         && let Some(display) = display_lock.as_mut()

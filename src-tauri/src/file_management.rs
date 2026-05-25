@@ -1612,21 +1612,17 @@ pub fn resolve_lens_params_in_adjustments(
                         if let Some(fl_str) = exif
                             .get("FocalLength")
                             .or(exif.get("FocalLengthIn35mmFilm"))
-                        {
-                            if let Ok(fl) = fl_str.replace(" mm", "").trim().parse::<f32>() {
+                            && let Ok(fl) = fl_str.replace(" mm", "").trim().parse::<f32>() {
                                 focal_length = fl;
                             }
-                        }
-                        if let Some(ap_str) = exif.get("ApertureValue").or(exif.get("FNumber")) {
-                            if let Ok(ap) = ap_str.replace("f/", "").trim().parse::<f32>() {
+                        if let Some(ap_str) = exif.get("ApertureValue").or(exif.get("FNumber"))
+                            && let Ok(ap) = ap_str.replace("f/", "").trim().parse::<f32>() {
                                 aperture = Some(ap);
                             }
-                        }
-                        if let Some(dist_str) = exif.get("SubjectDistance") {
-                            if let Ok(dist) = dist_str.replace(" m", "").trim().parse::<f32>() {
+                        if let Some(dist_str) = exif.get("SubjectDistance")
+                            && let Ok(dist) = dist_str.replace(" m", "").trim().parse::<f32>() {
                                 distance = Some(dist);
                             }
-                        }
                     }
 
                     if let Some(params) = crate::lens_correction::resolve_lens_params(
