@@ -93,12 +93,12 @@ const ThumbnailComponent = ({
     if (layerToFadeIn) {
       const timer = setTimeout(() => {
         setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
-        onLoad();
+        onLoad(path);
       }, 10);
 
       return () => clearTimeout(timer);
     }
-  }, [layers, onLoad]);
+  }, [layers, onLoad, path]);
 
   const handleTransitionEnd = useCallback((finishedId: string) => {
     setLayers((prev) => {
@@ -431,11 +431,12 @@ const ListItemComponent = ({
     if (layerToFadeIn) {
       const timer = setTimeout(() => {
         setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
-        onLoad();
+        onLoad(path);
       }, 10);
+
       return () => clearTimeout(timer);
     }
-  }, [layers, onLoad]);
+  }, [layers, onLoad, path]);
 
   const handleTransitionEnd = useCallback((finishedId: string) => {
     setLayers((prev) => {
@@ -598,12 +599,12 @@ const RowComponent = ({
   style,
   rows,
   activePath,
-  multiSelectedPaths,
+  multiSelectedSet,
   onContextMenu,
   onImageClick,
   onImageDoubleClick,
   thumbnailAspectRatio,
-  loadedThumbnails,
+  onImageLoad,
   imageRatings,
   baseFolderPath,
   itemWidth,
@@ -701,14 +702,14 @@ const RowComponent = ({
           {isListView ? (
             <ListItem
               isActive={activePath === imageFile.path}
-              isSelected={multiSelectedPaths.includes(imageFile.path)}
+              isSelected={multiSelectedSet.has(imageFile.path)}
               onContextMenu={onContextMenu}
               onImageClick={onImageClick}
               onImageDoubleClick={onImageDoubleClick}
-              onLoad={() => loadedThumbnails.add(imageFile.path)}
+              onLoad={onImageLoad}
               path={imageFile.path}
               rating={imageRatings?.[imageFile.path] || 0}
-              tags={imageFile.tags || []}
+              tags={imageFile.tags}
               exif={imageFile.exif}
               aspectRatio={thumbnailAspectRatio}
               modified={imageFile.modified}
@@ -717,14 +718,14 @@ const RowComponent = ({
           ) : (
             <Thumbnail
               isActive={activePath === imageFile.path}
-              isSelected={multiSelectedPaths.includes(imageFile.path)}
+              isSelected={multiSelectedSet.has(imageFile.path)}
               onContextMenu={onContextMenu}
               onImageClick={onImageClick}
               onImageDoubleClick={onImageDoubleClick}
-              onLoad={() => loadedThumbnails.add(imageFile.path)}
+              onLoad={onImageLoad}
               path={imageFile.path}
               rating={imageRatings?.[imageFile.path] || 0}
-              tags={imageFile.tags || []}
+              tags={imageFile.tags}
               exif={imageFile.exif}
               aspectRatio={thumbnailAspectRatio}
             />
@@ -735,34 +736,4 @@ const RowComponent = ({
   );
 };
 
-function rowAreEqual(prev: any, next: any) {
-  if (
-    prev.index !== next.index ||
-    prev.itemWidth !== next.itemWidth ||
-    prev.isListView !== next.isListView ||
-    prev.columnWidths !== next.columnWidths
-  )
-    return false;
-
-  const prevRow = prev.rows[prev.index];
-  const nextRow = next.rows[next.index];
-
-  if (!prevRow || !nextRow || prevRow.type !== nextRow.type) return false;
-
-  if (prevRow.type === 'images') {
-    if (prevRow.images.length !== nextRow.images.length) return false;
-    for (let i = 0; i < nextRow.images.length; i++) {
-      if (prevRow.images[i] !== nextRow.images[i]) return false;
-      if (prevRow.images[i].path !== nextRow.images[i].path) return false;
-      const path = nextRow.images[i].path;
-      if ((prev.activePath === path) !== (next.activePath === path)) return false;
-      if (prev.multiSelectedPaths.includes(path) !== next.multiSelectedPaths.includes(path)) return false;
-      if (prev.imageRatings?.[path] !== next.imageRatings?.[path]) return false;
-    }
-  } else if (prevRow.type === 'header') {
-    if (prevRow.isExpanded !== nextRow.isExpanded || prevRow.count !== nextRow.count) return false;
-  }
-  return true;
-}
-
-export const Row = React.memo(RowComponent, rowAreEqual);
+export const Row = React.memo(RowComponent);

@@ -1468,6 +1468,23 @@ pub fn update_thumbnail_queue(
 ) -> Result<(), String> {
     let state = app_handle.state::<crate::AppState>();
 
+    let mut queue = state.thumbnail_manager.queue.lock().unwrap();
+
+    if paths.is_empty() {
+        queue.clear();
+        let mut tracker = state.thumbnail_progress.lock().unwrap();
+        tracker.total = 0;
+        tracker.completed = 0;
+        drop(tracker);
+
+        let _ = app_handle.emit(
+            "thumbnail-progress",
+            serde_json::json!({ "current": 0, "total": 0 }),
+        );
+        state.thumbnail_manager.cvar.notify_all();
+        return Ok(());
+    }
+
     let mut unique_paths = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for path in paths {
@@ -1476,21 +1493,21 @@ pub fn update_thumbnail_queue(
         }
     }
 
-    let mut queue = state.thumbnail_manager.queue.lock().unwrap();
-    queue.clear();
+    queue.retain(|p| !seen.contains(p));
 
-    let path_count = unique_paths.len();
+    while queue.len() + unique_paths.len() > 500 {
+        queue.pop_front();
+    }
+
     for path in unique_paths {
         queue.push_back(path);
     }
 
+    let queue_len = queue.len();
+    drop(queue);
+
     let mut tracker = state.thumbnail_progress.lock().unwrap();
-    if path_count == 0 {
-        tracker.total = 0;
-        tracker.completed = 0;
-    } else {
-        tracker.total = tracker.completed + path_count;
-    }
+    tracker.total = tracker.completed + queue_len;
 
     let current = tracker.completed;
     let total = tracker.total;
@@ -1500,6 +1517,7 @@ pub fn update_thumbnail_queue(
         "thumbnail-progress",
         serde_json::json!({ "current": current, "total": total }),
     );
+
     state.thumbnail_manager.cvar.notify_all();
     Ok(())
 }
