@@ -10,8 +10,7 @@ name = "rapidraw_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
-tauri = { version = "2.10", features = [ "macos-private-api", "rustls-tls" ] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls-webpki-roots"] }
+tauri = { version = "2.11", features = [ "macos-private-api", "rustls-tls" ] }
 tauri-plugin-dialog = "2.7.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -20,7 +19,7 @@ base64 = "0.22"
 tauri-plugin-fs = "2.5.1"
 rayon = "1.12.0"
 blake3 = "1.8.5"
-wgpu = "28.0"
+wgpu = "29.0"
 pollster = "0.4"
 bytemuck = { version = "1.25", features = ["derive"] }
 anyhow = "1.0.102"
@@ -70,6 +69,7 @@ imgref = "1.12.1"
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 trash = "5.2.6"
 tauri-plugin-single-instance = "2.4.2"
+reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "rustls"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
@@ -77,6 +77,7 @@ objc = "0.2"
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-context = "0.1"
 jni = "0.21"
+reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "rustls"] }
 include_dir = "0.7.4"
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -84,9 +85,9 @@ gtk = "0.18.2"
 webkit2gtk = "=2.0.2"
 
 [build-dependencies]
-tauri-build = { version = "2.5", features = [] }
+tauri-build = { version = "2.6", features = [] }
 sha2 = "0.11"
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls-webpki-roots"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
 hex = "0.4"
 
 [profile.dev]

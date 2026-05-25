@@ -2055,6 +2055,9 @@ pub fn run() {
 
             let window = window_builder.build().expect("Failed to build window");
 
+            #[cfg(target_os = "android")]
+            android_integration::initialize_android(&window);
+
             #[cfg(not(target_os = "android"))]
             {
                 let app_state = app.state::<AppState>();
