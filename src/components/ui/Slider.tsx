@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GLOBAL_KEYS } from './AppProperties';
 
 type SliderChangeEvent =
@@ -41,6 +42,7 @@ const Slider = ({
   fillOrigin = 'default',
   suffix = '',
 }: SliderProps) => {
+  const { t } = useTranslation();
   const [displayValue, setDisplayValue] = useState<number>(value);
   const [isDragging, setIsDragging] = useState(false);
   const animationFrameRef = useRef<number | undefined>(undefined);
@@ -484,7 +486,7 @@ const Slider = ({
                 isLabelHovered ? 'opacity-100' : 'opacity-0'
               }`}
             >
-              Reset
+              {t('ui.slider.reset')}
             </span>
           )}
         </div>
@@ -507,7 +509,7 @@ const Slider = ({
               className="text-sm text-text-primary w-full text-right select-none cursor-text"
               onClick={handleValueClick}
               onDoubleClick={handleReset}
-              data-tooltip={`Click to edit`}
+              data-tooltip={t('ui.slider.clickToEdit')}
             >
               {decimalPlaces > 0 && numericValue === 0 ? '0' : numericValue.toFixed(decimalPlaces)}
               {suffix && <span className="text-[10px] align-top inline-block mt-0.5 ml-0.5">{suffix}</span>}

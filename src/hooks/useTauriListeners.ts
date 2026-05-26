@@ -211,8 +211,6 @@ export function useTauriListeners({
           useEditorStore.getState().setEditor({ hasRenderedFirstFrame: true });
         }
       }),
-
-      // Panorama
       listen('panorama-progress', (event: any) => {
         if (isEffectActive) {
           useUIStore.getState().setUI((state) => {
@@ -247,8 +245,6 @@ export function useTauriListeners({
           }));
         }
       }),
-
-      // HDR
       listen('hdr-progress', (event: any) => {
         if (isEffectActive) {
           useUIStore.getState().setUI((state) => ({
@@ -288,8 +284,6 @@ export function useTauriListeners({
           }));
         }
       }),
-
-      // Culling
       listen('culling-start', (event: any) => {
         if (isEffectActive) {
           useUIStore.getState().setUI((state) => ({

@@ -3,6 +3,7 @@ import { Image as ImageIcon, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { Grid, useGridCallbackRef } from 'react-window';
+import { useTranslation } from 'react-i18next';
 import { ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
 import { Color, COLOR_LABELS } from '../../utils/adjustments';
 import Text from '../ui/Text';
@@ -55,6 +56,7 @@ const FilmstripThumbnail = memo(
     index: number;
     setRatio: (index: number, ratio: number) => void;
   }) => {
+    const { t } = useTranslation();
     const thumbData = useProcessStore((s) => s.thumbnails[imageFile.path]);
 
     const [layers, setLayers] = useState<ImageLayer[]>(() => {
@@ -213,7 +215,7 @@ const FilmstripThumbnail = memo(
                 <div
                   className="w-3 h-3 rounded-full ring-1 ring-black/20 pointer-events-auto"
                   style={{ backgroundColor: colorLabel.color }}
-                  data-tooltip={`Color: ${colorLabel.name}`}
+                  data-tooltip={t('ui.filmstrip.tooltips.color', { color: colorLabel.name })}
                 />
               )}
               {rating > 0 && (
@@ -236,9 +238,9 @@ const FilmstripThumbnail = memo(
                 color={TextColors.white}
                 weight={TextWeights.bold}
                 className="shadow-md text-[10px] px-1 py-0.5 rounded-full backdrop-blur-xs"
-                data-tooltip="Virtual Copy"
+                data-tooltip={t('ui.filmstrip.tooltips.virtualCopy')}
               >
-                VC
+                {t('ui.filmstrip.virtualCopyAbbreviation')}
               </Text>
             </div>
           </>

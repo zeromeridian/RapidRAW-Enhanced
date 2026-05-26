@@ -214,7 +214,6 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
           return tagsMatch && textMatch;
         });
 
-  // Sorting
   const list = [...filteredBySearch];
 
   list.sort((a, b) => {

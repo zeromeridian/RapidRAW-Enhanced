@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { List, useListCallbackRef } from 'react-window';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import debounce from 'lodash.debounce';
+import { useTranslation } from 'react-i18next';
 import { Row } from './LibraryItems';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { LibraryViewMode, SortDirection, ThumbnailSize } from '../../ui/AppProperties';
@@ -12,6 +13,7 @@ import { ExifOverlay } from '../../ui/AppProperties';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 
 function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: any) {
+  const { t } = useTranslation();
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
   const showExifCols = exifOverlay !== ExifOverlay.Off;
   const totalRawWidth =
@@ -103,19 +105,24 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
   return (
     <div className="flex items-center w-full h-9 bg-bg-secondary/80 backdrop-blur-sm border-b border-border-color/50 shrink-0">
       <Column title="" widthKey="thumbnail" nextKey="name" />
-      <Column title="Name" widthKey="name" nextKey="date" sortKey="name" />
-      <Column title="Modified" widthKey="date" nextKey="rating" sortKey="date" />
-      <Column title="Rating" widthKey="rating" nextKey="color" sortKey="rating" />
+      <Column title={t('library.grid.columns.name')} widthKey="name" nextKey="date" sortKey="name" />
+      <Column title={t('library.grid.columns.modified')} widthKey="date" nextKey="rating" sortKey="date" />
+      <Column title={t('library.grid.columns.rating')} widthKey="rating" nextKey="color" sortKey="rating" />
       {showExifCols ? (
         <>
-          <Column title="Label" widthKey="color" nextKey="shutter" />
-          <Column title="Shutter" widthKey="shutter" nextKey="aperture" sortKey="shutter_speed" />
-          <Column title="Aperture" widthKey="aperture" nextKey="iso" sortKey="aperture" />
-          <Column title="ISO" widthKey="iso" nextKey="focal" sortKey="iso" />
-          <Column title="Focal" widthKey="focal" sortKey="focal_length" />
+          <Column title={t('library.grid.columns.label')} widthKey="color" nextKey="shutter" />
+          <Column
+            title={t('library.grid.columns.shutter')}
+            widthKey="shutter"
+            nextKey="aperture"
+            sortKey="shutter_speed"
+          />
+          <Column title={t('library.grid.columns.aperture')} widthKey="aperture" nextKey="iso" sortKey="aperture" />
+          <Column title={t('library.grid.columns.iso')} widthKey="iso" nextKey="focal" sortKey="iso" />
+          <Column title={t('library.grid.columns.focal')} widthKey="focal" sortKey="focal_length" />
         </>
       ) : (
-        <Column title="Label" widthKey="color" />
+        <Column title={t('library.grid.columns.label')} widthKey="color" />
       )}
     </div>
   );
@@ -165,7 +172,6 @@ export default function LibraryGrid(props: any) {
     thumbnailSizeOptions,
     onThumbnailSizeChange,
   } = props;
-
   const { listColumnWidths, setLibrary, sortCriteria, setSortCriteria } = useLibraryStore();
   const [gridSize, setGridSize] = useState({ height: 0, width: 0 });
   const [listHandle, setListHandle] = useListCallbackRef();

@@ -202,6 +202,7 @@ export interface AppSettings {
   openTreeSections?: string[];
   folderIcons?: Record<string, string>;
   exifOverlay?: ExifOverlay;
+  language?: string;
 }
 
 export interface BrushSettings {

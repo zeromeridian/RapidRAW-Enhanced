@@ -11,6 +11,7 @@ import {
   ChevronDown,
   HelpCircle,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import {
@@ -77,6 +78,7 @@ function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName =
 }
 
 export function SearchInput({ indexingProgress, isIndexing }: any) {
+  const { t } = useTranslation();
   const { searchCriteria, setSearchCriteria } = useLibraryStore(
     useShallow((state) => ({ searchCriteria: state.searchCriteria, setSearchCriteria: state.setSearchCriteria })),
   );
@@ -163,12 +165,15 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
   const isActive = isSearchActive || tags.length > 0 || !!text;
   const placeholderText =
     isIndexing && indexingProgress.total > 0
-      ? `Indexing... (${indexingProgress.current}/${indexingProgress.total})`
+      ? t('library.header.search.indexingProgress', {
+          current: indexingProgress.current,
+          total: indexingProgress.total,
+        })
       : isIndexing
-        ? 'Indexing Images...'
+        ? t('library.header.search.indexingImages')
         : tags.length > 0
-          ? 'Add filter or search...'
-          : 'Search or add query';
+          ? t('library.header.search.addFilterOrSearch')
+          : t('library.header.search.searchOrQuery');
 
   const INACTIVE_WIDTH = 48;
   const PADDING_AND_ICONS_WIDTH = 100;
@@ -191,7 +196,7 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
           if (!isActive) setIsSearchActive(true);
           inputRef.current?.focus();
         }}
-        data-tooltip="Search or Filter"
+        data-tooltip={t('library.header.search.tooltipSearchFilter')}
       >
         <Search className="w-4 h-4" />
       </button>
@@ -259,7 +264,7 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
             onMouseDown={(e) => e.preventDefault()}
             onClick={toggleMode}
             className="p-1.5 rounded-md hover:bg-bg-primary w-10 shrink-0 flex items-center justify-center outline-hidden"
-            data-tooltip={`Match ${mode === 'AND' ? 'ALL' : 'ANY'} tags`}
+            data-tooltip={mode === 'AND' ? t('library.header.search.matchAll') : t('library.header.search.matchAny')}
           >
             <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.semibold}>
               {mode}
@@ -268,7 +273,7 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
         )}
         <div
           className="p-1.5 rounded-md text-text-secondary hover:text-text-primary transition-colors cursor-help shrink-0 outline-hidden"
-          data-tooltip="Advanced Queries: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony"
+          data-tooltip={t('library.header.search.tooltipAdvancedQueries')}
         >
           <HelpCircle size={16} />
         </div>
@@ -277,7 +282,7 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
             onMouseDown={(e) => e.preventDefault()}
             onClick={clearSearch}
             className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-primary shrink-0 outline-hidden"
-            data-tooltip="Clear search"
+            data-tooltip={t('library.header.search.tooltipClearSearch')}
           >
             <X className="h-5 w-5" />
           </button>
@@ -305,6 +310,7 @@ export function ViewOptionsDropdown({
   rawStatusOptions,
   sortOptions,
 }: any) {
+  const { t } = useTranslation();
   const { filterCriteria, setFilterCriteria, sortCriteria, setSortCriteria } = useLibraryStore(
     useShallow((state) => ({
       filterCriteria: state.filterCriteria,
@@ -328,6 +334,15 @@ export function ViewOptionsDropdown({
 
   const [lastClickedColor, setLastClickedColor] = useState<string | null>(null);
   const allColors = useMemo(() => [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }], []);
+
+  const metadataOptions = useMemo(
+    () => [
+      { id: ExifOverlay.Off, label: t('library.header.viewOptions.metadataOff') },
+      { id: ExifOverlay.Hover, label: t('library.header.viewOptions.metadataHover') },
+      { id: ExifOverlay.Always, label: t('library.header.viewOptions.metadataAlways') },
+    ],
+    [t],
+  );
 
   const handleColorClick = (colorName: string, event: any) => {
     const { ctrlKey, metaKey, shiftKey } = event;
@@ -365,14 +380,14 @@ export function ViewOptionsDropdown({
           {isFilterActive && <div className="absolute -top-1 -right-1 bg-accent rounded-full w-3 h-3" />}
         </>
       }
-      buttonTitle="View Options"
+      buttonTitle={t('library.header.viewOptions.title')}
       contentClassName="library-view-options-menu w-[720px]"
     >
       <div className="library-view-options-content flex">
         <div className="library-view-options-section w-1/4 p-2 border-r border-border-color">
           <>
             <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
-              Thumbnail Size
+              {t('library.header.viewOptions.thumbnailSize')}
             </Text>
             {thumbnailSizeOptions.map((option: any) => {
               const isSelected = thumbnailSize === option.id;
@@ -401,7 +416,7 @@ export function ViewOptionsDropdown({
           <div className="pt-2">
             <>
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
-                Thumbnail Fit
+                {t('library.header.viewOptions.thumbnailFit')}
               </Text>
               {thumbnailAspectRatioOptions.map((option: any) => {
                 const isSelected = thumbnailAspectRatio === option.id;
@@ -431,7 +446,7 @@ export function ViewOptionsDropdown({
           <div className="pt-2">
             <>
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
-                Display Mode
+                {t('library.header.viewOptions.displayMode')}
               </Text>
               <button
                 className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
@@ -445,7 +460,7 @@ export function ViewOptionsDropdown({
                   color={TextColors.primary}
                   weight={libraryViewMode === LibraryViewMode.Flat ? TextWeights.semibold : TextWeights.normal}
                 >
-                  Current Folder
+                  {t('library.header.viewOptions.currentFolder')}
                 </Text>
                 {libraryViewMode === LibraryViewMode.Flat && (
                   <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />
@@ -463,7 +478,7 @@ export function ViewOptionsDropdown({
                   color={TextColors.primary}
                   weight={libraryViewMode === LibraryViewMode.Recursive ? TextWeights.semibold : TextWeights.normal}
                 >
-                  Recursive
+                  {t('library.header.viewOptions.recursive')}
                 </Text>
                 {libraryViewMode === LibraryViewMode.Recursive && (
                   <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />
@@ -474,13 +489,9 @@ export function ViewOptionsDropdown({
 
           <div className="pt-2">
             <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
-              Show Metadata
+              {t('library.header.viewOptions.showMetadata')}
             </Text>
-            {[
-              { id: ExifOverlay.Off, label: 'Off' },
-              { id: ExifOverlay.Hover, label: 'On Hover' },
-              { id: ExifOverlay.Always, label: 'Always' },
-            ].map((option) => {
+            {metadataOptions.map((option) => {
               const isSelected = (appSettings?.exifOverlay || ExifOverlay.Off) === option.id;
               return (
                 <button
@@ -508,7 +519,7 @@ export function ViewOptionsDropdown({
           <div className="space-y-4">
             <div>
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
-                Filter by Rating
+                {t('library.header.viewOptions.filterByRating')}
               </Text>
               {ratingFilterOptions.map((option: any) => {
                 const isSelected = filterCriteria.rating === option.value;
@@ -541,7 +552,7 @@ export function ViewOptionsDropdown({
 
             <div>
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
-                Filter by File Type
+                {t('library.header.viewOptions.filterByFileType')}
               </Text>
               {rawStatusOptions.map((option: any) => {
                 const isSelected = (filterCriteria.rawStatus || RawStatus.All) === option.key;
@@ -574,13 +585,15 @@ export function ViewOptionsDropdown({
 
           <div>
             <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
-              Filter by Color Label
+              {t('library.header.viewOptions.filterByColorLabel')}
             </Text>
             <div className="flex flex-wrap gap-3 px-3 py-2">
               {allColors.map((color: Color) => {
                 const isSelected = (filterCriteria.colors || []).includes(color.name);
                 const title =
-                  color.name === 'none' ? 'No Label' : color.name.charAt(0).toUpperCase() + color.name.slice(1);
+                  color.name === 'none'
+                    ? t('library.header.viewOptions.noLabel')
+                    : color.name.charAt(0).toUpperCase() + color.name.slice(1);
                 return (
                   <button
                     key={color.name}
@@ -608,7 +621,7 @@ export function ViewOptionsDropdown({
           <>
             <div className="px-3 py-2 relative flex items-center">
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="uppercase">
-                Sort by
+                {t('library.header.viewOptions.sortBy')}
               </Text>
               <button
                 onClick={() =>
@@ -617,7 +630,11 @@ export function ViewOptionsDropdown({
                     order: prev.order === SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending,
                   }))
                 }
-                data-tooltip={`Sort ${sortCriteria.order === SortDirection.Ascending ? 'Descending' : 'Ascending'}`}
+                data-tooltip={
+                  sortCriteria.order === SortDirection.Ascending
+                    ? t('library.header.viewOptions.sortDescending')
+                    : t('library.header.viewOptions.sortAscending')
+                }
                 className="absolute top-1/2 right-3 -translate-y-1/2 p-1 bg-transparent border-none text-text-secondary hover:text-text-primary focus:outline-hidden focus:ring-1 focus:ring-accent rounded-sm"
               >
                 {sortCriteria.order === SortDirection.Ascending ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -636,7 +653,7 @@ export function ViewOptionsDropdown({
                   }
                   role="menuitem"
                   disabled={option.disabled}
-                  data-tooltip={option.disabled ? 'Enable EXIF Reading in Settings to use this option.' : undefined}
+                  data-tooltip={option.disabled ? t('library.header.viewOptions.exifDisabledTooltip') : undefined}
                 >
                   <Text
                     variant={TextVariants.label}

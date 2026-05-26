@@ -16,6 +16,7 @@ import {
   ThumbnailSize,
   ThumbnailAspectRatio,
 } from '../components/ui/AppProperties';
+import i18n from '../i18n';
 
 interface UseAppInitializationProps {
   preloadedDataRef: React.RefObject<any>;
@@ -122,6 +123,10 @@ export const useAppInitialization = ({
           settings.copyPasteSettings = { mode: 'merge', includedAdjustments: COPYABLE_ADJUSTMENT_KEYS };
         }
         setAppSettings(settings);
+
+        if (settings?.language) {
+          i18n.changeLanguage(settings.language);
+        }
 
         if (settings?.sortCriteria) setSortCriteria(settings.sortCriteria);
 
@@ -265,6 +270,13 @@ export const useAppInitialization = ({
       handleSettingsChange({ ...appSettings, filterCriteria });
     }
   }, [filterCriteria, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (isInitialMount.current || !appSettings) return;
+    if (appSettings.language && appSettings.language !== i18n.language) {
+      i18n.changeLanguage(appSettings.language);
+    }
+  }, [appSettings?.language]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;

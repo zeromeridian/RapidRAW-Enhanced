@@ -1888,13 +1888,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   );
 
   if (!selectedImage) {
-    return (
-      <div className="flex-1 bg-bg-secondary rounded-lg flex items-center justify-center">
-        <Text variant={TextVariants.heading} color={TextColors.secondary} weight={TextWeights.normal}>
-          Select an image from the library to begin editing.
-        </Text>
-      </div>
-    );
+    return null;
   }
 
   const isZoomActionActive = !isCropping && !isMasking && !isAiEditing && !isWbPickerActive;
