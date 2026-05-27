@@ -593,7 +593,9 @@ export function ViewOptionsDropdown({
                 const title =
                   color.name === 'none'
                     ? t('library.header.viewOptions.noLabel')
-                    : color.name.charAt(0).toUpperCase() + color.name.slice(1);
+                    : t(`contextMenus.colors.${color.name}`, {
+                        defaultValue: color.name.charAt(0).toUpperCase() + color.name.slice(1),
+                      });
                 return (
                   <button
                     key={color.name}

@@ -164,7 +164,7 @@ const KeybindRow = ({
     };
     window.addEventListener('keydown', handler, { capture: true });
     return () => window.removeEventListener('keydown', handler, { capture: true });
-  }, [recording, def.action, onSave, onStartRecording, osPlatform]);
+  }, [recording, def.action, onSave, onStartRecording]);
 
   const displayCombo = currentCombo !== undefined ? (currentCombo.length ? currentCombo : null) : def.defaultCombo;
 
@@ -547,7 +547,9 @@ export default function SettingsPanel({
   });
   const [restartRequired, setRestartRequired] = useState(false);
   const [activeCategory, setActiveCategory] = useState('general');
-  const [logPath, setLogPath] = useState('');
+  const [logPath, setLogPath] = useState<string | null>(null);
+  const [logPathLoading, setLogPathLoading] = useState(true);
+  const [logPathError, setLogPathError] = useState(false);
   const [dpr, setDpr] = useState(() => (typeof window !== 'undefined' ? window.devicePixelRatio : 1));
 
   const settingCategories = useMemo(
@@ -660,15 +662,13 @@ export default function SettingsPanel({
         setLogPath(path);
       } catch (error) {
         console.error('Failed to get log file path:', error);
-        setLogPath(t('settings.data.loading'));
+        setLogPathError(true);
+      } finally {
+        setLogPathLoading(false);
       }
     };
     fetchLogPath();
-
-    invoke('get_lensfun_makers')
-      .then((m: any) => setLensMakers(m))
-      .catch(console.error);
-  }, [t]);
+  }, []);
 
   const handleProcessingSettingChange = async (key: string, value: any) => {
     setProcessingSettings((prev) => ({ ...prev, [key]: value }));
@@ -1960,9 +1960,7 @@ export default function SettingsPanel({
                         min={0}
                         max={1.0}
                         step={0.05}
-                        value={
-                          processingSettings.rawPreprocessingTextSharp ?? processingSettings.rawPreprocessingSharpening
-                        }
+                        value={processingSettings.rawPreprocessingSharpening}
                         defaultValue={0.35}
                         onChange={(e: any) =>
                           handleProcessingSettingChange('rawPreprocessingSharpening', parseFloat(e.target.value))
@@ -2273,7 +2271,7 @@ export default function SettingsPanel({
 
                     <DataActionItem
                       buttonAction={async () => {
-                        if (logPath && logPath !== t('settings.data.loading')) {
+                        if (logPath && !logPathLoading && !logPathError) {
                           await invoke(Invokes.ShowInFinder, { path: logPath });
                         }
                       }}
@@ -2282,11 +2280,15 @@ export default function SettingsPanel({
                         <Text as="span" variant={TextVariants.small}>
                           {t('settings.data.logsDesc')}
                           <span className="block font-mono bg-bg-primary p-2 rounded-sm mt-2 break-all border border-border-color">
-                            {logPath || t('settings.data.loading')}
+                            {logPathLoading
+                              ? t('settings.data.loading')
+                              : logPathError
+                                ? t('settings.data.statuses.failedToGetPath')
+                                : logPath}
                           </span>
                         </Text>
                       }
-                      disabled={!logPath || logPath === t('settings.data.loading')}
+                      disabled={logPathLoading || logPathError || !logPath}
                       icon={<ExternalLinkIcon size={16} className="mr-2" />}
                       isProcessing={false}
                       message=""

@@ -568,8 +568,10 @@ const ListItemComponent = ({
               className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-black/20"
               style={{ backgroundColor: colorLabel.color }}
             />
-            <Text variant={TextVariants.small} color={TextColors.secondary} className="capitalize truncate">
-              {colorLabel.name}
+            <Text variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+              {t(`contextMenus.colors.${colorLabel.name}`, {
+                defaultValue: colorLabel.name.charAt(0).toUpperCase() + colorLabel.name.slice(1),
+              })}
             </Text>
           </div>
         )}
