@@ -10,8 +10,4 @@ export default defineConfig({
     sort: true,
     defaultValue: '',
   },
-  types: {
-    input: ['src/i18n/locales/en.json'],
-    output: 'src/@types/i18next.d.ts',
-  },
 });
