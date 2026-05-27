@@ -28,6 +28,18 @@ interface UseAppInitializationProps {
   setLibraryViewMode: (mode: LibraryViewMode) => void;
 }
 
+const getDefaultLanguage = (i18nInstance: any): string => {
+  const browserLang = navigator.language || (navigator as any).userLanguage || 'en';
+  const shortLang = browserLang.split('-')[0].toLowerCase();
+  const supportedLanguages = Object.keys(i18nInstance.options.resources || {});
+  const fallbackLang =
+    typeof i18nInstance.options.fallbackLng === 'string'
+      ? i18nInstance.options.fallbackLng
+      : i18nInstance.options.fallbackLng?.[0] || 'en';
+
+  return supportedLanguages.includes(shortLang) ? shortLang : fallbackLang;
+};
+
 export const useAppInitialization = ({
   preloadedDataRef,
   thumbnailSize,
@@ -123,11 +135,14 @@ export const useAppInitialization = ({
         ) {
           settings.copyPasteSettings = { mode: 'merge', includedAdjustments: COPYABLE_ADJUSTMENT_KEYS };
         }
-        setAppSettings(settings);
 
-        if (settings?.language) {
-          i18n.changeLanguage(settings.language);
+        if (!settings.language) {
+          settings.language = getDefaultLanguage(i18n);
+          handleSettingsChange(settings);
         }
+
+        setAppSettings(settings);
+        i18n.changeLanguage(settings.language);
 
         if (settings?.sortCriteria) setSortCriteria(settings.sortCriteria);
 
