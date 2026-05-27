@@ -938,6 +938,132 @@
       "others": "Others"
     }
   },
+  "adjustments": {
+    "basic": {
+      "toneMapper": "Tone Mapper",
+      "reset": "Reset",
+      "evShift": "EV Shift",
+      "exposure": "Exposure",
+      "contrast": "Contrast",
+      "highlights": "Highlights",
+      "shadows": "Shadows",
+      "whites": "Whites",
+      "blacks": "Blacks",
+      "mappers": {
+        "basic": "Basic",
+        "basicDesc": "Standard Tonemapping",
+        "agx": "AgX",
+        "agxDesc": "Film-like Tonemapping"
+      }
+    },
+    "color": {
+      "whiteBalance": "White Balance",
+      "wbPickerWgpuDisabled": "WB Picker: Disable WGPU in Settings.",
+      "wbPickerTooltip": "White Balance Picker",
+      "temperature": "Temperature",
+      "tint": "Tint",
+      "presence": "Presence",
+      "vibrance": "Vibrance",
+      "saturation": "Saturation",
+      "colorGrading": "Color Grading",
+      "colorMixer": "Color Mixer",
+      "hue": "Hue",
+      "luminance": "Luminance",
+      "toggleSliders": "Toggle Sliders",
+      "grading": {
+        "midtones": "Midtones",
+        "shadows": "Shadows",
+        "highlights": "Highlights",
+        "global": "Global",
+        "blending": "Blending",
+        "balance": "Balance"
+      },
+      "calibration": {
+        "title": "Color Calibration",
+        "shadows": "Shadows",
+        "primaries": "Primaries",
+        "tint": "Tint",
+        "hue": "Hue",
+        "saturation": "Saturation",
+        "colors": {
+          "red": "Red",
+          "green": "Green",
+          "blue": "Blue"
+        }
+      },
+      "mixerColors": {
+        "reds": "Reds",
+        "oranges": "Oranges",
+        "yellows": "Yellows",
+        "greens": "Greens",
+        "aquas": "Aquas",
+        "blues": "Blues",
+        "purples": "Purples",
+        "magentas": "Magentas"
+      },
+      "ariaSelectColor": "Select {{name}} color"
+    },
+    "curves": {
+      "pointCurve": "Point Curve",
+      "parametricCurve": "Parametric Curve",
+      "curveDataUnavailable": "Curve data not available.",
+      "channelTitle": "{{channel}} Channel",
+      "copyParametric": "Copy {{channel}} Parametric Curve",
+      "pasteParametric": "Paste Parametric Curve",
+      "resetParametric": "Reset {{channel}} Parametric Curve",
+      "resetAllParametric": "Reset All Parametric Curves",
+      "copyPoint": "Copy {{channel}} Point Curve",
+      "pastePoint": "Paste Point Curve",
+      "pasteFromParametric": "Paste from Parametric Curve",
+      "resetPoint": "Reset {{channel}} Point Curve",
+      "resetAllPoint": "Reset All Point Curves",
+      "channels": {
+        "luma": "Luma",
+        "red": "Red",
+        "green": "Green",
+        "blue": "Blue"
+      },
+      "params": {
+        "whiteLevel": "White Level",
+        "highlights": "Highlights",
+        "lights": "Lights",
+        "darks": "Darks",
+        "shadows": "Shadows",
+        "blackLevel": "Black Level"
+      }
+    },
+    "details": {
+      "sharpening": "Sharpening",
+      "sharpness": "Sharpness",
+      "threshold": "Threshold",
+      "presence": "Presence",
+      "clarity": "Clarity",
+      "dehaze": "Dehaze",
+      "structure": "Structure",
+      "centre": "Centré",
+      "noiseReduction": "Noise Reduction",
+      "luminance": "Luminance",
+      "color": "Color",
+      "chromaticAberration": "Chromatic Aberration",
+      "redCyan": "Red/Cyan",
+      "blueYellow": "Blue/Yellow"
+    },
+    "effects": {
+      "creative": "Creative",
+      "glow": "Glow",
+      "halation": "Halation",
+      "lightFlares": "Light Flares",
+      "lut": "LUT",
+      "vignette": "Vignette",
+      "amount": "Amount",
+      "midpoint": "Midpoint",
+      "roundness": "Roundness",
+      "feather": "Feather",
+      "grain": "Grain",
+      "size": "Size",
+      "roughness": "Roughness"
+    }
+  },
   "export": {
     "title": "Export",
     "sections": {
@@ -1224,7 +1350,29 @@
       "selectAll": "Select All",
       "selectNone": "Select None",
       "cancel": "Cancel",
-      "save": "Save"
+      "save": "Save",
+      "groups": {
+        "exposureToneMapper": "Exposure & Tone Mapper",
+        "tone": "Tone",
+        "curves": "Curves",
+        "whiteBalance": "White Balance",
+        "presence": "Presence",
+        "colorGrading": "Color Grading",
+        "colorMixer": "Color Mixer",
+        "colorCalibration": "Color Calibration",
+        "clarityDehaze": "Clarity & Dehaze",
+        "sharpness": "Sharpness",
+        "noiseReduction": "Noise Reduction",
+        "chromaticAberration": "Chromatic Aberration",
+        "vignette": "Vignette",
+        "grain": "Grain",
+        "halationGlow": "Halation & Glow",
+        "lut": "LUT",
+        "cropAspectRatio": "Crop & Aspect Ratio",
+        "transformRotation": "Transform & Rotation",
+        "lensCorrection": "Lens Correction",
+        "masks": "Masks"
+      }
     },
     "createFolder": {
       "title": "Create New Folder",
