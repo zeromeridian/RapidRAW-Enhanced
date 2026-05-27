@@ -1,0 +1,4984 @@
+diff --git a/.github/workflows/lint.yml b/.github/workflows/lint.yml
+index d829ecf4..dea8e99d 100644
+--- a/.github/workflows/lint.yml
++++ b/.github/workflows/lint.yml
+@@ -7,6 +7,32 @@ on:
+   pull_request:
+ 
+ jobs:
++  frontend-lint:
++    name: Frontend Lint & Format
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++
++      - uses: actions/setup-node@v4
++        with:
++          node-version: '20'
++          cache: 'npm'
++
++      - name: Install dependencies
++        run: npm ci
++
++      - name: Check Formatting
++        run: npm run format:check
++        continue-on-error: true
++
++      - name: Run ESLint
++        run: npm run lint
++        continue-on-error: true
++
++      - name: Check Translation Sync
++        run: npm run i18n:check
++        continue-on-error: true
++
+   fmt:
+     name: cargo fmt
+     runs-on: ubuntu-latest
+diff --git a/eslint.config.js b/eslint.config.js
+index e74cd8b2..32acc076 100644
+--- a/eslint.config.js
++++ b/eslint.config.js
+@@ -1,8 +1,7 @@
+ const js = require('@eslint/js');
+ const tseslint = require('typescript-eslint');
+ const react = require('eslint-plugin-react');
+-// const prettier = require('eslint-plugin-prettier');
+-// const prettierConfig = require('eslint-config-prettier');
++const i18next = require('eslint-plugin-i18next');
+ 
+ const tsFiles = ['**/*.{ts,tsx}'];
+ 
+@@ -32,6 +31,7 @@ module.exports = [
+     files: tsFiles,
+     plugins: {
+       react,
++      i18next,
+     },
+     languageOptions: {
+       ecmaVersion: 'latest',
+@@ -53,10 +53,31 @@ module.exports = [
+         'warn',
+         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+       ],
+-      // '@typescript-eslint/no-explicit-any': 'off',
+-      // '@typescript-eslint/explicit-function-return-type': 'off',
+-      // 'prettier/prettier': 'error',
++      'i18next/no-literal-string': [
++        'warn',
++        {
++          markupOnly: true,
++          ignoreAttribute: [
++            'className',
++            'style',
++            'data-tooltip',
++            'variant',
++            'size',
++            'color',
++            'weight',
++            'fillOrigin',
++            'id',
++            'name',
++            'type',
++            'value',
++            'label',
++            'placeholder',
++            'stroke',
++            'fill',
++            'viewBox',
++          ],
++        },
++      ],
+     },
+   },
+-  // prettierConfig,
+ ];
+diff --git a/package-lock.json b/package-lock.json
+index d1b1cf5e..de0828ed 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -46,8 +46,10 @@
+         "esbuild": "^0.28.0",
+         "eslint": "^9.39.2",
+         "eslint-config-prettier": "^10.1.8",
++        "eslint-plugin-i18next": "^6.1.4",
+         "eslint-plugin-prettier": "^5.5.5",
+         "eslint-plugin-react": "^7.37.5",
++        "i18next-cli": "^1.58.0",
+         "prettier": "^3.8.3",
+         "tailwindcss": "^4.3.0",
+         "typescript": "^6.0.0",
+@@ -110,6 +112,23 @@
+         }
+       }
+     },
++    "node_modules/@croct/json": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/@croct/json/-/json-2.1.0.tgz",
++      "integrity": "sha512-UrWfjNQVlBxN+OVcFwHmkjARMW55MBN04E9KfGac8ac8z1QnFVuiOOFtMWXCk3UwsyRqhsNaFoYLZC+xxqsVjQ==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/@croct/json5-parser": {
++      "version": "0.2.2",
++      "resolved": "https://registry.npmjs.org/@croct/json5-parser/-/json5-parser-0.2.2.tgz",
++      "integrity": "sha512-0NJMLrbeLbQ0eCVj3UoH/kG2QckUgOASfwmfDTjyW1xAYPyTNJXcWVT/dssJdTJd0pRchW+qF0VFWQHcxs1OVw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@croct/json": "^2.1.0"
++      }
++    },
+     "node_modules/@dnd-kit/accessibility": {
+       "version": "3.1.1",
+       "resolved": "https://registry.npmjs.org/@dnd-kit/accessibility/-/accessibility-3.1.1.tgz",
+@@ -835,6 +854,360 @@
+         "url": "https://github.com/sponsors/nzakas"
+       }
+     },
++    "node_modules/@inquirer/ansi": {
++      "version": "2.0.6",
++      "resolved": "https://registry.npmjs.org/@inquirer/ansi/-/ansi-2.0.6.tgz",
++      "integrity": "sha512-I/INw4sHGlVZ/afZOckpLiDP9SmbMl1g/GCqeHjLw1Afw/0PlRs2tRFgTGWmdI0hoNuWZn3y2iHNmG1vyECyQQ==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      }
++    },
++    "node_modules/@inquirer/checkbox": {
++      "version": "5.2.0",
++      "resolved": "https://registry.npmjs.org/@inquirer/checkbox/-/checkbox-5.2.0.tgz",
++      "integrity": "sha512-1HJt+3fqxblp/GQjdntSyoSHYBc0e3CzXVgjFpKA6qFLd9FHBBqwN8Co0xYH6t2JVUZrtFwZ4bBiwptkiLxyOg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@inquirer/ansi": "^2.0.6",
++        "@inquirer/core": "^11.2.0",
++        "@inquirer/figures": "^2.0.6",
++        "@inquirer/type": "^4.0.6"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@inquirer/confirm": {
++      "version": "6.1.0",
++      "resolved": "https://registry.npmjs.org/@inquirer/confirm/-/confirm-6.1.0.tgz",
++      "integrity": "sha512-USpeB76eqK7yGricDlGAupxWlp4a59qpeZOoNWaxO/nJln7agpJveyNkQ1d5u8YXG6TOqxZtQpKPORQQDrdVsA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@inquirer/core": "^11.2.0",
++        "@inquirer/type": "^4.0.6"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@inquirer/core": {
++      "version": "11.2.0",
++      "resolved": "https://registry.npmjs.org/@inquirer/core/-/core-11.2.0.tgz",
++      "integrity": "sha512-joR1YS2sI0us+9d0I8ViqFbrRLONO8CFTuyvBX4ZVBSch+VsZiugUABdrhBXXJR1VyEzvpz5SQCix3keETQ58g==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@inquirer/ansi": "^2.0.6",
++        "@inquirer/figures": "^2.0.6",
++        "@inquirer/type": "^4.0.6",
++        "cli-width": "^4.1.0",
++        "fast-wrap-ansi": "^0.2.0",
++        "mute-stream": "^4.0.0",
++        "signal-exit": "^4.1.0"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@inquirer/core/node_modules/mute-stream": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/mute-stream/-/mute-stream-4.0.0.tgz",
++      "integrity": "sha512-gSrprq0fJ3EiOErzjdIZrjysVVmJ4uu1QWfCDss5LypA5OXvrMje5Ym5z6V6RLyJ2eF87lasX7t6a0AnFvZblg==",
++      "dev": true,
++      "license": "ISC",
++      "engines": {
++        "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
++      }
++    },
++    "node_modules/@inquirer/editor": {
++      "version": "5.2.0",
++      "resolved": "https://registry.npmjs.org/@inquirer/editor/-/editor-5.2.0.tgz",
++      "integrity": "sha512-/m+sgRmzSdK6HDtVnl3PmI6MnZC4O+LLezedoJcrX7mINhTjjb0hlC7aEDGZXkFTB4b5uQ0q59AhYTah88KbNg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@inquirer/core": "^11.2.0",
++        "@inquirer/external-editor": "^3.0.1",
++        "@inquirer/type": "^4.0.6"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@inquirer/expand": {
++      "version": "5.1.0",
++      "resolved": "https://registry.npmjs.org/@inquirer/expand/-/expand-5.1.0.tgz",
++      "integrity": "sha512-fR7g4BVnIcs+4NApF6C5byflNM/EULxSxsv/2Jvg+gmop0R6eBIPvZqE6RYnTy1tQTFnf9wyHkwNoQSZbofaGA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@inquirer/core": "^11.2.0",
++        "@inquirer/type": "^4.0.6"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@inquirer/external-editor": {
++      "version": "3.0.1",
++      "resolved": "https://registry.npmjs.org/@inquirer/external-editor/-/external-editor-3.0.1.tgz",
++      "integrity": "sha512-tam+Gwjsxg2sx3iUVPkAnhKT/yrk2rd2NAa7XJU/J8OYpU0ifXsnp12xlvzp/DCpWBXVv+vLQsqnpAWwUcWD5Q==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "chardet": "^2.1.1",
++        "iconv-lite": "^0.7.2"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@inquirer/figures": {
++      "version": "2.0.6",
++      "resolved": "https://registry.npmjs.org/@inquirer/figures/-/figures-2.0.6.tgz",
++      "integrity": "sha512-dsZgQtH2t5Q6ah3aPbZbeEZAxsD9qQu0DXf01AltuEfRTm+NoLN6+rLVbr+4edeEbNCp/wBNM6mALRWtsQpfkw==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      }
++    },
++    "node_modules/@inquirer/input": {
++      "version": "5.1.0",
++      "resolved": "https://registry.npmjs.org/@inquirer/input/-/input-5.1.0.tgz",
++      "integrity": "sha512-sVZCz6P6e8tW5g2bSFel1oLpa6jK/u7BexFfrgTqR8syIdnHqy+iopnlSbYBZMsCK52chLjhGNBxt0eRqhsghw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@inquirer/core": "^11.2.0",
++        "@inquirer/type": "^4.0.6"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@inquirer/number": {
++      "version": "4.1.0",
++      "resolved": "https://registry.npmjs.org/@inquirer/number/-/number-4.1.0.tgz",
++      "integrity": "sha512-VMXB/XejCbaSTf9Xucl7dqjzzsaGsrs6XwSYXPbGZ2QbSuq/Gz8XamhSi9ClRubNXZlGry9xVg1tKkJdTDgCtQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@inquirer/core": "^11.2.0",
++        "@inquirer/type": "^4.0.6"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@inquirer/password": {
++      "version": "5.1.0",
++      "resolved": "https://registry.npmjs.org/@inquirer/password/-/password-5.1.0.tgz",
++      "integrity": "sha512-5tqRuKCDIUxdPxTI/CuLnh914kz+WMPmURHKnZgui9gk43ebudEsdu4EwSn1CPSi5R+17YpBG+ba/YqTnRAcJA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@inquirer/ansi": "^2.0.6",
++        "@inquirer/core": "^11.2.0",
++        "@inquirer/type": "^4.0.6"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@inquirer/prompts": {
++      "version": "8.5.0",
++      "resolved": "https://registry.npmjs.org/@inquirer/prompts/-/prompts-8.5.0.tgz",
++      "integrity": "sha512-pLjXOnY4y3R1mgyHP3pXD/8eXejp+L/dde/0N2NLKgKfMstqhNZrpvs7Wkzbl9FYFQh10LRQ7QZwq+cz9rrhyw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@inquirer/checkbox": "^5.2.0",
++        "@inquirer/confirm": "^6.1.0",
++        "@inquirer/editor": "^5.2.0",
++        "@inquirer/expand": "^5.1.0",
++        "@inquirer/input": "^5.1.0",
++        "@inquirer/number": "^4.1.0",
++        "@inquirer/password": "^5.1.0",
++        "@inquirer/rawlist": "^5.3.0",
++        "@inquirer/search": "^4.2.0",
++        "@inquirer/select": "^5.2.0"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@inquirer/rawlist": {
++      "version": "5.3.0",
++      "resolved": "https://registry.npmjs.org/@inquirer/rawlist/-/rawlist-5.3.0.tgz",
++      "integrity": "sha512-p+vAeTAD+cGXjGleP1F5LXrX2ISxNDZm+lqeBpnJausNLSZskZZkcggwhomqP8Igx9oIjnoeOrw98xvdFvdm2w==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@inquirer/core": "^11.2.0",
++        "@inquirer/type": "^4.0.6"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@inquirer/search": {
++      "version": "4.2.0",
++      "resolved": "https://registry.npmjs.org/@inquirer/search/-/search-4.2.0.tgz",
++      "integrity": "sha512-ByURoSGIaSl5O5Q0AmYmVmUsXbMUcBGNoA3FRL7TOyiA22IeFHymJKRkuILbOIlJwqnBk7AnPpseodyFUBzg+g==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@inquirer/core": "^11.2.0",
++        "@inquirer/figures": "^2.0.6",
++        "@inquirer/type": "^4.0.6"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@inquirer/select": {
++      "version": "5.2.0",
++      "resolved": "https://registry.npmjs.org/@inquirer/select/-/select-5.2.0.tgz",
++      "integrity": "sha512-6IzkcmEbEXfgVbxZ2d1UyJFbCBoc6dTofulFmrYuomIp88HXiVqRbqbg4/mbfZhvnNo6xYmnYo2AEmDof6fQkg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@inquirer/ansi": "^2.0.6",
++        "@inquirer/core": "^11.2.0",
++        "@inquirer/figures": "^2.0.6",
++        "@inquirer/type": "^4.0.6"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@inquirer/type": {
++      "version": "4.0.6",
++      "resolved": "https://registry.npmjs.org/@inquirer/type/-/type-4.0.6.tgz",
++      "integrity": "sha512-J+9tdxOskuYuGjsvGaq00AamhDgjR7anhEW2dP4QdQpFCMPngCeC/bCYWQ5NsMWZRdsy53is7kAHb/+7cwDk2g==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
+     "node_modules/@jridgewell/gen-mapping": {
+       "version": "0.3.13",
+       "resolved": "https://registry.npmjs.org/@jridgewell/gen-mapping/-/gen-mapping-0.3.13.tgz",
+@@ -1191,6 +1564,288 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/@sec-ant/readable-stream": {
++      "version": "0.4.1",
++      "resolved": "https://registry.npmjs.org/@sec-ant/readable-stream/-/readable-stream-0.4.1.tgz",
++      "integrity": "sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/@sindresorhus/merge-streams": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/@sindresorhus/merge-streams/-/merge-streams-4.0.0.tgz",
++      "integrity": "sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
++    "node_modules/@swc/core": {
++      "version": "1.15.40",
++      "resolved": "https://registry.npmjs.org/@swc/core/-/core-1.15.40.tgz",
++      "integrity": "sha512-2kwzJikRvgtNAG7MwVZY2vEzZjTxKIq5jXOihuSV/8U+Hej8Va22t65aKnJZs3P+NwojZvR8Mf8kyM7O+V8sQg==",
++      "dev": true,
++      "hasInstallScript": true,
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@swc/counter": "^0.1.3",
++        "@swc/types": "^0.1.26"
++      },
++      "engines": {
++        "node": ">=10"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/swc"
++      },
++      "optionalDependencies": {
++        "@swc/core-darwin-arm64": "1.15.40",
++        "@swc/core-darwin-x64": "1.15.40",
++        "@swc/core-linux-arm-gnueabihf": "1.15.40",
++        "@swc/core-linux-arm64-gnu": "1.15.40",
++        "@swc/core-linux-arm64-musl": "1.15.40",
++        "@swc/core-linux-ppc64-gnu": "1.15.40",
++        "@swc/core-linux-s390x-gnu": "1.15.40",
++        "@swc/core-linux-x64-gnu": "1.15.40",
++        "@swc/core-linux-x64-musl": "1.15.40",
++        "@swc/core-win32-arm64-msvc": "1.15.40",
++        "@swc/core-win32-ia32-msvc": "1.15.40",
++        "@swc/core-win32-x64-msvc": "1.15.40"
++      },
++      "peerDependencies": {
++        "@swc/helpers": ">=0.5.17"
++      },
++      "peerDependenciesMeta": {
++        "@swc/helpers": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@swc/core-darwin-arm64": {
++      "version": "1.15.40",
++      "resolved": "https://registry.npmjs.org/@swc/core-darwin-arm64/-/core-darwin-arm64-1.15.40.tgz",
++      "integrity": "sha512-PaYyclfmQ++77D8ityYvmmVzHv9aG8ROwt2GfG6/ccloy4Hgf80qtOnzb9VYvPsUT7Ty1uhuDRhv3XYpf62qhQ==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "Apache-2.0 AND MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/@swc/core-darwin-x64": {
++      "version": "1.15.40",
++      "resolved": "https://registry.npmjs.org/@swc/core-darwin-x64/-/core-darwin-x64-1.15.40.tgz",
++      "integrity": "sha512-HbbPzvfLBUXjIB1Ezks+//lNUjmLjfyd63XSwprJgrZaXYdm70kohXPJUWdqKZozolFxbPaO+xtBaiUp6BoueA==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "Apache-2.0 AND MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/@swc/core-linux-arm-gnueabihf": {
++      "version": "1.15.40",
++      "resolved": "https://registry.npmjs.org/@swc/core-linux-arm-gnueabihf/-/core-linux-arm-gnueabihf-1.15.40.tgz",
++      "integrity": "sha512-SlRZsCjOCPR2LvFs0Ri/Xrx/5o5TCt8vl4gW6mX1hEZOG0a625RxzRHpHdAQNGykmAN/7IeaFAJG+QnNmxlHcA==",
++      "cpu": [
++        "arm"
++      ],
++      "dev": true,
++      "license": "Apache-2.0",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/@swc/core-linux-arm64-gnu": {
++      "version": "1.15.40",
++      "resolved": "https://registry.npmjs.org/@swc/core-linux-arm64-gnu/-/core-linux-arm64-gnu-1.15.40.tgz",
++      "integrity": "sha512-Q8byxJt2fh8CR3EUX6snBpy47AoBVm+In/+Z3rjDHMjC38ZvR9/gtUUNCT0tfrn4EdVsO8/QPi59nxrxvqxvBQ==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "Apache-2.0 AND MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/@swc/core-linux-arm64-musl": {
++      "version": "1.15.40",
++      "resolved": "https://registry.npmjs.org/@swc/core-linux-arm64-musl/-/core-linux-arm64-musl-1.15.40.tgz",
++      "integrity": "sha512-4z0MgHU+7M0pZDqBN1El7mFXDI1SBwinfcUkAyA4v8QrhOIUOZltySt2aStQLZGrdXVXM4Y4ylfiTC04ED+MoQ==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "Apache-2.0 AND MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/@swc/core-linux-ppc64-gnu": {
++      "version": "1.15.40",
++      "resolved": "https://registry.npmjs.org/@swc/core-linux-ppc64-gnu/-/core-linux-ppc64-gnu-1.15.40.tgz",
++      "integrity": "sha512-fLI4iUgeSZu0eRWUXwe6YzPFx9gHbFiPkl8Rp3mJfP8OpNR3nTQCGPvHdDh9xniW7mVvgMY4ni7A4VzqI1KrpA==",
++      "cpu": [
++        "ppc64"
++      ],
++      "dev": true,
++      "license": "Apache-2.0 AND MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/@swc/core-linux-s390x-gnu": {
++      "version": "1.15.40",
++      "resolved": "https://registry.npmjs.org/@swc/core-linux-s390x-gnu/-/core-linux-s390x-gnu-1.15.40.tgz",
++      "integrity": "sha512-YqeKMAb7d4nQSGMJQ454IlaCENpzcDqhvBE9+CPfdnYpnUXxd+BSrB6Xk0YjW8UyoEhUj4p6quATCxbsp6J3jg==",
++      "cpu": [
++        "s390x"
++      ],
++      "dev": true,
++      "license": "Apache-2.0 AND MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/@swc/core-linux-x64-gnu": {
++      "version": "1.15.40",
++      "resolved": "https://registry.npmjs.org/@swc/core-linux-x64-gnu/-/core-linux-x64-gnu-1.15.40.tgz",
++      "integrity": "sha512-7HOuS1iGcme/j/TuL1TfmmLGiMQrjv/GmjyZeydl00FKPtpGXEldwqfI56xgd1YzrzoB2svWjxbGGyQ0TEASxg==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "Apache-2.0 AND MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/@swc/core-linux-x64-musl": {
++      "version": "1.15.40",
++      "resolved": "https://registry.npmjs.org/@swc/core-linux-x64-musl/-/core-linux-x64-musl-1.15.40.tgz",
++      "integrity": "sha512-h4kZYHc7dpc9P9u4brRJaS8Pl7tPVHAeiLSzw7T5RfIJgAoSdaCMKzI/2Uay9gFhaw8uyCDl0L5q37r0EpAfIA==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "Apache-2.0 AND MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/@swc/core-win32-arm64-msvc": {
++      "version": "1.15.40",
++      "resolved": "https://registry.npmjs.org/@swc/core-win32-arm64-msvc/-/core-win32-arm64-msvc-1.15.40.tgz",
++      "integrity": "sha512-+mQgKZXSj6mV38Zh05QaxSjUDmGP/R2JWlXZTDLSPkDzHU6p3GxN9eeSf5dfyDVU86946fmCvSzyl/ucImx8+A==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "Apache-2.0 AND MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/@swc/core-win32-ia32-msvc": {
++      "version": "1.15.40",
++      "resolved": "https://registry.npmjs.org/@swc/core-win32-ia32-msvc/-/core-win32-ia32-msvc-1.15.40.tgz",
++      "integrity": "sha512-yvwdPLGd25mcj/mNatjNQ0lZujtQD6psH3v9PNmMb+fSzjbNG8KIDxjFWrcV+fsFVLOkyOmdJsFmX7NAFjVyPw==",
++      "cpu": [
++        "ia32"
++      ],
++      "dev": true,
++      "license": "Apache-2.0 AND MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/@swc/core-win32-x64-msvc": {
++      "version": "1.15.40",
++      "resolved": "https://registry.npmjs.org/@swc/core-win32-x64-msvc/-/core-win32-x64-msvc-1.15.40.tgz",
++      "integrity": "sha512-OXtKsLU1bVtInzzDEAY2sYiF/rl4tvAnLLLpuMp3HzAOQZ5A+i69AKDhA1YLQTaMAqO3vzyYNVAYVRMPtSYD4w==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "Apache-2.0 AND MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/@swc/counter": {
++      "version": "0.1.3",
++      "resolved": "https://registry.npmjs.org/@swc/counter/-/counter-0.1.3.tgz",
++      "integrity": "sha512-e2BR4lsJkkRlKZ/qCHPw9ZaSxc0MVUd7gtbtaB7aMvHeJVYe8sOB8DBZkP2DtISHGSku9sCK6T6cnY0CtXrOCQ==",
++      "dev": true,
++      "license": "Apache-2.0"
++    },
++    "node_modules/@swc/types": {
++      "version": "0.1.26",
++      "resolved": "https://registry.npmjs.org/@swc/types/-/types-0.1.26.tgz",
++      "integrity": "sha512-lyMwd7WGgG79RS7EERZV3T8wMdmPq3xwyg+1nmAM64kIhx5yl+juO2PYIHb7vTiPgPCj8LYjsNV2T5wiQHUEaw==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@swc/counter": "^0.1.3"
++      }
++    },
+     "node_modules/@tailwindcss/node": {
+       "version": "4.3.0",
+       "resolved": "https://registry.npmjs.org/@tailwindcss/node/-/node-4.3.0.tgz",
+@@ -2221,6 +2876,19 @@
+         "url": "https://github.com/sponsors/epoberezkin"
+       }
+     },
++    "node_modules/ansi-regex": {
++      "version": "6.2.2",
++      "resolved": "https://registry.npmjs.org/ansi-regex/-/ansi-regex-6.2.2.tgz",
++      "integrity": "sha512-Bq3SmSpyFHaWjPk8If9yc6svM8c56dB5BAtW4Qbw5jHTwwXXcTLoRMkpDJp6VL0XzlWaCHTXrkFURMYmD0sLqg==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=12"
++      },
++      "funding": {
++        "url": "https://github.com/chalk/ansi-regex?sponsor=1"
++      }
++    },
+     "node_modules/ansi-styles": {
+       "version": "4.3.0",
+       "resolved": "https://registry.npmjs.org/ansi-styles/-/ansi-styles-4.3.0.tgz",
+@@ -2470,37 +3138,99 @@
+         "get-intrinsic": "^1.3.0"
+       },
+       "engines": {
+-        "node": ">= 0.4"
++        "node": ">= 0.4"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/ljharb"
++      }
++    },
++    "node_modules/callsites": {
++      "version": "3.1.0",
++      "resolved": "https://registry.npmjs.org/callsites/-/callsites-3.1.0.tgz",
++      "integrity": "sha512-P8BjAsXvZS+VIDUI11hHCQEv74YT67YUi5JJFNWIqL235sBmjX4+qx9Muvls5ivyNENctx46xQLQ3aTuE7ssaQ==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=6"
++      }
++    },
++    "node_modules/chalk": {
++      "version": "4.1.2",
++      "resolved": "https://registry.npmjs.org/chalk/-/chalk-4.1.2.tgz",
++      "integrity": "sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "ansi-styles": "^4.1.0",
++        "supports-color": "^7.1.0"
++      },
++      "engines": {
++        "node": ">=10"
++      },
++      "funding": {
++        "url": "https://github.com/chalk/chalk?sponsor=1"
++      }
++    },
++    "node_modules/chardet": {
++      "version": "2.1.1",
++      "resolved": "https://registry.npmjs.org/chardet/-/chardet-2.1.1.tgz",
++      "integrity": "sha512-PsezH1rqdV9VvyNhxxOW32/d75r01NY7TQCmOqomRo15ZSOKbpTFVsfjghxo6JloQUCGnH4k1LGu0R4yCLlWQQ==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/chokidar": {
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/chokidar/-/chokidar-5.0.0.tgz",
++      "integrity": "sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "readdirp": "^5.0.0"
++      },
++      "engines": {
++        "node": ">= 20.19.0"
++      },
++      "funding": {
++        "url": "https://paulmillr.com/funding/"
++      }
++    },
++    "node_modules/cli-cursor": {
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/cli-cursor/-/cli-cursor-5.0.0.tgz",
++      "integrity": "sha512-aCj4O5wKyszjMmDT4tZj93kxyydN/K5zPWSCe6/0AV/AA1pqe5ZBIw0a2ZfPQV7lL5/yb5HsUreJ6UFAF1tEQw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "restore-cursor": "^5.0.0"
++      },
++      "engines": {
++        "node": ">=18"
+       },
+       "funding": {
+-        "url": "https://github.com/sponsors/ljharb"
++        "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
+-    "node_modules/callsites": {
+-      "version": "3.1.0",
+-      "resolved": "https://registry.npmjs.org/callsites/-/callsites-3.1.0.tgz",
+-      "integrity": "sha512-P8BjAsXvZS+VIDUI11hHCQEv74YT67YUi5JJFNWIqL235sBmjX4+qx9Muvls5ivyNENctx46xQLQ3aTuE7ssaQ==",
++    "node_modules/cli-spinners": {
++      "version": "3.4.0",
++      "resolved": "https://registry.npmjs.org/cli-spinners/-/cli-spinners-3.4.0.tgz",
++      "integrity": "sha512-bXfOC4QcT1tKXGorxL3wbJm6XJPDqEnij2gQ2m7ESQuE+/z9YFIWnl/5RpTiKWbMq3EVKR4fRLJGn6DVfu0mpw==",
+       "dev": true,
+       "license": "MIT",
+       "engines": {
+-        "node": ">=6"
++        "node": ">=18.20"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
+-    "node_modules/chalk": {
+-      "version": "4.1.2",
+-      "resolved": "https://registry.npmjs.org/chalk/-/chalk-4.1.2.tgz",
+-      "integrity": "sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==",
++    "node_modules/cli-width": {
++      "version": "4.1.0",
++      "resolved": "https://registry.npmjs.org/cli-width/-/cli-width-4.1.0.tgz",
++      "integrity": "sha512-ouuZd4/dm2Sw5Gmqy6bGyNNNe1qt9RpmxveLSO7KcgsTnU7RXfsw+/bukWGo1abgBiMAic068rclZsO4IWmmxQ==",
+       "dev": true,
+-      "license": "MIT",
+-      "dependencies": {
+-        "ansi-styles": "^4.1.0",
+-        "supports-color": "^7.1.0"
+-      },
++      "license": "ISC",
+       "engines": {
+-        "node": ">=10"
+-      },
+-      "funding": {
+-        "url": "https://github.com/chalk/chalk?sponsor=1"
++        "node": ">= 12"
+       }
+     },
+     "node_modules/clsx": {
+@@ -2532,6 +3262,16 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/commander": {
++      "version": "14.0.3",
++      "resolved": "https://registry.npmjs.org/commander/-/commander-14.0.3.tgz",
++      "integrity": "sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=20"
++      }
++    },
+     "node_modules/concat-map": {
+       "version": "0.0.1",
+       "resolved": "https://registry.npmjs.org/concat-map/-/concat-map-0.0.1.tgz",
+@@ -3044,6 +3784,20 @@
+         "eslint": ">=7.0.0"
+       }
+     },
++    "node_modules/eslint-plugin-i18next": {
++      "version": "6.1.4",
++      "resolved": "https://registry.npmjs.org/eslint-plugin-i18next/-/eslint-plugin-i18next-6.1.4.tgz",
++      "integrity": "sha512-BekXQu1VaVFkREepQGsntBYoKuPsf89V16n/s2xpKMtsw0/lDseds1wBhj3RtO1dKnHsfTPaG+xul1vF0R7LEQ==",
++      "dev": true,
++      "license": "ISC",
++      "dependencies": {
++        "lodash": "^4.17.21",
++        "requireindex": "~1.1.0"
++      },
++      "engines": {
++        "node": ">=18.10.0"
++      }
++    },
+     "node_modules/eslint-plugin-prettier": {
+       "version": "5.5.5",
+       "resolved": "https://registry.npmjs.org/eslint-plugin-prettier/-/eslint-plugin-prettier-5.5.5.tgz",
+@@ -3202,6 +3956,33 @@
+         "node": ">=0.10.0"
+       }
+     },
++    "node_modules/execa": {
++      "version": "9.6.1",
++      "resolved": "https://registry.npmjs.org/execa/-/execa-9.6.1.tgz",
++      "integrity": "sha512-9Be3ZoN4LmYR90tUoVu2te2BsbzHfhJyfEiAVfz7N5/zv+jduIfLrV2xdQXOHbaD6KgpGdO9PRPM1Y4Q9QkPkA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@sindresorhus/merge-streams": "^4.0.0",
++        "cross-spawn": "^7.0.6",
++        "figures": "^6.1.0",
++        "get-stream": "^9.0.0",
++        "human-signals": "^8.0.1",
++        "is-plain-obj": "^4.1.0",
++        "is-stream": "^4.0.1",
++        "npm-run-path": "^6.0.0",
++        "pretty-ms": "^9.2.0",
++        "signal-exit": "^4.1.0",
++        "strip-final-newline": "^4.0.0",
++        "yoctocolors": "^2.1.1"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.5.0"
++      },
++      "funding": {
++        "url": "https://github.com/sindresorhus/execa?sponsor=1"
++      }
++    },
+     "node_modules/fast-deep-equal": {
+       "version": "3.1.3",
+       "resolved": "https://registry.npmjs.org/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz",
+@@ -3230,6 +4011,33 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/fast-string-truncated-width": {
++      "version": "3.0.3",
++      "resolved": "https://registry.npmjs.org/fast-string-truncated-width/-/fast-string-truncated-width-3.0.3.tgz",
++      "integrity": "sha512-0jjjIEL6+0jag3l2XWWizO64/aZVtpiGE3t0Zgqxv0DPuxiMjvB3M24fCyhZUO4KomJQPj3LTSUnDP3GpdwC0g==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/fast-string-width": {
++      "version": "3.0.2",
++      "resolved": "https://registry.npmjs.org/fast-string-width/-/fast-string-width-3.0.2.tgz",
++      "integrity": "sha512-gX8LrtNEI5hq8DVUfRQMbr5lpaS4nMIWV+7XEbXk2b8kiQIizgnlr12B4dA3ZEx3308ze0O4Q1R+cHts8kyUJg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "fast-string-truncated-width": "^3.0.2"
++      }
++    },
++    "node_modules/fast-wrap-ansi": {
++      "version": "0.2.2",
++      "resolved": "https://registry.npmjs.org/fast-wrap-ansi/-/fast-wrap-ansi-0.2.2.tgz",
++      "integrity": "sha512-7F2Fl+TjRSenLqlU3UjSH0iyqopqoZIu7eZVpEirP2g1GtWa2G/ecEmBdgz31+Mxr+ELclgg6sokpSFIQiZ02Q==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "fast-string-width": "^3.0.2"
++      }
++    },
+     "node_modules/fdir": {
+       "version": "6.5.0",
+       "resolved": "https://registry.npmjs.org/fdir/-/fdir-6.5.0.tgz",
+@@ -3248,6 +4056,22 @@
+         }
+       }
+     },
++    "node_modules/figures": {
++      "version": "6.1.0",
++      "resolved": "https://registry.npmjs.org/figures/-/figures-6.1.0.tgz",
++      "integrity": "sha512-d+l3qxjSesT4V7v2fh+QnmFnUWv9lSpjarhShNTgBOfA0ttejbQUAlHLitbjkoRiDulW0OPoQPYIGhIC8ohejg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "is-unicode-supported": "^2.0.0"
++      },
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/file-entry-cache": {
+       "version": "8.0.0",
+       "resolved": "https://registry.npmjs.org/file-entry-cache/-/file-entry-cache-8.0.0.tgz",
+@@ -3408,6 +4232,19 @@
+         "node": ">= 0.4"
+       }
+     },
++    "node_modules/get-east-asian-width": {
++      "version": "1.6.0",
++      "resolved": "https://registry.npmjs.org/get-east-asian-width/-/get-east-asian-width-1.6.0.tgz",
++      "integrity": "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/get-intrinsic": {
+       "version": "1.3.0",
+       "resolved": "https://registry.npmjs.org/get-intrinsic/-/get-intrinsic-1.3.0.tgz",
+@@ -3447,6 +4284,23 @@
+         "node": ">= 0.4"
+       }
+     },
++    "node_modules/get-stream": {
++      "version": "9.0.1",
++      "resolved": "https://registry.npmjs.org/get-stream/-/get-stream-9.0.1.tgz",
++      "integrity": "sha512-kVCxPF3vQM/N0B1PmoqVUqgHP+EeVjmZSQn+1oCRPxd2P21P2F19lIgbR3HBosbB1PUhOAoctJnfEn2GbN2eZA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@sec-ant/readable-stream": "^0.4.1",
++        "is-stream": "^4.0.1"
++      },
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/get-symbol-description": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/get-symbol-description/-/get-symbol-description-1.1.0.tgz",
+@@ -3465,6 +4319,24 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/glob": {
++      "version": "13.0.6",
++      "resolved": "https://registry.npmjs.org/glob/-/glob-13.0.6.tgz",
++      "integrity": "sha512-Wjlyrolmm8uDpm/ogGyXZXb1Z+Ca2B8NbJwqBVg0axK9GbBeoS7yGV6vjXnYdGm6X53iehEuxxbyiKp8QmN4Vw==",
++      "dev": true,
++      "license": "BlueOak-1.0.0",
++      "dependencies": {
++        "minimatch": "^10.2.2",
++        "minipass": "^7.1.3",
++        "path-scurry": "^2.0.2"
++      },
++      "engines": {
++        "node": "18 || 20 || >=22"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/isaacs"
++      }
++    },
+     "node_modules/glob-parent": {
+       "version": "6.0.2",
+       "resolved": "https://registry.npmjs.org/glob-parent/-/glob-parent-6.0.2.tgz",
+@@ -3484,6 +4356,45 @@
+       "integrity": "sha512-lkX1HJXwyMcprw/5YUZc2s7DrpAiHB21/V+E1rHUrVNokkvB6bqMzT0VfV6/86ZNabt1k14YOIaT7nDvOX3Iiw==",
+       "license": "BSD-2-Clause"
+     },
++    "node_modules/glob/node_modules/balanced-match": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/balanced-match/-/balanced-match-4.0.4.tgz",
++      "integrity": "sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": "18 || 20 || >=22"
++      }
++    },
++    "node_modules/glob/node_modules/brace-expansion": {
++      "version": "5.0.6",
++      "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.6.tgz",
++      "integrity": "sha512-kLpxurY4Z4r9sgMsyG0Z9uzsBlgiU/EFKhj/h91/8yHu0edo7XuixOIH3VcJ8kkxs6/jPzoI6U9Vj3WqbMQ94g==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "balanced-match": "^4.0.2"
++      },
++      "engines": {
++        "node": "18 || 20 || >=22"
++      }
++    },
++    "node_modules/glob/node_modules/minimatch": {
++      "version": "10.2.5",
++      "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-10.2.5.tgz",
++      "integrity": "sha512-MULkVLfKGYDFYejP07QOurDLLQpcjk7Fw+7jXS2R2czRQzR56yHRveU5NDJEOviH+hETZKSkIk5c+T23GjFUMg==",
++      "dev": true,
++      "license": "BlueOak-1.0.0",
++      "dependencies": {
++        "brace-expansion": "^5.0.5"
++      },
++      "engines": {
++        "node": "18 || 20 || >=22"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/isaacs"
++      }
++    },
+     "node_modules/globals": {
+       "version": "14.0.0",
+       "resolved": "https://registry.npmjs.org/globals/-/globals-14.0.0.tgz",
+@@ -3637,6 +4548,16 @@
+         "void-elements": "3.1.0"
+       }
+     },
++    "node_modules/human-signals": {
++      "version": "8.0.1",
++      "resolved": "https://registry.npmjs.org/human-signals/-/human-signals-8.0.1.tgz",
++      "integrity": "sha512-eKCa6bwnJhvxj14kZk5NCPc6Hb6BdsU9DZcOnmQKSnO1VKrfV0zCvtttPZUsBvjmNDn8rpcJfpwSYnHBjc95MQ==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=18.18.0"
++      }
++    },
+     "node_modules/i18next": {
+       "version": "26.3.0",
+       "resolved": "https://registry.npmjs.org/i18next/-/i18next-26.3.0.tgz",
+@@ -3665,6 +4586,109 @@
+         }
+       }
+     },
++    "node_modules/i18next-cli": {
++      "version": "1.58.0",
++      "resolved": "https://registry.npmjs.org/i18next-cli/-/i18next-cli-1.58.0.tgz",
++      "integrity": "sha512-S5Nm6fE/HZzbuC5g8i2JQGq2CCVw7uSpDomY+PpqIglslEuQpje1rQ5r97ZDBdJebUZ4E5v7wf9FRLfGXDGjtQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@croct/json5-parser": "^0.2.2",
++        "@swc/core": "^1.15.26",
++        "chokidar": "^5.0.0",
++        "commander": "^14.0.3",
++        "execa": "^9.6.1",
++        "glob": "^13.0.6",
++        "i18next-resources-for-ts": "^2.1.0",
++        "inquirer": "^13.4.1",
++        "jiti": "^2.6.1",
++        "jsonc-parser": "^3.3.1",
++        "magic-string": "^0.30.21",
++        "minimatch": "^10.2.5",
++        "ora": "^9.3.0",
++        "react": "^19.2.5",
++        "react-i18next": "^17.0.7",
++        "yaml": "^2.8.3"
++      },
++      "bin": {
++        "i18next-cli": "dist/esm/cli.js"
++      },
++      "engines": {
++        "node": ">=22"
++      }
++    },
++    "node_modules/i18next-cli/node_modules/balanced-match": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/balanced-match/-/balanced-match-4.0.4.tgz",
++      "integrity": "sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": "18 || 20 || >=22"
++      }
++    },
++    "node_modules/i18next-cli/node_modules/brace-expansion": {
++      "version": "5.0.6",
++      "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.6.tgz",
++      "integrity": "sha512-kLpxurY4Z4r9sgMsyG0Z9uzsBlgiU/EFKhj/h91/8yHu0edo7XuixOIH3VcJ8kkxs6/jPzoI6U9Vj3WqbMQ94g==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "balanced-match": "^4.0.2"
++      },
++      "engines": {
++        "node": "18 || 20 || >=22"
++      }
++    },
++    "node_modules/i18next-cli/node_modules/minimatch": {
++      "version": "10.2.5",
++      "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-10.2.5.tgz",
++      "integrity": "sha512-MULkVLfKGYDFYejP07QOurDLLQpcjk7Fw+7jXS2R2czRQzR56yHRveU5NDJEOviH+hETZKSkIk5c+T23GjFUMg==",
++      "dev": true,
++      "license": "BlueOak-1.0.0",
++      "dependencies": {
++        "brace-expansion": "^5.0.5"
++      },
++      "engines": {
++        "node": "18 || 20 || >=22"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/isaacs"
++      }
++    },
++    "node_modules/i18next-resources-for-ts": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/i18next-resources-for-ts/-/i18next-resources-for-ts-2.1.0.tgz",
++      "integrity": "sha512-n5UexwEVt0OoIAhG2MWpSnAVJW1U8mQrQTmXyxc5DMAx+NLhcLZhSMJo/FnUsA5JQ3obTYqTgB7YIuZKWpDgow==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@babel/runtime": "^7.28.6",
++        "@swc/core": "^1.15.18",
++        "chokidar": "^5.0.0",
++        "yaml": "^2.8.2"
++      },
++      "bin": {
++        "i18next-resources-for-ts": "bin/i18next-resources-for-ts.js"
++      }
++    },
++    "node_modules/iconv-lite": {
++      "version": "0.7.2",
++      "resolved": "https://registry.npmjs.org/iconv-lite/-/iconv-lite-0.7.2.tgz",
++      "integrity": "sha512-im9DjEDQ55s9fL4EYzOAv0yMqmMBSZp6G0VvFyTMPKWxiSBHUj9NW/qqLmXUwXrrM7AvqSlTCfvqRb0cM8yYqw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "safer-buffer": ">= 2.1.2 < 3.0.0"
++      },
++      "engines": {
++        "node": ">=0.10.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/express"
++      }
++    },
+     "node_modules/ignore": {
+       "version": "5.3.2",
+       "resolved": "https://registry.npmjs.org/ignore/-/ignore-5.3.2.tgz",
+@@ -3702,6 +4726,33 @@
+         "node": ">=0.8.19"
+       }
+     },
++    "node_modules/inquirer": {
++      "version": "13.4.3",
++      "resolved": "https://registry.npmjs.org/inquirer/-/inquirer-13.4.3.tgz",
++      "integrity": "sha512-EPd3IqieHSavSOXh+LZhrIkdQcOELWeRblLT6kslQr+cF9XTh/HxZdSt1YkHH1iq4dvqBnV42uwg2YlorgOy6g==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@inquirer/ansi": "^2.0.5",
++        "@inquirer/core": "^11.1.10",
++        "@inquirer/prompts": "^8.4.3",
++        "@inquirer/type": "^4.0.5",
++        "mute-stream": "^3.0.0",
++        "run-async": "^4.0.6",
++        "rxjs": "^7.8.2"
++      },
++      "engines": {
++        "node": ">=23.5.0 || ^22.13.0 || ^21.7.0 || ^20.12.0"
++      },
++      "peerDependencies": {
++        "@types/node": ">=18"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        }
++      }
++    },
+     "node_modules/internal-slot": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/internal-slot/-/internal-slot-1.1.0.tgz",
+@@ -3911,6 +4962,19 @@
+         "node": ">=0.10.0"
+       }
+     },
++    "node_modules/is-interactive": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/is-interactive/-/is-interactive-2.0.0.tgz",
++      "integrity": "sha512-qP1vozQRI+BMOPcjFzrjXuQvdak2pHNUMZoeG2eRbiSqyvbEf/wQtEOTOX1guk6E3t36RkaqiSt8A/6YElNxLQ==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=12"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/is-map": {
+       "version": "2.0.3",
+       "resolved": "https://registry.npmjs.org/is-map/-/is-map-2.0.3.tgz",
+@@ -3954,6 +5018,19 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/is-plain-obj": {
++      "version": "4.1.0",
++      "resolved": "https://registry.npmjs.org/is-plain-obj/-/is-plain-obj-4.1.0.tgz",
++      "integrity": "sha512-+Pgi+vMuUNkJyExiMBt5IlFoMyKnr5zhJ4Uspz58WOhBF5QoIZkFyNHIbBAtHwzVAgk5RtndVNsDRN61/mmDqg==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=12"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/is-regex": {
+       "version": "1.2.1",
+       "resolved": "https://registry.npmjs.org/is-regex/-/is-regex-1.2.1.tgz",
+@@ -3999,7 +5076,20 @@
+         "node": ">= 0.4"
+       },
+       "funding": {
+-        "url": "https://github.com/sponsors/ljharb"
++        "url": "https://github.com/sponsors/ljharb"
++      }
++    },
++    "node_modules/is-stream": {
++      "version": "4.0.1",
++      "resolved": "https://registry.npmjs.org/is-stream/-/is-stream-4.0.1.tgz",
++      "integrity": "sha512-Dnz92NInDqYckGEUJv689RbRiTSEHCQ7wOVeALbkOz999YpqT46yMRIGtSNl2iCL1waAZSx40+h59NV/EwzV/A==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
+     "node_modules/is-string": {
+@@ -4053,6 +5143,19 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/is-unicode-supported": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/is-unicode-supported/-/is-unicode-supported-2.1.0.tgz",
++      "integrity": "sha512-mE00Gnza5EEB3Ds0HfMyllZzbBrmLOX3vfWoj9A9PEnTfratQ/BcaJOuMhnkhjXvb2+FkY3VuHqtAGpTPmglFQ==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/is-weakmap": {
+       "version": "2.0.2",
+       "resolved": "https://registry.npmjs.org/is-weakmap/-/is-weakmap-2.0.2.tgz",
+@@ -4211,6 +5314,13 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/jsonc-parser": {
++      "version": "3.3.1",
++      "resolved": "https://registry.npmjs.org/jsonc-parser/-/jsonc-parser-3.3.1.tgz",
++      "integrity": "sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==",
++      "dev": true,
++      "license": "MIT"
++    },
+     "node_modules/jsx-ast-utils": {
+       "version": "3.3.5",
+       "resolved": "https://registry.npmjs.org/jsx-ast-utils/-/jsx-ast-utils-3.3.5.tgz",
+@@ -4548,6 +5658,13 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
++    "node_modules/lodash": {
++      "version": "4.18.1",
++      "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.18.1.tgz",
++      "integrity": "sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==",
++      "dev": true,
++      "license": "MIT"
++    },
+     "node_modules/lodash.debounce": {
+       "version": "4.0.8",
+       "resolved": "https://registry.npmjs.org/lodash.debounce/-/lodash.debounce-4.0.8.tgz",
+@@ -4567,6 +5684,23 @@
+       "integrity": "sha512-wIkUCfVKpVsWo3JSZlc+8MB5it+2AN5W8J7YVMST30UrvcQNZ1Okbj+rbVniijTWE6FGYy4XJq/rHkas8qJMLQ==",
+       "license": "MIT"
+     },
++    "node_modules/log-symbols": {
++      "version": "7.0.1",
++      "resolved": "https://registry.npmjs.org/log-symbols/-/log-symbols-7.0.1.tgz",
++      "integrity": "sha512-ja1E3yCr9i/0hmBVaM0bfwDjnGy8I/s6PP4DFp+yP+a+mrHO4Rm7DtmnqROTUkHIkqffC84YY7AeqX6oFk0WFg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "is-unicode-supported": "^2.0.0",
++        "yoctocolors": "^2.1.1"
++      },
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/loose-envify": {
+       "version": "1.4.0",
+       "resolved": "https://registry.npmjs.org/loose-envify/-/loose-envify-1.4.0.tgz",
+@@ -4579,6 +5713,16 @@
+         "loose-envify": "cli.js"
+       }
+     },
++    "node_modules/lru-cache": {
++      "version": "11.5.1",
++      "resolved": "https://registry.npmjs.org/lru-cache/-/lru-cache-11.5.1.tgz",
++      "integrity": "sha512-RPimw/7aMdv2oqRrxKwvZXcPfwBrn/JZ2xYcY9Hus/6LaS3VOAKVWKWgNLCFSiOm1ESXinjsDlidVU7JlnCN2A==",
++      "dev": true,
++      "license": "BlueOak-1.0.0",
++      "engines": {
++        "node": "20 || >=22"
++      }
++    },
+     "node_modules/lucide-react": {
+       "version": "1.16.0",
+       "resolved": "https://registry.npmjs.org/lucide-react/-/lucide-react-1.16.0.tgz",
+@@ -4608,6 +5752,19 @@
+         "node": ">= 0.4"
+       }
+     },
++    "node_modules/mimic-function": {
++      "version": "5.0.1",
++      "resolved": "https://registry.npmjs.org/mimic-function/-/mimic-function-5.0.1.tgz",
++      "integrity": "sha512-VP79XUPxV2CigYP3jWwAUFSku2aKqBH7uTAapFWCBqutsbmDo96KY5o8uh6U+/YSIn5OxJnXp73beVkpqMIGhA==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/minimatch": {
+       "version": "3.1.5",
+       "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-3.1.5.tgz",
+@@ -4621,6 +5778,16 @@
+         "node": "*"
+       }
+     },
++    "node_modules/minipass": {
++      "version": "7.1.3",
++      "resolved": "https://registry.npmjs.org/minipass/-/minipass-7.1.3.tgz",
++      "integrity": "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A==",
++      "dev": true,
++      "license": "BlueOak-1.0.0",
++      "engines": {
++        "node": ">=16 || 14 >=14.17"
++      }
++    },
+     "node_modules/motion-dom": {
+       "version": "12.38.0",
+       "resolved": "https://registry.npmjs.org/motion-dom/-/motion-dom-12.38.0.tgz",
+@@ -4643,6 +5810,16 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/mute-stream": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/mute-stream/-/mute-stream-3.0.0.tgz",
++      "integrity": "sha512-dkEJPVvun4FryqBmZ5KhDo0K9iDXAwn08tMLDinNdRBNPcYEDiWYysLcc6k3mjTMlbP9KyylvRpd4wFtwrT9rw==",
++      "dev": true,
++      "license": "ISC",
++      "engines": {
++        "node": "^20.17.0 || >=22.9.0"
++      }
++    },
+     "node_modules/nanoid": {
+       "version": "3.3.12",
+       "resolved": "https://registry.npmjs.org/nanoid/-/nanoid-3.3.12.tgz",
+@@ -4688,6 +5865,36 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/npm-run-path": {
++      "version": "6.0.0",
++      "resolved": "https://registry.npmjs.org/npm-run-path/-/npm-run-path-6.0.0.tgz",
++      "integrity": "sha512-9qny7Z9DsQU8Ou39ERsPU4OZQlSTP47ShQzuKZ6PRXpYLtIFgl/DEBYEXKlvcEa+9tHVcK8CF81Y2V72qaZhWA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "path-key": "^4.0.0",
++        "unicorn-magic": "^0.3.0"
++      },
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
++    "node_modules/npm-run-path/node_modules/path-key": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/path-key/-/path-key-4.0.0.tgz",
++      "integrity": "sha512-haREypq7xkM7ErfgIyA0z+Bj4AGKlMSdlQE2jvJo6huWD1EdkKYV+G/T4nq0YEF2vgTT8kqMFKo1uHn950r4SQ==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=12"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/object-assign": {
+       "version": "4.1.1",
+       "resolved": "https://registry.npmjs.org/object-assign/-/object-assign-4.1.1.tgz",
+@@ -4795,6 +6002,22 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/onetime": {
++      "version": "7.0.0",
++      "resolved": "https://registry.npmjs.org/onetime/-/onetime-7.0.0.tgz",
++      "integrity": "sha512-VXJjc87FScF88uafS3JllDgvAm+c/Slfz06lorj2uAY34rlUu0Nt+v8wreiImcrgAjjIHp1rXpTDlLOGw29WwQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "mimic-function": "^5.0.0"
++      },
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/optionator": {
+       "version": "0.9.4",
+       "resolved": "https://registry.npmjs.org/optionator/-/optionator-0.9.4.tgz",
+@@ -4813,6 +6036,42 @@
+         "node": ">= 0.8.0"
+       }
+     },
++    "node_modules/ora": {
++      "version": "9.4.0",
++      "resolved": "https://registry.npmjs.org/ora/-/ora-9.4.0.tgz",
++      "integrity": "sha512-84cglkRILFxdtA8hAvLNdMrtBpPNBTrQ9/ulg0FA7xLMnD6mifv+enAIeRmvtv+WgdCE+LPGOfQmtJRrVaIVhQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "chalk": "^5.6.2",
++        "cli-cursor": "^5.0.0",
++        "cli-spinners": "^3.2.0",
++        "is-interactive": "^2.0.0",
++        "is-unicode-supported": "^2.1.0",
++        "log-symbols": "^7.0.1",
++        "stdin-discarder": "^0.3.2",
++        "string-width": "^8.1.0"
++      },
++      "engines": {
++        "node": ">=20"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
++    "node_modules/ora/node_modules/chalk": {
++      "version": "5.6.2",
++      "resolved": "https://registry.npmjs.org/chalk/-/chalk-5.6.2.tgz",
++      "integrity": "sha512-7NzBL0rN6fMUW+f7A6Io4h40qQlG+xGmtMxfbnH/K7TAtt8JQWVQK+6g0UXKMeVJoyV5EkkNsErQ8pVD3bLHbA==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": "^12.17.0 || ^14.13 || >=16.0.0"
++      },
++      "funding": {
++        "url": "https://github.com/chalk/chalk?sponsor=1"
++      }
++    },
+     "node_modules/own-keys": {
+       "version": "1.0.1",
+       "resolved": "https://registry.npmjs.org/own-keys/-/own-keys-1.0.1.tgz",
+@@ -4876,6 +6135,19 @@
+         "node": ">=6"
+       }
+     },
++    "node_modules/parse-ms": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/parse-ms/-/parse-ms-4.0.0.tgz",
++      "integrity": "sha512-TXfryirbmq34y8QBwgqCVLi+8oA3oWx2eAnSn62ITyEhEYaWRlVZ2DvMM9eZbMs/RfxPu/PK/aBLyGj4IrqMHw==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/path-exists": {
+       "version": "4.0.0",
+       "resolved": "https://registry.npmjs.org/path-exists/-/path-exists-4.0.0.tgz",
+@@ -4903,6 +6175,23 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/path-scurry": {
++      "version": "2.0.2",
++      "resolved": "https://registry.npmjs.org/path-scurry/-/path-scurry-2.0.2.tgz",
++      "integrity": "sha512-3O/iVVsJAPsOnpwWIeD+d6z/7PmqApyQePUtCndjatj/9I5LylHvt5qluFaBT3I5h3r1ejfR056c+FCv+NnNXg==",
++      "dev": true,
++      "license": "BlueOak-1.0.0",
++      "dependencies": {
++        "lru-cache": "^11.0.0",
++        "minipass": "^7.1.2"
++      },
++      "engines": {
++        "node": "18 || 20 || >=22"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/isaacs"
++      }
++    },
+     "node_modules/picocolors": {
+       "version": "1.1.1",
+       "resolved": "https://registry.npmjs.org/picocolors/-/picocolors-1.1.1.tgz",
+@@ -5001,6 +6290,22 @@
+         "node": ">=6.0.0"
+       }
+     },
++    "node_modules/pretty-ms": {
++      "version": "9.3.0",
++      "resolved": "https://registry.npmjs.org/pretty-ms/-/pretty-ms-9.3.0.tgz",
++      "integrity": "sha512-gjVS5hOP+M3wMm5nmNOucbIrqudzs9v/57bWRHQWLYklXqoXKrVfYW2W9+glfGsqtPgpiz5WwyEEB+ksXIx3gQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "parse-ms": "^4.0.0"
++      },
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/prop-types": {
+       "version": "15.8.1",
+       "resolved": "https://registry.npmjs.org/prop-types/-/prop-types-15.8.1.tgz",
+@@ -5168,6 +6473,20 @@
+         "react-dom": "^18.0.0 || ^19.0.0"
+       }
+     },
++    "node_modules/readdirp": {
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/readdirp/-/readdirp-5.0.0.tgz",
++      "integrity": "sha512-9u/XQ1pvrQtYyMpZe7DXKv2p5CNvyVwzUB6uhLAnQwHMSgKMBR62lc7AHljaeteeHXn11XTAaLLUVZYVZyuRBQ==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">= 20.19.0"
++      },
++      "funding": {
++        "type": "individual",
++        "url": "https://paulmillr.com/funding/"
++      }
++    },
+     "node_modules/reflect.getprototypeof": {
+       "version": "1.0.10",
+       "resolved": "https://registry.npmjs.org/reflect.getprototypeof/-/reflect.getprototypeof-1.0.10.tgz",
+@@ -5212,6 +6531,16 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/requireindex": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/requireindex/-/requireindex-1.1.0.tgz",
++      "integrity": "sha512-LBnkqsDE7BZKvqylbmn7lTIVdpx4K/QCduRATpO5R+wtPmky/a8pN1bO2D6wXppn1497AJF9mNjqAXr6bdl9jg==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=0.10.5"
++      }
++    },
+     "node_modules/resolve": {
+       "version": "2.0.0-next.7",
+       "resolved": "https://registry.npmjs.org/resolve/-/resolve-2.0.0-next.7.tgz",
+@@ -5246,6 +6575,23 @@
+         "node": ">=4"
+       }
+     },
++    "node_modules/restore-cursor": {
++      "version": "5.1.0",
++      "resolved": "https://registry.npmjs.org/restore-cursor/-/restore-cursor-5.1.0.tgz",
++      "integrity": "sha512-oMA2dcrw6u0YfxJQXm342bFKX/E4sG9rbTzO9ptUcR/e8A33cHuvStiYOwH7fszkZlZ1z/ta9AAoPk2F4qIOHA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "onetime": "^7.0.0",
++        "signal-exit": "^4.1.0"
++      },
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/rolldown": {
+       "version": "1.0.1",
+       "resolved": "https://registry.npmjs.org/rolldown/-/rolldown-1.0.1.tgz",
+@@ -5280,6 +6626,26 @@
+         "@rolldown/binding-win32-x64-msvc": "1.0.1"
+       }
+     },
++    "node_modules/run-async": {
++      "version": "4.0.6",
++      "resolved": "https://registry.npmjs.org/run-async/-/run-async-4.0.6.tgz",
++      "integrity": "sha512-IoDlSLTs3Yq593mb3ZoKWKXMNu3UpObxhgA/Xuid5p4bbfi2jdY1Hj0m1K+0/tEuQTxIGMhQDqGjKb7RuxGpAQ==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=0.12.0"
++      }
++    },
++    "node_modules/rxjs": {
++      "version": "7.8.2",
++      "resolved": "https://registry.npmjs.org/rxjs/-/rxjs-7.8.2.tgz",
++      "integrity": "sha512-dhKf903U/PQZY6boNNtAGdWbG85WAbjT/1xYoZIC7FAY0yWapOBQVsVrDl58W86//e1VpMNBtRV4MaXfdMySFA==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "dependencies": {
++        "tslib": "^2.1.0"
++      }
++    },
+     "node_modules/safe-array-concat": {
+       "version": "1.1.4",
+       "resolved": "https://registry.npmjs.org/safe-array-concat/-/safe-array-concat-1.1.4.tgz",
+@@ -5335,6 +6701,13 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/safer-buffer": {
++      "version": "2.1.2",
++      "resolved": "https://registry.npmjs.org/safer-buffer/-/safer-buffer-2.1.2.tgz",
++      "integrity": "sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==",
++      "dev": true,
++      "license": "MIT"
++    },
+     "node_modules/scheduler": {
+       "version": "0.27.0",
+       "resolved": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+@@ -5499,6 +6872,19 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/signal-exit": {
++      "version": "4.1.0",
++      "resolved": "https://registry.npmjs.org/signal-exit/-/signal-exit-4.1.0.tgz",
++      "integrity": "sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==",
++      "dev": true,
++      "license": "ISC",
++      "engines": {
++        "node": ">=14"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/isaacs"
++      }
++    },
+     "node_modules/simple-icons": {
+       "version": "16.20.0",
+       "resolved": "https://registry.npmjs.org/simple-icons/-/simple-icons-16.20.0.tgz",
+@@ -5534,6 +6920,19 @@
+       "integrity": "sha512-5GS12FdOZNliM5mAOxFRg7Ir0pWz8MdpYm6AY6VPkGpbA7ZzmbzNcBJQ0GPvvyWgcY7QAhCgf9Uy89I03faLkg==",
+       "license": "MIT"
+     },
++    "node_modules/stdin-discarder": {
++      "version": "0.3.2",
++      "resolved": "https://registry.npmjs.org/stdin-discarder/-/stdin-discarder-0.3.2.tgz",
++      "integrity": "sha512-eCPu1qRxPVkl5605OTWF8Wz40b4Mf45NY5LQmVPQ599knfs5QhASUm9GbJ5BDMDOXgrnh0wyEdvzmL//YMlw0A==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/stop-iteration-iterator": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/stop-iteration-iterator/-/stop-iteration-iterator-1.1.0.tgz",
+@@ -5548,6 +6947,23 @@
+         "node": ">= 0.4"
+       }
+     },
++    "node_modules/string-width": {
++      "version": "8.2.1",
++      "resolved": "https://registry.npmjs.org/string-width/-/string-width-8.2.1.tgz",
++      "integrity": "sha512-IIaP0g3iy9Cyy18w3M9YcaDudujEAVHKt3a3QJg1+sr/oX96TbaGUubG0hJyCjCBThFH+tFpcIyoUHUn1ogaLA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "get-east-asian-width": "^1.5.0",
++        "strip-ansi": "^7.1.2"
++      },
++      "engines": {
++        "node": ">=20"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/string.prototype.matchall": {
+       "version": "4.0.12",
+       "resolved": "https://registry.npmjs.org/string.prototype.matchall/-/string.prototype.matchall-4.0.12.tgz",
+@@ -5646,6 +7062,35 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/strip-ansi": {
++      "version": "7.2.0",
++      "resolved": "https://registry.npmjs.org/strip-ansi/-/strip-ansi-7.2.0.tgz",
++      "integrity": "sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "ansi-regex": "^6.2.2"
++      },
++      "engines": {
++        "node": ">=12"
++      },
++      "funding": {
++        "url": "https://github.com/chalk/strip-ansi?sponsor=1"
++      }
++    },
++    "node_modules/strip-final-newline": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/strip-final-newline/-/strip-final-newline-4.0.0.tgz",
++      "integrity": "sha512-aulFJcD6YK8V1G7iRB5tigAP4TsHBZZrOV8pjV++zdUwmeV8uzbY7yn6h9MswN62adStNZFuCIx4haBnRuMDaw==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/strip-json-comments": {
+       "version": "3.1.1",
+       "resolved": "https://registry.npmjs.org/strip-json-comments/-/strip-json-comments-3.1.1.tgz",
+@@ -5906,6 +7351,19 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/unicorn-magic": {
++      "version": "0.3.0",
++      "resolved": "https://registry.npmjs.org/unicorn-magic/-/unicorn-magic-0.3.0.tgz",
++      "integrity": "sha512-+QBBXBCvifc56fsbuxZQ6Sic3wqqc3WWaqxs58gvJrcOuN83HGTCwz3oS5phzU9LthRNE9VrJCFCLUgHeeFnfA==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/uri-js": {
+       "version": "4.4.1",
+       "resolved": "https://registry.npmjs.org/uri-js/-/uri-js-4.4.1.tgz",
+@@ -6140,6 +7598,22 @@
+         "node": ">=0.10.0"
+       }
+     },
++    "node_modules/yaml": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/yaml/-/yaml-2.9.0.tgz",
++      "integrity": "sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==",
++      "dev": true,
++      "license": "ISC",
++      "bin": {
++        "yaml": "bin.mjs"
++      },
++      "engines": {
++        "node": ">= 14.6"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/eemeli"
++      }
++    },
+     "node_modules/yocto-queue": {
+       "version": "0.1.0",
+       "resolved": "https://registry.npmjs.org/yocto-queue/-/yocto-queue-0.1.0.tgz",
+@@ -6153,6 +7627,19 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
++    "node_modules/yoctocolors": {
++      "version": "2.1.2",
++      "resolved": "https://registry.npmjs.org/yoctocolors/-/yoctocolors-2.1.2.tgz",
++      "integrity": "sha512-CzhO+pFNo8ajLM2d2IW/R93ipy99LWjtwblvC1RsoSUMZgyLbYFr221TnSNT7GjGdYui6P459mw9JH/g/zW2ug==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/zustand": {
+       "version": "5.0.13",
+       "resolved": "https://registry.npmjs.org/zustand/-/zustand-5.0.13.tgz",
+diff --git a/package.json b/package.json
+index 3dae867e..c0b55655 100644
+--- a/package.json
++++ b/package.json
+@@ -7,10 +7,14 @@
+     "build": "vite build",
+     "tauri": "tauri",
+     "start": "tauri dev",
++    "typecheck": "tsc --noEmit",
+     "lint": "eslint .",
+     "lint:fix": "eslint . --fix",
+     "format": "prettier --write .",
+-    "format:check": "prettier --check ."
++    "format:check": "prettier --check .",
++    "i18n:extract": "i18next-cli extract --with-types",
++    "i18n:check": "i18next-cli extract --ci --dry-run",
++    "i18n:lint": "i18next-cli lint"
+   },
+   "dependencies": {
+     "@clerk/react": "^6.6.2",
+@@ -53,8 +57,10 @@
+     "esbuild": "^0.28.0",
+     "eslint": "^9.39.2",
+     "eslint-config-prettier": "^10.1.8",
++    "eslint-plugin-i18next": "^6.1.4",
+     "eslint-plugin-prettier": "^5.5.5",
+     "eslint-plugin-react": "^7.37.5",
++    "i18next-cli": "^1.58.0",
+     "prettier": "^3.8.3",
+     "tailwindcss": "^4.3.0",
+     "typescript": "^6.0.0",
+diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
+index e8e8cd69..9f8f569e 100644
+--- a/src/i18n/locales/en.json
++++ b/src/i18n/locales/en.json
+@@ -1,1582 +1,1580 @@
+ {
+-  "settings": {
+-    "title": "Settings",
+-    "language": "Language",
+-    "languageDesc": "Change the application language. Falls back to English if translations are missing.",
+-    "categories": {
+-      "general": "General",
+-      "processing": "Processing",
+-      "shortcuts": "Controls"
++  "adjustments": {
++    "basic": {
++      "blacks": "Blacks",
++      "contrast": "Contrast",
++      "evShift": "EV Shift",
++      "exposure": "Exposure",
++      "highlights": "Highlights",
++      "mappers": {
++        "agx": "AgX",
++        "agxDesc": "Film-like Tonemapping",
++        "basic": "Basic",
++        "basicDesc": "Standard Tonemapping"
++      },
++      "reset": "Reset",
++      "shadows": "Shadows",
++      "toneMapper": "Tone Mapper",
++      "whites": "Whites"
+     },
+-    "general": {
+-      "title": "General Settings",
+-      "theme": "Theme",
+-      "themeDesc": "Change the look and feel of the application.",
+-      "xmpSync": "XMP Metadata Sync",
+-      "xmpSyncDesc": "Sync ratings, color labels and tags to standard XMP sidecar files for compatibility with other photo editors.",
+-      "enableXmpSync": "Enable XMP Sync",
+-      "createXmp": "Create Missing XMP Files",
+-      "createXmpDesc": "Automatically create a new XMP sidecar file if one does not exist for an image.",
+-      "createXmpMissing": "Create XMP if missing",
+-      "folderImageCounts": "Folder Image Counts",
+-      "folderImageCountsDesc": "Show the number of images inside folders when hovering over the folder tree.",
+-      "showImageCounts": "Show Image Counts",
+-      "focusMode": "Focus Mode",
+-      "focusModeDesc": "Helps you focus by automatically closing other panels when you open a new one.",
+-      "enableFocusMode": "Enable Focus Mode",
+-      "font": "Font",
+-      "fontDesc": "Change the application font.",
+-      "poppins": "Poppins",
+-      "system": "System Default",
+-      "nativeTitlebar": "Native Titlebar",
+-      "nativeTitlebarDesc": "Use your system's default window titlebar instead of RapidRAW's custom one.",
+-      "enableOsTitlebar": "Enable OS Titlebar"
++    "color": {
++      "ariaSelectColor": "Select {{name}} color",
++      "calibration": {
++        "colors": {
++          "blue": "Blue",
++          "green": "Green",
++          "red": "Red"
++        },
++        "hue": "Hue",
++        "primaries": "Primaries",
++        "saturation": "Saturation",
++        "shadows": "Shadows",
++        "tint": "Tint",
++        "title": "Color Calibration"
++      },
++      "colorGrading": "Color Grading",
++      "colorMixer": "Color Mixer",
++      "grading": {
++        "balance": "Balance",
++        "blending": "Blending",
++        "global": "Global",
++        "highlights": "Highlights",
++        "midtones": "Midtones",
++        "shadows": "Shadows"
++      },
++      "hue": "Hue",
++      "luminance": "Luminance",
++      "mixerColors": {
++        "aquas": "Aquas",
++        "blues": "Blues",
++        "greens": "Greens",
++        "magentas": "Magentas",
++        "oranges": "Oranges",
++        "purples": "Purples",
++        "reds": "Reds",
++        "yellows": "Yellows"
++      },
++      "presence": "Presence",
++      "saturation": "Saturation",
++      "temperature": "Temperature",
++      "tint": "Tint",
++      "toggleSliders": "Toggle Sliders",
++      "vibrance": "Vibrance",
++      "wbPickerTooltip": "White Balance Picker",
++      "wbPickerWgpuDisabled": "WB Picker: Disable WGPU in Settings.",
++      "whiteBalance": "White Balance"
+     },
+-    "adjustments": {
+-      "title": "Adjustments Visibility",
+-      "description": "Hide adjustment sections you don't use often to simplify the editing panel. Your settings will be preserved and applied even when hidden.",
++    "curves": {
++      "channels": {
++        "blue": "Blue",
++        "green": "Green",
++        "luma": "Luma",
++        "red": "Red"
++      },
++      "channelTitle": "{{channel}} Channel",
++      "copyParametric": "Copy {{channel}} Parametric Curve",
++      "copyPoint": "Copy {{channel}} Point Curve",
++      "curveDataUnavailable": "Curve data not available.",
++      "parametricCurve": "Parametric Curve",
++      "params": {
++        "blackLevel": "Black Level",
++        "darks": "Darks",
++        "highlights": "Highlights",
++        "lights": "Lights",
++        "shadows": "Shadows",
++        "whiteLevel": "White Level"
++      },
++      "pasteFromParametric": "Paste from Parametric Curve",
++      "pasteParametric": "Paste Parametric Curve",
++      "pastePoint": "Paste Point Curve",
++      "pointCurve": "Point Curve",
++      "resetAllParametric": "Reset All Parametric Curves",
++      "resetAllPoint": "Reset All Point Curves",
++      "resetParametric": "Reset {{channel}} Parametric Curve",
++      "resetPoint": "Reset {{channel}} Point Curve"
++    },
++    "details": {
++      "blueYellow": "Blue/Yellow",
++      "centre": "Centré",
+       "chromaticAberration": "Chromatic Aberration",
++      "clarity": "Clarity",
++      "color": "Color",
++      "dehaze": "Dehaze",
++      "luminance": "Luminance",
++      "noiseReduction": "Noise Reduction",
++      "presence": "Presence",
++      "redCyan": "Red/Cyan",
++      "sharpening": "Sharpening",
++      "sharpness": "Sharpness",
++      "structure": "Structure",
++      "threshold": "Threshold"
++    },
++    "effects": {
++      "amount": "Amount",
++      "creative": "Creative",
++      "feather": "Feather",
++      "glow": "Glow",
+       "grain": "Grain",
+-      "colorCalibration": "Color Calibration",
+-      "noiseReduction": "Noise Reduction"
++      "halation": "Halation",
++      "lightFlares": "Light Flares",
++      "lut": "LUT",
++      "midpoint": "Midpoint",
++      "roughness": "Roughness",
++      "roundness": "Roundness",
++      "size": "Size",
++      "vignette": "Vignette"
++    }
++  },
++  "contextMenus": {
++    "album": {
++      "emptyGroup": "(Empty Group)"
+     },
+-    "lenses": {
+-      "title": "My Lenses",
+-      "description": "Create a list of your frequently used lenses to quickly access them in the Lens Correction panel.",
+-      "addNew": "Add New Lens",
+-      "manufacturerPlaceholder": "Select Manufacturer",
+-      "modelPlaceholder": "Select Lens Model",
+-      "addButton": "Add to My Lenses",
+-      "saved": "Saved Lenses",
+-      "noLenses": "No lenses added yet.",
+-      "removeTooltip": "Remove lens"
++    "albumIcons": {
++      "automotive": "Automotive",
++      "default": "Folder (Default)",
++      "favorites": "Favorites",
++      "featured": "Featured",
++      "locations": "Locations",
++      "nature": "Nature",
++      "people": "People",
++      "person": "Person",
++      "photography": "Photography",
++      "portfolio": "Portfolio",
++      "summer": "Summer",
++      "travel": "Travel"
+     },
+-    "tagging": {
+-      "title": "Tagging",
+-      "aiTagging": "AI Tagging",
+-      "automaticAiTagging": "Automatic AI Tagging",
+-      "aiTaggingDesc": "Enables automatic image tagging using an AI (CLIP) model. This will download an additional model and impact performance while browsing folders. Tags are used for searching a folder.",
+-      "maxAiTags": "Maximum AI Tags",
+-      "maxAiTagsDesc": "The maximum number of tags to generate per image.",
+-      "amount": "Amount",
+-      "customList": "Custom AI Tag List",
+-      "customListDesc": "If provided, the AI will ONLY use tags from this list, overriding RapidRAW’s built-in list. Tagging works only in English.",
+-      "noCustomTags": "No custom AI tags (Using built-in list)",
+-      "addCustomPlaceholder": "Add custom AI tags (comma separated)...",
+-      "addCustomTooltip": "Add AI tag",
+-      "clearCustomTooltip": "Clear AI Tag List",
+-      "removeCustomTooltip": "Remove tag \"{{tag}}\"",
+-      "shortcuts": "Tagging Shortcuts",
+-      "shortcutsDesc": "A list of tags that will appear as shortcuts in the tagging context menu.",
+-      "noShortcuts": "No shortcuts added",
+-      "addShortcutsPlaceholder": "Add shortcuts (comma separated)...",
+-      "addShortcutTooltip": "Add Shortcut",
+-      "clearShortcutsTooltip": "Clear Shortcuts Tag List",
+-      "removeShortcutTooltip": "Remove shortcut \"{{shortcut}}\"",
+-      "clearAiTagsTitle": "Clear AI Tags",
+-      "clearAiTagsButton": "Clear",
+-      "clearAiTagsDesc": "This will remove all AI-generated tags from your .rrdata files in all active root folders. User-added tags will be kept.",
+-      "clearAllTagsTitle": "Clear All Tags",
+-      "clearAllTagsDesc": "This will remove all AI-generated and user-added tags from your .rrdata files in all active root folders. Color labels will be kept."
++    "albums": {
++      "alreadyAtRoot": "Already at Root",
++      "alreadyHere": "Already Here",
++      "confirmDeleteAlbum": "Confirm Delete Album",
++      "confirmDeleteGroupEmpty": "Confirm Delete Album Group",
++      "confirmDeleteGroupNested": "Confirm Delete Group & All Nested Albums",
++      "deleteAlbum": "Delete Album",
++      "deleteGroup": "Delete Group",
++      "moveHere": "Move Here",
++      "moveTo": "Move To...",
++      "newAlbum": "New Album",
++      "newGroup": "New Group",
++      "renameAlbum": "Rename Album",
++      "rootDir": "Root Directory"
+     },
+-    "thanks": {
+-      "title": "Special Thanks",
+-      "description": "A huge thank you to the following projects that were very important in the development of RapidRAW:",
+-      "list": {
+-        "rawler": "For the excellent Rust crate that provides the foundation for RAW file processing in this project.",
+-        "lensfun": "For its invaluable open-source library and comprehensive database for automatic lens correction.",
+-        "negpy": "For the inspiration behind the negative conversion logic.",
+-        "lama": "For the powerful & simple image inpainting model, which enables content-aware fill and object removal.",
+-        "sam2": "For providing the foundation model used for the AI subject detection capabilities.",
+-        "u2net": "For providing the robust architecture used for the AI sky and foreground detection capabilities.",
+-        "depth": "For the powerful monocular depth estimation model that enables the AI depth masking capabilities.",
+-        "nind": "For providing AI models that power the AI noise reduction capabilities in RapidRAW.",
+-        "darktable": "For some reference implementations that guided parts of this work.",
+-        "you": "For using and supporting RapidRAW. Your interest keeps this project alive and evolving.",
+-        "youLabel": "You"
+-      }
++    "editor": {
++      "autoAdjust": "Auto Adjust Image",
++      "cancel": "Cancel",
++      "colorLabel": "Color Label",
++      "confirmReset": "Confirm Reset",
++      "convertNegative": "Convert Negative",
++      "copyAdjustments": "Copy Adjustments",
++      "cullImage": "Cull Image",
++      "denoise": "Denoise Image",
++      "exportImage": "Export Image",
++      "frameImage": "Frame Image",
++      "mergeHdr": "Merge to HDR",
++      "noLabel": "No Label",
++      "noRating": "No Rating",
++      "pasteAdjustments": "Paste Adjustments",
++      "productivity": "Productivity",
++      "rating": "Rating",
++      "ratingLabel_one": "{{count}} Star",
++      "ratingLabel_other": "{{count}} Stars",
++      "redo": "Redo",
++      "resetAdjustments": "Reset Adjustments",
++      "stitchPanorama": "Stitch Panorama",
++      "tagging": "Tagging",
++      "undo": "Undo"
+     },
+-    "processing": {
+-      "title": "Processing Engine",
+-      "previewStrategy": "Preview Rendering Strategy",
+-      "modes": {
+-        "static": "Fixed Resolution",
+-        "dynamic": "Dynamic"
+-      },
+-      "staticDesc": "The editor renders the image at a fixed resolution. This mode is the fastest and most consistent, making it ideal for lower-end hardware where smooth performance is prioritized over pixel-perfect zoom.",
+-      "previewRes": "Preview Resolution",
+-      "previewResDesc": "Determines the maximum resolution of the preview. Lower values significantly improve performance.",
+-      "dynamicDesc": "The editor renders the preview to match your display's actual pixel density. This ensures that every detail is represented with 1:1 pixel accuracy, providing maximum clarity when zooming and checking focus.",
+-      "staticPreviewRes": "Static Preview Resolution",
+-      "staticPreviewResDesc": "Sets the resolution for static previews like crop mode, lens correction, and perspective tools. Does not affect the main editor preview.",
+-      "renderScale": "Render Resolution Scale",
+-      "renderScaleDesc": "Scales the render resolution relative to your display. Lower values improve performance on high-resolution screens at the cost of some sharpness.",
+-      "highDpi": "High-DPI Rendering",
+-      "highDpiDesc": "Render previews at your screen's native {{dpr}}x physical pixel resolution. Produces the sharpest possible preview but uses significantly more memory.",
+-      "highDpiDescStandard": "This setting only affects high-DPI displays. Your current display is standard resolution.",
+-      "nativeDpi": "Render at native DPI",
+-      "livePreviews": "Live Interactive Previews",
+-      "livePreviewsDesc": "Update the preview immediately while dragging sliders. Disable this if the interface feels laggy during adjustments.",
+-      "enableLivePreviews": "Enable Live Previews",
+-      "livePreviewQuality": "Live Preview Quality",
+-      "livePreviewQualityDesc": "Controls the resolution and compression of the image while dragging sliders. Lower quality significantly improves responsiveness.",
+-      "qualities": {
+-        "full": "Full Resolution",
+-        "high": "High Quality",
+-        "performance": "Performance"
+-      },
+-      "thumbnailRes": "Thumbnail Resolution",
+-      "thumbnailResDesc": "Determines the resolution of generated library thumbnails. Higher values produce sharper images during loading.",
+-      "workerThreads": "Thumbnail Worker Threads",
+-      "workerThreadsDesc": "Number of parallel threads used to generate thumbnails. Higher values speed up library loading but use more CPU & RAM.",
+-      "threads": "Threads",
+-      "imageCache": "Decoded Image Cache",
+-      "imageCacheDesc": "Maximum number of full-resolution images kept in RAM. Higher values make switching between recently edited images instant, but use significantly more memory.",
+-      "images": "Images",
+-      "wgpu": "WGPU Direct Rendering",
+-      "wgpuDescLinux": "Bypasses browser encoding for instantly responsive live previews. (Disabled on Linux: Tauri uses GTK for webviews, which conflicts with WGPU on the same X11 surface and causes flickering.)",
+-      "wgpuDescAndroid": "Bypasses browser encoding for instantly responsive live previews. (Disabled on Android: Native WGPU surface creation is currently not supported alongside the mobile webview.)",
+-      "wgpuDescRecommended": "Bypasses browser encoding for instantly responsive live previews. Highly recommended for performance.",
+-      "wgpuLabel": "Enable Direct WGPU Render",
+-      "backend": "Processing Backend",
+-      "backendDesc": "Select the graphics API. 'Auto' is recommended. May fix crashes on some systems.",
+-      "backends": {
+-        "auto": "Auto",
+-        "vulkan": "Vulkan",
+-        "dx12": "DirectX 12",
+-        "metal": "Metal",
+-        "gl": "OpenGL"
+-      },
+-      "linuxCompat": "Linux Compatibility Mode",
+-      "linuxCompatDesc": "Enable workarounds for common GPU driver and display server issues. Disable this to enable full GPU acceleration.",
+-      "linuxCompatLabel": "Enable Compatibility Mode",
+-      "restartRequired": "Changes to the processing engine require an application restart to take effect.",
+-      "saveRelaunch": "Save & Relaunch",
+-      "preprocessing": {
+-        "title": "Image Preprocessing",
+-        "highlightRecovery": "RAW Highlight Recovery",
+-        "highlightRecoveryDesc": "Controls how much detail is recovered from clipped highlights in RAW files. Higher values recover more detail but can introduce purple artefacts.",
+-        "colorNr": "Base Color Noise Reduction",
+-        "colorNrDesc": "Applies a cross-bilateral filter early in the pipeline to remove chroma noise. Higher value = Stronger NR.",
+-        "sharpening": "Base Pre-Sharpening",
+-        "sharpeningDesc": "Applies gentle detail enhancement early in the pipeline. Higher value = More sharpening.",
+-        "applyPreprocessing": "Apply Preprocessing to Non-RAWs",
+-        "applyPreprocessingDesc": "If enabled, the base color noise reduction and pre-sharpening above will also be applied to standard formats.",
+-        "enablePreprocessingNonRaws": "Enable for Non-RAWs",
+-        "linearRaw": "Linear RAW Processing",
+-        "linearRawDesc": "Fixes color casts or pink tint in some DNG files. Controls how already processed LinearRAW data is interpreted.",
+-        "linearOptions": {
+-          "auto": "Auto",
+-          "gamma": "Apply Gamma",
+-          "skip_calib": "Skip Calibrate",
+-          "gamma_skip_calib": "Apply Gamma & Skip Calibrate"
+-        },
+-        "tonemapperOverride": "Global Tonemapper Override",
+-        "tonemapperOverrideDesc": "Force a specific tonemapper globally for all images, hiding the tonemapper switch from the adjustments panel.",
+-        "enableTonemapperOverride": "Enable Tonemapper Override",
+-        "defaultRawTonemapper": "Default RAW Tonemapper",
+-        "defaultRawTonemapperDesc": "The tonemapper to apply to RAW images.",
+-        "defaultNonRawTonemapper": "Default Non-RAW Tonemapper",
+-        "defaultNonRawTonemapperDesc": "The tonemapper to apply to non-RAW images (e.g., JPEG, PNG).",
+-        "tonemapperOptions": {
+-          "agx": "AgX",
+-          "basic": "Basic"
+-        }
+-      },
+-      "ai": {
+-        "title": "Generative AI",
+-        "description": "RapidRAW's AI is built for flexibility. Choose your ideal workflow, from fast local tools to powerful self-hosting.",
+-        "providers": {
+-          "cpu": "CPU",
+-          "aiConnector": "AI Connector",
+-          "cloud": "Cloud"
+-        },
+-        "cpu": {
+-          "title": "Built-in AI (CPU)",
+-          "description": "Integrated directly into RapidRAW, these features run entirely on your computer. They are fast, free, and require no setup, making them ideal for everyday workflow acceleration.",
+-          "feature1": "AI Masking (Subject, Sky, Foreground)",
+-          "feature2": "Automatic Image Tagging",
+-          "feature3": "Simple CPU-based Generative Replace"
+-        },
+-        "connector": {
+-          "title": "Self-Hosted (RapidRAW AI Connector)",
+-          "description": "For users with a capable GPU who want maximum control, connect RapidRAW to your own Connector server. This gives you full control for technical workflows.",
+-          "feature1": "Use your own ComfyUI instance",
+-          "feature2": "Cost-free advanced generative edits",
+-          "feature3": "Custom workflow selection",
+-          "address": "AI Connector Address",
+-          "addressDesc": "Enter the address and port of your running AI Connector instance. Required for generative AI features.",
+-          "test": "Test",
+-          "testing": "Testing...",
+-          "success": "Connection successful!",
+-          "failed": "Connection failed."
+-        },
+-        "cloud": {
+-          "title": "Cloud Service",
+-          "description": "For those who want a simpler solution, an optional subscription provides the same high-quality results as self-hosting without any hassle. This is the most convenient option and the best way to support the project.",
+-          "feature1": "Maximum convenience, no setup",
+-          "feature2": "Same results as self-hosting",
+-          "feature3": "No powerful hardware required",
+-          "signedIn": {
+-            "active": "Cloud Subscription Active",
+-            "inactive": "No Active Subscription",
+-            "manage": "Manage",
+-            "logout": "Log Out",
+-            "usage": "Monthly Usage",
+-            "usageStats": "{{requests}} / {{limit}} requests"
+-          },
+-          "signedOut": {
+-            "upgradeDesc": "To use Cloud AI features, you need a Cloud subscription.",
+-            "upgradeBtn": "Upgrade on Website",
+-            "noAccount": "Don't have an account?",
+-            "signup": "Sign up on the website"
+-          }
+-        }
+-      }
++    "folders": {
++      "changeIcon": "Change Icon",
++      "confirm": "Confirm",
++      "copyHere_one": "Copy image here",
++      "copyHere_other": "Copy {{count}} images here",
++      "deleteFolder": "Delete Folder",
++      "importImages": "Import Images",
++      "moveHere_one": "Move image here",
++      "moveHere_other": "Move {{count}} images here",
++      "newFolder": "New Folder",
++      "paste": "Paste",
++      "pin": "Pin Folder",
++      "refresh": "Refresh Folders",
++      "removeRoot": "Remove Root Folder",
++      "renameFolder": "Rename Folder",
++      "showExplorer": "Show in File Explorer",
++      "unpin": "Unpin Folder"
+     },
+-    "data": {
+-      "title": "Data Management",
+-      "clearSidecars": "Clear All Sidecar Files",
+-      "clearSidecarsDesc": "This will delete all .rrdata files (containing your edits) within your root folders:",
+-      "noFolders": "No folders selected",
+-      "clearSidecarsButton": "Clear",
+-      "clearThumbnail": "Clear Thumbnail Cache",
+-      "clearThumbnailDesc": "This will delete all cached thumbnail images. They will be regenerated automatically as you browse your library.",
+-      "clearThumbnailButton": "Clear",
+-      "logs": "View Application Logs",
+-      "logsDesc": "View the application's log file for troubleshooting. The log is located at:",
+-      "loading": "Loading...",
+-      "logsButton": "Open",
+-      "modals": {
+-        "confirmTitle": "Confirm Deletion",
+-        "confirmAiTitle": "Confirm AI Tag Deletion",
+-        "confirmAllTitle": "Confirm All Tag Deletion",
+-        "confirmCacheTitle": "Confirm Cache Deletion",
+-        "confirmDeleteAllEdits": "Delete All Edits",
+-        "confirmClear": "Clear",
+-        "confirmClearAi": "Clear AI Tags",
+-        "confirmClearAll": "Clear All Tags",
+-        "confirmClearCache": "Clear Cache",
+-        "sidecarMessage": "Are you sure you want to delete all sidecar files?\n\nThis will permanently remove all your edits for all images inside all active root folders and their subfolders.",
+-        "aiMessage": "Are you sure you want to remove all AI-generated tags from all images in all active root folders?\n\nThis will not affect user-added tags. This action cannot be undone.",
+-        "allMessage": "Are you sure you want to remove all AI-generated and user-added tags from all images in all active root folders?\n\nThis action cannot be undone.",
+-        "cacheMessage": "Are you sure you want to clear the thumbnail cache?\n\nAll thumbnails will need to be regenerated, which may be slow for large folders."
+-      },
+-      "statuses": {
+-        "deleting": "Deleting sidecar files, please wait...",
+-        "clearingAi": "Clearing AI tags from all sidecar files...",
+-        "clearingAll": "Clearing all tags from sidecar files...",
+-        "clearingCache": "Clearing thumbnail cache...",
+-        "sidecarSuccess": "{{count}} sidecar files deleted successfully.",
+-        "aiSuccess": "{{count}} files updated. AI tags removed.",
+-        "allSuccess": "{{count}} files updated. All non-color tags removed.",
+-        "cacheSuccess": "Thumbnail cache cleared successfully.",
+-        "processing": "Processing...",
+-        "failedToGetPath": "Could not retrieve log file path."
+-      }
++    "library": {
++      "addCopiedToAlbum_one": "Add copied image to album",
++      "addCopiedToAlbum_other": "Add {{count}} copied images to album",
++      "refreshView": "Refresh View"
+     },
+-    "controls": {
+-      "title": "Mouse Controls",
+-      "optimization": "Input Device Optimization",
+-      "optimizationDesc": "Choose the primary input device you use to pan and zoom the canvas.",
+-      "modes": {
+-        "mouse": "Mouse",
+-        "trackpad": "Touchpad"
+-      },
+-      "zoom": "Zoom Speed Multiplier",
+-      "zoomDesc": "Adjust how fast the canvas zooms in and out when using the scroll wheel or pinch gesture.",
+-      "speed": "Speed",
+-      "keyboardTitle": "Keyboard Controls",
+-      "resetDefaults": "Reset All to Defaults",
+-      "pressKey": "Press a key... (Esc to clear)",
+-      "notAssigned": "Not assigned"
++    "thumbnail": {
++      "addToAlbum": "Add to Album",
++      "autoAdjust_one": "Auto Adjust Image",
++      "autoAdjust_other": "Auto Adjust Images",
++      "collage_one": "Frame Image",
++      "collage_other": "Create Collage",
++      "confirmDelete": "Confirm Delete",
++      "confirmDeleteVc": "Confirm Delete + Virtual Copies",
++      "convertNegative_one": "Convert Negative",
++      "convertNegative_other": "Convert Negatives",
++      "copyImage_one": "Copy Image",
++      "copyImage_other": "Copy {{count}} Images",
++      "cullImage_one": "Cull Image",
++      "cullImage_other": "Cull Images",
++      "deleteAssociated": "Delete + Associated",
++      "deleteImage_one": "Delete Image",
++      "deleteImage_other": "Delete {{count}} Images",
++      "deleteSelected": "Delete Selected Only",
++      "denoise_one": "Denoise Image",
++      "denoise_other": "Denoise Images",
++      "duplicateImage": "Duplicate Image",
++      "exportImage_one": "Export Image",
++      "exportImage_other": "Export {{count}} Images",
++      "noAlbums": "No Albums Available",
++      "pasteAdjustments_one": "Paste Adjustments",
++      "pasteAdjustments_other": "Paste Adjustments to {{count}} Images",
++      "physicalCopy": "Physical Copy",
++      "removeFromAlbum_one": "Remove from Album",
++      "removeFromAlbum_other": "Remove {{count}} Images from Album",
++      "renameImage_one": "Rename Image",
++      "renameImage_other": "Rename {{count}} Images",
++      "resetAdjustments_one": "Reset Adjustments",
++      "resetAdjustments_other": "Reset Adjustments on {{count}} Images",
++      "showExplorer": "Show in File Explorer",
++      "virtualCopy": "Virtual Copy"
+     },
+-    "tooltips": {
+-      "goHome": "Go to Home"
++    "toasts": {
++      "couldNotShowExplorer": "Could not show file in explorer: {{err}}",
++      "couldNotShowFolder": "Could not show folder: {{err}}",
++      "failedAddToAlbum": "Failed to add to album: {{err}}",
++      "failedApplyAuto": "Failed to apply auto adjustments: {{err}}",
++      "failedChangeIcon": "Failed to change icon: {{err}}",
++      "failedCopy": "Failed to copy files: {{err}}",
++      "failedCreateVirtualCopy": "Failed to create virtual copy: {{err}}",
++      "failedDelete": "Failed to delete: {{err}}",
++      "failedDeleteFolder": "Failed to delete folder: {{err}}",
++      "failedDuplicate": "Failed to duplicate file: {{err}}",
++      "failedMove": "Failed to move files: {{err}}",
++      "failedMoveError": "Failed to move: {{err}}",
++      "failedMoveInvalid": "Failed to move: Target group not found or invalid.",
++      "failedRemoveImages": "Failed to remove images: {{err}}"
+     }
+   },
+-  "library": {
+-    "header": {
+-      "title": "Library",
+-      "search": {
+-        "indexingProgress": "Indexing... ({{current}}/{{total}})",
+-        "indexingImages": "Indexing Images...",
+-        "addFilterOrSearch": "Add filter or search...",
+-        "searchOrQuery": "Search or add query",
+-        "tooltipSearchFilter": "Search or Filter",
+-        "matchAll": "Match ALL tags",
+-        "matchAny": "Match ANY tags",
+-        "tooltipAdvancedQueries": "Advanced Queries: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony",
+-        "tooltipClearSearch": "Clear search"
++  "editor": {
++    "adjustments": {
++      "actions": {
++        "copySectionSettings": "Copy {{section}} Settings",
++        "pasteLabel": "Paste {{section}} Settings",
++        "pasteSettings": "Paste Settings",
++        "resetSectionSettings": "Reset {{section}} Settings"
+       },
+-      "viewOptions": {
+-        "title": "View Options",
+-        "thumbnailSize": "Thumbnail Size",
+-        "thumbnailFit": "Thumbnail Fit",
+-        "displayMode": "Display Mode",
+-        "showMetadata": "Show Metadata",
+-        "filterByRating": "Filter by Rating",
+-        "filterByFileType": "Filter by File Type",
+-        "filterByColorLabel": "Filter by Color Label",
+-        "sortBy": "Sort by",
+-        "currentFolder": "Current Folder",
+-        "recursive": "Recursive",
+-        "metadataOff": "Off",
+-        "metadataHover": "On Hover",
+-        "metadataAlways": "Always",
+-        "noLabel": "No Label",
+-        "sortDescending": "Sort Descending",
+-        "sortAscending": "Sort Ascending",
+-        "exifDisabledTooltip": "Enable EXIF Reading in Settings to use this option."
++      "title": "Adjustments",
++      "tooltips": {
++        "autoAdjust": "Auto Adjust Image",
++        "resetAdjustments": "Reset Adjustments",
++        "toggleAnalytics": "Toggle Analytics Display"
+       }
+     },
+-    "splash": {
+-      "brand": "RapidRAW",
+-      "welcomeBack": "Welcome back!",
+-      "welcomeBackDesc": "Continue where you left off or start a new session.",
+-      "descriptionAndroid": "A blazingly fast, GPU-accelerated RAW image editor. Open the library to begin.",
+-      "descriptionDesktop": "A blazingly fast, GPU-accelerated RAW image editor. Open a folder to begin.",
+-      "continueSession": "Continue Session",
+-      "openLibrary": "Open Library",
+-      "addFolder": "Add Folder",
+-      "openFolder": "Open Folder",
+-      "goToSettings": "Go to Settings",
+-      "imagesBy": "Images by",
+-      "version": "Version {{version}}",
+-      "downloadVersion": "Click to download version {{version}}",
+-      "latestVersion": "You are on the latest version",
+-      "donate": "Donate on Ko-Fi",
+-      "or": "or",
+-      "contribute": "Contribute on GitHub"
+-    },
+-    "import": {
+-      "progress": "Importing... ({{current}}/{{total}})",
+-      "complete": "Import Complete!",
+-      "failed": "Import Failed!"
+-    },
+-    "status": {
+-      "downloading": "Downloading {{status}}...",
+-      "indexing": "Indexing images... ({{current}}/{{total}})",
+-      "importing": "Importing images... ({{current}}/{{total}})",
+-      "processing": "Processing images...",
+-      "moment": "This may take a moment."
+-    },
+-    "search": {
+-      "noResults": "No Results Found",
+-      "noResultsDesc": "Could not find an image based on filename or tags.",
+-      "noResultsAiHint": " For a more comprehensive search, enable automatic tagging in Settings."
+-    },
+-    "filters": {
+-      "noMatch": "No images found that match your filter.",
+-      "rating": {
+-        "all": "Show All",
+-        "unrated": "Unrated Only",
+-        "oneAndUp": "1 & up",
+-        "twoAndUp": "2 & up",
+-        "threeAndUp": "3 & up",
+-        "fourAndUp": "4 & up",
+-        "fiveOnly": "5 only"
+-      },
+-      "raw": {
+-        "all": "All Types",
+-        "rawOnly": "RAW Only",
+-        "nonRawOnly": "Non-RAW Only",
+-        "preferRaw": "Prefer RAW"
+-      }
+-    },
+-    "thumbnailSize": {
+-      "small": "Small",
+-      "medium": "Medium",
+-      "large": "Large",
+-      "list": "List"
+-    },
+-    "thumbnailFit": {
+-      "fillSquare": "Fill Square",
+-      "originalRatio": "Original Ratio"
+-    },
+-    "sort": {
+-      "fileName": "File Name",
+-      "dateModified": "Date Modified",
+-      "rating": "Rating",
+-      "dateTaken": "Date Taken",
+-      "focalLength": "Focal Length",
+-      "iso": "ISO",
+-      "shutterSpeed": "Shutter Speed",
+-      "aperture": "Aperture"
+-    },
+-    "tooltips": {
+-      "communityPresets": "Community Presets",
+-      "goHome": "Go to Home",
+-      "importImages": "Import Images"
+-    },
+-    "grid": {
+-      "columns": {
+-        "name": "Name",
+-        "modified": "Modified",
+-        "rating": "Rating",
+-        "label": "Label",
+-        "shutter": "Shutter",
+-        "aperture": "Aperture",
+-        "iso": "ISO",
+-        "focal": "Focal"
+-      }
+-    },
+-    "items": {
+-      "tooltipVirtualCopy": "Virtual Copy",
+-      "tooltipShutterSpeed": "Shutter Speed",
+-      "tooltipAperture": "Aperture",
+-      "tooltipIso": "ISO",
+-      "tooltipFocalLength": "Focal Length",
+-      "currentFolder": "Current Folder",
+-      "collapseFolder": "Collapse Folder",
+-      "expandFolder": "Expand Folder",
+-      "imagesCount_one": "1 image",
+-      "imagesCount_other": "{{count}} images"
+-    },
+-    "folders": {
+-      "searchPlaceholder": "Search folders...",
+-      "noFoldersFound": "No folders found.",
+-      "loading": "Loading folders...",
+-      "openFolderInstruction": "Open a folder to see its structure.",
+-      "addFolder": "Add folder",
+-      "albumsEmpty": "Right-click to create an album.",
+-      "collapseSection": "Collapse {{section}}",
+-      "expandSection": "Expand {{section}}",
+-      "sections": {
+-        "pinned": "Pinned",
+-        "albums": "Albums",
+-        "folders": "Folders"
+-      },
+-      "tooltips": {
+-        "expand": "Expand",
+-        "collapse": "Collapse",
+-        "clearSearch": "Clear search"
+-      }
+-    },
+-    "community": {
+-      "headerTitle": "Community Presets",
+-      "headerDesc": "Discover presets created by the community.",
+-      "searchPlaceholder": "Search presets...",
+-      "sortBy": "Sort by:",
+-      "fetchingPresets": "Fetching presets from GitHub...",
+-      "actionSave": "Save",
+-      "actionSaving": "Saving...",
+-      "actionSaved": "Saved",
+-      "presetBy": "by {{creator}}",
+-      "footerHeading": "Want to get your preset featured?",
+-      "footerLinkText": "Create an issue on GitHub",
+-      "sortMethods": {
+-        "name": "Name (A-Z)"
+-      }
+-    }
+-  },
+-  "ui": {
+-    "slider": {
+-      "reset": "Reset",
+-      "clickToEdit": "Click to edit"
+-    },
+-    "lut": {
+-      "filterLabel": "LUT Files",
+-      "unsupportedFormat": "Unsupported file format(s) detected: .{{ext}}",
+-      "label": "LUT",
+-      "selectLutFile": "Select a LUT file",
+-      "select": "Select",
+-      "clearLut": "Clear LUT",
+-      "intensity": "Intensity"
+-    },
+-    "imagePicker": {
+-      "filterLabel": "Image Files",
+-      "selectImageFile": "Select an image file",
+-      "select": "Select",
+-      "clearImage": "Clear Image"
+-    },
+-    "exportPresets": {
+-      "heading": "Export Presets",
+-      "placeholder": "Select a preset...",
+-      "saveAsNewTooltip": "Save current settings as new preset",
+-      "savedTooltip": "Saved!",
+-      "overwriteTooltip": "Overwrite selected preset",
+-      "deleteTooltip": "Delete preset",
+-      "presetNamePlaceholder": "Preset Name"
+-    },
+-    "colorWheel": {
+-      "reset": "Reset",
+-      "hue": "Hue",
+-      "saturation": "Saturation",
+-      "luminance": "Luminance",
+-      "hueAbbreviation": "H:",
+-      "saturationAbbreviation": "S:"
+-    },
+-    "collapsibleSection": {
+-      "disableSection": "Disable Section",
+-      "enableSection": "Enable Section"
+-    },
+-    "bottomBar": {
+-      "imagesSelected": "{{current}} of {{total}} images selected",
+-      "zoomLabelReset": "Reset Zoom",
+-      "zoomLabel": "Zoom",
+-      "tooltips": {
+-        "selectToRate": "Select an image to rate",
+-        "rateStars_one": "Rate 1 star",
+-        "rateStars_other": "Rate {{count}} stars",
+-        "copySettings": "Copy Settings",
+-        "pasteSettings": "Paste Settings",
+-        "copyPasteSettings": "Copy & Paste Settings",
+-        "export": "Export",
+-        "resetZoom": "Reset Zoom to Fit Window",
+-        "customZoom": "Click to enter custom zoom percentage",
+-        "collapseFilmstrip": "Collapse Filmstrip",
+-        "expandFilmstrip": "Expand Filmstrip"
+-      }
+-    },
+-    "filmstrip": {
+-      "virtualCopyAbbreviation": "VC",
+-      "tooltips": {
+-        "virtualCopy": "Virtual Copy",
+-        "color": "Color: {{color}}"
+-      }
+-    },
+-    "waveform": {
+-      "tooltips": {
+-        "luma": "Luma",
+-        "rgb": "RGB Overlay",
+-        "parade": "Parade",
+-        "vectorscope": "Vectorscope",
+-        "histogram": "Histogram",
+-        "showClipping": "Show Clipping Warnings",
+-        "hideClipping": "Hide Clipping Warnings"
+-      }
+-    }
+-  },
+-  "editor": {
+     "ai": {
+-      "inpaintingTitle": "Inpainting",
+-      "resetInpaintingTooltip": "Reset Inpainting",
+-      "noImageSelected": "No image selected.",
+-      "createNewTitle": "Create New Generative Edit",
+-      "comingSoon": "Coming Soon",
+-      "createNewTooltip": "Create New {{name}} Edit",
+-      "editsTitle": "Edits",
+-      "dropzoneText": "Drop here to create a new edit",
++      "actions": {
++        "addNewComponent": "Add New Component",
++        "copyComponent": "Copy Component",
++        "copyEdit": "Copy Edit",
++        "deleteComponent": "Delete Component",
++        "deleteEdit": "Delete Edit",
++        "duplicateAndInvertComponent": "Duplicate and Invert Component",
++        "duplicateAndInvertEdit": "Duplicate and Invert Edit",
++        "duplicateComponent": "Duplicate Component",
++        "duplicateEdit": "Duplicate Edit",
++        "hideEdit": "Hide Edit",
++        "intersectEditWith": "Intersect Edit with",
++        "pasteComponent": "Paste Component",
++        "pasteEdit": "Paste Edit",
++        "rename": "Rename",
++        "resetSelection": "Reset Selection",
++        "showEdit": "Show Edit",
++        "subtractFromEdit": "Subtract from Edit",
++        "switchToAdd": "Switch to Add",
++        "switchToIntersect": "Switch to Intersect",
++        "switchToSubtract": "Switch to Subtract"
++      },
+       "addNewEdit": "Add New Edit",
+-      "editSettingsTitle": "Edit Settings",
+       "brush": {
+-        "size": "Brush Size",
+-        "feather": "Brush Feather",
+         "add": "Add",
+-        "erase": "Erase"
++        "erase": "Erase",
++        "feather": "Brush Feather",
++        "size": "Brush Size"
+       },
++      "comingSoon": "Coming Soon",
+       "connection": {
+-        "ready": "Ready",
+-        "upgradeRequired": "Upgrade Required",
+-        "notLoggedIn": "Not Logged In",
+-        "notDetected": "Not Detected",
+         "backendLabel": "AI Backend:",
++        "builtinDesc": "Using basic local CPU. Select Cloud or AI Connector in settings for generative replace.",
++        "builtinLabel": "Built-in AI:",
+         "cloudLabel": "Cloud AI:",
++        "connectorConnectedDesc": "Connected to local generative backend.",
++        "connectorDisconnectedDesc": "Only simple inpainting available. Start your local backend.",
+         "connectorLabel": "AI Connector:",
+-        "builtinLabel": "Built-in AI:",
++        "loginRequiredDesc": "Log in via Settings to use Cloud AI.",
+         "monthlyUsage": "Monthly Usage",
++        "notDetected": "Not Detected",
++        "notLoggedIn": "Not Logged In",
+         "proRequiredDesc": "Pro subscription required. Upgrade in Settings.",
+-        "loginRequiredDesc": "Log in via Settings to use Cloud AI.",
+-        "connectorConnectedDesc": "Connected to local generative backend.",
+-        "connectorDisconnectedDesc": "Only simple inpainting available. Start your local backend.",
+-        "builtinDesc": "Using basic local CPU. Select Cloud or AI Connector in settings for generative replace."
+-      },
+-      "actions": {
+-        "rename": "Rename",
+-        "duplicateEdit": "Duplicate Edit",
+-        "duplicateAndInvertEdit": "Duplicate and Invert Edit",
+-        "copyEdit": "Copy Edit",
+-        "pasteEdit": "Paste Edit",
+-        "resetSelection": "Reset Selection",
+-        "deleteEdit": "Delete Edit",
+-        "hideEdit": "Hide Edit",
+-        "showEdit": "Show Edit",
+-        "addNewComponent": "Add New Component",
+-        "subtractFromEdit": "Subtract from Edit",
+-        "intersectEditWith": "Intersect Edit with",
+-        "duplicateComponent": "Duplicate Component",
+-        "duplicateAndInvertComponent": "Duplicate and Invert Component",
+-        "copyComponent": "Copy Component",
+-        "pasteComponent": "Paste Component",
+-        "deleteComponent": "Delete Component",
+-        "switchToSubtract": "Switch to Subtract",
+-        "switchToIntersect": "Switch to Intersect",
+-        "switchToAdd": "Switch to Add"
++        "ready": "Ready",
++        "upgradeRequired": "Upgrade Required"
+       },
++      "createNewTitle": "Create New Generative Edit",
++      "createNewTooltip": "Create New {{name}} Edit",
++      "dropzoneText": "Drop here to create a new edit",
++      "editSettingsTitle": "Edit Settings",
++      "editsTitle": "Edits",
++      "inpaintingTitle": "Inpainting",
++      "noImageSelected": "No image selected.",
+       "patches": {
+-        "quickErase": "Quick Erase {{count}}",
+-        "aiEdit": "AI Edit {{count}}",
+-        "invertedName": "{{name}} Inverted"
++        "aiEdit_one": "",
++        "aiEdit_other": "",
++        "invertedName": "{{name}} Inverted",
++        "quickErase_one": "",
++        "quickErase_other": ""
+       },
++      "resetInpaintingTooltip": "Reset Inpainting",
+       "settings": {
+-        "generativeReplaceTitle": "Generative Replace",
+-        "downloading": "Downloading: ",
+-        "quickEraseDesc": "Fill selection to remove the object.",
+-        "fastInpaintDesc": "Fill selection based on surrounding pixels.",
+-        "generativeDesc": "Describe what you want to generate in the selected area.",
+-        "useBasicInpaint": "Use basic inpainting",
++        "aiModelDownloading": "AI Model Downloading: ",
+         "basicInpaintTooltipDisabled": "Generative backend not available or not configured. Basic inpainting is required.",
+         "basicInpaintTooltipEnabled": "Basic inpainting is quicker but not generative. Uncheck to use Generative AI with a text prompt.",
+-        "placeholder": "e.g., a field of flowers",
++        "componentPropertiesTitle": "{{name}} Properties",
++        "downloading": "Downloading: ",
++        "fastInpaintDesc": "Fill selection based on surrounding pixels.",
++        "generateWithAiButton": "Generate with AI",
+         "generating": "Generating...",
++        "generativeDesc": "Describe what you want to generate in the selected area.",
++        "generativeReplaceTitle": "Generative Replace",
+         "inpaintSelectionButton": "Inpaint Selection",
+-        "generateWithAiButton": "Generate with AI",
+-        "componentPropertiesTitle": "{{name}} Properties",
+-        "selectionPropertiesTitle": "Selection Properties",
+         "invertComponent": "Invert Component",
+         "invertSelection": "Invert Selection",
+-        "aiModelDownloading": "AI Model Downloading: "
+-      },
+-      "params": {
+-        "feather": "Feather",
+-        "grow": "Grow"
+-      }
+-    },
+-    "adjustments": {
+-      "title": "Adjustments",
+-      "tooltips": {
+-        "autoAdjust": "Auto Adjust Image",
+-        "toggleAnalytics": "Toggle Analytics Display",
+-        "resetAdjustments": "Reset Adjustments"
+-      },
+-      "sections": {
+-        "basic": "Basic",
+-        "curves": "Curves",
+-        "color": "Color",
+-        "details": "Details",
+-        "effects": "Effects"
+-      },
+-      "actions": {
+-        "copySectionSettings": "Copy {{section}} Settings",
+-        "pasteLabel": "Paste {{section}} Settings",
+-        "pasteSettings": "Paste Settings",
+-        "resetSectionSettings": "Reset {{section}} Settings"
++        "placeholder": "e.g., a field of flowers",
++        "quickEraseDesc": "Fill selection to remove the object.",
++        "selectionPropertiesTitle": "Selection Properties",
++        "useBasicInpaint": "Use basic inpainting"
+       }
+     },
+     "crop": {
+-      "title": "Crop & Transform",
+-      "resetTooltip": "Reset Crop & Transform",
+       "aspectRatioHeading": "Aspect Ratio",
+-      "rotationHeading": "Rotation",
+-      "orientationHeading": "Orientation",
+-      "geometryHeading": "Geometry",
+       "custom": {
+-        "wPlaceholder": "W",
+         "hPlaceholder": "H",
+-        "wTooltip": "Width",
+-        "hTooltip": "Height"
++        "hTooltip": "Height",
++        "wPlaceholder": "W",
++        "wTooltip": "Width"
+       },
+-      "presets": {
+-        "free": { "name": "Free", "desc": "Freeform crop" },
+-        "original": { "name": "Original", "desc": "Original image aspect ratio" },
+-        "sq": { "name": "1:1", "desc": "Square - Instagram, profile pictures" },
+-        "r54": { "name": "5:4", "desc": "5:4 - Instagram landscape, 8x10 prints" },
+-        "r43": { "name": "4:3", "desc": "4:3 - Traditional monitors, tablets" },
+-        "r32": { "name": "3:2", "desc": "3:2 - 35mm film, DSLR cameras" },
+-        "r169": { "name": "16:9", "desc": "16:9 - Widescreen, desktop wallpapers, YouTube" },
+-        "r219": { "name": "21:9", "desc": "21:9 - Ultrawide monitors, cinematic" },
+-        "r6524": { "name": "65:24", "desc": "65:24 - Panoramic 35mm wide format" },
+-        "custom": { "name": "Custom", "tooltip": "Enter custom aspect ratio" }
++      "geometryHeading": "Geometry",
++      "labels": {
++        "flipHoriz": "Flip Horiz",
++        "flipVert": "Flip Vert",
++        "lens": "Lens",
++        "rotateLeft": "Rotate Left",
++        "rotateRight": "Rotate Right",
++        "transform": "Transform"
+       },
++      "orientationHeading": "Orientation",
+       "overlays": {
+-        "none": { "name": "None", "desc": "No overlay" },
+-        "thirds": { "name": "Thirds", "desc": "Rule of Thirds" },
+-        "diagonal": { "name": "Diagonal Lines", "desc": "Diagonal Lines" },
+-        "triangle": { "name": "Triangle", "desc": "Golden Triangle" },
+-        "spiral": { "name": "Spiral", "desc": "Golden Spiral (Fibonacci)" },
+-        "phiGrid": { "name": "Phi Grid", "desc": "Phi Grid (Golden Ratio)" },
+-        "armature": { "name": "Armature", "desc": "Armature" }
++        "armature": {
++          "desc": "Armature",
++          "name": "Armature"
++        },
++        "diagonal": {
++          "desc": "Diagonal Lines",
++          "name": "Diagonal Lines"
++        },
++        "none": {
++          "desc": "No overlay",
++          "name": "None"
++        },
++        "phiGrid": {
++          "desc": "Phi Grid (Golden Ratio)",
++          "name": "Phi Grid"
++        },
++        "spiral": {
++          "desc": "Golden Spiral (Fibonacci)",
++          "name": "Spiral"
++        },
++        "thirds": {
++          "desc": "Rule of Thirds",
++          "name": "Thirds"
++        },
++        "triangle": {
++          "desc": "Golden Triangle",
++          "name": "Triangle"
++        }
++      },
++      "presets": {
++        "custom": {
++          "name": "Custom",
++          "tooltip": "Enter custom aspect ratio"
++        },
++        "free": {
++          "desc": "Freeform crop",
++          "name": "Free"
++        },
++        "original": {
++          "desc": "Original image aspect ratio",
++          "name": "Original"
++        },
++        "r169": {
++          "desc": "16:9 - Widescreen, desktop wallpapers, YouTube",
++          "name": "16:9"
++        },
++        "r219": {
++          "desc": "21:9 - Ultrawide monitors, cinematic",
++          "name": "21:9"
++        },
++        "r32": {
++          "desc": "3:2 - 35mm film, DSLR cameras",
++          "name": "3:2"
++        },
++        "r43": {
++          "desc": "4:3 - Traditional monitors, tablets",
++          "name": "4:3"
++        },
++        "r54": {
++          "desc": "5:4 - Instagram landscape, 8x10 prints",
++          "name": "5:4"
++        },
++        "r6524": {
++          "desc": "65:24 - Panoramic 35mm wide format",
++          "name": "65:24"
++        },
++        "sq": {
++          "desc": "Square - Instagram, profile pictures",
++          "name": "1:1"
++        }
+       },
++      "resetTooltip": "Reset Crop & Transform",
++      "rotationHeading": "Rotation",
++      "title": "Crop & Transform",
+       "tooltips": {
+-        "straighten": "Straighten Tool (S)",
+-        "resetFineRotation": "Reset Fine Rotation",
+-        "rotateLeft": "Rotate 90° counter-clockwise",
+-        "rotateRight": "Rotate 90° clockwise",
++        "compositionOverlay": "Composition Overlay",
+         "flipHoriz": "Flip image horizontally",
+         "flipVert": "Flip image vertically",
+-        "transform": "Perspective and keystone correction",
+         "lens": "Lens distortion correction",
+-        "compositionOverlay": "Composition Overlay",
+         "overlayDetails": "Overlay: {{name}}{{rotateHint}}",
++        "resetFineRotation": "Reset Fine Rotation",
+         "rotateHint": " (Shift+O to rotate)",
++        "rotateLeft": "Rotate 90° counter-clockwise",
++        "rotateRight": "Rotate 90° clockwise",
++        "straighten": "Straighten Tool (S)",
+         "switchOrientation": "Switch orientation",
+         "switchToLandscape": "Switch to landscape",
+-        "switchToPortrait": "Switch to portrait"
+-      },
+-      "labels": {
+-        "rotateLeft": "Rotate Left",
+-        "rotateRight": "Rotate Right",
+-        "flipHoriz": "Flip Horiz",
+-        "flipVert": "Flip Vert",
+-        "transform": "Transform",
+-        "lens": "Lens"
++        "switchToPortrait": "Switch to portrait",
++        "transform": "Perspective and keystone correction"
+       }
+     },
+     "masks": {
+-      "maskingTitle": "Masking",
+-      "toggleAnalyticsTooltip": "Toggle Analytics Display",
+-      "resetMaskingTooltip": "Reset Masking",
+-      "createNewTitle": "Create New Mask",
+-      "comingSoon": "Coming Soon",
+-      "masksTitle": "Masks",
+-      "dropzoneText": "Drop here to create a new mask",
+-      "addNewMask": "Add New Mask",
+-      "maskAdjustmentsTitle": "Mask Adjustments",
+-      "tooltips": {
+-        "showMore": "Show More Mask Types",
+-        "addToCurrent": "Add {{name}} to Current Mask or Create New (Right-click)",
+-        "createNew": "Create New {{name}} Mask"
++      "actions": {
++        "addNewComponent": "Add New Component",
++        "applyPreset": "Apply Preset",
++        "copyComponent": "Copy Component",
++        "copyMask": "Copy Mask",
++        "deleteComponent": "Delete Component",
++        "deleteMask": "Delete Mask",
++        "duplicateAndInvertComponent": "Duplicate and Invert Component",
++        "duplicateAndInvertMask": "Duplicate and Invert Mask",
++        "duplicateComponent": "Duplicate Component",
++        "duplicateMask": "Duplicate Mask",
++        "hideComponent": "Hide Component",
++        "hideMask": "Hide Mask",
++        "intersectMaskWith": "Intersect Mask with",
++        "noPresets": "No presets",
++        "pasteComponent": "Paste Component",
++        "pasteMask": "Paste Mask",
++        "pasteMaskAdjustments": "Paste Mask Adjustments",
++        "rename": "Rename",
++        "resetMaskAdjustments": "Reset Mask Adjustments",
++        "showComponent": "Show Component",
++        "showMask": "Show Mask",
++        "subtractFromMask": "Subtract from Mask",
++        "switchToAdd": "Switch to Add",
++        "switchToIntersect": "Switch to Intersect",
++        "switchToSubtract": "Switch to Subtract"
+       },
++      "addNewMask": "Add New Mask",
+       "brush": {
+-        "size": "Brush Size",
++        "brush": "Brush",
++        "eraser": "Eraser",
+         "feather": "Brush Feather",
+         "flow": "Flow",
+-        "brush": "Brush",
+-        "eraser": "Eraser"
++        "size": "Brush Size"
+       },
++      "comingSoon": "Coming Soon",
++      "createNewTitle": "Create New Mask",
+       "depthRange": {
+-        "title": "Depth Range",
+-        "reset": "Reset",
++        "far": "Far",
+         "near": "Near",
+-        "far": "Far"
++        "reset": "Reset",
++        "title": "Depth Range"
++      },
++      "dropzoneText": "Drop here to create a new mask",
++      "maskAdjustmentsTitle": "Mask Adjustments",
++      "maskingTitle": "Masking",
++      "masksTitle": "Masks",
++      "params": {
++        "globalFeather": "Global Feather"
+       },
+       "patches": {
+-        "maskName": "Mask {{count}}",
+         "copyName": "{{name}} Copy",
+-        "invertedName": "{{name}} Inverted"
+-      },
+-      "actions": {
+-        "rename": "Rename",
+-        "duplicateMask": "Duplicate Mask",
+-        "duplicateAndInvertMask": "Duplicate and Invert Mask",
+-        "copyMask": "Copy Mask",
+-        "pasteMask": "Paste Mask",
+-        "pasteMaskAdjustments": "Paste Mask Adjustments",
+-        "applyPreset": "Apply Preset",
+-        "noPresets": "No presets",
+-        "resetMaskAdjustments": "Reset Mask Adjustments",
+-        "deleteMask": "Delete Mask",
+-        "hideMask": "Hide Mask",
+-        "showMask": "Show Mask",
+-        "subtractFromMask": "Subtract from Mask",
+-        "intersectMaskWith": "Intersect Mask with",
+-        "addNewComponent": "Add New Component",
+-        "duplicateComponent": "Duplicate Component",
+-        "duplicateAndInvertComponent": "Duplicate and Invert Component",
+-        "copyComponent": "Copy Component",
+-        "pasteComponent": "Paste Component",
+-        "deleteComponent": "Delete Component",
+-        "switchToSubtract": "Switch to Subtract",
+-        "switchToIntersect": "Switch to Intersect",
+-        "switchToAdd": "Switch to Add",
+-        "hideComponent": "Hide Component",
+-        "showComponent": "Show Component"
++        "invertedName": "{{name}} Inverted",
++        "maskName_one": "",
++        "maskName_other": ""
+       },
++      "resetMaskingTooltip": "Reset Masking",
+       "settings": {
++        "aiModelDownloading": "AI Model Downloading: ",
++        "applyPreset": "Apply Preset",
+         "componentPropertiesTitle": "{{name}} Properties",
+-        "maskPropertiesTitle": "Mask Properties",
++        "copySectionSettings": "Copy {{section}} Settings",
+         "invertComponent": "Invert Component",
+         "invertMask": "Invert Mask",
+-        "applyPreset": "Apply Preset",
+-        "select": "Select",
+-        "selectPresetTooltip": "Select a preset to apply",
++        "maskPropertiesTitle": "Mask Properties",
+         "noPresetsFound": "No presets found",
+         "opacity": "Opacity",
+-        "aiModelDownloading": "AI Model Downloading: ",
+-        "copySectionSettings": "Copy {{section}} Settings",
+         "pasteSectionSettings": "Paste {{section}} Settings",
++        "pasteSettings": "Paste Settings",
+         "resetSectionSettings": "Reset {{section}} Settings",
+-        "pasteSettings": "Paste Settings"
++        "select": "Select",
++        "selectPresetTooltip": "Select a preset to apply"
+       },
+-      "params": {
+-        "feather": "Feather",
+-        "grow": "Grow",
+-        "tolerance": "Tolerance",
+-        "globalFeather": "Global Feather"
++      "toggleAnalyticsTooltip": "Toggle Analytics Display",
++      "tooltips": {
++        "addToCurrent": "Add {{name}} to Current Mask or Create New (Right-click)",
++        "createNew": "Create New {{name}} Mask",
++        "showMore": "Show More Mask Types"
+       }
+     },
+     "metadata": {
+-      "title": "Metadata",
++      "author": {
++        "creatorDetails": "Creator Details",
++        "title": "Author & Copyright"
++      },
++      "camera": {
++        "aperture": "Aperture",
++        "focalLength": "Focal Length",
++        "iso": "ISO",
++        "lens": "Lens",
++        "shutterSpeed": "Shutter Speed",
++        "title": "Camera Details"
++      },
+       "clickToEdit": "Click to edit",
+       "emptyClickToAdd": "Empty (Click to add)",
+-      "fields": {
+-        "title": "Title",
+-        "author": "Author",
+-        "copyright": "Copyright",
+-        "comments": "Comments"
++      "extendedExif": {
++        "title": "Extended EXIF"
+       },
+       "fileInfo": {
+-        "title": "File Information",
+-        "virtualCopy": "Virtual Copy",
+-        "emptyDimensions": "- × - px",
+         "dimensions": "{{width}} × {{height}} px • {{megapixels}} MP",
+-        "dimensionsNoMp": "{{width}} × {{height}} px"
+-      },
+-      "camera": {
+-        "title": "Camera Details",
+-        "aperture": "Aperture",
+-        "shutterSpeed": "Shutter Speed",
+-        "iso": "ISO",
+-        "focalLength": "Focal Length",
+-        "lens": "Lens"
++        "emptyDimensions": "- × - px",
++        "title": "File Information",
++        "virtualCopy": "Virtual Copy"
+       },
+-      "author": {
+-        "title": "Author & Copyright",
+-        "creatorDetails": "Creator Details"
++      "gps": {
++        "altitude": "Altitude",
++        "clickToOpenTooltip": "Click to open map in a new tab",
++        "latitude": "Latitude",
++        "longitude": "Longitude",
++        "title": "GPS Location"
+       },
+       "organization": {
+-        "title": "Organization",
+-        "ratingLabels": "Rating & Labels",
+-        "rating": "Rating",
++        "addTagPlaceholder": "Add tag...",
+         "colorLabel": "Color Label",
+         "none": "None",
+-        "tags": "Tags",
+         "noTags": "No tags",
+-        "addTagPlaceholder": "Add tag..."
+-      },
+-      "gps": {
+-        "title": "GPS Location",
+-        "latitude": "Latitude",
+-        "longitude": "Longitude",
+-        "altitude": "Altitude",
+-        "clickToOpenTooltip": "Click to open map in a new tab"
++        "rating": "Rating",
++        "ratingLabels": "Rating & Labels",
++        "tags": "Tags",
++        "title": "Organization"
+       },
+-      "extendedExif": {
+-        "title": "Extended EXIF"
+-      }
++      "title": "Metadata"
+     },
+     "presets": {
+-      "title": "Presets",
+-      "supports": {
+-        "masks": "Masks",
+-        "cropTransform": "Crop & Transform",
+-        "label": "Supports {{features}}"
+-      },
+-      "types": {
+-        "tool": "Tool",
+-        "style": "Style",
+-        "folder": "Folder",
+-        "preset": "Preset"
++      "dialog": {
++        "allPresetFiles": "All Preset Files",
++        "exportAllTitle": "Export All Presets",
++        "exportTitle": "Export {{type}}",
++        "importPresetsTitle": "Import Presets",
++        "legacyPreset": "Legacy Preset",
++        "presetFile": "Preset File",
++        "rapidRawPreset": "RapidRAW Preset"
+       },
+       "menu": {
+-        "renameFolder": "Rename Folder",
+-        "exportFolder": "Export Folder",
+-        "deleteFolder": "Delete Folder",
+-        "overwrite": "Overwrite",
+         "configurePreset": "Configure Preset",
++        "deleteFolder": "Delete Folder",
++        "deletePreset": "Delete Preset",
+         "duplicatePreset": "Duplicate Preset",
++        "exportFolder": "Export Folder",
+         "exportPreset": "Export Preset",
+-        "deletePreset": "Delete Preset",
+-        "newPreset": "New Preset",
+         "newFolder": "New Folder",
++        "newPreset": "New Preset",
++        "overwrite": "Overwrite",
++        "renameFolder": "Rename Folder",
+         "sortAll": "Sort All Alphabetically"
+       },
++      "status": {
++        "empty": "No presets saved yet. Create your own, import from a file, or explore community presets.",
++        "getCommunity": "Get Community Presets",
++        "loading": "Loading Presets..."
++      },
++      "supports": {
++        "cropTransform": "Crop & Transform",
++        "label": "Supports {{features}}",
++        "masks": "Masks"
++      },
++      "title": "Presets",
+       "tooltips": {
+         "explore": "Explore Community Presets",
+-        "import": "Import presets from .rrpreset file",
+         "export": "Export all presets to .rrpreset file",
++        "import": "Import presets from .rrpreset file",
+         "saveNew": "Save as new preset"
+       },
+-      "dialog": {
+-        "allPresetFiles": "All Preset Files",
+-        "rapidRawPreset": "RapidRAW Preset",
+-        "legacyPreset": "Legacy Preset",
+-        "importPresetsTitle": "Import Presets",
+-        "presetFile": "Preset File",
+-        "exportTitle": "Export {{type}}",
+-        "exportAllTitle": "Export All Presets"
+-      },
+-      "status": {
+-        "loading": "Loading Presets...",
+-        "empty": "No presets saved yet. Create your own, import from a file, or explore community presets.",
+-        "getCommunity": "Get Community Presets"
+-      }
+-    },
+-    "switcher": {
+-      "tooltips": {
+-        "info": "Info",
+-        "adjust": "Adjust",
+-        "crop": "Crop",
+-        "masks": "Masks",
+-        "inpaint": "Inpaint",
+-        "presets": "Presets",
+-        "export": "Export"
++      "types": {
++        "folder": "Folder",
++        "preset": "Preset",
++        "style": "Style",
++        "tool": "Tool"
+       }
+     },
+     "toolbar": {
+-      "vc": "VC",
+       "tooltips": {
+-        "backToLibrary": "Back to Library",
+-        "shutterSpeed": "Shutter Speed",
+         "aperture": "Aperture",
+-        "iso": "ISO",
++        "backToLibrary": "Back to Library",
+         "focalLength": "Focal Length",
+-        "undo": "Undo (Ctrl+Z) or History (Right-click)",
++        "fullscreen": "Toggle Fullscreen (F)",
++        "iso": "ISO",
+         "redo": "Redo (Ctrl+Y) or History (Right-click)",
+         "showEdited": "Show Edited (B)",
+         "showOriginal": "Show Original (B)",
+-        "fullscreen": "Toggle Fullscreen (F)"
+-      }
+-    }
+-  },
+-  "masks": {
+-    "types": {
+-      "depth": "Depth",
+-      "subject": "Subject",
+-      "foreground": "Foreground",
+-      "sky": "Sky",
+-      "all": "Whole Image",
+-      "quickEraser": "Quick Eraser",
+-      "quickErase": "Quick Erase",
+-      "brush": "Brush",
+-      "flow": "Flow",
+-      "color": "Color",
+-      "linear": "Linear",
+-      "luminance": "Luminance",
+-      "radial": "Radial",
+-      "others": "Others"
+-    }
+-  },
+-  "adjustments": {
+-    "basic": {
+-      "toneMapper": "Tone Mapper",
+-      "reset": "Reset",
+-      "evShift": "EV Shift",
+-      "exposure": "Exposure",
+-      "contrast": "Contrast",
+-      "highlights": "Highlights",
+-      "shadows": "Shadows",
+-      "whites": "Whites",
+-      "blacks": "Blacks",
+-      "mappers": {
+-        "basic": "Basic",
+-        "basicDesc": "Standard Tonemapping",
+-        "agx": "AgX",
+-        "agxDesc": "Film-like Tonemapping"
+-      }
+-    },
+-    "color": {
+-      "whiteBalance": "White Balance",
+-      "wbPickerWgpuDisabled": "WB Picker: Disable WGPU in Settings.",
+-      "wbPickerTooltip": "White Balance Picker",
+-      "temperature": "Temperature",
+-      "tint": "Tint",
+-      "presence": "Presence",
+-      "vibrance": "Vibrance",
+-      "saturation": "Saturation",
+-      "colorGrading": "Color Grading",
+-      "colorMixer": "Color Mixer",
+-      "hue": "Hue",
+-      "luminance": "Luminance",
+-      "toggleSliders": "Toggle Sliders",
+-      "grading": {
+-        "midtones": "Midtones",
+-        "shadows": "Shadows",
+-        "highlights": "Highlights",
+-        "global": "Global",
+-        "blending": "Blending",
+-        "balance": "Balance"
+-      },
+-      "calibration": {
+-        "title": "Color Calibration",
+-        "shadows": "Shadows",
+-        "primaries": "Primaries",
+-        "tint": "Tint",
+-        "hue": "Hue",
+-        "saturation": "Saturation",
+-        "colors": {
+-          "red": "Red",
+-          "green": "Green",
+-          "blue": "Blue"
+-        }
+-      },
+-      "mixerColors": {
+-        "reds": "Reds",
+-        "oranges": "Oranges",
+-        "yellows": "Yellows",
+-        "greens": "Greens",
+-        "aquas": "Aquas",
+-        "blues": "Blues",
+-        "purples": "Purples",
+-        "magentas": "Magentas"
+-      },
+-      "ariaSelectColor": "Select {{name}} color"
+-    },
+-    "curves": {
+-      "pointCurve": "Point Curve",
+-      "parametricCurve": "Parametric Curve",
+-      "curveDataUnavailable": "Curve data not available.",
+-      "channelTitle": "{{channel}} Channel",
+-      "copyParametric": "Copy {{channel}} Parametric Curve",
+-      "pasteParametric": "Paste Parametric Curve",
+-      "resetParametric": "Reset {{channel}} Parametric Curve",
+-      "resetAllParametric": "Reset All Parametric Curves",
+-      "copyPoint": "Copy {{channel}} Point Curve",
+-      "pastePoint": "Paste Point Curve",
+-      "pasteFromParametric": "Paste from Parametric Curve",
+-      "resetPoint": "Reset {{channel}} Point Curve",
+-      "resetAllPoint": "Reset All Point Curves",
+-      "channels": {
+-        "luma": "Luma",
+-        "red": "Red",
+-        "green": "Green",
+-        "blue": "Blue"
++        "shutterSpeed": "Shutter Speed",
++        "undo": "Undo (Ctrl+Z) or History (Right-click)"
+       },
+-      "params": {
+-        "whiteLevel": "White Level",
+-        "highlights": "Highlights",
+-        "lights": "Lights",
+-        "darks": "Darks",
+-        "shadows": "Shadows",
+-        "blackLevel": "Black Level"
+-      }
+-    },
+-    "details": {
+-      "sharpening": "Sharpening",
+-      "sharpness": "Sharpness",
+-      "threshold": "Threshold",
+-      "presence": "Presence",
+-      "clarity": "Clarity",
+-      "dehaze": "Dehaze",
+-      "structure": "Structure",
+-      "centre": "Centré",
+-      "noiseReduction": "Noise Reduction",
+-      "luminance": "Luminance",
+-      "color": "Color",
+-      "chromaticAberration": "Chromatic Aberration",
+-      "redCyan": "Red/Cyan",
+-      "blueYellow": "Blue/Yellow"
+-    },
+-    "effects": {
+-      "creative": "Creative",
+-      "glow": "Glow",
+-      "halation": "Halation",
+-      "lightFlares": "Light Flares",
+-      "lut": "LUT",
+-      "vignette": "Vignette",
+-      "amount": "Amount",
+-      "midpoint": "Midpoint",
+-      "roundness": "Roundness",
+-      "feather": "Feather",
+-      "grain": "Grain",
+-      "size": "Size",
+-      "roughness": "Roughness"
++      "vc": "VC"
+     }
+   },
+   "export": {
+-    "title": "Export",
+-    "sections": {
+-      "fileSettings": "File Settings",
+-      "fileNaming": "File Naming",
+-      "imageSizing": "Image Sizing",
+-      "metadata": "Metadata",
+-      "watermark": "Watermark",
+-      "advanced": "Advanced"
++    "advanced": {
++      "exportMasks": "Export masks as separate files",
++      "preserveFolders": "Preserve Folder Structure",
++      "preserveTimestamps": "Set File Timestamps from EXIF Capture Date",
++      "title": "Export Settings"
++    },
++    "bytes": {
++      "bytes": "Bytes",
++      "gb": "GB",
++      "kb": "KB",
++      "mb": "MB",
++      "tb": "TB"
++    },
++    "dialog": {
++      "saveEditedImageTitle": "Save Edited Image",
++      "selectFolderTitle_one": "",
++      "selectFolderTitle_other": ""
+     },
+     "file": {
+       "quality": "Quality",
+       "qualityLossless": "Quality (Lossless)"
+     },
++    "labels": {
++      "image": "Image",
++      "image_plural": "Images",
++      "lut": "LUT",
++      "lut_plural": "LUTs"
++    },
++    "metadata": {
++      "removeGps": "Remove GPS Data",
++      "saveWithMetadata": "Save with Metadata"
++    },
+     "resize": {
+-      "resizeToFit": "Resize to Fit",
+-      "pixels": "pixels",
+       "dontEnlarge": "Don't Enlarge",
+       "modes": {
++        "height": "Height",
+         "longEdge": "Long Edge",
+         "shortEdge": "Short Edge",
+-        "width": "Width",
+-        "height": "Height"
+-      }
+-    },
+-    "metadata": {
+-      "saveWithMetadata": "Save with Metadata",
+-      "removeGps": "Remove GPS Data"
+-    },
+-    "watermark": {
+-      "addWatermark": "Add Watermark",
+-      "watermarkImage": "Watermark Image",
+-      "scale": "Scale",
+-      "spacing": "Spacing",
+-      "opacity": "Opacity",
+-      "previewText": "Preview",
+-      "logoText": "Logo",
+-      "anchors": {
+-        "topLeft": "Top Left",
+-        "topCenter": "Top Center",
+-        "topRight": "Top Right",
+-        "centerLeft": "Center Left",
+-        "center": "Center",
+-        "centerRight": "Center Right",
+-        "bottomLeft": "Bottom Left",
+-        "bottomCenter": "Bottom Center",
+-        "bottomRight": "Bottom Right"
+-      }
++        "width": "Width"
++      },
++      "pixels": "pixels",
++      "resizeToFit": "Resize to Fit"
+     },
+-    "advanced": {
+-      "title": "Export Settings",
+-      "preserveFolders": "Preserve Folder Structure",
+-      "preserveTimestamps": "Set File Timestamps from EXIF Capture Date",
+-      "exportMasks": "Export masks as separate files"
++    "sections": {
++      "advanced": "Advanced",
++      "fileNaming": "File Naming",
++      "fileSettings": "File Settings",
++      "imageSizing": "Image Sizing",
++      "metadata": "Metadata",
++      "watermark": "Watermark"
+     },
+     "status": {
+-      "estimatingSize": "Estimating size...",
++      "cancelExport": "Cancel Export",
++      "cancelled": "Export cancelled",
++      "estimatedAverageSize": " ({{size}} avg)",
+       "estimatedSize": "Estimated file size: ~{{size}}",
+-      "noImageSelected": "No image selected for export.",
++      "estimatedTotalSize": "Estimated total size: ~{{size}}",
++      "estimatingSize": "Estimating size...",
+       "exporting": "Exporting…",
+       "exportingProgress": "Exporting… ({{current}}/{{total}})",
+-      "cancelExport": "Cancel Export",
+-      "success": "Export successful!",
+-      "failed": "Export failed",
+-      "cancelled": "Export cancelled",
++      "exportMultiple_one": "",
++      "exportMultiple_other": "",
+       "exportSingle": "Export {{label}}",
+-      "exportMultiple": "Export {{count}} {{label}}",
+-      "estimatedTotalSize": "Estimated total size: ~{{size}}",
+-      "estimatedAverageSize": " ({{size}} avg)",
+-      "noImagesSelected": "No images selected."
+-    },
+-    "labels": {
+-      "lut": "LUT",
+-      "lut_plural": "LUTs",
+-      "image": "Image",
+-      "image_plural": "Images"
+-    },
+-    "dialog": {
+-      "selectFolderTitle": "Select Folder to Export {{count}} Image(s)",
+-      "saveEditedImageTitle": "Save Edited Image"
++      "failed": "Export failed",
++      "noImageSelected": "No image selected for export.",
++      "noImagesSelected": "No images selected.",
++      "success": "Export successful!"
+     },
+-    "bytes": {
+-      "bytes": "Bytes",
+-      "kb": "KB",
+-      "mb": "MB",
+-      "gb": "GB",
+-      "tb": "TB"
++    "title": "Export",
++    "watermark": {
++      "addWatermark": "Add Watermark",
++      "anchors": {
++        "bottomCenter": "Bottom Center",
++        "bottomLeft": "Bottom Left",
++        "bottomRight": "Bottom Right",
++        "center": "Center",
++        "centerLeft": "Center Left",
++        "centerRight": "Center Right",
++        "topCenter": "Top Center",
++        "topLeft": "Top Left",
++        "topRight": "Top Right"
++      },
++      "logoText": "Logo",
++      "opacity": "Opacity",
++      "previewText": "Preview",
++      "scale": "Scale",
++      "spacing": "Spacing",
++      "watermarkImage": "Watermark Image"
+     }
+   },
+-  "contextMenus": {
+-    "albumIcons": {
+-      "default": "Folder (Default)",
+-      "travel": "Travel",
+-      "nature": "Nature",
+-      "summer": "Summer",
+-      "photography": "Photography",
+-      "locations": "Locations",
+-      "favorites": "Favorites",
+-      "featured": "Featured",
+-      "people": "People",
+-      "person": "Person",
+-      "automotive": "Automotive",
+-      "portfolio": "Portfolio"
+-    },
+-    "album": {
+-      "emptyGroup": "(Empty Group)"
++  "library": {
++    "community": {
++      "actionSave": "Save",
++      "actionSaved": "Saved",
++      "actionSaving": "Saving...",
++      "fetchingPresets": "Fetching presets from GitHub...",
++      "footerHeading": "Want to get your preset featured?",
++      "footerLinkText": "Create an issue on GitHub",
++      "headerDesc": "Discover presets created by the community.",
++      "headerTitle": "Community Presets",
++      "presetBy": "by {{creator}}",
++      "searchPlaceholder": "Search presets...",
++      "sortBy": "Sort by:",
++      "sortMethods": {
++        "name": "Name (A-Z)"
++      }
+     },
+-    "toasts": {
+-      "failedAddToAlbum": "Failed to add to album: {{err}}",
+-      "failedCreateVirtualCopy": "Failed to create virtual copy: {{err}}",
+-      "failedApplyAuto": "Failed to apply auto adjustments: {{err}}",
+-      "failedRemoveImages": "Failed to remove images: {{err}}",
+-      "couldNotShowExplorer": "Could not show file in explorer: {{err}}",
+-      "failedDuplicate": "Failed to duplicate file: {{err}}",
+-      "couldNotShowFolder": "Could not show folder: {{err}}",
+-      "failedCopy": "Failed to copy files: {{err}}",
+-      "failedMove": "Failed to move files: {{err}}",
+-      "failedDeleteFolder": "Failed to delete folder: {{err}}",
+-      "failedDelete": "Failed to delete: {{err}}",
+-      "failedChangeIcon": "Failed to change icon: {{err}}",
+-      "failedMoveInvalid": "Failed to move: Target group not found or invalid.",
+-      "failedMoveError": "Failed to move: {{err}}"
++    "filters": {
++      "noMatch": "No images found that match your filter.",
++      "rating": {
++        "all": "Show All",
++        "fiveOnly": "5 only",
++        "fourAndUp": "4 & up",
++        "oneAndUp": "1 & up",
++        "threeAndUp": "3 & up",
++        "twoAndUp": "2 & up",
++        "unrated": "Unrated Only"
++      },
++      "raw": {
++        "all": "All Types",
++        "nonRawOnly": "Non-RAW Only",
++        "preferRaw": "Prefer RAW",
++        "rawOnly": "RAW Only"
++      }
++    },
++    "folders": {
++      "addFolder": "Add folder",
++      "albumsEmpty": "Right-click to create an album.",
++      "collapseSection": "Collapse {{section}}",
++      "expandSection": "Expand {{section}}",
++      "loading": "Loading folders...",
++      "noFoldersFound": "No folders found.",
++      "openFolderInstruction": "Open a folder to see its structure.",
++      "searchPlaceholder": "Search folders...",
++      "sections": {
++        "albums": "Albums",
++        "folders": "Folders",
++        "pinned": "Pinned"
++      },
++      "tooltips": {
++        "clearSearch": "Clear search",
++        "collapse": "Collapse",
++        "expand": "Expand"
++      }
+     },
+-    "colors": {
+-      "red": "Red",
+-      "orange": "Orange",
+-      "yellow": "Yellow",
+-      "green": "Green",
+-      "blue": "Blue",
+-      "purple": "Purple",
+-      "pink": "Pink"
++    "grid": {
++      "columns": {
++        "aperture": "Aperture",
++        "focal": "Focal",
++        "iso": "ISO",
++        "label": "Label",
++        "modified": "Modified",
++        "name": "Name",
++        "rating": "Rating",
++        "shutter": "Shutter"
++      }
+     },
+-    "editor": {
+-      "exportImage": "Export Image",
+-      "undo": "Undo",
+-      "redo": "Redo",
+-      "copyAdjustments": "Copy Adjustments",
+-      "pasteAdjustments": "Paste Adjustments",
+-      "productivity": "Productivity",
+-      "autoAdjust": "Auto Adjust Image",
+-      "denoise": "Denoise Image",
+-      "convertNegative": "Convert Negative",
+-      "stitchPanorama": "Stitch Panorama",
+-      "mergeHdr": "Merge to HDR",
+-      "frameImage": "Frame Image",
+-      "cullImage": "Cull Image",
++    "header": {
++      "search": {
++        "addFilterOrSearch": "Add filter or search...",
++        "indexingImages": "Indexing Images...",
++        "indexingProgress": "Indexing... ({{current}}/{{total}})",
++        "matchAll": "Match ALL tags",
++        "matchAny": "Match ANY tags",
++        "searchOrQuery": "Search or add query",
++        "tooltipAdvancedQueries": "Advanced Queries: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony",
++        "tooltipClearSearch": "Clear search",
++        "tooltipSearchFilter": "Search or Filter"
++      },
++      "title": "Library",
++      "viewOptions": {
++        "currentFolder": "Current Folder",
++        "displayMode": "Display Mode",
++        "exifDisabledTooltip": "Enable EXIF Reading in Settings to use this option.",
++        "filterByColorLabel": "Filter by Color Label",
++        "filterByFileType": "Filter by File Type",
++        "filterByRating": "Filter by Rating",
++        "metadataAlways": "Always",
++        "metadataHover": "On Hover",
++        "metadataOff": "Off",
++        "noLabel": "No Label",
++        "recursive": "Recursive",
++        "showMetadata": "Show Metadata",
++        "sortAscending": "Sort Ascending",
++        "sortBy": "Sort by",
++        "sortDescending": "Sort Descending",
++        "thumbnailFit": "Thumbnail Fit",
++        "thumbnailSize": "Thumbnail Size",
++        "title": "View Options"
++      }
++    },
++    "import": {
++      "complete": "Import Complete!",
++      "failed": "Import Failed!",
++      "progress": "Importing... ({{current}}/{{total}})"
++    },
++    "items": {
++      "collapseFolder": "Collapse Folder",
++      "currentFolder": "Current Folder",
++      "expandFolder": "Expand Folder",
++      "imagesCount_one": "1 image",
++      "imagesCount_other": "{{count}} images",
++      "tooltipAperture": "Aperture",
++      "tooltipFocalLength": "Focal Length",
++      "tooltipIso": "ISO",
++      "tooltipShutterSpeed": "Shutter Speed",
++      "tooltipVirtualCopy": "Virtual Copy"
++    },
++    "search": {
++      "noResults": "No Results Found",
++      "noResultsAiHint": " For a more comprehensive search, enable automatic tagging in Settings.",
++      "noResultsDesc": "Could not find an image based on filename or tags."
++    },
++    "sort": {
++      "aperture": "Aperture",
++      "dateModified": "Date Modified",
++      "dateTaken": "Date Taken",
++      "fileName": "File Name",
++      "focalLength": "Focal Length",
++      "iso": "ISO",
+       "rating": "Rating",
+-      "ratingLabel_one": "{{count}} Star",
+-      "ratingLabel_other": "{{count}} Stars",
+-      "noRating": "No Rating",
+-      "colorLabel": "Color Label",
+-      "noLabel": "No Label",
+-      "tagging": "Tagging",
+-      "resetAdjustments": "Reset Adjustments",
+-      "cancel": "Cancel",
+-      "confirmReset": "Confirm Reset"
++      "shutterSpeed": "Shutter Speed"
+     },
+-    "thumbnail": {
+-      "deleteImage_one": "Delete Image",
+-      "deleteImage_other": "Delete {{count}} Images",
+-      "exportImage_one": "Export Image",
+-      "exportImage_other": "Export {{count}} Images",
+-      "confirmDeleteVc": "Confirm Delete + Virtual Copies",
+-      "deleteSelected": "Delete Selected Only",
+-      "deleteAssociated": "Delete + Associated",
+-      "confirmDelete": "Confirm Delete",
+-      "pasteAdjustments_one": "Paste Adjustments",
+-      "pasteAdjustments_other": "Paste Adjustments to {{count}} Images",
+-      "resetAdjustments_one": "Reset Adjustments",
+-      "resetAdjustments_other": "Reset Adjustments on {{count}} Images",
+-      "copyImage_one": "Copy Image",
+-      "copyImage_other": "Copy {{count}} Images",
+-      "autoAdjust_one": "Auto Adjust Image",
+-      "autoAdjust_other": "Auto Adjust Images",
+-      "renameImage_one": "Rename Image",
+-      "renameImage_other": "Rename {{count}} Images",
+-      "cullImage_one": "Cull Image",
+-      "cullImage_other": "Cull Images",
+-      "collage_one": "Frame Image",
+-      "collage_other": "Create Collage",
+-      "convertNegative_one": "Convert Negative",
+-      "convertNegative_other": "Convert Negatives",
+-      "denoise_one": "Denoise Image",
+-      "denoise_other": "Denoise Images",
+-      "duplicateImage": "Duplicate Image",
+-      "physicalCopy": "Physical Copy",
+-      "virtualCopy": "Virtual Copy",
+-      "addToAlbum": "Add to Album",
+-      "noAlbums": "No Albums Available",
+-      "removeFromAlbum_one": "Remove from Album",
+-      "removeFromAlbum_other": "Remove {{count}} Images from Album",
+-      "showExplorer": "Show in File Explorer"
++    "splash": {
++      "addFolder": "Add Folder",
++      "brand": "RapidRAW",
++      "continueSession": "Continue Session",
++      "contribute": "Contribute on GitHub",
++      "descriptionAndroid": "A blazingly fast, GPU-accelerated RAW image editor. Open the library to begin.",
++      "descriptionDesktop": "A blazingly fast, GPU-accelerated RAW image editor. Open a folder to begin.",
++      "donate": "Donate on Ko-Fi",
++      "downloadVersion": "Click to download version {{version}}",
++      "imagesBy": "Images by",
++      "latestVersion": "You are on the latest version",
++      "newVersionAvailable": "",
++      "openFolder": "Open Folder",
++      "openLibrary": "Open Library",
++      "or": "or",
++      "version": "Version {{version}}",
++      "welcomeBack": "Welcome back!",
++      "welcomeBackDesc": "Continue where you left off or start a new session."
+     },
+-    "folders": {
+-      "copyHere_one": "Copy image here",
+-      "copyHere_other": "Copy {{count}} images here",
+-      "moveHere_one": "Move image here",
+-      "moveHere_other": "Move {{count}} images here",
+-      "unpin": "Unpin Folder",
+-      "pin": "Pin Folder",
+-      "removeRoot": "Remove Root Folder",
+-      "newFolder": "New Folder",
+-      "renameFolder": "Rename Folder",
+-      "changeIcon": "Change Icon",
+-      "paste": "Paste",
+-      "importImages": "Import Images",
+-      "showExplorer": "Show in File Explorer",
+-      "refresh": "Refresh Folders",
+-      "deleteFolder": "Delete Folder",
+-      "confirm": "Confirm"
++    "status": {
++      "downloading": "Downloading {{status}}...",
++      "importing": "Importing images... ({{current}}/{{total}})",
++      "indexing": "Indexing images... ({{current}}/{{total}})",
++      "moment": "This may take a moment.",
++      "processing": "Processing images..."
+     },
+-    "albums": {
+-      "alreadyHere": "Already Here",
+-      "moveHere": "Move Here",
+-      "newAlbum": "New Album",
+-      "newGroup": "New Group",
+-      "renameAlbum": "Rename Album",
+-      "moveTo": "Move To...",
+-      "alreadyAtRoot": "Already at Root",
+-      "rootDir": "Root Directory",
+-      "deleteGroup": "Delete Group",
+-      "deleteAlbum": "Delete Album",
+-      "confirmDeleteAlbum": "Confirm Delete Album",
+-      "confirmDeleteGroupNested": "Confirm Delete Group & All Nested Albums",
+-      "confirmDeleteGroupEmpty": "Confirm Delete Album Group"
++    "thumbnailFit": {
++      "fillSquare": "Fill Square",
++      "originalRatio": "Original Ratio"
+     },
+-    "library": {
+-      "addCopiedToAlbum_one": "Add copied image to album",
+-      "addCopiedToAlbum_other": "Add {{count}} copied images to album",
+-      "refreshView": "Refresh View"
++    "thumbnailSize": {
++      "large": "Large",
++      "list": "List",
++      "medium": "Medium",
++      "small": "Small"
+     },
++    "tooltips": {
++      "communityPresets": "Community Presets",
++      "goHome": "Go to Home",
++      "importImages": "Import Images"
++    }
++  },
++  "masks": {
++    "types": {
++      "all": "Whole Image",
++      "brush": "Brush",
++      "color": "Color",
++      "depth": "Depth",
++      "flow": "Flow",
++      "foreground": "Foreground",
++      "linear": "Linear",
++      "luminance": "Luminance",
++      "others": "Others",
++      "quickErase": "Quick Erase",
++      "quickEraser": "Quick Eraser",
++      "radial": "Radial",
++      "sky": "Sky",
++      "subject": "Subject"
++    }
++  },
++  "menus": {
+     "tagging": {
+-      "removeTooltip": "Remove tag \"{{tag}}\"",
+-      "noTags": "No tags added",
+-      "placeholder": "Add a tag...",
+-      "addTagTooltip": "Add tag",
+-      "shortcutsHeading": "SHORTCUTS"
++      "addTagTooltip": "",
++      "noTags": "",
++      "placeholder": "",
++      "removeTooltip": "",
++      "shortcutsHeading": ""
+     }
+   },
+   "modals": {
+     "collage": {
+-      "layout": "Layout",
+-      "shuffleTooltip": "Shuffle Images",
+       "aspectRatio": "Aspect Ratio",
+-      "original": "Original",
+-      "keepOriginalRatio": "Keep Original Aspect Ratio",
+-      "spacing": "Spacing",
+-      "borderRadius": "Border Radius",
+       "background": "Background",
++      "borderRadius": "Border Radius",
++      "cancel": "Cancel",
++      "close": "Close",
++      "done": "Done",
++      "errorTitle": "An Error Occurred",
+       "exportSize": "Export Size (px)",
++      "keepOriginalRatio": "Keep Original Aspect Ratio",
++      "layout": "Layout",
++      "original": "Original",
++      "saveButton": "Save Collage",
+       "saved": "Collage Saved!",
+-      "errorTitle": "An Error Occurred",
+-      "done": "Done",
+-      "close": "Close",
+-      "cancel": "Cancel",
+       "saving": "Saving...",
+-      "saveButton": "Save Collage"
++      "shuffleTooltip": "Shuffle Images",
++      "spacing": "Spacing"
+     },
+     "configurePreset": {
++      "cancel": "Cancel",
++      "includeCropTransform": "Include Crop & Transform",
++      "includeMasks": "Include Masks",
++      "placeholder": "Enter preset name...",
++      "save": "Save",
+       "titleConfigure": "Configure Preset",
+       "titleSave": "Save New Preset",
+-      "placeholder": "Enter preset name...",
+-      "includeMasks": "Include Masks",
+-      "includeCropTransform": "Include Crop & Transform",
+-      "cancel": "Cancel",
+-      "save": "Save",
+-      "typeStyleLabel": "Style",
+       "typeStyleDesc": "Applies the complete look. This will override all your current settings to match the preset exactly.",
+-      "typeToolLabel": "Tool",
+-      "typeToolDesc": "Only applies specific changes without touching your other settings."
++      "typeStyleLabel": "Style",
++      "typeToolDesc": "Only applies specific changes without touching your other settings.",
++      "typeToolLabel": "Tool"
+     },
+     "confirm": {
+       "cancel": "Cancel",
+       "confirm": "Confirm"
+     },
+-    "copyPaste": {
+-      "title": "Copy & Paste Settings",
+-      "pasteMode": "Paste Mode",
+-      "modeMerge": "Merge",
+-      "modeReplace": "Replace",
+-      "descMerge": "Adds your copied changes, leaving other settings untouched.",
+-      "descReplace": "Overwrites all selected settings, resetting the rest to their defaults.",
+-      "includedAdjustments": "Included Adjustments",
+-      "selectAll": "Select All",
+-      "selectNone": "Select None",
+-      "cancel": "Cancel",
+-      "save": "Save",
+-      "groups": {
+-        "exposureToneMapper": "Exposure & Tone Mapper",
+-        "tone": "Tone",
+-        "curves": "Curves",
+-        "whiteBalance": "White Balance",
+-        "presence": "Presence",
+-        "colorGrading": "Color Grading",
+-        "colorMixer": "Color Mixer",
+-        "colorCalibration": "Color Calibration",
+-        "clarityDehaze": "Clarity & Dehaze",
+-        "sharpness": "Sharpness",
+-        "noiseReduction": "Noise Reduction",
+-        "chromaticAberration": "Chromatic Aberration",
+-        "vignette": "Vignette",
+-        "grain": "Grain",
+-        "halationGlow": "Halation & Glow",
+-        "lut": "LUT",
+-        "cropAspectRatio": "Crop & Aspect Ratio",
+-        "transformRotation": "Transform & Rotation",
+-        "lensCorrection": "Lens Correction",
+-        "masks": "Masks"
+-      }
++    "copyPaste": {
++      "cancel": "Cancel",
++      "descMerge": "Adds your copied changes, leaving other settings untouched.",
++      "descReplace": "Overwrites all selected settings, resetting the rest to their defaults.",
++      "includedAdjustments": "Included Adjustments",
++      "modeMerge": "Merge",
++      "modeReplace": "Replace",
++      "pasteMode": "Paste Mode",
++      "save": "Save",
++      "selectAll": "Select All",
++      "selectNone": "Select None",
++      "title": "Copy & Paste Settings"
++    },
++    "createFolder": {
++      "cancel": "Cancel",
++      "create": "Create",
++      "placeholder": "Enter folder name...",
++      "title": "Create New Folder"
++    },
++    "culling": {
++      "actionDelete": "Move to Trash",
++      "actionRateZero": "Set Rating to 1 Stars",
++      "actionReject": "Mark as Rejected (Red Label)",
++      "applyButton_one": "Apply to 1 image",
++      "applyButton_other": "Apply to {{count}} images",
++      "bestImage": "Best Image",
++      "blurryImagesTab": "Blurry Images",
++      "blurThreshold": "Blur Threshold",
++      "blurThresholdDesc": "Images with a sharpness score below this value are flagged. Higher is stricter.",
++      "cancel": "Cancel",
++      "close": "Close",
++      "cullingFailed": "Culling Failed",
++      "cullingSuggestions": "Culling Suggestions",
++      "done": "Done",
++      "duplicatesHeader_one": "",
++      "duplicatesHeader_other": "",
++      "filterBlurry": "Filter Blurry Images",
++      "groupHeader": "Group {{index}}",
++      "groupSimilar": "Group Similar Images",
++      "noIssuesDesc": "All images seem to be unique and sharp.",
++      "noIssuesFound": "No issues found!",
++      "score": "Score: {{score}}",
++      "sharpness": "Sharpness: {{sharpness}}",
++      "similarGroupsTab": "Similar Groups",
++      "similarityThreshold": "Similarity Threshold",
++      "similarityThresholdDesc": "Lower is stricter (exact duplicates). Higher is looser (near duplicates). A value of 24-32 is recommended.",
++      "startCulling": "Start Culling",
++      "starting": "Starting...",
++      "title": "Cull Images"
++    },
++    "denoise": {
++      "batchProgressText": "Denoising {{current}} of {{total}}...",
++      "btnBatchDenoise": "Batch Denoise & Save",
++      "btnRetry": "Retry",
++      "btnSave": "Save",
++      "btnStart": "Start",
++      "cancel": "Cancel",
++      "close": "Close",
++      "denoised": "Denoised",
++      "denoisingProgress": "Denoising in Progress",
++      "description": "Remove noise from your image using AI-powered or traditional denoising.",
++      "downloadingText": "Downloading {{status}}...",
++      "gpuWarningTooltip": "NIND Denoise does not yet support GPU acceleration due to dependency limitations.",
++      "initializing": "Initializing...",
++      "methodAi": "NIND (AI - Best for RAW)",
++      "methodBm3d": "BM3D (Traditional - All formats)",
++      "methodLabel": "Method",
++      "openInEditor": "Open in Editor",
++      "original": "Original",
++      "panZoomEnabled": "Pan & Zoom enabled",
++      "processingFailed": "Processing Failed",
++      "qualityTileSizeLabel": "Quality / Tile Size",
++      "reset": "Reset",
++      "saveSuccess": "Image Saved Successfully!",
++      "speedNotice": "This may take a few minutes depending on image size and selected method.",
++      "strengthLabel": "Strength",
++      "titleBatch": "Denoise Images",
++      "titleSingle": "Denoise Image"
++    },
++    "hdr": {
++      "cancel": "Cancel",
++      "close": "Close",
++      "description": "Combine your bracketed exposures into a single High Dynamic Range image.",
++      "descriptionWithCount_one": "",
++      "descriptionWithCount_other": "",
++      "failed": "HDR Merge Failed",
++      "initializing": "Initializing...",
++      "merging": "Merging HDR",
++      "openInEditor": "Open in Editor",
++      "retry": "Retry",
++      "save": "Save",
++      "savedSuccess": "HDR Saved Successfully!",
++      "speedNotice": "This may take a few minutes depending on the number and size of your exposures.",
++      "start": "Start",
++      "title": "Merge to HDR"
++    },
++    "importSettings": {
++      "cancel": "Cancel",
++      "dateFormat": "Date Format",
++      "dateFormatPlaceholder": "e.g., YYYY/MM-DD",
++      "deleteAfterImport": "Delete originals after successful import",
++      "deleteWarning": "Files will be moved to the system trash.",
++      "fileNaming": "File Naming",
++      "folderOrganization": "Folder Organization",
++      "organizeByDate": "Organize into subfolders by date",
++      "sourceFiles": "Source Files",
++      "startImport": "Start Import",
++      "title": "Import Settings"
++    },
++    "lensCorrection": {
++      "amount": "Amount",
++      "apply": "Apply",
++      "autoDetectLens": "Auto-detect Lens",
++      "autoDetectStatus": "Auto Detection Status",
++      "cancel": "Cancel",
++      "chooseSavedLens": "Choose Saved Lens",
++      "chromaticAberration": "Chromatic Aberration",
++      "compareTooltip": "Hold to Compare",
++      "corrections": "Corrections",
++      "databaseNotice": "Lens database provided by the <0>Lensfun Project</0> (<1>CC BY-SA 3.0</1>).",
++      "detecting": "Detecting...",
++      "detectingExif": "Detecting EXIF...",
++      "distortion": "Distortion",
++      "lensFound": "Lens Found",
++      "lensProfileNotFound": "Lens profile not found",
++      "manageLensesPlaceholder": "Manage your lenses in Settings",
++      "manualSelection": "Manual Selection",
++      "maskWarning": "Lens correction updates base geometry. Existing masks may shift, and AI masks must be regenerated.",
++      "modeAuto": "Auto",
++      "modeManual": "Manual",
++      "notFound": "Not Found",
++      "original": "Original",
++      "resetTooltip": "Reset Lens Correction",
++      "resetZoomTooltip": "Reset Zoom",
++      "selectLensModel": "Select Lens Model",
++      "selectManufacturer": "Select Manufacturer",
++      "title": "Lens Correction",
++      "vignetting": "Vignetting",
++      "waitingAutoDetect": "Waiting for Auto-Detect...",
++      "zoomInTooltip": "Zoom In",
++      "zoomOutTooltip": "Zoom Out"
++    },
++    "negativeConversion": {
++      "blueWeight": "Blue (Yellow)",
++      "cancel": "Cancel",
++      "colorTiming": "Color Timing",
++      "compareTooltip": "Hold to View Original",
++      "contrast": "Contrast (Grade)",
++      "convertAndSave": "Convert & Save",
++      "convertAndSaveAll_one": "",
++      "convertAndSaveAll_other": "",
++      "converting": "Converting",
++      "convertingProgress": "Converting {{current}}/{{total}}",
++      "exposure": "Exposure",
++      "greenWeight": "Green (Magenta)",
++      "noticeText": "Inversion logic inspired by <0>NegPy</0> created by marcinz606 (<1>GPL-3.0</1>).",
++      "originalLabel": "Original Negative",
++      "printGrade": "Print Grade",
++      "redWeight": "Red (Cyan)",
++      "resetTooltip": "Reset",
++      "resetViewTooltip": "Reset View",
++      "title": "Negative Conversion",
++      "zoomInTooltip": "Zoom In",
++      "zoomOutTooltip": "Zoom Out"
++    },
++    "panorama": {
++      "cancel": "Cancel",
++      "close": "Close",
++      "descCount_one": "",
++      "descCount_other": "",
++      "descGeneric": "Combine your overlapping images into a seamless panorama.",
++      "failed": "Panorama Failed",
++      "initializing": "Initializing...",
++      "openInEditor": "Open in Editor",
++      "retry": "Retry",
++      "save": "Save",
++      "savedSuccess": "Panorama Saved Successfully!",
++      "speedNotice": "This may take a few minutes depending on the number and size of images.",
++      "start": "Start",
++      "stitchingProgress": "Stitching Panorama",
++      "title": "Stitch Panorama"
++    },
++    "renameFile": {
++      "cancel": "Cancel",
++      "fileNamingTemplate": "File Naming Template",
++      "newName": "New Name",
++      "save": "Save",
++      "titleMultiple_one": "",
++      "titleMultiple_other": "",
++      "titleSingle": "Rename Image"
++    },
++    "renameFolder": {
++      "cancel": "Cancel",
++      "placeholder": "Enter new folder name...",
++      "save": "Save",
++      "title": "Rename Folder"
++    },
++    "transform": {
++      "amount": "Amount",
++      "apply": "Apply",
++      "aspect": "Aspect",
++      "cancel": "Cancel",
++      "compareTooltip": "Hold to Compare",
++      "distortion": "Distortion",
++      "horizontal": "Horizontal",
++      "maskWarning": "Transforming updates base geometry. Existing masks may shift, and AI masks must be regenerated.",
++      "offset": "Offset",
++      "original": "Original",
++      "perspective": "Perspective",
++      "resetTooltip": "Reset Transform",
++      "resetZoomTooltip": "Reset Zoom",
++      "rotate": "Rotate",
++      "scale": "Scale",
++      "title": "Transform",
++      "toggleGridTooltip": "Toggle Grid",
++      "toggleHelperLinesTooltip": "Toggle Helper Lines",
++      "vertical": "Vertical",
++      "xAxis": "X Axis",
++      "yAxis": "Y Axis",
++      "zoomInTooltip": "Zoom In",
++      "zoomOutTooltip": "Zoom Out"
++    }
++  },
++  "settings": {
++    "adjustments": {
++      "chromaticAberration": "Chromatic Aberration",
++      "colorCalibration": "Color Calibration",
++      "description": "Hide adjustment sections you don't use often to simplify the editing panel. Your settings will be preserved and applied even when hidden.",
++      "grain": "Grain",
++      "noiseReduction": "Noise Reduction",
++      "title": "Adjustments Visibility"
++    },
++    "categories": {
++      "general": "General",
++      "processing": "Processing",
++      "shortcuts": "Controls"
++    },
++    "controls": {
++      "keyboardTitle": "Keyboard Controls",
++      "modes": {
++        "mouse": "Mouse",
++        "trackpad": "Touchpad"
++      },
++      "notAssigned": "Not assigned",
++      "optimization": "Input Device Optimization",
++      "optimizationDesc": "Choose the primary input device you use to pan and zoom the canvas.",
++      "pressKey": "Press a key... (Esc to clear)",
++      "resetDefaults": "Reset All to Defaults",
++      "speed": "Speed",
++      "title": "Mouse Controls",
++      "zoom": "Zoom Speed Multiplier",
++      "zoomDesc": "Adjust how fast the canvas zooms in and out when using the scroll wheel or pinch gesture."
++    },
++    "data": {
++      "clearSidecars": "Clear All Sidecar Files",
++      "clearSidecarsButton": "Clear",
++      "clearSidecarsDesc": "This will delete all .rrdata files (containing your edits) within your root folders:",
++      "clearThumbnail": "Clear Thumbnail Cache",
++      "clearThumbnailButton": "Clear",
++      "clearThumbnailDesc": "This will delete all cached thumbnail images. They will be regenerated automatically as you browse your library.",
++      "loading": "Loading...",
++      "logs": "View Application Logs",
++      "logsButton": "Open",
++      "logsDesc": "View the application's log file for troubleshooting. The log is located at:",
++      "modals": {
++        "aiMessage": "Are you sure you want to remove all AI-generated tags from all images in all active root folders?\n\nThis will not affect user-added tags. This action cannot be undone.",
++        "allMessage": "Are you sure you want to remove all AI-generated and user-added tags from all images in all active root folders?\n\nThis action cannot be undone.",
++        "cacheMessage": "Are you sure you want to clear the thumbnail cache?\n\nAll thumbnails will need to be regenerated, which may be slow for large folders.",
++        "confirmAiTitle": "Confirm AI Tag Deletion",
++        "confirmAllTitle": "Confirm All Tag Deletion",
++        "confirmCacheTitle": "Confirm Cache Deletion",
++        "confirmClear": "Clear",
++        "confirmClearAi": "Clear AI Tags",
++        "confirmClearAll": "Clear All Tags",
++        "confirmClearCache": "Clear Cache",
++        "confirmDeleteAllEdits": "Delete All Edits",
++        "confirmTitle": "Confirm Deletion",
++        "sidecarMessage": "Are you sure you want to delete all sidecar files?\n\nThis will permanently remove all your edits for all images inside all active root folders and their subfolders."
++      },
++      "noFolders": "No folders selected",
++      "statuses": {
++        "aiSuccess_one": "",
++        "aiSuccess_other": "",
++        "allSuccess_one": "",
++        "allSuccess_other": "",
++        "cacheSuccess": "Thumbnail cache cleared successfully.",
++        "clearingAi": "Clearing AI tags from all sidecar files...",
++        "clearingAll": "Clearing all tags from sidecar files...",
++        "clearingCache": "Clearing thumbnail cache...",
++        "deleting": "Deleting sidecar files, please wait...",
++        "failedToGetPath": "Could not retrieve log file path.",
++        "processing": "Processing...",
++        "sidecarSuccess_one": "",
++        "sidecarSuccess_other": ""
++      },
++      "title": "Data Management"
++    },
++    "general": {
++      "createXmp": "Create Missing XMP Files",
++      "createXmpDesc": "Automatically create a new XMP sidecar file if one does not exist for an image.",
++      "createXmpMissing": "Create XMP if missing",
++      "enableFocusMode": "Enable Focus Mode",
++      "enableOsTitlebar": "Enable OS Titlebar",
++      "enableXmpSync": "Enable XMP Sync",
++      "focusMode": "Focus Mode",
++      "focusModeDesc": "Helps you focus by automatically closing other panels when you open a new one.",
++      "folderImageCounts": "Folder Image Counts",
++      "folderImageCountsDesc": "Show the number of images inside folders when hovering over the folder tree.",
++      "font": "Font",
++      "fontDesc": "Change the application font.",
++      "nativeTitlebar": "Native Titlebar",
++      "nativeTitlebarDesc": "Use your system's default window titlebar instead of RapidRAW's custom one.",
++      "poppins": "Poppins",
++      "showImageCounts": "Show Image Counts",
++      "system": "System Default",
++      "theme": "Theme",
++      "themeDesc": "Change the look and feel of the application.",
++      "title": "General Settings",
++      "xmpSync": "XMP Metadata Sync",
++      "xmpSyncDesc": "Sync ratings, color labels and tags to standard XMP sidecar files for compatibility with other photo editors."
++    },
++    "language": "Language",
++    "languageDesc": "Change the application language. Falls back to English if translations are missing.",
++    "lenses": {
++      "addButton": "Add to My Lenses",
++      "addNew": "Add New Lens",
++      "description": "Create a list of your frequently used lenses to quickly access them in the Lens Correction panel.",
++      "manufacturerPlaceholder": "Select Manufacturer",
++      "modelPlaceholder": "Select Lens Model",
++      "noLenses": "No lenses added yet.",
++      "removeTooltip": "Remove lens",
++      "saved": "Saved Lenses",
++      "title": "My Lenses"
++    },
++    "processing": {
++      "ai": {
++        "cloud": {
++          "description": "For those who want a simpler solution, an optional subscription provides the same high-quality results as self-hosting without any hassle. This is the most convenient option and the best way to support the project.",
++          "feature1": "Maximum convenience, no setup",
++          "feature2": "Same results as self-hosting",
++          "feature3": "No powerful hardware required",
++          "signedIn": {
++            "active": "Cloud Subscription Active",
++            "inactive": "No Active Subscription",
++            "logout": "Log Out",
++            "manage": "Manage",
++            "usage": "Monthly Usage",
++            "usageStats": "{{requests}} / {{limit}} requests"
++          },
++          "signedOut": {
++            "noAccount": "Don't have an account?",
++            "signup": "Sign up on the website",
++            "upgradeBtn": "Upgrade on Website",
++            "upgradeDesc": "To use Cloud AI features, you need a Cloud subscription."
++          },
++          "title": "Cloud Service"
++        },
++        "connector": {
++          "address": "AI Connector Address",
++          "addressDesc": "Enter the address and port of your running AI Connector instance. Required for generative AI features.",
++          "description": "For users with a capable GPU who want maximum control, connect RapidRAW to your own Connector server. This gives you full control for technical workflows.",
++          "failed": "Connection failed.",
++          "feature1": "Use your own ComfyUI instance",
++          "feature2": "Cost-free advanced generative edits",
++          "feature3": "Custom workflow selection",
++          "success": "Connection successful!",
++          "test": "Test",
++          "testing": "Testing...",
++          "title": "Self-Hosted (RapidRAW AI Connector)"
++        },
++        "cpu": {
++          "description": "Integrated directly into RapidRAW, these features run entirely on your computer. They are fast, free, and require no setup, making them ideal for everyday workflow acceleration.",
++          "feature1": "AI Masking (Subject, Sky, Foreground)",
++          "feature2": "Automatic Image Tagging",
++          "feature3": "Simple CPU-based Generative Replace",
++          "title": "Built-in AI (CPU)"
++        },
++        "description": "RapidRAW's AI is built for flexibility. Choose your ideal workflow, from fast local tools to powerful self-hosting.",
++        "providers": {
++          "aiConnector": "AI Connector",
++          "cloud": "Cloud",
++          "cpu": "CPU"
++        },
++        "title": "Generative AI"
++      },
++      "backend": "Processing Backend",
++      "backendDesc": "Select the graphics API. 'Auto' is recommended. May fix crashes on some systems.",
++      "backends": {
++        "auto": "Auto",
++        "dx12": "DirectX 12",
++        "gl": "OpenGL",
++        "metal": "Metal",
++        "vulkan": "Vulkan"
++      },
++      "dynamicDesc": "The editor renders the preview to match your display's actual pixel density. This ensures that every detail is represented with 1:1 pixel accuracy, providing maximum clarity when zooming and checking focus.",
++      "enableLivePreviews": "Enable Live Previews",
++      "highDpi": "High-DPI Rendering",
++      "highDpiDesc": "Render previews at your screen's native {{dpr}}x physical pixel resolution. Produces the sharpest possible preview but uses significantly more memory.",
++      "highDpiDescStandard": "This setting only affects high-DPI displays. Your current display is standard resolution.",
++      "imageCache": "Decoded Image Cache",
++      "imageCacheDesc": "Maximum number of full-resolution images kept in RAM. Higher values make switching between recently edited images instant, but use significantly more memory.",
++      "images": "Images",
++      "linuxCompat": "Linux Compatibility Mode",
++      "linuxCompatDesc": "Enable workarounds for common GPU driver and display server issues. Disable this to enable full GPU acceleration.",
++      "linuxCompatLabel": "Enable Compatibility Mode",
++      "livePreviewQuality": "Live Preview Quality",
++      "livePreviewQualityDesc": "Controls the resolution and compression of the image while dragging sliders. Lower quality significantly improves responsiveness.",
++      "livePreviews": "Live Interactive Previews",
++      "livePreviewsDesc": "Update the preview immediately while dragging sliders. Disable this if the interface feels laggy during adjustments.",
++      "modes": {
++        "dynamic": "Dynamic",
++        "static": "Fixed Resolution"
++      },
++      "nativeDpi": "Render at native DPI",
++      "preprocessing": {
++        "applyPreprocessing": "Apply Preprocessing to Non-RAWs",
++        "applyPreprocessingDesc": "If enabled, the base color noise reduction and pre-sharpening above will also be applied to standard formats.",
++        "colorNr": "Base Color Noise Reduction",
++        "colorNrDesc": "Applies a cross-bilateral filter early in the pipeline to remove chroma noise. Higher value = Stronger NR.",
++        "defaultNonRawTonemapper": "Default Non-RAW Tonemapper",
++        "defaultNonRawTonemapperDesc": "The tonemapper to apply to non-RAW images (e.g., JPEG, PNG).",
++        "defaultRawTonemapper": "Default RAW Tonemapper",
++        "defaultRawTonemapperDesc": "The tonemapper to apply to RAW images.",
++        "enablePreprocessingNonRaws": "Enable for Non-RAWs",
++        "enableTonemapperOverride": "Enable Tonemapper Override",
++        "highlightRecovery": "RAW Highlight Recovery",
++        "highlightRecoveryDesc": "Controls how much detail is recovered from clipped highlights in RAW files. Higher values recover more detail but can introduce purple artefacts.",
++        "linearOptions": {
++          "auto": "Auto",
++          "gamma": "Apply Gamma",
++          "gamma_skip_calib": "Apply Gamma & Skip Calibrate",
++          "skip_calib": "Skip Calibrate"
++        },
++        "linearRaw": "Linear RAW Processing",
++        "linearRawDesc": "Fixes color casts or pink tint in some DNG files. Controls how already processed LinearRAW data is interpreted.",
++        "sharpening": "Base Pre-Sharpening",
++        "sharpeningDesc": "Applies gentle detail enhancement early in the pipeline. Higher value = More sharpening.",
++        "title": "Image Preprocessing",
++        "tonemapperOptions": {
++          "agx": "AgX",
++          "basic": "Basic"
++        },
++        "tonemapperOverride": "Global Tonemapper Override",
++        "tonemapperOverrideDesc": "Force a specific tonemapper globally for all images, hiding the tonemapper switch from the adjustments panel."
++      },
++      "previewRes": "Preview Resolution",
++      "previewResDesc": "Determines the maximum resolution of the preview. Lower values significantly improve performance.",
++      "previewStrategy": "Preview Rendering Strategy",
++      "qualities": {
++        "full": "Full Resolution",
++        "high": "High Quality",
++        "performance": "Performance"
++      },
++      "renderScale": "Render Resolution Scale",
++      "renderScaleDesc": "Scales the render resolution relative to your display. Lower values improve performance on high-resolution screens at the cost of some sharpness.",
++      "restartRequired": "Changes to the processing engine require an application restart to take effect.",
++      "saveRelaunch": "Save & Relaunch",
++      "staticDesc": "The editor renders the image at a fixed resolution. This mode is the fastest and most consistent, making it ideal for lower-end hardware where smooth performance is prioritized over pixel-perfect zoom.",
++      "staticPreviewRes": "Static Preview Resolution",
++      "staticPreviewResDesc": "Sets the resolution for static previews like crop mode, lens correction, and perspective tools. Does not affect the main editor preview.",
++      "threads": "Threads",
++      "thumbnailRes": "Thumbnail Resolution",
++      "thumbnailResDesc": "Determines the resolution of generated library thumbnails. Higher values produce sharper images during loading.",
++      "title": "Processing Engine",
++      "wgpu": "WGPU Direct Rendering",
++      "wgpuDescAndroid": "Bypasses browser encoding for instantly responsive live previews. (Disabled on Android: Native WGPU surface creation is currently not supported alongside the mobile webview.)",
++      "wgpuDescLinux": "Bypasses browser encoding for instantly responsive live previews. (Disabled on Linux: Tauri uses GTK for webviews, which conflicts with WGPU on the same X11 surface and causes flickering.)",
++      "wgpuDescRecommended": "Bypasses browser encoding for instantly responsive live previews. Highly recommended for performance.",
++      "wgpuLabel": "Enable Direct WGPU Render",
++      "workerThreads": "Thumbnail Worker Threads",
++      "workerThreadsDesc": "Number of parallel threads used to generate thumbnails. Higher values speed up library loading but use more CPU & RAM."
++    },
++    "tagging": {
++      "addCustomPlaceholder": "Add custom AI tags (comma separated)...",
++      "addCustomTooltip": "Add AI tag",
++      "addShortcutsPlaceholder": "Add shortcuts (comma separated)...",
++      "addShortcutTooltip": "Add Shortcut",
++      "aiTagging": "AI Tagging",
++      "aiTaggingDesc": "Enables automatic image tagging using an AI (CLIP) model. This will download an additional model and impact performance while browsing folders. Tags are used for searching a folder.",
++      "amount": "Amount",
++      "automaticAiTagging": "Automatic AI Tagging",
++      "clearAiTagsButton": "Clear",
++      "clearAiTagsDesc": "This will remove all AI-generated tags from your .rrdata files in all active root folders. User-added tags will be kept.",
++      "clearAiTagsTitle": "Clear AI Tags",
++      "clearAllTagsDesc": "This will remove all AI-generated and user-added tags from your .rrdata files in all active root folders. Color labels will be kept.",
++      "clearAllTagsTitle": "Clear All Tags",
++      "clearCustomTooltip": "Clear AI Tag List",
++      "clearShortcutsTooltip": "Clear Shortcuts Tag List",
++      "customList": "Custom AI Tag List",
++      "customListDesc": "If provided, the AI will ONLY use tags from this list, overriding RapidRAW’s built-in list. Tagging works only in English.",
++      "maxAiTags": "Maximum AI Tags",
++      "maxAiTagsDesc": "The maximum number of tags to generate per image.",
++      "noCustomTags": "No custom AI tags (Using built-in list)",
++      "noShortcuts": "No shortcuts added",
++      "removeCustomTooltip": "Remove tag \"{{tag}}\"",
++      "removeShortcutTooltip": "Remove shortcut \"{{shortcut}}\"",
++      "shortcuts": "Tagging Shortcuts",
++      "shortcutsDesc": "A list of tags that will appear as shortcuts in the tagging context menu.",
++      "title": "Tagging"
++    },
++    "thanks": {
++      "description": "A huge thank you to the following projects that were very important in the development of RapidRAW:",
++      "list": {
++        "darktable": "For some reference implementations that guided parts of this work.",
++        "depth": "For the powerful monocular depth estimation model that enables the AI depth masking capabilities.",
++        "lama": "For the powerful & simple image inpainting model, which enables content-aware fill and object removal.",
++        "lensfun": "For its invaluable open-source library and comprehensive database for automatic lens correction.",
++        "negpy": "For the inspiration behind the negative conversion logic.",
++        "nind": "For providing AI models that power the AI noise reduction capabilities in RapidRAW.",
++        "rawler": "For the excellent Rust crate that provides the foundation for RAW file processing in this project.",
++        "sam2": "For providing the foundation model used for the AI subject detection capabilities.",
++        "u2net": "For providing the robust architecture used for the AI sky and foreground detection capabilities.",
++        "you": "For using and supporting RapidRAW. Your interest keeps this project alive and evolving.",
++        "youLabel": "You"
++      },
++      "title": "Special Thanks"
+     },
+-    "createFolder": {
+-      "title": "Create New Folder",
+-      "placeholder": "Enter folder name...",
+-      "cancel": "Cancel",
+-      "create": "Create"
++    "title": "Settings",
++    "tooltips": {
++      "goHome": "Go to Home"
++    }
++  },
++  "ui": {
++    "bottomBar": {
++      "imagesSelected": "{{current}} of {{total}} images selected",
++      "tooltips": {
++        "collapseFilmstrip": "Collapse Filmstrip",
++        "copyPasteSettings": "Copy & Paste Settings",
++        "copySettings": "Copy Settings",
++        "customZoom": "Click to enter custom zoom percentage",
++        "expandFilmstrip": "Expand Filmstrip",
++        "export": "Export",
++        "pasteSettings": "Paste Settings",
++        "rateStars_one": "Rate 1 star",
++        "rateStars_other": "Rate {{count}} stars",
++        "resetZoom": "Reset Zoom to Fit Window",
++        "selectToRate": "Select an image to rate"
++      },
++      "zoomLabel": "Zoom",
++      "zoomLabelReset": "Reset Zoom"
+     },
+-    "culling": {
+-      "title": "Cull Images",
+-      "groupSimilar": "Group Similar Images",
+-      "similarityThreshold": "Similarity Threshold",
+-      "similarityThresholdDesc": "Lower is stricter (exact duplicates). Higher is looser (near duplicates). A value of 24-32 is recommended.",
+-      "filterBlurry": "Filter Blurry Images",
+-      "blurThreshold": "Blur Threshold",
+-      "blurThresholdDesc": "Images with a sharpness score below this value are flagged. Higher is stricter.",
+-      "cancel": "Cancel",
+-      "startCulling": "Start Culling",
+-      "starting": "Starting...",
+-      "cullingFailed": "Culling Failed",
+-      "close": "Close",
+-      "noIssuesFound": "No issues found!",
+-      "noIssuesDesc": "All images seem to be unique and sharp.",
+-      "done": "Done",
+-      "cullingSuggestions": "Culling Suggestions",
+-      "similarGroupsTab": "Similar Groups",
+-      "blurryImagesTab": "Blurry Images",
+-      "groupHeader": "Group {{index}}",
+-      "bestImage": "Best Image",
+-      "duplicatesHeader": "Duplicates ({{count}})",
+-      "score": "Score: {{score}}",
+-      "sharpness": "Sharpness: {{sharpness}}",
+-      "applyButton_one": "Apply to 1 image",
+-      "applyButton_other": "Apply to {{count}} images",
+-      "actionReject": "Mark as Rejected (Red Label)",
+-      "actionRateZero": "Set Rating to 1 Stars",
+-      "actionDelete": "Move to Trash"
++    "collapsibleSection": {
++      "disableSection": "Disable Section",
++      "enableSection": "Enable Section"
+     },
+-    "denoise": {
+-      "methodAi": "NIND (AI - Best for RAW)",
+-      "methodBm3d": "BM3D (Traditional - All formats)",
+-      "panZoomEnabled": "Pan & Zoom enabled",
++    "colorWheel": {
++      "hue": "Hue",
++      "hueAbbreviation": "H:",
++      "luminance": "Luminance",
+       "reset": "Reset",
+-      "original": "Original",
+-      "denoised": "Denoised",
+-      "processingFailed": "Processing Failed",
+-      "saveSuccess": "Image Saved Successfully!",
+-      "denoisingProgress": "Denoising in Progress",
+-      "initializing": "Initializing...",
+-      "batchProgressText": "Denoising {{current}} of {{total}}...",
+-      "downloadingText": "Downloading {{status}}...",
+-      "speedNotice": "This may take a few minutes depending on image size and selected method.",
+-      "gpuWarningTooltip": "NIND Denoise does not yet support GPU acceleration due to dependency limitations.",
+-      "titleSingle": "Denoise Image",
+-      "titleBatch": "Denoise Images",
+-      "description": "Remove noise from your image using AI-powered or traditional denoising.",
+-      "close": "Close",
+-      "cancel": "Cancel",
+-      "openInEditor": "Open in Editor",
+-      "methodLabel": "Method",
+-      "strengthLabel": "Strength",
+-      "qualityTileSizeLabel": "Quality / Tile Size",
+-      "btnRetry": "Retry",
+-      "btnStart": "Start",
+-      "btnSave": "Save",
+-      "btnBatchDenoise": "Batch Denoise & Save"
+-    },
+-    "hdr": {
+-      "failed": "HDR Merge Failed",
+-      "savedSuccess": "HDR Saved Successfully!",
+-      "merging": "Merging HDR",
+-      "initializing": "Initializing...",
+-      "speedNotice": "This may take a few minutes depending on the number and size of your exposures.",
+-      "title": "Merge to HDR",
+-      "description": "Combine your bracketed exposures into a single High Dynamic Range image.",
+-      "descriptionWithCount": "Combine {{count}} bracketed exposures into a single High Dynamic Range image.",
+-      "close": "Close",
+-      "cancel": "Cancel",
+-      "openInEditor": "Open in Editor",
+-      "retry": "Retry",
+-      "start": "Start",
+-      "save": "Save"
+-    },
+-    "importSettings": {
+-      "title": "Import Settings",
+-      "fileNaming": "File Naming",
+-      "folderOrganization": "Folder Organization",
+-      "organizeByDate": "Organize into subfolders by date",
+-      "dateFormat": "Date Format",
+-      "dateFormatPlaceholder": "e.g., YYYY/MM-DD",
+-      "sourceFiles": "Source Files",
+-      "deleteAfterImport": "Delete originals after successful import",
+-      "deleteWarning": "Files will be moved to the system trash.",
+-      "cancel": "Cancel",
+-      "startImport": "Start Import"
++      "saturation": "Saturation",
++      "saturationAbbreviation": "S:"
+     },
+-    "lensCorrection": {
+-      "title": "Lens Correction",
+-      "modeAuto": "Auto",
+-      "modeManual": "Manual",
+-      "autoDetectStatus": "Auto Detection Status",
+-      "detectingExif": "Detecting EXIF...",
+-      "lensProfileNotFound": "Lens profile not found",
+-      "waitingAutoDetect": "Waiting for Auto-Detect...",
+-      "manualSelection": "Manual Selection",
+-      "chooseSavedLens": "Choose Saved Lens",
+-      "selectManufacturer": "Select Manufacturer",
+-      "selectLensModel": "Select Lens Model",
+-      "corrections": "Corrections",
+-      "distortion": "Distortion",
+-      "chromaticAberration": "Chromatic Aberration",
+-      "vignetting": "Vignetting",
+-      "amount": "Amount",
+-      "maskWarning": "Lens correction updates base geometry. Existing masks may shift, and AI masks must be regenerated.",
+-      "databaseNotice": "Lens database provided by the <0>Lensfun Project</0> (<1>CC BY-SA 3.0</1>).",
+-      "original": "Original",
+-      "zoomOutTooltip": "Zoom Out",
+-      "zoomInTooltip": "Zoom In",
+-      "resetZoomTooltip": "Reset Zoom",
+-      "compareTooltip": "Hold to Compare",
+-      "cancel": "Cancel",
+-      "apply": "Apply",
+-      "resetTooltip": "Reset Lens Correction",
+-      "detecting": "Detecting...",
+-      "notFound": "Not Found",
+-      "lensFound": "Lens Found",
+-      "autoDetectLens": "Auto-detect Lens",
+-      "manageLensesPlaceholder": "Manage your lenses in Settings"
++    "exportPresets": {
++      "deleteTooltip": "Delete preset",
++      "heading": "Export Presets",
++      "overwriteTooltip": "Overwrite selected preset",
++      "placeholder": "Select a preset...",
++      "presetNamePlaceholder": "Preset Name",
++      "saveAsNewTooltip": "Save current settings as new preset",
++      "savedTooltip": "Saved!"
+     },
+-    "negativeConversion": {
+-      "title": "Negative Conversion",
+-      "resetTooltip": "Reset",
+-      "colorTiming": "Color Timing",
+-      "redWeight": "Red (Cyan)",
+-      "greenWeight": "Green (Magenta)",
+-      "blueWeight": "Blue (Yellow)",
+-      "printGrade": "Print Grade",
+-      "exposure": "Exposure",
+-      "contrast": "Contrast (Grade)",
+-      "noticeText": "Inversion logic inspired by <0>NegPy</0> created by marcinz606 (<1>GPL-3.0</1>).",
+-      "originalLabel": "Original Negative",
+-      "zoomOutTooltip": "Zoom Out",
+-      "zoomInTooltip": "Zoom In",
+-      "resetViewTooltip": "Reset View",
+-      "compareTooltip": "Hold to View Original",
+-      "cancel": "Cancel",
+-      "converting": "Converting",
+-      "convertingProgress": "Converting {{current}}/{{total}}",
+-      "convertAndSave": "Convert & Save",
+-      "convertAndSaveAll": "Convert & Save All ({{count}})"
++    "filmstrip": {
++      "tooltips": {
++        "color": "Color: {{color}}",
++        "virtualCopy": "Virtual Copy"
++      },
++      "virtualCopyAbbreviation": "VC"
+     },
+-    "panorama": {
+-      "title": "Stitch Panorama",
+-      "failed": "Panorama Failed",
+-      "savedSuccess": "Panorama Saved Successfully!",
+-      "stitchingProgress": "Stitching Panorama",
+-      "initializing": "Initializing...",
+-      "speedNotice": "This may take a few minutes depending on the number and size of images.",
+-      "descGeneric": "Combine your overlapping images into a seamless panorama.",
+-      "descCount": "Combine {{count}} overlapping images into a seamless panorama.",
+-      "close": "Close",
+-      "cancel": "Cancel",
+-      "openInEditor": "Open in Editor",
+-      "retry": "Retry",
+-      "start": "Start",
+-      "save": "Save"
++    "imagePicker": {
++      "clearImage": "Clear Image",
++      "filterLabel": "Image Files",
++      "select": "Select",
++      "selectImageFile": "Select an image file"
+     },
+-    "renameFile": {
+-      "titleSingle": "Rename Image",
+-      "titleMultiple": "Rename {{count}} Images",
+-      "newName": "New Name",
+-      "fileNamingTemplate": "File Naming Template",
+-      "cancel": "Cancel",
+-      "save": "Save"
++    "lut": {
++      "clearLut": "Clear LUT",
++      "filterLabel": "LUT Files",
++      "intensity": "Intensity",
++      "label": "LUT",
++      "select": "Select",
++      "selectLutFile": "Select a LUT file",
++      "unsupportedFormat": "Unsupported file format(s) detected: .{{ext}}"
+     },
+-    "renameFolder": {
+-      "title": "Rename Folder",
+-      "placeholder": "Enter new folder name...",
+-      "cancel": "Cancel",
+-      "save": "Save"
++    "slider": {
++      "clickToEdit": "Click to edit",
++      "reset": "Reset"
+     },
+-    "transform": {
+-      "title": "Transform",
+-      "resetTooltip": "Reset Transform",
+-      "distortion": "Distortion",
+-      "amount": "Amount",
+-      "perspective": "Perspective",
+-      "vertical": "Vertical",
+-      "horizontal": "Horizontal",
+-      "rotate": "Rotate",
+-      "aspect": "Aspect",
+-      "scale": "Scale",
+-      "offset": "Offset",
+-      "xAxis": "X Axis",
+-      "yAxis": "Y Axis",
+-      "maskWarning": "Transforming updates base geometry. Existing masks may shift, and AI masks must be regenerated.",
+-      "original": "Original",
+-      "toggleGridTooltip": "Toggle Grid",
+-      "toggleHelperLinesTooltip": "Toggle Helper Lines",
+-      "zoomOutTooltip": "Zoom Out",
+-      "zoomInTooltip": "Zoom In",
+-      "resetZoomTooltip": "Reset Zoom",
+-      "compareTooltip": "Hold to Compare",
+-      "cancel": "Cancel",
+-      "apply": "Apply"
++    "waveform": {
++      "tooltips": {
++        "hideClipping": "Hide Clipping Warnings",
++        "showClipping": "Show Clipping Warnings"
++      }
+     }
+   }
+ }
