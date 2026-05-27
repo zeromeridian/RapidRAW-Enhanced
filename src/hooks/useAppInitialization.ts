@@ -16,7 +16,7 @@ import {
   ThumbnailSize,
   ThumbnailAspectRatio,
 } from '../components/ui/AppProperties';
-import i18n from '../i18n';
+import { useTranslation } from 'react-i18next';
 
 interface UseAppInitializationProps {
   preloadedDataRef: React.RefObject<any>;
@@ -38,6 +38,7 @@ export const useAppInitialization = ({
   setLibraryViewMode,
 }: UseAppInitializationProps) => {
   const isInitialMount = useRef(true);
+  const { i18n } = useTranslation();
 
   const {
     appSettings,
@@ -276,7 +277,7 @@ export const useAppInitialization = ({
     if (appSettings.language && appSettings.language !== i18n.language) {
       i18n.changeLanguage(appSettings.language);
     }
-  }, [appSettings?.language]);
+  }, [appSettings?.language, i18n.language]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;
