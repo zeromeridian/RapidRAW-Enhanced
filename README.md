@@ -21,9 +21,9 @@
 
 > A beautiful, non-destructive, and GPU-accelerated RAW image editor built with performance in mind.
 
-RapidRAW is a modern, high-performance alternative to Adobe Lightroom®. It delivers a simple, beautiful editing experience in a lightweight package (under 20MB) for Windows, macOS, and Linux.
+RapidRAW is a modern, high-performance alternative to Adobe Lightroom®. It delivers a simple, beautiful editing experience in a lightweight package (under 20MB) for Windows, macOS, Linux, and Android.
 
-I started developing this project as a personal challenge when I was 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of React, WGSL and Rust, with the support from Google Gemini.
+I started developing this project as a personal challenge when I was 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of React, WGSL and Rust.
 
 <table width="100%">
   <tr>
@@ -33,7 +33,7 @@ I started developing this project as a personal challenge when I was 18. My goal
         <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/src-tauri/icons/full_res_original.png" alt="Download RapidRAW" height="96">
       </a>
       <h3>Download RapidRAW</h3>
-      <p>Get the latest release for Windows, macOS, and Linux. Packaged and ready to run.</p>
+      <p>Get the latest release for Windows, macOS, Linux, and Android. Packaged and ready to run.</p>
       <strong><a href="https://github.com/CyberTimon/RapidRAW/releases/latest">Download Latest Version →</a></strong>
       <br><br>
     </td>
@@ -400,7 +400,7 @@ I set an ambitious goal to rapidly build a functional, feature-rich application 
 
 The foundation is built on Rust for its safety and performance, and Tauri for its ability to create lightweight, cross-platform desktop apps with a web frontend. The entire image processing pipeline is offloaded to the GPU via WGPU and a custom WGSL shader, ensuring that even on complex edits with multiple masks, the UI remains fluid.
 
-I am **immensely grateful for Google's Gemini suite of AI models.** As an 18-year-old without a formal background in advanced mathematics or image science, the AI Studio's free tier was an invaluable assistant, helping me research and implement complex concepts in record time.
+I am immensely grateful for Google's Gemini suite of AI models. As a young developer without a formal background in advanced mathematics or image science, Google's AI Studio was an invaluable assistant, helping me research and implement complex concepts in record time.
 
 ## Current Priorities
 
@@ -578,10 +578,6 @@ I’m really grateful for any contributions you make to RapidRAW! Whether you’
 
 If your camera’s RAW files aren’t supported, please open a issue here first: [rawler issues](https://github.com/dnglab/dnglab/issues). Once support is added in rawler, create a issue for RapidRAW so I can update the packages and keep everything in sync.
 
-### Feature requests
-
-Got an idea? Add it in the discussion tab with the **"idea"** tag. This way, the community can vote on features they'd love to see, and I can focus on the most impactful ones.
-
 ## Special Thanks
 
 A huge thank you to the following projects and tools that were very important in the development of RapidRAW:
@@ -601,7 +597,7 @@ A huge thank you to the following projects and tools that were very important in
 
 ## Support the Project
 
-As an 18-year-old developer balancing this project with an apprenticeship, your support means the world. If you find RapidRAW useful or exciting, please consider donating to help me dedicate more time to its development and cover any associated costs.
+As a young developer balancing this project with an apprenticeship, your support means the world. If you find RapidRAW useful or exciting, please consider donating to help me dedicate more time to its development and cover any associated costs.
 
 - **Ko-fi:** [Donate on Ko-fi](https://ko-fi.com/cybertimon)
 - **Crypto:**
