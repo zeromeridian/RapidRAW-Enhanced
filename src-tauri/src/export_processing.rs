@@ -635,6 +635,7 @@ fn export_adjustments_as_lut(
     convert_image_to_cube_lut(&processed_lut, lut_size)
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn export_images(
     paths: Vec<String>,
