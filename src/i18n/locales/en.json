@@ -357,12 +357,12 @@
       },
       "patches": {
         "aiEdit": "AI Edit {{count}}",
-        "aiEdit_one": "",
-        "aiEdit_other": "",
+        "aiEdit_one": "AI Edit {{count}}",
+        "aiEdit_other": "AI Edit {{count}}",
         "invertedName": "{{name}} Inverted",
         "quickErase": "Quick Erase {{count}}",
-        "quickErase_one": "",
-        "quickErase_other": ""
+        "quickErase_one": "Quick Erase {{count}}",
+        "quickErase_other": "Quick Erase {{count}}"
       },
       "resetInpaintingTooltip": "Reset Inpainting",
       "settings": {
@@ -553,8 +553,8 @@
         "copyName": "{{name}} Copy",
         "invertedName": "{{name}} Inverted",
         "maskName": "Mask {{count}}",
-        "maskName_one": "",
-        "maskName_other": ""
+        "maskName_one": "Mask {{count}}",
+        "maskName_other": "Mask {{count}}"
       },
       "resetMaskingTooltip": "Reset Masking",
       "settings": {
@@ -721,8 +721,8 @@
     "dialog": {
       "saveEditedImageTitle": "Save Edited Image",
       "selectFolderTitle": "Select Folder to Export {{count}} Image(s)",
-      "selectFolderTitle_one": "",
-      "selectFolderTitle_other": ""
+      "selectFolderTitle_one": "Select Folder to Export {{count}} Image",
+      "selectFolderTitle_other": "Select Folder to Export {{count}} Images"
     },
     "file": {
       "quality": "Quality",
@@ -767,8 +767,8 @@
       "exporting": "Exporting…",
       "exportingProgress": "Exporting… ({{current}}/{{total}})",
       "exportMultiple": "Export {{count}} {{label}}",
-      "exportMultiple_one": "",
-      "exportMultiple_other": "",
+      "exportMultiple_one": "Export {{count}} {{label}}",
+      "exportMultiple_other": "Export {{count}} {{label}}",
       "exportSingle": "Export {{label}}",
       "failed": "Export failed",
       "noImageSelected": "No image selected for export.",
@@ -993,11 +993,11 @@
   },
   "menus": {
     "tagging": {
-      "addTagTooltip": "",
-      "noTags": "",
-      "placeholder": "",
-      "removeTooltip": "",
-      "shortcutsHeading": ""
+      "addTagTooltip": "Add tag",
+      "noTags": "No tags added",
+      "placeholder": "Add a tag...",
+      "removeTooltip": "Remove tag \"{{tag}}\"",
+      "shortcutsHeading": "SHORTCUTS"
     }
   },
   "modals": {
@@ -1093,8 +1093,8 @@
       "cullingSuggestions": "Culling Suggestions",
       "done": "Done",
       "duplicatesHeader": "Duplicates ({{count}})",
-      "duplicatesHeader_one": "",
-      "duplicatesHeader_other": "",
+      "duplicatesHeader_one": "Duplicates ({{count}})",
+      "duplicatesHeader_other": "Duplicates ({{count}})",
       "filterBlurry": "Filter Blurry Images",
       "groupHeader": "Group {{index}}",
       "groupSimilar": "Group Similar Images",
@@ -1143,8 +1143,8 @@
       "close": "Close",
       "description": "Combine your bracketed exposures into a single High Dynamic Range image.",
       "descriptionWithCount": "Combine {{count}} bracketed exposures into a single High Dynamic Range image.",
-      "descriptionWithCount_one": "",
-      "descriptionWithCount_other": "",
+      "descriptionWithCount_one": "Combine {{count}} bracketed exposure into a single High Dynamic Range image.",
+      "descriptionWithCount_other": "Combine {{count}} bracketed exposures into a single High Dynamic Range image.",
       "failed": "HDR Merge Failed",
       "initializing": "Initializing...",
       "merging": "Merging HDR",
@@ -1210,8 +1210,8 @@
       "contrast": "Contrast (Grade)",
       "convertAndSave": "Convert & Save",
       "convertAndSaveAll": "Convert & Save All ({{count}})",
-      "convertAndSaveAll_one": "",
-      "convertAndSaveAll_other": "",
+      "convertAndSaveAll_one": "Convert & Save All ({{count}})",
+      "convertAndSaveAll_other": "Convert & Save All ({{count}})",
       "converting": "Converting",
       "convertingProgress": "Converting {{current}}/{{total}}",
       "exposure": "Exposure",
@@ -1230,8 +1230,8 @@
       "cancel": "Cancel",
       "close": "Close",
       "descCount": "Combine {{count}} overlapping images into a seamless panorama.",
-      "descCount_one": "",
-      "descCount_other": "",
+      "descCount_one": "Combine {{count}} overlapping image into a seamless panorama.",
+      "descCount_other": "Combine {{count}} overlapping images into a seamless panorama.",
       "descGeneric": "Combine your overlapping images into a seamless panorama.",
       "failed": "Panorama Failed",
       "initializing": "Initializing...",
@@ -1250,8 +1250,8 @@
       "newName": "New Name",
       "save": "Save",
       "titleMultiple": "Rename {{count}} Images",
-      "titleMultiple_one": "",
-      "titleMultiple_other": "",
+      "titleMultiple_one": "Rename {{count}} Image",
+      "titleMultiple_other": "Rename {{count}} Images",
       "titleSingle": "Rename Image"
     },
     "renameFolder": {
@@ -1345,11 +1345,11 @@
       "noFolders": "No folders selected",
       "statuses": {
         "aiSuccess": "{{count}} files updated. AI tags removed.",
-        "aiSuccess_one": "",
-        "aiSuccess_other": "",
+        "aiSuccess_one": "{{count}} file updated. AI tags removed.",
+        "aiSuccess_other": "{{count}} files updated. AI tags removed.",
         "allSuccess": "{{count}} files updated. All non-color tags removed.",
-        "allSuccess_one": "",
-        "allSuccess_other": "",
+        "allSuccess_one": "{{count}} file updated. All non-color tags removed.",
+        "allSuccess_other": "{{count}} files updated. All non-color tags removed.",
         "cacheSuccess": "Thumbnail cache cleared successfully.",
         "clearingAi": "Clearing AI tags from all sidecar files...",
         "clearingAll": "Clearing all tags from sidecar files...",
@@ -1358,8 +1358,8 @@
         "failedToGetPath": "Could not retrieve log file path.",
         "processing": "Processing...",
         "sidecarSuccess": "{{count}} sidecar files deleted successfully.",
-        "sidecarSuccess_one": "",
-        "sidecarSuccess_other": ""
+        "sidecarSuccess_one": "{{count}} sidecar file deleted successfully.",
+        "sidecarSuccess_other": "{{count}} sidecar files deleted successfully."
       },
       "title": "Data Management"
     },
