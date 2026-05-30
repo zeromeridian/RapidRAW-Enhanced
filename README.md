@@ -60,6 +60,8 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+- **2026-05-30:** Implemented reliable edited status, sorting & filtering options
+- **2026-05-29:** Refactor exporting to be resource aware
 - **2026-05-27:** Added German language
 - **2026-05-26:** Converted all components to support full internalization (multilingual / i18n support)
 - **2026-05-25:** Implemented dynamic high-resolution rendering for the canvas UI and added copy/pasting of lens correction parameters
@@ -68,12 +70,12 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 - **2026-05-18:** Added global image preprocessing settings, numpad support for customizable keyboard shortcuts, and updated the "Grey" theme color variables
 - **2026-05-16:** Initial backend implementation of the cloud service functionality alongside a preview worker backpressure mechanism for better handling of high-quality live previews
 - **2026-05-15:** Added the ability to assign custom icons to individual folders in the library tree
-- **2026-05-14:** Expanded the library architecture to support multi-root folders and introduced a custom album system
-- **2026-05-11:** Improved brush tool
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+- **2026-05-14:** Expanded the library architecture to support multi-root folders and introduced a custom album system
+- **2026-05-11:** Improved brush tool
 - **2026-05-05:** Major refactor to zustand...
 - **2026-05-04:** Added EXIF editing to the metadata panel, accumulating shader execution order, and improved UI responsiveness with triple buffering
 - **2026-05-03:** Introduced a "focus mode" for distraction-free editing and enhanced filmic exposure. Batch editing now correctly respects copy/paste settings
