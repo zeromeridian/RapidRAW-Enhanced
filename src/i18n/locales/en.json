@@ -830,6 +830,11 @@
         "nonRawOnly": "Non-RAW Only",
         "preferRaw": "Prefer RAW",
         "rawOnly": "RAW Only"
+      },
+      "edited": {
+        "all": "All Images",
+        "editedOnly": "Edited Only",
+        "uneditedOnly": "Unedited Only"
       }
     },
     "folders": {
@@ -884,6 +889,7 @@
         "filterByColorLabel": "Filter by Color Label",
         "filterByFileType": "Filter by File Type",
         "filterByRating": "Filter by Rating",
+        "filterByEdited": "Filter by Edit Status",
         "metadataAlways": "Always",
         "metadataHover": "On Hover",
         "metadataOff": "Off",
@@ -928,7 +934,8 @@
       "focalLength": "Focal Length",
       "iso": "ISO",
       "rating": "Rating",
-      "shutterSpeed": "Shutter Speed"
+      "shutterSpeed": "Shutter Speed",
+      "editedStatus": "Edited Status"
     },
     "splash": {
       "addFolder": "Add Folder",
@@ -1374,6 +1381,8 @@
       "focusModeDesc": "Helps you focus by automatically closing other panels when you open a new one.",
       "folderImageCounts": "Folder Image Counts",
       "folderImageCountsDesc": "Show the number of images inside folders when hovering over the folder tree.",
+      "displayEditIcon": "Display Edit Icon",
+      "displayEditIconDesc": "Show a small slider icon on thumbnails that have been edited.",
       "font": "Font",
       "fontDesc": "Change the application font.",
       "nativeTitlebar": "Native Titlebar",

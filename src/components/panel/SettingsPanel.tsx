@@ -1129,6 +1129,18 @@ export default function SettingsPanel({
                     </SettingItem>
 
                     <SettingItem
+                      label={t('settings.general.displayEditIcon')}
+                      description={t('settings.general.displayEditIconDesc')}
+                    >
+                      <Switch
+                        checked={appSettings?.displayEditIcon ?? true}
+                        id="display-edit-icon-toggle"
+                        label={t('settings.general.displayEditIcon')}
+                        onChange={(checked) => onSettingsChange({ ...appSettings, displayEditIcon: checked })}
+                      />
+                    </SettingItem>
+
+                    <SettingItem
                       label={t('settings.general.focusMode')}
                       description={t('settings.general.focusModeDesc')}
                     >

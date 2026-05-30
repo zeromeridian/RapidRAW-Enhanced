@@ -380,9 +380,14 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
                         let _ = fs::write(&sidecar_path, json);
                     }
 
-                    let edited = metadata.adjustments.as_object().is_some_and(|a| {
-                        a.keys().len() > 1 || (a.keys().len() == 1 && !a.contains_key("rating"))
-                    });
+                    let is_raw = crate::formats::is_raw_file(&path_str);
+                    let tm_override =
+                        crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
+                    let edited = crate::image_processing::is_image_edited(
+                        &metadata.adjustments,
+                        is_raw,
+                        tm_override,
+                    );
                     (edited, metadata.tags, metadata.rating)
                 };
 
@@ -506,9 +511,14 @@ pub fn list_images_recursive(
                         let _ = fs::write(&sidecar_path, json);
                     }
 
-                    let edited = metadata.adjustments.as_object().is_some_and(|a| {
-                        a.keys().len() > 1 || (a.keys().len() == 1 && !a.contains_key("rating"))
-                    });
+                    let is_raw = crate::formats::is_raw_file(&path_str);
+                    let tm_override =
+                        crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
+                    let edited = crate::image_processing::is_image_edited(
+                        &metadata.adjustments,
+                        is_raw,
+                        tm_override,
+                    );
                     (edited, metadata.tags, metadata.rating)
                 };
 
@@ -773,9 +783,14 @@ pub fn get_album_images(
                     let _ = fs::write(&sidecar_path, json);
                 }
 
-                let edited = metadata.adjustments.as_object().is_some_and(|a| {
-                    a.keys().len() > 1 || (a.keys().len() == 1 && !a.contains_key("rating"))
-                });
+                let is_raw = crate::formats::is_raw_file(&source_path);
+                let tm_override =
+                    crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
+                let edited = crate::image_processing::is_image_edited(
+                    &metadata.adjustments,
+                    is_raw,
+                    tm_override,
+                );
                 (edited, metadata.tags, metadata.rating)
             };
 
@@ -1353,21 +1368,27 @@ fn generate_single_thumbnail_and_cache(
     preloaded_image: Option<&DynamicImage>,
     force_regenerate: bool,
     app_handle: &AppHandle,
-) -> Option<(String, u8)> {
+    settings: &AppSettings,
+) -> Option<(String, u8, bool)> {
     let (_, sidecar_path) = parse_virtual_path(path_str);
 
-    let (rating, adjustments_bytes) = if let Ok(content) = fs::read_to_string(&sidecar_path) {
-        if let Ok(meta) = serde_json::from_str::<ImageMetadata>(&content) {
-            (
-                meta.rating,
-                serde_json::to_vec(&meta.adjustments).unwrap_or_default(),
-            )
+    let (rating, is_edited, adjustments_bytes) =
+        if let Ok(content) = fs::read_to_string(&sidecar_path) {
+            if let Ok(meta) = serde_json::from_str::<ImageMetadata>(&content) {
+                let is_raw = crate::formats::is_raw_file(path_str);
+                let tm = crate::image_processing::resolve_tonemapper_override(settings, is_raw);
+
+                (
+                    meta.rating,
+                    crate::image_processing::is_image_edited(&meta.adjustments, is_raw, tm),
+                    serde_json::to_vec(&meta.adjustments).unwrap_or_default(),
+                )
+            } else {
+                (0, false, Vec::new())
+            }
         } else {
-            (0, Vec::new())
-        }
-    } else {
-        (0, Vec::new())
-    };
+            (0, false, Vec::new())
+        };
 
     let cache_hash = compute_thumbnail_cache_hash(path_str, &adjustments_bytes)?;
 
@@ -1379,10 +1400,13 @@ fn generate_single_thumbnail_and_cache(
         && let Ok(data) = fs::read(&cache_path)
     {
         let base64_str = general_purpose::STANDARD.encode(&data);
-        return Some((format!("data:image/jpeg;base64,{}", base64_str), rating));
+        return Some((
+            format!("data:image/jpeg;base64,{}", base64_str),
+            rating,
+            is_edited,
+        ));
     }
 
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let target_width = settings.thumbnail_resolution.unwrap_or(720);
 
     if let Ok(thumb_image) =
@@ -1391,7 +1415,11 @@ fn generate_single_thumbnail_and_cache(
     {
         let _ = fs::write(&cache_path, &thumb_data);
         let base64_str = general_purpose::STANDARD.encode(&thumb_data);
-        return Some((format!("data:image/jpeg;base64,{}", base64_str), rating));
+        return Some((
+            format!("data:image/jpeg;base64,{}", base64_str),
+            rating,
+            is_edited,
+        ));
     }
     None
 }
@@ -1405,6 +1433,7 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
     for _ in 0..thread_count {
         let app_clone = app_handle.clone();
         let manager_clone = manager.clone();
+        let worker_settings = settings.clone();
 
         std::thread::spawn(move || {
             loop {
@@ -1437,15 +1466,17 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                         None,
                         false,
                         &app_clone,
+                        &worker_settings,
                     );
 
-                    if let Some((thumbnail_data, rating)) = result {
+                    if let Some((thumbnail_data, rating, is_edited)) = result {
                         let _ = app_clone.emit(
                             "thumbnail-generated",
                             serde_json::json!({
                                 "path": path_to_process,
                                 "data": thumbnail_data,
-                                "rating": rating
+                                "rating": rating,
+                                "is_edited": is_edited
                             }),
                         );
                     }
@@ -2067,6 +2098,7 @@ pub fn save_metadata_and_update_thumbnail(
 
     thread::spawn(move || {
         let state = app_handle_clone.state::<AppState>();
+        let settings = load_settings(app_handle_clone.clone()).unwrap_or_default();
 
         let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle_clone) {
             Ok(dir) => dir,
@@ -2089,12 +2121,13 @@ pub fn save_metadata_and_update_thumbnail(
             preloaded_image_option.as_deref(),
             true,
             &app_handle_clone,
+            &settings,
         );
 
-        if let Some((thumbnail_data, rating)) = result {
+        if let Some((thumbnail_data, rating, is_edited)) = result {
             let _ = app_handle_clone.emit(
                 "thumbnail-generated",
-                serde_json::json!({ "path": path_clone, "data": thumbnail_data, "rating": rating }),
+                serde_json::json!({ "path": path_clone, "data": thumbnail_data, "rating": rating, "is_edited": is_edited }),
             );
         }
 
@@ -2193,12 +2226,13 @@ pub async fn apply_adjustments_to_paths(
                 None,
                 true,
                 &app_handle,
+                &settings,
             );
 
-            if let Some((thumbnail_data, rating)) = result {
+            if let Some((thumbnail_data, rating, is_edited)) = result {
                 let _ = app_handle.emit(
                     "thumbnail-generated",
-                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating }),
+                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating, "is_edited": is_edited  }),
                 );
             }
 
@@ -2271,12 +2305,13 @@ pub async fn reset_adjustments_for_paths(
                 None,
                 true,
                 &app_handle,
+                &settings,
             );
 
-            if let Some((thumbnail_data, rating)) = result {
+            if let Some((thumbnail_data, rating, is_edited)) = result {
                 let _ = app_handle.emit(
                     "thumbnail-generated",
-                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating }),
+                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating, "is_edited": is_edited }),
                 );
             }
 
@@ -2390,12 +2425,13 @@ pub async fn apply_auto_adjustments_to_paths(
                 loaded_image.as_ref(),
                 true,
                 &app_handle,
+                &settings,
             );
 
-            if let Some((thumbnail_data, rating)) = result {
+            if let Some((thumbnail_data, rating, is_edited)) = result {
                 let _ = app_handle.emit(
                     "thumbnail-generated",
-                    serde_json::json!({ "path": path, "data": thumbnail_data, "rating": rating }),
+                    serde_json::json!({ "path": path, "data": thumbnail_data, "rating": rating, "is_edited": is_edited  }),
                 );
             }
 

@@ -209,7 +209,7 @@ export default function MetadataPanel() {
   const { cameraGridSettings, lensSetting, gpsData, otherExifEntries } = useMemo(() => {
     const exif = selectedImage?.exif || {};
 
-    const cameraGridKeys = ['FNumber', 'ExposureTime', 'PhotographicSensitivity', 'FocalLengthIn35mmFilm'];
+    const cameraGridKeys = ['ExposureTime', 'FNumber', 'PhotographicSensitivity', 'FocalLengthIn35mmFilm'];
     const cameraGridSettings = cameraGridKeys.map((key) => {
       const value = exif[key];
       const hasValue = value !== undefined && value !== null && value !== '';

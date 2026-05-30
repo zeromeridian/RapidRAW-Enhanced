@@ -9,7 +9,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, imageops};
 use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::Emitter;
@@ -752,17 +751,18 @@ pub async fn export_images(
                 let source_path_str = source_path.to_string_lossy().to_string();
                 let is_current_edit = Some(&source_path_str) == current_edit_path.as_ref();
 
-                let mut js_adjustments = if is_current_edit && current_edit_adjustments.is_some() {
-                    current_edit_adjustments.unwrap()
-                } else {
-                    let metadata: ImageMetadata = if sidecar_path.exists() {
-                        let file_content = fs::read_to_string(&sidecar_path)
-                            .map_err(|e| format!("Failed to read sidecar: {}", e))?;
-                        serde_json::from_str(&file_content).unwrap_or_default()
-                    } else {
-                        ImageMetadata::default()
-                    };
-                    metadata.adjustments
+                let mut js_adjustments = match (is_current_edit, current_edit_adjustments) {
+                    (true, Some(adjustments)) => adjustments,
+                    _ => {
+                        let metadata: ImageMetadata = if sidecar_path.exists() {
+                            let file_content = fs::read_to_string(&sidecar_path)
+                                .map_err(|e| format!("Failed to read sidecar: {}", e))?;
+                            serde_json::from_str(&file_content).unwrap_or_default()
+                        } else {
+                            ImageMetadata::default()
+                        };
+                        metadata.adjustments
+                    }
                 };
 
                 hydrate_adjustments(&state, &mut js_adjustments);

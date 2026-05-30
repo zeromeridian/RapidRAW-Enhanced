@@ -830,6 +830,11 @@
         "nonRawOnly": "Nur Nicht-RAW",
         "preferRaw": "RAW bevorzugen",
         "rawOnly": "Nur RAW"
+      },
+      "edited": {
+        "all": "Alle Bilder",
+        "editedOnly": "Nur bearbeitete",
+        "uneditedOnly": "Nur unbearbeitete"
       }
     },
     "folders": {
@@ -884,6 +889,7 @@
         "filterByColorLabel": "Nach Farbmarkierung filtern",
         "filterByFileType": "Nach Dateityp filtern",
         "filterByRating": "Nach Bewertung filtern",
+        "filterByEdited": "Nach Bearbeitungsstatus filtern",
         "metadataAlways": "Immer",
         "metadataHover": "Beim Darüberfahren",
         "metadataOff": "Aus",
@@ -928,7 +934,8 @@
       "focalLength": "Brennweite",
       "iso": "ISO",
       "rating": "Bewertung",
-      "shutterSpeed": "Verschlusszeit"
+      "shutterSpeed": "Verschlusszeit",
+      "editedStatus": "Bearbeitungsstatus"
     },
     "splash": {
       "addFolder": "Ordner hinzufügen",
@@ -1374,6 +1381,8 @@
       "focusModeDesc": "Hilft beim Fokussieren, indem andere Panels automatisch geschlossen werden, wenn Sie ein neues öffnen.",
       "folderImageCounts": "Bildanzahl im Ordner",
       "folderImageCountsDesc": "Zeigt die Anzahl der Bilder in Ordnern an, wenn Sie mit der Maus über die Ordnerstruktur fahren.",
+      "displayEditIcon": "Bearbeitungssymbol anzeigen",
+      "displayEditIconDesc": "Zeigt ein kleines Schieberegler-Symbol auf Miniaturbildern an, die bearbeitet wurden.",
       "font": "Schriftart",
       "fontDesc": "Ändern Sie die Schriftart der Anwendung.",
       "nativeTitlebar": "Native Titelleiste",

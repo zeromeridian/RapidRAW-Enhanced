@@ -182,6 +182,7 @@ export interface AppSettings {
   exportPresets?: ExportPreset[];
   myLenses?: any;
   enableFolderImageCounts?: boolean;
+  displayEditIcon?: boolean;
   linearRawMode?: string;
   enableXmpSync?: boolean;
   createXmpIfMissing?: boolean;
@@ -214,10 +215,17 @@ export enum LibraryViewMode {
   Recursive = 'recursive',
 }
 
+export enum EditedStatus {
+  All = 'all',
+  EditedOnly = 'editedOnly',
+  UneditedOnly = 'uneditedOnly',
+}
+
 export interface FilterCriteria {
   colors: Array<string>;
   rating: number;
   rawStatus: RawStatus;
+  editedStatus?: EditedStatus;
 }
 
 export interface Folder {

@@ -308,6 +308,7 @@ export function ViewOptionsDropdown({
   thumbnailAspectRatioOptions,
   ratingFilterOptions,
   rawStatusOptions,
+  editedStatusOptions,
   sortOptions,
 }: any) {
   const { t } = useTranslation();
@@ -579,6 +580,36 @@ export function ViewOptionsDropdown({
                 );
               })}
             </div>
+
+            <div>
+              <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+                {t('library.header.viewOptions.filterByEdited', 'Filter by Edit Status')}
+              </Text>
+              {editedStatusOptions.map((option: any) => {
+                const isSelected = (filterCriteria.editedStatus || EditedStatus.All) === option.key;
+                return (
+                  <button
+                    className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
+                      isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
+                    }`}
+                    key={option.key}
+                    onClick={() =>
+                      setFilterCriteria((prev: Partial<FilterCriteria>) => ({ ...prev, editedStatus: option.key }))
+                    }
+                    role="menuitem"
+                  >
+                    <Text
+                      variant={TextVariants.label}
+                      color={TextColors.primary}
+                      weight={isSelected ? TextWeights.semibold : TextWeights.normal}
+                    >
+                      {option.label}
+                    </Text>
+                    {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="py-2"></div>
@@ -637,7 +668,7 @@ export function ViewOptionsDropdown({
                     ? t('library.header.viewOptions.sortDescending')
                     : t('library.header.viewOptions.sortAscending')
                 }
-                className="absolute top-1/2 right-3 -translate-y-1/2 p-1 bg-transparent border-none text-text-secondary hover:text-text-primary focus:outline-hidden focus:ring-1 focus:ring-accent rounded-sm"
+                className="absolute top-1/2 right-3 -translate-y-1/2 p-1 bg-transparent border-none text-text-secondary hover:text-text-primary rounded-sm"
               >
                 {sortCriteria.order === SortDirection.Ascending ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
