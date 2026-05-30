@@ -1800,20 +1800,23 @@ pub fn is_image_edited(
     }
 
     if let Some(patches) = adj.get("aiPatches").and_then(|v| v.as_array())
-        && !patches.is_empty() {
-            return true;
-        }
+        && !patches.is_empty()
+    {
+        return true;
+    }
     if let Some(masks) = adj.get("masks").and_then(|v| v.as_array())
-        && !masks.is_empty() {
-            return true;
-        }
+        && !masks.is_empty()
+    {
+        return true;
+    }
 
     if let Some(crop_val) = adj.get("crop")
         && !crop_val.is_null()
-            && let Ok(crop) = serde_json::from_value::<Crop>(crop_val.clone())
-                && (crop.x.abs() > 0.1 || crop.y.abs() > 0.1) {
-                    return true;
-                }
+        && let Ok(crop) = serde_json::from_value::<Crop>(crop_val.clone())
+        && (crop.x.abs() > 0.1 || crop.y.abs() > 0.1)
+    {
+        return true;
+    }
 
     if adj
         .get("orientationSteps")
