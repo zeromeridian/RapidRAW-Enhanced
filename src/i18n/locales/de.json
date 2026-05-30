@@ -818,9 +818,11 @@
       "noMatch": "Keine Bilder gefunden, die Ihrem Filter entsprechen.",
       "rating": {
         "all": "Alle anzeigen",
+        "andUpSuffix": "& höher",
         "fiveOnly": "Nur 5",
         "fourAndUp": "4 & höher",
         "oneAndUp": "1 & höher",
+        "onlySuffix": "nur",
         "threeAndUp": "3 & höher",
         "twoAndUp": "2 & höher",
         "unrated": "Nur unbewertete"

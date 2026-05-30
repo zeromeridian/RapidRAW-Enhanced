@@ -818,9 +818,11 @@
       "noMatch": "No images found that match your filter.",
       "rating": {
         "all": "Show All",
+        "andUpSuffix": "& up",
         "fiveOnly": "5 only",
         "fourAndUp": "4 & up",
         "oneAndUp": "1 & up",
+        "onlySuffix": "only",
         "threeAndUp": "3 & up",
         "twoAndUp": "2 & up",
         "unrated": "Unrated Only"
