@@ -816,6 +816,11 @@
       }
     },
     "filters": {
+      "edited": {
+        "all": "All Images",
+        "editedOnly": "Edited Only",
+        "uneditedOnly": "Unedited Only"
+      },
       "noMatch": "No images found that match your filter.",
       "rating": {
         "all": "Show All",
@@ -833,11 +838,6 @@
         "nonRawOnly": "Non-RAW Only",
         "preferRaw": "Prefer RAW",
         "rawOnly": "RAW Only"
-      },
-      "edited": {
-        "all": "All Images",
-        "editedOnly": "Edited Only",
-        "uneditedOnly": "Unedited Only"
       }
     },
     "folders": {
@@ -890,9 +890,9 @@
         "displayMode": "Display Mode",
         "exifDisabledTooltip": "Enable EXIF Reading in Settings to use this option.",
         "filterByColorLabel": "Filter by Color Label",
+        "filterByEdited": "Filter by Edit Status",
         "filterByFileType": "Filter by File Type",
         "filterByRating": "Filter by Rating",
-        "filterByEdited": "Filter by Edit Status",
         "metadataAlways": "Always",
         "metadataHover": "On Hover",
         "metadataOff": "Off",
@@ -933,12 +933,12 @@
       "aperture": "Aperture",
       "dateModified": "Date Modified",
       "dateTaken": "Date Taken",
+      "editedStatus": "Edited Status",
       "fileName": "File Name",
       "focalLength": "Focal Length",
       "iso": "ISO",
       "rating": "Rating",
-      "shutterSpeed": "Shutter Speed",
-      "editedStatus": "Edited Status"
+      "shutterSpeed": "Shutter Speed"
     },
     "splash": {
       "addFolder": "Add Folder",
@@ -1081,11 +1081,17 @@
       "selectNone": "Select None",
       "title": "Copy & Paste Settings"
     },
+    "createAlbum": {
+      "placeholder": "Enter album name..."
+    },
     "createFolder": {
       "cancel": "Cancel",
       "create": "Create",
       "placeholder": "Enter folder name...",
       "title": "Create New Folder"
+    },
+    "createGroup": {
+      "placeholder": "Enter group name..."
     },
     "culling": {
       "actionDelete": "Move to Trash",
@@ -1254,6 +1260,9 @@
       "stitchingProgress": "Stitching Panorama",
       "title": "Stitch Panorama"
     },
+    "renameAlbum": {
+      "placeholder": "Enter new album name..."
+    },
     "renameFile": {
       "cancel": "Cancel",
       "fileNamingTemplate": "File Naming Template",
@@ -1269,15 +1278,6 @@
       "placeholder": "Enter new folder name...",
       "save": "Save",
       "title": "Rename Folder"
-    },
-    "createAlbum": {
-      "placeholder": "Enter album name..."
-    },
-    "createGroup": {
-      "placeholder": "Enter group name..."
-    },
-    "renameAlbum": {
-      "placeholder": "Enter new album name..."
     },
     "renameGroup": {
       "placeholder": "Enter new group name..."
@@ -1389,6 +1389,8 @@
       "createXmp": "Create Missing XMP Files",
       "createXmpDesc": "Automatically create a new XMP sidecar file if one does not exist for an image.",
       "createXmpMissing": "Create XMP if missing",
+      "displayEditIcon": "Display Edit Icon",
+      "displayEditIconDesc": "Show a small slider icon on thumbnails that have been edited.",
       "enableFocusMode": "Enable Focus Mode",
       "enableOsTitlebar": "Enable OS Titlebar",
       "enableXmpSync": "Enable XMP Sync",
@@ -1396,8 +1398,6 @@
       "focusModeDesc": "Helps you focus by automatically closing other panels when you open a new one.",
       "folderImageCounts": "Folder Image Counts",
       "folderImageCountsDesc": "Show the number of images inside folders when hovering over the folder tree.",
-      "displayEditIcon": "Display Edit Icon",
-      "displayEditIconDesc": "Show a small slider icon on thumbnails that have been edited.",
       "font": "Font",
       "fontDesc": "Change the application font.",
       "nativeTitlebar": "Native Titlebar",

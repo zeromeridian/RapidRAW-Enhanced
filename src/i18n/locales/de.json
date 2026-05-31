@@ -816,6 +816,11 @@
       }
     },
     "filters": {
+      "edited": {
+        "all": "Alle Bilder",
+        "editedOnly": "Nur bearbeitete",
+        "uneditedOnly": "Nur unbearbeitete"
+      },
       "noMatch": "Keine Bilder gefunden, die Ihrem Filter entsprechen.",
       "rating": {
         "all": "Alle anzeigen",
@@ -833,11 +838,6 @@
         "nonRawOnly": "Nur Nicht-RAW",
         "preferRaw": "RAW bevorzugen",
         "rawOnly": "Nur RAW"
-      },
-      "edited": {
-        "all": "Alle Bilder",
-        "editedOnly": "Nur bearbeitete",
-        "uneditedOnly": "Nur unbearbeitete"
       }
     },
     "folders": {
@@ -890,9 +890,9 @@
         "displayMode": "Anzeigemodus",
         "exifDisabledTooltip": "EXIF-Lesen in den Einstellungen aktivieren, um diese Option zu nutzen.",
         "filterByColorLabel": "Nach Farbmarkierung filtern",
+        "filterByEdited": "Nach Bearbeitungsstatus filtern",
         "filterByFileType": "Nach Dateityp filtern",
         "filterByRating": "Nach Bewertung filtern",
-        "filterByEdited": "Nach Bearbeitungsstatus filtern",
         "metadataAlways": "Immer",
         "metadataHover": "Beim Darüberfahren",
         "metadataOff": "Aus",
@@ -933,12 +933,12 @@
       "aperture": "Blende",
       "dateModified": "Änderungsdatum",
       "dateTaken": "Aufnahmedatum",
+      "editedStatus": "Bearbeitungsstatus",
       "fileName": "Dateiname",
       "focalLength": "Brennweite",
       "iso": "ISO",
       "rating": "Bewertung",
-      "shutterSpeed": "Verschlusszeit",
-      "editedStatus": "Bearbeitungsstatus"
+      "shutterSpeed": "Verschlusszeit"
     },
     "splash": {
       "addFolder": "Ordner hinzufügen",
@@ -1081,11 +1081,17 @@
       "selectNone": "Keine auswählen",
       "title": "Einstellungen kopieren & einfügen"
     },
+    "createAlbum": {
+      "placeholder": "Albumnamen eingeben..."
+    },
     "createFolder": {
       "cancel": "Abbrechen",
       "create": "Erstellen",
       "placeholder": "Ordnernamen eingeben...",
       "title": "Neuen Ordner erstellen"
+    },
+    "createGroup": {
+      "placeholder": "Gruppennamen eingeben..."
     },
     "culling": {
       "actionDelete": "In den Papierkorb verschieben",
@@ -1254,6 +1260,9 @@
       "stitchingProgress": "Panorama wird zusammengefügt",
       "title": "Panorama zusammenfügen"
     },
+    "renameAlbum": {
+      "placeholder": "Neuen Albumnamen eingeben..."
+    },
     "renameFile": {
       "cancel": "Abbrechen",
       "fileNamingTemplate": "Dateibenennungsvorlage",
@@ -1269,15 +1278,6 @@
       "placeholder": "Neuen Ordnernamen eingeben...",
       "save": "Speichern",
       "title": "Ordner umbenennen"
-    },
-    "createAlbum": {
-      "placeholder": "Albumnamen eingeben..."
-    },
-    "createGroup": {
-      "placeholder": "Gruppennamen eingeben..."
-    },
-    "renameAlbum": {
-      "placeholder": "Neuen Albumnamen eingeben..."
     },
     "renameGroup": {
       "placeholder": "Neuen Gruppennamen eingeben..."
@@ -1389,6 +1389,8 @@
       "createXmp": "Fehlende XMP-Dateien erstellen",
       "createXmpDesc": "Erstellt automatisch eine neue XMP-Filialdatei, falls noch keine für ein Bild existiert.",
       "createXmpMissing": "XMP erstellen, falls fehlend",
+      "displayEditIcon": "Bearbeitungssymbol anzeigen",
+      "displayEditIconDesc": "Zeigt ein kleines Schieberegler-Symbol auf Miniaturbildern an, die bearbeitet wurden.",
       "enableFocusMode": "Fokusmodus aktivieren",
       "enableOsTitlebar": "OS-Titelleiste aktivieren",
       "enableXmpSync": "XMP-Sync aktivieren",
@@ -1396,8 +1398,6 @@
       "focusModeDesc": "Hilft beim Fokussieren, indem andere Panels automatisch geschlossen werden, wenn Sie ein neues öffnen.",
       "folderImageCounts": "Bildanzahl im Ordner",
       "folderImageCountsDesc": "Zeigt die Anzahl der Bilder in Ordnern an, wenn Sie mit der Maus über die Ordnerstruktur fahren.",
-      "displayEditIcon": "Bearbeitungssymbol anzeigen",
-      "displayEditIconDesc": "Zeigt ein kleines Schieberegler-Symbol auf Miniaturbildern an, die bearbeitet wurden.",
       "font": "Schriftart",
       "fontDesc": "Ändern Sie die Schriftart der Anwendung.",
       "nativeTitlebar": "Native Titelleiste",
