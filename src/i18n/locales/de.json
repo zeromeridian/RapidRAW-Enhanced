@@ -156,6 +156,7 @@
       "newAlbum": "Neues Album",
       "newGroup": "Neue Gruppe",
       "renameAlbum": "Album umbenennen",
+      "renameGroup": "Gruppe umbenennen",
       "rootDir": "Stammverzeichnis"
     },
     "colors": {
@@ -1268,6 +1269,18 @@
       "placeholder": "Neuen Ordnernamen eingeben...",
       "save": "Speichern",
       "title": "Ordner umbenennen"
+    },
+    "createAlbum": {
+      "placeholder": "Albumnamen eingeben..."
+    },
+    "createGroup": {
+      "placeholder": "Gruppennamen eingeben..."
+    },
+    "renameAlbum": {
+      "placeholder": "Neuen Albumnamen eingeben..."
+    },
+    "renameGroup": {
+      "placeholder": "Neuen Gruppennamen eingeben..."
     },
     "transform": {
       "amount": "Betrag",

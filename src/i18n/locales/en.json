@@ -156,6 +156,7 @@
       "newAlbum": "New Album",
       "newGroup": "New Group",
       "renameAlbum": "Rename Album",
+      "renameGroup": "Rename Group",
       "rootDir": "Root Directory"
     },
     "colors": {
@@ -1268,6 +1269,18 @@
       "placeholder": "Enter new folder name...",
       "save": "Save",
       "title": "Rename Folder"
+    },
+    "createAlbum": {
+      "placeholder": "Enter album name..."
+    },
+    "createGroup": {
+      "placeholder": "Enter group name..."
+    },
+    "renameAlbum": {
+      "placeholder": "Enter new album name..."
+    },
+    "renameGroup": {
+      "placeholder": "Enter new group name..."
     },
     "transform": {
       "amount": "Amount",

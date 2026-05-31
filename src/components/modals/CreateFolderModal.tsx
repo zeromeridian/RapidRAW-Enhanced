@@ -7,9 +7,19 @@ interface FolderModalProps {
   isOpen: boolean;
   onClose(): void;
   onSave(name: string): void;
+  title?: string;
+  placeholder?: string;
+  buttonText?: string;
 }
 
-export default function CreateFolderModal({ isOpen, onClose, onSave }: FolderModalProps) {
+export default function CreateFolderModal({
+  isOpen,
+  onClose,
+  onSave,
+  title,
+  placeholder,
+  buttonText,
+}: FolderModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const [isMounted, setIsMounted] = useState(false);
@@ -73,14 +83,14 @@ export default function CreateFolderModal({ isOpen, onClose, onSave }: FolderMod
         onClick={(e: any) => e.stopPropagation()}
       >
         <Text variant={TextVariants.title} className="mb-4">
-          {t('modals.createFolder.title')}
+          {title || t('modals.createFolder.title')}
         </Text>
         <input
           autoFocus
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-accent"
           onChange={(e: any) => setName(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={t('modals.createFolder.placeholder')}
+          placeholder={placeholder || t('modals.createFolder.placeholder')}
           type="text"
           value={name}
         />
@@ -96,7 +106,7 @@ export default function CreateFolderModal({ isOpen, onClose, onSave }: FolderMod
             disabled={!name.trim()}
             onClick={handleSave}
           >
-            {t('modals.createFolder.create')}
+            {buttonText || t('modals.createFolder.create')}
           </button>
         </div>
       </div>

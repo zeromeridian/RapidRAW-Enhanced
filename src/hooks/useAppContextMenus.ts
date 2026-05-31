@@ -1144,7 +1144,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           ? [
               { type: OPTION_SEPARATOR },
               {
-                label: t('contextMenus.albums.renameAlbum'),
+                label:
+                  item.type === 'group' ? t('contextMenus.albums.renameGroup') : t('contextMenus.albums.renameAlbum'),
                 icon: FileEdit,
                 onClick: () => setUI({ albumActionTarget: item.id, isRenameAlbumModalOpen: true }),
               },
