@@ -784,18 +784,26 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
   );
 
   const handleFolderTreeContextMenu = useCallback(
-    (event: any, path: string, isCurrentlyPinned?: boolean) => {
+    (event: any, path: string | null, isCurrentlyPinned?: boolean) => {
       event.preventDefault();
       event.stopPropagation();
+
+      if (!path) {
+        showContextMenu(event.clientX, event.clientY, [
+          {
+            icon: RefreshCw,
+            label: t('contextMenus.folders.refresh'),
+            onClick: () => props.refreshAllFolderTrees(),
+          },
+        ]);
+        return;
+      }
 
       const { rootPaths, currentFolderPath, folderTrees, setLibrary } = useLibraryStore.getState();
       const { copiedFilePaths, setProcess } = useProcessStore.getState();
       const { appSettings, handleSettingsChange } = useSettingsStore.getState();
       const { setUI } = useUIStore.getState();
-
-      const targetPath = path || currentFolderPath || rootPaths?.[0];
-      if (!targetPath) return;
-
+      const targetPath = path;
       const isRoot = rootPaths.includes(targetPath);
       const numCopied = copiedFilePaths.length;
       const copyPastedLabel = t('contextMenus.folders.copyHere', { count: numCopied });
@@ -953,54 +961,50 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           label: t('contextMenus.folders.refresh'),
           onClick: () => props.refreshAllFolderTrees(),
         },
-        ...(path
-          ? [
-              {
-                disabled: isRoot,
-                icon: Trash2,
-                isDestructive: true,
-                label: t('contextMenus.folders.deleteFolder'),
-                submenu: [
-                  { label: t('contextMenus.editor.cancel'), icon: X, onClick: () => {} },
-                  {
-                    label: t('contextMenus.folders.confirm'),
-                    icon: Check,
-                    isDestructive: true,
-                    onClick: async () => {
-                      try {
-                        await invoke(Invokes.DeleteFolder, { path: targetPath });
+        {
+          disabled: isRoot,
+          icon: Trash2,
+          isDestructive: true,
+          label: t('contextMenus.folders.deleteFolder'),
+          submenu: [
+            { label: t('contextMenus.editor.cancel'), icon: X, onClick: () => {} },
+            {
+              label: t('contextMenus.folders.confirm'),
+              icon: Check,
+              isDestructive: true,
+              onClick: async () => {
+                try {
+                  await invoke(Invokes.DeleteFolder, { path: targetPath });
 
-                        const isCurrentInTarget =
-                          currentFolderPath === targetPath ||
-                          currentFolderPath?.startsWith(targetPath + '/') ||
-                          currentFolderPath?.startsWith(targetPath + '\\');
+                  const isCurrentInTarget =
+                    currentFolderPath === targetPath ||
+                    currentFolderPath?.startsWith(targetPath + '/') ||
+                    currentFolderPath?.startsWith(targetPath + '\\');
 
-                        if (isCurrentInTarget) {
-                          props.handleBackToLibrary();
-                          setLibrary({
-                            currentFolderPath: null,
-                            imageList: [],
-                            libraryActivePath: null,
-                            multiSelectedPaths: [],
-                            selectionAnchorPath: null,
-                          });
+                  if (isCurrentInTarget) {
+                    props.handleBackToLibrary();
+                    setLibrary({
+                      currentFolderPath: null,
+                      imageList: [],
+                      libraryActivePath: null,
+                      multiSelectedPaths: [],
+                      selectionAnchorPath: null,
+                    });
 
-                          const { appSettings, handleSettingsChange } = useSettingsStore.getState();
-                          if (appSettings) {
-                            handleSettingsChange({ ...appSettings, lastFolderState: null } as any);
-                          }
-                        }
+                    const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+                    if (appSettings) {
+                      handleSettingsChange({ ...appSettings, lastFolderState: null } as any);
+                    }
+                  }
 
-                        props.refreshAllFolderTrees();
-                      } catch (err) {
-                        toast.error(t('contextMenus.toasts.failedDeleteFolder', { err }));
-                      }
-                    },
-                  },
-                ],
+                  props.refreshAllFolderTrees();
+                } catch (err) {
+                  toast.error(t('contextMenus.toasts.failedDeleteFolder', { err }));
+                }
               },
-            ]
-          : []),
+            },
+          ],
+        },
       ];
       showContextMenu(event.clientX, event.clientY, options);
     },

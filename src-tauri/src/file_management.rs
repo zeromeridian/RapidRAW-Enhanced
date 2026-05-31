@@ -945,12 +945,20 @@ fn get_folder_tree_sync(
     let children_sum: usize = children.iter().map(|c| c.image_count).sum();
     let has_subdirs = children.iter().any(|c| c.is_dir);
 
+    let name = match root_path.file_name() {
+        Some(n) => n.to_string_lossy().into_owned(),
+        None => {
+            let trimmed = path.trim_end_matches(&['/', '\\'][..]);
+            if trimmed.is_empty() {
+                path.clone()
+            } else {
+                trimmed.to_string()
+            }
+        }
+    };
+
     Ok(FolderNode {
-        name: root_path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .into_owned(),
+        name,
         path: path.clone(),
         children,
         is_dir: true,
