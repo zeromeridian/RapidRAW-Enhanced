@@ -283,28 +283,28 @@ const ThumbnailComponent = ({
                 </Text>
               )}
             </div>
-            <div className="pt-1.5 pb-1 flex flex-wrap items-center gap-x-2.5 shrink-0">
+            <div className="pt-1.5 pb-0.5 flex flex-wrap items-center gap-x-2.5 shrink-0">
               <div className="flex items-center gap-1">
                 <IconShutter className="w-2.5 h-2.5" />
-                <Text variant={TextVariants.small} className="text-[9px]">
+                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
                   {shutter || '-'}
                 </Text>
               </div>
               <div className="flex items-center gap-1">
                 <IconAperture className="w-2.5 h-2.5" />
-                <Text variant={TextVariants.small} className="text-[9px]">
+                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
                   {fNumber || '-'}
                 </Text>
               </div>
               <div className="flex items-center gap-1">
                 <IconIso className="w-2.5 h-2.5" />
-                <Text variant={TextVariants.small} className="text-[9px]">
+                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
                   {iso || '-'}
                 </Text>
               </div>
               <div className="flex items-center gap-1">
                 <IconFocalLength className="w-2.5 h-2.5" />
-                <Text variant={TextVariants.small} className="text-[9px]">
+                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
                   {focal ? (String(focal).endsWith('mm') ? focal : `${focal}mm`) : '-'}
                 </Text>
               </div>
@@ -317,7 +317,7 @@ const ThumbnailComponent = ({
         className={clsx(
           'absolute bottom-0 left-0 right-0 flex flex-col p-2 pb-1.5 transition-all duration-300 ease-in-out z-20',
           isAlways
-            ? 'bg-surface/95 border-t border-border-color/50 pointer-events-auto'
+            ? 'bg-surface border-t border-border-color/50 pointer-events-auto'
             : isHover
               ? 'bg-transparent group-hover:bg-surface/60 backdrop-blur-none group-hover:backdrop-blur-md border-t border-transparent group-hover:border-border-color/50 pointer-events-none group-hover:pointer-events-auto'
               : 'bg-transparent border-t border-transparent pointer-events-none',
