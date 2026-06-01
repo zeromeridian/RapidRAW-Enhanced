@@ -508,6 +508,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         let treesData;
         if (preloadedDataRef.current?.rootPaths?.join() === rootFolders.join() && preloadedDataRef.current.trees) {
           treesData = await preloadedDataRef.current.trees;
+          preloadedDataRef.current.trees = undefined;
         } else {
           const expandedArr = folderState?.expandedFolders
             ? Array.from(new Set(folderState.expandedFolders))
@@ -529,6 +530,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       if (preloadedDataRef.current?.currentPath === pathToSelect && preloadedDataRef.current.images) {
         try {
           preloadedImages = await preloadedDataRef.current.images;
+          preloadedDataRef.current.images = undefined;
         } catch (e) {
           console.error('Failed to retrieve preloaded images', e);
         }
