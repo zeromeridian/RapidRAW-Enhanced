@@ -227,14 +227,13 @@ const FilmstripThumbnail = memo(
             {(colorLabel || rating > 0 || showEditIcon) && (
               <motion.div
                 key="badge-container"
-                layout
                 initial={{ opacity: 0, scale: 0.8, y: -5 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.8, y: -5 }}
                 transition={{ duration: 0.25, type: 'spring', bounce: 0.3 }}
                 className="bg-primary rounded-full px-1.5 py-0.5 text-xs text-white flex items-center gap-1.5 backdrop-blur-xs shadow-md"
               >
-                <AnimatePresence mode="popLayout" initial={false}>
+                <AnimatePresence initial={false}>
                   {showEditIcon && (
                     <motion.div
                       key="edited"

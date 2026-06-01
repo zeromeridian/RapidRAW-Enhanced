@@ -197,14 +197,13 @@ const ThumbnailComponent = ({
           {(colorLabel || rating > 0 || showEditIcon) && (
             <motion.div
               key="badge-container"
-              layout
               initial={{ opacity: 0, scale: 0.8, y: -5 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: -5 }}
               transition={{ duration: 0.25, type: 'spring', bounce: 0.3 }}
               className="rounded-full px-1.5 py-0.5 flex items-center gap-1.5 backdrop-blur-md shadow-md bg-black/10"
             >
-              <AnimatePresence mode="popLayout" initial={false}>
+              <AnimatePresence initial={false}>
                 {showEditIcon && (
                   <motion.div
                     key="edited"
