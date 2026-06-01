@@ -264,7 +264,7 @@ const AiProviderSwitch = ({ selectedProvider, onProviderChange }: AiProviderSwit
     () => [
       { id: 'cpu', label: t('settings.processing.ai.providers.cpu'), icon: Cpu },
       { id: 'ai-connector', label: t('settings.processing.ai.providers.aiConnector'), icon: Server },
-      { id: 'cloud', label: t('settings.processing.ai.providers.cloud'), icon: Cloud },
+      //{ id: 'cloud', label: t('settings.processing.ai.providers.cloud'), icon: Cloud },
     ],
     [t],
   );
