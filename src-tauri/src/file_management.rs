@@ -198,33 +198,37 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
 pub async fn read_exif_for_paths(
     paths: Vec<String>,
 ) -> Result<HashMap<String, HashMap<String, String>>, String> {
-    let exif_data: HashMap<String, HashMap<String, String>> = paths
-        .par_iter()
-        .filter_map(|virtual_path| {
-            let (source_path, _) = parse_virtual_path(virtual_path);
-            let source_path_str = source_path.to_string_lossy().to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        let exif_data: HashMap<String, HashMap<String, String>> = paths
+            .par_iter()
+            .filter_map(|virtual_path| {
+                let (source_path, _) = parse_virtual_path(virtual_path);
+                let source_path_str = source_path.to_string_lossy().to_string();
 
-            let map = if let Some(sidecar_exif) =
-                crate::exif_processing::read_rrexif_sidecar(&source_path)
-            {
-                sidecar_exif
-            } else if let Ok(mmap) = read_file_mapped(&source_path) {
-                crate::exif_processing::read_exif_data(&source_path_str, &mmap)
-            } else if let Ok(bytes) = fs::read(&source_path) {
-                crate::exif_processing::read_exif_data(&source_path_str, &bytes)
-            } else {
-                HashMap::new()
-            };
+                let map = if let Some(sidecar_exif) =
+                    crate::exif_processing::read_rrexif_sidecar(&source_path)
+                {
+                    sidecar_exif
+                } else if let Ok(mmap) = read_file_mapped(&source_path) {
+                    crate::exif_processing::read_exif_data(&source_path_str, &mmap)
+                } else if let Ok(bytes) = fs::read(&source_path) {
+                    crate::exif_processing::read_exif_data(&source_path_str, &bytes)
+                } else {
+                    HashMap::new()
+                };
 
-            if map.is_empty() {
-                None
-            } else {
-                Some((virtual_path.clone(), map))
-            }
-        })
-        .collect();
+                if map.is_empty() {
+                    None
+                } else {
+                    Some((virtual_path.clone(), map))
+                }
+            })
+            .collect();
 
-    Ok(exif_data)
+        Ok(exif_data)
+    })
+    .await
+    .unwrap_or_else(|e| Err(format!("Task failed: {}", e)))
 }
 
 #[tauri::command]
@@ -3118,7 +3122,7 @@ pub async fn import_files(
     let total_files = source_paths.len();
     let _ = app_handle.emit("import-start", serde_json::json!({ "total": total_files }));
 
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn_blocking(move || {
         for (i, source_path_str) in source_paths.iter().enumerate() {
             let _ = app_handle.emit(
                 "import-progress",
