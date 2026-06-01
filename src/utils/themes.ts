@@ -37,9 +37,9 @@ export const THEMES: Array<ThemeProps> = [
       '--app-button-text': 'rgb(255, 255, 255)',
       '--app-text-primary': 'rgb(20, 20, 20)',
       '--app-text-secondary': 'rgb(108, 108, 108)',
-      '--app-accent': 'rgb(181, 141, 98)',
+      '--app-accent': 'rgb(198, 142, 110)',
       '--app-border-color': 'rgb(224, 224, 224)',
-      '--app-hover-color': 'rgb(181, 141, 98)',
+      '--app-hover-color': 'rgb(198, 142, 110)',
     },
   },
   {
