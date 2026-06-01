@@ -599,30 +599,33 @@ export default function LensCorrectionModal({
         </button>
       </div>
       <div className="grow overflow-y-auto p-4 flex flex-col gap-6 text-text-secondary">
-        <div className="bg-bg-primary rounded-md p-1">
+        <div className="w-full p-2 bg-card-active rounded-md">
           <div className="relative flex w-full">
             <motion.div
-              className="absolute top-0 bottom-0 z-0 bg-surface rounded-md shadow-sm"
+              className="absolute top-0 bottom-0 z-0 bg-accent"
+              style={{ borderRadius: 6 }}
               animate={modeBubbleStyle}
               transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
             />
             <button
               onClick={() => handleModeChange('auto')}
               className={clsx(
-                'relative z-10 flex-1 py-1.5 text-sm font-medium rounded-md transition-colors',
-                params.lensCorrectionMode === 'auto' ? 'text-white' : 'text-text-secondary hover:text-white',
+                'relative flex-1 flex items-center justify-center gap-2 px-3 p-1.5 text-sm font-medium rounded-md transition-colors',
+                params.lensCorrectionMode === 'auto' ? 'text-button-text' : 'text-text-primary hover:bg-surface',
               )}
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
-              {t('modals.lensCorrection.modeAuto')}
+              <span className="relative z-10 flex items-center">{t('modals.lensCorrection.modeAuto')}</span>
             </button>
             <button
               onClick={() => handleModeChange('manual')}
               className={clsx(
-                'relative z-10 flex-1 py-1.5 text-sm font-medium rounded-md transition-colors',
-                params.lensCorrectionMode === 'manual' ? 'text-white' : 'text-text-secondary hover:text-white',
+                'relative flex-1 flex items-center justify-center gap-2 px-3 p-1.5 text-sm font-medium rounded-md transition-colors',
+                params.lensCorrectionMode === 'manual' ? 'text-button-text' : 'text-text-primary hover:bg-surface',
               )}
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
-              {t('modals.lensCorrection.modeManual')}
+              <span className="relative z-10 flex items-center">{t('modals.lensCorrection.modeManual')}</span>
             </button>
           </div>
         </div>

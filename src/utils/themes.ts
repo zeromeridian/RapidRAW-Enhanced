@@ -10,7 +10,7 @@ export interface ThemeProps {
 export const THEMES: Array<ThemeProps> = [
   {
     id: Theme.Dark,
-    name: 'Dark',
+    name: 'settings.themes.dark',
     splashImage: '/splash-dark.jpg',
     cssVariables: {
       '--app-bg-primary': 'rgb(24, 24, 24)',
@@ -27,13 +27,13 @@ export const THEMES: Array<ThemeProps> = [
   },
   {
     id: Theme.Light,
-    name: 'Light',
+    name: 'settings.themes.light',
     splashImage: '/splash-light.jpg',
     cssVariables: {
-      '--app-bg-primary': 'rgb(248, 248, 248)',
+      '--app-bg-primary': 'rgb(245, 245, 245)',
       '--app-bg-secondary': 'rgb(255, 255, 255)',
-      '--app-surface': 'rgb(243, 243, 243)',
-      '--app-card-active': 'rgb(255, 255, 255)',
+      '--app-surface': 'rgb(241, 241, 241)',
+      '--app-card-active': 'rgb(250, 250, 250)',
       '--app-button-text': 'rgb(255, 255, 255)',
       '--app-text-primary': 'rgb(20, 20, 20)',
       '--app-text-secondary': 'rgb(108, 108, 108)',
@@ -44,7 +44,7 @@ export const THEMES: Array<ThemeProps> = [
   },
   {
     id: Theme.Grey,
-    name: 'Grey',
+    name: 'settings.themes.grey',
     splashImage: '/splash-grey.jpg',
     cssVariables: {
       '--app-bg-primary': 'rgb(112, 112, 112)',

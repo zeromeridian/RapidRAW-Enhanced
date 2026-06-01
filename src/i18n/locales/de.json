@@ -1413,8 +1413,65 @@
       "xmpSync": "XMP-Metadaten-Sync",
       "xmpSyncDesc": "Synchronisieren Sie Bewertungen, Farbmarkierungen und Tags in Standard-XMP-Filialdateien für Kompatibilität mit anderen Foto-Editoren."
     },
+    "keybinds": {
+      "actions": {
+        "brush_size_down": "Pinselgröße verringern",
+        "brush_size_up": "Pinselgröße erhöhen",
+        "color_label_blue": "Farbmarkierung: Blau",
+        "color_label_green": "Farbmarkierung: Grün",
+        "color_label_none": "Farbmarkierung: Keine",
+        "color_label_purple": "Farbmarkierung: Lila",
+        "color_label_red": "Farbmarkierung: Rot",
+        "color_label_yellow": "Farbmarkierung: Gelb",
+        "copy_adjustments": "Ausgewählte Anpassungen kopieren",
+        "copy_files": "Ausgewählte Datei(en) kopieren",
+        "cycle_zoom": "Zoom durchwechseln (Einpassen, 2x Einpassen, 100%)",
+        "delete_selected": "Ausgewählte Datei(en) löschen",
+        "open_image": "Ausgewähltes Bild öffnen",
+        "paste_adjustments": "Kopierte Anpassungen einfügen",
+        "paste_files": "Datei(en) in aktuellen Ordner einfügen",
+        "preview_next": "Nächstes Bild",
+        "preview_prev": "Vorheriges Bild",
+        "rate_0": "Sternbewertung: 0",
+        "rate_1": "Sternbewertung: 1",
+        "rate_2": "Sternbewertung: 2",
+        "rate_3": "Sternbewertung: 3",
+        "rate_4": "Sternbewertung: 4",
+        "rate_5": "Sternbewertung: 5",
+        "redo": "Bearbeitung wiederholen",
+        "rotate_left": "90° gegen den Uhrzeigersinn drehen",
+        "rotate_right": "90° im Uhrzeigersinn drehen",
+        "select_all": "Alle Bilder auswählen",
+        "show_original": "Original anzeigen (Vorher/Nachher)",
+        "toggle_adjustments": "Anpassungen-Panel ein-/ausblenden",
+        "toggle_ai": "KI-Panel ein-/ausblenden",
+        "toggle_analytics": "Analyseanzeige ein-/ausblenden",
+        "toggle_crop": "Zuschnitt / Gerade ausrichten umschalten",
+        "toggle_crop_panel": "Zuschneiden-Panel ein-/ausblenden",
+        "toggle_export": "Exportieren-Panel ein-/ausblenden",
+        "toggle_fullscreen": "Vollbild umschalten",
+        "toggle_library_exif": "EXIF-Überlagerung ein-/ausblenden",
+        "toggle_masks": "Maskieren-Panel ein-/ausblenden",
+        "toggle_metadata": "Metadaten-Panel ein-/ausblenden",
+        "toggle_presets": "Vorgaben-Panel ein-/ausblenden",
+        "undo": "Bearbeitung rückgängig machen",
+        "zoom_100": "Auf 100% zoomen",
+        "zoom_fit": "Auf Fenstergröße einpassen",
+        "zoom_in": "Vergrößern",
+        "zoom_in_step": "Vergrößern (schrittweise)",
+        "zoom_out": "Verkleinern",
+        "zoom_out_step": "Verkleinern (schrittweise)"
+      },
+      "sections": {
+        "editing": "Bearbeitung",
+        "library": "Bibliothek",
+        "panels": "Panels",
+        "rating": "Bewertungen & Markierungen",
+        "view": "Ansicht"
+      }
+    },
     "language": "Sprache",
-    "languageDesc": "Ändern Sie die Sprache der Anwendung. Fällt auf Englisch zurück, wenn Übersetzungen fehlen.",
+    "languageDesc": "Ändern Sie die Sprache der Anwendung.",
     "lenses": {
       "addButton": "Zu meinen Objektiven hinzufügen",
       "addNew": "Neues Objektiv hinzufügen",
@@ -1608,6 +1665,11 @@
         "youLabel": "Ihnen"
       },
       "title": "Besonderer Dank"
+    },
+    "themes": {
+      "dark": "Dunkel",
+      "grey": "Grau",
+      "light": "Hell"
     },
     "title": "Einstellungen",
     "tooltips": {

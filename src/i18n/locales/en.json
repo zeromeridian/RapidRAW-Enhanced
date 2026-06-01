@@ -1413,8 +1413,65 @@
       "xmpSync": "XMP Metadata Sync",
       "xmpSyncDesc": "Sync ratings, color labels and tags to standard XMP sidecar files for compatibility with other photo editors."
     },
+    "keybinds": {
+      "actions": {
+        "brush_size_down": "Decrease brush size",
+        "brush_size_up": "Increase brush size",
+        "color_label_blue": "Color label: Blue",
+        "color_label_green": "Color label: Green",
+        "color_label_none": "Color label: None",
+        "color_label_purple": "Color label: Purple",
+        "color_label_red": "Color label: Red",
+        "color_label_yellow": "Color label: Yellow",
+        "copy_adjustments": "Copy selected adjustments",
+        "copy_files": "Copy selected file(s)",
+        "cycle_zoom": "Cycle zoom (Fit, 2x Fit, 100%)",
+        "delete_selected": "Delete selected file(s)",
+        "open_image": "Open selected image",
+        "paste_adjustments": "Paste copied adjustments",
+        "paste_files": "Paste file(s) to current folder",
+        "preview_next": "Next image",
+        "preview_prev": "Previous image",
+        "rate_0": "Star rating: 0",
+        "rate_1": "Star rating: 1",
+        "rate_2": "Star rating: 2",
+        "rate_3": "Star rating: 3",
+        "rate_4": "Star rating: 4",
+        "rate_5": "Star rating: 5",
+        "redo": "Redo adjustment",
+        "rotate_left": "Rotate 90° counter-clockwise",
+        "rotate_right": "Rotate 90° clockwise",
+        "select_all": "Select all images",
+        "show_original": "Show original (before/after)",
+        "toggle_adjustments": "Toggle Adjustments panel",
+        "toggle_ai": "Toggle AI panel",
+        "toggle_analytics": "Toggle Analytics display",
+        "toggle_crop": "Toggle Crop / Straighten",
+        "toggle_crop_panel": "Toggle Crop panel",
+        "toggle_export": "Toggle Export panel",
+        "toggle_fullscreen": "Toggle fullscreen",
+        "toggle_library_exif": "Toggle EXIF overlay",
+        "toggle_masks": "Toggle Masks panel",
+        "toggle_metadata": "Toggle Metadata panel",
+        "toggle_presets": "Toggle Presets panel",
+        "undo": "Undo adjustment",
+        "zoom_100": "Zoom to 100%",
+        "zoom_fit": "Zoom to fit",
+        "zoom_in": "Zoom in",
+        "zoom_in_step": "Zoom in (by step)",
+        "zoom_out": "Zoom out",
+        "zoom_out_step": "Zoom out (by step)"
+      },
+      "sections": {
+        "editing": "Editing",
+        "library": "Library",
+        "panels": "Panels",
+        "rating": "Rating & Labels",
+        "view": "View"
+      }
+    },
     "language": "Language",
-    "languageDesc": "Change the application language. Falls back to English if translations are missing.",
+    "languageDesc": "Change the application language.",
     "lenses": {
       "addButton": "Add to My Lenses",
       "addNew": "Add New Lens",
@@ -1608,6 +1665,11 @@
         "youLabel": "You"
       },
       "title": "Special Thanks"
+    },
+    "themes": {
+      "dark": "Dark",
+      "grey": "Grey",
+      "light": "Light"
     },
     "title": "Settings",
     "tooltips": {
