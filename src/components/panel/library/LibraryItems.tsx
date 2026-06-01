@@ -38,7 +38,7 @@ const ThumbnailComponent = ({
   const displayEditIcon = useSettingsStore((s) => s.appSettings?.displayEditIcon ?? true);
   const showEditIcon = isEdited && displayEditIcon;
 
-  const [showPlaceholder, setShowPlaceholder] = useState(!data);
+  const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
   const latestThumbDataRef = useRef<string | undefined>(undefined);
 
@@ -64,7 +64,14 @@ const ThumbnailComponent = ({
   }, [exif]);
 
   useEffect(() => {
-    setShowPlaceholder(!data);
+    if (data) {
+      setShowPlaceholder(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setShowPlaceholder(true);
+    }, 500);
+    return () => clearTimeout(timer);
   }, [data]);
 
   useEffect(() => {
@@ -423,7 +430,7 @@ const ListItemComponent = ({
   const data = useProcessStore((s) => s.thumbnails[path]);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
 
-  const [showPlaceholder, setShowPlaceholder] = useState(!data);
+  const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
   const latestThumbDataRef = useRef<string | undefined>(undefined);
 
@@ -459,7 +466,14 @@ const ListItemComponent = ({
   const getW = (key: keyof ColumnWidths) => `${(columnWidths[key] / totalBase) * 100}%`;
 
   useEffect(() => {
-    setShowPlaceholder(!data);
+    if (data) {
+      setShowPlaceholder(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setShowPlaceholder(true);
+    }, 500);
+    return () => clearTimeout(timer);
   }, [data]);
 
   useEffect(() => {
