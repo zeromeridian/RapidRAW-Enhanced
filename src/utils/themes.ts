@@ -30,9 +30,9 @@ export const THEMES: Array<ThemeProps> = [
     name: 'Light',
     splashImage: '/splash-light.jpg',
     cssVariables: {
-      '--app-bg-primary': 'rgb(240, 240, 240)',
+      '--app-bg-primary': 'rgb(248, 248, 248)',
       '--app-bg-secondary': 'rgb(255, 255, 255)',
-      '--app-surface': 'rgb(244, 244, 244)',
+      '--app-surface': 'rgb(243, 243, 243)',
       '--app-card-active': 'rgb(255, 255, 255)',
       '--app-button-text': 'rgb(255, 255, 255)',
       '--app-text-primary': 'rgb(20, 20, 20)',
