@@ -60,6 +60,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+- **2026-06-01:** Improved thumbnail performance, polished metadata panel & non-blocking exif reading
 - **2026-05-30:** Implemented reliable edited status, sorting & filtering options
 - **2026-05-29:** Refactor exporting to be resource aware
 - **2026-05-27:** Added German language
@@ -69,11 +70,11 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 - **2026-05-20:** Introduced a dedicated EXIF data overlay display directly inside the library and list views
 - **2026-05-18:** Added global image preprocessing settings, numpad support for customizable keyboard shortcuts, and updated the "Grey" theme color variables
 - **2026-05-16:** Initial backend implementation of the cloud service functionality alongside a preview worker backpressure mechanism for better handling of high-quality live previews
-- **2026-05-15:** Added the ability to assign custom icons to individual folders in the library tree
 
 <details>
 <summary><strong>Expand further</strong></summary>
 
+- **2026-05-15:** Added the ability to assign custom icons to individual folders in the library tree
 - **2026-05-14:** Expanded the library architecture to support multi-root folders and introduced a custom album system
 - **2026-05-11:** Improved brush tool
 - **2026-05-05:** Major refactor to zustand...
