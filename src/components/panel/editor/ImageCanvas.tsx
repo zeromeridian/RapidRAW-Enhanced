@@ -191,6 +191,8 @@ const MaskOverlay = memo(
 
     const handleMaskTouchStart = useCallback(
       (e: any) => {
+        if (e.evt && typeof e.evt.button === 'number' && e.evt.button !== 0) return;
+
         onMaskInteractionStart(e);
         if (e.evt.cancelable) e.evt.preventDefault();
         e.evt.stopPropagation?.();
@@ -217,6 +219,7 @@ const MaskOverlay = memo(
 
     const handleRadialDragStart = useCallback(
       (e: any) => {
+        if (e.evt && typeof e.evt.button === 'number' && e.evt.button !== 0) return;
         isDragging.current = true;
         onMaskInteractionStart(e);
         dragStartPointer.current = getPointer(e.target.getStage());
@@ -344,6 +347,8 @@ const MaskOverlay = memo(
 
     const handleRotateStart = useCallback(
       (e: any) => {
+        if (e.evt && typeof e.evt.button === 'number' && e.evt.button !== 0) return;
+
         isDragging.current = true;
         onMaskInteractionStart(e);
         e.cancelBubble = true;
@@ -403,7 +408,7 @@ const MaskOverlay = memo(
         onUpdate(subMask.id, { parameters: pRef.current });
 
         if (e?.target?.getStage) {
-          e.target.getStage().container().style.cursor = 'default';
+          e.target.getStage().container().style.cursor = '';
         }
       },
       [subMask.id, onMaskInteractionEnd, onUpdate],
@@ -436,7 +441,7 @@ const MaskOverlay = memo(
         onMaskMouseLeave();
         if (!isDragging.current) {
           const stage = e.target.getStage();
-          stage.container().style.cursor = 'default';
+          stage.container().style.cursor = '';
         }
       },
       [onMaskMouseLeave],
@@ -444,6 +449,7 @@ const MaskOverlay = memo(
 
     const handleLinearGroupDragStart = useCallback(
       (e: any) => {
+        if (e.evt && typeof e.evt.button === 'number' && e.evt.button !== 0) return;
         isDragging.current = true;
         onMaskInteractionStart(e);
         dragStartPointer.current = getPointer(e.target.getStage());
@@ -488,6 +494,7 @@ const MaskOverlay = memo(
 
     const handleLinearPointDragStart = useCallback(
       (e: any) => {
+        if (e.evt && typeof e.evt.button === 'number' && e.evt.button !== 0) return;
         isDragging.current = true;
         onMaskInteractionStart(e);
         e.cancelBubble = true;
@@ -676,8 +683,18 @@ const MaskOverlay = memo(
             onDragStart={handleRadialDragStart}
             onDragMove={handleRadialDragMove}
             onDragEnd={handleRadialDragEnd}
-            onMouseEnter={onMaskMouseEnter}
-            onMouseLeave={onMaskMouseLeave}
+            onMouseEnter={(e: any) => {
+              onMaskMouseEnter();
+              if (!isToolActive && !isDragging.current) {
+                e.target.getStage().container().style.cursor = 'move';
+              }
+            }}
+            onMouseLeave={(e: any) => {
+              onMaskMouseLeave();
+              if (!isDragging.current && e?.target?.getStage) {
+                e.target.getStage().container().style.cursor = '';
+              }
+            }}
             onTouchEnd={handleMaskTouchEnd}
             onTouchStart={handleMaskTouchStart}
             radiusX={radiusX * scale}
@@ -702,6 +719,7 @@ const MaskOverlay = memo(
                 'middle-right',
               ]}
               onMouseDown={(e) => {
+                if (e.evt && typeof e.evt.button === 'number' && e.evt.button !== 0) return;
                 e.cancelBubble = true;
                 e.evt.preventDefault();
               }}
@@ -799,7 +817,7 @@ const MaskOverlay = memo(
             }}
             onMouseLeave={(e: any) => {
               onMaskMouseLeave();
-              e.target.getStage().container().style.cursor = 'default';
+              e.target.getStage().container().style.cursor = '';
             }}
           >
             <Line points={[-5000, 0, 5000, 0]} {...lineProps} dash={[2, 3]} />
@@ -823,7 +841,7 @@ const MaskOverlay = memo(
                 }}
                 onMouseLeave={(e: any) => {
                   onMaskMouseLeave();
-                  e.target.getStage().container().style.cursor = 'default';
+                  e.target.getStage().container().style.cursor = '';
                 }}
               />
               <Line
@@ -842,7 +860,7 @@ const MaskOverlay = memo(
                 }}
                 onMouseLeave={(e: any) => {
                   onMaskMouseLeave();
-                  e.target.getStage().container().style.cursor = 'default';
+                  e.target.getStage().container().style.cursor = '';
                 }}
               />
             </>
@@ -853,10 +871,10 @@ const MaskOverlay = memo(
               <Circle
                 x={sX}
                 y={sY}
-                radius={8}
+                radius={8 / stageScale}
                 fill="#0ea5e9"
                 stroke="white"
-                strokeWidth={2}
+                strokeWidth={2 / stageScale}
                 draggable
                 dragBoundFunc={lockDragBoundFunc}
                 onDragStart={handleLinearPointDragStart}
@@ -870,16 +888,16 @@ const MaskOverlay = memo(
                 }}
                 onMouseLeave={(e: any) => {
                   onMaskMouseLeave();
-                  e.target.getStage().container().style.cursor = 'default';
+                  e.target.getStage().container().style.cursor = '';
                 }}
               />
               <Circle
                 x={eX}
                 y={eY}
-                radius={8}
+                radius={8 / stageScale}
                 fill="#0ea5e9"
                 stroke="white"
-                strokeWidth={2}
+                strokeWidth={2 / stageScale}
                 draggable
                 dragBoundFunc={lockDragBoundFunc}
                 onDragStart={handleLinearPointDragStart}
@@ -893,7 +911,7 @@ const MaskOverlay = memo(
                 }}
                 onMouseLeave={(e: any) => {
                   onMaskMouseLeave();
-                  e.target.getStage().container().style.cursor = 'default';
+                  e.target.getStage().container().style.cursor = '';
                 }}
               />
             </>
@@ -917,7 +935,7 @@ const MaskOverlay = memo(
                 }}
                 onMouseLeave={(e: any) => {
                   onMaskMouseLeave();
-                  e.target.getStage().container().style.cursor = 'default';
+                  e.target.getStage().container().style.cursor = '';
                 }}
               />
               <Line
@@ -936,7 +954,7 @@ const MaskOverlay = memo(
                 }}
                 onMouseLeave={(e: any) => {
                   onMaskMouseLeave();
-                  e.target.getStage().container().style.cursor = 'default';
+                  e.target.getStage().container().style.cursor = '';
                 }}
               />
             </>
@@ -1430,6 +1448,10 @@ const ImageCanvas = memo(
 
     const handleStart = useCallback(
       (e: any) => {
+        if (e.evt && typeof e.evt.button === 'number' && e.evt.button !== 0) {
+          return;
+        }
+
         if (e.evt && e.evt.cancelable) e.evt.preventDefault();
 
         if (isWbPickerActive) {
@@ -2398,7 +2420,6 @@ const ImageCanvas = memo(
                 onTouchMove={handleMove}
                 onMouseUp={handleUp}
                 onTouchEnd={handleUp}
-                style={{ cursor: effectiveCursor }}
               >
                 <Layer listening={!showOriginal}>
                   <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
