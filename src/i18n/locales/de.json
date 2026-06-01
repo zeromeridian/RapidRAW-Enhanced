@@ -595,6 +595,8 @@
         "title": "Kamera-Details"
       },
       "clickToEdit": "Zum Bearbeiten klicken",
+      "copied": "Kopiert",
+      "copy": "Kopieren",
       "emptyClickToAdd": "Leer (Klicken zum Hinzufügen)",
       "extendedExif": {
         "title": "Erweiterte EXIF"

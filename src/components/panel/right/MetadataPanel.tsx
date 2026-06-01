@@ -120,7 +120,7 @@ function MetadataItem({ label, value }: MetaDataItemProps) {
             isHovered ? 'opacity-100' : 'opacity-0',
           )}
         >
-          {copied ? t('editor.metadata.copied', 'Copied') : t('editor.metadata.copy', 'Copy')}
+          {copied ? t('editor.metadata.copied') : t('editor.metadata.copy')}
         </span>
       </div>
     </div>
