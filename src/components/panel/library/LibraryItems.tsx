@@ -38,7 +38,7 @@ const ThumbnailComponent = ({
   const displayEditIcon = useSettingsStore((s) => s.appSettings?.displayEditIcon ?? true);
   const showEditIcon = isEdited && displayEditIcon;
 
-  const [showPlaceholder, setShowPlaceholder] = useState(false);
+  const [showPlaceholder, setShowPlaceholder] = useState(!data);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
   const latestThumbDataRef = useRef<string | undefined>(undefined);
 
@@ -64,14 +64,7 @@ const ThumbnailComponent = ({
   }, [exif]);
 
   useEffect(() => {
-    if (data) {
-      setShowPlaceholder(false);
-      return;
-    }
-    const timer = setTimeout(() => {
-      setShowPlaceholder(true);
-    }, 500);
-    return () => clearTimeout(timer);
+    setShowPlaceholder(!data);
   }, [data]);
 
   useEffect(() => {
@@ -207,7 +200,6 @@ const ThumbnailComponent = ({
                 {showEditIcon && (
                   <motion.div
                     key="edited"
-                    layout
                     initial={{ opacity: 0, scale: 0.5 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.5 }}
@@ -220,7 +212,6 @@ const ThumbnailComponent = ({
                 {colorLabel && (
                   <motion.div
                     key="color"
-                    layout
                     initial={{ opacity: 0, scale: 0.5 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.5 }}
@@ -236,7 +227,6 @@ const ThumbnailComponent = ({
                 {rating > 0 && (
                   <motion.div
                     key="rating"
-                    layout
                     initial={{ opacity: 0, scale: 0.5 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.5 }}
@@ -433,7 +423,7 @@ const ListItemComponent = ({
   const data = useProcessStore((s) => s.thumbnails[path]);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
 
-  const [showPlaceholder, setShowPlaceholder] = useState(false);
+  const [showPlaceholder, setShowPlaceholder] = useState(!data);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
   const latestThumbDataRef = useRef<string | undefined>(undefined);
 
@@ -469,14 +459,7 @@ const ListItemComponent = ({
   const getW = (key: keyof ColumnWidths) => `${(columnWidths[key] / totalBase) * 100}%`;
 
   useEffect(() => {
-    if (data) {
-      setShowPlaceholder(false);
-      return;
-    }
-    const timer = setTimeout(() => {
-      setShowPlaceholder(true);
-    }, 500);
-    return () => clearTimeout(timer);
+    setShowPlaceholder(!data);
   }, [data]);
 
   useEffect(() => {
