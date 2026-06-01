@@ -37,20 +37,10 @@ const ThumbnailComponent = ({
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
   const displayEditIcon = useSettingsStore((s) => s.appSettings?.displayEditIcon ?? true);
   const showEditIcon = isEdited && displayEditIcon;
-  const [showPlaceholder, setShowPlaceholder] = useState(!data);
-  const [layers, setLayers] = useState<ImageLayer[]>(() => {
-    return data ? [{ id: data, url: data, opacity: 1 }] : [];
-  });
 
-  const latestThumbDataRef = useRef<string | undefined>(data);
-  const prevPathRef = useRef(path);
-
-  if (path !== prevPathRef.current) {
-    prevPathRef.current = path;
-    latestThumbDataRef.current = data;
-    setLayers(data ? [{ id: data, url: data, opacity: 1 }] : []);
-    setShowPlaceholder(!data);
-  }
+  const [showPlaceholder, setShowPlaceholder] = useState(false);
+  const [layers, setLayers] = useState<ImageLayer[]>([]);
+  const latestThumbDataRef = useRef<string | undefined>(undefined);
 
   const { baseName, isVirtualCopy } = useMemo(() => {
     const fullFileName = path.split(/[\\/]/).pop() || '';
@@ -74,19 +64,30 @@ const ThumbnailComponent = ({
   }, [exif]);
 
   useEffect(() => {
-    if (!data) {
+    if (data) {
+      setShowPlaceholder(false);
+      return;
+    }
+    const timer = setTimeout(() => {
       setShowPlaceholder(true);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [data]);
+
+  useEffect(() => {
+    if (!data) {
       setLayers([]);
       latestThumbDataRef.current = undefined;
       return;
     }
 
-    setShowPlaceholder(false);
-
     if (data !== latestThumbDataRef.current) {
       latestThumbDataRef.current = data;
+
       setLayers((prev) => {
-        if (prev.some((l) => l.id === data)) return prev;
+        if (prev.some((l) => l.id === data)) {
+          return prev;
+        }
         return [...prev, { id: data, url: data, opacity: 0 }];
       });
     }
@@ -99,6 +100,7 @@ const ThumbnailComponent = ({
         setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
         onLoad(path);
       }, 10);
+
       return () => clearTimeout(timer);
     }
   }, [layers, onLoad, path]);
@@ -205,6 +207,7 @@ const ThumbnailComponent = ({
                 {showEditIcon && (
                   <motion.div
                     key="edited"
+                    layout
                     initial={{ opacity: 0, scale: 0.5 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.5 }}
@@ -217,6 +220,7 @@ const ThumbnailComponent = ({
                 {colorLabel && (
                   <motion.div
                     key="color"
+                    layout
                     initial={{ opacity: 0, scale: 0.5 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.5 }}
@@ -232,6 +236,7 @@ const ThumbnailComponent = ({
                 {rating > 0 && (
                   <motion.div
                     key="rating"
+                    layout
                     initial={{ opacity: 0, scale: 0.5 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.5 }}
@@ -428,20 +433,9 @@ const ListItemComponent = ({
   const data = useProcessStore((s) => s.thumbnails[path]);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
 
-  const [showPlaceholder, setShowPlaceholder] = useState(!data);
-  const [layers, setLayers] = useState<ImageLayer[]>(() => {
-    return data ? [{ id: data, url: data, opacity: 1 }] : [];
-  });
-
-  const latestThumbDataRef = useRef<string | undefined>(data);
-  const prevPathRef = useRef(path);
-
-  if (path !== prevPathRef.current) {
-    prevPathRef.current = path;
-    latestThumbDataRef.current = data;
-    setLayers(data ? [{ id: data, url: data, opacity: 1 }] : []);
-    setShowPlaceholder(!data);
-  }
+  const [showPlaceholder, setShowPlaceholder] = useState(false);
+  const [layers, setLayers] = useState<ImageLayer[]>([]);
+  const latestThumbDataRef = useRef<string | undefined>(undefined);
 
   const { baseName, isVirtualCopy } = useMemo(() => {
     const fullFileName = path.split(/[\\/]/).pop() || '';
@@ -475,14 +469,22 @@ const ListItemComponent = ({
   const getW = (key: keyof ColumnWidths) => `${(columnWidths[key] / totalBase) * 100}%`;
 
   useEffect(() => {
-    if (!data) {
+    if (data) {
+      setShowPlaceholder(false);
+      return;
+    }
+    const timer = setTimeout(() => {
       setShowPlaceholder(true);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [data]);
+
+  useEffect(() => {
+    if (!data) {
       setLayers([]);
       latestThumbDataRef.current = undefined;
       return;
     }
-
-    setShowPlaceholder(false);
 
     if (data !== latestThumbDataRef.current) {
       latestThumbDataRef.current = data;
@@ -500,6 +502,7 @@ const ListItemComponent = ({
         setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
         onLoad(path);
       }, 10);
+
       return () => clearTimeout(timer);
     }
   }, [layers, onLoad, path]);

@@ -66,13 +66,6 @@ const FilmstripThumbnail = memo(
 
     const latestThumbDataRef = useRef<string | undefined>(thumbData);
     const isInitialLoad = useRef(true);
-    const prevPathRef = useRef(imageFile.path);
-
-    if (imageFile.path !== prevPathRef.current) {
-      prevPathRef.current = imageFile.path;
-      latestThumbDataRef.current = thumbData;
-      setLayers(thumbData ? [{ id: thumbData, url: thumbData, opacity: 1 }] : []);
-    }
 
     const { path, tags, is_edited: isEdited } = imageFile;
     const rating = imageRatings?.[path] || 0;
@@ -114,6 +107,11 @@ const FilmstripThumbnail = memo(
 
       if (thumbData !== latestThumbDataRef.current) {
         latestThumbDataRef.current = thumbData;
+
+        if (layers.length === 0) {
+          setLayers([{ id: thumbData, url: thumbData, opacity: 1 }]);
+          return;
+        }
 
         const img = new Image();
         img.src = thumbData;
@@ -239,6 +237,7 @@ const FilmstripThumbnail = memo(
                   {showEditIcon && (
                     <motion.div
                       key="edited"
+                      layout
                       initial={{ opacity: 0, scale: 0.5 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.5 }}
@@ -251,6 +250,7 @@ const FilmstripThumbnail = memo(
                   {colorLabel && (
                     <motion.div
                       key="color"
+                      layout
                       initial={{ opacity: 0, scale: 0.5 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.5 }}
@@ -262,6 +262,7 @@ const FilmstripThumbnail = memo(
                   {rating > 0 && (
                     <motion.div
                       key="rating"
+                      layout
                       initial={{ opacity: 0, scale: 0.5 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.5 }}
