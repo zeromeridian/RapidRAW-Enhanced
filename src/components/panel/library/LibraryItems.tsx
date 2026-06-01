@@ -333,7 +333,7 @@ const ThumbnailComponent = ({
               variant={TextVariants.small}
               weight={TextWeights.bold}
               className={clsx(
-                'shrink-0 px-1.5 py-0.5 rounded-full transition-colors duration-300 font-bold',
+                'shrink-0 px-1.5 py-0.5 rounded-full transition-colors duration-300 font-bold pointer-events-auto',
                 isAlways
                   ? 'bg-border-color/30 text-text-primary shadow-none'
                   : isHover

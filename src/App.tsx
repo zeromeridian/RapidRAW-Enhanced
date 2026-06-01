@@ -310,10 +310,10 @@ function App() {
             return null;
           };
           const album = findObj(albumTree);
-          if (album) await handleSelectAlbum(album.id, album.name, album.images);
+          if (album) await handleSelectAlbum(album.id, album.name, album.images, true);
         }
       } else {
-        await handleSelectSubfolder(currentFolderPath, false);
+        await handleSelectSubfolder(currentFolderPath, false, undefined, false, true);
       }
     }
   }, [currentFolderPath, handleSelectSubfolder, handleSelectAlbum]);
