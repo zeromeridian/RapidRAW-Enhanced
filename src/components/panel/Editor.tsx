@@ -1136,10 +1136,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       const windowWidth = Math.max(window.innerWidth * dpr, 1);
       const windowHeight = Math.max(window.innerHeight * dpr, 1);
 
-      const clipX = currentRect.left * dpr;
-      const clipY = currentRect.top * dpr;
-      const clipW = Math.max(currentRect.width * dpr, 1);
-      const clipH = Math.max(currentRect.height * dpr, 1);
+      const OVERLAP = 2;
+      const clipX = (currentRect.left - OVERLAP) * dpr;
+      const clipY = (currentRect.top - OVERLAP) * dpr;
+      const clipW = Math.max((currentRect.width + OVERLAP * 2) * dpr, 1);
+      const clipH = Math.max((currentRect.height + OVERLAP * 2) * dpr, 1);
 
       if (state.useWgpuRenderer === false || !state.isReady || !state.hasRenderedFirstFrame) {
         const hiddenTransform = `${windowWidth},${windowHeight},-999999,-999999,1,1,${clipX},${clipY},${clipW},${clipH},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
