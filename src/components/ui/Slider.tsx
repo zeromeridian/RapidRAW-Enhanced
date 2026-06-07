@@ -22,6 +22,7 @@ interface SliderProps {
   trackClassName?: string;
   fillOrigin?: 'min' | 'default';
   suffix?: string;
+  fineAdjustment?: boolean;
 }
 
 const DOUBLE_CLICK_THRESHOLD_MS = 300;
@@ -41,6 +42,7 @@ const Slider = ({
   trackClassName,
   fillOrigin = 'default',
   suffix = '',
+  fineAdjustment = false,
 }: SliderProps) => {
   const { t } = useTranslation();
   const [displayValue, setDisplayValue] = useState<number>(value);
@@ -173,7 +175,8 @@ const Slider = ({
       const deltaX = clientX - lastPointerXRef.current;
       const { min: curMin, max: curMax } = rangeRef.current;
 
-      const multiplier = shiftKey ? FINE_ADJUSTMENT_MULTIPLIER : 1;
+      const isFine = shiftKey || fineAdjustment;
+      const multiplier = isFine ? FINE_ADJUSTMENT_MULTIPLIER : 1;
       const deltaValue = (deltaX / sliderWidth) * (curMax - curMin) * multiplier;
 
       const prevAccumulated = accumulatedValueRef.current;
@@ -212,7 +215,7 @@ const Slider = ({
       window.removeEventListener('touchend', handlePointerUp);
       window.removeEventListener('touchcancel', handlePointerUp);
     };
-  }, [isDragging]);
+  }, [isDragging, fineAdjustment]);
 
   useEffect(() => {
     if (isDragging) {
@@ -364,7 +367,9 @@ const Slider = ({
     if (!inputEl) return;
 
     const rect = inputEl.getBoundingClientRect();
-    const rawValue = pendingTouch.startValue + (deltaX / rect.width) * (max - min);
+    const isFine = e.shiftKey || e.altKey || fineAdjustment;
+    const multiplier = isFine ? FINE_ADJUSTMENT_MULTIPLIER : 1;
+    const rawValue = pendingTouch.startValue + (deltaX / rect.width) * (max - min) * multiplier;
     const snappedValue = snapToStep(rawValue);
 
     accumulatedValueRef.current = rawValue;
@@ -460,6 +465,15 @@ const Slider = ({
   };
 
   const numericValue = isNaN(Number(value)) ? 0 : Number(value);
+  const getTrackStyle = () => {
+    if (trackClassName === 'hue-range-track') {
+      return {
+        background:
+          'linear-gradient(to right, #ff0000 0%, #ff8000 8.3%, #ffff00 16.7%, #80ff00 25%, #00ff00 33.3%, #00ff80 41.7%, #00ffff 50%, #0080ff 58.3%, #0000ff 66.7%, #8000ff 75%, #ff00ff 83.3%, #ff0080 91.7%, #ff0000 100%)',
+      };
+    }
+    return undefined;
+  };
 
   return (
     <div className="mb-2 group" ref={containerRef}>
@@ -523,6 +537,7 @@ const Slider = ({
           className={`absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/4 rounded-full pointer-events-none ${
             trackClassName || 'bg-card-active'
           }`}
+          style={getTrackStyle()}
         />
         <div
           className="absolute top-1/2 h-1.5 -translate-y-1/4 rounded-full pointer-events-none bg-accent/25"

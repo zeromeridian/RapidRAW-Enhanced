@@ -1362,9 +1362,9 @@ pub struct MaskAdjustments {
     pub flare_amount: f32,
     pub sharpness_threshold: f32,
 
+    pub hue: f32,
     _pad_cg1: f32,
     _pad_cg2: f32,
-    _pad_cg3: f32,
     pub color_grading_shadows: ColorGradeSettings,
     pub color_grading_midtones: ColorGradeSettings,
     pub color_grading_highlights: ColorGradeSettings,
@@ -2222,9 +2222,13 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         flare_amount: get_val("effects", "flareAmount", SCALES.flares),
         sharpness_threshold: get_val("details", "sharpnessThreshold", SCALES.sharpness_threshold),
 
+        hue: if is_visible("color") {
+            adj["hue"].as_f64().unwrap_or(0.0) as f32
+        } else {
+            0.0
+        },
         _pad_cg1: 0.0,
         _pad_cg2: 0.0,
-        _pad_cg3: 0.0,
         color_grading_shadows: if is_visible("color") {
             parse_color_grade_settings(&cg_obj["shadows"])
         } else {

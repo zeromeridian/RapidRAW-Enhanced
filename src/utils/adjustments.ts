@@ -308,6 +308,7 @@ export interface MaskAdjustments {
   halationAmount: number;
   highlights: number;
   hsl: Hsl;
+  hue: number;
   id?: string;
   lumaNoiseReduction: number;
   saturation: number;
@@ -318,6 +319,7 @@ export interface MaskAdjustments {
   structure: number;
   temperature: number;
   tint: number;
+  useFineAdjustment: boolean;
   vibrance: number;
   whites: number;
 }
@@ -444,6 +446,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
     reds: { hue: 0, saturation: 0, luminance: 0 },
     yellows: { hue: 0, saturation: 0, luminance: 0 },
   },
+  hue: 0,
   lumaNoiseReduction: 0,
   saturation: 0,
   sectionVisibility: {
@@ -459,6 +462,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   structure: 0,
   temperature: 0,
   tint: 0,
+  useFineAdjustment: false,
   vibrance: 0,
   whites: 0,
 };
@@ -617,6 +621,8 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
         flareAmount: containerAdjustments.flareAmount ?? INITIAL_MASK_ADJUSTMENTS.flareAmount,
         glowAmount: containerAdjustments.glowAmount ?? INITIAL_MASK_ADJUSTMENTS.glowAmount,
         halationAmount: containerAdjustments.halationAmount ?? INITIAL_MASK_ADJUSTMENTS.halationAmount,
+        hue: containerAdjustments.hue ?? INITIAL_MASK_ADJUSTMENTS.hue,
+        useFineAdjustment: containerAdjustments.useFineAdjustment ?? INITIAL_MASK_ADJUSTMENTS.useFineAdjustment,
         colorGrading: { ...INITIAL_MASK_ADJUSTMENTS.colorGrading, ...(containerAdjustments.colorGrading || {}) },
         hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...(containerAdjustments.hsl || {}) },
         curves: containerAdjustments.curves ? deepCloneCurves(containerAdjustments.curves) : getDefaultCurves(),
@@ -819,6 +825,8 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     ColorAdjustment.Hsl,
     ColorAdjustment.ColorGrading,
     'colorCalibration',
+    ColorAdjustment.Hue,
+    'useFineAdjustment',
   ],
   details: [
     DetailsAdjustment.Clarity,
