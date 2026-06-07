@@ -671,9 +671,7 @@ export default function SettingsPanel({
   }, []);
 
   useEffect(() => {
-    invoke<string[]>('get_lensfun_makers')
-      .then(setLensMakers)
-      .catch(console.error);
+    invoke<string[]>('get_lensfun_makers').then(setLensMakers).catch(console.error);
   }, []);
 
   const handleProcessingSettingChange = async (key: string, value: any) => {
@@ -1068,6 +1066,7 @@ export default function SettingsPanel({
                         options={[
                           { value: 'en', label: 'English' },
                           { value: 'de', label: 'Deutsch' },
+                          { value: 'pl', label: 'Polski' },
                         ]}
                         value={appSettings?.language || 'en'}
                         triggerClassName="bg-bg-primary"
