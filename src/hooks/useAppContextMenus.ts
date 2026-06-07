@@ -182,7 +182,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         { label: t('contextMenus.editor.undo'), icon: Undo, onClick: undo, disabled: !canUndo },
         { label: t('contextMenus.editor.redo'), icon: Redo, onClick: redo, disabled: !canRedo },
         { type: OPTION_SEPARATOR },
-        { label: t('contextMenus.editor.copyAdjustments'), icon: Copy, onClick: handleCopyAdjustments },
+        {
+          label: t('contextMenus.editor.copyAdjustments'),
+          icon: Copy,
+          onClick: () => handleCopyAdjustments(),
+        },
         {
           label: t('contextMenus.editor.pasteAdjustments'),
           icon: ClipboardPaste,
@@ -527,7 +531,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           disabled: !isSingleSelection,
           icon: Copy,
           label: t('contextMenus.editor.copyAdjustments'),
-          onClick: handleCopyAdjustments,
+          onClick: () => handleCopyAdjustments(),
         },
         {
           disabled: copiedAdjustments === null,
