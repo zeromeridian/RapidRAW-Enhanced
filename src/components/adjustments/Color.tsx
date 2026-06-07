@@ -470,45 +470,6 @@ export default function ColorPanel({
 
   return (
     <div className="space-y-4">
-      {isForMask && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">
-            {t('adjustments.color.localHueTitle', 'Local Hue')}
-          </Text>
-          <Slider
-            label={t('adjustments.color.hue', 'Hue')}
-            max={180}
-            min={-180}
-            onChange={(e: any) => handleGlobalChange(ColorAdjustment.Hue, e.target.value)}
-            step={1}
-            value={adjustments.hue || 0}
-            trackClassName="hue-range-track"
-            onDragStateChange={onDragStateChange}
-            fineAdjustment={adjustments.useFineAdjustment}
-          />
-          <div className="flex items-center gap-2 mt-1">
-            <input
-              type="checkbox"
-              id="useFineAdjustment"
-              checked={!!adjustments.useFineAdjustment}
-              onChange={(e) =>
-                setAdjustments((prev: Partial<Adjustments>) => ({
-                  ...prev,
-                  useFineAdjustment: e.target.checked,
-                }))
-              }
-              className="rounded border-surface bg-bg-secondary text-accent focus:ring-accent w-4 h-4 cursor-pointer"
-            />
-            <label
-              htmlFor="useFineAdjustment"
-              className="text-xs text-text-secondary select-none cursor-pointer hover:text-text-primary"
-            >
-              {t('adjustments.color.useFineAdjustment', 'Use Fine Adjustment')}
-            </label>
-          </div>
-        </div>
-      )}
-
       <div className="p-2 bg-bg-tertiary rounded-md">
         <div className="flex justify-between items-center mb-2">
           <Text variant={TextVariants.heading}>{t('adjustments.color.whiteBalance')}</Text>
@@ -576,6 +537,24 @@ export default function ColorPanel({
           onDragStateChange={onDragStateChange}
         />
       </div>
+
+      {isForMask && (
+        <div className="p-2 bg-bg-tertiary rounded-md">
+          <Text variant={TextVariants.heading} className="mb-2">
+            {t('adjustments.color.localHueTitle', 'Local Hue')}
+          </Text>
+          <Slider
+            label={t('adjustments.color.hue', 'Hue')}
+            max={180}
+            min={-180}
+            onChange={(e: any) => handleGlobalChange(ColorAdjustment.Hue, e.target.value)}
+            step={1}
+            value={adjustments.hue || 0}
+            trackClassName="hue-range-track"
+            onDragStateChange={onDragStateChange}
+          />
+        </div>
+      )}
 
       <div className="p-2 bg-bg-tertiary rounded-md">
         <Text variant={TextVariants.heading} className="mb-3">

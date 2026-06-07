@@ -22,7 +22,6 @@ interface SliderProps {
   trackClassName?: string;
   fillOrigin?: 'min' | 'default';
   suffix?: string;
-  fineAdjustment?: boolean;
 }
 
 const DOUBLE_CLICK_THRESHOLD_MS = 300;
@@ -42,7 +41,6 @@ const Slider = ({
   trackClassName,
   fillOrigin = 'default',
   suffix = '',
-  fineAdjustment = false,
 }: SliderProps) => {
   const { t } = useTranslation();
   const [displayValue, setDisplayValue] = useState<number>(value);
@@ -175,8 +173,7 @@ const Slider = ({
       const deltaX = clientX - lastPointerXRef.current;
       const { min: curMin, max: curMax } = rangeRef.current;
 
-      const isFine = shiftKey || fineAdjustment;
-      const multiplier = isFine ? FINE_ADJUSTMENT_MULTIPLIER : 1;
+      const multiplier = shiftKey ? FINE_ADJUSTMENT_MULTIPLIER : 1;
       const deltaValue = (deltaX / sliderWidth) * (curMax - curMin) * multiplier;
 
       const prevAccumulated = accumulatedValueRef.current;
@@ -215,7 +212,7 @@ const Slider = ({
       window.removeEventListener('touchend', handlePointerUp);
       window.removeEventListener('touchcancel', handlePointerUp);
     };
-  }, [isDragging, fineAdjustment]);
+  }, [isDragging]);
 
   useEffect(() => {
     if (isDragging) {
@@ -367,8 +364,7 @@ const Slider = ({
     if (!inputEl) return;
 
     const rect = inputEl.getBoundingClientRect();
-    const isFine = e.shiftKey || e.altKey || fineAdjustment;
-    const multiplier = isFine ? FINE_ADJUSTMENT_MULTIPLIER : 1;
+    const multiplier = e.shiftKey || e.altKey ? FINE_ADJUSTMENT_MULTIPLIER : 1;
     const rawValue = pendingTouch.startValue + (deltaX / rect.width) * (max - min) * multiplier;
     const snappedValue = snapToStep(rawValue);
 
