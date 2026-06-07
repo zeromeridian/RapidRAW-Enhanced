@@ -57,16 +57,6 @@ import { useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
 import { globalImageCache } from '../utils/ImageLRUCache';
 
-const RIGHT_PANEL_ORDER = [
-  Panel.Metadata,
-  Panel.Adjustments,
-  Panel.Crop,
-  Panel.Masks,
-  Panel.Ai,
-  Panel.Presets,
-  Panel.Export,
-];
-
 export interface UseAppContextMenusProps {
   handleImageSelect: (path: string) => void;
   handleBackToLibrary: () => void;
@@ -186,7 +176,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         {
           label: t('contextMenus.editor.exportImage'),
           icon: FileInput,
-          onClick: () => setRightPanel(Panel.Export, RIGHT_PANEL_ORDER),
+          onClick: () => setRightPanel(Panel.Export),
         },
         { type: OPTION_SEPARATOR },
         { label: t('contextMenus.editor.undo'), icon: Undo, onClick: undo, disabled: !canUndo },
@@ -472,7 +462,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             props.handleImageSelect(path);
           }
           setLibrary({ multiSelectedPaths: finalSelection });
-          setRightPanel(Panel.Export, RIGHT_PANEL_ORDER);
+          setRightPanel(Panel.Export);
         } else {
           setLibrary({ multiSelectedPaths: finalSelection });
           setUI({ isLibraryExportPanelVisible: true });
@@ -526,7 +516,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               {
                 disabled: !isSingleSelection,
                 icon: Edit,
-                label: t('contextMenus.editor.frameImage'),
+                label: t('contextMenus.editor.editImage'),
                 onClick: () => props.handleImageSelect(finalSelection[0]),
               },
               { icon: FileInput, label: exportLabel, onClick: onExportClick },
