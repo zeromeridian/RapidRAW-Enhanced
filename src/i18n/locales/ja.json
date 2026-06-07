@@ -1408,7 +1408,7 @@
       "showImageCounts": "画像数を表示",
       "system": "システムデフォルト",
       "theme": "テーマ",
-      "themeDesc": "Change the look and feel of the application.",
+      "themeDesc": "アプリケーションのテーマ（外観）を変更します。",
       "title": "全般設定",
       "xmpSync": "XMPメタデータ同期",
       "xmpSyncDesc": "他の写真編集ソフトとの互換性のために、評価、カラーラベル、タグを標準のXMPサイドカーファイルと同期します。"
