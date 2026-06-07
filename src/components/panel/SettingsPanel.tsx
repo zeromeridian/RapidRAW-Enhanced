@@ -1069,8 +1069,10 @@ export default function SettingsPanel({
                           { value: 'es', label: 'Español' },
                           { value: 'fr', label: 'Français' },
                           { value: 'it', label: 'Italiano' },
+                          { value: 'ja', label: '日本語' },
                           { value: 'pl', label: 'Polski' },
                           { value: 'pt', label: 'Português' },
+                          { value: 'ru', label: 'Русский' },
                           { value: 'zh-CN', label: '简体中文' },
                         ]}
                         value={appSettings?.language || 'en'}
