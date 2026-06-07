@@ -245,7 +245,7 @@ const FilmstripThumbnail = memo(
               )}
             >
               <div
-                className="w-3 h-3 rounded-full ring-1 ring-black/20 transition-colors duration-200"
+                className="w-3 h-3 rounded-full transition-colors duration-200"
                 style={{ backgroundColor: colorLabel ? colorLabel.color : 'transparent' }}
               />
             </div>
