@@ -1066,6 +1066,7 @@ export default function SettingsPanel({
                         options={[
                           { value: 'en', label: 'English' },
                           { value: 'de', label: 'Deutsch' },
+                          { value: 'zh-CN', label: '简体中文' },
                           { value: 'pl', label: 'Polski' },
                         ]}
                         value={appSettings?.language || 'en'}
