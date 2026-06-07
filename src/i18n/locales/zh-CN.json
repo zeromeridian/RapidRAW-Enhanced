@@ -177,6 +177,7 @@
       "copyAdjustments": "复制调整",
       "cullImage": "筛选图像",
       "denoise": "降噪图像",
+      "editImage": "编辑图像",
       "exportImage": "导出图像",
       "frameImage": "装裱图像",
       "mergeHdr": "合并为 HDR",
