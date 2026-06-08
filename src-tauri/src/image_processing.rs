@@ -2230,11 +2230,7 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         flare_amount: get_val("effects", "flareAmount", SCALES.flares),
         sharpness_threshold: get_val("details", "sharpnessThreshold", SCALES.sharpness_threshold),
 
-        hue: if is_visible("color") {
-            adj["hue"].as_f64().unwrap_or(0.0) as f32
-        } else {
-            0.0
-        },
+        hue: get_val("color", "hue", 1.0),
         _pad_cg1: 0.0,
         _pad_cg2: 0.0,
         color_grading_shadows: if is_visible("color") {
