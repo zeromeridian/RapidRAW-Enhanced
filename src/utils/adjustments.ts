@@ -177,6 +177,7 @@ export interface Adjustments {
   halationAmount: number;
   highlights: number;
   hsl: Hsl;
+  hue: number;
   lensCorrectionMode: 'auto' | 'manual';
   lensDistortionAmount: number;
   lensVignetteAmount: number;
@@ -513,6 +514,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
     reds: { hue: 0, saturation: 0, luminance: 0 },
     yellows: { hue: 0, saturation: 0, luminance: 0 },
   },
+  hue: 0,
   lensCorrectionMode: 'manual',
   lensDistortionAmount: 100,
   lensVignetteAmount: 100,

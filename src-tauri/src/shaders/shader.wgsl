@@ -42,6 +42,10 @@ struct GlobalAdjustments {
     temperature: f32,
     tint: f32,
     vibrance: f32,
+    hue: f32,
+    _pad_color1: f32,
+    _pad_color2: f32,
+    _pad_color3: f32,
 
     sharpness: f32,
     luma_noise_reduction: f32,
@@ -1470,7 +1474,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     var t_halation = adjustments.global.halation_amount;
     var t_flare = adjustments.global.flare_amount;
     var t_sharpness = adjustments.global.sharpness;
-    var t_hue: f32 = 0.0;
+    var t_hue = adjustments.global.hue;
 
     var h0_h = adjustments.global.hsl[0].hue; var h0_s = adjustments.global.hsl[0].saturation; var h0_l = adjustments.global.hsl[0].luminance;
     var h1_h = adjustments.global.hsl[1].hue; var h1_s = adjustments.global.hsl[1].saturation; var h1_l = adjustments.global.hsl[1].luminance;

@@ -1264,6 +1264,10 @@ pub struct GlobalAdjustments {
     pub temperature: f32,
     pub tint: f32,
     pub vibrance: f32,
+    pub hue: f32,
+    _pad_color1: f32,
+    _pad_color2: f32,
+    _pad_color3: f32,
 
     pub sharpness: f32,
     pub luma_noise_reduction: f32,
@@ -1995,6 +1999,10 @@ fn get_global_adjustments_from_json(
         temperature: get_val("color", "temperature", SCALES.temperature, None),
         tint: get_val("color", "tint", SCALES.tint, None),
         vibrance: get_val("color", "vibrance", SCALES.vibrance, None),
+        hue: get_val("color", "hue", 1.0, None),
+        _pad_color1: 0.0,
+        _pad_color2: 0.0,
+        _pad_color3: 0.0,
 
         sharpness: get_val("details", "sharpness", SCALES.sharpness, None),
         luma_noise_reduction: get_val(

@@ -538,23 +538,21 @@ export default function ColorPanel({
         />
       </div>
 
-      {isForMask && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">
-            {t('adjustments.color.localHueTitle', 'Local Hue')}
-          </Text>
-          <Slider
-            label={t('adjustments.color.hue', 'Hue')}
-            max={180}
-            min={-180}
-            onChange={(e: any) => handleGlobalChange(ColorAdjustment.Hue, e.target.value)}
-            step={1}
-            value={adjustments.hue || 0}
-            trackClassName="hue-range-track"
-            onDragStateChange={onDragStateChange}
-          />
-        </div>
-      )}
+      <div className="p-2 bg-bg-tertiary rounded-md">
+        <Text variant={TextVariants.heading} className="mb-2">
+          {isForMask ? t('adjustments.color.localHueTitle', 'Local Hue') : t('adjustments.color.hue', 'Hue')}
+        </Text>
+        <Slider
+          label={t('adjustments.color.hue', 'Hue')}
+          max={180}
+          min={-180}
+          onChange={(e: any) => handleGlobalChange(ColorAdjustment.Hue, e.target.value)}
+          step={1}
+          value={adjustments.hue || 0}
+          trackClassName="hue-range-track"
+          onDragStateChange={onDragStateChange}
+        />
+      </div>
 
       <div className="p-2 bg-bg-tertiary rounded-md">
         <Text variant={TextVariants.heading} className="mb-3">
