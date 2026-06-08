@@ -234,6 +234,15 @@ fn linear_to_srgb(c: vec3<f32>) -> vec3<f32> {
     return select(higher, lower, c_clamped <= cutoff);
 }
 
+fn linear_to_srgb_extended(c: vec3<f32>) -> vec3<f32> {
+    let safe_c = max(c, vec3<f32>(0.0));
+    let cutoff = vec3<f32>(0.0031308);
+    let a = vec3<f32>(0.055);
+    let higher = (1.0 + a) * pow(safe_c, vec3<f32>(1.0 / 2.4)) - a;
+    let lower = safe_c * 12.92;
+    return select(higher, lower, safe_c <= cutoff);
+}
+
 fn rgb_to_hsv(c: vec3<f32>) -> vec3<f32> {
     let c_max = max(c.r, max(c.g, c.b));
     let c_min = min(c.r, min(c.g, c.b));
@@ -268,11 +277,12 @@ fn apply_hue_shift(color: vec3<f32>, shift_degrees: f32) -> vec3<f32> {
     if (abs(shift_degrees) < 0.01) {
         return color;
     }
-    let safe_color = max(color, vec3<f32>(0.0));
-    let hsv = rgb_to_hsv(safe_color);
+    let srgb_color = linear_to_srgb_extended(color);
+    let hsv = rgb_to_hsv(srgb_color);
     var shifted_h = hsv.x + shift_degrees;
     shifted_h = (shifted_h + 360.0) % 360.0;
-    return hsv_to_rgb(vec3<f32>(shifted_h, hsv.y, hsv.z));
+    let shifted_srgb = hsv_to_rgb(vec3<f32>(shifted_h, hsv.y, hsv.z));
+    return srgb_to_linear(shifted_srgb);
 }
 
 fn get_raw_hsl_influence(hue: f32, center: f32, width: f32) -> f32 {
