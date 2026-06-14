@@ -540,10 +540,10 @@ export default function ColorPanel({
 
       <div className="p-2 bg-bg-tertiary rounded-md">
         <Text variant={TextVariants.heading} className="mb-2">
-          {isForMask ? t('adjustments.color.localHueTitle', 'Local Hue') : t('adjustments.color.hue', 'Hue')}
+          {isForMask ? t('adjustments.color.localHue') : t('adjustments.color.hue')}
         </Text>
         <Slider
-          label={t('adjustments.color.hue', 'Hue')}
+          label={t('adjustments.color.hue')}
           max={180}
           min={-180}
           onChange={(e: any) => handleAdjustmentChange(ColorAdjustment.Hue, e.target.value)}
