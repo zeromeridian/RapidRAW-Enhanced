@@ -310,6 +310,7 @@
         "effects": "Effetti"
       },
       "title": "Regolazioni",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "autoAdjust": "Regolazione Automatica Immagine",
         "resetAdjustments": "Ripristina Regolazioni",
@@ -509,6 +510,7 @@
       "resetTooltip": "Ripristina Ritaglio e Trasformazione",
       "rotationHeading": "Rotazione",
       "title": "Ritaglio e Trasformazione",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "compositionOverlay": "Sovrapposizione Composizione",
         "flipHoriz": "Rifletti immagine orizzontalmente",
@@ -611,6 +613,7 @@
         "selectPresetTooltip": "Seleziona un predefinito da applicare"
       },
       "toggleAnalyticsTooltip": "Attiva/Disattiva Visualizzazione Analitiche",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "addToCurrent": "Aggiungi {{name}} alla Maschera Attuale o Crea Nuova (Tasto Destro)",
         "createNew": "Crea Nuova Maschera {{name}}",
@@ -705,6 +708,7 @@
         "masks": "Maschere"
       },
       "title": "Predefiniti",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "explore": "Esplora i Predefiniti della Community",
         "export": "Esporta tutti i predefiniti in un file .rrpreset",
@@ -719,6 +723,7 @@
       }
     },
     "switcher": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "adjust": "Regola",
         "crop": "Ritaglio",
@@ -730,6 +735,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "Apertura",
         "backToLibrary": "Torna alla Libreria",
@@ -926,6 +932,7 @@
         "modified": "Data di modifica",
         "name": "In ordine alfabetico"
       },
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "clearSearch": "Cancella ricerca",
         "collapse": "Comprimi",
@@ -1058,6 +1065,7 @@
       "medium": "Media",
       "small": "Piccola"
     },
+      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "communityPresets": "Predefiniti della Community",
       "goHome": "Torna alla Home page",
@@ -1768,6 +1776,7 @@
       "light": "Chiaro"
     },
     "title": "Impostazioni",
+      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "goHome": "Torna alla Home page"
     }
@@ -1775,6 +1784,7 @@
   "ui": {
     "bottomBar": {
       "imagesSelected": "{{current}} di {{total}} immagini selezionate",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "collapseFilmstrip": "Comprimi Striscia Immagini",
         "copyPasteSettings": "Copia e Incolla Impostazioni",
@@ -1815,6 +1825,7 @@
       "savedTooltip": "Salvato!"
     },
     "filmstrip": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "color": "Colore: {{color}}",
         "virtualCopy": "Copia Virtuale"
@@ -1845,6 +1856,7 @@
       "reset": "Ripristina"
     },
     "waveform": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "hideClipping": "Nascondi Avvisi di Ritaglio",
         "histogram": "Istogramma",

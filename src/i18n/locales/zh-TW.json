@@ -294,6 +294,7 @@
         "effects": "效果"
       },
       "title": "調整",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "autoAdjust": "自動調整影像",
         "resetAdjustments": "重置調整",
@@ -487,6 +488,7 @@
       "resetTooltip": "重置裁剪和變換",
       "rotationHeading": "旋轉",
       "title": "裁剪與變換",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "compositionOverlay": "構圖疊加",
         "flipHoriz": "水平翻轉影像",
@@ -588,6 +590,7 @@
         "selectPresetTooltip": "選擇一個預設以應用"
       },
       "toggleAnalyticsTooltip": "切換分析顯示",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "addToCurrent": "將 {{name}} 新增到當前遮色片或建立新遮色片（右鍵單擊）",
         "createNew": "建立新 {{name}} 遮色片",
@@ -682,6 +685,7 @@
         "masks": "遮色片"
       },
       "title": "預設",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "explore": "探索社群預設",
         "export": "將所有預設匯出為 .rrpreset 檔案",
@@ -696,6 +700,7 @@
       }
     },
     "switcher": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "adjust": "調整",
         "crop": "裁剪",
@@ -707,6 +712,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "光圈",
         "backToLibrary": "返回相簿",
@@ -901,6 +907,7 @@
         "modified": "修改日期",
         "name": "按字母順序"
       },
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "clearSearch": "清除搜尋",
         "collapse": "摺疊",
@@ -1032,6 +1039,7 @@
       "medium": "中",
       "small": "小"
     },
+      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "communityPresets": "社群預設",
       "goHome": "返回首頁",
@@ -1733,6 +1741,7 @@
       "light": "淺色"
     },
     "title": "設定",
+      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "goHome": "返回首頁"
     }
@@ -1740,6 +1749,7 @@
   "ui": {
     "bottomBar": {
       "imagesSelected": "已選擇 {{current}} / {{total}} 張影像",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "collapseFilmstrip": "摺疊膠片條",
         "copyPasteSettings": "複製與貼上設定",
@@ -1779,6 +1789,7 @@
       "savedTooltip": "已儲存！"
     },
     "filmstrip": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "color": "顏色：{{color}}",
         "virtualCopy": "虛擬副本"
@@ -1809,6 +1820,7 @@
       "reset": "重置"
     },
     "waveform": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "hideClipping": "隱藏裁剪警告",
         "histogram": "直方圖",

@@ -326,6 +326,7 @@
         "effects": "Efekty"
       },
       "title": "Ustawienia",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "autoAdjust": "Auto-korekta obrazu",
         "resetAdjustments": "Resetuj ustawienia",
@@ -529,6 +530,7 @@
       "resetTooltip": "Resetuj Kadrowanie i Przekształcanie",
       "rotationHeading": "Obrót",
       "title": "Kadrowanie i Przekształcanie",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "compositionOverlay": "Nakładka kompozycji",
         "flipHoriz": "Przerzuć obraz w poziomie",
@@ -632,6 +634,7 @@
         "selectPresetTooltip": "Wybierz preset do zastosowania"
       },
       "toggleAnalyticsTooltip": "Przełącz widok analityki",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "addToCurrent": "Dodaj {{name}} do bieżącej maski lub utwórz nową (Prawy przycisk)",
         "createNew": "Utwórz nową maskę {{name}}",
@@ -726,6 +729,7 @@
         "masks": "Maski"
       },
       "title": "Presety",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "explore": "Odkryj presety społeczności",
         "export": "Eksportuj wszystkie presety do pliku .rrpreset",
@@ -740,6 +744,7 @@
       }
     },
     "switcher": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "adjust": "Dopasuj",
         "crop": "Kadruj",
@@ -751,6 +756,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "Przysłona",
         "backToLibrary": "Wróć do biblioteki",
@@ -949,6 +955,7 @@
         "modified": "Data modyfikacji",
         "name": "Alfabetycznie"
       },
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "clearSearch": "Wyczyść wyszukiwanie",
         "collapse": "Zwiń",
@@ -1082,6 +1089,7 @@
       "medium": "Średni",
       "small": "Mały"
     },
+      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "communityPresets": "Presety społeczności",
       "goHome": "Przejdź do strony głównej",
@@ -1801,6 +1809,7 @@
       "light": "Jasny"
     },
     "title": "Ustawienia",
+      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "goHome": "Przejdź do strony głównej"
     }
@@ -1808,6 +1817,7 @@
   "ui": {
     "bottomBar": {
       "imagesSelected": "Zaznaczono {{current}} z {{total}} obrazów",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "collapseFilmstrip": "Zwiń pasek z klatkami",
         "copyPasteSettings": "Kopiuj i Wklej Ustawienia",
@@ -1849,6 +1859,7 @@
       "savedTooltip": "Zapisano!"
     },
     "filmstrip": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "color": "Kolor: {{color}}",
         "virtualCopy": "Kopia wirtualna"
@@ -1879,6 +1890,7 @@
       "reset": "Resetuj"
     },
     "waveform": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "hideClipping": "Ukryj ostrzeżenia przed przycięciem",
         "histogram": "Histogram",

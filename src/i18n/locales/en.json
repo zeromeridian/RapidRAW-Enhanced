@@ -709,6 +709,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "Aperture",
         "backToLibrary": "Back to Library",

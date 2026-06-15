@@ -294,6 +294,7 @@
         "effects": "効果"
       },
       "title": "補正",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "autoAdjust": "画像を自動補正",
         "resetAdjustments": "補正設定をリセット",
@@ -487,6 +488,7 @@
       "resetTooltip": "切り抜きと変形をリセット",
       "rotationHeading": "回転",
       "title": "切り抜きと変形",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "compositionOverlay": "構図ガイド",
         "flipHoriz": "画像を水平方向に反転",
@@ -588,6 +590,7 @@
         "selectPresetTooltip": "適用するプリセットを選択"
       },
       "toggleAnalyticsTooltip": "アナリティクス表示の切り替え",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "addToCurrent": "{{name}}を現在のマスクに追加、または新規作成 (右クリック)",
         "createNew": "新規の {{name}} マスクを作成",
@@ -682,6 +685,7 @@
         "masks": "マスク"
       },
       "title": "プリセット",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "explore": "コミュニティのプリセットを検索",
         "export": "すべてのプリセットを .rrpreset ファイルとして書き出し",
@@ -696,6 +700,7 @@
       }
     },
     "switcher": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "adjust": "補正",
         "crop": "切り抜き",
@@ -707,6 +712,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "絞り値",
         "backToLibrary": "ライブラリに戻る",
@@ -901,6 +907,7 @@
         "modified": "更新日",
         "name": "アルファベット順"
       },
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "clearSearch": "検索をクリア",
         "collapse": "折りたたむ",
@@ -1032,6 +1039,7 @@
       "medium": "中",
       "small": "小"
     },
+      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "communityPresets": "コミュニティプリセット",
       "goHome": "ホームへ移動",
@@ -1733,6 +1741,7 @@
       "light": "ライト"
     },
     "title": "設定",
+      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "goHome": "ホームへ移動"
     }
@@ -1740,6 +1749,7 @@
   "ui": {
     "bottomBar": {
       "imagesSelected": "{{total}}枚中 {{current}}枚の画像を選択中",
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "collapseFilmstrip": "フィルムストリップをたたむ",
         "copyPasteSettings": "補正設定のコピーと貼り付け",
@@ -1779,6 +1789,7 @@
       "savedTooltip": "保存しました！"
     },
     "filmstrip": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "color": "カラー: {{color}}",
         "virtualCopy": "仮想コピー"
@@ -1809,6 +1820,7 @@
       "reset": "リセット"
     },
     "waveform": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "hideClipping": "白とび・黒つぶれ警告を非表示",
         "histogram": "ヒストグラム",

@@ -440,7 +440,7 @@ const EditorToolbar = memo(
                             ? 'bg-surface text-text-primary'
                             : 'text-text-secondary hover:bg-surface/50',
                         )}
-                        data-tooltip={`Switch to ${v.label}`}
+                        data-tooltip={t('editor.toolbar.switchToVariant', { label: v.label })}
                         onClick={(e) => onImageSelect?.(v.path, e)}
                         onKeyDown={handleButtonKeyDown}
                       >

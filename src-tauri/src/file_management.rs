@@ -322,8 +322,7 @@ fn assign_group_ids(files: &mut Vec<ImageFile>, require_matching_exif: bool, gro
                 .iter()
                 .map(|p| exif_dates.as_ref().unwrap().get(p).copied().flatten())
                 .collect();
-            // All files must have EXIF data, and all dates must match exactly
-            if dates.len() != paths.len() || dates.iter().any(|d| d.is_none()) {
+            if dates.iter().any(|d| d.is_none()) {
                 continue;
             }
             let first = dates[0];
@@ -3360,9 +3359,19 @@ pub fn delete_files_with_associated(
                             files_to_trash.insert(entry_path);
                         }
                     }
-                } else if is_supported_image_file(entry_filename_str.as_ref())
-                    || entry_filename_str.ends_with(".rrexif")
-                {
+                } else if entry_filename_str.ends_with(".rrexif") {
+                    // .rrexif sidecars are named {image_filename}.rrexif,
+                    // e.g. DSCF0001.RAF.rrexif. Strip the suffix first.
+                    let without_rrexif = entry_filename_str.trim_end_matches(".rrexif");
+                    let sidecar_stem = Path::new(without_rrexif)
+                        .file_stem()
+                        .and_then(|s| s.to_str());
+                    if let Some(stem) = sidecar_stem {
+                        if stems_to_delete.contains(stem) {
+                            files_to_trash.insert(entry_path);
+                        }
+                    }
+                } else if is_supported_image_file(entry_filename_str.as_ref()) {
                     let entry_stem = Path::new(entry_filename_str.as_ref())
                         .file_stem()
                         .and_then(|s| s.to_str());
