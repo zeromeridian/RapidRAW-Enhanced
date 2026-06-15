@@ -427,7 +427,7 @@ const EditorToolbar = memo(
               )}
 
               {variantOptions.length > 0 && (
-                <div className="flex items-center gap-1 ml-2 shrink-0">
+                <div className="flex items-center ml-2 shrink-0 border border-text-secondary/20 rounded-full overflow-hidden">
                   {variantOptions.map((v) => {
                     const isActive = v.path === selectedImage.path;
                     return (
@@ -435,13 +435,14 @@ const EditorToolbar = memo(
                         key={v.path}
                         disabled={isActive}
                         className={clsx(
-                          'px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors',
+                          'px-2.5 py-1 text-[11px] font-medium transition-colors',
                           isActive
-                            ? 'bg-accent/30 text-accent'
-                            : 'bg-text-secondary/10 text-text-secondary hover:bg-text-secondary/20',
+                            ? 'bg-surface text-text-primary'
+                            : 'text-text-secondary hover:bg-surface/50',
                         )}
                         data-tooltip={`Switch to ${v.label}`}
                         onClick={(e) => onImageSelect?.(v.path, e)}
+                        onKeyDown={handleButtonKeyDown}
                       >
                         {v.label}
                       </button>

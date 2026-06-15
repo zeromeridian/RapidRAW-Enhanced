@@ -984,7 +984,7 @@ pub fn get_album_images(
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
-    let result_list: Vec<ImageFile> = paths
+    let mut result_list: Vec<ImageFile> = paths
         .into_par_iter()
         .filter_map(|virtual_path| {
             let (source_path, sidecar_path) = parse_virtual_path(&virtual_path);
@@ -1036,6 +1036,9 @@ pub fn get_album_images(
         })
         .collect();
 
+    let require_exif = settings.require_matching_exif.unwrap_or(false);
+    let group_edited = settings.group_edited_files.unwrap_or(true);
+    assign_group_ids(&mut result_list, require_exif, group_edited);
     Ok(result_list)
 }
 

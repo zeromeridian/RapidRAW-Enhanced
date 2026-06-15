@@ -42,15 +42,9 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
   const groupingMode: GroupingMode = appSettings?.grouping ?? 'off';
   const isGroupingActive = groupingMode !== 'off';
 
-  let processedList = imageList;
+  // --- Build filter & search predicates ---
 
-  if (isGroupingActive) {
-    const groupEditedFiles = appSettings?.groupEditedFiles ?? true;
-    const groupingResult = buildImageGroups(imageList, groupingMode, groupEditedFiles);
-    processedList = groupingResult.displayList;
-  }
-
-  const filteredList = processedList.filter((image: ImageFile) => {
+  const matchesFilter = (image: ImageFile): boolean => {
     if (filterCriteria.rating !== 0) {
       const rating = imageRatings[image.path] || 0;
       if (filterCriteria.rating === -1 && rating !== 0) return false;
@@ -80,7 +74,7 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
     }
 
     return true;
-  });
+  };
 
   const { tags: searchTags, text: searchText, mode: searchMode } = searchCriteria;
   const lowerCaseSearchText = searchText.trim().toLowerCase();
@@ -142,37 +136,79 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
     }
   };
 
-  const filteredBySearch =
-    parsedTags.length === 0 && lowerCaseSearchText === ''
-      ? filteredList
-      : filteredList.filter((image: ImageFile) => {
-          const lowerCaseImageTags = (image.tags || []).map((t) => t.toLowerCase().replace('user:', ''));
-          const filename = image?.path?.split(/[\\/]/)?.pop()?.toLowerCase() || '';
+  const isSearchActive = parsedTags.length > 0 || lowerCaseSearchText !== '';
 
-          let tagsMatch = true;
-          if (parsedTags.length > 0) {
-            const evaluateTag = (parsedTag: any) => {
-              if (parsedTag.type === 'normal') {
-                return lowerCaseImageTags.some((imgTag) => imgTag.includes(parsedTag.value));
-              }
-              return evaluateQuery(parsedTag, image);
-            };
+  const matchesSearch = (image: ImageFile): boolean => {
+    if (!isSearchActive) return true;
 
-            if (searchMode === 'OR') {
-              tagsMatch = parsedTags.some((pt) => evaluateTag(pt));
-            } else {
-              tagsMatch = parsedTags.every((pt) => evaluateTag(pt));
-            }
-          }
+    const lowerCaseImageTags = (image.tags || []).map((t) => t.toLowerCase().replace('user:', ''));
+    const filename = image?.path?.split(/[\\/]/)?.pop()?.toLowerCase() || '';
 
-          let textMatch = true;
-          if (lowerCaseSearchText !== '') {
-            textMatch =
-              filename.includes(lowerCaseSearchText) || lowerCaseImageTags.some((t) => t.includes(lowerCaseSearchText));
-          }
+    let tagsMatch = true;
+    if (parsedTags.length > 0) {
+      const evaluateTag = (parsedTag: any) => {
+        if (parsedTag.type === 'normal') {
+          return lowerCaseImageTags.some((imgTag) => imgTag.includes(parsedTag.value));
+        }
+        return evaluateQuery(parsedTag, image);
+      };
 
-          return tagsMatch && textMatch;
-        });
+      if (searchMode === 'OR') {
+        tagsMatch = parsedTags.some((pt: any) => evaluateTag(pt));
+      } else {
+        tagsMatch = parsedTags.every((pt: any) => evaluateTag(pt));
+      }
+    }
+
+    let textMatch = true;
+    if (lowerCaseSearchText !== '') {
+      textMatch =
+        filename.includes(lowerCaseSearchText) || lowerCaseImageTags.some((t) => t.includes(lowerCaseSearchText));
+    }
+
+    return tagsMatch && textMatch;
+  };
+
+  // --- Collapse groups, then filter with group-aware matching ---
+
+  let processedList = imageList;
+  let matchingGroupIds: Set<string> | null = null;
+
+  if (isGroupingActive) {
+    const groupEditedFiles = appSettings?.groupEditedFiles ?? true;
+    const groupingResult = buildImageGroups(imageList, groupingMode, groupEditedFiles);
+    processedList = groupingResult.displayList;
+
+    // When filter/search is active, pre-scan all variants so a hidden
+    // variant that matches still surfaces its group's primary.
+    const isFilterActive =
+      filterCriteria.rating !== 0 ||
+      (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) ||
+      (filterCriteria.editedStatus && filterCriteria.editedStatus !== EditedStatus.All) ||
+      (filterCriteria.colors && filterCriteria.colors.length > 0);
+
+    if (isFilterActive || isSearchActive) {
+      matchingGroupIds = new Set<string>();
+      for (const image of imageList) {
+        if (!image.group_id) continue;
+        if (matchesFilter(image) && matchesSearch(image)) {
+          matchingGroupIds.add(image.group_id);
+        }
+      }
+    }
+  }
+
+  const filteredList = processedList.filter((image: ImageFile) => {
+    if (matchingGroupIds && image.group_id && matchingGroupIds.has(image.group_id)) return true;
+    return matchesFilter(image);
+  });
+
+  const filteredBySearch = !isSearchActive
+    ? filteredList
+    : filteredList.filter((image: ImageFile) => {
+        if (matchingGroupIds && image.group_id && matchingGroupIds.has(image.group_id)) return true;
+        return matchesSearch(image);
+      });
 
   const list = [...filteredBySearch];
 
@@ -243,14 +279,13 @@ export function useSortedLibrary() {
   const sortCriteria = useLibraryStore((state) => state.sortCriteria);
 
   const appSettings = useSettingsStore((state) => state.appSettings);
-  const supportedTypes = useSettingsStore((state) => state.supportedTypes);
 
   const sortedImageList = useMemo(() => {
     return computeSortedLibrary(
       { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria },
-      { appSettings, supportedTypes },
+      { appSettings },
     );
-  }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchCriteria, appSettings]);
+  }, [imageList, sortCriteria, imageRatings, filterCriteria, searchCriteria, appSettings]);
 
   return sortedImageList;
 }

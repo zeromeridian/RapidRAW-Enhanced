@@ -130,7 +130,7 @@ export function buildGroupBadgeInfo(images: ImageFile[]): Map<string, GroupBadge
     const extensions = new Set(files.map((f) => getVariantLabel(f.path)));
     badges.set(groupId, {
       count: files.length,
-      label: Array.from(extensions).join('+'),
+      label: Array.from(extensions).sort().join('+'),
     });
   }
   return badges;

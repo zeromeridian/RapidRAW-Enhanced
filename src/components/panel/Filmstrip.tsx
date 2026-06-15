@@ -634,20 +634,20 @@ export default function Filmstrip({
   }, []);
 
   const groupingMode: GroupingMode = useSettingsStore((s) => s.appSettings?.grouping) ?? 'off';
+  const fullImageList = useLibraryStore((s) => s.imageList);
 
   const filmstripActivePath = useMemo(() => {
     const path = selectedImage?.path;
     if (!path || groupingMode === 'off') return path;
     if (path.includes('?vc=')) return path;
     if (imageList.some((img) => img.path === path)) return path;
-    const fullList = useLibraryStore.getState().imageList;
-    const selected = fullList.find((img) => img.path === path);
+    const selected = fullImageList.find((img) => img.path === path);
     if (!selected?.group_id) return path;
     const primary = imageList.find(
       (img) => img.group_id === selected.group_id && !img.is_virtual_copy,
     );
     return primary?.path ?? path;
-  }, [selectedImage?.path, imageList, groupingMode]);
+  }, [selectedImage?.path, imageList, fullImageList, groupingMode]);
 
   const handleImageSelect = (path: string, event: any) => {
     if (path !== selectedImage?.path) {

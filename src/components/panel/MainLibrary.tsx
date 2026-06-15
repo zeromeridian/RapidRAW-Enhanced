@@ -559,7 +559,6 @@ export default function MainLibrary(props: MainLibraryProps) {
               <span>{t('library.import.failed')}</span>
             </Text>
           )}
-
           <DisplayModeSwitch displayMode={libraryDisplayMode} setDisplayMode={setLibraryDisplayMode} t={t} />
 
           <div className="flex items-center bg-surface p-1 rounded-lg gap-1 border border-border-color/20">
@@ -568,6 +567,7 @@ export default function MainLibrary(props: MainLibraryProps) {
               libraryViewMode={props.libraryViewMode}
               onSelectSize={props.onThumbnailSizeChange}
               onSelectAspectRatio={props.onThumbnailAspectRatioChange}
+              onLibraryRefresh={props.onLibraryRefresh}
               setLibraryViewMode={props.setLibraryViewMode}
               thumbnailSize={props.thumbnailSize}
               thumbnailAspectRatio={props.thumbnailAspectRatio}

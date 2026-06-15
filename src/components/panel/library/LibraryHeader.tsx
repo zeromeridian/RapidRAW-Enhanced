@@ -311,16 +311,17 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
   );
 }
 
-const groupingOptions = [
-  { key: 'off' as GroupingMode, label: 'Off' },
-  { key: 'raw' as GroupingMode, label: 'JPEG behind RAW' },
-  { key: 'jpeg' as GroupingMode, label: 'JPEG over RAW' },
+const groupingOptionKeys = [
+  { key: 'off' as GroupingMode, labelKey: 'library.header.viewOptions.groupOff' as const },
+  { key: 'raw' as GroupingMode, labelKey: 'library.header.viewOptions.groupPreferRaw' as const },
+  { key: 'jpeg' as GroupingMode, labelKey: 'library.header.viewOptions.groupPreferJpeg' as const },
 ];
 
 export function ViewOptionsDropdown({
   libraryViewMode,
   onSelectSize,
   onSelectAspectRatio,
+  onLibraryRefresh,
   setLibraryViewMode,
   thumbnailSize,
   thumbnailAspectRatio,
@@ -684,9 +685,9 @@ export function ViewOptionsDropdown({
           <div className="space-y-4">
             <div>
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
-                Group RAW + JPEG
+                {t('library.header.viewOptions.groupRawJpeg')}
               </Text>
-              {groupingOptions.map((option) => {
+              {groupingOptionKeys.map((option) => {
                 const isSelected = groupingMode === option.key;
                 return (
                   <button
@@ -706,7 +707,7 @@ export function ViewOptionsDropdown({
                       color={TextColors.primary}
                       weight={isSelected ? TextWeights.semibold : TextWeights.normal}
                     >
-                      {option.label}
+                      {t(option.labelKey)}
                     </Text>
                     {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
                   </button>
@@ -716,9 +717,10 @@ export function ViewOptionsDropdown({
                 <div className="mt-1 space-y-0.5">
                   <button
                     className="w-full text-left pl-5 pr-3 py-1 rounded-md flex items-center gap-2 transition-colors duration-150 hover:bg-bg-primary"
-                    onClick={() => {
+                    onClick={async () => {
                       if (appSettings) {
-                        handleSettingsChange({ ...appSettings, requireMatchingExif: !requireMatchingExif });
+                        await handleSettingsChange({ ...appSettings, requireMatchingExif: !requireMatchingExif });
+                        onLibraryRefresh?.();
                       }
                     }}
                     role="menuitemcheckbox"
@@ -726,17 +728,18 @@ export function ViewOptionsDropdown({
                   >
                     {!requireMatchingExif
                       ? <SquareCheck size={14} className={TEXT_COLOR_KEYS[TextColors.primary]} />
-                      : <Square size={14} className={TEXT_COLOR_KEYS[TextColors.tertiary]} />
+                      : <Square size={14} className={TEXT_COLOR_KEYS[TextColors.secondary]} />
                     }
                     <Text variant={TextVariants.small} color={TextColors.secondary}>
-                      Group even with differing metadata
+                      {t('library.header.viewOptions.groupIgnoreMetadata')}
                     </Text>
                   </button>
                   <button
                     className="w-full text-left pl-5 pr-3 py-1 rounded-md flex items-center gap-2 transition-colors duration-150 hover:bg-bg-primary"
-                    onClick={() => {
+                    onClick={async () => {
                       if (appSettings) {
-                        handleSettingsChange({ ...appSettings, groupEditedFiles: !(appSettings.groupEditedFiles ?? true) });
+                        await handleSettingsChange({ ...appSettings, groupEditedFiles: !(appSettings.groupEditedFiles ?? true) });
+                        onLibraryRefresh?.();
                       }
                     }}
                     role="menuitemcheckbox"
@@ -744,10 +747,10 @@ export function ViewOptionsDropdown({
                   >
                     {(appSettings?.groupEditedFiles ?? true)
                       ? <SquareCheck size={14} className={TEXT_COLOR_KEYS[TextColors.primary]} />
-                      : <Square size={14} className={TEXT_COLOR_KEYS[TextColors.tertiary]} />
+                      : <Square size={14} className={TEXT_COLOR_KEYS[TextColors.secondary]} />
                     }
                     <Text variant={TextVariants.small} color={TextColors.secondary}>
-                      Group even excluded items
+                      {t('library.header.viewOptions.groupEditedFiles')}
                     </Text>
                   </button>
                 </div>
