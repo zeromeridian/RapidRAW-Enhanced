@@ -132,12 +132,6 @@ export enum RawStatus {
   RawOnly = 'rawOnly',
 }
 
-/** Sentinel values from pre-grouping-refactor settings; migrated on load. */
-export const LEGACY_GROUPING_RAW_STATUSES: ReadonlySet<string> = new Set([
-  'rawOverNonRaw',
-  'groupVariants',
-]);
-
 export enum SortDirection {
   Ascending = 'asc',
   Descending = 'desc',

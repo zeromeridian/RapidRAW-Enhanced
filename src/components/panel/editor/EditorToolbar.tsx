@@ -428,20 +428,25 @@ const EditorToolbar = memo(
 
               {variantOptions.length > 0 && (
                 <div className="flex items-center gap-1 ml-2 shrink-0">
-                  {variantOptions.map((v) => (
-                    <button
-                      key={v.path}
-                      className={clsx(
-                        'px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors',
-                        v.path === selectedImage.path
-                          ? 'bg-accent/30 text-accent'
-                          : 'bg-text-secondary/10 text-text-secondary hover:bg-text-secondary/20',
-                      )}
-                      onClick={() => onImageSelect?.(v.path)}
-                    >
-                      {v.label}
-                    </button>
-                  ))}
+                  {variantOptions.map((v) => {
+                    const isActive = v.path === selectedImage.path;
+                    return (
+                      <button
+                        key={v.path}
+                        disabled={isActive}
+                        className={clsx(
+                          'px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors',
+                          isActive
+                            ? 'bg-accent/30 text-accent'
+                            : 'bg-text-secondary/10 text-text-secondary hover:bg-text-secondary/20',
+                        )}
+                        data-tooltip={`Switch to ${v.label}`}
+                        onClick={(e) => onImageSelect?.(v.path, e)}
+                      >
+                        {v.label}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 

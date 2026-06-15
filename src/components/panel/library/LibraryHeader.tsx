@@ -6,6 +6,8 @@ import {
   X,
   SlidersHorizontal,
   Check,
+  Square,
+  SquareCheck,
   Star as StarIcon,
   ChevronUp,
   ChevronDown,
@@ -711,38 +713,44 @@ export function ViewOptionsDropdown({
                 );
               })}
               {groupingMode !== 'off' && (
-                <>
-                  <label className="mt-2 px-3 flex items-center gap-2 cursor-pointer py-1">
-                    <input
-                      type="checkbox"
-                      checked={!requireMatchingExif}
-                      onChange={(e) => {
-                        if (appSettings) {
-                          handleSettingsChange({ ...appSettings, requireMatchingExif: !e.target.checked });
-                        }
-                      }}
-                      className="rounded border-border-color"
-                    />
+                <div className="mt-1 space-y-0.5">
+                  <button
+                    className="w-full text-left pl-5 pr-3 py-1 rounded-md flex items-center gap-2 transition-colors duration-150 hover:bg-bg-primary"
+                    onClick={() => {
+                      if (appSettings) {
+                        handleSettingsChange({ ...appSettings, requireMatchingExif: !requireMatchingExif });
+                      }
+                    }}
+                    role="menuitemcheckbox"
+                    aria-checked={!requireMatchingExif}
+                  >
+                    {!requireMatchingExif
+                      ? <SquareCheck size={14} className={TEXT_COLOR_KEYS[TextColors.primary]} />
+                      : <Square size={14} className={TEXT_COLOR_KEYS[TextColors.tertiary]} />
+                    }
                     <Text variant={TextVariants.small} color={TextColors.secondary}>
                       Group even with differing metadata
                     </Text>
-                  </label>
-                  <label className="px-3 flex items-center gap-2 cursor-pointer py-1">
-                    <input
-                      type="checkbox"
-                      checked={appSettings?.groupEditedFiles ?? true}
-                      onChange={(e) => {
-                        if (appSettings) {
-                          handleSettingsChange({ ...appSettings, groupEditedFiles: e.target.checked });
-                        }
-                      }}
-                      className="rounded border-border-color"
-                    />
+                  </button>
+                  <button
+                    className="w-full text-left pl-5 pr-3 py-1 rounded-md flex items-center gap-2 transition-colors duration-150 hover:bg-bg-primary"
+                    onClick={() => {
+                      if (appSettings) {
+                        handleSettingsChange({ ...appSettings, groupEditedFiles: !(appSettings.groupEditedFiles ?? true) });
+                      }
+                    }}
+                    role="menuitemcheckbox"
+                    aria-checked={appSettings?.groupEditedFiles ?? true}
+                  >
+                    {(appSettings?.groupEditedFiles ?? true)
+                      ? <SquareCheck size={14} className={TEXT_COLOR_KEYS[TextColors.primary]} />
+                      : <Square size={14} className={TEXT_COLOR_KEYS[TextColors.tertiary]} />
+                    }
                     <Text variant={TextVariants.small} color={TextColors.secondary}>
                       Group even excluded items
                     </Text>
-                  </label>
-                </>
+                  </button>
+                </div>
               )}
             </div>
           </div>
