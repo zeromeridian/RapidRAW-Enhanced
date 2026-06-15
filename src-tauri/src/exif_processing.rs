@@ -724,41 +724,8 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
 }
 
 pub fn get_creation_date_from_path(path: &Path) -> DateTime<Utc> {
-    if let Some(map) = read_rrexif_sidecar(path)
-        && let Some(dt_str) = map.get("DateTimeOriginal").or(map.get("CreateDate"))
-        && let Some(dt) = parse_creation_datetime(dt_str)
-    {
-        return DateTime::from_naive_utc_and_offset(dt, Utc);
-    }
-
-    if let Ok(file) = std::fs::File::open(path) {
-        let mut bufreader = BufReader::new(&file);
-        let exifreader = exif::Reader::new();
-
-        if let Ok(exif_obj) = exifreader.read_from_container(&mut bufreader) {
-            for tag in [exif::Tag::DateTimeOriginal, exif::Tag::DateTime] {
-                if let Some(field) = exif_obj.get_field(tag, exif::In::PRIMARY)
-                    && let Some(dt) = parse_creation_field(field)
-                {
-                    return dt;
-                }
-            }
-        }
-    }
-
-    if is_raw_file(path.to_string_lossy().as_ref()) {
-        let loader = rawler::RawLoader::new();
-        if let Ok(raw_source) = rawler::rawsource::RawSource::new(path)
-            && let Ok(decoder) = loader.get_decoder(&raw_source)
-            && let Ok(metadata) = decoder.raw_metadata(&raw_source, &Default::default())
-        {
-            if let Some(dt) = parse_raw_creation_date(metadata.exif.date_time_original.as_deref()) {
-                return dt;
-            }
-            if let Some(dt) = parse_raw_creation_date(metadata.exif.create_date.as_deref()) {
-                return dt;
-            }
-        }
+    if let Some(dt) = try_get_exif_creation_date(path) {
+        return dt;
     }
 
     fs::metadata(path)

@@ -283,7 +283,10 @@ fn make_group_key(source_path: &Path) -> String {
 /// When `require_matching_exif` is true, a group is only formed if all
 /// non-virtual-copy files in the stem set have EXIF creation dates that match
 /// exactly. Files without EXIF data are excluded from grouping entirely.
-fn assign_group_ids(files: &mut Vec<ImageFile>, require_matching_exif: bool, group_edited_files: bool) {
+fn assign_group_ids(files: &mut [ImageFile], settings: &crate::app_settings::AppSettings) {
+    let require_matching_exif = settings.require_matching_exif.unwrap_or(false);
+    let group_edited_files = settings.group_edited_files.unwrap_or(true);
+
     let mut stem_sources: HashMap<String, HashSet<PathBuf>> = HashMap::new();
 
     for file in files.iter() {
@@ -301,20 +304,27 @@ fn assign_group_ids(files: &mut Vec<ImageFile>, require_matching_exif: bool, gro
     // Pre-compute EXIF dates only for paths that could actually form groups.
     let exif_dates: Option<HashMap<PathBuf, Option<chrono::DateTime<chrono::Utc>>>> =
         if require_matching_exif {
-            let mut dates = HashMap::new();
-            for paths in stem_sources.values().filter(|p| p.len() >= 2) {
-                for path in paths {
-                    dates.entry(path.clone())
-                        .or_insert_with(|| crate::exif_processing::try_get_exif_creation_date(path));
-                }
-            }
+            let groupable_paths: Vec<PathBuf> = stem_sources
+                .values()
+                .filter(|p| p.len() >= 2)
+                .flat_map(|paths| paths.iter().cloned())
+                .collect();
+            let dates: HashMap<_, _> = groupable_paths
+                .par_iter()
+                .map(|p| {
+                    (
+                        p.clone(),
+                        crate::exif_processing::try_get_exif_creation_date(p),
+                    )
+                })
+                .collect();
             Some(dates)
         } else {
             None
         };
 
     // Determine which keys actually form valid groups (>=2 files, matching EXIF if required)
-    let mut valid_group_keys: HashSet<String> = HashSet::new();
+    let mut valid_group_keys: HashSet<&str> = HashSet::new();
     for (key, paths) in &stem_sources {
         if paths.len() < 2 {
             continue;
@@ -332,7 +342,7 @@ fn assign_group_ids(files: &mut Vec<ImageFile>, require_matching_exif: bool, gro
                 continue;
             }
         }
-        valid_group_keys.insert(key.clone());
+        valid_group_keys.insert(key);
     }
 
     for file in files.iter_mut() {
@@ -341,7 +351,7 @@ fn assign_group_ids(files: &mut Vec<ImageFile>, require_matching_exif: bool, gro
         }
         let (source_path, _) = parse_virtual_path(&file.path);
         let key = make_group_key(&source_path);
-        if valid_group_keys.contains(&key) {
+        if valid_group_keys.contains(key.as_str()) {
             file.group_id = Some(key);
         }
     }
@@ -640,9 +650,7 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
         })
         .collect();
 
-    let require_exif = settings.require_matching_exif.unwrap_or(false);
-    let group_edited = settings.group_edited_files.unwrap_or(true);
-    assign_group_ids(&mut result_list, require_exif, group_edited);
+    assign_group_ids(&mut result_list, &settings);
     Ok(result_list)
 }
 
@@ -771,9 +779,7 @@ pub fn list_images_recursive(
         })
         .collect();
 
-    let require_exif = settings.require_matching_exif.unwrap_or(false);
-    let group_edited = settings.group_edited_files.unwrap_or(true);
-    assign_group_ids(&mut result_list, require_exif, group_edited);
+    assign_group_ids(&mut result_list, &settings);
     Ok(result_list)
 }
 
@@ -1037,9 +1043,7 @@ pub fn get_album_images(
         })
         .collect();
 
-    let require_exif = settings.require_matching_exif.unwrap_or(false);
-    let group_edited = settings.group_edited_files.unwrap_or(true);
-    assign_group_ids(&mut result_list, require_exif, group_edited);
+    assign_group_ids(&mut result_list, &settings);
     Ok(result_list)
 }
 
@@ -3356,10 +3360,10 @@ pub fn delete_files_with_associated(
                     let sidecar_stem = Path::new(image_filename)
                         .file_stem()
                         .and_then(|s| s.to_str());
-                    if let Some(stem) = sidecar_stem {
-                        if stems_to_delete.contains(stem) {
-                            files_to_trash.insert(entry_path);
-                        }
+                    if let Some(stem) = sidecar_stem
+                        && stems_to_delete.contains(stem)
+                    {
+                        files_to_trash.insert(entry_path);
                     }
                 } else if entry_filename_str.ends_with(".rrexif") {
                     // .rrexif sidecars are named {image_filename}.rrexif,
@@ -3368,19 +3372,19 @@ pub fn delete_files_with_associated(
                     let sidecar_stem = Path::new(without_rrexif)
                         .file_stem()
                         .and_then(|s| s.to_str());
-                    if let Some(stem) = sidecar_stem {
-                        if stems_to_delete.contains(stem) {
-                            files_to_trash.insert(entry_path);
-                        }
+                    if let Some(stem) = sidecar_stem
+                        && stems_to_delete.contains(stem)
+                    {
+                        files_to_trash.insert(entry_path);
                     }
                 } else if is_supported_image_file(entry_filename_str.as_ref()) {
                     let entry_stem = Path::new(entry_filename_str.as_ref())
                         .file_stem()
                         .and_then(|s| s.to_str());
-                    if let Some(stem) = entry_stem {
-                        if stems_to_delete.contains(stem) {
-                            files_to_trash.insert(entry_path);
-                        }
+                    if let Some(stem) = entry_stem
+                        && stems_to_delete.contains(stem)
+                    {
+                        files_to_trash.insert(entry_path);
                     }
                 }
             }

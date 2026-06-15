@@ -73,7 +73,7 @@ const EditorToolbar = memo(
       if (groupingMode === 'off' || !onImageSelect) return [];
       const isVC = selectedImage.path.includes('?vc=');
       if (isVC) return [];
-      const variants = findGroupVariants(imageList, selectedImage.path);
+      const variants = findGroupVariants(imageList, selectedImage.group_id);
       if (variants.length < 2) return [];
       return variants.map((v) => ({ path: v.path, label: getVariantLabel(v.path) }));
     }, [groupingMode, selectedImage.path, imageList, onImageSelect]);

@@ -734,44 +734,31 @@ export function ViewOptionsDropdown({
               })}
               {groupingMode !== 'off' && (
                 <div className="mt-1 space-y-0.5">
-                  <button
-                    className="w-full text-left pl-5 pr-3 py-1 rounded-md flex items-center gap-2 transition-colors duration-150 hover:bg-bg-primary"
-                    onClick={async () => {
-                      if (appSettings) {
-                        await handleSettingsChange({ ...appSettings, requireMatchingExif: !requireMatchingExif });
-                        onLibraryRefresh?.();
+                  {([
+                    { checked: !requireMatchingExif, labelKey: 'library.header.viewOptions.groupIgnoreMetadata' as const, toggle: { requireMatchingExif: !requireMatchingExif } },
+                    { checked: appSettings?.groupEditedFiles ?? true, labelKey: 'library.header.viewOptions.groupEditedFiles' as const, toggle: { groupEditedFiles: !(appSettings?.groupEditedFiles ?? true) } },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.labelKey}
+                      className="w-full text-left pl-5 pr-3 py-1 rounded-md flex items-center gap-2 transition-colors duration-150 hover:bg-bg-primary"
+                      onClick={async () => {
+                        if (appSettings) {
+                          await handleSettingsChange({ ...appSettings, ...opt.toggle });
+                          onLibraryRefresh?.();
+                        }
+                      }}
+                      role="menuitemcheckbox"
+                      aria-checked={opt.checked}
+                    >
+                      {opt.checked
+                        ? <SquareCheck size={14} className={TEXT_COLOR_KEYS[TextColors.primary]} />
+                        : <Square size={14} className={TEXT_COLOR_KEYS[TextColors.secondary]} />
                       }
-                    }}
-                    role="menuitemcheckbox"
-                    aria-checked={!requireMatchingExif}
-                  >
-                    {!requireMatchingExif
-                      ? <SquareCheck size={14} className={TEXT_COLOR_KEYS[TextColors.primary]} />
-                      : <Square size={14} className={TEXT_COLOR_KEYS[TextColors.secondary]} />
-                    }
-                    <Text variant={TextVariants.small} color={TextColors.secondary}>
-                      {t('library.header.viewOptions.groupIgnoreMetadata')}
-                    </Text>
-                  </button>
-                  <button
-                    className="w-full text-left pl-5 pr-3 py-1 rounded-md flex items-center gap-2 transition-colors duration-150 hover:bg-bg-primary"
-                    onClick={async () => {
-                      if (appSettings) {
-                        await handleSettingsChange({ ...appSettings, groupEditedFiles: !(appSettings.groupEditedFiles ?? true) });
-                        onLibraryRefresh?.();
-                      }
-                    }}
-                    role="menuitemcheckbox"
-                    aria-checked={appSettings?.groupEditedFiles ?? true}
-                  >
-                    {(appSettings?.groupEditedFiles ?? true)
-                      ? <SquareCheck size={14} className={TEXT_COLOR_KEYS[TextColors.primary]} />
-                      : <Square size={14} className={TEXT_COLOR_KEYS[TextColors.secondary]} />
-                    }
-                    <Text variant={TextVariants.small} color={TextColors.secondary}>
-                      {t('library.header.viewOptions.groupEditedFiles')}
-                    </Text>
-                  </button>
+                      <Text variant={TextVariants.small} color={TextColors.secondary}>
+                        {t(opt.labelKey)}
+                      </Text>
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
