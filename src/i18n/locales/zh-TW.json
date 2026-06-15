@@ -878,7 +878,6 @@
       "raw": {
         "all": "所有型別",
         "nonRawOnly": "僅非 RAW",
-        "preferRaw": "優先 RAW",
         "rawOnly": "僅 RAW"
       }
     },

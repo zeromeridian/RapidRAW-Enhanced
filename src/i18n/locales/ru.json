@@ -926,7 +926,6 @@
       "raw": {
         "all": "Все типы файлов",
         "nonRawOnly": "Только не-RAW",
-        "preferRaw": "Приоритет RAW",
         "rawOnly": "Только RAW"
       }
     },

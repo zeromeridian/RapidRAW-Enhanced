@@ -10,8 +10,9 @@ import { LibraryViewMode, SortDirection, LibraryDisplayMode } from '../../ui/App
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { useProcessStore } from '../../../store/useProcessStore';
-import { ExifOverlay } from '../../ui/AppProperties';
+import { ExifOverlay, GroupingMode } from '../../ui/AppProperties';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+import { buildGroupBadgeInfo, GroupBadgeInfo } from '../../../utils/imageGrouping';
 
 function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: any) {
   const { t } = useTranslation();
@@ -182,6 +183,14 @@ export default function LibraryGrid(props: any) {
       setSortCriteria: state.setSortCriteria,
     })),
   );
+  const rawImageList = useLibraryStore((s) => s.imageList);
+  const groupingMode: GroupingMode = useSettingsStore((s) => s.appSettings?.grouping) ?? 'off';
+
+  const groupBadgeInfo = useMemo<Map<string, GroupBadgeInfo> | null>(() => {
+    if (groupingMode === 'off') return null;
+    return buildGroupBadgeInfo(rawImageList);
+  }, [rawImageList, groupingMode]);
+
   const [gridSize, setGridSize] = useState({ height: 0, width: 0 });
   const [listHandle, setListHandle] = useListCallbackRef();
   const [collapsedRecursiveFolders, setCollapsedRecursiveFolders] = useState<Set<string>>(new Set());
@@ -464,6 +473,7 @@ export default function LibraryGrid(props: any) {
       columnWidths: listColumnWidths,
       queueThumbnailRequest,
       onToggleRecursiveFolder: handleToggleRecursiveFolder,
+      groupBadgeInfo,
     };
   }, [
     gridData,
@@ -479,6 +489,7 @@ export default function LibraryGrid(props: any) {
     listColumnWidths,
     queueThumbnailRequest,
     handleToggleRecursiveFolder,
+    groupBadgeInfo,
   ]);
 
   const getItemSize = useCallback(

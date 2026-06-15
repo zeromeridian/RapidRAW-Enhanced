@@ -99,3 +99,48 @@ export function getVariantLabel(path: string): string {
   const ext = getFileExtension(path);
   return ext ? ext.toUpperCase() : 'FILE';
 }
+
+export interface GroupBadgeInfo {
+  count: number;
+  label: string;
+}
+
+/**
+ * Build a map from group_id to badge display info (variant count and
+ * extension label like "RAF+JPG"). Only includes groups with 2+ non-VC
+ * files. Operates on the raw image list, not the display list.
+ */
+export function buildGroupBadgeInfo(images: ImageFile[]): Map<string, GroupBadgeInfo> {
+  const groups = new Map<string, ImageFile[]>();
+
+  for (const image of images) {
+    if (!image.group_id || image.is_virtual_copy) continue;
+    let group = groups.get(image.group_id);
+    if (!group) {
+      group = [];
+      groups.set(image.group_id, group);
+    }
+    group.push(image);
+  }
+
+  const badges = new Map<string, GroupBadgeInfo>();
+  for (const [groupId, files] of groups) {
+    if (files.length < 2) continue;
+    const extensions = new Set(files.map((f) => getVariantLabel(f.path)));
+    badges.set(groupId, {
+      count: files.length,
+      label: Array.from(extensions).join('+'),
+    });
+  }
+  return badges;
+}
+
+/**
+ * Find all non-VC variants sharing a group_id with the image at the
+ * given path. Returns an empty array when not grouped.
+ */
+export function findGroupVariants(images: ImageFile[], path: string): ImageFile[] {
+  const target = images.find((img) => img.path === path);
+  if (!target?.group_id) return [];
+  return images.filter((img) => img.group_id === target.group_id && !img.is_virtual_copy);
+}

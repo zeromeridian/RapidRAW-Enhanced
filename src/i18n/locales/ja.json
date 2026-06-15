@@ -878,7 +878,6 @@
       "raw": {
         "all": "すべての種類",
         "nonRawOnly": "非RAWのみ",
-        "preferRaw": "RAWを優先",
         "rawOnly": "RAWのみ"
       }
     },

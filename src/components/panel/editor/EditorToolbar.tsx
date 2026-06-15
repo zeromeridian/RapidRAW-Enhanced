@@ -3,10 +3,13 @@ import { Eye, EyeOff, ArrowLeft, Maximize, Loader2, Undo, Redo, Waves } from 'lu
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import { SelectedImage } from '../../ui/AppProperties';
+import { SelectedImage, GroupingMode } from '../../ui/AppProperties';
 import { IconAperture, IconCalendar, IconClock, IconFocalLength, IconIso, IconShutter } from './ExifIcons';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { useLibraryStore } from '../../../store/useLibraryStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
+import { findGroupVariants, getVariantLabel } from '../../../utils/imageGrouping';
 
 interface EditorToolbarProps {
   canRedo: boolean;
@@ -14,6 +17,7 @@ interface EditorToolbarProps {
   isAndroid: boolean;
   isLoading: boolean;
   onBackToLibrary(): void;
+  onImageSelect?(path: string, event?: any): void;
   onRedo(): void;
   onToggleFullScreen(): void;
   onToggleShowOriginal(): void;
@@ -34,6 +38,7 @@ const EditorToolbar = memo(
     isAndroid,
     isLoading,
     onBackToLibrary,
+    onImageSelect,
     onRedo,
     onToggleFullScreen,
     onToggleShowOriginal,
@@ -60,6 +65,18 @@ const EditorToolbar = memo(
 
     const showResolution = !isAndroid && selectedImage.width > 0 && selectedImage.height > 0;
     const [displayedResolution, setDisplayedResolution] = useState('');
+
+    const imageList = useLibraryStore((s) => s.imageList);
+    const groupingMode: GroupingMode = useSettingsStore((s) => s.appSettings?.grouping) ?? 'off';
+
+    const variantOptions = useMemo(() => {
+      if (groupingMode === 'off' || !onImageSelect) return [];
+      const isVC = selectedImage.path.includes('?vc=');
+      if (isVC) return [];
+      const variants = findGroupVariants(imageList, selectedImage.path);
+      if (variants.length < 2) return [];
+      return variants.map((v) => ({ path: v.path, label: getVariantLabel(v.path) }));
+    }, [groupingMode, selectedImage.path, imageList, onImageSelect]);
 
     const { baseName, isVirtualCopy, vcId, exifData, hasExif } = useMemo(() => {
       const path = selectedImage.path;
@@ -407,6 +424,25 @@ const EditorToolbar = memo(
                     <span>-{vcId}</span>
                   </div>
                 </Text>
+              )}
+
+              {variantOptions.length > 0 && (
+                <div className="flex items-center gap-1 ml-2 shrink-0">
+                  {variantOptions.map((v) => (
+                    <button
+                      key={v.path}
+                      className={clsx(
+                        'px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors',
+                        v.path === selectedImage.path
+                          ? 'bg-accent/30 text-accent'
+                          : 'bg-text-secondary/10 text-text-secondary hover:bg-text-secondary/20',
+                      )}
+                      onClick={() => onImageSelect?.(v.path)}
+                    >
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
               )}
 
               <div

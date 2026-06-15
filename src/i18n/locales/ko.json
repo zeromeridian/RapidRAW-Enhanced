@@ -878,7 +878,6 @@
       "raw": {
         "all": "모든 유형",
         "nonRawOnly": "RAW가 아닌 항목만",
-        "preferRaw": "RAW 우선",
         "rawOnly": "RAW만"
       }
     },

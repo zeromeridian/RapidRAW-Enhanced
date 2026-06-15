@@ -880,7 +880,6 @@
       "raw": {
         "all": "Alle Typen",
         "nonRawOnly": "Nur Nicht-RAW",
-        "preferRaw": "RAW bevorzugen",
         "rawOnly": "Nur RAW"
       }
     },
