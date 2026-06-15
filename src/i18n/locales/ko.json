@@ -294,7 +294,6 @@
         "effects": "효과"
       },
       "title": "조정",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "autoAdjust": "이미지 자동 조정",
         "resetAdjustments": "조정값 초기화",
@@ -488,7 +487,6 @@
       "resetTooltip": "자르기 및 변형 초기화",
       "rotationHeading": "회전",
       "title": "자르기 및 변형",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "compositionOverlay": "구도 오버레이",
         "flipHoriz": "이미지를 좌우로 반전",
@@ -590,7 +588,6 @@
         "selectPresetTooltip": "적용할 프리셋 선택"
       },
       "toggleAnalyticsTooltip": "분석 표시 전환",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "addToCurrent": "{{name}}을(를) 현재 마스크에 추가하거나 새로 만들기 (우클릭)",
         "createNew": "새 {{name}} 마스크 만들기",
@@ -685,7 +682,6 @@
         "masks": "마스크"
       },
       "title": "프리셋",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "explore": "커뮤니티 프리셋 둘러보기",
         "export": "모든 프리셋을 .rrpreset 파일로 내보내기",
@@ -700,7 +696,6 @@
       }
     },
     "switcher": {
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "adjust": "조정",
         "crop": "자르기",
@@ -907,7 +902,6 @@
         "modified": "수정일",
         "name": "알파벳순"
       },
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "clearSearch": "검색 지우기",
         "collapse": "접기",
@@ -948,8 +942,8 @@
         "filterByEdited": "편집 상태로 필터링",
         "filterByFileType": "파일 유형으로 필터링",
         "filterByRating": "평점으로 필터링",
-        "groupEditedFiles": "Group even excluded items",
-        "groupIgnoreMetadata": "Group even with differing metadata",
+        "groupEditedFiles": "Include edited files in groups",
+        "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
         "groupOff": "Off",
         "groupPreferJpeg": "Prefer JPEG",
         "groupPreferRaw": "Prefer RAW",
@@ -1039,7 +1033,6 @@
       "medium": "보통",
       "small": "작게"
     },
-      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "communityPresets": "커뮤니티 프리셋",
       "goHome": "홈으로 이동",
@@ -1741,7 +1734,6 @@
       "light": "라이트"
     },
     "title": "설정",
-      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "goHome": "홈으로 이동"
     }
@@ -1749,7 +1741,6 @@
   "ui": {
     "bottomBar": {
       "imagesSelected": "이미지 {{total}}개 중 {{current}}개 선택됨",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "collapseFilmstrip": "필름스트립 접기",
         "copyPasteSettings": "설정 복사 및 붙여넣기",
@@ -1789,7 +1780,6 @@
       "savedTooltip": "저장됨!"
     },
     "filmstrip": {
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "color": "색상: {{color}}",
         "virtualCopy": "가상 복사본"
@@ -1820,7 +1810,6 @@
       "reset": "초기화"
     },
     "waveform": {
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "hideClipping": "클리핑 경고 숨기기",
         "histogram": "히스토그램",

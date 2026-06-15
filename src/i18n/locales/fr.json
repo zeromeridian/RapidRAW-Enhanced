@@ -310,7 +310,6 @@
         "effects": "Effets"
       },
       "title": "Ajustements",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "autoAdjust": "Ajustement auto de l'image",
         "resetAdjustments": "Réinitialiser les ajustements",
@@ -510,7 +509,6 @@
       "resetTooltip": "Réinitialiser Recadrage & Transformation",
       "rotationHeading": "Rotation",
       "title": "Recadrage & Transformation",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "compositionOverlay": "Superposition de composition",
         "flipHoriz": "Retourner l'image horizontalement",
@@ -613,7 +611,6 @@
         "selectPresetTooltip": "Sélectionner un paramètre prédéfini à appliquer"
       },
       "toggleAnalyticsTooltip": "Basculer l'affichage des analyses",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "addToCurrent": "Ajouter {{name}} au masque actuel ou en créer un nouveau (Clic-droit)",
         "createNew": "Créer un nouveau masque {{name}}",
@@ -708,7 +705,6 @@
         "masks": "Masques"
       },
       "title": "Paramètres prédéfinis",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "explore": "Explorer les paramètres prédéfinis de la communauté",
         "export": "Exporter tous les paramètres prédéfinis vers un fichier .rrpreset",
@@ -723,7 +719,6 @@
       }
     },
     "switcher": {
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "adjust": "Ajuster",
         "crop": "Recadrer",
@@ -932,7 +927,6 @@
         "modified": "Date de modification",
         "name": "Alphabétique"
       },
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "clearSearch": "Effacer la recherche",
         "collapse": "Réduire",
@@ -973,8 +967,8 @@
         "filterByEdited": "Filtrer par statut de modification",
         "filterByFileType": "Filtrer par type de fichier",
         "filterByRating": "Filtrer par note",
-        "groupEditedFiles": "Group even excluded items",
-        "groupIgnoreMetadata": "Group even with differing metadata",
+        "groupEditedFiles": "Include edited files in groups",
+        "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
         "groupOff": "Off",
         "groupPreferJpeg": "Prefer JPEG",
         "groupPreferRaw": "Prefer RAW",
@@ -1065,7 +1059,6 @@
       "medium": "Moyen",
       "small": "Petit"
     },
-      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "communityPresets": "Paramètres prédéfinis de la communauté",
       "goHome": "Aller à l'accueil",
@@ -1776,7 +1769,6 @@
       "light": "Clair"
     },
     "title": "Paramètres",
-      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "goHome": "Aller à l'accueil"
     }
@@ -1784,7 +1776,6 @@
   "ui": {
     "bottomBar": {
       "imagesSelected": "{{current}} sur {{total}} images sélectionnées",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "collapseFilmstrip": "Réduire la bande de film",
         "copyPasteSettings": "Copier & Coller les paramètres",
@@ -1825,7 +1816,6 @@
       "savedTooltip": "Enregistré !"
     },
     "filmstrip": {
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "color": "Couleur : {{color}}",
         "virtualCopy": "Copie virtuelle"
@@ -1856,7 +1846,6 @@
       "reset": "Réinitialiser"
     },
     "waveform": {
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "hideClipping": "Masquer les avertissements d'écrêtage",
         "histogram": "Histogramme",

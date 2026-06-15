@@ -298,13 +298,15 @@ fn assign_group_ids(files: &mut Vec<ImageFile>, require_matching_exif: bool, gro
         stem_sources.entry(key).or_default().insert(source_path);
     }
 
-    // Pre-compute EXIF dates keyed by source path when required.
+    // Pre-compute EXIF dates only for paths that could actually form groups.
     let exif_dates: Option<HashMap<PathBuf, Option<chrono::DateTime<chrono::Utc>>>> =
         if require_matching_exif {
             let mut dates = HashMap::new();
-            for file in files.iter() {
-                let (source_path, _) = parse_virtual_path(&file.path);
-                dates.insert(source_path.clone(), crate::exif_processing::try_get_exif_creation_date(&source_path));
+            for paths in stem_sources.values().filter(|p| p.len() >= 2) {
+                for path in paths {
+                    dates.entry(path.clone())
+                        .or_insert_with(|| crate::exif_processing::try_get_exif_creation_date(path));
+                }
             }
             Some(dates)
         } else {

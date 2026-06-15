@@ -169,44 +169,41 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
     return tagsMatch && textMatch;
   };
 
-  // --- Collapse groups, then filter with group-aware matching ---
+  // --- Collapse groups, then filter/search ---
+  //
+  // Filters (rating, raw status, etc.) apply to the primary only: the
+  // user is narrowing the visible list, so showing an unedited RAW
+  // because its hidden JPEG is edited would be confusing.
+  //
+  // Search (text/tags) is group-aware: if any variant matches the query,
+  // the group primary surfaces. The user is looking for something by
+  // name/tag, so hidden variants should be findable.
 
   let processedList = imageList;
-  let matchingGroupIds: Set<string> | null = null;
+  let searchMatchingGroupIds: Set<string> | null = null;
 
   if (isGroupingActive) {
     const groupEditedFiles = appSettings?.groupEditedFiles ?? true;
     const groupingResult = buildImageGroups(imageList, groupingMode, groupEditedFiles);
     processedList = groupingResult.displayList;
 
-    // When filter/search is active, pre-scan all variants so a hidden
-    // variant that matches still surfaces its group's primary.
-    const isFilterActive =
-      filterCriteria.rating !== 0 ||
-      (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) ||
-      (filterCriteria.editedStatus && filterCriteria.editedStatus !== EditedStatus.All) ||
-      (filterCriteria.colors && filterCriteria.colors.length > 0);
-
-    if (isFilterActive || isSearchActive) {
-      matchingGroupIds = new Set<string>();
+    if (isSearchActive) {
+      searchMatchingGroupIds = new Set<string>();
       for (const image of imageList) {
         if (!image.group_id) continue;
-        if (matchesFilter(image) && matchesSearch(image)) {
-          matchingGroupIds.add(image.group_id);
+        if (matchesSearch(image)) {
+          searchMatchingGroupIds.add(image.group_id);
         }
       }
     }
   }
 
-  const filteredList = processedList.filter((image: ImageFile) => {
-    if (matchingGroupIds && image.group_id && matchingGroupIds.has(image.group_id)) return true;
-    return matchesFilter(image);
-  });
+  const filteredList = processedList.filter((image: ImageFile) => matchesFilter(image));
 
   const filteredBySearch = !isSearchActive
     ? filteredList
     : filteredList.filter((image: ImageFile) => {
-        if (matchingGroupIds && image.group_id && matchingGroupIds.has(image.group_id)) return true;
+        if (searchMatchingGroupIds && image.group_id && searchMatchingGroupIds.has(image.group_id)) return true;
         return matchesSearch(image);
       });
 

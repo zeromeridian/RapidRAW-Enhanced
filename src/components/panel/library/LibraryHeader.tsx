@@ -25,6 +25,8 @@ import {
   SortDirection,
   ExifOverlay,
   GroupingMode,
+  ThumbnailSize,
+  ThumbnailAspectRatio,
 } from '../../ui/AppProperties';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import Text from '../../ui/Text';
@@ -317,6 +319,22 @@ const groupingOptionKeys = [
   { key: 'jpeg' as GroupingMode, labelKey: 'library.header.viewOptions.groupPreferJpeg' as const },
 ];
 
+interface ViewOptionsDropdownProps {
+  libraryViewMode: LibraryViewMode;
+  onSelectSize: (id: ThumbnailSize) => void;
+  onSelectAspectRatio: (id: ThumbnailAspectRatio) => void;
+  onLibraryRefresh?: () => void;
+  setLibraryViewMode: (mode: LibraryViewMode) => void;
+  thumbnailSize: ThumbnailSize;
+  thumbnailAspectRatio: ThumbnailAspectRatio;
+  thumbnailSizeOptions: Array<{ id: ThumbnailSize; label: string; size: number }>;
+  thumbnailAspectRatioOptions: Array<{ id: ThumbnailAspectRatio; label: string }>;
+  ratingFilterOptions: Array<{ value: number; label: string }>;
+  rawStatusOptions: Array<{ key: RawStatus; label: string }>;
+  editedStatusOptions: Array<{ key: EditedStatus; label: string }>;
+  sortOptions: Array<{ key: string; label: string; disabled?: boolean }>;
+}
+
 export function ViewOptionsDropdown({
   libraryViewMode,
   onSelectSize,
@@ -331,7 +349,7 @@ export function ViewOptionsDropdown({
   rawStatusOptions,
   editedStatusOptions,
   sortOptions,
-}: any) {
+}: ViewOptionsDropdownProps) {
   const { t } = useTranslation();
   const { filterCriteria, setFilterCriteria, sortCriteria, setSortCriteria } = useLibraryStore(
     useShallow((state) => ({
@@ -355,6 +373,7 @@ export function ViewOptionsDropdown({
   const isFilterActive =
     filterCriteria.rating !== 0 ||
     (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) ||
+    (filterCriteria.editedStatus && filterCriteria.editedStatus !== EditedStatus.All) ||
     (filterCriteria.colors && filterCriteria.colors.length > 0);
 
   const [lastClickedColor, setLastClickedColor] = useState<string | null>(null);
@@ -414,7 +433,7 @@ export function ViewOptionsDropdown({
             <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
               {t('library.header.viewOptions.thumbnailSize')}
             </Text>
-            {thumbnailSizeOptions.map((option: any) => {
+            {thumbnailSizeOptions.map((option) => {
               const isSelected = thumbnailSize === option.id;
               return (
                 <button
@@ -443,7 +462,7 @@ export function ViewOptionsDropdown({
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
                 {t('library.header.viewOptions.thumbnailFit')}
               </Text>
-              {thumbnailAspectRatioOptions.map((option: any) => {
+              {thumbnailAspectRatioOptions.map((option) => {
                 const isSelected = thumbnailAspectRatio === option.id;
                 return (
                   <button
@@ -548,8 +567,8 @@ export function ViewOptionsDropdown({
               </Text>
 
               {ratingFilterOptions
-                .filter((option: any) => option.value <= 0)
-                .map((option: any) => {
+                .filter((option) => option.value <= 0)
+                .map((option) => {
                   const isSelected = filterCriteria.rating === option.value;
                   return (
                     <button
@@ -558,7 +577,7 @@ export function ViewOptionsDropdown({
                       }`}
                       key={option.value}
                       onClick={() =>
-                        setFilterCriteria((prev: Partial<FilterCriteria>) => ({ ...prev, rating: option.value }))
+                        setFilterCriteria((prev: FilterCriteria) => ({ ...prev, rating: option.value }))
                       }
                       role="menuitem"
                     >
@@ -584,14 +603,14 @@ export function ViewOptionsDropdown({
                     {[...Array(5)].map((_, index: number) => {
                       const starValue = index + 1;
                       const isFilled = filterCriteria.rating > 0 && starValue <= filterCriteria.rating;
-                      const optionLabel = ratingFilterOptions.find((o: any) => o.value === starValue)?.label;
+                      const optionLabel = ratingFilterOptions.find((o) => o.value === starValue)?.label;
 
                       return (
                         <button
                           key={starValue}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setFilterCriteria((prev: Partial<FilterCriteria>) => ({
+                            setFilterCriteria((prev: FilterCriteria) => ({
                               ...prev,
                               rating: prev.rating === starValue ? 0 : starValue,
                             }));
@@ -623,7 +642,7 @@ export function ViewOptionsDropdown({
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
                 {t('library.header.viewOptions.filterByFileType')}
               </Text>
-              {rawStatusOptions.map((option: any) => {
+              {rawStatusOptions.map((option) => {
                 const isSelected = (filterCriteria.rawStatus || RawStatus.All) === option.key;
                 return (
                   <button
@@ -632,7 +651,7 @@ export function ViewOptionsDropdown({
                     }`}
                     key={option.key}
                     onClick={() =>
-                      setFilterCriteria((prev: Partial<FilterCriteria>) => ({ ...prev, rawStatus: option.key }))
+                      setFilterCriteria((prev: FilterCriteria) => ({ ...prev, rawStatus: option.key }))
                     }
                     role="menuitem"
                   >
@@ -653,7 +672,7 @@ export function ViewOptionsDropdown({
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
                 {t('library.header.viewOptions.filterByEdited', 'Filter by Edit Status')}
               </Text>
-              {editedStatusOptions.map((option: any) => {
+              {editedStatusOptions.map((option) => {
                 const isSelected = (filterCriteria.editedStatus || EditedStatus.All) === option.key;
                 return (
                   <button
@@ -662,7 +681,7 @@ export function ViewOptionsDropdown({
                     }`}
                     key={option.key}
                     onClick={() =>
-                      setFilterCriteria((prev: Partial<FilterCriteria>) => ({ ...prev, editedStatus: option.key }))
+                      setFilterCriteria((prev: FilterCriteria) => ({ ...prev, editedStatus: option.key }))
                     }
                     role="menuitem"
                   >
@@ -819,7 +838,7 @@ export function ViewOptionsDropdown({
                 {sortCriteria.order === SortDirection.Ascending ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
             </div>
-            {sortOptions.map((option: any) => {
+            {sortOptions.map((option) => {
               const isSelected = sortCriteria.key === option.key;
               return (
                 <button

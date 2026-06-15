@@ -326,7 +326,6 @@
         "effects": "Эффекты"
       },
       "title": "Настройки",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "autoAdjust": "Автонастройка изображения",
         "resetAdjustments": "Сбросить настройки",
@@ -530,7 +529,6 @@
       "resetTooltip": "Сбросить кадрирование и геометрию",
       "rotationHeading": "Вращение",
       "title": "Обрезка и трансформация",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "compositionOverlay": "Сетка композиции",
         "flipHoriz": "Отразить горизонтально",
@@ -634,7 +632,6 @@
         "selectPresetTooltip": "Выберите пресет для применения"
       },
       "toggleAnalyticsTooltip": "Показать/скрыть панель гистограммы",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "addToCurrent": "Добавить {{name}} к текущей маске или создать новую (правый клик)",
         "createNew": "Создать новую маску: {{name}}",
@@ -729,7 +726,6 @@
         "masks": "Маски"
       },
       "title": "Пресеты",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "explore": "Обзор пресетов сообщества",
         "export": "Экспортировать все пресеты в файл .rrpreset",
@@ -744,7 +740,6 @@
       }
     },
     "switcher": {
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "adjust": "Коррекция",
         "crop": "Обрезка",
@@ -955,7 +950,6 @@
         "modified": "Дата изменения",
         "name": "По алфавиту"
       },
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "clearSearch": "Очистить поиск",
         "collapse": "Свернуть",
@@ -996,8 +990,8 @@
         "filterByEdited": "Фильтр по редактированию",
         "filterByFileType": "Фильтр по формату",
         "filterByRating": "Фильтр по рейтингу",
-        "groupEditedFiles": "Group even excluded items",
-        "groupIgnoreMetadata": "Group even with differing metadata",
+        "groupEditedFiles": "Include edited files in groups",
+        "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
         "groupOff": "Off",
         "groupPreferJpeg": "Prefer JPEG",
         "groupPreferRaw": "Prefer RAW",
@@ -1089,7 +1083,6 @@
       "medium": "Средний",
       "small": "Маленький"
     },
-      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "communityPresets": "Пресеты сообщества",
       "goHome": "На главную",
@@ -1809,7 +1802,6 @@
       "light": "Светлая"
     },
     "title": "Настройки",
-      "switchToVariant": "Switch to {{label}}",
     "tooltips": {
       "goHome": "На главную"
     }
@@ -1817,7 +1809,6 @@
   "ui": {
     "bottomBar": {
       "imagesSelected": "Выбрано снимков: {{current}} из {{total}}",
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "collapseFilmstrip": "Свернуть ленту кадров",
         "copyPasteSettings": "Копирование и вставка настроек",
@@ -1859,7 +1850,6 @@
       "savedTooltip": "Сохранено!"
     },
     "filmstrip": {
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "color": "Цвет: {{color}}",
         "virtualCopy": "Виртуальная копия"
@@ -1890,7 +1880,6 @@
       "reset": "Сбросить значение"
     },
     "waveform": {
-      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "hideClipping": "Скрыть предупреждения о переэкспозиции",
         "histogram": "Гистограмма",
