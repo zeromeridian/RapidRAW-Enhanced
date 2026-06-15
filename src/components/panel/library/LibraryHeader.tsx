@@ -711,21 +711,38 @@ export function ViewOptionsDropdown({
                 );
               })}
               {groupingMode !== 'off' && (
-                <label className="mt-2 px-3 flex items-center gap-2 cursor-pointer py-1">
-                  <input
-                    type="checkbox"
-                    checked={requireMatchingExif}
-                    onChange={(e) => {
-                      if (appSettings) {
-                        handleSettingsChange({ ...appSettings, requireMatchingExif: e.target.checked });
-                      }
-                    }}
-                    className="rounded border-border-color"
-                  />
-                  <Text variant={TextVariants.small} color={TextColors.secondary}>
-                    Require matching metadata
-                  </Text>
-                </label>
+                <>
+                  <label className="mt-2 px-3 flex items-center gap-2 cursor-pointer py-1">
+                    <input
+                      type="checkbox"
+                      checked={!requireMatchingExif}
+                      onChange={(e) => {
+                        if (appSettings) {
+                          handleSettingsChange({ ...appSettings, requireMatchingExif: !e.target.checked });
+                        }
+                      }}
+                      className="rounded border-border-color"
+                    />
+                    <Text variant={TextVariants.small} color={TextColors.secondary}>
+                      Group even with differing metadata
+                    </Text>
+                  </label>
+                  <label className="px-3 flex items-center gap-2 cursor-pointer py-1">
+                    <input
+                      type="checkbox"
+                      checked={appSettings?.groupEditedFiles ?? true}
+                      onChange={(e) => {
+                        if (appSettings) {
+                          handleSettingsChange({ ...appSettings, groupEditedFiles: e.target.checked });
+                        }
+                      }}
+                      className="rounded border-border-color"
+                    />
+                    <Text variant={TextVariants.small} color={TextColors.secondary}>
+                      Group even excluded items
+                    </Text>
+                  </label>
+                </>
               )}
             </div>
           </div>

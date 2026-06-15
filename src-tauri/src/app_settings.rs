@@ -445,6 +445,8 @@ pub struct AppSettings {
     pub grouping: Option<String>,
     #[serde(default)]
     pub require_matching_exif: Option<bool>,
+    #[serde(default)]
+    pub group_edited_files: Option<bool>,
     /// Legacy: read for migration, never written back.
     #[serde(default, skip_serializing)]
     #[allow(dead_code)]
@@ -540,6 +542,7 @@ impl Default for AppSettings {
             library_display_mode: Some("grid".to_string()),
             grouping: Some("off".to_string()),
             require_matching_exif: Some(false),
+            group_edited_files: Some(true),
             group_associated_files: Some(false),
             group_preferred_type: Some("raw".to_string()),
         }

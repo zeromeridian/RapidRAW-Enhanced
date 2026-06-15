@@ -37,7 +37,7 @@ export const parseFocalLength = (val: string | undefined): number => {
 
 export function computeSortedLibrary(libraryState: any, settingsState: any): ImageFile[] {
   const { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria } = libraryState;
-  const { appSettings, supportedTypes } = settingsState;
+  const { appSettings } = settingsState;
 
   const groupingMode: GroupingMode = appSettings?.grouping ?? 'off';
   const isGroupingActive = groupingMode !== 'off';
@@ -45,7 +45,8 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
   let processedList = imageList;
 
   if (isGroupingActive) {
-    const groupingResult = buildImageGroups(imageList, groupingMode);
+    const groupEditedFiles = appSettings?.groupEditedFiles ?? true;
+    const groupingResult = buildImageGroups(imageList, groupingMode, groupEditedFiles);
     processedList = groupingResult.displayList;
   }
 
@@ -59,15 +60,10 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
 
     if (
       filterCriteria.rawStatus &&
-      filterCriteria.rawStatus !== RawStatus.All &&
-      supportedTypes
+      filterCriteria.rawStatus !== RawStatus.All
     ) {
-      const pathWithoutVC = image.path.split('?vc=')[0];
-      const extension = pathWithoutVC.split('.').pop()?.toLowerCase() || '';
-      const isRaw = supportedTypes.raw?.includes(extension);
-
-      if (filterCriteria.rawStatus === RawStatus.RawOnly && !isRaw) return false;
-      if (filterCriteria.rawStatus === RawStatus.NonRawOnly && isRaw) return false;
+      if (filterCriteria.rawStatus === RawStatus.RawOnly && !image.is_raw) return false;
+      if (filterCriteria.rawStatus === RawStatus.NonRawOnly && image.is_raw) return false;
     }
 
     if (filterCriteria.editedStatus && filterCriteria.editedStatus !== EditedStatus.All) {

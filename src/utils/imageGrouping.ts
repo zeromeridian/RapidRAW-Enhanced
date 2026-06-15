@@ -22,11 +22,12 @@ export interface GroupingResult {
  * group, return a collapsed display list. Virtual copies stay visible
  * (never collapsed).
  */
-export function buildImageGroups(images: ImageFile[], preference: GroupPreference): GroupingResult {
+export function buildImageGroups(images: ImageFile[], preference: GroupPreference, groupEditedFiles = true): GroupingResult {
   const buckets = new Map<GroupId, { files: ImageFile[]; vcs: ImageFile[] }>();
 
   for (const image of images) {
     if (!image.group_id) continue;
+    if (!groupEditedFiles && image.is_edited) continue;
 
     let bucket = buckets.get(image.group_id);
     if (!bucket) {

@@ -229,6 +229,7 @@ export interface AppSettings {
   libraryDisplayMode?: LibraryDisplayMode;
   grouping?: GroupingMode;
   requireMatchingExif?: boolean;
+  groupEditedFiles?: boolean;
   /** Legacy: read for migration, never written back. */
   groupPreferredType?: GroupPreference;
 }
