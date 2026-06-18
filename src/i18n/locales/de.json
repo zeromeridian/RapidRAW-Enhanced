@@ -680,7 +680,8 @@
         "preset": "Vorgabe",
         "style": "Stil",
         "tool": "Werkzeug"
-      }
+      },
+      "amount": "Stärke"
     },
     "switcher": {
       "tooltips": {

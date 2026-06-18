@@ -680,7 +680,8 @@
         "preset": "Predefinito",
         "style": "Stile",
         "tool": "Strumento"
-      }
+      },
+      "amount": "Quantità"
     },
     "switcher": {
       "tooltips": {

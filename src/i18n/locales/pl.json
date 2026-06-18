@@ -718,7 +718,8 @@
         "preset": "Preset",
         "style": "Styl",
         "tool": "Narzędzie"
-      }
+      },
+      "amount": "Siła"
     },
     "switcher": {
       "tooltips": {

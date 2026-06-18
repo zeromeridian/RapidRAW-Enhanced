@@ -680,7 +680,8 @@
         "preset": "Predefinição",
         "style": "Estilo",
         "tool": "Ferramenta"
-      }
+      },
+      "amount": "Intensidade"
     },
     "switcher": {
       "tooltips": {

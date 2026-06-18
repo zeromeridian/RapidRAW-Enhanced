@@ -680,7 +680,8 @@
         "preset": "預設",
         "style": "風格",
         "tool": "工具"
-      }
+      },
+      "amount": "數量"
     },
     "switcher": {
       "tooltips": {

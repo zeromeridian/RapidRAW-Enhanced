@@ -680,7 +680,8 @@
         "preset": "Preset",
         "style": "Style",
         "tool": "Tool"
-      }
+      },
+      "amount": "Amount"
     },
     "switcher": {
       "tooltips": {

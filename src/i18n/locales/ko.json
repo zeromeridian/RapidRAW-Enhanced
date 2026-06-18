@@ -680,7 +680,8 @@
         "preset": "프리셋",
         "style": "스타일",
         "tool": "도구"
-      }
+      },
+      "amount": "양"
     },
     "switcher": {
       "tooltips": {

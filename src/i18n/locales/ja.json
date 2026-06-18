@@ -680,7 +680,8 @@
         "preset": "プリセット",
         "style": "スタイル",
         "tool": "ツール"
-      }
+      },
+      "amount": "適用量"
     },
     "switcher": {
       "tooltips": {
