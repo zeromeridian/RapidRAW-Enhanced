@@ -1066,6 +1066,7 @@
         "exposureToneMapper": "曝光與色調映射",
         "grain": "顆粒",
         "halationGlow": "光暈與發光",
+        "hueShift": "全域色相偏移",
         "lensCorrection": "鏡頭校正",
         "lut": "LUT",
         "masks": "遮色片",

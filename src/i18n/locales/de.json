@@ -1066,6 +1066,7 @@
         "exposureToneMapper": "Belichtung & Tonemapper",
         "grain": "Körnung",
         "halationGlow": "Lichthof & Glühen",
+        "hueShift": "Globaler Farbton-Shift",
         "lensCorrection": "Objektivkorrektur",
         "lut": "LUT",
         "masks": "Masken",

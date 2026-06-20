@@ -1110,6 +1110,7 @@
         "exposureToneMapper": "Ekspozycja i Mapowanie tonów",
         "grain": "Ziarno",
         "halationGlow": "Halacja i Poświata",
+        "hueShift": "Globalne przesunięcie odcienia",
         "lensCorrection": "Korekcja obiektywu",
         "lut": "LUT",
         "masks": "Maski",

@@ -1066,6 +1066,7 @@
         "exposureToneMapper": "Esposizione e Tone Mapper",
         "grain": "Grana",
         "halationGlow": "Alonatura e Bagliore",
+        "hueShift": "Spostamento tonalità globale",
         "lensCorrection": "Correzione Obiettivo",
         "lut": "LUT",
         "masks": "Maschere",

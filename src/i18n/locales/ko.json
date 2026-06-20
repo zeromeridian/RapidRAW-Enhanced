@@ -1066,6 +1066,7 @@
         "exposureToneMapper": "노출 및 톤 매퍼",
         "grain": "그레인",
         "halationGlow": "헐레이션 및 글로우",
+        "hueShift": "글로벌 색조 시프트",
         "lensCorrection": "렌즈 보정",
         "lut": "LUT",
         "masks": "마스크",

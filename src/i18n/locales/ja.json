@@ -1065,6 +1065,7 @@
         "exposureToneMapper": "露光量とトーンマッパー",
         "grain": "粒子",
         "halationGlow": "ハレーションとグロー",
+        "hueShift": "グローバル色相シフト",
         "lensCorrection": "レンズ補正",
         "lut": "LUT",
         "masks": "マスク",

@@ -1066,6 +1066,7 @@
         "exposureToneMapper": "Exposure & Tone Mapper",
         "grain": "Grain",
         "halationGlow": "Halation & Glow",
+        "hueShift": "Global Hue Shift",
         "lensCorrection": "Lens Correction",
         "lut": "LUT",
         "masks": "Masks",
