@@ -264,7 +264,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
     ) => {
       const { appSettings, handleSettingsChange } = useSettingsStore.getState();
       const { pinnedFolders } = appSettings || { pinnedFolders: [] };
-      const { setLibrary, sortCriteria, rootPaths, expandedFolders } = useLibraryStore.getState();
+      const { setLibrary, sortCriteria } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
       const { setProcess } = useProcessStore.getState();
       const { selectedImage, resetHistory, setEditor } = useEditorStore.getState();
@@ -283,7 +283,8 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       }
 
       try {
-        let newExpandedFolders = new Set(expandedFolders);
+        const { rootPaths, expandedFolders: currentExpandedFolders } = useLibraryStore.getState();
+        let newExpandedFolders = new Set(currentExpandedFolders);
 
         if (isNewRoot && path) {
           newExpandedFolders = new Set([path]);
