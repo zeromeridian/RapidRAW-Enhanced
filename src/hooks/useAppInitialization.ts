@@ -38,7 +38,6 @@ const getDefaultLanguage = (i18nInstance: any): string => {
       ? i18nInstance.options.fallbackLng
       : i18nInstance.options.fallbackLng?.[0] || 'en';
 
-  // Check full locale first (e.g., 'zh-CN'), then short code (e.g., 'zh')
   return supportedLanguages.includes(browserLang)
     ? browserLang
     : supportedLanguages.includes(shortLang)
@@ -120,6 +119,7 @@ export const useAppInitialization = ({
   const isAndroid = osPlatform === 'android';
   const defaultThumbnailSize = isAndroid ? ThumbnailSize.Small : ThumbnailSize.Medium;
   const defaultLibraryViewMode = isAndroid ? LibraryViewMode.Recursive : LibraryViewMode.Flat;
+  const prevImageCountsNeed = useRef<boolean | undefined>(undefined);
 
   useEffect(() => {
     initPlatform();
@@ -333,6 +333,73 @@ export const useAppInitialization = ({
       });
     }
   }, [currentFolderPath, expandedFolders, activeAlbumId, expandedAlbumGroups, appSettings, handleSettingsChange]);
+
+  useEffect(() => {
+    if (!appSettings) return;
+
+    const needsImageCounts = Boolean(
+      appSettings.enableFolderImageCounts || appSettings.folderTreeSort?.key === 'imageCount',
+    );
+
+    if (prevImageCountsNeed.current === undefined) {
+      prevImageCountsNeed.current = needsImageCounts;
+      return;
+    }
+
+    if (prevImageCountsNeed.current !== needsImageCounts) {
+      prevImageCountsNeed.current = needsImageCounts;
+
+      const rootFolders = appSettings.rootFolders?.length
+        ? appSettings.rootFolders
+        : appSettings.lastRootPath
+          ? [appSettings.lastRootPath]
+          : [];
+      const pinnedFolders = appSettings.pinnedFolders || [];
+
+      const currentExpanded = Array.from(useLibraryStore.getState().expandedFolders);
+
+      setLibrary({ isTreeLoading: true });
+
+      const promises = [];
+
+      if (pinnedFolders.length > 0) {
+        promises.push(
+          invoke(Invokes.GetPinnedFolderTrees, {
+            paths: pinnedFolders,
+            expandedFolders: currentExpanded,
+            showImageCounts: needsImageCounts,
+          }).then((trees: any) => ({ type: 'pinned', trees })),
+        );
+      }
+
+      if (rootFolders.length > 0) {
+        promises.push(
+          invoke(Invokes.GetPinnedFolderTrees, {
+            paths: rootFolders,
+            expandedFolders: currentExpanded,
+            showImageCounts: needsImageCounts,
+          }).then((trees: any) => ({ type: 'root', trees })),
+        );
+      }
+
+      Promise.all(promises)
+        .then((results) => {
+          useLibraryStore.getState().setLibrary((_state) => {
+            const updates: any = { isTreeLoading: false };
+            results.forEach((res) => {
+              if (res.type === 'pinned') updates.pinnedFolderTrees = res.trees;
+              if (res.type === 'root') updates.folderTrees = res.trees;
+            });
+            return updates;
+          });
+        })
+        .catch((err) => {
+          console.error('Failed to re-fetch trees for image counts:', err);
+          setLibrary({ isTreeLoading: false });
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appSettings?.enableFolderImageCounts, appSettings?.folderTreeSort?.key]);
 
   useEffect(() => {
     const root = document.documentElement;

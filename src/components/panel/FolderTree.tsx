@@ -302,6 +302,16 @@ function SectionHeader({ title, isOpen, onToggle }: { title: string; isOpen: boo
   );
 }
 
+const getAlbumImageCount = (item: any): number => {
+  if (item.type === 'album' && item.images) {
+    return item.images.length;
+  }
+  if (item.type === 'group' && item.children) {
+    return item.children.reduce((sum: number, child: any) => sum + getAlbumImageCount(child), 0);
+  }
+  return 0;
+};
+
 function AlbumTreeNode({
   item,
   expandedGroups,
@@ -309,6 +319,7 @@ function AlbumTreeNode({
   onSelectAlbum,
   onContextMenu,
   selectedAlbumId,
+  showImageCounts,
 }: {
   item: AlbumItem;
   expandedGroups: Set<string>;
@@ -316,10 +327,12 @@ function AlbumTreeNode({
   onSelectAlbum: (id: string, name: string, images: string[]) => void;
   onContextMenu: (e: any, item: AlbumItem) => void;
   selectedAlbumId: string | null;
+  showImageCounts: boolean;
 }) {
   const isGroup = item.type === 'group';
   const isExpanded = expandedGroups.has(item.id);
   const isSelected = item.id === selectedAlbumId;
+  const imageCount = getAlbumImageCount(item);
 
   let ItemIcon = isGroup ? (isExpanded ? FolderOpen : Folder) : AlbumIcon;
   if (item.icon && ALBUM_ICONS[item.icon]) {
@@ -351,9 +364,24 @@ function AlbumTreeNode({
             </motion.div>
           </AnimatePresence>
         </div>
+
         <span onDoubleClick={() => isGroup && onToggle(item.id)} className="truncate flex-1 select-none">
-          {item.name}
+          <span className="truncate">{item.name}</span>
+          {imageCount > 0 && (
+            <Text
+              as="span"
+              variant={TextVariants.small}
+              color={TextColors.secondary}
+              className={clsx(
+                'inline-block ml-1 transition-all ease-in-out duration-300',
+                showImageCounts ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2',
+              )}
+            >
+              ({imageCount})
+            </Text>
+          )}
         </span>
+
         {isGroup && (
           <div
             className="text-text-secondary p-0.5 rounded-sm hover:bg-surface/50"
@@ -392,6 +420,7 @@ function AlbumTreeNode({
                       onSelectAlbum={onSelectAlbum}
                       onContextMenu={onContextMenu}
                       selectedAlbumId={selectedAlbumId}
+                      showImageCounts={showImageCounts}
                     />
                   </motion.div>
                 ))}
@@ -611,45 +640,6 @@ export default function FolderTree({
   useEffect(() => {
     invoke(Invokes.GetAlbums).then((res: any) => useLibraryStore.getState().setLibrary({ albumTree: res }));
   }, []);
-
-  useEffect(() => {
-    if (appSettings && folderTreeSort.key === 'imageCount' && !appSettings.enableFolderImageCounts) {
-      useLibraryStore.getState().setLibrary({ isTreeLoading: true });
-
-      const rootFolders = appSettings.rootFolders?.length
-        ? appSettings.rootFolders
-        : appSettings.lastRootPath
-          ? [appSettings.lastRootPath]
-          : [];
-      const pinned = appSettings.pinnedFolders || [];
-      const expandedArr = Array.from(expandedFolders);
-      const promises = [];
-
-      if (pinned.length > 0) {
-        promises.push(
-          invoke(Invokes.GetPinnedFolderTrees, {
-            paths: pinned,
-            expandedFolders: expandedArr,
-            showImageCounts: true,
-          }).then((trees: any) => useLibraryStore.getState().setLibrary({ pinnedFolderTrees: trees })),
-        );
-      }
-
-      if (rootFolders.length > 0) {
-        promises.push(
-          invoke(Invokes.GetPinnedFolderTrees, {
-            paths: rootFolders,
-            expandedFolders: expandedArr,
-            showImageCounts: true,
-          }).then((trees: any) => useLibraryStore.getState().setLibrary({ folderTrees: trees })),
-        );
-      }
-
-      Promise.all(promises).finally(() => {
-        useLibraryStore.getState().setLibrary({ isTreeLoading: false });
-      });
-    }
-  }, [folderTreeSort.key, appSettings?.enableFolderImageCounts]);
 
   const toggleSection = (section: string) => {
     if (appSettings) {
@@ -961,6 +951,7 @@ export default function FolderTree({
                                 onSelectAlbum={onSelectAlbum}
                                 onContextMenu={onAlbumContextMenu}
                                 selectedAlbumId={activeAlbumId}
+                                showImageCounts={showImageCounts && isHovering}
                               />
                             </motion.div>
                           ))}
