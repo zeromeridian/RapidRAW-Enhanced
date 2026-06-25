@@ -858,10 +858,17 @@
         "folders": "フォルダ",
         "pinned": "ピン留め"
       },
+      "sort": {
+        "created": "作成日",
+        "imageCount": "画像数",
+        "modified": "更新日",
+        "name": "アルファベット順"
+      },
       "tooltips": {
         "clearSearch": "検索をクリア",
         "collapse": "折りたたむ",
-        "expand": "展開"
+        "expand": "展開",
+        "sortFolders": "フォルダーを並べ替え"
       }
     },
     "grid": {

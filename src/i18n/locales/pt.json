@@ -859,10 +859,17 @@
         "folders": "Pastas",
         "pinned": "Fixados"
       },
+      "sort": {
+        "created": "Data de criação",
+        "imageCount": "Contagem de imagens",
+        "modified": "Data de modificação",
+        "name": "Alfabeticamente"
+      },
       "tooltips": {
         "clearSearch": "Limpar pesquisa",
         "collapse": "Recolher",
-        "expand": "Expandir"
+        "expand": "Expandir",
+        "sortFolders": "Ordenar pastas"
       }
     },
     "grid": {

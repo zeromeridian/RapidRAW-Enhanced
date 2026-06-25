@@ -859,10 +859,17 @@
         "folders": "Cartelle",
         "pinned": "Fissate"
       },
+      "sort": {
+        "created": "Data di creazione",
+        "imageCount": "Conteggio immagini",
+        "modified": "Data di modifica",
+        "name": "In ordine alfabetico"
+      },
       "tooltips": {
         "clearSearch": "Cancella ricerca",
         "collapse": "Comprimi",
-        "expand": "Espandi"
+        "expand": "Espandi",
+        "sortFolders": "Ordina cartelle"
       }
     },
     "grid": {

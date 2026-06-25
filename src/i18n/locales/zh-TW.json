@@ -859,10 +859,17 @@
         "folders": "資料夾",
         "pinned": "已固定"
       },
+      "sort": {
+        "created": "建立日期",
+        "imageCount": "影像數量",
+        "modified": "修改日期",
+        "name": "按字母順序"
+      },
       "tooltips": {
         "clearSearch": "清除搜尋",
         "collapse": "摺疊",
-        "expand": "展開"
+        "expand": "展開",
+        "sortFolders": "對資料夾排序"
       }
     },
     "grid": {

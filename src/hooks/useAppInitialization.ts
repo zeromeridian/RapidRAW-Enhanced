@@ -42,8 +42,8 @@ const getDefaultLanguage = (i18nInstance: any): string => {
   return supportedLanguages.includes(browserLang)
     ? browserLang
     : supportedLanguages.includes(shortLang)
-    ? shortLang
-    : fallbackLang;
+      ? shortLang
+      : fallbackLang;
 };
 
 export const useAppInitialization = ({
@@ -180,7 +180,7 @@ export const useAppInitialization = ({
             const trees = await invoke(Invokes.GetPinnedFolderTrees, {
               paths: settings.pinnedFolders,
               expandedFolders: settings.lastFolderState?.expandedFolders || [],
-              showImageCounts: settings.enableFolderImageCounts ?? false,
+              showImageCounts: settings.enableFolderImageCounts || settings.folderTreeSort?.key === 'imageCount',
             });
             setLibrary({ pinnedFolderTrees: trees });
           } catch (err) {
@@ -208,7 +208,7 @@ export const useAppInitialization = ({
             trees: invoke(Invokes.GetPinnedFolderTrees, {
               paths: rootFolders,
               expandedFolders: settings.lastFolderState?.expandedFolders ?? rootFolders,
-              showImageCounts: settings.enableFolderImageCounts ?? false,
+              showImageCounts: settings.enableFolderImageCounts || settings.folderTreeSort?.key === 'imageCount',
             }),
             images: isAlbum ? undefined : invoke(command, { path: currentPath }),
           };

@@ -859,10 +859,17 @@
         "folders": "Ordner",
         "pinned": "Angeheftet"
       },
+      "sort": {
+        "created": "Erstellungsdatum",
+        "imageCount": "Bildanzahl",
+        "modified": "Änderungsdatum",
+        "name": "Alphabetisch"
+      },
       "tooltips": {
         "clearSearch": "Suche löschen",
         "collapse": "Zuklappen",
-        "expand": "Aufklappen"
+        "expand": "Aufklappen",
+        "sortFolders": "Ordner sortieren"
       }
     },
     "grid": {

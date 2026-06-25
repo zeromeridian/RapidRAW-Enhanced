@@ -859,10 +859,17 @@
         "folders": "Folders",
         "pinned": "Pinned"
       },
+      "sort": {
+        "created": "Date Created",
+        "imageCount": "Image Count",
+        "modified": "Date Modified",
+        "name": "Alphabetically"
+      },
       "tooltips": {
         "clearSearch": "Clear search",
         "collapse": "Collapse",
-        "expand": "Expand"
+        "expand": "Expand",
+        "sortFolders": "Sort Folders"
       }
     },
     "grid": {

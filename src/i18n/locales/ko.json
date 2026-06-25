@@ -859,10 +859,17 @@
         "folders": "폴더",
         "pinned": "고정됨"
       },
+      "sort": {
+        "created": "생성일",
+        "imageCount": "이미지 수",
+        "modified": "수정일",
+        "name": "알파벳순"
+      },
       "tooltips": {
         "clearSearch": "검색 지우기",
         "collapse": "접기",
-        "expand": "펼치기"
+        "expand": "펼치기",
+        "sortFolders": "폴더 정렬"
       }
     },
     "grid": {

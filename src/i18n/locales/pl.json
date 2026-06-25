@@ -901,10 +901,17 @@
         "folders": "Foldery",
         "pinned": "Przypięte"
       },
+      "sort": {
+        "created": "Data utworzenia",
+        "imageCount": "Liczba obrazów",
+        "modified": "Data modyfikacji",
+        "name": "Alfabetycznie"
+      },
       "tooltips": {
         "clearSearch": "Wyczyść wyszukiwanie",
         "collapse": "Zwiń",
-        "expand": "Rozwiń"
+        "expand": "Rozwiń",
+        "sortFolders": "Sortuj foldery"
       }
     },
     "grid": {
