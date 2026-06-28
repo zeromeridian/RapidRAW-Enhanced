@@ -1188,6 +1188,112 @@ fn generate_preset_preview(
     Ok(Response::new(buf.into_inner()))
 }
 
+#[derive(Serialize)]
+struct LutPreview {
+    path: String,
+    thumb: Option<String>,
+}
+
+#[tauri::command]
+fn list_luts(app_handle: tauri::AppHandle) -> Result<Vec<lut_processing::LutEntry>, String> {
+    let data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let luts_dir = lut_processing::get_luts_dir(&data_dir).map_err(|e| e.to_string())?;
+    lut_processing::list_luts_in_dir(&luts_dir).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn import_luts(
+    app_handle: tauri::AppHandle,
+    source_paths: Vec<String>,
+) -> Result<Vec<lut_processing::LutEntry>, String> {
+    let data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let luts_dir = lut_processing::get_luts_dir(&data_dir).map_err(|e| e.to_string())?;
+    lut_processing::import_luts_to_dir(&luts_dir, &source_paths).map_err(|e| e.to_string())
+}
+
+fn render_lut_swatch(
+    context: &crate::image_processing::GpuContext,
+    state: &tauri::State<AppState>,
+    base_image: &DynamicImage,
+    transform_hash: u64,
+    adjustments: crate::image_processing::AllAdjustments,
+    lut_path: &str,
+) -> Option<String> {
+    let lut = get_or_load_lut(state, lut_path).ok()?;
+    let processed = process_and_get_dynamic_image(
+        context,
+        state,
+        base_image,
+        transform_hash,
+        RenderRequest {
+            adjustments,
+            mask_bitmaps: &[],
+            lut: Some(lut),
+            roi: None,
+        },
+        "generate_lut_previews",
+    )
+    .ok()?;
+
+    let rgb = processed.to_rgb8();
+    let (width, height) = rgb.dimensions();
+    let bytes = Encoder::new(Preset::BaselineFastest)
+        .quality(80)
+        .encode_rgb(&rgb.into_vec(), width, height)
+        .ok()?;
+    Some(format!(
+        "data:image/jpeg;base64,{}",
+        general_purpose::STANDARD.encode(&bytes)
+    ))
+}
+
+#[tauri::command]
+fn generate_lut_previews(
+    lut_paths: Vec<String>,
+    size: u32,
+    state: tauri::State<AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<LutPreview>, String> {
+    let context = get_or_init_gpu_context(&state, &app_handle)?;
+    let loaded_image = state
+        .original_image
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or("No original image loaded for LUT previews")?;
+    let is_raw = loaded_image.is_raw;
+
+    let base_json = serde_json::json!({});
+    let (base_image, _scale, _offset) =
+        generate_transformed_preview(&state, &loaded_image, &base_json, size)?;
+
+    let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
+    let lut_json = serde_json::json!({
+        "lutPath": "preview",
+        "lutIntensity": 100,
+        "sectionVisibility": { "effects": true }
+    });
+    let adjustments = get_all_adjustments_from_json(&lut_json, is_raw, tm_override);
+    let transform_hash = calculate_transform_hash(&base_json);
+
+    let previews = lut_paths
+        .into_iter()
+        .map(|path| {
+            let thumb = render_lut_swatch(
+                &context,
+                &state,
+                &base_image,
+                transform_hash,
+                adjustments,
+                &path,
+            );
+            LutPreview { path, thumb }
+        })
+        .collect();
+
+    Ok(previews)
+}
+
 #[tauri::command]
 async fn fetch_community_presets() -> Result<Vec<CommunityPreset>, String> {
     let client = reqwest::Client::new();
@@ -2232,6 +2338,9 @@ pub fn run() {
             merge_hdr,
             save_hdr,
             load_and_parse_lut,
+            list_luts,
+            import_luts,
+            generate_lut_previews,
             fetch_community_presets,
             generate_all_community_previews,
             save_temp_file,
