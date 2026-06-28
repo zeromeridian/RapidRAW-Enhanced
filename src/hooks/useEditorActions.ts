@@ -104,6 +104,24 @@ export function useEditorActions() {
     [setAdjustments],
   );
 
+  const setLutPreviewOverride = useCallback(
+    (path: string | null) => {
+      setEditor((state) => {
+        if (!path) return { previewOverride: null };
+        const name = path.split(/[\\/]/).pop() || 'LUT';
+        return {
+          previewOverride: {
+            ...state.adjustments,
+            lutPath: path,
+            lutName: name,
+            lutIntensity: state.adjustments.lutIntensity,
+          },
+        };
+      });
+    },
+    [setEditor],
+  );
+
   const handleResetAdjustments = useCallback(
     (paths?: string[]) => {
       const { multiSelectedPaths, libraryActivePath, setLibrary } = useLibraryStore.getState();
@@ -269,6 +287,7 @@ export function useEditorActions() {
     handleRotate,
     handleAutoAdjustments,
     handleLutSelect,
+    setLutPreviewOverride,
     handleResetAdjustments,
     handleCopyAdjustments,
     handlePasteAdjustments,

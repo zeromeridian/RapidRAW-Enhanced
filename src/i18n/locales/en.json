@@ -1731,7 +1731,10 @@
     },
     "lut": {
       "clearLut": "Clear LUT",
+      "empty": "No LUTs yet — import some",
       "filterLabel": "LUT Files",
+      "import": "Import profiles",
+      "importFailed": "Failed to import LUTs",
       "intensity": "Intensity",
       "label": "LUT",
       "select": "Select",

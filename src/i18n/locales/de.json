@@ -1731,7 +1731,10 @@
     },
     "lut": {
       "clearLut": "LUT löschen",
+      "empty": "Noch keine LUTs — importiere welche",
       "filterLabel": "LUT-Dateien",
+      "import": "Profile importieren",
+      "importFailed": "LUTs konnten nicht importiert werden",
       "intensity": "Intensität",
       "label": "LUT",
       "select": "Auswählen",
