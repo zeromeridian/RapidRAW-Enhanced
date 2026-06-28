@@ -240,15 +240,7 @@ pub async fn update_exif_fields(
         paths.par_iter().for_each(|path| {
             let original_path = Path::new(&path);
             let primary_path = crate::exif_processing::get_primary_sidecar_path(original_path);
-
-            let temp_metadata: ImageMetadata = if primary_path.exists() {
-                fs::read_to_string(&primary_path)
-                    .ok()
-                    .and_then(|c| serde_json::from_str(&c).ok())
-                    .unwrap_or_default()
-            } else {
-                ImageMetadata::default()
-            };
+            let temp_metadata = crate::exif_processing::load_sidecar(&primary_path);
 
             let mut exif_data = temp_metadata.exif.unwrap_or_else(|| {
                 if let Some(existing) = crate::exif_processing::read_rrexif_sidecar(original_path) {
@@ -271,14 +263,7 @@ pub async fn update_exif_fields(
                 }
             }
 
-            let mut final_metadata: ImageMetadata = if primary_path.exists() {
-                fs::read_to_string(&primary_path)
-                    .ok()
-                    .and_then(|c| serde_json::from_str(&c).ok())
-                    .unwrap_or_default()
-            } else {
-                ImageMetadata::default()
-            };
+            let mut final_metadata = crate::exif_processing::load_sidecar(&primary_path);
 
             final_metadata.exif = Some(exif_data);
             if let Ok(json) = serde_json::to_string_pretty(&final_metadata) {
@@ -367,15 +352,7 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
                 let sidecar_path = path_buf.with_file_name(sidecar_filename);
 
                 let (is_edited, tags, rating) = {
-                    let mut metadata = if sidecar_path.exists() {
-                        if let Ok(content) = fs::read_to_string(&sidecar_path) {
-                            serde_json::from_str::<ImageMetadata>(&content).unwrap_or_default()
-                        } else {
-                            ImageMetadata::default()
-                        }
-                    } else {
-                        ImageMetadata::default()
-                    };
+                    let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
                     if enable_xmp_sync
                         && sync_metadata_from_xmp(&path_buf, &mut metadata)
@@ -498,15 +475,7 @@ pub fn list_images_recursive(
                 let sidecar_path = path_buf.with_file_name(sidecar_filename);
 
                 let (is_edited, tags, rating) = {
-                    let mut metadata = if sidecar_path.exists() {
-                        if let Ok(content) = fs::read_to_string(&sidecar_path) {
-                            serde_json::from_str::<ImageMetadata>(&content).unwrap_or_default()
-                        } else {
-                            ImageMetadata::default()
-                        }
-                    } else {
-                        ImageMetadata::default()
-                    };
+                    let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
                     if enable_xmp_sync
                         && sync_metadata_from_xmp(&path_buf, &mut metadata)
@@ -770,15 +739,7 @@ pub fn get_album_images(
             let is_virtual_copy = virtual_path.contains("?vc=");
 
             let (is_edited, tags, rating) = {
-                let mut metadata = if sidecar_path.exists() {
-                    if let Ok(content) = fs::read_to_string(&sidecar_path) {
-                        serde_json::from_str::<ImageMetadata>(&content).unwrap_or_default()
-                    } else {
-                        ImageMetadata::default()
-                    }
-                } else {
-                    ImageMetadata::default()
-                };
+                let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
                 if enable_xmp_sync
                     && sync_metadata_from_xmp(&source_path, &mut metadata)
@@ -822,6 +783,8 @@ pub struct FolderNode {
     pub is_dir: bool,
     pub image_count: usize,
     pub has_subdirs: bool,
+    pub modified: u64,
+    pub created: u64,
 }
 
 fn has_subdirs(path: &Path) -> bool {
@@ -859,8 +822,24 @@ fn scan_dir_lazy(
 
     for entry in entries.filter_map(Result::ok) {
         let current_path = entry.path();
-        let file_type = match entry.file_type() {
-            Ok(ft) => ft,
+        let (file_type, modified, created) = match entry.metadata() {
+            Ok(meta) => {
+                let ft = meta.file_type();
+                let mod_time = meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                let cre_time = meta.created().unwrap_or(mod_time);
+
+                (
+                    ft,
+                    mod_time
+                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                    cre_time
+                        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                )
+            }
             Err(_) => continue,
         };
 
@@ -917,6 +896,8 @@ fn scan_dir_lazy(
                 is_dir: true,
                 image_count: total_child_count,
                 has_subdirs: has_any_subdirs,
+                modified,
+                created,
             });
         } else if show_image_counts
             && file_type.is_file()
@@ -940,6 +921,24 @@ fn get_folder_tree_sync(
     if !root_path.is_dir() {
         return Err(format!("Directory does not exist: {}", path));
     }
+
+    let (modified, created) = root_path
+        .metadata()
+        .map(|m| {
+            let mod_time = m.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            let cre_time = m.created().unwrap_or(mod_time);
+            (
+                mod_time
+                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs(),
+                cre_time
+                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs(),
+            )
+        })
+        .unwrap_or((0, 0));
 
     let expanded_set: HashSet<&str> = expanded_folders.iter().map(|s| s.as_str()).collect();
 
@@ -968,6 +967,8 @@ fn get_folder_tree_sync(
         is_dir: true,
         image_count: own_count + children_sum,
         has_subdirs,
+        modified,
+        created,
     })
 }
 
@@ -2059,14 +2060,7 @@ pub fn save_metadata_and_update_thumbnail(
 ) -> Result<(), String> {
     let (source_path, sidecar_path) = parse_virtual_path(&path);
 
-    let mut metadata: ImageMetadata = if sidecar_path.exists() {
-        fs::read_to_string(&sidecar_path)
-            .ok()
-            .and_then(|content| serde_json::from_str(&content).ok())
-            .unwrap_or_default()
-    } else {
-        ImageMetadata::default()
-    };
+    let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
     let mut final_adjustments = adjustments;
     {
@@ -2173,14 +2167,7 @@ pub async fn apply_adjustments_to_paths(
         paths.par_iter().for_each(|path| {
             let (_, sidecar_path) = parse_virtual_path(path);
 
-            let mut existing_metadata: ImageMetadata = if sidecar_path.exists() {
-                fs::read_to_string(&sidecar_path)
-                    .ok()
-                    .and_then(|content| serde_json::from_str(&content).ok())
-                    .unwrap_or_default()
-            } else {
-                ImageMetadata::default()
-            };
+            let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
             let mut new_adjustments = existing_metadata.adjustments;
             if new_adjustments.is_null() {
@@ -2271,14 +2258,7 @@ pub async fn reset_adjustments_for_paths(
         paths.par_iter().for_each(|path| {
             let (_, sidecar_path) = parse_virtual_path(path);
 
-            let mut existing_metadata: ImageMetadata = if sidecar_path.exists() {
-                fs::read_to_string(&sidecar_path)
-                    .ok()
-                    .and_then(|content| serde_json::from_str(&content).ok())
-                    .unwrap_or_default()
-            } else {
-                ImageMetadata::default()
-            };
+            let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
             existing_metadata.adjustments = serde_json::json!({});
 
@@ -2382,14 +2362,7 @@ pub async fn apply_auto_adjustments_to_paths(
                 let auto_results = perform_auto_analysis(&image);
                 let auto_adjustments_json = auto_results_to_json(&auto_results);
 
-                let mut existing_metadata: ImageMetadata = if sidecar_path.exists() {
-                    fs::read_to_string(&sidecar_path)
-                        .ok()
-                        .and_then(|content| serde_json::from_str(&content).ok())
-                        .unwrap_or_default()
-                } else {
-                    ImageMetadata::default()
-                };
+                let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
                 if existing_metadata.adjustments.is_null() {
                     existing_metadata.adjustments = serde_json::json!({});
@@ -2467,14 +2440,7 @@ pub fn set_color_label_for_paths(
     paths.par_iter().for_each(|path| {
         let (_, sidecar_path) = parse_virtual_path(path);
 
-        let mut metadata: ImageMetadata = if sidecar_path.exists() {
-            fs::read_to_string(&sidecar_path)
-                .ok()
-                .and_then(|content| serde_json::from_str(&content).ok())
-                .unwrap_or_default()
-        } else {
-            ImageMetadata::default()
-        };
+        let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
         let mut tags = metadata.tags.unwrap_or_default();
         tags.retain(|tag| !tag.starts_with(COLOR_TAG_PREFIX));
@@ -2517,14 +2483,7 @@ pub fn set_rating_for_paths(
     paths.par_iter().for_each(|path| {
         let (_, sidecar_path) = parse_virtual_path(path);
 
-        let mut metadata: ImageMetadata = if sidecar_path.exists() {
-            fs::read_to_string(&sidecar_path)
-                .ok()
-                .and_then(|content| serde_json::from_str(&content).ok())
-                .unwrap_or_default()
-        } else {
-            ImageMetadata::default()
-        };
+        let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
         metadata.rating = rating;
 
@@ -2547,12 +2506,7 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
     let (source_path, sidecar_path) = parse_virtual_path(&path);
-    let mut metadata: ImageMetadata = if sidecar_path.exists() {
-        let file_content = fs::read_to_string(&sidecar_path).map_err(|e| e.to_string())?;
-        serde_json::from_str(&file_content).unwrap_or_default()
-    } else {
-        ImageMetadata::default()
-    };
+    let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
     if enable_xmp_sync
         && sync_metadata_from_xmp(&source_path, &mut metadata)

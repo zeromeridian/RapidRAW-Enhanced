@@ -138,6 +138,13 @@ export enum SortDirection {
   Descending = 'desc',
 }
 
+export type FolderSortKey = 'name' | 'modified' | 'created' | 'imageCount';
+
+export interface FolderTreeSort {
+  key: FolderSortKey;
+  order: SortDirection;
+}
+
 export enum Theme {
   Arctic = 'arctic',
   Blue = 'blue',
@@ -202,6 +209,7 @@ export interface AppSettings {
   folderIcons?: Record<string, string>;
   exifOverlay?: ExifOverlay;
   language?: string;
+  folderTreeSort?: FolderTreeSort;
 }
 
 export interface BrushSettings {
@@ -215,11 +223,13 @@ export enum LibraryViewMode {
   Recursive = 'recursive',
 }
 
-export enum EditedStatus {
-  All = 'all',
-  EditedOnly = 'editedOnly',
-  UneditedOnly = 'uneditedOnly',
-}
+export const EditedStatus = {
+  All: 'all',
+  EditedOnly: 'editedOnly',
+  UneditedOnly: 'uneditedOnly',
+} as const;
+
+export type EditedStatus = (typeof EditedStatus)[keyof typeof EditedStatus];
 
 export interface FilterCriteria {
   colors: Array<string>;
