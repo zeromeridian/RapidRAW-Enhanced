@@ -7,16 +7,92 @@ use crate::android_integration::{
 use anyhow::Context;
 use anyhow::{Result, anyhow};
 use image::{DynamicImage, GenericImageView, Rgb, Rgb32FImage};
-#[cfg(target_os = "android")]
+use serde::Serialize;
 use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct Lut {
     pub size: u32,
     pub data: Vec<f32>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LutEntry {
+    pub name: String,
+    pub path: String,
+}
+
+pub fn get_luts_dir(app_data_dir: &Path) -> Result<PathBuf> {
+    let luts_dir = app_data_dir.join("luts");
+    if !luts_dir.exists() {
+        std::fs::create_dir_all(&luts_dir)?;
+    }
+    Ok(luts_dir)
+}
+
+pub fn list_luts_in_dir(dir: &Path) -> Result<Vec<LutEntry>> {
+    let mut entries: Vec<LutEntry> = Vec::new();
+    if !dir.exists() {
+        return Ok(entries);
+    }
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        let extension = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        if extension == "cube" || extension == "3dl" {
+            let name = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("LUT")
+                .to_string();
+            entries.push(LutEntry {
+                name,
+                path: path.to_string_lossy().into_owned(),
+            });
+        }
+    }
+    entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(entries)
+}
+
+fn unique_lut_destination(dir: &Path, stem: &str, extension: &str) -> PathBuf {
+    let mut candidate = dir.join(format!("{}.{}", stem, extension));
+    let mut suffix = 1;
+    while candidate.exists() && suffix < 1000 {
+        candidate = dir.join(format!("{} ({}).{}", stem, suffix, extension));
+        suffix += 1;
+    }
+    candidate
+}
+
+pub fn import_luts_to_dir(dir: &Path, source_paths: &[String]) -> Result<Vec<LutEntry>> {
+    for source in source_paths {
+        if let Err(error) = parse_lut_file(source) {
+            log::warn!("Skipping invalid LUT '{}': {}", source, error);
+            continue;
+        }
+        let source_path = Path::new(source);
+        let stem = source_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("LUT");
+        let extension = source_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("cube")
+            .to_lowercase();
+        let destination = unique_lut_destination(dir, stem, &extension);
+        if let Err(error) = std::fs::copy(source_path, &destination) {
+            log::error!("Failed to copy LUT '{}': {}", source, error);
+        }
+    }
+    list_luts_in_dir(dir)
 }
 
 fn parse_cube(reader: impl BufRead) -> Result<Lut> {
