@@ -8,8 +8,9 @@ use anyhow::Context;
 use anyhow::{Result, anyhow};
 use image::{DynamicImage, GenericImageView, Rgb, Rgb32FImage};
 use serde::Serialize;
+#[cfg(target_os = "android")]
 use std::fs;
-use std::fs::File;
+use std::fs::{File, copy, create_dir_all, read_dir};
 use std::io::{BufRead, BufReader, Cursor};
 use std::path::{Path, PathBuf};
 
@@ -28,7 +29,7 @@ pub struct LutEntry {
 pub fn get_luts_dir(app_data_dir: &Path) -> Result<PathBuf> {
     let luts_dir = app_data_dir.join("luts");
     if !luts_dir.exists() {
-        std::fs::create_dir_all(&luts_dir)?;
+        create_dir_all(&luts_dir)?;
     }
     Ok(luts_dir)
 }
@@ -38,7 +39,7 @@ pub fn list_luts_in_dir(dir: &Path) -> Result<Vec<LutEntry>> {
     if !dir.exists() {
         return Ok(entries);
     }
-    for entry in std::fs::read_dir(dir)? {
+    for entry in read_dir(dir)? {
         let path = entry?.path();
         let extension = path
             .extension()
@@ -88,7 +89,7 @@ pub fn import_luts_to_dir(dir: &Path, source_paths: &[String]) -> Result<Vec<Lut
             .unwrap_or("cube")
             .to_lowercase();
         let destination = unique_lut_destination(dir, stem, &extension);
-        if let Err(error) = std::fs::copy(source_path, &destination) {
+        if let Err(error) = copy(source_path, &destination) {
             log::error!("Failed to copy LUT '{}': {}", source, error);
         }
     }

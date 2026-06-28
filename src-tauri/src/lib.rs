@@ -1196,7 +1196,10 @@ struct LutPreview {
 
 #[tauri::command]
 fn list_luts(app_handle: tauri::AppHandle) -> Result<Vec<lut_processing::LutEntry>, String> {
-    let data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
     let luts_dir = lut_processing::get_luts_dir(&data_dir).map_err(|e| e.to_string())?;
     lut_processing::list_luts_in_dir(&luts_dir).map_err(|e| e.to_string())
 }
@@ -1206,7 +1209,10 @@ fn import_luts(
     app_handle: tauri::AppHandle,
     source_paths: Vec<String>,
 ) -> Result<Vec<lut_processing::LutEntry>, String> {
-    let data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
     let luts_dir = lut_processing::get_luts_dir(&data_dir).map_err(|e| e.to_string())?;
     lut_processing::import_luts_to_dir(&luts_dir, &source_paths).map_err(|e| e.to_string())
 }
