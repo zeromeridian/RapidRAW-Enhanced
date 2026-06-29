@@ -1743,9 +1743,13 @@
     },
     "lut": {
       "clearLut": "LUT 지우기",
+      "empty": "아직 LUT가 없습니다 — 가져오기를 수행하세요",
       "filterLabel": "LUT 파일",
+      "import": "프로필 가져오기",
+      "importFailed": "LUT 가져오기 실패",
       "intensity": "강도",
       "label": "LUT",
+      "removeLut": "LUT 제거",
       "select": "선택",
       "selectLutFile": "LUT 파일 선택",
       "unsupportedFormat": "지원되지 않는 파일 형식이 감지되었습니다: .{{ext}}"

@@ -1749,10 +1749,10 @@
       "importFailed": "Failed to import LUTs",
       "intensity": "Intensity",
       "label": "LUT",
+      "removeLut": "Remove LUT",
       "select": "Select",
       "selectLutFile": "Select a LUT file",
-      "unsupportedFormat": "Unsupported file format(s) detected: .{{ext}}",
-      "removeLut": "Remove LUT"
+      "unsupportedFormat": "Unsupported file format(s) detected: .{{ext}}"
     },
     "slider": {
       "clickToEdit": "Click to edit",

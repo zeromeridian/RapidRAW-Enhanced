@@ -1743,9 +1743,13 @@
     },
     "lut": {
       "clearLut": "Effacer LUT",
+      "empty": "Pas encore de LUT — importez-en",
       "filterLabel": "Fichiers LUT",
+      "import": "Importer des profils",
+      "importFailed": "Échec de l'importation des LUT",
       "intensity": "Intensité",
       "label": "LUT",
+      "removeLut": "Supprimer la LUT",
       "select": "Sélectionner",
       "selectLutFile": "Sélectionner un fichier LUT",
       "unsupportedFormat": "Format(s) de fichier non pris en charge détecté(s) : .{{ext}}"

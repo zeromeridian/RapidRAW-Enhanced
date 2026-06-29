@@ -5,88 +5,76 @@ LOCALES_DIR = Path("./locales")
 
 TRANSLATIONS = {
     "de": {
-        "name": "Alphabetisch",
-        "created": "Erstellungsdatum",
-        "modified": "Änderungsdatum",
-        "imageCount": "Bildanzahl",
-        "sortFolders": "Ordner sortieren"
+        "empty": "Noch keine LUTs — importiere welche",
+        "import": "Profile importieren",
+        "importFailed": "LUTs konnten nicht importiert werden",
+        "removeLut": "LUT entfernen"
     },
     "en": {
-        "name": "Alphabetically",
-        "created": "Date Created",
-        "modified": "Date Modified",
-        "imageCount": "Image Count",
-        "sortFolders": "Sort Folders"
+        "empty": "No LUTs yet — import some",
+        "import": "Import profiles",
+        "importFailed": "Failed to import LUTs",
+        "removeLut": "Remove LUT"
     },
     "es": {
-        "name": "Alfabéticamente",
-        "created": "Fecha de creación",
-        "modified": "Fecha de modificación",
-        "imageCount": "Recuento de imágenes",
-        "sortFolders": "Ordenar carpetas"
+        "empty": "Aún no hay LUTs — importa algunos",
+        "import": "Importar perfiles",
+        "importFailed": "Error al importar LUTs",
+        "removeLut": "Eliminar LUT"
     },
     "fr": {
-        "name": "Alphabétique",
-        "created": "Date de création",
-        "modified": "Date de modification",
-        "imageCount": "Nombre d'images",
-        "sortFolders": "Trier les dossiers"
+        "empty": "Pas encore de LUT — importez-en",
+        "import": "Importer des profils",
+        "importFailed": "Échec de l'importation des LUT",
+        "removeLut": "Supprimer la LUT"
     },
     "it": {
-        "name": "In ordine alfabetico",
-        "created": "Data di creazione",
-        "modified": "Data di modifica",
-        "imageCount": "Conteggio immagini",
-        "sortFolders": "Ordina cartelle"
+        "empty": "Nessuna LUT ancora — importane alcune",
+        "import": "Importa profili",
+        "importFailed": "Impossibile importare le LUT",
+        "removeLut": "Rimuovi LUT"
     },
     "ja": {
-        "name": "アルファベット順",
-        "created": "作成日",
-        "modified": "更新日",
-        "imageCount": "画像数",
-        "sortFolders": "フォルダーを並べ替え"
+        "empty": "LUTはまだありません — インポートしてください",
+        "import": "プロファイルをインポート",
+        "importFailed": "LUTのインポートに失敗しました",
+        "removeLut": "LUTを削除"
     },
     "ko": {
-        "name": "알파벳순",
-        "created": "생성일",
-        "modified": "수정일",
-        "imageCount": "이미지 수",
-        "sortFolders": "폴더 정렬"
+        "empty": "아직 LUT가 없습니다 — 가져오기를 수행하세요",
+        "import": "프로필 가져오기",
+        "importFailed": "LUT 가져오기 실패",
+        "removeLut": "LUT 제거"
     },
     "pl": {
-        "name": "Alfabetycznie",
-        "created": "Data utworzenia",
-        "modified": "Data modyfikacji",
-        "imageCount": "Liczba obrazów",
-        "sortFolders": "Sortuj foldery"
+        "empty": "Brak LUT — zaimportuj jakieś",
+        "import": "Importuj profile",
+        "importFailed": "Nie udało się zaimportować LUT",
+        "removeLut": "Usuń LUT"
     },
     "pt": {
-        "name": "Alfabeticamente",
-        "created": "Data de criação",
-        "modified": "Data de modificação",
-        "imageCount": "Contagem de imagens",
-        "sortFolders": "Ordenar pastas"
+        "empty": "Sem LUTs ainda — importe alguns",
+        "import": "Importar perfis",
+        "importFailed": "Falha ao importar LUTs",
+        "removeLut": "Remover LUT"
     },
     "ru": {
-        "name": "По алфавиту",
-        "created": "Дата создания",
-        "modified": "Дата изменения",
-        "imageCount": "Количество изображений",
-        "sortFolders": "Сортировать папки"
+        "empty": "Пока нет LUT — импортируйте их",
+        "import": "Импорт профилей",
+        "importFailed": "Не удалось импортировать LUT",
+        "removeLut": "Удалить LUT"
     },
     "zh-CN": {
-        "name": "按字母顺序",
-        "created": "创建日期",
-        "modified": "修改日期",
-        "imageCount": "图像数量",
-        "sortFolders": "对文件夹排序"
+        "empty": "暂无 LUT — 请导入一些",
+        "import": "导入配置文件",
+        "importFailed": "导入 LUT 失败",
+        "removeLut": "移除 LUT"
     },
     "zh-TW": {
-        "name": "按字母順序",
-        "created": "建立日期",
-        "modified": "修改日期",
-        "imageCount": "影像數量",
-        "sortFolders": "對資料夾排序"
+        "empty": "暫無 LUT — 請匯入一些",
+        "import": "匯入設定檔",
+        "importFailed": "匯入 LUT 失敗",
+        "removeLut": "移除 LUT"
     }
 }
 
@@ -110,24 +98,17 @@ def update_json_file(file_path: Path, trans: dict):
         print(f"Error parsing JSON in {file_path.name}. Skipping.")
         return
 
-    if "library" not in data or not isinstance(data["library"], dict):
-        data["library"] = {}
-    if "folders" not in data["library"] or not isinstance(data["library"]["folders"], dict):
-        data["library"]["folders"] = {}
+    if "ui" not in data or not isinstance(data["ui"], dict):
+        data["ui"] = {}
+    if "lut" not in data["ui"] or not isinstance(data["ui"]["lut"], dict):
+        data["ui"]["lut"] = {}
 
-    folders = data["library"]["folders"]
+    lut_node = data["ui"]["lut"]
 
-    if "sort" not in folders or not isinstance(folders["sort"], dict):
-        folders["sort"] = {}
-    if "tooltips" not in folders or not isinstance(folders["tooltips"], dict):
-        folders["tooltips"] = {}
-
-    folders["sort"]["name"] = trans["name"]
-    folders["sort"]["created"] = trans["created"]
-    folders["sort"]["modified"] = trans["modified"]
-    folders["sort"]["imageCount"] = trans["imageCount"]
-
-    folders["tooltips"]["sortFolders"] = trans["sortFolders"]
+    lut_node["empty"] = trans["empty"]
+    lut_node["import"] = trans["import"]
+    lut_node["importFailed"] = trans["importFailed"]
+    lut_node["removeLut"] = trans["removeLut"]
 
     sorted_data = sort_dict_recursively(data)
 
