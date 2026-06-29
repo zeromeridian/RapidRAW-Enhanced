@@ -1751,7 +1751,8 @@
       "label": "LUT",
       "select": "Select",
       "selectLutFile": "Select a LUT file",
-      "unsupportedFormat": "Unsupported file format(s) detected: .{{ext}}"
+      "unsupportedFormat": "Unsupported file format(s) detected: .{{ext}}",
+      "removeLut": "Remove LUT"
     },
     "slider": {
       "clickToEdit": "Click to edit",
