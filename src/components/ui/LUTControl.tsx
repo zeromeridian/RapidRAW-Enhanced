@@ -42,6 +42,7 @@ export default function LUTControl({
 }: LUTControlProps) {
   const { t } = useTranslation();
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
+  const isImageReady = useEditorStore((state) => state.selectedImage?.isReady ?? false);
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [entries, setEntries] = useState<LutEntry[]>([]);
@@ -63,7 +64,7 @@ export default function LUTControl({
   }, [refreshList]);
 
   useEffect(() => {
-    if (!isExpanded || !selectedImagePath || entries.length === 0) {
+    if (!isExpanded || !selectedImagePath || !isImageReady || entries.length === 0) {
       return;
     }
     const cacheKey = `${selectedImagePath}|${entries.map((entry) => entry.path).join(',')}`;
@@ -95,7 +96,7 @@ export default function LUTControl({
     return () => {
       isActive = false;
     };
-  }, [isExpanded, selectedImagePath, entries]);
+  }, [isExpanded, selectedImagePath, isImageReady, entries]);
 
   const handleImport = async () => {
     try {
