@@ -84,7 +84,6 @@ use crate::image_processing::{
     process_and_get_dynamic_image, resolve_tonemapper_override,
     resolve_tonemapper_override_from_handle, warp_image_geometry,
 };
-use crate::lut_processing::Lut;
 use crate::mask_generation::{
     MaskDefinition, generate_mask_bitmap, get_cached_or_generate_mask,
     resolve_warped_image_for_masks,
@@ -122,11 +121,6 @@ pub struct CommunityPreset {
     pub include_masks: Option<bool>,
     #[serde(rename = "includeCropTransform")]
     pub include_crop_transform: Option<bool>,
-}
-
-#[derive(Serialize)]
-struct LutParseResult {
-    size: u32,
 }
 
 #[derive(serde::Serialize)]
@@ -214,18 +208,6 @@ fn compute_full_transformed_res(
 
     let (transformed_img, offset) = apply_all_transformations(patched_original_image, adjustments);
     Ok((Arc::new(transformed_img.into_owned()), offset))
-}
-
-pub fn get_or_load_lut(state: &tauri::State<AppState>, path: &str) -> Result<Arc<Lut>, String> {
-    let mut cache = state.lut_cache.lock().unwrap();
-    if let Some(lut) = cache.get(path) {
-        return Ok(lut.clone());
-    }
-
-    let lut = lut_processing::parse_lut_file(path).map_err(|e| e.to_string())?;
-    let arc_lut = Arc::new(lut);
-    cache.insert(path.to_string(), arc_lut.clone());
-    Ok(arc_lut)
 }
 
 #[tauri::command]
@@ -485,7 +467,7 @@ fn process_preview_job(
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
     let final_adjustments = get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
     let lut_path = adjustments_clone["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+    let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
 
     let wants_analytics = !(is_interactive && pixel_roi.is_some());
     let channel_filter = if is_interactive {
@@ -816,7 +798,7 @@ fn generate_uncropped_preview(
         let uncropped_adjustments =
             get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
         let lut_path = adjustments_clone["lutPath"].as_str();
-        let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+        let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
 
         if let Ok(processed_image) = process_and_get_dynamic_image(
             &context,
@@ -980,7 +962,7 @@ async fn preview_geometry_transform(
             let all_adjustments =
                 get_all_adjustments_from_json(&temp_adjustments, is_raw, tm_override);
             let lut_path = temp_adjustments["lutPath"].as_str();
-            let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+            let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
             let mask_bitmaps = Vec::new();
 
             let processed_base = process_and_get_dynamic_image(
@@ -1163,7 +1145,7 @@ fn generate_preset_preview(
     let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
     let lut_path = js_adjustments["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+    let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
 
     let processed_image = process_and_get_dynamic_image(
         &context,
@@ -1312,7 +1294,7 @@ async fn generate_all_community_previews(
             let all_adjustments =
                 get_all_adjustments_from_json(&scaled_adjustments, *is_raw, tm_override);
             let lut_path = js_adjustments["lutPath"].as_str();
-            let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+            let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
 
             let unique_hash = preset_hash.wrapping_add(i as u64);
 
@@ -1649,7 +1631,7 @@ fn generate_preview_for_path(
     let tm_override = resolve_tonemapper_override(&settings, is_raw);
     let all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
     let lut_path = js_adjustments["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+    let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
     let unique_hash = calculate_full_job_hash(&source_path_str, &js_adjustments);
     let final_image = process_and_get_dynamic_image(
         &context,
@@ -1673,20 +1655,6 @@ fn generate_preview_for_path(
         .map_err(|e| format!("Failed to encode with mozjpeg-rs: {}", e))?;
 
     Ok(Response::new(bytes))
-}
-
-#[tauri::command]
-async fn load_and_parse_lut(
-    path: String,
-    state: tauri::State<'_, AppState>,
-) -> Result<LutParseResult, String> {
-    let lut = lut_processing::parse_lut_file(&path).map_err(|e| e.to_string())?;
-    let lut_size = lut.size;
-
-    let mut cache = state.lut_cache.lock().unwrap();
-    cache.insert(path, Arc::new(lut));
-
-    Ok(LutParseResult { size: lut_size })
 }
 
 fn setup_logging(app_handle: &tauri::AppHandle) {
@@ -2231,7 +2199,11 @@ pub fn run() {
             save_collage,
             merge_hdr,
             save_hdr,
-            load_and_parse_lut,
+            lut_processing::load_and_parse_lut,
+            lut_processing::list_luts,
+            lut_processing::import_luts,
+            lut_processing::remove_lut,
+            lut_processing::generate_lut_previews,
             fetch_community_presets,
             generate_all_community_previews,
             save_temp_file,

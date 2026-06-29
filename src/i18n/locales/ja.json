@@ -1742,9 +1742,13 @@
     },
     "lut": {
       "clearLut": "LUTをクリア",
+      "empty": "LUTはまだありません — インポートしてください",
       "filterLabel": "LUTファイル",
+      "import": "プロファイルをインポート",
+      "importFailed": "LUTのインポートに失敗しました",
       "intensity": "適用度",
       "label": "LUT",
+      "removeLut": "LUTを削除",
       "select": "選択",
       "selectLutFile": "LUTファイルを選択",
       "unsupportedFormat": "未対応のファイル形式が検出されました: .{{ext}}"

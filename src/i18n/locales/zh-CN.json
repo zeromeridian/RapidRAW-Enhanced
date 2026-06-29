@@ -1743,9 +1743,13 @@
     },
     "lut": {
       "clearLut": "清除 LUT",
+      "empty": "暂无 LUT — 请导入一些",
       "filterLabel": "LUT 文件",
+      "import": "导入配置文件",
+      "importFailed": "导入 LUT 失败",
       "intensity": "强度",
       "label": "LUT",
+      "removeLut": "移除 LUT",
       "select": "选择",
       "selectLutFile": "选择 LUT 文件",
       "unsupportedFormat": "检测到不支持的文件格式：.{{ext}}"

@@ -1807,9 +1807,13 @@
     },
     "lut": {
       "clearLut": "Wyczyść LUT",
+      "empty": "Brak LUT — zaimportuj jakieś",
       "filterLabel": "Pliki LUT",
+      "import": "Importuj profile",
+      "importFailed": "Nie udało się zaimportować LUT",
       "intensity": "Intensywność",
       "label": "LUT",
+      "removeLut": "Usuń LUT",
       "select": "Wybierz",
       "selectLutFile": "Wybierz plik LUT",
       "unsupportedFormat": "Wykryto nieobsługiwany format pliku: .{{ext}}"
