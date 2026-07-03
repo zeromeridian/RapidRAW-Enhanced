@@ -5,7 +5,9 @@ use crate::exif_processing;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::image_processing::ImageMetadata;
-use crate::image_processing::{apply_orientation, remove_raw_artifacts_and_enhance};
+use crate::image_processing::{
+    apply_orientation, apply_srgb_to_linear, remove_raw_artifacts_and_enhance,
+};
 use crate::mask_generation::{MaskDefinition, SubMask, generate_mask_bitmap};
 use crate::raw_processing::develop_raw_image;
 use anyhow::{Context, Result, anyhow};
@@ -118,6 +120,21 @@ pub fn load_base_image_from_bytes(
                     path_for_ext_check,
                     classified
                 );
+                // Some raws carry raw data rawler cannot decode (e.g. DNG 1.7 with
+                // 8-bit lossy JPEG compression, "ljpeg: sof.precision 8") or lack
+                // the make/model tags rawler needs to pick a decoder. Fall back to
+                // the embedded preview — linearized, since the raw pipeline expects
+                // linear input it will tone-map again — so the file stays viewable
+                // and editable instead of failing outright.
+                if let Some(preview) = embedded_preview_fallback(path_for_ext_check) {
+                    log::warn!(
+                        "Using embedded preview fallback for '{}' ({}x{})",
+                        path_for_ext_check,
+                        preview.width(),
+                        preview.height()
+                    );
+                    return Ok(apply_srgb_to_linear(preview));
+                }
                 Err(classified)
             }
             Err(_) => {
@@ -164,6 +181,124 @@ fn classify_raw_develop_error(path: &str, err: anyhow::Error) -> anyhow::Error {
     }
 
     err
+}
+
+/// Largest embedded JPEG preview found by walking the TIFF IFD tree directly.
+/// Works even when rawler has no decoder for the file (stripped make/model) or
+/// cannot decode its raw data (e.g. DNG 1.7 lossy 8-bit JPEG raws): previews are
+/// plain JPEG streams referenced by standard tags, independent of the raw payload.
+fn largest_tiff_jpeg_preview(buf: &[u8]) -> Option<DynamicImage> {
+    let le = match buf.get(..4)? {
+        [0x49, 0x49, 0x2A, 0x00] => true,
+        [0x4D, 0x4D, 0x00, 0x2A] => false,
+        _ => return None,
+    };
+    let rd16 = |o: usize| -> Option<u64> {
+        let b: [u8; 2] = buf.get(o..o + 2)?.try_into().ok()?;
+        Some(if le { u16::from_le_bytes(b) } else { u16::from_be_bytes(b) } as u64)
+    };
+    let rd32 = |o: usize| -> Option<u64> {
+        let b: [u8; 4] = buf.get(o..o + 4)?.try_into().ok()?;
+        Some(if le { u32::from_le_bytes(b) } else { u32::from_be_bytes(b) } as u64)
+    };
+
+    // (offset, len) of the biggest JPEG stream seen so far
+    let mut best: Option<(u64, u64)> = None;
+    let mut queue: Vec<u64> = vec![rd32(4)?];
+    let mut seen = HashMap::new();
+
+    while let Some(ifd) = queue.pop() {
+        if seen.insert(ifd, ()).is_some() || seen.len() > 64 {
+            continue;
+        }
+        let Some(n) = rd16(ifd as usize) else { continue };
+        let mut subfile: u64 = u64::MAX; // absent
+        let mut compression: u64 = 0;
+        let mut strip: Option<(u64, u64)> = None; // 273/279, single strip
+        let mut old_jpeg: Option<(u64, u64)> = None; // 513/514
+        for i in 0..n {
+            let e = ifd as usize + 2 + (i as usize) * 12;
+            let (Some(tag), Some(count), Some(val)) = (rd16(e), rd32(e + 4), rd32(e + 8)) else {
+                continue;
+            };
+            match tag {
+                254 => subfile = val,
+                259 => compression = val,
+                273 if count == 1 => strip = Some((val, strip.map_or(0, |s| s.1))),
+                279 if count == 1 => strip = strip.map(|s| (s.0, val)).or(Some((0, val))),
+                513 => old_jpeg = Some((val, old_jpeg.map_or(0, |s| s.1))),
+                514 => old_jpeg = old_jpeg.map(|s| (s.0, val)).or(Some((0, val))),
+                330 => {
+                    // SubIFD pointers: inline if count == 1, else an offset array
+                    if count == 1 {
+                        queue.push(val);
+                    } else {
+                        for j in 0..count.min(8) {
+                            if let Some(p) = rd32(val as usize + (j as usize) * 4) {
+                                queue.push(p);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        // Strip-based JPEG previews must be reduced-resolution (254 == 1); the main
+        // raw IFD may also use JPEG compression but is subfile type 0 and undecodable.
+        if matches!(compression, 6 | 7)
+            && subfile == 1
+            && let Some((off, len)) = strip
+            && len > best.map_or(0, |b| b.1)
+        {
+            best = Some((off, len));
+        }
+        if let Some((off, len)) = old_jpeg
+            && len > best.map_or(0, |b| b.1)
+        {
+            best = Some((off, len));
+        }
+        if let Some(next) = rd32(ifd as usize + 2 + (n as usize) * 12)
+            && next != 0
+        {
+            queue.push(next);
+        }
+    }
+
+    let (off, len) = best?;
+    let bytes = buf.get(off as usize..(off + len) as usize)?;
+    image::load_from_memory_with_format(bytes, image::ImageFormat::Jpeg).ok()
+}
+
+/// Embedded preview for a raw whose raw data cannot be developed: largest JPEG
+/// via the IFD walk (decoder-independent), else rawler's extractor (non-TIFF
+/// layouts like RAF), with the file's EXIF orientation applied.
+fn embedded_preview_fallback(path: &str) -> Option<DynamicImage> {
+    let img = {
+        let mapped = fs::File::open(path)
+            .ok()
+            .and_then(|f| unsafe { memmap2::Mmap::map(&f).ok() });
+        match mapped.as_ref().and_then(|m| largest_tiff_jpeg_preview(m)) {
+            Some(img) => img,
+            None => rawler::analyze::extract_preview_pixels(
+                path,
+                &rawler::decoders::RawDecodeParams::default(),
+            )
+            .ok()?,
+        }
+    };
+    let orientation = fs::File::open(path).ok().and_then(|f| {
+        let mut r = std::io::BufReader::new(f);
+        ExifReader::new()
+            .read_from_container(&mut r)
+            .ok()?
+            .get_field(Tag::Orientation, exif::In::PRIMARY)?
+            .value
+            .get_uint(0)
+    });
+    Some(match orientation {
+        Some(o) if o > 1 => apply_orientation(img, Orientation::from_u16(o as u16)),
+        _ => img,
+    })
 }
 
 pub fn load_image_with_orientation(
