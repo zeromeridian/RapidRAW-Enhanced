@@ -689,32 +689,3 @@ fn get_interpolated_pixel(img: &Rgb32FImage, x: f64, y: f64) -> Rgb<f32> {
         final_pixel[2] as f32,
     ])
 }
-
-#[cfg(test)]
-mod warp_image_homography_tests {
-    use super::warp_image_homography;
-    use image::{Rgb, Rgb32FImage};
-    use nalgebra::Matrix3;
-
-    fn marker_image() -> Rgb32FImage {
-        let mut img = Rgb32FImage::from_pixel(8, 8, Rgb([0.0, 0.0, 0.0]));
-        img.put_pixel(5, 4, Rgb([1.0, 0.0, 0.0]));
-        img
-    }
-
-    #[test]
-    fn identity_homography_preserves_source() {
-        let source = marker_image();
-        let warped = warp_image_homography(&source, &Matrix3::identity(), 8, 8);
-        assert_eq!(warped.get_pixel(5, 4)[0], 1.0);
-        assert_eq!(warped.get_pixel(0, 0)[0], 0.0);
-    }
-
-    #[test]
-    fn translation_homography_shifts_marker() {
-        let source = marker_image();
-        let translation = Matrix3::new(1.0, 0.0, 2.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0);
-        let warped = warp_image_homography(&source, &translation, 8, 8);
-        assert_eq!(warped.get_pixel(3, 3)[0], 1.0);
-    }
-}

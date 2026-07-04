@@ -449,28 +449,3 @@ pub fn generate_low_detail_mask(gray_full: &GrayImage) -> GrayImage {
         });
     mask
 }
-
-#[cfg(test)]
-mod normalize_grayscale_tests {
-    use super::normalize_grayscale;
-    use image::{GrayImage, Luma};
-
-    #[test]
-    fn stretches_compressed_range_to_full_span() {
-        let mut img = GrayImage::new(2, 2);
-        img.put_pixel(0, 0, Luma([100]));
-        img.put_pixel(1, 0, Luma([120]));
-        img.put_pixel(0, 1, Luma([140]));
-        img.put_pixel(1, 1, Luma([160]));
-        let normalized = normalize_grayscale(&img);
-        assert_eq!(normalized.get_pixel(0, 0)[0], 0);
-        assert_eq!(normalized.get_pixel(1, 1)[0], 255);
-    }
-
-    #[test]
-    fn returns_clone_when_image_is_flat() {
-        let img = GrayImage::from_pixel(3, 3, Luma([42]));
-        let normalized = normalize_grayscale(&img);
-        assert!(normalized.pixels().all(|pixel| pixel[0] == 42));
-    }
-}

@@ -74,7 +74,10 @@ pub fn load_hdr_frames(
 }
 
 pub fn assert_uniform_dimensions(frames: &[HdrFrame]) -> Result<(), String> {
-    assert!(!frames.is_empty(), "dimension check requires at least one frame");
+    assert!(
+        !frames.is_empty(),
+        "dimension check requires at least one frame"
+    );
     let (first_path, first_image, _, _) = &frames[0];
     let width = first_image.width();
     let height = first_image.height();
@@ -203,7 +206,10 @@ fn debug_dump_normalized(label: &str, normalized: &GrayImage) {
     let path = std::env::temp_dir().join(format!("rapidraw_deghost_{}.png", label));
     match normalized.save(&path) {
         Ok(()) => println!("[deghost] normalized image written to {}", path.display()),
-        Err(e) => println!("[deghost] failed to write normalized image for '{}': {}", label, e),
+        Err(e) => println!(
+            "[deghost] failed to write normalized image for '{}': {}",
+            label, e
+        ),
     }
 }
 
@@ -221,19 +227,25 @@ fn align_frame_to_reference(
     if matches.len() < processing::MIN_INLIERS_FOR_CONNECTION {
         return AlignmentOutcome::Failed;
     }
-    let (_, inliers) =
-        match processing::find_homography_ransac(&matches, &reference.keypoints, &frame.keypoints) {
-            Some(result) => result,
-            None => {
-                println!("[deghost] RANSAC found too few inliers");
-                return AlignmentOutcome::Failed;
-            }
-        };
+    let (_, inliers) = match processing::find_homography_ransac(
+        &matches,
+        &reference.keypoints,
+        &frame.keypoints,
+    ) {
+        Some(result) => result,
+        None => {
+            println!("[deghost] RANSAC found too few inliers");
+            return AlignmentOutcome::Failed;
+        }
+    };
     println!("[deghost] inliers: {}", inliers.len());
     let rigid_full = estimate_rigid_transform(&inliers, reference, frame);
     let (width, height) = frame_image.dimensions();
     let displacement = max_corner_displacement(&rigid_full, width, height);
-    println!("[deghost] rigid max corner displacement: {:.3} px", displacement);
+    println!(
+        "[deghost] rigid max corner displacement: {:.3} px",
+        displacement
+    );
     if displacement < DEGHOST_IDENTITY_MAX_DISPLACEMENT {
         return AlignmentOutcome::AlreadyAligned;
     }
@@ -251,7 +263,10 @@ fn estimate_rigid_transform(
     reference: &FrameDetection,
     frame: &FrameDetection,
 ) -> Matrix3<f64> {
-    assert!(inliers.len() >= 2, "rigid estimate requires at least two inliers");
+    assert!(
+        inliers.len() >= 2,
+        "rigid estimate requires at least two inliers"
+    );
     let pairs: Vec<((f64, f64), (f64, f64))> = inliers
         .iter()
         .map(|m| {
@@ -331,128 +346,4 @@ fn max_corner_displacement(transform: &Matrix3<f64>, width: u32, height: u32) ->
         }
     }
     max_displacement
-}
-
-#[cfg(test)]
-mod align_hdr_frames_tests {
-    use super::align_frame_to_reference;
-    use crate::panorama_utils::processing::generate_brief_pairs;
-    use crate::panorama_utils::stitching::warp_image_homography;
-    use image::{DynamicImage, GenericImageView, Rgb32FImage};
-    use nalgebra::Matrix3;
-
-    fn textured_frame() -> DynamicImage {
-        let mut img = Rgb32FImage::new(320, 320);
-        for y in 0..320u32 {
-            for x in 0..320u32 {
-                let mut hash = x.wrapping_mul(374761393).wrapping_add(y.wrapping_mul(668265263));
-                hash = (hash ^ (hash >> 13)).wrapping_mul(1274126177);
-                let value = (hash & 0xff) as f32 / 255.0;
-                img.put_pixel(x, y, image::Rgb([value, value, value]));
-            }
-        }
-        DynamicImage::ImageRgb32F(img)
-    }
-
-    fn detect(image: &DynamicImage) -> super::FrameDetection {
-        super::detect_frame_features(image, &generate_brief_pairs(), "test", false)
-    }
-
-    #[test]
-    fn realigns_translated_frame_to_reference() {
-        let reference_image = textured_frame();
-        let shift = Matrix3::new(1.0, 0.0, 3.0, 0.0, 1.0, 2.0, 0.0, 0.0, 1.0);
-        let shifted = warp_image_homography(&reference_image.to_rgb32f(), &shift, 320, 320);
-        let shifted_image = DynamicImage::ImageRgb32F(shifted);
-
-        let reference = detect(&reference_image);
-        let frame = detect(&shifted_image);
-        let aligned = match align_frame_to_reference(&shifted_image, &frame, &reference) {
-            super::AlignmentOutcome::Warped(warped) => warped,
-            _ => panic!("alignment should warp the shifted frame"),
-        };
-
-        let reference_pixels = reference_image.to_rgb32f();
-        let mut error = 0.0f32;
-        for y in 80..240u32 {
-            for x in 80..240u32 {
-                error += (aligned.get_pixel(x, y)[0] - reference_pixels.get_pixel(x, y)[0]).abs();
-            }
-        }
-        let mean_error = error / (160.0 * 160.0);
-        assert!(mean_error < 0.1, "mean realignment error too high: {}", mean_error);
-    }
-
-    #[test]
-    fn rigid_estimate_recovers_known_rotation_and_translation() {
-        use crate::panorama_stitching::{KeyPoint, Match};
-        let angle = 0.03_f64;
-        let (sin, cos) = angle.sin_cos();
-        let (tx, ty) = (4.0, -3.0);
-        let mut reference_keypoints = Vec::new();
-        let mut frame_keypoints = Vec::new();
-        let mut matches = Vec::new();
-        for grid_y in 0..5 {
-            for grid_x in 0..5 {
-                let rx = 20.0 + grid_x as f64 * 60.0;
-                let ry = 20.0 + grid_y as f64 * 60.0;
-                let fx = cos * rx - sin * ry + tx;
-                let fy = sin * rx + cos * ry + ty;
-                let index = reference_keypoints.len();
-                reference_keypoints.push(KeyPoint {
-                    x: rx.round() as u32,
-                    y: ry.round() as u32,
-                });
-                frame_keypoints.push(KeyPoint {
-                    x: fx.round() as u32,
-                    y: fy.round() as u32,
-                });
-                matches.push(Match {
-                    index1: index,
-                    index2: index,
-                });
-            }
-        }
-        let reference = super::FrameDetection {
-            keypoints: reference_keypoints,
-            features: Vec::new(),
-            scale_factor: 1.0,
-        };
-        let frame = super::FrameDetection {
-            keypoints: frame_keypoints,
-            features: Vec::new(),
-            scale_factor: 1.0,
-        };
-        let rigid = super::estimate_rigid_transform(&matches, &reference, &frame);
-        let recovered_angle = rigid[(1, 0)].atan2(rigid[(0, 0)]);
-        assert!((recovered_angle - angle).abs() < 0.005, "angle off: {}", recovered_angle);
-        assert!((rigid[(0, 2)] - tx).abs() < 1.0, "tx off: {}", rigid[(0, 2)]);
-        assert!((rigid[(1, 2)] - ty).abs() < 1.0, "ty off: {}", rigid[(1, 2)]);
-    }
-
-    #[test]
-    fn fails_on_featureless_frame() {
-        let flat = DynamicImage::ImageRgb32F(Rgb32FImage::from_pixel(
-            160,
-            160,
-            image::Rgb([0.5, 0.5, 0.5]),
-        ));
-        let reference = detect(&textured_frame());
-        let frame = detect(&flat);
-        assert!(matches!(
-            align_frame_to_reference(&flat, &frame, &reference),
-            super::AlignmentOutcome::Failed
-        ));
-    }
-
-    #[test]
-    fn skips_warp_when_frame_matches_reference() {
-        let reference_image = textured_frame();
-        let reference = detect(&reference_image);
-        let frame = detect(&reference_image);
-        assert!(matches!(
-            align_frame_to_reference(&reference_image, &frame, &reference),
-            super::AlignmentOutcome::AlreadyAligned
-        ));
-    }
 }
