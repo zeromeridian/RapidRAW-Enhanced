@@ -7,7 +7,7 @@ use crate::image_processing::{
 };
 use crate::panorama_stitching::{Feature, KeyPoint, Match};
 use crate::panorama_utils::{processing, stitching};
-use image::{DynamicImage, GenericImageView, GrayImage, Rgb32FImage};
+use image::{DynamicImage, GenericImageView, Rgb32FImage};
 use nalgebra::{Matrix2, Matrix3, Point2};
 use std::fs;
 use std::path::Path;
@@ -110,14 +110,7 @@ pub fn align_hdr_frames(frames: &mut [HdrFrame], app_handle: &AppHandle) {
     let reference_index = frames.len() / 2;
     let detections: Vec<FrameDetection> = frames
         .iter()
-        .map(|frame| {
-            let label = Path::new(&frame.0)
-                .file_stem()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .into_owned();
-            detect_frame_features(&frame.1, &brief_pairs, &label, is_raw_file(&frame.0))
-        })
+        .map(|frame| detect_frame_features(&frame.1, &brief_pairs, is_raw_file(&frame.0)))
         .collect();
     for index in 0..frames.len() {
         if index == reference_index {
@@ -152,7 +145,6 @@ pub fn align_hdr_frames(frames: &mut [HdrFrame], app_handle: &AppHandle) {
 fn detect_frame_features(
     image: &DynamicImage,
     brief_pairs: &[(Point2<i32>, Point2<i32>)],
-    debug_label: &str,
     source_is_raw: bool,
 ) -> FrameDetection {
     let mut detection_proxy = image.clone();
@@ -176,7 +168,6 @@ fn detect_frame_features(
         image::imageops::FilterType::Triangle,
     );
     let normalized = processing::normalize_grayscale(&gray_small);
-    debug_dump_normalized(debug_label, &normalized);
     let features = processing::find_features_tuned(
         &normalized,
         brief_pairs,
