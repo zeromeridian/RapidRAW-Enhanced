@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{Cursor, Read};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -170,12 +170,50 @@ fn get_models_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf> {
     Ok(models_dir)
 }
 
-async fn download_model(url: &str, dest: &Path) -> Result<()> {
-    let response = reqwest::get(url).await?;
-    let mut file = fs::File::create(dest)?;
-    let mut content = Cursor::new(response.bytes().await?);
-    std::io::copy(&mut content, &mut file)?;
+fn persist_downloaded_asset(dest: &Path, bytes: &[u8]) -> Result<()> {
+    if bytes.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Downloaded asset for {} was empty",
+            dest.display()
+        ));
+    }
+
+    let parent = dest.parent().ok_or_else(|| {
+        anyhow::anyhow!(
+            "Cannot determine parent directory for downloaded asset {}",
+            dest.display()
+        )
+    })?;
+    fs::create_dir_all(parent)?;
+
+    let file_name = dest
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| anyhow::anyhow!("Invalid downloaded asset path {}", dest.display()))?;
+    let tmp_path = dest.with_file_name(format!(".{}.download", file_name));
+
+    {
+        let mut file = fs::File::create(&tmp_path)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+    }
+
+    fs::rename(&tmp_path, dest).or_else(|rename_error| -> std::io::Result<()> {
+        if dest.exists() {
+            fs::remove_file(dest)?;
+            fs::rename(&tmp_path, dest)?;
+            Ok(())
+        } else {
+            Err(rename_error)
+        }
+    })?;
     Ok(())
+}
+
+async fn download_model(url: &str, dest: &Path) -> Result<()> {
+    let response = reqwest::get(url).await?.error_for_status()?;
+    let bytes = response.bytes().await?;
+    persist_downloaded_asset(dest, &bytes)
 }
 
 fn verify_sha256(path: &Path, expected_hash: &str) -> Result<bool> {
@@ -214,8 +252,9 @@ async fn download_and_verify_model(
             fs::remove_file(&dest_path)?;
         }
         let _ = app_handle.emit("ai-model-download-start", model_name);
-        download_model(url, &dest_path).await?;
+        let download_result = download_model(url, &dest_path).await;
         let _ = app_handle.emit("ai-model-download-finish", model_name);
+        download_result?;
 
         if !verify_sha256(&dest_path, expected_hash)? {
             return Err(anyhow::anyhow!(
@@ -441,8 +480,9 @@ pub async fn get_or_init_clip_models(
     let clip_tokenizer_path = models_dir.join(CLIP_TOKENIZER_FILENAME);
     if !clip_tokenizer_path.exists() {
         let _ = app_handle.emit("ai-model-download-start", "CLIP Tokenizer");
-        download_model(CLIP_TOKENIZER_URL, &clip_tokenizer_path).await?;
+        let download_result = download_model(CLIP_TOKENIZER_URL, &clip_tokenizer_path).await;
         let _ = app_handle.emit("ai-model-download-finish", "CLIP Tokenizer");
+        download_result?;
     }
 
     let _ = ort::init().with_name("AI-Tagging").commit();
@@ -1433,6 +1473,33 @@ pub fn run_depth_anything_model(
         .ok_or_else(|| anyhow::anyhow!("Failed to create mask from Depth output"))?;
 
     Ok(depth_map)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::persist_downloaded_asset;
+
+    #[test]
+    fn persist_downloaded_asset_rejects_empty_download_without_final_file() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let dest = temp_dir.path().join("model.onnx");
+
+        let result = persist_downloaded_asset(&dest, b"");
+
+        assert!(result.is_err());
+        assert!(!dest.exists());
+    }
+
+    #[test]
+    fn persist_downloaded_asset_writes_non_empty_download_to_final_path() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let dest = temp_dir.path().join("model.onnx");
+
+        persist_downloaded_asset(&dest, b"model-bytes").unwrap();
+
+        assert_eq!(std::fs::read(&dest).unwrap(), b"model-bytes");
+        assert!(!dest.with_file_name(".model.onnx.download").exists());
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
