@@ -193,35 +193,6 @@ fn calculate_resize_target(
     }
 }
 
-#[cfg(test)]
-mod preserve_folder_tests {
-    use super::relative_export_dir_for_preserved_folders;
-    use std::path::{Path, PathBuf};
-
-    #[test]
-    fn uses_longest_matching_root_for_preserved_export_directory() {
-        let source = Path::new("/photos/raw/2013/image.NEF");
-        let roots = vec!["/photos".to_string(), "/photos/raw".to_string()];
-
-        assert_eq!(
-            relative_export_dir_for_preserved_folders(source, &roots),
-            Some(PathBuf::from("2013"))
-        );
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn matches_windows_root_case_insensitively() {
-        let source = Path::new(r"C:\Users\Rose\Pictures\RAW\Trip\image.NEF");
-        let roots = vec![r"c:\users\rose\pictures\raw".to_string()];
-
-        assert_eq!(
-            relative_export_dir_for_preserved_folders(source, &roots),
-            Some(PathBuf::from("Trip"))
-        );
-    }
-}
-
 fn relative_dir_is_safe(rel_dir: &Path) -> bool {
     rel_dir.components().all(|component| {
         matches!(

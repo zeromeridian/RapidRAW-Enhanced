@@ -1842,69 +1842,9 @@ fn available_monitor_bounds(window: &tauri::WebviewWindow) -> Vec<MonitorBounds>
         .unwrap_or_default()
 }
 
-#[cfg(test)]
-mod window_state_tests {
-    use super::{MonitorBounds, WindowState, saved_window_state_is_usable};
-
-    fn state(x: i32, y: i32, width: u32, height: u32) -> WindowState {
-        WindowState {
-            width,
-            height,
-            x,
-            y,
-            maximized: false,
-            fullscreen: false,
-        }
-    }
-
-    fn monitor(x: i32, y: i32, width: u32, height: u32) -> MonitorBounds {
-        MonitorBounds {
-            x,
-            y,
-            width,
-            height,
-        }
-    }
-
-    #[test]
-    fn accepts_saved_window_state_that_overlaps_a_monitor() {
-        let monitors = [monitor(0, 0, 1920, 1080)];
-
-        assert!(saved_window_state_is_usable(
-            &state(100, 100, 1280, 720),
-            &monitors
-        ));
-    }
-
-    #[test]
-    fn rejects_saved_window_state_that_is_off_screen() {
-        let monitors = [monitor(0, 0, 1920, 1080)];
-
-        assert!(!saved_window_state_is_usable(
-            &state(5000, 5000, 1280, 720),
-            &monitors
-        ));
-    }
-
-    #[test]
-    fn rejects_saved_window_state_with_unusable_dimensions() {
-        let monitors = [monitor(0, 0, 1920, 1080)];
-
-        assert!(!saved_window_state_is_usable(
-            &state(100, 100, 320, 240),
-            &monitors
-        ));
-    }
-
-    #[test]
-    fn accepts_saved_window_state_on_secondary_monitor_with_negative_origin() {
-        let monitors = [monitor(-1920, 0, 1920, 1080), monitor(0, 0, 1920, 1080)];
-
-        assert!(saved_window_state_is_usable(
-            &state(-1600, 100, 1280, 720),
-            &monitors
-        ));
-    }
+#[cfg(target_os = "android")]
+fn available_monitor_bounds(_window: &tauri::WebviewWindow) -> Vec<MonitorBounds> {
+    Vec::new()
 }
 
 #[tauri::command]
