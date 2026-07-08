@@ -1407,14 +1407,8 @@ fn generate_single_thumbnail_and_cache(
     let cache_filename = format!("{}.jpg", cache_hash);
     let cache_path = thumb_cache_dir.join(cache_filename);
 
-    if !force_regenerate
-        && cache_path.exists()
-    {
-        return Some((
-            cache_path.to_string_lossy().into_owned(),
-            rating,
-            is_edited,
-        ));
+    if !force_regenerate && cache_path.exists() {
+        return Some((cache_path.to_string_lossy().into_owned(), rating, is_edited));
     }
 
     let target_width = settings.thumbnail_resolution.unwrap_or(720);
@@ -1424,11 +1418,7 @@ fn generate_single_thumbnail_and_cache(
         && let Ok(thumb_data) = encode_thumbnail(&thumb_image, target_width)
     {
         let _ = fs::write(&cache_path, &thumb_data);
-        return Some((
-            cache_path.to_string_lossy().into_owned(),
-            rating,
-            is_edited,
-        ));
+        return Some((cache_path.to_string_lossy().into_owned(), rating, is_edited));
     }
     None
 }
@@ -1479,7 +1469,13 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                     );
 
                     if let Some((thumbnail_path, rating, is_edited)) = result {
-                        emit_thumbnail_generated(&app_clone, &path_to_process, &thumbnail_path, rating, is_edited);
+                        emit_thumbnail_generated(
+                            &app_clone,
+                            &path_to_process,
+                            &thumbnail_path,
+                            rating,
+                            is_edited,
+                        );
                     }
                     increment_thumbnail_progress(&state, &app_clone);
                 }
@@ -1592,7 +1588,13 @@ pub fn increment_thumbnail_progress(state: &AppState, app_handle: &AppHandle) {
     }
 }
 
-fn emit_thumbnail_generated(app_handle: &AppHandle, path: &str, thumbnail_path: &str, rating: u8, is_edited: bool) {
+fn emit_thumbnail_generated(
+    app_handle: &AppHandle,
+    path: &str,
+    thumbnail_path: &str,
+    rating: u8,
+    is_edited: bool,
+) {
     let _ = app_handle.emit(
         "thumbnail-generated",
         serde_json::json!({ "path": path, "thumbnailPath": thumbnail_path, "rating": rating, "is_edited": is_edited }),
@@ -2126,7 +2128,13 @@ pub fn save_metadata_and_update_thumbnail(
         );
 
         if let Some((thumbnail_path, rating, is_edited)) = result {
-            emit_thumbnail_generated(&app_handle_clone, &path_clone, &thumbnail_path, rating, is_edited);
+            emit_thumbnail_generated(
+                &app_handle_clone,
+                &path_clone,
+                &thumbnail_path,
+                rating,
+                is_edited,
+            );
         }
 
         increment_thumbnail_progress(&state, &app_handle_clone);
