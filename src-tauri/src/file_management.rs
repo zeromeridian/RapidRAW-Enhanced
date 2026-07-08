@@ -12,7 +12,6 @@ use std::sync::Arc;
 use std::thread;
 
 use anyhow::Result;
-use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
@@ -1410,11 +1409,9 @@ fn generate_single_thumbnail_and_cache(
 
     if !force_regenerate
         && cache_path.exists()
-        && let Ok(data) = fs::read(&cache_path)
     {
-        let base64_str = general_purpose::STANDARD.encode(&data);
         return Some((
-            format!("data:image/jpeg;base64,{}", base64_str),
+            cache_path.to_string_lossy().into_owned(),
             rating,
             is_edited,
         ));
@@ -1427,9 +1424,8 @@ fn generate_single_thumbnail_and_cache(
         && let Ok(thumb_data) = encode_thumbnail(&thumb_image, target_width)
     {
         let _ = fs::write(&cache_path, &thumb_data);
-        let base64_str = general_purpose::STANDARD.encode(&thumb_data);
         return Some((
-            format!("data:image/jpeg;base64,{}", base64_str),
+            cache_path.to_string_lossy().into_owned(),
             rating,
             is_edited,
         ));
@@ -1482,16 +1478,8 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                         &worker_settings,
                     );
 
-                    if let Some((thumbnail_data, rating, is_edited)) = result {
-                        let _ = app_clone.emit(
-                            "thumbnail-generated",
-                            serde_json::json!({
-                                "path": path_to_process,
-                                "data": thumbnail_data,
-                                "rating": rating,
-                                "is_edited": is_edited
-                            }),
-                        );
+                    if let Some((thumbnail_path, rating, is_edited)) = result {
+                        emit_thumbnail_generated(&app_clone, &path_to_process, &thumbnail_path, rating, is_edited);
                     }
                     increment_thumbnail_progress(&state, &app_clone);
                 }
@@ -1602,6 +1590,13 @@ pub fn increment_thumbnail_progress(state: &AppState, app_handle: &AppHandle) {
             serde_json::json!({ "current": current, "total": total }),
         );
     }
+}
+
+fn emit_thumbnail_generated(app_handle: &AppHandle, path: &str, thumbnail_path: &str, rating: u8, is_edited: bool) {
+    let _ = app_handle.emit(
+        "thumbnail-generated",
+        serde_json::json!({ "path": path, "thumbnailPath": thumbnail_path, "rating": rating, "is_edited": is_edited }),
+    );
 }
 
 pub fn resolve_lens_params_in_adjustments(
@@ -2130,11 +2125,8 @@ pub fn save_metadata_and_update_thumbnail(
             &settings,
         );
 
-        if let Some((thumbnail_data, rating, is_edited)) = result {
-            let _ = app_handle_clone.emit(
-                "thumbnail-generated",
-                serde_json::json!({ "path": path_clone, "data": thumbnail_data, "rating": rating, "is_edited": is_edited }),
-            );
+        if let Some((thumbnail_path, rating, is_edited)) = result {
+            emit_thumbnail_generated(&app_handle_clone, &path_clone, &thumbnail_path, rating, is_edited);
         }
 
         increment_thumbnail_progress(&state, &app_handle_clone);
@@ -2228,11 +2220,8 @@ pub async fn apply_adjustments_to_paths(
                 &settings,
             );
 
-            if let Some((thumbnail_data, rating, is_edited)) = result {
-                let _ = app_handle.emit(
-                    "thumbnail-generated",
-                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating, "is_edited": is_edited  }),
-                );
+            if let Some((thumbnail_path, rating, is_edited)) = result {
+                emit_thumbnail_generated(&app_handle, path_str, &thumbnail_path, rating, is_edited);
             }
 
             increment_thumbnail_progress(&state, &app_handle);
@@ -2300,11 +2289,8 @@ pub async fn reset_adjustments_for_paths(
                 &settings,
             );
 
-            if let Some((thumbnail_data, rating, is_edited)) = result {
-                let _ = app_handle.emit(
-                    "thumbnail-generated",
-                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating, "is_edited": is_edited }),
-                );
+            if let Some((thumbnail_path, rating, is_edited)) = result {
+                emit_thumbnail_generated(&app_handle, path_str, &thumbnail_path, rating, is_edited);
             }
 
             increment_thumbnail_progress(&state, &app_handle);
@@ -2413,11 +2399,8 @@ pub async fn apply_auto_adjustments_to_paths(
                 &settings,
             );
 
-            if let Some((thumbnail_data, rating, is_edited)) = result {
-                let _ = app_handle.emit(
-                    "thumbnail-generated",
-                    serde_json::json!({ "path": path, "data": thumbnail_data, "rating": rating, "is_edited": is_edited  }),
-                );
+            if let Some((thumbnail_path, rating, is_edited)) = result {
+                emit_thumbnail_generated(&app_handle, &path, &thumbnail_path, rating, is_edited);
             }
 
             increment_thumbnail_progress(&state, &app_handle);
