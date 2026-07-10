@@ -521,12 +521,12 @@ export default function AIPanel() {
       const count =
         (adjustments.aiPatches || []).filter((p: AiPatch) => p.subMasks.some((sm: SubMask) => sm.type === Mask.Clone))
           .length + 1;
-      name = t('editor.ai.patches.clone', 'Clone {{count}}', { count });
+      name = t('editor.ai.patches.clone', { count });
     } else if (type === Mask.Heal) {
       const count =
         (adjustments.aiPatches || []).filter((p: AiPatch) => p.subMasks.some((sm: SubMask) => sm.type === Mask.Heal))
           .length + 1;
-      name = t('editor.ai.patches.heal', 'Heal {{count}}', { count });
+      name = t('editor.ai.patches.heal', { count });
     } else {
       const count = (adjustments.aiPatches || []).length + 1;
       name = t('editor.ai.patches.aiEdit', { count });
@@ -606,7 +606,7 @@ export default function AIPanel() {
       types
         .filter((mt) => !mt.disabled && (!targetContainerId || ![Mask.Clone, Mask.Heal].includes(mt.type)))
         .map((maskType: MaskType) => ({
-          label: maskType.name,
+          label: formatMaskTypeName(maskType.type),
           icon: maskType.icon,
           onClick: () => {
             if (targetContainerId) {
@@ -820,13 +820,13 @@ export default function AIPanel() {
     }
 
     const manualSubMenu = AI_MANUAL_CLEANUP_TYPES.filter((maskType) => !maskType.disabled).map((maskType) => ({
-      label: maskType.name,
+      label: formatMaskTypeName(maskType.type),
       icon: maskType.icon,
       onClick: () => handleAddAiPatchContainer(maskType.type),
     }));
 
     const genSubMenu = AI_GENERATIVE_CREATION_TYPES.filter((maskType) => !maskType.disabled).map((maskType) => ({
-      label: maskType.name,
+      label: formatMaskTypeName(maskType.type),
       icon: maskType.icon,
       onClick: () => handleAddAiPatchContainer(maskType.type),
     }));
@@ -1059,7 +1059,7 @@ export default function AIPanel() {
                     />
 
                     <Text variant={TextVariants.heading} className="mb-2 mt-6">
-                      {t('editor.ai.manualCleanupTitle', 'Manual Cleanup')}
+                      {t('editor.ai.manualCleanupTitle')}
                     </Text>
                     <div className="grid grid-cols-3 gap-2 mb-6" onClick={(e) => e.stopPropagation()}>
                       {AI_MANUAL_CLEANUP_TYPES.map((maskType: MaskType) => (
@@ -1073,7 +1073,7 @@ export default function AIPanel() {
                     </div>
 
                     <Text variant={TextVariants.heading} className="mb-2">
-                      {t('editor.ai.generativeEditTitle', 'Generative Edit')}
+                      {t('editor.ai.generativeEditTitle')}
                     </Text>
                     <div className="grid grid-cols-3 gap-2" onClick={(e) => e.stopPropagation()}>
                       {AI_GENERATIVE_CREATION_TYPES.map((maskType: MaskType) => (
@@ -1311,14 +1311,16 @@ function DraggableGridItem({ maskType, isGenerating, onClick }: any) {
             }
             ${isDragging ? 'opacity-50' : ''}`}
       data-tooltip={
-        maskType.disabled ? t('editor.ai.comingSoon') : t('editor.ai.createNewTooltip', { name: maskType.name })
+        maskType.disabled
+          ? t('editor.ai.comingSoon')
+          : t('editor.ai.createNewTooltip', { name: formatMaskTypeName(maskType.type) })
       }
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
     >
       <maskType.icon size={24} />{' '}
       <Text as="span" variant={TextVariants.small} color={TextColors.primary}>
-        {maskType.name}
+        {formatMaskTypeName(maskType.type)}
       </Text>
     </motion.div>
   );
