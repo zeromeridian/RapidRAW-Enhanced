@@ -104,15 +104,15 @@ pub async fn generate_manual_cleanup_patch(
     for y in min_y..=max_y {
         let row_start = y * img_w_usize;
         let row = &mask_raw[row_start..row_start + img_w_usize];
-        if let Some(first) = row.iter().position(|&p| p > 0) {
-            if first < min_x {
-                min_x = first;
-            }
+        if let Some(first) = row.iter().position(|&p| p > 0)
+            && first < min_x
+        {
+            min_x = first;
         }
-        if let Some(last) = row.iter().rposition(|&p| p > 0) {
-            if last > max_x {
-                max_x = last;
-            }
+        if let Some(last) = row.iter().rposition(|&p| p > 0)
+            && last > max_x
+        {
+            max_x = last;
         }
     }
 
@@ -159,8 +159,8 @@ pub async fn generate_manual_cleanup_patch(
             }
         }
     } else {
-        let bw = (max_x - min_x + 3) as usize;
-        let bh = (max_y - min_y + 3) as usize;
+        let bw = max_x - min_x + 3;
+        let bh = max_y - min_y + 3;
 
         let mut v_r = vec![0.0f32; bw * bh];
         let mut v_g = vec![0.0f32; bw * bh];
@@ -463,15 +463,15 @@ pub async fn invoke_generative_replace_with_mask_def(
     for y in min_y..=max_y {
         let row_start = y * img_w_usize;
         let row = &mask_raw[row_start..row_start + img_w_usize];
-        if let Some(first) = row.iter().position(|&p| p > 0) {
-            if first < min_x {
-                min_x = first;
-            }
+        if let Some(first) = row.iter().position(|&p| p > 0)
+            && first < min_x
+        {
+            min_x = first;
         }
-        if let Some(last) = row.iter().rposition(|&p| p > 0) {
-            if last > max_x {
-                max_x = last;
-            }
+        if let Some(last) = row.iter().rposition(|&p| p > 0)
+            && last > max_x
+        {
+            max_x = last;
         }
     }
 

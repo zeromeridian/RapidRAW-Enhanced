@@ -479,7 +479,7 @@ pub fn composite_patches_on_image(
                         let alpha = mask_value as f32 / 255.0;
                         let one_minus_alpha = 1.0 - alpha;
 
-                        let mut base_pixel = composited_rgba.get_pixel(x, y).clone();
+                        let mut base_pixel = *composited_rgba.get_pixel(x, y);
                         base_pixel[0] = patch_pixel[0] * alpha + base_pixel[0] * one_minus_alpha;
                         base_pixel[1] = patch_pixel[1] * alpha + base_pixel[1] * one_minus_alpha;
                         base_pixel[2] = patch_pixel[2] * alpha + base_pixel[2] * one_minus_alpha;
