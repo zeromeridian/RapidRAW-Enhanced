@@ -12,7 +12,7 @@ use crate::app_state::AppState;
 use crate::image_loader::composite_patches_on_image;
 use crate::image_processing::apply_unwarp_geometry;
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
-use crate::{get_full_image_for_processing, resolve_warped_image_for_masks};
+use crate::resolve_warped_image_for_masks;
 
 #[tauri::command]
 pub async fn generate_manual_cleanup_patch(
@@ -29,7 +29,7 @@ pub async fn generate_manual_cleanup_patch(
         patches.retain(|p| p.get("id").and_then(|id| id.as_str()) != Some(&patch_definition.id));
     }
 
-    let (base_image, _) = get_full_image_for_processing(&state)?;
+    let (base_image, _) = crate::get_original_image(&state)?;
     let source_image = composite_patches_on_image(&base_image, &source_image_adjustments)
         .map_err(|e| format!("Failed to prepare source image: {}", e))?;
 
@@ -307,7 +307,7 @@ pub async fn invoke_generative_replace_with_mask_def(
         patches.retain(|p| p.get("id").and_then(|id| id.as_str()) != Some(&patch_definition.id));
     }
 
-    let (base_image, _) = get_full_image_for_processing(&state)?;
+    let (base_image, _) = crate::get_original_image(&state)?;
     let source_image = composite_patches_on_image(&base_image, &source_image_adjustments)
         .map_err(|e| format!("Failed to prepare source image: {}", e))?;
 

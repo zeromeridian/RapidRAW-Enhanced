@@ -253,11 +253,14 @@ pub fn get_cached_full_warped_image(
         }
     }
 
-    let (mut full_image, is_raw) = get_full_image_for_processing(state)?;
+    let (base_arc, is_raw) = get_original_image(state)?;
+    let mut cow_image = Cow::Borrowed(base_arc.as_ref());
+
     if is_raw {
-        apply_cpu_default_raw_processing(&mut full_image);
+        apply_cpu_default_raw_processing(cow_image.to_mut());
     }
-    let warped_image = apply_geometry_warp(Cow::Borrowed(&full_image), js_adjustments).into_owned();
+
+    let warped_image = apply_geometry_warp(cow_image, js_adjustments).into_owned();
     let warped_arc = Arc::new(warped_image);
 
     {
@@ -1079,15 +1082,15 @@ async fn preview_geometry_transform(
     Ok(format!("data:image/jpeg;base64,{}", base64_str))
 }
 
-pub fn get_full_image_for_processing(
+pub fn get_original_image(
     state: &tauri::State<AppState>,
-) -> Result<(DynamicImage, bool), String> {
+) -> Result<(std::sync::Arc<image::DynamicImage>, bool), String> {
     let original_image_lock = state.original_image.lock().unwrap();
     let loaded_image = original_image_lock
         .as_ref()
         .ok_or("No original image loaded")?;
     Ok((
-        loaded_image.image.clone().as_ref().clone(),
+        std::sync::Arc::clone(&loaded_image.image),
         loaded_image.is_raw,
     ))
 }
