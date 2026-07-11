@@ -973,18 +973,14 @@ pub fn apply_srgb_to_linear(mut image: DynamicImage) -> DynamicImage {
 
     match &mut image {
         DynamicImage::ImageRgb32F(img) => {
-            for p in img.pixels_mut() {
-                p[0] = to_linear(p[0]);
-                p[1] = to_linear(p[1]);
-                p[2] = to_linear(p[2]);
-            }
+            img.as_mut().par_iter_mut().for_each(|c| *c = to_linear(*c));
         }
         DynamicImage::ImageRgba32F(img) => {
-            for p in img.pixels_mut() {
+            img.par_chunks_mut(4).for_each(|p| {
                 p[0] = to_linear(p[0]);
                 p[1] = to_linear(p[1]);
                 p[2] = to_linear(p[2]);
-            }
+            });
         }
         _ => {}
     }
@@ -1003,18 +999,14 @@ pub fn apply_linear_to_srgb(mut image: DynamicImage) -> DynamicImage {
 
     match &mut image {
         DynamicImage::ImageRgb32F(img) => {
-            for p in img.pixels_mut() {
-                p[0] = to_srgb(p[0]);
-                p[1] = to_srgb(p[1]);
-                p[2] = to_srgb(p[2]);
-            }
+            img.as_mut().par_iter_mut().for_each(|c| *c = to_srgb(*c));
         }
         DynamicImage::ImageRgba32F(img) => {
-            for p in img.pixels_mut() {
+            img.par_chunks_mut(4).for_each(|p| {
                 p[0] = to_srgb(p[0]);
                 p[1] = to_srgb(p[1]);
                 p[2] = to_srgb(p[2]);
-            }
+            });
         }
         _ => {}
     }

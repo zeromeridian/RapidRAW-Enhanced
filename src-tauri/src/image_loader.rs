@@ -9,7 +9,6 @@ use crate::image_processing::{
     apply_orientation, apply_srgb_to_linear, remove_raw_artifacts_and_enhance,
 };
 use crate::mask_generation::{MaskDefinition, SubMask, generate_mask_bitmap};
-use crate::raw_processing::develop_raw_image;
 use anyhow::{Context, Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use exif::{Reader as ExifReader, Tag};
@@ -22,6 +21,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::panic;
 use std::path::Path;
+use std::sync::OnceLock;
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
@@ -46,6 +46,22 @@ struct PatchMaskInfo {
     invert: bool,
     #[serde(default)]
     sub_masks: Vec<SubMask>,
+}
+
+fn srgb_to_linear_lut() -> &'static [f32; 256] {
+    static LUT: OnceLock<[f32; 256]> = OnceLock::new();
+    LUT.get_or_init(|| {
+        let mut lut = [0.0f32; 256];
+        for (i, v) in lut.iter_mut().enumerate() {
+            let x = i as f32 / 255.0;
+            *v = if x <= 0.04045 {
+                x / 12.92
+            } else {
+                ((x + 0.055) / 1.055).powf(2.4)
+            };
+        }
+        lut
+    })
 }
 
 pub fn load_and_composite(
@@ -88,7 +104,7 @@ pub fn load_base_image_from_bytes(
 
     if is_raw_file(path_for_ext_check) {
         match panic::catch_unwind(move || {
-            develop_raw_image(
+            crate::raw_processing::develop_raw_image(
                 bytes,
                 use_fast_raw_dev,
                 highlight_compression,
@@ -408,6 +424,7 @@ pub fn composite_patches_on_image(
         offset_y: Option<u32>,
         mask: image::GrayImage,
         color: image::RgbImage,
+        is_srgb_encoded: bool,
     }
 
     let decoded_patches: Result<Vec<DecodedPatch>> = visible_patches
@@ -423,6 +440,11 @@ pub fn composite_patches_on_image(
                 .and_then(|v| v.as_u64())
                 .map(|v| v as u32);
             let is_cropped = offset_x.is_some() && offset_y.is_some();
+
+            let is_srgb_encoded = patch_data
+                .get("isSrgbEncoded")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
 
             let mask_bitmap = if let Some(mask_b64) = patch_data
                 .get("mask")
@@ -496,6 +518,7 @@ pub fn composite_patches_on_image(
                 offset_y,
                 mask: mask_bitmap,
                 color: final_color,
+                is_srgb_encoded,
             })
         })
         .collect();
@@ -503,6 +526,15 @@ pub fn composite_patches_on_image(
     let decoded_patches = decoded_patches?;
 
     let mut composited_image = base_image.clone();
+    let lut = srgb_to_linear_lut();
+
+    let get_color = |patch: &DecodedPatch, r: u8, g: u8, b: u8| -> (f32, f32, f32) {
+        if patch.is_srgb_encoded {
+            (lut[r as usize], lut[g as usize], lut[b as usize])
+        } else {
+            (r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0)
+        }
+    };
 
     match &mut composited_image {
         DynamicImage::ImageRgb32F(img_buf) => {
@@ -518,16 +550,20 @@ pub fn composite_patches_on_image(
                             let mask_value = patch.mask.get_pixel(px, py)[0];
                             if mask_value > 0 {
                                 let patch_pixel = patch.color.get_pixel(px, py);
+                                let (pr, pg, pb) = get_color(
+                                    &patch,
+                                    patch_pixel[0],
+                                    patch_pixel[1],
+                                    patch_pixel[2],
+                                );
+
                                 let alpha = mask_value as f32 / 255.0;
                                 let one_minus_alpha = 1.0 - alpha;
 
                                 let base_px = img_buf.get_pixel_mut(x, y);
-                                base_px[0] = (patch_pixel[0] as f32 / 255.0) * alpha
-                                    + base_px[0] * one_minus_alpha;
-                                base_px[1] = (patch_pixel[1] as f32 / 255.0) * alpha
-                                    + base_px[1] * one_minus_alpha;
-                                base_px[2] = (patch_pixel[2] as f32 / 255.0) * alpha
-                                    + base_px[2] * one_minus_alpha;
+                                base_px[0] = pr * alpha + base_px[0] * one_minus_alpha;
+                                base_px[1] = pg * alpha + base_px[1] * one_minus_alpha;
+                                base_px[2] = pb * alpha + base_px[2] * one_minus_alpha;
                             }
                         }
                     }
@@ -540,15 +576,19 @@ pub fn composite_patches_on_image(
                                 let mask_value = patch.mask.get_pixel(x as u32, y as u32)[0];
                                 if mask_value > 0 {
                                     let patch_pixel = patch.color.get_pixel(x as u32, y as u32);
+                                    let (pr, pg, pb) = get_color(
+                                        &patch,
+                                        patch_pixel[0],
+                                        patch_pixel[1],
+                                        patch_pixel[2],
+                                    );
+
                                     let alpha = mask_value as f32 / 255.0;
                                     let one_minus_alpha = 1.0 - alpha;
 
-                                    row[x * 3] = (patch_pixel[0] as f32 / 255.0) * alpha
-                                        + row[x * 3] * one_minus_alpha;
-                                    row[x * 3 + 1] = (patch_pixel[1] as f32 / 255.0) * alpha
-                                        + row[x * 3 + 1] * one_minus_alpha;
-                                    row[x * 3 + 2] = (patch_pixel[2] as f32 / 255.0) * alpha
-                                        + row[x * 3 + 2] * one_minus_alpha;
+                                    row[x * 3] = pr * alpha + row[x * 3] * one_minus_alpha;
+                                    row[x * 3 + 1] = pg * alpha + row[x * 3 + 1] * one_minus_alpha;
+                                    row[x * 3 + 2] = pb * alpha + row[x * 3 + 2] * one_minus_alpha;
                                 }
                             }
                         });
@@ -568,16 +608,20 @@ pub fn composite_patches_on_image(
                             let mask_value = patch.mask.get_pixel(px, py)[0];
                             if mask_value > 0 {
                                 let patch_pixel = patch.color.get_pixel(px, py);
+                                let (pr, pg, pb) = get_color(
+                                    &patch,
+                                    patch_pixel[0],
+                                    patch_pixel[1],
+                                    patch_pixel[2],
+                                );
+
                                 let alpha = mask_value as f32 / 255.0;
                                 let one_minus_alpha = 1.0 - alpha;
 
                                 let base_px = img_buf.get_pixel_mut(x, y);
-                                base_px[0] = (patch_pixel[0] as f32 / 255.0) * alpha
-                                    + base_px[0] * one_minus_alpha;
-                                base_px[1] = (patch_pixel[1] as f32 / 255.0) * alpha
-                                    + base_px[1] * one_minus_alpha;
-                                base_px[2] = (patch_pixel[2] as f32 / 255.0) * alpha
-                                    + base_px[2] * one_minus_alpha;
+                                base_px[0] = pr * alpha + base_px[0] * one_minus_alpha;
+                                base_px[1] = pg * alpha + base_px[1] * one_minus_alpha;
+                                base_px[2] = pb * alpha + base_px[2] * one_minus_alpha;
                             }
                         }
                     }
@@ -590,15 +634,19 @@ pub fn composite_patches_on_image(
                                 let mask_value = patch.mask.get_pixel(x as u32, y as u32)[0];
                                 if mask_value > 0 {
                                     let patch_pixel = patch.color.get_pixel(x as u32, y as u32);
+                                    let (pr, pg, pb) = get_color(
+                                        &patch,
+                                        patch_pixel[0],
+                                        patch_pixel[1],
+                                        patch_pixel[2],
+                                    );
+
                                     let alpha = mask_value as f32 / 255.0;
                                     let one_minus_alpha = 1.0 - alpha;
 
-                                    row[x * 4] = (patch_pixel[0] as f32 / 255.0) * alpha
-                                        + row[x * 4] * one_minus_alpha;
-                                    row[x * 4 + 1] = (patch_pixel[1] as f32 / 255.0) * alpha
-                                        + row[x * 4 + 1] * one_minus_alpha;
-                                    row[x * 4 + 2] = (patch_pixel[2] as f32 / 255.0) * alpha
-                                        + row[x * 4 + 2] * one_minus_alpha;
+                                    row[x * 4] = pr * alpha + row[x * 4] * one_minus_alpha;
+                                    row[x * 4 + 1] = pg * alpha + row[x * 4 + 1] * one_minus_alpha;
+                                    row[x * 4 + 2] = pb * alpha + row[x * 4 + 2] * one_minus_alpha;
                                 }
                             }
                         });
@@ -618,15 +666,15 @@ pub fn composite_patches_on_image(
                             let mask_val = patch.mask.get_pixel(px, py)[0];
                             if mask_val > 0 {
                                 let patch_px = patch.color.get_pixel(px, py);
+                                let (pr, pg, pb) =
+                                    get_color(&patch, patch_px[0], patch_px[1], patch_px[2]);
+
                                 let alpha = mask_val as f32 / 255.0;
                                 let one_minus_alpha = 1.0 - alpha;
                                 let base_px = rgba32_img.get_pixel_mut(x, y);
-                                base_px[0] = (patch_px[0] as f32 / 255.0) * alpha
-                                    + base_px[0] * one_minus_alpha;
-                                base_px[1] = (patch_px[1] as f32 / 255.0) * alpha
-                                    + base_px[1] * one_minus_alpha;
-                                base_px[2] = (patch_px[2] as f32 / 255.0) * alpha
-                                    + base_px[2] * one_minus_alpha;
+                                base_px[0] = pr * alpha + base_px[0] * one_minus_alpha;
+                                base_px[1] = pg * alpha + base_px[1] * one_minus_alpha;
+                                base_px[2] = pb * alpha + base_px[2] * one_minus_alpha;
                             }
                         }
                     }
@@ -636,15 +684,15 @@ pub fn composite_patches_on_image(
                             let mask_val = patch.mask.get_pixel(x, y)[0];
                             if mask_val > 0 {
                                 let patch_px = patch.color.get_pixel(x, y);
+                                let (pr, pg, pb) =
+                                    get_color(&patch, patch_px[0], patch_px[1], patch_px[2]);
+
                                 let alpha = mask_val as f32 / 255.0;
                                 let one_minus_alpha = 1.0 - alpha;
                                 let base_px = rgba32_img.get_pixel_mut(x, y);
-                                base_px[0] = (patch_px[0] as f32 / 255.0) * alpha
-                                    + base_px[0] * one_minus_alpha;
-                                base_px[1] = (patch_px[1] as f32 / 255.0) * alpha
-                                    + base_px[1] * one_minus_alpha;
-                                base_px[2] = (patch_px[2] as f32 / 255.0) * alpha
-                                    + base_px[2] * one_minus_alpha;
+                                base_px[0] = pr * alpha + base_px[0] * one_minus_alpha;
+                                base_px[1] = pg * alpha + base_px[1] * one_minus_alpha;
+                                base_px[2] = pb * alpha + base_px[2] * one_minus_alpha;
                             }
                         }
                     }

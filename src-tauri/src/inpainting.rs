@@ -10,7 +10,7 @@ use crate::ai_processing;
 use crate::app_settings::load_settings;
 use crate::app_state::AppState;
 use crate::image_loader::composite_patches_on_image;
-use crate::image_processing::apply_unwarp_geometry;
+use crate::image_processing::{apply_linear_to_srgb, apply_unwarp_geometry};
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
 use crate::resolve_warped_image_for_masks;
 
@@ -29,9 +29,20 @@ pub async fn generate_manual_cleanup_patch(
         patches.retain(|p| p.get("id").and_then(|id| id.as_str()) != Some(&patch_definition.id));
     }
 
+    let is_raw = {
+        let guard = state.original_image.lock().unwrap();
+        guard.as_ref().map(|img| img.is_raw).unwrap_or(false)
+    };
+
     let (base_image, _) = crate::get_original_image(&state)?;
-    let source_image = composite_patches_on_image(&base_image, &source_image_adjustments)
+    let composited = composite_patches_on_image(&base_image, &source_image_adjustments)
         .map_err(|e| format!("Failed to prepare source image: {}", e))?;
+
+    let source_image = if is_raw {
+        apply_linear_to_srgb(composited)
+    } else {
+        composited
+    };
 
     let (img_w, img_h) = source_image.dimensions();
 
@@ -254,7 +265,7 @@ pub async fn generate_manual_cleanup_patch(
         }
     }
 
-    let quality = 92;
+    let quality = 100;
 
     let output_mask =
         image::imageops::crop_imm(&mask_bitmap, min_x_u32, min_y_u32, crop_w, crop_h).to_image();
@@ -283,7 +294,8 @@ pub async fn generate_manual_cleanup_patch(
         "offsetX": min_x_u32,
         "offsetY": min_y_u32,
         "width": crop_w,
-        "height": crop_h
+        "height": crop_h,
+        "isSrgbEncoded": is_raw
     })
     .to_string();
 
@@ -310,9 +322,20 @@ pub async fn invoke_generative_replace_with_mask_def(
         patches.retain(|p| p.get("id").and_then(|id| id.as_str()) != Some(&patch_definition.id));
     }
 
+    let is_raw = {
+        let guard = state.original_image.lock().unwrap();
+        guard.as_ref().map(|img| img.is_raw).unwrap_or(false)
+    };
+
     let (base_image, _) = crate::get_original_image(&state)?;
-    let source_image = composite_patches_on_image(&base_image, &source_image_adjustments)
+    let composited = composite_patches_on_image(&base_image, &source_image_adjustments)
         .map_err(|e| format!("Failed to prepare source image: {}", e))?;
+
+    let source_image = if is_raw {
+        apply_linear_to_srgb(composited)
+    } else {
+        composited
+    };
 
     let (img_w, img_h) = source_image.dimensions();
     let mask_def_for_generation = MaskDefinition {
@@ -510,7 +533,7 @@ pub async fn invoke_generative_replace_with_mask_def(
     let output_mask =
         image::imageops::crop_imm(&mask_bitmap, min_x_u32, min_y_u32, crop_w, crop_h).to_image();
 
-    let quality = 92;
+    let quality = 95;
     let mut color_buf = Cursor::new(Vec::with_capacity(32768));
     color_image
         .write_with_encoder(image::codecs::jpeg::JpegEncoder::new_with_quality(
@@ -535,7 +558,8 @@ pub async fn invoke_generative_replace_with_mask_def(
         "offsetX": min_x_u32,
         "offsetY": min_y_u32,
         "width": crop_w,
-        "height": crop_h
+        "height": crop_h,
+        "isSrgbEncoded": is_raw
     })
     .to_string();
 
