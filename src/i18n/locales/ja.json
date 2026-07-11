@@ -934,6 +934,7 @@
       "progress": "インポート中... ({{current}}/{{total}})"
     },
     "items": {
+      "cloudPlaceholder": "iCloudに保存されています — 未ダウンロード",
       "collapseFolder": "フォルダを折りたたむ",
       "currentFolder": "現在のフォルダ",
       "expandFolder": "フォルダを展開",

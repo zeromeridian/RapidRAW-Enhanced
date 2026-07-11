@@ -935,6 +935,7 @@
       "progress": "Importazione in corso... ({{current}}/{{total}})"
     },
     "items": {
+      "cloudPlaceholder": "Archiviato in iCloud — non scaricato",
       "collapseFolder": "Comprimi Cartella",
       "currentFolder": "Cartella Corrente",
       "expandFolder": "Espandi Cartella",

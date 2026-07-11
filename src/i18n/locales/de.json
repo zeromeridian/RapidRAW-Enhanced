@@ -935,6 +935,7 @@
       "progress": "Wird importiert... ({{current}}/{{total}})"
     },
     "items": {
+      "cloudPlaceholder": "In iCloud gespeichert — nicht heruntergeladen",
       "collapseFolder": "Ordner zuklappen",
       "currentFolder": "Aktueller Ordner",
       "expandFolder": "Ordner aufklappen",

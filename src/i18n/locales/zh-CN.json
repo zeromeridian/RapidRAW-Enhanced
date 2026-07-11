@@ -935,6 +935,7 @@
       "progress": "导入中...（{{current}}/{{total}}）"
     },
     "items": {
+      "cloudPlaceholder": "存储在 iCloud 中 — 未下载",
       "collapseFolder": "折叠文件夹",
       "currentFolder": "当前文件夹",
       "expandFolder": "展开文件夹",

@@ -935,6 +935,7 @@
       "progress": "匯入中...（{{current}}/{{total}}）"
     },
     "items": {
+      "cloudPlaceholder": "儲存在 iCloud 中 — 未下載",
       "collapseFolder": "摺疊資料夾",
       "currentFolder": "當前資料夾",
       "expandFolder": "展開資料夾",

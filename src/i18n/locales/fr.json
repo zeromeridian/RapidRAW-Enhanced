@@ -935,6 +935,7 @@
       "progress": "Importation... ({{current}}/{{total}})"
     },
     "items": {
+      "cloudPlaceholder": "Stocké dans iCloud — non téléchargé",
       "collapseFolder": "Réduire le dossier",
       "currentFolder": "Dossier actuel",
       "expandFolder": "Développer le dossier",

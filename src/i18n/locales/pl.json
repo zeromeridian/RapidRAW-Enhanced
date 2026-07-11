@@ -977,6 +977,7 @@
       "progress": "Importowanie... ({{current}}/{{total}})"
     },
     "items": {
+      "cloudPlaceholder": "Przechowywane w iCloud — niepobrane",
       "collapseFolder": "Zwiń folder",
       "currentFolder": "Bieżący folder",
       "expandFolder": "Rozwiń folder",
