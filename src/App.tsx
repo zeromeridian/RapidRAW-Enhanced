@@ -575,6 +575,7 @@ function App() {
   );
 
   const hasRoots = rootPaths && rootPaths.length > 0;
+  const hasMainContent = hasRoots || !!selectedImage;
 
   const renderFolderTree = () => {
     if (!hasRoots) return null;
@@ -643,8 +644,8 @@ function App() {
         <div
           className={clsx(
             'flex-1 flex flex-col min-h-0',
-            isLayoutReady && hasRoots && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-            [hasRoots && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2')],
+            isLayoutReady && hasMainContent && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+            [hasMainContent && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2')],
           )}
         >
           <div className="flex flex-row grow h-full min-h-0">
