@@ -1433,9 +1433,18 @@ const ImageCanvas = memo(
       return { width: w, height: h };
     }, [selectedImage.width, selectedImage.height, adjustments.orientationSteps]);
 
-    const isPercentCrop = crop?.unit === '%';
-    const cropX = crop ? (isPercentCrop ? (crop.x / 100) * effectiveImageDimensions.width : crop.x) : 0;
-    const cropY = crop ? (isPercentCrop ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0;
+    const activeCrop = adjustments.crop;
+    const isPercentCrop = activeCrop?.unit === '%';
+    const cropX = activeCrop
+      ? isPercentCrop
+        ? (activeCrop.x / 100) * effectiveImageDimensions.width
+        : activeCrop.x
+      : 0;
+    const cropY = activeCrop
+      ? isPercentCrop
+        ? (activeCrop.y / 100) * effectiveImageDimensions.height
+        : activeCrop.y
+      : 0;
 
     const effectiveZoomScale = transformState.scale > 0 ? transformState.scale : 1;
     const brushStageSize = (brushSettings?.size ?? 0) / effectiveZoomScale;
