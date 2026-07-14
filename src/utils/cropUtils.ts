@@ -39,3 +39,27 @@ export function calculateCenteredCrop(
     height: Math.round(h_c),
   };
 }
+
+export function rotateCropCenter(
+  crop: Crop,
+  orientedWidth: number,
+  orientedHeight: number,
+  deltaDegrees: number,
+): Crop {
+  const rad = (deltaDegrees * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const cx = orientedWidth / 2;
+  const cy = orientedHeight / 2;
+  const px = crop.x + crop.width / 2 - cx;
+  const py = crop.y + crop.height / 2 - cy;
+  const rx = px * cos - py * sin;
+  const ry = px * sin + py * cos;
+  return {
+    unit: 'px',
+    x: Math.round(cx + rx - crop.width / 2),
+    y: Math.round(cy + ry - crop.height / 2),
+    width: crop.width,
+    height: crop.height,
+  };
+}
