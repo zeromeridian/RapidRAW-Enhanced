@@ -295,9 +295,6 @@ fn clean_undefined_field(
     fallback_display: impl FnOnce() -> String,
 ) -> Option<String> {
     if tag_name == "UserComment" {
-        // First 8 bytes are a character-code header (e.g. b"ASCII\0\0\0",
-        // b"UNICODE\0"). Strip it, then check whether what remains is
-        // meaningful text or just padding/zeros.
         let body = if bytes.len() > 8 { &bytes[8..] } else { &[][..] };
         let text = String::from_utf8_lossy(body)
             .trim_matches(char::from(0))
@@ -965,15 +962,7 @@ pub fn write_image_with_metadata(
 
             let get_string_val = |field: &exif::Field| -> String {
                 match &field.value {
-                    exif::Value::Ascii(vec) => vec
-                        .iter()
-                        .map(|v| {
-                            String::from_utf8_lossy(v)
-                                .trim_matches(char::from(0))
-                                .to_string()
-                        })
-                        .collect::<Vec<String>>()
-                        .join(" "),
+                    exif::Value::Ascii(components) => clean_ascii_field(components).unwrap_or_default(),
                     _ => field
                         .display_value()
                         .to_string()
