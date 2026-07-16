@@ -54,9 +54,9 @@ pub fn neutralize_wb_if_multiexposure(wb_coeffs: [f32; 4], file_bytes: &[u8]) ->
     if is_incamera_multiexposure_canon(file_bytes) {
         log::info!("[raw_hdr_wb] multi-exposure CR2 detected, neutralizing WB");
         let mut neutralized = wb_coeffs;
-        for i in 0..4 {
-            if neutralized[i].is_finite() {
-                neutralized[i] = 1.0;
+        for exp in &mut neutralized {
+            if exp.is_finite() {
+                *exp = 1.0;
             }
         }
         neutralized
