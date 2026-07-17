@@ -111,6 +111,29 @@ const Slider = ({
   }, [isDragging, onDragStateChange]);
 
   useEffect(() => {
+    if (!disabled) return;
+
+    pendingTouchRef.current = null;
+    suppressTouchChangeRef.current = false;
+    isWheelActivelyChangingRef.current = false;
+
+    if (wheelTimeoutRef.current !== undefined) {
+      window.clearTimeout(wheelTimeoutRef.current);
+      wheelTimeoutRef.current = undefined;
+    }
+    if (animationFrameRef.current !== undefined) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = undefined;
+    }
+
+    setIsDragging(false);
+    setIsEditing(false);
+    setIsLabelHovered(false);
+    setDisplayValue(value);
+    setInputValue(String(value));
+  }, [disabled, value]);
+
+  useEffect(() => {
     const sliderElement = containerRef.current;
     if (!sliderElement) return;
 
@@ -155,7 +178,7 @@ const Slider = ({
 
   // Handle Dragging
   useEffect(() => {
-    if (!isDragging) return;
+    if (!isDragging || disabled) return;
 
     const inputEl = rangeInputRef.current;
     if (!inputEl) return;
@@ -217,7 +240,7 @@ const Slider = ({
       window.removeEventListener('touchend', handlePointerUp);
       window.removeEventListener('touchcancel', handlePointerUp);
     };
-  }, [isDragging]);
+  }, [disabled, isDragging]);
 
   useEffect(() => {
     if (isDragging) {
@@ -409,7 +432,7 @@ const Slider = ({
     if (disabled) return;
 
     const textVal = e.target.value;
-    if (!/^[0-9.,\-]*$/.test(textVal)) {
+    if (!/^[0-9.,-]*$/.test(textVal)) {
       return;
     }
     setInputValue(textVal);
@@ -426,7 +449,11 @@ const Slider = ({
   };
 
   const handleInputCommit = () => {
-    if (disabled) return;
+    if (disabled) {
+      setInputValue(String(value));
+      setIsEditing(false);
+      return;
+    }
 
     let newValue = parseFloat(inputValue.replace(',', '.'));
     if (isNaN(newValue)) {
@@ -532,7 +559,7 @@ const Slider = ({
               className={`text-sm text-text-primary w-full text-right select-none ${disabled ? '' : 'cursor-text'}`}
               onClick={disabled ? undefined : handleValueClick}
               onDoubleClick={disabled ? undefined : handleReset}
-              data-tooltip={t('ui.slider.clickToEdit')}
+              data-tooltip={disabled ? undefined : t('ui.slider.clickToEdit')}
             >
               {decimalPlaces > 0 && numericValue === 0 ? '0' : numericValue.toFixed(decimalPlaces)}
               {suffix && <span className="text-[10px] align-top inline-block mt-0.5 ml-0.5">{suffix}</span>}
