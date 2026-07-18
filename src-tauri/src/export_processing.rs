@@ -697,11 +697,11 @@ fn export_adjustments_as_lut(
     convert_image_to_cube_lut(&processed_lut, lut_size)
 }
 
-struct ExportHandleGuide {
+struct ExportHandleGuard {
     app_handle: tauri::AppHandle,
 }
 
-impl Drop for ExportHandleGuide {
+impl Drop for ExportHandleGuard {
     fn drop(&mut self) {
         if let Ok(mut handle_lock) = self
             .app_handle
@@ -763,7 +763,7 @@ pub async fn export_images(
     );
 
     let task = tokio::spawn(async move {
-        let _export_guard = ExportHandleGuide {
+        let _export_guard = ExportHandleGuard {
             app_handle: app_handle.clone(),
         };
         let output_folder_path = std::path::Path::new(&output_folder_or_file);
