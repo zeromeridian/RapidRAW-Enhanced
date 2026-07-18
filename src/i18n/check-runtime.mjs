@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import i18next from 'i18next';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const localeDir = path.resolve(scriptDir, '../src/i18n/locales');
+const localeDir = path.resolve(scriptDir, 'locales');
 const pluralSuffix = /_(zero|one|two|few|many|other)$/;
 const countCandidates = [
   ...Array.from({ length: 201 }, (_, count) => count),
