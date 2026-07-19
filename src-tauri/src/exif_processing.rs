@@ -248,75 +248,6 @@ pub fn read_iso(path: &str, file_bytes: &[u8]) -> Option<u32> {
     None
 }
 
-fn decode_cfa_pattern(bytes: &[u8]) -> Option<String> {
-    if bytes.len() < 4 {
-        return None;
-    }
-
-    let h_repeat = u16::from_le_bytes([bytes[0], bytes[1]]) as usize;
-    let v_repeat = u16::from_le_bytes([bytes[2], bytes[3]]) as usize;
-    let count = h_repeat * v_repeat;
-    if count == 0 || bytes.len() < 4 + count {
-        return None;
-    }
-
-    let pattern: String = bytes[4..4 + count]
-        .iter()
-        .map(|&b| match b {
-            0 => 'R',
-            1 => 'G',
-            2 => 'B',
-            3 => 'C',
-            4 => 'M',
-            5 => 'Y',
-            6 => 'W',
-            _ => '?',
-        })
-        .collect();
-
-    if pattern.is_empty() { None } else { Some(pattern) }
-}
-
-fn clean_ascii_field(components: &[Vec<u8>]) -> Option<String> {
-    components
-        .iter()
-        .map(|c| {
-            String::from_utf8_lossy(c)
-                .trim_matches(char::from(0))
-                .trim()
-                .to_string()
-        })
-        .find(|s| !s.is_empty())
-}
-
-fn clean_undefined_field(
-    tag_name: &str,
-    bytes: &[u8],
-    fallback_display: impl FnOnce() -> String,
-) -> Option<String> {
-    if tag_name == "UserComment" {
-        let body = if bytes.len() > 8 { &bytes[8..] } else { &[][..] };
-        let text = String::from_utf8_lossy(body)
-            .trim_matches(char::from(0))
-            .trim()
-            .to_string();
-        return if text.is_empty() { None } else { Some(text) };
-    }
-
-    let is_all_zero = bytes.iter().all(|&b| b == 0);
-    let is_meaningless_binary = tag_name == "MakerNote" || is_all_zero || bytes.is_empty();
-    if is_meaningless_binary {
-        return None;
-    }
-
-    let val = fallback_display();
-    if !val.trim().is_empty() && !val.trim_start().starts_with("0x") {
-        Some(val)
-    } else {
-        None
-    }
-}
-
 pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
     let mut map = HashMap::new();
 
@@ -401,101 +332,13 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
                         fmt_date_str(field.display_value().to_string()),
                     );
                 }
-                exif::Tag::CFAPattern => {
-                    if let exif::Value::Undefined(ref bytes, _) = field.value
-                        && let Some(pattern) = decode_cfa_pattern(bytes)
-                    {
-                        map.insert("CFAPattern".to_string(), pattern);
-                    }
-                }
-                exif::Tag::LensSpecification => {
-                    if let exif::Value::Rational(ref v) = field.value
-                        && v.len() == 4
-                    {
-                        let calc = |r: &exif::Rational| -> Option<f32> {
-                            if r.denom == 0 {
-                                None
-                            } else {
-                                Some(r.num as f32 / r.denom as f32)
-                            }
-                        };
-                        if let (Some(min_f), Some(max_f)) = (calc(&v[0]), calc(&v[1])) {
-                            let focal = if (min_f - max_f).abs() < f32::EPSILON {
-                                format!("{} mm", min_f)
-                            } else {
-                                format!("{}-{} mm", min_f, max_f)
-                            };
-                            let aperture = match (calc(&v[2]), calc(&v[3])) {
-                                (Some(min_a), Some(max_a))
-                                    if (min_a - max_a).abs() < f32::EPSILON =>
-                                {
-                                    format!(", f/{}", min_a)
-                                }
-                                (Some(min_a), Some(max_a)) => {
-                                    format!(", f/{}-{}", min_a, max_a)
-                                }
-                                _ => String::new(),
-                            };
-                            map.insert(
-                                "LensSpecification".to_string(),
-                                format!("{}{}", focal, aperture),
-                            );
-                        }
-                    }
-                }
                 _ => {
-                    if let exif::Value::Ascii(ref components) = field.value {
-                        if let Some(val) = clean_ascii_field(components) {
-                            map.insert(field.tag.to_string(), val);
-                        }
-                    } else if let exif::Value::Undefined(ref bytes, _) = field.value {
-                        let tag_name = field.tag.to_string();
-                        if let Some(val) = clean_undefined_field(&tag_name, bytes, || {
-                            field.display_value().with_unit(&exif_obj).to_string()
-                        }) {
-                            map.insert(tag_name, val);
-                        }
-                    } else {
-                        let val = field.display_value().with_unit(&exif_obj).to_string();
-                        if !val.trim().is_empty() {
-                            map.insert(field.tag.to_string(), val);
-                        }
+                    let val = field.display_value().with_unit(&exif_obj).to_string();
+                    if !val.trim().is_empty() {
+                        map.insert(field.tag.to_string(), val);
                     }
                 }
             }
-        }
-    }
-
-    let needs_lens_spec_patch = !map
-        .get("LensSpecification")
-        .is_some_and(|s| s.contains("f/"));
-
-    if needs_lens_spec_patch
-        && let Some(patch_meta) = read_raw_metadata(file_bytes)
-        && let Some(lens_desc) = &patch_meta.lens
-    {
-        let fmt_rat_patch = |r: &rawler::formats::tiff::Rational| -> f32 {
-            if r.d == 0 { 0.0 } else { r.n as f32 / r.d as f32 }
-        };
-        let focal_min = fmt_rat_patch(&lens_desc.focal_range[0]);
-        let focal_max = fmt_rat_patch(&lens_desc.focal_range[1]);
-        let focal = if (focal_min - focal_max).abs() < f32::EPSILON {
-            format!("{} mm", focal_min)
-        } else {
-            format!("{}-{} mm", focal_min, focal_max)
-        };
-        let aperture_min = fmt_rat_patch(&lens_desc.aperture_range[0]);
-        let aperture_max = fmt_rat_patch(&lens_desc.aperture_range[1]);
-        if aperture_min > 0.0 || aperture_max > 0.0 {
-            let aperture = if (aperture_min - aperture_max).abs() < f32::EPSILON {
-                format!(", f/{}", aperture_min)
-            } else {
-                format!(", f/{}-{}", aperture_min, aperture_max)
-            };
-            map.insert(
-                "LensSpecification".to_string(),
-                format!("{}{}", focal, aperture),
-            );
         }
     }
 
@@ -962,7 +805,15 @@ pub fn write_image_with_metadata(
 
             let get_string_val = |field: &exif::Field| -> String {
                 match &field.value {
-                    exif::Value::Ascii(components) => clean_ascii_field(components).unwrap_or_default(),
+                    exif::Value::Ascii(vec) => vec
+                        .iter()
+                        .map(|v| {
+                            String::from_utf8_lossy(v)
+                                .trim_matches(char::from(0))
+                                .to_string()
+                        })
+                        .collect::<Vec<String>>()
+                        .join(" "),
                     _ => field
                         .display_value()
                         .to_string()
@@ -1275,29 +1126,8 @@ pub fn read_exif_data_from_bytes(path: &str, file_bytes: &[u8]) -> HashMap<Strin
     let mut exif_data = HashMap::new();
     if let Some(exif) = read_exif(file_bytes) {
         for field in exif.fields() {
-            if field.tag == exif::Tag::CFAPattern {
-                if let exif::Value::Undefined(ref bytes, _) = field.value
-                    && let Some(pattern) = decode_cfa_pattern(bytes)
-                {
-                    exif_data.insert("CFAPattern".to_string(), pattern);
-                }
-                continue;
-            }
-            if let exif::Value::Ascii(ref components) = field.value {
-                if let Some(val) = clean_ascii_field(components) {
-                    exif_data.insert(field.tag.to_string(), truncate_large_exif(&val));
-                }
-            } else if let exif::Value::Undefined(ref bytes, _) = field.value {
-                let tag_name = field.tag.to_string();
-                if let Some(val) = clean_undefined_field(&tag_name, bytes, || {
-                    field.display_value().with_unit(&exif).to_string()
-                }) {
-                    exif_data.insert(tag_name, truncate_large_exif(&val));
-                }
-            } else {
-                let raw_val = field.display_value().with_unit(&exif).to_string();
-                exif_data.insert(field.tag.to_string(), truncate_large_exif(&raw_val));
-            }
+            let raw_val = field.display_value().with_unit(&exif).to_string();
+            exif_data.insert(field.tag.to_string(), truncate_large_exif(&raw_val));
         }
     }
     exif_data
