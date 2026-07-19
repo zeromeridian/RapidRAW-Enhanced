@@ -132,6 +132,29 @@ fn parse_raw_creation_date(date_str: Option<&str>) -> Option<DateTime<Utc>> {
     parse_creation_datetime(date_str?).map(|dt| DateTime::from_naive_utc_and_offset(dt, Utc))
 }
 
+fn clean_ascii_value(value: &exif::Value) -> Option<String> {
+    let exif::Value::Ascii(ref components) = *value else {
+        return None;
+    };
+
+    let cleaned: Vec<String> = components
+        .iter()
+        .map(|c| {
+            String::from_utf8_lossy(c)
+                .trim_matches(char::from(0))
+                .trim()
+                .to_string()
+        })
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(cleaned.join(" "))
+    }
+}
+
 pub fn read_exif(file_bytes: &[u8]) -> Option<Exif> {
     let exifreader = exif::Reader::new();
     exifreader
@@ -332,12 +355,19 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
                         fmt_date_str(field.display_value().to_string()),
                     );
                 }
-                _ => {
-                    let val = field.display_value().with_unit(&exif_obj).to_string();
-                    if !val.trim().is_empty() {
-                        map.insert(field.tag.to_string(), val);
+                _ => match &field.value {
+                    exif::Value::Ascii(_) => {
+                        if let Some(val) = clean_ascii_value(&field.value) {
+                            map.insert(field.tag.to_string(), val);
+                        }
                     }
-                }
+                    _ => {
+                        let val = field.display_value().with_unit(&exif_obj).to_string();
+                        if !val.trim().is_empty() {
+                            map.insert(field.tag.to_string(), val);
+                        }
+                    }
+                },
             }
         }
     }
@@ -1126,7 +1156,13 @@ pub fn read_exif_data_from_bytes(path: &str, file_bytes: &[u8]) -> HashMap<Strin
     let mut exif_data = HashMap::new();
     if let Some(exif) = read_exif(file_bytes) {
         for field in exif.fields() {
-            let raw_val = field.display_value().with_unit(&exif).to_string();
+            let raw_val = match &field.value {
+                exif::Value::Ascii(_) => match clean_ascii_value(&field.value) {
+                    Some(v) => v,
+                    None => continue,
+                },
+                _ => field.display_value().with_unit(&exif).to_string(),
+            };
             exif_data.insert(field.tag.to_string(), truncate_large_exif(&raw_val));
         }
     }
