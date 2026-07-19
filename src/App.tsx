@@ -712,9 +712,9 @@ function App() {
                   requestThumbnails={requestThumbnails}
                 />
               )}
-              {isSettingsOpen && appSettings && (
-                <div className="absolute inset-0 z-50 flex bg-bg-secondary">
-                  <div className="w-full h-full flex flex-col p-8 lg:p-16 overflow-y-auto custom-scrollbar">
+              {isSettingsOpen && appSettings && hasRoots && (
+                <div className="absolute inset-0 z-50 flex bg-bg-secondary rounded-lg">
+                  <div className="w-full h-full flex flex-col p-4 lg:p-8 overflow-y-auto custom-scrollbar">
                     <SettingsPanel
                       appSettings={appSettings}
                       onBack={() => setUI({ isSettingsOpen: false })}

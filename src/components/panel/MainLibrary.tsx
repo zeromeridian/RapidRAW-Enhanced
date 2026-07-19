@@ -38,6 +38,7 @@ import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
+import SettingsPanel from './SettingsPanel';
 
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
@@ -165,6 +166,7 @@ export default function MainLibrary(props: MainLibraryProps) {
   const [latestVersion, setLatestVersion] = useState('');
   const [isBusyDelayed, setIsBusyDelayed] = useState(false);
   const [isProgressHovered, setIsProgressHovered] = useState(false);
+  const isSettingsOpen = useUIStore((state) => state.isSettingsOpen);
 
   const libraryDisplayMode = props.appSettings?.libraryDisplayMode || LibraryDisplayMode.Grid;
 
@@ -343,135 +345,145 @@ export default function MainLibrary(props: MainLibraryProps) {
             </div>
 
             <div className="w-full h-full flex flex-col p-8 lg:p-16 overflow-y-auto custom-scrollbar relative z-10">
-              <>
-                <div className="my-auto text-left relative z-10">
-                  <Text variant={TextVariants.displayLarge}>{t('library.splash.brand')}</Text>
-                  <Text
-                    variant={TextVariants.heading}
-                    color={TextColors.secondary}
-                    weight={TextWeights.normal}
-                    className="mb-10 max-w-md drop-shadow-sm"
-                  >
-                    {hasLastPath ? (
-                      <>
-                        {t('library.splash.welcomeBack')}
-                        <br />
-                        {t('library.splash.welcomeBackDesc')}
-                      </>
-                    ) : props.isAndroid ? (
-                      t('library.splash.descriptionAndroid')
-                    ) : (
-                      t('library.splash.descriptionDesktop')
-                    )}
-                  </Text>
-                  <div className="flex flex-col w-full max-w-xs gap-4 relative z-10">
-                    {hasLastPath && (
-                      <Button
-                        className="rounded-md h-11 w-full flex justify-center items-center shadow-md transition-transform duration-200 hover:scale-[1.01] active:scale-[.98]"
-                        onClick={props.onContinueSession}
-                        size="lg"
-                      >
-                        <RefreshCw size={20} className="mr-2" /> {t('library.splash.continueSession')}
-                      </Button>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <Button
-                        className={`rounded-md grow flex justify-center items-center shadow-md h-11 transition-transform duration-200 hover:scale-[1.01] active:scale-[.98] ${
-                          hasLastPath ? 'bg-surface text-text-primary' : ''
-                        }`}
-                        onClick={props.onOpenFolder}
-                        size="lg"
-                      >
-                        <Folder size={20} className="mr-2" />
-                        {props.isAndroid
-                          ? t('library.splash.openLibrary')
-                          : hasLastPath
-                            ? t('library.splash.addFolder')
-                            : t('library.splash.openFolder')}
-                      </Button>
-                      <Button
-                        className="px-3 bg-surface text-text-primary shadow-md h-11 transition-transform duration-200 hover:scale-[1.03] active:scale-[.96]"
-                        onClick={() => setUI({ isSettingsOpen: true })}
-                        size="lg"
-                        data-tooltip={t('settings.general.title')}
-                        variant="ghost"
-                      >
-                        <Settings size={20} />
-                      </Button>
+              {isSettingsOpen && props.appSettings ? (
+                <SettingsPanel
+                  appSettings={props.appSettings}
+                  onBack={() => setUI({ isSettingsOpen: false })}
+                  onLibraryRefresh={props.onLibraryRefresh}
+                  onSettingsChange={props.onSettingsChange}
+                  rootPaths={props.rootPaths}
+                />
+              ) : (
+                <>
+                  <div className="my-auto text-left relative z-10">
+                    <Text variant={TextVariants.displayLarge}>{t('library.splash.brand')}</Text>
+                    <Text
+                      variant={TextVariants.heading}
+                      color={TextColors.secondary}
+                      weight={TextWeights.normal}
+                      className="mb-10 max-w-md drop-shadow-sm"
+                    >
+                      {hasLastPath ? (
+                        <>
+                          {t('library.splash.welcomeBack')}
+                          <br />
+                          {t('library.splash.welcomeBackDesc')}
+                        </>
+                      ) : props.isAndroid ? (
+                        t('library.splash.descriptionAndroid')
+                      ) : (
+                        t('library.splash.descriptionDesktop')
+                      )}
+                    </Text>
+                    <div className="flex flex-col w-full max-w-xs gap-4 relative z-10">
+                      {hasLastPath && (
+                        <Button
+                          className="rounded-md h-11 w-full flex justify-center items-center shadow-md transition-transform duration-200 hover:scale-[1.01] active:scale-[.98]"
+                          onClick={props.onContinueSession}
+                          size="lg"
+                        >
+                          <RefreshCw size={20} className="mr-2" /> {t('library.splash.continueSession')}
+                        </Button>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          className={`rounded-md grow flex justify-center items-center shadow-md h-11 transition-transform duration-200 hover:scale-[1.01] active:scale-[.98] ${
+                            hasLastPath ? 'bg-surface text-text-primary' : ''
+                          }`}
+                          onClick={props.onOpenFolder}
+                          size="lg"
+                        >
+                          <Folder size={20} className="mr-2" />
+                          {props.isAndroid
+                            ? t('library.splash.openLibrary')
+                            : hasLastPath
+                              ? t('library.splash.addFolder')
+                              : t('library.splash.openFolder')}
+                        </Button>
+                        <Button
+                          className="px-3 bg-surface text-text-primary shadow-md h-11 transition-transform duration-200 hover:scale-[1.03] active:scale-[.96]"
+                          onClick={() => setUI({ isSettingsOpen: true })}
+                          size="lg"
+                          data-tooltip={t('settings.general.title')}
+                          variant="ghost"
+                        >
+                          <Settings size={20} />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <Text
-                  variant={TextVariants.small}
-                  as="div"
-                  className="absolute bottom-8 left-8 lg:left-16 space-y-1 z-10 drop-shadow-sm"
-                >
-                  <p>
-                    {t('library.splash.imagesBy')}{' '}
-                    <a
-                      href="https://instagram.com/timonkaech.photography"
-                      className="hover:underline"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Timon Käch
-                    </a>
-                  </p>
-                  {appVersion && (
-                    <div className="flex items-center space-x-2">
-                      <p>
-                        <span
-                          className={`group transition-all duration-300 ease-in-out rounded-md py-1 ${
-                            isUpdateAvailable
-                              ? 'cursor-pointer border border-yellow-500 px-2 hover:bg-yellow-500/20'
-                              : ''
-                          }`}
-                          onClick={() => {
-                            if (isUpdateAvailable) {
-                              open('https://github.com/CyberTimon/RapidRAW/releases/latest');
+                  <Text
+                    variant={TextVariants.small}
+                    as="div"
+                    className="absolute bottom-8 left-8 lg:left-16 space-y-1 z-10 drop-shadow-sm"
+                  >
+                    <p>
+                      {t('library.splash.imagesBy')}{' '}
+                      <a
+                        href="https://instagram.com/timonkaech.photography"
+                        className="hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Timon Käch
+                      </a>
+                    </p>
+                    {appVersion && (
+                      <div className="flex items-center space-x-2">
+                        <p>
+                          <span
+                            className={`group transition-all duration-300 ease-in-out rounded-md py-1 ${
+                              isUpdateAvailable
+                                ? 'cursor-pointer border border-yellow-500 px-2 hover:bg-yellow-500/20'
+                                : ''
+                            }`}
+                            onClick={() => {
+                              if (isUpdateAvailable) {
+                                open('https://github.com/CyberTimon/RapidRAW/releases/latest');
+                              }
+                            }}
+                            data-tooltip={
+                              isUpdateAvailable
+                                ? t('library.splash.downloadVersion', { version: latestVersion })
+                                : t('library.splash.latestVersion')
                             }
-                          }}
-                          data-tooltip={
-                            isUpdateAvailable
-                              ? t('library.splash.downloadVersion', { version: latestVersion })
-                              : t('library.splash.latestVersion')
-                          }
-                        >
-                          <span className={isUpdateAvailable ? 'group-hover:hidden' : ''}>
-                            {t('library.splash.version', { version: appVersion })}
-                          </span>
-                          {isUpdateAvailable && (
-                            <span className="hidden group-hover:inline text-yellow-400">
-                              {t('library.splash.newVersionAvailable')}
+                          >
+                            <span className={isUpdateAvailable ? 'group-hover:hidden' : ''}>
+                              {t('library.splash.version', { version: appVersion })}
                             </span>
-                          )}
-                        </span>
-                      </p>
-                      <span>-</span>
-                      <p>
-                        <a
-                          href="https://ko-fi.com/cybertimon"
-                          className="hover:underline"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {t('library.splash.donate')}
-                        </a>
-                        <span className="mx-1">{t('library.splash.or')}</span>
-                        <a
-                          href="https://github.com/CyberTimon/RapidRAW"
-                          className="hover:underline"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {t('library.splash.contribute')}
-                        </a>
-                      </p>
-                    </div>
-                  )}
-                </Text>
-              </>
+                            {isUpdateAvailable && (
+                              <span className="hidden group-hover:inline text-yellow-400">
+                                {t('library.splash.newVersionAvailable')}
+                              </span>
+                            )}
+                          </span>
+                        </p>
+                        <span>-</span>
+                        <p>
+                          <a
+                            href="https://ko-fi.com/cybertimon"
+                            className="hover:underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {t('library.splash.donate')}
+                          </a>
+                          <span className="mx-1">{t('library.splash.or')}</span>
+                          <a
+                            href="https://github.com/CyberTimon/RapidRAW"
+                            className="hover:underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {t('library.splash.contribute')}
+                          </a>
+                        </p>
+                      </div>
+                    )}
+                  </Text>
+                </>
+              )}
             </div>
           </div>
         </div>
