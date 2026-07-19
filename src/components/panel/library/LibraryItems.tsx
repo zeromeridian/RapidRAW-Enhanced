@@ -20,6 +20,7 @@ interface ImageLayer {
 const ThumbnailComponent = ({
   isActive,
   isSelected,
+  isForcedHover,
   onContextMenu,
   onImageClick,
   onImageDoubleClick,
@@ -130,7 +131,9 @@ const ThumbnailComponent = ({
     ? 'ring-2 ring-inset ring-accent'
     : isSelected
       ? 'ring-2 ring-inset ring-gray-400'
-      : 'group-hover:ring-2 group-hover:ring-inset group-hover:ring-hover-color';
+      : isForcedHover
+        ? 'ring-2 ring-inset ring-hover-color'
+        : 'group-hover:ring-2 group-hover:ring-inset group-hover:ring-hover-color';
 
   const colorTag = tags?.find((t: string) => t.startsWith('color:'))?.substring(6);
   const colorLabel = COLOR_LABELS.find((c: Color) => c.name === colorTag);
@@ -169,9 +172,11 @@ const ThumbnailComponent = ({
               >
                 <img
                   alt={path.split(/[\\/]/).pop()}
-                  className={`w-full h-full group-hover:scale-[1.02] transition-transform duration-300 will-change-transform ${
-                    thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
-                  } relative`}
+                  className={clsx(
+                    'w-full h-full transition-transform duration-300 will-change-transform relative',
+                    thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover',
+                    isForcedHover ? 'scale-[1.02]' : 'group-hover:scale-[1.02]',
+                  )}
                   decoding="async"
                   loading="lazy"
                   src={layer.url}

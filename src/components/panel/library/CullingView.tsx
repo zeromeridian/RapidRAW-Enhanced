@@ -3,7 +3,20 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { List } from 'react-window';
-import { Loader2, Star as StarIcon, ZoomIn, ZoomOut, Maximize, Link, SquarePen } from 'lucide-react';
+import {
+  Loader2,
+  Star as StarIcon,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
+  Link,
+  SquarePen,
+  Tag,
+  X,
+  Check,
+  Plus,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { Invokes, ImageFile } from '../../ui/AppProperties';
@@ -11,6 +24,9 @@ import { Thumbnail } from './LibraryItems';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { useProcessStore } from '../../../store/useProcessStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
+import { useLibraryActions } from '../../../hooks/useLibraryActions';
+import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 
 interface SyncViewport {
   isActive: boolean;
@@ -29,6 +45,7 @@ function CullingPreview({
   setSyncViewport,
   onContextMenu,
   onImageDoubleClick,
+  setHoveredCullingPath,
 }: {
   image: ImageFile;
   rating: number;
@@ -39,6 +56,7 @@ function CullingPreview({
   setSyncViewport: React.Dispatch<React.SetStateAction<SyncViewport>>;
   onContextMenu: (e: React.MouseEvent, path: string, forceSingleSelection?: boolean) => void;
   onImageDoubleClick: (path: string) => void;
+  setHoveredCullingPath: (path: string | null) => void;
 }) {
   const thumbUrl = useProcessStore((s) => s.thumbnails[image.path]);
   const initialPreview = useProcessStore((s) => s.previews[image.path]);
@@ -52,11 +70,73 @@ function CullingPreview({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const dragStartMouse = useRef({ x: 0, y: 0 });
   const dragStartPan = useRef({ x: 0, y: 0 });
   const hasDragged = useRef(false);
   const zoomRef = useRef(zoom);
   const panRef = useRef(pan);
+  const [showMetadataBar, setShowMetadataBar] = useState(false);
+  const [tagInputValue, setTagInputValue] = useState('');
+  const [fitScale, setFitScale] = useState<number | null>(null);
+  const { handleRate, handleSetColorLabel, handleTagsChanged } = useLibraryActions();
+  const USER_TAG_PREFIX = 'user:';
+
+  const currentColor = useMemo(() => {
+    return image.tags?.find((t) => t.startsWith('color:'))?.substring(6) || null;
+  }, [image.tags]);
+
+  const colorLabel = useMemo(() => {
+    return COLOR_LABELS.find((c: Color) => c.name === currentColor) || null;
+  }, [currentColor]);
+
+  const displayEditIcon = useSettingsStore((s) => s.appSettings?.displayEditIcon ?? true);
+  const showEditIcon = image.is_edited && displayEditIcon;
+  const hasAnyOverlay = showEditIcon || !!colorLabel || rating > 0;
+
+  const currentTags = useMemo(() => {
+    return (image.tags || [])
+      .filter((t) => !t.startsWith('color:'))
+      .map((t) => ({
+        tag: t.startsWith(USER_TAG_PREFIX) ? t.substring(USER_TAG_PREFIX.length) : t,
+        isUser: t.startsWith(USER_TAG_PREFIX),
+      }))
+      .sort((a, b) => a.tag.localeCompare(b.tag));
+  }, [image.tags]);
+
+  const handleAddTag = async (tagToAdd: string) => {
+    const newTagValue = tagToAdd.trim().toLowerCase();
+    if (newTagValue && !currentTags.some((t) => t.tag === newTagValue)) {
+      try {
+        const prefixedTag = `${USER_TAG_PREFIX}${newTagValue}`;
+        await invoke(Invokes.AddTagForPaths, { paths: [image.path], tag: prefixedTag });
+        const newTags = [...currentTags, { tag: newTagValue, isUser: true }];
+        handleTagsChanged([image.path], newTags);
+        setTagInputValue('');
+      } catch (err) {
+        console.error(`Failed to add tag: ${err}`);
+      }
+    }
+  };
+
+  const handleRemoveTag = async (tagToRemove: { tag: string; isUser: boolean }) => {
+    try {
+      const prefixedTag = tagToRemove.isUser ? `${USER_TAG_PREFIX}${tagToRemove.tag}` : tagToRemove.tag;
+      await invoke(Invokes.RemoveTagForPaths, { paths: [image.path], tag: prefixedTag });
+      const newTags = currentTags.filter((t) => t.tag !== tagToRemove.tag);
+      handleTagsChanged([image.path], newTags);
+    } catch (err) {
+      console.error(`Failed to remove tag: ${err}`);
+    }
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTag(tagInputValue);
+    }
+    e.stopPropagation();
+  };
 
   useEffect(() => {
     zoomRef.current = zoom;
@@ -67,6 +147,32 @@ function CullingPreview({
   const parts = fullFileName.split('?vc=');
   const baseName = parts[0];
   const isVirtualCopy = parts.length > 1;
+
+  const updateFitScale = useCallback(() => {
+    if (!containerRef.current || !imageRef.current) return;
+    const { naturalWidth, naturalHeight } = imageRef.current;
+    if (!naturalWidth || !naturalHeight) return;
+
+    const { clientWidth, clientHeight } = containerRef.current;
+    const scale = Math.min(clientWidth / naturalWidth, clientHeight / naturalHeight);
+    setFitScale(scale);
+  }, []);
+
+  useEffect(() => {
+    if (imageRef.current && imageRef.current.complete) {
+      updateFitScale();
+    }
+  }, [highResSrc, updateFitScale]);
+
+  useEffect(() => {
+    const observer = new ResizeObserver(() => {
+      updateFitScale();
+    });
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+    return () => observer.disconnect();
+  }, [updateFitScale]);
 
   useEffect(() => {
     const currentPreview = useProcessStore.getState().previews[image.path];
@@ -194,16 +300,27 @@ function CullingPreview({
     e.stopPropagation();
     if (hasDragged.current) return;
 
-    if (zoom !== 1 || pan.x !== 0 || pan.y !== 0) {
-      updateViewport(1, { x: 0, y: 0 });
+    if (showMetadataBar) {
+      setShowMetadataBar(false);
+      return;
+    }
+
+    if (Math.abs(zoom - 1) > 0.01 || pan.x !== 0 || pan.y !== 0) {
+      updateViewport(1, { x: 0, y: 0 }); // Reset to fit
     } else {
+      const targetZoom = fitScale ? 1 / fitScale : 2;
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
         const mouseX = e.clientX - rect.left - rect.width / 2;
         const mouseY = e.clientY - rect.top - rect.height / 2;
-        updateViewport(2, { x: -mouseX, y: -mouseY });
+
+        // Compute pan adjustment to bring the clicked point to the center
+        const newPanX = -mouseX * (targetZoom - 1);
+        const newPanY = -mouseY * (targetZoom - 1);
+
+        updateViewport(targetZoom, { x: newPanX, y: newPanY });
       } else {
-        updateViewport(2, { x: 0, y: 0 });
+        updateViewport(targetZoom, { x: 0, y: 0 });
       }
     }
   };
@@ -216,7 +333,12 @@ function CullingPreview({
     const mouseY = e.clientY - rect.top - rect.height / 2;
 
     const zoomFactor = Math.exp(-e.deltaY * 0.002);
-    const newZoom = Math.min(Math.max(0.1, zoom * zoomFactor), 8);
+
+    // Calculate CSS scaling limits so absolute image pixels scale between 1% and 1000%
+    const minCSSScale = fitScale ? 0.01 / fitScale : 0.1;
+    const maxCSSScale = fitScale ? 10 / fitScale : 10;
+
+    const newZoom = Math.min(Math.max(minCSSScale, zoom * zoomFactor), maxCSSScale);
     const scaleRatio = newZoom / zoom;
 
     const mouseFromCenterX = mouseX - pan.x;
@@ -229,14 +351,16 @@ function CullingPreview({
 
   const handleZoomIn = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const newZoom = Math.min(8, zoom * 1.25);
+    const maxCSSScale = fitScale ? 10 / fitScale : 10;
+    const newZoom = Math.min(maxCSSScale, zoom * 1.25);
     const ratio = newZoom / zoom;
     updateViewport(newZoom, { x: pan.x * ratio, y: pan.y * ratio });
   };
 
   const handleZoomOut = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const newZoom = Math.max(0.1, zoom / 1.25);
+    const minCSSScale = fitScale ? 0.01 / fitScale : 0.1;
+    const newZoom = Math.max(minCSSScale, zoom / 1.25);
     const ratio = newZoom / zoom;
     updateViewport(newZoom, { x: pan.x * ratio, y: pan.y * ratio });
   };
@@ -244,6 +368,18 @@ function CullingPreview({
   const handleResetZoom = (e: React.MouseEvent) => {
     e.stopPropagation();
     updateViewport(1, { x: 0, y: 0 });
+  };
+
+  const handleToggle1to1 = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!fitScale) return;
+
+    const currentAbsoluteZoom = zoom * fitScale;
+    if (Math.abs(currentAbsoluteZoom - 1) < 0.05) {
+      updateViewport(1, { x: 0, y: 0 }); // Go back to fit container
+    } else {
+      updateViewport(1 / fitScale, { x: 0, y: 0 }); // True 1:1 image pixels mapping
+    }
   };
 
   const toggleSync = (e: React.MouseEvent) => {
@@ -280,8 +416,10 @@ function CullingPreview({
       onClick={handleClick}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
+      onMouseEnter={() => setHoveredCullingPath(image.path)}
+      onMouseLeave={() => setHoveredCullingPath(null)}
       className={clsx(
-        'relative flex items-center justify-center w-full h-full overflow-hidden group bg-[#0f0f0f] rounded-lg shadow-sm border border-border-color/10 cursor-grab active:cursor-grabbing select-none',
+        'relative flex items-center justify-center w-full h-full overflow-hidden group bg-bg-primary rounded-lg shadow-sm border border-border-color/10 cursor-grab active:cursor-grabbing select-none',
         isFullWidth && 'col-span-2',
       )}
     >
@@ -306,6 +444,8 @@ function CullingPreview({
 
           {highResSrc && (
             <motion.img
+              ref={imageRef}
+              onLoad={updateFitScale}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
@@ -318,8 +458,157 @@ function CullingPreview({
         </div>
       </div>
 
+      {/* Floating Metadata Overlay */}
+      <AnimatePresence>
+        {showMetadataBar && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute bottom-[4.5rem] left-1/2 -translate-x-1/2 flex flex-col gap-4 bg-bg-primary/95 backdrop-blur-xl p-4 rounded-xl border border-white/10 shadow-2xl z-30 pointer-events-auto w-64 max-h-[70%] overflow-y-auto custom-scrollbar"
+            onMouseDown={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <Text variant={TextVariants.small} weight={TextWeights.semibold} className="text-white">
+                Metadata
+              </Text>
+              <button
+                onClick={() => setShowMetadataBar(false)}
+                className="text-white/50 hover:text-white transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div>
+              <Text
+                variant={TextVariants.small}
+                className="text-white/50 text-[10px] uppercase tracking-wider mb-1.5 block"
+              >
+                Rating
+              </Text>
+              <div className="flex items-center gap-1.5">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => handleRate(star, [image.path])}
+                    className="focus:outline-hidden transition-transform active:scale-95 hover:scale-110"
+                  >
+                    <StarIcon
+                      size={18}
+                      className={clsx(
+                        'transition-colors duration-200',
+                        star <= rating
+                          ? 'fill-accent text-accent'
+                          : 'fill-transparent text-white/30 hover:text-white/80',
+                      )}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Text
+                variant={TextVariants.small}
+                className="text-white/50 text-[10px] uppercase tracking-wider mb-1.5 block"
+              >
+                Color Label
+              </Text>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleSetColorLabel(null, [image.path])}
+                  className={clsx(
+                    'w-5 h-5 rounded-full flex items-center justify-center transition-all hover:scale-110',
+                    currentColor === null
+                      ? 'ring-2 ring-white/50 ring-offset-1 ring-offset-bg-primary'
+                      : 'opacity-50 hover:opacity-100 hover:ring-2 hover:ring-white/30',
+                  )}
+                  data-tooltip="None"
+                >
+                  <X size={12} className="text-white/50" />
+                </button>
+                {COLOR_LABELS.map((color: Color) => (
+                  <button
+                    key={color.name}
+                    onClick={() => handleSetColorLabel(color.name, [image.path])}
+                    className={clsx(
+                      'w-5 h-5 rounded-full transition-all hover:scale-110',
+                      currentColor === color.name
+                        ? 'ring-2 ring-white ring-offset-1 ring-offset-bg-primary'
+                        : 'hover:ring-2 hover:ring-white/30',
+                    )}
+                    style={{ backgroundColor: color.color }}
+                    data-tooltip={color.name}
+                  >
+                    {currentColor === color.name && <Check size={12} className="text-black/50 mx-auto" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Text
+                variant={TextVariants.small}
+                className="text-white/50 text-[10px] uppercase tracking-wider mb-1.5 block"
+              >
+                Tags
+              </Text>
+              <div className="flex flex-wrap gap-1 mb-2">
+                <AnimatePresence>
+                  {currentTags.map((tagItem) => (
+                    <motion.div
+                      key={tagItem.tag}
+                      layout
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded-md group cursor-pointer border border-transparent hover:border-white/20 transition-colors"
+                      onClick={() => handleRemoveTag(tagItem)}
+                    >
+                      <Text as="span" variant={TextVariants.small} className="text-white/90 text-xs">
+                        {tagItem.tag}
+                      </Text>
+                      <X size={10} className="text-white/50 group-hover:text-white" />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                {currentTags.length === 0 && (
+                  <Text variant={TextVariants.small} className="italic text-white/40 text-xs">
+                    No tags added
+                  </Text>
+                )}
+              </div>
+              <div className="flex items-center bg-black/40 border border-white/10 rounded-md px-2 py-1.5 focus-within:border-accent/50 transition-colors">
+                <input
+                  type="text"
+                  value={tagInputValue}
+                  onChange={(e) => setTagInputValue(e.target.value)}
+                  onKeyDown={handleTagInputKeyDown}
+                  placeholder="Add tag..."
+                  className="bg-transparent border-none outline-hidden text-xs w-full text-white placeholder-white/40"
+                />
+                <button
+                  onClick={() => handleAddTag(tagInputValue)}
+                  disabled={!tagInputValue.trim()}
+                  className="text-white/50 hover:text-white disabled:opacity-30 transition-colors"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div
-        className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-xl z-20 pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+        className={clsx(
+          'absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-bg-primary/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-xl z-20 pointer-events-auto transition-opacity duration-200',
+          showMetadataBar ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+        )}
         onMouseDown={(e) => e.stopPropagation()}
         onWheel={(e) => e.stopPropagation()}
       >
@@ -340,21 +629,37 @@ function CullingPreview({
           {baseName}
         </Text>
 
-        {(isVirtualCopy || rating > 0) && (
-          <div className="flex items-center gap-1 shrink-0 ml-1">
-            {isVirtualCopy && (
-              <div className="bg-white/20 text-white px-1.5 py-0.5 rounded-sm">
-                <Text variant={TextVariants.small} weight={TextWeights.bold} className="text-[9px] leading-none">
-                  VC
-                </Text>
+        {isVirtualCopy && (
+          <div className="bg-white/20 text-white px-1.5 py-0.5 rounded-sm shrink-0 ml-1">
+            <Text variant={TextVariants.small} weight={TextWeights.bold} className="text-[9px] leading-none">
+              VC
+            </Text>
+          </div>
+        )}
+
+        {hasAnyOverlay && (
+          <div className="rounded-full h-5 px-1.5 flex items-center justify-center gap-0 shadow-md bg-surface/30 pointer-events-auto shrink-0 ml-1">
+            {showEditIcon && (
+              <div className="text-white flex items-center shrink-0">
+                <SlidersHorizontal size={12} />
               </div>
             )}
+
+            {colorLabel && (
+              <div className={clsx('flex items-center justify-center shrink-0', showEditIcon && 'ml-1.5')}>
+                <div
+                  className="w-3 h-3 rounded-full transition-colors duration-200"
+                  style={{ backgroundColor: colorLabel.color }}
+                />
+              </div>
+            )}
+
             {rating > 0 && (
-              <div className="flex items-center gap-1 bg-white/20 px-1.5 py-0.5 rounded-sm">
-                <Text variant={TextVariants.small} className="text-white font-medium leading-none text-[10px]">
+              <div className={clsx('flex items-center gap-0.5 shrink-0', (showEditIcon || colorLabel) && 'ml-1.5')}>
+                <Text variant={TextVariants.small} color={TextColors.white}>
                   {rating}
                 </Text>
-                <StarIcon size={10} className="text-accent fill-accent" />
+                <StarIcon size={12} className="text-white fill-white" />
               </div>
             )}
           </div>
@@ -371,6 +676,20 @@ function CullingPreview({
           data-tooltip="Edit Image"
         >
           <SquarePen size={14} />
+        </button>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowMetadataBar(!showMetadataBar);
+          }}
+          className={clsx(
+            'p-1.5 rounded-full transition-colors shrink-0',
+            showMetadataBar ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white',
+          )}
+          data-tooltip="Rate & Label"
+        >
+          <Tag size={14} />
         </button>
 
         <div className="w-px h-5 bg-white/20 mx-1 shrink-0"></div>
@@ -393,9 +712,13 @@ function CullingPreview({
           <ZoomOut size={16} />
         </button>
 
-        <span className="text-xs font-mono text-white/90 w-10 text-center select-none pointer-events-none shrink-0">
-          {Math.round(zoom * 100)}%
-        </span>
+        <button
+          onClick={handleToggle1to1}
+          className="text-xs font-mono text-white/90 w-12 text-center select-none shrink-0 hover:bg-white/10 hover:text-white rounded-md py-1 transition-colors cursor-pointer"
+          data-tooltip="Toggle 1:1 / Fit"
+        >
+          {fitScale ? Math.round(zoom * fitScale * 100) : Math.round(zoom * 100)}%
+        </button>
 
         <button
           onClick={handleZoomIn}
@@ -435,6 +758,7 @@ const Row = React.memo(
     imageRatings,
     handleSidebarClick,
     queueThumbnailRequest,
+    hoveredCullingPath,
   }: any) => {
     const image: ImageFile = imageList[index];
     const isSelected = multiSelectedPaths.includes(image.path);
@@ -458,6 +782,7 @@ const Row = React.memo(
             path={image.path}
             isSelected={isSelected}
             isActive={activePath === image.path}
+            isForcedHover={hoveredCullingPath === image.path}
             onImageClick={(path: string, e: any) => handleSidebarClick(path, e)}
             onContextMenu={onContextMenu}
             onImageDoubleClick={onImageDoubleClick}
@@ -465,6 +790,7 @@ const Row = React.memo(
             rating={imageRatings?.[image.path] || 0}
             tags={image.tags}
             exif={image.exif}
+            isEdited={image.is_edited}
             aspectRatio={thumbnailAspectRatio}
             isCloudPlaceholder={image.is_cloud_placeholder}
           />
@@ -494,6 +820,8 @@ export default function CullingView(props: any) {
 
   const requestQueueRef = useRef<Set<string>>(new Set());
   const requestTimeoutRef = useRef<any>(null);
+
+  const [hoveredCullingPath, setHoveredCullingPath] = useState<string | null>(null);
 
   const [syncViewport, setSyncViewport] = useState<SyncViewport>({
     isActive: false,
@@ -582,6 +910,7 @@ export default function CullingView(props: any) {
       handleSidebarClick,
       queueThumbnailRequest,
       sidebarWidth,
+      hoveredCullingPath,
     }),
     [
       imageList,
@@ -594,6 +923,7 @@ export default function CullingView(props: any) {
       handleSidebarClick,
       queueThumbnailRequest,
       sidebarWidth,
+      hoveredCullingPath,
     ],
   );
 
@@ -618,7 +948,7 @@ export default function CullingView(props: any) {
         ) : (
           <div
             className={clsx(
-              'grid gap-4 w-full h-full p-4',
+              'grid gap-2 w-full h-full p-2',
               displayCount === 1 && 'grid-cols-1 grid-rows-1',
               displayCount === 2 && 'grid-cols-2 grid-rows-1',
               displayCount === 3 && 'grid-cols-2 grid-rows-2',
@@ -637,6 +967,7 @@ export default function CullingView(props: any) {
                 isFullWidth={displayCount === 3 && index === 2}
                 syncViewport={syncViewport}
                 setSyncViewport={setSyncViewport}
+                setHoveredCullingPath={setHoveredCullingPath}
               />
             ))}
           </div>
