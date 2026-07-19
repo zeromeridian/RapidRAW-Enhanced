@@ -1,6 +1,5 @@
-// TODO: Add i18n to this component
-
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { List } from 'react-window';
 import {
@@ -70,6 +69,7 @@ function CullingPreview({
   showInfoBar: boolean;
   setShowInfoBar: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
+  const { t } = useTranslation();
   const thumbUrl = useProcessStore((s) => s.thumbnails[image.path]);
   const initialPreview = useProcessStore((s) => s.previews[image.path]);
   const setPreview = useProcessStore((s) => s.setPreview);
@@ -495,7 +495,7 @@ function CullingPreview({
             <img
               src={thumbUrl}
               className="absolute w-full h-full object-contain drop-shadow-lg"
-              alt="Thumbnail Loading"
+              alt={t('library.culling.altThumbnailLoading')}
               draggable={false}
             />
           )}
@@ -509,7 +509,7 @@ function CullingPreview({
               transition={{ duration: 0.3 }}
               src={highResSrc}
               className="absolute w-full h-full object-contain drop-shadow-lg"
-              alt="Culling Preview High Res"
+              alt={t('library.culling.altCullingPreviewHighRes')}
               draggable={false}
             />
           )}
@@ -530,7 +530,7 @@ function CullingPreview({
           >
             <div className="flex items-center justify-between">
               <Text variant={TextVariants.small} weight={TextWeights.semibold} className="text-white">
-                Metadata
+                {t('library.culling.metadata')}
               </Text>
               <button
                 onClick={() => setShowInfoBar(false)}
@@ -547,7 +547,7 @@ function CullingPreview({
                     variant={TextVariants.small}
                     className="text-white/50 text-[10px] uppercase tracking-wider mb-1.5 block"
                   >
-                    Dimensions
+                    {t('library.culling.dimensions')}
                   </Text>
                   <Text variant={TextVariants.small} className="text-white">
                     {imageWidth} × {imageHeight}
@@ -561,11 +561,14 @@ function CullingPreview({
                     variant={TextVariants.small}
                     className="text-white/50 text-[10px] uppercase tracking-wider mb-1.5 block"
                   >
-                    Camera Settings
+                    {t('library.culling.cameraSettings')}
                   </Text>
                   <div className="grid grid-cols-2 gap-3">
                     {exifData.shutter && (
-                      <div className="flex items-center gap-1.5 text-white/90" title="Shutter Speed">
+                      <div
+                        className="flex items-center gap-1.5 text-white/90"
+                        title={t('library.culling.shutterSpeed')}
+                      >
                         <span className="opacity-70">
                           <IconShutter />
                         </span>
@@ -573,7 +576,7 @@ function CullingPreview({
                       </div>
                     )}
                     {exifData.fNumber && (
-                      <div className="flex items-center gap-1.5 text-white/90" title="Aperture">
+                      <div className="flex items-center gap-1.5 text-white/90" title={t('library.culling.aperture')}>
                         <span className="opacity-70">
                           <IconAperture />
                         </span>
@@ -581,7 +584,7 @@ function CullingPreview({
                       </div>
                     )}
                     {exifData.iso && (
-                      <div className="flex items-center gap-1.5 text-white/90" title="ISO">
+                      <div className="flex items-center gap-1.5 text-white/90" title={t('library.culling.iso')}>
                         <span className="opacity-70">
                           <IconIso />
                         </span>
@@ -589,7 +592,7 @@ function CullingPreview({
                       </div>
                     )}
                     {exifData.focal && (
-                      <div className="flex items-center gap-1.5 text-white/90" title="Focal Length">
+                      <div className="flex items-center gap-1.5 text-white/90" title={t('library.culling.focalLength')}>
                         <span className="opacity-70">
                           <IconFocalLength />
                         </span>
@@ -604,7 +607,7 @@ function CullingPreview({
 
               {!hasExif && !imageWidth && !imageHeight && (
                 <Text variant={TextVariants.small} className="text-white/50 italic">
-                  No metadata available
+                  {t('library.culling.noMetadataAvailable')}
                 </Text>
               )}
             </div>
@@ -626,7 +629,7 @@ function CullingPreview({
           >
             <div className="flex items-center justify-between">
               <Text variant={TextVariants.small} weight={TextWeights.semibold} className="text-white">
-                Rate & Label
+                {t('library.culling.rateAndLabel')}
               </Text>
               <button
                 onClick={() => setShowRateBar(false)}
@@ -641,7 +644,7 @@ function CullingPreview({
                 variant={TextVariants.small}
                 className="text-white/50 text-[10px] uppercase tracking-wider mb-1.5 block"
               >
-                Rating
+                {t('library.culling.rating')}
               </Text>
               <div className="flex items-center gap-1.5">
                 {[1, 2, 3, 4, 5].map((star) => (
@@ -669,7 +672,7 @@ function CullingPreview({
                 variant={TextVariants.small}
                 className="text-white/50 text-[10px] uppercase tracking-wider mb-1.5 block"
               >
-                Color Label
+                {t('library.culling.colorLabel')}
               </Text>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -680,7 +683,7 @@ function CullingPreview({
                       ? 'ring-2 ring-white/50 ring-offset-1 ring-offset-bg-primary'
                       : 'opacity-50 hover:opacity-100 hover:ring-2 hover:ring-white/30',
                   )}
-                  data-tooltip="None"
+                  data-tooltip={t('library.culling.none')}
                 >
                   <X size={12} className="text-white/50" />
                 </button>
@@ -708,7 +711,7 @@ function CullingPreview({
                 variant={TextVariants.small}
                 className="text-white/50 text-[10px] uppercase tracking-wider mb-1.5 block"
               >
-                Tags
+                {t('library.culling.tags')}
               </Text>
               <div className="flex flex-wrap gap-1 mb-2">
                 <AnimatePresence>
@@ -731,7 +734,7 @@ function CullingPreview({
                 </AnimatePresence>
                 {currentTags.length === 0 && (
                   <Text variant={TextVariants.small} className="italic text-white/40 text-xs">
-                    No tags added
+                    {t('library.culling.noTagsAdded')}
                   </Text>
                 )}
               </div>
@@ -741,7 +744,7 @@ function CullingPreview({
                   value={tagInputValue}
                   onChange={(e) => setTagInputValue(e.target.value)}
                   onKeyDown={handleTagInputKeyDown}
-                  placeholder="Add tag..."
+                  placeholder={t('library.culling.addTagPlaceholder')}
                   className="bg-transparent border-none outline-hidden text-xs w-full text-white placeholder-white/40"
                 />
                 <button
@@ -789,7 +792,7 @@ function CullingPreview({
         {isVirtualCopy && (
           <div className="bg-white/20 text-white px-1.5 py-0.5 rounded-sm shrink-0 ml-1">
             <Text variant={TextVariants.small} weight={TextWeights.bold} className="text-[9px] leading-none">
-              VC
+              {t('library.culling.vc')}
             </Text>
           </div>
         )}
@@ -830,7 +833,7 @@ function CullingPreview({
             onImageDoubleClick(image.path);
           }}
           className="p-1.5 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors shrink-0"
-          data-tooltip="Edit Image"
+          data-tooltip={t('library.culling.editImage')}
         >
           <SquarePen size={14} />
         </button>
@@ -847,7 +850,7 @@ function CullingPreview({
             'p-1.5 rounded-full transition-colors shrink-0',
             showInfoBar ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white',
           )}
-          data-tooltip="Metadata"
+          data-tooltip={t('library.culling.metadata')}
         >
           <Info size={14} />
         </button>
@@ -864,7 +867,7 @@ function CullingPreview({
             'p-1.5 rounded-full transition-colors shrink-0',
             showRateBar ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white',
           )}
-          data-tooltip="Rate & Label"
+          data-tooltip={t('library.culling.rateAndLabel')}
         >
           <Tag size={14} />
         </button>
@@ -877,7 +880,7 @@ function CullingPreview({
             'p-1.5 rounded-full transition-colors shrink-0',
             syncViewport.isActive ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white',
           )}
-          data-tooltip="Sync Zoom and Pan"
+          data-tooltip={t('library.culling.syncZoomAndPan')}
         >
           <Link size={14} />
         </button>
@@ -892,7 +895,7 @@ function CullingPreview({
         <button
           onClick={handleToggle1to1}
           className="text-xs font-mono text-white/90 w-8 text-center select-none shrink-0 hover:bg-white/10 hover:text-white rounded-md py-1 transition-colors cursor-pointer"
-          data-tooltip="Toggle 1:1 / Fit"
+          data-tooltip={t('library.culling.toggleFit')}
         >
           {fitScale ? Math.round(zoom * fitScale * 100) : Math.round(zoom * 100)}%
         </button>
@@ -978,6 +981,7 @@ const Row = React.memo(
 );
 
 export default function CullingView(props: any) {
+  const { t } = useTranslation();
   const {
     imageList,
     multiSelectedPaths,
@@ -1135,11 +1139,9 @@ export default function CullingView(props: any) {
         {displayCount === 0 ? (
           <div className="m-auto text-center">
             <Text variant={TextVariants.heading} color={TextColors.secondary}>
-              Select images to compare
+              {t('library.culling.selectImagesToCompare')}
             </Text>
-            <Text className="mt-2 text-text-secondary">
-              Click thumbnails in the right sidebar to add them to the comparison view.
-            </Text>
+            <Text className="mt-2 text-text-secondary">{t('library.culling.clickThumbnailsHint')}</Text>
           </div>
         ) : (
           <div
