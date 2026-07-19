@@ -285,10 +285,13 @@ function CullingPreview({
       }
     };
 
-    fetchPreviewWithAdjustments();
+    const delayTimeout = setTimeout(() => {
+      fetchPreviewWithAdjustments();
+    }, 200);
 
     return () => {
       active = false;
+      clearTimeout(delayTimeout);
     };
   }, [image.path, safeThumbKey, setPreview]);
 
@@ -936,7 +939,7 @@ const Row = React.memo(
     onImageDoubleClick,
     thumbnailAspectRatio,
     imageRatings,
-    handleSidebarClick,
+    onImageClick,
     queueThumbnailRequest,
     hoveredCullingPath,
   }: any) => {
@@ -963,7 +966,7 @@ const Row = React.memo(
             isSelected={isSelected}
             isActive={activePath === image.path}
             isForcedHover={hoveredCullingPath === image.path}
-            onImageClick={(path: string, e: any) => handleSidebarClick(path, e)}
+            onImageClick={(path: string, e: any) => onImageClick(path, e)}
             onContextMenu={onContextMenu}
             onImageDoubleClick={onImageDoubleClick}
             onLoad={() => {}}
@@ -1077,13 +1080,6 @@ export default function CullingView(props: any) {
     };
   }, [resize, stopResizing]);
 
-  const handleSidebarClick = useCallback(
-    (path: string, e: React.MouseEvent) => {
-      onImageClick(path, { ...e, ctrlKey: true, metaKey: true });
-    },
-    [onImageClick],
-  );
-
   const rowProps = useMemo(
     () => ({
       imageList,
@@ -1093,7 +1089,7 @@ export default function CullingView(props: any) {
       imageRatings,
       onContextMenu,
       onImageDoubleClick,
-      handleSidebarClick,
+      onImageClick,
       queueThumbnailRequest,
       sidebarWidth,
       hoveredCullingPath,
@@ -1106,7 +1102,7 @@ export default function CullingView(props: any) {
       imageRatings,
       onContextMenu,
       onImageDoubleClick,
-      handleSidebarClick,
+      onImageClick,
       queueThumbnailRequest,
       sidebarWidth,
       hoveredCullingPath,
