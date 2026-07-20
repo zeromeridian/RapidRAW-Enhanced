@@ -1125,6 +1125,9 @@
       "confirm": "Confirmar"
     },
     "copyPaste": {
+      "autoSyncDesc": "Aplica automaticamente os ajustes a todas as imagens selecionadas.",
+      "autoSyncLabel": "Ativar sincronização automática",
+      "autoSyncTitle": "Sincronização automática de ajustes",
       "cancel": "Cancelar",
       "descMerge": "Adiciona suas alterações copiadas, deixando as outras configurações intocadas.",
       "descReplace": "Substitui todas as configurações selecionadas, redefinindo o resto para seus padrões.",

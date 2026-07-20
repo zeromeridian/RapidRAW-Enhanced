@@ -1099,6 +1099,9 @@
       "confirm": "確認"
     },
     "copyPaste": {
+      "autoSyncDesc": "選択したすべての画像に調整を自動的に適用します。",
+      "autoSyncLabel": "自動同期を有効にする",
+      "autoSyncTitle": "調整の自動同期",
       "cancel": "キャンセル",
       "descMerge": "コピーした設定を追加し、その他の設定はそのまま残します。",
       "descReplace": "選択したすべての設定を上書きし、残りの設定をデフォルトにリセットします。",

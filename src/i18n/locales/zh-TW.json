@@ -1099,6 +1099,9 @@
       "confirm": "確認"
     },
     "copyPaste": {
+      "autoSyncDesc": "自動將調整套用於所有選取的影像。",
+      "autoSyncLabel": "啟用自動同步",
+      "autoSyncTitle": "自動同步調整",
       "cancel": "取消",
       "descMerge": "新增您複製的更改，保留其他設定不變。",
       "descReplace": "覆蓋所有選中的設定，其餘重置為預設值。",

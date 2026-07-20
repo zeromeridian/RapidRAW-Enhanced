@@ -201,6 +201,8 @@ pub struct CopyPasteSettings {
     pub included_adjustments: HashSet<String>,
     #[serde(default)]
     pub known_adjustments: HashSet<String>,
+    #[serde(default)]
+    pub auto_sync: bool,
 }
 
 impl Default for CopyPasteSettings {
@@ -209,6 +211,7 @@ impl Default for CopyPasteSettings {
             mode: PasteMode::Merge,
             included_adjustments: default_included_adjustments(),
             known_adjustments: all_available_adjustments(),
+            auto_sync: false,
         }
     }
 }

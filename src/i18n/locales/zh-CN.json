@@ -1099,6 +1099,9 @@
       "confirm": "确认"
     },
     "copyPaste": {
+      "autoSyncDesc": "自动将调整应用于所有选定的图像。",
+      "autoSyncLabel": "启用自动同步",
+      "autoSyncTitle": "自动同步调整",
       "cancel": "取消",
       "descMerge": "添加您复制的更改，保留其他设置不变。",
       "descReplace": "覆盖所有选中的设置，其余重置为默认值。",

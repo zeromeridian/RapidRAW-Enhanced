@@ -1099,6 +1099,9 @@
       "confirm": "확인"
     },
     "copyPaste": {
+      "autoSyncDesc": "선택한 모든 이미지에 조정을 자동으로 적용합니다.",
+      "autoSyncLabel": "자동 동기화 활성화",
+      "autoSyncTitle": "조정 자동 동기화",
       "cancel": "취소",
       "descMerge": "복사한 변경 사항을 추가하며 다른 설정은 그대로 둡니다.",
       "descReplace": "선택한 모든 설정을 덮어쓰고 나머지는 기본값으로 초기화합니다.",
