@@ -410,26 +410,21 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
                             rational_to_f32_checked(&v[1]),
                         )
                     {
-                        let mut spec =
-                            format!("{} mm", format_min_max(focal_min, focal_max, 0.01));
+                        let mut spec = format!("{} mm", format_min_max(focal_min, focal_max, 0.01));
 
                         let aperture = match (
                             rational_to_f32_checked(&v[2]),
                             rational_to_f32_checked(&v[3]),
                         ) {
                             (Some(amin), Some(amax)) => Some((amin, amax)),
-                            _ => {
-                                read_raw_metadata(file_bytes).and_then(|meta| {
-                                    let lens_desc = meta.lens?;
-                                    let amin = rawler_rational_to_f32_checked(
-                                        &lens_desc.aperture_range[0],
-                                    )?;
-                                    let amax = rawler_rational_to_f32_checked(
-                                        &lens_desc.aperture_range[1],
-                                    )?;
-                                    Some((amin, amax))
-                                })
-                            }
+                            _ => read_raw_metadata(file_bytes).and_then(|meta| {
+                                let lens_desc = meta.lens?;
+                                let amin =
+                                    rawler_rational_to_f32_checked(&lens_desc.aperture_range[0])?;
+                                let amax =
+                                    rawler_rational_to_f32_checked(&lens_desc.aperture_range[1])?;
+                                Some((amin, amax))
+                            }),
                         };
 
                         if let Some((amin, amax)) = aperture
@@ -564,7 +559,10 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
         let aperture_min = fmt_rat(&lens_desc.aperture_range[0]);
         let aperture_max = fmt_rat(&lens_desc.aperture_range[1]);
         if aperture_min > 0.0 || aperture_max > 0.0 {
-            spec.push_str(&format!(", f/{}", format_min_max(aperture_min, aperture_max, 0.01)));
+            spec.push_str(&format!(
+                ", f/{}",
+                format_min_max(aperture_min, aperture_max, 0.01)
+            ));
         }
 
         insert_if_present("LensSpecification", spec);
