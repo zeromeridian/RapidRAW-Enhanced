@@ -8,7 +8,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, imageops};
-use jxl_encoder::{api::{calibrated_jxl_quality, quality_to_distance}, LosslessConfig, LossyConfig, PixelLayout};
+use jxl_encoder::{
+    LosslessConfig, LossyConfig, PixelLayout,
+    api::{calibrated_jxl_quality, quality_to_distance},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::Emitter;
