@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, imageops};
-use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
+use jxl_encoder::{api::quality_to_distance, LosslessConfig, LossyConfig, PixelLayout};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::Emitter;
@@ -474,8 +474,7 @@ fn encode_image_to_bytes(
                         .map_err(|e| format!("Failed to encode lossless JXL: {}", e))?
                 }
             } else {
-                let distance = (100.0 - jpeg_quality as f32) / 10.0;
-                let distance = distance.max(0.01);
+                let distance = quality_to_distance(jpeg_quality as f32);
 
                 if has_alpha {
                     let rgba = image.to_rgba8();
