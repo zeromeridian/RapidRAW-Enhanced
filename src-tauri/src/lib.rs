@@ -1611,6 +1611,11 @@ async fn generate_preview_for_path(
     .map_err(|e| format!("Task execution failed: {}", e))?
 }
 
+#[cfg(target_os = "linux")]
+fn is_nvidia_gpu() -> bool {
+    std::path::Path::new("/proc/driver/nvidia/version").exists()
+}
+
 fn setup_logging(app_handle: &tauri::AppHandle) {
     let log_dir = match app_handle.path().app_log_dir() {
         Ok(dir) => dir,
@@ -2050,12 +2055,14 @@ pub fn run() {
                         std::env::set_var("WGPU_BACKEND", backend);
                     }
 
-                if settings.linux_gpu_optimization.unwrap_or(true) {
-                    #[cfg(target_os = "linux")]
-                    {
+                #[cfg(target_os = "linux")]
+                {
+                    if settings.linux_gpu_optimization.unwrap_or(false) {
                         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
                         std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
                         std::env::set_var("NODEVICE_SELECT", "1");
+                    } else if is_nvidia_gpu() {
+                        std::env::set_var("__NV_DISABLE_EXPLICIT_SYNC", "1");
                     }
                 }
 
@@ -2088,10 +2095,12 @@ pub fn run() {
                 && backend != "auto" {
                     log::info!("Applied processing backend setting: {}", backend);
                 }
-            if settings.linux_gpu_optimization.unwrap_or(false) {
-                #[cfg(target_os = "linux")]
-                {
-                    log::info!("Applied Linux GPU optimizations.");
+            #[cfg(target_os = "linux")]
+            {
+                if settings.linux_gpu_optimization.unwrap_or(false) {
+                    log::info!("Applied Linux Compatibility Mode (forced software compositing).");
+                } else if is_nvidia_gpu() {
+                    log::info!("Applied Nvidia explicit-sync workaround (hardware compositing kept).");
                 }
             }
 
