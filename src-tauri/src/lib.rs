@@ -2022,6 +2022,16 @@ pub fn run() {
             }
 
             let app_handle = app.handle().clone();
+
+            {
+                let disks_app_handle = app_handle.clone();
+                std::thread::spawn(move || {
+                    let disks = sysinfo::Disks::new_with_refreshed_list();
+                    let state = disks_app_handle.state::<AppState>();
+                    *state.disks_cache.lock().unwrap() = Some(disks);
+                });
+            }
+
             let config_dir = app_handle.path().app_config_dir().expect("Failed to get config dir");
             let crash_flag_path = config_dir.join(".gpu_init_crash_flag");
 
@@ -2303,6 +2313,8 @@ pub fn run() {
             decoded_image_cache: Mutex::new(DecodedImageCache::new(5)),
             thumbnail_manager: ThumbnailManager::new(),
             metadata_manager: MetadataManager::new(),
+            disks_cache: Mutex::new(None),
+            disks_cache_refreshing: AtomicBool::new(false),
         })
         .invoke_handler(tauri::generate_handler![
             apply_adjustments,

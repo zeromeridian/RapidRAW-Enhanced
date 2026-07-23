@@ -390,12 +390,7 @@ pub async fn update_exif_fields(
     .map_err(|e| format!("Task failed: {}", e))?
 }
 
-fn is_rotational_disk(path: &Path) -> bool {
-    let Ok(canonical) = path.canonicalize() else {
-        return false;
-    };
-
-    let disks = Disks::new_with_refreshed_list();
+fn match_disk_kind(disks: &Disks, canonical: &Path) -> Option<bool> {
     let mut best_match: Option<(&Path, bool)> = None;
 
     for disk in disks.list() {
@@ -410,16 +405,41 @@ fn is_rotational_disk(path: &Path) -> bool {
         }
     }
 
-    best_match.map(|(_, is_hdd)| is_hdd).unwrap_or(false)
+    best_match.map(|(_, is_hdd)| is_hdd)
 }
 
 fn update_rotational_disk_flag(path: &str, app_handle: &AppHandle) {
     let state = app_handle.state::<crate::AppState>();
-    let detected_hdd = is_rotational_disk(Path::new(path));
-    state
-        .thumbnail_manager
-        .rotational_disk
-        .store(detected_hdd, Ordering::Relaxed);
+    let Ok(canonical) = Path::new(path).canonicalize() else {
+        return;
+    };
+
+    let cached_match = {
+        let cache = state.disks_cache.lock().unwrap();
+        cache
+            .as_ref()
+            .and_then(|disks| match_disk_kind(disks, &canonical))
+    };
+
+    match cached_match {
+        Some(is_hdd) => {
+            state
+                .thumbnail_manager
+                .rotational_disk
+                .store(is_hdd, Ordering::Relaxed);
+        }
+        None => {
+            if !state.disks_cache_refreshing.swap(true, Ordering::Relaxed) {
+                let refresh_app_handle = app_handle.clone();
+                thread::spawn(move || {
+                    let disks = Disks::new_with_refreshed_list();
+                    let state = refresh_app_handle.state::<crate::AppState>();
+                    *state.disks_cache.lock().unwrap() = Some(disks);
+                    state.disks_cache_refreshing.store(false, Ordering::Relaxed);
+                });
+            }
+        }
+    }
 }
 
 #[tauri::command]
