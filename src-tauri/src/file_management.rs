@@ -1726,8 +1726,15 @@ pub fn update_thumbnail_queue(
         queue.pop_front();
     }
 
-    for path in unique_paths {
-        queue.push_back(path);
+    if state.thumbnail_manager.rotational_disk.load(Ordering::Relaxed) {
+        unique_paths.sort();
+        for path in unique_paths.into_iter().rev() {
+            queue.push_back(path);
+        }
+    } else {
+        for path in unique_paths {
+            queue.push_back(path);
+        }
     }
 
     let queue_len = queue.len();
