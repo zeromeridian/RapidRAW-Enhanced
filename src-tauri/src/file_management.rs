@@ -17,10 +17,10 @@ use chrono::{DateTime, Utc};
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
 use rayon::prelude::*;
-use sysinfo::Disks;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sysinfo::Disks;
 use tauri::{AppHandle, Emitter, Manager};
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -1239,6 +1239,55 @@ pub fn read_file_mapped(path: &Path) -> Result<Mmap, ReadFileError> {
     Ok(mmap)
 }
 
+fn find_embedded_jpeg(exif: &exif::Exif, ifd: exif::In) -> Option<&[u8]> {
+    let offset = exif
+        .get_field(exif::Tag::JPEGInterchangeFormat, ifd)?
+        .value
+        .get_uint(0)? as usize;
+    let len = exif
+        .get_field(exif::Tag::JPEGInterchangeFormatLength, ifd)?
+        .value
+        .get_uint(0)? as usize;
+    exif.buf().get(offset..offset + len)
+}
+
+fn apply_exif_orientation(img: DynamicImage, orientation: u32) -> DynamicImage {
+    match orientation {
+        2 => img.fliph(),
+        3 => img.rotate180(),
+        4 => img.flipv(),
+        5 => img.rotate90().fliph(),
+        6 => img.rotate90(),
+        7 => img.rotate270().fliph(),
+        8 => img.rotate270(),
+        _ => img,
+    }
+}
+
+fn try_load_embedded_raw_preview(source_path: &Path, target_res: u32) -> Option<DynamicImage> {
+    let mmap = read_file_mapped(source_path).ok()?;
+    let exif = exif_processing::read_exif(&mmap)?;
+
+    let (jpeg_bytes, ifd) = find_embedded_jpeg(&exif, exif::In::PRIMARY)
+        .map(|b| (b, exif::In::PRIMARY))
+        .or_else(|| {
+            find_embedded_jpeg(&exif, exif::In::THUMBNAIL).map(|b| (b, exif::In::THUMBNAIL))
+        })?;
+
+    let img = image::load_from_memory_with_format(jpeg_bytes, image::ImageFormat::Jpeg).ok()?;
+
+    if img.width().max(img.height()) < (target_res as f32 * 0.95) as u32 {
+        return None;
+    }
+
+    let orientation = exif
+        .get_field(exif::Tag::Orientation, ifd)
+        .and_then(|f| f.value.get_uint(0))
+        .unwrap_or(1);
+
+    Some(apply_exif_orientation(img, orientation))
+}
+
 pub fn generate_thumbnail_data(
     path_str: &str,
     gpu_context: Option<&GpuContext>,
@@ -1266,6 +1315,14 @@ pub fn generate_thumbnail_data(
     let adjustments = metadata
         .as_ref()
         .map_or(serde_json::Value::Null, |m| m.adjustments.clone());
+
+    if is_raw && adjustments.is_null() && preloaded_image.is_none() {
+        let settings = load_settings(app_handle.clone()).unwrap_or_default();
+        let target_res = settings.thumbnail_resolution.unwrap_or(720);
+        if let Some(preview) = try_load_embedded_raw_preview(&source_path, target_res) {
+            return Ok(preview);
+        }
+    }
 
     if let (Some(context), Some(meta)) = (gpu_context, metadata)
         && !meta.adjustments.is_null()
@@ -1726,7 +1783,11 @@ pub fn update_thumbnail_queue(
         queue.pop_front();
     }
 
-    if state.thumbnail_manager.rotational_disk.load(Ordering::Relaxed) {
+    if state
+        .thumbnail_manager
+        .rotational_disk
+        .load(Ordering::Relaxed)
+    {
         unique_paths.sort();
         for path in unique_paths.into_iter().rev() {
             queue.push_back(path);
