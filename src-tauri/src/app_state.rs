@@ -101,6 +101,8 @@ pub struct ThumbnailManager {
     pub queue: Mutex<VecDeque<String>>,
     pub cvar: Condvar,
     pub processing_now: Mutex<HashSet<String>>,
+    pub rotational_disk: AtomicBool,
+    pub io_gate: Mutex<()>,
 }
 
 impl ThumbnailManager {
@@ -109,6 +111,8 @@ impl ThumbnailManager {
             queue: Mutex::new(VecDeque::new()),
             cvar: Condvar::new(),
             processing_now: Mutex::new(HashSet::new()),
+            rotational_disk: AtomicBool::new(false),
+            io_gate: Mutex::new(()),
         })
     }
 }
