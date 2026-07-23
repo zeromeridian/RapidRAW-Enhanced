@@ -217,6 +217,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     defaultCombo: ['ctrl', 'Comma'],
     section: 'library',
   },
+  {
+    action: 'focus_search',
+    description: 'settings.keybinds.actions.focus_search',
+    defaultCombo: ['ctrl', 'KeyF'],
+    section: 'library',
+  },
   { action: 'undo', description: 'settings.keybinds.actions.undo', defaultCombo: ['ctrl', 'KeyZ'], section: 'editing' },
   { action: 'redo', description: 'settings.keybinds.actions.redo', defaultCombo: ['ctrl', 'KeyY'], section: 'editing' },
   {

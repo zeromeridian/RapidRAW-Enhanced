@@ -1483,6 +1483,7 @@
         "copy_files": "Copy selected file(s)",
         "cycle_zoom": "Cycle zoom (Fit, 2x Fit, 100%)",
         "delete_selected": "Delete selected file(s)",
+        "focus_search": "Focus search field",
         "open_image": "Open selected image",
         "open_settings": "Open settings",
         "paste_adjustments": "Paste copied adjustments",

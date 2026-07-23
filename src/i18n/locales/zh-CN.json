@@ -1481,6 +1481,7 @@
         "copy_files": "复制选中的文件",
         "cycle_zoom": "循环缩放（适应、2倍适应、100%）",
         "delete_selected": "删除选中的文件",
+        "focus_search": "聚焦搜索框",
         "open_image": "打开选中的图像",
         "open_settings": "打开设置",
         "paste_adjustments": "粘贴复制的调整",

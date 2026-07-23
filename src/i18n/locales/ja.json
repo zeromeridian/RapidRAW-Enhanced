@@ -1481,6 +1481,7 @@
         "copy_files": "選択したファイルをコピー",
         "cycle_zoom": "ズームの切り替え (全体表示、2倍拡大、100%)",
         "delete_selected": "選択したファイルを削除",
+        "focus_search": "検索フィールドにフォーカス",
         "open_image": "選択した画像を開く",
         "open_settings": "設定を開く",
         "paste_adjustments": "コピーした補正設定を貼り付け",
