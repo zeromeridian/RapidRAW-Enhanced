@@ -1694,6 +1694,11 @@ fn generate_single_thumbnail_and_cache(
     None
 }
 
+fn prefetch_source_file(path_str: &str) {
+    let (source_path, _) = parse_virtual_path(path_str);
+    let _ = fs::read(&source_path);
+}
+
 pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<crate::AppState>();
     let manager = state.thumbnail_manager.clone();
@@ -1729,10 +1734,10 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                     crate::gpu_processing::get_or_init_gpu_context(&state, &app_clone).ok();
 
                 if let Ok(cache_dir) = get_thumb_cache_dir(&app_clone) {
-                    let _io_permit = manager_clone
-                        .rotational_disk
-                        .load(Ordering::Relaxed)
-                        .then(|| manager_clone.io_gate.lock().unwrap());
+                    if manager_clone.rotational_disk.load(Ordering::Relaxed) {
+                        let _io_permit = manager_clone.io_gate.lock().unwrap();
+                        prefetch_source_file(&path_to_process);
+                    }
 
                     let result = generate_single_thumbnail_and_cache(
                         &path_to_process,
