@@ -1516,6 +1516,7 @@
         "copy_files": "Copiar arquivo(s) selecionado(s)",
         "cycle_zoom": "Alternar zoom (Caber, 2x Caber, 100%)",
         "delete_selected": "Excluir arquivo(s) selecionado(s)",
+        "focus_search": "Focar o campo de pesquisa",
         "open_image": "Abrir imagem selecionada",
         "open_settings": "Abrir configurações",
         "paste_adjustments": "Colar ajustes copiados",

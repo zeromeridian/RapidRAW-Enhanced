@@ -1516,6 +1516,7 @@
         "copy_files": "Copier le(s) fichier(s) sélectionné(s)",
         "cycle_zoom": "Faire défiler le zoom (Ajuster, 2x Ajuster, 100%)",
         "delete_selected": "Supprimer le(s) fichier(s) sélectionné(s)",
+        "focus_search": "Activer le champ de recherche",
         "open_image": "Ouvrir l'image sélectionnée",
         "open_settings": "Ouvrir les paramètres",
         "paste_adjustments": "Coller les ajustements copiés",

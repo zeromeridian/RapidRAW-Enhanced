@@ -1516,6 +1516,7 @@
         "copy_files": "Copia file selezionati",
         "cycle_zoom": "Ruota zoom (Adatta, Adatta 2x, 100%)",
         "delete_selected": "Elimina file selezionati",
+        "focus_search": "Attiva il campo di ricerca",
         "open_image": "Apri immagine selezionata",
         "open_settings": "Apri le impostazioni",
         "paste_adjustments": "Incolla regolazioni copiate",

@@ -1481,6 +1481,7 @@
         "copy_files": "선택한 파일 복사",
         "cycle_zoom": "확대/축소 순환 (맞춤, 2배 맞춤, 100%)",
         "delete_selected": "선택한 파일 삭제",
+        "focus_search": "검색창에 포커스",
         "open_image": "선택한 이미지 열기",
         "open_settings": "설정 열기",
         "paste_adjustments": "복사한 조정값 붙여넣기",
