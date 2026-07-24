@@ -609,23 +609,26 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
                 job = latest;
             }
 
-            if let Ok(histogram_data) = image_processing::calculate_histogram_from_image(&job.image)
-            {
-                let _ = app_handle.emit(
-                    "histogram-update",
-                    serde_json::json!({ "path": job.path, "data": histogram_data }),
-                );
-            }
+            let histogram_data = image_processing::calculate_histogram_from_image(&job.image).ok();
 
-            if job.compute_waveform
-                && let Ok(waveform_data) = image_processing::calculate_waveform_from_image(
+            let waveform_data = if job.compute_waveform {
+                image_processing::calculate_waveform_from_image(
                     &job.image,
                     job.active_waveform_channel.as_deref(),
                 )
-            {
+                .ok()
+            } else {
+                None
+            };
+
+            if histogram_data.is_some() || waveform_data.is_some() {
                 let _ = app_handle.emit(
-                    "waveform-update",
-                    serde_json::json!({ "path": job.path, "data": waveform_data }),
+                    "analytics-update",
+                    serde_json::json!({
+                        "path": job.path,
+                        "histogram": histogram_data,
+                        "waveform": waveform_data,
+                    }),
                 );
             }
         }
