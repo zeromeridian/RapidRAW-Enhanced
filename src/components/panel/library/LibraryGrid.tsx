@@ -4,6 +4,7 @@ import { ChevronUp, ChevronDown } from 'lucide-react';
 import debounce from 'lodash.debounce';
 import { useTranslation } from 'react-i18next';
 import { Row } from './LibraryItems';
+import { useShallow } from 'zustand/react/shallow';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { LibraryViewMode, SortDirection, LibraryDisplayMode } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
@@ -173,7 +174,14 @@ export default function LibraryGrid(props: any) {
     thumbnailSizeOptions,
     onThumbnailSizeChange,
   } = props;
-  const { listColumnWidths, setLibrary, sortCriteria, setSortCriteria } = useLibraryStore();
+  const { listColumnWidths, setLibrary, sortCriteria, setSortCriteria } = useLibraryStore(
+    useShallow((state) => ({
+      listColumnWidths: state.listColumnWidths,
+      setLibrary: state.setLibrary,
+      sortCriteria: state.sortCriteria,
+      setSortCriteria: state.setSortCriteria,
+    })),
+  );
   const [gridSize, setGridSize] = useState({ height: 0, width: 0 });
   const [listHandle, setListHandle] = useListCallbackRef();
   const [collapsedRecursiveFolders, setCollapsedRecursiveFolders] = useState<Set<string>>(new Set());
