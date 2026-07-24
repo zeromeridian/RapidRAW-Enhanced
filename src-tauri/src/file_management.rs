@@ -9,6 +9,7 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::thread;
 
 use anyhow::Result;
@@ -19,6 +20,7 @@ use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sysinfo::Disks;
 use tauri::{AppHandle, Emitter, Manager};
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -388,10 +390,64 @@ pub async fn update_exif_fields(
     .map_err(|e| format!("Task failed: {}", e))?
 }
 
+fn match_disk_kind(disks: &Disks, canonical: &Path) -> Option<bool> {
+    let mut best_match: Option<(&Path, bool)> = None;
+
+    for disk in disks.list() {
+        let mount_point = disk.mount_point();
+        if canonical.starts_with(mount_point) {
+            let is_longer_match = best_match
+                .map(|(current, _)| mount_point.as_os_str().len() > current.as_os_str().len())
+                .unwrap_or(true);
+            if is_longer_match {
+                best_match = Some((mount_point, disk.kind() == sysinfo::DiskKind::HDD));
+            }
+        }
+    }
+
+    best_match.map(|(_, is_hdd)| is_hdd)
+}
+
+fn update_rotational_disk_flag(path: &str, app_handle: &AppHandle) {
+    let state = app_handle.state::<crate::AppState>();
+    let Ok(canonical) = Path::new(path).canonicalize() else {
+        return;
+    };
+
+    let cached_match = {
+        let cache = state.disks_cache.lock().unwrap();
+        cache
+            .as_ref()
+            .and_then(|disks| match_disk_kind(disks, &canonical))
+    };
+
+    match cached_match {
+        Some(is_hdd) => {
+            state
+                .thumbnail_manager
+                .rotational_disk
+                .store(is_hdd, Ordering::Relaxed);
+        }
+        None => {
+            if !state.disks_cache_refreshing.swap(true, Ordering::Relaxed) {
+                let refresh_app_handle = app_handle.clone();
+                thread::spawn(move || {
+                    let disks = Disks::new_with_refreshed_list();
+                    let state = refresh_app_handle.state::<crate::AppState>();
+                    *state.disks_cache.lock().unwrap() = Some(disks);
+                    state.disks_cache_refreshing.store(false, Ordering::Relaxed);
+                });
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<ImageFile>, String> {
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
+
+    update_rotational_disk_flag(&path, &app_handle);
 
     let entries = fs::read_dir(&path).map_err(|e| e.to_string())?;
     let mut images = Vec::new();
@@ -510,6 +566,8 @@ pub fn list_images_recursive(
 ) -> Result<Vec<ImageFile>, String> {
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
+
+    update_rotational_disk_flag(&path, &app_handle);
 
     let root_path = Path::new(&path);
     let mut images = Vec::new();
@@ -1201,6 +1259,55 @@ pub fn read_file_mapped(path: &Path) -> Result<Mmap, ReadFileError> {
     Ok(mmap)
 }
 
+fn find_embedded_jpeg(exif: &exif::Exif, ifd: exif::In) -> Option<&[u8]> {
+    let offset = exif
+        .get_field(exif::Tag::JPEGInterchangeFormat, ifd)?
+        .value
+        .get_uint(0)? as usize;
+    let len = exif
+        .get_field(exif::Tag::JPEGInterchangeFormatLength, ifd)?
+        .value
+        .get_uint(0)? as usize;
+    exif.buf().get(offset..offset + len)
+}
+
+fn apply_exif_orientation(img: DynamicImage, orientation: u32) -> DynamicImage {
+    match orientation {
+        2 => img.fliph(),
+        3 => img.rotate180(),
+        4 => img.flipv(),
+        5 => img.rotate90().fliph(),
+        6 => img.rotate90(),
+        7 => img.rotate270().fliph(),
+        8 => img.rotate270(),
+        _ => img,
+    }
+}
+
+fn try_load_embedded_raw_preview(source_path: &Path, target_res: u32) -> Option<DynamicImage> {
+    let mmap = read_file_mapped(source_path).ok()?;
+    let exif = exif_processing::read_exif(&mmap)?;
+
+    let (jpeg_bytes, ifd) = find_embedded_jpeg(&exif, exif::In::PRIMARY)
+        .map(|b| (b, exif::In::PRIMARY))
+        .or_else(|| {
+            find_embedded_jpeg(&exif, exif::In::THUMBNAIL).map(|b| (b, exif::In::THUMBNAIL))
+        })?;
+
+    let img = image::load_from_memory_with_format(jpeg_bytes, image::ImageFormat::Jpeg).ok()?;
+
+    if img.width().max(img.height()) < (target_res as f32 * 0.95) as u32 {
+        return None;
+    }
+
+    let orientation = exif
+        .get_field(exif::Tag::Orientation, ifd)
+        .and_then(|f| f.value.get_uint(0))
+        .unwrap_or(1);
+
+    Some(apply_exif_orientation(img, orientation))
+}
+
 pub fn generate_thumbnail_data(
     path_str: &str,
     gpu_context: Option<&GpuContext>,
@@ -1228,6 +1335,14 @@ pub fn generate_thumbnail_data(
     let adjustments = metadata
         .as_ref()
         .map_or(serde_json::Value::Null, |m| m.adjustments.clone());
+
+    if is_raw && adjustments.is_null() && preloaded_image.is_none() {
+        let settings = load_settings(app_handle.clone()).unwrap_or_default();
+        let target_res = settings.thumbnail_resolution.unwrap_or(720);
+        if let Some(preview) = try_load_embedded_raw_preview(&source_path, target_res) {
+            return Ok(preview);
+        }
+    }
 
     if let (Some(context), Some(meta)) = (gpu_context, metadata)
         && !meta.adjustments.is_null()
@@ -1579,6 +1694,11 @@ fn generate_single_thumbnail_and_cache(
     None
 }
 
+fn prefetch_source_file(path_str: &str) {
+    let (source_path, _) = parse_virtual_path(path_str);
+    let _ = fs::read(&source_path);
+}
+
 pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<crate::AppState>();
     let manager = state.thumbnail_manager.clone();
@@ -1614,6 +1734,11 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                     crate::gpu_processing::get_or_init_gpu_context(&state, &app_clone).ok();
 
                 if let Ok(cache_dir) = get_thumb_cache_dir(&app_clone) {
+                    if manager_clone.rotational_disk.load(Ordering::Relaxed) {
+                        let _io_permit = manager_clone.io_gate.lock().unwrap();
+                        prefetch_source_file(&path_to_process);
+                    }
+
                     let result = generate_single_thumbnail_and_cache(
                         &path_to_process,
                         &cache_dir,
@@ -1683,8 +1808,19 @@ pub fn update_thumbnail_queue(
         queue.pop_front();
     }
 
-    for path in unique_paths {
-        queue.push_back(path);
+    if state
+        .thumbnail_manager
+        .rotational_disk
+        .load(Ordering::Relaxed)
+    {
+        unique_paths.sort();
+        for path in unique_paths.into_iter().rev() {
+            queue.push_back(path);
+        }
+    } else {
+        for path in unique_paths {
+            queue.push_back(path);
+        }
     }
 
     let queue_len = queue.len();
