@@ -27,7 +27,6 @@ import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../../../store/useEditorStore';
 
 interface ExportPanelProps {
@@ -237,11 +236,7 @@ export default function ExportPanel({
     currentSettingsObject,
   } = useExportSettings();
 
-  const { adjustments } = useEditorStore(
-    useShallow((state) => ({
-      adjustments: state.adjustments,
-    })),
-  );
+  const adjustmentsRef = useRef(useEditorStore.getState().adjustments);
 
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const initDone = useRef(false);
@@ -392,11 +387,21 @@ export default function ExportPanel({
           : null,
     };
     const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
-    debouncedEstimateSize(pathsToExport, adjustments, selectedImage?.path, exportSettings, format);
-    return () => debouncedEstimateSize.cancel();
+    const runEstimate = () =>
+      debouncedEstimateSize(pathsToExport, adjustmentsRef.current, selectedImage?.path, exportSettings, format);
+
+    runEstimate();
+    const unsubscribe = useEditorStore.subscribe((state) => {
+      adjustmentsRef.current = state.adjustments;
+      runEstimate();
+    });
+
+    return () => {
+      unsubscribe();
+      debouncedEstimateSize.cancel();
+    };
   }, [
     pathsToExport,
-    adjustments,
     selectedImage?.path,
     fileFormat,
     jpegQuality,
@@ -524,7 +529,7 @@ export default function ExportPanel({
           exportSettings,
           outputFormat: selectedFormat.extensions[0],
           currentEditPath: selectedImage?.path || null,
-          currentEditAdjustments: adjustments || null,
+          currentEditAdjustments: adjustmentsRef.current || null,
         });
       }
     } catch (error) {
