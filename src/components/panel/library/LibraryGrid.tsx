@@ -473,6 +473,15 @@ export default function LibraryGrid(props: any) {
     handleToggleRecursiveFolder,
   ]);
 
+  const getItemSize = useCallback(
+    (index: number) => {
+      if (!gridData) return 0;
+      if (gridData.rows[index].type === 'footer') return gridData.isListView ? 24 : gridData.OUTER_PADDING;
+      return gridData.rows[index].type === 'header' ? gridData.headerHeight : gridData.rowHeight;
+    },
+    [gridData],
+  );
+
   if (!gridData) {
     return (
       <div
@@ -483,11 +492,6 @@ export default function LibraryGrid(props: any) {
       />
     );
   }
-
-  const getItemSize = (index: number) => {
-    if (gridData.rows[index].type === 'footer') return gridData.isListView ? 24 : gridData.OUTER_PADDING;
-    return gridData.rows[index].type === 'header' ? gridData.headerHeight : gridData.rowHeight;
-  };
 
   const handleHeaderSort = (key: string) => {
     props.onClearSelection();
