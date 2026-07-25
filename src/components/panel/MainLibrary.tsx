@@ -165,6 +165,7 @@ export default function MainLibrary(props: MainLibraryProps) {
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
   const [latestVersion, setLatestVersion] = useState('');
   const [isBusyDelayed, setIsBusyDelayed] = useState(false);
+  const [isBusyLoaderMounted, setIsBusyLoaderMounted] = useState(false);
   const [isProgressHovered, setIsProgressHovered] = useState(false);
   const isSettingsOpen = useUIStore((state) => state.isSettingsOpen);
 
@@ -261,6 +262,12 @@ export default function MainLibrary(props: MainLibraryProps) {
 
     return () => clearTimeout(timer);
   }, [isBusy]);
+
+  useEffect(() => {
+    if (isBusyDelayed) {
+      setIsBusyLoaderMounted(true);
+    }
+  }, [isBusyDelayed]);
 
   useEffect(() => {
     const compareVersions = (v1: string, v2: string) => {
@@ -511,8 +518,15 @@ export default function MainLibrary(props: MainLibraryProps) {
                 className={`flex items-center gap-2 overflow-hidden transition-all duration-300 whitespace-nowrap ${
                   isBusyDelayed ? 'max-w-xs opacity-100' : 'max-w-0 opacity-0'
                 }`}
+                onTransitionEnd={(e) => {
+                  if (e.propertyName === 'opacity' && !isBusyDelayed) {
+                    setIsBusyLoaderMounted(false);
+                  }
+                }}
               >
-                <Loader2 size={14} className="animate-spin text-text-secondary shrink-0" />
+                {isBusyLoaderMounted && (
+                  <Loader2 size={14} className="animate-spin text-text-secondary shrink-0" />
+                )}
                 <div
                   className={`flex items-center transition-all duration-300 ease-out overflow-hidden ${
                     isProgressHovered && isBusyDelayed && (props.thumbnailProgress?.total ?? 0) > 0

@@ -49,6 +49,7 @@ const EditorToolbar = memo(
     const { t } = useTranslation();
     const isAnyLoading = isLoading;
     const [isLoaderVisible, setIsLoaderVisible] = useState(false);
+    const [isLoaderMounted, setIsLoaderMounted] = useState(false);
     const [disableLoaderTransition, setDisableLoaderTransition] = useState(false);
     const hideTimeoutRef = useRef<number | null>(null);
     const prevIsLoadingRef = useRef(isLoading);
@@ -137,6 +138,14 @@ const EditorToolbar = memo(
         if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
       };
     }, [isAnyLoading, isLoading, isLoaderVisible]);
+
+    useEffect(() => {
+      if (isLoaderVisible) {
+        setIsLoaderMounted(true);
+      } else if (disableLoaderTransition) {
+        setIsLoaderMounted(false);
+      }
+    }, [isLoaderVisible, disableLoaderTransition]);
 
     useEffect(() => {
       if (!isHistoryVisible) return;
@@ -433,8 +442,13 @@ const EditorToolbar = memo(
                   isLoaderVisible ? 'max-w-4 opacity-100 ml-2' : 'max-w-0 opacity-0 ml-0',
                   disableLoaderTransition ? 'transition-none' : 'transition-all duration-300',
                 )}
+                onTransitionEnd={(e) => {
+                  if (e.propertyName === 'opacity' && !isLoaderVisible) {
+                    setIsLoaderMounted(false);
+                  }
+                }}
               >
-                <Loader2 size={12} className="text-text-secondary animate-spin" />
+                {isLoaderMounted && <Loader2 size={12} className="text-text-secondary animate-spin" />}
               </div>
             </div>
 
