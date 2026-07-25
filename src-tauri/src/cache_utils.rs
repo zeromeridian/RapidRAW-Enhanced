@@ -25,6 +25,37 @@ pub const GEOMETRY_KEYS: &[&str] = &[
     "lensVignetteEnabled",
 ];
 
+pub fn calculate_thumbnail_base_hash(adjustments: &serde_json::Value) -> u64 {
+    let mut hasher = DefaultHasher::new();
+
+    calculate_geometry_hash(adjustments).hash(&mut hasher);
+
+    let blur_enabled = adjustments["lensBlurEnabled"].as_bool().unwrap_or(false);
+    blur_enabled.hash(&mut hasher);
+
+    if blur_enabled {
+        let blur_keys = [
+            "lensBlurAmount",
+            "lensBlurDiffusion",
+            "lensBlurShape",
+            "lensBlurMinDepth",
+            "lensBlurMaxDepth",
+            "lensBlurMinFade",
+            "lensBlurMaxFade",
+            "lensBlurDepthMap",
+        ];
+
+        for key in blur_keys {
+            if let Some(val) = adjustments.get(key) {
+                key.hash(&mut hasher);
+                val.to_string().hash(&mut hasher);
+            }
+        }
+    }
+
+    hasher.finish()
+}
+
 pub fn calculate_geometry_hash(adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
 

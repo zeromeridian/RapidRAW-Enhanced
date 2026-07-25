@@ -30,7 +30,6 @@ use crate::PendingMetadata;
 #[cfg(target_os = "android")]
 use crate::android_integration::*;
 use crate::app_settings::*;
-use crate::cache_utils::calculate_geometry_hash;
 use crate::exif_processing;
 use crate::formats::{is_raw_file, is_supported_image_file};
 use crate::gpu_processing;
@@ -1469,7 +1468,7 @@ pub fn generate_thumbnail_data(
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
         let target_res = settings.thumbnail_resolution.unwrap_or(720);
 
-        let geometry_hash = calculate_geometry_hash(&meta.adjustments);
+        let base_cache_hash = crate::cache_utils::calculate_thumbnail_base_hash(&meta.adjustments);
 
         let crop_data: Option<Crop> = serde_json::from_value(meta.adjustments["crop"].clone()).ok();
 
@@ -1488,7 +1487,7 @@ pub fn generate_thumbnail_data(
                     }
                 }
 
-                if *cached_hash == geometry_hash && sufficient_resolution {
+                if *cached_hash == base_cache_hash && sufficient_resolution {
                     Some((img.clone(), *scale))
                 } else {
                     None
@@ -1599,7 +1598,7 @@ pub fn generate_thumbnail_data(
             }
             cache.insert(
                 path_str.to_string(),
-                (geometry_hash, base.clone(), total_scale),
+                (base_cache_hash, base.clone(), total_scale),
             );
 
             (base, total_scale)
