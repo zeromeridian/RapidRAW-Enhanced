@@ -30,7 +30,13 @@ pub fn calculate_thumbnail_base_hash(adjustments: &serde_json::Value) -> u64 {
 
     calculate_geometry_hash(adjustments).hash(&mut hasher);
 
-    let blur_enabled = adjustments["lensBlurEnabled"].as_bool().unwrap_or(false);
+    let effects_visible = adjustments
+        .get("sectionVisibility")
+        .and_then(|v| v.get("effects"))
+        .and_then(|s| s.as_bool())
+        .unwrap_or(true);
+
+    let blur_enabled = effects_visible && adjustments["lensBlurEnabled"].as_bool().unwrap_or(false);
     blur_enabled.hash(&mut hasher);
 
     if blur_enabled {
