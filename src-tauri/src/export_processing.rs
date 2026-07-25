@@ -836,12 +836,14 @@ pub(crate) async fn export_images_impl(
                 let source_path_str = source_path.to_string_lossy().to_string();
                 let is_current_edit = Some(&source_path_str) == current_edit_path.as_ref();
 
-                let mut js_adjustments = match (is_current_edit, current_edit_adjustments) {
-                    (true, Some(adjustments)) => adjustments,
-                    _ => {
-                        let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-                        metadata.adjustments
+                let mut js_adjustments = if let Some(ref adj) = current_edit_adjustments {
+                    if is_current_edit || current_edit_path.is_none() {
+                        adj.clone()
+                    } else {
+                        crate::exif_processing::load_sidecar(&sidecar_path).adjustments
                     }
+                } else {
+                    crate::exif_processing::load_sidecar(&sidecar_path).adjustments
                 };
 
                 hydrate_adjustments(&state, &mut js_adjustments);
@@ -1146,6 +1148,19 @@ pub async fn run_headless_export(
         preserve_folders: true,
     };
 
+    let mut custom_adjustments = None;
+    if let Some(adj_path) = &session.adjustments_override {
+        let content = std::fs::read_to_string(adj_path)
+            .map_err(|e| format!("Failed to read adjustments file: {}", e))?;
+        let json: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse adjustments JSON: {}", e))?;
+        custom_adjustments = Some(json);
+        println!(
+            "Loaded custom adjustments to override sidecars from: {}",
+            adj_path
+        );
+    }
+
     let (tx, rx) = tokio::sync::oneshot::channel();
 
     export_images_impl(
@@ -1156,7 +1171,7 @@ pub async fn run_headless_export(
         export_settings,
         session.format,
         None,
-        None,
+        custom_adjustments,
         state.clone(),
         app_handle.clone(),
         Some(tx),

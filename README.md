@@ -345,6 +345,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
         <li><strong>Filmstrip View:</strong> Quickly navigate between all the images in your current folder while editing.</li>
         <li><strong>Batch Operations:</strong> Save significant time by applying a consistent set of adjustments or exporting entire batches of images simultaneously.</li>
         <li><strong>EXIF Data Viewer:</strong> Gain insights by inspecting the complete metadata from your camera.</li>
+        <li><strong>Headless CLI Export:</strong> Batch export photos or entire directory trees directly from your terminal/scripts without launching the GUI.</li>
       </ul>
       <h4>Productivity & UI</h4>
       <ul>
@@ -536,6 +537,29 @@ npm install
 # 3. Build and run the application
 npm start
 ```
+
+## Command Line Interface (CLI)
+
+RapidRAW includes a headless export tool for batch processing photos in automated scripts, terminal pipelines, or server environments without opening the GUI:
+
+```bash
+# Export a folder using the default edits found in .rrdata sidecar files
+rapidraw export /path/to/photos --output /path/to/output_dir --format jpeg --quality 90
+
+# Batch export a folder using a custom adjustments JSON
+rapidraw export /path/to/photos --output /path/to/output_dir --adjustments /path/to/preset.json
+```
+
+> **Note:** By default, headless export automatically detects and applies edits stored in `.rrdata` sidecar files located alongside your source images. You can override this by passing a custom JSON file using the `--adjustments` flag.
+
+| Option                 | Description                                                               | Default           |
+| :--------------------- | :------------------------------------------------------------------------ | :---------------- |
+| `<source>`             | Path to an image file or directory containing images                      | _(Required)_      |
+| `--output <path>`      | Target folder for exported images                                         | _(Required)_      |
+| `--format <fmt>`       | Output format (`jpeg`, `png`, `webp`, `avif`, `tiff`, `jxl`, `cube`)      | `jpeg`            |
+| `--quality <1-100>`    | Image export quality                                                      | `90`              |
+| `--keep-metadata`      | Retain EXIF/capture metadata in exported files                            | `false`           |
+| `--adjustments <path>` | Path to a custom JSON file containing adjustments to override the sidecar | _(Auto-detected)_ |
 
 ## System Requirements
 

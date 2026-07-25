@@ -18,6 +18,7 @@ pub struct HeadlessExportSession {
     pub format: String,
     pub quality: u8,
     pub keep_metadata: bool,
+    pub adjustments_override: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -44,6 +45,7 @@ pub fn parse_launch_args(args: &[String]) -> LaunchRequest {
         let mut format = String::from("jpeg");
         let mut quality = 90;
         let mut keep_metadata = false;
+        let mut adjustments_override = None;
 
         if let Some(src) = iter.next() {
             if !src.starts_with('-') {
@@ -69,6 +71,11 @@ pub fn parse_launch_args(args: &[String]) -> LaunchRequest {
                     }
                 }
                 "--keep-metadata" => keep_metadata = true,
+                "--adjustments" => {
+                    if let Some(adj) = iter.next() {
+                        adjustments_override = Some(adj.clone());
+                    }
+                }
                 _ => {}
             }
         }
@@ -79,6 +86,7 @@ pub fn parse_launch_args(args: &[String]) -> LaunchRequest {
             format,
             quality,
             keep_metadata,
+            adjustments_override,
         });
     }
 
