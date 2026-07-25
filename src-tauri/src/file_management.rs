@@ -82,12 +82,20 @@ fn compute_thumbnail_cache_hash(path_str: &str, adjustments_bytes: &[u8]) -> Opt
     Some(hasher.finalize().to_hex().to_string())
 }
 
+/// Metadata fields required to build an `ImageFile` from a sidecar.
+struct ImageFileMetadata {
+    is_edited: bool,
+    tags: Option<Vec<String>>,
+    rating: u8,
+    is_raw: bool,
+}
+
 fn resolve_image_metadata(
     image_path: &Path,
     sidecar_path: &Path,
     enable_xmp_sync: bool,
     settings: &AppSettings,
-) -> (bool, Option<Vec<String>>, u8, bool) {
+) -> ImageFileMetadata {
     let mut metadata = crate::exif_processing::load_sidecar(sidecar_path);
 
     if enable_xmp_sync
@@ -99,9 +107,14 @@ fn resolve_image_metadata(
 
     let is_raw = crate::formats::is_raw_file(image_path);
     let tm_override = crate::image_processing::resolve_tonemapper_override(settings, is_raw);
-    let edited =
+    let is_edited =
         crate::image_processing::is_image_edited(&metadata.adjustments, is_raw, tm_override);
-    (edited, metadata.tags, metadata.rating, is_raw)
+    ImageFileMetadata {
+        is_edited,
+        tags: metadata.tags,
+        rating: metadata.rating,
+        is_raw,
+    }
 }
 
 fn emit_image_metadata_loaded(
@@ -166,7 +179,7 @@ pub fn start_metadata_workers(app_handle: tauri::AppHandle) {
                 let settings = load_settings(app_clone.clone()).unwrap_or_default();
                 let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
-                let (is_edited, tags, rating, _is_raw) = resolve_image_metadata(
+                let metadata = resolve_image_metadata(
                     &item.image_path,
                     &item.sidecar_path,
                     enable_xmp_sync,
@@ -176,9 +189,9 @@ pub fn start_metadata_workers(app_handle: tauri::AppHandle) {
                 emit_image_metadata_loaded(
                     &app_clone,
                     &item.virtual_path,
-                    rating,
-                    is_edited,
-                    &tags,
+                    metadata.rating,
+                    metadata.is_edited,
+                    &metadata.tags,
                 );
 
                 manager_clone
@@ -620,31 +633,35 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
                     && resolve_xmp_path(&path_buf)
                         .is_some_and(|p| crate::file_management::is_cloud_placeholder(&p));
 
-                let (is_edited, tags, rating, is_raw) =
-                    if crate::file_management::is_cloud_placeholder(&sidecar_path)
-                        || xmp_is_placeholder
-                    {
-                        enqueue_metadata(
-                            &app_handle,
-                            virtual_path.clone(),
-                            path_buf.clone(),
-                            sidecar_path.clone(),
-                        );
-                        (false, None, 0, crate::formats::is_raw_file(&path_buf))
-                    } else {
-                        resolve_image_metadata(&path_buf, &sidecar_path, enable_xmp_sync, &settings)
-                    };
+                let metadata = if crate::file_management::is_cloud_placeholder(&sidecar_path)
+                    || xmp_is_placeholder
+                {
+                    enqueue_metadata(
+                        &app_handle,
+                        virtual_path.clone(),
+                        path_buf.clone(),
+                        sidecar_path.clone(),
+                    );
+                    ImageFileMetadata {
+                        is_edited: false,
+                        tags: None,
+                        rating: 0,
+                        is_raw: crate::formats::is_raw_file(&path_buf),
+                    }
+                } else {
+                    resolve_image_metadata(&path_buf, &sidecar_path, enable_xmp_sync, &settings)
+                };
 
                 file_results.push(ImageFile {
                     path: virtual_path,
                     modified,
-                    is_edited,
-                    tags,
+                    is_edited: metadata.is_edited,
+                    tags: metadata.tags,
                     exif: None,
                     is_virtual_copy,
-                    is_raw,
+                    is_raw: metadata.is_raw,
                     group_id: None,
-                    rating,
+                    rating: metadata.rating,
                     is_cloud_placeholder,
                 });
             }
@@ -749,31 +766,35 @@ pub fn list_images_recursive(
                     && resolve_xmp_path(&path_buf)
                         .is_some_and(|p| crate::file_management::is_cloud_placeholder(&p));
 
-                let (is_edited, tags, rating, is_raw) =
-                    if crate::file_management::is_cloud_placeholder(&sidecar_path)
-                        || xmp_is_placeholder
-                    {
-                        enqueue_metadata(
-                            &app_handle,
-                            virtual_path.clone(),
-                            path_buf.clone(),
-                            sidecar_path.clone(),
-                        );
-                        (false, None, 0, crate::formats::is_raw_file(&path_buf))
-                    } else {
-                        resolve_image_metadata(&path_buf, &sidecar_path, enable_xmp_sync, &settings)
-                    };
+                let metadata = if crate::file_management::is_cloud_placeholder(&sidecar_path)
+                    || xmp_is_placeholder
+                {
+                    enqueue_metadata(
+                        &app_handle,
+                        virtual_path.clone(),
+                        path_buf.clone(),
+                        sidecar_path.clone(),
+                    );
+                    ImageFileMetadata {
+                        is_edited: false,
+                        tags: None,
+                        rating: 0,
+                        is_raw: crate::formats::is_raw_file(&path_buf),
+                    }
+                } else {
+                    resolve_image_metadata(&path_buf, &sidecar_path, enable_xmp_sync, &settings)
+                };
 
                 file_results.push(ImageFile {
                     path: virtual_path,
                     modified,
-                    is_edited,
-                    tags,
+                    is_edited: metadata.is_edited,
+                    tags: metadata.tags,
                     exif: None,
                     is_virtual_copy,
-                    is_raw,
+                    is_raw: metadata.is_raw,
                     group_id: None,
-                    rating,
+                    rating: metadata.rating,
                     is_cloud_placeholder,
                 });
             }
@@ -1016,9 +1037,8 @@ pub fn get_album_images(
                 && resolve_xmp_path(&source_path)
                     .is_some_and(|p| crate::file_management::is_cloud_placeholder(&p));
 
-            let (is_edited, tags, rating, is_raw) = if crate::file_management::is_cloud_placeholder(
-                &sidecar_path,
-            ) || xmp_is_placeholder
+            let metadata = if crate::file_management::is_cloud_placeholder(&sidecar_path)
+                || xmp_is_placeholder
             {
                 enqueue_metadata(
                     &app_handle,
@@ -1026,7 +1046,12 @@ pub fn get_album_images(
                     source_path.clone(),
                     sidecar_path.clone(),
                 );
-                (false, None, 0, crate::formats::is_raw_file(&source_path))
+                ImageFileMetadata {
+                    is_edited: false,
+                    tags: None,
+                    rating: 0,
+                    is_raw: crate::formats::is_raw_file(&source_path),
+                }
             } else {
                 resolve_image_metadata(&source_path, &sidecar_path, enable_xmp_sync, &settings)
             };
@@ -1034,13 +1059,13 @@ pub fn get_album_images(
             Some(ImageFile {
                 path: virtual_path.clone(),
                 modified,
-                is_edited,
-                tags,
+                is_edited: metadata.is_edited,
+                tags: metadata.tags,
                 exif: None,
                 is_virtual_copy,
-                is_raw,
+                is_raw: metadata.is_raw,
                 group_id: None,
-                rating,
+                rating: metadata.rating,
                 is_cloud_placeholder,
             })
         })
