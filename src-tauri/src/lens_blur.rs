@@ -3,6 +3,15 @@ use image::{DynamicImage, GenericImageView, Rgb32FImage};
 use rayon::prelude::*;
 use std::borrow::Cow;
 
+#[derive(Clone, Copy)]
+struct BokehTap {
+    x: i32,
+    y: i32,
+    ux: f32,
+    uy: f32,
+    weight: f32,
+}
+
 pub fn apply_lens_blur<'a>(
     image: Cow<'a, DynamicImage>,
     adjustments: &serde_json::Value,
@@ -652,11 +661,7 @@ fn dof_aperture_intensity(rr: f32, shape: &str, dreamy: f32) -> f32 {
     crisp * (1.0 - dreamy) + soft * dreamy
 }
 
-fn build_bokeh_kernel(
-    radius: f32,
-    shape: &str,
-    dreamy: f32,
-) -> (Vec<(i32, i32, f32, f32, f32)>, usize) {
+fn build_bokeh_kernel(radius: f32, shape: &str, dreamy: f32) -> (Vec<BokehTap>, usize) {
     let r = radius.max(0.6);
     let blades: u32 = match shape {
         "hexagon" => 6,
@@ -664,7 +669,7 @@ fn build_bokeh_kernel(
         _ => 0,
     };
 
-    let mut taps: Vec<(i32, i32, f32, f32, f32)> = Vec::new();
+    let mut taps: Vec<BokehTap> = Vec::new();
     let mut sum = 0.0f32;
 
     if r <= 3.5 {
@@ -678,7 +683,13 @@ fn build_bokeh_kernel(
                 }
                 let wgt = cov * dof_aperture_intensity((d / r).min(1.0), shape, dreamy);
                 sum += wgt;
-                taps.push((x, y, x as f32 / r, y as f32 / r, wgt));
+                taps.push(BokehTap {
+                    x,
+                    y,
+                    ux: x as f32 / r,
+                    uy: y as f32 / r,
+                    weight: wgt,
+                });
             }
         }
     } else {
@@ -704,26 +715,26 @@ fn build_bokeh_kernel(
 
             let wgt = jw * dof_aperture_intensity(rr, shape, dreamy);
             sum += wgt;
-            taps.push((
-                (ux * r).round() as i32,
-                (uy * r).round() as i32,
+            taps.push(BokehTap {
+                x: (ux * r).round() as i32,
+                y: (uy * r).round() as i32,
                 ux,
                 uy,
-                wgt,
-            ));
+                weight: wgt,
+            });
         }
     }
 
     if sum > 0.0 {
         let inv = 1.0 / sum;
         for t in taps.iter_mut() {
-            t.4 *= inv;
+            t.weight *= inv;
         }
     }
 
     let ext = taps
         .iter()
-        .map(|t| t.0.unsigned_abs().max(t.1.unsigned_abs()) as usize)
+        .map(|t| t.x.unsigned_abs().max(t.y.unsigned_abs()) as usize)
         .max()
         .unwrap_or(0);
 
@@ -735,7 +746,7 @@ fn blur_layer_bokeh(
     layer: &[f32],
     ww: usize,
     wh: usize,
-    taps: &[(i32, i32, f32, f32, f32)],
+    taps: &[BokehTap],
     spans: &[(usize, usize)],
     ext: usize,
     radius: f32,
@@ -768,10 +779,10 @@ fn blur_layer_bokeh(
                 if y_safe && x >= ext && x + ext < ww {
                     let center = (y * ww + x) as i32;
                     for t in taps {
-                        let mut wgt = t.4;
+                        let mut wgt = t.weight;
                         if use_cat {
-                            let ox = t.2 - ccx;
-                            let oy = t.3 - ccy;
+                            let ox = t.ux - ccx;
+                            let oy = t.uy - ccy;
                             let d2 = ox * ox + oy * oy;
                             if d2 >= 1.0 {
                                 continue;
@@ -781,7 +792,7 @@ fn blur_layer_bokeh(
                             }
                         }
 
-                        let si = ((center + t.1 * ww as i32 + t.0) as usize) * 4;
+                        let si = ((center + t.y * ww as i32 + t.x) as usize) * 4;
                         unsafe {
                             acc[0] += layer.get_unchecked(si) * wgt;
                             acc[1] += layer.get_unchecked(si + 1) * wgt;
@@ -792,15 +803,15 @@ fn blur_layer_bokeh(
                     }
                 } else {
                     for t in taps {
-                        let sx = x as i32 + t.0;
-                        let sy = y as i32 + t.1;
+                        let sx = x as i32 + t.x;
+                        let sy = y as i32 + t.y;
                         if sx < 0 || sy < 0 || sx >= ww as i32 || sy >= wh as i32 {
                             continue;
                         }
-                        let mut wgt = t.4;
+                        let mut wgt = t.weight;
                         if use_cat {
-                            let ox = t.2 - ccx;
-                            let oy = t.3 - ccy;
+                            let ox = t.ux - ccx;
+                            let oy = t.uy - ccy;
                             let d2 = ox * ox + oy * oy;
                             if d2 >= 1.0 {
                                 continue;
