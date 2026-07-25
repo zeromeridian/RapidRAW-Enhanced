@@ -760,7 +760,7 @@ pub fn try_get_exif_creation_date(path: &Path) -> Option<DateTime<Utc>> {
         }
     }
 
-    if is_raw_file(path.to_string_lossy().as_ref()) {
+    if is_raw_file(path) {
         let loader = rawler::RawLoader::new();
         if let Ok(raw_source) = rawler::rawsource::RawSource::new(path)
             && let Ok(decoder) = loader.get_decoder(&raw_source)

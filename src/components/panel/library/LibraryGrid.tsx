@@ -10,9 +10,9 @@ import { LibraryViewMode, SortDirection, LibraryDisplayMode } from '../../ui/App
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { useProcessStore } from '../../../store/useProcessStore';
-import { ExifOverlay, GroupingMode } from '../../ui/AppProperties';
+import { ExifOverlay } from '../../ui/AppProperties';
 import { useSettingsStore } from '../../../store/useSettingsStore';
-import { buildImageGroups, GroupBadgeInfo } from '../../../utils/imageGrouping';
+
 
 function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: any) {
   const { t } = useTranslation();
@@ -174,6 +174,7 @@ export default function LibraryGrid(props: any) {
     onRequestThumbnails,
     thumbnailSizeOptions,
     onThumbnailSizeChange,
+    groupBadgeInfo,
   } = props;
   const { listColumnWidths, setLibrary, sortCriteria, setSortCriteria } = useLibraryStore(
     useShallow((state) => ({
@@ -183,15 +184,6 @@ export default function LibraryGrid(props: any) {
       setSortCriteria: state.setSortCriteria,
     })),
   );
-  const rawImageList = useLibraryStore((s) => s.imageList);
-  const appSettings = useSettingsStore((s) => s.appSettings);
-  const groupingMode: GroupingMode = appSettings?.grouping ?? 'off';
-
-  const groupBadgeInfo = useMemo<Map<string, GroupBadgeInfo> | null>(() => {
-    if (groupingMode === 'off') return null;
-    const groupEditedFiles = appSettings?.groupEditedFiles ?? true;
-    return buildImageGroups(rawImageList, groupingMode, groupEditedFiles).badges;
-  }, [rawImageList, groupingMode, appSettings?.groupEditedFiles]);
 
   const [gridSize, setGridSize] = useState({ height: 0, width: 0 });
   const [listHandle, setListHandle] = useListCallbackRef();

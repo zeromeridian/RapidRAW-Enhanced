@@ -33,6 +33,7 @@ import {
   EditedStatus,
   LibraryDisplayMode,
 } from '../ui/AppProperties';
+import { GroupBadgeInfo, GroupId } from '../../utils/imageGrouping';
 import { ImportState, Status } from '../ui/ExportImportProperties';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
@@ -56,6 +57,7 @@ interface MainLibraryProps {
   aiModelDownloadStatus: string | null;
   appSettings: AppSettings | null;
   currentFolderPath: string | null;
+  groupBadgeInfo: Map<GroupId, GroupBadgeInfo> | null;
   imageList: Array<ImageFile>;
   imageRatings: Record<string, number>;
   importState: ImportState;

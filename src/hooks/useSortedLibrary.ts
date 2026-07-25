@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { RawStatus, EditedStatus, SortDirection, ImageFile, GroupingMode } from '../components/ui/AppProperties';
-import { buildImageGroups } from '../utils/imageGrouping';
+import { buildImageGroups, GroupBadgeInfo, GroupId } from '../utils/imageGrouping';
 
 export const ADVANCED_QUERY_REGEX =
   /^(iso|aperture|f|shutter|s|focal|mm|rating|color|camera|make|model|lens)\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
@@ -35,7 +35,12 @@ export const parseFocalLength = (val: string | undefined): number => {
   return isNaN(numVal) ? 0 : numVal;
 };
 
-export function computeSortedLibrary(libraryState: any, settingsState: any): ImageFile[] {
+export interface GroupedLibrary {
+  displayList: ImageFile[];
+  badges: Map<GroupId, GroupBadgeInfo> | null;
+}
+
+export function computeGroupedLibrary(libraryState: any, settingsState: any): GroupedLibrary {
   const { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria } = libraryState;
   const { appSettings } = settingsState;
 
@@ -265,7 +270,15 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
     return order === SortDirection.Ascending ? comparison : -comparison;
   });
 
-  return list;
+  const badges = isGroupingActive
+    ? buildImageGroups(imageList, groupingMode, appSettings?.groupEditedFiles ?? true).badges
+    : null;
+
+  return { displayList: list, badges };
+}
+
+export function computeSortedLibrary(libraryState: any, settingsState: any): ImageFile[] {
+  return computeGroupedLibrary(libraryState, settingsState).displayList;
 }
 
 export function useSortedLibrary() {
@@ -277,12 +290,12 @@ export function useSortedLibrary() {
 
   const appSettings = useSettingsStore((state) => state.appSettings);
 
-  const sortedImageList = useMemo(() => {
-    return computeSortedLibrary(
+  const result = useMemo(() => {
+    return computeGroupedLibrary(
       { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria },
       { appSettings },
     );
   }, [imageList, sortCriteria, imageRatings, filterCriteria, searchCriteria, appSettings]);
 
-  return sortedImageList;
+  return result;
 }
