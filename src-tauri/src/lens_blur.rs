@@ -67,7 +67,7 @@ pub fn apply_lens_blur<'a>(
     let max_depth = adjustments["lensBlurMaxDepth"].as_f64().unwrap_or(100.0) as f32 / 100.0;
     let min_fade = adjustments["lensBlurMinFade"].as_f64().unwrap_or(15.0) as f32 / 100.0;
     let max_fade = adjustments["lensBlurMaxFade"].as_f64().unwrap_or(15.0) as f32 / 100.0;
-    let dreamy =
+    let diffusion =
         (adjustments["lensBlurDiffusion"].as_f64().unwrap_or(0.0) as f32 / 100.0).clamp(0.0, 1.0);
 
     let start = std::time::Instant::now();
@@ -78,18 +78,18 @@ pub fn apply_lens_blur<'a>(
     );
 
     let blurred_px = coc.par_iter().filter(|c| c.abs() > 0.4).count();
-    if blurred_px * 400 < coc.len() && dreamy <= 0.0 {
+    if blurred_px * 400 < coc.len() && diffusion <= 0.0 {
         return image;
     }
 
-    let out = render_depth_of_field(&src, &coc, max_radius, shape, dreamy);
+    let out = render_depth_of_field(&src, &coc, max_radius, shape, diffusion);
 
     log::info!(
-        "lens blur ({}x{}, r_max {:.1}px, dreamy {:.2}) took {:.2?}",
+        "lens blur ({}x{}, r_max {:.1}px, diffusion {:.2}) took {:.2?}",
         w,
         h,
         max_radius,
-        dreamy,
+        diffusion,
         start.elapsed()
     );
 
@@ -371,7 +371,7 @@ fn render_depth_of_field(
     coc: &[f32],
     max_radius: f32,
     shape: &str,
-    dreamy: f32,
+    diffusion: f32,
 ) -> Rgb32FImage {
     let w = src.width() as usize;
     let h = src.height() as usize;
@@ -397,20 +397,33 @@ fn render_depth_of_field(
         *r = max_radius * (k as f32 / 4.0).powf(1.7);
     }
 
-    let (far_rgb, far_a) =
-        dof_composite_stack(&base, &coc_small, ww, wh, &radii, ds, shape, dreamy, false);
-    let (near_rgb, near_a) =
-        dof_composite_stack(&base, &coc_small, ww, wh, &radii, ds, shape, dreamy, true);
+    let (far_rgb, far_a) = dof_composite_stack(
+        &base, &coc_small, ww, wh, &radii, ds, shape, diffusion, false,
+    );
+    let (near_rgb, near_a) = dof_composite_stack(
+        &base, &coc_small, ww, wh, &radii, ds, shape, diffusion, true,
+    );
 
-    let dreamy_on = dreamy > 1.0e-3;
-    let bloom = if dreamy_on {
-        let mut bl = base.clone();
+    let diffusion_on = diffusion > 1.0e-3;
+    let bloom = if diffusion_on {
+        let mut bl = vec![0.0f32; ww * wh * 4];
+        bl.par_chunks_exact_mut(4).enumerate().for_each(|(i, px)| {
+            px[0] = base[i * 3];
+            px[1] = base[i * 3 + 1];
+            px[2] = base[i * 3 + 2];
+            px[3] = 1.0 - dof_tent(coc_small[i].abs(), &radii, 0);
+        });
         let cap = (ww.min(wh) / 2).max(2);
         let br1 = (((max_radius / ds as f32) * 0.8).max(6.0) as usize).min(cap);
         let br2 = ((br1 * 2) / 3).max(3).min(cap);
-        dof_box_filter(&mut bl, ww, wh, 3, br1);
-        dof_box_filter(&mut bl, ww, wh, 3, br2);
-        bl.par_iter_mut().for_each(|v| *v = v.max(0.0).sqrt());
+        dof_box_filter(&mut bl, ww, wh, 4, br1);
+        dof_box_filter(&mut bl, ww, wh, 4, br2);
+        bl.par_chunks_exact_mut(4).for_each(|px| {
+            px[0] = px[0].max(0.0).sqrt();
+            px[1] = px[1].max(0.0).sqrt();
+            px[2] = px[2].max(0.0).sqrt();
+            px[3] = px[3].clamp(0.0, 1.0);
+        });
         bl
     } else {
         Vec::new()
@@ -421,10 +434,16 @@ fn render_depth_of_field(
         .par_chunks_exact_mut(4)
         .enumerate()
         .for_each(|(i, px)| {
-            let a = far_a[i].min(1.0);
-            let inv = 1.0 - a;
-            for c in 0..3 {
-                px[c] = (far_rgb[i * 3 + c] + base[i * 3 + c] * inv).max(0.0).sqrt();
+            let a = far_a[i].clamp(0.0, 1.0);
+            if a > 1.0e-4 {
+                let inv_a = 1.0 / a;
+                for c in 0..3 {
+                    px[c] = (far_rgb[i * 3 + c] * inv_a).max(0.0).sqrt();
+                }
+            } else {
+                for c in 0..3 {
+                    px[c] = base[i * 3 + c].max(0.0).sqrt();
+                }
             }
             px[3] = dof_tent(coc_small[i].abs(), &radii, 0);
         });
@@ -447,8 +466,7 @@ fn render_depth_of_field(
     let mut out = vec![0.0f32; n * 3];
     let sx = ww as f32 / w as f32;
     let sy = wh as f32 / h as f32;
-    let keep = 1.0 - 0.55 * dreamy;
-    let veil = 0.75 * dreamy;
+    let veil = 0.75 * diffusion;
 
     out.par_chunks_exact_mut(w * 3)
         .enumerate()
@@ -489,21 +507,38 @@ fn render_depth_of_field(
                 let na = ns[3].clamp(0.0, 1.0);
                 let inv_na = 1.0 - na;
 
-                if dreamy_on {
-                    let j00 = (r0 + x0) * 3;
-                    let j10 = (r0 + x1) * 3;
-                    let j01 = (r1 + x0) * 3;
-                    let j11 = (r1 + x1) * 3;
+                if diffusion_on {
+                    let j00 = (r0 + x0) * 4;
+                    let j10 = (r0 + x1) * 4;
+                    let j01 = (r1 + x0) * 4;
+                    let j11 = (r1 + x1) * 4;
 
-                    for c in 0..3 {
+                    let mut bv = [0.0f32; 3];
+                    let mut b_mask = 0.0f32;
+
+                    for c in 0..4 {
                         let bt = bloom[j00 + c] + (bloom[j10 + c] - bloom[j00 + c]) * wx;
                         let bb = bloom[j01 + c] + (bloom[j11 + c] - bloom[j01 + c]) * wx;
-                        let bv = bt + (bb - bt) * wy;
+                        let val = bt + (bb - bt) * wy;
+                        if c < 3 {
+                            bv[c] = val;
+                        } else {
+                            b_mask = val;
+                        }
+                    }
 
+                    let sharp_mask = (1.0 - fa).max(na).clamp(0.0, 1.0);
+                    let final_mask = sharp_mask.max(b_mask).clamp(0.0, 1.0);
+
+                    let local_veil = veil * final_mask;
+                    let local_keep = 1.0 - (0.55 * diffusion * final_mask);
+
+                    for c in 0..3 {
                         let sharp = raw[src_row + x * 3 + c];
                         let mid = sharp * fa + fs[c] * (1.0 - fa);
                         let base_px = ns[c] + mid * inv_na;
-                        row[x * 3 + c] = (base_px * keep + bv * veil).max(0.0);
+
+                        row[x * 3 + c] = (base_px * local_keep + bv[c] * local_veil).max(0.0);
                     }
                 } else {
                     for c in 0..3 {
@@ -527,7 +562,7 @@ fn dof_composite_stack(
     radii: &[f32; 5],
     ds: usize,
     shape: &str,
-    dreamy: f32,
+    diffusion: f32,
     near_side: bool,
 ) -> (Vec<f32>, Vec<f32>) {
     let np = ww * wh;
@@ -574,11 +609,11 @@ fn dof_composite_stack(
             continue;
         }
 
-        let r_work = (radii[k] / ds as f32) * (1.0 + 0.3 * dreamy);
+        let r_work = (radii[k] / ds as f32) * (1.0 + 0.3 * diffusion);
         let (blurred, spans) = if r_work >= 0.6 {
-            let (taps, ext) = build_bokeh_kernel(r_work, shape, dreamy);
+            let (taps, ext) = build_bokeh_kernel(r_work, shape, diffusion);
             let spans = dof_dilate_spans(&row_bounds, ww, wh, ext);
-            let b = blur_layer_bokeh(&layer, ww, wh, &taps, &spans, ext, r_work, dreamy);
+            let b = blur_layer_bokeh(&layer, ww, wh, &taps, &spans, ext, r_work, diffusion);
             (b, spans)
         } else {
             let spans = dof_dilate_spans(&row_bounds, ww, wh, 0);
@@ -648,20 +683,20 @@ fn dof_polygon_scale(theta: f32, blades: u32) -> f32 {
 }
 
 #[inline(always)]
-fn dof_aperture_intensity(rr: f32, shape: &str, dreamy: f32) -> f32 {
+fn dof_aperture_intensity(rr: f32, shape: &str, diffusion: f32) -> f32 {
     let crisp = if shape == "ring" {
         0.22 + 3.2 * dof_smoothstep(0.60, 0.93, rr)
     } else {
         1.0 + 0.12 * dof_smoothstep(0.55, 1.0, rr)
     };
-    if dreamy <= 1.0e-3 {
+    if diffusion <= 1.0e-3 {
         return crisp;
     }
     let soft = (-2.6 * rr * rr).exp() + 0.05;
-    crisp * (1.0 - dreamy) + soft * dreamy
+    crisp * (1.0 - diffusion) + soft * diffusion
 }
 
-fn build_bokeh_kernel(radius: f32, shape: &str, dreamy: f32) -> (Vec<BokehTap>, usize) {
+fn build_bokeh_kernel(radius: f32, shape: &str, diffusion: f32) -> (Vec<BokehTap>, usize) {
     let r = radius.max(0.6);
     let blades: u32 = match shape {
         "hexagon" => 6,
@@ -681,7 +716,7 @@ fn build_bokeh_kernel(radius: f32, shape: &str, dreamy: f32) -> (Vec<BokehTap>, 
                 if cov <= 0.0 {
                     continue;
                 }
-                let wgt = cov * dof_aperture_intensity((d / r).min(1.0), shape, dreamy);
+                let wgt = cov * dof_aperture_intensity((d / r).min(1.0), shape, diffusion);
                 sum += wgt;
                 taps.push(BokehTap {
                     x,
@@ -707,13 +742,13 @@ fn build_bokeh_kernel(radius: f32, shape: &str, dreamy: f32) -> (Vec<BokehTap>, 
             let mut jw = 1.0f32;
             if blades > 0 {
                 let poly = dof_polygon_scale(ang, blades);
-                let shaped = 1.0 + (poly - 1.0) * (1.0 - dreamy * 0.6);
+                let shaped = 1.0 + (poly - 1.0) * (1.0 - diffusion * 0.6);
                 ux *= shaped;
                 uy *= shaped;
                 jw = shaped * shaped;
             }
 
-            let wgt = jw * dof_aperture_intensity(rr, shape, dreamy);
+            let wgt = jw * dof_aperture_intensity(rr, shape, diffusion);
             sum += wgt;
             taps.push(BokehTap {
                 x: (ux * r).round() as i32,
@@ -750,12 +785,12 @@ fn blur_layer_bokeh(
     spans: &[(usize, usize)],
     ext: usize,
     radius: f32,
-    dreamy: f32,
+    diffusion: f32,
 ) -> Vec<f32> {
     let mut out = vec![0.0f32; ww * wh * 4];
     let inv_ww = 1.0 / ww as f32;
     let inv_wh = 1.0 / wh as f32;
-    let cat_eye = 0.38f32 * (1.0 - 0.7 * dreamy);
+    let cat_eye = 0.38f32 * (1.0 - 0.7 * diffusion);
     let use_cat = cat_eye > 0.02;
 
     out.par_chunks_exact_mut(ww * 4)

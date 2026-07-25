@@ -857,6 +857,14 @@ fn generate_original_transformed_preview(
         .ok_or("No original image loaded")?;
 
     let mut adjustments_clone = js_adjustments.clone();
+
+    if let Some(obj) = adjustments_clone.as_object_mut() {
+        obj.insert(
+            "lensBlurEnabled".to_string(),
+            serde_json::Value::Bool(false),
+        );
+    }
+
     hydrate_adjustments(&state, &mut adjustments_clone);
 
     let mut image_for_preview = loaded_image.image.as_ref().clone();
@@ -945,6 +953,7 @@ async fn preview_geometry_transform(
                 obj.insert("orientationSteps".to_string(), serde_json::json!(0));
                 obj.insert("flipHorizontal".to_string(), serde_json::json!(false));
                 obj.insert("flipVertical".to_string(), serde_json::json!(false));
+                obj.insert("lensBlurEnabled".to_string(), serde_json::json!(false));
                 for key in GEOMETRY_KEYS {
                     match *key {
                         "transformScale"
