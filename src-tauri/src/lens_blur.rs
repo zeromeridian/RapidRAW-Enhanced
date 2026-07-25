@@ -57,7 +57,7 @@ pub fn apply_lens_blur<'a>(
         return image;
     }
 
-    let max_radius = (amount / 100.0) * (w.max(h) as f32) * 0.02;
+    let max_radius = (amount / 100.0) * (w.max(h) as f32) * 0.012;
     if max_radius < 0.35 {
         return image;
     }
