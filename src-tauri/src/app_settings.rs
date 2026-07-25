@@ -447,12 +447,10 @@ pub struct AppSettings {
     pub require_matching_exif: Option<bool>,
     #[serde(default)]
     pub group_edited_files: Option<bool>,
-    /// Legacy: read for migration, never written back.
-    #[serde(default, skip_serializing)]
+    #[serde(default, skip_serializing)] // legacy
     #[allow(dead_code)]
     pub group_associated_files: Option<bool>,
-    /// Legacy: read for migration, never written back.
-    #[serde(default, skip_serializing)]
+    #[serde(default, skip_serializing)] // legacy
     #[allow(dead_code)]
     pub group_preferred_type: Option<String>,
 }

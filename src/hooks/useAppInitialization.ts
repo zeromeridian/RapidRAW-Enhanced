@@ -148,7 +148,7 @@ export const useAppInitialization = ({
           handleSettingsChange(settings);
         }
 
-        // Migrate legacy grouping sentinels out of filterCriteria.rawStatus.
+        // legacy
         const savedRawStatus = settings?.filterCriteria?.rawStatus as string | undefined;
         if (savedRawStatus === 'groupVariants' || savedRawStatus === 'rawOverNonRaw') {
           const legacyPref = settings?.groupPreferredType === 'jpeg' ? 'jpeg' : 'raw';

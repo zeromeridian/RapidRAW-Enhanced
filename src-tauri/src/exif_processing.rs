@@ -735,8 +735,6 @@ pub fn get_creation_date_from_path(path: &Path) -> DateTime<Utc> {
         .unwrap_or_else(Utc::now)
 }
 
-/// Attempt to read the EXIF creation date without falling back to filesystem metadata.
-/// Returns `None` when no DateTimeOriginal / DateTime / CreateDate tag is found.
 pub fn try_get_exif_creation_date(path: &Path) -> Option<DateTime<Utc>> {
     if let Some(map) = read_rrexif_sidecar(path)
         && let Some(dt_str) = map.get("DateTimeOriginal").or(map.get("CreateDate"))

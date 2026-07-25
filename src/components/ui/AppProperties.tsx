@@ -161,8 +161,6 @@ export enum ThumbnailAspectRatio {
 }
 
 export type GroupPreference = 'jpeg' | 'raw';
-
-/** Top-level grouping control: off, or on with a preferred primary. */
 export type GroupingMode = 'off' | GroupPreference;
 
 export interface AppSettings {
@@ -223,8 +221,7 @@ export interface AppSettings {
   grouping?: GroupingMode;
   requireMatchingExif?: boolean;
   groupEditedFiles?: boolean;
-  /** Legacy: read for migration, never written back. */
-  groupPreferredType?: GroupPreference;
+  groupPreferredType?: GroupPreference; // legacy
 }
 
 export interface BrushSettings {

@@ -47,8 +47,6 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
   const groupingMode: GroupingMode = appSettings?.grouping ?? 'off';
   const isGroupingActive = groupingMode !== 'off';
 
-  // --- Build filter & search predicates ---
-
   const matchesFilter = (image: ImageFile): boolean => {
     if (filterCriteria.rating !== 0) {
       const rating = imageRatings[image.path] || 0;
@@ -57,10 +55,7 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
       if (filterCriteria.rating > 0 && filterCriteria.rating < 5 && rating < filterCriteria.rating) return false;
     }
 
-    if (
-      filterCriteria.rawStatus &&
-      filterCriteria.rawStatus !== RawStatus.All
-    ) {
+    if (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) {
       if (filterCriteria.rawStatus === RawStatus.RawOnly && !image.is_raw) return false;
       if (filterCriteria.rawStatus === RawStatus.NonRawOnly && image.is_raw) return false;
     }
@@ -173,16 +168,6 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
 
     return tagsMatch && textMatch;
   };
-
-  // --- Collapse groups, then filter/search ---
-  //
-  // Filters (rating, raw status, etc.) apply to the primary only: the
-  // user is narrowing the visible list, so showing an unedited RAW
-  // because its hidden JPEG is edited would be confusing.
-  //
-  // Search (text/tags) is group-aware: if any variant matches the query,
-  // the group primary surfaces. The user is looking for something by
-  // name/tag, so hidden variants should be findable.
 
   let processedList = imageList;
   let searchMatchingGroupIds: Set<string> | null = null;

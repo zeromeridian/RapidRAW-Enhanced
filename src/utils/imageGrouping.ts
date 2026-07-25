@@ -8,18 +8,15 @@ export interface GroupBadgeInfo {
 }
 
 export interface GroupingResult {
-  /** Image list with non-primary variants filtered out. */
   displayList: ImageFile[];
-  /** Badge info (count + extension label) per group_id. */
   badges: Map<GroupId, GroupBadgeInfo>;
 }
 
-/**
- * Bucket images by their backend-assigned group_id, pick a primary per
- * group, return a collapsed display list and badge info. Virtual copies
- * stay visible (never collapsed).
- */
-export function buildImageGroups(images: ImageFile[], preference: GroupPreference, groupEditedFiles = true): GroupingResult {
+export function buildImageGroups(
+  images: ImageFile[],
+  preference: GroupPreference,
+  groupEditedFiles = true,
+): GroupingResult {
   const buckets = new Map<GroupId, ImageFile[]>();
 
   for (const image of images) {
@@ -72,7 +69,6 @@ function pickPrimary(files: ImageFile[], preference: GroupPreference): ImageFile
   }
 }
 
-/** File extension from a path, lowercased. Handles ?vc= suffixes. */
 export function getFileExtension(path: string): string {
   const clean = path.split('?')[0];
   const dot = clean.lastIndexOf('.');
@@ -80,16 +76,11 @@ export function getFileExtension(path: string): string {
   return clean.substring(dot + 1).toLowerCase();
 }
 
-/** Display label for a variant: uppercase extension (e.g. "RAF", "JPG"). */
 export function getVariantLabel(path: string): string {
   const ext = getFileExtension(path);
   return ext ? ext.toUpperCase() : 'FILE';
 }
 
-/**
- * Find all non-VC variants sharing the given group_id.
- * Returns an empty array when groupId is null/undefined.
- */
 export function findGroupVariants(images: ImageFile[], groupId: string | null | undefined): ImageFile[] {
   if (!groupId) return [];
   return images.filter((img) => img.group_id === groupId && !img.is_virtual_copy);

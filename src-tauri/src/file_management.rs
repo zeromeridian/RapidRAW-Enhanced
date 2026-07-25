@@ -82,7 +82,6 @@ fn compute_thumbnail_cache_hash(path_str: &str, adjustments_bytes: &[u8]) -> Opt
     Some(hasher.finalize().to_hex().to_string())
 }
 
-/// Metadata fields required to build an `ImageFile` from a sidecar.
 struct ImageFileMetadata {
     is_edited: bool,
     tags: Option<Vec<String>>,
@@ -280,22 +279,12 @@ pub struct ImageFile {
     group_id: Option<String>,
 }
 
-/// Build a grouping key from a source image path: "{parent_dir}/{stem}".
-/// Files sharing this key in the same directory are variants of the same shot.
 fn make_group_key(source_path: &Path) -> String {
     let parent = source_path.parent().unwrap_or(Path::new(""));
     let stem = source_path.file_stem().unwrap_or_default();
     format!("{}/{}", parent.to_string_lossy(), stem.to_string_lossy())
 }
 
-/// Assign `group_id` to files that share a stem with another file in the same
-/// directory. Virtual copies are excluded from counting (so one file + its VC
-/// don't form a false group) but included in assignment (they inherit the
-/// group_id of their source).
-///
-/// When `require_matching_exif` is true, a group is only formed if all
-/// non-virtual-copy files in the stem set have EXIF creation dates that match
-/// exactly. Files without EXIF data are excluded from grouping entirely.
 fn assign_group_ids(files: &mut [ImageFile], settings: &crate::app_settings::AppSettings) {
     let require_matching_exif = settings.require_matching_exif.unwrap_or(false);
     let group_edited_files = settings.group_edited_files.unwrap_or(true);
@@ -3330,9 +3319,6 @@ pub fn delete_files_from_disk(paths: Vec<String>, app_handle: AppHandle) -> Resu
     Ok(())
 }
 
-/// Extract the image stem used for associated-file deletion from a directory
-/// entry name. Handles regular images, `{name}.rrexif` sidecars, and
-/// `{name}[.{vc_id}].rrdata` sidecars (the 6-char VC suffix is stripped).
 fn deletion_stem_for(filename: &str) -> Option<&str> {
     let image_filename = if filename.ends_with(".rrdata") {
         let without_rrdata = filename.trim_end_matches(".rrdata");

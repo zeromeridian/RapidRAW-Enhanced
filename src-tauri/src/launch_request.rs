@@ -47,10 +47,10 @@ pub fn parse_launch_args(args: &[String]) -> LaunchRequest {
         let mut keep_metadata = false;
         let mut adjustments_override = None;
 
-        if let Some(src) = iter.next() {
-            if !src.starts_with('-') {
-                source = src.clone();
-            }
+        if let Some(src) = iter.next()
+            && !src.starts_with('-')
+        {
+            source = src.clone();
         }
 
         while let Some(arg) = iter.next() {
@@ -137,10 +137,10 @@ pub fn parse_launch_args(args: &[String]) -> LaunchRequest {
 }
 
 fn handle_file_open(app_handle: &tauri::AppHandle, path: PathBuf) {
-    if let Some(path_str) = path.to_str() {
-        if let Err(e) = app_handle.emit("open-with-file", path_str) {
-            log::error!("Failed to emit open-with-file event: {}", e);
-        }
+    if let Some(path_str) = path.to_str()
+        && let Err(e) = app_handle.emit("open-with-file", path_str)
+    {
+        log::error!("Failed to emit open-with-file event: {}", e);
     }
 }
 
