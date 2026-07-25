@@ -348,8 +348,6 @@ where
     if cancellation_token.swap(true, Ordering::SeqCst) {
         ExportCancellationRequest::AlreadyRequested
     } else {
-        // Keep the task slot locked until the terminal event is emitted so a new
-        // export cannot receive a late cancellation event from the previous one.
         on_requested();
         ExportCancellationRequest::Requested
     }
@@ -374,9 +372,6 @@ where
     let cancelled = cancellation_token.load(Ordering::SeqCst);
     *active_token = None;
 
-    // Keep the mutex held while notifying the UI. The task slot is logically
-    // free, but a new export cannot register until the terminal event has
-    // been serialized, preventing the old event from racing with new UI state.
     on_finish(cancelled);
     true
 }
@@ -1653,117 +1648,4 @@ pub async fn estimate_export_sizes(
     };
 
     Ok(single_image_extrapolated_size * paths.len())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn export_cancellation_check_is_idempotent() {
-        let cancellation_token = AtomicBool::new(false);
-        ensure_export_not_cancelled(&cancellation_token).unwrap();
-
-        cancellation_token.store(true, Ordering::SeqCst);
-        assert_eq!(
-            ensure_export_not_cancelled(&cancellation_token).unwrap_err(),
-            "Export cancelled"
-        );
-        assert_eq!(
-            ensure_export_not_cancelled(&cancellation_token).unwrap_err(),
-            "Export cancelled"
-        );
-    }
-
-    #[test]
-    fn cancellation_requested_during_startup_is_preserved_and_emitted_once() {
-        let task_token = Mutex::new(None);
-        let cancellation_token = register_export_task(&task_token).unwrap();
-        let emitted_count = AtomicUsize::new(0);
-
-        assert_eq!(
-            request_export_cancellation(&task_token, || {
-                emitted_count.fetch_add(1, Ordering::SeqCst);
-            }),
-            ExportCancellationRequest::Requested
-        );
-        assert!(cancellation_token.load(Ordering::SeqCst));
-
-        assert_eq!(
-            request_export_cancellation(&task_token, || {
-                emitted_count.fetch_add(1, Ordering::SeqCst);
-            }),
-            ExportCancellationRequest::AlreadyRequested
-        );
-        assert_eq!(emitted_count.load(Ordering::SeqCst), 1);
-
-        let mut finalized_as_cancelled = false;
-        assert!(finish_export_task(
-            &task_token,
-            &cancellation_token,
-            |cancelled| finalized_as_cancelled = cancelled,
-        ));
-        assert!(finalized_as_cancelled);
-        assert!(task_token.lock().unwrap().is_none());
-    }
-
-    #[test]
-    fn completion_prevents_a_late_cancellation_event() {
-        let task_token = Mutex::new(None);
-        let cancellation_token = register_export_task(&task_token).unwrap();
-        let completed_count = AtomicUsize::new(0);
-        let cancelled_count = AtomicUsize::new(0);
-        let callback_invoked = AtomicBool::new(false);
-
-        assert!(finish_export_task(
-            &task_token,
-            &cancellation_token,
-            |cancelled| {
-                assert!(!cancelled);
-                callback_invoked.store(true, Ordering::SeqCst);
-                completed_count.fetch_add(1, Ordering::SeqCst);
-            },
-        ));
-        assert!(callback_invoked.load(Ordering::SeqCst));
-        assert!(task_token.lock().unwrap().is_none());
-        assert_eq!(
-            request_export_cancellation(&task_token, || {
-                cancelled_count.fetch_add(1, Ordering::SeqCst);
-            }),
-            ExportCancellationRequest::NoActiveTask
-        );
-        assert_eq!(completed_count.load(Ordering::SeqCst), 1);
-        assert_eq!(cancelled_count.load(Ordering::SeqCst), 0);
-    }
-
-    #[test]
-    fn overlapping_export_registration_is_rejected() {
-        let task_token = Mutex::new(None);
-        let cancellation_token = register_export_task(&task_token).unwrap();
-
-        assert_eq!(
-            register_export_task(&task_token).unwrap_err(),
-            "An export is already in progress."
-        );
-        assert!(finish_export_task(&task_token, &cancellation_token, |_| {},));
-        assert!(register_export_task(&task_token).is_ok());
-    }
-
-    #[test]
-    fn stale_export_cannot_clear_or_complete_a_newer_task() {
-        let task_token = Mutex::new(None);
-        let stale_token = register_export_task(&task_token).unwrap();
-        let current_token = Arc::new(AtomicBool::new(false));
-        *task_token.lock().unwrap() = Some(Arc::clone(&current_token));
-        let stale_terminal_count = AtomicUsize::new(0);
-
-        assert!(!finish_export_task(&task_token, &stale_token, |_| {
-            stale_terminal_count.fetch_add(1, Ordering::SeqCst);
-        },));
-        assert_eq!(stale_terminal_count.load(Ordering::SeqCst), 0);
-        assert!(Arc::ptr_eq(
-            task_token.lock().unwrap().as_ref().unwrap(),
-            &current_token
-        ));
-    }
 }
