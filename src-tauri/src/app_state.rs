@@ -15,17 +15,9 @@ use crate::ai_processing::AiState;
 use crate::cache_utils::DecodedImageCache;
 use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
+use crate::launch_request::ExternalEditSession;
 use crate::lens_correction::LensDatabase;
 use crate::lut_processing::Lut;
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ExternalEditSession {
-    pub source: String,
-    pub output: String,
-    pub format: String,
-    pub jpeg_quality: u8,
-}
 
 #[derive(Serialize, Deserialize)]
 pub struct WindowState {

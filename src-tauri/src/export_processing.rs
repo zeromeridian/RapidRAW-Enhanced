@@ -718,8 +718,7 @@ impl Drop for ExportHandleGuard {
 }
 
 #[allow(clippy::too_many_arguments)]
-#[tauri::command]
-pub async fn export_images(
+pub(crate) async fn export_images_impl(
     paths: Vec<String>,
     output_folder_or_file: String,
     is_explicit_file_path: bool,
@@ -730,6 +729,7 @@ pub async fn export_images(
     current_edit_adjustments: Option<Value>,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
+    completion_tx: Option<tokio::sync::oneshot::Sender<Result<(), usize>>>,
 ) -> Result<(), String> {
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
 
@@ -749,7 +749,6 @@ pub async fn export_images(
     sys.refresh_memory();
 
     let available_ram_gb = sys.available_memory() as f64 / 1024.0 / 1024.0 / 1024.0;
-
     let ram_based_limit = (available_ram_gb / 4.0).floor() as usize;
 
     let num_threads = if paths.len() == 1 {
@@ -1059,10 +1058,116 @@ pub async fn export_images(
             );
             let _ = app_handle.emit("export-complete", ());
         }
+
+        if let Some(tx) = completion_tx {
+            if error_count > 0 {
+                let _ = tx.send(Err(error_count));
+            } else {
+                let _ = tx.send(Ok(()));
+            }
+        }
     });
 
     *state.export_task_handle.lock().unwrap() = Some(task);
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub async fn export_images(
+    paths: Vec<String>,
+    output_folder_or_file: String,
+    is_explicit_file_path: bool,
+    base_origin_folders: Vec<String>,
+    export_settings: ExportSettings,
+    output_format: String,
+    current_edit_path: Option<String>,
+    current_edit_adjustments: Option<Value>,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    export_images_impl(
+        paths,
+        output_folder_or_file,
+        is_explicit_file_path,
+        base_origin_folders,
+        export_settings,
+        output_format,
+        current_edit_path,
+        current_edit_adjustments,
+        state,
+        app_handle,
+        None,
+    )
+    .await
+}
+
+pub async fn run_headless_export(
+    session: crate::launch_request::HeadlessExportSession,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    println!("Starting headless export...");
+    let state = app_handle.state::<crate::AppState>();
+
+    let source_path = std::path::Path::new(&session.source);
+    if !source_path.exists() {
+        return Err(format!("Source path does not exist: {}", session.source));
+    }
+
+    std::fs::create_dir_all(&session.output)
+        .map_err(|e| format!("Failed to create output directory: {}", e))?;
+
+    let mut paths = Vec::new();
+    if source_path.is_dir() {
+        let images = crate::file_management::list_images_recursive(
+            session.source.clone(),
+            app_handle.clone(),
+        )?;
+        paths = images.into_iter().map(|img| img.path).collect();
+    } else {
+        paths.push(session.source.clone());
+    }
+
+    if paths.is_empty() {
+        return Err("No supported images found at the source path.".to_string());
+    }
+
+    println!("Found {} images to export. Processing...", paths.len());
+
+    let export_settings = ExportSettings {
+        jpeg_quality: session.quality,
+        resize: None,
+        keep_metadata: session.keep_metadata,
+        preserve_timestamps: true,
+        strip_gps: false,
+        filename_template: None,
+        watermark: None,
+        export_masks: false,
+        preserve_folders: true,
+    };
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+
+    export_images_impl(
+        paths,
+        session.output,
+        false,
+        vec![session.source],
+        export_settings,
+        session.format,
+        None,
+        None,
+        state.clone(),
+        app_handle.clone(),
+        Some(tx),
+    )
+    .await?;
+
+    match rx.await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(errors)) => Err(format!("Export completed with {} errors.", errors)),
+        Err(_) => Err("Export task panicked or was cancelled.".to_string()),
+    }
 }
 
 #[tauri::command]

@@ -24,6 +24,7 @@ mod hdr_deghosting;
 mod image_loader;
 mod image_processing;
 mod inpainting;
+mod launch_request;
 mod lens_correction;
 mod lut_processing;
 mod mask_generation;
@@ -43,7 +44,6 @@ use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::io::Write;
 use std::panic;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
@@ -93,6 +93,7 @@ pub use adjustment_utils::*;
 pub use android_integration::*;
 pub use app_settings::*;
 pub use app_state::*;
+pub use launch_request::*;
 use tagging_utils::{candidates, hierarchy};
 
 #[cfg(target_os = "macos")]
@@ -1723,88 +1724,6 @@ fn frontend_log(level: String, message: String) -> Result<(), String> {
     Ok(())
 }
 
-fn handle_file_open(app_handle: &tauri::AppHandle, path: PathBuf) {
-    if let Some(path_str) = path.to_str()
-        && let Err(e) = app_handle.emit("open-with-file", path_str)
-    {
-        log::error!("Failed to emit open-with-file event: {}", e);
-    }
-}
-
-enum LaunchRequest {
-    None,
-    OpenFile(String),
-    EditSession(ExternalEditSession),
-}
-
-fn parse_launch_args(args: &[String]) -> LaunchRequest {
-    let mut edit: Option<String> = None;
-    let mut output: Option<String> = None;
-    let mut format: Option<String> = None;
-    let mut quality: Option<u8> = None;
-    let mut plain: Option<String> = None;
-
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--edit" => edit = iter.next().cloned(),
-            "--output" => output = iter.next().cloned(),
-            "--format" => format = iter.next().cloned(),
-            "--quality" => quality = iter.next().and_then(|q| q.parse().ok()),
-            s if !s.starts_with('-') && plain.is_none() => plain = Some(s.to_string()),
-            _ => {}
-        }
-    }
-
-    match (edit, output) {
-        (Some(source), Some(output)) => {
-            let format = format.unwrap_or_else(|| {
-                std::path::Path::new(&output)
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .map(|e| e.to_lowercase())
-                    .unwrap_or_else(|| "jpg".to_string())
-            });
-            let format = match format.as_str() {
-                "tif" => "tiff".to_string(),
-                _ => format,
-            };
-            LaunchRequest::EditSession(ExternalEditSession {
-                source,
-                output,
-                format,
-                jpeg_quality: quality.unwrap_or(90),
-            })
-        }
-        (Some(source), None) => LaunchRequest::OpenFile(source),
-        _ => match plain {
-            Some(path) => LaunchRequest::OpenFile(path),
-            None => LaunchRequest::None,
-        },
-    }
-}
-
-fn emit_launch_request(app_handle: &tauri::AppHandle, request: LaunchRequest) {
-    match request {
-        LaunchRequest::EditSession(session) => {
-            if let Err(e) = app_handle.emit("external-edit-session", &session) {
-                log::error!("Failed to emit external-edit-session event: {}", e);
-            }
-        }
-        LaunchRequest::OpenFile(path) => {
-            handle_file_open(app_handle, PathBuf::from(path));
-        }
-        LaunchRequest::None => {}
-    }
-}
-
-#[derive(serde::Serialize, Default)]
-#[serde(rename_all = "camelCase")]
-struct LaunchPayload {
-    open_with_file: Option<String>,
-    edit_session: Option<ExternalEditSession>,
-}
-
 #[derive(Clone, Copy, Debug)]
 struct MonitorBounds {
     x: i32,
@@ -1967,25 +1886,31 @@ pub fn run() {
 
     let mut builder = tauri::Builder::default();
 
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let launch_req = parse_launch_args(&args);
+    let is_headless = matches!(launch_req, LaunchRequest::HeadlessExport(_));
+
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            log::info!(
-                "New instance launched with args: {:?}. Focusing main window.",
-                argv
-            );
-            if let Some(window) = app.get_webview_window("main") {
-                if let Err(e) = window.unminimize() {
-                    log::error!("Failed to unminimize window: {}", e);
+        if !is_headless {
+            builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+                log::info!(
+                    "New instance launched with args: {:?}. Focusing main window.",
+                    argv
+                );
+                if let Some(window) = app.get_webview_window("main") {
+                    if let Err(e) = window.unminimize() {
+                        log::error!("Failed to unminimize window: {}", e);
+                    }
+                    if let Err(e) = window.set_focus() {
+                        log::error!("Failed to set focus on window: {}", e);
+                    }
                 }
-                if let Err(e) = window.set_focus() {
-                    log::error!("Failed to set focus on window: {}", e);
-                }
-            }
 
-            let forwarded_args = argv.get(1..).unwrap_or(&[]);
-            emit_launch_request(app, parse_launch_args(forwarded_args));
-        }));
+                let forwarded_args = argv.get(1..).unwrap_or(&[]);
+                emit_launch_request(app, parse_launch_args(forwarded_args));
+            }));
+        }
     }
 
     builder
@@ -2006,21 +1931,21 @@ pub fn run() {
                         display.render(&ctx.device, &ctx.queue);
                     }
         })
-        .setup(|app| {
-            #[cfg(any(windows, target_os = "linux"))]
+        .setup(move |app| {
+            let state = app.state::<AppState>();
+
+            #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
             {
-                let args: Vec<String> = std::env::args().skip(1).collect();
-                let state = app.state::<AppState>();
-                match parse_launch_args(&args) {
+                match launch_req.clone() {
                     LaunchRequest::EditSession(session) => {
                         log::info!("Initial launch with external edit session for: {}", &session.source);
                         *state.pending_edit_session.lock().unwrap() = Some(session);
                     }
                     LaunchRequest::OpenFile(path) => {
-                        log::info!("Windows/Linux initial open: Storing path {} for later.", &path);
+                        log::info!("Initial open: Storing path {} for later.", &path);
                         *state.initial_file_path.lock().unwrap() = Some(path);
                     }
-                    LaunchRequest::None => {}
+                    _ => {}
                 }
             }
 
@@ -2059,8 +1984,10 @@ pub fn run() {
             }
 
             let lens_db = lens_correction::load_lensfun_db(&app_handle);
-            let state = app.state::<AppState>();
-            *state.lens_db.lock().unwrap() = Some(Arc::new(lens_db));
+            {
+                let state = app.state::<AppState>();
+                *state.lens_db.lock().unwrap() = Some(Arc::new(lens_db));
+            }
 
             unsafe {
                 if let Some(backend) = &settings.processing_backend
@@ -2115,6 +2042,24 @@ pub fn run() {
                 } else if is_nvidia_gpu() {
                     log::info!("Applied Nvidia explicit-sync workaround (hardware compositing kept).");
                 }
+            }
+
+            if let LaunchRequest::HeadlessExport(session) = launch_req {
+                let app_handle_clone = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    match crate::export_processing::run_headless_export(session, app_handle_clone.clone()).await {
+                        Ok(_) => {
+                            println!("Headless export completed successfully.");
+                            app_handle_clone.exit(0);
+                        }
+                        Err(e) => {
+                            eprintln!("Headless export failed: {}", e);
+                            app_handle_clone.exit(1);
+                        }
+                    }
+                });
+
+                return Ok(());
             }
 
             start_preview_worker(app_handle.clone());
