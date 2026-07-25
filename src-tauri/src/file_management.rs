@@ -335,7 +335,7 @@ fn assign_group_ids(files: &mut [ImageFile], settings: &crate::app_settings::App
 
         stem_groups.retain(|_, candidates| {
             if candidates.len() < 2 {
-                return true;
+                return false;
             }
             let first = exif_dates
                 .get(&candidates[0].source_path)
