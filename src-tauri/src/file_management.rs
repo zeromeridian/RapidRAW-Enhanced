@@ -287,72 +287,75 @@ fn assign_group_ids(files: &mut [ImageFile], settings: &crate::app_settings::App
     let require_matching_exif = settings.require_matching_exif.unwrap_or(false);
     let group_edited_files = settings.group_edited_files.unwrap_or(true);
 
-    let mut stem_sources: HashMap<String, HashSet<PathBuf>> = HashMap::new();
-
-    for file in files.iter() {
-        if file.is_virtual_copy {
-            continue;
-        }
-        if !group_edited_files && file.is_edited {
-            continue;
-        }
-        let (source_path, _) = parse_virtual_path(&file.path);
-        let key = make_group_key(&source_path);
-        stem_sources.entry(key).or_default().insert(source_path);
+    #[derive(Clone)]
+    struct Candidate {
+        index: usize,
+        source_path: PathBuf,
+        key: String,
     }
 
-    // Pre-compute EXIF dates only for paths that could actually form groups.
-    let exif_dates: Option<HashMap<PathBuf, Option<chrono::DateTime<chrono::Utc>>>> =
-        if require_matching_exif {
-            let groupable_paths: Vec<PathBuf> = stem_sources
-                .values()
-                .filter(|p| p.len() >= 2)
-                .flat_map(|paths| paths.iter().cloned())
-                .collect();
-            let dates: HashMap<_, _> = groupable_paths
-                .par_iter()
-                .map(|p| {
-                    (
-                        p.clone(),
-                        crate::exif_processing::try_get_exif_creation_date(p),
-                    )
-                })
-                .collect();
-            Some(dates)
-        } else {
-            None
-        };
+    let candidates: Vec<Candidate> = files
+        .iter()
+        .enumerate()
+        .filter(|(_, file)| !file.is_virtual_copy && (group_edited_files || !file.is_edited))
+        .map(|(index, file)| {
+            let (source_path, _) = parse_virtual_path(&file.path);
+            let key = make_group_key(&source_path);
+            Candidate {
+                index,
+                source_path,
+                key,
+            }
+        })
+        .collect();
 
-    // Determine which keys actually form valid groups (>=2 files, matching EXIF if required)
-    let mut valid_group_keys: HashSet<&str> = HashSet::new();
-    for (key, paths) in &stem_sources {
-        if paths.len() < 2 {
-            continue;
-        }
-        if require_matching_exif {
-            let dates: Vec<_> = paths
+    let mut stem_groups: HashMap<String, Vec<Candidate>> = HashMap::new();
+    for candidate in candidates {
+        stem_groups
+            .entry(candidate.key.clone())
+            .or_default()
+            .push(candidate);
+    }
+
+    if require_matching_exif {
+        let groupable_paths: Vec<PathBuf> = stem_groups
+            .values()
+            .filter(|candidates| candidates.len() >= 2)
+            .flat_map(|candidates| candidates.iter().map(|c| c.source_path.clone()))
+            .collect();
+        let exif_dates: HashMap<PathBuf, Option<chrono::DateTime<chrono::Utc>>> = groupable_paths
+            .par_iter()
+            .map(|p| {
+                (
+                    p.clone(),
+                    crate::exif_processing::try_get_exif_creation_date(p),
+                )
+            })
+            .collect();
+
+        stem_groups.retain(|_, candidates| {
+            if candidates.len() < 2 {
+                return true;
+            }
+            let first = exif_dates
+                .get(&candidates[0].source_path)
+                .copied()
+                .flatten();
+            if first.is_none() {
+                return false;
+            }
+            candidates
                 .iter()
-                .map(|p| exif_dates.as_ref().unwrap().get(p).copied().flatten())
-                .collect();
-            if dates.iter().any(|d| d.is_none()) {
-                continue;
-            }
-            let first = dates[0];
-            if !dates.iter().all(|d| *d == first) {
-                continue;
-            }
-        }
-        valid_group_keys.insert(key);
+                .skip(1)
+                .all(|c| exif_dates.get(&c.source_path).copied().flatten() == first)
+        });
+    } else {
+        stem_groups.retain(|_, candidates| candidates.len() >= 2);
     }
 
-    for file in files.iter_mut() {
-        if !group_edited_files && file.is_edited {
-            continue;
-        }
-        let (source_path, _) = parse_virtual_path(&file.path);
-        let key = make_group_key(&source_path);
-        if valid_group_keys.contains(key.as_str()) {
-            file.group_id = Some(key);
+    for (key, candidates) in stem_groups {
+        for candidate in candidates {
+            files[candidate.index].group_id = Some(key.clone());
         }
     }
 }
@@ -3302,6 +3305,34 @@ pub fn delete_files_from_disk(paths: Vec<String>, app_handle: AppHandle) -> Resu
     Ok(())
 }
 
+/// Extract the image stem used for associated-file deletion from a directory
+/// entry name. Handles regular images, `{name}.rrexif` sidecars, and
+/// `{name}[.{vc_id}].rrdata` sidecars (the 6-char VC suffix is stripped).
+fn deletion_stem_for(filename: &str) -> Option<&str> {
+    let image_filename = if filename.ends_with(".rrdata") {
+        let without_rrdata = filename.trim_end_matches(".rrdata");
+        if let Some(dot_pos) = without_rrdata.rfind('.') {
+            let suffix = &without_rrdata[dot_pos + 1..];
+            if suffix.len() == 6 && suffix.chars().all(|c| c.is_ascii_hexdigit()) {
+                &without_rrdata[..dot_pos]
+            } else {
+                without_rrdata
+            }
+        } else {
+            without_rrdata
+        }
+    } else if filename.ends_with(".rrexif") {
+        filename.trim_end_matches(".rrexif")
+    } else if is_supported_image_file(filename) {
+        filename
+    } else {
+        return None;
+    };
+    Path::new(image_filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+}
+
 #[tauri::command]
 pub fn delete_files_with_associated(
     paths: Vec<String>,
@@ -3343,49 +3374,10 @@ pub fn delete_files_with_associated(
                 let entry_filename = entry.file_name();
                 let entry_filename_str = entry_filename.to_string_lossy();
 
-                if entry_filename_str.ends_with(".rrdata") {
-                    // Sidecars: {filename}.rrdata or {filename}.{vc_id}.rrdata
-                    // VC ids are first 6 chars of a UUID v4, see create_virtual_copy()
-                    let without_rrdata = entry_filename_str.trim_end_matches(".rrdata");
-                    let image_filename = if let Some(dot_pos) = without_rrdata.rfind('.') {
-                        let suffix = &without_rrdata[dot_pos + 1..];
-                        if suffix.len() == 6 && suffix.chars().all(|c| c.is_ascii_hexdigit()) {
-                            &without_rrdata[..dot_pos]
-                        } else {
-                            without_rrdata
-                        }
-                    } else {
-                        without_rrdata
-                    };
-                    let sidecar_stem = Path::new(image_filename)
-                        .file_stem()
-                        .and_then(|s| s.to_str());
-                    if let Some(stem) = sidecar_stem
-                        && stems_to_delete.contains(stem)
-                    {
-                        files_to_trash.insert(entry_path);
-                    }
-                } else if entry_filename_str.ends_with(".rrexif") {
-                    // .rrexif sidecars are named {image_filename}.rrexif,
-                    // e.g. DSCF0001.RAF.rrexif. Strip the suffix first.
-                    let without_rrexif = entry_filename_str.trim_end_matches(".rrexif");
-                    let sidecar_stem = Path::new(without_rrexif)
-                        .file_stem()
-                        .and_then(|s| s.to_str());
-                    if let Some(stem) = sidecar_stem
-                        && stems_to_delete.contains(stem)
-                    {
-                        files_to_trash.insert(entry_path);
-                    }
-                } else if is_supported_image_file(entry_filename_str.as_ref()) {
-                    let entry_stem = Path::new(entry_filename_str.as_ref())
-                        .file_stem()
-                        .and_then(|s| s.to_str());
-                    if let Some(stem) = entry_stem
-                        && stems_to_delete.contains(stem)
-                    {
-                        files_to_trash.insert(entry_path);
-                    }
+                if let Some(stem) = deletion_stem_for(&entry_filename_str)
+                    && stems_to_delete.contains(stem)
+                {
+                    files_to_trash.insert(entry_path);
                 }
             }
         }

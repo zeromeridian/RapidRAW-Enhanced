@@ -734,10 +734,18 @@ export function ViewOptionsDropdown({
               })}
               {groupingMode !== 'off' && (
                 <div className="mt-1 space-y-0.5">
-                  {([
-                    { checked: !requireMatchingExif, labelKey: 'library.header.viewOptions.groupIgnoreMetadata' as const, toggle: { requireMatchingExif: !requireMatchingExif } },
-                    { checked: appSettings?.groupEditedFiles ?? true, labelKey: 'library.header.viewOptions.groupEditedFiles' as const, toggle: { groupEditedFiles: !(appSettings?.groupEditedFiles ?? true) } },
-                  ]).map((opt) => (
+                  {[
+                    {
+                      checked: !requireMatchingExif,
+                      labelKey: 'library.header.viewOptions.groupIgnoreMetadata' as const,
+                      toggle: { requireMatchingExif: !requireMatchingExif },
+                    },
+                    {
+                      checked: appSettings?.groupEditedFiles ?? true,
+                      labelKey: 'library.header.viewOptions.groupEditedFiles' as const,
+                      toggle: { groupEditedFiles: !(appSettings?.groupEditedFiles ?? true) },
+                    },
+                  ].map((opt) => (
                     <button
                       key={opt.labelKey}
                       className="w-full text-left pl-5 pr-3 py-1 rounded-md flex items-center gap-2 transition-colors duration-150 hover:bg-bg-primary"
