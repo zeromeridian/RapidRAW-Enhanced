@@ -5,90 +5,244 @@ LOCALES_DIR = Path("./locales")
 
 TRANSLATIONS = {
     "de": {
-        "copyPaste": {
-            "autoSyncTitle": "Anpassungen automatisch synchronisieren",
-            "autoSyncLabel": "Auto-Sync aktivieren",
-            "autoSyncDesc": "Wendet Anpassungen automatisch auf alle ausgewählten Bilder an."
+        "adjustments": {
+            "effects": {
+                "amount": "Stärke",
+                "bokehCircular": "Kreisförmig",
+                "bokehHexagonal": "Sechseckig",
+                "bokehOctagonal": "Achteckig",
+                "bokehRing": "Blase (Ring)",
+                "bokehShape": "Bokeh-Form",
+                "lensBlur": "Objektivunschärfe",
+                "lensDiffusion": "Streuung"
+            }
+        },
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "KI-Tiefenkarte wird berechnet..."
+            }
         }
     },
     "en": {
-        "copyPaste": {
-            "autoSyncTitle": "Auto-sync adjustments",
-            "autoSyncLabel": "Enable auto-sync",
-            "autoSyncDesc": "Automatically apply adjustments to all selected images."
+        "adjustments": {
+            "effects": {
+                "amount": "Amount",
+                "bokehCircular": "Circular",
+                "bokehHexagonal": "Hexagonal",
+                "bokehOctagonal": "Octagonal",
+                "bokehRing": "Bubble (Ring)",
+                "bokehShape": "Bokeh Shape",
+                "lensBlur": "Lens Blur",
+                "lensDiffusion": "Diffusion"
+            }
+        },
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "Calculating AI Depth Map..."
+            }
         }
     },
     "es": {
-        "copyPaste": {
-            "autoSyncTitle": "Sincronizar ajustes automáticamente",
-            "autoSyncLabel": "Habilitar sincronización automática",
-            "autoSyncDesc": "Aplica automáticamente los ajustes a todas las imágenes seleccionadas."
+        "adjustments": {
+            "effects": {
+                "amount": "Cantidad",
+                "bokehCircular": "Circular",
+                "bokehHexagonal": "Hexagonal",
+                "bokehOctagonal": "Octogonal",
+                "bokehRing": "Burbuja (Anillo)",
+                "bokehShape": "Forma del bokeh",
+                "lensBlur": "Desenfoque de lente",
+                "lensDiffusion": "Difusión"
+            }
+        },
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "Calculando mapa de profundidad IA..."
+            }
         }
     },
     "fr": {
-        "copyPaste": {
-            "autoSyncTitle": "Synchronisation automatique des réglages",
-            "autoSyncLabel": "Activer la synchronisation automatique",
-            "autoSyncDesc": "Applique automatiquement les réglages à toutes les images sélectionnées."
+        "adjustments": {
+            "effects": {
+                "amount": "Intensité",
+                "bokehCircular": "Circulaire",
+                "bokehHexagonal": "Hexagonal",
+                "bokehOctagonal": "Octogonal",
+                "bokehRing": "Bulle (Anneau)",
+                "bokehShape": "Forme du bokeh",
+                "lensBlur": "Flou d'objectif",
+                "lensDiffusion": "Diffusion"
+            }
+        },
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "Calcul de la carte de profondeur IA..."
+            }
         }
     },
     "it": {
-        "copyPaste": {
-            "autoSyncTitle": "Sincronizzazione automatica regolazioni",
-            "autoSyncLabel": "Abilita sincronizzazione automatica",
-            "autoSyncDesc": "Applica automaticamente le regolazioni a tutte le immagini selezionate."
+        "adjustments": {
+            "effects": {
+                "amount": "Quantità",
+                "bokehCircular": "Circolare",
+                "bokehHexagonal": "Esagonale",
+                "bokehOctagonal": "Ottagonale",
+                "bokehRing": "Bolla (Anello)",
+                "bokehShape": "Forma del bokeh",
+                "lensBlur": "Sfocatura obiettivo",
+                "lensDiffusion": "Diffusione"
+            }
+        },
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "Calcolo mappa di profondità IA..."
+            }
         }
     },
     "ja": {
-        "copyPaste": {
-            "autoSyncTitle": "調整の自動同期",
-            "autoSyncLabel": "自動同期を有効にする",
-            "autoSyncDesc": "選択したすべての画像に調整を自動的に適用します。"
+        "adjustments": {
+            "effects": {
+                "amount": "適用量",
+                "bokehCircular": "円形",
+                "bokehHexagonal": "六角形",
+                "bokehOctagonal": "八角形",
+                "bokehRing": "バブル（リング）",
+                "bokehShape": "ボケの形状",
+                "lensBlur": "レンズぼかし",
+                "lensDiffusion": "拡散"
+            }
+        },
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "AI深度マップを計算中..."
+            }
         }
     },
     "ko": {
-        "copyPaste": {
-            "autoSyncTitle": "조정 자동 동기화",
-            "autoSyncLabel": "자동 동기화 활성화",
-            "autoSyncDesc": "선택한 모든 이미지에 조정을 자동으로 적용합니다."
+        "adjustments": {
+            "effects": {
+                "amount": "양",
+                "bokehCircular": "원형",
+                "bokehHexagonal": "육각형",
+                "bokehOctagonal": "팔각형",
+                "bokehRing": "버블 (링)",
+                "bokehShape": "보케 모양",
+                "lensBlur": "렌즈 블러",
+                "lensDiffusion": "확산"
+            }
+        },
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "AI 심도 맵 계산 중..."
+            }
         }
     },
     "pl": {
-        "copyPaste": {
-            "autoSyncTitle": "Automatyczna synchronizacja dostosowań",
-            "autoSyncLabel": "Włącz auto-synchronizację",
-            "autoSyncDesc": "Automatycznie stosuje dostosowania do wszystkich wybranych obrazów."
+        "adjustments": {
+            "effects": {
+                "amount": "Ilość",
+                "bokehCircular": "Kołowy",
+                "bokehHexagonal": "Sześciokątny",
+                "bokehOctagonal": "Ośmiokątny",
+                "bokehRing": "Bąbelek (Pierścień)",
+                "bokehShape": "Kształt bokeh",
+                "lensBlur": "Rozmycie obiektywu",
+                "lensDiffusion": "Dyfuzja"
+            }
+        },
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "Obliczanie mapy głębi AI..."
+            }
         }
     },
     "pt": {
-        "copyPaste": {
-            "autoSyncTitle": "Sincronização automática de ajustes",
-            "autoSyncLabel": "Ativar sincronização automática",
-            "autoSyncDesc": "Aplica automaticamente os ajustes a todas as imagens selecionadas."
+        "adjustments": {
+            "effects": {
+                "amount": "Quantidade",
+                "bokehCircular": "Circular",
+                "bokehHexagonal": "Hexagonal",
+                "bokehOctagonal": "Octogonal",
+                "bokehRing": "Bolha (Anel)",
+                "bokehShape": "Forma do bokeh",
+                "lensBlur": "Desfocagem de lente",
+                "lensDiffusion": "Difusão"
+            }
+        },
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "A calcular mapa de profundidade IA..."
+            }
         }
     },
     "ru": {
-        "copyPaste": {
-            "autoSyncTitle": "Автосинхронизация коррекций",
-            "autoSyncLabel": "Включить автосинхронизацию",
-            "autoSyncDesc": "Автоматически применяет коррекции ко всем выбранным изображениям."
+        "adjustments": {
+            "effects": {
+                "amount": "Величина",
+                "bokehCircular": "Круглая",
+                "bokehHexagonal": "Шестиугольная",
+                "bokehOctagonal": "Восьмиугольная",
+                "bokehRing": "Пузырь (Кольцо)",
+                "bokehShape": "Форма боке",
+                "lensBlur": "Размытие объектива",
+                "lensDiffusion": "Диффузия"
+            }
+        },
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "Расчет карты глубины ИИ..."
+            }
         }
     },
     "zh-CN": {
-        "copyPaste": {
-            "autoSyncTitle": "自动同步调整",
-            "autoSyncLabel": "启用自动同步",
-            "autoSyncDesc": "自动将调整应用于所有选定的图像。"
+        "adjustments": {
+            "effects": {
+                "amount": "数量",
+                "bokehCircular": "圆形",
+                "bokehHexagonal": "六边形",
+                "bokehOctagonal": "八边形",
+                "bokehRing": "气泡（环形）",
+                "bokehShape": "散景形状",
+                "lensBlur": "镜头模糊",
+                "lensDiffusion": "扩散"
+            }
+        },
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "正在计算 AI 深度图..."
+            }
         }
     },
     "zh-TW": {
-        "copyPaste": {
-            "autoSyncTitle": "自動同步調整",
-            "autoSyncLabel": "啟用自動同步",
-            "autoSyncDesc": "自動將調整套用於所有選取的影像。"
+        "adjustments": {
+            "effects": {
+                "amount": "數量",
+                "bokehCircular": "圓形",
+                "bokehHexagonal": "六角形",
+                "bokehOctagonal": "八角形",
+                "bokehRing": "氣泡（環形）",
+                "bokehShape": "散景形狀",
+                "lensBlur": "鏡頭模糊",
+                "lensDiffusion": "擴散"
+            }
+        },
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "正在計算 AI 深度圖..."
+            }
         }
     }
 }
+
+def deep_merge(target: dict, source: dict):
+    """Recursively merges source dict into target dict."""
+    for key, value in source.items():
+        if isinstance(value, dict):
+            node = target.setdefault(key, {})
+            if isinstance(node, dict):
+                deep_merge(node, value)
+        else:
+            target[key] = value
 
 def sort_dict_recursively(item):
     if isinstance(item, dict):
@@ -109,13 +263,7 @@ def update_json_file(file_path: Path, trans: dict):
         print(f"Error parsing JSON in {file_path.name}. Skipping.")
         return
 
-    # Navigate to or create modals -> copyPaste node
-    modals_node = data.setdefault("modals", {})
-    copy_paste_node = modals_node.setdefault("copyPaste", {})
-
-    for key, value in trans["copyPaste"].items():
-        copy_paste_node[key] = value
-
+    deep_merge(data, trans)
     sorted_data = sort_dict_recursively(data)
 
     with open(file_path, "w", encoding="utf-8") as f:
@@ -129,7 +277,7 @@ def main():
         print(f"Error: Locales directory '{LOCALES_DIR}' does not exist.")
         return
 
-    print("Starting sorted translation updates...")
+    print("Starting lens blur translation updates...")
     for lang, trans in TRANSLATIONS.items():
         file_path = LOCALES_DIR / f"{lang}.json"
         update_json_file(file_path, trans)

@@ -25,6 +25,7 @@ mod image_loader;
 mod image_processing;
 mod inpainting;
 mod launch_request;
+mod lens_blur;
 mod lens_correction;
 mod lut_processing;
 mod mask_generation;
@@ -2306,6 +2307,7 @@ pub fn run() {
             ai_commands::generate_ai_depth_mask,
             ai_commands::check_ai_connector_status,
             ai_commands::test_ai_connector_connection,
+            ai_commands::generate_full_image_depth_map,
             inpainting::invoke_generative_replace_with_mask_def,
             inpainting::generate_manual_cleanup_patch,
             denoising::apply_denoising,

@@ -1552,9 +1552,12 @@ pub fn generate_thumbnail_data(
 
             let warped_image =
                 apply_geometry_warp(Cow::Borrowed(&composite_image), &meta.adjustments);
+
+            let blurred_image = crate::lens_blur::apply_lens_blur(warped_image, &meta.adjustments);
+
             let orientation_steps =
                 meta.adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
-            let coarse_rotated_image = apply_coarse_rotation(warped_image, orientation_steps);
+            let coarse_rotated_image = apply_coarse_rotation(blurred_image, orientation_steps);
 
             let (full_w, full_h) = coarse_rotated_image.dimensions();
 
