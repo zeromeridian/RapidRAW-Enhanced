@@ -707,6 +707,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "光圈",
         "backToLibrary": "返回相簿",
@@ -878,7 +879,6 @@
       "raw": {
         "all": "所有型別",
         "nonRawOnly": "僅非 RAW",
-        "preferRaw": "優先 RAW",
         "rawOnly": "僅 RAW"
       }
     },
@@ -942,6 +942,12 @@
         "filterByEdited": "按編輯狀態過濾",
         "filterByFileType": "按檔案型別過濾",
         "filterByRating": "按評分過濾",
+        "groupEditedFiles": "Include edited files in groups",
+        "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
+        "groupOff": "Off",
+        "groupPreferJpeg": "Prefer JPEG",
+        "groupPreferRaw": "Prefer RAW",
+        "groupRawJpeg": "Group RAW + JPEG",
         "metadataAlways": "始終",
         "metadataHover": "懸停時",
         "metadataOff": "關閉",

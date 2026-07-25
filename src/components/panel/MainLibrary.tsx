@@ -33,6 +33,7 @@ import {
   EditedStatus,
   LibraryDisplayMode,
 } from '../ui/AppProperties';
+import { GroupBadgeInfo, GroupId } from '../../utils/imageGrouping';
 import { ImportState, Status } from '../ui/ExportImportProperties';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
@@ -43,11 +44,20 @@ import SettingsPanel from './SettingsPanel';
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 
+export interface ColumnWidths {
+  thumbnail: number;
+  name: number;
+  date: number;
+  rating: number;
+  color: number;
+}
+
 interface MainLibraryProps {
   activePath: string | null;
   aiModelDownloadStatus: string | null;
   appSettings: AppSettings | null;
   currentFolderPath: string | null;
+  groupBadgeInfo: Map<GroupId, GroupBadgeInfo> | null;
   imageList: Array<ImageFile>;
   imageRatings: Record<string, number>;
   importState: ImportState;
@@ -200,7 +210,6 @@ export default function MainLibrary(props: MainLibraryProps) {
       { key: RawStatus.All, label: t('library.filters.raw.all') },
       { key: RawStatus.RawOnly, label: t('library.filters.raw.rawOnly') },
       { key: RawStatus.NonRawOnly, label: t('library.filters.raw.nonRawOnly') },
-      { key: RawStatus.RawOverNonRaw, label: t('library.filters.raw.preferRaw') },
     ],
     [t],
   );
@@ -566,7 +575,6 @@ export default function MainLibrary(props: MainLibraryProps) {
               <span>{t('library.import.failed')}</span>
             </Text>
           )}
-
           <DisplayModeSwitch displayMode={libraryDisplayMode} setDisplayMode={setLibraryDisplayMode} t={t} />
 
           <div className="flex items-center bg-surface p-1 rounded-lg gap-1 border border-border-color/20">
@@ -575,6 +583,7 @@ export default function MainLibrary(props: MainLibraryProps) {
               libraryViewMode={props.libraryViewMode}
               onSelectSize={props.onThumbnailSizeChange}
               onSelectAspectRatio={props.onThumbnailAspectRatioChange}
+              onLibraryRefresh={props.onLibraryRefresh}
               setLibraryViewMode={props.setLibraryViewMode}
               thumbnailSize={props.thumbnailSize}
               thumbnailAspectRatio={props.thumbnailAspectRatio}

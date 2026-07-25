@@ -6,6 +6,8 @@ import {
   X,
   SlidersHorizontal,
   Check,
+  Square,
+  SquareCheck,
   Star as StarIcon,
   ChevronUp,
   ChevronDown,
@@ -22,6 +24,9 @@ import {
   SortCriteria,
   SortDirection,
   ExifOverlay,
+  GroupingMode,
+  ThumbnailSize,
+  ThumbnailAspectRatio,
 } from '../../ui/AppProperties';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import Text from '../../ui/Text';
@@ -308,10 +313,33 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
   );
 }
 
+const groupingOptionKeys = [
+  { key: 'off' as GroupingMode, labelKey: 'library.header.viewOptions.groupOff' as const },
+  { key: 'raw' as GroupingMode, labelKey: 'library.header.viewOptions.groupPreferRaw' as const },
+  { key: 'jpeg' as GroupingMode, labelKey: 'library.header.viewOptions.groupPreferJpeg' as const },
+];
+
+interface ViewOptionsDropdownProps {
+  libraryViewMode: LibraryViewMode;
+  onSelectSize: (id: ThumbnailSize) => void;
+  onSelectAspectRatio: (id: ThumbnailAspectRatio) => void;
+  onLibraryRefresh?: () => void;
+  setLibraryViewMode: (mode: LibraryViewMode) => void;
+  thumbnailSize: ThumbnailSize;
+  thumbnailAspectRatio: ThumbnailAspectRatio;
+  thumbnailSizeOptions: Array<{ id: ThumbnailSize; label: string; size: number }>;
+  thumbnailAspectRatioOptions: Array<{ id: ThumbnailAspectRatio; label: string }>;
+  ratingFilterOptions: Array<{ value: number; label: string }>;
+  rawStatusOptions: Array<{ key: RawStatus; label: string }>;
+  editedStatusOptions: Array<{ key: EditedStatus; label: string }>;
+  sortOptions: Array<{ key: string; label: string; disabled?: boolean }>;
+}
+
 export function ViewOptionsDropdown({
   libraryViewMode,
   onSelectSize,
   onSelectAspectRatio,
+  onLibraryRefresh,
   setLibraryViewMode,
   thumbnailSize,
   thumbnailAspectRatio,
@@ -321,7 +349,7 @@ export function ViewOptionsDropdown({
   rawStatusOptions,
   editedStatusOptions,
   sortOptions,
-}: any) {
+}: ViewOptionsDropdownProps) {
   const { t } = useTranslation();
   const { filterCriteria, setFilterCriteria, sortCriteria, setSortCriteria } = useLibraryStore(
     useShallow((state) => ({
@@ -339,9 +367,13 @@ export function ViewOptionsDropdown({
     })),
   );
 
+  const groupingMode: GroupingMode = appSettings?.grouping ?? 'off';
+  const requireMatchingExif = appSettings?.requireMatchingExif ?? false;
+
   const isFilterActive =
     filterCriteria.rating !== 0 ||
     (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) ||
+    (filterCriteria.editedStatus && filterCriteria.editedStatus !== EditedStatus.All) ||
     (filterCriteria.colors && filterCriteria.colors.length > 0);
 
   const [lastClickedColor, setLastClickedColor] = useState<string | null>(null);
@@ -401,7 +433,7 @@ export function ViewOptionsDropdown({
             <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
               {t('library.header.viewOptions.thumbnailSize')}
             </Text>
-            {thumbnailSizeOptions.map((option: any) => {
+            {thumbnailSizeOptions.map((option) => {
               const isSelected = thumbnailSize === option.id;
               return (
                 <button
@@ -430,7 +462,7 @@ export function ViewOptionsDropdown({
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
                 {t('library.header.viewOptions.thumbnailFit')}
               </Text>
-              {thumbnailAspectRatioOptions.map((option: any) => {
+              {thumbnailAspectRatioOptions.map((option) => {
                 const isSelected = thumbnailAspectRatio === option.id;
                 return (
                   <button
@@ -535,8 +567,8 @@ export function ViewOptionsDropdown({
               </Text>
 
               {ratingFilterOptions
-                .filter((option: any) => option.value <= 0)
-                .map((option: any) => {
+                .filter((option) => option.value <= 0)
+                .map((option) => {
                   const isSelected = filterCriteria.rating === option.value;
                   return (
                     <button
@@ -545,7 +577,7 @@ export function ViewOptionsDropdown({
                       }`}
                       key={option.value}
                       onClick={() =>
-                        setFilterCriteria((prev: Partial<FilterCriteria>) => ({ ...prev, rating: option.value }))
+                        setFilterCriteria((prev: FilterCriteria) => ({ ...prev, rating: option.value }))
                       }
                       role="menuitem"
                     >
@@ -571,14 +603,14 @@ export function ViewOptionsDropdown({
                     {[...Array(5)].map((_, index: number) => {
                       const starValue = index + 1;
                       const isFilled = filterCriteria.rating > 0 && starValue <= filterCriteria.rating;
-                      const optionLabel = ratingFilterOptions.find((o: any) => o.value === starValue)?.label;
+                      const optionLabel = ratingFilterOptions.find((o) => o.value === starValue)?.label;
 
                       return (
                         <button
                           key={starValue}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setFilterCriteria((prev: Partial<FilterCriteria>) => ({
+                            setFilterCriteria((prev: FilterCriteria) => ({
                               ...prev,
                               rating: prev.rating === starValue ? 0 : starValue,
                             }));
@@ -610,7 +642,7 @@ export function ViewOptionsDropdown({
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
                 {t('library.header.viewOptions.filterByFileType')}
               </Text>
-              {rawStatusOptions.map((option: any) => {
+              {rawStatusOptions.map((option) => {
                 const isSelected = (filterCriteria.rawStatus || RawStatus.All) === option.key;
                 return (
                   <button
@@ -619,7 +651,7 @@ export function ViewOptionsDropdown({
                     }`}
                     key={option.key}
                     onClick={() =>
-                      setFilterCriteria((prev: Partial<FilterCriteria>) => ({ ...prev, rawStatus: option.key }))
+                      setFilterCriteria((prev: FilterCriteria) => ({ ...prev, rawStatus: option.key }))
                     }
                     role="menuitem"
                   >
@@ -640,7 +672,7 @@ export function ViewOptionsDropdown({
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
                 {t('library.header.viewOptions.filterByEdited', 'Filter by Edit Status')}
               </Text>
-              {editedStatusOptions.map((option: any) => {
+              {editedStatusOptions.map((option) => {
                 const isSelected = (filterCriteria.editedStatus || EditedStatus.All) === option.key;
                 return (
                   <button
@@ -649,7 +681,7 @@ export function ViewOptionsDropdown({
                     }`}
                     key={option.key}
                     onClick={() =>
-                      setFilterCriteria((prev: Partial<FilterCriteria>) => ({ ...prev, editedStatus: option.key }))
+                      setFilterCriteria((prev: FilterCriteria) => ({ ...prev, editedStatus: option.key }))
                     }
                     role="menuitem"
                   >
@@ -664,6 +696,79 @@ export function ViewOptionsDropdown({
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="py-2"></div>
+
+          <div className="space-y-4">
+            <div>
+              <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+                {t('library.header.viewOptions.groupRawJpeg')}
+              </Text>
+              {groupingOptionKeys.map((option) => {
+                const isSelected = groupingMode === option.key;
+                return (
+                  <button
+                    className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
+                      isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
+                    }`}
+                    key={option.key}
+                    onClick={() => {
+                      if (appSettings) {
+                        handleSettingsChange({ ...appSettings, grouping: option.key });
+                      }
+                    }}
+                    role="menuitem"
+                  >
+                    <Text
+                      variant={TextVariants.label}
+                      color={TextColors.primary}
+                      weight={isSelected ? TextWeights.semibold : TextWeights.normal}
+                    >
+                      {t(option.labelKey)}
+                    </Text>
+                    {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
+                  </button>
+                );
+              })}
+              {groupingMode !== 'off' && (
+                <div className="mt-1 space-y-0.5">
+                  {[
+                    {
+                      checked: !requireMatchingExif,
+                      labelKey: 'library.header.viewOptions.groupIgnoreMetadata' as const,
+                      toggle: { requireMatchingExif: !requireMatchingExif },
+                    },
+                    {
+                      checked: appSettings?.groupEditedFiles ?? true,
+                      labelKey: 'library.header.viewOptions.groupEditedFiles' as const,
+                      toggle: { groupEditedFiles: !(appSettings?.groupEditedFiles ?? true) },
+                    },
+                  ].map((opt) => (
+                    <button
+                      key={opt.labelKey}
+                      className="w-full text-left pl-5 pr-3 py-1 rounded-md flex items-center gap-2 transition-colors duration-150 hover:bg-bg-primary"
+                      onClick={async () => {
+                        if (appSettings) {
+                          await handleSettingsChange({ ...appSettings, ...opt.toggle });
+                          onLibraryRefresh?.();
+                        }
+                      }}
+                      role="menuitemcheckbox"
+                      aria-checked={opt.checked}
+                    >
+                      {opt.checked
+                        ? <SquareCheck size={14} className={TEXT_COLOR_KEYS[TextColors.primary]} />
+                        : <Square size={14} className={TEXT_COLOR_KEYS[TextColors.secondary]} />
+                      }
+                      <Text variant={TextVariants.small} color={TextColors.secondary}>
+                        {t(opt.labelKey)}
+                      </Text>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -728,7 +833,7 @@ export function ViewOptionsDropdown({
                 {sortCriteria.order === SortDirection.Ascending ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
             </div>
-            {sortOptions.map((option: any) => {
+            {sortOptions.map((option) => {
               const isSelected = sortCriteria.key === option.key;
               return (
                 <button

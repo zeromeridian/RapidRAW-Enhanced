@@ -360,10 +360,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         imageList.some((image) => image.path.startsWith(`${finalSelection[0]}?vc=`));
 
       const hasAssociatedFiles = finalSelection.some((selectedPath) => {
-        const lastDotIndex = selectedPath.lastIndexOf('.');
-        if (lastDotIndex === -1) return false;
-        const basePath = selectedPath.substring(0, lastDotIndex);
-        return imageList.some((image) => image.path.startsWith(basePath + '.') && image.path !== selectedPath);
+        const image = imageList.find((img) => img.path === selectedPath);
+        return image?.group_id != null;
       });
 
       let deleteSubmenu;

@@ -751,6 +751,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "Диафрагма",
         "backToLibrary": "Назад в библиотеку",
@@ -926,7 +927,6 @@
       "raw": {
         "all": "Все типы файлов",
         "nonRawOnly": "Только не-RAW",
-        "preferRaw": "Приоритет RAW",
         "rawOnly": "Только RAW"
       }
     },
@@ -990,6 +990,12 @@
         "filterByEdited": "Фильтр по редактированию",
         "filterByFileType": "Фильтр по формату",
         "filterByRating": "Фильтр по рейтингу",
+        "groupEditedFiles": "Include edited files in groups",
+        "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
+        "groupOff": "Off",
+        "groupPreferJpeg": "Prefer JPEG",
+        "groupPreferRaw": "Prefer RAW",
+        "groupRawJpeg": "Group RAW + JPEG",
         "metadataAlways": "Всегда",
         "metadataHover": "При наведении",
         "metadataOff": "Выкл",

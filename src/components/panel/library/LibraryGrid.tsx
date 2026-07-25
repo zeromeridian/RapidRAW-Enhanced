@@ -13,6 +13,7 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { ExifOverlay } from '../../ui/AppProperties';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 
+
 function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: any) {
   const { t } = useTranslation();
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
@@ -173,6 +174,7 @@ export default function LibraryGrid(props: any) {
     onRequestThumbnails,
     thumbnailSizeOptions,
     onThumbnailSizeChange,
+    groupBadgeInfo,
   } = props;
   const { listColumnWidths, setLibrary, sortCriteria, setSortCriteria } = useLibraryStore(
     useShallow((state) => ({
@@ -182,6 +184,7 @@ export default function LibraryGrid(props: any) {
       setSortCriteria: state.setSortCriteria,
     })),
   );
+
   const [gridSize, setGridSize] = useState({ height: 0, width: 0 });
   const [listHandle, setListHandle] = useListCallbackRef();
   const [collapsedRecursiveFolders, setCollapsedRecursiveFolders] = useState<Set<string>>(new Set());
@@ -464,6 +467,7 @@ export default function LibraryGrid(props: any) {
       columnWidths: listColumnWidths,
       queueThumbnailRequest,
       onToggleRecursiveFolder: handleToggleRecursiveFolder,
+      groupBadgeInfo,
     };
   }, [
     gridData,
@@ -479,6 +483,7 @@ export default function LibraryGrid(props: any) {
     listColumnWidths,
     queueThumbnailRequest,
     handleToggleRecursiveFolder,
+    groupBadgeInfo,
   ]);
 
   const getItemSize = useCallback(

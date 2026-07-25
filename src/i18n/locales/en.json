@@ -709,6 +709,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "Aperture",
         "backToLibrary": "Back to Library",
@@ -880,7 +881,6 @@
       "raw": {
         "all": "All Types",
         "nonRawOnly": "Non-RAW Only",
-        "preferRaw": "Prefer RAW",
         "rawOnly": "RAW Only"
       }
     },
@@ -944,6 +944,12 @@
         "filterByEdited": "Filter by Edit Status",
         "filterByFileType": "Filter by File Type",
         "filterByRating": "Filter by Rating",
+        "groupEditedFiles": "Include edited files in groups",
+        "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
+        "groupOff": "Off",
+        "groupPreferJpeg": "Prefer JPEG",
+        "groupPreferRaw": "Prefer RAW",
+        "groupRawJpeg": "Group RAW + JPEG",
         "metadataAlways": "Always",
         "metadataHover": "On Hover",
         "metadataOff": "Off",

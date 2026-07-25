@@ -707,6 +707,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "絞り値",
         "backToLibrary": "ライブラリに戻る",
@@ -878,7 +879,6 @@
       "raw": {
         "all": "すべての種類",
         "nonRawOnly": "非RAWのみ",
-        "preferRaw": "RAWを優先",
         "rawOnly": "RAWのみ"
       }
     },
@@ -942,6 +942,12 @@
         "filterByEdited": "編集状態でフィルター",
         "filterByFileType": "ファイル形式でフィルター",
         "filterByRating": "評価でフィルター",
+        "groupEditedFiles": "Include edited files in groups",
+        "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
+        "groupOff": "Off",
+        "groupPreferJpeg": "Prefer JPEG",
+        "groupPreferRaw": "Prefer RAW",
+        "groupRawJpeg": "Group RAW + JPEG",
         "metadataAlways": "常に表示",
         "metadataHover": "ホバー時に表示",
         "metadataOff": "オフ",

@@ -707,6 +707,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "조리개",
         "backToLibrary": "라이브러리로 돌아가기",
@@ -878,7 +879,6 @@
       "raw": {
         "all": "모든 유형",
         "nonRawOnly": "RAW가 아닌 항목만",
-        "preferRaw": "RAW 우선",
         "rawOnly": "RAW만"
       }
     },
@@ -942,6 +942,12 @@
         "filterByEdited": "편집 상태로 필터링",
         "filterByFileType": "파일 유형으로 필터링",
         "filterByRating": "평점으로 필터링",
+        "groupEditedFiles": "Include edited files in groups",
+        "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
+        "groupOff": "Off",
+        "groupPreferJpeg": "Prefer JPEG",
+        "groupPreferRaw": "Prefer RAW",
+        "groupRawJpeg": "Group RAW + JPEG",
         "metadataAlways": "항상",
         "metadataHover": "마우스 오버 시",
         "metadataOff": "끄기",
