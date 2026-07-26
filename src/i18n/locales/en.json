@@ -1607,6 +1607,9 @@
         },
         "title": "Generative AI"
       },
+      "alwaysDecodeRaw": "Always Decode RAW",
+      "alwaysDecodeRawDesc": "Force full RAW decoding for thumbnails instead of using embedded JPEG previews. Enable this if your thumbnails look different in color or contrast compared to the opened image.",
+      "alwaysDecodeRawLabel": "Always decode RAW for thumbnails",
       "backend": "Processing Backend",
       "backendDesc": "Select the graphics API. 'Auto' is recommended. May fix crashes on some systems.",
       "backends": {

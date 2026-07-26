@@ -5,230 +5,110 @@ LOCALES_DIR = Path("./locales")
 
 TRANSLATIONS = {
     "de": {
-        "adjustments": {
-            "effects": {
-                "amount": "Stärke",
-                "bokehCircular": "Kreisförmig",
-                "bokehHexagonal": "Sechseckig",
-                "bokehOctagonal": "Achteckig",
-                "bokehRing": "Blase (Ring)",
-                "bokehShape": "Bokeh-Form",
-                "lensBlur": "Objektivunschärfe",
-                "lensDiffusion": "Streuung"
-            }
-        },
-        "editor": {
-            "ai": {
-                "generatingDepthMap": "KI-Tiefenkarte wird berechnet..."
+        "settings": {
+            "processing": {
+                "alwaysDecodeRaw": "RAW immer decodieren",
+                "alwaysDecodeRawDesc": "Erzwingt die vollständige RAW-Decodierung für Vorschaubilder, anstatt eingebettete JPEG-Vorschauen zu verwenden. Aktiviere diese Option, wenn sich die Vorschaubilder farblich oder im Kontrast vom geöffneten Bild unterscheiden.",
+                "alwaysDecodeRawLabel": "RAW für Vorschaubilder immer decodieren"
             }
         }
     },
     "en": {
-        "adjustments": {
-            "effects": {
-                "amount": "Amount",
-                "bokehCircular": "Circular",
-                "bokehHexagonal": "Hexagonal",
-                "bokehOctagonal": "Octagonal",
-                "bokehRing": "Bubble (Ring)",
-                "bokehShape": "Bokeh Shape",
-                "lensBlur": "Lens Blur",
-                "lensDiffusion": "Diffusion"
-            }
-        },
-        "editor": {
-            "ai": {
-                "generatingDepthMap": "Calculating AI Depth Map..."
+        "settings": {
+            "processing": {
+                "alwaysDecodeRaw": "Always Decode RAW",
+                "alwaysDecodeRawDesc": "Force full RAW decoding for thumbnails instead of using embedded JPEG previews. Enable this if your thumbnails look different in color or contrast compared to the opened image.",
+                "alwaysDecodeRawLabel": "Always decode RAW for thumbnails"
             }
         }
     },
     "es": {
-        "adjustments": {
-            "effects": {
-                "amount": "Cantidad",
-                "bokehCircular": "Circular",
-                "bokehHexagonal": "Hexagonal",
-                "bokehOctagonal": "Octogonal",
-                "bokehRing": "Burbuja (Anillo)",
-                "bokehShape": "Forma del bokeh",
-                "lensBlur": "Desenfoque de lente",
-                "lensDiffusion": "Difusión"
-            }
-        },
-        "editor": {
-            "ai": {
-                "generatingDepthMap": "Calculando mapa de profundidad IA..."
+        "settings": {
+            "processing": {
+                "alwaysDecodeRaw": "Decodificar RAW siempre",
+                "alwaysDecodeRawDesc": "Fuerza la decodificación RAW completa para las miniaturas en lugar de usar vistas previas JPEG incrustadas. Activa esta opción si las miniaturas tienen colores o contrastes diferentes a la imagen abierta.",
+                "alwaysDecodeRawLabel": "Decodificar RAW siempre para miniaturas"
             }
         }
     },
     "fr": {
-        "adjustments": {
-            "effects": {
-                "amount": "Intensité",
-                "bokehCircular": "Circulaire",
-                "bokehHexagonal": "Hexagonal",
-                "bokehOctagonal": "Octogonal",
-                "bokehRing": "Bulle (Anneau)",
-                "bokehShape": "Forme du bokeh",
-                "lensBlur": "Flou d'objectif",
-                "lensDiffusion": "Diffusion"
-            }
-        },
-        "editor": {
-            "ai": {
-                "generatingDepthMap": "Calcul de la carte de profondeur IA..."
+        "settings": {
+            "processing": {
+                "alwaysDecodeRaw": "Toujours décoder le RAW",
+                "alwaysDecodeRawDesc": "Force le décodage RAW complet pour les miniatures au lieu d'utiliser les aperçus JPEG intégrés. Activez cette option si vos miniatures ont des couleurs ou des contrastes différents de l'image ouverte.",
+                "alwaysDecodeRawLabel": "Toujours décoder le RAW pour les miniatures"
             }
         }
     },
     "it": {
-        "adjustments": {
-            "effects": {
-                "amount": "Quantità",
-                "bokehCircular": "Circolare",
-                "bokehHexagonal": "Esagonale",
-                "bokehOctagonal": "Ottagonale",
-                "bokehRing": "Bolla (Anello)",
-                "bokehShape": "Forma del bokeh",
-                "lensBlur": "Sfocatura obiettivo",
-                "lensDiffusion": "Diffusione"
-            }
-        },
-        "editor": {
-            "ai": {
-                "generatingDepthMap": "Calcolo mappa di profondità IA..."
+        "settings": {
+            "processing": {
+                "alwaysDecodeRaw": "Decodifica RAW sempre",
+                "alwaysDecodeRawDesc": "Forza la decodifica RAW completa per le miniature invece di usare le anteprime JPEG incorporate. Attiva questa opzione se i colori o il contrasto delle miniature sono diversi dall'immagine aperta.",
+                "alwaysDecodeRawLabel": "Decodifica RAW sempre per le miniature"
             }
         }
     },
     "ja": {
-        "adjustments": {
-            "effects": {
-                "amount": "適用量",
-                "bokehCircular": "円形",
-                "bokehHexagonal": "六角形",
-                "bokehOctagonal": "八角形",
-                "bokehRing": "バブル（リング）",
-                "bokehShape": "ボケの形状",
-                "lensBlur": "レンズぼかし",
-                "lensDiffusion": "拡散"
-            }
-        },
-        "editor": {
-            "ai": {
-                "generatingDepthMap": "AI深度マップを計算中..."
+        "settings": {
+            "processing": {
+                "alwaysDecodeRaw": "常にRAWをデコード",
+                "alwaysDecodeRawDesc": "埋め込まれたJPEGプレビューを使用する代わりに、サムネイルの完全なRAWデコードを強制します。サムネイルの色やコントラストが開いた画像と異なる場合に有効にしてください。",
+                "alwaysDecodeRawLabel": "サムネイル用に常にRAWをデコード"
             }
         }
     },
     "ko": {
-        "adjustments": {
-            "effects": {
-                "amount": "양",
-                "bokehCircular": "원형",
-                "bokehHexagonal": "육각형",
-                "bokehOctagonal": "팔각형",
-                "bokehRing": "버블 (링)",
-                "bokehShape": "보케 모양",
-                "lensBlur": "렌즈 블러",
-                "lensDiffusion": "확산"
-            }
-        },
-        "editor": {
-            "ai": {
-                "generatingDepthMap": "AI 심도 맵 계산 중..."
+        "settings": {
+            "processing": {
+                "alwaysDecodeRaw": "항상 RAW 디코딩",
+                "alwaysDecodeRawDesc": "포함된 JPEG 미리보기를 사용하는 대신 썸네일에 대해 전체 RAW 디코딩을 강제합니다. 썸네일의 색상이나 대비가 열린 이미지와 다르게 보이는 경우 이 옵션을 활성화하세요.",
+                "alwaysDecodeRawLabel": "썸네일에 대해 항상 RAW 디코딩"
             }
         }
     },
     "pl": {
-        "adjustments": {
-            "effects": {
-                "amount": "Ilość",
-                "bokehCircular": "Kołowy",
-                "bokehHexagonal": "Sześciokątny",
-                "bokehOctagonal": "Ośmiokątny",
-                "bokehRing": "Bąbelek (Pierścień)",
-                "bokehShape": "Kształt bokeh",
-                "lensBlur": "Rozmycie obiektywu",
-                "lensDiffusion": "Dyfuzja"
-            }
-        },
-        "editor": {
-            "ai": {
-                "generatingDepthMap": "Obliczanie mapy głębi AI..."
+        "settings": {
+            "processing": {
+                "alwaysDecodeRaw": "Zawsze dekoduj RAW",
+                "alwaysDecodeRawDesc": "Wymusza pełne dekodowanie RAW dla miniatur zamiast korzystania z osadzonych podglądów JPEG. Włącz tę opcję, jeśli miniatury różnią się kolorami lub kontrastem od otwartego obrazu.",
+                "alwaysDecodeRawLabel": "Zawsze dekoduj RAW dla miniatur"
             }
         }
     },
     "pt": {
-        "adjustments": {
-            "effects": {
-                "amount": "Quantidade",
-                "bokehCircular": "Circular",
-                "bokehHexagonal": "Hexagonal",
-                "bokehOctagonal": "Octogonal",
-                "bokehRing": "Bolha (Anel)",
-                "bokehShape": "Forma do bokeh",
-                "lensBlur": "Desfocagem de lente",
-                "lensDiffusion": "Difusão"
-            }
-        },
-        "editor": {
-            "ai": {
-                "generatingDepthMap": "A calcular mapa de profundidade IA..."
+        "settings": {
+            "processing": {
+                "alwaysDecodeRaw": "Sempre decodificar RAW",
+                "alwaysDecodeRawDesc": "Força a decodificação RAW completa para miniaturas em vez de usar visualizações JPEG incorporadas. Ative esta opção se as suas miniaturas tiverem cores ou contrastes diferentes em comparação com a imagem aberta.",
+                "alwaysDecodeRawLabel": "Sempre decodificar RAW para miniaturas"
             }
         }
     },
     "ru": {
-        "adjustments": {
-            "effects": {
-                "amount": "Величина",
-                "bokehCircular": "Круглая",
-                "bokehHexagonal": "Шестиугольная",
-                "bokehOctagonal": "Восьмиугольная",
-                "bokehRing": "Пузырь (Кольцо)",
-                "bokehShape": "Форма боке",
-                "lensBlur": "Размытие объектива",
-                "lensDiffusion": "Диффузия"
-            }
-        },
-        "editor": {
-            "ai": {
-                "generatingDepthMap": "Расчет карты глубины ИИ..."
+        "settings": {
+            "processing": {
+                "alwaysDecodeRaw": "Всегда декодировать RAW",
+                "alwaysDecodeRawDesc": "Принудительно использовать полное декодирование RAW для миниатюр вместо встроенных превью JPEG. Включите эту опцию, если цвета или контрастность миниатюр отличаются от открытого изображения.",
+                "alwaysDecodeRawLabel": "Всегда декодировать RAW для миниатюр"
             }
         }
     },
     "zh-CN": {
-        "adjustments": {
-            "effects": {
-                "amount": "数量",
-                "bokehCircular": "圆形",
-                "bokehHexagonal": "六边形",
-                "bokehOctagonal": "八边形",
-                "bokehRing": "气泡（环形）",
-                "bokehShape": "散景形状",
-                "lensBlur": "镜头模糊",
-                "lensDiffusion": "扩散"
-            }
-        },
-        "editor": {
-            "ai": {
-                "generatingDepthMap": "正在计算 AI 深度图..."
+        "settings": {
+            "processing": {
+                "alwaysDecodeRaw": "始终解码 RAW",
+                "alwaysDecodeRawDesc": "强制对缩略图进行完整的 RAW 解码，而不是使用内置的 JPEG 预览。如果您的缩略图在颜色或对比度上与打开的图像不同，请启用此选项。",
+                "alwaysDecodeRawLabel": "始终为缩略图解码 RAW"
             }
         }
     },
     "zh-TW": {
-        "adjustments": {
-            "effects": {
-                "amount": "數量",
-                "bokehCircular": "圓形",
-                "bokehHexagonal": "六角形",
-                "bokehOctagonal": "八角形",
-                "bokehRing": "氣泡（環形）",
-                "bokehShape": "散景形狀",
-                "lensBlur": "鏡頭模糊",
-                "lensDiffusion": "擴散"
-            }
-        },
-        "editor": {
-            "ai": {
-                "generatingDepthMap": "正在計算 AI 深度圖..."
+        "settings": {
+            "processing": {
+                "alwaysDecodeRaw": "始終解碼 RAW",
+                "alwaysDecodeRawDesc": "強制對縮圖進行完整的 RAW 解碼，而不是使用內建的 JPEG 預覽。如果您的縮圖在顏色或對比度上與打開的影像不同，請啟用此選項。",
+                "alwaysDecodeRawLabel": "始終為縮圖解碼 RAW"
             }
         }
     }
@@ -277,7 +157,7 @@ def main():
         print(f"Error: Locales directory '{LOCALES_DIR}' does not exist.")
         return
 
-    print("Starting lens blur translation updates...")
+    print("Starting thumbnail RAW decoding translation updates...")
     for lang, trans in TRANSLATIONS.items():
         file_path = LOCALES_DIR / f"{lang}.json"
         update_json_file(file_path, trans)

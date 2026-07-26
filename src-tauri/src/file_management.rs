@@ -1453,8 +1453,10 @@ pub fn generate_thumbnail_data(
         .as_ref()
         .map_or(serde_json::Value::Null, |m| m.adjustments.clone());
 
-    if is_raw && adjustments.is_null() && preloaded_image.is_none() {
-        let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let always_decode_raw = settings.always_decode_raw_thumbnails.unwrap_or(false);
+
+    if is_raw && adjustments.is_null() && preloaded_image.is_none() && !always_decode_raw {
         let target_res = settings.thumbnail_resolution.unwrap_or(720);
         if let Some(preview) = try_load_embedded_raw_preview(&source_path, target_res) {
             return Ok(preview);
@@ -1465,7 +1467,6 @@ pub fn generate_thumbnail_data(
         && !meta.adjustments.is_null()
     {
         let state = app_handle.state::<AppState>();
-        let settings = load_settings(app_handle.clone()).unwrap_or_default();
         let target_res = settings.thumbnail_resolution.unwrap_or(720);
 
         let base_cache_hash = crate::cache_utils::calculate_thumbnail_base_hash(&meta.adjustments);
@@ -1500,7 +1501,6 @@ pub fn generate_thumbnail_data(
         let (processing_base, total_scale) = if let Some(hit) = cached_base {
             hit
         } else {
-            let settings = load_settings(app_handle.clone()).unwrap_or_default();
             let mut raw_scale_factor = 1.0f32;
 
             let composite_image = if let Some(img) = preloaded_image {
@@ -1692,8 +1692,6 @@ pub fn generate_thumbnail_data(
             return Ok(cropped_preview.into_owned());
         }
     }
-
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
 
     let mut final_image = if let Some(img) = preloaded_image {
         image_loader::composite_patches_on_image(img, &adjustments)?

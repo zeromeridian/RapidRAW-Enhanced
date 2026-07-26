@@ -1640,6 +1640,9 @@
         },
         "title": "IA Generativa"
       },
+      "alwaysDecodeRaw": "Sempre decodificar RAW",
+      "alwaysDecodeRawDesc": "Força a decodificação RAW completa para miniaturas em vez de usar visualizações JPEG incorporadas. Ative esta opção se as suas miniaturas tiverem cores ou contrastes diferentes em comparação com a imagem aberta.",
+      "alwaysDecodeRawLabel": "Sempre decodificar RAW para miniaturas",
       "backend": "Backend de Processamento",
       "backendDesc": "Selecione a API gráfica. 'Auto' é recomendado. Pode corrigir travamentos em alguns sistemas.",
       "backends": {

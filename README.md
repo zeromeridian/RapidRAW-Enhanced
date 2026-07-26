@@ -307,7 +307,6 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 
 <details>
 <summary><strong>Table of Contents</strong></summary>
-<br>
 
 - [Showcase & Edits](#showcase--edits)
 - [The Idea](#the-idea)
@@ -550,6 +549,10 @@ Here is an outlook on what is actively being developed and planned for the comin
 - **Performance & Algorithm Refinements:** Further optimizing processing speed on older GPU architectures, refining Fujifilm X-Trans sensor demosaicing algorithms, and expanding UI responsiveness on mobile/Android devices.
 
 ## AI Roadmap
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/inpainting.gif" alt="RapidRAW AI Inpainting" width="100%">
+</p>
 
 I've designed RapidRAW's AI features with flexibility in mind. You have three ways to use them, giving you the choice between fast local tools, powerful self-hosting, and simple cloud convenience.
 

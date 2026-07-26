@@ -1673,6 +1673,9 @@
         },
         "title": "Generatywne AI"
       },
+      "alwaysDecodeRaw": "Zawsze dekoduj RAW",
+      "alwaysDecodeRawDesc": "Wymusza pełne dekodowanie RAW dla miniatur zamiast korzystania z osadzonych podglądów JPEG. Włącz tę opcję, jeśli miniatury różnią się kolorami lub kontrastem od otwartego obrazu.",
+      "alwaysDecodeRawLabel": "Zawsze dekoduj RAW dla miniatur",
       "backend": "Backend przetwarzania",
       "backendDesc": "Wybierz interfejs API grafiki. 'Auto' jest zalecane. Może rozwiązać problemy z zawieszaniem się na niektórych systemach.",
       "backends": {

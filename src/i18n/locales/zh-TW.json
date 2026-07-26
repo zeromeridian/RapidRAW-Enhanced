@@ -1605,6 +1605,9 @@
         },
         "title": "生成式 AI"
       },
+      "alwaysDecodeRaw": "始終解碼 RAW",
+      "alwaysDecodeRawDesc": "強制對縮圖進行完整的 RAW 解碼，而不是使用內建的 JPEG 預覽。如果您的縮圖在顏色或對比度上與打開的影像不同，請啟用此選項。",
+      "alwaysDecodeRawLabel": "始終為縮圖解碼 RAW",
       "backend": "處理後端",
       "backendDesc": "選擇圖形 API。推薦使用「自動」。在某些系統上可能解決崩潰問題。",
       "backends": {
