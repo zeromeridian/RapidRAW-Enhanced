@@ -332,11 +332,9 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 Watch RapidRAW in action:
 
 <p align="center">
-  <video src="https://github.com/CyberTimon/RapidRAW/raw/assets/.github/assets/demo.mp4" controls width="100%" poster="https://github.com/CyberTimon/RapidRAW/raw/assets/.github/assets/grading.jpg">
-    Your browser does not support the video tag.
-  </video>
-  <br>
-  <em>Overview of RapidRAW's GPU-accelerated editor workflow and performance.</em>
+
+https://github.com/user-attachments/assets/4b9b932a-b18c-49d3-849f-e44d3bef0d12
+
 </p>
 
 <table width="100%">
@@ -354,7 +352,6 @@ Watch RapidRAW in action:
   </tr>
 </table>
 
-<br>
 
 Explore example edits processed entirely within RapidRAW. You can download the `.rrdata` sidecar file for each image to inspect or apply the exact adjustment parameters.
 
@@ -462,7 +459,7 @@ Explore example edits processed entirely within RapidRAW. You can download the `
 
 <table width="100%">
   <tr>
-    <td width="28%" valign="top" align="center">
+    <td width="25%" valign="top" align="center">
       <br>
       <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/portrait.jpg" alt="Timon Käch" width="100%" style="border-radius: 8px;">
       <br><br>
@@ -470,11 +467,9 @@ Explore example edits processed entirely within RapidRAW. You can download the `
       <sub>Lucerne, Switzerland</sub><br>
       <sub>Developer & Photographer</sub>
       <br><br>
-      <a href="https://www.timonkaech.ch"><strong>www.timonkaech.ch</strong></a><br>
-      <a href="https://www.instagram.com/timonkaech.photography/"><strong>Instagram</strong></a><br>
-      <a href="mailto:timon@cybertimon.ch"><strong>Email</strong></a>
     </td>
-    <td width="72%" valign="top">
+    <td width="75%" valign="top">
+      <br><br>
       <p>
         As a photography enthusiast, I often found existing software to be sluggish and resource-heavy on my machine. I wanted a faster, simpler photo editing experience, so I decided to build my own. The goal was to create a tool that was not only fast but <strong>also helped me learn the details of digital image processing and camera technology</strong>.
       </p>
@@ -487,6 +482,7 @@ Explore example edits processed entirely within RapidRAW. You can download the `
       <p>
         I am immensely grateful for Google's Gemini suite of AI models. As a young developer without a formal background in advanced mathematics or image science, Google's AI Studio was an invaluable assistant, helping me research and implement complex concepts in record time.
       </p>
+      <br>
     </td>
   </tr>
 </table>
@@ -504,7 +500,7 @@ Explore example edits processed entirely within RapidRAW. You can download the `
         <li><strong>Generative Edits:</strong> Remove or add elements using text prompts, powered by an optional AI backend.</li>
         <li><strong>Full RAW Support:</strong> Supports a wide range of RAW camera formats through rawler, with JPEG support included.</li>
         <li><strong>Non-Destructive Workflow:</strong> All edits are stored in a <code>.rrdata</code> sidecar file, leaving your original images untouched.</li>
-        <li><strong>Lens Correction:</strong> Automatic distortion, TCA, and vignette correction powered by Lensfun.</li>
+        <li><strong>Lens Correction:</strong> Automatic distortion, TCA, and vignette correction powered by Lensfun.</li><br><br>
       </ul>
     </td>
     <td valign="top" width="50%">
@@ -541,7 +537,7 @@ Explore example edits processed entirely within RapidRAW. You can download the `
         <li><strong>Copy & Paste Settings:</strong> Quickly transfer adjustments and masks between images.</li>
         <li><strong>Undo/Redo History:</strong> Robust history tracking for every edit step.</li>
         <li><strong>Compositions & Merging:</strong> Bracketed HDR merging, seamless Panorama Stitcher, Collage Maker, and Film Negative Converter.</li>
-        <li><strong>Flexible Exporting:</strong> Export to JPEG, PNG, WebP, AVIF, TIFF, JXL, or LUT formats with custom watermarking and EXIF retention.</li>
+        <li><strong>Flexible Exporting:</strong> Export to JPEG, PNG, WebP, AVIF, TIFF, JXL, or LUT formats with custom watermarking and EXIF retention.</li><br><br>
       </ul>
     </td>
   </tr>
@@ -551,28 +547,10 @@ Explore example edits processed entirely within RapidRAW. You can download the `
 
 Here is an outlook on what is actively being developed and planned for the coming months:
 
-<table width="100%">
-  <tr>
-    <td width="50%" valign="top">
-      <h4>Bug Fixes & Stability</h4>
-      <p>Continuous memory optimization, resolving OS-specific crashes (such as Linux Wayland/WebKit edge cases), and refining GPU processing backend auto-selection for seamless performance across all platforms.</p>
-    </td>
-    <td width="50%" valign="top">
-      <h4>Tethered Shooting</h4>
-      <p>Adding native camera tethering support to allow studio and portrait photographers to capture photos directly into RapidRAW with instant live previews and automatic sidecar application.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h4>Cloud AI Inpainting</h4>
-      <p>Launching the optional cloud generative AI integration to deliver high-quality object removal and generative replace without requiring local ComfyUI setups or heavy GPU hardware.</p>
-    </td>
-    <td width="50%" valign="top">
-      <h4>Performance & Algorithm Refinements</h4>
-      <p>Further optimizing processing speed on older GPU architectures, refining Fujifilm X-Trans sensor demosaicing algorithms, and expanding UI responsiveness on mobile/Android devices.</p>
-    </td>
-  </tr>
-</table>
+- **Bug Fixes & Stability:** Continuous memory optimization, resolving OS-specific crashes (such as Linux Wayland/WebKit edge cases), and refining GPU processing backend auto-selection for seamless performance across all platforms.
+- **Tethered Shooting:** Adding native camera tethering support to allow studio and portrait photographers to capture photos directly into RapidRAW with instant live previews and automatic sidecar application.
+- **Cloud AI Inpainting:** Launching the optional cloud generative AI integration to deliver high-quality object removal and generative replace without requiring local ComfyUI setups or heavy GPU hardware.
+- **Performance & Algorithm Refinements:** Further optimizing processing speed on older GPU architectures, refining Fujifilm X-Trans sensor demosaicing algorithms, and expanding UI responsiveness on mobile/Android devices.
 
 ## AI Roadmap
 
