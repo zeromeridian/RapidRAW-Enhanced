@@ -49,6 +49,17 @@ Implementation:
 - Visibility is persisted in `bottomToolbarVisibility`; missing keys default to
   visible for backward compatibility.
 
+Manual Lightroom-style image stacking is implemented separately from RAW/JPEG
+grouping:
+
+- Select two or more library images and use **Stacking → Stack Selected Photos**.
+- Stacks persist in `imageStacks` in application settings.
+- Collapsed stacks show their selected cover plus a numeric count badge.
+- Expanded stack members remain contiguous in their saved order.
+- Context-menu actions expand/collapse, select a cover, and unstack.
+- Stack badges appear in both grid and list library modes.
+- Stack membership uses full image paths and does not modify `group_id`.
+
 ## Working Tree
 
 Expected intentional source changes:
@@ -61,6 +72,10 @@ Expected intentional source changes:
 - `src/i18n/locales/en.json`
 - `src-tauri/src/app_settings.rs`
 - `src-tauri/tauri.conf.json`
+- `src/utils/imageStacks.ts`
+- `src/hooks/useSortedLibrary.ts`
+- `src/hooks/useAppContextMenus.ts`
+- `src/components/panel/library/LibraryItems.tsx`
 - `HANDOFF.md`
 - `AGENTS.md`
 
@@ -77,22 +92,21 @@ Do not discard unrelated user changes.
 
 Successful production build:
 
-- Version: `1.6.1-colrbent.1`
+- Version: `1.6.1-colrbent.2`
 - Architecture: `amd64` / `x86_64`
 - DEB:
-  `src-tauri/target/release/bundle/deb/RapidRAW_1.6.1-colrbent.1_amd64.deb`
+  `src-tauri/target/release/bundle/deb/RapidRAW_1.6.1-colrbent.2_amd64.deb`
 - AppImage:
-  `src-tauri/target/release/bundle/appimage/RapidRAW_1.6.1-colrbent.1_amd64.AppImage`
+  `src-tauri/target/release/bundle/appimage/RapidRAW_1.6.1-colrbent.2_amd64.AppImage`
 
-These packages include all nine toolbar buttons: the seven Productivity actions
-plus Physical Copy and Virtual Copy. They also include persisted individual
-toolbar visibility controls.
+These packages include toolbar customization and persistent manual image
+stacking.
 
 SHA-256 at the time of this handoff:
 
 ```text
-6357ed580fb88344b1c2947d67af1993e3bec666c1ddb0e5f755712c96a8d7c5  RapidRAW_1.6.1-colrbent.1_amd64.deb
-b090449735f2bab334ed090a205a23e64a2e1776d1f2da80d9d626e91dfb1c09  RapidRAW_1.6.1-colrbent.1_amd64.AppImage
+cfddab9367ffd8a57203373c7144a26b65a2283a952b10874a6e15a99480fe0c  RapidRAW_1.6.1-colrbent.2_amd64.deb
+935775e0cffa27c28cdd37d6e0ee1eee57bfe516ffe98130791260cb74517739  RapidRAW_1.6.1-colrbent.2_amd64.AppImage
 ```
 
 These hashes become stale after any rebuild and must then be replaced.
@@ -138,6 +152,7 @@ The resource and build outputs are ignored by Git.
 
 - `vite build`: passed.
 - Latest `vite build` with toolbar customization: passed.
+- Stack collapsed/expanded ordering checks: passed.
 - Tauri release compilation: passed.
 - DEB generation: passed and verified as `amd64`.
 - AppImage generation: passed and verified as x86-64.
@@ -165,6 +180,9 @@ The resource and build outputs are ignored by Git.
 6. Restart the application and confirm hidden toolbar items remain hidden.
 7. Hide every optional item and confirm the customization control remains
    available to restore them.
+8. Create stacks in grid and list modes; restart and verify persistence.
+9. Verify stack behavior under rating/color filters, search, albums, and
+   RAW/JPEG grouping.
 
 ## Continuous Maintenance Protocol
 

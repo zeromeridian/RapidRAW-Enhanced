@@ -163,6 +163,13 @@ export enum ThumbnailAspectRatio {
 export type GroupPreference = 'jpeg' | 'raw';
 export type GroupingMode = 'off' | GroupPreference;
 
+export interface ImageStack {
+  id: string;
+  paths: string[];
+  coverPath: string;
+  collapsed: boolean;
+}
+
 export interface AppSettings {
   aiConnectorAddress?: string;
   aiProvider?: string;
@@ -224,6 +231,7 @@ export interface AppSettings {
   groupPreferredType?: GroupPreference; // legacy
   alwaysDecodeRawThumbnails?: boolean;
   bottomToolbarVisibility?: Record<string, boolean>;
+  imageStacks?: ImageStack[];
 }
 
 export interface BrushSettings {
