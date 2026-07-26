@@ -183,6 +183,7 @@ export default function LibraryView({
               setUI((state) => ({ isLibraryExportPanelVisible: !state.isLibraryExportPanelVisible }))
             }
             onOpenCopyPasteSettings={() => setUI({ isCopyPasteSettingsModalOpen: true })}
+            onLibraryRefresh={handleLibraryRefresh}
             onPaste={() => handlePasteAdjustments()}
             onRate={handleRate}
             onReset={() => handleResetAdjustments()}
