@@ -527,8 +527,7 @@ fn render_depth_of_field(
                         }
                     }
 
-                    let sharp_mask = (1.0 - fa).max(na).clamp(0.0, 1.0);
-                    let final_mask = sharp_mask.max(b_mask).clamp(0.0, 1.0);
+                    let final_mask = dof_smoothstep(0.0, 1.0, b_mask.clamp(0.0, 1.0));
 
                     let local_veil = veil * final_mask;
                     let local_keep = 1.0 - (0.55 * diffusion * final_mask);
