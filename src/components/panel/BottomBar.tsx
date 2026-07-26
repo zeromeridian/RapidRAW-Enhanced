@@ -1,16 +1,38 @@
-import { useState, useEffect, useRef } from 'react';
-import { Star, Copy, ClipboardPaste, ChevronUp, ChevronDown, Check, FileInput, Settings, Filter } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import {
+  Aperture,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  ClipboardPaste,
+  Copy,
+  CopyPlus,
+  Film,
+  FileInput,
+  Filter,
+  Grip,
+  Images,
+  LayoutTemplate,
+  Settings,
+  SquaresUnite,
+  Star,
+  Users,
+} from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'react-toastify';
 
 import Filmstrip from './Filmstrip';
-import { GLOBAL_KEYS, ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
+import { AlbumItem, GLOBAL_KEYS, ImageFile, Invokes, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
 import Text from '../ui/Text';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
-import { COLOR_LABELS } from '../../utils/adjustments';
+import { useUIStore } from '../../store/useUIStore';
+import { COLOR_LABELS, normalizeLoadedAdjustments } from '../../utils/adjustments';
+import { globalImageCache } from '../../utils/ImageLRUCache';
 
 interface BottomBarProps {
   filmstripHeight?: number;
@@ -33,6 +55,7 @@ interface BottomBarProps {
   onCopy(): void;
   onExportClick?(): void;
   onImageSelect?(path: string, event: any): void;
+  onLibraryRefresh?(): Promise<void>;
   onOpenCopyPasteSettings?(): void;
   onRequestThumbnails?(paths: string[]): void;
   onPaste(): void;
@@ -112,6 +135,7 @@ export default function BottomBar({
   onCopy,
   onExportClick,
   onImageSelect,
+  onLibraryRefresh,
   onOpenCopyPasteSettings,
   onRequestThumbnails,
   onPaste,
@@ -155,14 +179,131 @@ export default function BottomBar({
   const showSelectionCounter = numSelected > 1;
 
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
-  const { filterCriteria, setFilterCriteria } = useLibraryStore(
+  const { filterCriteria, libraryActivePath, setFilterCriteria, setLibrary } = useLibraryStore(
     useShallow((state) => ({
       filterCriteria: state.filterCriteria,
+      libraryActivePath: state.libraryActivePath,
       setFilterCriteria: state.setFilterCriteria,
+      setLibrary: state.setLibrary,
     })),
   );
+  const setUI = useUIStore((state) => state.setUI);
+  const setEditor = useEditorStore((state) => state.setEditor);
 
   const allColors = [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }];
+  const productivityPaths =
+    multiSelectedPaths.length > 0
+      ? multiSelectedPaths
+      : selectedImage?.path
+        ? [selectedImage.path]
+        : libraryActivePath
+          ? [libraryActivePath]
+          : [];
+  const productivityCount = productivityPaths.length;
+  const firstProductivityImage = imageList.find((image) => image.path === productivityPaths[0]);
+  const productivityButtonClass =
+    'w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed';
+
+  const handleAutoAdjust = () => {
+    if (productivityCount === 0) return;
+    productivityPaths.forEach((path) => globalImageCache.delete(path));
+
+    invoke(Invokes.ApplyAutoAdjustmentsToPaths, { paths: productivityPaths })
+      .then(async () => {
+        if (selectedImage && productivityPaths.includes(selectedImage.path)) {
+          const metadata: any = await invoke(Invokes.LoadMetadata, { path: selectedImage.path });
+          if (metadata.adjustments && !metadata.adjustments.is_null) {
+            const normalized = normalizeLoadedAdjustments(metadata.adjustments);
+            setEditor({ adjustments: normalized });
+            useEditorStore.getState().resetHistory(normalized);
+          }
+        }
+        if (libraryActivePath && productivityPaths.includes(libraryActivePath)) {
+          const metadata: any = await invoke(Invokes.LoadMetadata, { path: libraryActivePath });
+          if (metadata.adjustments && !metadata.adjustments.is_null) {
+            setLibrary({ libraryActiveAdjustments: normalizeLoadedAdjustments(metadata.adjustments) });
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to apply auto adjustments to paths:', err);
+        toast.error(t('contextMenus.toasts.failedApplyAuto', { err }));
+      });
+  };
+
+  const openDenoise = () =>
+    setUI({
+      denoiseModalState: {
+        isOpen: true,
+        isProcessing: false,
+        previewBase64: null,
+        error: null,
+        targetPaths: productivityPaths,
+        progressMessage: null,
+        isRaw: firstProductivityImage?.is_raw || selectedImage?.isRaw || false,
+      },
+    });
+
+  const openPanorama = () =>
+    setUI({
+      panoramaModalState: {
+        error: null,
+        finalImageBase64: null,
+        isOpen: true,
+        isProcessing: false,
+        progressMessage: null,
+        stitchingSourcePaths: productivityPaths,
+      },
+    });
+
+  const openHdr = () =>
+    setUI({
+      hdrModalState: {
+        error: null,
+        finalImageBase64: null,
+        isOpen: true,
+        isProcessing: false,
+        progressMessage: null,
+        stitchingSourcePaths: productivityPaths,
+      },
+    });
+
+  const refreshAfterDuplicate = async () => {
+    const { activeAlbumId } = useLibraryStore.getState();
+    if (activeAlbumId) {
+      const albumTree = await invoke<AlbumItem[]>(Invokes.GetAlbums);
+      setLibrary({ albumTree });
+    }
+    await onLibraryRefresh?.();
+  };
+
+  const handlePhysicalCopy = async () => {
+    if (productivityCount !== 1) return;
+    try {
+      await invoke(Invokes.DuplicateFile, {
+        path: productivityPaths[0],
+        targetAlbumId: useLibraryStore.getState().activeAlbumId || null,
+      });
+      await refreshAfterDuplicate();
+    } catch (err) {
+      console.error('Failed to duplicate file:', err);
+      toast.error(t('contextMenus.toasts.failedDuplicate', { err }));
+    }
+  };
+
+  const handleVirtualCopy = async () => {
+    if (productivityCount !== 1) return;
+    try {
+      await invoke(Invokes.CreateVirtualCopy, {
+        sourceVirtualPath: productivityPaths[0],
+        targetAlbumId: useLibraryStore.getState().activeAlbumId || null,
+      });
+      await refreshAfterDuplicate();
+    } catch (err) {
+      console.error('Failed to create virtual copy:', err);
+      toast.error(t('contextMenus.toasts.failedCreateVirtualCopy', { err }));
+    }
+  };
 
   useEffect(() => {
     if (isZoomReady && !isDraggingSlider.current) {
@@ -364,6 +505,100 @@ export default function BottomBar({
               data-tooltip={t('ui.bottomBar.tooltips.copyPasteSettings')}
             >
               <Settings size={18} />
+            </button>
+          </div>
+
+          <div className="h-5 w-px bg-surface"></div>
+
+          <div className="flex items-center gap-1">
+            <button
+              className={productivityButtonClass}
+              disabled={productivityCount === 0}
+              onClick={handleAutoAdjust}
+              data-tooltip={t('contextMenus.thumbnail.autoAdjust', { count: productivityCount })}
+            >
+              <Aperture size={18} />
+            </button>
+            <button
+              className={productivityButtonClass}
+              disabled={productivityCount === 0}
+              onClick={openDenoise}
+              data-tooltip={t('contextMenus.thumbnail.denoise', { count: productivityCount })}
+            >
+              <Grip size={18} />
+            </button>
+            <button
+              className={productivityButtonClass}
+              disabled={productivityCount === 0}
+              onClick={() => setUI({ negativeModalState: { isOpen: true, targetPaths: productivityPaths } })}
+              data-tooltip={t('contextMenus.thumbnail.convertNegative', { count: productivityCount })}
+            >
+              <Film size={18} />
+            </button>
+            <button
+              className={productivityButtonClass}
+              disabled={productivityCount < 2 || productivityCount > 30}
+              onClick={openPanorama}
+              data-tooltip={t('contextMenus.editor.stitchPanorama')}
+            >
+              <SquaresUnite size={18} />
+            </button>
+            <button
+              className={productivityButtonClass}
+              disabled={productivityCount < 2 || productivityCount > 9}
+              onClick={openHdr}
+              data-tooltip={t('contextMenus.editor.mergeHdr')}
+            >
+              <Images size={18} />
+            </button>
+            <button
+              className={productivityButtonClass}
+              disabled={productivityCount === 0 || productivityCount > 9}
+              onClick={() =>
+                setUI({
+                  collageModalState: {
+                    isOpen: true,
+                    sourceImages: imageList.filter((image) => productivityPaths.includes(image.path)),
+                  },
+                })
+              }
+              data-tooltip={t('contextMenus.thumbnail.collage', { count: productivityCount })}
+            >
+              <LayoutTemplate size={18} />
+            </button>
+            <button
+              className={productivityButtonClass}
+              disabled={productivityCount < 2}
+              onClick={() =>
+                setUI({
+                  cullingModalState: {
+                    isOpen: true,
+                    progress: null,
+                    suggestions: null,
+                    error: null,
+                    pathsToCull: productivityPaths,
+                  },
+                })
+              }
+              data-tooltip={t('contextMenus.thumbnail.cullImage', { count: productivityCount })}
+            >
+              <Users size={18} />
+            </button>
+            <button
+              className={productivityButtonClass}
+              disabled={productivityCount !== 1}
+              onClick={handlePhysicalCopy}
+              data-tooltip={t('contextMenus.thumbnail.physicalCopy')}
+            >
+              <Copy size={18} />
+            </button>
+            <button
+              className={productivityButtonClass}
+              disabled={productivityCount !== 1}
+              onClick={handleVirtualCopy}
+              data-tooltip={t('contextMenus.thumbnail.virtualCopy')}
+            >
+              <CopyPlus size={18} />
             </button>
           </div>
 

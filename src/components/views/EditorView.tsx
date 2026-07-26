@@ -54,6 +54,7 @@ interface EditorViewProps {
   handleEditorContextMenu: (...args: any) => void;
   handleThumbnailContextMenu: (...args: any) => void;
   handleImageClick: (...args: any) => void;
+  handleLibraryRefresh: () => Promise<void>;
   handleClearSelection: () => void;
   handleCopyAdjustments: () => void;
   handlePasteAdjustments: () => void;
@@ -77,6 +78,7 @@ export default function EditorView({
   handleEditorContextMenu,
   handleThumbnailContextMenu,
   handleImageClick,
+  handleLibraryRefresh,
   handleClearSelection,
   handleCopyAdjustments,
   handlePasteAdjustments,
@@ -168,6 +170,7 @@ export default function EditorView({
       onCopy={handleCopyAdjustments}
       onOpenCopyPasteSettings={() => setUI({ isCopyPasteSettingsModalOpen: true })}
       onImageSelect={handleImageClick}
+      onLibraryRefresh={handleLibraryRefresh}
       onPaste={() => handlePasteAdjustments()}
       onRate={handleRate}
       onRequestThumbnails={requestThumbnails}
