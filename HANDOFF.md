@@ -88,7 +88,14 @@ These packages include all nine toolbar buttons: the seven Productivity actions
 plus Physical Copy and Virtual Copy. They also include persisted individual
 toolbar visibility controls.
 
-SHA-256 values must be recorded after the branded rebuild completes.
+SHA-256 at the time of this handoff:
+
+```text
+6357ed580fb88344b1c2947d67af1993e3bec666c1ddb0e5f755712c96a8d7c5  RapidRAW_1.6.1-colrbent.1_amd64.deb
+b090449735f2bab334ed090a205a23e64a2e1776d1f2da80d9d626e91dfb1c09  RapidRAW_1.6.1-colrbent.1_amd64.AppImage
+```
+
+These hashes become stale after any rebuild and must then be replaced.
 
 ## Versioning
 
