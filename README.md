@@ -341,17 +341,16 @@ https://github.com/user-attachments/assets/4b9b932a-b18c-49d3-849f-e44d3bef0d12
   <tr>
     <td width="50%" align="center" valign="top">
       <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/library_view.jpg" alt="RapidRAW Library View" width="100%">
-      <br><br>
+      <br>
       <strong>Library & Culling View</strong>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/editor_view.jpg" alt="RapidRAW Editor View" width="100%">
-      <br><br>
+      <br>
       <strong>Editor View</strong>
     </td>
   </tr>
 </table>
-
 
 Explore example edits processed entirely within RapidRAW. You can download the `.rrdata` sidecar file for each image to inspect or apply the exact adjustment parameters.
 
@@ -451,8 +450,6 @@ Explore example edits processed entirely within RapidRAW. You can download the `
 
 </details>
 
-<br>
-
 > If you like the showcased images and want to see more of my own photography, check out my Instagram: [**@timonkaech.photography**](https://www.instagram.com/timonkaech.photography/)
 
 ## The Idea
@@ -469,7 +466,7 @@ Explore example edits processed entirely within RapidRAW. You can download the `
       <br><br>
     </td>
     <td width="75%" valign="top">
-      <br><br>
+      <br>
       <p>
         As a photography enthusiast, I often found existing software to be sluggish and resource-heavy on my machine. I wanted a faster, simpler photo editing experience, so I decided to build my own. The goal was to create a tool that was not only fast but <strong>also helped me learn the details of digital image processing and camera technology</strong>.
       </p>
