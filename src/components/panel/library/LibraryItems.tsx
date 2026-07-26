@@ -42,6 +42,7 @@ const ThumbnailComponent = ({
   isCloudPlaceholder,
   groupBadgeLabel,
   groupBadgeCount,
+  onStackBadgeClick,
 }: any) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
@@ -274,11 +275,25 @@ const ThumbnailComponent = ({
 
           <div
             className={clsx(
-              'flex items-center shrink-0 transition-all duration-200 ease-out overflow-hidden',
+              'flex items-center shrink-0 transition-all duration-200 ease-out overflow-hidden rounded-sm',
               hasGroupBadge ? 'max-w-10 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
               hasGroupBadge && (hasEditIcon || hasColorLabel || hasRating) ? 'ml-1.5' : 'ml-0',
+              groupBadgeCount && 'cursor-pointer hover:bg-white/20 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-white',
             )}
             data-tooltip={groupBadgeLabel}
+            role={groupBadgeCount ? 'button' : undefined}
+            tabIndex={groupBadgeCount ? 0 : undefined}
+            onClick={(event) => {
+              if (!groupBadgeCount) return;
+              event.stopPropagation();
+              onStackBadgeClick(path);
+            }}
+            onKeyDown={(event) => {
+              if (!groupBadgeCount || (event.key !== 'Enter' && event.key !== ' ')) return;
+              event.preventDefault();
+              event.stopPropagation();
+              onStackBadgeClick(path);
+            }}
           >
             <Layers size={12} className="text-white" />
             {groupBadgeCount && (
@@ -468,6 +483,7 @@ const ListItemComponent = ({
   isNextSelected,
   stackBadgeLabel,
   stackBadgeCount,
+  onStackBadgeClick,
 }: any) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
@@ -655,15 +671,20 @@ const ListItemComponent = ({
             ))}
 
           {stackBadgeCount && (
-            <div
-              className="absolute top-1 right-1 z-10 rounded-full bg-black/50 text-white px-1.5 h-5 flex items-center gap-0.5"
+            <button
+              type="button"
+              className="absolute top-1 right-1 z-10 rounded-full bg-black/50 hover:bg-black/70 text-white px-1.5 h-5 flex items-center gap-0.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-white"
               data-tooltip={stackBadgeLabel}
+              onClick={(event) => {
+                event.stopPropagation();
+                onStackBadgeClick(path);
+              }}
             >
               <Layers size={11} />
               <Text variant={TextVariants.small} color={TextColors.white}>
                 {stackBadgeCount}
               </Text>
-            </div>
+            </button>
           )}
 
           {isCloudPlaceholder && layers.length > 0 && (
@@ -784,6 +805,20 @@ const RowComponent = ({
 }: any) => {
   const { t } = useTranslation();
   const row = rows[index];
+  const handleStackBadgeClick = useCallback((path: string) => {
+    const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+    if (!appSettings) return;
+
+    const targetStack = appSettings.imageStacks?.find((stack) => stack.paths.includes(path));
+    if (!targetStack) return;
+
+    void handleSettingsChange({
+      ...appSettings,
+      imageStacks: appSettings.imageStacks?.map((stack) =>
+        stack.id === targetStack.id ? { ...stack, collapsed: !stack.collapsed } : stack,
+      ),
+    });
+  }, []);
 
   useEffect(() => {
     if (!row || row.type !== 'images') return;
@@ -917,6 +952,7 @@ const RowComponent = ({
                 isNextSelected={isNextSelected}
                 stackBadgeLabel={stackBadge?.label}
                 stackBadgeCount={stackBadge?.count}
+                onStackBadgeClick={handleStackBadgeClick}
               />
             ) : (
               <Thumbnail
@@ -937,6 +973,7 @@ const RowComponent = ({
                   stackBadge?.label || (imageFile.group_id && groupBadgeInfo?.get(imageFile.group_id)?.label)
                 }
                 groupBadgeCount={stackBadge?.count}
+                onStackBadgeClick={handleStackBadgeClick}
               />
             )}
           </div>

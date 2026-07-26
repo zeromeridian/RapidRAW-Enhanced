@@ -56,6 +56,9 @@ grouping:
 - Stacks persist in `imageStacks` in application settings.
 - Collapsed stacks show their selected cover plus a numeric count badge.
 - Expanded stack members remain contiguous in their saved order.
+- Clicking the numeric stack badge toggles that stack between collapsed and
+  expanded in both grid and list modes; the grid badge is also keyboard
+  accessible with Enter or Space.
 - Context-menu actions expand/collapse, select a cover, and unstack.
 - Stack badges appear in both grid and list library modes.
 - Stack membership uses full image paths and does not modify `group_id`.
@@ -92,21 +95,21 @@ Do not discard unrelated user changes.
 
 Successful production build:
 
-- Version: `1.6.1-colrbent.2`
+- Version: `1.6.1-colrbent.3`
 - Architecture: `amd64` / `x86_64`
 - DEB:
-  `src-tauri/target/release/bundle/deb/RapidRAW_1.6.1-colrbent.2_amd64.deb`
+  `src-tauri/target/release/bundle/deb/RapidRAW_1.6.1-colrbent.3_amd64.deb`
 - AppImage:
-  `src-tauri/target/release/bundle/appimage/RapidRAW_1.6.1-colrbent.2_amd64.AppImage`
+  `src-tauri/target/release/bundle/appimage/RapidRAW_1.6.1-colrbent.3_amd64.AppImage`
 
-These packages include toolbar customization and persistent manual image
-stacking.
+These packages include toolbar customization, persistent manual image stacking,
+and click-to-toggle stack badges.
 
 SHA-256 at the time of this handoff:
 
 ```text
-cfddab9367ffd8a57203373c7144a26b65a2283a952b10874a6e15a99480fe0c  RapidRAW_1.6.1-colrbent.2_amd64.deb
-935775e0cffa27c28cdd37d6e0ee1eee57bfe516ffe98130791260cb74517739  RapidRAW_1.6.1-colrbent.2_amd64.AppImage
+87359c64f0b06e366febcecd454c92777c875349c8bee57af5850a91e14f9daf  RapidRAW_1.6.1-colrbent.3_amd64.deb
+941e62207e19231f97ce01d4b4c92f199ac63a21d98d3903a0d3458e0161cac1  RapidRAW_1.6.1-colrbent.3_amd64.AppImage
 ```
 
 These hashes become stale after any rebuild and must then be replaced.
@@ -151,12 +154,14 @@ The resource and build outputs are ignored by Git.
 ## Validation Status
 
 - `vite build`: passed.
+- Latest `vite build` with clickable stack badges: passed.
 - Latest `vite build` with toolbar customization: passed.
 - Stack collapsed/expanded ordering checks: passed.
 - Tauri release compilation: passed.
-- DEB generation: passed and verified as `amd64`.
-- AppImage generation: passed and verified as x86-64.
-- i18n runtime check: passed (952 plural resolutions across 12 locales).
+- `1.6.1-colrbent.3` DEB generation: passed; package metadata verified as
+  version `1.6.1-colrbent.3`, architecture `amd64`.
+- `1.6.1-colrbent.3` AppImage generation: passed; verified as an x86-64 ELF.
+- i18n runtime check: passed (954 plural resolutions across 12 locales).
 - `git diff --check`: passed after the toolbar implementation.
 - `cargo fmt --check` was unavailable because the isolated minimal Rust
   toolchain does not include `rustfmt`; the modified Rust settings schema
