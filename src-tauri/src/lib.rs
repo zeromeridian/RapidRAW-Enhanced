@@ -750,9 +750,9 @@ fn generate_uncropped_preview(
         };
 
         let warped_image = apply_geometry_warp(patched_image, &adjustments_clone);
-
+        let blurred_image = crate::lens_blur::apply_lens_blur(warped_image, &adjustments_clone);
         let orientation_steps = adjustments_clone["orientationSteps"].as_u64().unwrap_or(0) as u8;
-        let coarse_rotated_image = apply_coarse_rotation(warped_image, orientation_steps);
+        let coarse_rotated_image = apply_coarse_rotation(blurred_image, orientation_steps);
 
         let flip_horizontal = adjustments_clone["flipHorizontal"]
             .as_bool()
