@@ -223,6 +223,7 @@ export interface AppSettings {
   groupEditedFiles?: boolean;
   groupPreferredType?: GroupPreference; // legacy
   alwaysDecodeRawThumbnails?: boolean;
+  bottomToolbarVisibility?: Record<string, boolean>;
 }
 
 export interface BrushSettings {

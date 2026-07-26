@@ -15,6 +15,7 @@ import {
   Images,
   LayoutTemplate,
   Settings,
+  SlidersHorizontal,
   SquaresUnite,
   Star,
   Users,
@@ -31,6 +32,7 @@ import Text from '../ui/Text';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import { COLOR_LABELS, normalizeLoadedAdjustments } from '../../utils/adjustments';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 
@@ -179,6 +181,8 @@ export default function BottomBar({
   const showSelectionCounter = numSelected > 1;
 
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+  const customizeRef = useRef<HTMLDivElement>(null);
   const { filterCriteria, libraryActivePath, setFilterCriteria, setLibrary } = useLibraryStore(
     useShallow((state) => ({
       filterCriteria: state.filterCriteria,
@@ -189,8 +193,45 @@ export default function BottomBar({
   );
   const setUI = useUIStore((state) => state.setUI);
   const setEditor = useEditorStore((state) => state.setEditor);
+  const { appSettings, handleSettingsChange } = useSettingsStore(
+    useShallow((state) => ({
+      appSettings: state.appSettings,
+      handleSettingsChange: state.handleSettingsChange,
+    })),
+  );
 
   const allColors = [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }];
+  const toolbarVisibility = appSettings?.bottomToolbarVisibility || {};
+  const isToolbarItemVisible = (id: string) => toolbarVisibility[id] !== false;
+  const toggleToolbarItem = (id: string) => {
+    if (!appSettings) return;
+    handleSettingsChange({
+      ...appSettings,
+      bottomToolbarVisibility: {
+        ...toolbarVisibility,
+        [id]: !isToolbarItemVisible(id),
+      },
+    });
+  };
+  const toolbarItems = [
+    { id: 'rating', label: t('contextMenus.editor.rating') },
+    { id: 'copySettings', label: t('ui.bottomBar.tooltips.copySettings') },
+    { id: 'pasteSettings', label: t('ui.bottomBar.tooltips.pasteSettings') },
+    { id: 'copyPasteSettings', label: t('ui.bottomBar.tooltips.copyPasteSettings') },
+    { id: 'autoAdjust', label: t('contextMenus.thumbnail.autoAdjust', { count: 1 }) },
+    { id: 'denoise', label: t('contextMenus.thumbnail.denoise', { count: 1 }) },
+    { id: 'convertNegative', label: t('contextMenus.thumbnail.convertNegative', { count: 1 }) },
+    { id: 'stitchPanorama', label: t('contextMenus.editor.stitchPanorama') },
+    { id: 'mergeHdr', label: t('contextMenus.editor.mergeHdr') },
+    { id: 'frameImage', label: t('contextMenus.thumbnail.collage', { count: 1 }) },
+    { id: 'cullImage', label: t('contextMenus.thumbnail.cullImage', { count: 2 }) },
+    { id: 'physicalCopy', label: t('contextMenus.thumbnail.physicalCopy') },
+    { id: 'virtualCopy', label: t('contextMenus.thumbnail.virtualCopy') },
+    { id: 'quickFilter', label: t('ui.bottomBar.tooltips.quickFilter') },
+    { id: 'export', label: t('ui.bottomBar.tooltips.export') },
+    { id: 'zoom', label: t('ui.bottomBar.zoomLabel') },
+    { id: 'filmstrip', label: t('ui.bottomBar.tooltips.collapseFilmstrip') },
+  ];
   const productivityPaths =
     multiSelectedPaths.length > 0
       ? multiSelectedPaths
@@ -304,6 +345,16 @@ export default function BottomBar({
       toast.error(t('contextMenus.toasts.failedCreateVirtualCopy', { err }));
     }
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (customizeRef.current && !customizeRef.current.contains(event.target as Node)) {
+        setIsCustomizeOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (isZoomReady && !isDraggingSlider.current) {
@@ -430,268 +481,296 @@ export default function BottomBar({
         )}
       >
         <div className="flex items-center gap-4">
-          <StarRating rating={rating} onRate={onRate} disabled={isRatingDisabled} />
+          {isToolbarItemVisible('rating') && <StarRating rating={rating} onRate={onRate} disabled={isRatingDisabled} />}
           <div className="h-5 w-px bg-surface"></div>
           <div className="flex items-center gap-2">
-            <button
-              className="relative w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
-              disabled={isCopyDisabled}
-              onClick={onCopy}
-              data-tooltip={t('ui.bottomBar.tooltips.copySettings')}
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                {isCopied ? (
-                  <motion.div
-                    key="copied"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.5 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute"
-                  >
-                    <Check size={18} className="text-green-500" />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="copy"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.5 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute"
-                  >
-                    <Copy size={18} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </button>
+            {isToolbarItemVisible('copySettings') && (
+              <button
+                className="relative w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                disabled={isCopyDisabled}
+                onClick={onCopy}
+                data-tooltip={t('ui.bottomBar.tooltips.copySettings')}
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  {isCopied ? (
+                    <motion.div
+                      key="copied"
+                      initial={{ opacity: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.5 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute"
+                    >
+                      <Check size={18} className="text-green-500" />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="copy"
+                      initial={{ opacity: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.5 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute"
+                    >
+                      <Copy size={18} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </button>
+            )}
 
-            <button
-              className="relative w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
-              disabled={isPasteDisabled}
-              onClick={onPaste}
-              data-tooltip={t('ui.bottomBar.tooltips.pasteSettings')}
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                {isPasted ? (
-                  <motion.div
-                    key="pasted"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.5 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute"
-                  >
-                    <Check size={18} className="text-green-500" />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="paste"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.5 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute"
-                  >
-                    <ClipboardPaste size={18} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </button>
+            {isToolbarItemVisible('pasteSettings') && (
+              <button
+                className="relative w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                disabled={isPasteDisabled}
+                onClick={onPaste}
+                data-tooltip={t('ui.bottomBar.tooltips.pasteSettings')}
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  {isPasted ? (
+                    <motion.div
+                      key="pasted"
+                      initial={{ opacity: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.5 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute"
+                    >
+                      <Check size={18} className="text-green-500" />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="paste"
+                      initial={{ opacity: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.5 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute"
+                    >
+                      <ClipboardPaste size={18} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </button>
+            )}
 
-            <button
-              className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors"
-              onClick={onOpenCopyPasteSettings}
-              data-tooltip={t('ui.bottomBar.tooltips.copyPasteSettings')}
-            >
-              <Settings size={18} />
-            </button>
+            {isToolbarItemVisible('copyPasteSettings') && (
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors"
+                onClick={onOpenCopyPasteSettings}
+                data-tooltip={t('ui.bottomBar.tooltips.copyPasteSettings')}
+              >
+                <Settings size={18} />
+              </button>
+            )}
           </div>
 
           <div className="h-5 w-px bg-surface"></div>
 
           <div className="flex items-center gap-1">
-            <button
-              className={productivityButtonClass}
-              disabled={productivityCount === 0}
-              onClick={handleAutoAdjust}
-              data-tooltip={t('contextMenus.thumbnail.autoAdjust', { count: productivityCount })}
-            >
-              <Aperture size={18} />
-            </button>
-            <button
-              className={productivityButtonClass}
-              disabled={productivityCount === 0}
-              onClick={openDenoise}
-              data-tooltip={t('contextMenus.thumbnail.denoise', { count: productivityCount })}
-            >
-              <Grip size={18} />
-            </button>
-            <button
-              className={productivityButtonClass}
-              disabled={productivityCount === 0}
-              onClick={() => setUI({ negativeModalState: { isOpen: true, targetPaths: productivityPaths } })}
-              data-tooltip={t('contextMenus.thumbnail.convertNegative', { count: productivityCount })}
-            >
-              <Film size={18} />
-            </button>
-            <button
-              className={productivityButtonClass}
-              disabled={productivityCount < 2 || productivityCount > 30}
-              onClick={openPanorama}
-              data-tooltip={t('contextMenus.editor.stitchPanorama')}
-            >
-              <SquaresUnite size={18} />
-            </button>
-            <button
-              className={productivityButtonClass}
-              disabled={productivityCount < 2 || productivityCount > 9}
-              onClick={openHdr}
-              data-tooltip={t('contextMenus.editor.mergeHdr')}
-            >
-              <Images size={18} />
-            </button>
-            <button
-              className={productivityButtonClass}
-              disabled={productivityCount === 0 || productivityCount > 9}
-              onClick={() =>
-                setUI({
-                  collageModalState: {
-                    isOpen: true,
-                    sourceImages: imageList.filter((image) => productivityPaths.includes(image.path)),
-                  },
-                })
-              }
-              data-tooltip={t('contextMenus.thumbnail.collage', { count: productivityCount })}
-            >
-              <LayoutTemplate size={18} />
-            </button>
-            <button
-              className={productivityButtonClass}
-              disabled={productivityCount < 2}
-              onClick={() =>
-                setUI({
-                  cullingModalState: {
-                    isOpen: true,
-                    progress: null,
-                    suggestions: null,
-                    error: null,
-                    pathsToCull: productivityPaths,
-                  },
-                })
-              }
-              data-tooltip={t('contextMenus.thumbnail.cullImage', { count: productivityCount })}
-            >
-              <Users size={18} />
-            </button>
-            <button
-              className={productivityButtonClass}
-              disabled={productivityCount !== 1}
-              onClick={handlePhysicalCopy}
-              data-tooltip={t('contextMenus.thumbnail.physicalCopy')}
-            >
-              <Copy size={18} />
-            </button>
-            <button
-              className={productivityButtonClass}
-              disabled={productivityCount !== 1}
-              onClick={handleVirtualCopy}
-              data-tooltip={t('contextMenus.thumbnail.virtualCopy')}
-            >
-              <CopyPlus size={18} />
-            </button>
+            {isToolbarItemVisible('autoAdjust') && (
+              <button
+                className={productivityButtonClass}
+                disabled={productivityCount === 0}
+                onClick={handleAutoAdjust}
+                data-tooltip={t('contextMenus.thumbnail.autoAdjust', { count: productivityCount })}
+              >
+                <Aperture size={18} />
+              </button>
+            )}
+            {isToolbarItemVisible('denoise') && (
+              <button
+                className={productivityButtonClass}
+                disabled={productivityCount === 0}
+                onClick={openDenoise}
+                data-tooltip={t('contextMenus.thumbnail.denoise', { count: productivityCount })}
+              >
+                <Grip size={18} />
+              </button>
+            )}
+            {isToolbarItemVisible('convertNegative') && (
+              <button
+                className={productivityButtonClass}
+                disabled={productivityCount === 0}
+                onClick={() => setUI({ negativeModalState: { isOpen: true, targetPaths: productivityPaths } })}
+                data-tooltip={t('contextMenus.thumbnail.convertNegative', { count: productivityCount })}
+              >
+                <Film size={18} />
+              </button>
+            )}
+            {isToolbarItemVisible('stitchPanorama') && (
+              <button
+                className={productivityButtonClass}
+                disabled={productivityCount < 2 || productivityCount > 30}
+                onClick={openPanorama}
+                data-tooltip={t('contextMenus.editor.stitchPanorama')}
+              >
+                <SquaresUnite size={18} />
+              </button>
+            )}
+            {isToolbarItemVisible('mergeHdr') && (
+              <button
+                className={productivityButtonClass}
+                disabled={productivityCount < 2 || productivityCount > 9}
+                onClick={openHdr}
+                data-tooltip={t('contextMenus.editor.mergeHdr')}
+              >
+                <Images size={18} />
+              </button>
+            )}
+            {isToolbarItemVisible('frameImage') && (
+              <button
+                className={productivityButtonClass}
+                disabled={productivityCount === 0 || productivityCount > 9}
+                onClick={() =>
+                  setUI({
+                    collageModalState: {
+                      isOpen: true,
+                      sourceImages: imageList.filter((image) => productivityPaths.includes(image.path)),
+                    },
+                  })
+                }
+                data-tooltip={t('contextMenus.thumbnail.collage', { count: productivityCount })}
+              >
+                <LayoutTemplate size={18} />
+              </button>
+            )}
+            {isToolbarItemVisible('cullImage') && (
+              <button
+                className={productivityButtonClass}
+                disabled={productivityCount < 2}
+                onClick={() =>
+                  setUI({
+                    cullingModalState: {
+                      isOpen: true,
+                      progress: null,
+                      suggestions: null,
+                      error: null,
+                      pathsToCull: productivityPaths,
+                    },
+                  })
+                }
+                data-tooltip={t('contextMenus.thumbnail.cullImage', { count: productivityCount })}
+              >
+                <Users size={18} />
+              </button>
+            )}
+            {isToolbarItemVisible('physicalCopy') && (
+              <button
+                className={productivityButtonClass}
+                disabled={productivityCount !== 1}
+                onClick={handlePhysicalCopy}
+                data-tooltip={t('contextMenus.thumbnail.physicalCopy')}
+              >
+                <Copy size={18} />
+              </button>
+            )}
+            {isToolbarItemVisible('virtualCopy') && (
+              <button
+                className={productivityButtonClass}
+                disabled={productivityCount !== 1}
+                onClick={handleVirtualCopy}
+                data-tooltip={t('contextMenus.thumbnail.virtualCopy')}
+              >
+                <CopyPlus size={18} />
+              </button>
+            )}
           </div>
 
           <div className="h-5 w-px bg-surface"></div>
 
-          <div
-            className={clsx(
-              'flex items-center transition-all duration-300',
-              isFilterExpanded ? 'bg-surface rounded-md' : 'bg-transparent',
-            )}
-          >
-            <button
-              className={clsx(
-                'relative w-8 h-8 flex items-center justify-center rounded-md transition-colors shrink-0',
-                isFilterExpanded ? 'text-text-primary' : 'text-text-secondary hover:bg-surface hover:text-text-primary',
-              )}
-              onClick={() => setIsFilterExpanded(!isFilterExpanded)}
-              data-tooltip={t('ui.bottomBar.tooltips.quickFilter', 'Quick Filter')}
-            >
-              <Filter size={18} />
-            </button>
-
+          {isToolbarItemVisible('quickFilter') && (
             <div
               className={clsx(
-                'flex items-center transition-all duration-300 ease-in-out overflow-hidden',
-                isFilterExpanded ? 'max-w-100 opacity-100 pr-2 ml-1' : 'max-w-0 opacity-0 pr-0 ml-0',
+                'flex items-center transition-all duration-300',
+                isFilterExpanded ? 'bg-surface rounded-md' : 'bg-transparent',
               )}
             >
-              <div className="flex items-center gap-3 whitespace-nowrap">
-                <div className="flex items-center gap-0.5">
-                  {[1, 2, 3, 4, 5].map((starValue) => {
-                    const isFilled = filterCriteria.rating > 0 && starValue <= filterCriteria.rating;
-                    return (
-                      <button
-                        key={`qf-star-${starValue}`}
-                        onClick={() =>
-                          setFilterCriteria((prev) => ({
-                            ...prev,
-                            rating: prev.rating === starValue ? 0 : starValue,
-                          }))
-                        }
-                        className="p-0.5 focus:outline-none"
-                      >
-                        <Star
-                          size={16}
+              <button
+                className={clsx(
+                  'relative w-8 h-8 flex items-center justify-center rounded-md transition-colors shrink-0',
+                  isFilterExpanded
+                    ? 'text-text-primary'
+                    : 'text-text-secondary hover:bg-surface hover:text-text-primary',
+                )}
+                onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+                data-tooltip={t('ui.bottomBar.tooltips.quickFilter', 'Quick Filter')}
+              >
+                <Filter size={18} />
+              </button>
+
+              <div
+                className={clsx(
+                  'flex items-center transition-all duration-300 ease-in-out overflow-hidden',
+                  isFilterExpanded ? 'max-w-100 opacity-100 pr-2 ml-1' : 'max-w-0 opacity-0 pr-0 ml-0',
+                )}
+              >
+                <div className="flex items-center gap-3 whitespace-nowrap">
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((starValue) => {
+                      const isFilled = filterCriteria.rating > 0 && starValue <= filterCriteria.rating;
+                      return (
+                        <button
+                          key={`qf-star-${starValue}`}
+                          onClick={() =>
+                            setFilterCriteria((prev) => ({
+                              ...prev,
+                              rating: prev.rating === starValue ? 0 : starValue,
+                            }))
+                          }
+                          className="p-0.5 focus:outline-none"
+                        >
+                          <Star
+                            size={16}
+                            className={clsx(
+                              'transition-colors duration-150',
+                              isFilled ? 'text-accent fill-accent' : 'text-text-secondary hover:text-accent',
+                            )}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="h-4 w-px bg-border-color"></div>
+
+                  <div className="flex items-center gap-1.5">
+                    {allColors.map((color) => {
+                      const isSelected = (filterCriteria.colors || []).includes(color.name);
+
+                      const tooltipTitle =
+                        color.name === 'none'
+                          ? t('library.header.viewOptions.noLabel')
+                          : t(`contextMenus.colors.${color.name}`, {
+                              defaultValue: color.name.charAt(0).toUpperCase() + color.name.slice(1),
+                            });
+
+                      return (
+                        <button
+                          key={`qf-color-${color.name}`}
+                          onClick={() => {
+                            const currentColors = filterCriteria.colors || [];
+                            const newColors = currentColors.includes(color.name)
+                              ? currentColors.filter((c) => c !== color.name)
+                              : [...currentColors, color.name];
+                            setFilterCriteria((prev) => ({ ...prev, colors: newColors }));
+                          }}
                           className={clsx(
-                            'transition-colors duration-150',
-                            isFilled ? 'text-accent fill-accent' : 'text-text-secondary hover:text-accent',
+                            'w-4 h-4 rounded-full transition-transform hover:scale-105 flex items-center justify-center focus:outline-none',
+                            isSelected ? 'ring-2 ring-accent ring-offset-1 ring-offset-bg-primary' : '',
                           )}
-                        />
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="h-4 w-px bg-border-color"></div>
-
-                <div className="flex items-center gap-1.5">
-                  {allColors.map((color) => {
-                    const isSelected = (filterCriteria.colors || []).includes(color.name);
-
-                    const tooltipTitle =
-                      color.name === 'none'
-                        ? t('library.header.viewOptions.noLabel')
-                        : t(`contextMenus.colors.${color.name}`, {
-                            defaultValue: color.name.charAt(0).toUpperCase() + color.name.slice(1),
-                          });
-
-                    return (
-                      <button
-                        key={`qf-color-${color.name}`}
-                        onClick={() => {
-                          const currentColors = filterCriteria.colors || [];
-                          const newColors = currentColors.includes(color.name)
-                            ? currentColors.filter((c) => c !== color.name)
-                            : [...currentColors, color.name];
-                          setFilterCriteria((prev) => ({ ...prev, colors: newColors }));
-                        }}
-                        className={clsx(
-                          'w-4 h-4 rounded-full transition-transform hover:scale-105 flex items-center justify-center focus:outline-none',
-                          isSelected ? 'ring-2 ring-accent ring-offset-1 ring-offset-bg-primary' : '',
-                        )}
-                        style={{ backgroundColor: color.color }}
-                        data-tooltip={tooltipTitle}
-                      >
-                        {isSelected && <Check size={10} className="text-white drop-shadow-md" />}
-                      </button>
-                    );
-                  })}
+                          style={{ backgroundColor: color.color }}
+                          data-tooltip={tooltipTitle}
+                        >
+                          {isSelected && <Check size={10} className="text-white drop-shadow-md" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div
             className={clsx(
@@ -708,75 +787,79 @@ export default function BottomBar({
         <div className="grow" />
         {isLibraryView ? (
           <div className="flex items-center gap-2">
-            <button
-              className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
-              disabled={isExportDisabled}
-              onClick={onExportClick}
-              data-tooltip={t('ui.bottomBar.tooltips.export')}
-            >
-              <FileInput size={18} />
-            </button>
+            {isToolbarItemVisible('export') && (
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                disabled={isExportDisabled}
+                onClick={onExportClick}
+                data-tooltip={t('ui.bottomBar.tooltips.export')}
+              >
+                <FileInput size={18} />
+              </button>
+            )}
           </div>
         ) : showZoomControls ? (
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 w-56">
-              <div
-                className="relative w-12 h-full flex items-center justify-end cursor-pointer"
-                onClick={handleResetZoom}
-                onMouseEnter={() => setIsZoomLabelHovered(true)}
-                onMouseLeave={() => setIsZoomLabelHovered(false)}
-                data-tooltip={t('ui.bottomBar.tooltips.resetZoom')}
-              >
-                <span className="absolute right-0 text-xs text-text-secondary select-none text-right w-max transition-colors hover:text-text-primary">
-                  {isZoomLabelHovered ? t('ui.bottomBar.zoomLabelReset') : t('ui.bottomBar.zoomLabel')}
-                </span>
-              </div>
-
-              <div className="relative flex-1 h-5">
-                <div className="absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/2 bg-surface rounded-full pointer-events-none" />
-                <input
-                  type="range"
-                  min={0.1}
-                  max={2.0}
-                  step="0.05"
-                  value={latchedSliderValue}
-                  onChange={handleSliderChange}
-                  onKeyDown={handleZoomKeyDown}
-                  onMouseDown={handleMouseDown}
-                  onMouseUp={handleMouseUp}
-                  onTouchStart={handleMouseDown}
-                  onTouchEnd={handleMouseUp}
-                  onDoubleClick={handleResetZoom}
-                  className={`absolute top-1/2 left-0 w-full h-1.5 mt-[-1.5px] appearance-none bg-transparent cursor-pointer p-0 slider-input z-10 ${
-                    isZoomActive ? 'slider-thumb-active' : ''
-                  }`}
-                />
-              </div>
-
-              <div className="relative text-xs text-text-secondary w-6 text-right flex items-center justify-end h-5 gap-1">
-                {isEditingPercent ? (
-                  <input
-                    ref={percentInputRef}
-                    type="text"
-                    value={percentInputValue}
-                    onChange={(e) => setPercentInputValue(e.target.value)}
-                    onKeyDown={handlePercentKeyDown}
-                    onBlur={handlePercentSubmit}
-                    className="w-full text-xs text-text-primary bg-bg-primary border border-border-color rounded-sm px-1 text-right"
-                    style={{ fontSize: '12px', height: '18px' }}
-                  />
-                ) : (
-                  <span
-                    onClick={handlePercentClick}
-                    className="cursor-pointer hover:text-text-primary transition-colors select-none"
-                    data-tooltip={t('ui.bottomBar.tooltips.customZoom')}
-                  >
-                    {latchedDisplayPercent}%
+            {isToolbarItemVisible('zoom') && (
+              <div className="flex items-center gap-2 w-56">
+                <div
+                  className="relative w-12 h-full flex items-center justify-end cursor-pointer"
+                  onClick={handleResetZoom}
+                  onMouseEnter={() => setIsZoomLabelHovered(true)}
+                  onMouseLeave={() => setIsZoomLabelHovered(false)}
+                  data-tooltip={t('ui.bottomBar.tooltips.resetZoom')}
+                >
+                  <span className="absolute right-0 text-xs text-text-secondary select-none text-right w-max transition-colors hover:text-text-primary">
+                    {isZoomLabelHovered ? t('ui.bottomBar.zoomLabelReset') : t('ui.bottomBar.zoomLabel')}
                   </span>
-                )}
+                </div>
+
+                <div className="relative flex-1 h-5">
+                  <div className="absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/2 bg-surface rounded-full pointer-events-none" />
+                  <input
+                    type="range"
+                    min={0.1}
+                    max={2.0}
+                    step="0.05"
+                    value={latchedSliderValue}
+                    onChange={handleSliderChange}
+                    onKeyDown={handleZoomKeyDown}
+                    onMouseDown={handleMouseDown}
+                    onMouseUp={handleMouseUp}
+                    onTouchStart={handleMouseDown}
+                    onTouchEnd={handleMouseUp}
+                    onDoubleClick={handleResetZoom}
+                    className={`absolute top-1/2 left-0 w-full h-1.5 mt-[-1.5px] appearance-none bg-transparent cursor-pointer p-0 slider-input z-10 ${
+                      isZoomActive ? 'slider-thumb-active' : ''
+                    }`}
+                  />
+                </div>
+
+                <div className="relative text-xs text-text-secondary w-6 text-right flex items-center justify-end h-5 gap-1">
+                  {isEditingPercent ? (
+                    <input
+                      ref={percentInputRef}
+                      type="text"
+                      value={percentInputValue}
+                      onChange={(e) => setPercentInputValue(e.target.value)}
+                      onKeyDown={handlePercentKeyDown}
+                      onBlur={handlePercentSubmit}
+                      className="w-full text-xs text-text-primary bg-bg-primary border border-border-color rounded-sm px-1 text-right"
+                      style={{ fontSize: '12px', height: '18px' }}
+                    />
+                  ) : (
+                    <span
+                      onClick={handlePercentClick}
+                      className="cursor-pointer hover:text-text-primary transition-colors select-none"
+                      data-tooltip={t('ui.bottomBar.tooltips.customZoom')}
+                    >
+                      {latchedDisplayPercent}%
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-            {showFilmstrip && (
+            )}
+            {showFilmstrip && isToolbarItemVisible('filmstrip') && (
               <>
                 <div className="h-5 w-px bg-surface"></div>
                 <button
@@ -794,6 +877,49 @@ export default function BottomBar({
             )}
           </div>
         ) : null}
+        <div className="relative ml-2" ref={customizeRef}>
+          <button
+            className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors"
+            onClick={() => setIsCustomizeOpen((open) => !open)}
+            data-tooltip={t('ui.bottomBar.tooltips.customizeToolbar')}
+            aria-expanded={isCustomizeOpen}
+            aria-haspopup="menu"
+          >
+            <SlidersHorizontal size={18} />
+          </button>
+          <AnimatePresence>
+            {isCustomizeOpen && (
+              <motion.div
+                className="absolute right-0 bottom-10 z-50 w-64 origin-bottom-right bg-surface/95 backdrop-blur-md rounded-lg shadow-xl p-2"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.1, ease: 'easeOut' }}
+                role="menu"
+              >
+                <div className="px-3 py-2 text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                  {t('ui.bottomBar.customizeToolbar')}
+                </div>
+                <div className="max-h-96 overflow-y-auto custom-scrollbar">
+                  {toolbarItems.map((item) => (
+                    <button
+                      key={item.id}
+                      className="w-full px-3 py-2 text-sm rounded-md flex items-center gap-3 text-left text-text-primary hover:bg-bg-primary transition-colors"
+                      onClick={() => toggleToolbarItem(item.id)}
+                      role="menuitemcheckbox"
+                      aria-checked={isToolbarItemVisible(item.id)}
+                    >
+                      <span className="w-4 h-4 rounded border border-text-secondary/50 flex items-center justify-center shrink-0">
+                        {isToolbarItemVisible(item.id) && <Check size={12} />}
+                      </span>
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );

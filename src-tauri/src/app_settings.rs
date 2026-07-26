@@ -455,6 +455,8 @@ pub struct AppSettings {
     pub group_preferred_type: Option<String>,
     #[serde(default)]
     pub always_decode_raw_thumbnails: Option<bool>,
+    #[serde(default)]
+    pub bottom_toolbar_visibility: HashMap<String, bool>,
 }
 
 impl Default for AppSettings {
@@ -546,6 +548,7 @@ impl Default for AppSettings {
             group_associated_files: Some(false),
             group_preferred_type: Some("raw".to_string()),
             always_decode_raw_thumbnails: Some(false),
+            bottom_toolbar_visibility: HashMap::new(),
         }
     }
 }

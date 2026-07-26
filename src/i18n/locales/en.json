@@ -1754,11 +1754,13 @@
   },
   "ui": {
     "bottomBar": {
+      "customizeToolbar": "Customize Toolbar",
       "imagesSelected": "{{current}} of {{total}} images selected",
       "tooltips": {
         "collapseFilmstrip": "Collapse Filmstrip",
         "copyPasteSettings": "Copy & Paste Settings",
         "copySettings": "Copy Settings",
+        "customizeToolbar": "Customize Toolbar",
         "customZoom": "Click to enter custom zoom percentage",
         "expandFilmstrip": "Expand Filmstrip",
         "export": "Export",

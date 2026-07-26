@@ -42,6 +42,12 @@ Implementation:
 - Physical Copy and Virtual Copy require exactly one image.
 - Copy actions preserve active-album membership and refresh the library after
   completion.
+- A permanently visible customization control at the far right opens a
+  Lightroom-style checklist.
+- Rating, copy/paste controls, all nine action buttons, Quick Filter, Export,
+  Zoom, and the filmstrip toggle can be shown or hidden independently.
+- Visibility is persisted in `bottomToolbarVisibility`; missing keys default to
+  visible for backward compatibility.
 
 ## Working Tree
 
@@ -51,6 +57,10 @@ Expected intentional source changes:
 - `src/components/views/LibraryView.tsx`
 - `src/components/views/EditorView.tsx`
 - `src/App.tsx`
+- `src/components/ui/AppProperties.tsx`
+- `src/i18n/locales/en.json`
+- `src-tauri/src/app_settings.rs`
+- `src-tauri/tauri.conf.json`
 - `HANDOFF.md`
 - `AGENTS.md`
 
@@ -67,25 +77,29 @@ Do not discard unrelated user changes.
 
 Successful production build:
 
-- Version: `1.6.1`
+- Version: `1.6.1-colrbent.1`
 - Architecture: `amd64` / `x86_64`
 - DEB:
-  `src-tauri/target/release/bundle/deb/RapidRAW_1.6.1_amd64.deb`
+  `src-tauri/target/release/bundle/deb/RapidRAW_1.6.1-colrbent.1_amd64.deb`
 - AppImage:
-  `src-tauri/target/release/bundle/appimage/RapidRAW_1.6.1_amd64.AppImage`
+  `src-tauri/target/release/bundle/appimage/RapidRAW_1.6.1-colrbent.1_amd64.AppImage`
 
 These packages include all nine toolbar buttons: the seven Productivity actions
-plus Physical Copy and Virtual Copy.
+plus Physical Copy and Virtual Copy. They also include persisted individual
+toolbar visibility controls.
 
-SHA-256 values must be recorded after the `1.6.1` rebuild completes.
+SHA-256 values must be recorded after the branded rebuild completes.
 
 ## Versioning
 
 - The application version is controlled by `version` in
   `src-tauri/tauri.conf.json`.
-- Fork build numbering starts at `1.6.1`.
-- Increment the patch number for every new distributable fork build:
-  `1.6.1` → `1.6.2` → `1.6.3`.
+- Colrbent build numbering starts at `1.6.1-colrbent.1`.
+- Keep the upstream-compatible base version and increment the Colrbent release
+  number for each distributable build:
+  `1.6.1-colrbent.1` → `1.6.1-colrbent.2` → `1.6.1-colrbent.3`.
+- When rebasing onto a new upstream version, update the base and restart the
+  Colrbent release counter, for example `1.7.0-colrbent.1`.
 - Update this section, artifact paths, and checksums in the same session as each
   version bump and rebuild.
 
@@ -116,11 +130,15 @@ The resource and build outputs are ignored by Git.
 ## Validation Status
 
 - `vite build`: passed.
-- Latest `vite build` after adding Physical Copy and Virtual Copy: passed.
+- Latest `vite build` with toolbar customization: passed.
 - Tauri release compilation: passed.
 - DEB generation: passed and verified as `amd64`.
 - AppImage generation: passed and verified as x86-64.
+- i18n runtime check: passed (952 plural resolutions across 12 locales).
 - `git diff --check`: passed after the toolbar implementation.
+- `cargo fmt --check` was unavailable because the isolated minimal Rust
+  toolchain does not include `rustfmt`; the modified Rust settings schema
+  compiled successfully in the release build.
 - Full `npm run typecheck`: fails due to numerous existing errors in unrelated
   files, including Curves, masking panels, navigation, library grids, and typed
   i18n calls. No reported typecheck error referenced `BottomBar.tsx`.
@@ -137,6 +155,9 @@ The resource and build outputs are ignored by Git.
 4. Exercise each modal/action and confirm it receives the selected paths.
 5. Check the toolbar at the minimum supported window width (`800px`) for
    crowding or overflow.
+6. Restart the application and confirm hidden toolbar items remain hidden.
+7. Hide every optional item and confirm the customization control remains
+   available to restore them.
 
 ## Continuous Maintenance Protocol
 
