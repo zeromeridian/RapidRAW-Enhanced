@@ -67,25 +67,27 @@ Do not discard unrelated user changes.
 
 Successful production build:
 
-- Version: `1.6.0`
+- Version: `1.6.1`
 - Architecture: `amd64` / `x86_64`
 - DEB:
-  `src-tauri/target/release/bundle/deb/RapidRAW_1.6.0_amd64.deb`
+  `src-tauri/target/release/bundle/deb/RapidRAW_1.6.1_amd64.deb`
 - AppImage:
-  `src-tauri/target/release/bundle/appimage/RapidRAW_1.6.0_amd64.AppImage`
+  `src-tauri/target/release/bundle/appimage/RapidRAW_1.6.1_amd64.AppImage`
 
-These packages include the seven Productivity buttons but predate the Physical
-Copy and Virtual Copy buttons. Rebuild before distributing if the copy buttons
-must be included.
+These packages include all nine toolbar buttons: the seven Productivity actions
+plus Physical Copy and Virtual Copy.
 
-SHA-256 at the time of this handoff:
+SHA-256 values must be recorded after the `1.6.1` rebuild completes.
 
-```text
-75c2bcbdecfcc51e1e9f7eb38790efe2ce8c46d0e2f9ca1716a06478375519ab  RapidRAW_1.6.0_amd64.deb
-499eb4858aff132f8b2653133298ab4550f9823c0931f15a7ddcd5e76449de2e  RapidRAW_1.6.0_amd64.AppImage
-```
+## Versioning
 
-These hashes become stale after any rebuild and must then be replaced.
+- The application version is controlled by `version` in
+  `src-tauri/tauri.conf.json`.
+- Fork build numbering starts at `1.6.1`.
+- Increment the patch number for every new distributable fork build:
+  `1.6.1` → `1.6.2` → `1.6.3`.
+- Update this section, artifact paths, and checksums in the same session as each
+  version bump and rebuild.
 
 ## Build Environment
 
