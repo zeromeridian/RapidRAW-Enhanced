@@ -457,7 +457,7 @@ export default function MasksPanel() {
     if (type === Mask.AiDepth) {
       if (!subMask.parameters) subMask.parameters = {};
       subMask.parameters.minDepth = 20;
-      subMask.parameters.maxDepth = 100;
+      subMask.parameters.maxDepth = 80;
       subMask.parameters.minFade = 15;
       subMask.parameters.maxFade = 15;
       subMask.parameters.feather = 10;
@@ -2144,7 +2144,7 @@ function SettingsPanel({
                   minFade={activeSubMask.parameters?.maxFade ?? 15}
                   maxFade={activeSubMask.parameters?.minFade ?? 15}
                   defaultMinDepth={20}
-                  defaultMaxDepth={100}
+                  defaultMaxDepth={80}
                   defaultMinFade={15}
                   defaultMaxFade={15}
                   onChange={handleDepthRangeChange}
