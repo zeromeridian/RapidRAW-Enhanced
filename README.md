@@ -332,7 +332,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 Watch RapidRAW in action:
 
 <p align="center">
-  <video src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/demo.mp4" controls width="100%" poster="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/grading.jpg">
+  <video src="https://github.com/CyberTimon/RapidRAW/raw/assets/.github/assets/demo.mp4" controls width="100%" poster="https://github.com/CyberTimon/RapidRAW/raw/assets/.github/assets/grading.jpg">
     Your browser does not support the video tag.
   </video>
   <br>
