@@ -259,6 +259,8 @@
       "pasteAdjustments_one": "Paste Adjustments",
       "pasteAdjustments_other": "Paste Adjustments to {{count}} Images",
       "physicalCopy": "Physical Copy",
+      "collapseStack": "Collapse Stack",
+      "expandStack": "Expand Stack",
       "removeFromAlbum_one": "Remove from Album",
       "removeFromAlbum_other": "Remove {{count}} Images from Album",
       "renameImage_one": "Rename Image",
@@ -266,6 +268,11 @@
       "resetAdjustments_one": "Reset Adjustments",
       "resetAdjustments_other": "Reset Adjustments on {{count}} Images",
       "showExplorer": "Show in File Explorer",
+      "setStackCover": "Set as Stack Cover",
+      "stacking": "Stacking",
+      "stackSelected_one": "Stack Selected Photo",
+      "stackSelected_other": "Stack {{count}} Selected Photos",
+      "unstack": "Unstack Photos",
       "virtualCopy": "Virtual Copy"
     },
     "toasts": {

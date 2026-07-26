@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Image as ImageIcon, Folder, FolderOpen, Star as StarIcon, SlidersHorizontal, CloudOff, Layers } from 'lucide-react';
+import {
+  Image as ImageIcon,
+  Folder,
+  FolderOpen,
+  Star as StarIcon,
+  SlidersHorizontal,
+  CloudOff,
+  Layers,
+} from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
@@ -33,6 +41,7 @@ const ThumbnailComponent = ({
   exif,
   isCloudPlaceholder,
   groupBadgeLabel,
+  groupBadgeCount,
 }: any) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
@@ -266,12 +275,17 @@ const ThumbnailComponent = ({
           <div
             className={clsx(
               'flex items-center shrink-0 transition-all duration-200 ease-out overflow-hidden',
-              hasGroupBadge ? 'max-w-4 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
+              hasGroupBadge ? 'max-w-10 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
               hasGroupBadge && (hasEditIcon || hasColorLabel || hasRating) ? 'ml-1.5' : 'ml-0',
             )}
             data-tooltip={groupBadgeLabel}
           >
             <Layers size={12} className="text-white" />
+            {groupBadgeCount && (
+              <Text variant={TextVariants.small} color={TextColors.white} className="ml-0.5">
+                {groupBadgeCount}
+              </Text>
+            )}
           </div>
         </div>
       </div>
@@ -452,6 +466,8 @@ const ListItemComponent = ({
   isCloudPlaceholder,
   isPrevSelected,
   isNextSelected,
+  stackBadgeLabel,
+  stackBadgeCount,
 }: any) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
@@ -637,6 +653,18 @@ const ListItemComponent = ({
                 <ImageIcon size={14} className="text-text-secondary animate-pulse" />
               </div>
             ))}
+
+          {stackBadgeCount && (
+            <div
+              className="absolute top-1 right-1 z-10 rounded-full bg-black/50 text-white px-1.5 h-5 flex items-center gap-0.5"
+              data-tooltip={stackBadgeLabel}
+            >
+              <Layers size={11} />
+              <Text variant={TextVariants.small} color={TextColors.white}>
+                {stackBadgeCount}
+              </Text>
+            </div>
+          )}
 
           {isCloudPlaceholder && layers.length > 0 && (
             <div
@@ -845,6 +873,7 @@ const RowComponent = ({
       }}
     >
       {row.images.map((imageFile: ImageFile) => {
+        const stackBadge = groupBadgeInfo?.get(imageFile.path);
         let isPrevSelected = false;
         let isNextSelected = false;
 
@@ -886,6 +915,8 @@ const RowComponent = ({
                 isCloudPlaceholder={imageFile.is_cloud_placeholder}
                 isPrevSelected={isPrevSelected}
                 isNextSelected={isNextSelected}
+                stackBadgeLabel={stackBadge?.label}
+                stackBadgeCount={stackBadge?.count}
               />
             ) : (
               <Thumbnail
@@ -902,7 +933,10 @@ const RowComponent = ({
                 isEdited={imageFile.is_edited}
                 aspectRatio={thumbnailAspectRatio}
                 isCloudPlaceholder={imageFile.is_cloud_placeholder}
-                groupBadgeLabel={imageFile.group_id && groupBadgeInfo?.get(imageFile.group_id)?.label}
+                groupBadgeLabel={
+                  stackBadge?.label || (imageFile.group_id && groupBadgeInfo?.get(imageFile.group_id)?.label)
+                }
+                groupBadgeCount={stackBadge?.count}
               />
             )}
           </div>

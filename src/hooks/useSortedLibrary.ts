@@ -3,6 +3,7 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { RawStatus, EditedStatus, SortDirection, ImageFile, GroupingMode } from '../components/ui/AppProperties';
 import { buildImageGroups, GroupBadgeInfo, GroupId } from '../utils/imageGrouping';
+import { applyImageStacks } from '../utils/imageStacks';
 
 export const ADVANCED_QUERY_REGEX =
   /^(iso|aperture|f|shutter|s|focal|mm|rating|color|camera|make|model|lens)\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
@@ -259,7 +260,7 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
     ? buildImageGroups(imageList, groupingMode, appSettings?.groupEditedFiles ?? true).badges
     : null;
 
-  return { displayList: list, badges };
+  return applyImageStacks(list, imageList, appSettings?.imageStacks, badges);
 }
 
 export function computeSortedLibrary(libraryState: any, settingsState: any): ImageFile[] {

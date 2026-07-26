@@ -457,6 +457,8 @@ pub struct AppSettings {
     pub always_decode_raw_thumbnails: Option<bool>,
     #[serde(default)]
     pub bottom_toolbar_visibility: HashMap<String, bool>,
+    #[serde(default)]
+    pub image_stacks: Option<Value>,
 }
 
 impl Default for AppSettings {
@@ -549,6 +551,7 @@ impl Default for AppSettings {
             group_preferred_type: Some("raw".to_string()),
             always_decode_raw_thumbnails: Some(false),
             bottom_toolbar_visibility: HashMap::new(),
+            image_stacks: None,
         }
     }
 }
