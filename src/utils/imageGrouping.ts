@@ -2,9 +2,18 @@ import { GroupPreference, ImageFile } from '../components/ui/AppProperties';
 
 export type GroupId = string;
 
+export type StackMemberPosition = 'only' | 'first' | 'middle' | 'last';
+
+export interface StackVisualInfo {
+  collapsed: boolean;
+  isCover: boolean;
+  position: StackMemberPosition;
+}
+
 export interface GroupBadgeInfo {
   count: number;
   label: string;
+  stackVisual?: StackVisualInfo;
 }
 
 export interface GroupingResult {
