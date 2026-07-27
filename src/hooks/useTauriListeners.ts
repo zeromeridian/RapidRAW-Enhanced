@@ -6,6 +6,7 @@ import { useProcessStore } from '../store/useProcessStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
 import { useLibraryStore } from '../store/useLibraryStore';
+import { autoStackCreatedImages } from '../utils/autoStacking';
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;
@@ -154,8 +155,13 @@ export function useTauriListeners({
       listen('batch-export-progress', (event: any) => {
         if (isEffectActive) useProcessStore.getState().setExportState({ progress: event.payload });
       }),
-      listen('export-complete', () => {
-        if (isEffectActive) useProcessStore.getState().setExportState({ status: Status.Success });
+      listen('export-complete', (event: any) => {
+        if (isEffectActive) {
+          useProcessStore.getState().setExportState({ status: Status.Success });
+          const exports = Array.isArray(event.payload?.exports) ? event.payload.exports : [];
+          autoStackCreatedImages(exports);
+          if (useLibraryStore.getState().currentFolderPath) refs.current.refreshImageList();
+        }
       }),
       listen('export-error', (event: any) => {
         if (isEffectActive)

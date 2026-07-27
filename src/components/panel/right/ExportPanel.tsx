@@ -529,6 +529,7 @@ export default function ExportPanel({
           baseOriginFolders: rootPaths,
           exportSettings,
           outputFormat: selectedFormat.extensions[0],
+          trackCreatedImages: true,
           currentEditPath: selectedImage?.path || null,
           currentEditAdjustments: adjustmentsRef.current || null,
         });

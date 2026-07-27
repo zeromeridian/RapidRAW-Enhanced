@@ -232,6 +232,7 @@ export interface AppSettings {
   alwaysDecodeRawThumbnails?: boolean;
   bottomToolbarVisibility?: Record<string, boolean>;
   imageStacks?: ImageStack[];
+  autoStackCreatedImages?: boolean;
 }
 
 export interface BrushSettings {

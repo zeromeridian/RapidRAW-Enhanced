@@ -1159,6 +1159,18 @@ export default function SettingsPanel({
                       </SettingItem>
 
                       <SettingItem
+                        label={t('settings.general.autoStackCreatedImages')}
+                        description={t('settings.general.autoStackCreatedImagesDesc')}
+                      >
+                        <Switch
+                          checked={appSettings?.autoStackCreatedImages ?? true}
+                          id="auto-stack-created-images-toggle"
+                          label={t('settings.general.enableAutoStackCreatedImages')}
+                          onChange={(checked) => onSettingsChange({ ...appSettings, autoStackCreatedImages: checked })}
+                        />
+                      </SettingItem>
+
+                      <SettingItem
                         label={t('settings.general.focusMode')}
                         description={t('settings.general.focusModeDesc')}
                       >

@@ -45,6 +45,7 @@ import {
   toggleImageStack,
   unstackImagePaths,
 } from '../../utils/imageStacks';
+import { autoStackCreatedImages } from '../../utils/autoStacking';
 
 interface BottomBarProps {
   filmstripHeight?: number;
@@ -88,6 +89,18 @@ interface StarRatingProps {
   onRate(rate: number): void;
   rating: number;
 }
+
+const PRODUCTIVITY_TOOLBAR_IDS = [
+  'autoAdjust',
+  'denoise',
+  'convertNegative',
+  'stitchPanorama',
+  'mergeHdr',
+  'frameImage',
+  'cullImage',
+] as const;
+const COPY_TOOLBAR_IDS = ['physicalCopy', 'virtualCopy'] as const;
+const STACK_TOOLBAR_IDS = ['stackSelected', 'toggleStack', 'setStackCover', 'unstack'] as const;
 
 const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
   const { t } = useTranslation();
@@ -213,6 +226,7 @@ export default function BottomBar({
   const allColors = [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }];
   const toolbarVisibility = appSettings?.bottomToolbarVisibility || {};
   const isToolbarItemVisible = (id: string) => toolbarVisibility[id] !== false;
+  const isToolbarGroupVisible = (ids: readonly string[]) => ids.some(isToolbarItemVisible);
   const toggleToolbarItem = (id: string) => {
     if (!appSettings) return;
     handleSettingsChange({
@@ -242,6 +256,9 @@ export default function BottomBar({
   const hasSelectedStacks = imageStacks.some((stack) =>
     stack.paths.some((stackPath) => productivityPaths.includes(stackPath)),
   );
+  const hasProductivityActions = isToolbarGroupVisible(PRODUCTIVITY_TOOLBAR_IDS);
+  const hasCopyActions = isToolbarGroupVisible(COPY_TOOLBAR_IDS);
+  const hasStackActions = isToolbarGroupVisible(STACK_TOOLBAR_IDS);
   const toolbarItems = [
     { id: 'rating', label: t('contextMenus.editor.rating') },
     { id: 'copySettings', label: t('ui.bottomBar.tooltips.copySettings') },
@@ -344,10 +361,11 @@ export default function BottomBar({
   const handlePhysicalCopy = async () => {
     if (productivityCount !== 1) return;
     try {
-      await invoke(Invokes.DuplicateFile, {
+      const outputPath = await invoke<string>(Invokes.DuplicateFile, {
         path: productivityPaths[0],
         targetAlbumId: useLibraryStore.getState().activeAlbumId || null,
       });
+      autoStackCreatedImages([{ sourcePath: productivityPaths[0], outputPath }]);
       await refreshAfterDuplicate();
     } catch (err) {
       console.error('Failed to duplicate file:', err);
@@ -358,10 +376,11 @@ export default function BottomBar({
   const handleVirtualCopy = async () => {
     if (productivityCount !== 1) return;
     try {
-      await invoke(Invokes.CreateVirtualCopy, {
+      const outputPath = await invoke<string>(Invokes.CreateVirtualCopy, {
         sourceVirtualPath: productivityPaths[0],
         targetAlbumId: useLibraryStore.getState().activeAlbumId || null,
       });
+      autoStackCreatedImages([{ sourcePath: productivityPaths[0], outputPath }]);
       await refreshAfterDuplicate();
     } catch (err) {
       console.error('Failed to create virtual copy:', err);
@@ -703,6 +722,9 @@ export default function BottomBar({
                 <Users size={18} />
               </button>
             )}
+            {hasProductivityActions && (hasCopyActions || hasStackActions) && (
+              <div className="h-5 w-px bg-surface mx-1" aria-hidden="true" />
+            )}
             {isToolbarItemVisible('physicalCopy') && (
               <button
                 className={productivityButtonClass}
@@ -723,6 +745,7 @@ export default function BottomBar({
                 <CopyPlus size={18} />
               </button>
             )}
+            {hasCopyActions && hasStackActions && <div className="h-5 w-px bg-surface mx-1" aria-hidden="true" />}
             {isToolbarItemVisible('stackSelected') && (
               <button
                 className={productivityButtonClass}

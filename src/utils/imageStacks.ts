@@ -1,6 +1,64 @@
 import { ImageFile, ImageStack } from '../components/ui/AppProperties';
 import { GroupBadgeInfo, GroupId, StackMemberPosition } from './imageGrouping';
 
+export interface AutoStackPair {
+  sourcePath: string;
+  outputPath: string;
+}
+
+interface AutoStackFileTypes {
+  nonRaw: string[];
+  raw: string[];
+}
+
+const NON_RAW_QUALITY: Record<string, number> = {
+  exr: 950,
+  tif: 900,
+  tiff: 900,
+  hdr: 850,
+  png: 800,
+  jxl: 700,
+  avif: 600,
+  webp: 500,
+  jpg: 400,
+  jpeg: 400,
+  qoi: 350,
+  bmp: 300,
+  tga: 300,
+  gif: 200,
+};
+
+const getPathExtension = (path: string) => {
+  const physicalPath = path.split('?')[0];
+  const extensionIndex = physicalPath.lastIndexOf('.');
+  return extensionIndex === -1 ? '' : physicalPath.slice(extensionIndex + 1).toLowerCase();
+};
+
+const normalizeExtensions = (extensions: string[]) =>
+  new Set(extensions.map((extension) => extension.replace(/^\./, '').toLowerCase()));
+
+const createStackId = () => `stack-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const removePathsFromStacks = (stacks: ImageStack[], paths: Set<string>): ImageStack[] =>
+  stacks
+    .map((stack) => ({ ...stack, paths: stack.paths.filter((path) => !paths.has(path)) }))
+    .filter((stack) => stack.paths.length >= 2)
+    .map((stack) => ({
+      ...stack,
+      coverPath: stack.paths.includes(stack.coverPath) ? stack.coverPath : stack.paths[0],
+    }));
+
+const selectAutoStackTopPath = (paths: string[], fileTypes: AutoStackFileTypes) => {
+  const rawExtensions = normalizeExtensions(fileTypes.raw);
+  return paths.reduce((bestPath, candidatePath) => {
+    const bestExtension = getPathExtension(bestPath);
+    const candidateExtension = getPathExtension(candidatePath);
+    const bestQuality = rawExtensions.has(bestExtension) ? 1000 : (NON_RAW_QUALITY[bestExtension] ?? 0);
+    const candidateQuality = rawExtensions.has(candidateExtension) ? 1000 : (NON_RAW_QUALITY[candidateExtension] ?? 0);
+    return candidateQuality > bestQuality ? candidatePath : bestPath;
+  });
+};
+
 const getStackMemberPosition = (index: number, memberCount: number): StackMemberPosition => {
   if (memberCount === 1) return 'only';
   if (index === 0) return 'first';
@@ -30,18 +88,12 @@ export const createImageStack = (stacks: ImageStack[], paths: string[], coverPat
   if (paths.length < 2) return stacks;
 
   const selectedPaths = new Set(paths);
-  const remainingStacks = stacks
-    .map((stack) => ({ ...stack, paths: stack.paths.filter((path) => !selectedPaths.has(path)) }))
-    .filter((stack) => stack.paths.length >= 2)
-    .map((stack) => ({
-      ...stack,
-      coverPath: stack.paths.includes(stack.coverPath) ? stack.coverPath : stack.paths[0],
-    }));
+  const remainingStacks = removePathsFromStacks(stacks, selectedPaths);
 
   return [
     ...remainingStacks,
     {
-      id: `stack-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: createStackId(),
       paths,
       coverPath: paths.includes(coverPath) ? coverPath : paths[0],
       collapsed: true,
@@ -58,6 +110,51 @@ export const setImageStackCover = (stacks: ImageStack[], stackId: string, coverP
 export const unstackImagePaths = (stacks: ImageStack[], paths: string[]): ImageStack[] => {
   const selectedPaths = new Set(paths);
   return stacks.filter((stack) => !stack.paths.some((path) => selectedPaths.has(path)));
+};
+
+export const autoStackImagePairs = (
+  stacks: ImageStack[],
+  pairs: AutoStackPair[],
+  fileTypes: AutoStackFileTypes,
+): ImageStack[] => {
+  const supportedExtensions = normalizeExtensions([...fileTypes.raw, ...fileTypes.nonRaw]);
+
+  return pairs.reduce((currentStacks, { sourcePath, outputPath }) => {
+    if (
+      !sourcePath ||
+      !outputPath ||
+      sourcePath === outputPath ||
+      !supportedExtensions.has(getPathExtension(sourcePath)) ||
+      !supportedExtensions.has(getPathExtension(outputPath))
+    ) {
+      return currentStacks;
+    }
+
+    const sourceStack = findImageStack(currentStacks, sourcePath);
+    const stacksWithoutOutput = removePathsFromStacks(currentStacks, new Set([outputPath]));
+    const retainedSourceStack = sourceStack
+      ? stacksWithoutOutput.find((stack) => stack.id === sourceStack.id)
+      : undefined;
+
+    if (retainedSourceStack) {
+      return stacksWithoutOutput.map((stack) =>
+        stack.id === retainedSourceStack.id ? { ...stack, paths: [...stack.paths, outputPath] } : stack,
+      );
+    }
+
+    const paths = [sourcePath, outputPath];
+    const topPath = selectAutoStackTopPath(paths, fileTypes);
+    const orderedPaths = topPath === sourcePath ? paths : [outputPath, sourcePath];
+    return [
+      ...removePathsFromStacks(stacksWithoutOutput, new Set([sourcePath])),
+      {
+        id: createStackId(),
+        paths: orderedPaths,
+        coverPath: topPath,
+        collapsed: true,
+      },
+    ];
+  }, stacks);
 };
 
 export function reorderStackPaths(
