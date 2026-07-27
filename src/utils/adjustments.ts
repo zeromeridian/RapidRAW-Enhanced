@@ -44,6 +44,7 @@ export enum ColorAdjustment {
   Hsl = 'hsl',
   Hue = 'hue',
   Luminance = 'luminance',
+  Monochrome = 'monochrome',
   Saturation = 'saturation',
   Temperature = 'temperature',
   Tint = 'tint',
@@ -224,6 +225,7 @@ export interface Adjustments {
   lutPath?: string | null;
   lutSize?: number;
   masks: Array<MaskContainer>;
+  monochrome: boolean;
   orientationSteps: number;
   rotation: number;
   saturation: number;
@@ -560,6 +562,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   lutPath: null,
   lutSize: 0,
   masks: [],
+  monochrome: false,
   orientationSteps: 0,
   rotation: 0,
   saturation: 0,
@@ -719,6 +722,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
       : getDefaultParametricCurve(),
     curveMode: loadedAdjustments.curveMode || INITIAL_ADJUSTMENTS.curveMode,
     masks: normalizedMasks,
+    monochrome: loadedAdjustments.monochrome ?? INITIAL_ADJUSTMENTS.monochrome,
     aiPatches: normalizedAiPatches,
     sectionVisibility: {
       ...INITIAL_ADJUSTMENTS.sectionVisibility,
@@ -757,7 +761,10 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
   ],
   color: [
     { label: 'modals.copyPaste.groups.whiteBalance', keys: [ColorAdjustment.Temperature, ColorAdjustment.Tint] },
-    { label: 'modals.copyPaste.groups.presence', keys: [ColorAdjustment.Saturation, ColorAdjustment.Vibrance] },
+    {
+      label: 'modals.copyPaste.groups.presence',
+      keys: [ColorAdjustment.Monochrome, ColorAdjustment.Saturation, ColorAdjustment.Vibrance],
+    },
     {
       label: 'modals.copyPaste.groups.hueShift',
       keys: [ColorAdjustment.Hue],
@@ -858,6 +865,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
   ],
   curves: ['curves', 'pointCurves', 'parametricCurve', 'curveMode'],
   color: [
+    ColorAdjustment.Monochrome,
     ColorAdjustment.Saturation,
     ColorAdjustment.Temperature,
     ColorAdjustment.Tint,

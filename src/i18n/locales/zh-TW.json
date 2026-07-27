@@ -19,6 +19,9 @@
     },
     "color": {
       "ariaSelectColor": "選擇 {{name}} 顏色",
+      "blackAndWhite": "Black & White",
+      "colorModeColor": "Color",
+      "monochromeDesc": "Switch between color and a persisted monochrome rendering while preserving all color adjustments.",
       "calibration": {
         "colors": {
           "blue": "藍色",

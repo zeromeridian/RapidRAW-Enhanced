@@ -3,6 +3,7 @@ import { Pipette, Sliders } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import Slider from '../ui/Slider';
+import Switch from '../ui/Switch';
 import ColorWheel from '../ui/ColorWheel';
 import { ColorAdjustment, ColorCalibration, HueSatLum, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import { Adjustments, ColorGrading } from '../../utils/adjustments';
@@ -451,6 +452,10 @@ export default function ColorPanel({
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: parseFloat(value) }));
   };
 
+  const handleMonochromeChange = (monochrome: boolean) => {
+    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, monochrome }));
+  };
+
   const handleHslChange = (key: ColorAdjustment, value: string) => {
     setAdjustments((prev: Partial<Adjustments>) => ({
       ...prev,
@@ -470,6 +475,19 @@ export default function ColorPanel({
 
   return (
     <div className="space-y-4">
+      {!isForMask && (
+        <div className="p-2 bg-bg-tertiary rounded-md">
+          <Switch
+            checked={!!adjustments.monochrome}
+            label={
+              adjustments.monochrome ? t('adjustments.color.blackAndWhite') : t('adjustments.color.colorModeColor')
+            }
+            onChange={handleMonochromeChange}
+            tooltip={t('adjustments.color.monochromeDesc')}
+          />
+        </div>
+      )}
+
       <div className="p-2 bg-bg-tertiary rounded-md">
         <div className="flex justify-between items-center mb-2">
           <Text variant={TextVariants.heading}>{t('adjustments.color.whiteBalance')}</Text>

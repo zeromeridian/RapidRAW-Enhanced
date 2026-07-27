@@ -95,6 +95,7 @@ pub fn all_available_adjustments() -> HashSet<String> {
         "toneMapper",
         "temperature",
         "tint",
+        "monochrome",
         "saturation",
         "vibrance",
         "hsl",
