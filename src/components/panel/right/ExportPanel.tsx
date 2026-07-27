@@ -28,6 +28,7 @@ import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { useEditorStore } from '../../../store/useEditorStore';
+import { getEnabledExportSuffix } from '../../../utils/outputNaming';
 
 interface ExportPanelProps {
   exportState: ExportState;
@@ -455,6 +456,7 @@ export default function ExportPanel({
 
     const exportSettings: ExportSettings = {
       filenameTemplate: finalFilenameTemplate,
+      filenameSuffix: getEnabledExportSuffix(appSettings),
       jpegQuality,
       keepMetadata,
       preserveTimestamps,
@@ -484,7 +486,9 @@ export default function ExportPanel({
       if (shouldChooseOutputFile) {
         const originalFilename = pathsToExport[0].split(/[\\/]/).pop() || '';
         const stem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
-        const suggestedName = finalFilenameTemplate.replace('{original_filename}', stem);
+        const suggestedName = `${finalFilenameTemplate.replace('{original_filename}', stem)}${
+          getEnabledExportSuffix(appSettings) || ''
+        }`;
         const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
 
         outputFolderOrFile = isAndroid

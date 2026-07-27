@@ -46,6 +46,7 @@ import {
   unstackImagePaths,
 } from '../../utils/imageStacks';
 import { autoStackCreatedImages } from '../../utils/autoStacking';
+import { getEnabledCopySuffix } from '../../utils/outputNaming';
 
 interface BottomBarProps {
   filmstripHeight?: number;
@@ -364,6 +365,7 @@ export default function BottomBar({
       const outputPath = await invoke<string>(Invokes.DuplicateFile, {
         path: productivityPaths[0],
         targetAlbumId: useLibraryStore.getState().activeAlbumId || null,
+        copyNameSuffix: getEnabledCopySuffix(appSettings),
       });
       autoStackCreatedImages([{ sourcePath: productivityPaths[0], outputPath }]);
       await refreshAfterDuplicate();
@@ -379,6 +381,7 @@ export default function BottomBar({
       const outputPath = await invoke<string>(Invokes.CreateVirtualCopy, {
         sourceVirtualPath: productivityPaths[0],
         targetAlbumId: useLibraryStore.getState().activeAlbumId || null,
+        copyNameSuffix: getEnabledCopySuffix(appSettings),
       });
       autoStackCreatedImages([{ sourcePath: productivityPaths[0], outputPath }]);
       await refreshAfterDuplicate();

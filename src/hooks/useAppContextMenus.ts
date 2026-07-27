@@ -65,6 +65,7 @@ import {
   unstackImagePaths,
 } from '../utils/imageStacks';
 import { autoStackCreatedImages } from '../utils/autoStacking';
+import { getEnabledCopySuffix } from '../utils/outputNaming';
 
 export interface UseAppContextMenusProps {
   handleImageSelect: (path: string) => void;
@@ -468,6 +469,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           const outputPath = await invoke<string>(Invokes.CreateVirtualCopy, {
             sourceVirtualPath: sourcePath,
             targetAlbumId: activeAlbumId || null,
+            copyNameSuffix: getEnabledCopySuffix(appSettings),
           });
           autoStackCreatedImages([{ sourcePath, outputPath }]);
 
@@ -733,6 +735,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                   const outputPath = await invoke<string>(Invokes.DuplicateFile, {
                     path: sourcePath,
                     targetAlbumId: activeAlbumId || null,
+                    copyNameSuffix: getEnabledCopySuffix(appSettings),
                   });
                   autoStackCreatedImages([{ sourcePath, outputPath }]);
                   if (activeAlbumId) {

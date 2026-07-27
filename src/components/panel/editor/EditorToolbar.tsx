@@ -10,6 +10,7 @@ import { TextColors, TextVariants, TextWeights } from '../../../types/typography
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { findGroupVariants, getVariantLabel } from '../../../utils/imageGrouping';
+import { getDisplayFilename } from '../../../utils/outputNaming';
 
 interface EditorToolbarProps {
   canRedo: boolean;
@@ -81,8 +82,7 @@ const EditorToolbar = memo(
 
     const { baseName, isVirtualCopy, vcId, exifData, hasExif } = useMemo(() => {
       const path = selectedImage.path;
-      const parts = path.split('?vc=');
-      const fullFileName = parts[0].split(/[\\/]/).pop() || '';
+      const { baseName, isVirtualCopy, vcId } = getDisplayFilename(path);
 
       const exif = selectedImage.exif || {};
 
@@ -116,9 +116,9 @@ const EditorToolbar = memo(
       const hasData = !!(data.iso || data.fNumber || data.shutter || data.focal || data.captureDate);
 
       return {
-        baseName: fullFileName,
-        isVirtualCopy: parts.length > 1,
-        vcId: parts.length > 1 ? parts[1] : null,
+        baseName,
+        isVirtualCopy,
+        vcId,
         exifData: data,
         hasExif: hasData,
       };
@@ -445,9 +445,7 @@ const EditorToolbar = memo(
                         disabled={isActive}
                         className={clsx(
                           'px-2.5 py-1 text-[11px] font-medium transition-colors',
-                          isActive
-                            ? 'bg-surface text-text-primary'
-                            : 'text-text-secondary hover:bg-surface/50',
+                          isActive ? 'bg-surface text-text-primary' : 'text-text-secondary hover:bg-surface/50',
                         )}
                         data-tooltip={t('editor.toolbar.switchToVariant', { label: v.label })}
                         onClick={(e) => onImageSelect?.(v.path, e)}

@@ -1171,6 +1171,56 @@ export default function SettingsPanel({
                       </SettingItem>
 
                       <SettingItem
+                        label={t('settings.general.exportFileSuffix')}
+                        description={t('settings.general.exportFileSuffixDesc')}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={appSettings?.exportFileSuffixEnabled ?? false}
+                            id="export-file-suffix-toggle"
+                            label={t('settings.general.enableExportFileSuffix')}
+                            onChange={(checked) =>
+                              onSettingsChange({ ...appSettings, exportFileSuffixEnabled: checked })
+                            }
+                          />
+                          <Input
+                            type="text"
+                            value={appSettings?.exportFileSuffix ?? ''}
+                            onChange={(event) =>
+                              onSettingsChange({ ...appSettings, exportFileSuffix: event.target.value })
+                            }
+                            placeholder={t('settings.general.fileSuffixPlaceholder')}
+                            className="max-w-48"
+                            bgClassName="bg-bg-primary"
+                          />
+                        </div>
+                      </SettingItem>
+
+                      <SettingItem
+                        label={t('settings.general.copyNameSuffix')}
+                        description={t('settings.general.copyNameSuffixDesc')}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={appSettings?.copyNameSuffixEnabled ?? false}
+                            id="copy-name-suffix-toggle"
+                            label={t('settings.general.enableCopyNameSuffix')}
+                            onChange={(checked) => onSettingsChange({ ...appSettings, copyNameSuffixEnabled: checked })}
+                          />
+                          <Input
+                            type="text"
+                            value={appSettings?.copyNameSuffix ?? ''}
+                            onChange={(event) =>
+                              onSettingsChange({ ...appSettings, copyNameSuffix: event.target.value })
+                            }
+                            placeholder={t('settings.general.copySuffixPlaceholder')}
+                            className="max-w-48"
+                            bgClassName="bg-bg-primary"
+                          />
+                        </div>
+                      </SettingItem>
+
+                      <SettingItem
                         label={t('settings.general.focusMode')}
                         description={t('settings.general.focusModeDesc')}
                       >

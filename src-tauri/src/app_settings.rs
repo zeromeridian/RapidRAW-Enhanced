@@ -465,6 +465,14 @@ pub struct AppSettings {
     pub image_stacks: Option<Value>,
     #[serde(default = "default_true")]
     pub auto_stack_created_images: bool,
+    #[serde(default)]
+    pub export_file_suffix_enabled: bool,
+    #[serde(default)]
+    pub export_file_suffix: String,
+    #[serde(default)]
+    pub copy_name_suffix_enabled: bool,
+    #[serde(default)]
+    pub copy_name_suffix: String,
 }
 
 impl Default for AppSettings {
@@ -559,6 +567,10 @@ impl Default for AppSettings {
             bottom_toolbar_visibility: HashMap::new(),
             image_stacks: None,
             auto_stack_created_images: true,
+            export_file_suffix_enabled: false,
+            export_file_suffix: String::new(),
+            copy_name_suffix_enabled: false,
+            copy_name_suffix: String::new(),
         }
     }
 }
