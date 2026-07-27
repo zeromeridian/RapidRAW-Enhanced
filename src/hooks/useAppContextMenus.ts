@@ -57,6 +57,13 @@ import TaggingSubMenu from '../context/TaggingSubMenu';
 import { useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
 import { globalImageCache } from '../utils/ImageLRUCache';
+import {
+  createImageStack,
+  findImageStack,
+  setImageStackCover,
+  toggleImageStack,
+  unstackImagePaths,
+} from '../utils/imageStacks';
 
 export interface UseAppContextMenusProps {
   handleImageSelect: (path: string) => void;
@@ -426,11 +433,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const denoiseLabel = t('contextMenus.thumbnail.denoise', { count: selectionCount });
       const mergeLabel = t('contextMenus.editor.mergeHdr');
       const imageStacks = appSettings?.imageStacks || [];
-      const targetStack = imageStacks.find((stack) => stack.paths.includes(path));
-      const selectedStackIds = new Set(
-        imageStacks
-          .filter((stack) => stack.paths.some((stackPath) => finalSelection.includes(stackPath)))
-          .map((stack) => stack.id),
+      const targetStack = findImageStack(imageStacks, path);
+      const hasSelectedStacks = imageStacks.some((stack) =>
+        stack.paths.some((stackPath) => finalSelection.includes(stackPath)),
       );
 
       const saveImageStacks = (nextStacks: typeof imageStacks) => {
@@ -440,41 +445,21 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
       const handleStackSelected = () => {
         if (finalSelection.length < 2) return;
-        const selectedPaths = new Set(finalSelection);
-        const remainingStacks = imageStacks
-          .map((stack) => ({ ...stack, paths: stack.paths.filter((stackPath) => !selectedPaths.has(stackPath)) }))
-          .filter((stack) => stack.paths.length >= 2)
-          .map((stack) => ({
-            ...stack,
-            coverPath: stack.paths.includes(stack.coverPath) ? stack.coverPath : stack.paths[0],
-          }));
-        saveImageStacks([
-          ...remainingStacks,
-          {
-            id: `stack-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            paths: finalSelection,
-            coverPath: finalSelection.includes(path) ? path : finalSelection[0],
-            collapsed: true,
-          },
-        ]);
+        saveImageStacks(createImageStack(imageStacks, finalSelection, path));
       };
 
       const handleUnstackSelected = () => {
-        saveImageStacks(imageStacks.filter((stack) => !selectedStackIds.has(stack.id)));
+        saveImageStacks(unstackImagePaths(imageStacks, finalSelection));
       };
 
       const handleToggleStack = () => {
         if (!targetStack) return;
-        saveImageStacks(
-          imageStacks.map((stack) => (stack.id === targetStack.id ? { ...stack, collapsed: !stack.collapsed } : stack)),
-        );
+        saveImageStacks(toggleImageStack(imageStacks, targetStack.id));
       };
 
       const handleSetStackCover = () => {
         if (!targetStack) return;
-        saveImageStacks(
-          imageStacks.map((stack) => (stack.id === targetStack.id ? { ...stack, coverPath: path } : stack)),
-        );
+        saveImageStacks(setImageStackCover(imageStacks, targetStack.id, path));
       };
 
       const handleCreateVirtualCopy = async (sourcePath: string) => {
@@ -719,7 +704,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             {
               label: t('contextMenus.thumbnail.unstack'),
               icon: Layers,
-              disabled: selectedStackIds.size === 0,
+              disabled: !hasSelectedStacks,
               onClick: handleUnstackSelected,
             },
           ],

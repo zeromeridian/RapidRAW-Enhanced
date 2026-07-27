@@ -23,6 +23,43 @@ const createStackBadge = (
   },
 });
 
+export const findImageStack = (stacks: ImageStack[], path: string) =>
+  stacks.find((stack) => stack.paths.includes(path));
+
+export const createImageStack = (stacks: ImageStack[], paths: string[], coverPath: string): ImageStack[] => {
+  if (paths.length < 2) return stacks;
+
+  const selectedPaths = new Set(paths);
+  const remainingStacks = stacks
+    .map((stack) => ({ ...stack, paths: stack.paths.filter((path) => !selectedPaths.has(path)) }))
+    .filter((stack) => stack.paths.length >= 2)
+    .map((stack) => ({
+      ...stack,
+      coverPath: stack.paths.includes(stack.coverPath) ? stack.coverPath : stack.paths[0],
+    }));
+
+  return [
+    ...remainingStacks,
+    {
+      id: `stack-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      paths,
+      coverPath: paths.includes(coverPath) ? coverPath : paths[0],
+      collapsed: true,
+    },
+  ];
+};
+
+export const toggleImageStack = (stacks: ImageStack[], stackId: string): ImageStack[] =>
+  stacks.map((stack) => (stack.id === stackId ? { ...stack, collapsed: !stack.collapsed } : stack));
+
+export const setImageStackCover = (stacks: ImageStack[], stackId: string, coverPath: string): ImageStack[] =>
+  stacks.map((stack) => (stack.id === stackId && stack.paths.includes(coverPath) ? { ...stack, coverPath } : stack));
+
+export const unstackImagePaths = (stacks: ImageStack[], paths: string[]): ImageStack[] => {
+  const selectedPaths = new Set(paths);
+  return stacks.filter((stack) => !stack.paths.some((path) => selectedPaths.has(path)));
+};
+
 export function reorderStackPaths(
   paths: string[],
   sourcePath: string,
