@@ -18,6 +18,11 @@ import { ColumnWidths } from '../MainLibrary';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
+import { reorderStackPaths } from '../../../utils/imageStacks';
+
+type StackDropEdge = 'before' | 'after';
+
+let draggedStackPath: string | null = null;
 
 interface ImageLayer {
   id: string;
@@ -43,6 +48,11 @@ const ThumbnailComponent = ({
   groupBadgeLabel,
   groupBadgeCount,
   onStackBadgeClick,
+  isStackDraggable,
+  onStackDragStart,
+  onStackDragOver,
+  onStackDrop,
+  onStackDragEnd,
 }: any) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
@@ -52,6 +62,8 @@ const ThumbnailComponent = ({
 
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
+  const [stackDropEdge, setStackDropEdge] = useState<StackDropEdge | null>(null);
+  const [isStackDragging, setIsStackDragging] = useState(false);
 
   const [currentPath, setCurrentPath] = useState(path);
   if (currentPath !== path) {
@@ -160,15 +172,51 @@ const ThumbnailComponent = ({
 
   return (
     <div
-      className="aspect-square bg-surface rounded-md overflow-hidden cursor-pointer group relative flex flex-col transition-all duration-150 transform-gpu [-webkit-mask-image:-webkit-radial-gradient(white,black)]"
+      className={clsx(
+        'aspect-square bg-surface rounded-md overflow-hidden cursor-pointer group relative flex flex-col transition-all duration-150 transform-gpu [-webkit-mask-image:-webkit-radial-gradient(white,black)]',
+        isStackDragging && 'opacity-50',
+      )}
       data-bench-id="thumbnail"
+      draggable={isStackDraggable}
       onClick={(e: any) => {
         e.stopPropagation();
         onImageClick(path, e);
       }}
       onContextMenu={(e: any) => onContextMenu(e, path)}
       onDoubleClick={() => onImageDoubleClick(path)}
+      onDragStart={(event) => {
+        if (!isStackDraggable) {
+          event.preventDefault();
+          return;
+        }
+        setIsStackDragging(true);
+        onStackDragStart(path, event);
+      }}
+      onDragOver={(event) => {
+        const edge = onStackDragOver(path, event, 'horizontal');
+        setStackDropEdge(edge);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setStackDropEdge(null);
+      }}
+      onDrop={(event) => {
+        setStackDropEdge(null);
+        onStackDrop(path, event, 'horizontal');
+      }}
+      onDragEnd={() => {
+        setIsStackDragging(false);
+        setStackDropEdge(null);
+        onStackDragEnd();
+      }}
     >
+      {stackDropEdge && (
+        <div
+          className={clsx(
+            'absolute top-0 bottom-0 z-40 w-1 bg-accent pointer-events-none',
+            stackDropEdge === 'before' ? 'left-0' : 'right-0',
+          )}
+        />
+      )}
       <div className="relative w-full flex-1 min-h-0 z-0 bg-surface">
         {layers.length > 0 && (
           <div className="absolute inset-0 w-full h-full">
@@ -484,6 +532,11 @@ const ListItemComponent = ({
   stackBadgeLabel,
   stackBadgeCount,
   onStackBadgeClick,
+  isStackDraggable,
+  onStackDragStart,
+  onStackDragOver,
+  onStackDrop,
+  onStackDragEnd,
 }: any) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
@@ -491,6 +544,8 @@ const ListItemComponent = ({
 
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
+  const [stackDropEdge, setStackDropEdge] = useState<StackDropEdge | null>(null);
+  const [isStackDragging, setIsStackDragging] = useState(false);
 
   const [currentPath, setCurrentPath] = useState(path);
   if (currentPath !== path) {
@@ -618,14 +673,51 @@ const ListItemComponent = ({
 
   return (
     <div
-      className={`flex items-center w-full h-full cursor-pointer transition-all duration-150 ${borderClass} ${roundingClass} ${stateClass}`}
+      className={clsx(
+        `flex items-center w-full h-full cursor-pointer transition-all duration-150 ${borderClass} ${roundingClass} ${stateClass}`,
+        'relative',
+        isStackDragging && 'opacity-50',
+      )}
+      draggable={isStackDraggable}
       onClick={(e: any) => {
         e.stopPropagation();
         onImageClick(path, e);
       }}
       onContextMenu={(e: any) => onContextMenu(e, path)}
       onDoubleClick={() => onImageDoubleClick(path)}
+      onDragStart={(event) => {
+        if (!isStackDraggable) {
+          event.preventDefault();
+          return;
+        }
+        setIsStackDragging(true);
+        onStackDragStart(path, event);
+      }}
+      onDragOver={(event) => {
+        const edge = onStackDragOver(path, event, 'vertical');
+        setStackDropEdge(edge);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setStackDropEdge(null);
+      }}
+      onDrop={(event) => {
+        setStackDropEdge(null);
+        onStackDrop(path, event, 'vertical');
+      }}
+      onDragEnd={() => {
+        setIsStackDragging(false);
+        setStackDropEdge(null);
+        onStackDragEnd();
+      }}
     >
+      {stackDropEdge && (
+        <div
+          className={clsx(
+            'absolute left-0 right-0 z-40 h-1 bg-accent pointer-events-none',
+            stackDropEdge === 'before' ? 'top-0' : 'bottom-0',
+          )}
+        />
+      )}
       <div
         style={{ width: getW('thumbnail') }}
         className="flex items-center justify-center p-1.5 h-full overflow-hidden"
@@ -819,6 +911,74 @@ const RowComponent = ({
       ),
     });
   }, []);
+  const getExpandedStackForPath = useCallback((path: string) => {
+    return useSettingsStore
+      .getState()
+      .appSettings?.imageStacks?.find((stack) => !stack.collapsed && stack.paths.includes(path));
+  }, []);
+  const handleStackDragStart = useCallback(
+    (path: string, event: React.DragEvent<HTMLElement>) => {
+      if (!getExpandedStackForPath(path)) {
+        event.preventDefault();
+        return;
+      }
+      draggedStackPath = path;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', path);
+    },
+    [getExpandedStackForPath],
+  );
+  const getStackDropEdge = useCallback(
+    (
+      targetPath: string,
+      event: React.DragEvent<HTMLElement>,
+      axis: 'horizontal' | 'vertical',
+    ): StackDropEdge | null => {
+      const sourcePath = draggedStackPath || event.dataTransfer.getData('text/plain');
+      if (!sourcePath || sourcePath === targetPath) return null;
+
+      const sourceStack = getExpandedStackForPath(sourcePath);
+      if (!sourceStack || !sourceStack.paths.includes(targetPath)) return null;
+
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      const rect = event.currentTarget.getBoundingClientRect();
+      const isAfter =
+        axis === 'horizontal'
+          ? event.clientX >= rect.left + rect.width / 2
+          : event.clientY >= rect.top + rect.height / 2;
+      return isAfter ? 'after' : 'before';
+    },
+    [getExpandedStackForPath],
+  );
+  const handleStackDrop = useCallback(
+    (targetPath: string, event: React.DragEvent<HTMLElement>, axis: 'horizontal' | 'vertical') => {
+      const sourcePath = draggedStackPath || event.dataTransfer.getData('text/plain');
+      const edge = getStackDropEdge(targetPath, event, axis);
+      if (!sourcePath || !edge) return;
+
+      const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+      const targetStack = appSettings?.imageStacks?.find(
+        (stack) => !stack.collapsed && stack.paths.includes(sourcePath) && stack.paths.includes(targetPath),
+      );
+      if (!appSettings || !targetStack) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      const reorderedPaths = reorderStackPaths(targetStack.paths, sourcePath, targetPath, edge === 'after');
+      void handleSettingsChange({
+        ...appSettings,
+        imageStacks: appSettings.imageStacks?.map((stack) =>
+          stack.id === targetStack.id ? { ...stack, paths: reorderedPaths } : stack,
+        ),
+      });
+      draggedStackPath = null;
+    },
+    [getStackDropEdge],
+  );
+  const handleStackDragEnd = useCallback(() => {
+    draggedStackPath = null;
+  }, []);
 
   useEffect(() => {
     if (!row || row.type !== 'images') return;
@@ -909,6 +1069,7 @@ const RowComponent = ({
     >
       {row.images.map((imageFile: ImageFile) => {
         const stackBadge = groupBadgeInfo?.get(imageFile.path);
+        const isStackDraggable = Boolean(getExpandedStackForPath(imageFile.path));
         let isPrevSelected = false;
         let isNextSelected = false;
 
@@ -953,6 +1114,11 @@ const RowComponent = ({
                 stackBadgeLabel={stackBadge?.label}
                 stackBadgeCount={stackBadge?.count}
                 onStackBadgeClick={handleStackBadgeClick}
+                isStackDraggable={isStackDraggable}
+                onStackDragStart={handleStackDragStart}
+                onStackDragOver={getStackDropEdge}
+                onStackDrop={handleStackDrop}
+                onStackDragEnd={handleStackDragEnd}
               />
             ) : (
               <Thumbnail
@@ -974,6 +1140,11 @@ const RowComponent = ({
                 }
                 groupBadgeCount={stackBadge?.count}
                 onStackBadgeClick={handleStackBadgeClick}
+                isStackDraggable={isStackDraggable}
+                onStackDragStart={handleStackDragStart}
+                onStackDragOver={getStackDropEdge}
+                onStackDrop={handleStackDrop}
+                onStackDragEnd={handleStackDragEnd}
               />
             )}
           </div>
