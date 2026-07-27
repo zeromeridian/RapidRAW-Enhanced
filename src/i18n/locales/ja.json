@@ -751,6 +751,8 @@
   "export": {
     "advanced": {
       "exportMasks": "マスクを個別ファイルとして書き出す",
+      "exportToSourceFolder": "Export to same folder as source",
+      "inheritAllExif": "Inherit all EXIF data from source",
       "preserveFolders": "フォルダ構造を維持",
       "preserveTimestamps": "EXIFの撮影日時からファイルタイムスタンプを設定",
       "title": "書き出し設定"

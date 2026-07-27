@@ -155,12 +155,12 @@ export function useTauriListeners({
       listen('batch-export-progress', (event: any) => {
         if (isEffectActive) useProcessStore.getState().setExportState({ progress: event.payload });
       }),
-      listen('export-complete', (event: any) => {
+      listen('export-complete', async (event: any) => {
         if (isEffectActive) {
           useProcessStore.getState().setExportState({ status: Status.Success });
           const exports = Array.isArray(event.payload?.exports) ? event.payload.exports : [];
-          autoStackCreatedImages(exports);
-          if (useLibraryStore.getState().currentFolderPath) refs.current.refreshImageList();
+          await autoStackCreatedImages(exports);
+          if (useLibraryStore.getState().currentFolderPath) await refs.current.refreshImageList();
         }
       }),
       listen('export-error', (event: any) => {

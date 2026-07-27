@@ -1,7 +1,7 @@
 import { useSettingsStore } from '../store/useSettingsStore';
 import { AutoStackPair, autoStackImagePairs } from './imageStacks';
 
-export const autoStackCreatedImages = (pairs: AutoStackPair[]) => {
+export const autoStackCreatedImages = async (pairs: AutoStackPair[]) => {
   if (pairs.length === 0) return;
 
   const { appSettings, handleSettingsChange, supportedTypes } = useSettingsStore.getState();
@@ -16,5 +16,5 @@ export const autoStackCreatedImages = (pairs: AutoStackPair[]) => {
   );
   if (imageStacks === currentStacks) return;
 
-  void handleSettingsChange({ ...appSettings, imageStacks });
+  await handleSettingsChange({ ...appSettings, imageStacks });
 };

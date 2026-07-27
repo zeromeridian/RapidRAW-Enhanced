@@ -38,6 +38,7 @@ export interface ExportSettings {
   filenameSuffix?: string | null;
   jpegQuality: number;
   keepMetadata: boolean;
+  inheritAllExif?: boolean;
   preserveTimestamps: boolean;
   resize: {
     mode: string;
@@ -48,6 +49,7 @@ export interface ExportSettings {
   watermark: WatermarkSettings | null;
   exportMasks?: boolean;
   preserveFolders?: boolean;
+  exportToSourceFolder?: boolean;
 }
 
 export enum WatermarkAnchor {
@@ -109,10 +111,12 @@ export interface ExportPreset {
   resizeValue: number;
   dontEnlarge: boolean;
   keepMetadata: boolean;
+  inheritAllExif?: boolean;
   preserveTimestamps: boolean;
   stripGps: boolean;
   exportMasks?: boolean;
   preserveFolders?: boolean;
+  exportToSourceFolder?: boolean;
   filenameTemplate: string;
   enableWatermark: boolean;
   watermarkPath: string | null;
