@@ -1,4 +1,4 @@
-name: build
+name: RapidRAW - Enhanced Reusable Build
 
 on:
   workflow_call:
@@ -24,9 +24,6 @@ on:
       upload-artifacts:
         required: false
         type: boolean
-      repository:
-        required: false
-        type: string
       ref:
         required: false
         type: string
@@ -43,7 +40,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          repository: ${{ inputs.repository }}
           ref: ${{ inputs.ref }}
           fetch-depth: 0
 
@@ -166,7 +162,7 @@ jobs:
           stage_dir="$RUNNER_TEMP/android-release-assets"
           mkdir -p "$stage_dir"
 
-          app_name="RapidRAW"
+          app_name="RapidRAW - Enhanced"
           version="$(node -e "const fs=require('fs'); const conf=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8')); process.stdout.write(conf.version || '')")"
           arch="${{ inputs.target }}"
           arch="${arch%%-*}"

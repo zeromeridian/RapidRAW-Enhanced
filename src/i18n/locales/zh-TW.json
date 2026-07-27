@@ -1007,7 +1007,7 @@
     },
     "splash": {
       "addFolder": "新增資料夾",
-      "brand": "RapidRAW",
+      "brand": "RapidRAW - Enhanced",
       "continueSession": "繼續會話",
       "contribute": "在 GitHub 上貢獻",
       "descriptionAndroid": "一款極速、GPU 加速的 RAW 影像編輯器。開啟相簿以開始。",
@@ -1472,7 +1472,7 @@
       "font": "字型",
       "fontDesc": "更改應用程式字型。",
       "nativeTitlebar": "原生標題欄",
-      "nativeTitlebarDesc": "使用系統預設的視窗標題欄，而非 RapidRAW 的自定義標題欄。",
+      "nativeTitlebarDesc": "使用系統預設的視窗標題欄，而非 RapidRAW - Enhanced 的自定義標題欄。",
       "poppins": "Poppins",
       "showImageCounts": "顯示影像計數",
       "system": "系統預設",

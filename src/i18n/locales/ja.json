@@ -1007,7 +1007,7 @@
     },
     "splash": {
       "addFolder": "フォルダを追加",
-      "brand": "RapidRAW",
+      "brand": "RapidRAW - Enhanced",
       "continueSession": "セッションを続行",
       "contribute": "GitHubで貢献する",
       "descriptionAndroid": "圧倒的に高速な、GPUアクセラレーション対応RAW画像エディタ。ライブラリを開いて始めましょう。",
@@ -1472,7 +1472,7 @@
       "font": "フォント",
       "fontDesc": "アプリケーションのフォントを変更します。",
       "nativeTitlebar": "OS標準のタイトルバー",
-      "nativeTitlebarDesc": "RapidRAWカスタムのもの代わりに、システムのデフォルトのウィンドウタイトルバーを使用します。",
+      "nativeTitlebarDesc": "RapidRAW - Enhancedカスタムのもの代わりに、システムのデフォルトのウィンドウタイトルバーを使用します。",
       "poppins": "Poppins",
       "showImageCounts": "画像数を表示",
       "system": "システムデフォルト",

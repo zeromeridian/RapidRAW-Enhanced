@@ -115,7 +115,9 @@ export default function TitleBar() {
             </div>
           )}
           <div data-tauri-drag-region className={`flex items-center h-full ${isMac ? '' : 'px-4'}`}>
-            <p className="text-sm font-semibold text-text-secondary pointer-events-none">RapidRAW</p>
+            <p className="text-sm font-semibold text-text-secondary pointer-events-none">
+              RapidRAW - Enhanced
+            </p>
           </div>
         </div>
         <div data-tauri-drag-region className="flex-1 h-full" />
