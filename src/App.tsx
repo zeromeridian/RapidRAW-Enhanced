@@ -158,6 +158,18 @@ function App() {
   );
 
   const defaultThumbnailSize = osPlatform === 'android' ? ThumbnailSize.Small : ThumbnailSize.Medium;
+
+  useEffect(() => {
+    if (!appSettings) return;
+    setUI({
+      ...(Number.isFinite(appSettings.leftPanelWidth)
+        ? { leftPanelWidth: Math.max(200, Math.min(appSettings.leftPanelWidth!, 500)) }
+        : {}),
+      ...(Number.isFinite(appSettings.rightPanelWidth)
+        ? { rightPanelWidth: Math.max(280, Math.min(appSettings.rightPanelWidth!, 600)) }
+        : {}),
+    });
+  }, [appSettings?.leftPanelWidth, appSettings?.rightPanelWidth, setUI]);
   const defaultLibraryViewMode = osPlatform === 'android' ? LibraryViewMode.Recursive : LibraryViewMode.Flat;
 
   const selectedImagePathRef = useRef<string | null>(null);
@@ -516,6 +528,15 @@ function App() {
       window.removeEventListener('pointerup', stopDrag);
       window.removeEventListener('pointercancel', stopDrag);
       setIsResizing(false);
+
+      if (appSettings && (stateKey === 'left' || stateKey === 'right')) {
+        const { leftPanelWidth: savedLeftPanelWidth, rightPanelWidth: savedRightPanelWidth } = useUIStore.getState();
+        void handleSettingsChange({
+          ...appSettings,
+          leftPanelWidth: savedLeftPanelWidth,
+          rightPanelWidth: savedRightPanelWidth,
+        });
+      }
     };
     document.documentElement.style.cursor =
       stateKey === 'bottom' || stateKey === 'compact' ? 'row-resize' : 'col-resize';

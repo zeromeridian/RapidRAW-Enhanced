@@ -9,12 +9,15 @@ import {
 } from './adjustments';
 
 export interface ToneCurvePreset {
+  builtIn?: boolean;
   curveMode: 'point' | 'parametric';
   id: string;
   name: string;
   parametricCurve: ParametricCurve;
   pointCurves: Curves;
 }
+
+export type ToneCurvePresetData = Pick<ToneCurvePreset, 'curveMode' | 'parametricCurve' | 'pointCurves'>;
 
 const CHANNELS = ['luma', 'red', 'green', 'blue'] as const;
 const PARAMETRIC_KEYS = [
@@ -91,13 +94,59 @@ export const hasToneCurvePresetNameConflict = (name: string, presets: ToneCurveP
   return !!normalizedName && presets.some((preset) => normalizeToneCurvePresetName(preset.name) === normalizedName);
 };
 
-export const createToneCurvePreset = (name: string, adjustments: Adjustments): ToneCurvePreset => ({
-  id: crypto.randomUUID(),
-  name: name.trim(),
+export const getToneCurvePresetData = (adjustments: Adjustments): ToneCurvePresetData => ({
   curveMode: adjustments.curveMode === 'parametric' ? 'parametric' : 'point',
   pointCurves: cloneToneCurvePoints(adjustments.curveMode === 'point' ? adjustments.curves : adjustments.pointCurves),
   parametricCurve: cloneToneCurveParametric(adjustments.parametricCurve),
 });
+
+export const createToneCurvePreset = (name: string, adjustments: Adjustments): ToneCurvePreset => ({
+  id: crypto.randomUUID(),
+  name: name.trim(),
+  ...getToneCurvePresetData(adjustments),
+});
+
+export const updateToneCurvePreset = (preset: ToneCurvePreset, adjustments: Adjustments): ToneCurvePreset => ({
+  ...preset,
+  ...getToneCurvePresetData(adjustments),
+});
+
+export const isToneCurvePresetDirty = (preset: ToneCurvePreset, adjustments: Adjustments) =>
+  JSON.stringify({
+    curveMode: preset.curveMode,
+    pointCurves: cloneToneCurvePoints(preset.pointCurves),
+    parametricCurve: cloneToneCurveParametric(preset.parametricCurve),
+  }) !== JSON.stringify(getToneCurvePresetData(adjustments));
+
+const createBuiltInPreset = (id: string, name: string, luma: Coord[]): ToneCurvePreset => ({
+  builtIn: true,
+  id,
+  name,
+  curveMode: 'point',
+  pointCurves: { ...getDefaultCurves(), luma },
+  parametricCurve: cloneToneCurveParametric(DEFAULT_PARAMETRIC_CURVE),
+});
+
+export const BUILT_IN_TONE_CURVE_PRESETS: ToneCurvePreset[] = [
+  createBuiltInPreset('builtin-linear', 'Linear', [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ]),
+  createBuiltInPreset('builtin-medium-contrast', 'Medium Contrast', [
+    { x: 0, y: 0 },
+    { x: 64, y: 54 },
+    { x: 128, y: 128 },
+    { x: 192, y: 204 },
+    { x: 255, y: 255 },
+  ]),
+  createBuiltInPreset('builtin-high-contrast', 'High Contrast', [
+    { x: 0, y: 0 },
+    { x: 64, y: 40 },
+    { x: 128, y: 128 },
+    { x: 192, y: 220 },
+    { x: 255, y: 255 },
+  ]),
+];
 
 export const normalizeToneCurvePresets = (presets: unknown): ToneCurvePreset[] => {
   if (!Array.isArray(presets)) return [];

@@ -241,6 +241,8 @@ export interface AppSettings {
   copyNameSuffixEnabled?: boolean;
   copyNameSuffix?: string;
   toneCurvePresets?: ToneCurvePreset[];
+  leftPanelWidth?: number;
+  rightPanelWidth?: number;
 }
 
 export interface BrushSettings {

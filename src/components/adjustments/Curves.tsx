@@ -13,10 +13,13 @@ import ToneCurvePresetModal from '../modals/ToneCurvePresetModal';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import {
+  BUILT_IN_TONE_CURVE_PRESETS,
   buildToneCurvePresetAdjustments,
   createToneCurvePreset,
   hasToneCurvePresetNameConflict,
+  isToneCurvePresetDirty,
   normalizeToneCurvePresets,
+  updateToneCurvePreset,
 } from '../../utils/toneCurvePresets';
 
 let curveClipboard: Array<Coord> | null = null;
@@ -293,11 +296,16 @@ export default function CurveGraph({
   const [isDeletePresetOpen, setIsDeletePresetOpen] = useState(false);
   const appSettings = useSettingsStore((state) => state.appSettings);
   const handleSettingsChange = useSettingsStore((state) => state.handleSettingsChange);
-  const toneCurvePresets = useMemo(
+  const userToneCurvePresets = useMemo(
     () => normalizeToneCurvePresets(appSettings?.toneCurvePresets),
     [appSettings?.toneCurvePresets],
   );
+  const toneCurvePresets = useMemo(
+    () => [...BUILT_IN_TONE_CURVE_PRESETS, ...userToneCurvePresets],
+    [userToneCurvePresets],
+  );
   const selectedPreset = toneCurvePresets.find((preset) => preset.id === selectedPresetId) || null;
+  const isSelectedPresetDirty = !!selectedPreset && isToneCurvePresetDirty(selectedPreset, adjustments);
   const presetOptions = useMemo(
     () => toneCurvePresets.map((preset) => ({ label: preset.name, value: preset.id })),
     [toneCurvePresets],
@@ -352,17 +360,27 @@ export default function CurveGraph({
     setSelectedPresetId(preset.id);
     void handleSettingsChange({
       ...appSettings,
-      toneCurvePresets: [...toneCurvePresets, preset],
+      toneCurvePresets: [...userToneCurvePresets, preset],
     });
   };
 
   const handleDeletePreset = () => {
-    if (!appSettings || !selectedPreset) return;
+    if (!appSettings || !selectedPreset || selectedPreset.builtIn) return;
     void handleSettingsChange({
       ...appSettings,
-      toneCurvePresets: toneCurvePresets.filter((preset) => preset.id !== selectedPreset.id),
+      toneCurvePresets: userToneCurvePresets.filter((preset) => preset.id !== selectedPreset.id),
     });
     setSelectedPresetId(null);
+  };
+
+  const handleUpdatePreset = () => {
+    if (!appSettings || !selectedPreset || selectedPreset.builtIn) return;
+    void handleSettingsChange({
+      ...appSettings,
+      toneCurvePresets: userToneCurvePresets.map((preset) =>
+        preset.id === selectedPreset.id ? updateToneCurvePreset(preset, adjustments) : preset,
+      ),
+    });
   };
 
   const handleToggleMode = (newMode: 'point' | 'parametric') => {
@@ -852,6 +870,17 @@ export default function CurveGraph({
             options={presetOptions}
             placeholder={t('adjustments.curves.selectPreset')}
             searchPlaceholder={t('adjustments.curves.searchPresets')}
+            selectedSuffix={
+              isSelectedPresetDirty ? (
+                <span
+                  aria-label={t('adjustments.curves.presetModified')}
+                  className="font-bold text-red-500"
+                  data-tooltip={t('adjustments.curves.presetModified')}
+                >
+                  *
+                </span>
+              ) : undefined
+            }
             triggerClassName="bg-surface-secondary h-9 px-2"
             value={selectedPresetId}
           />
@@ -866,11 +895,31 @@ export default function CurveGraph({
           <button
             className="w-9 h-9 shrink-0 rounded-md bg-surface-secondary text-text-secondary hover:text-red-400 hover:bg-surface transition-colors flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-text-secondary"
             data-tooltip={t('adjustments.curves.deletePreset')}
-            disabled={!selectedPreset}
+            disabled={!selectedPreset || selectedPreset.builtIn}
             onClick={() => setIsDeletePresetOpen(true)}
             type="button"
           >
             <Trash2 size={16} />
+          </button>
+        </div>
+      )}
+      {!isForMask && isSelectedPresetDirty && (
+        <div className="flex justify-end gap-2 mb-2">
+          {!selectedPreset?.builtIn && (
+            <button
+              className="px-2 py-1 rounded-md bg-surface-secondary text-text-primary hover:bg-surface text-xs font-medium transition-colors"
+              onClick={handleUpdatePreset}
+              type="button"
+            >
+              {t('adjustments.curves.updatePreset')}
+            </button>
+          )}
+          <button
+            className="px-2 py-1 rounded-md bg-surface-secondary text-text-primary hover:bg-surface text-xs font-medium transition-colors"
+            onClick={() => setIsSavePresetOpen(true)}
+            type="button"
+          >
+            {t('adjustments.curves.saveAsNew')}
           </button>
         </div>
       )}

@@ -480,6 +480,10 @@ pub struct AppSettings {
     pub copy_name_suffix: String,
     #[serde(default)]
     pub tone_curve_presets: Vec<Value>,
+    #[serde(default)]
+    pub left_panel_width: Option<u32>,
+    #[serde(default)]
+    pub right_panel_width: Option<u32>,
 }
 
 impl Default for AppSettings {
@@ -581,6 +585,8 @@ impl Default for AppSettings {
             copy_name_suffix_enabled: false,
             copy_name_suffix: String::new(),
             tone_curve_presets: Vec::new(),
+            left_panel_width: None,
+            right_panel_width: None,
         }
     }
 }
