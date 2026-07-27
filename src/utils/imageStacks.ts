@@ -89,13 +89,14 @@ export const createImageStack = (stacks: ImageStack[], paths: string[], coverPat
 
   const selectedPaths = new Set(paths);
   const remainingStacks = removePathsFromStacks(stacks, selectedPaths);
+  const resolvedCoverPath = paths.includes(coverPath) ? coverPath : paths[0];
 
   return [
     ...remainingStacks,
     {
       id: createStackId(),
-      paths,
-      coverPath: paths.includes(coverPath) ? coverPath : paths[0],
+      paths: [resolvedCoverPath, ...paths.filter((path) => path !== resolvedCoverPath)],
+      coverPath: resolvedCoverPath,
       collapsed: true,
     },
   ];
@@ -104,8 +105,16 @@ export const createImageStack = (stacks: ImageStack[], paths: string[], coverPat
 export const toggleImageStack = (stacks: ImageStack[], stackId: string): ImageStack[] =>
   stacks.map((stack) => (stack.id === stackId ? { ...stack, collapsed: !stack.collapsed } : stack));
 
-export const setImageStackCover = (stacks: ImageStack[], stackId: string, coverPath: string): ImageStack[] =>
-  stacks.map((stack) => (stack.id === stackId && stack.paths.includes(coverPath) ? { ...stack, coverPath } : stack));
+export const moveImageToTopOfStack = (stacks: ImageStack[], stackId: string, imagePath: string): ImageStack[] =>
+  stacks.map((stack) =>
+    stack.id === stackId && stack.paths.includes(imagePath)
+      ? {
+          ...stack,
+          paths: [imagePath, ...stack.paths.filter((path) => path !== imagePath)],
+          coverPath: imagePath,
+        }
+      : stack,
+  );
 
 export const unstackImagePaths = (stacks: ImageStack[], paths: string[]): ImageStack[] => {
   const selectedPaths = new Set(paths);
@@ -176,10 +185,11 @@ export function normalizeImageStacks(stacks: ImageStack[] | undefined, available
   return (stacks || [])
     .map((stack) => {
       const paths = Array.from(new Set(stack.paths)).filter((path) => availablePaths.has(path));
+      const coverPath = paths.includes(stack.coverPath) ? stack.coverPath : paths[0];
       return {
         ...stack,
-        paths,
-        coverPath: paths.includes(stack.coverPath) ? stack.coverPath : paths[0],
+        paths: coverPath ? [coverPath, ...paths.filter((path) => path !== coverPath)] : paths,
+        coverPath,
       };
     })
     .filter((stack) => stack.paths.length >= 2 && stack.coverPath);

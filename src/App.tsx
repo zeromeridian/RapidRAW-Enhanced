@@ -693,6 +693,7 @@ function App() {
                   compactEditorPanelCollapsedHeight={compactEditorPanelCollapsedHeight}
                   thumbnailAspectRatio={thumbnailAspectRatio}
                   sortedImageList={sortedImageList}
+                  groupBadgeInfo={groupBadgeInfo}
                   createResizeHandler={createResizeHandler}
                   handleBackToLibrary={handleBackToLibrary}
                   handleEditorContextMenu={handleEditorContextMenu}

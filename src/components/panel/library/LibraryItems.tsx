@@ -35,7 +35,7 @@ const STACK_SPINE_POSITION_CLASSES: Record<StackMemberPosition, string> = {
 
 const STACK_ACCENT_COLOR = '#f97316';
 
-const StackVisualCue = ({ info }: { info?: StackVisualInfo }) => {
+export const StackVisualCue = ({ info }: { info?: StackVisualInfo }) => {
   if (!info) return null;
 
   return (

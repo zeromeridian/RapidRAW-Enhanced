@@ -22,6 +22,7 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 
 import { ImageFile, Orientation, Panel, ThumbnailAspectRatio } from '../ui/AppProperties';
+import { GroupBadgeInfo } from '../../utils/imageGrouping';
 
 const panelVariants: any = {
   animate: (direction: number) => ({
@@ -49,6 +50,7 @@ interface EditorViewProps {
   compactEditorPanelCollapsedHeight: number;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   sortedImageList: ImageFile[];
+  groupBadgeInfo: Map<string, GroupBadgeInfo> | null;
   createResizeHandler: (stateKey: string, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => void;
   handleBackToLibrary: () => void;
   handleEditorContextMenu: (...args: any) => void;
@@ -73,6 +75,7 @@ export default function EditorView({
   compactEditorPanelCollapsedHeight,
   thumbnailAspectRatio,
   sortedImageList,
+  groupBadgeInfo,
   createResizeHandler,
   handleBackToLibrary,
   handleEditorContextMenu,
@@ -156,6 +159,7 @@ export default function EditorView({
       filmstripHeight={bottomPanelHeight}
       imageList={sortedImageList}
       imageRatings={imageRatings}
+      groupBadgeInfo={groupBadgeInfo}
       isCopied={isCopied}
       isCopyDisabled={!selectedImage}
       isFilmstripVisible={uiVisibility.filmstrip}
