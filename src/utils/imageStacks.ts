@@ -1,6 +1,20 @@
 import { ImageFile, ImageStack } from '../components/ui/AppProperties';
 import { GroupBadgeInfo, GroupId } from './imageGrouping';
 
+export function reorderStackPaths(
+  paths: string[],
+  sourcePath: string,
+  targetPath: string,
+  placeAfterTarget: boolean,
+): string[] {
+  if (sourcePath === targetPath || !paths.includes(sourcePath) || !paths.includes(targetPath)) return paths;
+
+  const reordered = paths.filter((path) => path !== sourcePath);
+  const targetIndex = reordered.indexOf(targetPath);
+  reordered.splice(targetIndex + (placeAfterTarget ? 1 : 0), 0, sourcePath);
+  return reordered;
+}
+
 export function normalizeImageStacks(stacks: ImageStack[] | undefined, availablePaths: Set<string>): ImageStack[] {
   return (stacks || [])
     .map((stack) => {

@@ -41,3 +41,5 @@ src-tauri/libs/
 
 # bench/replay.js result dumps
 bench/out/
+HANDOFF.md
+AGENTS.md
