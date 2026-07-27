@@ -8,7 +8,12 @@ export const autoStackCreatedImages = (pairs: AutoStackPair[]) => {
   if (!appSettings || !supportedTypes || appSettings.autoStackCreatedImages === false) return;
 
   const currentStacks = appSettings.imageStacks || [];
-  const imageStacks = autoStackImagePairs(currentStacks, pairs, supportedTypes);
+  const imageStacks = autoStackImagePairs(
+    currentStacks,
+    pairs,
+    supportedTypes,
+    appSettings.expandAutoCreatedStacks !== false,
+  );
   if (imageStacks === currentStacks) return;
 
   void handleSettingsChange({ ...appSettings, imageStacks });

@@ -178,6 +178,7 @@ export default function MainLibrary(props: MainLibraryProps) {
   const [isBusyLoaderMounted, setIsBusyLoaderMounted] = useState(false);
   const [isProgressHovered, setIsProgressHovered] = useState(false);
   const isSettingsOpen = useUIStore((state) => state.isSettingsOpen);
+  const splashBypassAttemptedRef = useRef(false);
 
   const libraryDisplayMode = props.appSettings?.libraryDisplayMode || LibraryDisplayMode.Grid;
 
@@ -191,6 +192,29 @@ export default function MainLibrary(props: MainLibraryProps) {
   };
 
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
+
+  useEffect(() => {
+    const hasStoredLibrary = !!props.appSettings?.lastRootPath || !!props.appSettings?.rootFolders?.length;
+    if (
+      props.rootPaths.length > 0 ||
+      !props.appSettings?.skipSplashScreen ||
+      !hasStoredLibrary ||
+      isSettingsOpen ||
+      splashBypassAttemptedRef.current
+    ) {
+      return;
+    }
+
+    splashBypassAttemptedRef.current = true;
+    props.onContinueSession();
+  }, [
+    isSettingsOpen,
+    props.appSettings?.lastRootPath,
+    props.appSettings?.rootFolders,
+    props.appSettings?.skipSplashScreen,
+    props.onContinueSession,
+    props.rootPaths.length,
+  ]);
 
   const translatedRatingFilterOptions = useMemo(
     () => [
@@ -533,9 +557,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                   }
                 }}
               >
-                {isBusyLoaderMounted && (
-                  <Loader2 size={14} className="animate-spin text-text-secondary shrink-0" />
-                )}
+                {isBusyLoaderMounted && <Loader2 size={14} className="animate-spin text-text-secondary shrink-0" />}
                 <div
                   className={`flex items-center transition-all duration-300 ease-out overflow-hidden ${
                     isProgressHovered && isBusyDelayed && (props.thumbnailProgress?.total ?? 0) > 0
@@ -594,6 +616,13 @@ export default function MainLibrary(props: MainLibraryProps) {
               editedStatusOptions={translatedEditedStatusOptions}
               sortOptions={translatedSortOptions}
             />
+            <Button
+              className="h-12 w-12 bg-transparent text-text-primary shadow-none p-0 flex items-center justify-center"
+              onClick={() => setUI({ isSettingsOpen: true })}
+              data-tooltip={t('library.splash.goToSettings')}
+            >
+              <Settings className="w-5 h-5" />
+            </Button>
             {!props.isAndroid && (
               <Button
                 className="h-12 w-12 bg-transparent text-text-primary shadow-none p-0 flex items-center justify-center"

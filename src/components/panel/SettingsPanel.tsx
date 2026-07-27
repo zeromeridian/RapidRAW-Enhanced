@@ -1171,6 +1171,30 @@ export default function SettingsPanel({
                       </SettingItem>
 
                       <SettingItem
+                        label={t('settings.general.expandAutoCreatedStacks')}
+                        description={t('settings.general.expandAutoCreatedStacksDesc')}
+                      >
+                        <Switch
+                          checked={appSettings?.expandAutoCreatedStacks ?? true}
+                          id="expand-auto-created-stacks-toggle"
+                          label={t('settings.general.enableExpandAutoCreatedStacks')}
+                          onChange={(checked) => onSettingsChange({ ...appSettings, expandAutoCreatedStacks: checked })}
+                        />
+                      </SettingItem>
+
+                      <SettingItem
+                        label={t('settings.general.skipSplashScreen')}
+                        description={t('settings.general.skipSplashScreenDesc')}
+                      >
+                        <Switch
+                          checked={appSettings?.skipSplashScreen ?? false}
+                          id="skip-splash-screen-toggle"
+                          label={t('settings.general.enableSkipSplashScreen')}
+                          onChange={(checked) => onSettingsChange({ ...appSettings, skipSplashScreen: checked })}
+                        />
+                      </SettingItem>
+
+                      <SettingItem
                         label={t('settings.general.exportFileSuffix')}
                         description={t('settings.general.exportFileSuffixDesc')}
                       >
