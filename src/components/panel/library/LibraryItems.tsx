@@ -33,6 +33,8 @@ const STACK_SPINE_POSITION_CLASSES: Record<StackMemberPosition, string> = {
   last: 'top-0 bottom-2 rounded-b-full',
 };
 
+const STACK_ACCENT_COLOR = '#f97316';
+
 const StackVisualCue = ({ info }: { info?: StackVisualInfo }) => {
   if (!info) return null;
 
@@ -40,10 +42,11 @@ const StackVisualCue = ({ info }: { info?: StackVisualInfo }) => {
     <>
       {!info.collapsed && (
         <div
-          className={clsx(
-            'absolute left-0 z-20 w-0.5 bg-accent/40 pointer-events-none',
-            STACK_SPINE_POSITION_CLASSES[info.position],
-          )}
+          className={clsx('absolute left-0 z-20 w-1 pointer-events-none', STACK_SPINE_POSITION_CLASSES[info.position])}
+          style={{
+            backgroundColor: STACK_ACCENT_COLOR,
+            boxShadow: '1px 0 0 rgba(0, 0, 0, 0.65)',
+          }}
         />
       )}
       {info.isCover && (
@@ -311,7 +314,10 @@ const ThumbnailComponent = ({
       <div className="absolute top-1.5 right-1.5 flex items-center justify-end z-10 pointer-events-none">
         <div
           className={clsx(
-            'rounded-full h-5 px-1.5 flex items-center justify-center gap-0 shadow-md bg-black/30 pointer-events-auto transition-all duration-200 ease-out origin-top-right',
+            'rounded-full h-5 px-1.5 flex items-center justify-center gap-0 pointer-events-auto transition-all duration-200 ease-out origin-top-right',
+            stackVisual?.collapsed && groupBadgeCount
+              ? 'bg-black/80 ring-1 ring-white/90 shadow-[0_1px_4px_rgba(0,0,0,0.9)]'
+              : 'bg-black/30 shadow-md',
             hasAnyOverlay ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none',
           )}
         >
@@ -792,7 +798,12 @@ const ListItemComponent = ({
           {stackBadgeCount && (
             <button
               type="button"
-              className="absolute top-1 right-1 z-10 rounded-full bg-black/50 hover:bg-black/70 text-white px-1.5 h-5 flex items-center gap-0.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-white"
+              className={clsx(
+                'absolute top-1 right-1 z-10 rounded-full text-white px-1.5 h-5 flex items-center gap-0.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white',
+                stackVisual?.collapsed
+                  ? 'bg-black/80 hover:bg-black ring-1 ring-white/90 shadow-[0_1px_4px_rgba(0,0,0,0.9)]'
+                  : 'bg-black/50 hover:bg-black/70',
+              )}
               data-tooltip={stackBadgeLabel}
               onClick={(event) => {
                 event.stopPropagation();
