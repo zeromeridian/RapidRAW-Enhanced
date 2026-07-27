@@ -5,6 +5,29 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.20 — 2026-07-27
+
+### Export metadata controls
+
+- Removed the redundant standalone Metadata section and the separate
+  full/safe inheritance switch.
+- JPEG and TIFF now expose one **Include EXIF metadata** toggle inside
+  **Advanced → Export Settings**, with **Remove GPS Data** nested below it.
+- The single toggle automatically selects the correct implementation: complete
+  readable EXIF for JPEG and the validated safe allowlist for TIFF.
+- Export presets retain only the existing `keepMetadata` choice as the active
+  source of truth. Older presets remain compatible.
+
+### Validation and artifact
+
+- Frontend production build, Rust compilation, locale runtime validation,
+  relevant-file TypeScript diagnostics, and AppImage packaging passed.
+- Artifact:
+  `src-tauri/target/release/bundle/appimage/RapidRAW - Enhanced_1.6.1-colrbent.20_amd64.AppImage`
+- SHA-256:
+  `98249d9b65150eea6c1a8d956e405aa32283db42e5bcb119240049973e03e492`
+- Platform: Linux x86-64 AppImage.
+
 ## 1.6.1-colrbent.19 — 2026-07-27
 
 ### TIFF metadata
