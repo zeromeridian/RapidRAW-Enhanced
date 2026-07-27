@@ -1,7 +1,7 @@
 name: Bug Report
-description: Report a bug or issue with RapidRAW
-title: "BUG: "
-labels: ["bug"]
+description: Report a bug or issue with RapidRAW - Enhanced
+title: 'BUG: '
+labels: ['bug']
 body:
   - type: markdown
     attributes:
@@ -40,7 +40,7 @@ body:
 
   - type: markdown
     attributes:
-      value: "### Your Environment"
+      value: '### Your Environment'
 
   - type: dropdown
     id: operating-system
@@ -59,11 +59,11 @@ body:
       required: true
 
   - type: input
-    id: rapidraw-version
+    id: colrbent-version
     attributes:
-      label: RapidRAW Version
-      description: What version of RapidRAW are you using?
-      placeholder: e.g., v1.4.3
+      label: ColrBent Version
+      description: What version of ColrBent are you using?
+      placeholder: e.g., 1.6.1-colrbent.7
     validations:
       required: true
 
@@ -79,7 +79,7 @@ body:
       value: |
         ### Lenses & Camera Support
 
-        RapidRAW relies on external libraries for lens corrections and raw file decoding. If your camera or lens is unsupported, please open an issue directly with the relevant project:
+        ColrBent relies on external libraries for lens corrections and raw file decoding. If your camera or lens is unsupported, please open an issue directly with the relevant project:
 
         | Feature | Library | Request addition |
         |---|---|---|

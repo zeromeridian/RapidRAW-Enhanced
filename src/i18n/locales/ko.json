@@ -1007,7 +1007,7 @@
     },
     "splash": {
       "addFolder": "폴더 추가",
-      "brand": "RapidRAW",
+      "brand": "RapidRAW - Enhanced",
       "continueSession": "세션 계속하기",
       "contribute": "GitHub에서 기여하기",
       "descriptionAndroid": "매우 빠른 GPU 가속 RAW 이미지 편집기입니다. 라이브러리를 열어 시작하세요.",
@@ -1472,7 +1472,7 @@
       "font": "글꼴",
       "fontDesc": "애플리케이션 글꼴을 변경합니다.",
       "nativeTitlebar": "네이티브 제목 표시줄",
-      "nativeTitlebarDesc": "RapidRAW의 사용자 지정 제목 표시줄 대신 시스템 기본 창 제목 표시줄을 사용합니다.",
+      "nativeTitlebarDesc": "RapidRAW - Enhanced의 사용자 지정 제목 표시줄 대신 시스템 기본 창 제목 표시줄을 사용합니다.",
       "poppins": "Poppins",
       "showImageCounts": "이미지 개수 표시",
       "system": "시스템 기본값",

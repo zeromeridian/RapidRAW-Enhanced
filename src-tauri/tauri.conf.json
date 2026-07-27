@@ -1,5 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
+  "productName": "RapidRAW - Enhanced",
   "identifier": "io.github.CyberTimon.RapidRAW",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -12,7 +13,7 @@
       {
         "label": "main",
         "create": false,
-        "title": "RapidRAW",
+        "title": "RapidRAW - Enhanced",
         "width": 1280,
         "height": 720,
         "minWidth": 800,
@@ -93,5 +94,5 @@
       }
     }
   },
-  "version": "1.6.1-colrbent.7"
+  "version": "1.6.1-colrbent.8"
 }

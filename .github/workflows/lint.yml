@@ -1,4 +1,4 @@
-name: Lint
+name: RapidRAW - Enhanced Lint
 
 on:
   push:
@@ -47,7 +47,7 @@ jobs:
 
       - name: Check formatting
         working-directory: src-tauri
-        run: cargo fmt -p RapidRAW -- --check
+        run: cargo fmt -p RapidRAW-Enhanced -- --check
 
   clippy:
     name: cargo clippy

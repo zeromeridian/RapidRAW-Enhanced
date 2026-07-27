@@ -1009,7 +1009,7 @@
     },
     "splash": {
       "addFolder": "Ordner hinzufügen",
-      "brand": "RapidRAW",
+      "brand": "RapidRAW - Enhanced",
       "continueSession": "Sitzung fortsetzen",
       "contribute": "Auf GitHub beitragen",
       "descriptionAndroid": "Ein blitzschneller, GPU-beschleunigter RAW-Bildeditor. Öffnen Sie die Bibliothek, um zu beginnen.",
@@ -1474,7 +1474,7 @@
       "font": "Schriftart",
       "fontDesc": "Ändern Sie die Schriftart der Anwendung.",
       "nativeTitlebar": "Native Titelleiste",
-      "nativeTitlebarDesc": "Verwenden Sie die Standard-Fenstertitelleiste Ihres Systems anstelle der benutzerdefinierten von RapidRAW.",
+      "nativeTitlebarDesc": "Verwenden Sie die Standard-Fenstertitelleiste Ihres Systems anstelle der benutzerdefinierten von RapidRAW - Enhanced.",
       "poppins": "Poppins",
       "showImageCounts": "Bildanzahl anzeigen",
       "system": "Systemstandard",
