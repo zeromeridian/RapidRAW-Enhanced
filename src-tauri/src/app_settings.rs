@@ -478,6 +478,8 @@ pub struct AppSettings {
     pub copy_name_suffix_enabled: bool,
     #[serde(default)]
     pub copy_name_suffix: String,
+    #[serde(default)]
+    pub tone_curve_presets: Vec<Value>,
 }
 
 impl Default for AppSettings {
@@ -578,6 +580,7 @@ impl Default for AppSettings {
             export_file_suffix: String::new(),
             copy_name_suffix_enabled: false,
             copy_name_suffix: String::new(),
+            tone_curve_presets: Vec::new(),
         }
     }
 }
@@ -676,4 +679,29 @@ pub fn save_settings(settings: AppSettings, app_handle: AppHandle) -> Result<(),
         .unwrap()
         .set_capacity(cache_size);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppSettings;
+    use serde_json::json;
+
+    #[test]
+    fn tone_curve_presets_round_trip_through_settings() {
+        let mut settings = AppSettings::default();
+        settings.tone_curve_presets = vec![json!({
+            "id": "curve-1",
+            "name": "Portrait",
+            "curveMode": "point",
+            "pointCurves": {},
+            "parametricCurve": {}
+        })];
+
+        let serialized = serde_json::to_string(&settings).expect("settings should serialize");
+        assert!(serialized.contains("\"toneCurvePresets\""));
+
+        let restored: AppSettings =
+            serde_json::from_str(&serialized).expect("settings should deserialize");
+        assert_eq!(restored.tone_curve_presets, settings.tone_curve_presets);
+    }
 }

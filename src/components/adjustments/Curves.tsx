@@ -1,13 +1,23 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCcw, Copy, ClipboardPaste, Spline, Settings2 } from 'lucide-react';
+import { RotateCcw, Copy, ClipboardPaste, Spline, Settings2, Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ActiveChannel, Adjustments, Coord, ParametricCurveSettings } from '../../utils/adjustments';
 import { Theme, OPTION_SEPARATOR } from '../ui/AppProperties';
 import { useContextMenu } from '../../context/ContextMenuContext';
 import Text from '../ui/Text';
 import Slider from '../ui/Slider';
+import Dropdown from '../ui/Dropdown';
+import ConfirmModal from '../modals/ConfirmModal';
+import ToneCurvePresetModal from '../modals/ToneCurvePresetModal';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import {
+  buildToneCurvePresetAdjustments,
+  createToneCurvePreset,
+  hasToneCurvePresetNameConflict,
+  normalizeToneCurvePresets,
+} from '../../utils/toneCurvePresets';
 
 let curveClipboard: Array<Coord> | null = null;
 let parametricClipboard: any = null;
@@ -267,6 +277,7 @@ export default function CurveGraph({
   setAdjustments,
   histogram,
   theme,
+  isForMask = false,
   onDragStateChange,
 }: CurveGraphProps) {
   const { t } = useTranslation();
@@ -277,6 +288,20 @@ export default function CurveGraph({
   const [draggingSplitKey, setDraggingSplitKey] = useState<'split1' | 'split2' | 'split3' | null>(null);
   const [localPoints, setLocalPoints] = useState<Array<Coord> | null>(null);
   const [localParametricSettings, setLocalParametricSettings] = useState<ParametricCurveSettings | null>(null);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [isSavePresetOpen, setIsSavePresetOpen] = useState(false);
+  const [isDeletePresetOpen, setIsDeletePresetOpen] = useState(false);
+  const appSettings = useSettingsStore((state) => state.appSettings);
+  const handleSettingsChange = useSettingsStore((state) => state.handleSettingsChange);
+  const toneCurvePresets = useMemo(
+    () => normalizeToneCurvePresets(appSettings?.toneCurvePresets),
+    [appSettings?.toneCurvePresets],
+  );
+  const selectedPreset = toneCurvePresets.find((preset) => preset.id === selectedPresetId) || null;
+  const presetOptions = useMemo(
+    () => toneCurvePresets.map((preset) => ({ label: preset.name, value: preset.id })),
+    [toneCurvePresets],
+  );
 
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -300,6 +325,45 @@ export default function CurveGraph({
 
   const activeParametricSettings =
     (draggingSplitKey ? localParametricSettings : null) ?? parametricCurves[activeChannel];
+
+  useEffect(() => {
+    if (selectedPresetId && !toneCurvePresets.some((preset) => preset.id === selectedPresetId)) {
+      setSelectedPresetId(null);
+    }
+  }, [selectedPresetId, toneCurvePresets]);
+
+  const handleApplyPreset = (presetId: string) => {
+    const preset = toneCurvePresets.find((candidate) => candidate.id === presetId);
+    if (!preset) return;
+
+    const presetAdjustments = buildToneCurvePresetAdjustments(preset, buildParametricPoints);
+    setSelectedPresetId(preset.id);
+    setCurveMode(preset.curveMode);
+    setLocalPoints(null);
+    setLocalParametricSettings(null);
+    setDraggingPointIndex(null);
+    setDraggingSplitKey(null);
+    setAdjustments((prev: Adjustments) => ({ ...prev, ...presetAdjustments }));
+  };
+
+  const handleSavePreset = (name: string) => {
+    if (!appSettings || hasToneCurvePresetNameConflict(name, toneCurvePresets)) return;
+    const preset = createToneCurvePreset(name, adjustments);
+    setSelectedPresetId(preset.id);
+    void handleSettingsChange({
+      ...appSettings,
+      toneCurvePresets: [...toneCurvePresets, preset],
+    });
+  };
+
+  const handleDeletePreset = () => {
+    if (!appSettings || !selectedPreset) return;
+    void handleSettingsChange({
+      ...appSettings,
+      toneCurvePresets: toneCurvePresets.filter((preset) => preset.id !== selectedPreset.id),
+    });
+    setSelectedPresetId(null);
+  };
 
   const handleToggleMode = (newMode: 'point' | 'parametric') => {
     if (newMode === curveMode) return;
@@ -780,6 +844,37 @@ export default function CurveGraph({
 
   return (
     <div className="select-none touch-none" ref={containerRef}>
+      {!isForMask && (
+        <div className="flex items-center gap-1 mb-2 mt-2">
+          <Dropdown
+            className="grow min-w-0"
+            onChange={handleApplyPreset}
+            options={presetOptions}
+            placeholder={t('adjustments.curves.selectPreset')}
+            searchPlaceholder={t('adjustments.curves.searchPresets')}
+            triggerClassName="bg-surface-secondary h-9 px-2"
+            value={selectedPresetId}
+          />
+          <button
+            className="w-9 h-9 shrink-0 rounded-md bg-surface-secondary text-text-secondary hover:text-text-primary hover:bg-surface transition-colors flex items-center justify-center"
+            data-tooltip={t('adjustments.curves.savePreset')}
+            onClick={() => setIsSavePresetOpen(true)}
+            type="button"
+          >
+            <Save size={16} />
+          </button>
+          <button
+            className="w-9 h-9 shrink-0 rounded-md bg-surface-secondary text-text-secondary hover:text-red-400 hover:bg-surface transition-colors flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-text-secondary"
+            data-tooltip={t('adjustments.curves.deletePreset')}
+            disabled={!selectedPreset}
+            onClick={() => setIsDeletePresetOpen(true)}
+            type="button"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-2 mb-2 mt-2">
         <div className="flex items-center gap-1 p-1 rounded-lg bg-surface-secondary shrink-0">
           <button
@@ -1044,6 +1139,26 @@ export default function CurveGraph({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {!isForMask && (
+        <>
+          <ToneCurvePresetModal
+            existingNames={toneCurvePresets.map((preset) => preset.name)}
+            isOpen={isSavePresetOpen}
+            onClose={() => setIsSavePresetOpen(false)}
+            onSave={handleSavePreset}
+          />
+          <ConfirmModal
+            confirmText={t('adjustments.curves.deletePreset')}
+            confirmVariant="danger"
+            isOpen={isDeletePresetOpen}
+            message={t('adjustments.curves.deletePresetMessage', { name: selectedPreset?.name || '' })}
+            onClose={() => setIsDeletePresetOpen(false)}
+            onConfirm={handleDeletePreset}
+            title={t('adjustments.curves.deletePresetTitle')}
+          />
+        </>
+      )}
     </div>
   );
 }
