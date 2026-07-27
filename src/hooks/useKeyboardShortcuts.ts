@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { ImageFile, Panel, ExifOverlay } from '../components/ui/AppProperties';
+import { ImageFile, Panel, ExifOverlay, LibraryDisplayMode } from '../components/ui/AppProperties';
 import { KEYBIND_DEFINITIONS, normalizeCombo } from '../utils/keyboardUtils';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
@@ -62,6 +62,21 @@ export const useKeyboardShortcuts = ({
         execute: (e: any, s: any) => {
           e.preventDefault();
           handleImageSelect(s.library.libraryActivePath!);
+        },
+      },
+      show_library_grid: {
+        shouldFire: () => true,
+        execute: (e: any, s: any) => {
+          e.preventDefault();
+          if (s.settings.appSettings?.libraryDisplayMode !== LibraryDisplayMode.Grid) {
+            s.settings.handleSettingsChange({
+              ...s.settings.appSettings,
+              libraryDisplayMode: LibraryDisplayMode.Grid,
+            });
+          }
+          if (s.editor.selectedImage) {
+            handleBackToLibrary();
+          }
         },
       },
       copy_adjustments: {

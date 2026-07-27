@@ -1595,6 +1595,7 @@
         "rotate_left": "Повернуть на 90° против часовой стрелки",
         "rotate_right": "Повернуть на 90° по часовой стрелке",
         "select_all": "Выбрать все снимки",
+        "show_library_grid": "Show Library Grid",
         "show_original": "Показать оригинал (До/После)",
         "toggle_adjustments": "Панель коррекции",
         "toggle_ai": "Панель ИИ",

@@ -26,6 +26,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'library',
   },
   {
+    action: 'show_library_grid',
+    description: 'settings.keybinds.actions.show_library_grid',
+    defaultCombo: ['KeyG'],
+    section: 'library',
+  },
+  {
     action: 'copy_files',
     description: 'settings.keybinds.actions.copy_files',
     defaultCombo: ['ctrl', 'shift', 'KeyC'],

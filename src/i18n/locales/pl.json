@@ -1595,6 +1595,7 @@
         "rotate_left": "Obróć o 90° w lewo",
         "rotate_right": "Obróć o 90° w prawo",
         "select_all": "Zaznacz wszystkie obrazy",
+        "show_library_grid": "Show Library Grid",
         "show_original": "Pokaż oryginał (przed/po)",
         "toggle_adjustments": "Przełącz panel Ustawienia",
         "toggle_ai": "Przełącz panel AI",
