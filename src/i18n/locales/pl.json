@@ -795,6 +795,8 @@
   "export": {
     "advanced": {
       "exportMasks": "Eksportuj maski jako osobne pliki",
+      "exportToSourceFolder": "Export to same folder as source",
+      "inheritAllExif": "Inherit all EXIF data from source",
       "preserveFolders": "Zachowaj strukturę folderów",
       "preserveTimestamps": "Ustaw datę modyfikacji pliku na podstawie daty wykonania (EXIF)",
       "title": "Ustawienia eksportu"

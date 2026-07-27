@@ -9,6 +9,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use exif::{Exif, In, Value};
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
+use little_exif::ifd::ExifTagGroup;
 use little_exif::metadata::Metadata;
 use little_exif::rational::{iR64, uR64};
 use rawler::decoders::RawMetadata;
@@ -808,6 +809,7 @@ pub fn write_image_with_metadata(
     output_format: &str,
     keep_metadata: bool,
     strip_gps: bool,
+    inherit_all_exif: bool,
 ) -> Result<(), String> {
     // FIXME: temporary solution until I find a way to write metadata to TIFF
     if !keep_metadata || output_format.to_lowercase() == "tiff" {
@@ -838,10 +840,23 @@ pub fn write_image_with_metadata(
         _ => return Ok(()),
     };
 
-    let mut metadata = Metadata::new();
-    let mut source_read_success = false;
+    let (mut metadata, mut source_read_success) = if inherit_all_exif {
+        match Metadata::new_from_path(original_path) {
+            Ok(metadata) => (metadata, true),
+            Err(error) => {
+                log::warn!(
+                    "Could not inherit complete EXIF from '{}': {}. Falling back to supported metadata fields.",
+                    original_path.display(),
+                    error
+                );
+                (Metadata::new(), false)
+            }
+        }
+    } else {
+        (Metadata::new(), false)
+    };
 
-    if let Some(map) = read_rrexif_sidecar(original_path) {
+    if !source_read_success && let Some(map) = read_rrexif_sidecar(original_path) {
         source_read_success = true;
 
         let clean_s = |s: &String| s.replace('"', "").trim().to_string();
@@ -1193,6 +1208,12 @@ pub fn write_image_with_metadata(
                     metadata.set_tag(ExifTag::GPSAltitudeRef(vec![alt_ref]));
                 }
             }
+        }
+    }
+
+    if strip_gps {
+        for tag in 0x0000..=0x001f {
+            metadata.remove_tag_by_hex_group(tag, ExifTagGroup::GPS);
         }
     }
 

@@ -211,6 +211,8 @@ export default function ExportPanel({
     setDontEnlarge,
     keepMetadata,
     setKeepMetadata,
+    inheritAllExif,
+    setInheritAllExif,
     preserveTimestamps,
     setPreserveTimestamps,
     stripGps,
@@ -233,6 +235,8 @@ export default function ExportPanel({
     setWatermarkOpacity,
     preserveFolders,
     setPreserveFolders,
+    exportToSourceFolder,
+    setExportToSourceFolder,
     handleApplyPreset,
     currentSettingsObject,
   } = useExportSettings();
@@ -372,8 +376,10 @@ export default function ExportPanel({
       filenameTemplate,
       jpegQuality,
       keepMetadata,
+      inheritAllExif,
       preserveTimestamps,
       preserveFolders,
+      exportToSourceFolder,
       resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
       stripGps,
       exportMasks: !isLibraryContext ? exportMasks : undefined,
@@ -412,6 +418,7 @@ export default function ExportPanel({
     resizeValue,
     dontEnlarge,
     keepMetadata,
+    inheritAllExif,
     preserveTimestamps,
     stripGps,
     filenameTemplate,
@@ -424,6 +431,7 @@ export default function ExportPanel({
     debouncedEstimateSize,
     exportMasks,
     preserveFolders,
+    exportToSourceFolder,
     isLibraryContext,
   ]);
 
@@ -444,7 +452,9 @@ export default function ExportPanel({
   const handleExport = async () => {
     if (numImages === 0 || isExporting) return;
 
-    let finalFilenameTemplate = filenameTemplate;
+    const filenameSuffix = getEnabledExportSuffix(appSettings);
+    let finalFilenameTemplate =
+      filenameSuffix && filenameTemplate === '{original_filename}_edited' ? '{original_filename}' : filenameTemplate;
     if (
       numImages > 1 &&
       !filenameTemplate.includes('{sequence}') &&
@@ -456,11 +466,13 @@ export default function ExportPanel({
 
     const exportSettings: ExportSettings = {
       filenameTemplate: finalFilenameTemplate,
-      filenameSuffix: getEnabledExportSuffix(appSettings),
+      filenameSuffix,
       jpegQuality,
       keepMetadata,
+      inheritAllExif,
       preserveTimestamps,
       preserveFolders,
+      exportToSourceFolder,
       resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
       stripGps,
       exportMasks: !isLibraryContext ? exportMasks : undefined,
@@ -482,13 +494,13 @@ export default function ExportPanel({
       const selectedFormat: any = FILE_FORMATS.find((f) => f.id === fileFormat);
 
       let outputFolderOrFile = '';
-      const shouldChooseOutputFile = numImages === 1 && !preserveFolders;
-      if (shouldChooseOutputFile) {
+      const shouldChooseOutputFile = !exportToSourceFolder && numImages === 1 && !preserveFolders;
+      if (exportToSourceFolder) {
+        outputFolderOrFile = '';
+      } else if (shouldChooseOutputFile) {
         const originalFilename = pathsToExport[0].split(/[\\/]/).pop() || '';
         const stem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
-        const suggestedName = `${finalFilenameTemplate.replace('{original_filename}', stem)}${
-          getEnabledExportSuffix(appSettings) || ''
-        }`;
+        const suggestedName = `${finalFilenameTemplate.replace('{original_filename}', stem)}${filenameSuffix || ''}`;
         const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
 
         outputFolderOrFile = isAndroid
@@ -514,8 +526,8 @@ export default function ExportPanel({
             })) as string);
       }
 
-      if (isAndroid || outputFolderOrFile) {
-        if (!isAndroid) {
+      if (isAndroid || exportToSourceFolder || outputFolderOrFile) {
+        if (!isAndroid && !exportToSourceFolder) {
           const dir = shouldChooseOutputFile
             ? outputFolderOrFile.substring(
                 0,
@@ -698,7 +710,10 @@ export default function ExportPanel({
                       checked={keepMetadata}
                       disabled={isExporting}
                       label={t('export.metadata.saveWithMetadata')}
-                      onChange={setKeepMetadata}
+                      onChange={(enabled) => {
+                        setKeepMetadata(enabled);
+                        if (!enabled) setInheritAllExif(false);
+                      }}
                       trackClassName="bg-surface"
                     />
                     {keepMetadata && (
@@ -827,11 +842,33 @@ export default function ExportPanel({
                           label={t('export.advanced.preserveFolders')}
                           checked={preserveFolders}
                           onChange={setPreserveFolders}
+                          disabled={isExporting || exportToSourceFolder}
+                          trackClassName="bg-surface"
+                        />
+                        <Switch
+                          label={t('export.advanced.exportToSourceFolder')}
+                          checked={exportToSourceFolder}
+                          onChange={(enabled) => {
+                            setExportToSourceFolder(enabled);
+                            if (enabled) setPreserveFolders(false);
+                          }}
                           disabled={isExporting}
                           trackClassName="bg-surface"
                         />
                         {fileFormat !== FileFormats.Cube && (
                           <>
+                            {fileFormat === FileFormats.Jpeg && (
+                              <Switch
+                                checked={inheritAllExif}
+                                disabled={isExporting}
+                                label={t('export.advanced.inheritAllExif')}
+                                onChange={(enabled) => {
+                                  setInheritAllExif(enabled);
+                                  if (enabled) setKeepMetadata(true);
+                                }}
+                                trackClassName="bg-surface"
+                              />
+                            )}
                             <Switch
                               checked={preserveTimestamps}
                               disabled={isExporting}

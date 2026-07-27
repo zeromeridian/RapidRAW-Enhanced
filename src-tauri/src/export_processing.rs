@@ -66,6 +66,8 @@ pub struct ExportSettings {
     pub resize: Option<ResizeOptions>,
     pub keep_metadata: bool,
     #[serde(default)]
+    pub inherit_all_exif: bool,
+    #[serde(default)]
     pub preserve_timestamps: bool,
     pub strip_gps: bool,
     pub filename_template: Option<String>,
@@ -76,6 +78,8 @@ pub struct ExportSettings {
     pub export_masks: bool,
     #[serde(default)]
     pub preserve_folders: bool,
+    #[serde(default)]
+    pub export_to_source_folder: bool,
 }
 
 #[derive(Serialize, Debug)]
@@ -503,6 +507,7 @@ fn save_image_with_metadata(
         &extension,
         export_settings.keep_metadata,
         export_settings.strip_gps,
+        export_settings.inherit_all_exif,
     )?;
 
     #[cfg(target_os = "android")]
@@ -1016,6 +1021,17 @@ pub(crate) async fn export_images_impl(
                     .filename_template
                     .as_deref()
                     .unwrap_or("{original_filename}_edited");
+                let has_filename_suffix = export_settings
+                    .filename_suffix
+                    .as_deref()
+                    .map(sanitize_filename_suffix)
+                    .is_some_and(|suffix| !suffix.is_empty());
+                let filename_template =
+                    if has_filename_suffix && filename_template == "{original_filename}_edited" {
+                        "{original_filename}"
+                    } else {
+                        filename_template
+                    };
 
                 let mut new_stem = generate_filename_from_template(
                     filename_template,
@@ -1041,7 +1057,12 @@ pub(crate) async fn export_images_impl(
                 }
 
                 let new_filename = format!("{}.{}", new_stem, output_format);
-                let output_path = if is_explicit_file_path && total_paths == 1 {
+                let output_path = if export_settings.export_to_source_folder {
+                    source_path
+                        .parent()
+                        .unwrap_or_else(|| Path::new(""))
+                        .join(&new_filename)
+                } else if is_explicit_file_path && total_paths == 1 {
                     output_folder_path
                 } else if export_settings.preserve_folders {
                     if let Some(rel_dir) = relative_export_dir_for_preserved_folders(
@@ -1059,6 +1080,12 @@ pub(crate) async fn export_images_impl(
                 } else {
                     output_folder_path.join(&new_filename)
                 };
+                if export_settings.export_to_source_folder && output_path == source_path {
+                    return Err(format!(
+                        "Export would overwrite its source image: {}",
+                        source_path.display()
+                    ));
+                }
 
                 let extension = output_format.to_lowercase();
 
@@ -1368,6 +1395,7 @@ pub async fn run_headless_export(
         jpeg_quality: session.quality,
         resize: None,
         keep_metadata: session.keep_metadata,
+        inherit_all_exif: false,
         preserve_timestamps: true,
         strip_gps: false,
         filename_template: None,
@@ -1375,6 +1403,7 @@ pub async fn run_headless_export(
         watermark: None,
         export_masks: false,
         preserve_folders: true,
+        export_to_source_folder: false,
     };
 
     let mut custom_adjustments = None;

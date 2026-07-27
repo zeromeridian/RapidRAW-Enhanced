@@ -774,6 +774,8 @@
   "export": {
     "advanced": {
       "exportMasks": "Exporter les masques sous forme de fichiers séparés",
+      "exportToSourceFolder": "Export to same folder as source",
+      "inheritAllExif": "Inherit all EXIF data from source",
       "preserveFolders": "Conserver la structure des dossiers",
       "preserveTimestamps": "Définir l'horodatage des fichiers à partir de la date de prise de vue EXIF",
       "title": "Paramètres d'exportation"

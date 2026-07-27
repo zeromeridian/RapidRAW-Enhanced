@@ -229,6 +229,10 @@ pub struct ExportPreset {
     pub resize_value: u32,
     pub dont_enlarge: bool,
     pub keep_metadata: bool,
+    #[serde(default)]
+    pub inherit_all_exif: bool,
+    #[serde(default)]
+    pub preserve_timestamps: bool,
     pub strip_gps: bool,
     pub filename_template: String,
     pub enable_watermark: bool,
@@ -241,6 +245,8 @@ pub struct ExportPreset {
     pub export_masks: Option<bool>,
     #[serde(default)]
     pub preserve_folders: Option<bool>,
+    #[serde(default)]
+    pub export_to_source_folder: Option<bool>,
     #[serde(default)]
     pub last_export_path: Option<String>,
 }
@@ -257,6 +263,8 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             resize_value: 2048,
             dont_enlarge: true,
             keep_metadata: true,
+            inherit_all_exif: false,
+            preserve_timestamps: false,
             strip_gps: false,
             filename_template: "{original_filename}".to_string(),
             enable_watermark: false,
@@ -267,6 +275,7 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             watermark_opacity: 75,
             export_masks: Some(false),
             preserve_folders: Some(false),
+            export_to_source_folder: Some(false),
             last_export_path: None,
         },
         ExportPreset {
@@ -279,6 +288,8 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             resize_value: 2048,
             dont_enlarge: true,
             keep_metadata: false,
+            inherit_all_exif: false,
+            preserve_timestamps: false,
             strip_gps: true,
             filename_template: "{original_filename}_web".to_string(),
             enable_watermark: false,
@@ -289,6 +300,7 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             watermark_opacity: 75,
             export_masks: Some(false),
             preserve_folders: Some(false),
+            export_to_source_folder: Some(false),
             last_export_path: None,
         },
     ]

@@ -9,10 +9,12 @@ export function useExportSettings() {
   const [resizeValue, setResizeValue] = useState(2048);
   const [dontEnlarge, setDontEnlarge] = useState(true);
   const [keepMetadata, setKeepMetadata] = useState(true);
+  const [inheritAllExif, setInheritAllExif] = useState(false);
   const [preserveTimestamps, setPreserveTimestamps] = useState(false);
   const [stripGps, setStripGps] = useState(true);
   const [exportMasks, setExportMasks] = useState(false);
   const [preserveFolders, setPreserveFolders] = useState(false);
+  const [exportToSourceFolder, setExportToSourceFolder] = useState(false);
   const [filenameTemplate, setFilenameTemplate] = useState('{original_filename}_edited');
   const [enableWatermark, setEnableWatermark] = useState(false);
   const [watermarkPath, setWatermarkPath] = useState<string | null>(null);
@@ -29,10 +31,12 @@ export function useExportSettings() {
     setResizeValue(preset.resizeValue);
     setDontEnlarge(preset.dontEnlarge);
     setKeepMetadata(preset.keepMetadata);
+    setInheritAllExif(preset.inheritAllExif ?? false);
     setPreserveTimestamps(preset.preserveTimestamps ?? false);
     setStripGps(preset.stripGps);
     setExportMasks(preset.exportMasks ?? false);
     setPreserveFolders(preset.preserveFolders ?? false);
+    setExportToSourceFolder(preset.exportToSourceFolder ?? false);
     setFilenameTemplate(preset.filenameTemplate);
     setEnableWatermark(preset.enableWatermark);
     setWatermarkPath(preset.watermarkPath);
@@ -51,10 +55,12 @@ export function useExportSettings() {
       resizeValue,
       dontEnlarge,
       keepMetadata,
+      inheritAllExif,
       preserveTimestamps,
       stripGps,
       exportMasks,
       preserveFolders,
+      exportToSourceFolder,
       filenameTemplate,
       enableWatermark,
       watermarkPath,
@@ -71,10 +77,12 @@ export function useExportSettings() {
       resizeValue,
       dontEnlarge,
       keepMetadata,
+      inheritAllExif,
       preserveTimestamps,
       stripGps,
       exportMasks,
       preserveFolders,
+      exportToSourceFolder,
       filenameTemplate,
       enableWatermark,
       watermarkPath,
@@ -82,7 +90,7 @@ export function useExportSettings() {
       watermarkScale,
       watermarkSpacing,
       watermarkOpacity,
-    ]
+    ],
   );
 
   return {
@@ -100,6 +108,8 @@ export function useExportSettings() {
     setDontEnlarge,
     keepMetadata,
     setKeepMetadata,
+    inheritAllExif,
+    setInheritAllExif,
     preserveTimestamps,
     setPreserveTimestamps,
     stripGps,
@@ -108,6 +118,8 @@ export function useExportSettings() {
     setExportMasks,
     preserveFolders,
     setPreserveFolders,
+    exportToSourceFolder,
+    setExportToSourceFolder,
     filenameTemplate,
     setFilenameTemplate,
     enableWatermark,
