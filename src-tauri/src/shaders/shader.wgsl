@@ -43,7 +43,7 @@ struct GlobalAdjustments {
     tint: f32,
     vibrance: f32,
     hue: f32,
-    _pad_color1: f32,
+    monochrome: u32,
     _pad_color2: f32,
     _pad_color3: f32,
 
@@ -1701,6 +1701,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     if (adjustments.global.has_lut == 1u) {
         let lut_color = sample_lut_tetrahedral(final_rgb);
         final_rgb = mix(final_rgb, lut_color, adjustments.global.lut_intensity);
+    }
+
+    if (adjustments.global.monochrome == 1u) {
+        let monochrome_luma = get_luma(srgb_to_linear(max(final_rgb, vec3<f32>(0.0))));
+        final_rgb = linear_to_srgb(vec3<f32>(monochrome_luma));
     }
 
     if (adjustments.global.grain_amount > 0.0) {

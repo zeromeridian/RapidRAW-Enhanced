@@ -19,6 +19,9 @@
     },
     "color": {
       "ariaSelectColor": "{{name}} 색상 선택",
+      "blackAndWhite": "Black & White",
+      "colorModeColor": "Color",
+      "monochromeDesc": "Switch between color and a persisted monochrome rendering while preserving all color adjustments.",
       "calibration": {
         "colors": {
           "blue": "파랑",
