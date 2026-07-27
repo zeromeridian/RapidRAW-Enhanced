@@ -86,6 +86,7 @@ struct ImageFileMetadata {
     tags: Option<Vec<String>>,
     rating: u8,
     is_raw: bool,
+    copy_name_suffix: Option<String>,
 }
 
 fn resolve_image_metadata(
@@ -112,6 +113,7 @@ fn resolve_image_metadata(
         tags: metadata.tags,
         rating: metadata.rating,
         is_raw,
+        copy_name_suffix: metadata.copy_name_suffix,
     }
 }
 
@@ -370,9 +372,26 @@ pub struct ImportSettings {
     pub delete_after_import: bool,
 }
 
+pub(crate) fn sanitize_filename_suffix(suffix: &str) -> String {
+    suffix
+        .trim()
+        .chars()
+        .filter(|character| {
+            !character.is_control()
+                && !matches!(
+                    character,
+                    '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' | '&' | '%' | '#'
+                )
+        })
+        .collect()
+}
+
 pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
     let (source_path_str, copy_id) = if let Some((base, id)) = virtual_path.rsplit_once("?vc=") {
-        (base.to_string(), Some(id.to_string()))
+        (
+            base.to_string(),
+            Some(id.split('&').next().unwrap_or(id).to_string()),
+        )
     } else {
         (virtual_path.to_string(), None)
     };
@@ -400,6 +419,26 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
 
     let sidecar_path = source_path.with_file_name(sidecar_filename);
     (source_path, sidecar_path)
+}
+
+#[cfg(test)]
+mod output_naming_tests {
+    use super::{parse_virtual_path, sanitize_filename_suffix};
+    use std::path::PathBuf;
+
+    #[test]
+    fn sanitizes_suffix_without_adding_or_removing_valid_separators() {
+        assert_eq!(sanitize_filename_suffix("  _web-copy  "), "_web-copy");
+        assert_eq!(sanitize_filename_suffix("_bad/name?"), "_badname");
+    }
+
+    #[test]
+    fn virtual_copy_display_name_does_not_change_its_sidecar_path() {
+        let (source, sidecar) = parse_virtual_path("/photos/image.raw?vc=abc123&name=_select");
+
+        assert_eq!(source, PathBuf::from("/photos/image.raw"));
+        assert_eq!(sidecar, PathBuf::from("/photos/image.raw.abc123.rrdata"));
+    }
 }
 
 #[tauri::command]
@@ -606,7 +645,7 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
             let mut file_results = Vec::with_capacity(sidecars.len());
 
             for copy_id_opt in sidecars {
-                let (virtual_path, is_virtual_copy, sidecar_filename) = match copy_id_opt {
+                let (mut virtual_path, is_virtual_copy, sidecar_filename) = match copy_id_opt {
                     Some(id) => (
                         format!("{}?vc={}", path_str, id),
                         true,
@@ -635,10 +674,21 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
                         tags: None,
                         rating: 0,
                         is_raw: crate::formats::is_raw_file(&path_buf),
+                        copy_name_suffix: None,
                     }
                 } else {
                     resolve_image_metadata(&path_buf, &sidecar_path, enable_xmp_sync, &settings)
                 };
+
+                if is_virtual_copy
+                    && let Some(copy_suffix) = metadata
+                        .copy_name_suffix
+                        .as_deref()
+                        .filter(|suffix| !suffix.is_empty())
+                {
+                    virtual_path.push_str("&name=");
+                    virtual_path.push_str(copy_suffix);
+                }
 
                 file_results.push(ImageFile {
                     path: virtual_path,
@@ -739,7 +789,7 @@ pub fn list_images_recursive(
             let mut file_results = Vec::with_capacity(sidecars.len());
 
             for copy_id_opt in sidecars {
-                let (virtual_path, is_virtual_copy, sidecar_filename) = match copy_id_opt {
+                let (mut virtual_path, is_virtual_copy, sidecar_filename) = match copy_id_opt {
                     Some(id) => (
                         format!("{}?vc={}", path_str, id),
                         true,
@@ -768,10 +818,21 @@ pub fn list_images_recursive(
                         tags: None,
                         rating: 0,
                         is_raw: crate::formats::is_raw_file(&path_buf),
+                        copy_name_suffix: None,
                     }
                 } else {
                     resolve_image_metadata(&path_buf, &sidecar_path, enable_xmp_sync, &settings)
                 };
+
+                if is_virtual_copy
+                    && let Some(copy_suffix) = metadata
+                        .copy_name_suffix
+                        .as_deref()
+                        .filter(|suffix| !suffix.is_empty())
+                {
+                    virtual_path.push_str("&name=");
+                    virtual_path.push_str(copy_suffix);
+                }
 
                 file_results.push(ImageFile {
                     path: virtual_path,
@@ -1039,6 +1100,7 @@ pub fn get_album_images(
                     tags: None,
                     rating: 0,
                     is_raw: crate::formats::is_raw_file(&source_path),
+                    copy_name_suffix: None,
                 }
             } else {
                 resolve_image_metadata(&source_path, &sidecar_path, enable_xmp_sync, &settings)
@@ -2195,6 +2257,7 @@ pub fn delete_folder(path: String, app_handle: AppHandle) -> Result<(), String> 
 pub fn duplicate_file(
     path: String,
     target_album_id: Option<String>,
+    copy_name_suffix: Option<String>,
     app_handle: AppHandle,
 ) -> Result<String, String> {
     let (source_path, source_sidecar_path) = parse_virtual_path(&path);
@@ -2216,11 +2279,20 @@ pub fn duplicate_file(
 
     let mut counter = 1;
     let mut dest_path;
+    let configured_suffix = copy_name_suffix
+        .as_deref()
+        .map(sanitize_filename_suffix)
+        .filter(|suffix| !suffix.is_empty());
     loop {
-        let new_stem = if counter == 1 {
-            format!("{}_copy", stem)
+        let base_stem = if let Some(suffix) = &configured_suffix {
+            format!("{}{}", stem, suffix)
         } else {
-            format!("{}_copy_{}", stem, counter - 1)
+            format!("{}_copy", stem)
+        };
+        let new_stem = if counter == 1 {
+            base_stem
+        } else {
+            format!("{}_{}", base_stem, counter - 1)
         };
         dest_path = parent.join(format!("{}.{}", new_stem, extension));
         if !dest_path.exists() {
@@ -3835,22 +3907,32 @@ pub fn rename_files(
 pub fn create_virtual_copy(
     source_virtual_path: String,
     target_album_id: Option<String>,
+    copy_name_suffix: Option<String>,
     app_handle: AppHandle,
 ) -> Result<String, String> {
     let (source_path, source_sidecar_path) = parse_virtual_path(&source_virtual_path);
 
     let new_copy_id = Uuid::new_v4().to_string()[..6].to_string();
-    let new_virtual_path = format!("{}?vc={}", source_path.to_string_lossy(), new_copy_id);
+    let configured_suffix = copy_name_suffix
+        .as_deref()
+        .map(sanitize_filename_suffix)
+        .filter(|suffix| !suffix.is_empty());
+    let mut new_virtual_path = format!("{}?vc={}", source_path.to_string_lossy(), new_copy_id);
     let (_, new_sidecar_path) = parse_virtual_path(&new_virtual_path);
 
-    if source_sidecar_path.exists() {
-        fs::copy(&source_sidecar_path, &new_sidecar_path)
-            .map_err(|e| format!("Failed to copy sidecar file: {}", e))?;
+    let mut metadata = if source_sidecar_path.exists() {
+        crate::exif_processing::load_sidecar(&source_sidecar_path)
     } else {
-        let default_metadata = ImageMetadata::default();
-        let json_string =
-            serde_json::to_string_pretty(&default_metadata).map_err(|e| e.to_string())?;
-        fs::write(new_sidecar_path, json_string).map_err(|e| e.to_string())?;
+        ImageMetadata::default()
+    };
+    metadata.copy_name_suffix = configured_suffix.clone();
+    let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
+    fs::write(new_sidecar_path, json_string)
+        .map_err(|e| format!("Failed to write virtual copy sidecar: {}", e))?;
+
+    if let Some(suffix) = configured_suffix {
+        new_virtual_path.push_str("&name=");
+        new_virtual_path.push_str(&suffix);
     }
 
     if let Some(album_id) = target_album_id {

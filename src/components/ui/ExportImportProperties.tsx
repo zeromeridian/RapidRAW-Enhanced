@@ -35,6 +35,7 @@ export const FILENAME_VARIABLES: Array<string> = [
 
 export interface ExportSettings {
   filenameTemplate: string | null;
+  filenameSuffix?: string | null;
   jpegQuality: number;
   keepMetadata: boolean;
   preserveTimestamps: boolean;

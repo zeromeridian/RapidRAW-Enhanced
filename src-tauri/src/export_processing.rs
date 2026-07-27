@@ -20,7 +20,7 @@ use tauri::Manager;
 use crate::AppState;
 use crate::exif_processing;
 use crate::file_management::{
-    generate_filename_from_template, parse_virtual_path, read_file_mapped,
+    generate_filename_from_template, parse_virtual_path, read_file_mapped, sanitize_filename_suffix,
 };
 use crate::formats::is_raw_file;
 use crate::image_loader::{
@@ -69,6 +69,8 @@ pub struct ExportSettings {
     pub preserve_timestamps: bool,
     pub strip_gps: bool,
     pub filename_template: Option<String>,
+    #[serde(default)]
+    pub filename_suffix: Option<String>,
     pub watermark: Option<WatermarkSettings>,
     #[serde(default)]
     pub export_masks: bool,
@@ -1029,6 +1031,15 @@ pub(crate) async fn export_images_impl(
                     new_stem = format!("{}_VC{:02}", new_stem, appearance_count - 1);
                 }
 
+                if let Some(suffix) = export_settings
+                    .filename_suffix
+                    .as_deref()
+                    .map(sanitize_filename_suffix)
+                    .filter(|suffix| !suffix.is_empty())
+                {
+                    new_stem.push_str(&suffix);
+                }
+
                 let new_filename = format!("{}.{}", new_stem, output_format);
                 let output_path = if is_explicit_file_path && total_paths == 1 {
                     output_folder_path
@@ -1254,8 +1265,8 @@ pub(crate) async fn export_images_impl(
                     } else {
                         Vec::new()
                     };
-                    let _ =
-                        app_handle.emit("export-complete", serde_json::json!({ "exports": exports }));
+                    let _ = app_handle
+                        .emit("export-complete", serde_json::json!({ "exports": exports }));
                 }
             },
         );
@@ -1360,6 +1371,7 @@ pub async fn run_headless_export(
         preserve_timestamps: true,
         strip_gps: false,
         filename_template: None,
+        filename_suffix: None,
         watermark: None,
         export_masks: false,
         preserve_folders: true,

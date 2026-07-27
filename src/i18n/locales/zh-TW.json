@@ -1457,6 +1457,14 @@
       "title": "資料管理"
     },
     "general": {
+      "copyNameSuffix": "Copy Name Suffix",
+      "copyNameSuffixDesc": "Append this suffix to new physical and virtual copy names. The saved value is retained while the option is disabled.",
+      "copySuffixPlaceholder": "e.g. _copy",
+      "enableCopyNameSuffix": "Use copy suffix",
+      "enableExportFileSuffix": "Use export suffix",
+      "exportFileSuffix": "Export File Suffix",
+      "exportFileSuffixDesc": "Append this suffix to exported filenames after the filename template and copy number. The saved value is retained while the option is disabled.",
+      "fileSuffixPlaceholder": "e.g. _web",
       "createXmp": "建立缺失的 XMP 檔案",
       "createXmpDesc": "如果影像沒有對應的 XMP 附屬檔案，則自動建立一個。",
       "createXmpMissing": "缺失時建立 XMP",

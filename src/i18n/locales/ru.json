@@ -1525,6 +1525,14 @@
       "title": "Управление данными"
     },
     "general": {
+      "copyNameSuffix": "Copy Name Suffix",
+      "copyNameSuffixDesc": "Append this suffix to new physical and virtual copy names. The saved value is retained while the option is disabled.",
+      "copySuffixPlaceholder": "e.g. _copy",
+      "enableCopyNameSuffix": "Use copy suffix",
+      "enableExportFileSuffix": "Use export suffix",
+      "exportFileSuffix": "Export File Suffix",
+      "exportFileSuffixDesc": "Append this suffix to exported filenames after the filename template and copy number. The saved value is retained while the option is disabled.",
+      "fileSuffixPlaceholder": "e.g. _web",
       "createXmp": "Создавать недостающие файлы XMP",
       "createXmpDesc": "Автоматически создавать файл сопутствующих данных XMP, если он отсутствует у изображения.",
       "createXmpMissing": "Создавать XMP при отсутствии",

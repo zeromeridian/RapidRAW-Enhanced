@@ -14,6 +14,7 @@ import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
+import { getDisplayFilename } from '../../../utils/outputNaming';
 
 interface CameraSetting {
   format?(value: number): string | number;
@@ -333,9 +334,7 @@ export default function MetadataPanel() {
 
   const hasGps = gpsData.lat !== null && gpsData.lon !== null;
   const fullPath = selectedImage?.path || '';
-  const isVirtualCopy = fullPath.includes('?vc=');
-  const basePath = fullPath.split('?vc=')[0];
-  const fileName = basePath.split(/[\\/]/).pop() || '';
+  const { baseName: fileName, isVirtualCopy } = getDisplayFilename(fullPath);
   const fileExtension = fileName.split('.').pop()?.toUpperCase() || 'FILE';
   const megapixels =
     selectedImage?.width && selectedImage?.height

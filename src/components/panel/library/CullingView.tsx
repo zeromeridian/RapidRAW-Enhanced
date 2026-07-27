@@ -28,6 +28,7 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
+import { getDisplayFilename } from '../../../utils/outputNaming';
 
 interface SyncViewport {
   isActive: boolean;
@@ -195,10 +196,7 @@ function CullingPreview({
     panRef.current = pan;
   }, [zoom, pan]);
 
-  const fullFileName = image.path.split(/[\\/]/).pop() || '';
-  const parts = fullFileName.split('?vc=');
-  const baseName = parts[0];
-  const isVirtualCopy = parts.length > 1;
+  const { baseName, isVirtualCopy } = getDisplayFilename(image.path);
 
   const updateFitScale = useCallback(() => {
     if (!containerRef.current || !imageRef.current) return;

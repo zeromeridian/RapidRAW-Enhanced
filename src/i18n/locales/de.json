@@ -1459,6 +1459,14 @@
       "title": "Datenverwaltung"
     },
     "general": {
+      "copyNameSuffix": "Copy Name Suffix",
+      "copyNameSuffixDesc": "Append this suffix to new physical and virtual copy names. The saved value is retained while the option is disabled.",
+      "copySuffixPlaceholder": "e.g. _copy",
+      "enableCopyNameSuffix": "Use copy suffix",
+      "enableExportFileSuffix": "Use export suffix",
+      "exportFileSuffix": "Export File Suffix",
+      "exportFileSuffixDesc": "Append this suffix to exported filenames after the filename template and copy number. The saved value is retained while the option is disabled.",
+      "fileSuffixPlaceholder": "e.g. _web",
       "createXmp": "Fehlende XMP-Dateien erstellen",
       "createXmpDesc": "Erstellt automatisch eine neue XMP-Filialdatei, falls noch keine für ein Bild existiert.",
       "createXmpMissing": "XMP erstellen, falls fehlend",

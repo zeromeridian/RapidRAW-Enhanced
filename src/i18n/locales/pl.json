@@ -1525,6 +1525,14 @@
       "title": "Zarządzanie danymi"
     },
     "general": {
+      "copyNameSuffix": "Copy Name Suffix",
+      "copyNameSuffixDesc": "Append this suffix to new physical and virtual copy names. The saved value is retained while the option is disabled.",
+      "copySuffixPlaceholder": "e.g. _copy",
+      "enableCopyNameSuffix": "Use copy suffix",
+      "enableExportFileSuffix": "Use export suffix",
+      "exportFileSuffix": "Export File Suffix",
+      "exportFileSuffixDesc": "Append this suffix to exported filenames after the filename template and copy number. The saved value is retained while the option is disabled.",
+      "fileSuffixPlaceholder": "e.g. _web",
       "createXmp": "Twórz brakujące pliki XMP",
       "createXmpDesc": "Automatycznie utwórz nowy plik poboczny XMP, jeśli nie istnieje dla obrazu.",
       "createXmpMissing": "Utwórz XMP, jeśli brakuje",

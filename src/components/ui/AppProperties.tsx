@@ -233,6 +233,10 @@ export interface AppSettings {
   bottomToolbarVisibility?: Record<string, boolean>;
   imageStacks?: ImageStack[];
   autoStackCreatedImages?: boolean;
+  exportFileSuffixEnabled?: boolean;
+  exportFileSuffix?: string;
+  copyNameSuffixEnabled?: boolean;
+  copyNameSuffix?: string;
 }
 
 export interface BrushSettings {

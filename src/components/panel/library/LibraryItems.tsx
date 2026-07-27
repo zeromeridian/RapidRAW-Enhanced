@@ -20,6 +20,7 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
 import { reorderStackPaths } from '../../../utils/imageStacks';
 import { StackMemberPosition, StackVisualInfo } from '../../../utils/imageGrouping';
+import { getDisplayFilename } from '../../../utils/outputNaming';
 
 type StackDropEdge = 'before' | 'after';
 
@@ -112,12 +113,7 @@ const ThumbnailComponent = ({
   }
 
   const { baseName, isVirtualCopy } = useMemo(() => {
-    const fullFileName = path.split(/[\\/]/).pop() || '';
-    const parts = fullFileName.split('?vc=');
-    return {
-      baseName: parts[0],
-      isVirtualCopy: parts.length > 1,
-    };
+    return getDisplayFilename(path);
   }, [path]);
 
   const { shutter, fNumber, iso, focal } = useMemo(() => {
@@ -359,7 +355,8 @@ const ThumbnailComponent = ({
               'flex items-center shrink-0 transition-all duration-200 ease-out overflow-hidden rounded-sm',
               hasGroupBadge ? 'max-w-10 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
               hasGroupBadge && (hasEditIcon || hasColorLabel || hasRating) ? 'ml-1.5' : 'ml-0',
-              groupBadgeCount && 'cursor-pointer hover:bg-white/20 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-white',
+              groupBadgeCount &&
+                'cursor-pointer hover:bg-white/20 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-white',
             )}
             data-tooltip={groupBadgeLabel}
             role={groupBadgeCount ? 'button' : undefined}
@@ -596,12 +593,7 @@ const ListItemComponent = ({
   }
 
   const { baseName, isVirtualCopy } = useMemo(() => {
-    const fullFileName = path.split(/[\\/]/).pop() || '';
-    const parts = fullFileName.split('?vc=');
-    return {
-      baseName: parts[0],
-      isVirtualCopy: parts.length > 1,
-    };
+    return getDisplayFilename(path);
   }, [path]);
 
   const { shutter, fNumber, iso, focal } = useMemo(() => {
