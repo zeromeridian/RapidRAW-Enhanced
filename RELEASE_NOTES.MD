@@ -5,6 +5,33 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.19 — 2026-07-27
+
+### TIFF metadata
+
+- Added **Preserve safe EXIF data from source** for TIFF exports.
+- TIFF exports can preserve camera make/model, lens make/model, capture and
+  creation dates, exposure time, aperture, ISO, exposure compensation, focal
+  lengths, artist, copyright, description, and GPS when GPS removal is
+  disabled.
+- Software is rewritten as `RapidRAW - Enhanced`.
+- Structural TIFF fields, embedded previews, MakerNote, and other
+  source-layout-dependent metadata are not copied.
+- Metadata is merged into the newly encoded TIFF's own structural directories.
+  RapidRAW then fully decodes the result; if metadata writing or validation
+  fails, it safely uses the metadata-free encoded TIFF.
+
+### Validation and artifact
+
+- Frontend production build, locale runtime validation, relevant-file
+  TypeScript diagnostics, focused TIFF metadata/decoding/GPS tests, and
+  AppImage packaging passed.
+- Artifact:
+  `src-tauri/target/release/bundle/appimage/RapidRAW - Enhanced_1.6.1-colrbent.19_amd64.AppImage`
+- SHA-256:
+  `f0f68eaa31f34ab78ec8b6eb33ef71e2c5439e3e49253b64e7c3a0164ed3d3cc`
+- Platform: Linux x86-64 AppImage.
+
 ## 1.6.1-colrbent.18 — 2026-07-27
 
 ### Export workflow
