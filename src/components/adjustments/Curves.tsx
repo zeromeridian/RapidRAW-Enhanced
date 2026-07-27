@@ -886,8 +886,18 @@ export default function CurveGraph({
           />
           <button
             className="w-9 h-9 shrink-0 rounded-md bg-surface-secondary text-text-secondary hover:text-text-primary hover:bg-surface transition-colors flex items-center justify-center"
-            data-tooltip={t('adjustments.curves.savePreset')}
-            onClick={() => setIsSavePresetOpen(true)}
+            data-tooltip={
+              isSelectedPresetDirty && !selectedPreset?.builtIn
+                ? t('adjustments.curves.updatePreset')
+                : t('adjustments.curves.savePreset')
+            }
+            onClick={() => {
+              if (isSelectedPresetDirty && !selectedPreset?.builtIn) {
+                handleUpdatePreset();
+              } else {
+                setIsSavePresetOpen(true);
+              }
+            }}
             type="button"
           >
             <Save size={16} />
