@@ -1562,6 +1562,7 @@
         "rotate_left": "Girar 90° no sentido anti-horário",
         "rotate_right": "Girar 90° no sentido horário",
         "select_all": "Selecionar todas as imagens",
+        "show_library_grid": "Show Library Grid",
         "show_original": "Mostrar original (antes/depois)",
         "toggle_adjustments": "Alternar painel de Ajustes",
         "toggle_ai": "Alternar painel de IA",

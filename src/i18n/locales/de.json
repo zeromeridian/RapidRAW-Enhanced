@@ -1529,6 +1529,7 @@
         "rotate_left": "90° gegen den Uhrzeigersinn drehen",
         "rotate_right": "90° im Uhrzeigersinn drehen",
         "select_all": "Alle Bilder auswählen",
+        "show_library_grid": "Show Library Grid",
         "show_original": "Original anzeigen (Vorher/Nachher)",
         "toggle_adjustments": "Anpassungen-Panel ein-/ausblenden",
         "toggle_ai": "KI-Panel ein-/ausblenden",

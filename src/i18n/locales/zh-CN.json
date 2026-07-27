@@ -1527,6 +1527,7 @@
         "rotate_left": "逆时针旋转 90°",
         "rotate_right": "顺时针旋转 90°",
         "select_all": "选择所有图像",
+        "show_library_grid": "Show Library Grid",
         "show_original": "显示原始图像（前后对比）",
         "toggle_adjustments": "切换调整面板",
         "toggle_ai": "切换 AI 面板",

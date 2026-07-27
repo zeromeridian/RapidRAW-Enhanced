@@ -1562,6 +1562,7 @@
         "rotate_left": "Pivoter de 90° à gauche",
         "rotate_right": "Pivoter de 90° à droite",
         "select_all": "Sélectionner toutes les images",
+        "show_library_grid": "Show Library Grid",
         "show_original": "Afficher l'original (avant/après)",
         "toggle_adjustments": "Basculer le panneau des ajustements",
         "toggle_ai": "Basculer le panneau IA",
