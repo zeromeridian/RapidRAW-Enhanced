@@ -116,6 +116,7 @@ export const autoStackImagePairs = (
   stacks: ImageStack[],
   pairs: AutoStackPair[],
   fileTypes: AutoStackFileTypes,
+  expandNewStacks = true,
 ): ImageStack[] => {
   const supportedExtensions = normalizeExtensions([...fileTypes.raw, ...fileTypes.nonRaw]);
 
@@ -151,7 +152,7 @@ export const autoStackImagePairs = (
         id: createStackId(),
         paths: orderedPaths,
         coverPath: topPath,
-        collapsed: true,
+        collapsed: !expandNewStacks,
       },
     ];
   }, stacks);

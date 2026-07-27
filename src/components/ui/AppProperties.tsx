@@ -233,6 +233,8 @@ export interface AppSettings {
   bottomToolbarVisibility?: Record<string, boolean>;
   imageStacks?: ImageStack[];
   autoStackCreatedImages?: boolean;
+  expandAutoCreatedStacks?: boolean;
+  skipSplashScreen?: boolean;
   exportFileSuffixEnabled?: boolean;
   exportFileSuffix?: string;
   copyNameSuffixEnabled?: boolean;

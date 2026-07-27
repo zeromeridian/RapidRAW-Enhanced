@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useRef, useMemo } from 'react';
-import { Eye, EyeOff, ArrowLeft, Maximize, Loader2, Undo, Redo } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, Maximize, Loader2, Undo, Redo, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,7 @@ import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { findGroupVariants, getVariantLabel } from '../../../utils/imageGrouping';
 import { getDisplayFilename } from '../../../utils/outputNaming';
+import { useUIStore } from '../../../store/useUIStore';
 
 interface EditorToolbarProps {
   canRedo: boolean;
@@ -70,6 +71,7 @@ const EditorToolbar = memo(
 
     const imageList = useLibraryStore((s) => s.imageList);
     const groupingMode: GroupingMode = useSettingsStore((s) => s.appSettings?.grouping) ?? 'off';
+    const setUI = useUIStore((state) => state.setUI);
 
     const variantOptions = useMemo(() => {
       if (groupingMode === 'off' || !onImageSelect) return [];
@@ -667,6 +669,14 @@ const EditorToolbar = memo(
             </AnimatePresence>
           </div>
 
+          <button
+            className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors"
+            onClick={() => setUI({ isSettingsOpen: true })}
+            onKeyDown={handleButtonKeyDown}
+            data-tooltip={t('library.splash.goToSettings')}
+          >
+            <Settings size={20} />
+          </button>
           <button
             className={clsx(
               'p-2 rounded-full transition-colors',
