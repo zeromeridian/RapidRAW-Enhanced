@@ -1,5 +1,27 @@
 import { ImageFile, ImageStack } from '../components/ui/AppProperties';
-import { GroupBadgeInfo, GroupId } from './imageGrouping';
+import { GroupBadgeInfo, GroupId, StackMemberPosition } from './imageGrouping';
+
+const getStackMemberPosition = (index: number, memberCount: number): StackMemberPosition => {
+  if (memberCount === 1) return 'only';
+  if (index === 0) return 'first';
+  if (index === memberCount - 1) return 'last';
+  return 'middle';
+};
+
+const createStackBadge = (
+  stack: ImageStack,
+  path: string,
+  index: number,
+  visibleMemberCount: number,
+): GroupBadgeInfo => ({
+  count: stack.paths.length,
+  label: `Stack · ${stack.paths.length}`,
+  stackVisual: {
+    collapsed: stack.collapsed,
+    isCover: path === stack.coverPath,
+    position: getStackMemberPosition(index, visibleMemberCount),
+  },
+});
 
 export function reorderStackPaths(
   paths: string[],
@@ -54,7 +76,7 @@ export function applyImageStacks(
     if (stack.collapsed) {
       const cover = availableByPath.get(stack.coverPath) || visibleMembers[0];
       displayList.splice(insertionIndex, 0, cover);
-      badges.set(cover.path, { count: stack.paths.length, label: `Stack · ${stack.paths.length}` });
+      badges.set(cover.path, createStackBadge(stack, cover.path, 0, 1));
       continue;
     }
 
@@ -63,9 +85,9 @@ export function applyImageStacks(
       .map((path) => visibleByPath.get(path))
       .filter((image): image is ImageFile => Boolean(image));
     displayList.splice(insertionIndex, 0, ...orderedMembers);
-    for (const member of orderedMembers) {
-      badges.set(member.path, { count: stack.paths.length, label: `Stack · ${stack.paths.length}` });
-    }
+    orderedMembers.forEach((member, index) => {
+      badges.set(member.path, createStackBadge(stack, member.path, index, orderedMembers.length));
+    });
   }
 
   return { displayList, badges };

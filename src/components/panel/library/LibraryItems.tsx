@@ -19,10 +19,41 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
 import { reorderStackPaths } from '../../../utils/imageStacks';
+import { StackMemberPosition, StackVisualInfo } from '../../../utils/imageGrouping';
 
 type StackDropEdge = 'before' | 'after';
 
 let draggedStackPath: string | null = null;
+
+const STACK_SPINE_POSITION_CLASSES: Record<StackMemberPosition, string> = {
+  only: 'top-2 bottom-2 rounded-full',
+  first: 'top-2 bottom-0 rounded-t-full',
+  middle: 'top-0 bottom-0',
+  last: 'top-0 bottom-2 rounded-b-full',
+};
+
+const StackVisualCue = ({ info }: { info?: StackVisualInfo }) => {
+  if (!info) return null;
+
+  return (
+    <>
+      {!info.collapsed && (
+        <div
+          className={clsx(
+            'absolute left-0 z-20 w-0.5 bg-accent/40 pointer-events-none',
+            STACK_SPINE_POSITION_CLASSES[info.position],
+          )}
+        />
+      )}
+      {info.isCover && (
+        <>
+          <div className="absolute top-1.5 left-1.5 z-20 w-3 h-3 rounded-tl-sm border-t border-l border-accent/40 pointer-events-none" />
+          <div className="absolute top-2.5 left-2.5 z-20 w-3 h-3 rounded-tl-sm border-t border-l border-accent/20 pointer-events-none" />
+        </>
+      )}
+    </>
+  );
+};
 
 interface ImageLayer {
   id: string;
@@ -47,6 +78,7 @@ const ThumbnailComponent = ({
   isCloudPlaceholder,
   groupBadgeLabel,
   groupBadgeCount,
+  stackVisual,
   onStackBadgeClick,
   isStackDraggable,
   onStackDragStart,
@@ -217,6 +249,7 @@ const ThumbnailComponent = ({
           )}
         />
       )}
+      <StackVisualCue info={stackVisual} />
       <div className="relative w-full flex-1 min-h-0 z-0 bg-surface">
         {layers.length > 0 && (
           <div className="absolute inset-0 w-full h-full">
@@ -531,6 +564,7 @@ const ListItemComponent = ({
   isNextSelected,
   stackBadgeLabel,
   stackBadgeCount,
+  stackVisual,
   onStackBadgeClick,
   isStackDraggable,
   onStackDragStart,
@@ -718,6 +752,7 @@ const ListItemComponent = ({
           )}
         />
       )}
+      <StackVisualCue info={stackVisual} />
       <div
         style={{ width: getW('thumbnail') }}
         className="flex items-center justify-center p-1.5 h-full overflow-hidden"
@@ -1113,6 +1148,7 @@ const RowComponent = ({
                 isNextSelected={isNextSelected}
                 stackBadgeLabel={stackBadge?.label}
                 stackBadgeCount={stackBadge?.count}
+                stackVisual={stackBadge?.stackVisual}
                 onStackBadgeClick={handleStackBadgeClick}
                 isStackDraggable={isStackDraggable}
                 onStackDragStart={handleStackDragStart}
@@ -1139,6 +1175,7 @@ const RowComponent = ({
                   stackBadge?.label || (imageFile.group_id && groupBadgeInfo?.get(imageFile.group_id)?.label)
                 }
                 groupBadgeCount={stackBadge?.count}
+                stackVisual={stackBadge?.stackVisual}
                 onStackBadgeClick={handleStackBadgeClick}
                 isStackDraggable={isStackDraggable}
                 onStackDragStart={handleStackDragStart}
