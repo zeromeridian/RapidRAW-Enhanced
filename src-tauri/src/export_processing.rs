@@ -76,6 +76,13 @@ pub struct ExportSettings {
     pub preserve_folders: bool,
 }
 
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct CompletedExport {
+    source_path: String,
+    output_path: String,
+}
+
 #[derive(Clone)]
 pub(crate) enum ExportAdjustmentsMode {
     UseSidecars {
@@ -855,6 +862,7 @@ pub(crate) async fn export_images_impl(
     adjustments_mode: ExportAdjustmentsMode,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
+    track_created_images: bool,
     completion_tx: Option<tokio::sync::oneshot::Sender<Result<(), usize>>>,
 ) -> Result<(), String> {
     let cancellation_token = register_export_task(&state.export_task_token)?;
@@ -1186,7 +1194,10 @@ pub(crate) async fn export_images_impl(
                 if cancellation_token_clone.load(Ordering::SeqCst) {
                     Err("Export cancelled".to_string())
                 } else {
-                    result
+                    result.map(|_| CompletedExport {
+                        source_path: image_path_str,
+                        output_path: output_path.to_string_lossy().into_owned(),
+                    })
                 }
             });
 
@@ -1201,7 +1212,14 @@ pub(crate) async fn export_images_impl(
             }
         }
 
-        let errors: Vec<String> = results.into_iter().filter_map(Result::err).collect();
+        let mut completed_exports = Vec::new();
+        let mut errors = Vec::new();
+        for result in results {
+            match result {
+                Ok(completed_export) => completed_exports.push(completed_export),
+                Err(error) => errors.push(error),
+            }
+        }
         let error_count = errors.len();
         let export_state = app_handle.state::<AppState>();
         let finalized = finish_export_task(
@@ -1231,7 +1249,13 @@ pub(crate) async fn export_images_impl(
                         "batch-export-progress",
                         serde_json::json!({ "current": total_paths, "total": total_paths, "path": "" }),
                     );
-                    let _ = app_handle.emit("export-complete", ());
+                    let exports = if track_created_images {
+                        completed_exports
+                    } else {
+                        Vec::new()
+                    };
+                    let _ =
+                        app_handle.emit("export-complete", serde_json::json!({ "exports": exports }));
                 }
             },
         );
@@ -1261,6 +1285,7 @@ pub async fn export_images(
     base_origin_folders: Vec<String>,
     export_settings: ExportSettings,
     output_format: String,
+    track_created_images: Option<bool>,
     current_edit_path: Option<String>,
     current_edit_adjustments: Option<Value>,
     state: tauri::State<'_, AppState>,
@@ -1279,6 +1304,7 @@ pub async fn export_images(
         },
         state,
         app_handle,
+        track_created_images.unwrap_or(false),
         None,
     )
     .await
@@ -1373,6 +1399,7 @@ pub async fn run_headless_export(
         mode,
         state.clone(),
         app_handle.clone(),
+        false,
         Some(tx),
     )
     .await?;

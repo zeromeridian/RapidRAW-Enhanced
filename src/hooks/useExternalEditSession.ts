@@ -80,6 +80,7 @@ export function useExternalEditSession(handleImageSelect: (path: string) => void
         baseOriginFolders: [],
         exportSettings,
         outputFormat: session.format,
+        trackCreatedImages: false,
         currentEditPath: selectedImage.path,
         currentEditAdjustments: adjustments || null,
       });

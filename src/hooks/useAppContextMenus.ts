@@ -64,6 +64,7 @@ import {
   toggleImageStack,
   unstackImagePaths,
 } from '../utils/imageStacks';
+import { autoStackCreatedImages } from '../utils/autoStacking';
 
 export interface UseAppContextMenusProps {
   handleImageSelect: (path: string) => void;
@@ -464,10 +465,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
       const handleCreateVirtualCopy = async (sourcePath: string) => {
         try {
-          await invoke(Invokes.CreateVirtualCopy, {
+          const outputPath = await invoke<string>(Invokes.CreateVirtualCopy, {
             sourceVirtualPath: sourcePath,
             targetAlbumId: activeAlbumId || null,
           });
+          autoStackCreatedImages([{ sourcePath, outputPath }]);
 
           if (activeAlbumId) {
             const sortedTree = await invoke<AlbumItem[]>(Invokes.GetAlbums);
@@ -727,10 +729,12 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: Copy,
               onClick: async () => {
                 try {
-                  await invoke(Invokes.DuplicateFile, {
-                    path: finalSelection[0],
+                  const sourcePath = finalSelection[0];
+                  const outputPath = await invoke<string>(Invokes.DuplicateFile, {
+                    path: sourcePath,
                     targetAlbumId: activeAlbumId || null,
                   });
+                  autoStackCreatedImages([{ sourcePath, outputPath }]);
                   if (activeAlbumId) {
                     const sortedTree = await invoke<AlbumItem[]>(Invokes.GetAlbums);
                     setLibrary({ albumTree: sortedTree });

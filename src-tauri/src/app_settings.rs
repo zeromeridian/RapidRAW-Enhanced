@@ -327,6 +327,10 @@ pub fn default_open_tree_sections() -> Vec<String> {
     vec!["current".to_string()]
 }
 
+const fn default_true() -> bool {
+    true
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
@@ -459,6 +463,8 @@ pub struct AppSettings {
     pub bottom_toolbar_visibility: HashMap<String, bool>,
     #[serde(default)]
     pub image_stacks: Option<Value>,
+    #[serde(default = "default_true")]
+    pub auto_stack_created_images: bool,
 }
 
 impl Default for AppSettings {
@@ -552,6 +558,7 @@ impl Default for AppSettings {
             always_decode_raw_thumbnails: Some(false),
             bottom_toolbar_visibility: HashMap::new(),
             image_stacks: None,
+            auto_stack_created_images: true,
         }
     }
 }

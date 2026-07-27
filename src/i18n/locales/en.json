@@ -1466,11 +1466,14 @@
       "title": "Data Management"
     },
     "general": {
+      "autoStackCreatedImages": "Automatically Stack Created Images",
+      "autoStackCreatedImagesDesc": "Automatically stack physical copies, virtual copies, and exported images with their source image. New stacks prefer RAW files, then the highest-quality image format.",
       "createXmp": "Create Missing XMP Files",
       "createXmpDesc": "Automatically create a new XMP sidecar file if one does not exist for an image.",
       "createXmpMissing": "Create XMP if missing",
       "displayEditIcon": "Display Edit Icon",
       "displayEditIconDesc": "Show a small slider icon on thumbnails that have been edited.",
+      "enableAutoStackCreatedImages": "Enable automatic stacking",
       "enableFocusMode": "Enable Focus Mode",
       "enableOsTitlebar": "Enable OS Titlebar",
       "enableXmpSync": "Enable XMP Sync",

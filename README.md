@@ -40,10 +40,12 @@ Enhancements currently added by this fork include:
 - Clickable stack-count badges in grid and list views.
 - Drag-and-drop ordering for expanded stack members.
 - Subtle visual cues for stack covers and stack-member order.
+- Optional automatic stacking of physical copies, virtual copies, and exported
+  images, with RAW-first cover selection for newly created stacks.
 
 ColrBent releases use the version format
 `<rapidraw-version>-colrbent.<release>`, for example
-`1.6.1-colrbent.6`.
+`1.6.1-colrbent.7`.
 
 ## Inherited RapidRAW Foundation
 
