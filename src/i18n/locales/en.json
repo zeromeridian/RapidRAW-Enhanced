@@ -1776,7 +1776,9 @@
         "rateStars_one": "Rate 1 star",
         "rateStars_other": "Rate {{count}} stars",
         "resetZoom": "Reset Zoom to Fit Window",
-        "selectToRate": "Select an image to rate"
+        "selectToRate": "Select an image to rate",
+        "stackSelected": "Stack Selected Photos",
+        "toggleStack": "Expand/Collapse Stack"
       },
       "zoomLabel": "Zoom",
       "zoomLabelReset": "Reset Zoom"

@@ -43,7 +43,7 @@ Enhancements currently added by this fork include:
 
 ColrBent releases use the version format
 `<rapidraw-version>-colrbent.<release>`, for example
-`1.6.1-colrbent.5`.
+`1.6.1-colrbent.6`.
 
 ## Inherited RapidRAW Foundation
 

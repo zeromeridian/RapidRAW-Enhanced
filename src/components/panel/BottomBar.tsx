@@ -14,10 +14,13 @@ import {
   Grip,
   Images,
   LayoutTemplate,
+  Layers,
+  ListCollapse,
   Settings,
   SlidersHorizontal,
   SquaresUnite,
   Star,
+  Ungroup,
   Users,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -35,6 +38,13 @@ import { useUIStore } from '../../store/useUIStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { COLOR_LABELS, normalizeLoadedAdjustments } from '../../utils/adjustments';
 import { globalImageCache } from '../../utils/ImageLRUCache';
+import {
+  createImageStack,
+  findImageStack,
+  setImageStackCover,
+  toggleImageStack,
+  unstackImagePaths,
+} from '../../utils/imageStacks';
 
 interface BottomBarProps {
   filmstripHeight?: number;
@@ -213,6 +223,25 @@ export default function BottomBar({
       },
     });
   };
+  const productivityPaths =
+    multiSelectedPaths.length > 0
+      ? multiSelectedPaths
+      : selectedImage?.path
+        ? [selectedImage.path]
+        : libraryActivePath
+          ? [libraryActivePath]
+          : [];
+  const productivityCount = productivityPaths.length;
+  const firstProductivityImage = imageList.find((image) => image.path === productivityPaths[0]);
+  const imageStacks = appSettings?.imageStacks || [];
+  const stackTargetPath =
+    (libraryActivePath && productivityPaths.includes(libraryActivePath) ? libraryActivePath : null) ||
+    (selectedImage?.path && productivityPaths.includes(selectedImage.path) ? selectedImage.path : null) ||
+    productivityPaths[0];
+  const targetStack = stackTargetPath ? findImageStack(imageStacks, stackTargetPath) : undefined;
+  const hasSelectedStacks = imageStacks.some((stack) =>
+    stack.paths.some((stackPath) => productivityPaths.includes(stackPath)),
+  );
   const toolbarItems = [
     { id: 'rating', label: t('contextMenus.editor.rating') },
     { id: 'copySettings', label: t('ui.bottomBar.tooltips.copySettings') },
@@ -227,21 +256,15 @@ export default function BottomBar({
     { id: 'cullImage', label: t('contextMenus.thumbnail.cullImage', { count: 2 }) },
     { id: 'physicalCopy', label: t('contextMenus.thumbnail.physicalCopy') },
     { id: 'virtualCopy', label: t('contextMenus.thumbnail.virtualCopy') },
+    { id: 'stackSelected', label: t('ui.bottomBar.tooltips.stackSelected') },
+    { id: 'toggleStack', label: t('ui.bottomBar.tooltips.toggleStack') },
+    { id: 'setStackCover', label: t('contextMenus.thumbnail.setStackCover') },
+    { id: 'unstack', label: t('contextMenus.thumbnail.unstack') },
     { id: 'quickFilter', label: t('ui.bottomBar.tooltips.quickFilter') },
     { id: 'export', label: t('ui.bottomBar.tooltips.export') },
     { id: 'zoom', label: t('ui.bottomBar.zoomLabel') },
     { id: 'filmstrip', label: t('ui.bottomBar.tooltips.collapseFilmstrip') },
   ];
-  const productivityPaths =
-    multiSelectedPaths.length > 0
-      ? multiSelectedPaths
-      : selectedImage?.path
-        ? [selectedImage.path]
-        : libraryActivePath
-          ? [libraryActivePath]
-          : [];
-  const productivityCount = productivityPaths.length;
-  const firstProductivityImage = imageList.find((image) => image.path === productivityPaths[0]);
   const productivityButtonClass =
     'w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed';
 
@@ -344,6 +367,31 @@ export default function BottomBar({
       console.error('Failed to create virtual copy:', err);
       toast.error(t('contextMenus.toasts.failedCreateVirtualCopy', { err }));
     }
+  };
+
+  const saveImageStacks = (nextStacks: typeof imageStacks) => {
+    if (!appSettings) return;
+    void handleSettingsChange({ ...appSettings, imageStacks: nextStacks });
+  };
+
+  const handleStackSelected = () => {
+    if (productivityCount < 2 || !stackTargetPath) return;
+    saveImageStacks(createImageStack(imageStacks, productivityPaths, stackTargetPath));
+  };
+
+  const handleToggleStack = () => {
+    if (!targetStack) return;
+    saveImageStacks(toggleImageStack(imageStacks, targetStack.id));
+  };
+
+  const handleSetStackCover = () => {
+    if (!targetStack || !stackTargetPath) return;
+    saveImageStacks(setImageStackCover(imageStacks, targetStack.id, stackTargetPath));
+  };
+
+  const handleUnstack = () => {
+    if (!hasSelectedStacks) return;
+    saveImageStacks(unstackImagePaths(imageStacks, productivityPaths));
   };
 
   useEffect(() => {
@@ -673,6 +721,50 @@ export default function BottomBar({
                 data-tooltip={t('contextMenus.thumbnail.virtualCopy')}
               >
                 <CopyPlus size={18} />
+              </button>
+            )}
+            {isToolbarItemVisible('stackSelected') && (
+              <button
+                className={productivityButtonClass}
+                disabled={productivityCount < 2}
+                onClick={handleStackSelected}
+                data-tooltip={t('contextMenus.thumbnail.stackSelected', { count: productivityCount })}
+              >
+                <Layers size={18} />
+              </button>
+            )}
+            {isToolbarItemVisible('toggleStack') && (
+              <button
+                className={productivityButtonClass}
+                disabled={!targetStack}
+                onClick={handleToggleStack}
+                data-tooltip={
+                  targetStack?.collapsed
+                    ? t('contextMenus.thumbnail.expandStack')
+                    : t('contextMenus.thumbnail.collapseStack')
+                }
+              >
+                <ListCollapse size={18} />
+              </button>
+            )}
+            {isToolbarItemVisible('setStackCover') && (
+              <button
+                className={productivityButtonClass}
+                disabled={!targetStack || !stackTargetPath || targetStack.coverPath === stackTargetPath}
+                onClick={handleSetStackCover}
+                data-tooltip={t('contextMenus.thumbnail.setStackCover')}
+              >
+                <Star size={18} />
+              </button>
+            )}
+            {isToolbarItemVisible('unstack') && (
+              <button
+                className={productivityButtonClass}
+                disabled={!hasSelectedStacks}
+                onClick={handleUnstack}
+                data-tooltip={t('contextMenus.thumbnail.unstack')}
+              >
+                <Ungroup size={18} />
               </button>
             )}
           </div>
