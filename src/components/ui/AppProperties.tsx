@@ -1,5 +1,6 @@
 import { ExportPreset } from './ExportImportProperties';
 import { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
+import { ToneCurvePreset } from '../../utils/toneCurvePresets';
 import { ToolType } from '../panel/right/Masks';
 
 export const GLOBAL_KEYS = [
@@ -239,6 +240,7 @@ export interface AppSettings {
   exportFileSuffix?: string;
   copyNameSuffixEnabled?: boolean;
   copyNameSuffix?: string;
+  toneCurvePresets?: ToneCurvePreset[];
 }
 
 export interface BrushSettings {
