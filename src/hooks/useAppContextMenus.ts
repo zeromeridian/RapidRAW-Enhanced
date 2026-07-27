@@ -60,7 +60,7 @@ import { globalImageCache } from '../utils/ImageLRUCache';
 import {
   createImageStack,
   findImageStack,
-  setImageStackCover,
+  moveImageToTopOfStack,
   toggleImageStack,
   unstackImagePaths,
 } from '../utils/imageStacks';
@@ -459,9 +459,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         saveImageStacks(toggleImageStack(imageStacks, targetStack.id));
       };
 
-      const handleSetStackCover = () => {
+      const handleMoveToTopOfStack = () => {
         if (!targetStack) return;
-        saveImageStacks(setImageStackCover(imageStacks, targetStack.id, path));
+        saveImageStacks(moveImageToTopOfStack(imageStacks, targetStack.id, path));
       };
 
       const handleCreateVirtualCopy = async (sourcePath: string) => {
@@ -700,10 +700,10 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               onClick: handleToggleStack,
             },
             {
-              label: t('contextMenus.thumbnail.setStackCover'),
+              label: t('contextMenus.thumbnail.moveToTopOfStack'),
               icon: Star,
               disabled: !targetStack || targetStack.coverPath === path,
-              onClick: handleSetStackCover,
+              onClick: handleMoveToTopOfStack,
             },
             {
               label: t('contextMenus.thumbnail.unstack'),

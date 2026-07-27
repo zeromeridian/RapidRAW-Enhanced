@@ -5,6 +5,24 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.22 — 2026-07-27
+
+### Stack presentation and ordering
+
+- Added the Library grid's stack presentation to the Develop filmstrip:
+  collapsed stacks use the same high-contrast count badge, while expanded
+  stacks use the same orange spine and cover cue.
+- Renamed **Set as Stack Cover** to **Move to Top of Stack**.
+- Moving an image to the top now updates both the persisted stack order and its
+  cover. New stacks and loaded legacy stacks also keep their cover in the first
+  position.
+
+### Validation
+
+- Frontend production build, stack-order assertions, formatting, relevant-file
+  TypeScript diagnostics, locale runtime validation, Rust release compilation,
+  and release packaging passed.
+
 ## 1.6.1-colrbent.20 — 2026-07-27
 
 ### Export metadata controls
@@ -18,15 +36,10 @@ errors.
 - Export presets retain only the existing `keepMetadata` choice as the active
   source of truth. Older presets remain compatible.
 
-### Validation and artifact
+### Validation
 
 - Frontend production build, Rust compilation, locale runtime validation,
-  relevant-file TypeScript diagnostics, and AppImage packaging passed.
-- Artifact:
-  `src-tauri/target/release/bundle/appimage/RapidRAW - Enhanced_1.6.1-colrbent.20_amd64.AppImage`
-- SHA-256:
-  `98249d9b65150eea6c1a8d956e405aa32283db42e5bcb119240049973e03e492`
-- Platform: Linux x86-64 AppImage.
+  relevant-file TypeScript diagnostics, and release packaging passed.
 
 ## 1.6.1-colrbent.19 — 2026-07-27
 
@@ -44,16 +57,11 @@ errors.
   RapidRAW then fully decodes the result; if metadata writing or validation
   fails, it safely uses the metadata-free encoded TIFF.
 
-### Validation and artifact
+### Validation
 
 - Frontend production build, locale runtime validation, relevant-file
   TypeScript diagnostics, focused TIFF metadata/decoding/GPS tests, and
-  AppImage packaging passed.
-- Artifact:
-  `src-tauri/target/release/bundle/appimage/RapidRAW - Enhanced_1.6.1-colrbent.19_amd64.AppImage`
-- SHA-256:
-  `f0f68eaa31f34ab78ec8b6eb33ef71e2c5439e3e49253b64e7c3a0164ed3d3cc`
-- Platform: Linux x86-64 AppImage.
+  release packaging passed.
 
 ## 1.6.1-colrbent.18 — 2026-07-27
 
@@ -78,13 +86,8 @@ errors.
   refresh, allowing new same-folder outputs and their expanded stacks to
   appear immediately in the Editor/Develop filmstrip.
 
-### Validation and artifact
+### Validation
 
 - Frontend production build, Rust compilation, focused settings test,
   relevant-file TypeScript diagnostics, locale runtime validation, and
-  AppImage packaging passed.
-- Artifact:
-  `src-tauri/target/release/bundle/appimage/RapidRAW - Enhanced_1.6.1-colrbent.18_amd64.AppImage`
-- SHA-256:
-  `55606953adb0cb343128ff865238659d2b366dc37b6eb50a880238da8469aecd`
-- Platform: Linux x86-64 AppImage.
+  release packaging passed.

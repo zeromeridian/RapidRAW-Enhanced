@@ -41,12 +41,13 @@ import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
   createImageStack,
   findImageStack,
-  setImageStackCover,
+  moveImageToTopOfStack,
   toggleImageStack,
   unstackImagePaths,
 } from '../../utils/imageStacks';
 import { autoStackCreatedImages } from '../../utils/autoStacking';
 import { getEnabledCopySuffix } from '../../utils/outputNaming';
+import { GroupBadgeInfo } from '../../utils/imageGrouping';
 
 interface BottomBarProps {
   filmstripHeight?: number;
@@ -83,6 +84,7 @@ interface BottomBarProps {
   showZoomControls?: boolean;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   totalImages?: number;
+  groupBadgeInfo?: Map<string, GroupBadgeInfo> | null;
 }
 
 interface StarRatingProps {
@@ -175,6 +177,7 @@ export default function BottomBar({
   showZoomControls = true,
   thumbnailAspectRatio,
   totalImages,
+  groupBadgeInfo,
 }: BottomBarProps) {
   const { t } = useTranslation();
   const { displaySize, originalSize } = useEditorStore(
@@ -276,7 +279,7 @@ export default function BottomBar({
     { id: 'virtualCopy', label: t('contextMenus.thumbnail.virtualCopy') },
     { id: 'stackSelected', label: t('ui.bottomBar.tooltips.stackSelected') },
     { id: 'toggleStack', label: t('ui.bottomBar.tooltips.toggleStack') },
-    { id: 'setStackCover', label: t('contextMenus.thumbnail.setStackCover') },
+    { id: 'setStackCover', label: t('contextMenus.thumbnail.moveToTopOfStack') },
     { id: 'unstack', label: t('contextMenus.thumbnail.unstack') },
     { id: 'quickFilter', label: t('ui.bottomBar.tooltips.quickFilter') },
     { id: 'export', label: t('ui.bottomBar.tooltips.export') },
@@ -406,9 +409,9 @@ export default function BottomBar({
     saveImageStacks(toggleImageStack(imageStacks, targetStack.id));
   };
 
-  const handleSetStackCover = () => {
+  const handleMoveToTopOfStack = () => {
     if (!targetStack || !stackTargetPath) return;
-    saveImageStacks(setImageStackCover(imageStacks, targetStack.id, stackTargetPath));
+    saveImageStacks(moveImageToTopOfStack(imageStacks, targetStack.id, stackTargetPath));
   };
 
   const handleUnstack = () => {
@@ -538,6 +541,7 @@ export default function BottomBar({
               onRequestThumbnails={onRequestThumbnails}
               selectedImage={selectedImage}
               thumbnailAspectRatio={thumbnailAspectRatio}
+              groupBadgeInfo={groupBadgeInfo}
             />
           </div>
         </div>
@@ -777,8 +781,8 @@ export default function BottomBar({
               <button
                 className={productivityButtonClass}
                 disabled={!targetStack || !stackTargetPath || targetStack.coverPath === stackTargetPath}
-                onClick={handleSetStackCover}
-                data-tooltip={t('contextMenus.thumbnail.setStackCover')}
+                onClick={handleMoveToTopOfStack}
+                data-tooltip={t('contextMenus.thumbnail.moveToTopOfStack')}
               >
                 <Star size={18} />
               </button>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
-import { Image as ImageIcon, Star, SlidersHorizontal } from 'lucide-react';
+import { Image as ImageIcon, Layers, Star, SlidersHorizontal } from 'lucide-react';
 import clsx from 'clsx';
 import { Grid, useGridCallbackRef } from 'react-window';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +10,8 @@ import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { GroupBadgeInfo } from '../../utils/imageGrouping';
+import { StackVisualCue } from './library/LibraryItems';
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;
@@ -31,6 +33,7 @@ interface ItemData {
   onImageSelect?: (path: string, event: any) => void;
   itemHeight: number;
   setRatio: (index: number, ratio: number) => void;
+  groupBadgeInfo?: Map<string, GroupBadgeInfo> | null;
 }
 
 const FilmstripThumbnail = memo(
@@ -45,6 +48,7 @@ const FilmstripThumbnail = memo(
     itemHeight: _itemHeight,
     index,
     setRatio,
+    stackBadge,
   }: {
     imageFile: ImageFile;
     imageRatings: any;
@@ -56,6 +60,7 @@ const FilmstripThumbnail = memo(
     itemHeight: number;
     index: number;
     setRatio: (index: number, ratio: number) => void;
+    stackBadge?: GroupBadgeInfo;
   }) => {
     const { t } = useTranslation();
     const thumbData = useProcessStore((s) => s.thumbnails[imageFile.path]);
@@ -89,7 +94,8 @@ const FilmstripThumbnail = memo(
     const hasEditIcon = !!showEditIcon;
     const hasColorLabel = !!colorLabel;
     const hasRating = rating > 0;
-    const hasAnyOverlay = hasEditIcon || hasColorLabel || hasRating;
+    const hasGroupBadge = !!stackBadge?.label;
+    const hasAnyOverlay = hasEditIcon || hasColorLabel || hasRating || hasGroupBadge;
 
     const cleanPath = path.split('?')[0];
     const filename = cleanPath.split(/[\\/]/).pop() || '';
@@ -177,6 +183,7 @@ const FilmstripThumbnail = memo(
         }}
         data-tooltip={truncatedTitle}
       >
+        <StackVisualCue info={stackBadge?.stackVisual} />
         {layers.length > 0 ? (
           <div className="absolute inset-0 w-full h-full">
             {layers.map((layer) => (
@@ -225,7 +232,10 @@ const FilmstripThumbnail = memo(
         <div className="absolute top-1 right-1 flex items-center justify-end z-10 pointer-events-none">
           <div
             className={clsx(
-              'rounded-full h-5 px-1.5 flex items-center justify-center gap-0 shadow-md bg-black/30 pointer-events-auto transition-all duration-200 ease-out origin-top-right',
+              'rounded-full h-5 px-1.5 flex items-center justify-center gap-0 pointer-events-auto transition-all duration-200 ease-out origin-top-right',
+              stackBadge?.stackVisual?.collapsed && stackBadge.count
+                ? 'bg-black/80 ring-1 ring-white/90 shadow-[0_1px_4px_rgba(0,0,0,0.9)]'
+                : 'bg-black/30 shadow-md',
               hasAnyOverlay ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none',
             )}
           >
@@ -262,6 +272,22 @@ const FilmstripThumbnail = memo(
                 {rating}
               </Text>
               <Star size={12} className="text-white fill-white" />
+            </div>
+
+            <div
+              className={clsx(
+                'flex items-center shrink-0 transition-all duration-200 ease-out overflow-hidden rounded-sm',
+                hasGroupBadge ? 'max-w-10 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
+                hasGroupBadge && (hasEditIcon || hasColorLabel || hasRating) ? 'ml-1.5' : 'ml-0',
+              )}
+              data-tooltip={stackBadge?.label}
+            >
+              <Layers size={12} className="text-white" />
+              {!!stackBadge?.count && (
+                <Text variant={TextVariants.small} color={TextColors.white} className="ml-0.5">
+                  {stackBadge.count}
+                </Text>
+              )}
             </div>
           </div>
         </div>
@@ -301,6 +327,7 @@ const FilmstripCell = ({
   onImageSelect,
   itemHeight,
   setRatio,
+  groupBadgeInfo,
 }: any) => {
   const imageFile = imageList[columnIndex];
   const fullWidth = style.width as number;
@@ -329,6 +356,7 @@ const FilmstripCell = ({
           itemHeight={itemHeight}
           index={columnIndex}
           setRatio={setRatio}
+          stackBadge={groupBadgeInfo?.get(imageFile.path)}
         />
       </div>
     </div>
@@ -601,6 +629,7 @@ interface FilmStripProps {
   selectedImage?: SelectedImage;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   totalImages?: number;
+  groupBadgeInfo?: Map<string, GroupBadgeInfo> | null;
 }
 
 export default function Filmstrip({
@@ -614,6 +643,7 @@ export default function Filmstrip({
   onRequestThumbnails,
   selectedImage,
   thumbnailAspectRatio,
+  groupBadgeInfo,
 }: FilmStripProps) {
   const clickTriggeredScroll = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -643,9 +673,7 @@ export default function Filmstrip({
     if (imageList.some((img) => img.path === path)) return path;
     const selected = fullImageList.find((img) => img.path === path);
     if (!selected?.group_id) return path;
-    const primary = imageList.find(
-      (img) => img.group_id === selected.group_id && !img.is_virtual_copy,
-    );
+    const primary = imageList.find((img) => img.group_id === selected.group_id && !img.is_virtual_copy);
     return primary?.path ?? path;
   }, [selectedImage?.path, imageList, fullImageList, groupingMode]);
 
@@ -672,6 +700,7 @@ export default function Filmstrip({
             onRequestThumbnails,
             onImageSelect: handleImageSelect,
             clickTriggeredScroll,
+            groupBadgeInfo,
           }}
         />
       )}
