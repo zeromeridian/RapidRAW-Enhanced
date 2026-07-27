@@ -704,7 +704,7 @@ export default function ExportPanel({
                   )}
                 </Section>
 
-                {fileFormat == FileFormats.Jpeg && (
+                {[FileFormats.Jpeg, FileFormats.Tiff].includes(fileFormat as FileFormats) && (
                   <Section title={t('export.sections.metadata')}>
                     <Switch
                       checked={keepMetadata}
@@ -857,11 +857,15 @@ export default function ExportPanel({
                         />
                         {fileFormat !== FileFormats.Cube && (
                           <>
-                            {fileFormat === FileFormats.Jpeg && (
+                            {[FileFormats.Jpeg, FileFormats.Tiff].includes(fileFormat as FileFormats) && (
                               <Switch
                                 checked={inheritAllExif}
                                 disabled={isExporting}
-                                label={t('export.advanced.inheritAllExif')}
+                                label={
+                                  fileFormat === FileFormats.Tiff
+                                    ? t('export.advanced.inheritSafeTiffExif')
+                                    : t('export.advanced.inheritAllExif')
+                                }
                                 onChange={(enabled) => {
                                   setInheritAllExif(enabled);
                                   if (enabled) setKeepMetadata(true);

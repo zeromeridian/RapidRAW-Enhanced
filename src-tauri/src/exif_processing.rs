@@ -811,23 +811,13 @@ pub fn write_image_with_metadata(
     strip_gps: bool,
     inherit_all_exif: bool,
 ) -> Result<(), String> {
-    // FIXME: temporary solution until I find a way to write metadata to TIFF
-    if !keep_metadata || output_format.to_lowercase() == "tiff" {
+    if !keep_metadata {
         return Ok(());
     }
 
+    let is_tiff_output = matches!(output_format.to_lowercase().as_str(), "tif" | "tiff");
     let original_path = Path::new(original_path_str);
     if !original_path.exists() {
-        return Ok(());
-    }
-
-    // Skip TIFF sources to avoid potential tag corruption issues
-    let original_ext = original_path
-        .extension()
-        .and_then(|s| s.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    if original_ext == "tiff" || original_ext == "tif" {
         return Ok(());
     }
 
@@ -840,7 +830,7 @@ pub fn write_image_with_metadata(
         _ => return Ok(()),
     };
 
-    let (mut metadata, mut source_read_success) = if inherit_all_exif {
+    let (mut metadata, mut source_read_success) = if inherit_all_exif && !is_tiff_output {
         match Metadata::new_from_path(original_path) {
             Ok(metadata) => (metadata, true),
             Err(error) => {
@@ -1218,6 +1208,61 @@ pub fn write_image_with_metadata(
     }
 
     metadata.set_tag(ExifTag::Software("RapidRAW - Enhanced".to_string()));
+
+    if is_tiff_output {
+        let original_image_bytes = image_bytes.clone();
+        let mut output_metadata = Metadata::new_from_vec(image_bytes, FileExtension::TIFF)
+            .map_err(|error| {
+                format!("Could not read the encoded TIFF before adding metadata: {error}")
+            })?;
+
+        for tag in &metadata {
+            if matches!(
+                tag,
+                ExifTag::Make(_)
+                    | ExifTag::Model(_)
+                    | ExifTag::LensMake(_)
+                    | ExifTag::LensModel(_)
+                    | ExifTag::DateTimeOriginal(_)
+                    | ExifTag::CreateDate(_)
+                    | ExifTag::ExposureTime(_)
+                    | ExifTag::FNumber(_)
+                    | ExifTag::ISO(_)
+                    | ExifTag::ExposureCompensation(_)
+                    | ExifTag::FocalLength(_)
+                    | ExifTag::FocalLengthIn35mmFormat(_)
+                    | ExifTag::Artist(_)
+                    | ExifTag::Copyright(_)
+                    | ExifTag::ImageDescription(_)
+                    | ExifTag::GPSLatitude(_)
+                    | ExifTag::GPSLatitudeRef(_)
+                    | ExifTag::GPSLongitude(_)
+                    | ExifTag::GPSLongitudeRef(_)
+                    | ExifTag::GPSAltitude(_)
+                    | ExifTag::GPSAltitudeRef(_)
+                    | ExifTag::Software(_)
+            ) {
+                output_metadata.set_tag(tag.clone());
+            }
+        }
+
+        if let Err(error) = output_metadata.write_to_vec(image_bytes, FileExtension::TIFF) {
+            log::warn!("Failed to add safe metadata to TIFF export: {error}");
+            *image_bytes = original_image_bytes;
+            return Ok(());
+        }
+
+        if let Err(error) =
+            image::load_from_memory_with_format(image_bytes, image::ImageFormat::Tiff)
+        {
+            log::warn!(
+                "TIFF metadata validation failed; using metadata-free export instead: {error}"
+            );
+            *image_bytes = original_image_bytes;
+        }
+        return Ok(());
+    }
+
     metadata.set_tag(ExifTag::Orientation(vec![1u16]));
     metadata.set_tag(ExifTag::ColorSpace(vec![1u16]));
 
@@ -1370,4 +1415,111 @@ pub fn write_rrexif_sidecar(source_path_str: &str, target_image_path: &Path) -> 
     metadata.exif = Some(exif_data);
     save_primary_metadata(target_image_path, &metadata)
         .map_err(|e| format!("Failed to write sidecar: {}", e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{DynamicImage, ImageBuffer, Rgb};
+    use std::io::Cursor;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn encoded_test_tiff() -> Vec<u8> {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(3, 2, Rgb([20, 40, 60])));
+        let mut bytes = Vec::new();
+        image
+            .write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Tiff)
+            .unwrap();
+        bytes
+    }
+
+    #[test]
+    fn safe_tiff_metadata_keeps_image_decodable_and_copies_allowlisted_tags() {
+        let mut source_bytes = encoded_test_tiff();
+        let mut source_metadata =
+            Metadata::new_from_vec(&source_bytes, FileExtension::TIFF).unwrap();
+        source_metadata.set_tag(ExifTag::Make("Test Camera Co.".to_string()));
+        source_metadata.set_tag(ExifTag::Model("Test Camera".to_string()));
+        source_metadata.set_tag(ExifTag::GPSLatitude(vec![
+            uR64 {
+                nominator: 40,
+                denominator: 1,
+            },
+            uR64 {
+                nominator: 30,
+                denominator: 1,
+            },
+            uR64 {
+                nominator: 0,
+                denominator: 1,
+            },
+        ]));
+        source_metadata.set_tag(ExifTag::GPSLatitudeRef("N".to_string()));
+        source_metadata.set_tag(ExifTag::Software("Source Software".to_string()));
+        source_metadata
+            .write_to_vec(&mut source_bytes, FileExtension::TIFF)
+            .unwrap();
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let source_path = std::env::temp_dir().join(format!("rapidraw-safe-exif-{unique}.tiff"));
+        fs::write(&source_path, source_bytes).unwrap();
+
+        let mut output_bytes = encoded_test_tiff();
+        write_image_with_metadata(
+            &mut output_bytes,
+            source_path.to_str().unwrap(),
+            "tiff",
+            true,
+            false,
+            true,
+        )
+        .unwrap();
+
+        image::load_from_memory_with_format(&output_bytes, image::ImageFormat::Tiff).unwrap();
+        let output_metadata = Metadata::new_from_vec(&output_bytes, FileExtension::TIFF).unwrap();
+        assert!(
+            output_metadata
+                .into_iter()
+                .any(|tag| matches!(tag, ExifTag::Make(value) if value == "Test Camera Co."))
+        );
+        assert!(
+            output_metadata
+                .into_iter()
+                .any(|tag| matches!(tag, ExifTag::Model(value) if value == "Test Camera"))
+        );
+        assert!(
+            output_metadata.into_iter().any(
+                |tag| matches!(tag, ExifTag::Software(value) if value == "RapidRAW - Enhanced")
+            )
+        );
+        assert!(
+            output_metadata
+                .into_iter()
+                .any(|tag| matches!(tag, ExifTag::GPSLatitude(_)))
+        );
+
+        let mut gps_stripped_bytes = encoded_test_tiff();
+        write_image_with_metadata(
+            &mut gps_stripped_bytes,
+            source_path.to_str().unwrap(),
+            "tiff",
+            true,
+            true,
+            true,
+        )
+        .unwrap();
+        image::load_from_memory_with_format(&gps_stripped_bytes, image::ImageFormat::Tiff).unwrap();
+        let gps_stripped_metadata =
+            Metadata::new_from_vec(&gps_stripped_bytes, FileExtension::TIFF).unwrap();
+        assert!(
+            !gps_stripped_metadata
+                .into_iter()
+                .any(|tag| matches!(tag, ExifTag::GPSLatitude(_) | ExifTag::GPSLatitudeRef(_)))
+        );
+
+        let _ = fs::remove_file(source_path);
+    }
 }
