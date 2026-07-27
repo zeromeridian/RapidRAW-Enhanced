@@ -754,6 +754,7 @@
       "exportToSourceFolder": "Export to same folder as source",
       "inheritAllExif": "Inherit all EXIF data from source",
       "inheritSafeTiffExif": "Preserve safe EXIF data from source",
+      "includeExifMetadata": "Include EXIF metadata",
       "preserveFolders": "保留資料夾結構",
       "preserveTimestamps": "將檔案時間戳設為 EXIF 拍攝日期",
       "title": "匯出設定"

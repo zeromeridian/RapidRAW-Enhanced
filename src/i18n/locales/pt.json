@@ -777,6 +777,7 @@
       "exportToSourceFolder": "Export to same folder as source",
       "inheritAllExif": "Inherit all EXIF data from source",
       "inheritSafeTiffExif": "Preserve safe EXIF data from source",
+      "includeExifMetadata": "Include EXIF metadata",
       "preserveFolders": "Preservar Estrutura de Pastas",
       "preserveTimestamps": "Definir Data/Hora do Arquivo a partir da Data de Captura EXIF",
       "title": "Configurações de Exportação"

@@ -211,8 +211,6 @@ export default function ExportPanel({
     setDontEnlarge,
     keepMetadata,
     setKeepMetadata,
-    inheritAllExif,
-    setInheritAllExif,
     preserveTimestamps,
     setPreserveTimestamps,
     stripGps,
@@ -376,7 +374,7 @@ export default function ExportPanel({
       filenameTemplate,
       jpegQuality,
       keepMetadata,
-      inheritAllExif,
+      inheritAllExif: keepMetadata && fileFormat === FileFormats.Jpeg,
       preserveTimestamps,
       preserveFolders,
       exportToSourceFolder,
@@ -418,7 +416,6 @@ export default function ExportPanel({
     resizeValue,
     dontEnlarge,
     keepMetadata,
-    inheritAllExif,
     preserveTimestamps,
     stripGps,
     filenameTemplate,
@@ -469,7 +466,7 @@ export default function ExportPanel({
       filenameSuffix,
       jpegQuality,
       keepMetadata,
-      inheritAllExif,
+      inheritAllExif: keepMetadata && fileFormat === FileFormats.Jpeg,
       preserveTimestamps,
       preserveFolders,
       exportToSourceFolder,
@@ -704,32 +701,6 @@ export default function ExportPanel({
                   )}
                 </Section>
 
-                {[FileFormats.Jpeg, FileFormats.Tiff].includes(fileFormat as FileFormats) && (
-                  <Section title={t('export.sections.metadata')}>
-                    <Switch
-                      checked={keepMetadata}
-                      disabled={isExporting}
-                      label={t('export.metadata.saveWithMetadata')}
-                      onChange={(enabled) => {
-                        setKeepMetadata(enabled);
-                        if (!enabled) setInheritAllExif(false);
-                      }}
-                      trackClassName="bg-surface"
-                    />
-                    {keepMetadata && (
-                      <div className="pl-2 border-l-2 border-surface">
-                        <Switch
-                          label={t('export.metadata.removeGps')}
-                          checked={stripGps}
-                          onChange={setStripGps}
-                          disabled={isExporting}
-                          trackClassName="bg-surface"
-                        />
-                      </div>
-                    )}
-                  </Section>
-                )}
-
                 <Section title={t('export.sections.watermark')}>
                   <Switch
                     label={t('export.watermark.addWatermark')}
@@ -858,20 +829,26 @@ export default function ExportPanel({
                         {fileFormat !== FileFormats.Cube && (
                           <>
                             {[FileFormats.Jpeg, FileFormats.Tiff].includes(fileFormat as FileFormats) && (
-                              <Switch
-                                checked={inheritAllExif}
-                                disabled={isExporting}
-                                label={
-                                  fileFormat === FileFormats.Tiff
-                                    ? t('export.advanced.inheritSafeTiffExif')
-                                    : t('export.advanced.inheritAllExif')
-                                }
-                                onChange={(enabled) => {
-                                  setInheritAllExif(enabled);
-                                  if (enabled) setKeepMetadata(true);
-                                }}
-                                trackClassName="bg-surface"
-                              />
+                              <>
+                                <Switch
+                                  checked={keepMetadata}
+                                  disabled={isExporting}
+                                  label={t('export.advanced.includeExifMetadata')}
+                                  onChange={setKeepMetadata}
+                                  trackClassName="bg-surface"
+                                />
+                                {keepMetadata && (
+                                  <div className="pl-2 border-l-2 border-surface">
+                                    <Switch
+                                      checked={stripGps}
+                                      disabled={isExporting}
+                                      label={t('export.metadata.removeGps')}
+                                      onChange={setStripGps}
+                                      trackClassName="bg-surface"
+                                    />
+                                  </div>
+                                )}
+                              </>
                             )}
                             <Switch
                               checked={preserveTimestamps}

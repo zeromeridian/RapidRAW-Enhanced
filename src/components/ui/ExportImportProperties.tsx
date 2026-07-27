@@ -111,7 +111,6 @@ export interface ExportPreset {
   resizeValue: number;
   dontEnlarge: boolean;
   keepMetadata: boolean;
-  inheritAllExif?: boolean;
   preserveTimestamps: boolean;
   stripGps: boolean;
   exportMasks?: boolean;

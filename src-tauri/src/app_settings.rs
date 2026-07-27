@@ -230,8 +230,6 @@ pub struct ExportPreset {
     pub dont_enlarge: bool,
     pub keep_metadata: bool,
     #[serde(default)]
-    pub inherit_all_exif: bool,
-    #[serde(default)]
     pub preserve_timestamps: bool,
     pub strip_gps: bool,
     pub filename_template: String,
@@ -263,7 +261,6 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             resize_value: 2048,
             dont_enlarge: true,
             keep_metadata: true,
-            inherit_all_exif: false,
             preserve_timestamps: false,
             strip_gps: false,
             filename_template: "{original_filename}".to_string(),
@@ -288,7 +285,6 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             resize_value: 2048,
             dont_enlarge: true,
             keep_metadata: false,
-            inherit_all_exif: false,
             preserve_timestamps: false,
             strip_gps: true,
             filename_template: "{original_filename}_web".to_string(),
