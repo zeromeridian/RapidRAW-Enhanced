@@ -20,6 +20,7 @@ interface DropdownProps<T extends React.Key> {
   value: T | null;
   disabled?: boolean;
   triggerClassName?: string;
+  selectedSuffix?: React.ReactNode;
 }
 
 const Dropdown = <T extends React.Key>({
@@ -31,6 +32,7 @@ const Dropdown = <T extends React.Key>({
   value,
   disabled = false,
   triggerClassName = '',
+  selectedSuffix,
 }: DropdownProps<T>) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -115,9 +117,12 @@ const Dropdown = <T extends React.Key>({
         onClick={() => setIsOpen(!isOpen)}
         type="button"
       >
-        <Text as="span" variant={TextVariants.label} color={TextColors.primary}>
-          {selectedOption ? selectedOption.label : placeholder}
-        </Text>
+        <span className="flex min-w-0 items-center gap-1">
+          <Text as="span" variant={TextVariants.label} color={TextColors.primary} className="truncate">
+            {selectedOption ? selectedOption.label : placeholder}
+          </Text>
+          {selectedOption && selectedSuffix}
+        </span>
         <ChevronDown
           className={`${TEXT_COLOR_KEYS[TextColors.secondary]} transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           size={20}
