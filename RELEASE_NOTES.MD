@@ -5,6 +5,23 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.28 — 2026-07-28
+
+### Active filter summary
+
+- The Library header now lists active rating, file-type, edit-state, color, and
+  flag filters as subtle compact chips beside the current folder path.
+- The summary remains on the header's existing second line and cannot increase
+  header height.
+- Long combinations are clipped to the available width, with the complete
+  filter list available in a tooltip.
+
+### Validation
+
+- Frontend production build, locale runtime validation, formatting, and
+  relevant-file TypeScript diagnostics passed.
+- Release packaging: pending final build.
+
 ## 1.6.1-colrbent.26 — 2026-07-28
 
 ### Flag presentation and filtering

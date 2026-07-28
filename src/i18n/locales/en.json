@@ -979,6 +979,14 @@
       }
     },
     "header": {
+      "activeFilters": {
+        "color": "Color: {{value}}",
+        "edited": "Edit: {{value}}",
+        "fileType": "Type: {{value}}",
+        "flag": "Flag: {{value}}",
+        "label": "Filters",
+        "rating": "Rating: {{value}}"
+      },
       "search": {
         "addFilterOrSearch": "Add filter or search...",
         "indexingImages": "Indexing Images...",
