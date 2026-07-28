@@ -702,14 +702,16 @@ mod tests {
 
     #[test]
     fn tone_curve_presets_round_trip_through_settings() {
-        let mut settings = AppSettings::default();
-        settings.tone_curve_presets = vec![json!({
-            "id": "curve-1",
-            "name": "Portrait",
-            "curveMode": "point",
-            "pointCurves": {},
-            "parametricCurve": {}
-        })];
+        let settings = AppSettings {
+            tone_curve_presets: vec![json!({
+                "id": "curve-1",
+                "name": "Portrait",
+                "curveMode": "point",
+                "pointCurves": {},
+                "parametricCurve": {}
+            })],
+            ..AppSettings::default()
+        };
 
         let serialized = serde_json::to_string(&settings).expect("settings should serialize");
         assert!(serialized.contains("\"toneCurvePresets\""));
