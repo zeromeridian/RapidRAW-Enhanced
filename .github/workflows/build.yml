@@ -11,6 +11,10 @@ on:
         description: Rust compilation target
         required: true
         type: string
+      asset-platform:
+        description: Stable platform label used in artifact and release asset names
+        required: true
+        type: string
       build-args:
         description: Additional Tauri build arguments
         required: true
@@ -79,7 +83,7 @@ jobs:
           NO_STRIP: ${{ runner.os == 'Linux' }}
         with:
           args: --verbose ${{ inputs.build-args }} --target ${{ inputs.target }}
-          assetNamePattern: '[name]_v[version]_[platform]_[arch][ext]'
+          assetNamePattern: '[name]_v[version]_${{ inputs.asset-platform }}_[arch][ext]'
           releaseId: ${{ inputs.release-id }}
           retryAttempts: 3
 
