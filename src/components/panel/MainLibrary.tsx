@@ -517,7 +517,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                     className="absolute bottom-8 left-8 lg:left-16 space-y-1 z-10 drop-shadow-sm"
                   >
                     {appVersion && (
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <p>
                           <span
                             className={`group transition-all duration-300 ease-in-out rounded-md py-1 ${
@@ -556,6 +556,10 @@ export default function MainLibrary(props: MainLibraryProps) {
                           >
                             {t('library.splash.contribute')}
                           </a>
+                        </p>
+                        <span>-</span>
+                        <p className="whitespace-nowrap text-text-secondary/80">
+                          {t('library.splash.ownership', { year: new Date().getFullYear() })}
                         </p>
                       </div>
                     )}

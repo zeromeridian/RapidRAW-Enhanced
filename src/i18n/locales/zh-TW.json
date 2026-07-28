@@ -1039,6 +1039,7 @@
       "newVersionAvailable": "新版本可用！",
       "openFolder": "開啟資料夾",
       "openLibrary": "開啟相簿",
+      "ownership": "Enhanced modifications © {{year}} ColrBent.",
       "version": "版本 {{version}}",
       "welcomeBack": "歡迎回來！",
       "welcomeBackDesc": "繼續上次的進度或開始新會話。"

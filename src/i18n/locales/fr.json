@@ -1065,6 +1065,7 @@
       "newVersionAvailable": "Nouvelle version disponible !",
       "openFolder": "Ouvrir un dossier",
       "openLibrary": "Ouvrir la bibliothèque",
+      "ownership": "Enhanced modifications © {{year}} ColrBent.",
       "version": "Version {{version}}",
       "welcomeBack": "Bon retour !",
       "welcomeBackDesc": "Reprenez là où vous vous étiez arrêté ou commencez une nouvelle session."

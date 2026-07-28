@@ -1039,6 +1039,7 @@
       "newVersionAvailable": "新版本可用！",
       "openFolder": "打开文件夹",
       "openLibrary": "打开图库",
+      "ownership": "Enhanced modifications © {{year}} ColrBent.",
       "version": "版本 {{version}}",
       "welcomeBack": "欢迎回来！",
       "welcomeBackDesc": "继续上次的进度或开始新会话。"

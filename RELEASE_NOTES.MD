@@ -5,6 +5,23 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.32 — 2026-07-28
+
+### Splash ownership notice
+
+- The launch-screen footer now identifies ColrBent's copyright ownership of
+  RapidRAW - Enhanced modifications beside the current application version.
+- The notice uses the current year automatically, remains visually subtle, and
+  can wrap without overflowing narrower layouts.
+- Its wording limits the ownership claim to fork modifications and does not
+  claim the original RapidRAW work.
+
+### Validation
+
+- Frontend production build, locale runtime validation, formatting, and
+  relevant-file TypeScript diagnostics passed.
+- Release packaging passed.
+
 ## 1.6.1-colrbent.31 — 2026-07-28
 
 ### Fork branding cleanup
