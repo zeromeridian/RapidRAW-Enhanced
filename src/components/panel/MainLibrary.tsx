@@ -192,6 +192,7 @@ export default function MainLibrary(props: MainLibraryProps) {
   };
 
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
+  const filterCriteria = useLibraryStore((state) => state.filterCriteria);
 
   useEffect(() => {
     const hasStoredLibrary = !!props.appSettings?.lastRootPath || !!props.appSettings?.rootFolders?.length;
@@ -246,6 +247,62 @@ export default function MainLibrary(props: MainLibraryProps) {
     ],
     [t],
   );
+
+  const activeFilterLabels = useMemo(() => {
+    const filters: Array<{ key: string; label: string }> = [];
+
+    if (filterCriteria.rating !== 0) {
+      const rating = translatedRatingFilterOptions.find((option) => option.value === filterCriteria.rating)?.label;
+      if (rating) {
+        filters.push({
+          key: 'rating',
+          label: t('library.header.activeFilters.rating', { value: rating }),
+        });
+      }
+    }
+
+    if (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) {
+      const fileType = translatedRawStatusOptions.find((option) => option.key === filterCriteria.rawStatus)?.label;
+      if (fileType) {
+        filters.push({
+          key: 'file-type',
+          label: t('library.header.activeFilters.fileType', { value: fileType }),
+        });
+      }
+    }
+
+    if (filterCriteria.editedStatus && filterCriteria.editedStatus !== EditedStatus.All) {
+      const edited = translatedEditedStatusOptions.find((option) => option.key === filterCriteria.editedStatus)?.label;
+      if (edited) {
+        filters.push({
+          key: 'edited',
+          label: t('library.header.activeFilters.edited', { value: edited }),
+        });
+      }
+    }
+
+    for (const color of filterCriteria.colors || []) {
+      const value =
+        color === 'none'
+          ? t('library.header.viewOptions.noLabel')
+          : t(`contextMenus.colors.${color}`, {
+              defaultValue: color.charAt(0).toUpperCase() + color.slice(1),
+            });
+      filters.push({
+        key: `color-${color}`,
+        label: t('library.header.activeFilters.color', { value }),
+      });
+    }
+
+    for (const flag of filterCriteria.flags || []) {
+      filters.push({
+        key: `flag-${flag}`,
+        label: t('library.header.activeFilters.flag', { value: t(`flags.${flag}`) }),
+      });
+    }
+
+    return filters;
+  }, [filterCriteria, t, translatedEditedStatusOptions, translatedRatingFilterOptions, translatedRawStatusOptions]);
 
   const translatedThumbnailSizeOptions = useMemo(
     () => [
@@ -538,14 +595,34 @@ export default function MainLibrary(props: MainLibraryProps) {
         onMouseEnter={() => setIsProgressHovered(true)}
         onMouseLeave={() => setIsProgressHovered(false)}
       >
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <Text variant={TextVariants.headline}>{t('library.header.title')}</Text>
           {!props.isAndroid && (
-            <div className="flex items-center gap-2">
+            <div className="flex h-5 min-w-0 items-center gap-2 overflow-hidden">
               {props.currentFolderPath ? (
-                <Text className="truncate">{props.currentFolderPath}</Text>
+                <Text className={activeFilterLabels.length > 0 ? 'max-w-[40%] shrink truncate' : 'max-w-full truncate'}>
+                  {props.currentFolderPath}
+                </Text>
               ) : (
                 <p className="text-sm invisible select-none pointer-events-none h-5 overflow-hidden"></p>
+              )}
+              {activeFilterLabels.length > 0 && (
+                <div
+                  className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden whitespace-nowrap"
+                  data-tooltip={activeFilterLabels.map((filter) => filter.label).join(' · ')}
+                >
+                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-text-secondary/70">
+                    {t('library.header.activeFilters.label')}
+                  </span>
+                  {activeFilterLabels.map((filter) => (
+                    <span
+                      key={filter.key}
+                      className="shrink-0 rounded-sm bg-surface/70 px-1.5 py-0.5 text-[10px] leading-4 text-text-secondary"
+                    >
+                      {filter.label}
+                    </span>
+                  ))}
+                </div>
               )}
               <div
                 className={`flex items-center gap-2 overflow-hidden transition-all duration-300 whitespace-nowrap ${
