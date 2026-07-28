@@ -1,9 +1,9 @@
 # RapidRAW - Enhanced Release Notes
 
 This is the continuous release history for production builds of RapidRAW -
-Enhanced. The newest release appears first. Existing release entries are
-historical records and should not be rewritten except to correct factual
-errors.
+Enhanced. The newest release appears first. Entries contain only concise,
+user-facing changes so each version can be copied directly into a GitHub
+Release description.
 
 ## 1.6.1-colrbent.38 — 2026-07-28
 
@@ -18,12 +18,6 @@ errors.
 - The current Library view refreshes automatically when its folder is
   imported, and a completion message reports the number of XMP files read.
 
-### Validation
-
-- Frontend production build, locale runtime validation, focused forced-import
-  and non-recursion tests, Rust formatting and strict Clippy validation passed.
-- Release packaging passed.
-
 ## 1.6.1-colrbent.37 — 2026-07-28
 
 ### Portable XMP flags and stacks
@@ -37,23 +31,12 @@ errors.
 - Virtual copies continue using their independent RapidRAW sidecars because
   multiple virtual copies share one physical XMP file.
 
-### Validation
-
-- Frontend production build, locale runtime validation, focused XMP round-trip
-  tests, Rust formatting and strict Clippy validation passed.
-- Release packaging passed.
-
 ## 1.6.1-colrbent.36 — 2026-07-28
 
 ### CI lint reliability
 
 - Updated the tone-curve preset settings test to follow the enforced Rust
   linting rules without changing application behavior.
-
-### Validation
-
-- Rust formatting and strict Clippy validation passed.
-- Frontend production build and release packaging passed.
 
 ## 1.6.1-colrbent.33 — 2026-07-28
 
@@ -66,12 +49,6 @@ errors.
 - Grid navigation and all four flag shortcuts remain independently
   configurable in Main Settings with conflict detection and reset support.
 
-### Validation
-
-- Frontend production build, locale runtime validation, formatting, relevant
-  TypeScript diagnostics, and shortcut-definition checks passed.
-- Release packaging passed.
-
 ## 1.6.1-colrbent.32 — 2026-07-28
 
 ### Splash ownership notice
@@ -82,12 +59,6 @@ errors.
   can wrap without overflowing narrower layouts.
 - Its wording limits the ownership claim to fork modifications and does not
   claim the original RapidRAW work.
-
-### Validation
-
-- Frontend production build, locale runtime validation, formatting, and
-  relevant-file TypeScript diagnostics passed.
-- Release packaging passed.
 
 ## 1.6.1-colrbent.31 — 2026-07-28
 
@@ -103,13 +74,6 @@ errors.
 - Upstream compatibility identifiers and required technical dependencies
   remain unchanged.
 
-### Validation
-
-- Frontend production build, locale runtime validation, metadata parsing,
-  formatting, relevant-file TypeScript diagnostics, and promotional-reference
-  audit passed.
-- Release packaging passed.
-
 ## 1.6.1-colrbent.30 — 2026-07-28
 
 ### Build automation
@@ -124,11 +88,6 @@ errors.
 - The reusable build uses deterministic dependency installation, exact
   caller-commit checkout, and a current immutable packaging-action release.
 
-### Validation
-
-- Workflow YAML parsing, formatting, static GitHub Actions analysis, matrix
-  assertions, action-input verification, and release packaging passed.
-
 ## 1.6.1-colrbent.29 — 2026-07-28
 
 ### Clear active filters
@@ -140,12 +99,6 @@ errors.
 - Filter chips continue to clip before the action and the header retains its
   existing height.
 
-### Validation
-
-- Frontend production build, locale runtime validation, formatting, and
-  relevant-file TypeScript diagnostics passed.
-- Release packaging passed.
-
 ## 1.6.1-colrbent.28 — 2026-07-28
 
 ### Active filter summary
@@ -156,12 +109,6 @@ errors.
   header height.
 - Long combinations are clipped to the available width, with the complete
   filter list available in a tooltip.
-
-### Validation
-
-- Frontend production build, locale runtime validation, formatting, and
-  relevant-file TypeScript diagnostics passed.
-- Release packaging passed.
 
 ## 1.6.1-colrbent.26 — 2026-07-28
 
@@ -176,13 +123,6 @@ errors.
   Options and the bottom Quick Filter.
 - Added advanced flag queries such as `flag:rejected`.
 
-### Validation
-
-- Frontend production build, locale runtime validation, backend compilation,
-  relevant-file TypeScript diagnostics, focused flag-filter assertions, and
-  formatting passed.
-- Release packaging passed.
-
 ## 1.6.1-colrbent.24 — 2026-07-27
 
 ### Flag badge refinement
@@ -191,11 +131,6 @@ errors.
   contour.
 - Flag badges now use a compact translucent dark square with a colored glyph,
   retaining visibility without obscuring the thumbnail.
-
-### Validation
-
-- Frontend production build and formatting passed.
-- Release packaging passed.
 
 ## 1.6.1-colrbent.23 — 2026-07-27
 
@@ -214,12 +149,6 @@ errors.
 - Flag metadata remains independent of color labels and ordinary editable
   tags.
 
-### Validation
-
-- Frontend production build, relevant-file TypeScript diagnostics, locale
-  runtime validation, backend compilation, focused flag policy checks,
-  formatting, and release packaging passed.
-
 ## 1.6.1-colrbent.22 — 2026-07-27
 
 ### Stack presentation and ordering
@@ -231,12 +160,6 @@ errors.
 - Moving an image to the top now updates both the persisted stack order and its
   cover. New stacks and loaded legacy stacks also keep their cover in the first
   position.
-
-### Validation
-
-- Frontend production build, stack-order assertions, formatting, relevant-file
-  TypeScript diagnostics, locale runtime validation, Rust release compilation,
-  and release packaging passed.
 
 ## 1.6.1-colrbent.20 — 2026-07-27
 
@@ -250,11 +173,6 @@ errors.
   readable EXIF for JPEG and the validated safe allowlist for TIFF.
 - Export presets retain only the existing `keepMetadata` choice as the active
   source of truth. Older presets remain compatible.
-
-### Validation
-
-- Frontend production build, Rust compilation, locale runtime validation,
-  relevant-file TypeScript diagnostics, and release packaging passed.
 
 ## 1.6.1-colrbent.19 — 2026-07-27
 
@@ -271,12 +189,6 @@ errors.
 - Metadata is merged into the newly encoded TIFF's own structural directories.
   RapidRAW then fully decodes the result; if metadata writing or validation
   fails, it safely uses the metadata-free encoded TIFF.
-
-### Validation
-
-- Frontend production build, locale runtime validation, relevant-file
-  TypeScript diagnostics, focused TIFF metadata/decoding/GPS tests, and
-  release packaging passed.
 
 ## 1.6.1-colrbent.18 — 2026-07-27
 
@@ -300,9 +212,3 @@ errors.
 - Successful exports now wait for automatic-stack persistence and library
   refresh, allowing new same-folder outputs and their expanded stacks to
   appear immediately in the Editor/Develop filmstrip.
-
-### Validation
-
-- Frontend production build, Rust compilation, focused settings test,
-  relevant-file TypeScript diagnostics, locale runtime validation, and
-  release packaging passed.
