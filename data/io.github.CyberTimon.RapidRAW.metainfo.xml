@@ -4,8 +4,8 @@
 
   <name>RapidRAW - Enhanced</name>
   <summary>A non-destructive, and GPU-accelerated RAW image editor built with performance in mind</summary>
-  <developer id="io.github.CyberTimon">
-    <name>Timon Käch</name>
+  <developer id="io.github.zeromeridian">
+    <name>ColrBent</name>
   </developer>
 
   <metadata_license>FSFAP</metadata_license>
@@ -21,9 +21,6 @@
     <p>
       RapidRAW - Enhanced is a modern, high-performance photo editor based on RapidRAW. It delivers a simple, beautiful editing experience in a lightweight package for Windows, macOS, and Linux.
     </p>
-    <p>
-      I started developing this project as a personal challenge when I was 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of React, WGSL and Rust, with the support from Google Gemini.
-    </p>
   </description>
 
   <launchable type="desktop-id">io.github.CyberTimon.RapidRAW.desktop</launchable>
@@ -35,7 +32,7 @@
   </screenshots>
 
   <content_rating type="oars-1.1"/>
-  <url type="homepage">https://github.com/CyberTimon/RapidRAW</url>
+  <url type="homepage">https://github.com/zeromeridian/RapidRAW-Enhanced</url>
 
   <releases>
     <release version="v1.6.0" date="2026-07-26">

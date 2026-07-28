@@ -1,6 +1,6 @@
 {
   "name": "rapidraw-enhanced",
-  "author": "Timon Käch",
+  "author": "ColrBent",
   "private": true,
   "scripts": {
     "dev": "vite",
