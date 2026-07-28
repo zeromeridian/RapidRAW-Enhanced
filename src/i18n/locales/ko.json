@@ -1039,6 +1039,7 @@
       "newVersionAvailable": "새 버전이 있습니다!",
       "openFolder": "폴더 열기",
       "openLibrary": "라이브러리 열기",
+      "ownership": "Enhanced modifications © {{year}} ColrBent.",
       "version": "버전 {{version}}",
       "welcomeBack": "다시 오신 것을 환영합니다!",
       "welcomeBackDesc": "이전 작업을 계속하거나 새 세션을 시작하세요."

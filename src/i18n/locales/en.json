@@ -1076,6 +1076,7 @@
       "newVersionAvailable": "New version available!",
       "openFolder": "Open Folder",
       "openLibrary": "Open Library",
+      "ownership": "Enhanced modifications © {{year}} ColrBent.",
       "version": "Version {{version}}",
       "welcomeBack": "Welcome back!",
       "welcomeBackDesc": "Continue where you left off or start a new session."

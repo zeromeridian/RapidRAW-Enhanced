@@ -1089,6 +1089,7 @@
       "newVersionAvailable": "Доступна новая версия!",
       "openFolder": "Открыть папку",
       "openLibrary": "Открыть библиотеку",
+      "ownership": "Enhanced modifications © {{year}} ColrBent.",
       "version": "Версия {{version}}",
       "welcomeBack": "С возвращением!",
       "welcomeBackDesc": "Продолжите работу с прошлого сеанса или начните новый."
