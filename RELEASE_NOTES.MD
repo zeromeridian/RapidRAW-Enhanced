@@ -5,6 +5,23 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.33 — 2026-07-28
+
+### Caps Lock auto-advance
+
+- With Caps Lock enabled, keyboard-applied ratings, color labels, and flags now
+  advance to the next visible image in Library and Develop.
+- Auto-advance stops at the final visible image and suppresses held-key repeats
+  to prevent unintended rapid changes.
+- Grid navigation and all four flag shortcuts remain independently
+  configurable in Main Settings with conflict detection and reset support.
+
+### Validation
+
+- Frontend production build, locale runtime validation, formatting, relevant
+  TypeScript diagnostics, and shortcut-definition checks passed.
+- Release packaging passed.
+
 ## 1.6.1-colrbent.32 — 2026-07-28
 
 ### Splash ownership notice
