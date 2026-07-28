@@ -5,6 +5,26 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.26 — 2026-07-28
+
+### Flag presentation and filtering
+
+- Rejected images now use a neutral dark thumbnail overlay in the Library
+  grid/list and Develop filmstrip, while badges and other thumbnail information
+  remain readable.
+- Flag badges and toolbar states now use monochrome icons consistent with the
+  rest of RapidRAW.
+- Added combinable Rejected, Selected, Deferred, and Unflagged filters to View
+  Options and the bottom Quick Filter.
+- Added advanced flag queries such as `flag:rejected`.
+
+### Validation
+
+- Frontend production build, locale runtime validation, backend compilation,
+  relevant-file TypeScript diagnostics, focused flag-filter assertions, and
+  formatting passed.
+- Release packaging passed.
+
 ## 1.6.1-colrbent.24 — 2026-07-27
 
 ### Flag badge refinement

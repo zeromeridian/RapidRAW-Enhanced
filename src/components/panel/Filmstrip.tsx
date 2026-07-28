@@ -12,7 +12,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { GroupBadgeInfo } from '../../utils/imageGrouping';
 import { StackVisualCue } from './library/LibraryItems';
-import { getImageFlag } from '../../utils/imageFlags';
+import { getImageFlag, ImageFlag } from '../../utils/imageFlags';
 import ImageFlagBadge from '../ui/ImageFlagBadge';
 
 const HORIZONTAL_PADDING = 4;
@@ -225,6 +225,8 @@ const FilmstripThumbnail = memo(
             <ImageIcon size={24} className="text-text-secondary animate-pulse" />
           </div>
         )}
+
+        {imageFlag === ImageFlag.Rejected && <div className="absolute inset-0 z-10 bg-black/45 pointer-events-none" />}
 
         <div
           className={clsx(

@@ -267,6 +267,7 @@ export type EditedStatus = (typeof EditedStatus)[keyof typeof EditedStatus];
 
 export interface FilterCriteria {
   colors: Array<string>;
+  flags?: Array<'rejected' | 'selected' | 'deferred' | 'unflagged'>;
   rating: number;
   rawStatus: RawStatus;
   editedStatus?: EditedStatus;

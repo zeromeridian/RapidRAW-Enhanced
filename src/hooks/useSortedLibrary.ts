@@ -4,9 +4,10 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { RawStatus, EditedStatus, SortDirection, ImageFile, GroupingMode } from '../components/ui/AppProperties';
 import { buildImageGroups, GroupBadgeInfo, GroupId } from '../utils/imageGrouping';
 import { applyImageStacks } from '../utils/imageStacks';
+import { getImageFlag, matchesImageFlagFilter } from '../utils/imageFlags';
 
 export const ADVANCED_QUERY_REGEX =
-  /^(iso|aperture|f|shutter|s|focal|mm|rating|color|camera|make|model|lens)\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
+  /^(iso|aperture|f|shutter|s|focal|mm|rating|color|flag|camera|make|model|lens)\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
 
 export const parseShutter = (val: string | undefined): number => {
   if (!val) return 0;
@@ -74,6 +75,10 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
       if (!hasMatchingColor && !matchesNone) return false;
     }
 
+    if (!matchesImageFlagFilter(image.tags, filterCriteria.flags)) {
+      return false;
+    }
+
     return true;
   };
 
@@ -131,6 +136,8 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
         ).toLowerCase();
       } else if (field === 'color') {
         imgStr = (image.tags || []).find((t: string) => t.startsWith('color:'))?.substring(6) || '';
+      } else if (field === 'flag') {
+        imgStr = getImageFlag(image.tags);
       }
 
       return operator === '=' || operator === ':' ? imgStr.includes(value) : false;

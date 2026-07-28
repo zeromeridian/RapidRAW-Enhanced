@@ -9,12 +9,22 @@ export const ImageFlag = {
 
 export type ImageFlag = (typeof ImageFlag)[keyof typeof ImageFlag];
 
+export const IMAGE_FLAG_FILTER_OPTIONS: ImageFlag[] = [
+  ImageFlag.Rejected,
+  ImageFlag.Selected,
+  ImageFlag.Deferred,
+  ImageFlag.Unflagged,
+];
+
 export const getImageFlag = (tags: string[] | null | undefined): ImageFlag => {
   const value = tags?.find((tag) => tag.startsWith(IMAGE_FLAG_PREFIX))?.slice(IMAGE_FLAG_PREFIX.length);
   return value === ImageFlag.Rejected || value === ImageFlag.Selected || value === ImageFlag.Deferred
     ? value
     : ImageFlag.Unflagged;
 };
+
+export const matchesImageFlagFilter = (tags: string[] | null | undefined, selectedFlags: ImageFlag[] | undefined) =>
+  !selectedFlags?.length || selectedFlags.includes(getImageFlag(tags));
 
 export const isImageFlagTag = (tag: string) => tag.startsWith(IMAGE_FLAG_PREFIX);
 

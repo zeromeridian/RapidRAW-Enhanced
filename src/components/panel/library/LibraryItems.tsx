@@ -21,7 +21,7 @@ import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/E
 import { reorderStackPaths } from '../../../utils/imageStacks';
 import { StackMemberPosition, StackVisualInfo } from '../../../utils/imageGrouping';
 import { getDisplayFilename } from '../../../utils/outputNaming';
-import { getImageFlag } from '../../../utils/imageFlags';
+import { getImageFlag, ImageFlag } from '../../../utils/imageFlags';
 import ImageFlagBadge from '../../ui/ImageFlagBadge';
 
 type StackDropEdge = 'before' | 'after';
@@ -306,6 +306,8 @@ const ThumbnailComponent = ({
             <CloudOff size={12} className="text-white" />
           </div>
         )}
+
+        {imageFlag === ImageFlag.Rejected && <div className="absolute inset-0 z-10 bg-black/45 pointer-events-none" />}
       </div>
 
       <div
@@ -801,11 +803,15 @@ const ListItemComponent = ({
               </div>
             ))}
 
+          {imageFlag === ImageFlag.Rejected && (
+            <div className="absolute inset-0 z-10 bg-black/45 pointer-events-none" />
+          )}
+
           {stackBadgeCount && (
             <button
               type="button"
               className={clsx(
-                'absolute top-1 right-1 z-10 rounded-full text-white px-1.5 h-5 flex items-center gap-0.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white',
+                'absolute top-1 right-1 z-20 rounded-full text-white px-1.5 h-5 flex items-center gap-0.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white',
                 stackVisual?.collapsed
                   ? 'bg-black/80 hover:bg-black ring-1 ring-white/90 shadow-[0_1px_4px_rgba(0,0,0,0.9)]'
                   : 'bg-black/50 hover:bg-black/70',
