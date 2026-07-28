@@ -5,6 +5,23 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.29 — 2026-07-28
+
+### Clear active filters
+
+- A subtle **Clear all filters** action now appears beside the Library header's
+  active-filter summary.
+- The action resets rating, file-type, edit-state, color, and flag filters
+  together, then disappears with the summary.
+- Filter chips continue to clip before the action and the header retains its
+  existing height.
+
+### Validation
+
+- Frontend production build, locale runtime validation, formatting, and
+  relevant-file TypeScript diagnostics passed.
+- Release packaging passed.
+
 ## 1.6.1-colrbent.28 — 2026-07-28
 
 ### Active filter summary
@@ -20,7 +37,7 @@ errors.
 
 - Frontend production build, locale runtime validation, formatting, and
   relevant-file TypeScript diagnostics passed.
-- Release packaging: pending final build.
+- Release packaging passed.
 
 ## 1.6.1-colrbent.26 — 2026-07-28
 
