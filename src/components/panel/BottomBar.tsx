@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import {
   Aperture,
   Check,
+  Clock3,
   ChevronDown,
   ChevronUp,
   ClipboardPaste,
@@ -11,6 +12,8 @@ import {
   Film,
   FileInput,
   Filter,
+  Flag,
+  FlagOff,
   Grip,
   Images,
   LayoutTemplate,
@@ -20,8 +23,10 @@ import {
   SlidersHorizontal,
   SquaresUnite,
   Star,
+  Trash2,
   Ungroup,
   Users,
+  X,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -48,6 +53,7 @@ import {
 import { autoStackCreatedImages } from '../../utils/autoStacking';
 import { getEnabledCopySuffix } from '../../utils/outputNaming';
 import { GroupBadgeInfo } from '../../utils/imageGrouping';
+import { getImageFlag, getRejectedPathsInFolder, ImageFlag } from '../../utils/imageFlags';
 
 interface BottomBarProps {
   filmstripHeight?: number;
@@ -69,6 +75,8 @@ interface BottomBarProps {
   onContextMenu?(event: any, path: string): void;
   onCopy(): void;
   onExportClick?(): void;
+  onDeleteRejected?(paths: string[]): void;
+  onFlag(flag: ImageFlag): void;
   onImageSelect?(path: string, event: any): void;
   onLibraryRefresh?(): Promise<void>;
   onOpenCopyPasteSettings?(): void;
@@ -104,6 +112,7 @@ const PRODUCTIVITY_TOOLBAR_IDS = [
 ] as const;
 const COPY_TOOLBAR_IDS = ['physicalCopy', 'virtualCopy'] as const;
 const STACK_TOOLBAR_IDS = ['stackSelected', 'toggleStack', 'setStackCover', 'unstack'] as const;
+const FLAG_TOOLBAR_IDS = ['flagRejected', 'flagSelected', 'flagDeferred', 'flagUnflagged', 'deleteRejected'] as const;
 
 const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
   const { t } = useTranslation();
@@ -162,6 +171,8 @@ export default function BottomBar({
   onContextMenu,
   onCopy,
   onExportClick,
+  onDeleteRejected,
+  onFlag,
   onImageSelect,
   onLibraryRefresh,
   onOpenCopyPasteSettings,
@@ -210,14 +221,17 @@ export default function BottomBar({
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const customizeRef = useRef<HTMLDivElement>(null);
-  const { filterCriteria, libraryActivePath, setFilterCriteria, setLibrary } = useLibraryStore(
-    useShallow((state) => ({
-      filterCriteria: state.filterCriteria,
-      libraryActivePath: state.libraryActivePath,
-      setFilterCriteria: state.setFilterCriteria,
-      setLibrary: state.setLibrary,
-    })),
-  );
+  const { filterCriteria, libraryActivePath, allLibraryImages, currentFolderPath, setFilterCriteria, setLibrary } =
+    useLibraryStore(
+      useShallow((state) => ({
+        filterCriteria: state.filterCriteria,
+        libraryActivePath: state.libraryActivePath,
+        allLibraryImages: state.imageList,
+        currentFolderPath: state.currentFolderPath,
+        setFilterCriteria: state.setFilterCriteria,
+        setLibrary: state.setLibrary,
+      })),
+    );
   const setUI = useUIStore((state) => state.setUI);
   const setEditor = useEditorStore((state) => state.setEditor);
   const { appSettings, handleSettingsChange } = useSettingsStore(
@@ -250,7 +264,11 @@ export default function BottomBar({
           ? [libraryActivePath]
           : [];
   const productivityCount = productivityPaths.length;
-  const firstProductivityImage = imageList.find((image) => image.path === productivityPaths[0]);
+  const firstProductivityImage =
+    imageList.find((image) => image.path === productivityPaths[0]) ||
+    allLibraryImages.find((image) => image.path === productivityPaths[0]);
+  const activeFlag = getImageFlag(firstProductivityImage?.tags);
+  const rejectedInCurrentFolder = getRejectedPathsInFolder(allLibraryImages, currentFolderPath);
   const imageStacks = appSettings?.imageStacks || [];
   const stackTargetPath =
     (libraryActivePath && productivityPaths.includes(libraryActivePath) ? libraryActivePath : null) ||
@@ -263,8 +281,14 @@ export default function BottomBar({
   const hasProductivityActions = isToolbarGroupVisible(PRODUCTIVITY_TOOLBAR_IDS);
   const hasCopyActions = isToolbarGroupVisible(COPY_TOOLBAR_IDS);
   const hasStackActions = isToolbarGroupVisible(STACK_TOOLBAR_IDS);
+  const hasFlagActions = isToolbarGroupVisible(FLAG_TOOLBAR_IDS);
   const toolbarItems = [
     { id: 'rating', label: t('contextMenus.editor.rating') },
+    { id: 'flagRejected', label: t('flags.rejected') },
+    { id: 'flagSelected', label: t('flags.selected') },
+    { id: 'flagDeferred', label: t('flags.deferred') },
+    { id: 'flagUnflagged', label: t('flags.unflagged') },
+    { id: 'deleteRejected', label: t('flags.deleteRejected') },
     { id: 'copySettings', label: t('ui.bottomBar.tooltips.copySettings') },
     { id: 'pasteSettings', label: t('ui.bottomBar.tooltips.pasteSettings') },
     { id: 'copyPasteSettings', label: t('ui.bottomBar.tooltips.copyPasteSettings') },
@@ -288,6 +312,20 @@ export default function BottomBar({
   ];
   const productivityButtonClass =
     'w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed';
+
+  const handleDeleteRejected = () => {
+    if (!onDeleteRejected || rejectedInCurrentFolder.length === 0) return;
+    setUI({
+      confirmModalState: {
+        confirmText: t('flags.deleteRejectedConfirm'),
+        confirmVariant: 'destructive',
+        isOpen: true,
+        message: t('flags.deleteRejectedMessage', { count: rejectedInCurrentFolder.length }),
+        onConfirm: () => onDeleteRejected(rejectedInCurrentFolder),
+        title: t('flags.deleteRejected'),
+      },
+    });
+  };
 
   const handleAutoAdjust = () => {
     if (productivityCount === 0) return;
@@ -557,6 +595,72 @@ export default function BottomBar({
         <div className="flex items-center gap-4">
           {isToolbarItemVisible('rating') && <StarRating rating={rating} onRate={onRate} disabled={isRatingDisabled} />}
           <div className="h-5 w-px bg-surface"></div>
+          {hasFlagActions && (
+            <>
+              <div className="flex items-center gap-1">
+                {isToolbarItemVisible('flagRejected') && (
+                  <button
+                    className={clsx(
+                      productivityButtonClass,
+                      activeFlag === ImageFlag.Rejected && 'bg-red-600 text-white',
+                    )}
+                    disabled={productivityCount === 0}
+                    onClick={() => onFlag(ImageFlag.Rejected)}
+                    data-tooltip={t('flags.rejectedShortcut')}
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+                {isToolbarItemVisible('flagSelected') && (
+                  <button
+                    className={clsx(
+                      productivityButtonClass,
+                      activeFlag === ImageFlag.Selected && 'bg-emerald-600 text-white',
+                    )}
+                    disabled={productivityCount === 0}
+                    onClick={() => onFlag(ImageFlag.Selected)}
+                    data-tooltip={t('flags.selectedShortcut')}
+                  >
+                    <Flag size={18} className={activeFlag === ImageFlag.Selected ? 'fill-current' : undefined} />
+                  </button>
+                )}
+                {isToolbarItemVisible('flagDeferred') && (
+                  <button
+                    className={clsx(
+                      productivityButtonClass,
+                      activeFlag === ImageFlag.Deferred && 'bg-amber-500 text-black',
+                    )}
+                    disabled={productivityCount === 0}
+                    onClick={() => onFlag(ImageFlag.Deferred)}
+                    data-tooltip={t('flags.deferredShortcut')}
+                  >
+                    <Clock3 size={18} />
+                  </button>
+                )}
+                {isToolbarItemVisible('flagUnflagged') && (
+                  <button
+                    className={clsx(productivityButtonClass, activeFlag === ImageFlag.Unflagged && 'bg-surface')}
+                    disabled={productivityCount === 0}
+                    onClick={() => onFlag(ImageFlag.Unflagged)}
+                    data-tooltip={t('flags.unflaggedShortcut')}
+                  >
+                    <FlagOff size={18} />
+                  </button>
+                )}
+                {isToolbarItemVisible('deleteRejected') && (
+                  <button
+                    className={productivityButtonClass}
+                    disabled={!onDeleteRejected || rejectedInCurrentFolder.length === 0}
+                    onClick={handleDeleteRejected}
+                    data-tooltip={t('flags.deleteRejectedCount', { count: rejectedInCurrentFolder.length })}
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                )}
+              </div>
+              <div className="h-5 w-px bg-surface"></div>
+            </>
+          )}
           <div className="flex items-center gap-2">
             {isToolbarItemVisible('copySettings') && (
               <button

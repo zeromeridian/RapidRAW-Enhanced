@@ -15,6 +15,7 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { getDisplayFilename } from '../../../utils/outputNaming';
+import { isImageFlagTag } from '../../../utils/imageFlags';
 
 interface CameraSetting {
   format?(value: number): string | number;
@@ -324,7 +325,7 @@ export default function MetadataPanel() {
 
   const currentTags = useMemo(() => {
     return tags
-      .filter((t) => !t.startsWith('color:'))
+      .filter((t) => !t.startsWith('color:') && !isImageFlagTag(t))
       .map((t) => ({
         tag: t.startsWith(USER_TAG_PREFIX) ? t.substring(USER_TAG_PREFIX.length) : t,
         isUser: t.startsWith(USER_TAG_PREFIX),

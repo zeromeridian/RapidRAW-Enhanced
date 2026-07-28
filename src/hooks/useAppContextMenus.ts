@@ -66,6 +66,7 @@ import {
 } from '../utils/imageStacks';
 import { autoStackCreatedImages } from '../utils/autoStacking';
 import { getEnabledCopySuffix } from '../utils/outputNaming';
+import { isImageFlagTag } from '../utils/imageFlags';
 
 export interface UseAppContextMenusProps {
   handleImageSelect: (path: string) => void;
@@ -112,7 +113,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
     if (imageFiles.length === 0) return [];
 
     const allTagsSets = imageFiles.map((img) => {
-      const tagsWithPrefix = (img.tags || []).filter((t: string) => !t.startsWith('color:'));
+      const tagsWithPrefix = (img.tags || []).filter((t: string) => !t.startsWith('color:') && !isImageFlagTag(t));
       return new Set(tagsWithPrefix);
     });
 

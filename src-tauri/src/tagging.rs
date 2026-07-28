@@ -21,7 +21,15 @@ use crate::image_processing::ImageMetadata;
 use crate::{AppState, candidates::TAG_CANDIDATES};
 
 pub const COLOR_TAG_PREFIX: &str = "color:";
+pub const FLAG_TAG_PREFIX: &str = "flag:";
 pub const USER_TAG_PREFIX: &str = "user:";
+
+fn apply_flag_to_tags(tags: &mut Vec<String>, flag: &str) {
+    tags.retain(|tag| !tag.starts_with(FLAG_TAG_PREFIX));
+    if flag != "unflagged" {
+        tags.push(format!("{FLAG_TAG_PREFIX}{flag}"));
+    }
+}
 
 fn preprocess_clip_image(image: &DynamicImage) -> Array<f32, ndarray::Dim<[usize; 4]>> {
     let input_size = 224;
@@ -466,6 +474,50 @@ pub fn remove_tag_for_paths(paths: Vec<String>, tag: String) -> Result<(), Strin
 }
 
 #[tauri::command]
+pub fn set_flag_for_paths(paths: Vec<String>, flag: String) -> Result<(), String> {
+    if !matches!(
+        flag.as_str(),
+        "rejected" | "selected" | "deferred" | "unflagged"
+    ) {
+        return Err(format!("Unsupported image flag: {flag}"));
+    }
+
+    paths
+        .par_iter()
+        .try_for_each(|path| {
+            modify_tags_for_path(path, |tags| {
+                apply_flag_to_tags(tags, &flag);
+            })
+            .map_err(|error| format!("Failed to set flag for {path}: {error}"))
+        })
+        .map_err(|error| {
+            eprintln!("{error}");
+            error
+        })?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod flag_tests {
+    use super::apply_flag_to_tags;
+
+    #[test]
+    fn replacing_and_clearing_flags_preserves_other_tags() {
+        let mut tags = vec![
+            "color:red".to_string(),
+            "user:portrait".to_string(),
+            "flag:rejected".to_string(),
+        ];
+
+        apply_flag_to_tags(&mut tags, "selected");
+        assert_eq!(tags, ["color:red", "user:portrait", "flag:selected"]);
+
+        apply_flag_to_tags(&mut tags, "unflagged");
+        assert_eq!(tags, ["color:red", "user:portrait"]);
+    }
+}
+
+#[tauri::command]
 pub fn clear_ai_tags(root_path: String) -> Result<usize, String> {
     if !Path::new(&root_path).exists() {
         return Err(format!("Root path does not exist: {}", root_path));
@@ -483,9 +535,11 @@ pub fn clear_ai_tags(root_path: String) -> Result<usize, String> {
             && let Some(tags) = &mut metadata.tags
         {
             let original_len = tags.len();
-            // Keep color tags and user tags, remove others (AI tags)
+            // Keep user-controlled metadata tags, remove only generated AI tags.
             tags.retain(|tag| {
-                tag.starts_with(COLOR_TAG_PREFIX) || tag.starts_with(USER_TAG_PREFIX)
+                tag.starts_with(COLOR_TAG_PREFIX)
+                    || tag.starts_with(FLAG_TAG_PREFIX)
+                    || tag.starts_with(USER_TAG_PREFIX)
             });
 
             if tags.len() < original_len {
@@ -521,8 +575,10 @@ pub fn clear_all_tags(root_path: String) -> Result<usize, String> {
             && let Some(tags) = &mut metadata.tags
         {
             let original_len = tags.len();
-            // Keep only color tags, remove AI and user tags
-            tags.retain(|tag| tag.starts_with(COLOR_TAG_PREFIX));
+            // Flags and color labels are independent of the editable tag list.
+            tags.retain(|tag| {
+                tag.starts_with(COLOR_TAG_PREFIX) || tag.starts_with(FLAG_TAG_PREFIX)
+            });
 
             if tags.len() < original_len {
                 if tags.is_empty() {

@@ -301,6 +301,7 @@ function App() {
     handleLibraryImageSingleClick,
     handleImageClick,
     handleSetColorLabel,
+    handleSetFlag,
     refreshAllFolderTrees,
     handleTogglePinFolder,
     handleCreateAlbumItem,
@@ -704,6 +705,8 @@ function App() {
                   handleCopyAdjustments={handleCopyAdjustments}
                   handlePasteAdjustments={handlePasteAdjustments}
                   handleRate={handleRate}
+                  handleSetFlag={handleSetFlag}
+                  handleDeleteRejected={(paths) => executeDelete(paths, { includeAssociated: false })}
                   handleZoomChange={handleZoomChange}
                   handleRightPanelSelect={handleRightPanelSelect}
                   requestThumbnails={requestThumbnails}
@@ -723,6 +726,8 @@ function App() {
                   handleLibraryImageSingleClick={handleLibraryImageSingleClick}
                   handleImageSelect={handleImageSelect}
                   handleRate={handleRate}
+                  handleSetFlag={handleSetFlag}
+                  handleDeleteRejected={(paths) => executeDelete(paths, { includeAssociated: false })}
                   handleThumbnailContextMenu={handleThumbnailContextMenu}
                   handleMainLibraryContextMenu={handleMainLibraryContextMenu}
                   handleContinueSession={handleContinueSession}

@@ -23,6 +23,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 
 import { ImageFile, Orientation, Panel, ThumbnailAspectRatio } from '../ui/AppProperties';
 import { GroupBadgeInfo } from '../../utils/imageGrouping';
+import { ImageFlag } from '../../utils/imageFlags';
 
 const panelVariants: any = {
   animate: (direction: number) => ({
@@ -61,6 +62,8 @@ interface EditorViewProps {
   handleCopyAdjustments: () => void;
   handlePasteAdjustments: () => void;
   handleRate: (...args: any) => void;
+  handleSetFlag: (flag: ImageFlag) => void;
+  handleDeleteRejected: (paths: string[]) => void;
   handleZoomChange: (zoom: number) => void;
   handleRightPanelSelect: (panelId: Panel) => void;
   requestThumbnails: any;
@@ -86,6 +89,8 @@ export default function EditorView({
   handleCopyAdjustments,
   handlePasteAdjustments,
   handleRate,
+  handleSetFlag,
+  handleDeleteRejected,
   handleZoomChange,
   handleRightPanelSelect,
   requestThumbnails,
@@ -172,6 +177,8 @@ export default function EditorView({
       onClearSelection={handleClearSelection}
       onContextMenu={handleThumbnailContextMenu}
       onCopy={handleCopyAdjustments}
+      onDeleteRejected={handleDeleteRejected}
+      onFlag={handleSetFlag}
       onOpenCopyPasteSettings={() => setUI({ isCopyPasteSettingsModalOpen: true })}
       onImageSelect={handleImageClick}
       onLibraryRefresh={handleLibraryRefresh}

@@ -309,6 +309,24 @@
       "failedRemoveImages": "Failed to remove images: {{err}}"
     }
   },
+  "flags": {
+    "deferred": "Deferred",
+    "deferredShortcut": "Deferred (Shift+D)",
+    "deleteRejected": "Delete Rejected Files",
+    "deleteRejectedConfirm": "Delete Rejected",
+    "deleteRejectedCount": "Delete {{count}} rejected files in this folder",
+    "deleteRejectedCount_one": "Delete 1 rejected file in this folder",
+    "deleteRejectedCount_other": "Delete {{count}} rejected files in this folder",
+    "deleteRejectedMessage": "Permanently delete {{count}} rejected files from the current folder? This cannot be undone.",
+    "deleteRejectedMessage_one": "Permanently delete the rejected file from the current folder? This cannot be undone.",
+    "deleteRejectedMessage_other": "Permanently delete {{count}} rejected files from the current folder? This cannot be undone.",
+    "rejected": "Rejected",
+    "rejectedShortcut": "Rejected (X)",
+    "selected": "Selected",
+    "selectedShortcut": "Selected (Shift+P)",
+    "unflagged": "Unflagged",
+    "unflaggedShortcut": "Unflagged (U)"
+  },
   "editor": {
     "adjustments": {
       "actions": {
@@ -1544,6 +1562,10 @@
         "cycle_zoom": "Cycle zoom (Fit, 2x Fit, 100%)",
         "delete_selected": "Delete selected file(s)",
         "focus_search": "Focus search field",
+        "flag_deferred": "Flag: Deferred",
+        "flag_rejected": "Flag: Rejected",
+        "flag_selected": "Flag: Selected",
+        "flag_unflagged": "Flag: Unflagged",
         "open_image": "Open selected image",
         "open_settings": "Open settings",
         "paste_adjustments": "Paste copied adjustments",
