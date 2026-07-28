@@ -4,34 +4,27 @@ on:
   workflow_call:
     inputs:
       platform:
+        description: GitHub-hosted runner label
         required: true
         type: string
       target:
+        description: Rust compilation target
         required: true
         type: string
       build-args:
-        required: false
+        description: Additional Tauri build arguments
+        required: true
         type: string
       release-id:
-        required: false
-        type: string
-      asset-prefix:
-        required: false
-        type: string
-      asset-name-pattern:
-        required: false
-        type: string
-      upload-artifacts:
-        required: false
-        type: boolean
-      ref:
-        required: false
-        type: string
-        default: ${{ github.ref }}
-      mobile:
+        description: Existing GitHub release ID for release asset uploads
         required: false
         type: string
         default: ''
+      upload-artifacts:
+        description: Upload bundles as workflow artifacts
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -40,28 +33,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
           fetch-depth: 0
 
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           rustflags: ''
+          target: ${{ inputs.target }}
 
-      - name: Rust Cache
+      - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-          key: ${{ inputs.mobile == '' && inputs.platform || format('{0}-{1}', inputs.platform, inputs.mobile) }}
+          key: ${{ inputs.platform }}-${{ inputs.target }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: npm
 
-      - name: Install additional system dependencies (Linux)
-        if: runner.os == 'Linux' && inputs.mobile == ''
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -75,154 +68,26 @@ jobs:
             librsvg2-dev \
             patchelf
 
-      # ------------- Android Setup -------------
-      - name: Set up JDK
-        if: inputs.mobile == 'android'
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Android SDK
-        if: inputs.mobile == 'android'
-        uses: android-actions/setup-android@v3
-
-      - name: Setup Android NDK
-        if: inputs.mobile == 'android'
-        uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r26d
-          link-to-sdk: true
-
       - name: Install frontend dependencies
-        run: npm install
-
-      - name: Setup Android signing
-        if: inputs.mobile == 'android' && github.event_name != 'pull_request'
-        run: |
-          cd src-tauri/gen/android
-          echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" > keystore.properties
-          echo "password=${{ secrets.ANDROID_KEY_PASSWORD }}" >> keystore.properties
-          echo "${{ secrets.ANDROID_KEY_BASE64 }}" | base64 -d > $RUNNER_TEMP/keystore.jks
-          echo "storeFile=$RUNNER_TEMP/keystore.jks" >> keystore.properties
-
-      - name: rustup install target
-        if: ${{ inputs.target != '' }}
-        run: rustup target add ${{ inputs.target }}
-
-      - id: patch-release-name
-        shell: bash
-        if: ${{ inputs.release-id != '' }}
-        run: |
-          platform="${{ inputs.platform }}"
-          if [[ "${{ inputs.mobile }}" == "android" ]]; then
-            replacement="android"
-          else
-            replacement="$(echo ${platform} | sed -E 's/-latest//')"
-          fi
-          patched_platform=$(echo '${{ inputs.asset-name-pattern }}' | sed -E "s/\[platform\]/${replacement}/")
-          if [[ -n "${{ inputs.asset-prefix }}" ]]; then
-            patched_platform="${{ inputs.asset-prefix }}_${patched_platform}"
-          fi
-          echo "platform=${patched_platform}" >> $GITHUB_OUTPUT
+        run: npm ci
 
       - id: tauri-build
-        name: Build with tauri-action
-        if: ${{ inputs.mobile == '' }}
-        # FIXME set this back to a release major version, ex. v0 . This is a commit from the `dev` branch which includes PR
-        # https://github.com/tauri-apps/tauri-action/pull/1099 , adding the assetNamePattern feature.
-        uses: tauri-apps/tauri-action@cf3eb9b18add8548a40584695215c80ab7274f31
+        name: Build and package application
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NO_STRIP: ${{ startsWith(inputs.platform, 'ubuntu') }}
+          NO_STRIP: ${{ runner.os == 'Linux' }}
         with:
-          args: --verbose ${{ inputs.build-args }} ${{ inputs.target != '' && '--target' || ''  }} ${{ inputs.target }}
-          assetNamePattern: ${{ steps.patch-release-name.outputs.platform }}
+          args: --verbose ${{ inputs.build-args }} --target ${{ inputs.target }}
+          assetNamePattern: '[name]_v[version]_[platform]_[arch][ext]'
           releaseId: ${{ inputs.release-id }}
           retryAttempts: 3
 
-      - name: Build Android
-        if: ${{ inputs.mobile == 'android' }}
-        shell: bash
-        env:
-          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-          ORT_SKIP_DOWNLOAD: '1'
-          ORT_LIB_LOCATION: ${{ format('{0}/src-tauri/libs/arm64-v8a', github.workspace) }}
-          ORT_STRATEGY: manual
-        run: |
-          npx tauri android build --verbose ${{ inputs.build-args }}
-
-      - name: Prepare Android Release Assets
-        if: ${{ inputs.mobile == 'android' && inputs.release-id != '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          stage_dir="$RUNNER_TEMP/android-release-assets"
-          mkdir -p "$stage_dir"
-
-          app_name="RapidRAW - Enhanced"
-          version="$(node -e "const fs=require('fs'); const conf=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8')); process.stdout.write(conf.version || '')")"
-          arch="${{ inputs.target }}"
-          arch="${arch%%-*}"
-          template='${{ steps.patch-release-name.outputs.platform }}'
-
-          find src-tauri/gen/android/app/build/outputs -type f \( -name '*.apk' -o -name '*.aab' \) | while read -r file; do
-            ext=".${file##*.}"
-            asset_name="${template//\[name\]/$app_name}"
-            asset_name="${asset_name//\[version\]/$version}"
-            asset_name="${asset_name//\[arch\]/$arch}"
-            asset_name="${asset_name//\[ext\]/$ext}"
-            cp "$file" "$stage_dir/$asset_name"
-          done
-
-      - name: Upload Android Release Assets
-        if: ${{ inputs.mobile == 'android' && inputs.release-id != '' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          tag_ref="${{ inputs.ref }}"
-          tag_name="${tag_ref#refs/tags/}"
-          gh release upload "$tag_name" "$RUNNER_TEMP"/android-release-assets/* --clobber
-
-      - name: Upload Android Artifacts
-        if: ${{ inputs.mobile == 'android' && inputs.release-id == '' }}
+      - name: Upload workflow artifact
+        if: inputs.upload-artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.asset-prefix }}_android${{ inputs.target && format('_{0}', inputs.target) || '' }}_artifacts
-          path: |
-            src-tauri/gen/android/app/build/outputs/**/*.apk
-            src-tauri/gen/android/app/build/outputs/**/*.aab
+          name: RapidRAW-Enhanced-${{ inputs.target }}
+          path: ${{ join(fromJSON(steps.tauri-build.outputs.artifactPaths), '\n') }}
+          if-no-files-found: error
           retention-days: 7
-          compression-level: 6
-          if-no-files-found: warn
-
-      - name: Upload Windows Artifacts
-        if: ${{ startsWith(inputs.platform, 'windows') && inputs.release-id == '' && inputs.mobile == '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}${{ inputs.target && format('_{0}', inputs.target) || '' }}_artifacts
-          path: |
-            src-tauri/target/${{ inputs.target || 'release' }}/bundle/**/*.exe
-            src-tauri/target/${{ inputs.target || 'release' }}/release/bundle/**/*.exe
-          retention-days: 7
-          compression-level: 6
-          if-no-files-found: warn
-
-      - name: Upload Linux/macOS Artifacts
-        if: ${{ !startsWith(inputs.platform, 'windows') && inputs.release-id == '' && inputs.mobile == '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}${{ inputs.target && format('_{0}', inputs.target) || '' }}_artifacts
-          path: |
-            src-tauri/target/${{ inputs.target || 'release' }}/**/*.rpm
-            src-tauri/target/${{ inputs.target || 'release' }}/**/*.deb
-            src-tauri/target/${{ inputs.target || 'release' }}/**/*.AppImage
-            src-tauri/target/${{ inputs.target || 'release' }}/**/*.dmg
-          retention-days: 7
-          compression-level: 6
-          if-no-files-found: warn
