@@ -5,6 +5,25 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.30 — 2026-07-28
+
+### Build automation
+
+- Continuous, pull-request, and release packaging matrices now contain only
+  the four currently supported desktop targets.
+- Main-branch builds can also be started manually for reliable pipeline
+  testing.
+- Workflow artifacts are uploaded from the packaging action's reported output
+  paths, and a missing bundle now fails the job instead of completing without a
+  downloadable build.
+- The reusable build uses deterministic dependency installation, exact
+  caller-commit checkout, and a current immutable packaging-action release.
+
+### Validation
+
+- Workflow YAML parsing, formatting, static GitHub Actions analysis, matrix
+  assertions, action-input verification, and release packaging passed.
+
 ## 1.6.1-colrbent.29 — 2026-07-28
 
 ### Clear active filters
