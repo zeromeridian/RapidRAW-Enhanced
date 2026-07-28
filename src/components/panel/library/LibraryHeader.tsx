@@ -36,6 +36,8 @@ import Dropdown from '../../ui/Dropdown';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { ADVANCED_QUERY_REGEX } from '../../../hooks/useSortedLibrary';
+import { IMAGE_FLAG_FILTER_OPTIONS } from '../../../utils/imageFlags';
+import { ImageFlagIcon } from '../../ui/ImageFlagBadge';
 
 function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName = 'w-56' }: any) {
   const [isOpen, setIsOpen] = useState(false);
@@ -528,7 +530,8 @@ export function ViewOptionsDropdown({
     filterCriteria.rating !== 0 ||
     (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) ||
     (filterCriteria.editedStatus && filterCriteria.editedStatus !== EditedStatus.All) ||
-    (filterCriteria.colors && filterCriteria.colors.length > 0);
+    (filterCriteria.colors && filterCriteria.colors.length > 0) ||
+    (filterCriteria.flags && filterCriteria.flags.length > 0);
 
   const [lastClickedColor, setLastClickedColor] = useState<string | null>(null);
   const allColors = useMemo(() => [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }], []);
@@ -706,6 +709,39 @@ export function ViewOptionsDropdown({
                 value={filterCriteria.editedStatus || EditedStatus.All}
                 onChange={(val) => setFilterCriteria((prev: FilterCriteria) => ({ ...prev, editedStatus: val }))}
               />
+            </div>
+          </div>
+
+          <div>
+            <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-1 uppercase">
+              {t('library.header.viewOptions.filterByFlag')}
+            </Text>
+            <div className="flex flex-wrap gap-1 px-3 py-1.5">
+              {IMAGE_FLAG_FILTER_OPTIONS.map((flag) => {
+                const isSelected = (filterCriteria.flags || []).includes(flag);
+                return (
+                  <button
+                    key={flag}
+                    type="button"
+                    className={clsx(
+                      'flex h-8 items-center gap-1.5 rounded-md px-2 text-xs transition-colors',
+                      isSelected
+                        ? 'bg-card-active text-text-primary'
+                        : 'bg-surface text-text-secondary hover:text-text-primary',
+                    )}
+                    onClick={() => {
+                      const currentFlags = filterCriteria.flags || [];
+                      const flags = currentFlags.includes(flag)
+                        ? currentFlags.filter((currentFlag) => currentFlag !== flag)
+                        : [...currentFlags, flag];
+                      setFilterCriteria((prev) => ({ ...prev, flags }));
+                    }}
+                  >
+                    <ImageFlagIcon flag={flag} size={14} />
+                    <span>{t(`flags.${flag}`)}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

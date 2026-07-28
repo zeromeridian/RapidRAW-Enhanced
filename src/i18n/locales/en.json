@@ -986,7 +986,7 @@
         "matchAll": "Match ALL tags",
         "matchAny": "Match ANY tags",
         "searchOrQuery": "Search or add query",
-        "tooltipAdvancedQueries": "Advanced Queries: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony",
+        "tooltipAdvancedQueries": "Advanced Queries: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony, flag:rejected",
         "tooltipClearSearch": "Clear search",
         "tooltipSearchFilter": "Search or Filter"
       },
@@ -997,6 +997,7 @@
         "exifDisabledTooltip": "Enable EXIF Reading in Settings to use this option.",
         "filterByColorLabel": "Filter by Color Label",
         "filterByEdited": "Filter by Edit Status",
+        "filterByFlag": "Filter by Flag",
         "filterByFileType": "Filter by File Type",
         "filterByRating": "Filter by Rating",
         "groupEditedFiles": "Include edited files in groups",

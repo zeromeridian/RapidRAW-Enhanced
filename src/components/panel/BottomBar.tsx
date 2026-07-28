@@ -3,7 +3,6 @@ import { invoke } from '@tauri-apps/api/core';
 import {
   Aperture,
   Check,
-  Clock3,
   ChevronDown,
   ChevronUp,
   ClipboardPaste,
@@ -12,8 +11,6 @@ import {
   Film,
   FileInput,
   Filter,
-  Flag,
-  FlagOff,
   Grip,
   Images,
   LayoutTemplate,
@@ -26,7 +23,6 @@ import {
   Trash2,
   Ungroup,
   Users,
-  X,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -53,7 +49,8 @@ import {
 import { autoStackCreatedImages } from '../../utils/autoStacking';
 import { getEnabledCopySuffix } from '../../utils/outputNaming';
 import { GroupBadgeInfo } from '../../utils/imageGrouping';
-import { getImageFlag, getRejectedPathsInFolder, ImageFlag } from '../../utils/imageFlags';
+import { getImageFlag, getRejectedPathsInFolder, ImageFlag, IMAGE_FLAG_FILTER_OPTIONS } from '../../utils/imageFlags';
+import { ImageFlagIcon } from '../ui/ImageFlagBadge';
 
 interface BottomBarProps {
   filmstripHeight?: number;
@@ -602,39 +599,39 @@ export default function BottomBar({
                   <button
                     className={clsx(
                       productivityButtonClass,
-                      activeFlag === ImageFlag.Rejected && 'bg-red-600 text-white',
+                      activeFlag === ImageFlag.Rejected && 'bg-surface text-text-primary',
                     )}
                     disabled={productivityCount === 0}
                     onClick={() => onFlag(ImageFlag.Rejected)}
                     data-tooltip={t('flags.rejectedShortcut')}
                   >
-                    <X size={18} />
+                    <ImageFlagIcon flag={ImageFlag.Rejected} size={18} />
                   </button>
                 )}
                 {isToolbarItemVisible('flagSelected') && (
                   <button
                     className={clsx(
                       productivityButtonClass,
-                      activeFlag === ImageFlag.Selected && 'bg-emerald-600 text-white',
+                      activeFlag === ImageFlag.Selected && 'bg-surface text-text-primary',
                     )}
                     disabled={productivityCount === 0}
                     onClick={() => onFlag(ImageFlag.Selected)}
                     data-tooltip={t('flags.selectedShortcut')}
                   >
-                    <Flag size={18} className={activeFlag === ImageFlag.Selected ? 'fill-current' : undefined} />
+                    <ImageFlagIcon flag={ImageFlag.Selected} size={18} />
                   </button>
                 )}
                 {isToolbarItemVisible('flagDeferred') && (
                   <button
                     className={clsx(
                       productivityButtonClass,
-                      activeFlag === ImageFlag.Deferred && 'bg-amber-500 text-black',
+                      activeFlag === ImageFlag.Deferred && 'bg-surface text-text-primary',
                     )}
                     disabled={productivityCount === 0}
                     onClick={() => onFlag(ImageFlag.Deferred)}
                     data-tooltip={t('flags.deferredShortcut')}
                   >
-                    <Clock3 size={18} />
+                    <ImageFlagIcon flag={ImageFlag.Deferred} size={18} />
                   </button>
                 )}
                 {isToolbarItemVisible('flagUnflagged') && (
@@ -644,7 +641,7 @@ export default function BottomBar({
                     onClick={() => onFlag(ImageFlag.Unflagged)}
                     data-tooltip={t('flags.unflaggedShortcut')}
                   >
-                    <FlagOff size={18} />
+                    <ImageFlagIcon flag={ImageFlag.Unflagged} size={18} />
                   </button>
                 )}
                 {isToolbarItemVisible('deleteRejected') && (
@@ -928,7 +925,7 @@ export default function BottomBar({
               <div
                 className={clsx(
                   'flex items-center transition-all duration-300 ease-in-out overflow-hidden',
-                  isFilterExpanded ? 'max-w-100 opacity-100 pr-2 ml-1' : 'max-w-0 opacity-0 pr-0 ml-0',
+                  isFilterExpanded ? 'max-w-[34rem] opacity-100 pr-2 ml-1' : 'max-w-0 opacity-0 pr-0 ml-0',
                 )}
               >
                 <div className="flex items-center gap-3 whitespace-nowrap">
@@ -989,6 +986,35 @@ export default function BottomBar({
                           data-tooltip={tooltipTitle}
                         >
                           {isSelected && <Check size={10} className="text-white drop-shadow-md" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="h-4 w-px bg-border-color"></div>
+
+                  <div className="flex items-center gap-1">
+                    {IMAGE_FLAG_FILTER_OPTIONS.map((flag) => {
+                      const isSelected = (filterCriteria.flags || []).includes(flag);
+                      return (
+                        <button
+                          key={`qf-flag-${flag}`}
+                          onClick={() => {
+                            const currentFlags = filterCriteria.flags || [];
+                            const flags = currentFlags.includes(flag)
+                              ? currentFlags.filter((currentFlag) => currentFlag !== flag)
+                              : [...currentFlags, flag];
+                            setFilterCriteria((prev) => ({ ...prev, flags }));
+                          }}
+                          className={clsx(
+                            'flex h-6 w-6 items-center justify-center rounded-sm transition-colors',
+                            isSelected
+                              ? 'bg-card-active text-text-primary'
+                              : 'text-text-secondary hover:bg-card-active hover:text-text-primary',
+                          )}
+                          data-tooltip={t(`flags.${flag}`)}
+                        >
+                          <ImageFlagIcon flag={flag} size={15} />
                         </button>
                       );
                     })}
