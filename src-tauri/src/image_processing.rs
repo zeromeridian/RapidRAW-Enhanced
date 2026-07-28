@@ -48,6 +48,15 @@ impl<'a> IntoCowImage<'a> for &'a std::sync::Arc<DynamicImage> {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct XmpStackMetadata {
+    pub id: String,
+    pub order: u32,
+    pub is_cover: bool,
+    pub collapsed: bool,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ImageMetadata {
     pub version: u32,
@@ -59,6 +68,8 @@ pub struct ImageMetadata {
     pub exif: Option<std::collections::HashMap<String, String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub copy_name_suffix: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub xmp_stack: Option<XmpStackMetadata>,
 }
 
 impl Default for ImageMetadata {
@@ -70,6 +81,7 @@ impl Default for ImageMetadata {
             tags: None,
             exif: None,
             copy_name_suffix: None,
+            xmp_stack: None,
         }
     }
 }

@@ -84,6 +84,37 @@ const createStackBadge = (
 export const findImageStack = (stacks: ImageStack[], path: string) =>
   stacks.find((stack) => stack.paths.includes(path));
 
+export function mergeXmpImageStacks(stacks: ImageStack[], images: ImageFile[]): ImageStack[] {
+  const membersByStack = new Map<string, ImageFile[]>();
+  for (const image of images) {
+    if (!image.xmpStack?.id) continue;
+    const members = membersByStack.get(image.xmpStack.id) || [];
+    members.push(image);
+    membersByStack.set(image.xmpStack.id, members);
+  }
+
+  const importedStacks: ImageStack[] = [];
+  for (const [id, members] of membersByStack) {
+    if (members.length < 2) continue;
+    members.sort((left, right) => (left.xmpStack?.order ?? 0) - (right.xmpStack?.order ?? 0));
+    const cover = members.find((member) => member.xmpStack?.isCover) || members[0];
+    importedStacks.push({
+      id,
+      paths: [cover.path, ...members.filter((member) => member.path !== cover.path).map((member) => member.path)],
+      coverPath: cover.path,
+      collapsed: cover.xmpStack?.collapsed ?? members[0].xmpStack?.collapsed ?? true,
+    });
+  }
+
+  if (importedStacks.length === 0) return stacks;
+  const importedPaths = new Set(importedStacks.flatMap((stack) => stack.paths));
+  const retainedStacks = removePathsFromStacks(
+    stacks.filter((stack) => !importedStacks.some((imported) => imported.id === stack.id)),
+    importedPaths,
+  );
+  return [...retainedStacks, ...importedStacks];
+}
+
 export const createImageStack = (stacks: ImageStack[], paths: string[], coverPath: string): ImageStack[] => {
   if (paths.length < 2) return stacks;
 

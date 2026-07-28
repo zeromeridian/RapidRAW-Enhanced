@@ -95,6 +95,7 @@ export enum Invokes {
   SetColorLabelForPaths = 'set_color_label_for_paths',
   SetFlagForPaths = 'set_flag_for_paths',
   SetRatingForPaths = 'set_rating_for_paths',
+  SyncImageStacksToXmp = 'sync_image_stacks_to_xmp',
   ShowInFinder = 'show_in_finder',
   StartBackgroundIndexing = 'start_background_indexing',
   StitchPanorama = 'stitch_panorama',
@@ -169,6 +170,13 @@ export interface ImageStack {
   id: string;
   paths: string[];
   coverPath: string;
+  collapsed: boolean;
+}
+
+export interface XmpStackMetadata {
+  id: string;
+  order: number;
+  isCover: boolean;
   collapsed: boolean;
 }
 
@@ -291,6 +299,7 @@ export interface ImageFile {
   is_cloud_placeholder: boolean;
   is_raw: boolean;
   group_id: string | null;
+  xmpStack?: XmpStackMetadata | null;
 }
 
 export interface Option {

@@ -36,13 +36,13 @@ use crate::gpu_processing;
 use crate::image_loader;
 use crate::image_processing::GpuContext;
 use crate::image_processing::{
-    Crop, ImageMetadata, apply_coarse_rotation, apply_cpu_default_raw_processing, apply_crop,
-    apply_flip, apply_geometry_warp, apply_rotation, auto_results_to_json,
+    Crop, ImageMetadata, XmpStackMetadata, apply_coarse_rotation, apply_cpu_default_raw_processing,
+    apply_crop, apply_flip, apply_geometry_warp, apply_rotation, auto_results_to_json,
     get_all_adjustments_from_json, perform_auto_analysis,
 };
 use crate::mask_generation::MaskDefinition;
 use crate::preset_converter;
-use crate::tagging::COLOR_TAG_PREFIX;
+use crate::tagging::{COLOR_TAG_PREFIX, FLAG_TAG_PREFIX};
 
 fn resolve_thumbnail_cache_dir(app_handle: &AppHandle) -> std::result::Result<PathBuf, String> {
     let cache_dir = app_handle
@@ -87,18 +87,20 @@ struct ImageFileMetadata {
     rating: u8,
     is_raw: bool,
     copy_name_suffix: Option<String>,
+    xmp_stack: Option<XmpStackMetadata>,
 }
 
 fn resolve_image_metadata(
     image_path: &Path,
     sidecar_path: &Path,
     enable_xmp_sync: bool,
+    include_rapidraw_xmp: bool,
     settings: &AppSettings,
 ) -> ImageFileMetadata {
     let mut metadata = crate::exif_processing::load_sidecar(sidecar_path);
 
     if enable_xmp_sync
-        && sync_metadata_from_xmp(image_path, &mut metadata)
+        && sync_metadata_from_xmp(image_path, &mut metadata, include_rapidraw_xmp)
         && let Ok(json) = serde_json::to_string_pretty(&metadata)
     {
         let _ = fs::write(sidecar_path, json);
@@ -114,6 +116,7 @@ fn resolve_image_metadata(
         rating: metadata.rating,
         is_raw,
         copy_name_suffix: metadata.copy_name_suffix,
+        xmp_stack: metadata.xmp_stack,
     }
 }
 
@@ -123,10 +126,17 @@ fn emit_image_metadata_loaded(
     rating: u8,
     is_edited: bool,
     tags: &Option<Vec<String>>,
+    xmp_stack: &Option<XmpStackMetadata>,
 ) {
     let _ = app_handle.emit(
         "image-metadata-loaded",
-        serde_json::json!({ "path": path, "rating": rating, "is_edited": is_edited, "tags": tags }),
+        serde_json::json!({
+            "path": path,
+            "rating": rating,
+            "is_edited": is_edited,
+            "tags": tags,
+            "xmpStack": xmp_stack
+        }),
     );
 }
 
@@ -183,6 +193,7 @@ pub fn start_metadata_workers(app_handle: tauri::AppHandle) {
                     &item.image_path,
                     &item.sidecar_path,
                     enable_xmp_sync,
+                    !item.virtual_path.contains("?vc="),
                     &settings,
                 );
 
@@ -192,6 +203,7 @@ pub fn start_metadata_workers(app_handle: tauri::AppHandle) {
                     metadata.rating,
                     metadata.is_edited,
                     &metadata.tags,
+                    &metadata.xmp_stack,
                 );
 
                 manager_clone
@@ -278,6 +290,8 @@ pub struct ImageFile {
     is_cloud_placeholder: bool,
     is_raw: bool,
     group_id: Option<String>,
+    #[serde(rename = "xmpStack")]
+    xmp_stack: Option<XmpStackMetadata>,
 }
 
 fn make_group_key(source_path: &Path) -> String {
@@ -423,7 +437,10 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
 
 #[cfg(test)]
 mod output_naming_tests {
-    use super::{parse_virtual_path, sanitize_filename_suffix};
+    use super::{
+        extract_rapidraw_xmp_value, extract_xmp_stack, parse_virtual_path,
+        sanitize_filename_suffix, set_rapidraw_xmp_value,
+    };
     use std::path::PathBuf;
 
     #[test]
@@ -438,6 +455,29 @@ mod output_naming_tests {
 
         assert_eq!(source, PathBuf::from("/photos/image.raw"));
         assert_eq!(sidecar, PathBuf::from("/photos/image.raw.abc123.rrdata"));
+    }
+
+    #[test]
+    fn rapidraw_xmp_fields_round_trip_and_clear() {
+        let mut xmp = "<rdf:Description>\n</rdf:Description>".to_string();
+        set_rapidraw_xmp_value(&mut xmp, "Flag", Some("rejected"));
+        set_rapidraw_xmp_value(&mut xmp, "StackId", Some("stack-123"));
+        set_rapidraw_xmp_value(&mut xmp, "StackOrder", Some("2"));
+        set_rapidraw_xmp_value(&mut xmp, "StackCover", Some("true"));
+        set_rapidraw_xmp_value(&mut xmp, "StackCollapsed", Some("false"));
+
+        assert_eq!(
+            extract_rapidraw_xmp_value(&xmp, "Flag").as_deref(),
+            Some("rejected")
+        );
+        let stack = extract_xmp_stack(&xmp).expect("stack metadata should parse");
+        assert_eq!(stack.id, "stack-123");
+        assert_eq!(stack.order, 2);
+        assert!(stack.is_cover);
+        assert!(!stack.collapsed);
+
+        set_rapidraw_xmp_value(&mut xmp, "Flag", None);
+        assert!(extract_rapidraw_xmp_value(&xmp, "Flag").is_none());
     }
 }
 
@@ -675,9 +715,16 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
                         rating: 0,
                         is_raw: crate::formats::is_raw_file(&path_buf),
                         copy_name_suffix: None,
+                        xmp_stack: None,
                     }
                 } else {
-                    resolve_image_metadata(&path_buf, &sidecar_path, enable_xmp_sync, &settings)
+                    resolve_image_metadata(
+                        &path_buf,
+                        &sidecar_path,
+                        enable_xmp_sync,
+                        !is_virtual_copy,
+                        &settings,
+                    )
                 };
 
                 if is_virtual_copy
@@ -701,6 +748,7 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
                     group_id: None,
                     rating: metadata.rating,
                     is_cloud_placeholder,
+                    xmp_stack: metadata.xmp_stack,
                 });
             }
 
@@ -819,9 +867,16 @@ pub fn list_images_recursive(
                         rating: 0,
                         is_raw: crate::formats::is_raw_file(&path_buf),
                         copy_name_suffix: None,
+                        xmp_stack: None,
                     }
                 } else {
-                    resolve_image_metadata(&path_buf, &sidecar_path, enable_xmp_sync, &settings)
+                    resolve_image_metadata(
+                        &path_buf,
+                        &sidecar_path,
+                        enable_xmp_sync,
+                        !is_virtual_copy,
+                        &settings,
+                    )
                 };
 
                 if is_virtual_copy
@@ -845,6 +900,7 @@ pub fn list_images_recursive(
                     group_id: None,
                     rating: metadata.rating,
                     is_cloud_placeholder,
+                    xmp_stack: metadata.xmp_stack,
                 });
             }
 
@@ -1101,9 +1157,16 @@ pub fn get_album_images(
                     rating: 0,
                     is_raw: crate::formats::is_raw_file(&source_path),
                     copy_name_suffix: None,
+                    xmp_stack: None,
                 }
             } else {
-                resolve_image_metadata(&source_path, &sidecar_path, enable_xmp_sync, &settings)
+                resolve_image_metadata(
+                    &source_path,
+                    &sidecar_path,
+                    enable_xmp_sync,
+                    !is_virtual_copy,
+                    &settings,
+                )
             };
 
             Some(ImageFile {
@@ -1117,6 +1180,7 @@ pub fn get_album_images(
                 group_id: None,
                 rating: metadata.rating,
                 is_cloud_placeholder,
+                xmp_stack: metadata.xmp_stack,
             })
         })
         .collect();
@@ -2560,7 +2624,12 @@ pub fn save_metadata_and_update_thumbnail(
         && settings.enable_xmp_sync.unwrap_or(false)
     {
         let create_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
-        sync_metadata_to_xmp(&source_path, &metadata, create_if_missing);
+        sync_metadata_to_xmp(
+            &source_path,
+            &metadata,
+            create_if_missing,
+            !path.contains("?vc="),
+        );
     }
 
     let loaded_image_lock = state.original_image.lock().unwrap();
@@ -2678,7 +2747,12 @@ pub async fn apply_adjustments_to_paths(
 
             if enable_xmp_sync {
                 let source_path = parse_virtual_path(path).0;
-                sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
+                sync_metadata_to_xmp(
+                    &source_path,
+                    &existing_metadata,
+                    create_xmp_if_missing,
+                    !path.contains("?vc="),
+                );
             }
         });
 
@@ -2747,7 +2821,12 @@ pub async fn reset_adjustments_for_paths(
 
             if enable_xmp_sync {
                 let source_path = parse_virtual_path(path).0;
-                sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
+                sync_metadata_to_xmp(
+                    &source_path,
+                    &existing_metadata,
+                    create_xmp_if_missing,
+                    !path.contains("?vc="),
+                );
             }
         });
 
@@ -2872,7 +2951,12 @@ pub async fn apply_auto_adjustments_to_paths(
                 }
 
                 if enable_xmp_sync {
-                    sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
+                    sync_metadata_to_xmp(
+                        &source_path,
+                        &existing_metadata,
+                        create_xmp_if_missing,
+                        !path.contains("?vc="),
+                    );
                 }
                 Ok(image)
             })()
@@ -2936,7 +3020,12 @@ pub fn set_color_label_for_paths(
 
         if enable_xmp_sync {
             let source_path = parse_virtual_path(path).0;
-            sync_metadata_to_xmp(&source_path, &metadata, create_xmp_if_missing);
+            sync_metadata_to_xmp(
+                &source_path,
+                &metadata,
+                create_xmp_if_missing,
+                !path.contains("?vc="),
+            );
         }
     });
 
@@ -2966,7 +3055,12 @@ pub fn set_rating_for_paths(
 
         if enable_xmp_sync {
             let source_path = parse_virtual_path(path).0;
-            sync_metadata_to_xmp(&source_path, &metadata, create_xmp_if_missing);
+            sync_metadata_to_xmp(
+                &source_path,
+                &metadata,
+                create_xmp_if_missing,
+                !path.contains("?vc="),
+            );
         }
     });
 
@@ -2982,7 +3076,7 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
     let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
     if enable_xmp_sync
-        && sync_metadata_from_xmp(&source_path, &mut metadata)
+        && sync_metadata_from_xmp(&source_path, &mut metadata, !path.contains("?vc="))
         && let Ok(json) = serde_json::to_string_pretty(&metadata)
     {
         let _ = fs::write(&sidecar_path, json);
@@ -3956,6 +4050,63 @@ pub fn extract_xmp_rating(content: &str) -> Option<u8> {
     None
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct XmpImageStack {
+    id: String,
+    paths: Vec<String>,
+    cover_path: String,
+    collapsed: bool,
+}
+
+#[tauri::command]
+pub fn sync_image_stacks_to_xmp(
+    stacks: Vec<XmpImageStack>,
+    affected_paths: Vec<String>,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let settings = load_settings(app_handle).unwrap_or_default();
+    if !settings.enable_xmp_sync.unwrap_or(false) {
+        return Ok(());
+    }
+    let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
+
+    affected_paths.par_iter().try_for_each(|path| {
+        if path.contains("?vc=") {
+            return Ok(());
+        }
+
+        let (source_path, sidecar_path) = parse_virtual_path(path);
+        let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+        metadata.xmp_stack = stacks.iter().find_map(|stack| {
+            let physical_paths: Vec<&String> = stack
+                .paths
+                .iter()
+                .filter(|member| !member.contains("?vc="))
+                .collect();
+            if physical_paths.len() < 2 {
+                return None;
+            }
+            physical_paths
+                .iter()
+                .position(|member| *member == path)
+                .map(|order| XmpStackMetadata {
+                    id: stack.id.clone(),
+                    order: order as u32,
+                    is_cover: stack.cover_path == *path,
+                    collapsed: stack.collapsed,
+                })
+        });
+
+        let json = serde_json::to_string_pretty(&metadata)
+            .map_err(|error| format!("Failed to serialize stack metadata for {path}: {error}"))?;
+        fs::write(&sidecar_path, json)
+            .map_err(|error| format!("Failed to save stack metadata for {path}: {error}"))?;
+        sync_metadata_to_xmp(&source_path, &metadata, create_xmp_if_missing, true);
+        Ok(())
+    })
+}
+
 pub fn extract_xmp_label(content: &str) -> Option<String> {
     if let Some(idx) = content.find("xmp:Label=\"") {
         let start = idx + 11;
@@ -3990,6 +4141,60 @@ pub fn extract_xmp_tags(content: &str) -> Vec<String> {
     tags
 }
 
+fn extract_rapidraw_xmp_value(content: &str, field: &str) -> Option<String> {
+    let attribute = Regex::new(&format!(r#"rr:{field}\s*=\s*"([^"]*)""#)).ok()?;
+    if let Some(captures) = attribute.captures(content) {
+        return captures.get(1).map(|value| value.as_str().to_string());
+    }
+
+    let element = Regex::new(&format!(r#"<rr:{field}(?:\s+[^>]*)?>([^<]*)</rr:{field}>"#)).ok()?;
+    element
+        .captures(content)
+        .and_then(|captures| captures.get(1))
+        .map(|value| value.as_str().to_string())
+}
+
+fn extract_xmp_stack(content: &str) -> Option<XmpStackMetadata> {
+    Some(XmpStackMetadata {
+        id: extract_rapidraw_xmp_value(content, "StackId")?,
+        order: extract_rapidraw_xmp_value(content, "StackOrder")?
+            .parse()
+            .ok()?,
+        is_cover: extract_rapidraw_xmp_value(content, "StackCover")? == "true",
+        collapsed: extract_rapidraw_xmp_value(content, "StackCollapsed")? == "true",
+    })
+}
+
+fn escape_xmp_text(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+fn set_rapidraw_xmp_value(content: &mut String, field: &str, value: Option<&str>) {
+    let attribute = Regex::new(&format!(r#"\s*rr:{field}\s*=\s*"[^"]*""#)).unwrap();
+    *content = attribute.replace_all(content, "").to_string();
+
+    let element = Regex::new(&format!(
+        r#"\s*<rr:{field}(?:\s+[^>]*)?>[^<]*</rr:{field}>"#
+    ))
+    .unwrap();
+    *content = element.replace_all(content, "").to_string();
+
+    if let Some(value) = value
+        && let Some(last_index) = content.rfind("</rdf:Description>")
+    {
+        let node = format!(
+            " <rr:{field} xmlns:rr=\"https://colrbent.com/ns/rapidraw-enhanced/1.0/\">{}</rr:{field}>\n",
+            escape_xmp_text(value)
+        );
+        content.insert_str(last_index, &node);
+    }
+}
+
 pub fn resolve_xmp_path(image_path: &Path) -> Option<PathBuf> {
     let xmp_path = image_path.with_extension("xmp");
     let xmp_path_upper = image_path.with_extension("XMP");
@@ -4002,7 +4207,11 @@ pub fn resolve_xmp_path(image_path: &Path) -> Option<PathBuf> {
     }
 }
 
-pub fn sync_metadata_from_xmp(source_path: &Path, metadata: &mut ImageMetadata) -> bool {
+pub fn sync_metadata_from_xmp(
+    source_path: &Path,
+    metadata: &mut ImageMetadata,
+    include_rapidraw_fields: bool,
+) -> bool {
     let actual_xmp = resolve_xmp_path(source_path);
 
     let mut changed = false;
@@ -4025,9 +4234,12 @@ pub fn sync_metadata_from_xmp(source_path: &Path, metadata: &mut ImageMetadata) 
 
         let xmp_label = extract_xmp_label(&content);
         let xmp_tags = extract_xmp_tags(&content);
+        let xmp_flag = include_rapidraw_fields
+            .then(|| extract_rapidraw_xmp_value(&content, "Flag"))
+            .flatten();
 
         let mut current_tags = metadata.tags.clone().unwrap_or_default();
-        let original_len = current_tags.len();
+        let original_tags = current_tags.clone();
         let had_no_tags = metadata.tags.is_none();
 
         for tag in xmp_tags {
@@ -4044,15 +4256,40 @@ pub fn sync_metadata_from_xmp(source_path: &Path, metadata: &mut ImageMetadata) 
             }
         }
 
-        if current_tags.len() != original_len || (had_no_tags && !current_tags.is_empty()) {
+        if let Some(flag) = xmp_flag
+            && matches!(
+                flag.as_str(),
+                "rejected" | "selected" | "deferred" | "unflagged"
+            )
+        {
+            current_tags.retain(|tag| !tag.starts_with(FLAG_TAG_PREFIX));
+            if flag != "unflagged" {
+                current_tags.push(format!("{FLAG_TAG_PREFIX}{flag}"));
+            }
+        }
+
+        if current_tags != original_tags || (had_no_tags && !current_tags.is_empty()) {
             metadata.tags = Some(current_tags);
             changed = true;
+        }
+
+        if include_rapidraw_fields {
+            let xmp_stack = extract_xmp_stack(&content);
+            if metadata.xmp_stack != xmp_stack {
+                metadata.xmp_stack = xmp_stack;
+                changed = true;
+            }
         }
     }
     changed
 }
 
-pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create_if_missing: bool) {
+pub fn sync_metadata_to_xmp(
+    source_path: &Path,
+    metadata: &ImageMetadata,
+    create_if_missing: bool,
+    include_rapidraw_fields: bool,
+) {
     let xmp_path = source_path.with_extension("xmp");
     let xmp_path_upper = source_path.with_extension("XMP");
 
@@ -4106,6 +4343,7 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
 
         let current_tags = metadata.tags.clone().unwrap_or_default();
         let mut label = None;
+        let mut flag = None;
         let mut normal_tags = Vec::new();
 
         for t in current_tags {
@@ -4116,6 +4354,8 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
                     Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
                 };
                 label = Some(cap_color);
+            } else if let Some(value) = t.strip_prefix(FLAG_TAG_PREFIX) {
+                flag = Some(value.to_string());
             } else {
                 normal_tags.push(t);
             }
@@ -4142,6 +4382,34 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
             let re_label_tag = Regex::new(r#"\s*<xmp:Label\s*>[^<]*</xmp:Label>"#).unwrap();
             content = re_label_attr.replace_all(&content, "").to_string();
             content = re_label_tag.replace_all(&content, "").to_string();
+        }
+
+        if include_rapidraw_fields {
+            set_rapidraw_xmp_value(
+                &mut content,
+                "Flag",
+                Some(flag.as_deref().unwrap_or("unflagged")),
+            );
+
+            if let Some(stack) = &metadata.xmp_stack {
+                set_rapidraw_xmp_value(&mut content, "StackId", Some(&stack.id));
+                set_rapidraw_xmp_value(&mut content, "StackOrder", Some(&stack.order.to_string()));
+                set_rapidraw_xmp_value(
+                    &mut content,
+                    "StackCover",
+                    Some(if stack.is_cover { "true" } else { "false" }),
+                );
+                set_rapidraw_xmp_value(
+                    &mut content,
+                    "StackCollapsed",
+                    Some(if stack.collapsed { "true" } else { "false" }),
+                );
+            } else {
+                set_rapidraw_xmp_value(&mut content, "StackId", None);
+                set_rapidraw_xmp_value(&mut content, "StackOrder", None);
+                set_rapidraw_xmp_value(&mut content, "StackCover", None);
+                set_rapidraw_xmp_value(&mut content, "StackCollapsed", None);
+            }
         }
 
         let re_subject =

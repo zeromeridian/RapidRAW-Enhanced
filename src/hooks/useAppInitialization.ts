@@ -158,6 +158,15 @@ export const useAppInitialization = ({
         }
 
         setAppSettings(settings);
+        if (settings.imageStacks?.length) {
+          const affectedPaths = Array.from(
+            new Set(settings.imageStacks.flatMap((stack: { paths: string[] }) => stack.paths)),
+          );
+          void invoke(Invokes.SyncImageStacksToXmp, {
+            stacks: settings.imageStacks,
+            affectedPaths,
+          }).catch((err) => console.error('Failed to backfill image stacks to XMP:', err));
+        }
         i18n.changeLanguage(settings.language);
 
         if (settings?.sortCriteria) setSortCriteria(settings.sortCriteria);

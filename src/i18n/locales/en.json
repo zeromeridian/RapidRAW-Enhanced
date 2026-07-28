@@ -1553,7 +1553,7 @@
       "themeDesc": "Change the look and feel of the application.",
       "title": "General Settings",
       "xmpSync": "XMP Metadata Sync",
-      "xmpSyncDesc": "Sync ratings, color labels and tags to standard XMP sidecar files for compatibility with other photo editors."
+      "xmpSyncDesc": "Sync ratings, color labels, tags, flags and physical stack information to XMP sidecar files. RapidRAW-specific fields transfer flags and stacks between RapidRAW - Enhanced installations."
     },
     "keybinds": {
       "actions": {

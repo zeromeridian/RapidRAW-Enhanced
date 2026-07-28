@@ -5,6 +5,25 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.37 — 2026-07-28
+
+### Portable XMP flags and stacks
+
+- Physical-image flags now synchronize through RapidRAW-specific XMP metadata
+  and are restored by another RapidRAW - Enhanced installation.
+- Physical stacks now store a shared stack identifier, member order, cover
+  status and collapsed state in each member's XMP sidecar.
+- Existing stacks are backfilled when settings load, and stacks discovered in
+  XMP are reconstructed using the paths available on the current machine.
+- Virtual copies continue using their independent RapidRAW sidecars because
+  multiple virtual copies share one physical XMP file.
+
+### Validation
+
+- Frontend production build, locale runtime validation, focused XMP round-trip
+  tests, Rust formatting and strict Clippy validation passed.
+- Release packaging passed.
+
 ## 1.6.1-colrbent.36 — 2026-07-28
 
 ### CI lint reliability
