@@ -5,6 +5,18 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.36 — 2026-07-28
+
+### CI lint reliability
+
+- Updated the tone-curve preset settings test to follow the enforced Rust
+  linting rules without changing application behavior.
+
+### Validation
+
+- Rust formatting and strict Clippy validation passed.
+- Frontend production build and release packaging passed.
+
 ## 1.6.1-colrbent.33 — 2026-07-28
 
 ### Caps Lock auto-advance
