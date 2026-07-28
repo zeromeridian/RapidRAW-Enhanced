@@ -5,6 +5,15 @@ Enhanced. The newest release appears first. Entries contain only concise,
 user-facing changes so each version can be copied directly into a GitHub
 Release description.
 
+## 1.6.1-colrbent.43 — 2026-07-28
+
+### Thumbnail file-type badges
+
+- Library thumbnail metadata now includes a compact neutral badge identifying
+  the image as `RAW`, `JPG`, `TIF`, `PNG`, or its corresponding file type.
+- File-type badges follow the existing Metadata Off/Hover/Always setting and
+  remain hidden when thumbnail metadata is disabled.
+
 ## 1.6.1-colrbent.41 — 2026-07-28
 
 ### Release asset naming

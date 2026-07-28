@@ -20,7 +20,7 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
 import { reorderStackPaths } from '../../../utils/imageStacks';
 import { StackMemberPosition, StackVisualInfo } from '../../../utils/imageGrouping';
-import { getDisplayFilename } from '../../../utils/outputNaming';
+import { getDisplayFilename, getFileTypeBadgeLabel } from '../../../utils/outputNaming';
 import { getImageFlag, ImageFlag } from '../../../utils/imageFlags';
 import ImageFlagBadge from '../../ui/ImageFlagBadge';
 
@@ -85,6 +85,7 @@ const ThumbnailComponent = ({
   groupBadgeLabel,
   groupBadgeCount,
   stackVisual,
+  isRaw,
   onStackBadgeClick,
   isStackDraggable,
   onStackDragStart,
@@ -120,6 +121,7 @@ const ThumbnailComponent = ({
   const { baseName, isVirtualCopy } = useMemo(() => {
     return getDisplayFilename(path);
   }, [path]);
+  const fileTypeLabel = useMemo(() => getFileTypeBadgeLabel(path, isRaw), [isRaw, path]);
 
   const { shutter, fNumber, iso, focal } = useMemo(() => {
     const e = exif || {};
@@ -197,6 +199,7 @@ const ThumbnailComponent = ({
 
   const isAlways = exifOverlay === ExifOverlay.Always;
   const isHover = exifOverlay === ExifOverlay.Hover;
+  const showFileTypeBadge = exifOverlay !== ExifOverlay.Off;
 
   const hasEditIcon = !!showEditIcon;
   const hasColorLabel = !!colorLabel;
@@ -412,15 +415,22 @@ const ThumbnailComponent = ({
       >
         <div className="min-h-0 overflow-hidden pointer-events-none invisible">
           <div className="flex flex-col p-2 pb-1.5">
-            <div className="flex items-end justify-between shrink-0">
-              <Text variant={TextVariants.small} className="truncate pr-2">
+            <div className="flex items-center justify-between gap-1 shrink-0">
+              <Text variant={TextVariants.small} className="min-w-0 flex-1 truncate pr-1">
                 {baseName}
               </Text>
-              {isVirtualCopy && (
-                <Text variant={TextVariants.small} className="px-1.5 py-0.5 font-bold">
-                  VC
-                </Text>
-              )}
+              <div className="flex shrink-0 items-center gap-1">
+                {showFileTypeBadge && (
+                  <Text variant={TextVariants.small} className="rounded-sm border px-1 py-0.5 text-[8px] font-bold">
+                    {fileTypeLabel}
+                  </Text>
+                )}
+                {isVirtualCopy && (
+                  <Text variant={TextVariants.small} className="px-1.5 py-0.5 font-bold">
+                    VC
+                  </Text>
+                )}
+              </div>
             </div>
             <div className="pt-1.5 pb-0.5 flex flex-wrap items-center gap-x-2.5 shrink-0">
               <div className="flex items-center gap-1">
@@ -462,34 +472,51 @@ const ThumbnailComponent = ({
               : 'bg-transparent border-t border-transparent pointer-events-none',
         )}
       >
-        <div className="flex items-end justify-between shrink-0">
+        <div className="flex items-center justify-between gap-1 shrink-0">
           <Text
             variant={TextVariants.small}
             className={clsx(
-              'truncate pr-2 transition-colors duration-300',
+              'min-w-0 flex-1 truncate pr-1 transition-colors duration-300',
               isAlways ? 'text-white' : isHover ? 'text-white group-hover:text-white' : 'text-white',
             )}
           >
             {baseName}
           </Text>
-          {isVirtualCopy && (
-            <Text
-              as="div"
-              variant={TextVariants.small}
-              weight={TextWeights.bold}
-              className={clsx(
-                'shrink-0 px-1.5 py-0.5 rounded-full transition-colors duration-300 font-bold pointer-events-auto',
-                isAlways
-                  ? 'bg-border-color/30 text-text-primary shadow-none'
-                  : isHover
-                    ? 'bg-black/30 text-white backdrop-blur-xs shadow-md group-hover:bg-border-color/30 group-hover:text-text-primary group-hover:shadow-none group-hover:backdrop-blur-none'
-                    : 'bg-black/30 text-white backdrop-blur-xs shadow-md',
-              )}
-              data-tooltip={t('library.items.tooltipVirtualCopy')}
-            >
-              VC
-            </Text>
-          )}
+          <div className="flex shrink-0 items-center gap-1">
+            {showFileTypeBadge && (
+              <Text
+                as="div"
+                variant={TextVariants.small}
+                weight={TextWeights.bold}
+                className={clsx(
+                  'shrink-0 rounded-sm border px-1 py-0.5 text-[8px] font-bold tracking-wide transition-colors duration-300',
+                  isAlways
+                    ? 'border-border-color/70 bg-bg-primary/60 text-text-secondary'
+                    : 'border-white/20 bg-black/35 text-white/85 backdrop-blur-xs group-hover:border-border-color/70 group-hover:bg-bg-primary/60 group-hover:text-text-secondary group-hover:backdrop-blur-none',
+                )}
+              >
+                {fileTypeLabel}
+              </Text>
+            )}
+            {isVirtualCopy && (
+              <Text
+                as="div"
+                variant={TextVariants.small}
+                weight={TextWeights.bold}
+                className={clsx(
+                  'shrink-0 px-1.5 py-0.5 rounded-full transition-colors duration-300 font-bold pointer-events-auto',
+                  isAlways
+                    ? 'bg-border-color/30 text-text-primary shadow-none'
+                    : isHover
+                      ? 'bg-black/30 text-white backdrop-blur-xs shadow-md group-hover:bg-border-color/30 group-hover:text-text-primary group-hover:shadow-none group-hover:backdrop-blur-none'
+                      : 'bg-black/30 text-white backdrop-blur-xs shadow-md',
+                )}
+                data-tooltip={t('library.items.tooltipVirtualCopy')}
+              >
+                VC
+              </Text>
+            )}
+          </div>
         </div>
 
         <div
@@ -574,6 +601,7 @@ const ListItemComponent = ({
   stackBadgeLabel,
   stackBadgeCount,
   stackVisual,
+  isRaw,
   onStackBadgeClick,
   isStackDraggable,
   onStackDragStart,
@@ -607,6 +635,7 @@ const ListItemComponent = ({
   const { baseName, isVirtualCopy } = useMemo(() => {
     return getDisplayFilename(path);
   }, [path]);
+  const fileTypeLabel = useMemo(() => getFileTypeBadgeLabel(path, isRaw), [isRaw, path]);
 
   const { shutter, fNumber, iso, focal } = useMemo(() => {
     const e = exif || {};
@@ -844,6 +873,17 @@ const ListItemComponent = ({
         <Text variant={TextVariants.small} className="truncate" weight={TextWeights.medium} color={TextColors.primary}>
           {baseName}
         </Text>
+        {showExifCols && (
+          <Text
+            as="div"
+            variant={TextVariants.small}
+            color={TextColors.secondary}
+            weight={TextWeights.bold}
+            className="shrink-0 rounded-sm border border-border-color bg-bg-primary/60 px-1 py-0.5 text-[8px] leading-none tracking-wide"
+          >
+            {fileTypeLabel}
+          </Text>
+        )}
         {isVirtualCopy && (
           <Text
             as="div"
@@ -1159,6 +1199,7 @@ const RowComponent = ({
                 modified={imageFile.modified}
                 columnWidths={columnWidths}
                 isCloudPlaceholder={imageFile.is_cloud_placeholder}
+                isRaw={imageFile.is_raw}
                 isPrevSelected={isPrevSelected}
                 isNextSelected={isNextSelected}
                 stackBadgeLabel={stackBadge?.label}
@@ -1186,6 +1227,7 @@ const RowComponent = ({
                 isEdited={imageFile.is_edited}
                 aspectRatio={thumbnailAspectRatio}
                 isCloudPlaceholder={imageFile.is_cloud_placeholder}
+                isRaw={imageFile.is_raw}
                 groupBadgeLabel={
                   stackBadge?.label || (imageFile.group_id && groupBadgeInfo?.get(imageFile.group_id)?.label)
                 }
