@@ -341,7 +341,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
             {t('library.community.footerHeading')}
             <br />
             <a
-              href="https://github.com/CyberTimon/RapidRAW-Presets/issues/new?assignees=&labels=preset-submission&template=preset_submission.md&title=Preset+Submission%3A+%5BYour+Preset+Name%5D"
+              href="https://github.com/zeromeridian/RapidRAW-Enhanced/issues/new"
               target="_blank"
               rel="noopener noreferrer"
               className="text-accent hover:underline inline-flex items-center gap-2"

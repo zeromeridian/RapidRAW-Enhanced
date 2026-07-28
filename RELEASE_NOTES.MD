@@ -5,6 +5,27 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.31 — 2026-07-28
+
+### Fork branding cleanup
+
+- Removed the inherited funding configuration and donation link.
+- Removed upstream personal promotional links and attribution from the launch
+  screen while preserving required upstream attribution in project
+  documentation.
+- Update checks, release downloads, contribution links, ownership metadata,
+  package authorship, and packaging sources now point to or identify the
+  RapidRAW - Enhanced fork.
+- Upstream compatibility identifiers and required technical dependencies
+  remain unchanged.
+
+### Validation
+
+- Frontend production build, locale runtime validation, metadata parsing,
+  formatting, relevant-file TypeScript diagnostics, and promotional-reference
+  audit passed.
+- Release packaging passed.
+
 ## 1.6.1-colrbent.30 — 2026-07-28
 
 ### Build automation
