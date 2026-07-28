@@ -193,6 +193,7 @@ export default function MainLibrary(props: MainLibraryProps) {
 
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
   const filterCriteria = useLibraryStore((state) => state.filterCriteria);
+  const setFilterCriteria = useLibraryStore((state) => state.setFilterCriteria);
 
   useEffect(() => {
     const hasStoredLibrary = !!props.appSettings?.lastRootPath || !!props.appSettings?.rootFolders?.length;
@@ -607,22 +608,41 @@ export default function MainLibrary(props: MainLibraryProps) {
                 <p className="text-sm invisible select-none pointer-events-none h-5 overflow-hidden"></p>
               )}
               {activeFilterLabels.length > 0 && (
-                <div
-                  className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden whitespace-nowrap"
-                  data-tooltip={activeFilterLabels.map((filter) => filter.label).join(' · ')}
-                >
-                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-text-secondary/70">
-                    {t('library.header.activeFilters.label')}
-                  </span>
-                  {activeFilterLabels.map((filter) => (
-                    <span
-                      key={filter.key}
-                      className="shrink-0 rounded-sm bg-surface/70 px-1.5 py-0.5 text-[10px] leading-4 text-text-secondary"
-                    >
-                      {filter.label}
+                <>
+                  <div
+                    className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden whitespace-nowrap"
+                    data-tooltip={activeFilterLabels.map((filter) => filter.label).join(' · ')}
+                  >
+                    <span className="shrink-0 text-[10px] uppercase tracking-wide text-text-secondary/70">
+                      {t('library.header.activeFilters.label')}
                     </span>
-                  ))}
-                </div>
+                    {activeFilterLabels.map((filter) => (
+                      <span
+                        key={filter.key}
+                        className="shrink-0 rounded-sm bg-surface/70 px-1.5 py-0.5 text-[10px] leading-4 text-text-secondary"
+                      >
+                        {filter.label}
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] leading-4 text-text-secondary/70 transition-colors hover:bg-surface/70 hover:text-text-primary"
+                    data-tooltip={t('library.header.activeFilters.clearAll')}
+                    onClick={() =>
+                      setFilterCriteria((previous) => ({
+                        ...previous,
+                        rating: 0,
+                        rawStatus: RawStatus.All,
+                        editedStatus: EditedStatus.All,
+                        colors: [],
+                        flags: [],
+                      }))
+                    }
+                  >
+                    {t('library.header.activeFilters.clearAll')}
+                  </button>
+                </>
               )}
               <div
                 className={`flex items-center gap-2 overflow-hidden transition-all duration-300 whitespace-nowrap ${

@@ -980,6 +980,7 @@
     },
     "header": {
       "activeFilters": {
+        "clearAll": "Clear all filters",
         "color": "Color: {{value}}",
         "edited": "Edit: {{value}}",
         "fileType": "Type: {{value}}",
