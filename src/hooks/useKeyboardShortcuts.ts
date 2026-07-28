@@ -57,6 +57,43 @@ export const useKeyboardShortcuts = ({
       }
     }
 
+    const advanceToNextImage = (state: ReturnType<typeof getStoreState>) => {
+      const currentPath = state.editor.selectedImage?.path || state.library.libraryActivePath;
+      if (!currentPath) return;
+
+      const currentIndex = sortedListRef.current.findIndex((image) => image.path === currentPath);
+      if (currentIndex < 0) return;
+
+      const nextImage = sortedListRef.current[currentIndex + 1];
+      if (!nextImage) return;
+
+      if (state.editor.selectedImage) {
+        state.library.setLibrary({
+          libraryActivePath: nextImage.path,
+          multiSelectedPaths: [nextImage.path],
+        });
+        handleImageSelect(nextImage.path);
+      } else {
+        state.library.setLibrary({
+          libraryActivePath: nextImage.path,
+          multiSelectedPaths: [nextImage.path],
+        });
+      }
+    };
+
+    const executeCullingShortcut = (
+      event: KeyboardEvent,
+      state: ReturnType<typeof getStoreState>,
+      action: () => void,
+    ) => {
+      event.preventDefault();
+      const shouldAutoAdvance = event.getModifierState('CapsLock');
+      if (shouldAutoAdvance && event.repeat) return;
+
+      action();
+      if (shouldAutoAdvance) advanceToNextImage(state);
+    };
+
     const actions: Record<string, any> = {
       open_image: {
         shouldFire: (s: any) => !s.editor.selectedImage && s.library.libraryActivePath !== null,
@@ -377,115 +414,83 @@ export const useKeyboardShortcuts = ({
       },
       rate_0: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleRate(0);
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleRate(0)),
       },
       rate_1: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleRate(1);
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleRate(1)),
       },
       rate_2: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleRate(2);
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleRate(2)),
       },
       rate_3: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleRate(3);
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleRate(3)),
       },
       rate_4: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleRate(4);
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleRate(4)),
       },
       rate_5: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleRate(5);
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleRate(5)),
       },
       color_label_none: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleSetColorLabel(null);
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleSetColorLabel(null)),
       },
       color_label_red: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleSetColorLabel('red');
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleSetColorLabel('red')),
       },
       color_label_yellow: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleSetColorLabel('yellow');
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleSetColorLabel('yellow')),
       },
       color_label_green: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleSetColorLabel('green');
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleSetColorLabel('green')),
       },
       color_label_blue: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleSetColorLabel('blue');
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleSetColorLabel('blue')),
       },
       color_label_purple: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleSetColorLabel('purple');
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleSetColorLabel('purple')),
       },
       flag_rejected: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleSetFlag(ImageFlag.Rejected);
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleSetFlag(ImageFlag.Rejected)),
       },
       flag_selected: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleSetFlag(ImageFlag.Selected);
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleSetFlag(ImageFlag.Selected)),
       },
       flag_deferred: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleSetFlag(ImageFlag.Deferred);
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleSetFlag(ImageFlag.Deferred)),
       },
       flag_unflagged: {
         shouldFire: () => true,
-        execute: (e: any) => {
-          e.preventDefault();
-          handleSetFlag(ImageFlag.Unflagged);
-        },
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          executeCullingShortcut(e, s, () => handleSetFlag(ImageFlag.Unflagged)),
       },
       brush_size_up: {
         shouldFire: (s: any) =>
@@ -637,5 +642,6 @@ export const useKeyboardShortcuts = ({
     handlePasteAdjustments,
     handleRate,
     handleSetColorLabel,
+    handleSetFlag,
   ]);
 };
