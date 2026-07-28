@@ -100,7 +100,7 @@ fn resolve_image_metadata(
     let mut metadata = crate::exif_processing::load_sidecar(sidecar_path);
 
     if enable_xmp_sync
-        && sync_metadata_from_xmp(image_path, &mut metadata, include_rapidraw_xmp)
+        && sync_metadata_from_xmp(image_path, &mut metadata, include_rapidraw_xmp, false)
         && let Ok(json) = serde_json::to_string_pretty(&metadata)
     {
         let _ = fs::write(sidecar_path, json);
@@ -438,9 +438,11 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
 #[cfg(test)]
 mod output_naming_tests {
     use super::{
-        extract_rapidraw_xmp_value, extract_xmp_stack, parse_virtual_path,
+        extract_rapidraw_xmp_value, extract_xmp_stack, parse_virtual_path, read_xmp_from_folder,
         sanitize_filename_suffix, set_rapidraw_xmp_value,
     };
+    use crate::image_processing::ImageMetadata;
+    use std::fs;
     use std::path::PathBuf;
 
     #[test]
@@ -478,6 +480,55 @@ mod output_naming_tests {
 
         set_rapidraw_xmp_value(&mut xmp, "Flag", None);
         assert!(extract_rapidraw_xmp_value(&xmp, "Flag").is_none());
+    }
+
+    #[test]
+    fn forced_folder_xmp_read_overwrites_metadata_without_recursing() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("image.jpg");
+        let sidecar = folder.path().join("image.jpg.rrdata");
+        fs::write(&image, []).unwrap();
+        fs::write(
+            image.with_extension("xmp"),
+            r#"<rdf:Description>
+ <xmp:Rating>5</xmp:Rating>
+ <xmp:Label>Blue</xmp:Label>
+ <rr:Flag>rejected</rr:Flag>
+ <dc:subject><rdf:Bag><rdf:li>user:xmp</rdf:li></rdf:Bag></dc:subject>
+</rdf:Description>"#,
+        )
+        .unwrap();
+
+        let existing = ImageMetadata {
+            rating: 2,
+            tags: Some(vec![
+                "color:green".to_string(),
+                "flag:selected".to_string(),
+                "user:local".to_string(),
+            ]),
+            ..ImageMetadata::default()
+        };
+        fs::write(&sidecar, serde_json::to_string_pretty(&existing).unwrap()).unwrap();
+
+        let nested = folder.path().join("nested");
+        fs::create_dir(&nested).unwrap();
+        fs::write(nested.join("ignored.jpg"), []).unwrap();
+        fs::write(
+            nested.join("ignored.xmp"),
+            "<rdf:Description><xmp:Rating>4</xmp:Rating></rdf:Description>",
+        )
+        .unwrap();
+
+        let result = read_xmp_from_folder(folder.path().to_string_lossy().into_owned()).unwrap();
+        assert_eq!(result.files_read, 1);
+
+        let imported = crate::exif_processing::load_sidecar(&sidecar);
+        assert_eq!(imported.rating, 5);
+        assert_eq!(
+            imported.tags.unwrap(),
+            ["user:xmp", "color:blue", "flag:rejected"]
+        );
+        assert!(!nested.join("ignored.jpg.rrdata").exists());
     }
 }
 
@@ -3076,7 +3127,7 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
     let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
     if enable_xmp_sync
-        && sync_metadata_from_xmp(&source_path, &mut metadata, !path.contains("?vc="))
+        && sync_metadata_from_xmp(&source_path, &mut metadata, !path.contains("?vc="), false)
         && let Ok(json) = serde_json::to_string_pretty(&metadata)
     {
         let _ = fs::write(&sidecar_path, json);
@@ -4207,10 +4258,54 @@ pub fn resolve_xmp_path(image_path: &Path) -> Option<PathBuf> {
     }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadXmpFolderResult {
+    files_read: usize,
+}
+
+#[tauri::command]
+pub fn read_xmp_from_folder(path: String) -> Result<ReadXmpFolderResult, String> {
+    let folder = Path::new(&path);
+    if !folder.is_dir() {
+        return Err(format!("Folder does not exist: {}", folder.display()));
+    }
+
+    let image_paths: Vec<PathBuf> = fs::read_dir(folder)
+        .map_err(|error| format!("Could not read folder {}: {error}", folder.display()))?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|entry| entry.is_file() && is_supported_image_file(entry))
+        .filter(|entry| resolve_xmp_path(entry).is_some())
+        .collect();
+
+    image_paths.par_iter().try_for_each(|image_path| {
+        let (_, sidecar_path) = parse_virtual_path(&image_path.to_string_lossy());
+        let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+        sync_metadata_from_xmp(image_path, &mut metadata, true, true);
+        let json = serde_json::to_string_pretty(&metadata).map_err(|error| {
+            format!(
+                "Could not serialize XMP metadata for {}: {error}",
+                image_path.display()
+            )
+        })?;
+        fs::write(&sidecar_path, json).map_err(|error| {
+            format!(
+                "Could not save XMP metadata for {}: {error}",
+                image_path.display()
+            )
+        })
+    })?;
+
+    Ok(ReadXmpFolderResult {
+        files_read: image_paths.len(),
+    })
+}
+
 pub fn sync_metadata_from_xmp(
     source_path: &Path,
     metadata: &mut ImageMetadata,
     include_rapidraw_fields: bool,
+    force: bool,
 ) -> bool {
     let actual_xmp = resolve_xmp_path(source_path);
 
@@ -4219,10 +4314,9 @@ pub fn sync_metadata_from_xmp(
     if let Some(xmp_file) = actual_xmp
         && let Ok(content) = fs::read_to_string(&xmp_file)
     {
-        if metadata.rating == 0
-            && let Some(rating) = extract_xmp_rating(&content)
-            && rating != 0
-        {
+        let xmp_rating = extract_xmp_rating(&content).unwrap_or(0);
+        if (force || (metadata.rating == 0 && xmp_rating != 0)) && metadata.rating != xmp_rating {
+            let rating = xmp_rating;
             metadata.rating = rating;
             if let Some(obj) = metadata.adjustments.as_object_mut() {
                 obj.insert("rating".to_string(), serde_json::json!(rating));
@@ -4238,7 +4332,11 @@ pub fn sync_metadata_from_xmp(
             .then(|| extract_rapidraw_xmp_value(&content, "Flag"))
             .flatten();
 
-        let mut current_tags = metadata.tags.clone().unwrap_or_default();
+        let mut current_tags = if force {
+            Vec::new()
+        } else {
+            metadata.tags.clone().unwrap_or_default()
+        };
         let original_tags = current_tags.clone();
         let had_no_tags = metadata.tags.is_none();
 
@@ -4268,8 +4366,11 @@ pub fn sync_metadata_from_xmp(
             }
         }
 
-        if current_tags != original_tags || (had_no_tags && !current_tags.is_empty()) {
-            metadata.tags = Some(current_tags);
+        if current_tags != original_tags
+            || (had_no_tags && !current_tags.is_empty())
+            || (force && metadata.tags.is_some() && current_tags.is_empty())
+        {
+            metadata.tags = (!current_tags.is_empty()).then_some(current_tags);
             changed = true;
         }
 
