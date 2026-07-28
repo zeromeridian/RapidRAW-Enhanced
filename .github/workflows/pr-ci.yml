@@ -14,23 +14,28 @@ jobs:
           - name: Windows x86-64
             platform: windows-latest
             target: x86_64-pc-windows-msvc
+            asset-platform: windows
             args: --bundles nsis
           - name: macOS ARM64
             platform: macos-14
             target: aarch64-apple-darwin
+            asset-platform: macos
             args: --bundles dmg
           - name: Ubuntu x86-64
             platform: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
+            asset-platform: linux
             args: --bundles appimage
           - name: Ubuntu ARM64
             platform: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
+            asset-platform: linux
             args: --bundles appimage
     uses: ./.github/workflows/build.yml
     with:
       platform: ${{ matrix.platform }}
       target: ${{ matrix.target }}
+      asset-platform: ${{ matrix.asset-platform }}
       build-args: ${{ matrix.args }}
       upload-artifacts: true
     secrets: inherit

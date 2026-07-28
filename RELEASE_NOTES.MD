@@ -5,6 +5,14 @@ Enhanced. The newest release appears first. Entries contain only concise,
 user-facing changes so each version can be copied directly into a GitHub
 Release description.
 
+## 1.6.1-colrbent.41 — 2026-07-28
+
+### Release asset naming
+
+- macOS build artifacts and GitHub Release assets now use `macos` in their
+  filenames instead of the underlying `darwin` platform identifier.
+- Windows and Linux assets retain stable explicit platform labels.
+
 ## 1.6.1-colrbent.38 — 2026-07-28
 
 ### Explicit folder XMP import
