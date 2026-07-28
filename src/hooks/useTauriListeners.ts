@@ -6,7 +6,9 @@ import { useProcessStore } from '../store/useProcessStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
 import { useLibraryStore } from '../store/useLibraryStore';
+import { useSettingsStore } from '../store/useSettingsStore';
 import { autoStackCreatedImages } from '../utils/autoStacking';
+import { mergeXmpImageStacks } from '../utils/imageStacks';
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;
@@ -121,14 +123,25 @@ export function useTauriListeners({
       }),
       listen('image-metadata-loaded', (event: any) => {
         if (!isEffectActive) return;
-        const { path, rating, is_edited, tags } = event.payload;
+        const { path, rating, is_edited, tags, xmpStack } = event.payload;
 
         useLibraryStore.getState().setLibrary((state) => ({
           imageRatings: { ...state.imageRatings, [path]: rating },
           imageList: state.imageList.map((img) =>
-            img.path === path ? { ...img, is_edited, tags: tags ?? img.tags } : img,
+            img.path === path ? { ...img, is_edited, tags: tags ?? img.tags, xmpStack } : img,
           ),
         }));
+
+        if (xmpStack) {
+          const settingsState = useSettingsStore.getState();
+          if (settingsState.appSettings) {
+            const imageList = useLibraryStore.getState().imageList;
+            const imageStacks = mergeXmpImageStacks(settingsState.appSettings.imageStacks || [], imageList);
+            if (JSON.stringify(imageStacks) !== JSON.stringify(settingsState.appSettings.imageStacks || [])) {
+              settingsState.setAppSettings({ ...settingsState.appSettings, imageStacks });
+            }
+          }
+        }
       }),
       listen('ai-model-download-start', (event: any) => {
         if (isEffectActive) useProcessStore.getState().setProcess({ aiModelDownloadStatus: event.payload });

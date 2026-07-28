@@ -12,6 +12,16 @@ import { Invokes, LibraryViewMode, ImageFile } from '../components/ui/AppPropert
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
+import { mergeXmpImageStacks } from '../utils/imageStacks';
+
+const mergeImportedXmpStacks = (images: ImageFile[]) => {
+  const settingsState = useSettingsStore.getState();
+  if (!settingsState.appSettings) return;
+  const imageStacks = mergeXmpImageStacks(settingsState.appSettings.imageStacks || [], images);
+  if (JSON.stringify(imageStacks) !== JSON.stringify(settingsState.appSettings.imageStacks || [])) {
+    settingsState.setAppSettings({ ...settingsState.appSettings, imageStacks });
+  }
+};
 
 export interface AppNavigationProps {
   clearThumbnailQueue: () => void;
@@ -347,6 +357,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         } else {
           files = await invoke(command, { path });
         }
+        mergeImportedXmpStacks(files);
 
         const initialRatings: Record<string, number> = {};
         files.forEach((f) => {
@@ -425,6 +436,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
 
       try {
         const files: ImageFile[] = await invoke(Invokes.GetAlbumImages, { paths: imagePaths });
+        mergeImportedXmpStacks(files);
 
         const initialRatings: Record<string, number> = {};
         files.forEach((f) => {

@@ -474,7 +474,11 @@ pub fn remove_tag_for_paths(paths: Vec<String>, tag: String) -> Result<(), Strin
 }
 
 #[tauri::command]
-pub fn set_flag_for_paths(paths: Vec<String>, flag: String) -> Result<(), String> {
+pub fn set_flag_for_paths(
+    paths: Vec<String>,
+    flag: String,
+    app_handle: AppHandle,
+) -> Result<(), String> {
     if !matches!(
         flag.as_str(),
         "rejected" | "selected" | "deferred" | "unflagged"
@@ -482,13 +486,28 @@ pub fn set_flag_for_paths(paths: Vec<String>, flag: String) -> Result<(), String
         return Err(format!("Unsupported image flag: {flag}"));
     }
 
+    let settings = crate::app_settings::load_settings(app_handle).unwrap_or_default();
+    let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
+    let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
+
     paths
         .par_iter()
-        .try_for_each(|path| {
+        .try_for_each(|path| -> Result<(), String> {
             modify_tags_for_path(path, |tags| {
                 apply_flag_to_tags(tags, &flag);
-            })
-            .map_err(|error| format!("Failed to set flag for {path}: {error}"))
+            })?;
+
+            if enable_xmp_sync && !path.contains("?vc=") {
+                let (source_path, sidecar_path) = parse_virtual_path(path);
+                let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+                file_management::sync_metadata_to_xmp(
+                    &source_path,
+                    &metadata,
+                    create_xmp_if_missing,
+                    true,
+                );
+            }
+            Ok(())
         })
         .map_err(|error| {
             eprintln!("{error}");
