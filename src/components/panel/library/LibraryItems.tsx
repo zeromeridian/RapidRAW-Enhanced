@@ -21,6 +21,8 @@ import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/E
 import { reorderStackPaths } from '../../../utils/imageStacks';
 import { StackMemberPosition, StackVisualInfo } from '../../../utils/imageGrouping';
 import { getDisplayFilename } from '../../../utils/outputNaming';
+import { getImageFlag } from '../../../utils/imageFlags';
+import ImageFlagBadge from '../../ui/ImageFlagBadge';
 
 type StackDropEdge = 'before' | 'after';
 
@@ -191,6 +193,7 @@ const ThumbnailComponent = ({
 
   const colorTag = tags?.find((t: string) => t.startsWith('color:'))?.substring(6);
   const colorLabel = COLOR_LABELS.find((c: Color) => c.name === colorTag);
+  const imageFlag = getImageFlag(tags);
 
   const isAlways = exifOverlay === ExifOverlay.Always;
   const isHover = exifOverlay === ExifOverlay.Hover;
@@ -249,6 +252,7 @@ const ThumbnailComponent = ({
         />
       )}
       <StackVisualCue info={stackVisual} />
+      <ImageFlagBadge flag={imageFlag} className="absolute bottom-1.5 left-2 z-30 pointer-events-none" />
       <div className="relative w-full flex-1 min-h-0 z-0 bg-surface">
         {layers.length > 0 && (
           <div className="absolute inset-0 w-full h-full">
@@ -676,6 +680,7 @@ const ListItemComponent = ({
 
   const colorTag = tags?.find((t: string) => t.startsWith('color:'))?.substring(6);
   const colorLabel = COLOR_LABELS.find((c: Color) => c.name === colorTag);
+  const imageFlag = getImageFlag(tags);
 
   const dateObj = new Date(modified > 1e11 ? modified : modified * 1000);
   const dateStr =
@@ -756,6 +761,7 @@ const ListItemComponent = ({
         className="flex items-center justify-center p-1.5 h-full overflow-hidden"
       >
         <div className="w-full h-full relative overflow-hidden rounded-sm bg-surface flex items-center justify-center">
+          <ImageFlagBadge flag={imageFlag} className="absolute bottom-1 left-1 z-20 pointer-events-none" />
           {layers.length > 0 && (
             <div className="absolute inset-0 w-full h-full flex items-center justify-center">
               {layers.map((layer) => (

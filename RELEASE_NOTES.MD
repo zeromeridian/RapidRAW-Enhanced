@@ -5,6 +5,43 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.24 — 2026-07-27
+
+### Flag badge refinement
+
+- Removed the bright circular outline that made flag badges resemble a halo or
+  contour.
+- Flag badges now use a compact translucent dark square with a colored glyph,
+  retaining visibility without obscuring the thumbnail.
+
+### Validation
+
+- Frontend production build and formatting passed.
+- Release packaging passed.
+
+## 1.6.1-colrbent.23 — 2026-07-27
+
+### Image flags
+
+- Added persistent **Rejected**, **Selected**, **Deferred**, and **Unflagged**
+  states for physical images and virtual copies.
+- Added distinct flag badges to Library grid/list thumbnails and the Develop
+  filmstrip.
+- Added a separate Flags group to the bottom toolbar in both Library and
+  Develop, including a confirmed action to permanently delete rejected files
+  from the current folder only.
+- Added configurable shortcuts: `X` for Rejected, `U` for Unflagged,
+  `Shift+P` for Selected, and `Shift+D` for Deferred. The modified shortcuts
+  avoid the existing `P` Presets and `D` Adjustments bindings.
+- Flag metadata remains independent of color labels and ordinary editable
+  tags.
+
+### Validation
+
+- Frontend production build, relevant-file TypeScript diagnostics, locale
+  runtime validation, backend compilation, focused flag policy checks,
+  formatting, and release packaging passed.
+
 ## 1.6.1-colrbent.22 — 2026-07-27
 
 ### Stack presentation and ordering

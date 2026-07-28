@@ -27,6 +27,7 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
+import { isImageFlagTag } from '../../../utils/imageFlags';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
 import { getDisplayFilename } from '../../../utils/outputNaming';
 
@@ -108,7 +109,7 @@ function CullingPreview({
 
   const currentTags = useMemo(() => {
     return (image.tags || [])
-      .filter((t) => !t.startsWith('color:'))
+      .filter((t) => !t.startsWith('color:') && !isImageFlagTag(t))
       .map((t) => ({
         tag: t.startsWith(USER_TAG_PREFIX) ? t.substring(USER_TAG_PREFIX.length) : t,
         isUser: t.startsWith(USER_TAG_PREFIX),

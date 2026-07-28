@@ -93,6 +93,7 @@ export enum Invokes {
   SavePresets = 'save_presets',
   SaveSettings = 'save_settings',
   SetColorLabelForPaths = 'set_color_label_for_paths',
+  SetFlagForPaths = 'set_flag_for_paths',
   SetRatingForPaths = 'set_rating_for_paths',
   ShowInFinder = 'show_in_finder',
   StartBackgroundIndexing = 'start_background_indexing',

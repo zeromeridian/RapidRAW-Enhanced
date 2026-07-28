@@ -12,6 +12,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 
 import { ImageFile, LibraryViewMode, ThumbnailAspectRatio, ThumbnailSize } from '../ui/AppProperties';
 import { GroupBadgeInfo, GroupId } from '../../utils/imageGrouping';
+import { ImageFlag } from '../../utils/imageFlags';
 
 interface LibraryViewProps {
   sortedImageList: ImageFile[];
@@ -27,6 +28,8 @@ interface LibraryViewProps {
   handleLibraryImageSingleClick: (...args: any) => void;
   handleImageSelect: (...args: any) => void;
   handleRate: (...args: any) => void;
+  handleSetFlag: (flag: ImageFlag) => void;
+  handleDeleteRejected: (paths: string[]) => void;
   handleThumbnailContextMenu: (...args: any) => void;
   handleMainLibraryContextMenu: (...args: any) => void;
   handleContinueSession: (...args: any) => void;
@@ -54,6 +57,8 @@ export default function LibraryView({
   handleLibraryImageSingleClick,
   handleImageSelect,
   handleRate,
+  handleSetFlag,
+  handleDeleteRejected,
   handleThumbnailContextMenu,
   handleMainLibraryContextMenu,
   handleContinueSession,
@@ -169,6 +174,7 @@ export default function LibraryView({
         )}
         {rootPaths && rootPaths.length > 0 && (
           <BottomBar
+            imageList={imageList}
             isCopied={isCopied}
             isCopyDisabled={multiSelectedPaths.length !== 1}
             isExportDisabled={multiSelectedPaths.length === 0}
@@ -182,6 +188,8 @@ export default function LibraryView({
             onExportClick={() =>
               setUI((state) => ({ isLibraryExportPanelVisible: !state.isLibraryExportPanelVisible }))
             }
+            onDeleteRejected={handleDeleteRejected}
+            onFlag={handleSetFlag}
             onOpenCopyPasteSettings={() => setUI({ isCopyPasteSettingsModalOpen: true })}
             onLibraryRefresh={handleLibraryRefresh}
             onPaste={() => handlePasteAdjustments()}

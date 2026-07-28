@@ -8,6 +8,7 @@ import { Invokes, ImageFile, AlbumItem, Album, AlbumGroup } from '../components/
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { computeSortedLibrary } from './useSortedLibrary';
+import { ImageFlag, IMAGE_FLAG_PREFIX } from '../utils/imageFlags';
 
 export function useLibraryActions(handleImageSelect?: (path: string) => void) {
   const handleRate = useCallback((newRating: number, paths?: string[]) => {
@@ -69,13 +70,45 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     }
   }, []);
 
+  const handleSetFlag = useCallback(async (flag: ImageFlag, paths?: string[]) => {
+    const { multiSelectedPaths, libraryActivePath, imageList, setLibrary } = useLibraryStore.getState();
+    const { selectedImage } = useEditorStore.getState();
+    const pathsToUpdate =
+      paths ||
+      (multiSelectedPaths.length > 0
+        ? multiSelectedPaths
+        : selectedImage
+          ? [selectedImage.path]
+          : libraryActivePath
+            ? [libraryActivePath]
+            : []);
+    if (pathsToUpdate.length === 0) return;
+
+    try {
+      await invoke(Invokes.SetFlagForPaths, { paths: pathsToUpdate, flag });
+      const updatedPaths = new Set(pathsToUpdate);
+      setLibrary({
+        imageList: imageList.map((image) => {
+          if (!updatedPaths.has(image.path)) return image;
+          const tags = (image.tags || []).filter((tag) => !tag.startsWith(IMAGE_FLAG_PREFIX));
+          if (flag !== ImageFlag.Unflagged) tags.push(`${IMAGE_FLAG_PREFIX}${flag}`);
+          return { ...image, tags: tags.length > 0 ? tags : null };
+        }),
+      });
+    } catch (err) {
+      toast.error(`Failed to set flag: ${err}`);
+    }
+  }, []);
+
   const handleTagsChanged = useCallback((changedPaths: string[], newTags: { tag: string; isUser: boolean }[]) => {
     useLibraryStore.getState().setLibrary((state) => ({
       imageList: state.imageList.map((image) => {
         if (changedPaths.includes(image.path)) {
-          const colorTags = (image.tags || []).filter((t) => t.startsWith('color:'));
+          const systemTags = (image.tags || []).filter(
+            (t) => t.startsWith('color:') || t.startsWith(IMAGE_FLAG_PREFIX),
+          );
           const prefixedNewTags = newTags.map((t) => (t.isUser ? `user:${t.tag}` : t.tag));
-          const finalTags = [...colorTags, ...prefixedNewTags].sort();
+          const finalTags = [...systemTags, ...prefixedNewTags].sort();
           return { ...image, tags: finalTags.length > 0 ? finalTags : null };
         }
         return image;
@@ -400,6 +433,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
   return {
     handleRate,
     handleSetColorLabel,
+    handleSetFlag,
     handleTagsChanged,
     handleUpdateExif,
     handleClearSelection,

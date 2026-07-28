@@ -8,6 +8,7 @@ import { useUIStore } from '../store/useUIStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
+import { ImageFlag } from '../utils/imageFlags';
 
 interface KeyboardShortcutsProps {
   sortedImageList: Array<ImageFile>;
@@ -29,7 +30,7 @@ export const useKeyboardShortcuts = ({
   handleZoomChange,
 }: KeyboardShortcutsProps) => {
   const { handleRotate, handleCopyAdjustments, handlePasteAdjustments } = useEditorActions();
-  const { handleRate, handleSetColorLabel } = useLibraryActions();
+  const { handleRate, handleSetColorLabel, handleSetFlag } = useLibraryActions();
 
   const sortedListRef = useRef(sortedImageList);
   useEffect(() => {
@@ -456,6 +457,34 @@ export const useKeyboardShortcuts = ({
         execute: (e: any) => {
           e.preventDefault();
           handleSetColorLabel('purple');
+        },
+      },
+      flag_rejected: {
+        shouldFire: () => true,
+        execute: (e: any) => {
+          e.preventDefault();
+          handleSetFlag(ImageFlag.Rejected);
+        },
+      },
+      flag_selected: {
+        shouldFire: () => true,
+        execute: (e: any) => {
+          e.preventDefault();
+          handleSetFlag(ImageFlag.Selected);
+        },
+      },
+      flag_deferred: {
+        shouldFire: () => true,
+        execute: (e: any) => {
+          e.preventDefault();
+          handleSetFlag(ImageFlag.Deferred);
+        },
+      },
+      flag_unflagged: {
+        shouldFire: () => true,
+        execute: (e: any) => {
+          e.preventDefault();
+          handleSetFlag(ImageFlag.Unflagged);
         },
       },
       brush_size_up: {

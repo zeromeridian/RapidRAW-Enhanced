@@ -12,6 +12,8 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { GroupBadgeInfo } from '../../utils/imageGrouping';
 import { StackVisualCue } from './library/LibraryItems';
+import { getImageFlag } from '../../utils/imageFlags';
+import ImageFlagBadge from '../ui/ImageFlagBadge';
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;
@@ -87,6 +89,7 @@ const FilmstripThumbnail = memo(
     const rating = imageRatings?.[path] || 0;
     const colorTag = tags?.find((t: string) => t.startsWith('color:'))?.substring(6);
     const colorLabel = COLOR_LABELS.find((c: Color) => c.name === colorTag);
+    const imageFlag = getImageFlag(tags);
     const isVirtualCopy = path.includes('?vc=');
     const displayEditIcon = useSettingsStore((s) => s.appSettings?.displayEditIcon ?? true);
     const showEditIcon = isEdited && displayEditIcon;
@@ -184,6 +187,7 @@ const FilmstripThumbnail = memo(
         data-tooltip={truncatedTitle}
       >
         <StackVisualCue info={stackBadge?.stackVisual} />
+        <ImageFlagBadge flag={imageFlag} className="absolute bottom-1 left-2 z-30 pointer-events-none" />
         {layers.length > 0 ? (
           <div className="absolute inset-0 w-full h-full">
             {layers.map((layer) => (

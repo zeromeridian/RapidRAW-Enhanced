@@ -128,6 +128,30 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
   { action: 'rate_4', description: 'settings.keybinds.actions.rate_4', defaultCombo: ['Digit4'], section: 'rating' },
   { action: 'rate_5', description: 'settings.keybinds.actions.rate_5', defaultCombo: ['Digit5'], section: 'rating' },
   {
+    action: 'flag_rejected',
+    description: 'settings.keybinds.actions.flag_rejected',
+    defaultCombo: ['KeyX'],
+    section: 'rating',
+  },
+  {
+    action: 'flag_selected',
+    description: 'settings.keybinds.actions.flag_selected',
+    defaultCombo: ['shift', 'KeyP'],
+    section: 'rating',
+  },
+  {
+    action: 'flag_deferred',
+    description: 'settings.keybinds.actions.flag_deferred',
+    defaultCombo: ['shift', 'KeyD'],
+    section: 'rating',
+  },
+  {
+    action: 'flag_unflagged',
+    description: 'settings.keybinds.actions.flag_unflagged',
+    defaultCombo: ['KeyU'],
+    section: 'rating',
+  },
+  {
     action: 'color_label_none',
     description: 'settings.keybinds.actions.color_label_none',
     defaultCombo: ['shift', 'Digit0'],
