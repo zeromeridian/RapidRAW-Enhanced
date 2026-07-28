@@ -5,6 +5,25 @@ Enhanced. The newest release appears first. Existing release entries are
 historical records and should not be rewritten except to correct factual
 errors.
 
+## 1.6.1-colrbent.38 — 2026-07-28
+
+### Explicit folder XMP import
+
+- Folder-tree context menus now provide **Read XMP from Folder** directly below
+  **Refresh Folders**.
+- The action reads only physical images directly inside the selected folder;
+  it does not recurse into subfolders.
+- XMP is treated as authoritative for ratings, labels, keywords, flags and
+  physical stack metadata, replacing the corresponding local sidecar values.
+- The current Library view refreshes automatically when its folder is
+  imported, and a completion message reports the number of XMP files read.
+
+### Validation
+
+- Frontend production build, locale runtime validation, focused forced-import
+  and non-recursion tests, Rust formatting and strict Clippy validation passed.
+- Release packaging passed.
+
 ## 1.6.1-colrbent.37 — 2026-07-28
 
 ### Portable XMP flags and stacks
