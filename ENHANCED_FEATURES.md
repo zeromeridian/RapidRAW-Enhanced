@@ -17,6 +17,9 @@ validation details are in `RELEASE_NOTES.MD`.
   rejected-file deletion.
 - Compact active-filter summary in the Library header with one-click
   **Clear all filters**.
+- Compact neutral file-type badges in Library grid and list metadata, using a
+  shared `RAW` label for camera formats and normalized labels such as `JPG` and
+  `TIF` for rendered files.
 - Configurable shortcuts for Library Grid and flag actions.
 - Caps Lock auto-advance after applying ratings, color labels, or flags.
 - Main Settings access from both Library and Develop.
@@ -43,5 +46,3 @@ validation details are in `RELEASE_NOTES.MD`.
   flags, and physical stack membership, order, cover, and collapsed state.
 - Non-recursive **Read XMP from Folder** action that treats XMP as authoritative
   and refreshes the currently open folder.
-
-

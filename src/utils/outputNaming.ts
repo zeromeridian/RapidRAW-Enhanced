@@ -15,6 +15,16 @@ export const getEnabledExportSuffix = (settings: AppSettings | null | undefined)
   return sanitizeFilenameSuffix(settings.exportFileSuffix) || null;
 };
 
+export const getFileTypeBadgeLabel = (path: string, isRaw: boolean): string => {
+  if (isRaw) return 'RAW';
+
+  const physicalPath = path.split('?')[0];
+  const extension = physicalPath.split('.').pop()?.toLowerCase() || '';
+  if (extension === 'jpeg' || extension === 'jpg') return 'JPG';
+  if (extension === 'tiff' || extension === 'tif') return 'TIF';
+  return extension.toUpperCase() || 'FILE';
+};
+
 export const getDisplayFilename = (path: string): { baseName: string; isVirtualCopy: boolean; vcId: string | null } => {
   const fullFileName = path.split(/[\\/]/).pop() || '';
   const [physicalName, virtualQuery] = fullFileName.split('?vc=');
