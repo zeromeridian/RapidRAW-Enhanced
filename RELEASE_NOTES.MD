@@ -5,6 +5,17 @@ Enhanced. The newest release appears first. Entries contain only concise,
 user-facing changes so each version can be copied directly into a GitHub
 Release description.
 
+## 1.6.1-colrbent.47 — 2026-07-29
+
+### Delete Rejected availability fix
+
+- **Delete Rejected Files** now uses the same loaded flag state as thumbnail
+  badges and filtering, so it becomes available whenever the current folder
+  view contains rejected images.
+- Newly applied Rejected flags update against the latest Library state,
+  preventing asynchronous metadata work from applying the change to a stale
+  image list.
+
 ## 1.6.1-colrbent.43 — 2026-07-28
 
 ### Thumbnail file-type badges
