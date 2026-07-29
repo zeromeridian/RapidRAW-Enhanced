@@ -163,10 +163,22 @@ fn enqueue_metadata(
     manager.cvar.notify_one();
 }
 
+fn clear_pending_metadata(app_handle: &AppHandle) {
+    let state = app_handle.state::<crate::AppState>();
+    let manager = &state.metadata_manager;
+    manager.queue.lock().unwrap().clear();
+    manager.pending.lock().unwrap().clear();
+}
+
 // Not compute-heavy — these threads mostly block waiting on iCloud to
 // materialize a file, not burning CPU — so a small fixed pool is enough and
 // doesn't need a user-facing setting the way thumbnail_worker_threads does.
 const METADATA_WORKER_THREADS: usize = 4;
+const RECURSIVE_BACKGROUND_METADATA_THRESHOLD: usize = 500;
+
+fn should_defer_recursive_metadata(image_count: usize) -> bool {
+    image_count >= RECURSIVE_BACKGROUND_METADATA_THRESHOLD
+}
 
 pub fn start_metadata_workers(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<crate::AppState>();
@@ -177,16 +189,21 @@ pub fn start_metadata_workers(app_handle: tauri::AppHandle) {
         let manager_clone = manager.clone();
 
         std::thread::spawn(move || {
+            let mut settings = load_settings(app_clone.clone()).unwrap_or_default();
             loop {
-                let item = {
+                let (item, resumed_from_idle) = {
                     let mut queue = manager_clone.queue.lock().unwrap();
+                    let mut resumed_from_idle = false;
                     while queue.is_empty() {
+                        resumed_from_idle = true;
                         queue = manager_clone.cvar.wait(queue).unwrap();
                     }
-                    queue.pop_front().unwrap()
+                    (queue.pop_front().unwrap(), resumed_from_idle)
                 };
 
-                let settings = load_settings(app_clone.clone()).unwrap_or_default();
+                if resumed_from_idle {
+                    settings = load_settings(app_clone.clone()).unwrap_or_default();
+                }
                 let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
                 let metadata = resolve_image_metadata(
@@ -534,6 +551,13 @@ mod output_naming_tests {
             crate::exif_processing::load_sidecar(&nested.join("nested.jpg.rrdata"));
         assert_eq!(nested_metadata.rating, 4);
     }
+
+    #[test]
+    fn large_recursive_folders_defer_metadata_loading() {
+        assert!(!super::should_defer_recursive_metadata(499));
+        assert!(super::should_defer_recursive_metadata(500));
+        assert!(super::should_defer_recursive_metadata(3_000));
+    }
 }
 
 #[tauri::command]
@@ -674,6 +698,7 @@ fn update_rotational_disk_flag(path: &str, app_handle: &AppHandle) {
 
 #[tauri::command]
 pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<ImageFile>, String> {
+    clear_pending_metadata(&app_handle);
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
@@ -724,7 +749,6 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
             (path_str, file_name, path_buf, sidecars)
         })
         .collect();
-
     let mut result_list: Vec<ImageFile> = tasks
         .into_par_iter()
         .flat_map(|(path_str, file_name, path_buf, sidecars)| {
@@ -820,6 +844,7 @@ pub fn list_images_recursive(
     path: String,
     app_handle: AppHandle,
 ) -> Result<Vec<ImageFile>, String> {
+    clear_pending_metadata(&app_handle);
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
@@ -876,6 +901,7 @@ pub fn list_images_recursive(
             (path_str, file_name, path_buf, sidecars)
         })
         .collect();
+    let defer_physical_metadata = should_defer_recursive_metadata(tasks.len());
 
     let mut result_list: Vec<ImageFile> = tasks
         .into_par_iter()
@@ -907,7 +933,8 @@ pub fn list_images_recursive(
                     && resolve_xmp_path(&path_buf)
                         .is_some_and(|p| crate::file_management::is_cloud_placeholder(&p));
 
-                let metadata = if crate::file_management::is_cloud_placeholder(&sidecar_path)
+                let metadata = if (!is_virtual_copy && defer_physical_metadata)
+                    || crate::file_management::is_cloud_placeholder(&sidecar_path)
                     || xmp_is_placeholder
                 {
                     enqueue_metadata(

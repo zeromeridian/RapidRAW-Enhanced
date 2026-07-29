@@ -25,6 +25,8 @@ validation details are in `RELEASE_NOTES.MD`.
 - Main Settings access from both Library and Develop.
 - Optional launch directly into the last library, bypassing the splash screen.
 - Persistent Library and Develop sidebar widths.
+- Progressive loading for large recursive folders, with background metadata
+  reconciliation and batched Library updates so thumbnails can appear promptly.
 
 ## Develop
 

@@ -5,6 +5,15 @@ Enhanced. The newest release appears first. Entries contain only concise,
 user-facing changes so each version can be copied directly into a GitHub
 Release description.
 
+## 1.6.1-colrbent.50 — 2026-07-29
+
+### Large recursive folder responsiveness
+
+- Large recursive folders now display their image list and begin loading
+  thumbnails without waiting for every metadata sidecar to be processed.
+- Ratings, flags, stack information, and edit status are loaded in the
+  background and applied to the Library in efficient batches.
+
 ## 1.6.1-colrbent.49 — 2026-07-29
 
 ### Recursive folder XMP import

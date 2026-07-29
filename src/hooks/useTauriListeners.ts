@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { Status } from '../components/ui/ExportImportProperties';
+import type { XmpStackMetadata } from '../components/ui/AppProperties';
 import { useProcessStore } from '../store/useProcessStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
@@ -32,6 +33,9 @@ export function useTauriListeners({
   const thumbnailBuffer = useRef<Record<string, string>>({});
   const ratingBuffer = useRef<Record<string, number>>({});
   const editStatusBuffer = useRef<Record<string, boolean>>({});
+  const metadataBuffer = useRef<
+    Record<string, { rating: number; is_edited: boolean; tags: string[] | null; xmpStack: XmpStackMetadata | null }>
+  >({});
   const flushHandle = useRef<number | null>(null);
 
   useEffect(() => {
@@ -44,10 +48,18 @@ export function useTauriListeners({
       const pendingThumbs = thumbnailBuffer.current;
       const pendingRatings = ratingBuffer.current;
       const pendingEdits = editStatusBuffer.current;
+      let pendingMetadata = metadataBuffer.current;
 
       thumbnailBuffer.current = {};
       ratingBuffer.current = {};
       editStatusBuffer.current = {};
+      metadataBuffer.current = {};
+
+      if (useLibraryStore.getState().isViewLoading && Object.keys(pendingMetadata).length > 0) {
+        metadataBuffer.current = { ...pendingMetadata, ...metadataBuffer.current };
+        pendingMetadata = {};
+        window.setTimeout(scheduleFlush, 50);
+      }
 
       if (Object.keys(pendingThumbs).length > 0) {
         useProcessStore.getState().setProcess((state) => ({
@@ -55,16 +67,42 @@ export function useTauriListeners({
         }));
       }
 
-      if (Object.keys(pendingRatings).length > 0 || Object.keys(pendingEdits).length > 0) {
+      const metadataPaths = Object.keys(pendingMetadata);
+      metadataPaths.forEach((path) => {
+        pendingRatings[path] = pendingMetadata[path].rating;
+      });
+
+      if (
+        Object.keys(pendingRatings).length > 0 ||
+        Object.keys(pendingEdits).length > 0 ||
+        metadataPaths.length > 0
+      ) {
         useLibraryStore.getState().setLibrary((state) => ({
           imageRatings: { ...state.imageRatings, ...pendingRatings },
-          imageList:
-            Object.keys(pendingEdits).length > 0
-              ? state.imageList.map((img) =>
-                  pendingEdits[img.path] !== undefined ? { ...img, is_edited: pendingEdits[img.path] } : img,
-                )
-              : state.imageList,
+          imageList: state.imageList.map((img) => {
+            const metadata = pendingMetadata[img.path];
+            const thumbnailEdit = pendingEdits[img.path];
+            if (!metadata && thumbnailEdit === undefined) return img;
+            return {
+              ...img,
+              is_edited: metadata?.is_edited ?? thumbnailEdit ?? img.is_edited,
+              tags: metadata?.tags ?? img.tags,
+              rating: metadata?.rating ?? img.rating,
+              xmpStack: metadata ? metadata.xmpStack : img.xmpStack,
+            };
+          }),
         }));
+
+        if (metadataPaths.some((path) => pendingMetadata[path].xmpStack)) {
+          const settingsState = useSettingsStore.getState();
+          if (settingsState.appSettings) {
+            const imageList = useLibraryStore.getState().imageList;
+            const imageStacks = mergeXmpImageStacks(settingsState.appSettings.imageStacks || [], imageList);
+            if (JSON.stringify(imageStacks) !== JSON.stringify(settingsState.appSettings.imageStacks || [])) {
+              settingsState.setAppSettings({ ...settingsState.appSettings, imageStacks });
+            }
+          }
+        }
       }
     };
 
@@ -124,24 +162,8 @@ export function useTauriListeners({
       listen('image-metadata-loaded', (event: any) => {
         if (!isEffectActive) return;
         const { path, rating, is_edited, tags, xmpStack } = event.payload;
-
-        useLibraryStore.getState().setLibrary((state) => ({
-          imageRatings: { ...state.imageRatings, [path]: rating },
-          imageList: state.imageList.map((img) =>
-            img.path === path ? { ...img, is_edited, tags: tags ?? img.tags, xmpStack } : img,
-          ),
-        }));
-
-        if (xmpStack) {
-          const settingsState = useSettingsStore.getState();
-          if (settingsState.appSettings) {
-            const imageList = useLibraryStore.getState().imageList;
-            const imageStacks = mergeXmpImageStacks(settingsState.appSettings.imageStacks || [], imageList);
-            if (JSON.stringify(imageStacks) !== JSON.stringify(settingsState.appSettings.imageStacks || [])) {
-              settingsState.setAppSettings({ ...settingsState.appSettings, imageStacks });
-            }
-          }
-        }
+        metadataBuffer.current[path] = { rating, is_edited, tags, xmpStack };
+        scheduleFlush();
       }),
       listen('ai-model-download-start', (event: any) => {
         if (isEffectActive) useProcessStore.getState().setProcess({ aiModelDownloadStatus: event.payload });
