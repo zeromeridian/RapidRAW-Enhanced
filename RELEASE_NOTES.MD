@@ -5,6 +5,17 @@ Enhanced. The newest release appears first. Entries contain only concise,
 user-facing changes so each version can be copied directly into a GitHub
 Release description.
 
+## 1.6.1-colrbent.51 — 2026-07-29
+
+### Faster first thumbnails in large folders
+
+- Visible thumbnails now receive a head start when opening large folders that
+  have not been accessed previously.
+- Background EXIF extraction is delayed briefly and processed in bounded
+  batches, preventing a cold folder-wide scan from competing with the first
+  thumbnails.
+- Obsolete EXIF work stops automatically when another folder is selected.
+
 ## 1.6.1-colrbent.50 — 2026-07-29
 
 ### Large recursive folder responsiveness
