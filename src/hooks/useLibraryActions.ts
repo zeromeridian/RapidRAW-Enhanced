@@ -71,7 +71,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
   }, []);
 
   const handleSetFlag = useCallback(async (flag: ImageFlag, paths?: string[]) => {
-    const { multiSelectedPaths, libraryActivePath, imageList, setLibrary } = useLibraryStore.getState();
+    const { multiSelectedPaths, libraryActivePath, setLibrary } = useLibraryStore.getState();
     const { selectedImage } = useEditorStore.getState();
     const pathsToUpdate =
       paths ||
@@ -87,14 +87,14 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     try {
       await invoke(Invokes.SetFlagForPaths, { paths: pathsToUpdate, flag });
       const updatedPaths = new Set(pathsToUpdate);
-      setLibrary({
-        imageList: imageList.map((image) => {
+      setLibrary((state) => ({
+        imageList: state.imageList.map((image) => {
           if (!updatedPaths.has(image.path)) return image;
           const tags = (image.tags || []).filter((tag) => !tag.startsWith(IMAGE_FLAG_PREFIX));
           if (flag !== ImageFlag.Unflagged) tags.push(`${IMAGE_FLAG_PREFIX}${flag}`);
           return { ...image, tags: tags.length > 0 ? tags : null };
         }),
-      });
+      }));
     } catch (err) {
       toast.error(`Failed to set flag: ${err}`);
     }

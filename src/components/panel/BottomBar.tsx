@@ -49,7 +49,12 @@ import {
 import { autoStackCreatedImages } from '../../utils/autoStacking';
 import { getEnabledCopySuffix } from '../../utils/outputNaming';
 import { GroupBadgeInfo } from '../../utils/imageGrouping';
-import { getImageFlag, getRejectedPathsInFolder, ImageFlag, IMAGE_FLAG_FILTER_OPTIONS } from '../../utils/imageFlags';
+import {
+  getImageFlag,
+  getRejectedPathsForLoadedFolder,
+  ImageFlag,
+  IMAGE_FLAG_FILTER_OPTIONS,
+} from '../../utils/imageFlags';
 import { ImageFlagIcon } from '../ui/ImageFlagBadge';
 
 interface BottomBarProps {
@@ -265,7 +270,7 @@ export default function BottomBar({
     imageList.find((image) => image.path === productivityPaths[0]) ||
     allLibraryImages.find((image) => image.path === productivityPaths[0]);
   const activeFlag = getImageFlag(firstProductivityImage?.tags);
-  const rejectedInCurrentFolder = getRejectedPathsInFolder(allLibraryImages, currentFolderPath);
+  const rejectedInCurrentFolder = getRejectedPathsForLoadedFolder(allLibraryImages, currentFolderPath);
   const imageStacks = appSettings?.imageStacks || [];
   const stackTargetPath =
     (libraryActivePath && productivityPaths.includes(libraryActivePath) ? libraryActivePath : null) ||

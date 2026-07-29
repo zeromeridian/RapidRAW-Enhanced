@@ -13,8 +13,8 @@ validation details are in `RELEASE_NOTES.MD`.
 - Automatic stacking of physical copies, virtual copies, and exported images,
   with optional automatic expansion.
 - Rejected, Selected, Deferred, and Unflagged states with keyboard shortcuts,
-  thumbnail badges, rejected-image dimming, filtering, and current-folder
-  rejected-file deletion.
+  thumbnail badges, rejected-image dimming, filtering, and rejected-file
+  deletion for the currently loaded folder view.
 - Compact active-filter summary in the Library header with one-click
   **Clear all filters**.
 - Compact neutral file-type badges in Library grid and list metadata, using a
