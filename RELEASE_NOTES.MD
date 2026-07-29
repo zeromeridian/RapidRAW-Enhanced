@@ -5,6 +5,22 @@ Enhanced. The newest release appears first. Entries contain only concise,
 user-facing changes so each version can be copied directly into a GitHub
 Release description.
 
+## 1.6.1-colrbent.49 — 2026-07-29
+
+### Recursive folder XMP import
+
+- **Read XMP from Folder** now imports matching sidecars from the selected
+  folder and all of its subfolders.
+- Both `image.xmp` and `image.ext.xmp` sidecar naming conventions are
+  recognized.
+
+## 1.6.1-colrbent.48 — 2026-07-29
+
+### XMP folder import count fix
+
+- **Read XMP from Folder** now reports the imported-image count directly,
+  preventing successful folder imports from being displayed as zero.
+
 ## 1.6.1-colrbent.47 — 2026-07-29
 
 ### Delete Rejected availability fix

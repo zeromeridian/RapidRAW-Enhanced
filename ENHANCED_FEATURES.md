@@ -44,5 +44,6 @@ validation details are in `RELEASE_NOTES.MD`.
   with RapidRAW - Enhanced recorded as the exporting software.
 - XMP synchronization for ratings, color labels, keywords, physical-image
   flags, and physical stack membership, order, cover, and collapsed state.
-- Non-recursive **Read XMP from Folder** action that treats XMP as authoritative
-  and refreshes the currently open folder.
+- Recursive **Read XMP from Folder** action that treats XMP as authoritative
+  for matching images, recognizes basename and full-filename sidecars, reports
+  the imported-image count, and refreshes the currently open folder.

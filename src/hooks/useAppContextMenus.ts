@@ -1047,13 +1047,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           label: t('contextMenus.folders.readXmp'),
           onClick: async () => {
             try {
-              const result = await invoke<{ filesRead: number }>(Invokes.ReadXmpFromFolder, {
+              const filesRead = await invoke<number>(Invokes.ReadXmpFromFolder, {
                 path: targetPath,
               });
               if (targetPath === currentFolderPath) {
                 await props.handleLibraryRefresh();
               }
-              toast.success(t('contextMenus.folders.readXmpSuccess', { count: result.filesRead }));
+              toast.success(t('contextMenus.folders.readXmpSuccess', { count: filesRead }));
             } catch (err) {
               toast.error(t('contextMenus.folders.readXmpFailed', { err }));
             }

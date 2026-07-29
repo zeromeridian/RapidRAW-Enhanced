@@ -483,7 +483,7 @@ mod output_naming_tests {
     }
 
     #[test]
-    fn forced_folder_xmp_read_overwrites_metadata_without_recursing() {
+    fn forced_folder_xmp_read_overwrites_metadata_recursively() {
         let folder = tempfile::tempdir().unwrap();
         let image = folder.path().join("image.jpg");
         let sidecar = folder.path().join("image.jpg.rrdata");
@@ -512,15 +512,17 @@ mod output_naming_tests {
 
         let nested = folder.path().join("nested");
         fs::create_dir(&nested).unwrap();
-        fs::write(nested.join("ignored.jpg"), []).unwrap();
+        let nested_image = nested.join("nested.jpg");
+        fs::write(&nested_image, []).unwrap();
         fs::write(
-            nested.join("ignored.xmp"),
+            nested.join("nested.jpg.xmp"),
             "<rdf:Description><xmp:Rating>4</xmp:Rating></rdf:Description>",
         )
         .unwrap();
 
-        let result = read_xmp_from_folder(folder.path().to_string_lossy().into_owned()).unwrap();
-        assert_eq!(result.files_read, 1);
+        let files_read =
+            read_xmp_from_folder(folder.path().to_string_lossy().into_owned()).unwrap();
+        assert_eq!(files_read, 2);
 
         let imported = crate::exif_processing::load_sidecar(&sidecar);
         assert_eq!(imported.rating, 5);
@@ -528,7 +530,9 @@ mod output_naming_tests {
             imported.tags.unwrap(),
             ["user:xmp", "color:blue", "flag:rejected"]
         );
-        assert!(!nested.join("ignored.jpg.rrdata").exists());
+        let nested_metadata =
+            crate::exif_processing::load_sidecar(&nested.join("nested.jpg.rrdata"));
+        assert_eq!(nested_metadata.rating, 4);
     }
 }
 
@@ -4247,34 +4251,29 @@ fn set_rapidraw_xmp_value(content: &mut String, field: &str, value: Option<&str>
 }
 
 pub fn resolve_xmp_path(image_path: &Path) -> Option<PathBuf> {
-    let xmp_path = image_path.with_extension("xmp");
-    let xmp_path_upper = image_path.with_extension("XMP");
-    if xmp_path.exists() {
-        Some(xmp_path)
-    } else if xmp_path_upper.exists() {
-        Some(xmp_path_upper)
-    } else {
-        None
-    }
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ReadXmpFolderResult {
-    files_read: usize,
+    let filename = image_path.file_name()?.to_string_lossy();
+    [
+        image_path.with_extension("xmp"),
+        image_path.with_extension("XMP"),
+        image_path.with_file_name(format!("{filename}.xmp")),
+        image_path.with_file_name(format!("{filename}.XMP")),
+    ]
+    .into_iter()
+    .find(|candidate| candidate.is_file())
 }
 
 #[tauri::command]
-pub fn read_xmp_from_folder(path: String) -> Result<ReadXmpFolderResult, String> {
+pub fn read_xmp_from_folder(path: String) -> Result<usize, String> {
     let folder = Path::new(&path);
     if !folder.is_dir() {
         return Err(format!("Folder does not exist: {}", folder.display()));
     }
 
-    let image_paths: Vec<PathBuf> = fs::read_dir(folder)
-        .map_err(|error| format!("Could not read folder {}: {error}", folder.display()))?
-        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-        .filter(|entry| entry.is_file() && is_supported_image_file(entry))
+    let image_paths: Vec<PathBuf> = WalkDir::new(folder)
+        .into_iter()
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.file_type().is_file() && is_supported_image_file(entry.path()))
+        .map(|entry| entry.into_path())
         .filter(|entry| resolve_xmp_path(entry).is_some())
         .collect();
 
@@ -4296,9 +4295,7 @@ pub fn read_xmp_from_folder(path: String) -> Result<ReadXmpFolderResult, String>
         })
     })?;
 
-    Ok(ReadXmpFolderResult {
-        files_read: image_paths.len(),
-    })
+    Ok(image_paths.len())
 }
 
 pub fn sync_metadata_from_xmp(
