@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir } from '@tauri-apps/api/path';
@@ -39,6 +39,7 @@ export interface AppNavigationProps {
 }
 
 export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationProps) {
+  const folderLoadGenerationRef = useRef(0);
   const {
     transformWrapperRef,
     preloadedDataRef,
@@ -283,6 +284,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       expandParents = true,
       preserveEditor = false,
     ) => {
+      const folderLoadGeneration = ++folderLoadGenerationRef.current;
       const { appSettings, handleSettingsChange } = useSettingsStore.getState();
       const { pinnedFolders } = appSettings || { pinnedFolders: [] };
       const { setLibrary, sortCriteria } = useLibraryStore.getState();
@@ -382,18 +384,38 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             setLibrary({ imageList: finalImageList });
           } else {
             setLibrary({ imageList: files });
-            invoke(Invokes.ReadExifForPaths, { paths })
-              .then((exifDataMap: any) => {
-                setLibrary((state) => ({
-                  imageList: state.imageList.map((image) => ({
-                    ...image,
-                    exif: exifDataMap[image.path] || image.exif || null,
-                  })),
-                }));
-              })
-              .catch((err) => {
-                console.error('Failed to read EXIF data in background:', err);
-              });
+            window.setTimeout(async () => {
+              const batchSize = 200;
+              for (let offset = 0; offset < paths.length; offset += batchSize) {
+                if (
+                  folderLoadGenerationRef.current !== folderLoadGeneration ||
+                  useLibraryStore.getState().currentFolderPath !== path
+                ) {
+                  return;
+                }
+
+                const batchPaths = paths.slice(offset, offset + batchSize);
+                try {
+                  const exifDataMap: Record<string, Record<string, string>> = await invoke(Invokes.ReadExifForPaths, {
+                    paths: batchPaths,
+                  });
+                  if (
+                    folderLoadGenerationRef.current !== folderLoadGeneration ||
+                    useLibraryStore.getState().currentFolderPath !== path
+                  ) {
+                    return;
+                  }
+                  setLibrary((state) => ({
+                    imageList: state.imageList.map((image) =>
+                      exifDataMap[image.path] ? { ...image, exif: exifDataMap[image.path] } : image,
+                    ),
+                  }));
+                } catch (err) {
+                  console.error('Failed to read EXIF data in background:', err);
+                  return;
+                }
+              }
+            }, 1200);
           }
         } else {
           setLibrary({ imageList: files });

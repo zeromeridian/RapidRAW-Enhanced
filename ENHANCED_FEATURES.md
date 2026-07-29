@@ -27,6 +27,8 @@ validation details are in `RELEASE_NOTES.MD`.
 - Persistent Library and Develop sidebar widths.
 - Progressive loading for large recursive folders, with background metadata
   reconciliation and batched Library updates so thumbnails can appear promptly.
+- Thumbnail-prioritized cold-folder loading with delayed, bounded, cancelable
+  background EXIF extraction.
 
 ## Develop
 
