@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.6.1-colrbent.58 — 2026-07-30
+
+### Stronger vignetting
+
+- Increased vignette strength by approximately 30% for both dark and bright
+  vignettes.
+- Global and masked vignettes share the stronger response while remaining
+  safely bounded at black and white.
+
 ## 1.6.1-colrbent.57 — 2026-07-30
 
 ### Launch screen subtitle

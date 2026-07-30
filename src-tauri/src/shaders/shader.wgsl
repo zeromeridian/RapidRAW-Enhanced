@@ -880,10 +880,12 @@ fn apply_vignette_effect(
     let uv_round = sign(uv_centered) * pow(abs(uv_centered), vec2<f32>(power, power));
     let distance = length(uv_round * vec2<f32>(1.0, aspect)) * 0.5;
     let falloff = smoothstep(midpoint - feather * 0.5, midpoint + feather * 0.5, distance);
-    if (amount < 0.0) {
-        return color_in * (1.0 + amount * falloff);
+    const VIGNETTE_STRENGTH: f32 = 1.3;
+    let effect = clamp(amount * VIGNETTE_STRENGTH * falloff, -1.0, 1.0);
+    if (effect < 0.0) {
+        return color_in * (1.0 + effect);
     }
-    return mix(color_in, vec3<f32>(1.0), amount * falloff);
+    return mix(color_in, vec3<f32>(1.0), effect);
 }
 
 fn grain_delta(
