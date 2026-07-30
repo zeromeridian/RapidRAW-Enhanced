@@ -1,4 +1,4 @@
-name: RapidRAW - Enhanced PR Build
+name: This Is Raw PR Build
 
 on:
   pull_request:

@@ -712,7 +712,7 @@
         "importPresetsTitle": "Import Presets",
         "legacyPreset": "Legacy Preset",
         "presetFile": "Preset File",
-        "rapidRawPreset": "RapidRAW Preset"
+        "rapidRawPreset": "This Is Raw Preset"
       },
       "menu": {
         "configurePreset": "Configure Preset",
@@ -1069,18 +1069,20 @@
     },
     "splash": {
       "addFolder": "Add Folder",
-      "brand": "RapidRAW - Enhanced",
+      "brand": "This Is Raw",
+      "subtitle": "A Modern RAW Workflow for Photographers",
+      "tagline": "Built on RapidRAW",
       "continueSession": "Continue Session",
       "contribute": "Contribute on GitHub",
-      "descriptionAndroid": "A blazingly fast, GPU-accelerated RAW image editor. Open the library to begin.",
-      "descriptionDesktop": "A blazingly fast, GPU-accelerated RAW image editor. Open a folder to begin.",
+      "descriptionAndroid": "Open the library to begin.",
+      "descriptionDesktop": "Open a folder to begin.",
       "downloadVersion": "Click to download version {{version}}",
       "goToSettings": "Go to Settings",
       "latestVersion": "You are on the latest version",
       "newVersionAvailable": "New version available!",
       "openFolder": "Open Folder",
       "openLibrary": "Open Library",
-      "ownership": "Enhanced modifications © {{year}} ColrBent.",
+      "ownership": "Built by ColrBent.",
       "version": "Version {{version}}",
       "welcomeBack": "Welcome back!",
       "welcomeBackDesc": "Continue where you left off or start a new session."
@@ -1547,7 +1549,7 @@
       "font": "Font",
       "fontDesc": "Change the application font.",
       "nativeTitlebar": "Native Titlebar",
-      "nativeTitlebarDesc": "Use your system's default window titlebar instead of RapidRAW - Enhanced's custom one.",
+      "nativeTitlebarDesc": "Use your system's default window titlebar instead of This Is Raw's custom one.",
       "poppins": "Poppins",
       "showImageCounts": "Show Image Counts",
       "skipSplashScreen": "Bypass Launch Splash Screen",
@@ -1557,7 +1559,7 @@
       "themeDesc": "Change the look and feel of the application.",
       "title": "General Settings",
       "xmpSync": "XMP Metadata Sync",
-      "xmpSyncDesc": "Sync ratings, color labels, tags, flags and physical stack information to XMP sidecar files. RapidRAW-specific fields transfer flags and stacks between RapidRAW - Enhanced installations."
+      "xmpSyncDesc": "Sync ratings, color labels, tags, flags and physical stack information to XMP sidecar files. Application-specific fields transfer flags and stacks between This Is Raw installations."
     },
     "keybinds": {
       "actions": {
@@ -1662,7 +1664,7 @@
         "connector": {
           "address": "AI Connector Address",
           "addressDesc": "Enter the address and port of your running AI Connector instance. Required for generative AI features.",
-          "description": "For users with a capable GPU who want maximum control, connect RapidRAW to your own Connector server. This gives you full control for technical workflows.",
+          "description": "For users with a capable GPU who want maximum control, connect This Is Raw to your own Connector server. This gives you full control for technical workflows.",
           "failed": "Connection failed.",
           "feature1": "Use your own ComfyUI instance",
           "feature2": "Cost-free advanced generative edits",
@@ -1670,16 +1672,16 @@
           "success": "Connection successful!",
           "test": "Test",
           "testing": "Testing...",
-          "title": "Self-Hosted (RapidRAW AI Connector)"
+          "title": "Self-Hosted (This Is Raw AI Connector)"
         },
         "cpu": {
-          "description": "Integrated directly into RapidRAW, these features run entirely on your computer. They are fast, free, and require no setup, making them ideal for everyday workflow acceleration.",
+          "description": "Integrated directly into This Is Raw, these features run entirely on your computer. They are fast, free, and require no setup, making them ideal for everyday workflow acceleration.",
           "feature1": "AI Masking (Subject, Sky, Foreground)",
           "feature2": "Automatic Image Tagging",
           "feature3": "Simple CPU-based Generative Replace",
           "title": "Built-in AI (CPU)"
         },
-        "description": "RapidRAW's AI is built for flexibility. Choose your ideal workflow, from fast local tools to powerful self-hosting.",
+        "description": "This Is Raw's AI is built for flexibility. Choose your ideal workflow, from fast local tools to powerful self-hosting.",
         "providers": {
           "aiConnector": "AI Connector",
           "cloud": "Cloud",
@@ -1794,7 +1796,7 @@
       "clearCustomTooltip": "Clear AI Tag List",
       "clearShortcutsTooltip": "Clear Shortcuts Tag List",
       "customList": "Custom AI Tag List",
-      "customListDesc": "If provided, the AI will ONLY use tags from this list, overriding RapidRAW’s built-in list. Tagging works only in English.",
+      "customListDesc": "If provided, the AI will ONLY use tags from this list, overriding This Is Raw’s built-in list. Tagging works only in English.",
       "maxAiTags": "Maximum AI Tags",
       "maxAiTagsDesc": "The maximum number of tags to generate per image.",
       "noCustomTags": "No custom AI tags (Using built-in list)",
@@ -1806,18 +1808,18 @@
       "title": "Tagging"
     },
     "thanks": {
-      "description": "A huge thank you to the following projects that were very important in the development of RapidRAW:",
+      "description": "A huge thank you to the following projects that were very important in the development of This Is Raw:",
       "list": {
         "darktable": "For some reference implementations that guided parts of this work.",
         "depth": "For the powerful monocular depth estimation model that enables the AI depth masking capabilities.",
         "lama": "For the powerful & simple image inpainting model, which enables content-aware fill and object removal.",
         "lensfun": "For its invaluable open-source library and comprehensive database for automatic lens correction.",
         "negpy": "For the inspiration behind the negative conversion logic.",
-        "nind": "For providing AI models that power the AI noise reduction capabilities in RapidRAW.",
+        "nind": "For providing AI models that power the AI noise reduction capabilities in This Is Raw.",
         "rawler": "For the excellent Rust crate that provides the foundation for RAW file processing in this project.",
         "sam2": "For providing the foundation model used for the AI subject detection capabilities.",
         "u2net": "For providing the robust architecture used for the AI sky and foreground detection capabilities.",
-        "you": "For using and supporting RapidRAW. Your interest keeps this project alive and evolving.",
+        "you": "For using and supporting This Is Raw. Your interest keeps this project alive and evolving.",
         "youLabel": "You"
       },
       "title": "Special Thanks"

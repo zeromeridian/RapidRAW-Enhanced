@@ -2,8 +2,8 @@
 <component type="desktop-application">
   <id>io.github.CyberTimon.RapidRAW</id>
 
-  <name>RapidRAW - Enhanced</name>
-  <summary>A non-destructive, and GPU-accelerated RAW image editor built with performance in mind</summary>
+  <name>This Is Raw</name>
+  <summary>Built on RapidRAW by ColrBent</summary>
   <developer id="io.github.zeromeridian">
     <name>ColrBent</name>
   </developer>
@@ -19,7 +19,7 @@
 
   <description>
     <p>
-      RapidRAW - Enhanced is a modern, high-performance photo editor based on RapidRAW. It delivers a simple, beautiful editing experience in a lightweight package for Windows, macOS, and Linux.
+      This Is Raw is a modern, high-performance photo editor built on RapidRAW by ColrBent. It delivers a simple, beautiful editing experience in a lightweight package.
     </p>
   </description>
 
@@ -32,7 +32,7 @@
   </screenshots>
 
   <content_rating type="oars-1.1"/>
-  <url type="homepage">https://github.com/zeromeridian/RapidRAW-Enhanced</url>
+  <url type="homepage">https://github.com/zeromeridian/This-Is-Raw</url>
 
   <releases>
     <release version="v1.6.0" date="2026-07-26">

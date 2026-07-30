@@ -687,7 +687,7 @@
         "importPresetsTitle": "Vorgaben importieren",
         "legacyPreset": "Alte Vorgabe",
         "presetFile": "Vorgabendatei",
-        "rapidRawPreset": "RapidRAW Vorgabe"
+        "rapidRawPreset": "This Is Raw Vorgabe"
       },
       "menu": {
         "configurePreset": "Vorgabe konfigurieren",
@@ -1034,18 +1034,20 @@
     },
     "splash": {
       "addFolder": "Ordner hinzufügen",
-      "brand": "RapidRAW - Enhanced",
+      "brand": "This Is Raw",
+      "subtitle": "A Modern RAW Workflow for Photographers",
+      "tagline": "Built on RapidRAW",
       "continueSession": "Sitzung fortsetzen",
       "contribute": "Auf GitHub beitragen",
-      "descriptionAndroid": "Ein blitzschneller, GPU-beschleunigter RAW-Bildeditor. Öffnen Sie die Bibliothek, um zu beginnen.",
-      "descriptionDesktop": "Ein blitzschneller, GPU-beschleunigter RAW-Bildeditor. Öffnen Sie einen Ordner, um zu beginnen.",
+      "descriptionAndroid": "Open the library to begin.",
+      "descriptionDesktop": "Open a folder to begin.",
       "downloadVersion": "Klicken, um Version {{version}} herunterzuladen",
       "goToSettings": "Zu den Einstellungen",
       "latestVersion": "Sie haben die neueste Version",
       "newVersionAvailable": "Neue Version verfügbar!",
       "openFolder": "Ordner öffnen",
       "openLibrary": "Bibliothek öffnen",
-      "ownership": "Enhanced modifications © {{year}} ColrBent.",
+      "ownership": "Built by ColrBent.",
       "version": "Version {{version}}",
       "welcomeBack": "Willkommen zurück!",
       "welcomeBackDesc": "Sitzung fortsetzen oder neu starten."
@@ -1511,7 +1513,7 @@
       "font": "Schriftart",
       "fontDesc": "Ändern Sie die Schriftart der Anwendung.",
       "nativeTitlebar": "Native Titelleiste",
-      "nativeTitlebarDesc": "Verwenden Sie die Standard-Fenstertitelleiste Ihres Systems anstelle der benutzerdefinierten von RapidRAW - Enhanced.",
+      "nativeTitlebarDesc": "Verwenden Sie die Standard-Fenstertitelleiste Ihres Systems anstelle der benutzerdefinierten von This Is Raw.",
       "poppins": "Poppins",
       "showImageCounts": "Bildanzahl anzeigen",
       "system": "Systemstandard",
@@ -1620,7 +1622,7 @@
         "connector": {
           "address": "AI Connector Adresse",
           "addressDesc": "Geben Sie die Adresse und den Port Ihrer laufenden AI Connector Instanz ein. Erforderlich für generative KI-Funktionen.",
-          "description": "Für Benutzer mit einer fähigen GPU, die maximale Kontrolle wünschen. Verbinden Sie RapidRAW mit Ihrem eigenen Connector-Server.",
+          "description": "Für Benutzer mit einer fähigen GPU, die maximale Kontrolle wünschen. Verbinden Sie This Is Raw mit Ihrem eigenen Connector-Server.",
           "failed": "Verbindung fehlgeschlagen.",
           "feature1": "Verwenden Sie Ihre eigene ComfyUI Instanz",
           "feature2": "Kostenlose erweiterte generative Bearbeitungen",
@@ -1628,16 +1630,16 @@
           "success": "Verbindung erfolgreich!",
           "test": "Testen",
           "testing": "Wird getestet...",
-          "title": "Selbstgehostet (RapidRAW AI Connector)"
+          "title": "Selbstgehostet (This Is Raw AI Connector)"
         },
         "cpu": {
-          "description": "Diese Funktionen sind direkt in RapidRAW integriert und laufen vollständig auf Ihrem Computer. Sie sind schnell, kostenlos und erfordern keine Einrichtung.",
+          "description": "Diese Funktionen sind direkt in This Is Raw integriert und laufen vollständig auf Ihrem Computer. Sie sind schnell, kostenlos und erfordern keine Einrichtung.",
           "feature1": "KI-Maskierung (Motiv, Himmel, Vordergrund)",
           "feature2": "Automatisches Bild-Tagging",
           "feature3": "Einfaches CPU-basiertes generatives Ersetzen",
           "title": "Integrierte KI (CPU)"
         },
-        "description": "Die KI von RapidRAW ist auf Flexibilität ausgelegt. Wählen Sie Ihren idealen Workflow.",
+        "description": "Die KI von This Is Raw ist auf Flexibilität ausgelegt. Wählen Sie Ihren idealen Workflow.",
         "providers": {
           "aiConnector": "AI Connector",
           "cloud": "Cloud",
@@ -1764,7 +1766,7 @@
       "title": "Tagging"
     },
     "thanks": {
-      "description": "Ein großes Dankeschön an die folgenden Projekte, die für die Entwicklung von RapidRAW sehr wichtig waren:",
+      "description": "Ein großes Dankeschön an die folgenden Projekte, die für die Entwicklung von This Is Raw sehr wichtig waren:",
       "list": {
         "darktable": "Für Referenzimplementierungen, die Teile dieser Arbeit leiteten.",
         "depth": "Für das Modell zur monokularen Tiefenschätzung (Tiefenmasken).",
@@ -1775,7 +1777,7 @@
         "rawler": "Für die hervorragende Rust-Crate zur RAW-Bildverarbeitung.",
         "sam2": "Für das grundlegende Modell der KI-Motiverkennung.",
         "u2net": "Für die Architektur zur Erkennung von Himmel und Vordergrund.",
-        "you": "Dafür, dass Sie RapidRAW nutzen. Ihr Interesse hält dieses Projekt am Leben.",
+        "you": "Dafür, dass Sie This Is Raw nutzen. Ihr Interesse hält dieses Projekt am Leben.",
         "youLabel": "Ihnen"
       },
       "title": "Besonderer Dank"
