@@ -63,7 +63,7 @@ body:
     attributes:
       label: This Is Raw Version
       description: What version of This Is Raw are you using?
-      placeholder: e.g., 1.6.1-colrbent.7
+      placeholder: e.g., 1.0.0
     validations:
       required: true
 

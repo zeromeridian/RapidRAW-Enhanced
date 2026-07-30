@@ -29,9 +29,10 @@ this version.
 
 ## Versioning
 
-This Is Raw releases use the format
-`<rapidraw-version>-colrbent.<release>`, for example
-`1.6.1-colrbent.54`.
+This Is Raw uses independent semantic versioning beginning at `1.0.0`.
+Patch releases contain fixes and small refinements (`1.0.1`), minor releases
+add backward-compatible features (`1.1.0`), and major releases contain breaking
+or compatibility-changing updates (`2.0.0`).
 
 ## Inherited RapidRAW Foundation
 
