@@ -94,13 +94,13 @@ fn resolve_image_metadata(
     image_path: &Path,
     sidecar_path: &Path,
     enable_xmp_sync: bool,
-    include_rapidraw_xmp: bool,
+    include_app_xmp: bool,
     settings: &AppSettings,
 ) -> ImageFileMetadata {
     let mut metadata = crate::exif_processing::load_sidecar(sidecar_path);
 
     if enable_xmp_sync
-        && sync_metadata_from_xmp(image_path, &mut metadata, include_rapidraw_xmp, false)
+        && sync_metadata_from_xmp(image_path, &mut metadata, include_app_xmp, false)
         && let Ok(json) = serde_json::to_string_pretty(&metadata)
     {
         let _ = fs::write(sidecar_path, json);
@@ -455,8 +455,8 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
 #[cfg(test)]
 mod output_naming_tests {
     use super::{
-        extract_rapidraw_xmp_value, extract_xmp_stack, parse_virtual_path, read_xmp_from_folder,
-        sanitize_filename_suffix, set_rapidraw_xmp_value,
+        extract_app_xmp_value, extract_xmp_stack, parse_virtual_path, read_xmp_from_folder,
+        sanitize_filename_suffix, set_app_xmp_value,
     };
     use crate::image_processing::ImageMetadata;
     use std::fs;
@@ -477,16 +477,16 @@ mod output_naming_tests {
     }
 
     #[test]
-    fn rapidraw_xmp_fields_round_trip_and_clear() {
+    fn app_xmp_fields_round_trip_and_clear() {
         let mut xmp = "<rdf:Description>\n</rdf:Description>".to_string();
-        set_rapidraw_xmp_value(&mut xmp, "Flag", Some("rejected"));
-        set_rapidraw_xmp_value(&mut xmp, "StackId", Some("stack-123"));
-        set_rapidraw_xmp_value(&mut xmp, "StackOrder", Some("2"));
-        set_rapidraw_xmp_value(&mut xmp, "StackCover", Some("true"));
-        set_rapidraw_xmp_value(&mut xmp, "StackCollapsed", Some("false"));
+        set_app_xmp_value(&mut xmp, "Flag", Some("rejected"));
+        set_app_xmp_value(&mut xmp, "StackId", Some("stack-123"));
+        set_app_xmp_value(&mut xmp, "StackOrder", Some("2"));
+        set_app_xmp_value(&mut xmp, "StackCover", Some("true"));
+        set_app_xmp_value(&mut xmp, "StackCollapsed", Some("false"));
 
         assert_eq!(
-            extract_rapidraw_xmp_value(&xmp, "Flag").as_deref(),
+            extract_app_xmp_value(&xmp, "Flag").as_deref(),
             Some("rejected")
         );
         let stack = extract_xmp_stack(&xmp).expect("stack metadata should parse");
@@ -495,8 +495,8 @@ mod output_naming_tests {
         assert!(stack.is_cover);
         assert!(!stack.collapsed);
 
-        set_rapidraw_xmp_value(&mut xmp, "Flag", None);
-        assert!(extract_rapidraw_xmp_value(&xmp, "Flag").is_none());
+        set_app_xmp_value(&mut xmp, "Flag", None);
+        assert!(extract_app_xmp_value(&xmp, "Flag").is_none());
     }
 
     #[test]
@@ -4223,7 +4223,7 @@ pub fn extract_xmp_tags(content: &str) -> Vec<String> {
     tags
 }
 
-fn extract_rapidraw_xmp_value(content: &str, field: &str) -> Option<String> {
+fn extract_app_xmp_value(content: &str, field: &str) -> Option<String> {
     let attribute = Regex::new(&format!(r#"rr:{field}\s*=\s*"([^"]*)""#)).ok()?;
     if let Some(captures) = attribute.captures(content) {
         return captures.get(1).map(|value| value.as_str().to_string());
@@ -4238,12 +4238,10 @@ fn extract_rapidraw_xmp_value(content: &str, field: &str) -> Option<String> {
 
 fn extract_xmp_stack(content: &str) -> Option<XmpStackMetadata> {
     Some(XmpStackMetadata {
-        id: extract_rapidraw_xmp_value(content, "StackId")?,
-        order: extract_rapidraw_xmp_value(content, "StackOrder")?
-            .parse()
-            .ok()?,
-        is_cover: extract_rapidraw_xmp_value(content, "StackCover")? == "true",
-        collapsed: extract_rapidraw_xmp_value(content, "StackCollapsed")? == "true",
+        id: extract_app_xmp_value(content, "StackId")?,
+        order: extract_app_xmp_value(content, "StackOrder")?.parse().ok()?,
+        is_cover: extract_app_xmp_value(content, "StackCover")? == "true",
+        collapsed: extract_app_xmp_value(content, "StackCollapsed")? == "true",
     })
 }
 
@@ -4256,7 +4254,7 @@ fn escape_xmp_text(value: &str) -> String {
         .replace('\'', "&apos;")
 }
 
-fn set_rapidraw_xmp_value(content: &mut String, field: &str, value: Option<&str>) {
+fn set_app_xmp_value(content: &mut String, field: &str, value: Option<&str>) {
     let attribute = Regex::new(&format!(r#"\s*rr:{field}\s*=\s*"[^"]*""#)).unwrap();
     *content = attribute.replace_all(content, "").to_string();
 
@@ -4270,7 +4268,7 @@ fn set_rapidraw_xmp_value(content: &mut String, field: &str, value: Option<&str>
         && let Some(last_index) = content.rfind("</rdf:Description>")
     {
         let node = format!(
-            " <rr:{field} xmlns:rr=\"https://colrbent.com/ns/rapidraw-enhanced/1.0/\">{}</rr:{field}>\n",
+            " <rr:{field} xmlns:rr=\"https://colrbent.com/ns/this-is-raw/1.0/\">{}</rr:{field}>\n",
             escape_xmp_text(value)
         );
         content.insert_str(last_index, &node);
@@ -4328,7 +4326,7 @@ pub fn read_xmp_from_folder(path: String) -> Result<usize, String> {
 pub fn sync_metadata_from_xmp(
     source_path: &Path,
     metadata: &mut ImageMetadata,
-    include_rapidraw_fields: bool,
+    include_app_fields: bool,
     force: bool,
 ) -> bool {
     let actual_xmp = resolve_xmp_path(source_path);
@@ -4352,8 +4350,8 @@ pub fn sync_metadata_from_xmp(
 
         let xmp_label = extract_xmp_label(&content);
         let xmp_tags = extract_xmp_tags(&content);
-        let xmp_flag = include_rapidraw_fields
-            .then(|| extract_rapidraw_xmp_value(&content, "Flag"))
+        let xmp_flag = include_app_fields
+            .then(|| extract_app_xmp_value(&content, "Flag"))
             .flatten();
 
         let mut current_tags = if force {
@@ -4398,7 +4396,7 @@ pub fn sync_metadata_from_xmp(
             changed = true;
         }
 
-        if include_rapidraw_fields {
+        if include_app_fields {
             let xmp_stack = extract_xmp_stack(&content);
             if metadata.xmp_stack != xmp_stack {
                 metadata.xmp_stack = xmp_stack;
@@ -4413,7 +4411,7 @@ pub fn sync_metadata_to_xmp(
     source_path: &Path,
     metadata: &ImageMetadata,
     create_if_missing: bool,
-    include_rapidraw_fields: bool,
+    include_app_fields: bool,
 ) {
     let xmp_path = source_path.with_extension("xmp");
     let xmp_path_upper = source_path.with_extension("XMP");
@@ -4431,7 +4429,7 @@ pub fn sync_metadata_to_xmp(
             return;
         }
         let skeleton = r#"<?xml version="1.0" encoding="UTF-8"?>
-<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="RapidRAW - Enhanced">
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="This Is Raw">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <rdf:Description rdf:about=""
     xmlns:xmp="http://ns.adobe.com/xap/1.0/"
@@ -4509,31 +4507,31 @@ pub fn sync_metadata_to_xmp(
             content = re_label_tag.replace_all(&content, "").to_string();
         }
 
-        if include_rapidraw_fields {
-            set_rapidraw_xmp_value(
+        if include_app_fields {
+            set_app_xmp_value(
                 &mut content,
                 "Flag",
                 Some(flag.as_deref().unwrap_or("unflagged")),
             );
 
             if let Some(stack) = &metadata.xmp_stack {
-                set_rapidraw_xmp_value(&mut content, "StackId", Some(&stack.id));
-                set_rapidraw_xmp_value(&mut content, "StackOrder", Some(&stack.order.to_string()));
-                set_rapidraw_xmp_value(
+                set_app_xmp_value(&mut content, "StackId", Some(&stack.id));
+                set_app_xmp_value(&mut content, "StackOrder", Some(&stack.order.to_string()));
+                set_app_xmp_value(
                     &mut content,
                     "StackCover",
                     Some(if stack.is_cover { "true" } else { "false" }),
                 );
-                set_rapidraw_xmp_value(
+                set_app_xmp_value(
                     &mut content,
                     "StackCollapsed",
                     Some(if stack.collapsed { "true" } else { "false" }),
                 );
             } else {
-                set_rapidraw_xmp_value(&mut content, "StackId", None);
-                set_rapidraw_xmp_value(&mut content, "StackOrder", None);
-                set_rapidraw_xmp_value(&mut content, "StackCover", None);
-                set_rapidraw_xmp_value(&mut content, "StackCollapsed", None);
+                set_app_xmp_value(&mut content, "StackId", None);
+                set_app_xmp_value(&mut content, "StackOrder", None);
+                set_app_xmp_value(&mut content, "StackCover", None);
+                set_app_xmp_value(&mut content, "StackCollapsed", None);
             }
         }
 

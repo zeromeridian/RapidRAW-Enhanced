@@ -1,9 +1,35 @@
-# RapidRAW - Enhanced Release Notes
+# This Is Raw Release Notes
 
-This is the continuous release history for production builds of RapidRAW -
-Enhanced. The newest release appears first. Entries contain only concise,
-user-facing changes so each version can be copied directly into a GitHub
-Release description.
+This is the continuous release history for production builds of This Is Raw.
+The newest release appears first. Entries contain only concise, user-facing
+changes so each version can be copied directly into a GitHub Release
+description.
+
+## 1.6.1-colrbent.57 — 2026-07-30
+
+### Launch screen subtitle
+
+- Added **A Modern RAW Workflow for Photographers** between the application
+  name and **Built on RapidRAW** tagline.
+
+## 1.6.1-colrbent.55 — 2026-07-30
+
+### Launch screen branding
+
+- Removed the inherited RapidRAW marketing description from the launch screen.
+- The launch screen now presents **This Is Raw**, **Built on RapidRAW**, and
+  the concise folder or library instruction.
+
+## 1.6.1-colrbent.54 — 2026-07-30
+
+### This Is Raw
+
+- The application is now named **This Is Raw**.
+- Product presentation now carries the tagline **Built on RapidRAW** and
+  identifies ColrBent as its builder.
+- Application windows, launch screen, packages, executables, workflows,
+  release artifacts, desktop metadata, export metadata, XMP metadata, Android
+  labels, documentation, and issue templates now use the new identity.
 
 ## 1.6.1-colrbent.53 — 2026-07-30
 
@@ -103,13 +129,13 @@ Release description.
 
 ### Portable XMP flags and stacks
 
-- Physical-image flags now synchronize through RapidRAW-specific XMP metadata
-  and are restored by another RapidRAW - Enhanced installation.
+- Physical-image flags now synchronize through application-specific XMP metadata
+  and are restored by another This Is Raw installation.
 - Physical stacks now store a shared stack identifier, member order, cover
   status and collapsed state in each member's XMP sidecar.
 - Existing stacks are backfilled when settings load, and stacks discovered in
   XMP are reconstructed using the paths available on the current machine.
-- Virtual copies continue using their independent RapidRAW sidecars because
+- Virtual copies continue using their independent This Is Raw sidecars because
   multiple virtual copies share one physical XMP file.
 
 ## 1.6.1-colrbent.36 — 2026-07-28
@@ -135,7 +161,7 @@ Release description.
 ### Splash ownership notice
 
 - The launch-screen footer now identifies ColrBent's copyright ownership of
-  RapidRAW - Enhanced modifications beside the current application version.
+  This Is Raw modifications beside the current application version.
 - The notice uses the current year automatically, remains visually subtle, and
   can wrap without overflowing narrower layouts.
 - Its wording limits the ownership claim to fork modifications and does not
@@ -151,7 +177,7 @@ Release description.
   documentation.
 - Update checks, release downloads, contribution links, ownership metadata,
   package authorship, and packaging sources now point to or identify the
-  RapidRAW - Enhanced fork.
+  This Is Raw fork.
 - Upstream compatibility identifiers and required technical dependencies
   remain unchanged.
 
@@ -199,7 +225,7 @@ Release description.
   grid/list and Develop filmstrip, while badges and other thumbnail information
   remain readable.
 - Flag badges and toolbar states now use monochrome icons consistent with the
-  rest of RapidRAW.
+  rest of This Is Raw.
 - Added combinable Rejected, Selected, Deferred, and Unflagged filters to View
   Options and the bottom Quick Filter.
 - Added advanced flag queries such as `flag:rejected`.
@@ -264,11 +290,11 @@ Release description.
   creation dates, exposure time, aperture, ISO, exposure compensation, focal
   lengths, artist, copyright, description, and GPS when GPS removal is
   disabled.
-- Software is rewritten as `RapidRAW - Enhanced`.
+- Software is rewritten as `This Is Raw`.
 - Structural TIFF fields, embedded previews, MakerNote, and other
   source-layout-dependent metadata are not copied.
 - Metadata is merged into the newly encoded TIFF's own structural directories.
-  RapidRAW then fully decodes the result; if metadata writing or validation
+  This Is Raw then fully decodes the result; if metadata writing or validation
   fails, it safely uses the metadata-free encoded TIFF.
 
 ## 1.6.1-colrbent.18 — 2026-07-27

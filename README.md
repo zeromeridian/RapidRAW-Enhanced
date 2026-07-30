@@ -1,78 +1,55 @@
-# ColrBent
+# This Is Raw
 
-ColrBent is an independent fork of
-[RapidRAW](https://github.com/CyberTimon/RapidRAW), based on the RapidRAW 1.6
-codebase. It preserves RapidRAW's fast, non-destructive, GPU-accelerated photo
-editing foundation while adding workflow and library-management enhancements
-for the ColrBent project.
+**Built on RapidRAW. Built by ColrBent.**
 
-RapidRAW was created by Timon Käch (CyberTimon). ColrBent is maintained
-separately and is not an official RapidRAW release.
+This Is Raw is an independent photo-editing application based on the RapidRAW
+1.6 codebase. It preserves RapidRAW's fast, non-destructive, GPU-accelerated
+foundation while adding integrated library, culling, organization, masking,
+export, and workflow enhancements.
+
+RapidRAW was created by Timon Käch (CyberTimon). This Is Raw is built and
+maintained separately by ColrBent and is not an official RapidRAW release.
 
 ## Project Direction
 
-ColrBent extends RapidRAW without needlessly diverging from it. Development
-follows these principles:
+This Is Raw extends RapidRAW without needlessly diverging from its proven
+architecture. Development aims to:
 
-- Preserve the original editing behavior and architecture wherever practical.
-- Follow upstream naming conventions, code organization, UI patterns, and
-  engineering standards as closely as possible.
-- Reuse and extend existing components and abstractions instead of creating
-  duplicate implementations or parallel sources of truth.
+- Preserve established editing behavior wherever practical.
+- Follow the existing code organization, UI patterns, and engineering
+  conventions.
+- Reuse and extend shared components and abstractions.
 - Keep changes focused, maintainable, and compatible with future upstream
-  improvements when possible.
-- Add enhancements that improve professional editing, culling, organization,
-  and productivity workflows.
+  improvements where possible.
+- Improve professional editing, culling, organization, and productivity
+  workflows.
 
-The goal is not to replace RapidRAW's core design. ColrBent builds on that
-design while developing a distinct set of carefully integrated enhancements.
+See [FEATURES.md](FEATURES.md) for the concise feature inventory maintained for
+this version.
 
-## ColrBent Enhancements
+## Versioning
 
-Enhancements currently added by this fork include:
-
-- Bottom-toolbar access to the Productivity actions from the image context menu.
-- One-click physical-copy and virtual-copy actions.
-- A Lightroom Classic-style toolbar customization menu for showing or hiding
-  individual controls.
-- Persistent manual image stacks that are independent of RAW/JPEG grouping.
-- Stack creation, expansion, collapse, cover selection, and removal.
-- Clickable stack-count badges in grid and list views.
-- Drag-and-drop ordering for expanded stack members.
-- Subtle visual cues for stack covers and stack-member order.
-- Optional automatic stacking of physical copies, virtual copies, and exported
-  images, with RAW-first cover selection for newly created stacks.
-
-ColrBent releases use the version format
+This Is Raw releases use the format
 `<rapidraw-version>-colrbent.<release>`, for example
-`1.6.1-colrbent.7`.
+`1.6.1-colrbent.54`.
 
 ## Inherited RapidRAW Foundation
 
-Because ColrBent is based on RapidRAW 1.6, it retains RapidRAW's core
-capabilities, including:
+Because This Is Raw is built on RapidRAW 1.6, it retains core capabilities such
+as:
 
 - Non-destructive RAW image editing.
 - GPU-accelerated image processing.
 - Library browsing, filtering, tagging, ratings, and color labels.
 - Batch workflows, presets, masking, metadata, and export tools.
-- Support for Linux, macOS, and Windows provided by the upstream architecture.
+- The upstream architecture for Linux, macOS, Windows, and Android.
 
-Platform support may differ between ColrBent releases. The current ColrBent
-build target is Ubuntu Linux on amd64 (`x86_64`).
-
-For information about the upstream project, visit the
+For upstream information, visit the
 [RapidRAW repository](https://github.com/CyberTimon/RapidRAW).
 
 ## Building from Source
 
-Install the platform prerequisites for Tauri, along with:
-
-- Node.js
-- npm
-- Rust
-
-Then clone this repository and run:
+Install the platform prerequisites for Tauri, Node.js, npm, and Rust. Then run:
 
 ```bash
 npm install
@@ -94,38 +71,29 @@ npm run lint
 npm run i18n:runtime-check
 ```
 
-RapidRAW's full TypeScript check currently contains known upstream errors.
-Changes should still avoid introducing new errors in modified files.
+The inherited full TypeScript check currently contains known diagnostics.
+Changes should still avoid introducing errors in modified files.
 
 ## Contributing
 
-Contributions should integrate naturally with the existing RapidRAW codebase.
-Before adding a new type, component, hook, utility, command, style, or state
-field, check whether an existing abstraction can be reused or extended.
-Unnecessary duplication is not accepted.
-
-Keep changes narrowly scoped, preserve existing behavior, and validate them in
-proportion to their risk. Refer to `AGENTS.md` and `HANDOFF.md` for the current
-project state and repository-specific development requirements.
+Contributions should integrate naturally with the existing codebase. Before
+adding a new type, component, hook, utility, command, style, or state field,
+check whether an existing abstraction can be reused or extended.
 
 Issues affecting general RAW-format support may originate in
 [rawler](https://github.com/dnglab/dnglab/tree/main/rawler), the RAW processing
-library used by RapidRAW.
+library inherited from RapidRAW.
 
 ## License and Upstream Attribution
 
-ColrBent is distributed under the same license as RapidRAW:
-the **GNU Affero General Public License, version 3 (AGPL-3.0)**.
+This Is Raw is distributed under the same **GNU Affero General Public License,
+version 3 (AGPL-3.0)** as RapidRAW.
 
 The original RapidRAW code remains subject to its existing copyright and
-attribution notices. ColrBent modifications are also distributed under
-AGPL-3.0. The fork does not remove or supersede the rights, notices, or
-obligations attached to the upstream work.
-
-Under AGPL-3.0, modified versions and corresponding source code must be made
-available as required by the license, including when the software is provided
-for users to interact with over a network. Refer to [LICENSE](LICENSE) for the
-complete and authoritative license terms.
+attribution notices. ColrBent's modifications are also distributed under
+AGPL-3.0. This project does not remove or supersede the rights, notices, or
+obligations attached to the upstream work. Refer to [LICENSE](LICENSE) for the
+complete license terms.
 
 RapidRAW and its original contributors are acknowledged for the project,
-architecture, and functionality on which ColrBent is built.
+architecture, and functionality on which This Is Raw is built.

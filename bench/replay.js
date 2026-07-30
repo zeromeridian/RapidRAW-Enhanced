@@ -1,5 +1,5 @@
 // Deterministic UI perf benchmark. Paste into the browser devtools Console
-// of a running RapidRAW build (right-click -> Inspect) and press Enter.
+// of a running This Is Raw build (right-click -> Inspect) and press Enter.
 //
 // Drives the same scroll/open/slider-drag interaction with fixed synthetic
 // timing, repeated over several iterations (with a discarded warmup
@@ -25,11 +25,10 @@
 
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const dispatchMouse = (target, type, x, y, opts = {}) =>
-    target.dispatchEvent(
-      new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, ...opts }),
-    );
+    target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, ...opts }));
 
-  const THUMBNAIL_SELECTOR = '[data-bench-id="thumbnail"], .aspect-square.bg-surface.rounded-md.overflow-hidden.cursor-pointer';
+  const THUMBNAIL_SELECTOR =
+    '[data-bench-id="thumbnail"], .aspect-square.bg-surface.rounded-md.overflow-hidden.cursor-pointer';
   const SCROLL_CONTAINER_SELECTOR = '.custom-scrollbar';
   const SLIDER_SELECTOR = '.slider-input';
   const BACK_TO_LIBRARY_SELECTOR = '[data-bench-id="back-to-library"]';
@@ -131,8 +130,7 @@
     }
     if (waited >= timeoutMs) {
       throw new Error(
-        'bench: editor did not report a rendered preview within 8s ' +
-          `(${FIRST_FRAME_SELECTOR} never appeared).`,
+        'bench: editor did not report a rendered preview within 8s ' + `(${FIRST_FRAME_SELECTOR} never appeared).`,
       );
     }
     return { start, end: performance.now() };

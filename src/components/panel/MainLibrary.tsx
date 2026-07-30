@@ -379,7 +379,7 @@ export default function MainLibrary(props: MainLibraryProps) {
         const currentVersion = await getVersion();
         setAppVersion(currentVersion);
 
-        const response = await fetch('https://api.github.com/repos/zeromeridian/RapidRAW-Enhanced/releases/latest');
+        const response = await fetch('https://api.github.com/repos/zeromeridian/This-Is-Raw/releases/latest');
         if (!response.ok) {
           console.error('Failed to fetch latest release info from GitHub.');
           return;
@@ -456,6 +456,22 @@ export default function MainLibrary(props: MainLibraryProps) {
                   <div className="my-auto text-left relative z-10">
                     <Text variant={TextVariants.displayLarge}>{t('library.splash.brand')}</Text>
                     <Text
+                      variant={TextVariants.display}
+                      color={TextColors.secondary}
+                      weight={TextWeights.normal}
+                      className="mb-2 max-w-lg"
+                    >
+                      {t('library.splash.subtitle')}
+                    </Text>
+                    <Text
+                      variant={TextVariants.heading}
+                      color={TextColors.secondary}
+                      weight={TextWeights.normal}
+                      className="mb-4"
+                    >
+                      {t('library.splash.tagline')}
+                    </Text>
+                    <Text
                       variant={TextVariants.heading}
                       color={TextColors.secondary}
                       weight={TextWeights.normal}
@@ -527,7 +543,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                             }`}
                             onClick={() => {
                               if (isUpdateAvailable) {
-                                open('https://github.com/zeromeridian/RapidRAW-Enhanced/releases/latest');
+                                open('https://github.com/zeromeridian/This-Is-Raw/releases/latest');
                               }
                             }}
                             data-tooltip={
@@ -549,7 +565,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                         <span>-</span>
                         <p>
                           <a
-                            href="https://github.com/zeromeridian/RapidRAW-Enhanced"
+                            href="https://github.com/zeromeridian/This-Is-Raw"
                             className="hover:underline"
                             target="_blank"
                             rel="noopener noreferrer"

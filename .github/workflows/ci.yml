@@ -1,4 +1,4 @@
-name: RapidRAW - Enhanced CI Build
+name: This Is Raw CI Build
 
 on:
   push:

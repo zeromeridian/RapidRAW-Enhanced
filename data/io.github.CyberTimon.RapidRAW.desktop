@@ -1,8 +1,8 @@
 [Desktop Entry]
 Categories=Graphics;Photography;
-Comment=A blazingly-fast, non-destructive, and GPU-accelerated RAW image editor built with performance in mind.
-Exec=RapidRAW-Enhanced
-Icon=RapidRAW-Enhanced
-Name=RapidRAW - Enhanced
+Comment=Built on RapidRAW by ColrBent.
+Exec=This-Is-Raw
+Icon=This-Is-Raw
+Name=This Is Raw
 Terminal=false
 Type=Application

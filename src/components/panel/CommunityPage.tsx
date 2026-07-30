@@ -341,7 +341,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
             {t('library.community.footerHeading')}
             <br />
             <a
-              href="https://github.com/zeromeridian/RapidRAW-Enhanced/issues/new"
+              href="https://github.com/zeromeridian/This-Is-Raw/issues/new"
               target="_blank"
               rel="noopener noreferrer"
               className="text-accent hover:underline inline-flex items-center gap-2"

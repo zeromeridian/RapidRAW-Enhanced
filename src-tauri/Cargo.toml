@@ -1,12 +1,12 @@
 [package]
-name = "RapidRAW-Enhanced"
-description = "A blazingly-fast, non-destructive, and GPU-accelerated RAW image editor built with performance in mind."
+name = "This-Is-Raw"
+description = "This Is Raw — built on RapidRAW by ColrBent."
 authors = ["ColrBent"]
 edition = "2024"
 rust-version = "1.96"
 
 [lib]
-name = "rapidraw_enhanced_lib"
+name = "this_is_raw_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]

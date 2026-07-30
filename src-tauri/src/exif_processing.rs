@@ -1207,7 +1207,7 @@ pub fn write_image_with_metadata(
         }
     }
 
-    metadata.set_tag(ExifTag::Software("RapidRAW - Enhanced".to_string()));
+    metadata.set_tag(ExifTag::Software("This Is Raw".to_string()));
 
     if is_tiff_output {
         let original_image_bytes = image_bytes.clone();
@@ -1464,7 +1464,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let source_path = std::env::temp_dir().join(format!("rapidraw-safe-exif-{unique}.tiff"));
+        let source_path = std::env::temp_dir().join(format!("this-is-raw-safe-exif-{unique}.tiff"));
         fs::write(&source_path, source_bytes).unwrap();
 
         let mut output_bytes = encoded_test_tiff();
@@ -1491,9 +1491,9 @@ mod tests {
                 .any(|tag| matches!(tag, ExifTag::Model(value) if value == "Test Camera"))
         );
         assert!(
-            output_metadata.into_iter().any(
-                |tag| matches!(tag, ExifTag::Software(value) if value == "RapidRAW - Enhanced")
-            )
+            output_metadata
+                .into_iter()
+                .any(|tag| matches!(tag, ExifTag::Software(value) if value == "This Is Raw"))
         );
         assert!(
             output_metadata
