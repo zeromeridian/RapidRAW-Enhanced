@@ -20,6 +20,7 @@ interface GeometryParams {
   scale: number;
   x_offset: number;
   y_offset: number;
+  constrain_crop: boolean;
   lens_distortion_amount: number;
   lens_vignette_amount: number;
   lens_tca_amount: number;
@@ -54,6 +55,7 @@ type TransformParams = Omit<
   | 'lens_distortion_enabled'
   | 'lens_tca_enabled'
   | 'lens_vignette_enabled'
+  | 'constrain_crop'
 >;
 
 interface TransformModalProps {
@@ -205,6 +207,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
       try {
         const fullParams: GeometryParams = {
           ...currentParams,
+          constrain_crop: currentAdjustments.transformConstrainCrop,
           lens_distortion_amount: (currentAdjustments.lensDistortionAmount ?? 100) / SLIDER_DIVISOR,
           lens_vignette_amount: (currentAdjustments.lensVignetteAmount ?? 100) / SLIDER_DIVISOR,
           lens_tca_amount: (currentAdjustments.lensTcaAmount ?? 100) / SLIDER_DIVISOR,
@@ -298,6 +301,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
     if (active) {
       const fullParams: GeometryParams = {
         ...DEFAULT_PARAMS,
+        constrain_crop: currentAdjustments.transformConstrainCrop,
         lens_distortion_amount: (currentAdjustments.lensDistortionAmount ?? 100) / SLIDER_DIVISOR,
         lens_vignette_amount: (currentAdjustments.lensVignetteAmount ?? 100) / SLIDER_DIVISOR,
         lens_tca_amount: (currentAdjustments.lensTcaAmount ?? 100) / SLIDER_DIVISOR,

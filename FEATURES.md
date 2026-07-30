@@ -32,6 +32,11 @@ details are in `RELEASE_NOTES.MD`.
 
 ## Develop
 
+- Crop & Transform includes automatic **Level** and **Vertical** geometry
+  correction, editable **Manual Transform** controls, and a persistent
+  **Constrain Crop** option that prevents empty transformed edges. Active
+  automatic modes remain highlighted and synchronize their correction values
+  through XMP.
 - Persisted Color / Black & White mode in the global Color section.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.

@@ -459,13 +459,19 @@
         "wTooltip": "Width"
       },
       "geometryHeading": "Geometry",
+      "autoGeometryFailed": "Automatic geometry correction failed: {{error}}",
       "labels": {
+        "analyzing": "Analyzing…",
+        "constrainCrop": "Constrain Crop",
         "flipHoriz": "Flip Horiz",
         "flipVert": "Flip Vert",
         "lens": "Lens",
+        "level": "Level",
+        "manualTransform": "Manual Transform",
         "rotateLeft": "Rotate Left",
         "rotateRight": "Rotate Right",
-        "transform": "Transform"
+        "transform": "Manual Transform",
+        "vertical": "Vertical"
       },
       "orientationHeading": "Orientation",
       "overlays": {
@@ -545,9 +551,12 @@
       "title": "Crop & Transform",
       "tooltips": {
         "compositionOverlay": "Composition Overlay",
+        "constrainCrop": "Automatically zoom to prevent empty edges after geometry corrections",
         "flipHoriz": "Flip image horizontally",
         "flipVert": "Flip image vertically",
         "lens": "Lens distortion correction",
+        "level": "Detect and straighten the dominant horizontal or vertical lines",
+        "manualTransform": "Manual perspective and keystone correction",
         "overlayDetails": "Overlay: {{name}}{{rotateHint}}",
         "resetFineRotation": "Reset Fine Rotation",
         "rotateHint": " (Shift+O to rotate)",
@@ -557,7 +566,8 @@
         "switchOrientation": "Switch orientation",
         "switchToLandscape": "Switch to landscape",
         "switchToPortrait": "Switch to portrait",
-        "transform": "Perspective and keystone correction"
+        "transform": "Manual perspective and keystone correction",
+        "vertical": "Detect and correct converging vertical lines"
       }
     },
     "externalEdit": {
@@ -1431,7 +1441,7 @@
       "resetZoomTooltip": "Reset Zoom",
       "rotate": "Rotate",
       "scale": "Scale",
-      "title": "Transform",
+      "title": "Manual Transform",
       "toggleGridTooltip": "Toggle Grid",
       "toggleHelperLinesTooltip": "Toggle Helper Lines",
       "vertical": "Vertical",

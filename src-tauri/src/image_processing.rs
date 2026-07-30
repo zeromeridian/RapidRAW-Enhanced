@@ -104,6 +104,8 @@ pub struct GeometryParams {
     pub scale: f32,
     pub x_offset: f32,
     pub y_offset: f32,
+    #[serde(default)]
+    pub constrain_crop: bool,
     pub lens_distortion_amount: f32,
     pub lens_vignette_amount: f32,
     pub lens_tca_amount: f32,
@@ -132,6 +134,7 @@ impl Default for GeometryParams {
             scale: 100.0,
             x_offset: 0.0,
             y_offset: 0.0,
+            constrain_crop: false,
             lens_distortion_amount: 1.0,
             lens_vignette_amount: 1.0,
             lens_tca_amount: 1.0,
@@ -165,6 +168,9 @@ pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> Geometr
         scale: adjustments["transformScale"].as_f64().unwrap_or(100.0) as f32,
         x_offset: adjustments["transformXOffset"].as_f64().unwrap_or(0.0) as f32,
         y_offset: adjustments["transformYOffset"].as_f64().unwrap_or(0.0) as f32,
+        constrain_crop: adjustments["transformConstrainCrop"]
+            .as_bool()
+            .unwrap_or(false),
 
         lens_distortion_amount: adjustments["lensDistortionAmount"]
             .as_f64()
@@ -420,11 +426,12 @@ fn interpolate_pixel(
     }
 }
 
-fn build_transform_matrices(
+fn build_transform_matrix(
     params: &GeometryParams,
     width: f32,
     height: f32,
-) -> (NaMatrix3<f32>, f32, f32, f64) {
+    extra_scale: f32,
+) -> NaMatrix3<f32> {
     let cx = width / 2.0;
     let cy = height / 2.0;
     let ref_dim = 2000.0;
@@ -439,7 +446,7 @@ fn build_transform_matrices(
         1.0 / (1.0 + params.aspect.abs() / 100.0)
     };
 
-    let scale_factor = params.scale / 100.0;
+    let scale_factor = (params.scale / 100.0) * extra_scale;
     let off_x = (params.x_offset / 100.0) * width;
     let off_y = (params.y_offset / 100.0) * height;
 
@@ -462,7 +469,90 @@ fn build_transform_matrices(
     );
     let m_offset = NaMatrix3::new(1.0, 0.0, off_x, 0.0, 1.0, off_y, 0.0, 0.0, 1.0);
 
-    let forward = t_center * m_offset * m_perspective * m_rotate * m_scale * t_uncenter;
+    t_center * m_offset * m_perspective * m_rotate * m_scale * t_uncenter
+}
+
+fn transform_point(matrix: &NaMatrix3<f32>, x: f32, y: f32) -> Option<(f32, f32)> {
+    let point = matrix * NaVector3::new(x, y, 1.0);
+    if point.z.abs() < 1e-6 {
+        return None;
+    }
+
+    let mapped = (point.x / point.z, point.y / point.z);
+    (mapped.0.is_finite() && mapped.1.is_finite()).then_some(mapped)
+}
+
+fn transform_covers_output(matrix: &NaMatrix3<f32>, width: f32, height: f32) -> bool {
+    let Some(inverse) = matrix.try_inverse() else {
+        return false;
+    };
+    let max_x = (width - 1.0).max(0.0);
+    let max_y = (height - 1.0).max(0.0);
+
+    [(0.0, 0.0), (max_x, 0.0), (max_x, max_y), (0.0, max_y)]
+        .into_iter()
+        .all(|(x, y)| {
+            transform_point(&inverse, x, y).is_some_and(|(source_x, source_y)| {
+                source_x >= 0.0 && source_x <= max_x && source_y >= 0.0 && source_y <= max_y
+            })
+        })
+}
+
+fn compute_transform_constrain_scale(params: &GeometryParams, width: f32, height: f32) -> f32 {
+    let base = build_transform_matrix(params, width, height, 1.0);
+    if transform_covers_output(&base, width, height) {
+        return 1.0;
+    }
+
+    let mut low = 1.0;
+    let mut high = 1.25;
+    while high < 8.0
+        && !transform_covers_output(
+            &build_transform_matrix(params, width, height, high),
+            width,
+            height,
+        )
+    {
+        high *= 1.5;
+    }
+
+    if !transform_covers_output(
+        &build_transform_matrix(params, width, height, high),
+        width,
+        height,
+    ) {
+        return high;
+    }
+
+    for _ in 0..24 {
+        let mid = (low + high) * 0.5;
+        if transform_covers_output(
+            &build_transform_matrix(params, width, height, mid),
+            width,
+            height,
+        ) {
+            high = mid;
+        } else {
+            low = mid;
+        }
+    }
+
+    high * 1.001
+}
+
+fn build_transform_matrices(
+    params: &GeometryParams,
+    width: f32,
+    height: f32,
+) -> (NaMatrix3<f32>, f32, f32, f64) {
+    let cx = width / 2.0;
+    let cy = height / 2.0;
+    let constrain_scale = if params.constrain_crop {
+        compute_transform_constrain_scale(params, width, height)
+    } else {
+        1.0
+    };
+    let forward = build_transform_matrix(params, width, height, constrain_scale);
     let half_diagonal =
         ((width as f64 * width as f64 + height as f64 * height as f64).sqrt()) / 2.0;
 
@@ -3507,7 +3597,8 @@ pub fn calculate_auto_adjustments(
 #[cfg(test)]
 mod tests {
     use super::{
-        MaskAdjustments, get_global_adjustments_from_json, get_mask_adjustments_from_json,
+        GeometryParams, MaskAdjustments, build_transform_matrix, compute_transform_constrain_scale,
+        get_global_adjustments_from_json, get_mask_adjustments_from_json, transform_covers_output,
     };
     use serde_json::json;
     use std::mem::size_of;
@@ -3516,6 +3607,25 @@ mod tests {
     fn monochrome_defaults_to_disabled() {
         let adjustments = get_global_adjustments_from_json(&json!({}), false, None);
         assert_eq!(adjustments.monochrome, 0);
+    }
+
+    #[test]
+    fn constrain_crop_is_identity_without_a_transform() {
+        let params = GeometryParams::default();
+        let scale = compute_transform_constrain_scale(&params, 1600.0, 1000.0);
+        assert!((scale - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn constrain_crop_fills_rotated_output() {
+        let params = GeometryParams {
+            rotate: 18.0,
+            ..GeometryParams::default()
+        };
+        let scale = compute_transform_constrain_scale(&params, 1600.0, 1000.0);
+        assert!(scale > 1.0);
+        let constrained = build_transform_matrix(&params, 1600.0, 1000.0, scale);
+        assert!(transform_covers_output(&constrained, 1600.0, 1000.0));
     }
 
     #[test]

@@ -17,6 +17,7 @@ const getTransformAdjustments = (adj: Adjustments) => ({
   transformScale: adj.transformScale,
   transformXOffset: adj.transformXOffset,
   transformYOffset: adj.transformYOffset,
+  transformConstrainCrop: adj.transformConstrainCrop,
   lensDistortionAmount: adj.lensDistortionAmount,
   lensVignetteAmount: adj.lensVignetteAmount,
   lensTcaAmount: adj.lensTcaAmount,

@@ -97,6 +97,182 @@ pub use app_state::*;
 pub use launch_request::*;
 use tagging_utils::{candidates, hierarchy};
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AutoGeometryResult {
+    rotate: f32,
+    vertical: Option<f32>,
+    detected_lines: usize,
+}
+
+fn median(values: &mut [f32]) -> Option<f32> {
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_by(|a, b| a.total_cmp(b));
+    let middle = values.len() / 2;
+    Some(if values.len() % 2 == 0 {
+        (values[middle - 1] + values[middle]) * 0.5
+    } else {
+        values[middle]
+    })
+}
+
+fn normalize_hough_angle(angle: f32) -> f32 {
+    let normalized = angle.rem_euclid(180.0);
+    if normalized > 90.0 {
+        normalized - 180.0
+    } else {
+        normalized
+    }
+}
+
+fn estimate_level_rotation(lines: &[(f32, f32)]) -> Option<f32> {
+    let mut corrections = lines
+        .iter()
+        .filter_map(|(_, angle)| {
+            let normal = normalize_hough_angle(*angle);
+            if normal.abs() <= 30.0 {
+                Some(-normal)
+            } else if normal.abs() >= 60.0 {
+                Some(normal.signum() * 90.0 - normal)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    median(&mut corrections).map(|value| value.clamp(-45.0, 45.0))
+}
+
+fn rotate_point(point: (f32, f32), center: (f32, f32), angle_degrees: f32) -> (f32, f32) {
+    let (sin, cos) = angle_degrees.to_radians().sin_cos();
+    let x = point.0 - center.0;
+    let y = point.1 - center.1;
+    (center.0 + x * cos - y * sin, center.1 + x * sin + y * cos)
+}
+
+fn estimate_vertical_correction(
+    lines: &[(f32, f32)],
+    width: f32,
+    height: f32,
+    level_rotation: f32,
+) -> Option<f32> {
+    let center = (width * 0.5, height * 0.5);
+    let distance = width.max(height) * 2.0;
+    let vertical_lines = lines
+        .iter()
+        .filter_map(|(r, angle)| {
+            let normal = normalize_hough_angle(*angle);
+            if normal.abs() > 35.0 {
+                return None;
+            }
+
+            let theta = angle.to_radians();
+            let (sin, cos) = theta.sin_cos();
+            let origin = (cos * *r, sin * *r);
+            let p1 = rotate_point(
+                (origin.0 - sin * distance, origin.1 + cos * distance),
+                center,
+                level_rotation,
+            );
+            let p2 = rotate_point(
+                (origin.0 + sin * distance, origin.1 - cos * distance),
+                center,
+                level_rotation,
+            );
+
+            let a = p1.1 - p2.1;
+            let b = p2.0 - p1.0;
+            let norm = (a * a + b * b).sqrt();
+            (norm > 1e-5).then_some((a / norm, b / norm, (a * p1.0 + b * p1.1) / norm))
+        })
+        .collect::<Vec<_>>();
+
+    let mut vanishing_y = Vec::new();
+    for (index, first) in vertical_lines.iter().enumerate() {
+        for second in vertical_lines.iter().skip(index + 1) {
+            let determinant = first.0 * second.1 - second.0 * first.1;
+            if determinant.abs() < 0.015 {
+                continue;
+            }
+
+            let x = (first.2 * second.1 - second.2 * first.1) / determinant;
+            let y = (first.0 * second.2 - second.0 * first.2) / determinant;
+            if x.is_finite()
+                && y.is_finite()
+                && (x - center.0).abs() < width * 4.0
+                && (y - center.1).abs() > height * 0.6
+                && (y - center.1).abs() < height * 50.0
+            {
+                vanishing_y.push(y);
+            }
+        }
+    }
+
+    let vp_y = median(&mut vanishing_y)?;
+    let perspective = -1.0 / (vp_y - center.1);
+    Some((perspective * 100_000.0 * height / 2_000.0).clamp(-100.0, 100.0))
+}
+
+#[tauri::command]
+async fn analyze_geometry(
+    mode: String,
+    js_adjustments: serde_json::Value,
+    state: tauri::State<'_, AppState>,
+) -> Result<AutoGeometryResult, String> {
+    let original = {
+        let guard = state.original_image.lock().unwrap();
+        guard.as_ref().ok_or("No image loaded")?.image.clone()
+    };
+    let orientation_steps = js_adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
+    let flip_horizontal = js_adjustments["flipHorizontal"].as_bool().unwrap_or(false);
+    let flip_vertical = js_adjustments["flipVertical"].as_bool().unwrap_or(false);
+
+    tokio::task::spawn_blocking(move || {
+        let preview = downscale_f32_image(&original, 1400, 1400);
+        let oriented = apply_coarse_rotation(Cow::Owned(preview), orientation_steps);
+        let oriented = apply_flip(oriented, flip_horizontal, flip_vertical).into_owned();
+        let gray = oriented.to_luma8();
+        let edges = canny(&gray, 50.0, 100.0);
+        let min_dim = gray.width().min(gray.height());
+        let lines = detect_lines(
+            &edges,
+            LineDetectionOptions {
+                vote_threshold: (min_dim as f32 * 0.20) as u32,
+                suppression_radius: 12,
+            },
+        )
+        .into_iter()
+        .map(|line| (line.r, line.angle_in_degrees as f32))
+        .collect::<Vec<_>>();
+
+        let rotate = estimate_level_rotation(&lines)
+            .ok_or_else(|| "No reliable horizontal or vertical lines were detected".to_string())?;
+        let vertical = match mode.as_str() {
+            "level" => None,
+            "vertical" => Some(
+                estimate_vertical_correction(
+                    &lines,
+                    gray.width() as f32,
+                    gray.height() as f32,
+                    rotate,
+                )
+                .ok_or_else(|| "No reliable converging vertical lines were detected".to_string())?,
+            ),
+            _ => return Err("Unsupported automatic geometry mode".to_string()),
+        };
+
+        Ok(AutoGeometryResult {
+            rotate,
+            vertical,
+            detected_lines: lines.len(),
+        })
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 #[cfg(target_os = "macos")]
 extern "C" fn force_exit(_signal: libc::c_int) {
     unsafe {
@@ -967,6 +1143,9 @@ async fn preview_geometry_transform(
                         }
                         "lensDistortionEnabled" | "lensTcaEnabled" | "lensVignetteEnabled" => {
                             obj.insert(key.to_string(), serde_json::json!(true));
+                        }
+                        "transformConstrainCrop" => {
+                            obj.insert(key.to_string(), serde_json::json!(false));
                         }
                         _ => {
                             obj.insert(key.to_string(), serde_json::json!(0.0));
@@ -2287,6 +2466,7 @@ pub fn run() {
             generate_preset_preview,
             generate_uncropped_preview,
             preview_geometry_transform,
+            analyze_geometry,
             get_log_file_path,
             frontend_log,
             save_collage,
