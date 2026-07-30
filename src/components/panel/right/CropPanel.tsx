@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Aperture,
+  Building2,
   FlipHorizontal,
   FlipVertical,
   Grid3x3,
+  Minus,
   RectangleHorizontal,
   RectangleVertical,
   RotateCcw,
@@ -12,6 +14,8 @@ import {
   Scan,
   X,
 } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 import { Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import clsx from 'clsx';
@@ -26,6 +30,7 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { calculateAreaPreservingCrop, calculateCenteredCrop } from '../../../utils/cropUtils';
 import { Crop } from 'react-image-crop';
+import Switch from '../../ui/Switch';
 
 const BASE_RATIO = 1.618;
 const ORIGINAL_RATIO = 0;
@@ -57,6 +62,7 @@ export default function CropPanel() {
   const [customH, setCustomH] = useState('');
   const [isTransformModalOpen, setIsTransformModalOpen] = useState(false);
   const [isLensModalOpen, setIsLensModalOpen] = useState(false);
+  const [analyzingGeometry, setAnalyzingGeometry] = useState<'level' | 'vertical' | null>(null);
   const [isRotationActive, setIsRotationActive] = useState(false);
   const [preferPortrait, setPreferPortrait] = useState(false);
   const [isEditingCustom, setIsEditingCustom] = useState(false);
@@ -372,6 +378,7 @@ export default function CropPanel() {
       flipVertical: INITIAL_ADJUSTMENTS.flipVertical ?? false,
       orientationSteps: INITIAL_ADJUSTMENTS.orientationSteps ?? 0,
       rotation: INITIAL_ADJUSTMENTS.rotation ?? 0,
+      transformAutoMode: INITIAL_ADJUSTMENTS.transformAutoMode,
       transformDistortion: INITIAL_ADJUSTMENTS.transformDistortion ?? 0,
       transformVertical: INITIAL_ADJUSTMENTS.transformVertical ?? 0,
       transformHorizontal: INITIAL_ADJUSTMENTS.transformHorizontal ?? 0,
@@ -380,6 +387,7 @@ export default function CropPanel() {
       transformScale: INITIAL_ADJUSTMENTS.transformScale ?? 100,
       transformXOffset: INITIAL_ADJUSTMENTS.transformXOffset ?? 0,
       transformYOffset: INITIAL_ADJUSTMENTS.transformYOffset ?? 0,
+      transformConstrainCrop: INITIAL_ADJUSTMENTS.transformConstrainCrop,
       lensMaker: INITIAL_ADJUSTMENTS.lensMaker,
       lensModel: INITIAL_ADJUSTMENTS.lensModel,
       lensDistortionAmount: INITIAL_ADJUSTMENTS.lensDistortionAmount,
@@ -390,6 +398,28 @@ export default function CropPanel() {
       lensVignetteEnabled: INITIAL_ADJUSTMENTS.lensVignetteEnabled,
       lensDistortionParams: INITIAL_ADJUSTMENTS.lensDistortionParams,
     }));
+  };
+
+  const handleAutoGeometry = async (mode: 'level' | 'vertical') => {
+    if (!selectedImage || analyzingGeometry) return;
+
+    setAnalyzingGeometry(mode);
+    try {
+      const result = await invoke<{ rotate: number; vertical?: number }>('analyze_geometry', {
+        mode,
+        jsAdjustments: adjustments,
+      });
+      setAdjustments((prev: Adjustments) => ({
+        ...prev,
+        transformAutoMode: mode,
+        transformRotate: result.rotate,
+        transformVertical: mode === 'vertical' && result.vertical !== undefined ? result.vertical : 0,
+      }));
+    } catch (error) {
+      toast.error(t('editor.crop.autoGeometryFailed', { error: String(error) }));
+    } finally {
+      setAnalyzingGeometry(null);
+    }
   };
 
   const isPresetActive = (preset: CropPreset) => preset === activePreset;
@@ -716,12 +746,12 @@ export default function CropPanel() {
                 <motion.div
                   className="flex flex-col items-center justify-center p-3 cursor-pointer rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary group"
                   onClick={() => setIsTransformModalOpen(true)}
-                  data-tooltip={t('editor.crop.tooltips.transform')}
+                  data-tooltip={t('editor.crop.tooltips.manualTransform')}
                   whileTap={{ scale: 0.98 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                 >
                   <Scan size={20} className="transition-none" />
-                  <span className="text-xs mt-2 transition-none">{t('editor.crop.labels.transform')}</span>
+                  <span className="text-xs mt-2 transition-none">{t('editor.crop.labels.manualTransform')}</span>
                 </motion.div>
                 <motion.div
                   className="flex flex-col items-center justify-center p-3  cursor-pointer rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary group"
@@ -733,6 +763,59 @@ export default function CropPanel() {
                   <Aperture size={20} className="transition-none" />
                   <span className="text-xs mt-2 transition-none">{t('editor.crop.labels.lens')}</span>
                 </motion.div>
+                <motion.button
+                  className={clsx(
+                    'flex flex-col items-center justify-center p-3 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-50',
+                    adjustments.transformAutoMode === 'level'
+                      ? 'bg-accent text-button-text shadow-sm'
+                      : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
+                  )}
+                  disabled={analyzingGeometry !== null}
+                  onClick={() => handleAutoGeometry('level')}
+                  data-tooltip={t('editor.crop.tooltips.level')}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                  type="button"
+                >
+                  <Minus size={20} className="transition-none" />
+                  <span className="text-xs mt-2 transition-none">
+                    {analyzingGeometry === 'level' ? t('editor.crop.labels.analyzing') : t('editor.crop.labels.level')}
+                  </span>
+                </motion.button>
+                <motion.button
+                  className={clsx(
+                    'flex flex-col items-center justify-center p-3 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-50',
+                    adjustments.transformAutoMode === 'vertical'
+                      ? 'bg-accent text-button-text shadow-sm'
+                      : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
+                  )}
+                  disabled={analyzingGeometry !== null}
+                  onClick={() => handleAutoGeometry('vertical')}
+                  data-tooltip={t('editor.crop.tooltips.vertical')}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                  type="button"
+                >
+                  <Building2 size={20} className="transition-none" />
+                  <span className="text-xs mt-2 transition-none">
+                    {analyzingGeometry === 'vertical'
+                      ? t('editor.crop.labels.analyzing')
+                      : t('editor.crop.labels.vertical')}
+                  </span>
+                </motion.button>
+              </div>
+              <div className="rounded-lg bg-surface p-3">
+                <Switch
+                  checked={adjustments.transformConstrainCrop}
+                  label={t('editor.crop.labels.constrainCrop')}
+                  onChange={(checked) =>
+                    setAdjustments((prev: Adjustments) => ({
+                      ...prev,
+                      transformConstrainCrop: checked,
+                    }))
+                  }
+                  tooltip={t('editor.crop.tooltips.constrainCrop')}
+                />
               </div>
             </div>
           </>
@@ -754,6 +837,7 @@ export default function CropPanel() {
         onApply={(newParams) => {
           setAdjustments((prev: Adjustments) => ({
             ...prev,
+            transformAutoMode: null,
             transformDistortion: newParams.distortion,
             transformVertical: newParams.vertical,
             transformHorizontal: newParams.horizontal,

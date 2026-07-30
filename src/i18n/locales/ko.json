@@ -1394,7 +1394,7 @@
       "resetZoomTooltip": "확대/축소 초기화",
       "rotate": "회전",
       "scale": "크기",
-      "title": "변형",
+      "title": "수동 변형",
       "toggleGridTooltip": "그리드 전환",
       "toggleHelperLinesTooltip": "보조선 전환",
       "vertical": "수직",

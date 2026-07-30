@@ -37,6 +37,7 @@ interface GeometryParams {
   scale: number;
   x_offset: number;
   y_offset: number;
+  constrain_crop: boolean;
   lens_distortion_amount: number;
   lens_vignette_amount: number;
   lens_tca_amount: number;
@@ -261,6 +262,7 @@ export default function LensCorrectionModal({
           scale: currentAdjustments.transformScale ?? 100,
           x_offset: currentAdjustments.transformXOffset ?? 0,
           y_offset: currentAdjustments.transformYOffset ?? 0,
+          constrain_crop: currentAdjustments.transformConstrainCrop,
 
           lens_distortion_amount: currentParams.lensDistortionAmount / SLIDER_DIVISOR,
           lens_vignette_amount: currentParams.lensVignetteAmount / SLIDER_DIVISOR,
@@ -501,6 +503,7 @@ export default function LensCorrectionModal({
         scale: currentAdjustments.transformScale ?? 100,
         x_offset: currentAdjustments.transformXOffset ?? 0,
         y_offset: currentAdjustments.transformYOffset ?? 0,
+        constrain_crop: currentAdjustments.transformConstrainCrop,
 
         lens_distortion_amount: (currentAdjustments.lensDistortionAmount ?? 100) / SLIDER_DIVISOR,
         lens_vignette_amount: (currentAdjustments.lensVignetteAmount ?? 100) / SLIDER_DIVISOR,

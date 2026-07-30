@@ -456,7 +456,7 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
 mod output_naming_tests {
     use super::{
         extract_app_xmp_value, extract_xmp_stack, parse_virtual_path, read_xmp_from_folder,
-        sanitize_filename_suffix, set_app_xmp_value,
+        sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
     };
     use crate::image_processing::ImageMetadata;
     use std::fs;
@@ -497,6 +497,46 @@ mod output_naming_tests {
 
         set_app_xmp_value(&mut xmp, "Flag", None);
         assert!(extract_app_xmp_value(&xmp, "Flag").is_none());
+    }
+
+    #[test]
+    fn automatic_geometry_round_trips_through_xmp() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("building.raw");
+        fs::write(&image, []).unwrap();
+        fs::write(
+            image.with_extension("xmp"),
+            "<rdf:Description>\n</rdf:Description>",
+        )
+        .unwrap();
+
+        let source = ImageMetadata {
+            adjustments: serde_json::json!({
+                "transformAutoMode": "vertical",
+                "transformRotate": -1.25,
+                "transformVertical": 18.5,
+                "transformConstrainCrop": true
+            }),
+            ..ImageMetadata::default()
+        };
+        sync_metadata_to_xmp(&image, &source, false, true);
+
+        let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
+        assert_eq!(
+            extract_app_xmp_value(&xmp, "AutoGeometryMode").as_deref(),
+            Some("vertical")
+        );
+        assert_eq!(
+            extract_app_xmp_value(&xmp, "ConstrainCrop").as_deref(),
+            Some("true")
+        );
+
+        let mut imported = ImageMetadata::default();
+        assert!(sync_metadata_from_xmp(&image, &mut imported, true, true));
+        assert_eq!(imported.adjustments["transformAutoMode"], "vertical");
+        assert_eq!(imported.adjustments["transformRotate"], -1.25);
+        assert_eq!(imported.adjustments["transformVertical"], 18.5);
+        assert_eq!(imported.adjustments["transformConstrainCrop"], true);
     }
 
     #[test]
@@ -4245,6 +4285,18 @@ fn extract_xmp_stack(content: &str) -> Option<XmpStackMetadata> {
     })
 }
 
+fn set_adjustment_value(metadata: &mut ImageMetadata, key: &str, value: Value) -> bool {
+    if !metadata.adjustments.is_object() {
+        metadata.adjustments = serde_json::json!({});
+    }
+    let adjustments = metadata.adjustments.as_object_mut().unwrap();
+    if adjustments.get(key) == Some(&value) {
+        return false;
+    }
+    adjustments.insert(key.to_string(), value);
+    true
+}
+
 fn escape_xmp_text(value: &str) -> String {
     value
         .replace('&', "&amp;")
@@ -4402,6 +4454,52 @@ pub fn sync_metadata_from_xmp(
                 metadata.xmp_stack = xmp_stack;
                 changed = true;
             }
+
+            let should_import_auto_geometry = force
+                || metadata
+                    .adjustments
+                    .get("transformAutoMode")
+                    .and_then(Value::as_str)
+                    .is_none();
+            let mut imported_auto_geometry = false;
+            let xmp_auto_mode = extract_app_xmp_value(&content, "AutoGeometryMode")
+                .filter(|mode| matches!(mode.as_str(), "level" | "vertical"));
+            if let Some(mode) = xmp_auto_mode
+                && should_import_auto_geometry
+            {
+                imported_auto_geometry = true;
+                changed |=
+                    set_adjustment_value(metadata, "transformAutoMode", serde_json::json!(mode));
+                let rotate = extract_app_xmp_value(&content, "TransformRotate")
+                    .and_then(|value| value.parse::<f64>().ok())
+                    .unwrap_or(0.0);
+                let vertical = extract_app_xmp_value(&content, "TransformVertical")
+                    .and_then(|value| value.parse::<f64>().ok())
+                    .unwrap_or(0.0);
+                changed |=
+                    set_adjustment_value(metadata, "transformRotate", serde_json::json!(rotate));
+                changed |= set_adjustment_value(
+                    metadata,
+                    "transformVertical",
+                    serde_json::json!(vertical),
+                );
+            } else if force {
+                changed |=
+                    set_adjustment_value(metadata, "transformAutoMode", serde_json::Value::Null);
+            }
+
+            if let Some(constrain_crop) = extract_app_xmp_value(&content, "ConstrainCrop")
+                .and_then(|value| value.parse::<bool>().ok())
+                && (force
+                    || imported_auto_geometry
+                    || metadata.adjustments.get("transformConstrainCrop").is_none())
+            {
+                changed |= set_adjustment_value(
+                    metadata,
+                    "transformConstrainCrop",
+                    serde_json::json!(constrain_crop),
+                );
+            }
         }
     }
     changed
@@ -4533,6 +4631,40 @@ pub fn sync_metadata_to_xmp(
                 set_app_xmp_value(&mut content, "StackCover", None);
                 set_app_xmp_value(&mut content, "StackCollapsed", None);
             }
+
+            let auto_mode = metadata
+                .adjustments
+                .get("transformAutoMode")
+                .and_then(Value::as_str)
+                .filter(|mode| matches!(*mode, "level" | "vertical"));
+            set_app_xmp_value(&mut content, "AutoGeometryMode", auto_mode);
+            if auto_mode.is_some() {
+                let rotate = metadata
+                    .adjustments
+                    .get("transformRotate")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0)
+                    .to_string();
+                let vertical = metadata
+                    .adjustments
+                    .get("transformVertical")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0)
+                    .to_string();
+                set_app_xmp_value(&mut content, "TransformRotate", Some(&rotate));
+                set_app_xmp_value(&mut content, "TransformVertical", Some(&vertical));
+            } else {
+                set_app_xmp_value(&mut content, "TransformRotate", None);
+                set_app_xmp_value(&mut content, "TransformVertical", None);
+            }
+
+            let constrain_crop = metadata
+                .adjustments
+                .get("transformConstrainCrop")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+                .to_string();
+            set_app_xmp_value(&mut content, "ConstrainCrop", Some(&constrain_crop));
         }
 
         let re_subject =

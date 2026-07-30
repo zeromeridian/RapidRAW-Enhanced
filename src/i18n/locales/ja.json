@@ -1394,7 +1394,7 @@
       "resetZoomTooltip": "ズームをリセット",
       "rotate": "回転",
       "scale": "倍率",
-      "title": "変形",
+      "title": "手動変形",
       "toggleGridTooltip": "グリッドを切り替え",
       "toggleHelperLinesTooltip": "ヘルプラインを切り替え",
       "vertical": "垂直方向",

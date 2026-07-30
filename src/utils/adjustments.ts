@@ -104,6 +104,7 @@ export enum CreativeAdjustment {
 }
 
 export enum TransformAdjustment {
+  TransformAutoMode = 'transformAutoMode',
   TransformDistortion = 'transformDistortion',
   TransformVertical = 'transformVertical',
   TransformHorizontal = 'transformHorizontal',
@@ -112,6 +113,7 @@ export enum TransformAdjustment {
   TransformScale = 'transformScale',
   TransformXOffset = 'transformXOffset',
   TransformYOffset = 'transformYOffset',
+  TransformConstrainCrop = 'transformConstrainCrop',
 }
 
 export enum LensAdjustment {
@@ -238,6 +240,7 @@ export interface Adjustments {
   temperature: number;
   tint: number;
   toneMapper: 'agx' | 'basic';
+  transformAutoMode: 'level' | 'vertical' | null;
   transformDistortion: number;
   transformVertical: number;
   transformHorizontal: number;
@@ -246,6 +249,7 @@ export interface Adjustments {
   transformScale: number;
   transformXOffset: number;
   transformYOffset: number;
+  transformConstrainCrop: boolean;
   vibrance: number;
   vignetteAmount: number;
   vignetteFeather: number;
@@ -599,6 +603,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   temperature: 0,
   tint: 0,
   toneMapper: 'basic',
+  transformAutoMode: null,
   transformDistortion: 0,
   transformVertical: 0,
   transformHorizontal: 0,
@@ -607,6 +612,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   transformScale: 100,
   transformXOffset: 0,
   transformYOffset: 0,
+  transformConstrainCrop: false,
   vibrance: 0,
   vignetteAmount: 0,
   vignetteFeather: 50,
@@ -726,6 +732,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     lensTcaEnabled: loadedAdjustments.lensTcaEnabled ?? INITIAL_ADJUSTMENTS.lensTcaEnabled,
     lensVignetteEnabled: loadedAdjustments.lensVignetteEnabled ?? INITIAL_ADJUSTMENTS.lensVignetteEnabled,
     lensDistortionParams: loadedAdjustments.lensDistortionParams ?? INITIAL_ADJUSTMENTS.lensDistortionParams,
+    transformAutoMode: loadedAdjustments.transformAutoMode ?? INITIAL_ADJUSTMENTS.transformAutoMode,
     transformDistortion: loadedAdjustments.transformDistortion ?? INITIAL_ADJUSTMENTS.transformDistortion,
     transformVertical: loadedAdjustments.transformVertical ?? INITIAL_ADJUSTMENTS.transformVertical,
     transformHorizontal: loadedAdjustments.transformHorizontal ?? INITIAL_ADJUSTMENTS.transformHorizontal,
@@ -734,6 +741,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     transformScale: loadedAdjustments.transformScale ?? INITIAL_ADJUSTMENTS.transformScale,
     transformXOffset: loadedAdjustments.transformXOffset ?? INITIAL_ADJUSTMENTS.transformXOffset,
     transformYOffset: loadedAdjustments.transformYOffset ?? INITIAL_ADJUSTMENTS.transformYOffset,
+    transformConstrainCrop: loadedAdjustments.transformConstrainCrop ?? INITIAL_ADJUSTMENTS.transformConstrainCrop,
     colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, ...(loadedAdjustments.colorCalibration || {}) },
     colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...(loadedAdjustments.colorGrading || {}) },
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
@@ -842,6 +850,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         'flipHorizontal',
         'flipVertical',
         'orientationSteps',
+        TransformAdjustment.TransformAutoMode,
         TransformAdjustment.TransformDistortion,
         TransformAdjustment.TransformVertical,
         TransformAdjustment.TransformHorizontal,
@@ -850,6 +859,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         TransformAdjustment.TransformScale,
         TransformAdjustment.TransformXOffset,
         TransformAdjustment.TransformYOffset,
+        TransformAdjustment.TransformConstrainCrop,
       ],
     },
     {

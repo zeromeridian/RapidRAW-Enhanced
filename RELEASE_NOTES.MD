@@ -5,6 +5,43 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.6.1-colrbent.61 — 2026-07-30
+
+### Automatic geometry persistence
+
+- Level and Vertical buttons now remain visibly highlighted while their
+  automatic correction mode is active.
+- Automatic geometry mode, rotation, vertical correction, and Constrain Crop
+  are now synchronized through XMP for use by other This Is Raw installations.
+- Applying Manual Transform clears the automatic-mode highlight while
+  preserving the manually selected geometry values.
+
+## 1.6.1-colrbent.60 — 2026-07-30
+
+### Automatic geometry correction
+
+- Added **Level** correction for automatically straightening prominent
+  horizontal or vertical lines.
+- Added **Vertical** correction for automatically straightening converging
+  architectural lines.
+- Added a persistent **Constrain Crop** option that automatically zooms enough
+  to prevent empty edges after geometry corrections.
+- Renamed **Transform** to **Manual Transform** to distinguish the existing
+  editable controls from the new automatic modes.
+
+## 1.6.1-colrbent.59 — 2026-07-30
+
+### Automatic geometry correction
+
+- Added **Level** correction for automatically straightening prominent
+  horizontal or vertical lines.
+- Added **Vertical** correction for automatically straightening converging
+  architectural lines.
+- Added a persistent **Constrain Crop** option that automatically zooms enough
+  to prevent empty edges after geometry corrections.
+- Renamed **Transform** to **Manual Transform** to distinguish the existing
+  editable controls from the new automatic modes.
+
 ## 1.6.1-colrbent.58 — 2026-07-30
 
 ### Stronger vignetting
