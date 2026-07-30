@@ -5,6 +5,23 @@ Enhanced. The newest release appears first. Entries contain only concise,
 user-facing changes so each version can be copied directly into a GitHub
 Release description.
 
+## 1.6.1-colrbent.53 — 2026-07-30
+
+### Masked Light Flares
+
+- Fixed Light Flares applied through a mask not appearing unless the global
+  Light Flares adjustment was also enabled.
+
+## 1.6.1-colrbent.52 — 2026-07-30
+
+### Expanded local mask adjustments
+
+- Masks now support localized Black & White conversion and Color Calibration.
+- Light Flares, Vignette, and Grain controls are now available within mask
+  adjustments.
+- Mask opacity and feathering blend the new effects consistently in previews
+  and full-resolution exports.
+
 ## 1.6.1-colrbent.51 — 2026-07-29
 
 ### Faster first thumbnails in large folders

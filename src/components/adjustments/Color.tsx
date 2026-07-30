@@ -475,18 +475,14 @@ export default function ColorPanel({
 
   return (
     <div className="space-y-4">
-      {!isForMask && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <Switch
-            checked={!!adjustments.monochrome}
-            label={
-              adjustments.monochrome ? t('adjustments.color.blackAndWhite') : t('adjustments.color.colorModeColor')
-            }
-            onChange={handleMonochromeChange}
-            tooltip={t('adjustments.color.monochromeDesc')}
-          />
-        </div>
-      )}
+      <div className="p-2 bg-bg-tertiary rounded-md">
+        <Switch
+          checked={!!adjustments.monochrome}
+          label={adjustments.monochrome ? t('adjustments.color.blackAndWhite') : t('adjustments.color.colorModeColor')}
+          onChange={handleMonochromeChange}
+          tooltip={t('adjustments.color.monochromeDesc')}
+        />
+      </div>
 
       <div className="p-2 bg-bg-tertiary rounded-md">
         <div className="flex justify-between items-center mb-2">
@@ -632,7 +628,7 @@ export default function ColorPanel({
         />
       </div>
 
-      {!isForMask && adjustmentVisibility.colorCalibration !== false && (
+      {adjustmentVisibility.colorCalibration !== false && (
         <ColorCalibrationPanel
           adjustments={adjustments}
           setAdjustments={setAdjustments}

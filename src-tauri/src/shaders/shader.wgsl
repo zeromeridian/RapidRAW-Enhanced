@@ -129,6 +129,10 @@ struct MaskAdjustments {
     temperature: f32,
     tint: f32,
     vibrance: f32,
+    monochrome: u32,
+    _pad_color1: f32,
+    _pad_color2: f32,
+    _pad_color3: f32,
 
     sharpness: f32,
     luma_noise_reduction: f32,
@@ -141,6 +145,14 @@ struct MaskAdjustments {
     halation_amount: f32,
     flare_amount: f32,
     sharpness_threshold: f32,
+    vignette_amount: f32,
+    vignette_midpoint: f32,
+    vignette_roundness: f32,
+    vignette_feather: f32,
+    grain_amount: f32,
+    grain_size: f32,
+    grain_roughness: f32,
+    _pad_effects: f32,
 
     hue: f32,
     _pad_cg1: f32,
@@ -153,6 +165,8 @@ struct MaskAdjustments {
     color_grading_balance: f32,
     _pad5: f32,
     _pad6: f32,
+
+    color_calibration: ColorCalibrationSettings,
 
     hsl: array<HslColor, 8>,
     luma_curve: array<Point, 16>,
@@ -845,6 +859,54 @@ fn apply_centre_tonal_and_color(
     processed_color = apply_creative_color(processed_color, total_saturation_effect, vibrance_center_boost);
 
     return processed_color;
+}
+
+fn apply_vignette_effect(
+    color_in: vec3<f32>,
+    amount: f32,
+    midpoint: f32,
+    roundness: f32,
+    feather: f32,
+    coords: vec2<u32>
+) -> vec3<f32> {
+    if (amount == 0.0) {
+        return color_in;
+    }
+    let full_dims = vec2<f32>(textureDimensions(input_texture));
+    let coord = vec2<f32>(coords);
+    let aspect = full_dims.y / full_dims.x;
+    let uv_centered = (coord / full_dims - 0.5) * 2.0;
+    let power = 1.0 - roundness;
+    let uv_round = sign(uv_centered) * pow(abs(uv_centered), vec2<f32>(power, power));
+    let distance = length(uv_round * vec2<f32>(1.0, aspect)) * 0.5;
+    let falloff = smoothstep(midpoint - feather * 0.5, midpoint + feather * 0.5, distance);
+    if (amount < 0.0) {
+        return color_in * (1.0 + amount * falloff);
+    }
+    return mix(color_in, vec3<f32>(1.0), amount * falloff);
+}
+
+fn grain_delta(
+    color_in: vec3<f32>,
+    coords: vec2<i32>,
+    amount: f32,
+    size: f32,
+    roughness: f32,
+    scale: f32
+) -> vec3<f32> {
+    if (amount <= 0.0) {
+        return vec3<f32>(0.0);
+    }
+    let coord = vec2<f32>(coords);
+    let grain_frequency = (1.0 / max(size, 0.1)) / scale;
+    let luma = max(0.0, get_luma(color_in));
+    let luma_mask = smoothstep(0.0, 0.15, luma) * (1.0 - smoothstep(0.6, 1.0, luma));
+    let base_coord = coord * grain_frequency;
+    let rough_coord = coord * grain_frequency * 0.6;
+    let noise_base = gradient_noise(base_coord);
+    let noise_rough = gradient_noise(rough_coord + vec2<f32>(5.2, 1.3));
+    let noise_val = mix(noise_base, noise_rough, roughness);
+    return vec3<f32>(noise_val) * amount * 0.5 * luma_mask;
 }
 
 fn apply_dehaze(color: vec3<f32>, blurred_color_input_space: vec3<f32>, is_raw: u32, amount: f32) -> vec3<f32> {
@@ -1618,6 +1680,16 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     composite_rgb_linear = apply_tonal_adjustments(composite_rgb_linear, tonal_blurred, is_raw, t_contrast, t_shadows, t_whites, t_blacks);
     composite_rgb_linear = apply_highlights_adjustment(composite_rgb_linear, tonal_blurred, is_raw, t_highlights);
     composite_rgb_linear = apply_color_calibration(composite_rgb_linear, adjustments.global.color_calibration);
+    for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
+        let influence = get_mask_influence(i, absolute_coord);
+        if (influence > 0.001) {
+            let calibrated = apply_color_calibration(
+                composite_rgb_linear,
+                adjustments.mask_adjustments[i].color_calibration
+            );
+            composite_rgb_linear = mix(composite_rgb_linear, calibrated, influence);
+        }
+    }
     composite_rgb_linear = apply_hsl_panel(composite_rgb_linear, final_hsl, absolute_coord_i);
     composite_rgb_linear = apply_hue_shift(composite_rgb_linear, t_hue);
     composite_rgb_linear = apply_creative_color(composite_rgb_linear, t_saturation, t_vibrance);
@@ -1644,22 +1716,27 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         }
     }
 
-    if (adjustments.global.vignette_amount != 0.0) {
-        let full_dims_f = vec2<f32>(textureDimensions(input_texture));
-        let coord_f = vec2<f32>(absolute_coord);
-        let v_amount = adjustments.global.vignette_amount;
-        let v_mid = adjustments.global.vignette_midpoint;
-        let v_round = 1.0 - adjustments.global.vignette_roundness;
-        let v_feather = adjustments.global.vignette_feather * 0.5;
-        let aspect = full_dims_f.y / full_dims_f.x;
-        let uv_centered = (coord_f / full_dims_f - 0.5) * 2.0;
-        let uv_round = sign(uv_centered) * pow(abs(uv_centered), vec2<f32>(v_round, v_round));
-        let d = length(uv_round * vec2<f32>(1.0, aspect)) * 0.5;
-        let vignette_mask = smoothstep(v_mid - v_feather, v_mid + v_feather, d);
-        if (v_amount < 0.0) {
-            composite_rgb_linear *= (1.0 + v_amount * vignette_mask);
-        } else {
-            composite_rgb_linear = mix(composite_rgb_linear, vec3<f32>(1.0), v_amount * vignette_mask);
+    composite_rgb_linear = apply_vignette_effect(
+        composite_rgb_linear,
+        adjustments.global.vignette_amount,
+        adjustments.global.vignette_midpoint,
+        adjustments.global.vignette_roundness,
+        adjustments.global.vignette_feather,
+        absolute_coord
+    );
+    for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
+        let influence = get_mask_influence(i, absolute_coord);
+        if (influence > 0.001) {
+            let m = adjustments.mask_adjustments[i];
+            let vignetted = apply_vignette_effect(
+                composite_rgb_linear,
+                m.vignette_amount,
+                m.vignette_midpoint,
+                m.vignette_roundness,
+                m.vignette_feather,
+                absolute_coord
+            );
+            composite_rgb_linear = mix(composite_rgb_linear, vignetted, influence);
         }
     }
 
@@ -1707,20 +1784,36 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         let monochrome_luma = get_luma(srgb_to_linear(max(final_rgb, vec3<f32>(0.0))));
         final_rgb = linear_to_srgb(vec3<f32>(monochrome_luma));
     }
+    for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
+        let influence = get_mask_influence(i, absolute_coord);
+        if (influence > 0.001 && adjustments.mask_adjustments[i].monochrome == 1u) {
+            let monochrome_luma = get_luma(srgb_to_linear(max(final_rgb, vec3<f32>(0.0))));
+            let monochrome_rgb = linear_to_srgb(vec3<f32>(monochrome_luma));
+            final_rgb = mix(final_rgb, monochrome_rgb, influence);
+        }
+    }
 
-    if (adjustments.global.grain_amount > 0.0) {
-        let coord = vec2<f32>(absolute_coord_i);
-        let amount = adjustments.global.grain_amount * 0.5;
-        let grain_frequency = (1.0 / max(adjustments.global.grain_size, 0.1)) / scale;
-        let roughness = adjustments.global.grain_roughness;
-        let luma = max(0.0, get_luma(final_rgb));
-        let luma_mask = smoothstep(0.0, 0.15, luma) * (1.0 - smoothstep(0.6, 1.0, luma));
-        let base_coord = coord * grain_frequency;
-        let rough_coord = coord * grain_frequency * 0.6;
-        let noise_base = gradient_noise(base_coord);
-        let noise_rough = gradient_noise(rough_coord + vec2<f32>(5.2, 1.3));
-        let noise_val = mix(noise_base, noise_rough, roughness);
-        final_rgb += vec3<f32>(noise_val) * amount * luma_mask;
+    final_rgb += grain_delta(
+        final_rgb,
+        absolute_coord_i,
+        adjustments.global.grain_amount,
+        adjustments.global.grain_size,
+        adjustments.global.grain_roughness,
+        scale
+    );
+    for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
+        let influence = get_mask_influence(i, absolute_coord);
+        if (influence > 0.001) {
+            let m = adjustments.mask_adjustments[i];
+            final_rgb += grain_delta(
+                final_rgb,
+                absolute_coord_i,
+                m.grain_amount,
+                m.grain_size,
+                m.grain_roughness,
+                scale
+            ) * influence;
+        }
     }
 
     if (adjustments.global.show_clipping == 1u) {
