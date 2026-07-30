@@ -316,6 +316,7 @@ export interface MaskAdjustments {
   blacks: number;
   brightness: number;
   clarity: number;
+  colorCalibration: ColorCalibration;
   colorGrading: ColorGradingProps;
   colorNoiseReduction: number;
   contrast: number;
@@ -327,12 +328,16 @@ export interface MaskAdjustments {
   exposure: number;
   flareAmount: number;
   glowAmount: number;
+  grainAmount: number;
+  grainRoughness: number;
+  grainSize: number;
   halationAmount: number;
   highlights: number;
   hsl: Hsl;
   hue: number;
   id?: string;
   lumaNoiseReduction: number;
+  monochrome: boolean;
   saturation: number;
   sectionVisibility: SectionVisibility;
   shadows: number;
@@ -342,6 +347,10 @@ export interface MaskAdjustments {
   temperature: number;
   tint: number;
   vibrance: number;
+  vignetteAmount: number;
+  vignetteFeather: number;
+  vignetteMidpoint: number;
+  vignetteRoundness: number;
   whites: number;
 }
 
@@ -444,6 +453,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   blacks: 0,
   brightness: 0,
   clarity: 0,
+  colorCalibration: { ...INITIAL_COLOR_CALIBRATION },
   colorGrading: { ...INITIAL_COLOR_GRADING },
   colorNoiseReduction: 0,
   contrast: 0,
@@ -455,6 +465,9 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   exposure: 0,
   flareAmount: 0,
   glowAmount: 0,
+  grainAmount: 0,
+  grainRoughness: 50,
+  grainSize: 25,
   halationAmount: 0,
   highlights: 0,
   hsl: {
@@ -469,6 +482,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   },
   hue: 0,
   lumaNoiseReduction: 0,
+  monochrome: false,
   saturation: 0,
   sectionVisibility: {
     basic: true,
@@ -484,6 +498,10 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   temperature: 0,
   tint: 0,
   vibrance: 0,
+  vignetteAmount: 0,
+  vignetteFeather: 50,
+  vignetteMidpoint: 50,
+  vignetteRoundness: 0,
   whites: 0,
 };
 
@@ -653,6 +671,10 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
         glowAmount: containerAdjustments.glowAmount ?? INITIAL_MASK_ADJUSTMENTS.glowAmount,
         halationAmount: containerAdjustments.halationAmount ?? INITIAL_MASK_ADJUSTMENTS.halationAmount,
         hue: containerAdjustments.hue ?? INITIAL_MASK_ADJUSTMENTS.hue,
+        colorCalibration: {
+          ...INITIAL_MASK_ADJUSTMENTS.colorCalibration,
+          ...(containerAdjustments.colorCalibration || {}),
+        },
         colorGrading: { ...INITIAL_MASK_ADJUSTMENTS.colorGrading, ...(containerAdjustments.colorGrading || {}) },
         hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...(containerAdjustments.hsl || {}) },
         curves: containerAdjustments.curves ? deepCloneCurves(containerAdjustments.curves) : getDefaultCurves(),

@@ -1536,6 +1536,10 @@ pub struct MaskAdjustments {
     pub temperature: f32,
     pub tint: f32,
     pub vibrance: f32,
+    pub monochrome: u32,
+    _pad_color1: f32,
+    _pad_color2: f32,
+    _pad_color3: f32,
 
     pub sharpness: f32,
     pub luma_noise_reduction: f32,
@@ -1548,6 +1552,14 @@ pub struct MaskAdjustments {
     pub halation_amount: f32,
     pub flare_amount: f32,
     pub sharpness_threshold: f32,
+    pub vignette_amount: f32,
+    pub vignette_midpoint: f32,
+    pub vignette_roundness: f32,
+    pub vignette_feather: f32,
+    pub grain_amount: f32,
+    pub grain_size: f32,
+    pub grain_roughness: f32,
+    _pad_effects: f32,
 
     pub hue: f32,
     _pad_cg1: f32,
@@ -1560,6 +1572,8 @@ pub struct MaskAdjustments {
     pub color_grading_balance: f32,
     _pad5: f32,
     _pad6: f32,
+
+    pub color_calibration: ColorCalibrationSettings,
 
     pub hsl: [HslColor; 8],
     pub luma_curve: [Point; 16],
@@ -2401,6 +2415,14 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         temperature: get_val("color", "temperature", SCALES.temperature),
         tint: get_val("color", "tint", SCALES.tint),
         vibrance: get_val("color", "vibrance", SCALES.vibrance),
+        monochrome: if is_visible("color") && adj["monochrome"].as_bool().unwrap_or(false) {
+            1
+        } else {
+            0
+        },
+        _pad_color1: 0.0,
+        _pad_color2: 0.0,
+        _pad_color3: 0.0,
 
         sharpness: get_val("details", "sharpness", SCALES.sharpness),
         luma_noise_reduction: get_val("details", "lumaNoiseReduction", SCALES.luma_noise_reduction),
@@ -2418,6 +2440,15 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         halation_amount: get_val("effects", "halationAmount", SCALES.halation),
         flare_amount: get_val("effects", "flareAmount", SCALES.flares),
         sharpness_threshold: get_val("details", "sharpnessThreshold", SCALES.sharpness_threshold),
+        vignette_amount: get_val("effects", "vignetteAmount", SCALES.vignette_amount),
+        vignette_midpoint: get_val("effects", "vignetteMidpoint", SCALES.vignette_midpoint),
+        vignette_roundness: get_val("effects", "vignetteRoundness", SCALES.vignette_roundness),
+        vignette_feather: get_val("effects", "vignetteFeather", SCALES.vignette_feather),
+        grain_amount: get_val("effects", "grainAmount", SCALES.grain_amount),
+        grain_size: adj["grainSize"].as_f64().unwrap_or(25.0) as f32 / SCALES.grain_size,
+        grain_roughness: adj["grainRoughness"].as_f64().unwrap_or(50.0) as f32
+            / SCALES.grain_roughness,
+        _pad_effects: 0.0,
 
         hue: get_val("color", "hue", 1.0),
         _pad_cg1: 0.0,
@@ -2454,6 +2485,29 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         },
         _pad5: 0.0,
         _pad6: 0.0,
+
+        color_calibration: if is_visible("color") {
+            let calibration = adj.get("colorCalibration").cloned().unwrap_or_default();
+            ColorCalibrationSettings {
+                shadows_tint: calibration["shadowsTint"].as_f64().unwrap_or(0.0) as f32
+                    / SCALES.color_calibration_hue,
+                red_hue: calibration["redHue"].as_f64().unwrap_or(0.0) as f32
+                    / SCALES.color_calibration_hue,
+                red_saturation: calibration["redSaturation"].as_f64().unwrap_or(0.0) as f32
+                    / SCALES.color_calibration_saturation,
+                green_hue: calibration["greenHue"].as_f64().unwrap_or(0.0) as f32
+                    / SCALES.color_calibration_hue,
+                green_saturation: calibration["greenSaturation"].as_f64().unwrap_or(0.0) as f32
+                    / SCALES.color_calibration_saturation,
+                blue_hue: calibration["blueHue"].as_f64().unwrap_or(0.0) as f32
+                    / SCALES.color_calibration_hue,
+                blue_saturation: calibration["blueSaturation"].as_f64().unwrap_or(0.0) as f32
+                    / SCALES.color_calibration_saturation,
+                _pad1: 0.0,
+            }
+        } else {
+            ColorCalibrationSettings::default()
+        },
 
         hsl: if is_visible("color") {
             parse_hsl_adjustments(&adj.get("hsl").cloned().unwrap_or_default())
@@ -3452,8 +3506,11 @@ pub fn calculate_auto_adjustments(
 
 #[cfg(test)]
 mod tests {
-    use super::get_global_adjustments_from_json;
+    use super::{
+        MaskAdjustments, get_global_adjustments_from_json, get_mask_adjustments_from_json,
+    };
     use serde_json::json;
+    use std::mem::size_of;
 
     #[test]
     fn monochrome_defaults_to_disabled() {
@@ -3475,5 +3532,78 @@ mod tests {
             None,
         );
         assert_eq!(hidden.monochrome, 0);
+    }
+
+    #[test]
+    fn phase_one_mask_adjustments_parse_with_expected_scales() {
+        let adjustments = get_mask_adjustments_from_json(&json!({
+            "monochrome": true,
+            "colorCalibration": {
+                "shadowsTint": 40,
+                "redHue": -20,
+                "redSaturation": 60,
+                "greenHue": 0,
+                "greenSaturation": -30,
+                "blueHue": 10,
+                "blueSaturation": 15
+            },
+            "flareAmount": 50,
+            "vignetteAmount": -50,
+            "vignetteMidpoint": 40,
+            "vignetteRoundness": 25,
+            "vignetteFeather": 60,
+            "grainAmount": 80,
+            "grainSize": 25,
+            "grainRoughness": 50
+        }));
+
+        assert_eq!(adjustments.monochrome, 1);
+        assert!((adjustments.color_calibration.shadows_tint - 0.1).abs() < f32::EPSILON);
+        assert!((adjustments.color_calibration.red_hue + 0.05).abs() < f32::EPSILON);
+        assert!((adjustments.color_calibration.red_saturation - 0.5).abs() < f32::EPSILON);
+        assert!((adjustments.flare_amount - 0.5).abs() < f32::EPSILON);
+        assert!((adjustments.vignette_amount + 0.5).abs() < f32::EPSILON);
+        assert!((adjustments.vignette_midpoint - 0.4).abs() < f32::EPSILON);
+        assert!((adjustments.vignette_roundness - 0.25).abs() < f32::EPSILON);
+        assert!((adjustments.vignette_feather - 0.6).abs() < f32::EPSILON);
+        assert!((adjustments.grain_amount - 0.4).abs() < f32::EPSILON);
+        assert!((adjustments.grain_size - 0.5).abs() < f32::EPSILON);
+        assert!((adjustments.grain_roughness - 0.5).abs() < f32::EPSILON);
+        assert_eq!(size_of::<MaskAdjustments>() % 16, 0);
+    }
+
+    #[test]
+    fn hidden_mask_sections_disable_phase_one_adjustments() {
+        let adjustments = get_mask_adjustments_from_json(&json!({
+            "monochrome": true,
+            "colorCalibration": { "redHue": 100 },
+            "flareAmount": 100,
+            "vignetteAmount": -100,
+            "grainAmount": 100,
+            "sectionVisibility": {
+                "color": false,
+                "effects": false
+            }
+        }));
+
+        assert_eq!(adjustments.monochrome, 0);
+        assert_eq!(adjustments.color_calibration.red_hue, 0.0);
+        assert_eq!(adjustments.flare_amount, 0.0);
+        assert_eq!(adjustments.vignette_amount, 0.0);
+        assert_eq!(adjustments.grain_amount, 0.0);
+    }
+
+    #[test]
+    fn image_processing_shader_parses_and_validates() {
+        let shader = include_str!("shaders/shader.wgsl");
+        let module =
+            wgpu::naga::front::wgsl::parse_str(shader).expect("image-processing WGSL should parse");
+        let mut validator = wgpu::naga::valid::Validator::new(
+            wgpu::naga::valid::ValidationFlags::all(),
+            wgpu::naga::valid::Capabilities::all(),
+        );
+        validator
+            .validate(&module)
+            .expect("image-processing WGSL should validate");
     }
 }

@@ -35,6 +35,9 @@ validation details are in `RELEASE_NOTES.MD`.
 - Persisted Color / Black & White mode in the global Color section.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.
+- Local masks support Black & White conversion, Color Calibration, Light
+  Flares, Vignette, and Grain in addition to the existing tonal, color,
+  detail, curve, glow, and halation adjustments.
 - Clear green enabled styling and dimmed neutral styling for shared toggle
   switches throughout the application.
 

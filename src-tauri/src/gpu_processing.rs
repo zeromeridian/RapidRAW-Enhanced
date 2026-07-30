@@ -28,6 +28,15 @@ pub struct RenderRequest<'a> {
     pub roi: Option<Roi>,
 }
 
+fn flare_generation_amount(adjustments: &AllAdjustments) -> f32 {
+    adjustments.mask_adjustments[..(adjustments.mask_count as usize).min(MAX_MASKS)]
+        .iter()
+        .fold(adjustments.global.flare_amount, |amount, mask| {
+            amount.max(mask.flare_amount)
+        })
+        .max(0.0)
+}
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct DisplayTransform {
@@ -1181,7 +1190,8 @@ impl GpuProcessor {
         };
 
         let adjustments = request.adjustments;
-        if adjustments.global.flare_amount > 0.0 {
+        let flare_amount = flare_generation_amount(&adjustments);
+        if flare_amount > 0.0 {
             let mut encoder = device.create_command_encoder(&Default::default());
 
             let aspect_ratio = if height > 0 {
@@ -1190,7 +1200,7 @@ impl GpuProcessor {
                 1.0
             };
             let f_params = FlareParams {
-                amount: adjustments.global.flare_amount,
+                amount: flare_amount,
                 is_raw: adjustments.global.is_raw_image,
                 exposure: adjustments.global.exposure,
                 brightness: adjustments.global.brightness,
@@ -1481,10 +1491,9 @@ impl GpuProcessor {
                     }),
                 });
 
-                let use_flare = adjustments.global.flare_amount > 0.0;
                 bind_group_entries.push(wgpu::BindGroupEntry {
                     binding: 9 + MAX_MASK_BINDINGS,
-                    resource: wgpu::BindingResource::TextureView(if use_flare {
+                    resource: wgpu::BindingResource::TextureView(if flare_amount > 0.0 {
                         &self.flare_ghosts_view
                     } else {
                         &self.dummy_blur_view
@@ -1985,4 +1994,27 @@ fn process_and_get_dynamic_image_inner(
     let img_buf = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(out_w, out_h, processed_pixels)
         .ok_or("Failed to create image buffer from GPU data")?;
     Ok(DynamicImage::ImageRgba8(img_buf))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::flare_generation_amount;
+    use crate::image_processing::AllAdjustments;
+
+    #[test]
+    fn mask_only_flare_activates_flare_generation() {
+        let mut adjustments = AllAdjustments::default();
+        adjustments.mask_count = 1;
+        adjustments.mask_adjustments[0].flare_amount = 0.65;
+
+        assert_eq!(flare_generation_amount(&adjustments), 0.65);
+    }
+
+    #[test]
+    fn inactive_masks_do_not_activate_flare_generation() {
+        let mut adjustments = AllAdjustments::default();
+        adjustments.mask_adjustments[0].flare_amount = 0.65;
+
+        assert_eq!(flare_generation_amount(&adjustments), 0.0);
+    }
 }
