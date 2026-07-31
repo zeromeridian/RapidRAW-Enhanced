@@ -5,6 +5,13 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.1.6-fix-ciisue — 2026-07-31
+
+### Updated application identity
+
+- Replaced the application icon across desktop and mobile packages with the
+  new ThisIsRAW artwork.
+
 ## 1.1.5-fix-ciisue — 2026-07-31
 
 ### Reliable release packaging
