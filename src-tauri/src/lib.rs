@@ -421,7 +421,7 @@ fn median(values: &mut [f32]) -> Option<f32> {
     }
     values.sort_by(|a, b| a.total_cmp(b));
     let middle = values.len() / 2;
-    Some(if values.len() % 2 == 0 {
+    Some(if values.len().is_multiple_of(2) {
         (values[middle - 1] + values[middle]) * 0.5
     } else {
         values[middle]

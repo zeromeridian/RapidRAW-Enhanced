@@ -2003,8 +2003,10 @@ mod tests {
 
     #[test]
     fn mask_only_flare_activates_flare_generation() {
-        let mut adjustments = AllAdjustments::default();
-        adjustments.mask_count = 1;
+        let mut adjustments = AllAdjustments {
+            mask_count: 1,
+            ..Default::default()
+        };
         adjustments.mask_adjustments[0].flare_amount = 0.65;
 
         assert_eq!(flare_generation_amount(&adjustments), 0.65);
