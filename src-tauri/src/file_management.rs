@@ -541,6 +541,51 @@ mod output_naming_tests {
     }
 
     #[test]
+    fn guided_geometry_lines_and_solution_round_trip_through_xmp() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("guided.raw");
+        fs::write(&image, []).unwrap();
+        fs::write(
+            image.with_extension("xmp"),
+            "<rdf:Description>\n</rdf:Description>",
+        )
+        .unwrap();
+
+        let source = ImageMetadata {
+            adjustments: serde_json::json!({
+                "transformAutoMode": "guided",
+                "transformRotate": -0.75,
+                "transformVertical": 21.5,
+                "transformHorizontal": -8.25,
+                "transformConstrainCrop": true,
+                "transformGuides": {
+                    "vertical": [
+                        { "id": "v1", "x1": 0.2, "y1": 0.1, "x2": 0.25, "y2": 0.9 },
+                        { "id": "v2", "x1": 0.8, "y1": 0.1, "x2": 0.75, "y2": 0.9 }
+                    ],
+                    "horizontal": []
+                }
+            }),
+            ..ImageMetadata::default()
+        };
+        sync_metadata_to_xmp(&image, &source, false, true);
+
+        let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
+        assert_eq!(
+            extract_app_xmp_value(&xmp, "AutoGeometryMode").as_deref(),
+            Some("guided")
+        );
+        assert_eq!(
+            extract_app_xmp_value(&xmp, "TransformHorizontal").as_deref(),
+            Some("-8.25")
+        );
+
+        let mut imported = ImageMetadata::default();
+        assert!(sync_metadata_from_xmp(&image, &mut imported, true, true));
+        assert_eq!(imported.adjustments, source.adjustments);
+    }
+
+    #[test]
     fn mask_order_and_blend_modes_round_trip_through_xmp() {
         let folder = tempfile::tempdir().unwrap();
         let image = folder.path().join("layers.raw");
@@ -4550,7 +4595,7 @@ pub fn sync_metadata_from_xmp(
                     .is_none();
             let mut imported_auto_geometry = false;
             let xmp_auto_mode = extract_app_xmp_value(&content, "AutoGeometryMode")
-                .filter(|mode| matches!(mode.as_str(), "level" | "vertical"));
+                .filter(|mode| matches!(mode.as_str(), "level" | "vertical" | "guided"));
             if let Some(mode) = xmp_auto_mode
                 && should_import_auto_geometry
             {
@@ -4563,12 +4608,20 @@ pub fn sync_metadata_from_xmp(
                 let vertical = extract_app_xmp_value(&content, "TransformVertical")
                     .and_then(|value| value.parse::<f64>().ok())
                     .unwrap_or(0.0);
+                let horizontal = extract_app_xmp_value(&content, "TransformHorizontal")
+                    .and_then(|value| value.parse::<f64>().ok())
+                    .unwrap_or(0.0);
                 changed |=
                     set_adjustment_value(metadata, "transformRotate", serde_json::json!(rotate));
                 changed |= set_adjustment_value(
                     metadata,
                     "transformVertical",
                     serde_json::json!(vertical),
+                );
+                changed |= set_adjustment_value(
+                    metadata,
+                    "transformHorizontal",
+                    serde_json::json!(horizontal),
                 );
             } else if force {
                 changed |=
@@ -4728,7 +4781,7 @@ pub fn sync_metadata_to_xmp(
                 .adjustments
                 .get("transformAutoMode")
                 .and_then(Value::as_str)
-                .filter(|mode| matches!(*mode, "level" | "vertical"));
+                .filter(|mode| matches!(*mode, "level" | "vertical" | "guided"));
             set_app_xmp_value(&mut content, "AutoGeometryMode", auto_mode);
             if auto_mode.is_some() {
                 let rotate = metadata
@@ -4743,11 +4796,19 @@ pub fn sync_metadata_to_xmp(
                     .and_then(Value::as_f64)
                     .unwrap_or(0.0)
                     .to_string();
+                let horizontal = metadata
+                    .adjustments
+                    .get("transformHorizontal")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0)
+                    .to_string();
                 set_app_xmp_value(&mut content, "TransformRotate", Some(&rotate));
                 set_app_xmp_value(&mut content, "TransformVertical", Some(&vertical));
+                set_app_xmp_value(&mut content, "TransformHorizontal", Some(&horizontal));
             } else {
                 set_app_xmp_value(&mut content, "TransformRotate", None);
                 set_app_xmp_value(&mut content, "TransformVertical", None);
+                set_app_xmp_value(&mut content, "TransformHorizontal", None);
             }
 
             let constrain_crop = metadata

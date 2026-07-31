@@ -106,6 +106,7 @@ export enum CreativeAdjustment {
 
 export enum TransformAdjustment {
   TransformAutoMode = 'transformAutoMode',
+  TransformGuides = 'transformGuides',
   TransformDistortion = 'transformDistortion',
   TransformVertical = 'transformVertical',
   TransformHorizontal = 'transformHorizontal',
@@ -241,7 +242,8 @@ export interface Adjustments {
   temperature: number;
   tint: number;
   toneMapper: 'agx' | 'basic';
-  transformAutoMode: 'level' | 'vertical' | null;
+  transformAutoMode: 'level' | 'vertical' | 'guided' | null;
+  transformGuides: GuidedTransformGuides;
   transformDistortion: number;
   transformVertical: number;
   transformHorizontal: number;
@@ -257,6 +259,19 @@ export interface Adjustments {
   vignetteMidpoint: number;
   vignetteRoundness: number;
   whites: number;
+}
+
+export interface GeometryGuide {
+  id: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+export interface GuidedTransformGuides {
+  horizontal: GeometryGuide[];
+  vertical: GeometryGuide[];
 }
 
 export interface AiPatch {
@@ -632,6 +647,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   tint: 0,
   toneMapper: 'basic',
   transformAutoMode: null,
+  transformGuides: { horizontal: [], vertical: [] },
   transformDistortion: 0,
   transformVertical: 0,
   transformHorizontal: 0,
@@ -761,6 +777,10 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     lensVignetteEnabled: loadedAdjustments.lensVignetteEnabled ?? INITIAL_ADJUSTMENTS.lensVignetteEnabled,
     lensDistortionParams: loadedAdjustments.lensDistortionParams ?? INITIAL_ADJUSTMENTS.lensDistortionParams,
     transformAutoMode: loadedAdjustments.transformAutoMode ?? INITIAL_ADJUSTMENTS.transformAutoMode,
+    transformGuides: {
+      horizontal: (loadedAdjustments.transformGuides?.horizontal || []).slice(0, 2).map((guide) => ({ ...guide })),
+      vertical: (loadedAdjustments.transformGuides?.vertical || []).slice(0, 2).map((guide) => ({ ...guide })),
+    },
     transformDistortion: loadedAdjustments.transformDistortion ?? INITIAL_ADJUSTMENTS.transformDistortion,
     transformVertical: loadedAdjustments.transformVertical ?? INITIAL_ADJUSTMENTS.transformVertical,
     transformHorizontal: loadedAdjustments.transformHorizontal ?? INITIAL_ADJUSTMENTS.transformHorizontal,
@@ -879,6 +899,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         'flipVertical',
         'orientationSteps',
         TransformAdjustment.TransformAutoMode,
+        TransformAdjustment.TransformGuides,
         TransformAdjustment.TransformDistortion,
         TransformAdjustment.TransformVertical,
         TransformAdjustment.TransformHorizontal,
