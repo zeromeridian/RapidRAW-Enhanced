@@ -13,6 +13,7 @@ use std::sync::atomic::Ordering;
 use std::thread;
 
 use anyhow::Result;
+use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
@@ -537,6 +538,33 @@ mod output_naming_tests {
         assert_eq!(imported.adjustments["transformRotate"], -1.25);
         assert_eq!(imported.adjustments["transformVertical"], 18.5);
         assert_eq!(imported.adjustments["transformConstrainCrop"], true);
+    }
+
+    #[test]
+    fn mask_order_and_blend_modes_round_trip_through_xmp() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("layers.raw");
+        fs::write(&image, []).unwrap();
+        fs::write(
+            image.with_extension("xmp"),
+            "<rdf:Description>\n</rdf:Description>",
+        )
+        .unwrap();
+
+        let source = ImageMetadata {
+            adjustments: serde_json::json!({
+                "masks": [
+                    { "id": "top", "blendMode": "overlay" },
+                    { "id": "bottom", "blendMode": "multiply" }
+                ]
+            }),
+            ..ImageMetadata::default()
+        };
+        sync_metadata_to_xmp(&image, &source, false, true);
+
+        let mut imported = ImageMetadata::default();
+        assert!(sync_metadata_from_xmp(&image, &mut imported, true, true));
+        assert_eq!(imported.adjustments["masks"], source.adjustments["masks"]);
     }
 
     #[test]
@@ -4497,6 +4525,17 @@ pub fn sync_metadata_from_xmp(
         }
 
         if include_app_fields {
+            if let Some(encoded_adjustments) = extract_app_xmp_value(&content, "Adjustments")
+                && let Ok(bytes) = general_purpose::STANDARD.decode(encoded_adjustments)
+                && let Ok(imported_adjustments) = serde_json::from_slice::<Value>(&bytes)
+                && imported_adjustments.is_object()
+                && (force || metadata.adjustments.is_null())
+                && metadata.adjustments != imported_adjustments
+            {
+                metadata.adjustments = imported_adjustments;
+                changed = true;
+            }
+
             let xmp_stack = extract_xmp_stack(&content);
             if metadata.xmp_stack != xmp_stack {
                 metadata.xmp_stack = xmp_stack;
@@ -4654,6 +4693,11 @@ pub fn sync_metadata_to_xmp(
         }
 
         if include_app_fields {
+            let adjustments_json = serde_json::to_vec(&metadata.adjustments).unwrap_or_default();
+            let encoded_adjustments = general_purpose::STANDARD.encode(adjustments_json);
+            set_app_xmp_value(&mut content, "AdjustmentsVersion", Some("1"));
+            set_app_xmp_value(&mut content, "Adjustments", Some(&encoded_adjustments));
+
             set_app_xmp_value(
                 &mut content,
                 "Flag",

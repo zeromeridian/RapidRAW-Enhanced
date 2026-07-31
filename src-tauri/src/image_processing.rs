@@ -1627,7 +1627,7 @@ pub struct MaskAdjustments {
     pub tint: f32,
     pub vibrance: f32,
     pub monochrome: u32,
-    _pad_color1: f32,
+    pub blend_mode: u32,
     _pad_color2: f32,
     _pad_color3: f32,
 
@@ -1649,7 +1649,7 @@ pub struct MaskAdjustments {
     pub grain_amount: f32,
     pub grain_size: f32,
     pub grain_roughness: f32,
-    _pad_effects: f32,
+    pub gaussian_blur_amount: f32,
 
     pub hue: f32,
     _pad_cg1: f32,
@@ -2510,7 +2510,7 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         } else {
             0
         },
-        _pad_color1: 0.0,
+        blend_mode: 0,
         _pad_color2: 0.0,
         _pad_color3: 0.0,
 
@@ -2538,7 +2538,7 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         grain_size: adj["grainSize"].as_f64().unwrap_or(25.0) as f32 / SCALES.grain_size,
         grain_roughness: adj["grainRoughness"].as_f64().unwrap_or(50.0) as f32
             / SCALES.grain_roughness,
-        _pad_effects: 0.0,
+        gaussian_blur_amount: get_val("effects", "gaussianBlurAmount", 100.0),
 
         hue: get_val("color", "hue", 1.0),
         _pad_cg1: 0.0,
@@ -2640,6 +2640,14 @@ pub fn get_all_adjustments_from_json(
         .take(MAX_MASKS)
     {
         mask_adjustments[i] = get_mask_adjustments_from_json(&mask_def.adjustments);
+        mask_adjustments[i].blend_mode = match mask_def.blend_mode.as_str() {
+            "darken" => 1, "multiply" => 2, "colorBurn" => 3, "linearBurn" => 4,
+            "lighten" => 5, "screen" => 6, "colorDodge" => 7, "linearDodge" => 8,
+            "overlay" => 9, "softLight" => 10, "hardLight" => 11, "vividLight" => 12,
+            "linearLight" => 13, "pinLight" => 14, "hardMix" => 15, "hue" => 16,
+            "saturation" => 17, "color" => 18, "luminosity" => 19,
+            _ => 0,
+        };
         mask_count += 1;
     }
 
@@ -3664,7 +3672,8 @@ mod tests {
             "vignetteFeather": 60,
             "grainAmount": 80,
             "grainSize": 25,
-            "grainRoughness": 50
+            "grainRoughness": 50,
+            "gaussianBlurAmount": 65
         }));
 
         assert_eq!(adjustments.monochrome, 1);
@@ -3679,6 +3688,7 @@ mod tests {
         assert!((adjustments.grain_amount - 0.4).abs() < f32::EPSILON);
         assert!((adjustments.grain_size - 0.5).abs() < f32::EPSILON);
         assert!((adjustments.grain_roughness - 0.5).abs() < f32::EPSILON);
+        assert!((adjustments.gaussian_blur_amount - 0.65).abs() < f32::EPSILON);
         assert_eq!(size_of::<MaskAdjustments>() % 16, 0);
     }
 
@@ -3690,6 +3700,7 @@ mod tests {
             "flareAmount": 100,
             "vignetteAmount": -100,
             "grainAmount": 100,
+            "gaussianBlurAmount": 100,
             "sectionVisibility": {
                 "color": false,
                 "effects": false
@@ -3701,6 +3712,7 @@ mod tests {
         assert_eq!(adjustments.flare_amount, 0.0);
         assert_eq!(adjustments.vignette_amount, 0.0);
         assert_eq!(adjustments.grain_amount, 0.0);
+        assert_eq!(adjustments.gaussian_blur_amount, 0.0);
     }
 
     #[test]

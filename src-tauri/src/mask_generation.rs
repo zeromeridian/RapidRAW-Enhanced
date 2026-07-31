@@ -54,6 +54,8 @@ pub struct MaskDefinition {
     pub invert: bool,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
+    #[serde(default)]
+    pub blend_mode: String,
     pub adjustments: Value,
     pub sub_masks: Vec<SubMask>,
 }

@@ -93,6 +93,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const transformedOriginalUrl = useEditorStore((s) => s.transformedOriginalUrl);
   const interactivePatch = useEditorStore((s) => s.interactivePatch);
   const showOriginal = useEditorStore((s) => s.showOriginal);
+  const maskOverlayVisible = useEditorStore((s) => s.maskOverlayVisible);
   const isSliderDragging = useEditorStore((s) => s.isSliderDragging);
   const targetZoom = useEditorStore((s) => s.zoom);
   const originalSize = useEditorStore((s) => s.originalSize);
@@ -264,7 +265,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     [setAdjustments],
   );
 
-  const handleWbPicked = useCallback(() => { }, []);
+  const handleWbPicked = useCallback(() => {}, []);
 
   useEffect(() => {
     if (isFullScreen) {
@@ -1186,7 +1187,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
               pixelated: false,
             },
           })
-            .catch(() => { })
+            .catch(() => {})
             .finally(() => {
               isInvoking = false;
             });
@@ -2037,7 +2038,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
             isStraightenActive={isStraightenActive}
             isRotationActive={isRotationActive}
             isSliderDragging={isSliderDragging}
-            maskOverlayUrl={maskOverlayUrl}
+            maskOverlayUrl={maskOverlayVisible ? maskOverlayUrl : null}
             onGenerateAiMask={handleGenerateAiMask}
             onSelectAiPatchContainer={(id) => setEditor({ activeAiPatchContainerId: id })}
             onSelectMaskContainer={(id) => setEditor({ activeMaskContainerId: id })}

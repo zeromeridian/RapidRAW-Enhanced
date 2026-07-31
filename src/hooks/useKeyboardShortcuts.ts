@@ -338,6 +338,14 @@ export const useKeyboardShortcuts = ({
           s.ui.setRightPanel(Panel.Masks);
         },
       },
+      toggle_mask_overlay: {
+        shouldFire: (s: any) =>
+          !!s.editor.selectedImage && (!!s.editor.activeMaskContainerId || !!s.editor.activeAiPatchContainerId),
+        execute: (e: any, s: any) => {
+          e.preventDefault();
+          s.editor.setEditor({ maskOverlayVisible: !s.editor.maskOverlayVisible });
+        },
+      },
       toggle_ai: {
         shouldFire: (s: any) => !!s.editor.selectedImage,
         execute: (e: any, s: any) => {

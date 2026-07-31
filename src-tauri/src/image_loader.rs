@@ -482,6 +482,7 @@ pub fn composite_patches_on_image(
                     visible: true,
                     invert: patch_info.invert,
                     opacity: 100.0,
+                    blend_mode: String::new(),
                     adjustments: Value::Null,
                     sub_masks: patch_info.sub_masks,
                 };

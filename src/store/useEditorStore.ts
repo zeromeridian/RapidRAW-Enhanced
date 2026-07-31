@@ -37,6 +37,7 @@ interface EditorState {
   transformedOriginalUrl: string | null;
   interactivePatch: InteractivePatch | null;
   showOriginal: boolean;
+  maskOverlayVisible: boolean;
 
   // Analytics
   histogram: ChannelConfig | null;
@@ -98,6 +99,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   finalPreviewUrl: null,
   uncroppedAdjustedPreviewUrl: null,
   showOriginal: false,
+  maskOverlayVisible: true,
   histogram: null,
   waveform: null,
   isWaveformVisible: false,
