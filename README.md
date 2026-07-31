@@ -34,6 +34,10 @@ Patch releases contain fixes and small refinements (`1.0.1`), minor releases
 add backward-compatible features (`1.1.0`), and major releases contain breaking
 or compatibility-changing updates (`2.0.0`).
 
+Production builds created from `main` use the plain semantic version. Builds
+from any other branch automatically append a sanitized branch prerelease
+suffix, such as `1.0.3-develop` or `1.0.3-feature-masks`.
+
 ## Inherited RapidRAW Foundation
 
 Because ThisIsRAW is built on RapidRAW 1.6, it retains core capabilities such

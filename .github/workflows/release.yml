@@ -38,6 +38,7 @@ jobs:
       target: ${{ matrix.target }}
       asset-platform: ${{ matrix.asset-platform }}
       build-args: ${{ matrix.args }}
+      source-branch: ${{ github.event.release.target_commitish }}
       release-id: ${{ github.event.release.id }}
     secrets: inherit
     permissions:

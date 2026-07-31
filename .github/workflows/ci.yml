@@ -39,6 +39,7 @@ jobs:
       target: ${{ matrix.target }}
       asset-platform: ${{ matrix.asset-platform }}
       build-args: ${{ matrix.args }}
+      source-branch: ${{ github.ref_name }}
       upload-artifacts: true
     secrets: inherit
     permissions:
