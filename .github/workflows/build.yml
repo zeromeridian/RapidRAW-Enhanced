@@ -19,6 +19,10 @@ on:
         description: Additional Tauri build arguments
         required: true
         type: string
+      source-branch:
+        description: Source branch used to derive the semantic-version suffix
+        required: true
+        type: string
       release-id:
         description: Existing GitHub release ID for release asset uploads
         required: false
@@ -74,6 +78,11 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Apply branch-qualified build version
+        env:
+          BUILD_BRANCH: ${{ inputs.source-branch }}
+        run: node scripts/prepare-build-version.mjs
 
       - id: tauri-build
         name: Build and package application

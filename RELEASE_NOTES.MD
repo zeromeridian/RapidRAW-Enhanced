@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.0.3-develop — 2026-07-30
+
+### Branch-qualified build versions
+
+- Development builds now append their active branch name to the application
+  version and package filename.
+- Builds from `main` retain the plain semantic version without a branch suffix.
+- Local, pull-request, continuous-integration, and release workflows use the
+  same automatic branch-versioning rule.
+
 ## 1.0.2 — 2026-07-30
 
 ### Editor toolbar customization
