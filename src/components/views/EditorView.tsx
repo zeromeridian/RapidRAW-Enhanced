@@ -206,7 +206,8 @@ export default function EditorView({
   const editorBottomBarNode = (
     <div
       className={clsx(
-        'flex flex-col w-full overflow-hidden shrink-0',
+        'flex flex-col w-full shrink-0',
+        isFullScreen ? 'overflow-hidden' : 'relative z-30 overflow-visible',
         !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
       )}
       style={{

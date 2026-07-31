@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.0.2 — 2026-07-30
+
+### Editor toolbar customization
+
+- Fixed the Customize Toolbar panel being clipped behind the image editor in
+  Develop mode.
+- The customization panel now remains fully visible above the editor while
+  retaining the established filmstrip and fullscreen behavior.
+
 ## 1.0.1 — 2026-07-30
 
 ### Product name normalization
