@@ -1,26 +1,26 @@
 import { useShallow } from 'zustand/react/shallow';
-import { invoke } from '@tauri-apps/api/core';
-import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
+import { lazy, Suspense, useRef } from 'react';
 import { useUIStore } from '../../store/useUIStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useEditorStore } from '../../store/useEditorStore';
 import CopyPasteSettingsModal from './CopyPasteSettingsModal';
-import PanoramaModal from './PanoramaModal';
-import HdrModal from './HdrModal';
-import NegativeConversionModal from './NegativeConversionModal';
-import DenoiseModal from './DenoiseModal';
 import CreateFolderModal from './CreateFolderModal';
 import RenameFolderModal from './RenameFolderModal';
 import RenameFileModal from './RenameFileModal';
 import ConfirmModal from './ConfirmModal';
-import ImportSettingsModal from './ImportSettingsModal';
-import CullingModal from './CullingModal';
-import CollageModal from './CollageModal';
-import { AppSettings, Invokes, AlbumItem, Album, AlbumGroup } from '../ui/AppProperties';
+import { AppSettings, AlbumItem, AlbumGroup } from '../ui/AppProperties';
 import { CopyPasteSettings } from '../../utils/adjustments';
+
+const PanoramaModal = lazy(() => import('./PanoramaModal'));
+const HdrModal = lazy(() => import('./HdrModal'));
+const NegativeConversionModal = lazy(() => import('./NegativeConversionModal'));
+const DenoiseModal = lazy(() => import('./DenoiseModal'));
+const ImportSettingsModal = lazy(() => import('./ImportSettingsModal'));
+const CullingModal = lazy(() => import('./CullingModal'));
+const CollageModal = lazy(() => import('./CollageModal'));
 
 export interface AppModalsProps {
   handleImageSelect: (path: string) => void;
@@ -46,6 +46,7 @@ export interface AppModalsProps {
 
 export default function AppModals(props: AppModalsProps) {
   const { t } = useTranslation();
+  const openedLazyModals = useRef(new Set<string>());
   const { appSettings, handleSettingsChange } = useSettingsStore(
     useShallow((state) => ({
       appSettings: state.appSettings,
@@ -136,6 +137,14 @@ export default function AppModals(props: AppModalsProps) {
   const currentAlbumName = currentAlbumData?.name || '';
   const isAlbumGroup = currentAlbumData?.type === 'group';
 
+  if (panoramaModalState.isOpen) openedLazyModals.current.add('panorama');
+  if (hdrModalState.isOpen) openedLazyModals.current.add('hdr');
+  if (negativeModalState.isOpen) openedLazyModals.current.add('negative');
+  if (denoiseModalState.isOpen) openedLazyModals.current.add('denoise');
+  if (isImportModalOpen) openedLazyModals.current.add('import');
+  if (cullingModalState.isOpen) openedLazyModals.current.add('culling');
+  if (collageModalState.isOpen) openedLazyModals.current.add('collage');
+
   return (
     <>
       <CopyPasteSettingsModal
@@ -146,183 +155,205 @@ export default function AppModals(props: AppModalsProps) {
           handleSettingsChange({ ...appSettings, copyPasteSettings: newSettings } as AppSettings)
         }
       />
-      <PanoramaModal
-        error={panoramaModalState.error}
-        finalImageBase64={panoramaModalState.finalImageBase64}
-        imageCount={panoramaModalState.stitchingSourcePaths.length}
-        isOpen={panoramaModalState.isOpen}
-        isProcessing={panoramaModalState.isProcessing}
-        loadingImageUrl={
-          panoramaModalState.stitchingSourcePaths.length > 0
-            ? thumbnails[
-                panoramaModalState.stitchingSourcePaths[Math.floor(panoramaModalState.stitchingSourcePaths.length / 2)]
-              ] || null
-            : null
-        }
-        onClose={() =>
-          setUI({
-            panoramaModalState: {
-              isOpen: false,
-              isProcessing: false,
-              progressMessage: '',
-              finalImageBase64: null,
-              error: null,
-              stitchingSourcePaths: [],
-            },
-          })
-        }
-        onOpenFile={(path: string) => props.handleImageSelect(path)}
-        onSave={props.handleSavePanorama}
-        onStitch={() => props.handleStartPanorama(panoramaModalState.stitchingSourcePaths)}
-        progressMessage={panoramaModalState.progressMessage}
-      />
-      <HdrModal
-        error={hdrModalState.error}
-        finalImageBase64={hdrModalState.finalImageBase64}
-        imageCount={hdrModalState.stitchingSourcePaths.length}
-        isOpen={hdrModalState.isOpen}
-        isProcessing={hdrModalState.isProcessing}
-        loadingImageUrl={
-          hdrModalState.stitchingSourcePaths.length > 0
-            ? thumbnails[
-                hdrModalState.stitchingSourcePaths[Math.floor(hdrModalState.stitchingSourcePaths.length / 2)]
-              ] || null
-            : null
-        }
-        onClose={() =>
-          setUI({
-            hdrModalState: {
-              isOpen: false,
-              isProcessing: false,
-              progressMessage: '',
-              finalImageBase64: null,
-              error: null,
-              stitchingSourcePaths: [],
-            },
-          })
-        }
-        onOpenFile={(path: string) => props.handleImageSelect(path)}
-        onSave={props.handleSaveHdr}
-        onMerge={() => props.handleStartHdr(hdrModalState.stitchingSourcePaths)}
-        progressMessage={hdrModalState.progressMessage}
-      />
-      <NegativeConversionModal
-        isOpen={negativeModalState.isOpen}
-        onClose={() => setUI((state) => ({ negativeModalState: { ...state.negativeModalState, isOpen: false } }))}
-        targetPaths={negativeModalState.targetPaths}
-        onSave={(savedPaths) => {
-          props.refreshImageList().then(() => {
-            if (selectedImage && negativeModalState.targetPaths.includes(selectedImage.path) && savedPaths.length > 0) {
-              props.handleImageSelect(savedPaths[0]);
+      <Suspense fallback={null}>
+        {openedLazyModals.current.has('panorama') && (
+          <PanoramaModal
+            error={panoramaModalState.error}
+            finalImageBase64={panoramaModalState.finalImageBase64}
+            imageCount={panoramaModalState.stitchingSourcePaths.length}
+            isOpen={panoramaModalState.isOpen}
+            isProcessing={panoramaModalState.isProcessing}
+            loadingImageUrl={
+              panoramaModalState.stitchingSourcePaths.length > 0
+                ? thumbnails[
+                    panoramaModalState.stitchingSourcePaths[
+                      Math.floor(panoramaModalState.stitchingSourcePaths.length / 2)
+                    ]
+                  ] || null
+                : null
             }
-          });
-        }}
-      />
-      <DenoiseModal
-        isOpen={denoiseModalState.isOpen}
-        onClose={() => setUI((state) => ({ denoiseModalState: { ...state.denoiseModalState, isOpen: false } }))}
-        onDenoise={props.handleApplyDenoise}
-        onBatchDenoise={props.handleBatchDenoise}
-        onSave={props.handleSaveDenoisedImage}
-        onOpenFile={props.handleImageSelect}
-        previewBase64={denoiseModalState.previewBase64}
-        originalBase64={denoiseModalState.originalBase64 || null}
-        isProcessing={denoiseModalState.isProcessing}
-        error={denoiseModalState.error}
-        progressMessage={denoiseModalState.progressMessage}
-        aiModelDownloadStatus={aiModelDownloadStatus}
-        isRaw={denoiseModalState.isRaw}
-        targetPaths={denoiseModalState.targetPaths}
-        loadingImageUrl={
-          denoiseModalState.targetPaths.length > 0
-            ? thumbnails[denoiseModalState.targetPaths[0]] ||
-              (selectedImage?.path === denoiseModalState.targetPaths[0] ? finalPreviewUrl : null)
-            : null
-        }
-      />
-      <CreateFolderModal
-        isOpen={isCreateFolderModalOpen}
-        onClose={() => setUI({ isCreateFolderModalOpen: false })}
-        onSave={props.handleCreateFolder}
-      />
-      <RenameFolderModal
-        currentName={folderActionTarget ? folderActionTarget.split(/[\\/]/).pop() || '' : ''}
-        isOpen={isRenameFolderModalOpen}
-        onClose={() => setUI({ isRenameFolderModalOpen: false })}
-        onSave={props.handleRenameFolder}
-      />
-      <CreateFolderModal
-        isOpen={isCreateAlbumModalOpen}
-        onClose={() => setUI({ isCreateAlbumModalOpen: false })}
-        onSave={(name) => props.handleCreateAlbumItem(name, 'album')}
-        title={t('contextMenus.albums.newAlbum')}
-        placeholder={t('modals.createAlbum.placeholder')}
-        buttonText={t('modals.createFolder.create')}
-      />
-      <CreateFolderModal
-        isOpen={isCreateAlbumGroupModalOpen}
-        onClose={() => setUI({ isCreateAlbumGroupModalOpen: false })}
-        onSave={(name) => props.handleCreateAlbumItem(name, 'group')}
-        title={t('contextMenus.albums.newGroup')}
-        placeholder={t('modals.createGroup.placeholder')}
-        buttonText={t('modals.createFolder.create')}
-      />
-      <RenameFolderModal
-        currentName={currentAlbumName}
-        isOpen={isRenameAlbumModalOpen}
-        onClose={() => setUI({ isRenameAlbumModalOpen: false })}
-        onSave={props.handleRenameAlbumItem}
-        title={isAlbumGroup ? t('contextMenus.albums.renameGroup') : t('contextMenus.albums.renameAlbum')}
-        placeholder={isAlbumGroup ? t('modals.renameGroup.placeholder') : t('modals.renameAlbum.placeholder')}
-      />
-      <RenameFileModal
-        filesToRename={renameTargetPaths}
-        isOpen={isRenameFileModalOpen}
-        onClose={() => setUI({ isRenameFileModalOpen: false })}
-        onSave={props.handleSaveRename}
-      />
-      <ConfirmModal {...confirmModalState} onClose={closeConfirmModal} />
-      <ImportSettingsModal
-        fileCount={importSourcePaths.length}
-        isOpen={isImportModalOpen}
-        onClose={() => setUI({ isImportModalOpen: false })}
-        onSave={props.handleStartImport}
-      />
-      <CullingModal
-        isOpen={cullingModalState.isOpen}
-        onClose={() =>
-          setUI({
-            cullingModalState: { isOpen: false, progress: null, suggestions: null, error: null, pathsToCull: [] },
-          })
-        }
-        progress={cullingModalState.progress}
-        suggestions={cullingModalState.suggestions}
-        error={cullingModalState.error}
-        imagePaths={cullingModalState.pathsToCull}
-        thumbnails={thumbnails}
-        onApply={(action, paths) => {
-          if (action === 'reject') {
-            props.handleSetColorLabel('red', paths);
-          } else if (action === 'rate_zero') {
-            props.handleRate(1, paths);
-          } else if (action === 'delete') {
-            props.executeDelete(paths, { includeAssociated: false });
-          }
-          setUI({
-            cullingModalState: { isOpen: false, progress: null, suggestions: null, error: null, pathsToCull: [] },
-          });
-        }}
-        onError={(err) => {
-          setUI((state) => ({ cullingModalState: { ...state.cullingModalState, error: err, progress: null } }));
-        }}
-      />
-      <CollageModal
-        isOpen={collageModalState.isOpen}
-        onClose={() => setUI({ collageModalState: { isOpen: false, sourceImages: [] } })}
-        onSave={props.handleSaveCollage}
-        sourceImages={collageModalState.sourceImages}
-        thumbnails={thumbnails}
-      />
+            onClose={() =>
+              setUI({
+                panoramaModalState: {
+                  isOpen: false,
+                  isProcessing: false,
+                  progressMessage: '',
+                  finalImageBase64: null,
+                  error: null,
+                  stitchingSourcePaths: [],
+                },
+              })
+            }
+            onOpenFile={(path: string) => props.handleImageSelect(path)}
+            onSave={props.handleSavePanorama}
+            onStitch={() => props.handleStartPanorama(panoramaModalState.stitchingSourcePaths)}
+            progressMessage={panoramaModalState.progressMessage}
+          />
+        )}
+        {openedLazyModals.current.has('hdr') && (
+          <HdrModal
+            error={hdrModalState.error}
+            finalImageBase64={hdrModalState.finalImageBase64}
+            imageCount={hdrModalState.stitchingSourcePaths.length}
+            isOpen={hdrModalState.isOpen}
+            isProcessing={hdrModalState.isProcessing}
+            loadingImageUrl={
+              hdrModalState.stitchingSourcePaths.length > 0
+                ? thumbnails[
+                    hdrModalState.stitchingSourcePaths[Math.floor(hdrModalState.stitchingSourcePaths.length / 2)]
+                  ] || null
+                : null
+            }
+            onClose={() =>
+              setUI({
+                hdrModalState: {
+                  isOpen: false,
+                  isProcessing: false,
+                  progressMessage: '',
+                  finalImageBase64: null,
+                  error: null,
+                  stitchingSourcePaths: [],
+                },
+              })
+            }
+            onOpenFile={(path: string) => props.handleImageSelect(path)}
+            onSave={props.handleSaveHdr}
+            onMerge={() => props.handleStartHdr(hdrModalState.stitchingSourcePaths)}
+            progressMessage={hdrModalState.progressMessage}
+          />
+        )}
+        {openedLazyModals.current.has('negative') && (
+          <NegativeConversionModal
+            isOpen={negativeModalState.isOpen}
+            onClose={() => setUI((state) => ({ negativeModalState: { ...state.negativeModalState, isOpen: false } }))}
+            targetPaths={negativeModalState.targetPaths}
+            onSave={(savedPaths) => {
+              props.refreshImageList().then(() => {
+                if (
+                  selectedImage &&
+                  negativeModalState.targetPaths.includes(selectedImage.path) &&
+                  savedPaths.length > 0
+                ) {
+                  props.handleImageSelect(savedPaths[0]);
+                }
+              });
+            }}
+          />
+        )}
+        {openedLazyModals.current.has('denoise') && (
+          <DenoiseModal
+            isOpen={denoiseModalState.isOpen}
+            onClose={() => setUI((state) => ({ denoiseModalState: { ...state.denoiseModalState, isOpen: false } }))}
+            onDenoise={props.handleApplyDenoise}
+            onBatchDenoise={props.handleBatchDenoise}
+            onSave={props.handleSaveDenoisedImage}
+            onOpenFile={props.handleImageSelect}
+            previewBase64={denoiseModalState.previewBase64}
+            originalBase64={denoiseModalState.originalBase64 || null}
+            isProcessing={denoiseModalState.isProcessing}
+            error={denoiseModalState.error}
+            progressMessage={denoiseModalState.progressMessage}
+            aiModelDownloadStatus={aiModelDownloadStatus}
+            isRaw={denoiseModalState.isRaw}
+            targetPaths={denoiseModalState.targetPaths}
+            loadingImageUrl={
+              denoiseModalState.targetPaths.length > 0
+                ? thumbnails[denoiseModalState.targetPaths[0]] ||
+                  (selectedImage?.path === denoiseModalState.targetPaths[0] ? finalPreviewUrl : null)
+                : null
+            }
+          />
+        )}
+        <CreateFolderModal
+          isOpen={isCreateFolderModalOpen}
+          onClose={() => setUI({ isCreateFolderModalOpen: false })}
+          onSave={props.handleCreateFolder}
+        />
+        <RenameFolderModal
+          currentName={folderActionTarget ? folderActionTarget.split(/[\\/]/).pop() || '' : ''}
+          isOpen={isRenameFolderModalOpen}
+          onClose={() => setUI({ isRenameFolderModalOpen: false })}
+          onSave={props.handleRenameFolder}
+        />
+        <CreateFolderModal
+          isOpen={isCreateAlbumModalOpen}
+          onClose={() => setUI({ isCreateAlbumModalOpen: false })}
+          onSave={(name) => props.handleCreateAlbumItem(name, 'album')}
+          title={t('contextMenus.albums.newAlbum')}
+          placeholder={t('modals.createAlbum.placeholder')}
+          buttonText={t('modals.createFolder.create')}
+        />
+        <CreateFolderModal
+          isOpen={isCreateAlbumGroupModalOpen}
+          onClose={() => setUI({ isCreateAlbumGroupModalOpen: false })}
+          onSave={(name) => props.handleCreateAlbumItem(name, 'group')}
+          title={t('contextMenus.albums.newGroup')}
+          placeholder={t('modals.createGroup.placeholder')}
+          buttonText={t('modals.createFolder.create')}
+        />
+        <RenameFolderModal
+          currentName={currentAlbumName}
+          isOpen={isRenameAlbumModalOpen}
+          onClose={() => setUI({ isRenameAlbumModalOpen: false })}
+          onSave={props.handleRenameAlbumItem}
+          title={isAlbumGroup ? t('contextMenus.albums.renameGroup') : t('contextMenus.albums.renameAlbum')}
+          placeholder={isAlbumGroup ? t('modals.renameGroup.placeholder') : t('modals.renameAlbum.placeholder')}
+        />
+        <RenameFileModal
+          filesToRename={renameTargetPaths}
+          isOpen={isRenameFileModalOpen}
+          onClose={() => setUI({ isRenameFileModalOpen: false })}
+          onSave={props.handleSaveRename}
+        />
+        <ConfirmModal {...confirmModalState} onClose={closeConfirmModal} />
+        {openedLazyModals.current.has('import') && (
+          <ImportSettingsModal
+            fileCount={importSourcePaths.length}
+            isOpen={isImportModalOpen}
+            onClose={() => setUI({ isImportModalOpen: false })}
+            onSave={props.handleStartImport}
+          />
+        )}
+        {openedLazyModals.current.has('culling') && (
+          <CullingModal
+            isOpen={cullingModalState.isOpen}
+            onClose={() =>
+              setUI({
+                cullingModalState: { isOpen: false, progress: null, suggestions: null, error: null, pathsToCull: [] },
+              })
+            }
+            progress={cullingModalState.progress}
+            suggestions={cullingModalState.suggestions}
+            error={cullingModalState.error}
+            imagePaths={cullingModalState.pathsToCull}
+            thumbnails={thumbnails}
+            onApply={(action, paths) => {
+              if (action === 'reject') {
+                props.handleSetColorLabel('red', paths);
+              } else if (action === 'rate_zero') {
+                props.handleRate(1, paths);
+              } else if (action === 'delete') {
+                props.executeDelete(paths, { includeAssociated: false });
+              }
+              setUI({
+                cullingModalState: { isOpen: false, progress: null, suggestions: null, error: null, pathsToCull: [] },
+              });
+            }}
+            onError={(err) => {
+              setUI((state) => ({ cullingModalState: { ...state.cullingModalState, error: err, progress: null } }));
+            }}
+          />
+        )}
+        {openedLazyModals.current.has('collage') && (
+          <CollageModal
+            isOpen={collageModalState.isOpen}
+            onClose={() => setUI({ collageModalState: { isOpen: false, sourceImages: [] } })}
+            onSave={props.handleSaveCollage}
+            sourceImages={collageModalState.sourceImages}
+            thumbnails={thumbnails}
+          />
+        )}
+      </Suspense>
     </>
   );
 }

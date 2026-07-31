@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir } from '@tauri-apps/api/path';
 import { toast } from 'react-toastify';
@@ -12,13 +13,13 @@ import { Invokes, LibraryViewMode, ImageFile } from '../components/ui/AppPropert
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
-import { mergeXmpImageStacks } from '../utils/imageStacks';
+import { areImageStacksEqual, mergeXmpImageStacks } from '../utils/imageStacks';
 
 const mergeImportedXmpStacks = (images: ImageFile[]) => {
   const settingsState = useSettingsStore.getState();
   if (!settingsState.appSettings) return;
   const imageStacks = mergeXmpImageStacks(settingsState.appSettings.imageStacks || [], images);
-  if (JSON.stringify(imageStacks) !== JSON.stringify(settingsState.appSettings.imageStacks || [])) {
+  if (!areImageStacksEqual(imageStacks, settingsState.appSettings.imageStacks || [])) {
     settingsState.setAppSettings({ ...settingsState.appSettings, imageStacks });
   }
 };
@@ -172,7 +173,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         compactEditorPanelHeightOverride: null,
       });
 
-      if (isFrontendCached) {
+      if (cached?.selectedImage?.isReady) {
         setEditor({
           selectedImage: {
             ...cached.selectedImage,
@@ -293,6 +294,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       const { selectedImage, resetHistory, setEditor } = useEditorStore.getState();
       const libraryViewMode = appSettings?.libraryViewMode;
 
+      await invoke('cancel_recursive_scan');
       if (!preserveEditor) {
         await invoke('cancel_thumbnail_generation');
         clearThumbnailQueue();
@@ -356,6 +358,48 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         let files: ImageFile[];
         if (preloadedImages) {
           files = preloadedImages;
+        } else if (libraryViewMode === LibraryViewMode.Recursive) {
+          const discoveredPaths = new Set<string>();
+          const unlisten = await listen<{
+            generation: number;
+            images: Array<{ path: string; isRaw: boolean }>;
+          }>('recursive-images-discovered', (event) => {
+            if (
+              event.payload.generation !== folderLoadGeneration ||
+              folderLoadGenerationRef.current !== folderLoadGeneration ||
+              useLibraryStore.getState().currentFolderPath !== path
+            ) {
+              return;
+            }
+
+            const discovered = event.payload.images
+              .filter((image) => !discoveredPaths.has(image.path))
+              .map((image) => {
+                discoveredPaths.add(image.path);
+                return {
+                  path: image.path,
+                  modified: 0,
+                  is_edited: false,
+                  rating: 0,
+                  tags: null,
+                  exif: null,
+                  is_virtual_copy: false,
+                  is_cloud_placeholder: false,
+                  is_raw: image.isRaw,
+                  group_id: null,
+                  xmpStack: null,
+                } satisfies ImageFile;
+              });
+
+            if (discovered.length > 0) {
+              setLibrary((state) => ({ imageList: [...state.imageList, ...discovered] }));
+            }
+          });
+          try {
+            files = await invoke(command, { path, scanGeneration: folderLoadGeneration });
+          } finally {
+            unlisten();
+          }
         } else {
           files = await invoke(command, { path });
         }
@@ -386,6 +430,8 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             setLibrary({ imageList: files });
             window.setTimeout(async () => {
               const batchSize = 200;
+              const updateEveryBatches = 5;
+              let pendingExifData: Record<string, Record<string, string>> = {};
               for (let offset = 0; offset < paths.length; offset += batchSize) {
                 if (
                   folderLoadGenerationRef.current !== folderLoadGeneration ||
@@ -405,11 +451,18 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
                   ) {
                     return;
                   }
-                  setLibrary((state) => ({
-                    imageList: state.imageList.map((image) =>
-                      exifDataMap[image.path] ? { ...image, exif: exifDataMap[image.path] } : image,
-                    ),
-                  }));
+                  Object.assign(pendingExifData, exifDataMap);
+                  const batchNumber = Math.floor(offset / batchSize) + 1;
+                  const isLastBatch = offset + batchSize >= paths.length;
+                  if (batchNumber % updateEveryBatches === 0 || isLastBatch) {
+                    const exifToApply = pendingExifData;
+                    pendingExifData = {};
+                    setLibrary((state) => ({
+                      imageList: state.imageList.map((image) =>
+                        exifToApply[image.path] ? { ...image, exif: exifToApply[image.path] } : image,
+                      ),
+                    }));
+                  }
                 } catch (err) {
                   console.error('Failed to read EXIF data in background:', err);
                   return;
@@ -427,10 +480,13 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
           });
         }
       } catch (err) {
+        if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
         console.error('Failed to load folder contents:', err);
         toast.error('Failed to load images from the selected folder.');
       } finally {
-        useLibraryStore.getState().setLibrary({ isViewLoading: false });
+        if (folderLoadGenerationRef.current === folderLoadGeneration) {
+          useLibraryStore.getState().setLibrary({ isViewLoading: false });
+        }
       }
     },
     [clearThumbnailQueue, refs],

@@ -1,4 +1,13 @@
-import { type PointerEvent as ReactPointerEvent, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import {
+  lazy,
+  Suspense,
+  type PointerEvent as ReactPointerEvent,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -8,8 +17,6 @@ import clsx from 'clsx';
 
 import TitleBar from './window/TitleBar';
 import FolderTree from './components/panel/FolderTree';
-import SettingsPanel from './components/panel/SettingsPanel';
-import ExportPanel from './components/panel/right/ExportPanel';
 import Resizer from './components/ui/Resizer';
 import GlobalTooltip from './components/ui/GlobalTooltip';
 import AppModals from './components/modals/AppModals';
@@ -59,6 +66,9 @@ import {
 import ImageProcessingManager from './components/managers/ImageProcessingManager';
 import ImageLoaderManager from './components/managers/ImageLoaderManager';
 
+const SettingsPanel = lazy(() => import('./components/panel/SettingsPanel'));
+const ExportPanel = lazy(() => import('./components/panel/right/ExportPanel'));
+
 const CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA'; // local dev key
 
 const insertChildrenIntoTree = (node: any, targetPath: string, newChildren: any[]): any => {
@@ -87,6 +97,7 @@ const insertChildrenIntoTree = (node: any, targetPath: string, newChildren: any[
 
 function App() {
   const COMPACT_EDITOR_MAX_WIDTH = 900;
+  const libraryExportOpenedRef = useRef(false);
 
   const { appSettings, theme, osPlatform, handleSettingsChange } = useSettingsStore(
     useShallow((state) => ({
@@ -128,6 +139,7 @@ function App() {
       setRightPanel: state.setRightPanel,
     })),
   );
+  if (isLibraryExportPanelVisible) libraryExportOpenedRef.current = true;
 
   const { rootPaths, currentFolderPath, expandedFolders, multiSelectedPaths, setLibrary } = useLibraryStore(
     useShallow((state) => ({
@@ -467,13 +479,27 @@ function App() {
     const unlisten = listen('ai-connector-status-update', (event: any) => {
       setEditor({ isAIConnectorConnected: event.payload.connected });
     });
-    invoke(Invokes.CheckAIConnectorStatus);
-    const interval = setInterval(() => invoke(Invokes.CheckAIConnectorStatus), 10000);
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const refreshPolling = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+      if (document.visibilityState === 'visible') {
+        void invoke(Invokes.CheckAIConnectorStatus);
+        if (activeRightPanel === Panel.Ai) {
+          interval = setInterval(() => invoke(Invokes.CheckAIConnectorStatus), 10000);
+        }
+      }
+    };
+    refreshPolling();
+    document.addEventListener('visibilitychange', refreshPolling);
     return () => {
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshPolling);
       unlisten.then((f) => f());
     };
-  }, [setEditor]);
+  }, [activeRightPanel, setEditor]);
 
   const createResizeHandler = (stateKey: string, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -747,13 +773,15 @@ function App() {
               {isSettingsOpen && appSettings && hasRoots && (
                 <div className="absolute inset-0 z-50 flex bg-bg-secondary rounded-lg">
                   <div className="w-full h-full flex flex-col p-4 lg:p-8 overflow-y-auto custom-scrollbar">
-                    <SettingsPanel
-                      appSettings={appSettings}
-                      onBack={() => setUI({ isSettingsOpen: false })}
-                      onLibraryRefresh={handleLibraryRefresh}
-                      onSettingsChange={handleSettingsChange}
-                      rootPaths={rootPaths}
-                    />
+                    <Suspense fallback={<div className="h-full w-full" />}>
+                      <SettingsPanel
+                        appSettings={appSettings}
+                        onBack={() => setUI({ isSettingsOpen: false })}
+                        onLibraryRefresh={handleLibraryRefresh}
+                        onSettingsChange={handleSettingsChange}
+                        rootPaths={rootPaths}
+                      />
+                    </Suspense>
                   </div>
                 </div>
               )}
@@ -768,17 +796,21 @@ function App() {
               )}
               style={{ width: isLibraryExportPanelVisible && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
             >
-              <ExportPanel
-                exportState={exportState}
-                multiSelectedPaths={multiSelectedPaths}
-                selectedImage={null}
-                setExportState={setExportState}
-                appSettings={appSettings}
-                onSettingsChange={handleSettingsChange}
-                rootPaths={rootPaths}
-                isVisible={isLibraryExportPanelVisible}
-                onClose={() => setUI({ isLibraryExportPanelVisible: false })}
-              />
+              {libraryExportOpenedRef.current && (
+                <Suspense fallback={<div className="h-full w-full" />}>
+                  <ExportPanel
+                    exportState={exportState}
+                    multiSelectedPaths={multiSelectedPaths}
+                    selectedImage={null}
+                    setExportState={setExportState}
+                    appSettings={appSettings}
+                    onSettingsChange={handleSettingsChange}
+                    rootPaths={rootPaths}
+                    isVisible={isLibraryExportPanelVisible}
+                    onClose={() => setUI({ isLibraryExportPanelVisible: false })}
+                  />
+                </Suspense>
+              )}
             </div>
           </div>
         </div>

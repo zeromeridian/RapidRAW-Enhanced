@@ -955,6 +955,7 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
 #[tauri::command]
 pub fn list_images_recursive(
     path: String,
+    scan_generation: Option<usize>,
     app_handle: AppHandle,
 ) -> Result<Vec<ImageFile>, String> {
     clear_pending_metadata(&app_handle);
@@ -965,10 +966,28 @@ pub fn list_images_recursive(
 
     let root_path = Path::new(&path);
     let mut images = Vec::new();
+    let scan_token = scan_generation.map(|_| {
+        app_handle
+            .state::<crate::AppState>()
+            .recursive_scan_generation
+            .fetch_add(1, Ordering::Relaxed)
+            + 1
+    });
+    let mut discovered_batch = Vec::with_capacity(128);
 
     let mut sidecars_by_path: HashMap<PathBuf, Vec<Option<String>>> = HashMap::new();
 
     for entry in WalkDir::new(root_path).into_iter().filter_map(Result::ok) {
+        if scan_token.is_some_and(|token| {
+            app_handle
+                .state::<crate::AppState>()
+                .recursive_scan_generation
+                .load(Ordering::Relaxed)
+                != token
+        })
+        {
+            return Err("Recursive scan superseded by a newer folder selection".to_string());
+        }
         let entry_path = entry.path();
         if !entry_path.is_file() {
             continue;
@@ -996,7 +1015,32 @@ pub fn list_images_recursive(
             }
         } else if is_supported_image_file(entry_path.to_string_lossy().as_ref()) {
             images.push(entry_path.to_path_buf());
+            if scan_generation.is_some() {
+                discovered_batch.push(serde_json::json!({
+                    "path": entry_path.to_string_lossy(),
+                    "isRaw": crate::formats::is_raw_file(entry_path),
+                }));
+            }
+            if discovered_batch.len() == 128 {
+                let _ = app_handle.emit(
+                    "recursive-images-discovered",
+                    serde_json::json!({
+                        "generation": scan_generation,
+                        "images": std::mem::take(&mut discovered_batch),
+                    }),
+                );
+            }
         }
+    }
+
+    if !discovered_batch.is_empty() && scan_generation.is_some() {
+        let _ = app_handle.emit(
+            "recursive-images-discovered",
+            serde_json::json!({
+                "generation": scan_generation,
+                "images": discovered_batch,
+            }),
+        );
     }
 
     let tasks: Vec<_> = images
@@ -1105,6 +1149,14 @@ pub fn list_images_recursive(
 
     assign_group_ids(&mut result_list, &settings);
     Ok(result_list)
+}
+
+#[tauri::command]
+pub fn cancel_recursive_scan(app_handle: AppHandle) {
+    app_handle
+        .state::<crate::AppState>()
+        .recursive_scan_generation
+        .fetch_add(1, Ordering::Relaxed);
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -2183,7 +2235,17 @@ fn generate_single_thumbnail_and_cache(
 
 fn prefetch_source_file(path_str: &str) {
     let (source_path, _) = parse_virtual_path(path_str);
-    let _ = fs::read(&source_path);
+    #[cfg(unix)]
+    if let Ok(file) = fs::File::open(&source_path) {
+        use std::os::fd::AsRawFd;
+        // Ask the OS to begin readahead without allocating and copying the
+        // complete RAW into a temporary userspace buffer.
+        unsafe {
+            libc::posix_fadvise(file.as_raw_fd(), 0, 0, libc::POSIX_FADV_WILLNEED);
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = source_path;
 }
 
 pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
@@ -2305,7 +2367,7 @@ pub fn update_thumbnail_queue(
             queue.push_back(path);
         }
     } else {
-        for path in unique_paths {
+        for path in unique_paths.into_iter().rev() {
             queue.push_back(path);
         }
     }

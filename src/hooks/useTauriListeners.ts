@@ -9,7 +9,7 @@ import { useUIStore } from '../store/useUIStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { autoStackCreatedImages } from '../utils/autoStacking';
-import { mergeXmpImageStacks } from '../utils/imageStacks';
+import { areImageStacksEqual, mergeXmpImageStacks } from '../utils/imageStacks';
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;
@@ -72,11 +72,7 @@ export function useTauriListeners({
         pendingRatings[path] = pendingMetadata[path].rating;
       });
 
-      if (
-        Object.keys(pendingRatings).length > 0 ||
-        Object.keys(pendingEdits).length > 0 ||
-        metadataPaths.length > 0
-      ) {
+      if (Object.keys(pendingRatings).length > 0 || Object.keys(pendingEdits).length > 0 || metadataPaths.length > 0) {
         useLibraryStore.getState().setLibrary((state) => ({
           imageRatings: { ...state.imageRatings, ...pendingRatings },
           imageList: state.imageList.map((img) => {
@@ -98,7 +94,7 @@ export function useTauriListeners({
           if (settingsState.appSettings) {
             const imageList = useLibraryStore.getState().imageList;
             const imageStacks = mergeXmpImageStacks(settingsState.appSettings.imageStacks || [], imageList);
-            if (JSON.stringify(imageStacks) !== JSON.stringify(settingsState.appSettings.imageStacks || [])) {
+            if (!areImageStacksEqual(imageStacks, settingsState.appSettings.imageStacks || [])) {
               settingsState.setAppSettings({ ...settingsState.appSettings, imageStacks });
             }
           }

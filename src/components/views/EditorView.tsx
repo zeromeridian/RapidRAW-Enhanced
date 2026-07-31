@@ -1,4 +1,4 @@
-import { type RefObject, type PointerEvent as ReactPointerEvent } from 'react';
+import { lazy, Suspense, type RefObject, type PointerEvent as ReactPointerEvent } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import clsx from 'clsx';
@@ -7,15 +7,6 @@ import Editor from '../panel/Editor';
 import BottomBar from '../panel/BottomBar';
 import RightPanelSwitcher from '../panel/right/RightPanelSwitcher';
 import Resizer from '../ui/Resizer';
-import Controls from '../panel/right/ControlsPanel';
-import MetadataPanel from '../panel/right/MetadataPanel';
-import CropPanel from '../panel/right/CropPanel';
-import GeometryPanel from '../panel/right/GeometryPanel';
-import TaggingPanel from '../panel/right/TaggingPanel';
-import MasksPanel from '../panel/right/MasksPanel';
-import AIPanel from '../panel/right/AIPanel';
-import PresetsPanel from '../panel/right/PresetsPanel';
-import ExportPanel from '../panel/right/ExportPanel';
 
 import { useEditorStore } from '../../store/useEditorStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -26,6 +17,16 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { ImageFile, Orientation, Panel, ThumbnailAspectRatio } from '../ui/AppProperties';
 import { GroupBadgeInfo } from '../../utils/imageGrouping';
 import { ImageFlag } from '../../utils/imageFlags';
+
+const Controls = lazy(() => import('../panel/right/ControlsPanel'));
+const MetadataPanel = lazy(() => import('../panel/right/MetadataPanel'));
+const CropPanel = lazy(() => import('../panel/right/CropPanel'));
+const GeometryPanel = lazy(() => import('../panel/right/GeometryPanel'));
+const TaggingPanel = lazy(() => import('../panel/right/TaggingPanel'));
+const MasksPanel = lazy(() => import('../panel/right/MasksPanel'));
+const AIPanel = lazy(() => import('../panel/right/AIPanel'));
+const PresetsPanel = lazy(() => import('../panel/right/PresetsPanel'));
+const ExportPanel = lazy(() => import('../panel/right/ExportPanel'));
 
 const panelVariants: any = {
   animate: (direction: number) => ({
@@ -235,32 +236,34 @@ export default function EditorView({
             key={renderedRightPanel}
             variants={panelVariants}
           >
-            {renderedRightPanel === Panel.Adjustments && <Controls />}
-            {renderedRightPanel === Panel.Metadata && <MetadataPanel />}
-            {renderedRightPanel === Panel.Crop && <CropPanel />}
-            {renderedRightPanel === Panel.Geometry && <GeometryPanel />}
-            {renderedRightPanel === Panel.Masks && <MasksPanel />}
-            {renderedRightPanel === Panel.Presets && (
-              <PresetsPanel
-                onNavigateToCommunity={() => {
-                  handleBackToLibrary();
-                  setUI({ activeView: 'community' });
-                }}
-              />
-            )}
-            {renderedRightPanel === Panel.Export && (
-              <ExportPanel
-                exportState={exportState}
-                multiSelectedPaths={multiSelectedPaths}
-                selectedImage={selectedImage}
-                setExportState={setExportState}
-                appSettings={appSettings}
-                onSettingsChange={handleSettingsChange}
-                rootPaths={rootPaths}
-              />
-            )}
-            {renderedRightPanel === Panel.Ai && <AIPanel />}
-            {renderedRightPanel === Panel.Tagging && <TaggingPanel />}
+            <Suspense fallback={<div className="h-full w-full bg-bg-secondary" />}>
+              {renderedRightPanel === Panel.Adjustments && <Controls />}
+              {renderedRightPanel === Panel.Metadata && <MetadataPanel />}
+              {renderedRightPanel === Panel.Crop && <CropPanel />}
+              {renderedRightPanel === Panel.Geometry && <GeometryPanel />}
+              {renderedRightPanel === Panel.Masks && <MasksPanel />}
+              {renderedRightPanel === Panel.Presets && (
+                <PresetsPanel
+                  onNavigateToCommunity={() => {
+                    handleBackToLibrary();
+                    setUI({ activeView: 'community' });
+                  }}
+                />
+              )}
+              {renderedRightPanel === Panel.Export && (
+                <ExportPanel
+                  exportState={exportState}
+                  multiSelectedPaths={multiSelectedPaths}
+                  selectedImage={selectedImage}
+                  setExportState={setExportState}
+                  appSettings={appSettings}
+                  onSettingsChange={handleSettingsChange}
+                  rootPaths={rootPaths}
+                />
+              )}
+              {renderedRightPanel === Panel.Ai && <AIPanel />}
+              {renderedRightPanel === Panel.Tagging && <TaggingPanel />}
+            </Suspense>
           </motion.div>
         )}
       </AnimatePresence>

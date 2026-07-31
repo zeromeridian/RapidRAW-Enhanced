@@ -1364,6 +1364,7 @@ pub async fn run_headless_export(
     if source_path.is_dir() {
         let images = crate::file_management::list_images_recursive(
             session.source.clone(),
+            None,
             app_handle.clone(),
         )?;
         paths = images.into_iter().map(|img| img.path).collect();

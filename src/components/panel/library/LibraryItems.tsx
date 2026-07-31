@@ -37,6 +37,23 @@ const STACK_SPINE_POSITION_CLASSES: Record<StackMemberPosition, string> = {
 
 const STACK_ACCENT_COLOR = '#f97316';
 
+const useThumbnailMetadata = (path: string, isRaw: boolean, exif: ImageFile['exif']) =>
+  useMemo(() => {
+    const { baseName, isVirtualCopy } = getDisplayFilename(path);
+    const metadata = exif || {};
+    let fNumber = metadata.FNumber ? String(metadata.FNumber) : '';
+    if (fNumber && !fNumber.toLowerCase().startsWith('f')) fNumber = `f/${fNumber}`;
+    return {
+      baseName,
+      isVirtualCopy,
+      fileTypeLabel: getFileTypeBadgeLabel(path, isRaw),
+      shutter: metadata.ExposureTime || '',
+      fNumber,
+      iso: metadata.PhotographicSensitivity || metadata.ISOSpeedRatings || '',
+      focal: metadata.FocalLengthIn35mmFilm || metadata.FocalLength || '',
+    };
+  }, [exif, isRaw, path]);
+
 export const StackVisualCue = ({ info }: { info?: StackVisualInfo }) => {
   if (!info) return null;
 
@@ -118,22 +135,11 @@ const ThumbnailComponent = ({
     hadDataOnPathChange.current = !!data;
   }
 
-  const { baseName, isVirtualCopy } = useMemo(() => {
-    return getDisplayFilename(path);
-  }, [path]);
-  const fileTypeLabel = useMemo(() => getFileTypeBadgeLabel(path, isRaw), [isRaw, path]);
-
-  const { shutter, fNumber, iso, focal } = useMemo(() => {
-    const e = exif || {};
-    let fNum = e.FNumber ? String(e.FNumber) : '';
-    if (fNum && !fNum.toLowerCase().startsWith('f')) fNum = `f/${fNum}`;
-    return {
-      shutter: e.ExposureTime || '',
-      fNumber: fNum,
-      iso: e.PhotographicSensitivity || e.ISOSpeedRatings || '',
-      focal: e.FocalLengthIn35mmFilm || e.FocalLength || '',
-    };
-  }, [exif]);
+  const { baseName, isVirtualCopy, fileTypeLabel, shutter, fNumber, iso, focal } = useThumbnailMetadata(
+    path,
+    isRaw,
+    exif,
+  );
 
   useEffect(() => {
     if (data) {
@@ -632,22 +638,11 @@ const ListItemComponent = ({
     hadDataOnPathChange.current = !!data;
   }
 
-  const { baseName, isVirtualCopy } = useMemo(() => {
-    return getDisplayFilename(path);
-  }, [path]);
-  const fileTypeLabel = useMemo(() => getFileTypeBadgeLabel(path, isRaw), [isRaw, path]);
-
-  const { shutter, fNumber, iso, focal } = useMemo(() => {
-    const e = exif || {};
-    let fNum = e.FNumber ? String(e.FNumber) : '';
-    if (fNum && !fNum.toLowerCase().startsWith('f')) fNum = `f/${fNum}`;
-    return {
-      shutter: e.ExposureTime || '',
-      fNumber: fNum,
-      iso: e.PhotographicSensitivity || e.ISOSpeedRatings || '',
-      focal: e.FocalLengthIn35mmFilm || e.FocalLength || '',
-    };
-  }, [exif]);
+  const { baseName, isVirtualCopy, fileTypeLabel, shutter, fNumber, iso, focal } = useThumbnailMetadata(
+    path,
+    isRaw,
+    exif,
+  );
 
   const showExifCols = exifOverlay !== ExifOverlay.Off;
   const totalBase =

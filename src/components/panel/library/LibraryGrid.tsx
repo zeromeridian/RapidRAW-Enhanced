@@ -6,13 +6,12 @@ import { useTranslation } from 'react-i18next';
 import { Row } from './LibraryItems';
 import { useShallow } from 'zustand/react/shallow';
 import { useLibraryStore } from '../../../store/useLibraryStore';
-import { LibraryViewMode, SortDirection, LibraryDisplayMode } from '../../ui/AppProperties';
+import { ImageFile, LibraryViewMode, SortDirection, LibraryDisplayMode } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { ExifOverlay } from '../../ui/AppProperties';
 import { useSettingsStore } from '../../../store/useSettingsStore';
-
 
 function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: any) {
   const { t } = useTranslation();
@@ -130,8 +129,13 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
   );
 }
 
-const groupImagesByFolder = (images: any[], baseFolderPath: string | null) => {
-  const groups: Record<string, any[]> = {};
+interface FolderImageGroup {
+  path: string;
+  images: ImageFile[];
+}
+
+const groupImagesByFolder = (images: ImageFile[], baseFolderPath: string | null): FolderImageGroup[] => {
+  const groups: Record<string, ImageFile[]> = {};
 
   images.forEach((img) => {
     const physicalPath = img.path.split('?vc=')[0];
@@ -287,6 +291,11 @@ export default function LibraryGrid(props: any) {
     loadedThumbnailsRef.current.add(path);
   }, []);
 
+  const recursiveGroups = useMemo(
+    () => (libraryViewMode === LibraryViewMode.Recursive ? groupImagesByFolder(imageList, currentFolderPath) : []),
+    [currentFolderPath, imageList, libraryViewMode],
+  );
+
   const gridData = useMemo(() => {
     if (gridSize.width === 0 || imageList.length === 0) return null;
 
@@ -318,8 +327,7 @@ export default function LibraryGrid(props: any) {
     const rows: any[] = [];
 
     if (libraryViewMode === LibraryViewMode.Recursive) {
-      const groups = groupImagesByFolder(imageList, currentFolderPath);
-      groups.forEach((group) => {
+      recursiveGroups.forEach((group) => {
         if (group.images.length === 0) return;
 
         const isExpanded = !collapsedRecursiveFolders.has(group.path);
@@ -368,6 +376,7 @@ export default function LibraryGrid(props: any) {
     listColumnWidths.thumbnail,
     currentFolderPath,
     thumbnailSizeOptions,
+    recursiveGroups,
   ]);
 
   useEffect(() => {
@@ -399,8 +408,7 @@ export default function LibraryGrid(props: any) {
     let found = false;
 
     if (libraryViewMode === LibraryViewMode.Recursive) {
-      const groups = groupImagesByFolder(imageList, currentFolderPath);
-      for (const group of groups) {
+      for (const group of recursiveGroups) {
         if (group.images.length === 0) continue;
 
         targetTop += headerHeight;
@@ -417,7 +425,7 @@ export default function LibraryGrid(props: any) {
         targetTop += rowsInGroup * rowHeight;
       }
     } else {
-      const index = imageList.findIndex((img) => img.path === activePath);
+      const index = imageList.findIndex((img: ImageFile) => img.path === activePath);
       if (index !== -1) {
         const rowIndex = Math.floor(index / columnCount);
         targetTop = rowIndex * rowHeight;
@@ -443,7 +451,7 @@ export default function LibraryGrid(props: any) {
         });
       }
     }
-  }, [activePath, gridData, multiSelectedPaths.length, listHandle, currentFolderPath, imageList, libraryViewMode]);
+  }, [activePath, gridData, multiSelectedPaths.length, listHandle, libraryViewMode, recursiveGroups]);
 
   const memoizedRowProps = useMemo(() => {
     if (!gridData) return {};

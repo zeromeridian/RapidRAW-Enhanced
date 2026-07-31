@@ -32,16 +32,16 @@ export function useThumbnails() {
 
   const requestThumbnails = useCallback(
     (visiblePaths: string[]) => {
-      let addedToQueue = false;
-
-      visiblePaths.forEach((p) => {
-        if (!generatedRef.current.has(p) && !pendingQueueRef.current.has(p)) {
-          pendingQueueRef.current.add(p);
-          addedToQueue = true;
-        }
+      const prioritized = new Set<string>();
+      visiblePaths.forEach((path) => {
+        if (!generatedRef.current.has(path)) prioritized.add(path);
+      });
+      pendingQueueRef.current.forEach((path) => {
+        if (!generatedRef.current.has(path)) prioritized.add(path);
       });
 
-      if (addedToQueue) {
+      if (prioritized.size > 0) {
+        pendingQueueRef.current = prioritized;
         flushQueueToBackend();
       }
     },

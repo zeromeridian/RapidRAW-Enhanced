@@ -42,12 +42,41 @@ export interface GroupedLibrary {
   badges: Map<GroupId, GroupBadgeInfo> | null;
 }
 
+interface DerivedImageFields {
+  aperture: number;
+  color: string;
+  filename: string;
+  flag: string;
+  focalLength: number;
+  iso: number;
+  normalizedTags: string[];
+  shutter: number;
+}
+
 export function computeGroupedLibrary(libraryState: any, settingsState: any): GroupedLibrary {
   const { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria } = libraryState;
   const { appSettings } = settingsState;
 
   const groupingMode: GroupingMode = appSettings?.grouping ?? 'off';
   const isGroupingActive = groupingMode !== 'off';
+  const derived = new Map<string, DerivedImageFields>(
+    imageList.map((image: ImageFile) => {
+      const tags = image.tags || [];
+      return [
+        image.path,
+        {
+          aperture: parseAperture(image.exif?.FNumber),
+          color: tags.find((tag: string) => tag.startsWith('color:'))?.substring(6) || '',
+          filename: image.path.split(/[\\/]/).pop() || image.path,
+          flag: getImageFlag(tags),
+          focalLength: parseFocalLength(image.exif?.FocalLength),
+          iso: parseInt(image.exif?.PhotographicSensitivity || image.exif?.ISOSpeedRatings || '0', 10) || 0,
+          normalizedTags: tags.map((tag: string) => tag.toLowerCase().replace('user:', '')),
+          shutter: parseShutter(image.exif?.ExposureTime),
+        },
+      ] as const;
+    }),
+  );
 
   const matchesFilter = (image: ImageFile): boolean => {
     if (filterCriteria.rating !== 0) {
@@ -68,7 +97,7 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
     }
 
     if (filterCriteria.colors && filterCriteria.colors.length > 0) {
-      const imageColor = (image.tags || []).find((tag: string) => tag.startsWith('color:'))?.substring(6);
+      const imageColor = derived.get(image.path)?.color;
       const hasMatchingColor = imageColor && filterCriteria.colors.includes(imageColor);
       const matchesNone = !imageColor && filterCriteria.colors.includes('none');
 
@@ -135,9 +164,9 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
           `${image.exif?.LensModel || ''} ${image.exif?.Lens || ''} ${image.exif?.LensMake || ''}`,
         ).toLowerCase();
       } else if (field === 'color') {
-        imgStr = (image.tags || []).find((t: string) => t.startsWith('color:'))?.substring(6) || '';
+        imgStr = derived.get(image.path)?.color || '';
       } else if (field === 'flag') {
-        imgStr = getImageFlag(image.tags);
+        imgStr = derived.get(image.path)?.flag || '';
       }
 
       return operator === '=' || operator === ':' ? imgStr.includes(value) : false;
@@ -149,8 +178,9 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
   const matchesSearch = (image: ImageFile): boolean => {
     if (!isSearchActive) return true;
 
-    const lowerCaseImageTags = (image.tags || []).map((t) => t.toLowerCase().replace('user:', ''));
-    const filename = image?.path?.split(/[\\/]/)?.pop()?.toLowerCase() || '';
+    const imageDerived = derived.get(image.path)!;
+    const lowerCaseImageTags = imageDerived.normalizedTags;
+    const filename = imageDerived.filename.toLowerCase();
 
     let tagsMatch = true;
     if (parsedTags.length > 0) {
@@ -179,11 +209,13 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
 
   let processedList = imageList;
   let searchMatchingGroupIds: Set<string> | null = null;
+  let groupBadges: Map<GroupId, GroupBadgeInfo> | null = null;
 
   if (isGroupingActive) {
     const groupEditedFiles = appSettings?.groupEditedFiles ?? true;
     const groupingResult = buildImageGroups(imageList, groupingMode, groupEditedFiles);
     processedList = groupingResult.displayList;
+    groupBadges = groupingResult.badges;
 
     if (isSearchActive) {
       searchMatchingGroupIds = new Set<string>();
@@ -209,6 +241,8 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
 
   list.sort((a, b) => {
     const { key, order } = sortCriteria;
+    const derivedA = derived.get(a.path)!;
+    const derivedB = derived.get(b.path)!;
     let comparison = 0;
 
     switch (key) {
@@ -220,21 +254,19 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
         break;
       }
       case 'iso': {
-        const isoA = parseInt(a.exif?.PhotographicSensitivity || a.exif?.ISOSpeedRatings || '0', 10) || 0;
-        const isoB = parseInt(b.exif?.PhotographicSensitivity || b.exif?.ISOSpeedRatings || '0', 10) || 0;
-        comparison = isoA - isoB;
+        comparison = derivedA.iso - derivedB.iso;
         break;
       }
       case 'shutter_speed': {
-        comparison = parseShutter(a.exif?.ExposureTime) - parseShutter(b.exif?.ExposureTime);
+        comparison = derivedA.shutter - derivedB.shutter;
         break;
       }
       case 'aperture': {
-        comparison = parseAperture(a.exif?.FNumber) - parseAperture(b.exif?.FNumber);
+        comparison = derivedA.aperture - derivedB.aperture;
         break;
       }
       case 'focal_length': {
-        comparison = parseFocalLength(a.exif?.FocalLength) - parseFocalLength(b.exif?.FocalLength);
+        comparison = derivedA.focalLength - derivedB.focalLength;
         break;
       }
       case 'date':
@@ -247,27 +279,19 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
         comparison = a.is_edited === b.is_edited ? 0 : a.is_edited ? 1 : -1;
         break;
       default: {
-        const nameA = a.path.split(/[\\/]/).pop() || a.path;
-        const nameB = b.path.split(/[\\/]/).pop() || b.path;
-        comparison = nameA.localeCompare(nameB);
+        comparison = derivedA.filename.localeCompare(derivedB.filename);
         break;
       }
     }
 
     if (comparison === 0 && key !== 'name') {
-      const nameA = a.path.split(/[\\/]/).pop() || a.path;
-      const nameB = b.path.split(/[\\/]/).pop() || b.path;
-      return nameA.localeCompare(nameB);
+      return derivedA.filename.localeCompare(derivedB.filename);
     }
 
     return order === SortDirection.Ascending ? comparison : -comparison;
   });
 
-  const badges = isGroupingActive
-    ? buildImageGroups(imageList, groupingMode, appSettings?.groupEditedFiles ?? true).badges
-    : null;
-
-  return applyImageStacks(list, imageList, appSettings?.imageStacks, badges);
+  return applyImageStacks(list, imageList, appSettings?.imageStacks, groupBadges);
 }
 
 export function computeSortedLibrary(libraryState: any, settingsState: any): ImageFile[] {

@@ -28,9 +28,15 @@ details are in `RELEASE_NOTES.MD`.
 - Optional empty-folder hiding that preserves configured and pinned roots while
   removing branches with no supported images.
 - Progressive loading for large recursive folders, with background metadata
-  reconciliation and batched Library updates so thumbnails can appear promptly.
+  reconciliation, cancellable discovery, and batched Library updates so
+  thumbnails can appear before the complete folder tree has been scanned.
 - Thumbnail-prioritized cold-folder loading with delayed, bounded, cancelable
-  background EXIF extraction.
+  background EXIF extraction, stable visible-item priority, and memory-safe
+  rotational-drive readahead.
+- Deferred loading of advanced Develop panels and heavyweight workflow modals
+  to reduce application startup and initial interface parsing work.
+- Ordered, coalesced settings persistence with atomic replacement where the
+  operating system supports it and a compatibility fallback elsewhere.
 
 ## Develop
 

@@ -5,6 +5,23 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.1.3-fix-optimize — 2026-07-31
+
+### Faster libraries and a lighter interface
+
+- Large recursive folders now begin showing discovered images before the full
+  folder scan completes, and obsolete scans stop when another folder opens.
+- Visible thumbnails receive predictable priority while scrolling, with more
+  efficient handling for rotational drives.
+- Improved filtering, grouping, sorting, EXIF updates, and stack comparisons
+  for large libraries.
+- Reduced initial interface loading work by loading advanced panels and tools
+  only when first opened.
+- Improved settings reliability by ordering and combining rapid preference
+  saves, with safer on-disk replacement.
+- Reduced unnecessary AI connector checks while the application is hidden or
+  the AI panel is closed.
+
 ## 1.1.2-feature-transform — 2026-07-31
 
 ### Refined Guided Transform controls

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react';
 import { getVersion } from '@tauri-apps/api/app';
 import { open } from '@tauri-apps/plugin-shell';
 import {
@@ -17,7 +17,6 @@ import {
   SlidersHorizontal,
   Rows3,
 } from 'lucide-react';
-import CullingView from './library/CullingView';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
@@ -39,10 +38,12 @@ import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
-import SettingsPanel from './SettingsPanel';
 
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
+
+const CullingView = lazy(() => import('./library/CullingView'));
+const SettingsPanel = lazy(() => import('./SettingsPanel'));
 
 export interface ColumnWidths {
   thumbnail: number;
@@ -444,13 +445,15 @@ export default function MainLibrary(props: MainLibraryProps) {
 
             <div className="w-full h-full flex flex-col p-8 lg:p-16 overflow-y-auto custom-scrollbar relative z-10">
               {isSettingsOpen && props.appSettings ? (
-                <SettingsPanel
-                  appSettings={props.appSettings}
-                  onBack={() => setUI({ isSettingsOpen: false })}
-                  onLibraryRefresh={props.onLibraryRefresh}
-                  onSettingsChange={props.onSettingsChange}
-                  rootPaths={props.rootPaths}
-                />
+                <Suspense fallback={<div className="h-full w-full" />}>
+                  <SettingsPanel
+                    appSettings={props.appSettings}
+                    onBack={() => setUI({ isSettingsOpen: false })}
+                    onLibraryRefresh={props.onLibraryRefresh}
+                    onSettingsChange={props.onSettingsChange}
+                    rootPaths={props.rootPaths}
+                  />
+                </Suspense>
               ) : (
                 <>
                   <div className="my-auto text-left relative z-10">
@@ -742,7 +745,9 @@ export default function MainLibrary(props: MainLibraryProps) {
 
       {props.imageList.length > 0 ? (
         libraryDisplayMode === LibraryDisplayMode.Cull ? (
-          <CullingView {...props} />
+          <Suspense fallback={<div className="h-full w-full" />}>
+            <CullingView {...props} />
+          </Suspense>
         ) : (
           <LibraryGrid
             {...props}

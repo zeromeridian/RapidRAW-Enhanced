@@ -84,6 +84,20 @@ const createStackBadge = (
 export const findImageStack = (stacks: ImageStack[], path: string) =>
   stacks.find((stack) => stack.paths.includes(path));
 
+export const areImageStacksEqual = (left: ImageStack[], right: ImageStack[]): boolean =>
+  left.length === right.length &&
+  left.every((stack, index) => {
+    const candidate = right[index];
+    return (
+      candidate !== undefined &&
+      stack.id === candidate.id &&
+      stack.coverPath === candidate.coverPath &&
+      stack.collapsed === candidate.collapsed &&
+      stack.paths.length === candidate.paths.length &&
+      stack.paths.every((path, pathIndex) => path === candidate.paths[pathIndex])
+    );
+  });
+
 export function mergeXmpImageStacks(stacks: ImageStack[], images: ImageFile[]): ImageStack[] {
   const membersByStack = new Map<string, ImageFile[]>();
   for (const image of images) {

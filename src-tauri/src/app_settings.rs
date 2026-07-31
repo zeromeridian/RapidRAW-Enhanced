@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -692,7 +693,24 @@ pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
 pub fn save_settings(settings: AppSettings, app_handle: AppHandle) -> Result<(), String> {
     let path = get_settings_path(&app_handle)?;
     let json_string = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
-    fs::write(path, json_string).map_err(|e| e.to_string())?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| "Settings path does not have a parent directory".to_string())?;
+    let mut temporary = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
+    temporary
+        .write_all(json_string.as_bytes())
+        .and_then(|_| temporary.as_file_mut().sync_all())
+        .map_err(|e| e.to_string())?;
+    let temporary_path = temporary.into_temp_path();
+    if let Err(rename_error) = fs::rename(&temporary_path, &path) {
+        // Some platforms do not replace an existing destination with rename.
+        // Preserve the established direct-write fallback in that case.
+        fs::write(&path, json_string).map_err(|write_error| {
+            format!(
+                "Failed to atomically replace settings ({rename_error}); fallback write failed: {write_error}"
+            )
+        })?;
+    }
 
     let state = app_handle.state::<AppState>();
     let cache_size = settings.image_cache_size.unwrap_or(5) as usize;
