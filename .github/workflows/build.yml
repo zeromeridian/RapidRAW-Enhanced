@@ -37,6 +37,11 @@ on:
 jobs:
   build:
     runs-on: ${{ inputs.platform }}
+    env:
+      # The Tauri action launches the npm/Tauri wrapper again after the
+      # explicit preparation step. Keep branch context available to that
+      # detached-checkout subprocess on every supported platform.
+      BUILD_BRANCH: ${{ inputs.source-branch }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -80,8 +85,6 @@ jobs:
         run: npm ci
 
       - name: Apply branch-qualified build version
-        env:
-          BUILD_BRANCH: ${{ inputs.source-branch }}
         run: node scripts/prepare-build-version.mjs
 
       - id: tauri-build

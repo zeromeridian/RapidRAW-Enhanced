@@ -38,7 +38,9 @@ jobs:
       target: ${{ matrix.target }}
       asset-platform: ${{ matrix.asset-platform }}
       build-args: ${{ matrix.args }}
-      source-branch: ${{ github.event.release.target_commitish }}
+      # Releases are published from main and must use the plain semantic
+      # version even though GitHub checks out the release tag in detached HEAD.
+      source-branch: main
       release-id: ${{ github.event.release.id }}
     secrets: inherit
     permissions:
