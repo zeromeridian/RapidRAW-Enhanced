@@ -4575,7 +4575,7 @@ pub fn sync_metadata_to_xmp(
             return;
         }
         let skeleton = r#"<?xml version="1.0" encoding="UTF-8"?>
-<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="This Is Raw">
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="ThisIsRAW">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <rdf:Description rdf:about=""
     xmlns:xmp="http://ns.adobe.com/xap/1.0/"

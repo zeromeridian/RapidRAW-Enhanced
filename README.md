@@ -1,18 +1,18 @@
-# This Is Raw
+# ThisIsRAW
 
 **Built on RapidRAW. Built by ColrBent.**
 
-This Is Raw is an independent photo-editing application based on the RapidRAW
+ThisIsRAW is an independent photo-editing application based on the RapidRAW
 1.6 codebase. It preserves RapidRAW's fast, non-destructive, GPU-accelerated
 foundation while adding integrated library, culling, organization, masking,
 export, and workflow enhancements.
 
-RapidRAW was created by Timon Käch (CyberTimon). This Is Raw is built and
+RapidRAW was created by Timon Käch (CyberTimon). ThisIsRAW is built and
 maintained separately by ColrBent and is not an official RapidRAW release.
 
 ## Project Direction
 
-This Is Raw extends RapidRAW without needlessly diverging from its proven
+ThisIsRAW extends RapidRAW without needlessly diverging from its proven
 architecture. Development aims to:
 
 - Preserve established editing behavior wherever practical.
@@ -29,14 +29,14 @@ this version.
 
 ## Versioning
 
-This Is Raw uses independent semantic versioning beginning at `1.0.0`.
+ThisIsRAW uses independent semantic versioning beginning at `1.0.0`.
 Patch releases contain fixes and small refinements (`1.0.1`), minor releases
 add backward-compatible features (`1.1.0`), and major releases contain breaking
 or compatibility-changing updates (`2.0.0`).
 
 ## Inherited RapidRAW Foundation
 
-Because This Is Raw is built on RapidRAW 1.6, it retains core capabilities such
+Because ThisIsRAW is built on RapidRAW 1.6, it retains core capabilities such
 as:
 
 - Non-destructive RAW image editing.
@@ -87,7 +87,7 @@ library inherited from RapidRAW.
 
 ## License and Upstream Attribution
 
-This Is Raw is distributed under the same **GNU Affero General Public License,
+ThisIsRAW is distributed under the same **GNU Affero General Public License,
 version 3 (AGPL-3.0)** as RapidRAW.
 
 The original RapidRAW code remains subject to its existing copyright and
@@ -97,4 +97,4 @@ obligations attached to the upstream work. Refer to [LICENSE](LICENSE) for the
 complete license terms.
 
 RapidRAW and its original contributors are acknowledged for the project,
-architecture, and functionality on which This Is Raw is built.
+architecture, and functionality on which ThisIsRAW is built.

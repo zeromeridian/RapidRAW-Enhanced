@@ -1,4 +1,4 @@
-name: This Is Raw Lint
+name: ThisIsRAW Lint
 
 on:
   push:
@@ -47,7 +47,7 @@ jobs:
 
       - name: Check formatting
         working-directory: src-tauri
-        run: cargo fmt -p This-Is-Raw -- --check
+        run: cargo fmt -p ThisIsRAW -- --check
 
   clippy:
     name: cargo clippy

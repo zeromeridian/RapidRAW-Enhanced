@@ -7,7 +7,7 @@ sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
   - org.freedesktop.Sdk.Extension.node24
 
-command: This-Is-Raw
+command: ThisIsRAW
 finish-args:
   - --socket=wayland
   - --socket=fallback-x11
@@ -18,7 +18,7 @@ build-options:
   append-path: /usr/lib/sdk/node24/bin:/usr/lib/sdk/rust-stable/bin
 
 modules:
-  - name: This-Is-Raw
+  - name: ThisIsRAW
     buildsystem: simple
     sources:
       - type: git
@@ -48,15 +48,15 @@ modules:
 
     build-options:
       env:
-        CARGO_HOME: /run/build/This-Is-Raw/cargo
-        XDG_CACHE_HOME: /run/build/This-Is-Raw/flatpak-node/cache
-        npm_config_cache: /run/build/This-Is-Raw/flatpak-node/npm-cache
+        CARGO_HOME: /run/build/ThisIsRAW/cargo
+        XDG_CACHE_HOME: /run/build/ThisIsRAW/flatpak-node/cache
+        npm_config_cache: /run/build/ThisIsRAW/flatpak-node/npm-cache
         npm_config_offline: 'true'
         ORT_STRATEGY: system
 
     build-commands:
-      - mkdir -p /run/build/This-Is-Raw/src-tauri/resources
-      - cp -rf libonnxruntime.so /run/build/This-Is-Raw/src-tauri/resources
+      - mkdir -p /run/build/ThisIsRAW/src-tauri/resources
+      - cp -rf libonnxruntime.so /run/build/ThisIsRAW/src-tauri/resources
 
       - npm ci --offline --legacy-peer-deps
       - cargo --offline fetch --manifest-path src-tauri/Cargo.toml --verbose
@@ -64,7 +64,7 @@ modules:
 
       - install -Dm644 -t /app/share/metainfo/ data/io.github.CyberTimon.RapidRAW.metainfo.xml
       - install -Dm644 -t /app/share/applications/ data/io.github.CyberTimon.RapidRAW.desktop
-      - install -Dm755 -t /app/bin/ src-tauri/target/release/This-Is-Raw
+      - install -Dm755 -t /app/bin/ src-tauri/target/release/ThisIsRAW
 
       - desktop-file-edit --set-key=Icon --set-value="io.github.CyberTimon.RapidRAW" /app/share/applications/io.github.CyberTimon.RapidRAW.desktop
 
@@ -73,8 +73,8 @@ modules:
       - install -Dm644 src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/io.github.CyberTimon.RapidRAW.png
       - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/256x256@2/apps/io.github.CyberTimon.RapidRAW.png
 
-      - mkdir -p /app/lib/This-Is-Raw
-      - cp -rf src-tauri/resources /app/lib/This-Is-Raw
-      - cp -rf src-tauri/workflows /app/lib/This-Is-Raw
+      - mkdir -p /app/lib/ThisIsRAW
+      - cp -rf src-tauri/resources /app/lib/ThisIsRAW
+      - cp -rf src-tauri/workflows /app/lib/ThisIsRAW
 
       - install -Dm644 LICENSE /app/share/licenses/io.github.CyberTimon.RapidRAW/LICENSE

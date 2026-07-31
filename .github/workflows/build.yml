@@ -1,4 +1,4 @@
-name: This Is Raw Reusable Build
+name: ThisIsRAW Reusable Build
 
 on:
   workflow_call:
@@ -91,7 +91,7 @@ jobs:
         if: inputs.upload-artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: This-Is-Raw-${{ inputs.target }}
+          name: ThisIsRAW-${{ inputs.target }}
           path: ${{ join(fromJSON(steps.tauri-build.outputs.artifactPaths), '\n') }}
           if-no-files-found: error
           retention-days: 7

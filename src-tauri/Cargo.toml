@@ -1,6 +1,6 @@
 [package]
-name = "This-Is-Raw"
-description = "This Is Raw — built on RapidRAW by ColrBent."
+name = "ThisIsRAW"
+description = "ThisIsRAW — built on RapidRAW by ColrBent."
 authors = ["ColrBent"]
 edition = "2024"
 rust-version = "1.96"

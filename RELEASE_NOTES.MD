@@ -1,9 +1,18 @@
-# This Is Raw Release Notes
+# ThisIsRAW Release Notes
 
-This is the continuous release history for production builds of This Is Raw.
+This is the continuous release history for production builds of ThisIsRAW.
 The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
+
+## 1.0.1 — 2026-07-30
+
+### Product name normalization
+
+- Standardized the application, package, executable, workflow artifacts, and
+  release branding as **ThisIsRAW**.
+- Updated exported metadata and application-facing descriptions to use the
+  same product name consistently.
 
 ## 1.0.0 — 2026-07-30
 
@@ -25,7 +34,7 @@ description.
 - Level and Vertical buttons now remain visibly highlighted while their
   automatic correction mode is active.
 - Automatic geometry mode, rotation, vertical correction, and Constrain Crop
-  are now synchronized through XMP for use by other This Is Raw installations.
+  are now synchronized through XMP for use by other ThisIsRAW installations.
 - Applying Manual Transform clears the automatic-mode highlight while
   preserving the manually selected geometry values.
 
@@ -76,14 +85,14 @@ description.
 ### Launch screen branding
 
 - Removed the inherited RapidRAW marketing description from the launch screen.
-- The launch screen now presents **This Is Raw**, **Built on RapidRAW**, and
+- The launch screen now presents **ThisIsRAW**, **Built on RapidRAW**, and
   the concise folder or library instruction.
 
 ## 1.6.1-colrbent.54 — 2026-07-30
 
-### This Is Raw
+### ThisIsRAW
 
-- The application is now named **This Is Raw**.
+- The application is now named **ThisIsRAW**.
 - Product presentation now carries the tagline **Built on RapidRAW** and
   identifies ColrBent as its builder.
 - Application windows, launch screen, packages, executables, workflows,
@@ -189,12 +198,12 @@ description.
 ### Portable XMP flags and stacks
 
 - Physical-image flags now synchronize through application-specific XMP metadata
-  and are restored by another This Is Raw installation.
+  and are restored by another ThisIsRAW installation.
 - Physical stacks now store a shared stack identifier, member order, cover
   status and collapsed state in each member's XMP sidecar.
 - Existing stacks are backfilled when settings load, and stacks discovered in
   XMP are reconstructed using the paths available on the current machine.
-- Virtual copies continue using their independent This Is Raw sidecars because
+- Virtual copies continue using their independent ThisIsRAW sidecars because
   multiple virtual copies share one physical XMP file.
 
 ## 1.6.1-colrbent.36 — 2026-07-28
@@ -220,7 +229,7 @@ description.
 ### Splash ownership notice
 
 - The launch-screen footer now identifies ColrBent's copyright ownership of
-  This Is Raw modifications beside the current application version.
+  ThisIsRAW modifications beside the current application version.
 - The notice uses the current year automatically, remains visually subtle, and
   can wrap without overflowing narrower layouts.
 - Its wording limits the ownership claim to fork modifications and does not
@@ -236,7 +245,7 @@ description.
   documentation.
 - Update checks, release downloads, contribution links, ownership metadata,
   package authorship, and packaging sources now point to or identify the
-  This Is Raw fork.
+  ThisIsRAW fork.
 - Upstream compatibility identifiers and required technical dependencies
   remain unchanged.
 
@@ -284,7 +293,7 @@ description.
   grid/list and Develop filmstrip, while badges and other thumbnail information
   remain readable.
 - Flag badges and toolbar states now use monochrome icons consistent with the
-  rest of This Is Raw.
+  rest of ThisIsRAW.
 - Added combinable Rejected, Selected, Deferred, and Unflagged filters to View
   Options and the bottom Quick Filter.
 - Added advanced flag queries such as `flag:rejected`.
@@ -349,11 +358,11 @@ description.
   creation dates, exposure time, aperture, ISO, exposure compensation, focal
   lengths, artist, copyright, description, and GPS when GPS removal is
   disabled.
-- Software is rewritten as `This Is Raw`.
+- Software is rewritten as `ThisIsRAW`.
 - Structural TIFF fields, embedded previews, MakerNote, and other
   source-layout-dependent metadata are not copied.
 - Metadata is merged into the newly encoded TIFF's own structural directories.
-  This Is Raw then fully decodes the result; if metadata writing or validation
+  ThisIsRAW then fully decodes the result; if metadata writing or validation
   fails, it safely uses the metadata-free encoded TIFF.
 
 ## 1.6.1-colrbent.18 — 2026-07-27

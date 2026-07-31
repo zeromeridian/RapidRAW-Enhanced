@@ -687,7 +687,7 @@
         "importPresetsTitle": "Vorgaben importieren",
         "legacyPreset": "Alte Vorgabe",
         "presetFile": "Vorgabendatei",
-        "rapidRawPreset": "This Is Raw Vorgabe"
+        "rapidRawPreset": "ThisIsRAW Vorgabe"
       },
       "menu": {
         "configurePreset": "Vorgabe konfigurieren",
@@ -1034,7 +1034,7 @@
     },
     "splash": {
       "addFolder": "Ordner hinzufügen",
-      "brand": "This Is Raw",
+      "brand": "ThisIsRAW",
       "subtitle": "A Modern RAW Workflow for Photographers",
       "tagline": "Built on RapidRAW",
       "continueSession": "Sitzung fortsetzen",
@@ -1513,7 +1513,7 @@
       "font": "Schriftart",
       "fontDesc": "Ändern Sie die Schriftart der Anwendung.",
       "nativeTitlebar": "Native Titelleiste",
-      "nativeTitlebarDesc": "Verwenden Sie die Standard-Fenstertitelleiste Ihres Systems anstelle der benutzerdefinierten von This Is Raw.",
+      "nativeTitlebarDesc": "Verwenden Sie die Standard-Fenstertitelleiste Ihres Systems anstelle der benutzerdefinierten von ThisIsRAW.",
       "poppins": "Poppins",
       "showImageCounts": "Bildanzahl anzeigen",
       "system": "Systemstandard",
@@ -1622,7 +1622,7 @@
         "connector": {
           "address": "AI Connector Adresse",
           "addressDesc": "Geben Sie die Adresse und den Port Ihrer laufenden AI Connector Instanz ein. Erforderlich für generative KI-Funktionen.",
-          "description": "Für Benutzer mit einer fähigen GPU, die maximale Kontrolle wünschen. Verbinden Sie This Is Raw mit Ihrem eigenen Connector-Server.",
+          "description": "Für Benutzer mit einer fähigen GPU, die maximale Kontrolle wünschen. Verbinden Sie ThisIsRAW mit Ihrem eigenen Connector-Server.",
           "failed": "Verbindung fehlgeschlagen.",
           "feature1": "Verwenden Sie Ihre eigene ComfyUI Instanz",
           "feature2": "Kostenlose erweiterte generative Bearbeitungen",
@@ -1630,16 +1630,16 @@
           "success": "Verbindung erfolgreich!",
           "test": "Testen",
           "testing": "Wird getestet...",
-          "title": "Selbstgehostet (This Is Raw AI Connector)"
+          "title": "Selbstgehostet (ThisIsRAW AI Connector)"
         },
         "cpu": {
-          "description": "Diese Funktionen sind direkt in This Is Raw integriert und laufen vollständig auf Ihrem Computer. Sie sind schnell, kostenlos und erfordern keine Einrichtung.",
+          "description": "Diese Funktionen sind direkt in ThisIsRAW integriert und laufen vollständig auf Ihrem Computer. Sie sind schnell, kostenlos und erfordern keine Einrichtung.",
           "feature1": "KI-Maskierung (Motiv, Himmel, Vordergrund)",
           "feature2": "Automatisches Bild-Tagging",
           "feature3": "Einfaches CPU-basiertes generatives Ersetzen",
           "title": "Integrierte KI (CPU)"
         },
-        "description": "Die KI von This Is Raw ist auf Flexibilität ausgelegt. Wählen Sie Ihren idealen Workflow.",
+        "description": "Die KI von ThisIsRAW ist auf Flexibilität ausgelegt. Wählen Sie Ihren idealen Workflow.",
         "providers": {
           "aiConnector": "AI Connector",
           "cloud": "Cloud",
@@ -1766,7 +1766,7 @@
       "title": "Tagging"
     },
     "thanks": {
-      "description": "Ein großes Dankeschön an die folgenden Projekte, die für die Entwicklung von This Is Raw sehr wichtig waren:",
+      "description": "Ein großes Dankeschön an die folgenden Projekte, die für die Entwicklung von ThisIsRAW sehr wichtig waren:",
       "list": {
         "darktable": "Für Referenzimplementierungen, die Teile dieser Arbeit leiteten.",
         "depth": "Für das Modell zur monokularen Tiefenschätzung (Tiefenmasken).",
@@ -1777,7 +1777,7 @@
         "rawler": "Für die hervorragende Rust-Crate zur RAW-Bildverarbeitung.",
         "sam2": "Für das grundlegende Modell der KI-Motiverkennung.",
         "u2net": "Für die Architektur zur Erkennung von Himmel und Vordergrund.",
-        "you": "Dafür, dass Sie This Is Raw nutzen. Ihr Interesse hält dieses Projekt am Leben.",
+        "you": "Dafür, dass Sie ThisIsRAW nutzen. Ihr Interesse hält dieses Projekt am Leben.",
         "youLabel": "Ihnen"
       },
       "title": "Besonderer Dank"
