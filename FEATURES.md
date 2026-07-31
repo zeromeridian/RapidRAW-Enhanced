@@ -38,7 +38,10 @@ details are in `RELEASE_NOTES.MD`.
   perspective work. Geometry includes automatic **Level** and **Vertical**
   correction, editable **Manual Transform** controls, lens correction, and a
   persistent **Constrain Crop** option. Active automatic modes remain
-  highlighted and synchronize their correction values through XMP.
+  highlighted and synchronize their correction values through XMP. Adaptive
+  contrast and line-length analysis recognizes shorter, lower-contrast
+  structures, while robust grouped-line perspective estimation handles both
+  parallel and converging architectural edges.
 - The Masking module presents every mask source directly, without an additional
   **Others** submenu.
 - A dedicated **Tagging** module adds and removes tags across the current image
