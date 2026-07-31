@@ -1,6 +1,6 @@
-# This Is Raw Features
+# ThisIsRAW Features
 
-This is the concise, current inventory of features added to This Is Raw. It
+This is the concise, current inventory of features added to ThisIsRAW. It
 describes the application as it exists now; release history and validation
 details are in `RELEASE_NOTES.MD`.
 
@@ -59,7 +59,7 @@ details are in `RELEASE_NOTES.MD`.
 - Export directly beside each source image.
 - Consolidated EXIF export controls with optional GPS removal.
 - Complete readable EXIF preservation for JPEG and a safe allowlist for TIFF,
-  with This Is Raw recorded as the exporting software.
+  with ThisIsRAW recorded as the exporting software.
 - XMP synchronization for ratings, color labels, keywords, physical-image
   flags, and physical stack membership, order, cover, and collapsed state.
 - Recursive **Read XMP from Folder** action that treats XMP as authoritative

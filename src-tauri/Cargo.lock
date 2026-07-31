@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "This-Is-Raw"
+name = "ThisIsRAW"
 version = "0.0.0"
 dependencies = [
  "anyhow",

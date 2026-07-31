@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>io.github.CyberTimon.RapidRAW</id>
 
-  <name>This Is Raw</name>
+  <name>ThisIsRAW</name>
   <summary>Built on RapidRAW by ColrBent</summary>
   <developer id="io.github.zeromeridian">
     <name>ColrBent</name>
@@ -19,7 +19,7 @@
 
   <description>
     <p>
-      This Is Raw is a modern, high-performance photo editor built on RapidRAW by ColrBent. It delivers a simple, beautiful editing experience in a lightweight package.
+      ThisIsRAW is a modern, high-performance photo editor built on RapidRAW by ColrBent. It delivers a simple, beautiful editing experience in a lightweight package.
     </p>
   </description>
 

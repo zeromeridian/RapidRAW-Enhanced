@@ -1,8 +1,8 @@
 [Desktop Entry]
 Categories=Graphics;Photography;
 Comment=Built on RapidRAW by ColrBent.
-Exec=This-Is-Raw
-Icon=This-Is-Raw
-Name=This Is Raw
+Exec=ThisIsRAW
+Icon=ThisIsRAW
+Name=ThisIsRAW
 Terminal=false
 Type=Application

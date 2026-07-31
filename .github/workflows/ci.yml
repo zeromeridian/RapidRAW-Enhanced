@@ -1,4 +1,4 @@
-name: This Is Raw CI Build
+name: ThisIsRAW CI Build
 
 on:
   push:

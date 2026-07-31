@@ -1207,7 +1207,7 @@ pub fn write_image_with_metadata(
         }
     }
 
-    metadata.set_tag(ExifTag::Software("This Is Raw".to_string()));
+    metadata.set_tag(ExifTag::Software("ThisIsRAW".to_string()));
 
     if is_tiff_output {
         let original_image_bytes = image_bytes.clone();
@@ -1493,7 +1493,7 @@ mod tests {
         assert!(
             output_metadata
                 .into_iter()
-                .any(|tag| matches!(tag, ExifTag::Software(value) if value == "This Is Raw"))
+                .any(|tag| matches!(tag, ExifTag::Software(value) if value == "ThisIsRAW"))
         );
         assert!(
             output_metadata

@@ -1,4 +1,4 @@
-name: This Is Raw Release
+name: ThisIsRAW Release
 
 on:
   release:

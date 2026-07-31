@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug or issue with This Is Raw
+description: Report a bug or issue with ThisIsRAW
 title: 'BUG: '
 labels: ['bug']
 body:
@@ -61,8 +61,8 @@ body:
   - type: input
     id: this-is-raw-version
     attributes:
-      label: This Is Raw Version
-      description: What version of This Is Raw are you using?
+      label: ThisIsRAW Version
+      description: What version of ThisIsRAW are you using?
       placeholder: e.g., 1.0.0
     validations:
       required: true
@@ -79,7 +79,7 @@ body:
       value: |
         ### Lenses & Camera Support
 
-        This Is Raw relies on external libraries for lens corrections and raw file decoding. If your camera or lens is unsupported, please open an issue directly with the relevant project:
+        ThisIsRAW relies on external libraries for lens corrections and raw file decoding. If your camera or lens is unsupported, please open an issue directly with the relevant project:
 
         | Feature | Library | Request addition |
         |---|---|---|
