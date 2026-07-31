@@ -5,6 +5,29 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.0.7-feature-mask-enhancements — 2026-07-31
+
+### Mask overlay and Gaussian Blur
+
+- Added a configurable `O` shortcut and Masking-panel visibility button for
+  hiding the colored mask overlay without disabling the mask or its edits.
+- Added Gaussian Blur to local-mask Effects with a controllable Amount.
+- Gaussian Blur settings persist with mask edits and synchronize through XMP.
+
+## 1.0.6-feature-mask-enhancements — 2026-07-31
+
+### Mask layers and blend modes
+
+- Added per-mask blend modes: Normal; Darken, Multiply, Color Burn, and Linear
+  Burn; Lighten, Screen, Color Dodge, and Linear Dodge; Overlay, Soft Light,
+  and Hard Light; Vivid Light, Linear Light, Pin Light, and Hard Mix; and Hue,
+  Saturation, Color, and Luminosity.
+- Existing mask drag ordering now controls the order used for blend-mode
+  compositing.
+- Added a versioned ThisIsRAW XMP adjustment payload so mask ordering, blend
+  modes, and the complete editable adjustment state can move between
+  installations.
+
 ## 1.0.3-develop — 2026-07-30
 
 ### Branch-qualified build versions

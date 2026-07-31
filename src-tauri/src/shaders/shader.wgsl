@@ -130,7 +130,7 @@ struct MaskAdjustments {
     tint: f32,
     vibrance: f32,
     monochrome: u32,
-    _pad_color1: f32,
+    blend_mode: u32,
     _pad_color2: f32,
     _pad_color3: f32,
 
@@ -152,7 +152,7 @@ struct MaskAdjustments {
     grain_amount: f32,
     grain_size: f32,
     grain_roughness: f32,
-    _pad_effects: f32,
+    gaussian_blur_amount: f32,
 
     hue: f32,
     _pad_cg1: f32,
@@ -285,6 +285,94 @@ fn hsv_to_rgb(c: vec3<f32>) -> vec3<f32> {
     else if (h < 300.0) { rgb_prime = vec3<f32>(X, 0.0, C); }
     else { rgb_prime = vec3<f32>(C, 0.0, X); }
     return rgb_prime + vec3<f32>(m, m, m);
+}
+
+fn rgb_to_hsl(c: vec3<f32>) -> vec3<f32> {
+    let maximum = max(c.r, max(c.g, c.b));
+    let minimum = min(c.r, min(c.g, c.b));
+    let delta = maximum - minimum;
+    let lightness = (maximum + minimum) * 0.5;
+    var hue = 0.0;
+    var saturation = 0.0;
+    if (delta > 0.000001) {
+        saturation = delta / max(0.000001, 1.0 - abs(2.0 * lightness - 1.0));
+        if (maximum == c.r) { hue = 60.0 * (((c.g - c.b) / delta) % 6.0); }
+        else if (maximum == c.g) { hue = 60.0 * (((c.b - c.r) / delta) + 2.0); }
+        else { hue = 60.0 * (((c.r - c.g) / delta) + 4.0); }
+        if (hue < 0.0) { hue += 360.0; }
+    }
+    return vec3<f32>(hue, saturation, lightness);
+}
+
+fn hsl_to_rgb(c: vec3<f32>) -> vec3<f32> {
+    let chroma = (1.0 - abs(2.0 * c.z - 1.0)) * c.y;
+    let x = chroma * (1.0 - abs((c.x / 60.0) % 2.0 - 1.0));
+    let offset = c.z - chroma * 0.5;
+    var rgb = vec3<f32>(0.0);
+    if (c.x < 60.0) { rgb = vec3<f32>(chroma, x, 0.0); }
+    else if (c.x < 120.0) { rgb = vec3<f32>(x, chroma, 0.0); }
+    else if (c.x < 180.0) { rgb = vec3<f32>(0.0, chroma, x); }
+    else if (c.x < 240.0) { rgb = vec3<f32>(0.0, x, chroma); }
+    else if (c.x < 300.0) { rgb = vec3<f32>(x, 0.0, chroma); }
+    else { rgb = vec3<f32>(chroma, 0.0, x); }
+    return rgb + vec3<f32>(offset);
+}
+
+fn color_burn_channel(backdrop: f32, source: f32) -> f32 {
+    if (source <= 0.0) { return 0.0; }
+    return 1.0 - min(1.0, (1.0 - backdrop) / source);
+}
+
+fn color_dodge_channel(backdrop: f32, source: f32) -> f32 {
+    if (source >= 1.0) { return 1.0; }
+    return min(1.0, backdrop / (1.0 - source));
+}
+
+fn soft_light_channel(backdrop: f32, source: f32) -> f32 {
+    if (source <= 0.5) {
+        return backdrop - (1.0 - 2.0 * source) * backdrop * (1.0 - backdrop);
+    }
+    var d: f32;
+    if (backdrop <= 0.25) { d = ((16.0 * backdrop - 12.0) * backdrop + 4.0) * backdrop; }
+    else { d = sqrt(backdrop); }
+    return backdrop + (2.0 * source - 1.0) * (d - backdrop);
+}
+
+fn vivid_light_channel(backdrop: f32, source: f32) -> f32 {
+    if (source < 0.5) { return color_burn_channel(backdrop, 2.0 * source); }
+    return color_dodge_channel(backdrop, 2.0 * (source - 0.5));
+}
+
+fn blend_colors(backdrop_input: vec3<f32>, source_input: vec3<f32>, mode: u32) -> vec3<f32> {
+    let backdrop = clamp(backdrop_input, vec3<f32>(0.0), vec3<f32>(1.0));
+    let source = clamp(source_input, vec3<f32>(0.0), vec3<f32>(1.0));
+    if (mode == 1u) { return min(backdrop, source); }
+    if (mode == 2u) { return backdrop * source; }
+    if (mode == 3u) { return vec3<f32>(color_burn_channel(backdrop.r, source.r), color_burn_channel(backdrop.g, source.g), color_burn_channel(backdrop.b, source.b)); }
+    if (mode == 4u) { return max(vec3<f32>(0.0), backdrop + source - 1.0); }
+    if (mode == 5u) { return max(backdrop, source); }
+    if (mode == 6u) { return backdrop + source - backdrop * source; }
+    if (mode == 7u) { return vec3<f32>(color_dodge_channel(backdrop.r, source.r), color_dodge_channel(backdrop.g, source.g), color_dodge_channel(backdrop.b, source.b)); }
+    if (mode == 8u) { return min(vec3<f32>(1.0), backdrop + source); }
+    if (mode == 9u) {
+        return vec3<f32>(select(2.0 * backdrop.r * source.r, 1.0 - 2.0 * (1.0 - backdrop.r) * (1.0 - source.r), backdrop.r > 0.5), select(2.0 * backdrop.g * source.g, 1.0 - 2.0 * (1.0 - backdrop.g) * (1.0 - source.g), backdrop.g > 0.5), select(2.0 * backdrop.b * source.b, 1.0 - 2.0 * (1.0 - backdrop.b) * (1.0 - source.b), backdrop.b > 0.5));
+    }
+    if (mode == 10u) { return vec3<f32>(soft_light_channel(backdrop.r, source.r), soft_light_channel(backdrop.g, source.g), soft_light_channel(backdrop.b, source.b)); }
+    if (mode == 11u) {
+        return vec3<f32>(select(2.0 * backdrop.r * source.r, 1.0 - 2.0 * (1.0 - backdrop.r) * (1.0 - source.r), source.r > 0.5), select(2.0 * backdrop.g * source.g, 1.0 - 2.0 * (1.0 - backdrop.g) * (1.0 - source.g), source.g > 0.5), select(2.0 * backdrop.b * source.b, 1.0 - 2.0 * (1.0 - backdrop.b) * (1.0 - source.b), source.b > 0.5));
+    }
+    let vivid = vec3<f32>(vivid_light_channel(backdrop.r, source.r), vivid_light_channel(backdrop.g, source.g), vivid_light_channel(backdrop.b, source.b));
+    if (mode == 12u) { return vivid; }
+    if (mode == 13u) { return clamp(backdrop + 2.0 * source - 1.0, vec3<f32>(0.0), vec3<f32>(1.0)); }
+    if (mode == 14u) { return vec3<f32>(select(min(backdrop.r, 2.0 * source.r), max(backdrop.r, 2.0 * source.r - 1.0), source.r > 0.5), select(min(backdrop.g, 2.0 * source.g), max(backdrop.g, 2.0 * source.g - 1.0), source.g > 0.5), select(min(backdrop.b, 2.0 * source.b), max(backdrop.b, 2.0 * source.b - 1.0), source.b > 0.5)); }
+    if (mode == 15u) { return select(vec3<f32>(0.0), vec3<f32>(1.0), vivid >= vec3<f32>(0.5)); }
+    let backdrop_hsl = rgb_to_hsl(backdrop);
+    let source_hsl = rgb_to_hsl(source);
+    if (mode == 16u) { return hsl_to_rgb(vec3<f32>(source_hsl.x, backdrop_hsl.y, backdrop_hsl.z)); }
+    if (mode == 17u) { return hsl_to_rgb(vec3<f32>(backdrop_hsl.x, source_hsl.y, backdrop_hsl.z)); }
+    if (mode == 18u) { return hsl_to_rgb(vec3<f32>(source_hsl.x, source_hsl.y, backdrop_hsl.z)); }
+    if (mode == 19u) { return hsl_to_rgb(vec3<f32>(backdrop_hsl.x, backdrop_hsl.y, source_hsl.z)); }
+    return source;
 }
 
 fn apply_hue_shift(color: vec3<f32>, shift_degrees: f32) -> vec3<f32> {
@@ -1529,6 +1617,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     } else {
         initial_linear_rgb = color_from_texture;
     }
+    let blend_backdrop_rgb = select(
+        linear_to_srgb_extended(initial_linear_rgb),
+        clamp(color_from_texture, vec3<f32>(0.0), vec3<f32>(1.0)),
+        is_raw == 0u
+    );
 
     var t_exposure = adjustments.global.exposure;
     var t_brightness = adjustments.global.brightness;
@@ -1617,6 +1710,19 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let tonal_blurred = textureLoad(tonal_blur_texture, id.xy, 0).rgb;
     let clarity_blurred = textureLoad(clarity_blur_texture, id.xy, 0).rgb;
     let structure_blurred = textureLoad(structure_blur_texture, id.xy, 0).rgb;
+
+    for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
+        let influence = get_mask_influence(i, absolute_coord);
+        let blur_amount = adjustments.mask_adjustments[i].gaussian_blur_amount * influence;
+        if (blur_amount > 0.001) {
+            let blurred_linear = select(
+                structure_blurred,
+                srgb_to_linear(structure_blurred),
+                is_raw == 0u
+            );
+            initial_linear_rgb = mix(initial_linear_rgb, blurred_linear, clamp(blur_amount, 0.0, 1.0));
+        }
+    }
 
     var locally_contrasted_rgb = initial_linear_rgb;
 
@@ -1815,6 +1921,19 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
                 m.grain_roughness,
                 scale
             ) * influence;
+        }
+    }
+
+    // Normal retains the established local-adjustment rendering. Other modes
+    // composite that adjusted result against the input in mask-list order.
+    for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
+        let mode = adjustments.mask_adjustments[i].blend_mode;
+        if (mode != 0u) {
+            let influence = get_mask_influence(i, absolute_coord);
+            if (influence > 0.001) {
+                let blended = blend_colors(blend_backdrop_rgb, final_rgb, mode);
+                final_rgb = mix(final_rgb, blended, influence);
+            }
         }
     }
 

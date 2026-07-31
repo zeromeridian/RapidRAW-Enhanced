@@ -136,6 +136,7 @@
       "bokehShape": "Bokeh Shape",
       "creative": "Creative",
       "feather": "Feather",
+      "gaussianBlur": "Gaussian Blur",
       "glow": "Glow",
       "grain": "Grain",
       "halation": "Halation",
@@ -583,6 +584,7 @@
       "actions": {
         "addNewComponent": "Add New Component",
         "applyPreset": "Apply Preset",
+        "blendMode": "Blend Mode",
         "copyComponent": "Copy Component",
         "copyMask": "Copy Mask",
         "deleteComponent": "Delete Component",
@@ -658,6 +660,7 @@
         "selectPresetTooltip": "Select a preset to apply"
       },
       "toggleAnalyticsTooltip": "Toggle Analytics Display",
+      "toggleOverlayTooltip": "Toggle Mask Overlay (O)",
       "tooltips": {
         "addToCurrent": "Add {{name}} to Current Mask or Create New (Right-click)",
         "createNew": "Create New {{name}} Mask",
@@ -1638,6 +1641,7 @@
         "toggle_fullscreen": "Toggle fullscreen",
         "toggle_library_exif": "Toggle EXIF overlay",
         "toggle_masks": "Toggle Masks panel",
+        "toggle_mask_overlay": "Toggle mask overlay",
         "toggle_metadata": "Toggle Metadata panel",
         "toggle_presets": "Toggle Presets panel",
         "undo": "Undo adjustment",

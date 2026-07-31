@@ -46,6 +46,7 @@ import {
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import Switch from '../../ui/Switch';
 import Slider from '../../ui/Slider';
+import Dropdown from '../../ui/Dropdown';
 import BasicAdjustments from '../../adjustments/Basic';
 import CurveGraph from '../../adjustments/Curves';
 import ColorPanel from '../../adjustments/Color';
@@ -73,6 +74,7 @@ import {
   INITIAL_MASK_ADJUSTMENTS,
   INITIAL_MASK_CONTAINER,
   MaskContainer,
+  MaskBlendMode,
   ADJUSTMENT_SECTIONS,
 } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
@@ -88,6 +90,10 @@ const ALL_MASK_CREATION_TYPES = [
   ...MASK_PANEL_CREATION_TYPES.filter((maskType) => maskType.id !== 'others'),
   ...OTHERS_MASK_TYPES,
 ];
+const MASK_BLEND_MODE_OPTIONS = Object.values(MaskBlendMode).map((value) => ({
+  value,
+  label: value.replace(/([A-Z])/g, ' $1').replace(/^./, (character) => character.toUpperCase()),
+}));
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useAiMasking } from '../../../hooks/useAiMasking';
 import { useEditorActions } from '../../../hooks/useEditorActions';
@@ -260,6 +266,7 @@ export default function MasksPanel() {
     isGeneratingAiMask,
     selectedImage,
     isWaveformVisible,
+    maskOverlayVisible,
     waveform,
     activeWaveformChannel,
     waveformHeight,
@@ -275,6 +282,7 @@ export default function MasksPanel() {
       isGeneratingAiMask: state.isGeneratingAiMask,
       selectedImage: state.selectedImage,
       isWaveformVisible: state.isWaveformVisible,
+      maskOverlayVisible: state.maskOverlayVisible,
       waveform: state.waveform,
       activeWaveformChannel: state.activeWaveformChannel,
       waveformHeight: state.waveformHeight,
@@ -920,6 +928,19 @@ export default function MasksPanel() {
         <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
           <Text variant={TextVariants.title}>{t('editor.masks.maskingTitle')}</Text>
           <div className="flex items-center gap-1">
+            <button
+              className={clsx(
+                'p-2 rounded-full transition-colors',
+                maskOverlayVisible
+                  ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                  : 'text-text-secondary opacity-60 hover:opacity-100 hover:bg-surface',
+              )}
+              onClick={() => setEditor({ maskOverlayVisible: !maskOverlayVisible })}
+              data-tooltip={t('editor.masks.toggleOverlayTooltip')}
+              aria-pressed={maskOverlayVisible}
+            >
+              {maskOverlayVisible ? <Eye size={18} /> : <EyeOff size={18} />}
+            </button>
             <button
               className={clsx(
                 'p-2 rounded-full transition-colors',
@@ -2058,19 +2079,32 @@ function SettingsPanel({
           />
 
           {!isComponentMode && (
-            <div className="flex justify-between items-center">
-              <Text variant={TextVariants.label} className="select-none">
-                {t('editor.masks.settings.applyPreset')}
-              </Text>
-              <button
-                ref={presetButtonRef}
-                onClick={handlePresetSelectClick}
-                className="text-sm text-text-primary text-right select-none cursor-pointer hover:text-accent transition-colors"
-                data-tooltip={t('editor.masks.settings.selectPresetTooltip')}
-              >
-                {t('editor.masks.settings.select')}
-              </button>
-            </div>
+            <>
+              <div className="space-y-2">
+                <Text as="div" variant={TextVariants.label} className="select-none">
+                  {t('editor.masks.actions.blendMode')}
+                </Text>
+                <Dropdown
+                  value={displayContainer.blendMode ?? MaskBlendMode.Normal}
+                  options={MASK_BLEND_MODE_OPTIONS}
+                  onChange={(value) => handleMaskPropertyChange('blendMode', value)}
+                  triggerClassName="bg-bg-primary"
+                />
+              </div>
+              <div className="flex justify-between items-center">
+                <Text variant={TextVariants.label} className="select-none">
+                  {t('editor.masks.settings.applyPreset')}
+                </Text>
+                <button
+                  ref={presetButtonRef}
+                  onClick={handlePresetSelectClick}
+                  className="text-sm text-text-primary text-right select-none cursor-pointer hover:text-accent transition-colors"
+                  data-tooltip={t('editor.masks.settings.selectPresetTooltip')}
+                >
+                  {t('editor.masks.settings.select')}
+                </button>
+              </div>
+            </>
           )}
 
           <Slider

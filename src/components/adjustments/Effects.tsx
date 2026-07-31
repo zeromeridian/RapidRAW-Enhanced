@@ -350,6 +350,25 @@ export default function EffectsPanel({
         </div>
       )}
 
+      {isForMask && (
+        <div className="p-2 bg-bg-tertiary rounded-md">
+          <Text variant={TextVariants.heading} className="mb-2">
+            {t('adjustments.effects.gaussianBlur')}
+          </Text>
+          <Slider
+            label={t('adjustments.effects.amount')}
+            max={100}
+            min={0}
+            defaultValue={0}
+            onChange={(e: any) => handleAdjustmentChange(Effect.GaussianBlurAmount, e.target.value)}
+            step={1}
+            value={adjustments.gaussianBlurAmount ?? 0}
+            onDragStateChange={onDragStateChange}
+            fillOrigin="min"
+          />
+        </div>
+      )}
+
       {adjustmentVisibility.vignette !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
           <Text variant={TextVariants.heading} className="mb-2">

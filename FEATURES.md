@@ -47,12 +47,20 @@ details are in `RELEASE_NOTES.MD`.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.
 - Local masks support Black & White conversion, Color Calibration, Light
-  Flares, Vignette, and Grain in addition to the existing tonal, color,
-  detail, curve, glow, and halation adjustments.
+  Flares, Gaussian Blur, Vignette, and Grain in addition to the existing tonal,
+  color, detail, curve, glow, and halation adjustments.
+- Mask overlays can be hidden without disabling the selected mask through a
+  dedicated Masking-panel control or configurable `O` shortcut.
+- Mask containers can be drag-reordered and composited with Normal, darkening,
+  lightening, contrast, and component blend modes. Mask order and blend mode
+  persist with the complete editable state in XMP.
 - Clear green enabled styling and dimmed neutral styling for shared toggle
   switches throughout the application.
 
 ## Files, export, and metadata
+
+- A versioned ThisIsRAW XMP payload carries the complete editable adjustment
+  document between installations, including ordered masks and blend modes.
 
 - Optional, remembered filename suffixes for exports and separate suffixes for
   physical and virtual copies.

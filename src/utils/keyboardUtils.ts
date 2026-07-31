@@ -206,6 +206,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'panels',
   },
   {
+    action: 'toggle_mask_overlay',
+    description: 'settings.keybinds.actions.toggle_mask_overlay',
+    defaultCombo: ['KeyO'],
+    section: 'view',
+  },
+  {
     action: 'toggle_ai',
     description: 'settings.keybinds.actions.toggle_ai',
     defaultCombo: ['KeyK'],

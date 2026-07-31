@@ -74,6 +74,7 @@ export enum DetailsAdjustment {
 }
 
 export enum Effect {
+  GaussianBlurAmount = 'gaussianBlurAmount',
   GrainAmount = 'grainAmount',
   GrainRoughness = 'grainRoughness',
   GrainSize = 'grainSize',
@@ -331,6 +332,7 @@ export interface MaskAdjustments {
   dehaze: number;
   exposure: number;
   flareAmount: number;
+  gaussianBlurAmount: number;
   glowAmount: number;
   grainAmount: number;
   grainRoughness: number;
@@ -360,12 +362,36 @@ export interface MaskAdjustments {
 
 export interface MaskContainer {
   adjustments: MaskAdjustments;
+  blendMode: MaskBlendMode;
   id?: any;
   invert: boolean;
   name: string;
   opacity: number;
   subMasks: Array<SubMask>;
   visible: boolean;
+}
+
+export enum MaskBlendMode {
+  Normal = 'normal',
+  Darken = 'darken',
+  Multiply = 'multiply',
+  ColorBurn = 'colorBurn',
+  LinearBurn = 'linearBurn',
+  Lighten = 'lighten',
+  Screen = 'screen',
+  ColorDodge = 'colorDodge',
+  LinearDodge = 'linearDodge',
+  Overlay = 'overlay',
+  SoftLight = 'softLight',
+  HardLight = 'hardLight',
+  VividLight = 'vividLight',
+  LinearLight = 'linearLight',
+  PinLight = 'pinLight',
+  HardMix = 'hardMix',
+  Hue = 'hue',
+  Saturation = 'saturation',
+  Color = 'color',
+  Luminosity = 'luminosity',
 }
 
 export interface Sections {
@@ -468,6 +494,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   dehaze: 0,
   exposure: 0,
   flareAmount: 0,
+  gaussianBlurAmount: 0,
   glowAmount: 0,
   grainAmount: 0,
   grainRoughness: 50,
@@ -511,6 +538,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
 
 export const INITIAL_MASK_CONTAINER: MaskContainer = {
   adjustments: INITIAL_MASK_ADJUSTMENTS,
+  blendMode: MaskBlendMode.Normal,
   invert: false,
   name: 'New Mask',
   opacity: 100,
