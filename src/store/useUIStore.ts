@@ -5,8 +5,10 @@ const RIGHT_PANEL_ORDER = [
   Panel.Metadata,
   Panel.Adjustments,
   Panel.Crop,
+  Panel.Geometry,
   Panel.Masks,
   Panel.Ai,
+  Panel.Tagging,
   Panel.Presets,
   Panel.Export,
 ];

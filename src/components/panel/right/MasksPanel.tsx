@@ -83,6 +83,11 @@ import Text from '../../ui/Text';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+
+const ALL_MASK_CREATION_TYPES = [
+  ...MASK_PANEL_CREATION_TYPES.filter((maskType) => maskType.id !== 'others'),
+  ...OTHERS_MASK_TYPES,
+];
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useAiMasking } from '../../../hooks/useAiMasking';
 import { useEditorActions } from '../../../hooks/useEditorActions';
@@ -528,18 +533,6 @@ export default function MasksPanel() {
     handleGridClick(type, true);
   };
 
-  const handleAddOthersMask = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const options = OTHERS_MASK_TYPES.map((maskType) => ({
-      label: getMaskTypeName(maskType),
-      icon: maskType.icon,
-      onClick: () => handleGridClick(maskType.type),
-      onRightClick: () => handleGridClick(maskType.type, true),
-    }));
-    showContextMenu(rect.left, rect.bottom + 5, options);
-  };
-
   const handleAddMaskContextMenu = (event: React.MouseEvent, targetContainerId?: string | null) => {
     event.preventDefault();
     event.stopPropagation();
@@ -565,35 +558,15 @@ export default function MasksPanel() {
     const buildModeSubmenu = (label: string, icon: any, mode: SubMaskMode) => ({
       label,
       icon,
-      submenu: MASK_PANEL_CREATION_TYPES.map((maskType) => {
-        if (maskType.id === 'others') {
-          return {
-            label: getMaskTypeName(maskType),
-            icon: maskType.icon,
-            submenu: buildMenu(OTHERS_MASK_TYPES, mode),
-          };
-        }
-        return {
-          label: getMaskTypeName(maskType),
-          icon: maskType.icon,
-          disabled: maskType.disabled,
-          onClick: () => handleAddSubMask(targetContainerId!, maskType.type, mode),
-        };
-      }),
+      submenu: ALL_MASK_CREATION_TYPES.map((maskType) => ({
+        label: getMaskTypeName(maskType),
+        icon: maskType.icon,
+        disabled: maskType.disabled,
+        onClick: () => handleAddSubMask(targetContainerId!, maskType.type, mode),
+      })),
     });
 
-    const options: any[] = buildMenu(
-      MASK_PANEL_CREATION_TYPES.filter((m) => m.id !== 'others'),
-      SubMaskMode.Additive,
-    );
-    const others = MASK_PANEL_CREATION_TYPES.find((m) => m.id === 'others');
-    if (others) {
-      options.push({
-        label: getMaskTypeName(others),
-        icon: others.icon,
-        submenu: buildMenu(OTHERS_MASK_TYPES, SubMaskMode.Additive),
-      });
-    }
+    const options: any[] = buildMenu(ALL_MASK_CREATION_TYPES, SubMaskMode.Additive);
 
     if (targetContainerId && hasComponents) {
       options.push(
@@ -920,8 +893,7 @@ export default function MasksPanel() {
 
   const handlePanelContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    const allTypes = [...MASK_PANEL_CREATION_TYPES.filter((m) => m.id !== 'others'), ...OTHERS_MASK_TYPES];
-    const newMaskSubMenu = allTypes.map((m) => ({
+    const newMaskSubMenu = ALL_MASK_CREATION_TYPES.map((m) => ({
       label: getMaskTypeName(m),
       icon: m.icon,
       onClick: () => handleAddMaskContainer(m.type),
@@ -1013,15 +985,13 @@ export default function MasksPanel() {
                   {t('editor.masks.createNewTitle')}
                 </Text>
                 <div className="grid grid-cols-3 gap-2" onClick={(e) => e.stopPropagation()}>
-                  {MASK_PANEL_CREATION_TYPES.map((maskType: MaskType) => (
+                  {ALL_MASK_CREATION_TYPES.map((maskType: MaskType) => (
                     <DraggableGridItem
                       key={maskType.type || maskType.id}
                       maskType={maskType}
-                      onClick={(e: any) =>
-                        maskType.id === 'others' ? handleAddOthersMask(e) : handleGridClick(maskType.type)
-                      }
+                      onClick={() => handleGridClick(maskType.type)}
                       onRightClick={(e: React.MouseEvent) => handleGridRightClick(e, maskType.type)}
-                      isDraggable={maskType.id !== 'others'}
+                      isDraggable
                       activeMaskContainerId={activeMaskContainerId}
                     />
                   ))}

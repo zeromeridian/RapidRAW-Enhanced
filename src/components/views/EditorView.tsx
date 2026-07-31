@@ -10,6 +10,8 @@ import Resizer from '../ui/Resizer';
 import Controls from '../panel/right/ControlsPanel';
 import MetadataPanel from '../panel/right/MetadataPanel';
 import CropPanel from '../panel/right/CropPanel';
+import GeometryPanel from '../panel/right/GeometryPanel';
+import TaggingPanel from '../panel/right/TaggingPanel';
 import MasksPanel from '../panel/right/MasksPanel';
 import AIPanel from '../panel/right/AIPanel';
 import PresetsPanel from '../panel/right/PresetsPanel';
@@ -63,6 +65,7 @@ interface EditorViewProps {
   handlePasteAdjustments: () => void;
   handleRate: (...args: any) => void;
   handleSetFlag: (flag: ImageFlag) => void;
+  handleSetColorLabel: (color: string | null, paths?: string[]) => Promise<void>;
   handleDeleteRejected: (paths: string[]) => void;
   handleZoomChange: (zoom: number) => void;
   handleRightPanelSelect: (panelId: Panel) => void;
@@ -90,6 +93,7 @@ export default function EditorView({
   handlePasteAdjustments,
   handleRate,
   handleSetFlag,
+  handleSetColorLabel,
   handleDeleteRejected,
   handleZoomChange,
   handleRightPanelSelect,
@@ -179,6 +183,7 @@ export default function EditorView({
       onCopy={handleCopyAdjustments}
       onDeleteRejected={handleDeleteRejected}
       onFlag={handleSetFlag}
+      onSetColorLabel={handleSetColorLabel}
       onOpenCopyPasteSettings={() => setUI({ isCopyPasteSettingsModalOpen: true })}
       onImageSelect={handleImageClick}
       onLibraryRefresh={handleLibraryRefresh}
@@ -232,6 +237,7 @@ export default function EditorView({
             {renderedRightPanel === Panel.Adjustments && <Controls />}
             {renderedRightPanel === Panel.Metadata && <MetadataPanel />}
             {renderedRightPanel === Panel.Crop && <CropPanel />}
+            {renderedRightPanel === Panel.Geometry && <GeometryPanel />}
             {renderedRightPanel === Panel.Masks && <MasksPanel />}
             {renderedRightPanel === Panel.Presets && (
               <PresetsPanel
@@ -253,6 +259,7 @@ export default function EditorView({
               />
             )}
             {renderedRightPanel === Panel.Ai && <AIPanel />}
+            {renderedRightPanel === Panel.Tagging && <TaggingPanel />}
           </motion.div>
         )}
       </AnimatePresence>

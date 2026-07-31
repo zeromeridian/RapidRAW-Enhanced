@@ -557,9 +557,9 @@
           "name": "1:1"
         }
       },
-      "resetTooltip": "Resetuj Kadrowanie i Przekształcanie",
+      "resetTooltip": "Resetuj Kadrowanie",
       "rotationHeading": "Obrót",
-      "title": "Kadrowanie i Przekształcanie",
+      "title": "Kadrowanie",
       "tooltips": {
         "compositionOverlay": "Nakładka kompozycji",
         "flipHoriz": "Przerzuć obraz w poziomie",

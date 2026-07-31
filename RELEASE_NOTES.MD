@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.0.0 — 2026-07-30
+
+### Workflow and panel organization
+
+- Split Crop and Geometry into separate right-toolbar modules. Geometry now
+  contains Manual Transform, Lens, Level, Vertical, and Constrain Crop.
+- Made all mask creation options directly visible without an **Others** submenu.
+- Added customizable color-label controls to the shared bottom toolbar.
+- Added a dedicated Tagging panel for adding or removing tags from one or
+  multiple selected images.
+- Added a persistent **Hide Empty Folders** setting for simplifying the folder
+  tree while retaining library and pinned roots.
+
 ## 1.6.1-colrbent.61 — 2026-07-30
 
 ### Automatic geometry persistence

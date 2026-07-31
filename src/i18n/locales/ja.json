@@ -513,9 +513,9 @@
           "name": "1:1"
         }
       },
-      "resetTooltip": "切り抜きと変形をリセット",
+      "resetTooltip": "切り抜きをリセット",
       "rotationHeading": "回転",
-      "title": "切り抜きと変形",
+      "title": "切り抜き",
       "tooltips": {
         "compositionOverlay": "構図ガイド",
         "flipHoriz": "画像を水平方向に反転",

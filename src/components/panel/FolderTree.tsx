@@ -41,6 +41,7 @@ export interface FolderTree {
   name: string;
   path: string;
   imageCount?: number;
+  containsImages?: boolean;
   hasSubdirs?: boolean;
   modified?: number;
   created?: number;
@@ -114,6 +115,15 @@ const filterTree = (node: FolderTree | null, query: string): FolderTree | null =
   }
 
   return null;
+};
+
+const filterEmptyFolders = (node: FolderTree, preserveNode = false): FolderTree | null => {
+  const children = (node.children || [])
+    .map((child) => filterEmptyFolders(child))
+    .filter((child): child is FolderTree => child !== null);
+
+  if (!preserveNode && !node.containsImages && children.length === 0) return null;
+  return { ...node, children };
 };
 
 const getAutoExpandedPaths = (node: FolderTree, paths: Set<string>) => {
@@ -650,6 +660,7 @@ export default function FolderTree({
   const pinnedFolders = appSettings?.pinnedFolders || [];
   const openSections = appSettings?.openTreeSections ?? ['current'];
   const showImageCounts = appSettings?.enableFolderImageCounts ?? false;
+  const hideEmptyFolders = appSettings?.hideEmptyFolders ?? false;
   const folderIcons = appSettings?.folderIcons || {};
   const folderTreeSort: FolderTreeSort = appSettings?.folderTreeSort || { key: 'name', order: SortDirection.Ascending };
   const showHeaderButtons = isHovering || isSortMenuOpen;
@@ -686,20 +697,26 @@ export default function FolderTree({
   const isSearching = trimmedQuery.length > 1;
 
   const filteredTrees = useMemo(() => {
-    let base = folderTrees;
+    let base = hideEmptyFolders
+      ? folderTrees.map((tree) => filterEmptyFolders(tree, true)).filter((tree): tree is FolderTree => tree !== null)
+      : folderTrees;
     if (isSearching) {
       base = base.map((tree: any) => filterTree(tree, trimmedQuery)).filter((t: any) => t !== null);
     }
     return sortFolderTree(base, folderTreeSort);
-  }, [folderTrees, trimmedQuery, isSearching, folderTreeSort]);
+  }, [folderTrees, trimmedQuery, isSearching, folderTreeSort, hideEmptyFolders]);
 
   const filteredPinnedTrees = useMemo(() => {
-    let base = pinnedFolderTrees;
+    let base = hideEmptyFolders
+      ? pinnedFolderTrees
+          .map((tree) => filterEmptyFolders(tree, true))
+          .filter((tree): tree is FolderTree => tree !== null)
+      : pinnedFolderTrees;
     if (isSearching) {
       base = base.map((pinnedTree) => filterTree(pinnedTree, trimmedQuery)).filter((t): t is FolderTree => t !== null);
     }
     return sortFolderTree(base, folderTreeSort);
-  }, [pinnedFolderTrees, trimmedQuery, isSearching, folderTreeSort]);
+  }, [pinnedFolderTrees, trimmedQuery, isSearching, folderTreeSort, hideEmptyFolders]);
 
   const searchAutoExpandedFolders = useMemo(() => {
     if (!isSearching) return new Set<string>();
@@ -867,229 +884,229 @@ export default function FolderTree({
           </div>
 
           <LayoutGroup id="folder-tree">
-          <div className="flex-1 overflow-y-auto" onContextMenu={handleEmptyAreaContextMenu}>
-            {hasVisiblePinnedTrees && (
-              <>
-                <div>
-                  <SectionHeader
-                    title={t('library.folders.sections.pinned')}
-                    isOpen={isPinnedOpen}
-                    onToggle={() => toggleSection('pinned')}
-                  />
-                </div>
-                <AnimatePresence initial={false}>
-                  {isPinnedOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: 'easeInOut' }}
-                      className="overflow-hidden"
-                    >
-                      <div className="pt-1 pb-2">
-                        <AnimatePresence>
-                          {filteredPinnedTrees.map((pinnedTree, index) => (
-                            <motion.div
-                              key={pinnedTree.path}
-                              animate="visible"
-                              custom={{ index, total: filteredPinnedTrees.length }}
-                              exit="exit"
-                              initial={isInstantTransition ? 'visible' : 'hidden'}
-                              layout={isInstantTransition ? false : 'position'}
-                              variants={{
-                                hidden: { opacity: 0, x: -15 },
-                                visible: ({ index, total }: VisibleProps) => ({
-                                  opacity: 1,
-                                  x: 0,
-                                  transition: { duration: 0.25, delay: total < 8 ? index * 0.05 : 0 },
-                                }),
-                                exit: { opacity: 0, x: -15, transition: { duration: 0.2 } },
-                              }}
-                            >
-                              <TreeNode
-                                expandedFolders={effectiveExpandedFolders}
-                                isExpanded={effectiveExpandedFolders.has(pinnedTree.path)}
-                                node={pinnedTree}
-                                onContextMenu={onContextMenu}
-                                onFolderSelect={onFolderSelect}
-                                onToggle={onToggleFolder}
-                                selectedPath={selectedPath}
-                                pinnedFolders={pinnedFolders}
-                                showImageCounts={showImageCounts && isHovering}
-                                isInstantTransition={isInstantTransition}
-                                folderIcons={folderIcons}
-                              />
-                            </motion.div>
-                          ))}
-                        </AnimatePresence>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </>
-            )}
-
-            {showAlbumsSection && (
-              <>
-                <div>
-                  <SectionHeader
-                    title={t('library.folders.sections.albums')}
-                    isOpen={isAlbumsOpen}
-                    onToggle={() => toggleSection('albums')}
-                  />
-                </div>
-                <AnimatePresence>
-                  {isAlbumsOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden"
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onAlbumContextMenu(e, null);
-                      }}
-                    >
-                      <div className="pt-1 pb-2">
-                        <AnimatePresence>
-                          {filteredAlbumTree.map((item: any) => (
-                            <motion.div
-                              key={item.id}
-                              initial={{ opacity: 0, height: 0, x: -15 }}
-                              animate={{ opacity: 1, height: 'auto', x: 0 }}
-                              exit={{ opacity: 0, height: 0, x: -15, overflow: 'hidden' }}
-                              transition={{ duration: 0.2 }}
-                              layout="position"
-                            >
-                              <AlbumTreeNode
-                                item={item}
-                                expandedGroups={effectiveExpandedAlbumGroups}
-                                onToggle={toggleAlbumGroup}
-                                onSelectAlbum={onSelectAlbum}
-                                onContextMenu={onAlbumContextMenu}
-                                selectedAlbumId={activeAlbumId}
-                                showImageCounts={showImageCounts && isHovering}
-                              />
-                            </motion.div>
-                          ))}
-                        </AnimatePresence>
-                        {albumTree.length === 0 && !isSearching && (
-                          <motion.div layout="position">
-                            <Text variant={TextVariants.small} className="p-2 text-center">
-                              {t('library.folders.albumsEmpty')}
-                            </Text>
-                          </motion.div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </>
-            )}
-
-            {filteredTrees && filteredTrees.length > 0 && (
-              <>
-                <div>
-                  <SectionHeader
-                    title={t('library.folders.sections.folders')}
-                    isOpen={isCurrentOpen}
-                    onToggle={() => toggleSection('current')}
-                  />
-                </div>
-                <AnimatePresence initial={false}>
-                  {isCurrentOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: 'easeInOut' }}
-                      className="overflow-hidden"
-                    >
-                      <div className="pt-1">
-                        <AnimatePresence>
-                          {filteredTrees.map((tree: any, index: number) => (
-                            <motion.div
-                              key={tree.path}
-                              animate="visible"
-                              custom={{ index, total: filteredTrees.length }}
-                              exit="exit"
-                              initial={isInstantTransition ? 'visible' : 'hidden'}
-                              layout={isInstantTransition ? false : 'position'}
-                              variants={{
-                                hidden: { opacity: 0, x: -15 },
-                                visible: ({ index, total }: VisibleProps) => ({
-                                  opacity: 1,
-                                  x: 0,
-                                  transition: { duration: 0.25, delay: total < 8 ? index * 0.05 : 0 },
-                                }),
-                                exit: { opacity: 0, x: -15, transition: { duration: 0.2 } },
-                              }}
-                            >
-                              <TreeNode
-                                expandedFolders={effectiveExpandedFolders}
-                                isExpanded={effectiveExpandedFolders.has(tree.path)}
-                                node={tree}
-                                onContextMenu={onContextMenu}
-                                onFolderSelect={onFolderSelect}
-                                onToggle={onToggleFolder}
-                                selectedPath={selectedPath}
-                                pinnedFolders={pinnedFolders}
-                                showImageCounts={showImageCounts && isHovering}
-                                isInstantTransition={isInstantTransition}
-                                folderIcons={folderIcons}
-                              />
-                            </motion.div>
-                          ))}
-                        </AnimatePresence>
-
-                        <AnimatePresence initial={false}>
-                          {isHovering && !isSearching && (
-                            <motion.div
-                              layout="position"
-                              initial={{ opacity: 0, height: 0, overflow: 'hidden' }}
-                              animate={{ opacity: 1, height: 'auto', overflow: 'hidden' }}
-                              exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
-                              transition={{ duration: 0.2 }}
-                            >
-                              <Text
-                                as="div"
-                                weight={TextWeights.medium}
-                                className="flex items-center gap-2 p-2 mt-1 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
-                                onClick={(e: React.MouseEvent) => {
-                                  e.stopPropagation();
-                                  onOpenFolder();
+            <div className="flex-1 overflow-y-auto" onContextMenu={handleEmptyAreaContextMenu}>
+              {hasVisiblePinnedTrees && (
+                <>
+                  <div>
+                    <SectionHeader
+                      title={t('library.folders.sections.pinned')}
+                      isOpen={isPinnedOpen}
+                      onToggle={() => toggleSection('pinned')}
+                    />
+                  </div>
+                  <AnimatePresence initial={false}>
+                    {isPinnedOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-1 pb-2">
+                          <AnimatePresence>
+                            {filteredPinnedTrees.map((pinnedTree, index) => (
+                              <motion.div
+                                key={pinnedTree.path}
+                                animate="visible"
+                                custom={{ index, total: filteredPinnedTrees.length }}
+                                exit="exit"
+                                initial={isInstantTransition ? 'visible' : 'hidden'}
+                                layout={isInstantTransition ? false : 'position'}
+                                variants={{
+                                  hidden: { opacity: 0, x: -15 },
+                                  visible: ({ index, total }: VisibleProps) => ({
+                                    opacity: 1,
+                                    x: 0,
+                                    transition: { duration: 0.25, delay: total < 8 ? index * 0.05 : 0 },
+                                  }),
+                                  exit: { opacity: 0, x: -15, transition: { duration: 0.2 } },
                                 }}
                               >
-                                <div className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center">
-                                  <Plus size={16} />
-                                </div>
-                                <span className="select-none">{t('library.folders.addFolder')}</span>
+                                <TreeNode
+                                  expandedFolders={effectiveExpandedFolders}
+                                  isExpanded={effectiveExpandedFolders.has(pinnedTree.path)}
+                                  node={pinnedTree}
+                                  onContextMenu={onContextMenu}
+                                  onFolderSelect={onFolderSelect}
+                                  onToggle={onToggleFolder}
+                                  selectedPath={selectedPath}
+                                  pinnedFolders={pinnedFolders}
+                                  showImageCounts={showImageCounts && isHovering}
+                                  isInstantTransition={isInstantTransition}
+                                  folderIcons={folderIcons}
+                                />
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
+
+              {showAlbumsSection && (
+                <>
+                  <div>
+                    <SectionHeader
+                      title={t('library.folders.sections.albums')}
+                      isOpen={isAlbumsOpen}
+                      onToggle={() => toggleSection('albums')}
+                    />
+                  </div>
+                  <AnimatePresence>
+                    {isAlbumsOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onAlbumContextMenu(e, null);
+                        }}
+                      >
+                        <div className="pt-1 pb-2">
+                          <AnimatePresence>
+                            {filteredAlbumTree.map((item: any) => (
+                              <motion.div
+                                key={item.id}
+                                initial={{ opacity: 0, height: 0, x: -15 }}
+                                animate={{ opacity: 1, height: 'auto', x: 0 }}
+                                exit={{ opacity: 0, height: 0, x: -15, overflow: 'hidden' }}
+                                transition={{ duration: 0.2 }}
+                                layout="position"
+                              >
+                                <AlbumTreeNode
+                                  item={item}
+                                  expandedGroups={effectiveExpandedAlbumGroups}
+                                  onToggle={toggleAlbumGroup}
+                                  onSelectAlbum={onSelectAlbum}
+                                  onContextMenu={onAlbumContextMenu}
+                                  selectedAlbumId={activeAlbumId}
+                                  showImageCounts={showImageCounts && isHovering}
+                                />
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
+                          {albumTree.length === 0 && !isSearching && (
+                            <motion.div layout="position">
+                              <Text variant={TextVariants.small} className="p-2 text-center">
+                                {t('library.folders.albumsEmpty')}
                               </Text>
                             </motion.div>
                           )}
-                        </AnimatePresence>
-                      </div>
-                    </motion.div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
+
+              {filteredTrees && filteredTrees.length > 0 && (
+                <>
+                  <div>
+                    <SectionHeader
+                      title={t('library.folders.sections.folders')}
+                      isOpen={isCurrentOpen}
+                      onToggle={() => toggleSection('current')}
+                    />
+                  </div>
+                  <AnimatePresence initial={false}>
+                    {isCurrentOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-1">
+                          <AnimatePresence>
+                            {filteredTrees.map((tree: any, index: number) => (
+                              <motion.div
+                                key={tree.path}
+                                animate="visible"
+                                custom={{ index, total: filteredTrees.length }}
+                                exit="exit"
+                                initial={isInstantTransition ? 'visible' : 'hidden'}
+                                layout={isInstantTransition ? false : 'position'}
+                                variants={{
+                                  hidden: { opacity: 0, x: -15 },
+                                  visible: ({ index, total }: VisibleProps) => ({
+                                    opacity: 1,
+                                    x: 0,
+                                    transition: { duration: 0.25, delay: total < 8 ? index * 0.05 : 0 },
+                                  }),
+                                  exit: { opacity: 0, x: -15, transition: { duration: 0.2 } },
+                                }}
+                              >
+                                <TreeNode
+                                  expandedFolders={effectiveExpandedFolders}
+                                  isExpanded={effectiveExpandedFolders.has(tree.path)}
+                                  node={tree}
+                                  onContextMenu={onContextMenu}
+                                  onFolderSelect={onFolderSelect}
+                                  onToggle={onToggleFolder}
+                                  selectedPath={selectedPath}
+                                  pinnedFolders={pinnedFolders}
+                                  showImageCounts={showImageCounts && isHovering}
+                                  isInstantTransition={isInstantTransition}
+                                  folderIcons={folderIcons}
+                                />
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
+
+                          <AnimatePresence initial={false}>
+                            {isHovering && !isSearching && (
+                              <motion.div
+                                layout="position"
+                                initial={{ opacity: 0, height: 0, overflow: 'hidden' }}
+                                animate={{ opacity: 1, height: 'auto', overflow: 'hidden' }}
+                                exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
+                                transition={{ duration: 0.2 }}
+                              >
+                                <Text
+                                  as="div"
+                                  weight={TextWeights.medium}
+                                  className="flex items-center gap-2 p-2 mt-1 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
+                                  onClick={(e: React.MouseEvent) => {
+                                    e.stopPropagation();
+                                    onOpenFolder();
+                                  }}
+                                >
+                                  <div className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center">
+                                    <Plus size={16} />
+                                  </div>
+                                  <span className="select-none">{t('library.folders.addFolder')}</span>
+                                </Text>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
+
+              {!filteredTrees?.length && !hasVisiblePinnedTrees && !hasVisibleAlbums && isSearching && (
+                <Text className="p-2 text-center">{t('library.folders.noFoldersFound')}</Text>
+              )}
+
+              {folderTrees.length === 0 && pinnedFolderTrees.length === 0 && !isSearching && (
+                <div className="pt-1">
+                  {isLoading ? (
+                    <Text className="animate-pulse p-2">{t('library.folders.loading')}</Text>
+                  ) : (
+                    <Text className="p-2">{t('library.folders.openFolderInstruction')}</Text>
                   )}
-                </AnimatePresence>
-              </>
-            )}
-
-            {!filteredTrees?.length && !hasVisiblePinnedTrees && !hasVisibleAlbums && isSearching && (
-              <Text className="p-2 text-center">{t('library.folders.noFoldersFound')}</Text>
-            )}
-
-            {folderTrees.length === 0 && pinnedFolderTrees.length === 0 && !isSearching && (
-              <div className="pt-1">
-                {isLoading ? (
-                  <Text className="animate-pulse p-2">{t('library.folders.loading')}</Text>
-                ) : (
-                  <Text className="p-2">{t('library.folders.openFolderInstruction')}</Text>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
           </LayoutGroup>
         </div>
       )}

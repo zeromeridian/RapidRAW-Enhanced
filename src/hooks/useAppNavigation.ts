@@ -512,6 +512,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
               expandedFolders: [selectedPath],
               showImageCounts:
                 appSettings?.enableFolderImageCounts || appSettings?.folderTreeSort?.key === 'imageCount',
+              hideEmptyFolders: appSettings?.hideEmptyFolders ?? false,
             });
             setLibrary({ folderTrees: [...folderTrees, newTree] });
           } catch (e) {
@@ -567,6 +568,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             paths: rootFolders,
             expandedFolders: expandedArr,
             showImageCounts: appSettings?.enableFolderImageCounts || appSettings?.folderTreeSort?.key === 'imageCount',
+            hideEmptyFolders: appSettings?.hideEmptyFolders ?? false,
           });
         }
         setLibrary({ folderTrees: treesData });

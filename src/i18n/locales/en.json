@@ -546,9 +546,9 @@
           "name": "1:1"
         }
       },
-      "resetTooltip": "Reset Crop & Transform",
+      "resetTooltip": "Reset Crop",
       "rotationHeading": "Rotation",
-      "title": "Crop & Transform",
+      "title": "Crop",
       "tooltips": {
         "compositionOverlay": "Composition Overlay",
         "constrainCrop": "Automatically zoom to prevent empty edges after geometry corrections",
@@ -569,6 +569,10 @@
         "transform": "Manual perspective and keystone correction",
         "vertical": "Detect and correct converging vertical lines"
       }
+    },
+    "geometry": {
+      "resetTooltip": "Reset Geometry",
+      "title": "Geometry"
     },
     "externalEdit": {
       "done": "Done",
@@ -766,11 +770,26 @@
         "adjust": "Adjust",
         "crop": "Crop",
         "export": "Export",
+        "geometry": "Geometry",
         "info": "Info",
         "inpaint": "Inpaint",
         "masks": "Masks",
-        "presets": "Presets"
+        "presets": "Presets",
+        "tagging": "Tagging"
       }
+    },
+    "tagging": {
+      "addFailed": "Could not add tag: {{error}}",
+      "addTag": "Add Tag",
+      "currentTags": "Current Tags",
+      "mixedTagTooltip": "This tag is set on some selected images. Click to remove it from all.",
+      "noTags": "No tags",
+      "placeholder": "Enter a tag…",
+      "removeFailed": "Could not remove tag: {{error}}",
+      "removeTooltip": "Remove tag from selected images",
+      "selectionCount_one": "Tagging {{count}} image",
+      "selectionCount_other": "Tagging {{count}} images",
+      "title": "Tagging"
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",
@@ -1556,6 +1575,8 @@
       "fileSuffixPlaceholder": "e.g. _web",
       "folderImageCounts": "Folder Image Counts",
       "folderImageCountsDesc": "Show the number of images inside folders when hovering over the folder tree.",
+      "hideEmptyFolders": "Hide Empty Folders",
+      "hideEmptyFoldersDesc": "Hide folders that contain no supported images anywhere below them.",
       "font": "Font",
       "fontDesc": "Change the application font.",
       "nativeTitlebar": "Native Titlebar",

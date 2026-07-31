@@ -409,6 +409,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub enable_folder_image_counts: Option<bool>,
     #[serde(default)]
+    pub hide_empty_folders: Option<bool>,
+    #[serde(default)]
     pub display_edit_icon: Option<bool>,
     #[serde(default = "default_linear_raw_mode")]
     pub linear_raw_mode: String,
@@ -547,6 +549,7 @@ impl Default for AppSettings {
             #[cfg(not(target_os = "android"))]
             high_res_zoom_multiplier: Some(1.0),
             enable_folder_image_counts: Some(false),
+            hide_empty_folders: Some(false),
             display_edit_icon: Some(true),
             linear_raw_mode: default_linear_raw_mode(),
             enable_xmp_sync: Some(true),

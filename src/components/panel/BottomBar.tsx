@@ -79,6 +79,7 @@ interface BottomBarProps {
   onExportClick?(): void;
   onDeleteRejected?(paths: string[]): void;
   onFlag(flag: ImageFlag): void;
+  onSetColorLabel(color: string | null, paths?: string[]): Promise<void>;
   onImageSelect?(path: string, event: any): void;
   onLibraryRefresh?(): Promise<void>;
   onOpenCopyPasteSettings?(): void;
@@ -115,6 +116,7 @@ const PRODUCTIVITY_TOOLBAR_IDS = [
 const COPY_TOOLBAR_IDS = ['physicalCopy', 'virtualCopy'] as const;
 const STACK_TOOLBAR_IDS = ['stackSelected', 'toggleStack', 'setStackCover', 'unstack'] as const;
 const FLAG_TOOLBAR_IDS = ['flagRejected', 'flagSelected', 'flagDeferred', 'flagUnflagged', 'deleteRejected'] as const;
+const COLOR_TOOLBAR_IDS = ['colorRed', 'colorYellow', 'colorGreen', 'colorBlue', 'colorPurple', 'colorNone'] as const;
 
 const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
   const { t } = useTranslation();
@@ -175,6 +177,7 @@ export default function BottomBar({
   onExportClick,
   onDeleteRejected,
   onFlag,
+  onSetColorLabel,
   onImageSelect,
   onLibraryRefresh,
   onOpenCopyPasteSettings,
@@ -269,6 +272,16 @@ export default function BottomBar({
   const firstProductivityImage =
     imageList.find((image) => image.path === productivityPaths[0]) ||
     allLibraryImages.find((image) => image.path === productivityPaths[0]);
+  const selectedColors = productivityPaths.map((path) => {
+    const image =
+      imageList.find((candidate) => candidate.path === path) ||
+      allLibraryImages.find((candidate) => candidate.path === path);
+    return image?.tags?.find((tag) => tag.startsWith('color:'))?.slice(6) || null;
+  });
+  const activeColor: string | null | undefined =
+    selectedColors.length > 0 && selectedColors.every((color) => color === selectedColors[0])
+      ? selectedColors[0]
+      : undefined;
   const activeFlag = getImageFlag(firstProductivityImage?.tags);
   const rejectedInCurrentFolder = getRejectedPathsForLoadedFolder(allLibraryImages, currentFolderPath);
   const imageStacks = appSettings?.imageStacks || [];
@@ -284,8 +297,14 @@ export default function BottomBar({
   const hasCopyActions = isToolbarGroupVisible(COPY_TOOLBAR_IDS);
   const hasStackActions = isToolbarGroupVisible(STACK_TOOLBAR_IDS);
   const hasFlagActions = isToolbarGroupVisible(FLAG_TOOLBAR_IDS);
+  const hasColorActions = isToolbarGroupVisible(COLOR_TOOLBAR_IDS);
   const toolbarItems = [
     { id: 'rating', label: t('contextMenus.editor.rating') },
+    ...COLOR_LABELS.map((color) => ({
+      id: `color${color.name.charAt(0).toUpperCase()}${color.name.slice(1)}`,
+      label: String(t(`contextMenus.colors.${color.name}` as never)),
+    })),
+    { id: 'colorNone', label: t('editor.metadata.organization.none') },
     { id: 'flagRejected', label: t('flags.rejected') },
     { id: 'flagSelected', label: t('flags.selected') },
     { id: 'flagDeferred', label: t('flags.deferred') },
@@ -596,7 +615,47 @@ export default function BottomBar({
       >
         <div className="flex items-center gap-4">
           {isToolbarItemVisible('rating') && <StarRating rating={rating} onRate={onRate} disabled={isRatingDisabled} />}
-          <div className="h-5 w-px bg-surface"></div>
+          {isToolbarItemVisible('rating') && hasColorActions && <div className="h-5 w-px bg-surface" />}
+          {isToolbarItemVisible('rating') && !hasColorActions && hasFlagActions && (
+            <div className="h-5 w-px bg-surface" />
+          )}
+          {hasColorActions && (
+            <>
+              <div className="flex items-center gap-1.5">
+                {COLOR_LABELS.map((color) => {
+                  const itemId = `color${color.name.charAt(0).toUpperCase()}${color.name.slice(1)}`;
+                  if (!isToolbarItemVisible(itemId)) return null;
+                  return (
+                    <button
+                      key={color.name}
+                      className={clsx(
+                        'w-4 h-4 rounded-full transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40',
+                        activeColor === color.name && 'ring-2 ring-white ring-offset-1 ring-offset-bg-primary',
+                      )}
+                      disabled={productivityCount === 0}
+                      onClick={() => void onSetColorLabel(color.name, productivityPaths)}
+                      style={{ backgroundColor: color.color }}
+                      data-tooltip={String(t(`contextMenus.colors.${color.name}` as never))}
+                    />
+                  );
+                })}
+                {isToolbarItemVisible('colorNone') && (
+                  <button
+                    className={clsx(
+                      'w-4 h-4 rounded-full border border-text-secondary/60 flex items-center justify-center text-text-secondary transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40',
+                      activeColor === null && 'ring-2 ring-text-secondary ring-offset-1 ring-offset-bg-primary',
+                    )}
+                    disabled={productivityCount === 0}
+                    onClick={() => void onSetColorLabel(null, productivityPaths)}
+                    data-tooltip={t('editor.metadata.organization.none')}
+                  >
+                    <Check size={9} className={activeColor === null ? 'opacity-100' : 'opacity-0'} />
+                  </button>
+                )}
+              </div>
+              {hasFlagActions && <div className="h-5 w-px bg-surface" />}
+            </>
+          )}
           {hasFlagActions && (
             <>
               <div className="flex items-center gap-1">

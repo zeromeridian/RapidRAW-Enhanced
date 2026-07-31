@@ -513,9 +513,9 @@
           "name": "1:1"
         }
       },
-      "resetTooltip": "자르기 및 변형 초기화",
+      "resetTooltip": "자르기 초기화",
       "rotationHeading": "회전",
-      "title": "자르기 및 변형",
+      "title": "자르기",
       "tooltips": {
         "compositionOverlay": "구도 오버레이",
         "flipHoriz": "이미지를 좌우로 반전",

@@ -121,6 +121,7 @@ export const useAppInitialization = ({
   const defaultThumbnailSize = isAndroid ? ThumbnailSize.Small : ThumbnailSize.Medium;
   const defaultLibraryViewMode = isAndroid ? LibraryViewMode.Recursive : LibraryViewMode.Flat;
   const prevImageCountsNeed = useRef<boolean | undefined>(undefined);
+  const prevHideEmptyFolders = useRef<boolean | undefined>(undefined);
 
   useEffect(() => {
     initPlatform();
@@ -200,6 +201,7 @@ export const useAppInitialization = ({
               paths: settings.pinnedFolders,
               expandedFolders: settings.lastFolderState?.expandedFolders || [],
               showImageCounts: settings.enableFolderImageCounts || settings.folderTreeSort?.key === 'imageCount',
+              hideEmptyFolders: settings.hideEmptyFolders ?? false,
             });
             setLibrary({ pinnedFolderTrees: trees });
           } catch (err) {
@@ -228,6 +230,7 @@ export const useAppInitialization = ({
               paths: rootFolders,
               expandedFolders: settings.lastFolderState?.expandedFolders ?? rootFolders,
               showImageCounts: settings.enableFolderImageCounts || settings.folderTreeSort?.key === 'imageCount',
+              hideEmptyFolders: settings.hideEmptyFolders ?? false,
             }),
             images: isAlbum ? undefined : invoke(command, { path: currentPath }),
           };
@@ -368,13 +371,16 @@ export const useAppInitialization = ({
       appSettings.enableFolderImageCounts || appSettings.folderTreeSort?.key === 'imageCount',
     );
 
-    if (prevImageCountsNeed.current === undefined) {
+    const hideEmptyFolders = appSettings.hideEmptyFolders ?? false;
+    if (prevImageCountsNeed.current === undefined || prevHideEmptyFolders.current === undefined) {
       prevImageCountsNeed.current = needsImageCounts;
+      prevHideEmptyFolders.current = hideEmptyFolders;
       return;
     }
 
-    if (prevImageCountsNeed.current !== needsImageCounts) {
+    if (prevImageCountsNeed.current !== needsImageCounts || prevHideEmptyFolders.current !== hideEmptyFolders) {
       prevImageCountsNeed.current = needsImageCounts;
+      prevHideEmptyFolders.current = hideEmptyFolders;
 
       const rootFolders = appSettings.rootFolders?.length
         ? appSettings.rootFolders
@@ -395,6 +401,7 @@ export const useAppInitialization = ({
             paths: pinnedFolders,
             expandedFolders: currentExpanded,
             showImageCounts: needsImageCounts,
+            hideEmptyFolders,
           }).then((trees: any) => ({ type: 'pinned', trees })),
         );
       }
@@ -405,6 +412,7 @@ export const useAppInitialization = ({
             paths: rootFolders,
             expandedFolders: currentExpanded,
             showImageCounts: needsImageCounts,
+            hideEmptyFolders,
           }).then((trees: any) => ({ type: 'root', trees })),
         );
       }

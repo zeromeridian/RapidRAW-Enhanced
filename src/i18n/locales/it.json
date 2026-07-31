@@ -536,9 +536,9 @@
           "name": "1:1"
         }
       },
-      "resetTooltip": "Ripristina Ritaglio e Trasformazione",
+      "resetTooltip": "Ripristina Ritaglio",
       "rotationHeading": "Rotazione",
-      "title": "Ritaglio e Trasformazione",
+      "title": "Ritaglio",
       "tooltips": {
         "compositionOverlay": "Sovrapposizione Composizione",
         "flipHoriz": "Rifletti immagine orizzontalmente",
