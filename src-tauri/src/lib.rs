@@ -107,6 +107,314 @@ struct AutoGeometryResult {
     detected_lines: usize,
 }
 
+#[derive(Clone, Copy, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct GuidedGeometryGuide {
+    x1: f32,
+    y1: f32,
+    x2: f32,
+    y2: f32,
+}
+
+#[derive(Deserialize, Debug)]
+struct GuidedGeometryGuides {
+    #[serde(default)]
+    horizontal: Vec<GuidedGeometryGuide>,
+    #[serde(default)]
+    vertical: Vec<GuidedGeometryGuide>,
+}
+
+#[derive(Clone, Copy, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct GuidedGeometryResult {
+    rotate: f32,
+    vertical: f32,
+    horizontal: f32,
+    residual: f32,
+}
+
+fn map_guided_point(
+    point: (f32, f32),
+    width: f32,
+    height: f32,
+    rotate: f32,
+    vertical: f32,
+    horizontal: f32,
+) -> Option<(f32, f32)> {
+    let x = point.0 * width - width * 0.5;
+    let y = point.1 * height - height * 0.5;
+    let (sin, cos) = rotate.to_radians().sin_cos();
+    let rotated_x = x * cos - y * sin;
+    let rotated_y = x * sin + y * cos;
+    let perspective_vertical = vertical / 100_000.0 * (2_000.0 / height);
+    let perspective_horizontal = -horizontal / 100_000.0 * (2_000.0 / width);
+    let denominator = 1.0 + perspective_horizontal * rotated_x + perspective_vertical * rotated_y;
+    if denominator.abs() < 0.05 {
+        return None;
+    }
+    Some((rotated_x / denominator, rotated_y / denominator))
+}
+
+fn guided_geometry_cost(
+    guides: &GuidedGeometryGuides,
+    width: f32,
+    height: f32,
+    rotate: f32,
+    vertical: f32,
+    horizontal: f32,
+) -> f32 {
+    let mut residual_sum = 0.0;
+    let mut residual_count = 0;
+    for (pair, is_vertical) in [(&guides.vertical, true), (&guides.horizontal, false)] {
+        if pair.len() != 2 {
+            continue;
+        }
+        for guide in pair {
+            let Some(first) = map_guided_point(
+                (guide.x1, guide.y1),
+                width,
+                height,
+                rotate,
+                vertical,
+                horizontal,
+            ) else {
+                return f32::MAX;
+            };
+            let Some(second) = map_guided_point(
+                (guide.x2, guide.y2),
+                width,
+                height,
+                rotate,
+                vertical,
+                horizontal,
+            ) else {
+                return f32::MAX;
+            };
+            let original_length = (((guide.x2 - guide.x1) * width).powi(2)
+                + ((guide.y2 - guide.y1) * height).powi(2))
+            .sqrt()
+            .max(width.min(height) * 0.02);
+            let residual = if is_vertical {
+                (second.0 - first.0) / original_length
+            } else {
+                (second.1 - first.1) / original_length
+            };
+            residual_sum += residual * residual;
+            residual_count += 1;
+        }
+    }
+    if residual_count == 0 {
+        return f32::MAX;
+    }
+
+    // Prefer the least invasive solution when several projective transforms
+    // satisfy the same parallel-line constraints.
+    residual_sum / residual_count as f32
+        + 1e-7
+            * ((rotate / 45.0).powi(2) + (vertical / 100.0).powi(2) + (horizontal / 100.0).powi(2))
+}
+
+fn validate_guided_pair(
+    pair: &[GuidedGeometryGuide],
+    width: f32,
+    height: f32,
+) -> Result<(), String> {
+    if pair.len() > 2 {
+        return Err("A guided orientation can contain at most two lines".to_string());
+    }
+    for guide in pair {
+        if ![guide.x1, guide.y1, guide.x2, guide.y2]
+            .into_iter()
+            .all(|value| value.is_finite() && (0.0..=1.0).contains(&value))
+        {
+            return Err("Guided line coordinates must be normalized to the image".to_string());
+        }
+        let length = (((guide.x2 - guide.x1) * width).powi(2)
+            + ((guide.y2 - guide.y1) * height).powi(2))
+        .sqrt();
+        if length < width.min(height) * 0.04 {
+            return Err("Guided lines must cover a meaningful image edge".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn solve_guided_geometry(
+    guides: &GuidedGeometryGuides,
+    width: f32,
+    height: f32,
+) -> Result<GuidedGeometryResult, String> {
+    validate_guided_pair(&guides.vertical, width, height)?;
+    validate_guided_pair(&guides.horizontal, width, height)?;
+    let use_vertical = guides.vertical.len() == 2;
+    let use_horizontal = guides.horizontal.len() == 2;
+    if !use_vertical && !use_horizontal {
+        return Err("Complete a pair of vertical or horizontal guides first".to_string());
+    }
+
+    let mut best = GuidedGeometryResult {
+        rotate: 0.0,
+        vertical: 0.0,
+        horizontal: 0.0,
+        residual: f32::MAX,
+    };
+
+    for rotate_step in -15..=15 {
+        let rotate = rotate_step as f32 * 3.0;
+        for vertical_step in -20..=20 {
+            if !use_vertical && vertical_step != 0 {
+                continue;
+            }
+            let vertical = vertical_step as f32 * 5.0;
+            for horizontal_step in -20..=20 {
+                if !use_horizontal && horizontal_step != 0 {
+                    continue;
+                }
+                let horizontal = horizontal_step as f32 * 5.0;
+                let cost =
+                    guided_geometry_cost(guides, width, height, rotate, vertical, horizontal);
+                if cost < best.residual {
+                    best = GuidedGeometryResult {
+                        rotate,
+                        vertical,
+                        horizontal,
+                        residual: cost,
+                    };
+                }
+            }
+        }
+    }
+
+    let mut rotate_step = 1.5;
+    let mut perspective_step = 2.5;
+    for _ in 0..8 {
+        let current = best;
+        for rotate_delta in [-rotate_step, 0.0, rotate_step] {
+            for vertical_delta in if use_vertical {
+                [-perspective_step, 0.0, perspective_step]
+            } else {
+                [0.0, 0.0, 0.0]
+            } {
+                for horizontal_delta in if use_horizontal {
+                    [-perspective_step, 0.0, perspective_step]
+                } else {
+                    [0.0, 0.0, 0.0]
+                } {
+                    let rotate = (current.rotate + rotate_delta).clamp(-45.0, 45.0);
+                    let vertical = (current.vertical + vertical_delta).clamp(-100.0, 100.0);
+                    let horizontal = (current.horizontal + horizontal_delta).clamp(-100.0, 100.0);
+                    let cost =
+                        guided_geometry_cost(guides, width, height, rotate, vertical, horizontal);
+                    if cost < best.residual {
+                        best = GuidedGeometryResult {
+                            rotate,
+                            vertical,
+                            horizontal,
+                            residual: cost,
+                        };
+                    }
+                }
+            }
+        }
+        rotate_step *= 0.5;
+        perspective_step *= 0.5;
+    }
+
+    if !best.residual.is_finite() || best.residual > 0.01 {
+        return Err("The selected guides do not produce a stable correction".to_string());
+    }
+    Ok(best)
+}
+
+fn unorient_guided_point(
+    point: (f32, f32),
+    orientation_steps: u8,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+) -> (f32, f32) {
+    let mut x = if flip_horizontal {
+        1.0 - point.0
+    } else {
+        point.0
+    };
+    let mut y = if flip_vertical {
+        1.0 - point.1
+    } else {
+        point.1
+    };
+    (x, y) = match orientation_steps % 4 {
+        1 => (y, 1.0 - x),
+        2 => (1.0 - x, 1.0 - y),
+        3 => (1.0 - y, x),
+        _ => (x, y),
+    };
+    (x, y)
+}
+
+fn unorient_guided_geometry(
+    guides: GuidedGeometryGuides,
+    orientation_steps: u8,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+) -> GuidedGeometryGuides {
+    let convert_pair = |pair: Vec<GuidedGeometryGuide>| {
+        pair.into_iter()
+            .map(|guide| {
+                let first = unorient_guided_point(
+                    (guide.x1, guide.y1),
+                    orientation_steps,
+                    flip_horizontal,
+                    flip_vertical,
+                );
+                let second = unorient_guided_point(
+                    (guide.x2, guide.y2),
+                    orientation_steps,
+                    flip_horizontal,
+                    flip_vertical,
+                );
+                GuidedGeometryGuide {
+                    x1: first.0,
+                    y1: first.1,
+                    x2: second.0,
+                    y2: second.1,
+                }
+            })
+            .collect::<Vec<_>>()
+    };
+    let horizontal = convert_pair(guides.horizontal);
+    let vertical = convert_pair(guides.vertical);
+    if orientation_steps % 2 == 1 {
+        GuidedGeometryGuides {
+            horizontal: vertical,
+            vertical: horizontal,
+        }
+    } else {
+        GuidedGeometryGuides {
+            horizontal,
+            vertical,
+        }
+    }
+}
+
+#[tauri::command]
+fn solve_guided_transform(
+    guides: GuidedGeometryGuides,
+    js_adjustments: serde_json::Value,
+    state: tauri::State<'_, AppState>,
+) -> Result<GuidedGeometryResult, String> {
+    let (width, height) = {
+        let guard = state.original_image.lock().unwrap();
+        let image = &guard.as_ref().ok_or("No image loaded")?.image;
+        (image.width() as f32, image.height() as f32)
+    };
+    let orientation_steps = js_adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
+    let flip_horizontal = js_adjustments["flipHorizontal"].as_bool().unwrap_or(false);
+    let flip_vertical = js_adjustments["flipVertical"].as_bool().unwrap_or(false);
+    let guides =
+        unorient_guided_geometry(guides, orientation_steps, flip_horizontal, flip_vertical);
+    solve_guided_geometry(&guides, width, height)
+}
+
 fn median(values: &mut [f32]) -> Option<f32> {
     if values.is_empty() {
         return None;
@@ -387,6 +695,71 @@ mod geometry_analysis_tests {
 
         let result = analyze_geometry_pixels(&gray, "vertical").unwrap();
         assert_eq!(result.vertical, Some(0.0));
+    }
+
+    fn guide(x1: f32, y1: f32, x2: f32, y2: f32) -> GuidedGeometryGuide {
+        GuidedGeometryGuide { x1, y1, x2, y2 }
+    }
+
+    #[test]
+    fn guided_vertical_pair_removes_convergence() {
+        let guides = GuidedGeometryGuides {
+            vertical: vec![guide(0.32, 0.1, 0.22, 0.9), guide(0.68, 0.1, 0.78, 0.9)],
+            horizontal: Vec::new(),
+        };
+        let before = guided_geometry_cost(&guides, 1200.0, 800.0, 0.0, 0.0, 0.0);
+        let result = solve_guided_geometry(&guides, 1200.0, 800.0).unwrap();
+        assert!(result.residual < before * 0.05);
+        assert!(result.vertical.abs() > 1.0);
+        assert_eq!(result.horizontal, 0.0);
+    }
+
+    #[test]
+    fn guided_horizontal_pair_removes_convergence() {
+        let guides = GuidedGeometryGuides {
+            vertical: Vec::new(),
+            horizontal: vec![guide(0.1, 0.32, 0.9, 0.22), guide(0.1, 0.68, 0.9, 0.78)],
+        };
+        let before = guided_geometry_cost(&guides, 1200.0, 800.0, 0.0, 0.0, 0.0);
+        let result = solve_guided_geometry(&guides, 1200.0, 800.0).unwrap();
+        assert!(result.residual < before * 0.05);
+        assert!(result.horizontal.abs() > 1.0);
+        assert_eq!(result.vertical, 0.0);
+    }
+
+    #[test]
+    fn guided_combined_pairs_solve_both_axes() {
+        let guides = GuidedGeometryGuides {
+            vertical: vec![guide(0.32, 0.1, 0.22, 0.9), guide(0.68, 0.1, 0.78, 0.9)],
+            horizontal: vec![guide(0.1, 0.32, 0.9, 0.22), guide(0.1, 0.68, 0.9, 0.78)],
+        };
+        let before = guided_geometry_cost(&guides, 1200.0, 800.0, 0.0, 0.0, 0.0);
+        let result = solve_guided_geometry(&guides, 1200.0, 800.0).unwrap();
+        assert!(result.residual < before * 0.05);
+        assert!(result.vertical.abs() > 1.0);
+        assert!(result.horizontal.abs() > 1.0);
+    }
+
+    #[test]
+    fn guided_solver_requires_a_complete_pair() {
+        let guides = GuidedGeometryGuides {
+            vertical: vec![guide(0.3, 0.1, 0.3, 0.9)],
+            horizontal: Vec::new(),
+        };
+        assert!(solve_guided_geometry(&guides, 1200.0, 800.0).is_err());
+    }
+
+    #[test]
+    fn guided_pairs_follow_coarse_orientation_and_flips() {
+        let guides = GuidedGeometryGuides {
+            vertical: vec![guide(0.2, 0.1, 0.2, 0.9), guide(0.8, 0.1, 0.8, 0.9)],
+            horizontal: Vec::new(),
+        };
+        let restored = unorient_guided_geometry(guides, 1, true, false);
+        assert_eq!(restored.vertical.len(), 0);
+        assert_eq!(restored.horizontal.len(), 2);
+        let first = restored.horizontal[0];
+        assert!((first.y1 - first.y2).abs() < 1e-6);
     }
 }
 
@@ -2609,6 +2982,7 @@ pub fn run() {
             generate_uncropped_preview,
             preview_geometry_transform,
             analyze_geometry,
+            solve_guided_transform,
             get_log_file_path,
             frontend_log,
             save_collage,

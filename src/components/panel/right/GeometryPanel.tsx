@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Aperture, Building2, Minus, RotateCcw, Scan } from 'lucide-react';
+import { Aperture, Building2, Minus, MoveDiagonal2, RotateCcw, Scan } from 'lucide-react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 
 import LensCorrectionModal from '../../modals/LensCorrectionModal';
+import GuidedTransformModal from '../../modals/GuidedTransformModal';
 import TransformModal from '../../modals/TransformModal';
 import Switch from '../../ui/Switch';
 import Text from '../../ui/Text';
@@ -22,12 +23,14 @@ export default function GeometryPanel() {
   const { setAdjustments } = useEditorActions();
   const [isTransformModalOpen, setIsTransformModalOpen] = useState(false);
   const [isLensModalOpen, setIsLensModalOpen] = useState(false);
+  const [isGuidedModalOpen, setIsGuidedModalOpen] = useState(false);
   const [analyzingGeometry, setAnalyzingGeometry] = useState<'level' | 'vertical' | null>(null);
 
   const resetGeometry = () => {
     setAdjustments((previous: Adjustments) => ({
       ...previous,
       transformAutoMode: INITIAL_ADJUSTMENTS.transformAutoMode,
+      transformGuides: INITIAL_ADJUSTMENTS.transformGuides,
       transformDistortion: INITIAL_ADJUSTMENTS.transformDistortion,
       transformVertical: INITIAL_ADJUSTMENTS.transformVertical,
       transformHorizontal: INITIAL_ADJUSTMENTS.transformHorizontal,
@@ -61,6 +64,7 @@ export default function GeometryPanel() {
       setAdjustments((previous: Adjustments) => ({
         ...previous,
         transformAutoMode: mode,
+        transformGuides: INITIAL_ADJUSTMENTS.transformGuides,
         transformRotate: result.rotate,
         transformVertical: mode === 'vertical' && result.vertical !== undefined ? result.vertical : 0,
       }));
@@ -100,6 +104,21 @@ export default function GeometryPanel() {
               >
                 <Scan size={20} />
                 <span className="text-xs mt-2">{t('editor.crop.labels.manualTransform')}</span>
+              </motion.button>
+              <motion.button
+                className={clsx(
+                  buttonClass,
+                  adjustments.transformAutoMode === 'guided'
+                    ? 'bg-accent text-button-text shadow-sm'
+                    : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
+                )}
+                onClick={() => setIsGuidedModalOpen(true)}
+                data-tooltip={t('editor.crop.tooltips.guided')}
+                whileTap={{ scale: 0.98 }}
+                type="button"
+              >
+                <MoveDiagonal2 size={20} />
+                <span className="text-xs mt-2">{t('editor.crop.labels.guided')}</span>
               </motion.button>
               <motion.button
                 className={`${buttonClass} bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary`}
@@ -183,6 +202,7 @@ export default function GeometryPanel() {
           setAdjustments((previous: Adjustments) => ({
             ...previous,
             transformAutoMode: null,
+            transformGuides: INITIAL_ADJUSTMENTS.transformGuides,
             transformDistortion: parameters.distortion,
             transformVertical: parameters.vertical,
             transformHorizontal: parameters.horizontal,
@@ -191,6 +211,22 @@ export default function GeometryPanel() {
             transformScale: parameters.scale,
             transformXOffset: parameters.x_offset,
             transformYOffset: parameters.y_offset,
+          }));
+        }}
+        currentAdjustments={adjustments}
+      />
+
+      <GuidedTransformModal
+        isOpen={isGuidedModalOpen}
+        onClose={() => setIsGuidedModalOpen(false)}
+        onApply={(result, guides) => {
+          setAdjustments((previous: Adjustments) => ({
+            ...previous,
+            transformAutoMode: 'guided',
+            transformGuides: guides,
+            transformRotate: result.rotate,
+            transformVertical: result.vertical,
+            transformHorizontal: result.horizontal,
           }));
         }}
         currentAdjustments={adjustments}

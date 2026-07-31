@@ -466,6 +466,7 @@
         "constrainCrop": "Constrain Crop",
         "flipHoriz": "Flip Horiz",
         "flipVert": "Flip Vert",
+        "guided": "Guided",
         "lens": "Lens",
         "level": "Level",
         "manualTransform": "Manual Transform",
@@ -555,6 +556,7 @@
         "constrainCrop": "Automatically zoom to prevent empty edges after geometry corrections",
         "flipHoriz": "Flip image horizontally",
         "flipVert": "Flip image vertically",
+        "guided": "Draw paired guides to correct horizontal and vertical perspective",
         "lens": "Lens distortion correction",
         "level": "Detect and straighten the dominant horizontal or vertical lines",
         "manualTransform": "Manual perspective and keystone correction",
@@ -1446,6 +1448,25 @@
     },
     "renameGroup": {
       "placeholder": "Enter new group name..."
+    },
+    "guidedTransform": {
+      "apply": "Apply",
+      "cancel": "Cancel",
+      "clearAll": "Clear All Guides",
+      "correctedPreview": "Corrected Preview",
+      "description": "Draw two lines along edges that should be parallel. Add both pairs to make horizontal and vertical edges perpendicular.",
+      "drawNextGuide": "Draw the next guide over the image.",
+      "guideNumber": "Guide {{number}}",
+      "horizontal": "Horizontal Pair",
+      "loadingPreview": "Loading preview…",
+      "previewAlt": "Guided transform preview",
+      "previewCorrection": "Preview Correction",
+      "rotation": "Rotation",
+      "selectToDraw": "Select this pair to draw guides.",
+      "showGuides": "Show Guides",
+      "solving": "Solving…",
+      "title": "Guided Transform",
+      "vertical": "Vertical Pair"
     },
     "transform": {
       "amount": "Amount",

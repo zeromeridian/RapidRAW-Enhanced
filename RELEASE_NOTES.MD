@@ -5,6 +5,37 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.1.2-feature-transform — 2026-07-31
+
+### Refined Guided Transform controls
+
+- Reduced the visual weight of Guided Transform lines for a clearer view of
+  image details while positioning guides.
+
+## 1.1.1-feature-transform — 2026-07-31
+
+### Guided perspective correction
+
+- Added Guided Transform with separate two-line vertical and horizontal pairs.
+- Completed guide pairs correct parallelism; using both pairs also corrects the
+  relationship between horizontal and vertical structures.
+- Guided lines can be adjusted, removed, previewed, and used with Constrain
+  Crop.
+- Guided lines and their resolved perspective correction synchronize through
+  XMP for use on other ThisIsRAW installations.
+
+## 1.1.0-feature-transform — 2026-07-31
+
+### Guided perspective correction
+
+- Added Guided Transform with separate two-line vertical and horizontal pairs.
+- Completed guide pairs correct parallelism; using both pairs also corrects the
+  relationship between horizontal and vertical structures.
+- Guided lines can be adjusted, removed, previewed, and used with Constrain
+  Crop.
+- Guided lines and their resolved perspective correction synchronize through
+  XMP for use on other ThisIsRAW installations.
+
 ## 1.0.9-fix-transform — 2026-07-31
 
 ### More reliable automatic geometry
