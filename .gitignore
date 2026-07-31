@@ -44,3 +44,8 @@ bench/out/
 HANDOFF.md
 AGENTS.md
 CODE_AUDIT_FINDINGS.md
+
+
+/.cargo/.package-cache
+/.cargo/registry/
+/.rustup/

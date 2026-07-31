@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.0.9-fix-transform — 2026-07-31
+
+### More reliable automatic geometry
+
+- Improved Level and Vertical detection for shorter and lower-contrast lines.
+- Improved Vertical correction stability for parallel and subtly converging
+  architectural structures.
+
 ## 1.0.7-feature-mask-enhancements — 2026-07-31
 
 ### Mask overlay and Gaussian Blur

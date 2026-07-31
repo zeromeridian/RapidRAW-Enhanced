@@ -55,7 +55,9 @@ use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose};
 use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, GenericImageView, ImageBuffer, ImageFormat, Luma, RgbImage, Rgba};
+use image::{
+    DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, RgbImage, Rgba,
+};
 use image_hdr::hdr_merge_images;
 use image_hdr::input::HDRInput;
 use imageproc::drawing::draw_line_segment_mut;
@@ -127,6 +129,67 @@ fn normalize_hough_angle(angle: f32) -> f32 {
     }
 }
 
+fn stretch_luma_contrast(gray: &GrayImage) -> GrayImage {
+    let mut histogram = [0_u32; 256];
+    for pixel in gray.pixels() {
+        histogram[pixel[0] as usize] += 1;
+    }
+
+    // Ignore a very small number of clipped pixels so isolated hot or black
+    // pixels do not prevent useful contrast expansion in a flat photograph.
+    let clipped_pixels = (gray.width() as u64 * gray.height() as u64 / 400) as u32;
+    let mut accumulated = 0_u32;
+    let low = histogram
+        .iter()
+        .position(|count| {
+            accumulated += *count;
+            accumulated > clipped_pixels
+        })
+        .unwrap_or(0) as u8;
+
+    accumulated = 0;
+    let high = histogram
+        .iter()
+        .rposition(|count| {
+            accumulated += *count;
+            accumulated > clipped_pixels
+        })
+        .unwrap_or(255) as u8;
+
+    if high.saturating_sub(low) < 8 {
+        return gray.clone();
+    }
+
+    let range = u16::from(high - low);
+    ImageBuffer::from_fn(gray.width(), gray.height(), |x, y| {
+        let value = gray.get_pixel(x, y)[0].clamp(low, high);
+        Luma([((u16::from(value - low) * 255) / range) as u8])
+    })
+}
+
+fn detect_geometry_lines(gray: &GrayImage, pass: usize) -> Vec<(f32, f32)> {
+    let (low_threshold, high_threshold, vote_fraction) = match pass {
+        0 => (50.0, 100.0, 0.20),
+        1 => (30.0, 70.0, 0.11),
+        _ => (15.0, 40.0, 0.065),
+    };
+    let edges = canny(gray, low_threshold, high_threshold);
+    let min_dim = gray.width().min(gray.height());
+    let vote_threshold = ((min_dim as f32 * vote_fraction).round() as u32).max(18);
+    let suppression_radius = ((min_dim as f32 * 0.008).round() as u32).clamp(6, 14);
+
+    detect_lines(
+        &edges,
+        LineDetectionOptions {
+            vote_threshold,
+            suppression_radius,
+        },
+    )
+    .into_iter()
+    .map(|line| (line.r, line.angle_in_degrees as f32))
+    .collect()
+}
+
 fn estimate_level_rotation(lines: &[(f32, f32)]) -> Option<f32> {
     let mut corrections = lines
         .iter()
@@ -145,13 +208,6 @@ fn estimate_level_rotation(lines: &[(f32, f32)]) -> Option<f32> {
     median(&mut corrections).map(|value| value.clamp(-45.0, 45.0))
 }
 
-fn rotate_point(point: (f32, f32), center: (f32, f32), angle_degrees: f32) -> (f32, f32) {
-    let (sin, cos) = angle_degrees.to_radians().sin_cos();
-    let x = point.0 - center.0;
-    let y = point.1 - center.1;
-    (center.0 + x * cos - y * sin, center.1 + x * sin + y * cos)
-}
-
 fn estimate_vertical_correction(
     lines: &[(f32, f32)],
     width: f32,
@@ -159,60 +215,179 @@ fn estimate_vertical_correction(
     level_rotation: f32,
 ) -> Option<f32> {
     let center = (width * 0.5, height * 0.5);
-    let distance = width.max(height) * 2.0;
-    let vertical_lines = lines
+    let (level_sin, level_cos) = level_rotation.to_radians().sin_cos();
+    let mut vertical_samples = lines
         .iter()
         .filter_map(|(r, angle)| {
             let normal = normalize_hough_angle(*angle);
-            if normal.abs() > 35.0 {
+            if normal.abs() > 45.0 {
                 return None;
             }
 
             let theta = angle.to_radians();
             let (sin, cos) = theta.sin_cos();
-            let origin = (cos * *r, sin * *r);
-            let p1 = rotate_point(
-                (origin.0 - sin * distance, origin.1 + cos * distance),
-                center,
-                level_rotation,
-            );
-            let p2 = rotate_point(
-                (origin.0 + sin * distance, origin.1 - cos * distance),
-                center,
-                level_rotation,
-            );
+            let origin_x = cos * *r - center.0;
+            let origin_y = sin * *r - center.1;
+            let rotated_origin_x = origin_x * level_cos - origin_y * level_sin + center.0;
+            let rotated_origin_y = origin_x * level_sin + origin_y * level_cos + center.1;
+            let a = cos * level_cos - sin * level_sin;
+            let b = cos * level_sin + sin * level_cos;
+            if a.abs() < 0.82 {
+                return None;
+            }
 
-            let a = p1.1 - p2.1;
-            let b = p2.0 - p1.0;
-            let norm = (a * a + b * b).sqrt();
-            (norm > 1e-5).then_some((a / norm, b / norm, (a * p1.0 + b * p1.1) / norm))
+            let c = a * rotated_origin_x + b * rotated_origin_y;
+            let x_at_center = (c - b * center.1) / a;
+            let horizontal_drift = -b / a;
+            (x_at_center.is_finite() && horizontal_drift.is_finite())
+                .then_some((x_at_center, horizontal_drift))
+        })
+        .collect::<Vec<_>>();
+    vertical_samples.sort_by(|first, second| first.0.total_cmp(&second.0));
+
+    // A single visible edge often produces several nearby Hough peaks. Merge
+    // those before estimating perspective so one edge cannot vote repeatedly.
+    let mut groups: Vec<Vec<(f32, f32)>> = Vec::new();
+    for sample in vertical_samples {
+        let joins_previous = groups
+            .last()
+            .and_then(|group| group.first())
+            .is_some_and(|first| sample.0 - first.0 <= width * 0.03);
+        if joins_previous {
+            groups.last_mut().unwrap().push(sample);
+        } else {
+            groups.push(vec![sample]);
+        }
+    }
+
+    let grouped_lines = groups
+        .into_iter()
+        .filter_map(|group| {
+            let mut positions = group.iter().map(|sample| sample.0).collect::<Vec<_>>();
+            let mut drifts = group.iter().map(|sample| sample.1).collect::<Vec<_>>();
+            Some((median(&mut positions)?, median(&mut drifts)?))
         })
         .collect::<Vec<_>>();
 
-    let mut vanishing_y = Vec::new();
-    for (index, first) in vertical_lines.iter().enumerate() {
-        for second in vertical_lines.iter().skip(index + 1) {
-            let determinant = first.0 * second.1 - second.0 * first.1;
-            if determinant.abs() < 0.015 {
-                continue;
-            }
-
-            let x = (first.2 * second.1 - second.2 * first.1) / determinant;
-            let y = (first.0 * second.2 - second.0 * first.2) / determinant;
-            if x.is_finite()
-                && y.is_finite()
-                && (x - center.0).abs() < width * 4.0
-                && (y - center.1).abs() > height * 0.6
-                && (y - center.1).abs() < height * 50.0
-            {
-                vanishing_y.push(y);
+    let mut perspective_estimates = Vec::new();
+    for (index, first) in grouped_lines.iter().enumerate() {
+        for second in grouped_lines.iter().skip(index + 1) {
+            let separation = second.0 - first.0;
+            if separation.abs() >= width * 0.08 {
+                perspective_estimates.push((second.1 - first.1) / separation);
             }
         }
     }
 
-    let vp_y = median(&mut vanishing_y)?;
-    let perspective = -1.0 / (vp_y - center.1);
-    Some((perspective * 100_000.0 * height / 2_000.0).clamp(-100.0, 100.0))
+    let perspective = median(&mut perspective_estimates)?;
+    let correction = perspective * 100_000.0 * height / 2_000.0;
+    if correction.abs() < 1.0 {
+        return Some(0.0);
+    }
+
+    Some(correction.clamp(-100.0, 100.0))
+}
+
+fn analyze_geometry_pixels(gray: &GrayImage, mode: &str) -> Result<AutoGeometryResult, String> {
+    let mut found_level_lines = false;
+    let mut enhanced = None;
+
+    for pass in 0..3 {
+        let detection_image = if pass == 0 {
+            gray
+        } else {
+            enhanced.get_or_insert_with(|| stretch_luma_contrast(gray))
+        };
+        let lines = detect_geometry_lines(detection_image, pass);
+        let Some(rotate) = estimate_level_rotation(&lines) else {
+            continue;
+        };
+        found_level_lines = true;
+
+        let vertical = match mode {
+            "level" => None,
+            "vertical" => {
+                let Some(correction) = estimate_vertical_correction(
+                    &lines,
+                    gray.width() as f32,
+                    gray.height() as f32,
+                    rotate,
+                ) else {
+                    continue;
+                };
+                Some(correction)
+            }
+            _ => return Err("Unsupported automatic geometry mode".to_string()),
+        };
+
+        return Ok(AutoGeometryResult {
+            rotate,
+            vertical,
+            detected_lines: lines.len(),
+        });
+    }
+
+    if mode == "vertical" && found_level_lines {
+        Err("No reliable vertical structures were detected".to_string())
+    } else {
+        Err("No reliable horizontal or vertical lines were detected".to_string())
+    }
+}
+
+#[cfg(test)]
+mod geometry_analysis_tests {
+    use super::*;
+
+    #[test]
+    fn adaptive_pass_finds_short_low_contrast_level_lines() {
+        let mut gray = GrayImage::from_pixel(320, 240, Luma([110]));
+        for index in 0..6 {
+            let y = 35.0 + index as f32 * 30.0;
+            draw_line_segment_mut(&mut gray, (24.0, y), (66.0, y + 4.0), Luma([124]));
+        }
+
+        let strict_lines = detect_geometry_lines(&gray, 0);
+        assert!(estimate_level_rotation(&strict_lines).is_none());
+
+        let result = analyze_geometry_pixels(&gray, "level").unwrap();
+        assert!(result.detected_lines >= 2);
+        assert!(result.rotate.abs() > 1.0);
+    }
+
+    #[test]
+    fn parallel_vertical_lines_are_a_valid_zero_correction() {
+        let lines = vec![(45.0, 0.0), (160.0, 0.0), (275.0, 0.0)];
+        let correction = estimate_vertical_correction(&lines, 320.0, 240.0, 0.0).unwrap();
+        assert_eq!(correction, 0.0);
+    }
+
+    #[test]
+    fn converging_vertical_lines_retain_their_perspective_correction() {
+        let center_y = 120.0;
+        let lines = [(60.0, -0.1), (160.0, 0.0), (260.0, 0.1)]
+            .into_iter()
+            .map(|(x_at_center, drift)| {
+                let norm = (1.0_f32 + drift * drift).sqrt();
+                let r = (x_at_center - drift * center_y) / norm;
+                let angle = (-drift).atan2(1.0).to_degrees();
+                (r, angle)
+            })
+            .collect::<Vec<_>>();
+
+        let correction = estimate_vertical_correction(&lines, 320.0, 240.0, 0.0).unwrap();
+        assert!((correction - 12.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn vertical_analysis_accepts_parallel_image_structures() {
+        let mut gray = GrayImage::from_pixel(320, 240, Luma([30]));
+        for x in [50.0, 160.0, 270.0] {
+            draw_line_segment_mut(&mut gray, (x, 25.0), (x, 215.0), Luma([225]));
+        }
+
+        let result = analyze_geometry_pixels(&gray, "vertical").unwrap();
+        assert_eq!(result.vertical, Some(0.0));
+    }
 }
 
 #[tauri::command]
@@ -234,40 +409,7 @@ async fn analyze_geometry(
         let oriented = apply_coarse_rotation(Cow::Owned(preview), orientation_steps);
         let oriented = apply_flip(oriented, flip_horizontal, flip_vertical).into_owned();
         let gray = oriented.to_luma8();
-        let edges = canny(&gray, 50.0, 100.0);
-        let min_dim = gray.width().min(gray.height());
-        let lines = detect_lines(
-            &edges,
-            LineDetectionOptions {
-                vote_threshold: (min_dim as f32 * 0.20) as u32,
-                suppression_radius: 12,
-            },
-        )
-        .into_iter()
-        .map(|line| (line.r, line.angle_in_degrees as f32))
-        .collect::<Vec<_>>();
-
-        let rotate = estimate_level_rotation(&lines)
-            .ok_or_else(|| "No reliable horizontal or vertical lines were detected".to_string())?;
-        let vertical = match mode.as_str() {
-            "level" => None,
-            "vertical" => Some(
-                estimate_vertical_correction(
-                    &lines,
-                    gray.width() as f32,
-                    gray.height() as f32,
-                    rotate,
-                )
-                .ok_or_else(|| "No reliable converging vertical lines were detected".to_string())?,
-            ),
-            _ => return Err("Unsupported automatic geometry mode".to_string()),
-        };
-
-        Ok(AutoGeometryResult {
-            rotate,
-            vertical,
-            detected_lines: lines.len(),
-        })
+        analyze_geometry_pixels(&gray, &mode)
     })
     .await
     .map_err(|error| error.to_string())?
