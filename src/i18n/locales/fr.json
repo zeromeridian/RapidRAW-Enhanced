@@ -536,9 +536,9 @@
           "name": "1:1"
         }
       },
-      "resetTooltip": "Réinitialiser Recadrage & Transformation",
+      "resetTooltip": "Réinitialiser le recadrage",
       "rotationHeading": "Rotation",
-      "title": "Recadrage & Transformation",
+      "title": "Recadrage",
       "tooltips": {
         "compositionOverlay": "Superposition de composition",
         "flipHoriz": "Retourner l'image horizontalement",

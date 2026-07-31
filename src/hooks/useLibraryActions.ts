@@ -282,6 +282,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
           paths: rootPaths,
           expandedFolders: expandedArray,
           showImageCounts,
+          hideEmptyFolders: appSettings?.hideEmptyFolders ?? false,
         });
         updates.folderTrees = treesData;
       } else {
@@ -293,6 +294,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
           paths: pinnedFolders,
           expandedFolders: expandedArray,
           showImageCounts,
+          hideEmptyFolders: appSettings?.hideEmptyFolders ?? false,
         });
         updates.pinnedFolderTrees = pinnedTreesData;
       } else {
@@ -325,6 +327,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
         paths: newPins,
         expandedFolders: Array.from(expandedFolders),
         showImageCounts: appSettings.enableFolderImageCounts ?? false,
+        hideEmptyFolders: appSettings.hideEmptyFolders ?? false,
       });
       setLibrary({ pinnedFolderTrees: trees });
     } catch (err) {

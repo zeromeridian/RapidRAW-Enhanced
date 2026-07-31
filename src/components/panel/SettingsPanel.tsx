@@ -1147,6 +1147,18 @@ export default function SettingsPanel({
                       </SettingItem>
 
                       <SettingItem
+                        label={t('settings.general.hideEmptyFolders')}
+                        description={t('settings.general.hideEmptyFoldersDesc')}
+                      >
+                        <Switch
+                          checked={appSettings?.hideEmptyFolders ?? false}
+                          id="hide-empty-folders-toggle"
+                          label={t('settings.general.hideEmptyFolders')}
+                          onChange={(checked) => onSettingsChange({ ...appSettings, hideEmptyFolders: checked })}
+                        />
+                      </SettingItem>
+
+                      <SettingItem
                         label={t('settings.general.displayEditIcon')}
                         description={t('settings.general.displayEditIconDesc')}
                       >

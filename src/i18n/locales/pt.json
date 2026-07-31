@@ -536,9 +536,9 @@
           "name": "1:1"
         }
       },
-      "resetTooltip": "Redefinir Corte e Transformação",
+      "resetTooltip": "Redefinir Corte",
       "rotationHeading": "Rotação",
-      "title": "Cortar e Transformar",
+      "title": "Cortar",
       "tooltips": {
         "compositionOverlay": "Sobreposição de Composição",
         "flipHoriz": "Inverter imagem horizontalmente",

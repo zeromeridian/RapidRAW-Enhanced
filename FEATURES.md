@@ -7,7 +7,7 @@ details are in `RELEASE_NOTES.MD`.
 ## Library and workflow
 
 - Customizable bottom toolbar shared by Library and Develop, with Productivity,
-  Copy, Stacking, and Flags groups.
+  Copy, Stacking, Flags, and direct color-label controls.
 - Manual image stacks with collapse/expand, visible stack cues, drag ordering,
   move-to-top covers, and matching Develop-filmstrip presentation.
 - Automatic stacking of physical copies, virtual copies, and exported images,
@@ -25,6 +25,8 @@ details are in `RELEASE_NOTES.MD`.
 - Main Settings access from both Library and Develop.
 - Optional launch directly into the last library, bypassing the splash screen.
 - Persistent Library and Develop sidebar widths.
+- Optional empty-folder hiding that preserves configured and pinned roots while
+  removing branches with no supported images.
 - Progressive loading for large recursive folders, with background metadata
   reconciliation and batched Library updates so thumbnails can appear promptly.
 - Thumbnail-prioritized cold-folder loading with delayed, bounded, cancelable
@@ -32,11 +34,15 @@ details are in `RELEASE_NOTES.MD`.
 
 ## Develop
 
-- Crop & Transform includes automatic **Level** and **Vertical** geometry
-  correction, editable **Manual Transform** controls, and a persistent
-  **Constrain Crop** option that prevents empty transformed edges. Active
-  automatic modes remain highlighted and synchronize their correction values
-  through XMP.
+- Dedicated **Crop** and **Geometry** modules separate composition from
+  perspective work. Geometry includes automatic **Level** and **Vertical**
+  correction, editable **Manual Transform** controls, lens correction, and a
+  persistent **Constrain Crop** option. Active automatic modes remain
+  highlighted and synchronize their correction values through XMP.
+- The Masking module presents every mask source directly, without an additional
+  **Others** submenu.
+- A dedicated **Tagging** module adds and removes tags across the current image
+  or multi-image selection, with common and mixed tags clearly distinguished.
 - Persisted Color / Black & White mode in the global Color section.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.

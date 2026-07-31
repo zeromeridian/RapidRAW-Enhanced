@@ -557,9 +557,9 @@
           "name": "1:1"
         }
       },
-      "resetTooltip": "Сбросить кадрирование и геометрию",
+      "resetTooltip": "Сбросить кадрирование",
       "rotationHeading": "Вращение",
-      "title": "Обрезка и трансформация",
+      "title": "Обрезка",
       "tooltips": {
         "compositionOverlay": "Сетка композиции",
         "flipHoriz": "Отразить горизонтально",

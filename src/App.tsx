@@ -585,6 +585,7 @@ function App() {
         const newChildren: any[] = await invoke(Invokes.GetFolderChildren, {
           path,
           showImageCounts: showCounts,
+          hideEmptyFolders: appSettings?.hideEmptyFolders ?? false,
         });
         setLibrary((state) => ({
           folderTrees: state.folderTrees.map((t: any) => insertChildrenIntoTree(t, path, newChildren)),
@@ -596,7 +597,7 @@ function App() {
         toast.error(`Failed to load folder: ${err}`);
       }
     },
-    [expandedFolders, appSettings?.enableFolderImageCounts, setLibrary],
+    [expandedFolders, appSettings?.enableFolderImageCounts, appSettings?.hideEmptyFolders, setLibrary],
   );
 
   const hasRoots = rootPaths && rootPaths.length > 0;
@@ -706,6 +707,7 @@ function App() {
                   handlePasteAdjustments={handlePasteAdjustments}
                   handleRate={handleRate}
                   handleSetFlag={handleSetFlag}
+                  handleSetColorLabel={handleSetColorLabel}
                   handleDeleteRejected={(paths) => executeDelete(paths, { includeAssociated: false })}
                   handleZoomChange={handleZoomChange}
                   handleRightPanelSelect={handleRightPanelSelect}
@@ -727,6 +729,7 @@ function App() {
                   handleImageSelect={handleImageSelect}
                   handleRate={handleRate}
                   handleSetFlag={handleSetFlag}
+                  handleSetColorLabel={handleSetColorLabel}
                   handleDeleteRejected={(paths) => executeDelete(paths, { includeAssociated: false })}
                   handleThumbnailContextMenu={handleThumbnailContextMenu}
                   handleMainLibraryContextMenu={handleMainLibraryContextMenu}

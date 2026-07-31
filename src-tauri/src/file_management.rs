@@ -1319,6 +1319,7 @@ pub struct FolderNode {
     pub children: Vec<FolderNode>,
     pub is_dir: bool,
     pub image_count: usize,
+    pub contains_images: bool,
     pub has_subdirs: bool,
     pub modified: u64,
     pub created: u64,
@@ -1340,20 +1341,29 @@ fn has_subdirs(path: &Path) -> bool {
     false
 }
 
+fn contains_supported_image(path: &Path) -> bool {
+    WalkDir::new(path)
+        .into_iter()
+        .filter_map(Result::ok)
+        .any(|entry| entry.file_type().is_file() && is_supported_image_file(entry.path()))
+}
+
 fn scan_dir_lazy(
     path: &Path,
     expanded_folders: &HashSet<&str>,
     show_image_counts: bool,
+    detect_images: bool,
     prefetch_one_level: bool,
-) -> Result<(Vec<FolderNode>, usize), std::io::Error> {
+) -> Result<(Vec<FolderNode>, usize, bool), std::io::Error> {
     let mut children_folders = Vec::new();
     let mut current_dir_image_count = 0;
+    let mut current_dir_contains_images = false;
 
     let entries = match std::fs::read_dir(path) {
         Ok(entries) => entries,
         Err(e) => {
             log::warn!("Could not scan directory '{}': {}", path.display(), e);
-            return Ok((Vec::new(), 0));
+            return Ok((Vec::new(), 0, false));
         }
     };
 
@@ -1394,11 +1404,12 @@ fn scan_dir_lazy(
             let should_scan = is_expanded || prefetch_one_level;
             let next_prefetch = is_expanded;
 
-            let (grand_children, sub_dir_own_images) = if should_scan {
+            let (grand_children, sub_dir_own_images, sub_dir_contains_images) = if should_scan {
                 scan_dir_lazy(
                     &current_path,
                     expanded_folders,
                     show_image_counts,
+                    detect_images,
                     next_prefetch,
                 )?
             } else {
@@ -1414,7 +1425,9 @@ fn scan_dir_lazy(
                 } else {
                     0
                 };
-                (Vec::new(), count)
+                let contains_images =
+                    count > 0 || (detect_images && contains_supported_image(&current_path));
+                (Vec::new(), count, contains_images)
             };
 
             let has_any_subdirs = if should_scan {
@@ -1425,6 +1438,8 @@ fn scan_dir_lazy(
 
             let grand_children_sum: usize = grand_children.iter().map(|c| c.image_count).sum();
             let total_child_count = sub_dir_own_images + grand_children_sum;
+            let contains_images =
+                sub_dir_contains_images || grand_children.iter().any(|child| child.contains_images);
 
             children_folders.push(FolderNode {
                 name: name_str.into_owned(),
@@ -1432,27 +1447,33 @@ fn scan_dir_lazy(
                 children: grand_children,
                 is_dir: true,
                 image_count: total_child_count,
+                contains_images,
                 has_subdirs: has_any_subdirs,
                 modified,
                 created,
             });
-        } else if show_image_counts
-            && file_type.is_file()
-            && crate::formats::is_supported_image_file(&current_path)
-        {
-            current_dir_image_count += 1;
+        } else if file_type.is_file() && crate::formats::is_supported_image_file(&current_path) {
+            current_dir_contains_images = true;
+            if show_image_counts {
+                current_dir_image_count += 1;
+            }
         }
     }
 
     children_folders.sort_by_key(|a| a.name.to_lowercase());
 
-    Ok((children_folders, current_dir_image_count))
+    Ok((
+        children_folders,
+        current_dir_image_count,
+        current_dir_contains_images,
+    ))
 }
 
 fn get_folder_tree_sync(
     path: String,
     expanded_folders: Vec<String>,
     show_image_counts: bool,
+    detect_images: bool,
 ) -> Result<FolderNode, String> {
     let root_path = Path::new(&path);
     if !root_path.is_dir() {
@@ -1479,11 +1500,18 @@ fn get_folder_tree_sync(
 
     let expanded_set: HashSet<&str> = expanded_folders.iter().map(|s| s.as_str()).collect();
 
-    let (children, own_count) = scan_dir_lazy(root_path, &expanded_set, show_image_counts, true)
-        .map_err(|e| e.to_string())?;
+    let (children, own_count, own_contains_images) = scan_dir_lazy(
+        root_path,
+        &expanded_set,
+        show_image_counts,
+        detect_images,
+        true,
+    )
+    .map_err(|e| e.to_string())?;
 
     let children_sum: usize = children.iter().map(|c| c.image_count).sum();
     let has_subdirs = children.iter().any(|c| c.is_dir);
+    let contains_images = own_contains_images || children.iter().any(|child| child.contains_images);
 
     let name = match root_path.file_name() {
         Some(n) => n.to_string_lossy().into_owned(),
@@ -1503,6 +1531,7 @@ fn get_folder_tree_sync(
         children,
         is_dir: true,
         image_count: own_count + children_sum,
+        contains_images,
         has_subdirs,
         modified,
         created,
@@ -1513,6 +1542,7 @@ fn get_folder_tree_sync(
 pub async fn get_folder_children(
     path: String,
     show_image_counts: bool,
+    hide_empty_folders: bool,
 ) -> Result<Vec<FolderNode>, String> {
     match tauri::async_runtime::spawn_blocking(move || {
         let root_path = Path::new(&path);
@@ -1520,8 +1550,14 @@ pub async fn get_folder_children(
             return Err(format!("Directory does not exist: {}", path));
         }
         let empty_set = HashSet::new();
-        let (children, _) = scan_dir_lazy(root_path, &empty_set, show_image_counts, false)
-            .map_err(|e| e.to_string())?;
+        let (children, _, _) = scan_dir_lazy(
+            root_path,
+            &empty_set,
+            show_image_counts,
+            hide_empty_folders,
+            false,
+        )
+        .map_err(|e| e.to_string())?;
 
         Ok(children)
     })
@@ -1538,9 +1574,15 @@ pub async fn get_folder_tree(
     path: String,
     expanded_folders: Vec<String>,
     show_image_counts: bool,
+    hide_empty_folders: bool,
 ) -> Result<FolderNode, String> {
     match tauri::async_runtime::spawn_blocking(move || {
-        get_folder_tree_sync(path, expanded_folders, show_image_counts)
+        get_folder_tree_sync(
+            path,
+            expanded_folders,
+            show_image_counts,
+            hide_empty_folders,
+        )
     })
     .await
     {
@@ -1555,12 +1597,18 @@ pub async fn get_pinned_folder_trees(
     paths: Vec<String>,
     expanded_folders: Vec<String>,
     show_image_counts: bool,
+    hide_empty_folders: bool,
 ) -> Result<Vec<FolderNode>, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let results: Vec<Result<FolderNode, String>> = paths
             .par_iter()
             .map(|path| {
-                get_folder_tree_sync(path.clone(), expanded_folders.clone(), show_image_counts)
+                get_folder_tree_sync(
+                    path.clone(),
+                    expanded_folders.clone(),
+                    show_image_counts,
+                    hide_empty_folders,
+                )
             })
             .collect();
 

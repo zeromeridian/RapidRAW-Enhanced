@@ -125,9 +125,11 @@ export enum Panel {
   Ai = 'ai',
   Crop = 'crop',
   Export = 'export',
+  Geometry = 'geometry',
   Masks = 'masks',
   Metadata = 'metadata',
   Presets = 'presets',
+  Tagging = 'tagging',
 }
 
 export enum RawStatus {
@@ -212,6 +214,7 @@ export interface AppSettings {
   exportPresets?: ExportPreset[];
   myLenses?: any;
   enableFolderImageCounts?: boolean;
+  hideEmptyFolders?: boolean;
   displayEditIcon?: boolean;
   linearRawMode?: string;
   enableXmpSync?: boolean;

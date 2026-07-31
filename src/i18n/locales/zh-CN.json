@@ -513,9 +513,9 @@
           "name": "1:1"
         }
       },
-      "resetTooltip": "重置裁剪和变换",
+      "resetTooltip": "重置裁剪",
       "rotationHeading": "旋转",
-      "title": "裁剪与变换",
+      "title": "裁剪",
       "tooltips": {
         "compositionOverlay": "构图叠加",
         "flipHoriz": "水平翻转图像",

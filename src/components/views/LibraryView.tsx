@@ -29,6 +29,7 @@ interface LibraryViewProps {
   handleImageSelect: (...args: any) => void;
   handleRate: (...args: any) => void;
   handleSetFlag: (flag: ImageFlag) => void;
+  handleSetColorLabel: (color: string | null, paths?: string[]) => Promise<void>;
   handleDeleteRejected: (paths: string[]) => void;
   handleThumbnailContextMenu: (...args: any) => void;
   handleMainLibraryContextMenu: (...args: any) => void;
@@ -58,6 +59,7 @@ export default function LibraryView({
   handleImageSelect,
   handleRate,
   handleSetFlag,
+  handleSetColorLabel,
   handleDeleteRejected,
   handleThumbnailContextMenu,
   handleMainLibraryContextMenu,
@@ -190,6 +192,7 @@ export default function LibraryView({
             }
             onDeleteRejected={handleDeleteRejected}
             onFlag={handleSetFlag}
+            onSetColorLabel={handleSetColorLabel}
             onOpenCopyPasteSettings={() => setUI({ isCopyPasteSettingsModalOpen: true })}
             onLibraryRefresh={handleLibraryRefresh}
             onPaste={() => handlePasteAdjustments()}
