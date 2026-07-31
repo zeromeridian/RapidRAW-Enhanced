@@ -13,7 +13,6 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { ExifOverlay } from '../../ui/AppProperties';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 
-
 function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: any) {
   const { t } = useTranslation();
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);

@@ -5,6 +5,13 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.1.3-fix-ci — 2026-07-31
+
+### CI compatibility
+
+- Updated Rust formatting and resolved Rust 1.96 Clippy checks so builds pass
+  the enforced CI quality gates.
+
 ## 1.1.2-feature-transform — 2026-07-31
 
 ### Refined Guided Transform controls

@@ -2641,11 +2641,25 @@ pub fn get_all_adjustments_from_json(
     {
         mask_adjustments[i] = get_mask_adjustments_from_json(&mask_def.adjustments);
         mask_adjustments[i].blend_mode = match mask_def.blend_mode.as_str() {
-            "darken" => 1, "multiply" => 2, "colorBurn" => 3, "linearBurn" => 4,
-            "lighten" => 5, "screen" => 6, "colorDodge" => 7, "linearDodge" => 8,
-            "overlay" => 9, "softLight" => 10, "hardLight" => 11, "vividLight" => 12,
-            "linearLight" => 13, "pinLight" => 14, "hardMix" => 15, "hue" => 16,
-            "saturation" => 17, "color" => 18, "luminosity" => 19,
+            "darken" => 1,
+            "multiply" => 2,
+            "colorBurn" => 3,
+            "linearBurn" => 4,
+            "lighten" => 5,
+            "screen" => 6,
+            "colorDodge" => 7,
+            "linearDodge" => 8,
+            "overlay" => 9,
+            "softLight" => 10,
+            "hardLight" => 11,
+            "vividLight" => 12,
+            "linearLight" => 13,
+            "pinLight" => 14,
+            "hardMix" => 15,
+            "hue" => 16,
+            "saturation" => 17,
+            "color" => 18,
+            "luminosity" => 19,
             _ => 0,
         };
         mask_count += 1;

@@ -72,11 +72,7 @@ export function useTauriListeners({
         pendingRatings[path] = pendingMetadata[path].rating;
       });
 
-      if (
-        Object.keys(pendingRatings).length > 0 ||
-        Object.keys(pendingEdits).length > 0 ||
-        metadataPaths.length > 0
-      ) {
+      if (Object.keys(pendingRatings).length > 0 || Object.keys(pendingEdits).length > 0 || metadataPaths.length > 0) {
         useLibraryStore.getState().setLibrary((state) => ({
           imageRatings: { ...state.imageRatings, ...pendingRatings },
           imageList: state.imageList.map((img) => {
