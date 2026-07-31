@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.1.5-fix-ciisue — 2026-07-31
+
+### Reliable release packaging
+
+- Release builds now retain their source-branch context throughout packaging,
+  allowing detached release-tag checkouts to produce and upload application
+  bundles correctly.
+
 ## 1.1.3-fix-ci — 2026-07-31
 
 ### CI compatibility
