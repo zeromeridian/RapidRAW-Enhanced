@@ -513,9 +513,10 @@ mod output_naming_tests {
 
         let source = ImageMetadata {
             adjustments: serde_json::json!({
-                "transformAutoMode": "vertical",
+                "transformAutoMode": "auto",
                 "transformRotate": -1.25,
                 "transformVertical": 18.5,
+                "transformHorizontal": -7.75,
                 "transformConstrainCrop": true
             }),
             ..ImageMetadata::default()
@@ -525,7 +526,7 @@ mod output_naming_tests {
         let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
         assert_eq!(
             extract_app_xmp_value(&xmp, "AutoGeometryMode").as_deref(),
-            Some("vertical")
+            Some("auto")
         );
         assert_eq!(
             extract_app_xmp_value(&xmp, "ConstrainCrop").as_deref(),
@@ -534,9 +535,10 @@ mod output_naming_tests {
 
         let mut imported = ImageMetadata::default();
         assert!(sync_metadata_from_xmp(&image, &mut imported, true, true));
-        assert_eq!(imported.adjustments["transformAutoMode"], "vertical");
+        assert_eq!(imported.adjustments["transformAutoMode"], "auto");
         assert_eq!(imported.adjustments["transformRotate"], -1.25);
         assert_eq!(imported.adjustments["transformVertical"], 18.5);
+        assert_eq!(imported.adjustments["transformHorizontal"], -7.75);
         assert_eq!(imported.adjustments["transformConstrainCrop"], true);
     }
 
@@ -4651,7 +4653,7 @@ pub fn sync_metadata_from_xmp(
                     .is_none();
             let mut imported_auto_geometry = false;
             let xmp_auto_mode = extract_app_xmp_value(&content, "AutoGeometryMode")
-                .filter(|mode| matches!(mode.as_str(), "level" | "vertical" | "guided"));
+                .filter(|mode| matches!(mode.as_str(), "auto" | "level" | "vertical" | "guided"));
             if let Some(mode) = xmp_auto_mode
                 && should_import_auto_geometry
             {
@@ -4837,7 +4839,7 @@ pub fn sync_metadata_to_xmp(
                 .adjustments
                 .get("transformAutoMode")
                 .and_then(Value::as_str)
-                .filter(|mode| matches!(*mode, "level" | "vertical" | "guided"));
+                .filter(|mode| matches!(*mode, "auto" | "level" | "vertical" | "guided"));
             set_app_xmp_value(&mut content, "AutoGeometryMode", auto_mode);
             if auto_mode.is_some() {
                 let rotate = metadata

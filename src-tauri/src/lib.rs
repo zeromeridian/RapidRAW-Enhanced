@@ -104,6 +104,7 @@ use tagging_utils::{candidates, hierarchy};
 struct AutoGeometryResult {
     rotate: f32,
     vertical: Option<f32>,
+    horizontal: Option<f32>,
     detected_lines: usize,
 }
 
@@ -596,6 +597,84 @@ fn estimate_vertical_correction(
     Some(correction.clamp(-100.0, 100.0))
 }
 
+fn estimate_horizontal_correction(
+    lines: &[(f32, f32)],
+    width: f32,
+    height: f32,
+    level_rotation: f32,
+) -> Option<f32> {
+    let center = (width * 0.5, height * 0.5);
+    let (level_sin, level_cos) = level_rotation.to_radians().sin_cos();
+    let mut horizontal_samples = lines
+        .iter()
+        .filter_map(|(r, angle)| {
+            let normal = normalize_hough_angle(*angle);
+            if normal.abs() < 45.0 {
+                return None;
+            }
+
+            let theta = angle.to_radians();
+            let (sin, cos) = theta.sin_cos();
+            let origin_x = cos * *r - center.0;
+            let origin_y = sin * *r - center.1;
+            let rotated_origin_x = origin_x * level_cos - origin_y * level_sin + center.0;
+            let rotated_origin_y = origin_x * level_sin + origin_y * level_cos + center.1;
+            let a = cos * level_cos - sin * level_sin;
+            let b = cos * level_sin + sin * level_cos;
+            if b.abs() < 0.82 {
+                return None;
+            }
+
+            let c = a * rotated_origin_x + b * rotated_origin_y;
+            let y_at_center = (c - a * center.0) / b;
+            let vertical_drift = -a / b;
+            (y_at_center.is_finite() && vertical_drift.is_finite())
+                .then_some((y_at_center, vertical_drift))
+        })
+        .collect::<Vec<_>>();
+    horizontal_samples.sort_by(|first, second| first.0.total_cmp(&second.0));
+
+    let mut groups: Vec<Vec<(f32, f32)>> = Vec::new();
+    for sample in horizontal_samples {
+        let joins_previous = groups
+            .last()
+            .and_then(|group| group.first())
+            .is_some_and(|first| sample.0 - first.0 <= height * 0.03);
+        if joins_previous {
+            groups.last_mut().unwrap().push(sample);
+        } else {
+            groups.push(vec![sample]);
+        }
+    }
+
+    let grouped_lines = groups
+        .into_iter()
+        .filter_map(|group| {
+            let mut positions = group.iter().map(|sample| sample.0).collect::<Vec<_>>();
+            let mut drifts = group.iter().map(|sample| sample.1).collect::<Vec<_>>();
+            Some((median(&mut positions)?, median(&mut drifts)?))
+        })
+        .collect::<Vec<_>>();
+
+    let mut perspective_estimates = Vec::new();
+    for (index, first) in grouped_lines.iter().enumerate() {
+        for second in grouped_lines.iter().skip(index + 1) {
+            let separation = second.0 - first.0;
+            if separation.abs() >= height * 0.08 {
+                perspective_estimates.push((second.1 - first.1) / separation);
+            }
+        }
+    }
+
+    let perspective = median(&mut perspective_estimates)?;
+    let correction = -perspective * 100_000.0 * width / 2_000.0;
+    if correction.abs() < 1.0 {
+        return Some(0.0);
+    }
+
+    Some(correction.clamp(-100.0, 100.0))
+}
+
 fn analyze_geometry_pixels(gray: &GrayImage, mode: &str) -> Result<AutoGeometryResult, String> {
     let mut found_level_lines = false;
     let mut enhanced = None;
@@ -612,8 +691,8 @@ fn analyze_geometry_pixels(gray: &GrayImage, mode: &str) -> Result<AutoGeometryR
         };
         found_level_lines = true;
 
-        let vertical = match mode {
-            "level" => None,
+        let (vertical, horizontal) = match mode {
+            "level" => (None, None),
             "vertical" => {
                 let Some(correction) = estimate_vertical_correction(
                     &lines,
@@ -623,7 +702,25 @@ fn analyze_geometry_pixels(gray: &GrayImage, mode: &str) -> Result<AutoGeometryR
                 ) else {
                     continue;
                 };
-                Some(correction)
+                (Some(correction), None)
+            }
+            "auto" => {
+                let vertical = estimate_vertical_correction(
+                    &lines,
+                    gray.width() as f32,
+                    gray.height() as f32,
+                    rotate,
+                );
+                let horizontal = estimate_horizontal_correction(
+                    &lines,
+                    gray.width() as f32,
+                    gray.height() as f32,
+                    rotate,
+                );
+                if vertical.is_none() && horizontal.is_none() {
+                    continue;
+                }
+                (vertical, horizontal)
             }
             _ => return Err("Unsupported automatic geometry mode".to_string()),
         };
@@ -631,14 +728,15 @@ fn analyze_geometry_pixels(gray: &GrayImage, mode: &str) -> Result<AutoGeometryR
         return Ok(AutoGeometryResult {
             rotate,
             vertical,
+            horizontal,
             detected_lines: lines.len(),
         });
     }
 
-    if mode == "vertical" && found_level_lines {
-        Err("No reliable vertical structures were detected".to_string())
-    } else {
-        Err("No reliable horizontal or vertical lines were detected".to_string())
+    match (mode, found_level_lines) {
+        ("vertical", true) => Err("No reliable vertical structures were detected".to_string()),
+        ("auto", true) => Err("No reliable perspective structures were detected".to_string()),
+        _ => Err("No reliable horizontal or vertical lines were detected".to_string()),
     }
 }
 
@@ -695,6 +793,38 @@ mod geometry_analysis_tests {
 
         let result = analyze_geometry_pixels(&gray, "vertical").unwrap();
         assert_eq!(result.vertical, Some(0.0));
+    }
+
+    #[test]
+    fn converging_horizontal_lines_retain_their_perspective_correction() {
+        let center_x = 160.0;
+        let lines = [(45.0, -0.1), (120.0, 0.0), (195.0, 0.1)]
+            .into_iter()
+            .map(|(y_at_center, drift)| {
+                let norm = (1.0_f32 + drift * drift).sqrt();
+                let r = (y_at_center - drift * center_x) / norm;
+                let angle = 1.0_f32.atan2(-drift).to_degrees();
+                (r, angle)
+            })
+            .collect::<Vec<_>>();
+
+        let correction = estimate_horizontal_correction(&lines, 320.0, 240.0, 0.0).unwrap();
+        assert!((correction + 21.333334).abs() < 0.01);
+    }
+
+    #[test]
+    fn auto_analysis_solves_both_perspective_axes() {
+        let mut gray = GrayImage::from_pixel(320, 240, Luma([30]));
+        for (x1, x2) in [(45.0, 65.0), (160.0, 160.0), (275.0, 255.0)] {
+            draw_line_segment_mut(&mut gray, (x1, 20.0), (x2, 220.0), Luma([225]));
+        }
+        for (y1, y2) in [(35.0, 55.0), (120.0, 120.0), (205.0, 185.0)] {
+            draw_line_segment_mut(&mut gray, (20.0, y1), (300.0, y2), Luma([225]));
+        }
+
+        let result = analyze_geometry_pixels(&gray, "auto").unwrap();
+        assert!(result.vertical.is_some_and(|value| value.abs() > 1.0));
+        assert!(result.horizontal.is_some_and(|value| value.abs() > 1.0));
     }
 
     fn guide(x1: f32, y1: f32, x2: f32, y2: f32) -> GuidedGeometryGuide {
