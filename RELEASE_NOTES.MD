@@ -5,6 +5,13 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.7-feature-transform-add-auto — 2026-08-01
+
+### Clearer Guided Transform completion
+
+- Moved Apply and Cancel directly below Clear All Guides so the action required
+  to retain a previewed Guided correction is immediately visible.
+
 ## 1.2.6-feature-transform-add-auto — 2026-08-01
 
 ### Transform reset placement

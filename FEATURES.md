@@ -45,8 +45,9 @@ details are in `RELEASE_NOTES.MD`.
   visible endpoint markers, while enlarged invisible endpoint targets preserve
   easy adjustment. A Reset tile beside the transformation-mode buttons clears
   all transforms while retaining separate lens corrections. It accepts up to
-  two vertical and two horizontal lines;
-  either completed pair corrects its parallel structures, while both
+  two vertical and two horizontal lines. Apply and Cancel sit immediately below
+  Clear All Guides so preview completion is explicit. Either completed pair
+  corrects its parallel structures, while both
   pairs produce a combined perpendicular correction. Guide coordinates and
   resolved geometry persist through presets, adjustment copying, and XMP.
   Active automatic modes remain highlighted; Guided also recognizes its
