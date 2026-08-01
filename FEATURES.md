@@ -27,8 +27,9 @@ details are in `RELEASE_NOTES.MD`.
 - Persistent Library and Develop sidebar widths.
 - Optional empty-folder hiding that preserves configured and pinned roots while
   removing branches with no supported images.
-- Progressive loading for large recursive folders, with background metadata
-  reconciliation and batched Library updates so thumbnails can appear promptly.
+- Responsive loading for large recursive folders, with scan and metadata
+  reconciliation moved off the application event loop, bounded background
+  filesystem work, and batched Library updates.
 - Thumbnail-prioritized cold-folder loading with delayed, bounded, cancelable
   background EXIF extraction.
 

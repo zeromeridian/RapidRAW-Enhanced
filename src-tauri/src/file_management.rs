@@ -955,8 +955,7 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
     Ok(result_list)
 }
 
-#[tauri::command]
-pub fn list_images_recursive(
+fn list_images_recursive_sync(
     path: String,
     app_handle: AppHandle,
 ) -> Result<Vec<ImageFile>, String> {
@@ -1019,106 +1018,128 @@ pub fn list_images_recursive(
         .collect();
     let defer_physical_metadata = should_defer_recursive_metadata(tasks.len());
 
-    let mut result_list: Vec<ImageFile> = tasks
-        .into_par_iter()
-        .flat_map(|(path_str, file_name, path_buf, sidecars)| {
-            let modified = fs::metadata(&path_buf)
-                .ok()
-                .and_then(|m| m.modified().ok())
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
+    let process_task = |(path_str, file_name, path_buf, sidecars): (
+        String,
+        String,
+        PathBuf,
+        Vec<Option<String>>,
+    )| {
+        let modified = fs::metadata(&path_buf)
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
 
-            let is_cloud_placeholder = is_cloud_placeholder(&path_buf);
+        let is_cloud_placeholder = is_cloud_placeholder(&path_buf);
 
-            let mut file_results = Vec::with_capacity(sidecars.len());
+        let mut file_results = Vec::with_capacity(sidecars.len());
 
-            for copy_id_opt in sidecars {
-                let (mut virtual_path, is_virtual_copy, sidecar_filename) = match copy_id_opt {
-                    Some(id) => (
-                        format!("{}?vc={}", path_str, id),
-                        true,
-                        format!("{}.{}.rrdata", file_name, id),
-                    ),
-                    None => (path_str.clone(), false, format!("{}.rrdata", file_name)),
+        for copy_id_opt in sidecars {
+            let (mut virtual_path, is_virtual_copy, sidecar_filename) = match copy_id_opt {
+                Some(id) => (
+                    format!("{}?vc={}", path_str, id),
+                    true,
+                    format!("{}.{}.rrdata", file_name, id),
+                ),
+                None => (path_str.clone(), false, format!("{}.rrdata", file_name)),
+            };
+
+            let sidecar_path = path_buf.with_file_name(sidecar_filename);
+
+            let xmp_path = enable_xmp_sync
+                .then(|| resolve_xmp_path(&path_buf))
+                .flatten();
+            let xmp_is_placeholder = xmp_path
+                .as_deref()
+                .is_some_and(crate::file_management::is_cloud_placeholder);
+            let sidecar_is_placeholder =
+                crate::file_management::is_cloud_placeholder(&sidecar_path);
+
+            // A missing primary sidecar already has known default metadata. Do not
+            // enqueue tens of thousands of no-op filesystem reads for a new large
+            // library; only persisted metadata (or XMP that may be imported) needs
+            // to be resolved by the background workers.
+            let has_persisted_metadata = sidecar_path.is_file() || xmp_path.is_some();
+            let metadata =
+                if (!is_virtual_copy && defer_physical_metadata && has_persisted_metadata)
+                    || sidecar_is_placeholder
+                    || xmp_is_placeholder
+                {
+                    enqueue_metadata(
+                        &app_handle,
+                        virtual_path.clone(),
+                        path_buf.clone(),
+                        sidecar_path.clone(),
+                    );
+                    ImageFileMetadata {
+                        is_edited: false,
+                        tags: None,
+                        rating: 0,
+                        is_raw: crate::formats::is_raw_file(&path_buf),
+                        copy_name_suffix: None,
+                        xmp_stack: None,
+                    }
+                } else {
+                    resolve_image_metadata(
+                        &path_buf,
+                        &sidecar_path,
+                        enable_xmp_sync,
+                        !is_virtual_copy,
+                        &settings,
+                    )
                 };
 
-                let sidecar_path = path_buf.with_file_name(sidecar_filename);
-
-                let xmp_path = enable_xmp_sync
-                    .then(|| resolve_xmp_path(&path_buf))
-                    .flatten();
-                let xmp_is_placeholder = xmp_path
+            if is_virtual_copy
+                && let Some(copy_suffix) = metadata
+                    .copy_name_suffix
                     .as_deref()
-                    .is_some_and(crate::file_management::is_cloud_placeholder);
-                let sidecar_is_placeholder =
-                    crate::file_management::is_cloud_placeholder(&sidecar_path);
-
-                // A missing primary sidecar already has known default metadata. Do not
-                // enqueue tens of thousands of no-op filesystem reads for a new large
-                // library; only persisted metadata (or XMP that may be imported) needs
-                // to be resolved by the background workers.
-                let has_persisted_metadata = sidecar_path.is_file() || xmp_path.is_some();
-                let metadata =
-                    if (!is_virtual_copy && defer_physical_metadata && has_persisted_metadata)
-                        || sidecar_is_placeholder
-                        || xmp_is_placeholder
-                    {
-                        enqueue_metadata(
-                            &app_handle,
-                            virtual_path.clone(),
-                            path_buf.clone(),
-                            sidecar_path.clone(),
-                        );
-                        ImageFileMetadata {
-                            is_edited: false,
-                            tags: None,
-                            rating: 0,
-                            is_raw: crate::formats::is_raw_file(&path_buf),
-                            copy_name_suffix: None,
-                            xmp_stack: None,
-                        }
-                    } else {
-                        resolve_image_metadata(
-                            &path_buf,
-                            &sidecar_path,
-                            enable_xmp_sync,
-                            !is_virtual_copy,
-                            &settings,
-                        )
-                    };
-
-                if is_virtual_copy
-                    && let Some(copy_suffix) = metadata
-                        .copy_name_suffix
-                        .as_deref()
-                        .filter(|suffix| !suffix.is_empty())
-                {
-                    virtual_path.push_str("&name=");
-                    virtual_path.push_str(copy_suffix);
-                }
-
-                file_results.push(ImageFile {
-                    path: virtual_path,
-                    modified,
-                    is_edited: metadata.is_edited,
-                    tags: metadata.tags,
-                    exif: None,
-                    is_virtual_copy,
-                    is_raw: metadata.is_raw,
-                    group_id: None,
-                    rating: metadata.rating,
-                    is_cloud_placeholder,
-                    xmp_stack: metadata.xmp_stack,
-                });
+                    .filter(|suffix| !suffix.is_empty())
+            {
+                virtual_path.push_str("&name=");
+                virtual_path.push_str(copy_suffix);
             }
 
-            file_results
-        })
-        .collect();
+            file_results.push(ImageFile {
+                path: virtual_path,
+                modified,
+                is_edited: metadata.is_edited,
+                tags: metadata.tags,
+                exif: None,
+                is_virtual_copy,
+                is_raw: metadata.is_raw,
+                group_id: None,
+                rating: metadata.rating,
+                is_cloud_placeholder,
+                xmp_stack: metadata.xmp_stack,
+            });
+        }
+
+        file_results
+    };
+
+    // Large recursive libraries already defer persisted metadata to a bounded
+    // worker pool. Reconciliation is dominated by filesystem calls (including
+    // macOS placeholder lstat checks), so spreading it over every Rayon thread
+    // only saturates the machine and starves the WebKit UI process.
+    let mut result_list: Vec<ImageFile> = if defer_physical_metadata {
+        tasks.into_iter().flat_map(process_task).collect()
+    } else {
+        tasks.into_par_iter().flat_map(process_task).collect()
+    };
 
     assign_group_ids(&mut result_list, &settings);
     Ok(result_list)
+}
+
+#[tauri::command]
+pub async fn list_images_recursive(
+    path: String,
+    app_handle: AppHandle,
+) -> Result<Vec<ImageFile>, String> {
+    tauri::async_runtime::spawn_blocking(move || list_images_recursive_sync(path, app_handle))
+        .await
+        .map_err(|error| format!("Recursive image scan task failed: {error}"))?
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -2197,7 +2218,26 @@ fn generate_single_thumbnail_and_cache(
 
 fn prefetch_source_file(path_str: &str) {
     let (source_path, _) = parse_virtual_path(path_str);
-    let _ = fs::read(&source_path);
+    #[cfg(target_os = "linux")]
+    if let Ok(file) = fs::File::open(&source_path) {
+        use std::os::fd::AsRawFd;
+        // Trigger OS readahead without allocating and copying an entire RAW
+        // file into a temporary userspace buffer that is immediately dropped.
+        unsafe {
+            libc::posix_fadvise(file.as_raw_fd(), 0, 0, libc::POSIX_FADV_WILLNEED);
+        }
+    }
+    #[cfg(target_os = "macos")]
+    if let Ok(file) = fs::File::open(&source_path) {
+        use std::os::fd::AsRawFd;
+        // F_RDAHEAD is the macOS equivalent: it enables kernel readahead
+        // without copying the complete file into a discarded Vec.
+        unsafe {
+            libc::fcntl(file.as_raw_fd(), libc::F_RDAHEAD, 1);
+        }
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    let _ = source_path;
 }
 
 pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
@@ -2319,7 +2359,9 @@ pub fn update_thumbnail_queue(
             queue.push_back(path);
         }
     } else {
-        for path in unique_paths {
+        // Workers pop from the back, so reverse insertion preserves the
+        // frontend's visible-first request order.
+        for path in unique_paths.into_iter().rev() {
             queue.push_back(path);
         }
     }
