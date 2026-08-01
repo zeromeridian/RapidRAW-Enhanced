@@ -2180,6 +2180,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
             <svg
               aria-label="Guided Transform guides"
               className="absolute z-40 touch-none overflow-visible"
+              onClick={(event) => event.stopPropagation()}
               onPointerCancel={handleGuidedPointerUp}
               onPointerDown={handleGuidedPointerDown}
               onPointerMove={handleGuidedPointerMove}
@@ -2195,8 +2196,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
               viewBox="0 0 1000 1000"
             >
               {(['vertical', 'horizontal'] as const).flatMap((orientation) =>
-                guidedTransformOverlay.guides[orientation].map((guide, index) => {
-                  const color = orientation === 'vertical' ? '#38bdf8' : '#f59e0b';
+                guidedTransformOverlay.guides[orientation].map((guide) => {
                   const x1 = guide.x1 * 1000;
                   const y1 = guide.y1 * 1000;
                   const x2 = guide.x2 * 1000;
@@ -2204,19 +2204,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
                   return (
                     <g key={guide.id}>
                       <line
-                        stroke="rgba(0, 0, 0, 0.75)"
-                        strokeLinecap="round"
-                        strokeWidth="8"
-                        vectorEffect="non-scaling-stroke"
-                        x1={x1}
-                        x2={x2}
-                        y1={y1}
-                        y2={y2}
-                      />
-                      <line
-                        stroke={color}
-                        strokeLinecap="round"
-                        strokeWidth="4"
+                        stroke="#38bdf8"
+                        strokeWidth="1"
                         vectorEffect="non-scaling-stroke"
                         x1={x1}
                         x2={x2}
@@ -2231,29 +2220,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
                           data-guide-endpoint={endpoint}
                           data-guide-id={guide.id}
                           data-guide-orientation={orientation}
-                          fill={color}
+                          fill="transparent"
                           key={endpoint}
-                          r="11"
-                          stroke="rgba(0, 0, 0, 0.8)"
-                          strokeWidth="3"
-                          vectorEffect="non-scaling-stroke"
+                          r="14"
                         />
                       ))}
-                      <text
-                        fill="white"
-                        fontSize="18"
-                        fontWeight="600"
-                        paintOrder="stroke"
-                        pointerEvents="none"
-                        stroke="rgba(0, 0, 0, 0.9)"
-                        strokeWidth="5"
-                        textAnchor="middle"
-                        vectorEffect="non-scaling-stroke"
-                        x={(x1 + x2) / 2}
-                        y={(y1 + y2) / 2 - 14}
-                      >
-                        {index + 1}
-                      </text>
                     </g>
                   );
                 }),

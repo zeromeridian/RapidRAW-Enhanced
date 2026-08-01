@@ -41,8 +41,10 @@ details are in `RELEASE_NOTES.MD`.
   **Vertical** correction, pair-based **Guided Transform**, editable **Manual Transform**
   controls, lens correction, and a persistent **Constrain Crop** option. Guided
   Transform operates directly on the full Develop image while its controls
-  occupy the Geometry panel. It accepts up to two vertical and two horizontal
-  lines; either completed pair corrects its parallel structures, while both
+  occupy the Geometry panel. Thin blue lines provide precise placement without
+  visible endpoint markers, while enlarged invisible endpoint targets preserve
+  easy adjustment. It accepts up to two vertical and two horizontal lines;
+  either completed pair corrects its parallel structures, while both
   pairs produce a combined perpendicular correction. Guide coordinates and
   resolved geometry persist through presets, adjustment copying, and XMP.
   Active automatic modes remain highlighted and synchronize their rotation,
