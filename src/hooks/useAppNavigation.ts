@@ -292,14 +292,17 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       const { setProcess } = useProcessStore.getState();
       const { selectedImage, resetHistory, setEditor } = useEditorStore.getState();
       const libraryViewMode = appSettings?.libraryViewMode;
+      const retainExistingLibrary = isNewRoot && !preserveEditor && useLibraryStore.getState().imageList.length > 0;
 
       if (!preserveEditor) {
         await invoke('cancel_thumbnail_generation');
         clearThumbnailQueue();
         setLibrary({ isViewLoading: true, activeAlbumId: null, libraryScrollTop: 0 });
         useLibraryStore.getState().setSearchCriteria({ tags: [], text: '', mode: 'OR' });
-        setProcess({ thumbnails: {} });
-        globalImageCache.clear();
+        if (!retainExistingLibrary) {
+          setProcess({ thumbnails: {} });
+          globalImageCache.clear();
+        }
         setUI({ activeView: 'library' });
       } else {
         setLibrary({ isViewLoading: true });
@@ -336,9 +339,11 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         }
 
         setLibrary({
-          currentFolderPath: path,
+          ...(retainExistingLibrary ? {} : { currentFolderPath: path }),
           expandedFolders: newExpandedFolders,
-          ...(preserveEditor ? {} : { imageList: [], multiSelectedPaths: [], libraryActivePath: null }),
+          ...(preserveEditor || retainExistingLibrary
+            ? {}
+            : { imageList: [], multiSelectedPaths: [], libraryActivePath: null }),
         });
 
         if (!preserveEditor && selectedImage) {
@@ -359,7 +364,21 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         } else {
           files = await invoke(command, { path });
         }
+        if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
         mergeImportedXmpStacks(files);
+
+        const showLoadedFiles = (imageList: ImageFile[]) => {
+          if (retainExistingLibrary) {
+            setProcess({ thumbnails: {} });
+            globalImageCache.clear();
+          }
+          setLibrary({
+            imageList,
+            ...(retainExistingLibrary
+              ? { currentFolderPath: path, multiSelectedPaths: [], libraryActivePath: null }
+              : {}),
+          });
+        };
 
         const initialRatings: Record<string, number> = {};
         files.forEach((f) => {
@@ -381,9 +400,9 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
               ...image,
               exif: exifDataMap[image.path] || image.exif || null,
             }));
-            setLibrary({ imageList: finalImageList });
+            showLoadedFiles(finalImageList);
           } else {
-            setLibrary({ imageList: files });
+            showLoadedFiles(files);
             window.setTimeout(async () => {
               const batchSize = 200;
               const stateUpdateBatchSize = 1_000;
@@ -434,7 +453,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             }, 1200);
           }
         } else {
-          setLibrary({ imageList: files });
+          showLoadedFiles(files);
         }
 
         if (!preserveEditor) {
