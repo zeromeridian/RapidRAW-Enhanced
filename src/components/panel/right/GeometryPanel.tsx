@@ -25,8 +25,12 @@ export default function GeometryPanel() {
   const [isLensModalOpen, setIsLensModalOpen] = useState(false);
   const [isGuidedModalOpen, setIsGuidedModalOpen] = useState(false);
   const [analyzingGeometry, setAnalyzingGeometry] = useState<'auto' | 'level' | 'vertical' | null>(null);
+  const hasAppliedGuidedTransform =
+    adjustments.transformAutoMode === 'guided' ||
+    adjustments.transformGuides.vertical.length === 2 ||
+    adjustments.transformGuides.horizontal.length === 2;
 
-  const resetGeometry = () => {
+  const resetTransforms = () => {
     setAdjustments((previous: Adjustments) => ({
       ...previous,
       transformAutoMode: INITIAL_ADJUSTMENTS.transformAutoMode,
@@ -40,15 +44,6 @@ export default function GeometryPanel() {
       transformXOffset: INITIAL_ADJUSTMENTS.transformXOffset,
       transformYOffset: INITIAL_ADJUSTMENTS.transformYOffset,
       transformConstrainCrop: INITIAL_ADJUSTMENTS.transformConstrainCrop,
-      lensMaker: INITIAL_ADJUSTMENTS.lensMaker,
-      lensModel: INITIAL_ADJUSTMENTS.lensModel,
-      lensDistortionAmount: INITIAL_ADJUSTMENTS.lensDistortionAmount,
-      lensVignetteAmount: INITIAL_ADJUSTMENTS.lensVignetteAmount,
-      lensTcaAmount: INITIAL_ADJUSTMENTS.lensTcaAmount,
-      lensDistortionEnabled: INITIAL_ADJUSTMENTS.lensDistortionEnabled,
-      lensTcaEnabled: INITIAL_ADJUSTMENTS.lensTcaEnabled,
-      lensVignetteEnabled: INITIAL_ADJUSTMENTS.lensVignetteEnabled,
-      lensDistortionParams: INITIAL_ADJUSTMENTS.lensDistortionParams,
     }));
   };
 
@@ -103,13 +98,6 @@ export default function GeometryPanel() {
     <div className="flex flex-col h-full">
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
         <Text variant={TextVariants.title}>{t('editor.geometry.title')}</Text>
-        <button
-          className="p-2 rounded-full hover:bg-surface transition-colors"
-          onClick={resetGeometry}
-          data-tooltip={t('editor.geometry.resetTooltip')}
-        >
-          <RotateCcw size={18} />
-        </button>
       </div>
 
       <div className="grow overflow-y-auto p-4 custom-scrollbar">
@@ -147,7 +135,7 @@ export default function GeometryPanel() {
               <motion.button
                 className={clsx(
                   buttonClass,
-                  adjustments.transformAutoMode === 'guided'
+                  hasAppliedGuidedTransform
                     ? 'bg-accent text-button-text shadow-sm'
                     : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
                 )}
@@ -158,6 +146,16 @@ export default function GeometryPanel() {
               >
                 <MoveDiagonal2 size={20} />
                 <span className="text-xs mt-2">{t('editor.crop.labels.guided')}</span>
+              </motion.button>
+              <motion.button
+                className={`${buttonClass} bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary`}
+                onClick={resetTransforms}
+                data-tooltip={t('editor.geometry.resetTooltip')}
+                whileTap={{ scale: 0.98 }}
+                type="button"
+              >
+                <RotateCcw size={20} />
+                <span className="text-xs mt-2">{t('adjustments.basic.reset')}</span>
               </motion.button>
               <motion.button
                 className={`${buttonClass} bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary`}

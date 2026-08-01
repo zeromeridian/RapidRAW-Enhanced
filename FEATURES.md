@@ -43,12 +43,15 @@ details are in `RELEASE_NOTES.MD`.
   Transform operates directly on the full Develop image while its controls
   occupy the Geometry panel. Thin blue lines provide precise placement without
   visible endpoint markers, while enlarged invisible endpoint targets preserve
-  easy adjustment. It accepts up to two vertical and two horizontal lines;
+  easy adjustment. A Reset tile beside the transformation-mode buttons clears
+  all transforms while retaining separate lens corrections. It accepts up to
+  two vertical and two horizontal lines;
   either completed pair corrects its parallel structures, while both
   pairs produce a combined perpendicular correction. Guide coordinates and
   resolved geometry persist through presets, adjustment copying, and XMP.
-  Active automatic modes remain highlighted and synchronize their rotation,
-  vertical, and horizontal correction values through XMP. Adaptive
+  Active automatic modes remain highlighted; Guided also recognizes its
+  completed persisted guide pairs when restored. All modes synchronize their
+  rotation, vertical, and horizontal correction values through XMP. Adaptive
   contrast and line-length analysis recognizes shorter, lower-contrast
   structures, while robust grouped-line perspective estimation handles both
   parallel and converging architectural edges.
