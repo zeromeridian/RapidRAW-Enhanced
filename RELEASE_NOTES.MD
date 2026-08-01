@@ -5,6 +5,29 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.1.8-fix-app-optimization — 2026-08-01
+
+### macOS large-library compatibility
+
+- Updated thumbnail disk readahead to use the native macOS mechanism while
+  retaining the non-copying Linux implementation.
+- Preserved the responsive background recursive scan and bounded filesystem
+  reconciliation behavior across supported desktop platforms.
+
+## 1.1.7-fix-app-optimization — 2026-08-01
+
+### Responsive very large libraries
+
+- Moved recursive folder discovery and reconciliation off the application event
+  loop so opening very large libraries no longer blocks the rest of the
+  interface.
+- Large recursive libraries now reconcile files on a bounded background thread
+  instead of saturating every CPU core, improving responsiveness on macOS and
+  other platforms without skipping images or metadata.
+- Thumbnail generation preserves visible-image request priority and no longer
+  copies complete source files into temporary memory merely to trigger disk
+  readahead.
+
 ## 1.1.6-fix-app-optimization — 2026-08-01
 
 ### Faster, more responsive large libraries
