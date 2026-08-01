@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.3-feature-transform-add-auto — 2026-08-01
+
+### Precise Guided Transform lines
+
+- Replaced the heavy outlined Guided Transform markers with precise, thin blue
+  guide lines and invisible endpoint drag targets.
+- Drawing or adjusting a guide no longer triggers the Develop image click-zoom
+  action.
+
 ## 1.2.2-feature-transform-add-auto — 2026-08-01
 
 ### Guided Transform on the Develop image
