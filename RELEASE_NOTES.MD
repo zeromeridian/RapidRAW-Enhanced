@@ -5,6 +5,29 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.6-feature-transform-add-auto — 2026-08-01
+
+### Transform reset placement
+
+- Moved Reset into the Geometry mode-button grid so it is available beside the
+  transformation choices.
+- Reset clears every transform mode, guide, correction, offset, scale, aspect,
+  and Constrain Crop setting while preserving separate lens corrections.
+
+## 1.2.5-feature-transform-add-auto — 2026-08-01
+
+### Guided Transform reset access
+
+- Added the full Geometry reset button to the Guided Transform panel so every
+  transform and lens correction can be reset while Guided editing is open.
+
+## 1.2.4-feature-transform-add-auto — 2026-08-01
+
+### Guided Transform active state
+
+- The Guided button now remains highlighted whenever a completed Guided
+  Transform is applied, including after persisted adjustments are restored.
+
 ## 1.2.3-feature-transform-add-auto — 2026-08-01
 
 ### Precise Guided Transform lines
