@@ -7,7 +7,7 @@ import { toast } from 'react-toastify';
 import debounce from 'lodash.debounce';
 
 import { ImageDimensions, RenderSize, useImageRenderSize } from '../../hooks/useImageRenderSize';
-import { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
+import { Adjustments, AiPatch, GeometryGuide, GuidedTransformGuides, MaskContainer } from '../../utils/adjustments';
 import { calculateCenteredCrop, rotateCropCenter } from '../../utils/cropUtils';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
@@ -58,6 +58,16 @@ const checkCropValid = (pixelCrop: Partial<Crop>, imageW: number, imageH: number
   return true;
 };
 
+const cloneGuidedTransformGuides = (guides: GuidedTransformGuides): GuidedTransformGuides => ({
+  horizontal: guides.horizontal.map((guide) => ({ ...guide })),
+  vertical: guides.vertical.map((guide) => ({ ...guide })),
+});
+
+const makeGeometryGuideId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `guide-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 interface WgpuRenderState {
   useWgpuRenderer: boolean | undefined;
   isReady: boolean;
@@ -86,6 +96,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const isLoading = useLibraryStore((s) => s.isViewLoading);
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const adjustments = useEditorStore((s) => s.adjustments);
+  const guidedTransformOverlay = useEditorStore((s) => s.guidedTransformOverlay);
   const adjustmentsHistory = useEditorStore((s) => s.history);
   const adjustmentsHistoryIndex = useEditorStore((s) => s.historyIndex);
   const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
@@ -112,6 +123,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const hasRenderedFirstFrame = useEditorStore((s) => s.hasRenderedFirstFrame);
 
   const setEditor = useEditorStore((s) => s.setEditor);
+  const guidedDrawingRef = useRef<{ id: string; orientation: keyof GuidedTransformGuides } | null>(null);
+  const guidedDraggingEndpointRef = useRef<{
+    endpoint: 'start' | 'end';
+    id: string;
+    orientation: keyof GuidedTransformGuides;
+  } | null>(null);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
   const goToHistoryIndex = useEditorStore((s) => s.goToHistoryIndex);
@@ -120,6 +137,98 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const canRedo = adjustmentsHistoryIndex < adjustmentsHistory.length - 1;
 
   const isAndroid = osPlatform === 'android';
+
+  const guidedPointerPosition = (event: React.PointerEvent<SVGSVGElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return {
+      x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
+      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
+    };
+  };
+
+  const handleGuidedPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    const overlay = useEditorStore.getState().guidedTransformOverlay;
+    if (!overlay?.interactive) return;
+    const endpointElement = (event.target as Element).closest<SVGElement>('[data-guide-endpoint]');
+    if (endpointElement) {
+      guidedDraggingEndpointRef.current = {
+        endpoint: endpointElement.dataset.guideEndpoint as 'start' | 'end',
+        id: endpointElement.dataset.guideId || '',
+        orientation: endpointElement.dataset.guideOrientation as keyof GuidedTransformGuides,
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
+    if (overlay.guides[overlay.activeOrientation].length >= 2) return;
+
+    const point = guidedPointerPosition(event);
+    const id = makeGeometryGuideId();
+    const guide: GeometryGuide = { id, x1: point.x, y1: point.y, x2: point.x, y2: point.y };
+    guidedDrawingRef.current = { id, orientation: overlay.activeOrientation };
+    setEditor({
+      guidedTransformOverlay: {
+        ...overlay,
+        guides: {
+          ...overlay.guides,
+          [overlay.activeOrientation]: [...overlay.guides[overlay.activeOrientation], guide],
+        },
+      },
+    });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleGuidedPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    const active = guidedDraggingEndpointRef.current || guidedDrawingRef.current;
+    if (!active) return;
+    event.stopPropagation();
+    const point = guidedPointerPosition(event);
+    setEditor((state) => {
+      if (!state.guidedTransformOverlay) return {};
+      const guides = cloneGuidedTransformGuides(state.guidedTransformOverlay.guides);
+      guides[active.orientation] = guides[active.orientation].map((guide) => {
+        if (guide.id !== active.id) return guide;
+        if (guidedDrawingRef.current || guidedDraggingEndpointRef.current?.endpoint === 'end') {
+          return { ...guide, x2: point.x, y2: point.y };
+        }
+        return { ...guide, x1: point.x, y1: point.y };
+      });
+      return { guidedTransformOverlay: { ...state.guidedTransformOverlay, guides } };
+    });
+  };
+
+  const handleGuidedPointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
+    const active = guidedDraggingEndpointRef.current || guidedDrawingRef.current;
+    if (!active) return;
+    event.stopPropagation();
+    const point = guidedPointerPosition(event);
+    setEditor((state) => {
+      if (!state.guidedTransformOverlay) return {};
+      const guides = cloneGuidedTransformGuides(state.guidedTransformOverlay.guides);
+      guides[active.orientation] = guides[active.orientation]
+        .map((guide) => {
+          if (guide.id !== active.id) return guide;
+          if (guidedDrawingRef.current || guidedDraggingEndpointRef.current?.endpoint === 'end') {
+            return { ...guide, x2: point.x, y2: point.y };
+          }
+          return { ...guide, x1: point.x, y1: point.y };
+        })
+        .filter((guide) => guide.id !== active.id || Math.hypot(guide.x2 - guide.x1, guide.y2 - guide.y1) >= 0.04);
+      return {
+        guidedTransformOverlay: {
+          ...state.guidedTransformOverlay,
+          guides,
+          revision: state.guidedTransformOverlay.revision + 1,
+        },
+      };
+    });
+    guidedDrawingRef.current = null;
+    guidedDraggingEndpointRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
 
   const debouncedSetHistory = useMemo(() => debounce((newAdj: Adjustments) => pushHistory(newAdj), 500), [pushHistory]);
 
@@ -2067,6 +2176,90 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
             transformState={transformState}
             hasRenderedFirstFrame={hasRenderedFirstFrame}
           />
+          {guidedTransformOverlay?.interactive && (
+            <svg
+              aria-label="Guided Transform guides"
+              className="absolute z-40 touch-none overflow-visible"
+              onPointerCancel={handleGuidedPointerUp}
+              onPointerDown={handleGuidedPointerDown}
+              onPointerMove={handleGuidedPointerMove}
+              onPointerUp={handleGuidedPointerUp}
+              preserveAspectRatio="none"
+              style={{
+                cursor: 'crosshair',
+                height: imageRenderSize.height,
+                left: imageRenderSize.offsetX,
+                top: imageRenderSize.offsetY,
+                width: imageRenderSize.width,
+              }}
+              viewBox="0 0 1000 1000"
+            >
+              {(['vertical', 'horizontal'] as const).flatMap((orientation) =>
+                guidedTransformOverlay.guides[orientation].map((guide, index) => {
+                  const color = orientation === 'vertical' ? '#38bdf8' : '#f59e0b';
+                  const x1 = guide.x1 * 1000;
+                  const y1 = guide.y1 * 1000;
+                  const x2 = guide.x2 * 1000;
+                  const y2 = guide.y2 * 1000;
+                  return (
+                    <g key={guide.id}>
+                      <line
+                        stroke="rgba(0, 0, 0, 0.75)"
+                        strokeLinecap="round"
+                        strokeWidth="8"
+                        vectorEffect="non-scaling-stroke"
+                        x1={x1}
+                        x2={x2}
+                        y1={y1}
+                        y2={y2}
+                      />
+                      <line
+                        stroke={color}
+                        strokeLinecap="round"
+                        strokeWidth="4"
+                        vectorEffect="non-scaling-stroke"
+                        x1={x1}
+                        x2={x2}
+                        y1={y1}
+                        y2={y2}
+                      />
+                      {(['start', 'end'] as const).map((endpoint) => (
+                        <circle
+                          className="cursor-grab active:cursor-grabbing"
+                          cx={endpoint === 'start' ? x1 : x2}
+                          cy={endpoint === 'start' ? y1 : y2}
+                          data-guide-endpoint={endpoint}
+                          data-guide-id={guide.id}
+                          data-guide-orientation={orientation}
+                          fill={color}
+                          key={endpoint}
+                          r="11"
+                          stroke="rgba(0, 0, 0, 0.8)"
+                          strokeWidth="3"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      ))}
+                      <text
+                        fill="white"
+                        fontSize="18"
+                        fontWeight="600"
+                        paintOrder="stroke"
+                        pointerEvents="none"
+                        stroke="rgba(0, 0, 0, 0.9)"
+                        strokeWidth="5"
+                        textAnchor="middle"
+                        vectorEffect="non-scaling-stroke"
+                        x={(x1 + x2) / 2}
+                        y={(y1 + y2) / 2 - 14}
+                      >
+                        {index + 1}
+                      </text>
+                    </g>
+                  );
+                }),
+              )}
+            </svg>
+          )}
         </div>
       </div>
     </div>

@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.2-feature-transform-add-auto — 2026-08-01
+
+### Guided Transform on the Develop image
+
+- Guided Transform lines are now drawn and adjusted directly on the full
+  Develop image instead of inside a small preview popup.
+- Guided controls remain available in the Geometry panel while the main image
+  retains its normal zoom and pan workflow.
+- Source/corrected preview, endpoint adjustment, guide removal, clearing,
+  Apply, Cancel, Constrain Crop, and XMP synchronization are preserved.
+
 ## 1.2.0-feature-transform-add-auto — 2026-08-01
 
 ### Automatic perspective correction
