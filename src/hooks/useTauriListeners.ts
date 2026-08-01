@@ -18,6 +18,8 @@ interface TauriListenerProps {
   markGenerated: (path: string) => void;
 }
 
+const EVENT_BATCH_INTERVAL_MS = 200;
+
 export function useTauriListeners({
   refreshAllFolderTrees,
   handleSelectSubfolder,
@@ -104,7 +106,10 @@ export function useTauriListeners({
 
     const scheduleFlush = () => {
       if (flushHandle.current !== null) return;
-      flushHandle.current = requestAnimationFrame(flushThumbnailBatch);
+      // Metadata workers can finish thousands of small sidecar reads per second.
+      // Coalesce their events so React does not repeatedly scan a very large
+      // image list once per animation frame while the user is interacting.
+      flushHandle.current = window.setTimeout(flushThumbnailBatch, EVENT_BATCH_INTERVAL_MS);
     };
 
     const listeners = [
@@ -390,7 +395,7 @@ export function useTauriListeners({
     return () => {
       isEffectActive = false;
       if (flushHandle.current !== null) {
-        cancelAnimationFrame(flushHandle.current);
+        window.clearTimeout(flushHandle.current);
         flushHandle.current = null;
       }
       thumbnailBuffer.current = {};

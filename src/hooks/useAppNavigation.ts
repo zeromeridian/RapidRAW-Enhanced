@@ -386,6 +386,8 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             setLibrary({ imageList: files });
             window.setTimeout(async () => {
               const batchSize = 200;
+              const stateUpdateBatchSize = 1_000;
+              let pendingExifData: Record<string, Record<string, string>> = {};
               for (let offset = 0; offset < paths.length; offset += batchSize) {
                 if (
                   folderLoadGenerationRef.current !== folderLoadGeneration ||
@@ -396,6 +398,13 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
 
                 const batchPaths = paths.slice(offset, offset + batchSize);
                 try {
+                  await new Promise<void>((resolve) => {
+                    if ('requestIdleCallback' in window) {
+                      window.requestIdleCallback(() => resolve(), { timeout: 250 });
+                    } else {
+                      setTimeout(resolve, 32);
+                    }
+                  });
                   const exifDataMap: Record<string, Record<string, string>> = await invoke(Invokes.ReadExifForPaths, {
                     paths: batchPaths,
                   });
@@ -405,11 +414,18 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
                   ) {
                     return;
                   }
-                  setLibrary((state) => ({
-                    imageList: state.imageList.map((image) =>
-                      exifDataMap[image.path] ? { ...image, exif: exifDataMap[image.path] } : image,
-                    ),
-                  }));
+                  Object.assign(pendingExifData, exifDataMap);
+
+                  const isLastBatch = offset + batchSize >= paths.length;
+                  if (Object.keys(pendingExifData).length >= stateUpdateBatchSize || isLastBatch) {
+                    const exifUpdates = pendingExifData;
+                    pendingExifData = {};
+                    setLibrary((state) => ({
+                      imageList: state.imageList.map((image) =>
+                        exifUpdates[image.path] ? { ...image, exif: exifUpdates[image.path] } : image,
+                      ),
+                    }));
+                  }
                 } catch (err) {
                   console.error('Failed to read EXIF data in background:', err);
                   return;
