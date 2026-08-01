@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.1.9-fix-app-optimization — 2026-08-01
+
+### Continuous library access during large-folder scans
+
+- Previously loaded images and thumbnails now remain available while a newly
+  added large folder is scanned in the background.
+- The Library switches to the new folder only after its initial image list is
+  ready, preserving responsive scanning without removing existing content.
+
 ## 1.1.8-fix-app-optimization — 2026-08-01
 
 ### macOS large-library compatibility
