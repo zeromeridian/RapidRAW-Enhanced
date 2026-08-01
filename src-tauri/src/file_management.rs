@@ -888,13 +888,16 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
 
                 let sidecar_path = path_buf.with_file_name(sidecar_filename);
 
-                let xmp_is_placeholder = enable_xmp_sync
-                    && resolve_xmp_path(&path_buf)
-                        .is_some_and(|p| crate::file_management::is_cloud_placeholder(&p));
+                let xmp_path = enable_xmp_sync
+                    .then(|| resolve_xmp_path(&path_buf))
+                    .flatten();
+                let xmp_is_placeholder = xmp_path
+                    .as_deref()
+                    .is_some_and(crate::file_management::is_cloud_placeholder);
+                let sidecar_is_placeholder =
+                    crate::file_management::is_cloud_placeholder(&sidecar_path);
 
-                let metadata = if crate::file_management::is_cloud_placeholder(&sidecar_path)
-                    || xmp_is_placeholder
-                {
+                let metadata = if sidecar_is_placeholder || xmp_is_placeholder {
                     enqueue_metadata(
                         &app_handle,
                         virtual_path.clone(),
@@ -1042,37 +1045,48 @@ pub fn list_images_recursive(
 
                 let sidecar_path = path_buf.with_file_name(sidecar_filename);
 
-                let xmp_is_placeholder = enable_xmp_sync
-                    && resolve_xmp_path(&path_buf)
-                        .is_some_and(|p| crate::file_management::is_cloud_placeholder(&p));
+                let xmp_path = enable_xmp_sync
+                    .then(|| resolve_xmp_path(&path_buf))
+                    .flatten();
+                let xmp_is_placeholder = xmp_path
+                    .as_deref()
+                    .is_some_and(crate::file_management::is_cloud_placeholder);
+                let sidecar_is_placeholder =
+                    crate::file_management::is_cloud_placeholder(&sidecar_path);
 
-                let metadata = if (!is_virtual_copy && defer_physical_metadata)
-                    || crate::file_management::is_cloud_placeholder(&sidecar_path)
-                    || xmp_is_placeholder
-                {
-                    enqueue_metadata(
-                        &app_handle,
-                        virtual_path.clone(),
-                        path_buf.clone(),
-                        sidecar_path.clone(),
-                    );
-                    ImageFileMetadata {
-                        is_edited: false,
-                        tags: None,
-                        rating: 0,
-                        is_raw: crate::formats::is_raw_file(&path_buf),
-                        copy_name_suffix: None,
-                        xmp_stack: None,
-                    }
-                } else {
-                    resolve_image_metadata(
-                        &path_buf,
-                        &sidecar_path,
-                        enable_xmp_sync,
-                        !is_virtual_copy,
-                        &settings,
-                    )
-                };
+                // A missing primary sidecar already has known default metadata. Do not
+                // enqueue tens of thousands of no-op filesystem reads for a new large
+                // library; only persisted metadata (or XMP that may be imported) needs
+                // to be resolved by the background workers.
+                let has_persisted_metadata = sidecar_path.is_file() || xmp_path.is_some();
+                let metadata =
+                    if (!is_virtual_copy && defer_physical_metadata && has_persisted_metadata)
+                        || sidecar_is_placeholder
+                        || xmp_is_placeholder
+                    {
+                        enqueue_metadata(
+                            &app_handle,
+                            virtual_path.clone(),
+                            path_buf.clone(),
+                            sidecar_path.clone(),
+                        );
+                        ImageFileMetadata {
+                            is_edited: false,
+                            tags: None,
+                            rating: 0,
+                            is_raw: crate::formats::is_raw_file(&path_buf),
+                            copy_name_suffix: None,
+                            xmp_stack: None,
+                        }
+                    } else {
+                        resolve_image_metadata(
+                            &path_buf,
+                            &sidecar_path,
+                            enable_xmp_sync,
+                            !is_virtual_copy,
+                            &settings,
+                        )
+                    };
 
                 if is_virtual_copy
                     && let Some(copy_suffix) = metadata
