@@ -79,6 +79,26 @@ export default function GeometryPanel() {
   const buttonClass =
     'flex flex-col items-center justify-center p-3 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-50';
 
+  if (isGuidedModalOpen) {
+    return (
+      <GuidedTransformModal
+        isOpen
+        onClose={() => setIsGuidedModalOpen(false)}
+        onApply={(result, guides) => {
+          setAdjustments((previous: Adjustments) => ({
+            ...previous,
+            transformAutoMode: 'guided',
+            transformGuides: guides,
+            transformRotate: result.rotate,
+            transformVertical: result.vertical,
+            transformHorizontal: result.horizontal,
+          }));
+        }}
+        currentAdjustments={adjustments}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
@@ -230,22 +250,6 @@ export default function GeometryPanel() {
             transformScale: parameters.scale,
             transformXOffset: parameters.x_offset,
             transformYOffset: parameters.y_offset,
-          }));
-        }}
-        currentAdjustments={adjustments}
-      />
-
-      <GuidedTransformModal
-        isOpen={isGuidedModalOpen}
-        onClose={() => setIsGuidedModalOpen(false)}
-        onApply={(result, guides) => {
-          setAdjustments((previous: Adjustments) => ({
-            ...previous,
-            transformAutoMode: 'guided',
-            transformGuides: guides,
-            transformRotate: result.rotate,
-            transformVertical: result.vertical,
-            transformHorizontal: result.horizontal,
           }));
         }}
         currentAdjustments={adjustments}
