@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.0-feature-transform-add-auto — 2026-08-01
+
+### Automatic perspective correction
+
+- Added Auto geometry correction that jointly balances image rotation and
+  converging vertical and horizontal structures.
+- Auto correction uses the existing non-destructive transform and Constrain
+  Crop pipeline, with its mode and resolved corrections synchronized through
+  XMP for use on other ThisIsRAW installations.
+
 ## 1.1.9-fix-app-optimization — 2026-08-01
 
 ### Continuous library access during large-folder scans

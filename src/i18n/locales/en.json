@@ -463,6 +463,7 @@
       "autoGeometryFailed": "Automatic geometry correction failed: {{error}}",
       "labels": {
         "analyzing": "Analyzing…",
+        "auto": "Auto",
         "constrainCrop": "Constrain Crop",
         "flipHoriz": "Flip Horiz",
         "flipVert": "Flip Vert",
@@ -552,6 +553,7 @@
       "rotationHeading": "Rotation",
       "title": "Crop",
       "tooltips": {
+        "auto": "Automatically balance rotation and vertical and horizontal perspective",
         "compositionOverlay": "Composition Overlay",
         "constrainCrop": "Automatically zoom to prevent empty edges after geometry corrections",
         "flipHoriz": "Flip image horizontally",

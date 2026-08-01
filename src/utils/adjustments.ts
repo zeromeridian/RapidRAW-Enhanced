@@ -242,7 +242,7 @@ export interface Adjustments {
   temperature: number;
   tint: number;
   toneMapper: 'agx' | 'basic';
-  transformAutoMode: 'level' | 'vertical' | 'guided' | null;
+  transformAutoMode: 'auto' | 'level' | 'vertical' | 'guided' | null;
   transformGuides: GuidedTransformGuides;
   transformDistortion: number;
   transformVertical: number;

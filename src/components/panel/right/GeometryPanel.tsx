@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Aperture, Building2, Minus, MoveDiagonal2, RotateCcw, Scan } from 'lucide-react';
+import { Aperture, Building2, Minus, MoveDiagonal2, RotateCcw, Scan, WandSparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
@@ -24,7 +24,7 @@ export default function GeometryPanel() {
   const [isTransformModalOpen, setIsTransformModalOpen] = useState(false);
   const [isLensModalOpen, setIsLensModalOpen] = useState(false);
   const [isGuidedModalOpen, setIsGuidedModalOpen] = useState(false);
-  const [analyzingGeometry, setAnalyzingGeometry] = useState<'level' | 'vertical' | null>(null);
+  const [analyzingGeometry, setAnalyzingGeometry] = useState<'auto' | 'level' | 'vertical' | null>(null);
 
   const resetGeometry = () => {
     setAdjustments((previous: Adjustments) => ({
@@ -52,12 +52,12 @@ export default function GeometryPanel() {
     }));
   };
 
-  const handleAutoGeometry = async (mode: 'level' | 'vertical') => {
+  const handleAutoGeometry = async (mode: 'auto' | 'level' | 'vertical') => {
     if (!selectedImage || analyzingGeometry) return;
 
     setAnalyzingGeometry(mode);
     try {
-      const result = await invoke<{ rotate: number; vertical?: number }>('analyze_geometry', {
+      const result = await invoke<{ horizontal?: number; rotate: number; vertical?: number }>('analyze_geometry', {
         mode,
         jsAdjustments: adjustments,
       });
@@ -66,7 +66,8 @@ export default function GeometryPanel() {
         transformAutoMode: mode,
         transformGuides: INITIAL_ADJUSTMENTS.transformGuides,
         transformRotate: result.rotate,
-        transformVertical: mode === 'vertical' && result.vertical !== undefined ? result.vertical : 0,
+        transformVertical: mode !== 'level' && result.vertical !== undefined ? result.vertical : 0,
+        transformHorizontal: mode === 'auto' && result.horizontal !== undefined ? result.horizontal : 0,
       }));
     } catch (error) {
       toast.error(t('editor.crop.autoGeometryFailed', { error: String(error) }));
@@ -95,6 +96,24 @@ export default function GeometryPanel() {
         {selectedImage ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-2">
+              <motion.button
+                className={clsx(
+                  buttonClass,
+                  adjustments.transformAutoMode === 'auto'
+                    ? 'bg-accent text-button-text shadow-sm'
+                    : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
+                )}
+                disabled={analyzingGeometry !== null}
+                onClick={() => handleAutoGeometry('auto')}
+                data-tooltip={t('editor.crop.tooltips.auto')}
+                whileTap={{ scale: 0.98 }}
+                type="button"
+              >
+                <WandSparkles size={20} />
+                <span className="text-xs mt-2">
+                  {analyzingGeometry === 'auto' ? t('editor.crop.labels.analyzing') : t('editor.crop.labels.auto')}
+                </span>
+              </motion.button>
               <motion.button
                 className={`${buttonClass} bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary`}
                 onClick={() => setIsTransformModalOpen(true)}
