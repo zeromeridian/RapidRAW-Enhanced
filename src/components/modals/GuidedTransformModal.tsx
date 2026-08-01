@@ -329,26 +329,26 @@ export default function GuidedTransformModal({
           <Trash2 size={16} />
           {t('modals.guidedTransform.clearAll')}
         </button>
-      </div>
-
-      <div className="flex shrink-0 justify-end gap-3 border-t border-surface bg-bg-secondary p-4">
-        <button
-          className="rounded-md px-4 py-2 text-text-secondary transition-colors hover:bg-surface"
-          onClick={onClose}
-          type="button"
-        >
-          {t('modals.guidedTransform.cancel')}
-        </button>
-        <Button
-          disabled={!hasCompletePair || isLoading || !!error}
-          onClick={() => {
-            onApply(result, unorientGuidesForStorage(cloneGuides(overlay.guides), currentAdjustments));
-            onClose();
-          }}
-        >
-          <Check className="mr-2" size={16} />
-          {isLoading ? t('modals.guidedTransform.solving') : t('modals.guidedTransform.apply')}
-        </Button>
+        <div className="flex gap-3 border-t border-surface pt-4">
+          <button
+            className="grow rounded-md px-4 py-2 text-text-secondary transition-colors hover:bg-surface"
+            onClick={onClose}
+            type="button"
+          >
+            {t('modals.guidedTransform.cancel')}
+          </button>
+          <Button
+            className="grow"
+            disabled={!hasCompletePair || isLoading || !!error}
+            onClick={() => {
+              onApply(result, unorientGuidesForStorage(cloneGuides(overlay.guides), currentAdjustments));
+              onClose();
+            }}
+          >
+            <Check className="mr-2" size={16} />
+            {isLoading ? t('modals.guidedTransform.solving') : t('modals.guidedTransform.apply')}
+          </Button>
+        </div>
       </div>
     </div>
   );
