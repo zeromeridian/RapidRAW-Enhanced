@@ -57,6 +57,7 @@ interface MainLibraryProps {
   aiModelDownloadStatus: string | null;
   appSettings: AppSettings | null;
   currentFolderPath: string | null;
+  pendingFolderPath: string | null;
   groupBadgeInfo: Map<GroupId, GroupBadgeInfo> | null;
   imageList: Array<ImageFile>;
   imageRatings: Record<string, number>;
@@ -590,7 +591,7 @@ export default function MainLibrary(props: MainLibraryProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden">
+    <div className="relative flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden">
       <header
         className="p-4 shrink-0 flex justify-between items-center border-b border-surface gap-4"
         onMouseEnter={() => setIsProgressHovered(true)}
@@ -606,6 +607,12 @@ export default function MainLibrary(props: MainLibraryProps) {
                 </Text>
               ) : (
                 <p className="text-sm invisible select-none pointer-events-none h-5 overflow-hidden"></p>
+              )}
+              {props.isLoading && props.pendingFolderPath && (
+                <Text className="flex shrink-0 items-center gap-1.5 text-text-secondary">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span className="max-w-48 truncate">{props.pendingFolderPath}</span>
+                </Text>
               )}
               {activeFilterLabels.length > 0 && (
                 <>
@@ -750,7 +757,10 @@ export default function MainLibrary(props: MainLibraryProps) {
             thumbnailSizeOptions={translatedThumbnailSizeOptions}
           />
         )
-      ) : props.isIndexing || props.aiModelDownloadStatus || props.importState.status === Status.Importing ? (
+      ) : props.isLoading ||
+        props.isIndexing ||
+        props.aiModelDownloadStatus ||
+        props.importState.status === Status.Importing ? (
         <div className="flex-1 flex flex-col items-center justify-center" onContextMenu={props.onEmptyAreaContextMenu}>
           <Loader2 className="h-12 w-12 text-secondary animate-spin mb-4" />
           <Text variant={TextVariants.heading} color={TextColors.secondary}>

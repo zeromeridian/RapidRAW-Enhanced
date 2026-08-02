@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.9-fix-app-optimization — 2026-08-02
+
+### Responsive navigation during very large background scans
+
+- Previously scanned folders now reopen immediately from a bounded cache while
+  their contents are safely revalidated in the background.
+- Folder and album transitions retain the current usable view until the
+  destination is ready, preventing false empty-folder messages and stale
+  asynchronous results.
+- Thumbnail references remain reusable across folder switches, while visible
+  thumbnail work takes priority over optional AI indexing.
+- Large direct and recursive folders defer persisted sidecar/XMP reconciliation
+  to bounded background workers instead of saturating the machine.
+- Large roots expose their initial folder tree first and refine optional image
+  counts and empty-folder filtering in the background.
+- Background indexing progress and completion are scoped to the job and folder
+  that produced them, preventing unrelated folder refreshes.
+
 ## 1.2.8-fix-app-optimization — 2026-08-01
 
 ### Stable thumbnails during large scans

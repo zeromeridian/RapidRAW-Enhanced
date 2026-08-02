@@ -262,13 +262,36 @@ pub async fn start_background_indexing(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    let job_id = state
+        .indexing_generation
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+        + 1;
     if let Some(handle) = state.indexing_task_handle.lock().unwrap().take() {
         println!("Cancelling previous indexing task.");
         handle.abort();
     }
 
-    let settings = crate::load_settings(app_handle.clone())?;
+    let _ = app_handle.emit(
+        "indexing-started",
+        serde_json::json!({ "jobId": job_id, "folderPath": folder_path }),
+    );
+
+    let settings = crate::load_settings(app_handle.clone()).map_err(|message| {
+        let _ = app_handle.emit(
+            "indexing-error",
+            serde_json::json!({
+                "jobId": job_id,
+                "folderPath": folder_path,
+                "error": message
+            }),
+        );
+        message
+    })?;
     if !settings.enable_ai_tagging.unwrap_or(false) {
+        let _ = app_handle.emit(
+            "indexing-finished",
+            serde_json::json!({ "jobId": job_id, "folderPath": folder_path }),
+        );
         return Ok(());
     }
 
@@ -282,12 +305,31 @@ pub async fn start_background_indexing(
         &state.ai_init_lock,
     )
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|error| {
+        let message = error.to_string();
+        let _ = app_handle.emit(
+            "indexing-error",
+            serde_json::json!({
+                "jobId": job_id,
+                "folderPath": folder_path,
+                "error": message
+            }),
+        );
+        message
+    })?;
+
+    if state
+        .indexing_generation
+        .load(std::sync::atomic::Ordering::SeqCst)
+        != job_id
+    {
+        return Ok(());
+    }
 
     let app_handle_clone = app_handle.clone();
+    let indexed_folder_path = folder_path.clone();
 
     let task: JoinHandle<()> = tokio::spawn(async move {
-        let _ = app_handle_clone.emit("indexing-started", ());
         println!("Starting background indexing for: {}", folder_path);
         println!(
             "Using {} concurrent threads for AI tagging.",
@@ -308,13 +350,22 @@ pub async fn start_background_indexing(
                 .collect(),
             Err(e) => {
                 eprintln!("Failed to read directory '{}': {}", folder_path, e);
-                let _ = app_handle_clone
-                    .emit("indexing-error", format!("Failed to read directory: {}", e));
-                *app_handle_clone
-                    .state::<AppState>()
-                    .indexing_task_handle
-                    .lock()
-                    .unwrap() = None;
+                let _ = app_handle_clone.emit(
+                    "indexing-error",
+                    serde_json::json!({
+                        "jobId": job_id,
+                        "folderPath": indexed_folder_path,
+                        "error": format!("Failed to read directory: {}", e)
+                    }),
+                );
+                let app_state = app_handle_clone.state::<AppState>();
+                if app_state
+                    .indexing_generation
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                    == job_id
+                {
+                    *app_state.indexing_task_handle.lock().unwrap() = None;
+                }
                 return;
             }
         };
@@ -335,10 +386,33 @@ pub async fn start_background_indexing(
                 let gpu_context_inner = gpu_context.clone();
                 let processed_count_inner = Arc::clone(&processed_count);
                 let tags_inner = Arc::clone(&custom_ai_tags_shared);
+                let indexed_folder_path_inner = indexed_folder_path.clone();
 
                 async move {
+                    if app_handle_inner
+                        .state::<AppState>()
+                        .indexing_generation
+                        .load(std::sync::atomic::Ordering::Relaxed)
+                        != job_id
+                    {
+                        return;
+                    }
                     let path_str = path.to_string_lossy().to_string();
                     let (_, sidecar_path) = parse_virtual_path(&path_str);
+
+                    // AI tagging is background work. Yield while the Library
+                    // has visible thumbnail work so navigation gets the next
+                    // available CPU/GPU and filesystem capacity.
+                    loop {
+                        let app_state = app_handle_inner.state::<AppState>();
+                        let has_foreground_thumbnails =
+                            !app_state.thumbnail_manager.queue.lock().unwrap().is_empty();
+                        if !has_foreground_thumbnails {
+                            break;
+                        }
+                        drop(app_state);
+                        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                    }
 
                     let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
@@ -363,8 +437,6 @@ pub async fn start_background_indexing(
                                     (*tags_inner).clone(),
                                     ai_tag_count,
                                 ) {
-                                    println!("Found AI tags for {}: {:?}", path_str, ai_tags);
-
                                     let mut existing_tags: HashSet<String> =
                                         metadata.tags.unwrap_or_default().into_iter().collect();
 
@@ -398,6 +470,8 @@ pub async fn start_background_indexing(
                     let _ = app_handle_inner.emit(
                         "indexing-progress",
                         serde_json::json!({
+                            "jobId": job_id,
+                            "folderPath": indexed_folder_path_inner,
                             "current": *count,
                             "total": total_images
                         }),
@@ -407,13 +481,19 @@ pub async fn start_background_indexing(
             .await;
 
         println!("Background indexing finished for: {}", folder_path);
-        let _ = app_handle_clone.emit("indexing-finished", ());
+        let _ = app_handle_clone.emit(
+            "indexing-finished",
+            serde_json::json!({ "jobId": job_id, "folderPath": indexed_folder_path }),
+        );
 
-        *app_handle_clone
-            .state::<AppState>()
-            .indexing_task_handle
-            .lock()
-            .unwrap() = None;
+        let app_state = app_handle_clone.state::<AppState>();
+        if app_state
+            .indexing_generation
+            .load(std::sync::atomic::Ordering::SeqCst)
+            == job_id
+        {
+            *app_state.indexing_task_handle.lock().unwrap() = None;
+        }
     });
 
     *state.indexing_task_handle.lock().unwrap() = Some(task);

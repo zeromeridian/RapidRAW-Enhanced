@@ -13,6 +13,8 @@ interface ProcessState {
   exportState: ExportState;
   importState: ImportState;
   isIndexing: boolean;
+  indexingFolderPath: string | null;
+  indexingJobId: number | null;
   indexingProgress: Progress;
   thumbnails: Record<string, string>;
   thumbnailProgress: Progress;
@@ -42,6 +44,8 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
   exportState: { errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle },
   importState: { errorMessage: '', path: '', progress: { current: 0, total: 0 }, status: Status.Idle },
   isIndexing: false,
+  indexingFolderPath: null,
+  indexingJobId: null,
   indexingProgress: { current: 0, total: 0 },
   thumbnails: {},
   thumbnailProgress: { current: 0, total: 0 },

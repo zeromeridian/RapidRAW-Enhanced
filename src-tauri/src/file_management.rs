@@ -167,8 +167,24 @@ fn enqueue_metadata(
 fn clear_pending_metadata(app_handle: &AppHandle) {
     let state = app_handle.state::<crate::AppState>();
     let manager = &state.metadata_manager;
-    manager.queue.lock().unwrap().clear();
-    manager.pending.lock().unwrap().clear();
+    let cancelled_sidecars: Vec<PathBuf> = manager
+        .queue
+        .lock()
+        .unwrap()
+        .drain(..)
+        .map(|item| item.sidecar_path)
+        .collect();
+    if cancelled_sidecars.is_empty() {
+        return;
+    }
+
+    // Keep entries owned by workers in `pending`: they cannot be cancelled and
+    // removing them would allow the same sidecar to be scheduled twice by a
+    // rapid folder switch. Only queued items are safe to release.
+    let mut pending = manager.pending.lock().unwrap();
+    for sidecar_path in cancelled_sidecars {
+        pending.remove(&sidecar_path);
+    }
 }
 
 // Not compute-heavy — these threads mostly block waiting on iCloud to
@@ -177,7 +193,7 @@ fn clear_pending_metadata(app_handle: &AppHandle) {
 const METADATA_WORKER_THREADS: usize = 4;
 const RECURSIVE_BACKGROUND_METADATA_THRESHOLD: usize = 500;
 
-fn should_defer_recursive_metadata(image_count: usize) -> bool {
+fn should_defer_metadata(image_count: usize) -> bool {
     image_count >= RECURSIVE_BACKGROUND_METADATA_THRESHOLD
 }
 
@@ -668,10 +684,10 @@ mod output_naming_tests {
     }
 
     #[test]
-    fn large_recursive_folders_defer_metadata_loading() {
-        assert!(!super::should_defer_recursive_metadata(499));
-        assert!(super::should_defer_recursive_metadata(500));
-        assert!(super::should_defer_recursive_metadata(3_000));
+    fn large_folders_defer_metadata_loading() {
+        assert!(!super::should_defer_metadata(499));
+        assert!(super::should_defer_metadata(500));
+        assert!(super::should_defer_metadata(30_000));
     }
 }
 
@@ -864,42 +880,51 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
             (path_str, file_name, path_buf, sidecars)
         })
         .collect();
-    let mut result_list: Vec<ImageFile> = tasks
-        .into_par_iter()
-        .flat_map(|(path_str, file_name, path_buf, sidecars)| {
-            let modified = fs::metadata(&path_buf)
-                .ok()
-                .and_then(|m| m.modified().ok())
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
+    let defer_physical_metadata = should_defer_metadata(tasks.len());
+    let process_task = |(path_str, file_name, path_buf, sidecars): (
+        String,
+        String,
+        PathBuf,
+        Vec<Option<String>>,
+    )| {
+        let modified = fs::metadata(&path_buf)
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
 
-            let is_cloud_placeholder = is_cloud_placeholder(&path_buf);
+        let is_cloud_placeholder = is_cloud_placeholder(&path_buf);
 
-            let mut file_results = Vec::with_capacity(sidecars.len());
+        let mut file_results = Vec::with_capacity(sidecars.len());
 
-            for copy_id_opt in sidecars {
-                let (mut virtual_path, is_virtual_copy, sidecar_filename) = match copy_id_opt {
-                    Some(id) => (
-                        format!("{}?vc={}", path_str, id),
-                        true,
-                        format!("{}.{}.rrdata", file_name, id),
-                    ),
-                    None => (path_str.clone(), false, format!("{}.rrdata", file_name)),
-                };
+        for copy_id_opt in sidecars {
+            let (mut virtual_path, is_virtual_copy, sidecar_filename) = match copy_id_opt {
+                Some(id) => (
+                    format!("{}?vc={}", path_str, id),
+                    true,
+                    format!("{}.{}.rrdata", file_name, id),
+                ),
+                None => (path_str.clone(), false, format!("{}.rrdata", file_name)),
+            };
 
-                let sidecar_path = path_buf.with_file_name(sidecar_filename);
+            let sidecar_path = path_buf.with_file_name(sidecar_filename);
 
-                let xmp_path = enable_xmp_sync
-                    .then(|| resolve_xmp_path(&path_buf))
-                    .flatten();
-                let xmp_is_placeholder = xmp_path
-                    .as_deref()
-                    .is_some_and(crate::file_management::is_cloud_placeholder);
-                let sidecar_is_placeholder =
-                    crate::file_management::is_cloud_placeholder(&sidecar_path);
+            let xmp_path = enable_xmp_sync
+                .then(|| resolve_xmp_path(&path_buf))
+                .flatten();
+            let xmp_is_placeholder = xmp_path
+                .as_deref()
+                .is_some_and(crate::file_management::is_cloud_placeholder);
+            let sidecar_is_placeholder =
+                crate::file_management::is_cloud_placeholder(&sidecar_path);
 
-                let metadata = if sidecar_is_placeholder || xmp_is_placeholder {
+            let has_persisted_metadata = sidecar_path.is_file() || xmp_path.is_some();
+            let metadata =
+                if (!is_virtual_copy && defer_physical_metadata && has_persisted_metadata)
+                    || sidecar_is_placeholder
+                    || xmp_is_placeholder
+                {
                     enqueue_metadata(
                         &app_handle,
                         virtual_path.clone(),
@@ -924,34 +949,39 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
                     )
                 };
 
-                if is_virtual_copy
-                    && let Some(copy_suffix) = metadata
-                        .copy_name_suffix
-                        .as_deref()
-                        .filter(|suffix| !suffix.is_empty())
-                {
-                    virtual_path.push_str("&name=");
-                    virtual_path.push_str(copy_suffix);
-                }
-
-                file_results.push(ImageFile {
-                    path: virtual_path,
-                    modified,
-                    is_edited: metadata.is_edited,
-                    tags: metadata.tags,
-                    exif: None,
-                    is_virtual_copy,
-                    is_raw: metadata.is_raw,
-                    group_id: None,
-                    rating: metadata.rating,
-                    is_cloud_placeholder,
-                    xmp_stack: metadata.xmp_stack,
-                });
+            if is_virtual_copy
+                && let Some(copy_suffix) = metadata
+                    .copy_name_suffix
+                    .as_deref()
+                    .filter(|suffix| !suffix.is_empty())
+            {
+                virtual_path.push_str("&name=");
+                virtual_path.push_str(copy_suffix);
             }
 
-            file_results
-        })
-        .collect();
+            file_results.push(ImageFile {
+                path: virtual_path,
+                modified,
+                is_edited: metadata.is_edited,
+                tags: metadata.tags,
+                exif: None,
+                is_virtual_copy,
+                is_raw: metadata.is_raw,
+                group_id: None,
+                rating: metadata.rating,
+                is_cloud_placeholder,
+                xmp_stack: metadata.xmp_stack,
+            });
+        }
+
+        file_results
+    };
+
+    let mut result_list: Vec<ImageFile> = if defer_physical_metadata {
+        tasks.into_iter().flat_map(process_task).collect()
+    } else {
+        tasks.into_par_iter().flat_map(process_task).collect()
+    };
 
     assign_group_ids(&mut result_list, &settings);
     Ok(result_list)
@@ -1018,7 +1048,7 @@ fn list_images_recursive_sync(
             (path_str, file_name, path_buf, sidecars)
         })
         .collect();
-    let defer_physical_metadata = should_defer_recursive_metadata(tasks.len());
+    let defer_physical_metadata = should_defer_metadata(tasks.len());
 
     let process_task = |(path_str, file_name, path_buf, sidecars): (
         String,
