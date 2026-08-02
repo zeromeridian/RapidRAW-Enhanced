@@ -13,6 +13,7 @@ import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjust
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
+import { createFolderCacheKey, libraryFolderCache } from '../utils/LibraryFolderCache';
 
 const mergeImportedXmpStacks = (images: ImageFile[]) => {
   const settingsState = useSettingsStore.getState();
@@ -24,7 +25,6 @@ const mergeImportedXmpStacks = (images: ImageFile[]) => {
 };
 
 export interface AppNavigationProps {
-  clearThumbnailQueue: () => void;
   refs: {
     transformWrapperRef: React.RefObject<any>;
     preloadedDataRef: React.RefObject<any>;
@@ -38,7 +38,7 @@ export interface AppNavigationProps {
   };
 }
 
-export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationProps) {
+export function useAppNavigation({ refs }: AppNavigationProps) {
   const folderLoadGenerationRef = useRef(0);
   const {
     transformWrapperRef,
@@ -53,9 +53,11 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
   } = refs;
 
   const handleGoHome = useCallback(() => {
+    libraryFolderCache.clear();
     useLibraryStore.getState().setLibrary({
       rootPaths: [],
       currentFolderPath: null,
+      pendingFolderPath: null,
       activeAlbumId: null,
       imageList: [],
       imageRatings: {},
@@ -289,24 +291,19 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       const { pinnedFolders } = appSettings || { pinnedFolders: [] };
       const { setLibrary, sortCriteria } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
-      const { setProcess } = useProcessStore.getState();
       const { selectedImage, resetHistory, setEditor } = useEditorStore.getState();
       const libraryViewMode = appSettings?.libraryViewMode;
-      const retainExistingLibrary = isNewRoot && !preserveEditor && useLibraryStore.getState().imageList.length > 0;
+      const { osPlatform } = useSettingsStore.getState();
+      const cacheKey = path
+        ? createFolderCacheKey(path, libraryViewMode, appSettings?.enableXmpSync ?? false, osPlatform)
+        : null;
+      const cachedImages = cacheKey ? libraryFolderCache.get(cacheKey) : undefined;
 
       if (!preserveEditor) {
-        await invoke('cancel_thumbnail_generation');
-        if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
-        clearThumbnailQueue();
-        setLibrary({ isViewLoading: true, activeAlbumId: null, libraryScrollTop: 0 });
-        useLibraryStore.getState().setSearchCriteria({ tags: [], text: '', mode: 'OR' });
-        if (!retainExistingLibrary) {
-          setProcess({ thumbnails: {} });
-          globalImageCache.clear();
-        }
+        setLibrary({ isViewLoading: true, pendingFolderPath: path });
         setUI({ activeView: 'library' });
       } else {
-        setLibrary({ isViewLoading: true });
+        setLibrary({ isViewLoading: true, pendingFolderPath: path });
       }
 
       try {
@@ -340,12 +337,40 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         }
 
         setLibrary({
-          ...(retainExistingLibrary ? {} : { currentFolderPath: path }),
           expandedFolders: newExpandedFolders,
-          ...(preserveEditor || retainExistingLibrary
-            ? {}
-            : { imageList: [], multiSelectedPaths: [], libraryActivePath: null }),
         });
+
+        let destinationCommitted = false;
+        const commitImages = (imageList: ImageFile[], ratings: Record<string, number>) => {
+          if (cacheKey) libraryFolderCache.set(cacheKey, imageList);
+          if (!preserveEditor && !destinationCommitted) {
+            useLibraryStore.getState().setSearchCriteria({ tags: [], text: '', mode: 'OR' });
+          }
+          setLibrary({
+            currentFolderPath: path,
+            pendingFolderPath: null,
+            imageList,
+            imageRatings: ratings,
+            activeAlbumId: null,
+            isViewLoading: false,
+            ...(destinationCommitted
+              ? {}
+              : {
+                  libraryScrollTop: 0,
+                  ...(preserveEditor ? {} : { multiSelectedPaths: [], libraryActivePath: null }),
+                }),
+          });
+          destinationCommitted = true;
+        };
+
+        if (cachedImages) {
+          mergeImportedXmpStacks(cachedImages);
+          const cachedRatings: Record<string, number> = {};
+          cachedImages.forEach((image) => {
+            if (image.rating !== undefined) cachedRatings[image.path] = image.rating;
+          });
+          commitImages(cachedImages, cachedRatings);
+        }
 
         if (!preserveEditor && selectedImage) {
           debouncedSave.flush();
@@ -368,27 +393,12 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
         mergeImportedXmpStacks(files);
 
-        const showLoadedFiles = (imageList: ImageFile[]) => {
-          if (retainExistingLibrary) {
-            setProcess({ thumbnails: {} });
-            globalImageCache.clear();
-          }
-          setLibrary({
-            imageList,
-            ...(retainExistingLibrary
-              ? { currentFolderPath: path, multiSelectedPaths: [], libraryActivePath: null }
-              : {}),
-          });
-        };
-
         const initialRatings: Record<string, number> = {};
         files.forEach((f) => {
           if (f.rating !== undefined) {
             initialRatings[f.path] = f.rating;
           }
         });
-        setLibrary({ imageRatings: initialRatings });
-
         const exifSortKeys = ['date_taken', 'iso', 'shutter_speed', 'aperture', 'focal_length'];
         const isExifSortActive = exifSortKeys.includes(sortCriteria.key);
 
@@ -396,14 +406,27 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
           const paths = files.map((f: ImageFile) => f.path);
 
           if (isExifSortActive) {
+            commitImages(files, initialRatings);
+            setLibrary({ isViewLoading: true, pendingFolderPath: path });
             const exifDataMap: Record<string, any> = await invoke(Invokes.ReadExifForPaths, { paths });
+            if (
+              folderLoadGenerationRef.current !== folderLoadGeneration ||
+              useLibraryStore.getState().currentFolderPath !== path
+            ) {
+              return;
+            }
             const finalImageList = files.map((image) => ({
               ...image,
               exif: exifDataMap[image.path] || image.exif || null,
             }));
-            showLoadedFiles(finalImageList);
+            const cacheUpdates: Record<string, Partial<ImageFile>> = {};
+            Object.entries(exifDataMap).forEach(([imagePath, exif]) => {
+              cacheUpdates[imagePath] = { exif };
+            });
+            libraryFolderCache.updateImages(cacheUpdates);
+            commitImages(finalImageList, initialRatings);
           } else {
-            showLoadedFiles(files);
+            commitImages(files, initialRatings);
             window.setTimeout(async () => {
               const batchSize = 200;
               const stateUpdateBatchSize = 1_000;
@@ -440,6 +463,11 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
                   if (Object.keys(pendingExifData).length >= stateUpdateBatchSize || isLastBatch) {
                     const exifUpdates = pendingExifData;
                     pendingExifData = {};
+                    const cacheUpdates: Record<string, Partial<ImageFile>> = {};
+                    Object.entries(exifUpdates).forEach(([imagePath, exif]) => {
+                      cacheUpdates[imagePath] = { exif };
+                    });
+                    libraryFolderCache.updateImages(cacheUpdates);
                     setLibrary((state) => ({
                       imageList: state.imageList.map((image) =>
                         exifUpdates[image.path] ? { ...image, exif: exifUpdates[image.path] } : image,
@@ -454,7 +482,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             }, 1200);
           }
         } else {
-          showLoadedFiles(files);
+          commitImages(files, initialRatings);
         }
 
         if (!preserveEditor) {
@@ -466,37 +494,35 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
         console.error('Failed to load folder contents:', err);
         toast.error('Failed to load images from the selected folder.');
+        setLibrary({ pendingFolderPath: null });
       } finally {
         if (folderLoadGenerationRef.current === folderLoadGeneration) {
-          useLibraryStore.getState().setLibrary({ isViewLoading: false });
+          useLibraryStore.getState().setLibrary({ isViewLoading: false, pendingFolderPath: null });
         }
       }
     },
-    [clearThumbnailQueue, refs],
+    [refs],
   );
 
   const handleSelectAlbum = useCallback(
     async (albumId: string, albumName: string, imagePaths: string[], preserveEditor = false) => {
+      const folderLoadGeneration = ++folderLoadGenerationRef.current;
       const { setLibrary } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
 
       if (!preserveEditor) {
-        await invoke('cancel_thumbnail_generation');
-        clearThumbnailQueue();
-        useLibraryStore.getState().setSearchCriteria({ tags: [], text: '', mode: 'OR' });
-        setLibrary({ libraryScrollTop: 0 });
         globalImageCache.clear();
         setUI({ activeView: 'library' });
       }
 
       setLibrary({
         isViewLoading: true,
-        currentFolderPath: `Album: ${albumName}`,
-        activeAlbumId: albumId,
+        pendingFolderPath: `Album: ${albumName}`,
       });
 
       try {
         const files: ImageFile[] = await invoke(Invokes.GetAlbumImages, { paths: imagePaths });
+        if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
         mergeImportedXmpStacks(files);
 
         const initialRatings: Record<string, number> = {};
@@ -507,21 +533,31 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         setLibrary({
           imageList: files,
           imageRatings: initialRatings,
+          currentFolderPath: `Album: ${albumName}`,
+          pendingFolderPath: null,
+          activeAlbumId: albumId,
+          libraryScrollTop: 0,
           ...(preserveEditor ? {} : { multiSelectedPaths: [], libraryActivePath: null }),
         });
+        if (!preserveEditor) {
+          useLibraryStore.getState().setSearchCriteria({ tags: [], text: '', mode: 'OR' });
+        }
       } catch (err) {
+        if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
         console.error('Failed to load album images:', err);
         toast.error(`Failed to load album: ${err}`);
       } finally {
-        setLibrary({ isViewLoading: false });
+        if (folderLoadGenerationRef.current === folderLoadGeneration) {
+          setLibrary({ isViewLoading: false, pendingFolderPath: null });
+        }
       }
     },
-    [clearThumbnailQueue],
+    [],
   );
 
   const handleOpenFolder = async () => {
     const { osPlatform, appSettings, handleSettingsChange } = useSettingsStore.getState();
-    const { rootPaths, folderTrees, setLibrary } = useLibraryStore.getState();
+    const { rootPaths, setLibrary } = useLibraryStore.getState();
     const isAndroid = osPlatform === 'android';
 
     try {
@@ -536,6 +572,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       }
 
       if (selectedPath) {
+        let shouldRefineTree = false;
         if (!rootPaths.includes(selectedPath)) {
           const newRootPaths = [...rootPaths, selectedPath];
           setLibrary({ rootPaths: newRootPaths });
@@ -549,11 +586,16 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             const newTree = await invoke(Invokes.GetFolderTree, {
               path: selectedPath,
               expandedFolders: [selectedPath],
-              showImageCounts:
-                appSettings?.enableFolderImageCounts || appSettings?.folderTreeSort?.key === 'imageCount',
-              hideEmptyFolders: appSettings?.hideEmptyFolders ?? false,
+              showImageCounts: false,
+              hideEmptyFolders: false,
             });
-            setLibrary({ folderTrees: [...folderTrees, newTree] });
+            setLibrary((state) => ({ folderTrees: [...state.folderTrees, newTree] }));
+
+            shouldRefineTree = Boolean(
+              appSettings?.enableFolderImageCounts ||
+              appSettings?.folderTreeSort?.key === 'imageCount' ||
+              appSettings?.hideEmptyFolders,
+            );
           } catch (e) {
             toast.error(`Failed to load folder tree: ${e}`);
           } finally {
@@ -561,6 +603,21 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
           }
         }
         await handleSelectSubfolder(selectedPath, true);
+        if (shouldRefineTree && useLibraryStore.getState().rootPaths.includes(selectedPath)) {
+          invoke(Invokes.GetFolderTree, {
+            path: selectedPath,
+            expandedFolders: [selectedPath],
+            showImageCounts: appSettings?.enableFolderImageCounts || appSettings?.folderTreeSort?.key === 'imageCount',
+            hideEmptyFolders: appSettings?.hideEmptyFolders ?? false,
+          })
+            .then((detailedTree) => {
+              if (!useLibraryStore.getState().rootPaths.includes(selectedPath)) return;
+              setLibrary((state) => ({
+                folderTrees: state.folderTrees.map((tree) => (tree.path === selectedPath ? detailedTree : tree)),
+              }));
+            })
+            .catch((error) => console.error('Failed to refine folder tree:', error));
+        }
       }
     } catch (err) {
       console.error(isAndroid ? 'Failed to open Android library root:' : 'Failed to open directory dialog:', err);

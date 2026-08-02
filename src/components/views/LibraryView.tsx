@@ -83,6 +83,7 @@ export default function LibraryView({
   const {
     rootPaths,
     currentFolderPath,
+    pendingFolderPath,
     libraryActivePath,
     multiSelectedPaths,
     imageList,
@@ -93,6 +94,7 @@ export default function LibraryView({
     useShallow((state) => ({
       rootPaths: state.rootPaths,
       currentFolderPath: state.currentFolderPath,
+      pendingFolderPath: state.pendingFolderPath,
       libraryActivePath: state.libraryActivePath,
       multiSelectedPaths: state.multiSelectedPaths,
       imageList: state.imageList,
@@ -133,6 +135,7 @@ export default function LibraryView({
             supportedTypes={supportedTypes}
             imageList={sortedImageList}
             currentFolderPath={currentFolderPath}
+            pendingFolderPath={pendingFolderPath}
           />
         ) : (
           <MainLibrary

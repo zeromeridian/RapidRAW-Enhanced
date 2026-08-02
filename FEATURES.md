@@ -27,10 +27,12 @@ details are in `RELEASE_NOTES.MD`.
 - Persistent Library and Develop sidebar widths.
 - Optional empty-folder hiding that preserves configured and pinned roots while
   removing branches with no supported images.
-- Responsive loading for large recursive folders, with scan and metadata
-  reconciliation moved off the application event loop, bounded background
-  filesystem work, batched Library updates, and generation-guarded folder
-  switches so delayed requests cannot clear the currently visible thumbnails.
+- Responsive loading for large direct and recursive folders, with transactional
+  folder/album navigation, bounded reusable folder results, persistent
+  cross-folder thumbnail references, progressive root-tree refinement, and
+  generation-guarded state commits. Sidecar/XMP reconciliation uses bounded
+  background workers, and optional AI indexing yields to visible thumbnails and
+  cannot refresh an unrelated folder.
 - Thumbnail-prioritized cold-folder loading with delayed, bounded, cancelable
   background EXIF extraction.
 

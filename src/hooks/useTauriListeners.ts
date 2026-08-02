@@ -10,6 +10,7 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { autoStackCreatedImages } from '../utils/autoStacking';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
+import { libraryFolderCache } from '../utils/LibraryFolderCache';
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;
@@ -57,12 +58,6 @@ export function useTauriListeners({
       editStatusBuffer.current = {};
       metadataBuffer.current = {};
 
-      if (useLibraryStore.getState().isViewLoading && Object.keys(pendingMetadata).length > 0) {
-        metadataBuffer.current = { ...pendingMetadata, ...metadataBuffer.current };
-        pendingMetadata = {};
-        window.setTimeout(scheduleFlush, 50);
-      }
-
       if (Object.keys(pendingThumbs).length > 0) {
         useProcessStore.getState().setProcess((state) => ({
           thumbnails: { ...state.thumbnails, ...pendingThumbs },
@@ -70,8 +65,24 @@ export function useTauriListeners({
       }
 
       const metadataPaths = Object.keys(pendingMetadata);
+      const activePaths = new Set(useLibraryStore.getState().imageList.map((image) => image.path));
+      Object.entries(pendingRatings).forEach(([path, rating]) => {
+        libraryFolderCache.updateImage(path, { rating });
+        if (!activePaths.has(path)) delete pendingRatings[path];
+      });
+      Object.entries(pendingEdits).forEach(([path, is_edited]) => {
+        libraryFolderCache.updateImage(path, { is_edited });
+        if (!activePaths.has(path)) delete pendingEdits[path];
+      });
       metadataPaths.forEach((path) => {
-        pendingRatings[path] = pendingMetadata[path].rating;
+        const metadata = pendingMetadata[path];
+        libraryFolderCache.updateImage(path, {
+          rating: metadata.rating,
+          is_edited: metadata.is_edited,
+          tags: metadata.tags,
+          xmpStack: metadata.xmpStack,
+        });
+        if (activePaths.has(path)) pendingRatings[path] = metadata.rating;
       });
 
       if (Object.keys(pendingRatings).length > 0 || Object.keys(pendingEdits).length > 0 || metadataPaths.length > 0) {
@@ -172,21 +183,49 @@ export function useTauriListeners({
       listen('ai-model-download-finish', () => {
         if (isEffectActive) useProcessStore.getState().setProcess({ aiModelDownloadStatus: null });
       }),
-      listen('indexing-started', () => {
+      listen('indexing-started', (event: any) => {
         if (isEffectActive)
-          useProcessStore.getState().setProcess({ isIndexing: true, indexingProgress: { current: 0, total: 0 } });
+          useProcessStore.getState().setProcess({
+            isIndexing: true,
+            indexingFolderPath: event.payload?.folderPath ?? null,
+            indexingJobId: event.payload?.jobId ?? null,
+            indexingProgress: { current: 0, total: 0 },
+          });
       }),
       listen('indexing-progress', (event: any) => {
-        if (isEffectActive) useProcessStore.getState().setProcess({ indexingProgress: event.payload });
+        const process = useProcessStore.getState();
+        if (isEffectActive && (event.payload?.jobId == null || event.payload.jobId === process.indexingJobId)) {
+          process.setProcess({ indexingProgress: event.payload });
+        }
       }),
-      listen('indexing-finished', () => {
+      listen('indexing-finished', (event: any) => {
         if (isEffectActive) {
-          useProcessStore.getState().setProcess({ isIndexing: false, indexingProgress: { current: 0, total: 0 } });
+          const process = useProcessStore.getState();
+          if (event.payload?.jobId != null && event.payload.jobId !== process.indexingJobId) return;
+          const indexedPath = event.payload?.folderPath ?? process.indexingFolderPath;
+          process.setProcess({
+            isIndexing: false,
+            indexingFolderPath: null,
+            indexingJobId: null,
+            indexingProgress: { current: 0, total: 0 },
+          });
           const currentPath = useLibraryStore.getState().currentFolderPath;
-          if (currentPath) {
+          if (currentPath && (!indexedPath || currentPath === indexedPath)) {
             refs.current.refreshImageList();
           }
         }
+      }),
+      listen('indexing-error', (event: any) => {
+        if (!isEffectActive) return;
+        const process = useProcessStore.getState();
+        if (event.payload?.jobId != null && event.payload.jobId !== process.indexingJobId) return;
+        process.setProcess({
+          isIndexing: false,
+          indexingFolderPath: null,
+          indexingJobId: null,
+          indexingProgress: { current: 0, total: 0 },
+        });
+        console.error('Background indexing failed:', event.payload?.error ?? event.payload);
       }),
       listen('batch-export-progress', (event: any) => {
         if (isEffectActive) useProcessStore.getState().setExportState({ progress: event.payload });

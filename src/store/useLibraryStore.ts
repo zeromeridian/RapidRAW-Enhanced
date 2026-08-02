@@ -20,6 +20,7 @@ interface LibraryState {
   // Paths & Trees
   rootPaths: string[];
   currentFolderPath: string | null;
+  pendingFolderPath: string | null;
   expandedFolders: Set<string>;
   folderTrees: any[];
   pinnedFolderTrees: any[];
@@ -59,6 +60,7 @@ interface LibraryState {
 export const useLibraryStore = create<LibraryState>((set) => ({
   rootPaths: [],
   currentFolderPath: null,
+  pendingFolderPath: null,
   expandedFolders: new Set<string>(),
   folderTrees: [],
   pinnedFolderTrees: [],
