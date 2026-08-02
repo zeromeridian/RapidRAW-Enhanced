@@ -296,6 +296,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
 
       if (!preserveEditor) {
         await invoke('cancel_thumbnail_generation');
+        if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
         clearThumbnailQueue();
         setLibrary({ isViewLoading: true, activeAlbumId: null, libraryScrollTop: 0 });
         useLibraryStore.getState().setSearchCriteria({ tags: [], text: '', mode: 'OR' });
@@ -462,10 +463,13 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
           });
         }
       } catch (err) {
+        if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
         console.error('Failed to load folder contents:', err);
         toast.error('Failed to load images from the selected folder.');
       } finally {
-        useLibraryStore.getState().setLibrary({ isViewLoading: false });
+        if (folderLoadGenerationRef.current === folderLoadGeneration) {
+          useLibraryStore.getState().setLibrary({ isViewLoading: false });
+        }
       }
     },
     [clearThumbnailQueue, refs],

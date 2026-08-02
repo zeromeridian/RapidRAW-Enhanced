@@ -29,7 +29,8 @@ details are in `RELEASE_NOTES.MD`.
   removing branches with no supported images.
 - Responsive loading for large recursive folders, with scan and metadata
   reconciliation moved off the application event loop, bounded background
-  filesystem work, and batched Library updates.
+  filesystem work, batched Library updates, and generation-guarded folder
+  switches so delayed requests cannot clear the currently visible thumbnails.
 - Thumbnail-prioritized cold-folder loading with delayed, bounded, cancelable
   background EXIF extraction.
 
