@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.8-fix-app-optimization — 2026-08-01
+
+### Stable thumbnails during large scans
+
+- Prevented an older delayed folder request from clearing the thumbnails and
+  image list belonging to the folder currently visible during a large scan.
+- Rapid folder switching remains responsive while stale loading completions no
+  longer overwrite the current loading state or surface irrelevant errors.
+
 ## 1.2.7-feature-transform-add-auto — 2026-08-01
 
 ### Clearer Guided Transform completion
