@@ -75,6 +75,7 @@ export enum Invokes {
   InvokeGenerativeReplaseWithMaskDef = 'invoke_generative_replace_with_mask_def',
   ListImagesInDir = 'list_images_in_dir',
   ListImagesRecursive = 'list_images_recursive',
+  LoadCatalogFolder = 'load_catalog_folder',
   LoadImage = 'load_image',
   LoadMetadata = 'load_metadata',
   LoadPresets = 'load_presets',

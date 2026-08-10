@@ -206,9 +206,7 @@ function App() {
   const transformWrapperRef = useRef<any>(null);
   const preloadedDataRef = useRef<{
     trees?: Promise<any>;
-    images?: Promise<ImageFile[]>;
     rootPaths?: string[];
-    currentPath?: string;
   }>({});
 
   useAppInitialization({

@@ -27,6 +27,7 @@ mod inpainting;
 mod launch_request;
 mod lens_blur;
 mod lens_correction;
+mod library_catalog;
 mod lut_processing;
 mod mask_generation;
 mod multi_exposure;
@@ -3164,6 +3165,7 @@ pub fn run() {
             file_management::read_xmp_from_folder,
             file_management::list_images_in_dir,
             file_management::list_images_recursive,
+            library_catalog::load_catalog_folder,
             file_management::get_folder_tree,
             file_management::get_folder_children,
             file_management::get_pinned_folder_trees,

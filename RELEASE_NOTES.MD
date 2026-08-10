@@ -5,6 +5,22 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.10-fix-app-optimization — 2026-08-09
+
+### Immediate library restore with background revalidation
+
+- Previously scanned folders and their generated thumbnails now restore from an
+  embedded catalog immediately after launch and during navigation.
+- Files, `.rrdata` sidecars, and XMP remain authoritative; the disposable
+  catalog is refreshed only after successful filesystem scans.
+- Folder-tree loading and filesystem revalidation no longer block restoration
+  of the last visible folder.
+- Thumbnail catalog writes are batched on a dedicated worker so large
+  thumbnail runs do not add UI or filesystem pressure.
+- Removed the redundant memory-only folder cache and eager startup image scan.
+- The embedded SQLite library is bundled in the application and requires no
+  database server on Ubuntu, macOS ARM64, or Windows x64.
+
 ## 1.2.9-fix-app-optimization — 2026-08-02
 
 ### Responsive navigation during very large background scans
