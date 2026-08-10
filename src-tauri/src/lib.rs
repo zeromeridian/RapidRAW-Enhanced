@@ -21,6 +21,7 @@ mod file_management;
 mod formats;
 mod gpu_processing;
 mod hdr_deghosting;
+mod identifier_migration;
 mod image_loader;
 mod image_processing;
 mod inpainting;
@@ -2773,6 +2774,9 @@ pub fn run() {
                     }
         })
         .setup(move |app| {
+            if let Err(error) = identifier_migration::migrate_from_previous_identifier(app.handle()) {
+                eprintln!("Application identifier data migration will be retried: {error}");
+            }
             let state = app.state::<AppState>();
 
             #[cfg(any(windows, target_os = "linux", target_os = "macos"))]

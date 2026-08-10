@@ -2,7 +2,7 @@
 Categories=Graphics;Photography;
 Comment=Built on RapidRAW by ColrBent.
 Exec=ThisIsRAW
-Icon=ThisIsRAW
+Icon=io.github.ColrBent.ThisIsRAW
 Name=ThisIsRAW
 Terminal=false
 Type=Application

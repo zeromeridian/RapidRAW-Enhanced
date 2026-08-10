@@ -1,4 +1,4 @@
-id: io.github.CyberTimon.RapidRAW
+id: io.github.ColrBent.ThisIsRAW
 
 runtime: org.gnome.Platform
 runtime-version: '49'
@@ -62,19 +62,19 @@ modules:
       - cargo --offline fetch --manifest-path src-tauri/Cargo.toml --verbose
       - npm run --offline tauri build -- --no-bundle
 
-      - install -Dm644 -t /app/share/metainfo/ data/io.github.CyberTimon.RapidRAW.metainfo.xml
-      - install -Dm644 -t /app/share/applications/ data/io.github.CyberTimon.RapidRAW.desktop
+      - install -Dm644 -t /app/share/metainfo/ data/io.github.ColrBent.ThisIsRAW.metainfo.xml
+      - install -Dm644 -t /app/share/applications/ data/io.github.ColrBent.ThisIsRAW.desktop
       - install -Dm755 -t /app/bin/ src-tauri/target/release/ThisIsRAW
 
-      - desktop-file-edit --set-key=Icon --set-value="io.github.CyberTimon.RapidRAW" /app/share/applications/io.github.CyberTimon.RapidRAW.desktop
+      - desktop-file-edit --set-key=Icon --set-value="io.github.ColrBent.ThisIsRAW" /app/share/applications/io.github.ColrBent.ThisIsRAW.desktop
 
-      - install -Dm644 src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/io.github.CyberTimon.RapidRAW.png
-      - install -Dm644 src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github.CyberTimon.RapidRAW.png
-      - install -Dm644 src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/io.github.CyberTimon.RapidRAW.png
-      - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/256x256@2/apps/io.github.CyberTimon.RapidRAW.png
+      - install -Dm644 src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/io.github.ColrBent.ThisIsRAW.png
+      - install -Dm644 src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github.ColrBent.ThisIsRAW.png
+      - install -Dm644 src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/io.github.ColrBent.ThisIsRAW.png
+      - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/256x256@2/apps/io.github.ColrBent.ThisIsRAW.png
 
       - mkdir -p /app/lib/ThisIsRAW
       - cp -rf src-tauri/resources /app/lib/ThisIsRAW
       - cp -rf src-tauri/workflows /app/lib/ThisIsRAW
 
-      - install -Dm644 LICENSE /app/share/licenses/io.github.CyberTimon.RapidRAW/LICENSE
+      - install -Dm644 LICENSE /app/share/licenses/io.github.ColrBent.ThisIsRAW/LICENSE
