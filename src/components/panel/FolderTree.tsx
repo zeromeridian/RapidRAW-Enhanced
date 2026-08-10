@@ -69,6 +69,7 @@ interface TreeNodeProps {
   onFolderSelect(folder: string): void;
   onToggle(path: string): void;
   selectedPath: string | null;
+  selectedFolderPaths: string[];
   pinnedFolders: string[];
   showImageCounts: boolean;
   isInstantTransition: boolean;
@@ -452,13 +453,15 @@ function TreeNode({
   onFolderSelect,
   onToggle,
   selectedPath,
+  selectedFolderPaths,
   pinnedFolders,
   showImageCounts,
   isInstantTransition,
   folderIcons,
 }: TreeNodeProps) {
   const hasChildren = node.hasSubdirs || (node.children && node.children.length > 0);
-  const isSelected = node.path === selectedPath;
+  const isSelected =
+    selectedFolderPaths.includes(node.path) || (selectedFolderPaths.length === 0 && node.path === selectedPath);
   const isPinned = pinnedFolders.includes(node.path);
 
   const handleFolderIconClick = (e: any) => {
@@ -468,7 +471,17 @@ function TreeNode({
     }
   };
 
-  const handleNameClick = () => {
+  const handleNameClick = (event: React.MouseEvent) => {
+    const toggleSelection = event.ctrlKey || event.metaKey;
+    const { selectedFolderPaths: currentSelection, setLibrary } = useLibraryStore.getState();
+    if (toggleSelection) {
+      const nextSelection = currentSelection.includes(node.path)
+        ? currentSelection.filter((path) => path !== node.path)
+        : [...currentSelection, node.path];
+      setLibrary({ selectedFolderPaths: nextSelection, multiSelectedPaths: [] });
+      return;
+    }
+    setLibrary({ selectedFolderPaths: [node.path], multiSelectedPaths: [] });
     onFolderSelect(node.path);
   };
 
@@ -596,6 +609,7 @@ function TreeNode({
                       onFolderSelect={onFolderSelect}
                       onToggle={onToggle}
                       selectedPath={selectedPath}
+                      selectedFolderPaths={selectedFolderPaths}
                       pinnedFolders={pinnedFolders}
                       showImageCounts={showImageCounts}
                       isInstantTransition={isInstantTransition}
@@ -641,6 +655,7 @@ export default function FolderTree({
     albumTree,
     activeAlbumId,
     expandedAlbumGroups,
+    selectedFolderPaths,
   } = useLibraryStore(
     useShallow((state) => ({
       folderTrees: state.folderTrees,
@@ -651,6 +666,7 @@ export default function FolderTree({
       albumTree: state.albumTree,
       activeAlbumId: state.activeAlbumId,
       expandedAlbumGroups: state.expandedAlbumGroups,
+      selectedFolderPaths: state.selectedFolderPaths,
     })),
   );
 
@@ -931,6 +947,7 @@ export default function FolderTree({
                                   onFolderSelect={onFolderSelect}
                                   onToggle={onToggleFolder}
                                   selectedPath={selectedPath}
+                                  selectedFolderPaths={selectedFolderPaths}
                                   pinnedFolders={pinnedFolders}
                                   showImageCounts={showImageCounts && isHovering}
                                   isInstantTransition={isInstantTransition}
@@ -1051,6 +1068,7 @@ export default function FolderTree({
                                   onFolderSelect={onFolderSelect}
                                   onToggle={onToggleFolder}
                                   selectedPath={selectedPath}
+                                  selectedFolderPaths={selectedFolderPaths}
                                   pinnedFolders={pinnedFolders}
                                   showImageCounts={showImageCounts && isHovering}
                                   isInstantTransition={isInstantTransition}

@@ -10,6 +10,7 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { autoStackCreatedImages } from '../utils/autoStacking';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
+import { globalImageCache } from '../utils/ImageLRUCache';
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;
@@ -160,6 +161,11 @@ export function useTauriListeners({
         }
         if (thumbnailPath || data || rating !== undefined || is_edited !== undefined) {
           scheduleFlush();
+        }
+      }),
+      listen('preset-batch-image-applied', (event: any) => {
+        if (isEffectActive && event.payload?.path) {
+          globalImageCache.delete(event.payload.path);
         }
       }),
       listen('image-metadata-loaded', (event: any) => {

@@ -77,6 +77,17 @@ export interface CullingModalState {
   pathsToCull: Array<string>;
 }
 
+export interface PresetBatchTarget {
+  folderPaths: string[];
+  imagePaths: string[];
+  includeSubfolders: boolean;
+}
+
+export interface PresetBatchModalState {
+  isOpen: boolean;
+  target: PresetBatchTarget;
+}
+
 interface UIState {
   // View & Layout
   activeView: string;
@@ -125,6 +136,7 @@ interface UIState {
   denoiseModalState: DenoiseModalState;
   cullingModalState: CullingModalState;
   collageModalState: CollageModalState;
+  presetBatchModalState: PresetBatchModalState;
 
   // Actions
   setUI: (updater: Partial<UIState> | ((state: UIState) => Partial<UIState>)) => void;
@@ -199,6 +211,10 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
   cullingModalState: { isOpen: false, suggestions: null, progress: null, error: null, pathsToCull: [] },
   collageModalState: { isOpen: false, sourceImages: [] },
+  presetBatchModalState: {
+    isOpen: false,
+    target: { folderPaths: [], imagePaths: [], includeSubfolders: false },
+  },
 
   setUI: (updater) => set((state) => (typeof updater === 'function' ? updater(state) : updater)),
 

@@ -24,6 +24,9 @@ details are in `RELEASE_NOTES.MD`.
 - Caps Lock auto-advance after applying ratings, color labels, or flags.
 - Main Settings access from both Library and Develop.
 - Optional launch directly into the last library, bypassing the splash screen.
+- Bulk preset application for selected images or multiple selected folders,
+  with direct-folder and recursive scopes, search, progress, cancellation, and
+  background continuation.
 - Persistent Library and Develop sidebar widths.
 - Optional empty-folder hiding that preserves configured and pinned roots while
   removing branches with no supported images.
@@ -98,7 +101,8 @@ details are in `RELEASE_NOTES.MD`.
 - Recursive **Read XMP from Folder** action that treats XMP as authoritative
   for matching images, recognizes basename and full-filename sidecars, reports
   the imported-image count, and refreshes the currently open folder.
-# Application identity and data continuity
+
+## Application identity and data continuity
 
 - Uses `io.github.ColrBent.ThisIsRAW` consistently across supported packaging.
 - Automatically preserves settings, catalogs, and cached thumbnails from the
