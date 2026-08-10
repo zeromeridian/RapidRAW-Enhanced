@@ -10,7 +10,6 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { autoStackCreatedImages } from '../utils/autoStacking';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
-import { libraryFolderCache } from '../utils/LibraryFolderCache';
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;
@@ -67,21 +66,13 @@ export function useTauriListeners({
       const metadataPaths = Object.keys(pendingMetadata);
       const activePaths = new Set(useLibraryStore.getState().imageList.map((image) => image.path));
       Object.entries(pendingRatings).forEach(([path, rating]) => {
-        libraryFolderCache.updateImage(path, { rating });
         if (!activePaths.has(path)) delete pendingRatings[path];
       });
       Object.entries(pendingEdits).forEach(([path, is_edited]) => {
-        libraryFolderCache.updateImage(path, { is_edited });
         if (!activePaths.has(path)) delete pendingEdits[path];
       });
       metadataPaths.forEach((path) => {
         const metadata = pendingMetadata[path];
-        libraryFolderCache.updateImage(path, {
-          rating: metadata.rating,
-          is_edited: metadata.is_edited,
-          tags: metadata.tags,
-          xmpStack: metadata.xmpStack,
-        });
         if (activePaths.has(path)) pendingRatings[path] = metadata.rating;
       });
 

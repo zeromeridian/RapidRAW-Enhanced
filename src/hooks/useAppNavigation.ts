@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir } from '@tauri-apps/api/path';
 import { toast } from 'react-toastify';
@@ -13,7 +13,12 @@ import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjust
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
-import { createFolderCacheKey, libraryFolderCache } from '../utils/LibraryFolderCache';
+
+interface CatalogFolderSnapshot {
+  images: ImageFile[];
+  thumbnails: Record<string, string>;
+  updatedAt: number;
+}
 
 const mergeImportedXmpStacks = (images: ImageFile[]) => {
   const settingsState = useSettingsStore.getState();
@@ -53,7 +58,6 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
   } = refs;
 
   const handleGoHome = useCallback(() => {
-    libraryFolderCache.clear();
     useLibraryStore.getState().setLibrary({
       rootPaths: [],
       currentFolderPath: null,
@@ -293,11 +297,6 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       const { setUI } = useUIStore.getState();
       const { selectedImage, resetHistory, setEditor } = useEditorStore.getState();
       const libraryViewMode = appSettings?.libraryViewMode;
-      const { osPlatform } = useSettingsStore.getState();
-      const cacheKey = path
-        ? createFolderCacheKey(path, libraryViewMode, appSettings?.enableXmpSync ?? false, osPlatform)
-        : null;
-      const cachedImages = cacheKey ? libraryFolderCache.get(cacheKey) : undefined;
 
       if (!preserveEditor) {
         setLibrary({ isViewLoading: true, pendingFolderPath: path });
@@ -342,7 +341,6 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
 
         let destinationCommitted = false;
         const commitImages = (imageList: ImageFile[], ratings: Record<string, number>) => {
-          if (cacheKey) libraryFolderCache.set(cacheKey, imageList);
           if (!preserveEditor && !destinationCommitted) {
             useLibraryStore.getState().setSearchCriteria({ tags: [], text: '', mode: 'OR' });
           }
@@ -363,13 +361,35 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
           destinationCommitted = true;
         };
 
-        if (cachedImages) {
-          mergeImportedXmpStacks(cachedImages);
-          const cachedRatings: Record<string, number> = {};
-          cachedImages.forEach((image) => {
-            if (image.rating !== undefined) cachedRatings[image.path] = image.rating;
+        if (path && !preloadedImages) {
+          const snapshot = await invoke<CatalogFolderSnapshot | null>(Invokes.LoadCatalogFolder, {
+            path,
+            recursive: libraryViewMode === LibraryViewMode.Recursive,
+            xmpSync: appSettings?.enableXmpSync ?? false,
+          }).catch((error) => {
+            console.warn('Library catalog could not be read; using filesystem scan:', error);
+            return null;
           });
-          commitImages(cachedImages, cachedRatings);
+          if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
+          if (snapshot) {
+            mergeImportedXmpStacks(snapshot.images);
+            const restoredThumbnails = Object.fromEntries(
+              Object.entries(snapshot.thumbnails).map(([imagePath, thumbnailPath]) => [
+                imagePath,
+                convertFileSrc(thumbnailPath.replace(/\\/g, '/')),
+              ]),
+            );
+            if (Object.keys(restoredThumbnails).length > 0) {
+              useProcessStore.getState().setProcess((state) => ({
+                thumbnails: { ...state.thumbnails, ...restoredThumbnails },
+              }));
+            }
+            const cachedRatings: Record<string, number> = {};
+            snapshot.images.forEach((image) => {
+              if (image.rating !== undefined) cachedRatings[image.path] = image.rating;
+            });
+            commitImages(snapshot.images, cachedRatings);
+          }
         }
 
         if (!preserveEditor && selectedImage) {
@@ -419,11 +439,6 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
               ...image,
               exif: exifDataMap[image.path] || image.exif || null,
             }));
-            const cacheUpdates: Record<string, Partial<ImageFile>> = {};
-            Object.entries(exifDataMap).forEach(([imagePath, exif]) => {
-              cacheUpdates[imagePath] = { exif };
-            });
-            libraryFolderCache.updateImages(cacheUpdates);
             commitImages(finalImageList, initialRatings);
           } else {
             commitImages(files, initialRatings);
@@ -463,11 +478,6 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
                   if (Object.keys(pendingExifData).length >= stateUpdateBatchSize || isLastBatch) {
                     const exifUpdates = pendingExifData;
                     pendingExifData = {};
-                    const cacheUpdates: Record<string, Partial<ImageFile>> = {};
-                    Object.entries(exifUpdates).forEach(([imagePath, exif]) => {
-                      cacheUpdates[imagePath] = { exif };
-                    });
-                    libraryFolderCache.updateImages(cacheUpdates);
                     setLibrary((state) => ({
                       imageList: state.imageList.map((image) =>
                         exifUpdates[image.path] ? { ...image, exif: exifUpdates[image.path] } : image,
@@ -651,38 +661,31 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       }
 
       setLibrary({ isTreeLoading: true });
-      try {
-        let treesData;
-        if (preloadedDataRef.current?.rootPaths?.join() === rootFolders.join() && preloadedDataRef.current.trees) {
-          treesData = await preloadedDataRef.current.trees;
-          preloadedDataRef.current.trees = undefined;
-        } else {
-          const expandedArr = folderState?.expandedFolders
-            ? Array.from(new Set(folderState.expandedFolders))
-            : rootFolders;
-          treesData = await invoke(Invokes.GetPinnedFolderTrees, {
-            paths: rootFolders,
-            expandedFolders: expandedArr,
-            showImageCounts: appSettings?.enableFolderImageCounts || appSettings?.folderTreeSort?.key === 'imageCount',
-            hideEmptyFolders: appSettings?.hideEmptyFolders ?? false,
-          });
-        }
-        setLibrary({ folderTrees: treesData });
-      } catch (err) {
-        console.error('Failed to restore folder trees:', err);
-      } finally {
-        setLibrary({ isTreeLoading: false });
-      }
-
-      let preloadedImages: ImageFile[] | undefined = undefined;
-      if (preloadedDataRef.current?.currentPath === pathToSelect && preloadedDataRef.current.images) {
+      void (async () => {
         try {
-          preloadedImages = await preloadedDataRef.current.images;
-          preloadedDataRef.current.images = undefined;
-        } catch (e) {
-          console.error('Failed to retrieve preloaded images', e);
+          let treesData;
+          if (preloadedDataRef.current?.rootPaths?.join() === rootFolders.join() && preloadedDataRef.current.trees) {
+            treesData = await preloadedDataRef.current.trees;
+            preloadedDataRef.current.trees = undefined;
+          } else {
+            const expandedArr = folderState?.expandedFolders
+              ? Array.from(new Set(folderState.expandedFolders))
+              : rootFolders;
+            treesData = await invoke(Invokes.GetPinnedFolderTrees, {
+              paths: rootFolders,
+              expandedFolders: expandedArr,
+              showImageCounts:
+                appSettings?.enableFolderImageCounts || appSettings?.folderTreeSort?.key === 'imageCount',
+              hideEmptyFolders: appSettings?.hideEmptyFolders ?? false,
+            });
+          }
+          setLibrary({ folderTrees: treesData });
+        } catch (err) {
+          console.error('Failed to restore folder trees:', err);
+        } finally {
+          setLibrary({ isTreeLoading: false });
         }
-      }
+      })();
 
       if (pathToSelect && pathToSelect.startsWith('Album: ')) {
         const activeAlbumId = folderState?.activeAlbumId;
@@ -716,7 +719,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
           await handleSelectSubfolder(rootFolders[0], false, undefined, false);
         }
       } else {
-        await handleSelectSubfolder(pathToSelect, false, preloadedImages, false);
+        await handleSelectSubfolder(pathToSelect, false, undefined, false);
       }
     };
 

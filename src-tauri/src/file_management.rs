@@ -984,6 +984,15 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
     };
 
     assign_group_ids(&mut result_list, &settings);
+    if let Err(error) = crate::library_catalog::save_folder_snapshot(
+        &app_handle,
+        &path,
+        false,
+        enable_xmp_sync,
+        &result_list,
+    ) {
+        eprintln!("Failed to update library catalog for {path}: {error}");
+    }
     Ok(result_list)
 }
 
@@ -1161,6 +1170,15 @@ fn list_images_recursive_sync(
     };
 
     assign_group_ids(&mut result_list, &settings);
+    if let Err(error) = crate::library_catalog::save_folder_snapshot(
+        &app_handle,
+        &path,
+        true,
+        enable_xmp_sync,
+        &result_list,
+    ) {
+        eprintln!("Failed to update library catalog for {path}: {error}");
+    }
     Ok(result_list)
 }
 
@@ -2462,6 +2480,9 @@ fn emit_thumbnail_generated(
     rating: u8,
     is_edited: bool,
 ) {
+    if let Err(error) = crate::library_catalog::record_thumbnail(app_handle, path, thumbnail_path) {
+        eprintln!("Failed to update thumbnail catalog for {path}: {error}");
+    }
     let _ = app_handle.emit(
         "thumbnail-generated",
         serde_json::json!({ "path": path, "thumbnailPath": thumbnail_path, "rating": rating, "is_edited": is_edited }),
@@ -3693,6 +3714,8 @@ pub fn clear_thumbnail_cache(app_handle: AppHandle) -> Result<(), String> {
 
     fs::create_dir_all(&thumb_cache_dir)
         .map_err(|e| format!("Failed to recreate thumbnail cache directory: {}", e))?;
+
+    crate::library_catalog::clear_thumbnail_index(&app_handle)?;
 
     Ok(())
 }

@@ -28,11 +28,13 @@ details are in `RELEASE_NOTES.MD`.
 - Optional empty-folder hiding that preserves configured and pinned roots while
   removing branches with no supported images.
 - Responsive loading for large direct and recursive folders, with transactional
-  folder/album navigation, bounded reusable folder results, persistent
-  cross-folder thumbnail references, progressive root-tree refinement, and
-  generation-guarded state commits. Sidecar/XMP reconciliation uses bounded
-  background workers, and optional AI indexing yields to visible thumbnails and
-  cannot refresh an unrelated folder.
+  folder/album navigation, embedded catalog snapshots, persistent
+  cross-launch thumbnail references, progressive root-tree refinement, and
+  generation-guarded state commits. Cataloged content appears immediately while
+  the filesystem is revalidated in the background. Sidecar/XMP reconciliation
+  uses bounded background workers, and optional AI indexing yields to visible
+  thumbnails and cannot refresh an unrelated folder. Files, `.rrdata`, and XMP
+  remain authoritative; the bundled SQLite catalog requires no server.
 - Thumbnail-prioritized cold-folder loading with delayed, bounded, cancelable
   background EXIF extraction.
 

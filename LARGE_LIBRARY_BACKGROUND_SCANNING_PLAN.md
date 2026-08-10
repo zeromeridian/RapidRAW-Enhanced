@@ -2,11 +2,15 @@
 
 ## Implementation Status
 
-Implemented in `1.2.9-fix-app-optimization`. The delivered architecture uses
-transactional generation-guarded folder and album commits, a bounded
-cross-platform folder-result LRU, retained thumbnail references, bounded
+Implemented and superseded in `1.2.10-fix-app-optimization`. The delivered
+architecture uses transactional generation-guarded folder and album commits,
+an embedded SQLite snapshot catalog, retained persistent thumbnail
+references, bounded
 sidecar/XMP workers for large direct and recursive folders, progressive root
 tree refinement, scoped AI-indexing events, and foreground-thumbnail yielding.
+The catalog is a disposable acceleration index; source files, `.rrdata`, and
+XMP remain authoritative and every restored snapshot is revalidated in the
+background. It uses bundled SQLite and therefore requires no database server.
 The validation and stress scenarios below remain the permanent regression
 checklist for future changes.
 

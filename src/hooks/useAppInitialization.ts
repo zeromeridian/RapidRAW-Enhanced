@@ -196,17 +196,14 @@ export const useAppInitialization = ({
         if (settings?.thumbnailAspectRatio) setThumbnailAspectRatio(settings.thumbnailAspectRatio);
 
         if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
-          try {
-            const trees = await invoke(Invokes.GetPinnedFolderTrees, {
-              paths: settings.pinnedFolders,
-              expandedFolders: settings.lastFolderState?.expandedFolders || [],
-              showImageCounts: settings.enableFolderImageCounts || settings.folderTreeSort?.key === 'imageCount',
-              hideEmptyFolders: settings.hideEmptyFolders ?? false,
-            });
-            setLibrary({ pinnedFolderTrees: trees });
-          } catch (err) {
-            console.error('Failed to load pinned folder trees:', err);
-          }
+          void invoke<any[]>(Invokes.GetPinnedFolderTrees, {
+            paths: settings.pinnedFolders,
+            expandedFolders: settings.lastFolderState?.expandedFolders || [],
+            showImageCounts: settings.enableFolderImageCounts || settings.folderTreeSort?.key === 'imageCount',
+            hideEmptyFolders: settings.hideEmptyFolders ?? false,
+          })
+            .then((trees) => setLibrary({ pinnedFolderTrees: trees }))
+            .catch((err) => console.error('Failed to load pinned folder trees:', err));
         }
 
         const rootFolders = settings.rootFolders?.length
@@ -216,23 +213,14 @@ export const useAppInitialization = ({
             : [];
 
         if (!isAndroid && rootFolders.length > 0) {
-          const currentPath = settings.lastFolderState?.currentFolderPath || rootFolders[0];
-          const isAlbum = currentPath.startsWith('Album: ');
-          const command =
-            settings.libraryViewMode === LibraryViewMode.Recursive
-              ? Invokes.ListImagesRecursive
-              : Invokes.ListImagesInDir;
-
           preloadedDataRef.current = {
             rootPaths: rootFolders,
-            currentPath: currentPath,
             trees: invoke(Invokes.GetPinnedFolderTrees, {
               paths: rootFolders,
               expandedFolders: settings.lastFolderState?.expandedFolders ?? rootFolders,
               showImageCounts: settings.enableFolderImageCounts || settings.folderTreeSort?.key === 'imageCount',
               hideEmptyFolders: settings.hideEmptyFolders ?? false,
             }),
-            images: isAlbum ? undefined : invoke(command, { path: currentPath }),
           };
         }
 
