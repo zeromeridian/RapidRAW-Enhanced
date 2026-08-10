@@ -3166,6 +3166,8 @@ pub fn run() {
             file_management::list_images_in_dir,
             file_management::list_images_recursive,
             library_catalog::load_catalog_folder,
+            library_catalog::get_catalog_location,
+            library_catalog::move_library_catalog,
             file_management::get_folder_tree,
             file_management::get_folder_children,
             file_management::get_pinned_folder_trees,

@@ -76,6 +76,8 @@ export enum Invokes {
   ListImagesInDir = 'list_images_in_dir',
   ListImagesRecursive = 'list_images_recursive',
   LoadCatalogFolder = 'load_catalog_folder',
+  GetCatalogLocation = 'get_catalog_location',
+  MoveLibraryCatalog = 'move_library_catalog',
   LoadImage = 'load_image',
   LoadMetadata = 'load_metadata',
   LoadPresets = 'load_presets',
@@ -185,6 +187,7 @@ export interface XmpStackMetadata {
 }
 
 export interface AppSettings {
+  catalogDirectory?: string;
   aiConnectorAddress?: string;
   aiProvider?: string;
   decorations?: any;
