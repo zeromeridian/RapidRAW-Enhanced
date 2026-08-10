@@ -1,4 +1,4 @@
-package io.github.CyberTimon.RapidRAW
+package io.github.ColrBent.ThisIsRAW
 
 import android.graphics.Color
 import android.os.Bundle
@@ -39,19 +39,16 @@ class MainActivity : TauriActivity() {
       insets
     }
 
-    ViewCompat.requestApplyInsets(rootView)
-  }
-
-  override fun onWebViewCreate(webView: WebView) {
-    super.onWebViewCreate(webView)
-    this.webView = webView
-
-    webView.setBackgroundColor(safeMarginBackgroundColor)
-    webView.fitsSystemWindows = true
+    webView = findViewById(R.id.tauri_webview)
 
     onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
       override fun handleOnBackPressed() {
-        this@MainActivity.webView?.evaluateJavascript("window.__handleAndroidBack()", null)
+        val currentWebView = webView
+        if (currentWebView?.canGoBack() == true) {
+          currentWebView.goBack()
+        } else {
+          finish()
+        }
       }
     })
   }

@@ -215,6 +215,43 @@ pub fn clear_thumbnail_index(app_handle: &AppHandle) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
+pub fn rebase_thumbnail_paths(
+    app_handle: &AppHandle,
+    old_cache_directory: &std::path::Path,
+    new_cache_directory: &std::path::Path,
+) -> Result<(), String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    let mut connection = open(app_handle)?;
+    let transaction = connection
+        .transaction()
+        .map_err(|error| error.to_string())?;
+    let mut statement = transaction
+        .prepare("SELECT image_path, thumbnail_path FROM thumbnail_index")
+        .map_err(|error| error.to_string())?;
+    let entries = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|error| error.to_string())?
+        .filter_map(Result::ok)
+        .collect::<Vec<_>>();
+    drop(statement);
+    for (image_path, thumbnail_path) in entries {
+        let thumbnail_path = PathBuf::from(thumbnail_path);
+        let Ok(relative) = thumbnail_path.strip_prefix(old_cache_directory) else {
+            continue;
+        };
+        let rebased = new_cache_directory.join(relative);
+        transaction
+            .execute(
+                "UPDATE thumbnail_index SET thumbnail_path=?1 WHERE image_path=?2",
+                params![rebased.to_string_lossy(), image_path],
+            )
+            .map_err(|error| error.to_string())?;
+    }
+    transaction.commit().map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 pub fn get_catalog_location(app_handle: AppHandle) -> Result<String, String> {
     database_path(&app_handle).map(|path| path.to_string_lossy().into_owned())

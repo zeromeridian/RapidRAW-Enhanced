@@ -5,6 +5,21 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.12-fix-app-optimization — 2026-08-10
+
+### Application identity migration
+
+- Changed the application identifier to `io.github.ColrBent.ThisIsRAW` across
+  desktop, mobile, and Flatpak packaging.
+- Existing settings, catalogs, and application data migrate automatically and
+  non-destructively from the previous identifier on Ubuntu, macOS, and Windows.
+- Large thumbnail caches migrate in a retry-safe background task so the first
+  launch under the new identity remains responsive and existing cached paths
+  stay usable until migration completes.
+- Custom catalog locations beneath an application-managed directory and stored
+  thumbnail paths are rebased only after their files are safely copied. The
+  previous application directories remain intact as a recovery copy.
+
 ## 1.2.11-fix-app-optimization — 2026-08-10
 
 ### Customizable library catalog location

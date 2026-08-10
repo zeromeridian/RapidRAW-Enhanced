@@ -98,3 +98,8 @@ details are in `RELEASE_NOTES.MD`.
 - Recursive **Read XMP from Folder** action that treats XMP as authoritative
   for matching images, recognizes basename and full-filename sidecars, reports
   the imported-image count, and refreshes the currently open folder.
+# Application identity and data continuity
+
+- Uses `io.github.ColrBent.ThisIsRAW` consistently across supported packaging.
+- Automatically preserves settings, catalogs, and cached thumbnails from the
+  previous application identifier without blocking the UI on large caches.
