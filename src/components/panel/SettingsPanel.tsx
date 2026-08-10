@@ -18,8 +18,11 @@ import {
   Image as ImageIcon,
   Mouse,
   Touchpad,
+  FolderOpen,
+  RotateCcw,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
@@ -99,6 +102,11 @@ interface TestStatus {
 interface MyLens {
   maker: string;
   model: string;
+}
+
+interface CatalogMoveResult {
+  databasePath: string;
+  directory: string | null;
 }
 
 const EXECUTE_TIMEOUT = 3000;
@@ -517,6 +525,9 @@ export default function SettingsPanel({
   const [testStatus, setTestStatus] = useState<TestStatus>({ message: '', success: null, testing: false });
   const [hasInteractedWithLivePreview, setHasInteractedWithLivePreview] = useState(false);
   const [recordingAction, setRecordingAction] = useState<string | null>(null);
+  const [catalogLocation, setCatalogLocation] = useState('');
+  const [catalogLocationMessage, setCatalogLocationMessage] = useState('');
+  const [isMovingCatalog, setIsMovingCatalog] = useState(false);
 
   const [aiProvider, setAiProvider] = useState(appSettings?.aiProvider || 'cpu');
   const [aiConnectorAddress, setAiConnectorAddress] = useState<string>(appSettings?.aiConnectorAddress || '');
@@ -673,6 +684,39 @@ export default function SettingsPanel({
   useEffect(() => {
     invoke<string[]>('get_lensfun_makers').then(setLensMakers).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    invoke<string>(Invokes.GetCatalogLocation).then(setCatalogLocation).catch(console.error);
+  }, [appSettings?.catalogDirectory]);
+
+  const moveCatalog = async (directory: string | null) => {
+    setIsMovingCatalog(true);
+    setCatalogLocationMessage('');
+    try {
+      const result = await invoke<CatalogMoveResult>(Invokes.MoveLibraryCatalog, { directory });
+      await onSettingsChange({
+        ...appSettings,
+        catalogDirectory: result.directory ?? undefined,
+      });
+      setCatalogLocation(result.databasePath);
+      setCatalogLocationMessage(t('settings.general.catalogMoveSuccess'));
+    } catch (error) {
+      console.error('Failed to move library catalog:', error);
+      setCatalogLocationMessage(`${t('settings.general.catalogMoveFailed')}: ${error}`);
+    } finally {
+      setIsMovingCatalog(false);
+    }
+  };
+
+  const handleChooseCatalogLocation = async () => {
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+      defaultPath: appSettings?.catalogDirectory || undefined,
+      title: t('settings.general.catalogChooseFolder'),
+    });
+    if (typeof selected === 'string') await moveCatalog(selected);
+  };
 
   const handleProcessingSettingChange = async (key: string, value: any) => {
     setProcessingSettings((prev) => ({ ...prev, [key]: value }));
@@ -1084,6 +1128,41 @@ export default function SettingsPanel({
                           value={appSettings?.language || 'en'}
                           triggerClassName="bg-bg-primary"
                         />
+                      </SettingItem>
+
+                      <SettingItem
+                        label={t('settings.general.catalogLocation')}
+                        description={t('settings.general.catalogLocationDesc')}
+                      >
+                        <div className="w-full space-y-2">
+                          <Input
+                            disabled
+                            onChange={() => {}}
+                            value={catalogLocation || t('settings.general.catalogLocationLoading')}
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <Button disabled={isMovingCatalog} onClick={handleChooseCatalogLocation} type="button">
+                              <FolderOpen size={16} />
+                              {isMovingCatalog
+                                ? t('settings.general.catalogMoving')
+                                : t('settings.general.catalogChooseFolder')}
+                            </Button>
+                            <Button
+                              className="bg-surface text-text-primary border border-border-color"
+                              disabled={isMovingCatalog || !appSettings?.catalogDirectory}
+                              onClick={() => moveCatalog(null)}
+                              type="button"
+                            >
+                              <RotateCcw size={16} />
+                              {t('settings.general.catalogUseDefault')}
+                            </Button>
+                          </div>
+                          {catalogLocationMessage && (
+                            <Text variant={TextVariants.small} color={TextColors.secondary}>
+                              {catalogLocationMessage}
+                            </Text>
+                          )}
+                        </div>
                       </SettingItem>
 
                       <div className="space-y-4">

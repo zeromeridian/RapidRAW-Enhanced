@@ -500,6 +500,8 @@ pub struct AppSettings {
     pub left_panel_width: Option<u32>,
     #[serde(default)]
     pub right_panel_width: Option<u32>,
+    #[serde(default)]
+    pub catalog_directory: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -604,6 +606,7 @@ impl Default for AppSettings {
             tone_curve_presets: Vec::new(),
             left_panel_width: None,
             right_panel_width: None,
+            catalog_directory: None,
         }
     }
 }

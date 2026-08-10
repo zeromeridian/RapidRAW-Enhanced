@@ -5,6 +5,18 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.11-fix-app-optimization — 2026-08-10
+
+### Customizable library catalog location
+
+- General Settings now shows the active catalog path and can safely move the
+  existing catalog to a user-selected folder.
+- The catalog can be moved back to the platform-default application-data
+  location at any time.
+- Catalog reads, background thumbnail writes, and moves are synchronized across
+  Ubuntu, macOS, and Windows. A failed move preserves the original catalog and
+  existing destination catalogs are never overwritten.
+
 ## 1.2.10-fix-app-optimization — 2026-08-09
 
 ### Immediate library restore with background revalidation

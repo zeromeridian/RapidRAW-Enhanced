@@ -35,6 +35,9 @@ details are in `RELEASE_NOTES.MD`.
   uses bounded background workers, and optional AI indexing yields to visible
   thumbnails and cannot refresh an unrelated folder. Files, `.rrdata`, and XMP
   remain authoritative; the bundled SQLite catalog requires no server.
+- The library catalog location is visible and customizable in General Settings;
+  changing it safely moves the existing catalog, with an option to restore the
+  platform-default location.
 - Thumbnail-prioritized cold-folder loading with delayed, bounded, cancelable
   background EXIF extraction.
 
