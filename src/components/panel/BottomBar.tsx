@@ -23,6 +23,7 @@ import {
   Trash2,
   Ungroup,
   Users,
+  SwatchBook,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -105,6 +106,7 @@ interface StarRatingProps {
 }
 
 const PRODUCTIVITY_TOOLBAR_IDS = [
+  'applyPreset',
   'autoAdjust',
   'denoise',
   'convertNegative',
@@ -226,17 +228,25 @@ export default function BottomBar({
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const customizeRef = useRef<HTMLDivElement>(null);
-  const { filterCriteria, libraryActivePath, allLibraryImages, currentFolderPath, setFilterCriteria, setLibrary } =
-    useLibraryStore(
-      useShallow((state) => ({
-        filterCriteria: state.filterCriteria,
-        libraryActivePath: state.libraryActivePath,
-        allLibraryImages: state.imageList,
-        currentFolderPath: state.currentFolderPath,
-        setFilterCriteria: state.setFilterCriteria,
-        setLibrary: state.setLibrary,
-      })),
-    );
+  const {
+    filterCriteria,
+    libraryActivePath,
+    allLibraryImages,
+    currentFolderPath,
+    selectedFolderPaths,
+    setFilterCriteria,
+    setLibrary,
+  } = useLibraryStore(
+    useShallow((state) => ({
+      filterCriteria: state.filterCriteria,
+      libraryActivePath: state.libraryActivePath,
+      allLibraryImages: state.imageList,
+      currentFolderPath: state.currentFolderPath,
+      selectedFolderPaths: state.selectedFolderPaths,
+      setFilterCriteria: state.setFilterCriteria,
+      setLibrary: state.setLibrary,
+    })),
+  );
   const setUI = useUIStore((state) => state.setUI);
   const setEditor = useEditorStore((state) => state.setEditor);
   const { appSettings, handleSettingsChange } = useSettingsStore(
@@ -261,13 +271,15 @@ export default function BottomBar({
     });
   };
   const productivityPaths =
-    multiSelectedPaths.length > 0
-      ? multiSelectedPaths
-      : selectedImage?.path
-        ? [selectedImage.path]
-        : libraryActivePath
-          ? [libraryActivePath]
-          : [];
+    selectedFolderPaths.length > 0
+      ? []
+      : multiSelectedPaths.length > 0
+        ? multiSelectedPaths
+        : selectedImage?.path
+          ? [selectedImage.path]
+          : libraryActivePath
+            ? [libraryActivePath]
+            : [];
   const productivityCount = productivityPaths.length;
   const firstProductivityImage =
     imageList.find((image) => image.path === productivityPaths[0]) ||
@@ -313,6 +325,7 @@ export default function BottomBar({
     { id: 'copySettings', label: t('ui.bottomBar.tooltips.copySettings') },
     { id: 'pasteSettings', label: t('ui.bottomBar.tooltips.pasteSettings') },
     { id: 'copyPasteSettings', label: t('ui.bottomBar.tooltips.copyPasteSettings') },
+    { id: 'applyPreset', label: t('presetBatch.applyPreset') },
     { id: 'autoAdjust', label: t('contextMenus.thumbnail.autoAdjust', { count: 1 }) },
     { id: 'denoise', label: t('contextMenus.thumbnail.denoise', { count: 1 }) },
     { id: 'convertNegative', label: t('contextMenus.thumbnail.convertNegative', { count: 1 }) },
@@ -807,6 +820,27 @@ export default function BottomBar({
           <div className="h-5 w-px bg-surface"></div>
 
           <div className="flex items-center gap-1">
+            {isToolbarItemVisible('applyPreset') && (
+              <button
+                className={productivityButtonClass}
+                disabled={productivityCount === 0 && selectedFolderPaths.length === 0}
+                onClick={() =>
+                  setUI({
+                    presetBatchModalState: {
+                      isOpen: true,
+                      target: {
+                        imagePaths: productivityPaths,
+                        folderPaths: productivityPaths.length > 0 ? [] : selectedFolderPaths,
+                        includeSubfolders: false,
+                      },
+                    },
+                  })
+                }
+                data-tooltip={t('presetBatch.applyPreset')}
+              >
+                <SwatchBook size={18} />
+              </button>
+            )}
             {isToolbarItemVisible('autoAdjust') && (
               <button
                 className={productivityButtonClass}

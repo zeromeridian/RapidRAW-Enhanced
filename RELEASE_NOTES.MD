@@ -5,6 +5,22 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.13-fix-app-optimization — 2026-08-10
+
+### Background preset application for images and folders
+
+- Presets can now be applied to selected images from the Productivity context
+  menu or the new customizable bottom-toolbar button.
+- Multiple folders can be selected with Ctrl on Ubuntu/Windows or Command on
+  macOS, with separate direct-folder and include-subfolders scopes.
+- A shared searchable preset selector preserves unrelated adjustments and
+  applies the preset to `.rrdata` and optional XMP metadata.
+- Folder discovery and preset application run in a cancellable, deduplicated,
+  single-worker background job that progressively refreshes thumbnails without
+  blocking navigation or saturating the machine.
+- Physical images and virtual copies are supported, while filters never cause
+  images in a selected folder to be skipped.
+
 ## 1.2.12-fix-app-optimization — 2026-08-10
 
 ### Application identity migration

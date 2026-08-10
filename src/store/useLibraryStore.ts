@@ -34,6 +34,7 @@ interface LibraryState {
   imageList: Array<ImageFile>;
   imageRatings: Record<string, number>;
   multiSelectedPaths: Array<string>;
+  selectedFolderPaths: Array<string>;
   selectionAnchorPath: string | null;
   libraryActivePath: string | null;
   libraryActiveAdjustments: Adjustments;
@@ -72,6 +73,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   imageList: [],
   imageRatings: {},
   multiSelectedPaths: [],
+  selectedFolderPaths: [],
   selectionAnchorPath: null,
   libraryActivePath: null,
   libraryActiveAdjustments: INITIAL_ADJUSTMENTS,
@@ -97,7 +99,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
 
   setLibrary: (updater) => set((state) => (typeof updater === 'function' ? updater(state) : updater)),
 
-  clearSelection: () => set({ multiSelectedPaths: [], libraryActivePath: null }),
+  clearSelection: () => set({ multiSelectedPaths: [], selectedFolderPaths: [], libraryActivePath: null }),
 
   setFilterCriteria: (criteria) =>
     set((state) => ({

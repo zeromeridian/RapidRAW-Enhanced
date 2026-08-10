@@ -42,6 +42,7 @@ import {
   Briefcase,
   User,
   Album as AlbumIcon,
+  SwatchBook,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
@@ -87,6 +88,24 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
   const { handleAutoAdjustments, handleResetAdjustments, handleCopyAdjustments, handlePasteAdjustments } =
     useEditorActions();
   const { handleRate, handleSetColorLabel, handleTagsChanged } = useLibraryActions();
+
+  const openPresetBatchForImages = useCallback((imagePaths: string[]) => {
+    useUIStore.getState().setUI({
+      presetBatchModalState: {
+        isOpen: true,
+        target: { imagePaths, folderPaths: [], includeSubfolders: false },
+      },
+    });
+  }, []);
+
+  const openPresetBatchForFolders = useCallback((folderPaths: string[], includeSubfolders: boolean) => {
+    useUIStore.getState().setUI({
+      presetBatchModalState: {
+        isOpen: true,
+        target: { imagePaths: [], folderPaths, includeSubfolders },
+      },
+    });
+  }, []);
 
   const albumIcons = useMemo(
     () => [
@@ -208,6 +227,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           label: t('contextMenus.editor.productivity'),
           icon: Gauge,
           submenu: [
+            {
+              label: t('presetBatch.applyPreset'),
+              icon: SwatchBook,
+              onClick: () => openPresetBatchForImages([selectedImage.path]),
+            },
             {
               label: t('contextMenus.editor.autoAdjust'),
               icon: Aperture,
@@ -341,6 +365,10 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const { appSettings } = useSettingsStore.getState();
       const { setUI, setRightPanel } = useUIStore.getState();
       const { setProcess } = useProcessStore.getState();
+
+      if (useLibraryStore.getState().selectedFolderPaths.length > 0) {
+        setLibrary({ selectedFolderPaths: [] });
+      }
 
       const isTargetInSelection = multiSelectedPaths.includes(path);
       let finalSelection: string[];
@@ -595,6 +623,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           label: t('contextMenus.editor.productivity'),
           icon: Gauge,
           submenu: [
+            {
+              label: t('presetBatch.applyPreset'),
+              icon: SwatchBook,
+              onClick: () => openPresetBatchForImages(finalSelection),
+            },
             { label: autoAdjustLabel, icon: Aperture, onClick: handleApplyAutoAdjustmentsToSelection },
             {
               label: denoiseLabel,
@@ -880,11 +913,15 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         return;
       }
 
-      const { rootPaths, currentFolderPath, folderTrees, setLibrary } = useLibraryStore.getState();
+      const { rootPaths, currentFolderPath, folderTrees, selectedFolderPaths, setLibrary } = useLibraryStore.getState();
       const { copiedFilePaths, setProcess } = useProcessStore.getState();
       const { appSettings, handleSettingsChange } = useSettingsStore.getState();
       const { setUI } = useUIStore.getState();
       const targetPath = path;
+      const folderTargets = selectedFolderPaths.includes(targetPath) ? selectedFolderPaths : [targetPath];
+      if (!selectedFolderPaths.includes(targetPath)) {
+        setLibrary({ selectedFolderPaths: folderTargets, multiSelectedPaths: [] });
+      }
       const isRoot = rootPaths.includes(targetPath);
       const numCopied = copiedFilePaths.length;
       const copyPastedLabel = t('contextMenus.folders.copyHere', { count: numCopied });
@@ -952,6 +989,27 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             ]
           : []),
         pinOption,
+        { type: OPTION_SEPARATOR },
+        {
+          label: t('contextMenus.editor.productivity'),
+          icon: Gauge,
+          submenu: [
+            {
+              label: t('presetBatch.applyPreset'),
+              icon: SwatchBook,
+              submenu: [
+                {
+                  label: t('presetBatch.selectedFolders'),
+                  onClick: () => openPresetBatchForFolders(folderTargets, false),
+                },
+                {
+                  label: t('presetBatch.selectedFoldersRecursive'),
+                  onClick: () => openPresetBatchForFolders(folderTargets, true),
+                },
+              ],
+            },
+          ],
+        },
         { type: OPTION_SEPARATOR },
         {
           icon: FolderPlus,

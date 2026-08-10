@@ -167,9 +167,13 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
   const handleClearSelection = useCallback(() => {
     const { selectedImage } = useEditorStore.getState();
     if (selectedImage) {
-      useLibraryStore.getState().setLibrary({ multiSelectedPaths: [selectedImage.path] });
+      useLibraryStore.getState().setLibrary({ multiSelectedPaths: [selectedImage.path], selectedFolderPaths: [] });
     } else {
-      useLibraryStore.getState().setLibrary({ multiSelectedPaths: [], libraryActivePath: null });
+      useLibraryStore.getState().setLibrary({
+        multiSelectedPaths: [],
+        selectedFolderPaths: [],
+        libraryActivePath: null,
+      });
     }
   }, []);
 
@@ -185,6 +189,9 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     ) => {
       const libraryState = useLibraryStore.getState();
       const { multiSelectedPaths, setLibrary } = libraryState;
+      if (libraryState.selectedFolderPaths.length > 0) {
+        setLibrary({ selectedFolderPaths: [] });
+      }
       const { ctrlKey, metaKey, shiftKey } = event;
       const isCtrlPressed = ctrlKey || metaKey;
       const { shiftAnchor, onSimpleClick, updateLibraryActivePath } = options;

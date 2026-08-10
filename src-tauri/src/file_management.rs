@@ -9,7 +9,7 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 use anyhow::Result;
@@ -469,15 +469,29 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
     (source_path, sidecar_path)
 }
 
+fn parse_rrdata_filename(file_name: &str) -> Option<(String, Option<String>)> {
+    let base = file_name.strip_suffix(".rrdata")?;
+    if base.len() >= 7 && base.as_bytes()[base.len() - 7] == b'.' {
+        let id = &base[base.len() - 6..];
+        if id.chars().all(|character| character.is_ascii_hexdigit()) {
+            return Some((base[..base.len() - 7].to_string(), Some(id.to_string())));
+        }
+    }
+    Some((base.to_string(), None))
+}
+
 #[cfg(test)]
 mod output_naming_tests {
     use super::{
-        extract_app_xmp_value, extract_xmp_stack, parse_virtual_path, read_xmp_from_folder,
+        apply_preset_adjustments_to_path, collect_preset_batch_folder_paths, extract_app_xmp_value,
+        extract_xmp_stack, parse_rrdata_filename, parse_virtual_path, read_xmp_from_folder,
         sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
     };
+    use crate::app_settings::AppSettings;
     use crate::image_processing::ImageMetadata;
     use std::fs;
     use std::path::PathBuf;
+    use std::sync::atomic::AtomicBool;
 
     #[test]
     fn sanitizes_suffix_without_adding_or_removing_valid_separators() {
@@ -491,6 +505,102 @@ mod output_naming_tests {
 
         assert_eq!(source, PathBuf::from("/photos/image.raw"));
         assert_eq!(sidecar, PathBuf::from("/photos/image.raw.abc123.rrdata"));
+    }
+
+    #[test]
+    fn rrdata_names_distinguish_primary_and_virtual_copy_sidecars() {
+        assert_eq!(
+            parse_rrdata_filename("image.jpg.abc123.rrdata"),
+            Some(("image.jpg".to_string(), Some("abc123".to_string())))
+        );
+        assert_eq!(
+            parse_rrdata_filename("image.jpg.rrdata"),
+            Some(("image.jpg".to_string(), None))
+        );
+        assert_eq!(parse_rrdata_filename("image.jpg"), None);
+    }
+
+    #[test]
+    fn preset_batch_folder_discovery_respects_recursion_and_virtual_copies() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("image.jpg");
+        fs::write(&image, []).unwrap();
+        fs::write(folder.path().join("image.jpg.rrdata"), "{}").unwrap();
+        fs::write(folder.path().join("image.jpg.abc123.rrdata"), "{}").unwrap();
+
+        let nested = folder.path().join("nested");
+        fs::create_dir(&nested).unwrap();
+        let nested_image = nested.join("nested.jpg");
+        fs::write(&nested_image, []).unwrap();
+
+        let folder_path = folder.path().to_string_lossy().into_owned();
+        let cancellation_token = AtomicBool::new(false);
+        let (direct, direct_failures) = collect_preset_batch_folder_paths(
+            std::slice::from_ref(&folder_path),
+            false,
+            &cancellation_token,
+        );
+        assert_eq!(direct_failures, 0);
+        assert!(direct.contains(image.to_string_lossy().as_ref()));
+        assert!(direct.contains(&format!("{}?vc=abc123", image.to_string_lossy())));
+        assert!(!direct.contains(nested_image.to_string_lossy().as_ref()));
+
+        let (recursive, recursive_failures) = collect_preset_batch_folder_paths(
+            &[folder_path.clone(), nested.to_string_lossy().into_owned()],
+            true,
+            &cancellation_token,
+        );
+        assert_eq!(recursive_failures, 0);
+        assert!(recursive.contains(nested_image.to_string_lossy().as_ref()));
+        assert_eq!(
+            recursive.len(),
+            3,
+            "overlapping folders must be deduplicated"
+        );
+    }
+
+    #[test]
+    fn preset_batch_merges_adjustments_and_round_trips_through_xmp() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("image.jpg");
+        fs::write(&image, []).unwrap();
+        let existing = ImageMetadata {
+            adjustments: serde_json::json!({ "exposure": 1.0, "contrast": 12.0 }),
+            rating: 4,
+            tags: Some(vec!["user:keep".to_string()]),
+            ..ImageMetadata::default()
+        };
+        fs::write(
+            folder.path().join("image.jpg.rrdata"),
+            serde_json::to_string_pretty(&existing).unwrap(),
+        )
+        .unwrap();
+        let settings = AppSettings {
+            enable_xmp_sync: Some(true),
+            create_xmp_if_missing: Some(true),
+            ..AppSettings::default()
+        };
+
+        apply_preset_adjustments_to_path(
+            image.to_string_lossy().as_ref(),
+            &serde_json::json!({ "exposure": 2.5, "saturation": 18.0 }),
+            &settings,
+            None,
+        )
+        .unwrap();
+
+        let merged = crate::exif_processing::load_sidecar(&folder.path().join("image.jpg.rrdata"));
+        assert_eq!(merged.adjustments["exposure"], 2.5);
+        assert_eq!(merged.adjustments["contrast"], 12.0);
+        assert_eq!(merged.adjustments["saturation"], 18.0);
+        assert_eq!(merged.rating, 4);
+        assert_eq!(merged.tags.as_deref().unwrap(), ["user:keep".to_string()]);
+
+        let mut imported = ImageMetadata::default();
+        assert!(sync_metadata_from_xmp(&image, &mut imported, true, true));
+        assert_eq!(imported.adjustments["exposure"], 2.5);
+        assert_eq!(imported.adjustments["contrast"], 12.0);
+        assert_eq!(imported.adjustments["saturation"], 18.0);
     }
 
     #[test]
@@ -846,23 +956,9 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
             .into_string()
             .unwrap_or_else(|os| os.to_string_lossy().into_owned());
 
-        if file_name.ends_with(".rrdata") {
-            let base = &file_name[..file_name.len() - 7];
-
-            let (source_filename, copy_id) =
-                if base.len() >= 7 && base.as_bytes()[base.len() - 7] == b'.' {
-                    let id = &base[base.len() - 6..];
-                    if id.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f')) {
-                        (&base[..base.len() - 7], Some(id.to_string()))
-                    } else {
-                        (base, None)
-                    }
-                } else {
-                    (base, None)
-                };
-
+        if let Some((source_filename, copy_id)) = parse_rrdata_filename(&file_name) {
             sidecars_by_filename
-                .entry(source_filename.to_string())
+                .entry(source_filename)
                 .or_default()
                 .push(copy_id);
         } else if is_supported_image_file(&file_name) {
@@ -1018,19 +1114,7 @@ fn list_images_recursive_sync(
         }
 
         let file_name = entry_path.file_name().unwrap_or_default().to_string_lossy();
-        if let Some(base) = file_name.strip_suffix(".rrdata") {
-            let (source_filename, copy_id) =
-                if base.len() >= 7 && base.as_bytes()[base.len() - 7] == b'.' {
-                    let id = &base[base.len() - 6..];
-                    if id.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f')) {
-                        (&base[..base.len() - 7], Some(id.to_string()))
-                    } else {
-                        (base, None)
-                    }
-                } else {
-                    (base, None)
-                };
-
+        if let Some((source_filename, copy_id)) = parse_rrdata_filename(&file_name) {
             if let Some(parent) = entry_path.parent() {
                 sidecars_by_path
                     .entry(parent.join(source_filename))
@@ -3145,6 +3229,321 @@ pub async fn apply_adjustments_to_paths(
     });
 
     Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplyPresetBatchRequest {
+    paths: Vec<String>,
+    folders: Vec<String>,
+    include_subfolders: bool,
+    adjustments: Value,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PresetBatchProgress {
+    job_id: String,
+    stage: &'static str,
+    current: usize,
+    total: usize,
+    failed: usize,
+    cancelled: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresetBatchResult {
+    job_id: String,
+    applied: usize,
+    failed: usize,
+    total: usize,
+    cancelled: bool,
+}
+
+fn emit_preset_batch_progress(app_handle: &AppHandle, progress: PresetBatchProgress) {
+    let _ = app_handle.emit("preset-batch-progress", progress);
+}
+
+fn collect_preset_batch_folder_paths(
+    folders: &[String],
+    include_subfolders: bool,
+    cancellation_token: &AtomicBool,
+) -> (HashSet<String>, usize) {
+    let mut physical_images = HashSet::new();
+    let mut sidecars_by_path: HashMap<PathBuf, Vec<Option<String>>> = HashMap::new();
+    let mut failed = 0;
+
+    for folder in folders {
+        if cancellation_token.load(Ordering::Relaxed) {
+            break;
+        }
+        let folder_path = Path::new(folder);
+        if !folder_path.is_dir() {
+            failed += 1;
+            continue;
+        }
+
+        let max_depth = if include_subfolders { usize::MAX } else { 1 };
+        for entry in WalkDir::new(folder_path)
+            .min_depth(1)
+            .max_depth(max_depth)
+            .follow_links(false)
+        {
+            if cancellation_token.load(Ordering::Relaxed) {
+                break;
+            }
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(_) => {
+                    failed += 1;
+                    continue;
+                }
+            };
+            if !entry.file_type().is_file() {
+                continue;
+            }
+
+            let entry_path = entry.path();
+            let file_name = entry.file_name().to_string_lossy();
+            if let Some((source_filename, copy_id)) = parse_rrdata_filename(&file_name) {
+                if let Some(parent) = entry_path.parent() {
+                    sidecars_by_path
+                        .entry(parent.join(source_filename))
+                        .or_default()
+                        .push(copy_id);
+                }
+            } else if is_supported_image_file(entry_path.to_string_lossy().as_ref()) {
+                physical_images.insert(entry_path.to_path_buf());
+            }
+        }
+    }
+
+    let mut paths = HashSet::new();
+    for image_path in physical_images {
+        let image_path_string = image_path.to_string_lossy().into_owned();
+        match sidecars_by_path.remove(&image_path) {
+            Some(sidecars) => {
+                for copy_id in sidecars {
+                    if let Some(copy_id) = copy_id {
+                        paths.insert(format!("{image_path_string}?vc={copy_id}"));
+                    } else {
+                        paths.insert(image_path_string.clone());
+                    }
+                }
+            }
+            None => {
+                paths.insert(image_path_string);
+            }
+        }
+    }
+
+    (paths, failed)
+}
+
+fn apply_preset_adjustments_to_path(
+    path: &str,
+    adjustments: &Value,
+    settings: &AppSettings,
+    lens_db: Option<&crate::lens_correction::LensDatabase>,
+) -> Result<(), String> {
+    let (source_path, sidecar_path) = parse_virtual_path(path);
+    if !source_path.is_file() || !is_supported_image_file(source_path.to_string_lossy().as_ref()) {
+        return Err(format!(
+            "Image is unavailable or unsupported: {}",
+            source_path.display()
+        ));
+    }
+    let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    if existing_metadata.adjustments.is_null() {
+        existing_metadata.adjustments = serde_json::json!({});
+    }
+
+    let existing_map = existing_metadata
+        .adjustments
+        .as_object_mut()
+        .ok_or_else(|| format!("Invalid adjustments in {}", sidecar_path.display()))?;
+    let preset_map = adjustments
+        .as_object()
+        .ok_or_else(|| "Preset adjustments must be an object".to_string())?;
+    for (key, value) in preset_map {
+        existing_map.insert(key.clone(), value.clone());
+    }
+
+    resolve_lens_params_in_adjustments(
+        &mut existing_metadata.adjustments,
+        &existing_metadata.exif,
+        lens_db,
+    );
+    let json_string =
+        serde_json::to_string_pretty(&existing_metadata).map_err(|error| error.to_string())?;
+    fs::write(&sidecar_path, json_string)
+        .map_err(|error| format!("Failed to write {}: {error}", sidecar_path.display()))?;
+
+    if settings.enable_xmp_sync.unwrap_or(false) {
+        sync_metadata_to_xmp(
+            &source_path,
+            &existing_metadata,
+            settings.create_xmp_if_missing.unwrap_or(false),
+            !path.contains("?vc="),
+        );
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn apply_preset_batch(
+    request: ApplyPresetBatchRequest,
+    app_handle: AppHandle,
+) -> Result<PresetBatchResult, String> {
+    if !request.adjustments.is_object() {
+        return Err("Preset adjustments must be an object".to_string());
+    }
+
+    let state = app_handle.state::<AppState>();
+    let cancellation_token = {
+        let mut active_token = state.preset_batch_task_token.lock().unwrap();
+        if active_token.is_some() {
+            return Err("A preset batch is already running".to_string());
+        }
+        let token = Arc::new(AtomicBool::new(false));
+        *active_token = Some(token.clone());
+        token
+    };
+    let task_token = state.preset_batch_task_token.clone();
+    let job_id = Uuid::new_v4().to_string();
+    let task_job_id = job_id.clone();
+    let task_app_handle = app_handle.clone();
+
+    let task = tauri::async_runtime::spawn_blocking(move || {
+        emit_preset_batch_progress(
+            &task_app_handle,
+            PresetBatchProgress {
+                job_id: task_job_id.clone(),
+                stage: "discovering",
+                current: 0,
+                total: 0,
+                failed: 0,
+                cancelled: false,
+            },
+        );
+
+        let mut paths: HashSet<String> = request.paths.into_iter().collect();
+        let (folder_paths, discovery_failed) = collect_preset_batch_folder_paths(
+            &request.folders,
+            request.include_subfolders,
+            &cancellation_token,
+        );
+        paths.extend(folder_paths);
+        let mut paths: Vec<String> = paths.into_iter().collect();
+        paths.sort();
+        let total = paths.len();
+        let settings = load_settings(task_app_handle.clone()).unwrap_or_default();
+        let lens_db = task_app_handle
+            .state::<AppState>()
+            .lens_db
+            .lock()
+            .unwrap()
+            .clone();
+        let thumb_cache_dir = (total > 0)
+            .then(|| resolve_thumbnail_cache_dir(&task_app_handle))
+            .transpose()?;
+        let mut applied = 0;
+        let mut process_failed = 0;
+
+        for path in paths {
+            if cancellation_token.load(Ordering::Relaxed) {
+                break;
+            }
+            match apply_preset_adjustments_to_path(
+                &path,
+                &request.adjustments,
+                &settings,
+                lens_db.as_deref(),
+            ) {
+                Ok(()) => {
+                    applied += 1;
+                    let _ = task_app_handle.emit(
+                        "preset-batch-image-applied",
+                        serde_json::json!({ "path": path }),
+                    );
+                    if let Some((thumbnail_path, rating, is_edited)) =
+                        generate_single_thumbnail_and_cache(
+                            &path,
+                            thumb_cache_dir
+                                .as_deref()
+                                .expect("non-empty batches have a cache directory"),
+                            None,
+                            None,
+                            true,
+                            &task_app_handle,
+                            &settings,
+                        )
+                    {
+                        emit_thumbnail_generated(
+                            &task_app_handle,
+                            &path,
+                            &thumbnail_path,
+                            rating,
+                            is_edited,
+                        );
+                    }
+                }
+                Err(error) => {
+                    process_failed += 1;
+                    log::warn!("Failed to apply preset to '{}': {}", path, error);
+                }
+            }
+
+            emit_preset_batch_progress(
+                &task_app_handle,
+                PresetBatchProgress {
+                    job_id: task_job_id.clone(),
+                    stage: "applying",
+                    current: applied + process_failed,
+                    total,
+                    failed: discovery_failed + process_failed,
+                    cancelled: false,
+                },
+            );
+            thread::yield_now();
+        }
+
+        let cancelled = cancellation_token.load(Ordering::Relaxed);
+        let failed = discovery_failed + process_failed;
+        emit_preset_batch_progress(
+            &task_app_handle,
+            PresetBatchProgress {
+                job_id: task_job_id.clone(),
+                stage: "complete",
+                current: applied + process_failed,
+                total,
+                failed,
+                cancelled,
+            },
+        );
+        Ok(PresetBatchResult {
+            job_id: task_job_id,
+            applied,
+            failed,
+            total,
+            cancelled,
+        })
+    })
+    .await;
+    *task_token.lock().unwrap() = None;
+    task.map_err(|error| format!("Preset batch task failed: {error}"))?
+}
+
+#[tauri::command]
+pub fn cancel_preset_batch(app_handle: AppHandle) -> bool {
+    let state = app_handle.state::<AppState>();
+    let active_token = state.preset_batch_task_token.lock().unwrap();
+    if let Some(token) = active_token.as_ref() {
+        !token.swap(true, Ordering::Relaxed)
+    } else {
+        false
+    }
 }
 
 #[tauri::command]

@@ -19,6 +19,7 @@ import ConfirmModal from './ConfirmModal';
 import ImportSettingsModal from './ImportSettingsModal';
 import CullingModal from './CullingModal';
 import CollageModal from './CollageModal';
+import PresetBatchModal from './PresetBatchModal';
 import { AppSettings, Invokes, AlbumItem, Album, AlbumGroup } from '../ui/AppProperties';
 import { CopyPasteSettings } from '../../utils/adjustments';
 
@@ -73,6 +74,7 @@ export default function AppModals(props: AppModalsProps) {
     denoiseModalState,
     cullingModalState,
     collageModalState,
+    presetBatchModalState,
     setUI,
   } = useUIStore(
     useShallow((state) => ({
@@ -95,6 +97,7 @@ export default function AppModals(props: AppModalsProps) {
       denoiseModalState: state.denoiseModalState,
       cullingModalState: state.cullingModalState,
       collageModalState: state.collageModalState,
+      presetBatchModalState: state.presetBatchModalState,
       setUI: state.setUI,
     })),
   );
@@ -138,6 +141,15 @@ export default function AppModals(props: AppModalsProps) {
 
   return (
     <>
+      <PresetBatchModal
+        isOpen={presetBatchModalState.isOpen}
+        target={presetBatchModalState.target}
+        onClose={() =>
+          setUI((state) => ({
+            presetBatchModalState: { ...state.presetBatchModalState, isOpen: false },
+          }))
+        }
+      />
       <CopyPasteSettingsModal
         isOpen={isCopyPasteSettingsModalOpen}
         onClose={() => setUI({ isCopyPasteSettingsModalOpen: false })}
