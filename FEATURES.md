@@ -42,7 +42,10 @@ details are in `RELEASE_NOTES.MD`.
   changing it safely moves the existing catalog, with an option to restore the
   platform-default location.
 - Thumbnail-prioritized cold-folder loading with delayed, bounded, cancelable
-  background EXIF extraction.
+  background EXIF extraction. Catalog thumbnails display immediately and
+  visible Grid/Culling items are then validated against source and current
+  sidecar adjustment cache keys. Develop autosaves coalesce superseded
+  thumbnail renders so stale jobs cannot replace the latest edit.
 
 ## Develop
 

@@ -96,6 +96,8 @@ pub struct ThumbnailManager {
     pub processing_now: Mutex<HashSet<String>>,
     pub rotational_disk: AtomicBool,
     pub io_gate: Mutex<()>,
+    live_update_generation: AtomicUsize,
+    latest_live_update: Mutex<HashMap<String, usize>>,
 }
 
 impl ThumbnailManager {
@@ -106,7 +108,53 @@ impl ThumbnailManager {
             processing_now: Mutex::new(HashSet::new()),
             rotational_disk: AtomicBool::new(false),
             io_gate: Mutex::new(()),
+            live_update_generation: AtomicUsize::new(0),
+            latest_live_update: Mutex::new(HashMap::new()),
         })
+    }
+
+    pub fn begin_live_update(&self, path: &str) -> usize {
+        let generation = self
+            .live_update_generation
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            + 1;
+        self.latest_live_update
+            .lock()
+            .unwrap()
+            .insert(path.to_string(), generation);
+        generation
+    }
+
+    pub fn is_latest_live_update(&self, path: &str, generation: usize) -> bool {
+        self.latest_live_update.lock().unwrap().get(path).copied() == Some(generation)
+    }
+
+    pub fn finish_live_update(&self, path: &str, generation: usize) {
+        let mut latest = self.latest_live_update.lock().unwrap();
+        if latest.get(path).copied() == Some(generation) {
+            latest.remove(path);
+        }
+    }
+}
+
+#[cfg(test)]
+mod thumbnail_manager_tests {
+    use super::ThumbnailManager;
+
+    #[test]
+    fn only_the_latest_live_thumbnail_update_can_publish() {
+        let manager = ThumbnailManager::new();
+        let first = manager.begin_live_update("image.raw");
+        let second = manager.begin_live_update("image.raw");
+
+        assert!(!manager.is_latest_live_update("image.raw", first));
+        assert!(manager.is_latest_live_update("image.raw", second));
+
+        manager.finish_live_update("image.raw", first);
+        assert!(manager.is_latest_live_update("image.raw", second));
+
+        manager.finish_live_update("image.raw", second);
+        assert!(!manager.is_latest_live_update("image.raw", second));
     }
 }
 

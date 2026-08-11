@@ -9,7 +9,6 @@ import { useLibraryStore } from '../../../store/useLibraryStore';
 import { LibraryViewMode, SortDirection, LibraryDisplayMode } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
-import { useProcessStore } from '../../../store/useProcessStore';
 import { ExifOverlay } from '../../ui/AppProperties';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 
@@ -258,7 +257,6 @@ export default function LibraryGrid(props: any) {
   const queueThumbnailRequest = useCallback(
     (path: string) => {
       if (!onRequestThumbnails) return;
-      if (useProcessStore.getState().thumbnails[path]) return;
       requestQueueRef.current.add(path);
       if (!requestTimeoutRef.current) {
         requestTimeoutRef.current = setTimeout(() => {

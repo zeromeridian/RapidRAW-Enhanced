@@ -5,6 +5,36 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.16-fix-app-optimization — 2026-08-11
+
+### Non-blocking thumbnail validation during folder scans
+
+- Removed the renderer-wide thumbnail-cache invalidation introduced in 1.2.15,
+  which could turn stale-folder validation into a large concurrent thumbnail
+  rebuild while background scanning was already active.
+- Existing catalog thumbnails remain immediately available and visible items
+  are checked using their established source-and-sidecar cache identity, so
+  unchanged thumbnails remain inexpensive cache hits.
+- Develop thumbnail autosaves remain coalesced and latest-only, preserving the
+  stale-thumbnail correction without allowing obsolete jobs to overwrite the
+  newest edit.
+
+## 1.2.15-fix-app-optimization — 2026-08-11
+
+### Accurate, responsive Library thumbnails
+
+- Catalog thumbnails still appear immediately, then visible Grid and Culling
+  items are validated against the current image and sidecar adjustments in the
+  background.
+- A versioned thumbnail-cache identity replaces thumbnails produced by older
+  rendering code without invalidating or eagerly rebuilding an entire large
+  library.
+- Develop autosaves now coalesce thumbnail work per image, skip superseded
+  renders, and prevent an older render from replacing the newest thumbnail.
+- The changes reduce redundant processing while preserving edits, sidecars,
+  catalog persistence, and responsive navigation on Ubuntu, macOS ARM, and
+  Windows x64.
+
 ## 1.2.14-fix-app-optimization — 2026-08-10
 
 ### Lens correction in the Develop sidebar
