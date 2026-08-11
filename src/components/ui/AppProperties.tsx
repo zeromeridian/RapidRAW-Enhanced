@@ -131,6 +131,7 @@ export enum Panel {
   Crop = 'crop',
   Export = 'export',
   Geometry = 'geometry',
+  LensCorrection = 'lensCorrection',
   Masks = 'masks',
   Metadata = 'metadata',
   Presets = 'presets',

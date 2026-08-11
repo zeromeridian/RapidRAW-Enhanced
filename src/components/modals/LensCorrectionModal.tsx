@@ -84,6 +84,7 @@ interface LensParams {
 }
 
 interface LensCorrectionModalProps {
+  inline?: boolean;
   isOpen: boolean;
   onClose(): void;
   onApply(newParams: LensParams): void;
@@ -103,6 +104,19 @@ const DEFAULT_PARAMS: LensParams = {
   lensVignetteEnabled: true,
   lensDistortionParams: null,
 };
+
+const lensParamsFromAdjustments = (adjustments: Adjustments): LensParams => ({
+  lensCorrectionMode: adjustments.lensCorrectionMode || 'manual',
+  lensMaker: adjustments.lensMaker,
+  lensModel: adjustments.lensModel,
+  lensDistortionAmount: adjustments.lensDistortionAmount ?? 100,
+  lensVignetteAmount: adjustments.lensVignetteAmount ?? 100,
+  lensTcaAmount: adjustments.lensTcaAmount ?? 100,
+  lensDistortionEnabled: adjustments.lensDistortionEnabled ?? true,
+  lensTcaEnabled: adjustments.lensTcaEnabled ?? true,
+  lensVignetteEnabled: adjustments.lensVignetteEnabled ?? true,
+  lensDistortionParams: adjustments.lensDistortionParams,
+});
 
 const parseFocalLength = (exif: any): number | null => {
   if (!exif || !exif.FocalLength) return null;
@@ -125,6 +139,7 @@ const parseDistance = (exif: any): number | null => {
 const SLIDER_DIVISOR = 100.0;
 
 export default function LensCorrectionModal({
+  inline = false,
   isOpen,
   onClose,
   onApply,
@@ -296,6 +311,18 @@ export default function LensCorrectionModal({
     [currentAdjustments],
   );
 
+  const updateParams = useCallback(
+    (newParams: LensParams) => {
+      setParams(newParams);
+      if (inline) {
+        onApply(newParams);
+      } else {
+        updatePreview(newParams);
+      }
+    },
+    [inline, onApply, updatePreview],
+  );
+
   useEffect(() => {
     if (isOpen) {
       setIsMounted(true);
@@ -307,23 +334,12 @@ export default function LensCorrectionModal({
         }
       });
 
-      const initParams: LensParams = {
-        lensCorrectionMode: currentAdjustments.lensCorrectionMode || 'manual',
-        lensMaker: currentAdjustments.lensMaker,
-        lensModel: currentAdjustments.lensModel,
-        lensDistortionAmount: currentAdjustments.lensDistortionAmount ?? 100,
-        lensVignetteAmount: currentAdjustments.lensVignetteAmount ?? 100,
-        lensTcaAmount: currentAdjustments.lensTcaAmount ?? 100,
-        lensDistortionEnabled: currentAdjustments.lensDistortionEnabled ?? true,
-        lensTcaEnabled: currentAdjustments.lensTcaEnabled ?? true,
-        lensVignetteEnabled: currentAdjustments.lensVignetteEnabled ?? true,
-        lensDistortionParams: currentAdjustments.lensDistortionParams,
-      };
+      const initParams = lensParamsFromAdjustments(currentAdjustments);
 
       setParams(initParams);
       setDetectionStatus('idle');
       handleResetZoom();
-      updatePreview(initParams);
+      if (!inline) updatePreview(initParams);
 
       invoke('get_lensfun_makers')
         .then((m: any) => setMakers(m))
@@ -345,7 +361,25 @@ export default function LensCorrectionModal({
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, currentAdjustments]);
+  }, [isOpen, inline, selectedImage?.path]);
+
+  useEffect(() => {
+    if (!inline || !isOpen) return;
+    setParams(lensParamsFromAdjustments(currentAdjustments));
+  }, [
+    inline,
+    isOpen,
+    currentAdjustments.lensCorrectionMode,
+    currentAdjustments.lensMaker,
+    currentAdjustments.lensModel,
+    currentAdjustments.lensDistortionAmount,
+    currentAdjustments.lensVignetteAmount,
+    currentAdjustments.lensTcaAmount,
+    currentAdjustments.lensDistortionEnabled,
+    currentAdjustments.lensTcaEnabled,
+    currentAdjustments.lensVignetteEnabled,
+    currentAdjustments.lensDistortionParams,
+  ]);
 
   const handleMakerChange = (maker: string) => {
     const newParams = {
@@ -354,27 +388,24 @@ export default function LensCorrectionModal({
       lensModel: null,
       lensDistortionParams: null,
     };
-    setParams(newParams);
+    updateParams(newParams);
     setLenses([]);
     setDetectionStatus('idle');
 
     invoke('get_lensfun_lenses_for_maker', { maker })
       .then((l: any) => setLenses(l))
       .catch(console.error);
-
-    updatePreview(newParams);
   };
 
   const handleModelChange = async (model: string) => {
     const tempParams = { ...params, lensModel: model };
-    setParams(tempParams);
+    updateParams(tempParams);
     setDetectionStatus('idle');
 
     if (params.lensMaker) {
       const distortionParams = await fetchDistortionParams(params.lensMaker, model);
       const finalParams = { ...tempParams, lensDistortionParams: distortionParams };
-      setParams(finalParams);
-      updatePreview(finalParams);
+      updateParams(finalParams);
     }
   };
 
@@ -385,7 +416,7 @@ export default function LensCorrectionModal({
     if (!selected) return;
 
     const tempParams = { ...params, lensMaker: selected.maker, lensModel: selected.model };
-    setParams(tempParams);
+    updateParams(tempParams);
     setDetectionStatus('idle');
 
     invoke('get_lensfun_lenses_for_maker', { maker: selected.maker })
@@ -394,23 +425,20 @@ export default function LensCorrectionModal({
 
     const distortionParams = await fetchDistortionParams(selected.maker, selected.model);
     const finalParams = { ...tempParams, lensDistortionParams: distortionParams };
-    setParams(finalParams);
-    updatePreview(finalParams);
+    updateParams(finalParams);
   };
 
   const handleAmountChange = (key: keyof LensParams, amount: number) => {
     const newParams = { ...params, [key]: amount };
-    setParams(newParams);
-    updatePreview(newParams);
+    updateParams(newParams);
   };
 
   const handleToggleChange = (key: keyof LensParams, val: boolean) => {
     const newParams = { ...params, [key]: val };
-    setParams(newParams);
-    updatePreview(newParams);
+    updateParams(newParams);
   };
 
-  const handleAutoDetect = async () => {
+  const handleAutoDetect = async (baseParams?: LensParams) => {
     if (!selectedImage?.exif) {
       setDetectionStatus('not_found');
       return;
@@ -439,12 +467,13 @@ export default function LensCorrectionModal({
 
         setParams((prev) => {
           const newParams = {
-            ...prev,
+            ...(baseParams ?? prev),
             lensMaker: detectedMaker,
             lensModel: detectedModel,
             lensDistortionParams: distortionParams,
           };
-          updatePreview(newParams);
+          if (inline) onApply(newParams);
+          else updatePreview(newParams);
           return newParams;
         });
 
@@ -456,12 +485,13 @@ export default function LensCorrectionModal({
       } else {
         setParams((prev) => {
           const clearedParams = {
-            ...prev,
+            ...(baseParams ?? prev),
             lensMaker: null,
             lensModel: null,
             lensDistortionParams: null,
           };
-          updatePreview(clearedParams);
+          if (inline) onApply(clearedParams);
+          else updatePreview(clearedParams);
           return clearedParams;
         });
         setDetectionStatus('not_found');
@@ -485,10 +515,9 @@ export default function LensCorrectionModal({
       lensTcaEnabled: true,
       lensVignetteEnabled: true,
     };
-    setParams(resetParams);
+    updateParams(resetParams);
     setLenses([]);
     setDetectionStatus('idle');
-    updatePreview(resetParams);
   };
 
   const toggleCompare = (active: boolean) => {
@@ -580,17 +609,20 @@ export default function LensCorrectionModal({
 
   const handleModeChange = (mode: 'auto' | 'manual') => {
     const newParams = { ...params, lensCorrectionMode: mode };
-    setParams(newParams);
+    updateParams(newParams);
 
     if (mode === 'auto') {
-      handleAutoDetect();
-    } else {
-      updatePreview(newParams);
+      handleAutoDetect(newParams);
     }
   };
 
   const renderControls = () => (
-    <div className="modal-adjustments-pane w-80 shrink-0 bg-bg-secondary flex flex-col border-l border-surface h-full z-10">
+    <div
+      className={clsx(
+        'modal-adjustments-pane bg-bg-secondary flex flex-col h-full z-10',
+        inline ? 'w-full' : 'w-80 shrink-0 border-l border-surface',
+      )}
+    >
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
         <Text variant={TextVariants.title}>{t('modals.lensCorrection.title')}</Text>
         <button
@@ -961,6 +993,8 @@ export default function LensCorrectionModal({
   );
 
   if (!isMounted) return null;
+
+  if (inline) return renderControls();
 
   return (
     <div

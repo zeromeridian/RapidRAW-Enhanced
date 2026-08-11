@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.14-fix-app-optimization — 2026-08-10
+
+### Lens correction in the Develop sidebar
+
+- Lens correction now has its own Develop-sidebar icon instead of opening a
+  modal from Geometry.
+- Auto detection, manual profile selection, correction toggles, amounts, and
+  reset controls now update the full Develop image directly.
+- Lens-correction settings, including Auto mode, are saved in Tool and Style
+  presets independently of the optional crop/transform preset setting.
+- The sidebar implementation retains Lensfun profile detection and works with
+  the existing cross-platform image-processing and sidecar pipeline on Ubuntu,
+  macOS ARM, and Windows x64.
+
 ## 1.2.13-fix-app-optimization — 2026-08-10
 
 ### Background preset application for images and folders

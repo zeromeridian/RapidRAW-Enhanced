@@ -911,6 +911,8 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         TransformAdjustment.TransformConstrainCrop,
       ],
     },
+  ],
+  lensCorrection: [
     {
       label: 'modals.copyPaste.groups.lensCorrection',
       keys: [

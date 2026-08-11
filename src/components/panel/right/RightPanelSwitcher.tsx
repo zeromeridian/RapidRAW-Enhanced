@@ -8,6 +8,7 @@ import {
   SwatchBook,
   FileInput,
   Scan,
+  Aperture,
   Tag,
   type LucideIcon,
 } from 'lucide-react';
@@ -33,6 +34,7 @@ const panelGroups: Array<Array<PanelOptions>> = [
     { id: Panel.Adjustments, icon: SlidersHorizontal, title: 'editor.switcher.tooltips.adjust' },
     { id: Panel.Crop, icon: Crop, title: 'editor.switcher.tooltips.crop' },
     { id: Panel.Geometry, icon: Scan, title: 'editor.switcher.tooltips.geometry' },
+    { id: Panel.LensCorrection, icon: Aperture, title: 'editor.crop.tooltips.lens' },
     { id: Panel.Masks, icon: Layers, title: 'editor.switcher.tooltips.masks' },
     { id: Panel.Ai, icon: Paintbrush, title: 'editor.switcher.tooltips.inpaint' },
   ],

@@ -11,6 +11,7 @@ import Controls from '../panel/right/ControlsPanel';
 import MetadataPanel from '../panel/right/MetadataPanel';
 import CropPanel from '../panel/right/CropPanel';
 import GeometryPanel from '../panel/right/GeometryPanel';
+import LensCorrectionPanel from '../panel/right/LensCorrectionPanel';
 import TaggingPanel from '../panel/right/TaggingPanel';
 import MasksPanel from '../panel/right/MasksPanel';
 import AIPanel from '../panel/right/AIPanel';
@@ -239,6 +240,7 @@ export default function EditorView({
             {renderedRightPanel === Panel.Metadata && <MetadataPanel />}
             {renderedRightPanel === Panel.Crop && <CropPanel />}
             {renderedRightPanel === Panel.Geometry && <GeometryPanel />}
+            {renderedRightPanel === Panel.LensCorrection && <LensCorrectionPanel />}
             {renderedRightPanel === Panel.Masks && <MasksPanel />}
             {renderedRightPanel === Panel.Presets && (
               <PresetsPanel

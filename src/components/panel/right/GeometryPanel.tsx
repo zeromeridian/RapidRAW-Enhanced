@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Aperture, Building2, Minus, MoveDiagonal2, RotateCcw, Scan, WandSparkles } from 'lucide-react';
+import { Building2, Minus, MoveDiagonal2, RotateCcw, Scan, WandSparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 
-import LensCorrectionModal from '../../modals/LensCorrectionModal';
 import GuidedTransformModal from '../../modals/GuidedTransformModal';
 import TransformModal from '../../modals/TransformModal';
 import Switch from '../../ui/Switch';
@@ -22,7 +21,6 @@ export default function GeometryPanel() {
   const adjustments = useEditorStore((state) => state.adjustments);
   const { setAdjustments } = useEditorActions();
   const [isTransformModalOpen, setIsTransformModalOpen] = useState(false);
-  const [isLensModalOpen, setIsLensModalOpen] = useState(false);
   const [isGuidedModalOpen, setIsGuidedModalOpen] = useState(false);
   const [analyzingGeometry, setAnalyzingGeometry] = useState<'auto' | 'level' | 'vertical' | null>(null);
   const hasAppliedGuidedTransform =
@@ -158,16 +156,6 @@ export default function GeometryPanel() {
                 <span className="text-xs mt-2">{t('adjustments.basic.reset')}</span>
               </motion.button>
               <motion.button
-                className={`${buttonClass} bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary`}
-                onClick={() => setIsLensModalOpen(true)}
-                data-tooltip={t('editor.crop.tooltips.lens')}
-                whileTap={{ scale: 0.98 }}
-                type="button"
-              >
-                <Aperture size={20} />
-                <span className="text-xs mt-2">{t('editor.crop.labels.lens')}</span>
-              </motion.button>
-              <motion.button
                 className={clsx(
                   buttonClass,
                   adjustments.transformAutoMode === 'level'
@@ -251,19 +239,6 @@ export default function GeometryPanel() {
           }));
         }}
         currentAdjustments={adjustments}
-      />
-
-      <LensCorrectionModal
-        isOpen={isLensModalOpen}
-        onClose={() => setIsLensModalOpen(false)}
-        onApply={(parameters) =>
-          setAdjustments((previous: Adjustments) => ({
-            ...previous,
-            ...parameters,
-          }))
-        }
-        currentAdjustments={adjustments}
-        selectedImage={selectedImage}
       />
     </div>
   );

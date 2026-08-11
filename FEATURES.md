@@ -50,7 +50,7 @@ details are in `RELEASE_NOTES.MD`.
   perspective work. Geometry includes full **Auto** correction that jointly
   balances rotation and both perspective axes, focused **Level** and
   **Vertical** correction, pair-based **Guided Transform**, editable **Manual Transform**
-  controls, lens correction, and a persistent **Constrain Crop** option. Guided
+  controls, and a persistent **Constrain Crop** option. Guided
   Transform operates directly on the full Develop image while its controls
   occupy the Geometry panel. Thin blue lines provide precise placement without
   visible endpoint markers, while enlarged invisible endpoint targets preserve
@@ -67,6 +67,11 @@ details are in `RELEASE_NOTES.MD`.
   contrast and line-length analysis recognizes shorter, lower-contrast
   structures, while robust grouped-line perspective estimation handles both
   parallel and converging architectural edges.
+- A dedicated **Lens Correction** sidebar module applies Auto detection or a
+  manually selected Lensfun profile directly to the full Develop image, with
+  independent distortion, chromatic-aberration, and vignetting controls. Lens
+  settings, including Auto mode, persist in Tool and Style presets without
+  requiring crop and transform data to be included.
 - The Masking module presents every mask source directly, without an additional
   **Others** submenu.
 - A dedicated **Tagging** module adds and removes tags across the current image

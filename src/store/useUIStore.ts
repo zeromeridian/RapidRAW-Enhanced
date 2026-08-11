@@ -6,6 +6,7 @@ const RIGHT_PANEL_ORDER = [
   Panel.Adjustments,
   Panel.Crop,
   Panel.Geometry,
+  Panel.LensCorrection,
   Panel.Masks,
   Panel.Ai,
   Panel.Tagging,
