@@ -1018,7 +1018,6 @@ export default function CullingView(props: any) {
   const queueThumbnailRequest = useCallback(
     (path: string) => {
       if (!onRequestThumbnails) return;
-      if (useProcessStore.getState().thumbnails[path]) return;
       requestQueueRef.current.add(path);
       if (!requestTimeoutRef.current) {
         requestTimeoutRef.current = setTimeout(() => {

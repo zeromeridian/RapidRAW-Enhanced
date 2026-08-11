@@ -3083,11 +3083,25 @@ pub fn save_metadata_and_update_thumbnail(
     let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
     let app_handle_clone = app_handle.clone();
     let path_clone = path.clone();
+    let live_update_generation = state.thumbnail_manager.begin_live_update(&path);
 
     add_to_thumbnail_queue(&state, 1, &app_handle);
 
     thread::spawn(move || {
         let state = app_handle_clone.state::<AppState>();
+
+        // Slider changes can autosave faster than a thumbnail can be rendered.
+        // Briefly coalesce them and let only the newest update for this image
+        // consume rendering resources or publish a grid thumbnail.
+        thread::sleep(std::time::Duration::from_millis(250));
+        if !state
+            .thumbnail_manager
+            .is_latest_live_update(&path_clone, live_update_generation)
+        {
+            increment_thumbnail_progress(&state, &app_handle_clone);
+            return;
+        }
+
         let settings = load_settings(app_handle_clone.clone()).unwrap_or_default();
 
         let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle_clone) {
@@ -3099,6 +3113,9 @@ pub fn save_metadata_and_update_thumbnail(
                     e
                 );
                 emit_thumbnail_cache_setup_error(&app_handle_clone, &path_clone, &e);
+                state
+                    .thumbnail_manager
+                    .finish_live_update(&path_clone, live_update_generation);
                 increment_thumbnail_progress(&state, &app_handle_clone);
                 return;
             }
@@ -3114,7 +3131,11 @@ pub fn save_metadata_and_update_thumbnail(
             &settings,
         );
 
-        if let Some((thumbnail_path, rating, is_edited)) = result {
+        if state
+            .thumbnail_manager
+            .is_latest_live_update(&path_clone, live_update_generation)
+            && let Some((thumbnail_path, rating, is_edited)) = result
+        {
             emit_thumbnail_generated(
                 &app_handle_clone,
                 &path_clone,
@@ -3123,6 +3144,10 @@ pub fn save_metadata_and_update_thumbnail(
                 is_edited,
             );
         }
+
+        state
+            .thumbnail_manager
+            .finish_live_update(&path_clone, live_update_generation);
 
         increment_thumbnail_progress(&state, &app_handle_clone);
     });
