@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.17-fix-lint-error — 2026-08-11
+
+### CI lint reliability
+
+- Fixed all Rust diagnostics reported by the strict all-targets, all-features
+  Clippy workflow with warnings treated as errors.
+- Kept the thumbnail concurrency test at the end of its module and simplified
+  equivalent migration and background-indexing control flow without changing
+  runtime behavior.
+
 ## 1.2.16-fix-app-optimization — 2026-08-11
 
 ### Non-blocking thumbnail validation during folder scans

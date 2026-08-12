@@ -404,13 +404,13 @@ pub async fn start_background_indexing(
                     // has visible thumbnail work so navigation gets the next
                     // available CPU/GPU and filesystem capacity.
                     loop {
-                        let app_state = app_handle_inner.state::<AppState>();
-                        let has_foreground_thumbnails =
-                            !app_state.thumbnail_manager.queue.lock().unwrap().is_empty();
+                        let has_foreground_thumbnails = {
+                            let app_state = app_handle_inner.state::<AppState>();
+                            !app_state.thumbnail_manager.queue.lock().unwrap().is_empty()
+                        };
                         if !has_foreground_thumbnails {
                             break;
                         }
-                        drop(app_state);
                         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
                     }
 
