@@ -137,27 +137,6 @@ impl ThumbnailManager {
     }
 }
 
-#[cfg(test)]
-mod thumbnail_manager_tests {
-    use super::ThumbnailManager;
-
-    #[test]
-    fn only_the_latest_live_thumbnail_update_can_publish() {
-        let manager = ThumbnailManager::new();
-        let first = manager.begin_live_update("image.raw");
-        let second = manager.begin_live_update("image.raw");
-
-        assert!(!manager.is_latest_live_update("image.raw", first));
-        assert!(manager.is_latest_live_update("image.raw", second));
-
-        manager.finish_live_update("image.raw", first);
-        assert!(manager.is_latest_live_update("image.raw", second));
-
-        manager.finish_live_update("image.raw", second);
-        assert!(!manager.is_latest_live_update("image.raw", second));
-    }
-}
-
 pub struct PendingMetadata {
     pub virtual_path: String,
     pub image_path: PathBuf,
@@ -219,4 +198,25 @@ pub struct AppState {
     pub metadata_manager: Arc<MetadataManager>,
     pub disks_cache: Mutex<Option<Disks>>,
     pub disks_cache_refreshing: AtomicBool,
+}
+
+#[cfg(test)]
+mod thumbnail_manager_tests {
+    use super::ThumbnailManager;
+
+    #[test]
+    fn only_the_latest_live_thumbnail_update_can_publish() {
+        let manager = ThumbnailManager::new();
+        let first = manager.begin_live_update("image.raw");
+        let second = manager.begin_live_update("image.raw");
+
+        assert!(!manager.is_latest_live_update("image.raw", first));
+        assert!(manager.is_latest_live_update("image.raw", second));
+
+        manager.finish_live_update("image.raw", first);
+        assert!(manager.is_latest_live_update("image.raw", second));
+
+        manager.finish_live_update("image.raw", second);
+        assert!(!manager.is_latest_live_update("image.raw", second));
+    }
 }

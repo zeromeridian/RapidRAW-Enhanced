@@ -90,11 +90,11 @@ pub fn migrate_from_previous_identifier(app_handle: &AppHandle) -> Result<(), St
         }
 
         let mut settings = crate::app_settings::load_settings(app_handle.clone())?;
-        if let Some(configured_directory) = settings.catalog_directory.as_deref() {
-            if let Some(remapped) = remap_path(Path::new(configured_directory), &directory_pairs) {
-                settings.catalog_directory = Some(remapped.to_string_lossy().into_owned());
-                crate::app_settings::save_settings(settings, app_handle.clone())?;
-            }
+        if let Some(configured_directory) = settings.catalog_directory.as_deref()
+            && let Some(remapped) = remap_path(Path::new(configured_directory), &directory_pairs)
+        {
+            settings.catalog_directory = Some(remapped.to_string_lossy().into_owned());
+            crate::app_settings::save_settings(settings, app_handle.clone())?;
         }
 
         fs::write(
@@ -129,12 +129,12 @@ fn migrate_cache_in_background(app_handle: AppHandle, app_data: PathBuf) {
             copy_directory_contents(&old_cache, &new_cache)?;
 
             let mut settings = crate::app_settings::load_settings(app_handle.clone())?;
-            if let Some(configured_directory) = settings.catalog_directory.as_deref() {
-                if let Ok(relative) = Path::new(configured_directory).strip_prefix(&old_cache) {
-                    settings.catalog_directory =
-                        Some(new_cache.join(relative).to_string_lossy().into_owned());
-                    crate::app_settings::save_settings(settings, app_handle.clone())?;
-                }
+            if let Some(configured_directory) = settings.catalog_directory.as_deref()
+                && let Ok(relative) = Path::new(configured_directory).strip_prefix(&old_cache)
+            {
+                settings.catalog_directory =
+                    Some(new_cache.join(relative).to_string_lossy().into_owned());
+                crate::app_settings::save_settings(settings, app_handle.clone())?;
             }
 
             crate::library_catalog::rebase_thumbnail_paths(&app_handle, &old_cache, &new_cache)?;
