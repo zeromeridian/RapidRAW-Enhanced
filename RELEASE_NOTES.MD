@@ -5,6 +5,18 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.19-fix-responsiveness — 2026-08-14
+
+### Responsive live histogram and waveform
+
+- Histogram and waveform feedback now refreshes periodically while Develop
+  sliders are dragged instead of waiting exclusively for release.
+- Analytics refresh automatically slows when preview rendering is expensive,
+  avoids building an analytics backlog, and keeps the visible image preview as
+  the priority.
+- Releasing a slider still triggers the exact full-quality preview, histogram,
+  and waveform result.
+
 ## 1.2.18-fix-responsiveness — 2026-08-14
 
 ### Faster Develop slider response

@@ -1144,6 +1144,7 @@ fn process_preview_job(
     is_interactive: bool,
     target_resolution: Option<u32>,
     roi: Option<(f32, f32, f32, f32)>,
+    compute_analytics: bool,
     compute_waveform: bool,
     active_waveform_channel: Option<&str>,
 ) -> Result<Vec<u8>, String> {
@@ -1297,7 +1298,7 @@ fn process_preview_job(
     let lut_path = adjustments_clone["lutPath"].as_str();
     let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
 
-    let wants_analytics = !is_interactive;
+    let wants_analytics = !is_interactive || compute_analytics;
     let channel_filter = if is_interactive {
         active_waveform_channel.map(|s| s.to_string())
     } else {
@@ -1481,6 +1482,7 @@ fn start_preview_worker(app_handle: tauri::AppHandle) {
                 job.is_interactive,
                 job.target_resolution,
                 job.roi,
+                job.compute_analytics,
                 job.compute_waveform,
                 job.active_waveform_channel.as_deref(),
             ) {
@@ -1495,14 +1497,21 @@ fn start_preview_worker(app_handle: tauri::AppHandle) {
     });
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PreviewAnalyticsOptions {
+    compute_analytics: bool,
+    compute_waveform: bool,
+    active_waveform_channel: Option<String>,
+}
+
 #[tauri::command]
 async fn apply_adjustments(
     js_adjustments: serde_json::Value,
     is_interactive: bool,
     target_resolution: Option<u32>,
     roi: Option<(f32, f32, f32, f32)>,
-    compute_waveform: bool,
-    active_waveform_channel: Option<String>,
+    analytics_options: PreviewAnalyticsOptions,
     state: tauri::State<'_, AppState>,
 ) -> Result<Response, String> {
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -1515,8 +1524,9 @@ async fn apply_adjustments(
                 is_interactive,
                 target_resolution,
                 roi,
-                compute_waveform,
-                active_waveform_channel,
+                compute_analytics: analytics_options.compute_analytics,
+                compute_waveform: analytics_options.compute_waveform,
+                active_waveform_channel: analytics_options.active_waveform_channel,
                 responder: tx,
             };
             worker_tx

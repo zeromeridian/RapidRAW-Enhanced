@@ -10,6 +10,10 @@ import { Invokes, Panel } from '../components/ui/AppProperties';
 import { debouncedSave } from './useEditorActions';
 import { globalImageCache } from '../utils/ImageLRUCache';
 
+const INTERACTIVE_ANALYTICS_MIN_INTERVAL_MS = 250;
+const INTERACTIVE_ANALYTICS_MAX_INTERVAL_MS = 1000;
+const INTERACTIVE_ANALYTICS_RENDER_COST_MULTIPLIER = 4;
+
 export function useImageProcessing(
   transformWrapperRef: any,
   prevAdjustmentsRef: React.RefObject<any>,
@@ -46,13 +50,25 @@ export function useImageProcessing(
   } | null>(null);
   const currentOriginalResRef = useRef<number>(0);
   const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastInteractiveAnalyticsAtRef = useRef(0);
+  const lastInteractiveRenderDurationRef = useRef(0);
+  const wasSliderDraggingRef = useRef(false);
   const activeWaveformChannelRef = useRef(activeWaveformChannel);
   activeWaveformChannelRef.current = activeWaveformChannel;
 
   const selectedImagePathRef = useRef<string | null>(null);
   useEffect(() => {
     selectedImagePathRef.current = selectedImage?.path ?? null;
+    lastInteractiveAnalyticsAtRef.current = 0;
+    lastInteractiveRenderDurationRef.current = 0;
   }, [selectedImage?.path]);
+
+  useEffect(() => {
+    if (isSliderDragging && !wasSliderDraggingRef.current) {
+      lastInteractiveAnalyticsAtRef.current = performance.now();
+    }
+    wasSliderDraggingRef.current = isSliderDragging;
+  }, [isSliderDragging]);
 
   const geometricAdjustmentsKey = useMemo(() => {
     if (!adjustments) return '';
@@ -123,9 +139,15 @@ export function useImageProcessing(
   }, [baseRenderSize, transformWrapperRef]);
 
   const executeApplyAdjustments = useCallback(
-    async (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
+    async (
+      currentAdjustments: Adjustments,
+      dragging: boolean = false,
+      targetRes?: number,
+      computeInteractiveAnalytics: boolean = false,
+    ) => {
       const currentPath = selectedImage?.path;
       if (!currentPath) return;
+      const renderStartedAt = performance.now();
 
       const payload = structuredClone(currentAdjustments);
       const { patchesSentToBackend } = useEditorStore.getState();
@@ -181,8 +203,11 @@ export function useImageProcessing(
           isInteractive: dragging,
           targetResolution: targetRes || null,
           roi: roi || null,
-          computeWaveform: !!isWaveformVisible,
-          activeWaveformChannel: activeWaveformChannelRef.current || null,
+          analyticsOptions: {
+            computeAnalytics: computeInteractiveAnalytics,
+            computeWaveform: !!isWaveformVisible,
+            activeWaveformChannel: activeWaveformChannelRef.current || null,
+          },
         });
 
         if (newlySentPatches.size > 0) {
@@ -269,6 +294,10 @@ export function useImageProcessing(
             return { interactivePatch: null };
           });
         }
+      } finally {
+        if (dragging) {
+          lastInteractiveRenderDurationRef.current = performance.now() - renderStartedAt;
+        }
       }
     },
     [selectedImage?.path, calculateROI, isWaveformVisible, setEditor, previewJobIdRef, latestRenderedJobIdRef],
@@ -283,7 +312,20 @@ export function useImageProcessing(
 
     isApplyInFlightRef.current = true;
 
-    executeApplyAdjustments(adjustments, dragging, targetRes).finally(() => {
+    const now = performance.now();
+    const analyticsInterval = Math.min(
+      INTERACTIVE_ANALYTICS_MAX_INTERVAL_MS,
+      Math.max(
+        INTERACTIVE_ANALYTICS_MIN_INTERVAL_MS,
+        lastInteractiveRenderDurationRef.current * INTERACTIVE_ANALYTICS_RENDER_COST_MULTIPLIER,
+      ),
+    );
+    const computeInteractiveAnalytics = dragging && now - lastInteractiveAnalyticsAtRef.current >= analyticsInterval;
+    if (computeInteractiveAnalytics) {
+      lastInteractiveAnalyticsAtRef.current = now;
+    }
+
+    executeApplyAdjustments(adjustments, dragging, targetRes, computeInteractiveAnalytics).finally(() => {
       isApplyInFlightRef.current = false;
       if (pendingApplyRef.current) {
         requestAnimationFrame(() => flushPipeline());
