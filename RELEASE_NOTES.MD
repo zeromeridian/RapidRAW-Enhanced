@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.18-fix-responsiveness — 2026-08-14
+
+### Faster Develop slider response
+
+- Coalesced rapid slider movements to the display refresh cycle while always
+  applying the exact final value when dragging ends.
+- Changed preview scheduling to keep only the newest pending adjustment instead
+  of queuing obsolete intermediate frames behind the visible result.
+- Improved the default interactive preview path with a temporary resolution
+  reduction and deferred histogram/waveform analysis during active dragging;
+  the full-quality preview and analytics still refresh immediately afterward.
+- Removed the additional post-adjustment delay before the final Develop preview
+  is requested.
+
 ## 1.2.17-fix-lint-error — 2026-08-11
 
 ### CI lint reliability

@@ -51,6 +51,9 @@ const Slider = ({
   const [displayValue, setDisplayValue] = useState<number>(value);
   const [isDragging, setIsDragging] = useState(false);
   const animationFrameRef = useRef<number | undefined>(undefined);
+  const changeFrameRef = useRef<number | undefined>(undefined);
+  const pendingChangeValueRef = useRef<number | null>(null);
+  const lastEmittedValueRef = useRef<number>(value);
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState<string>(String(value));
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -99,16 +102,49 @@ const Slider = ({
   );
 
   const onChangeRef = useRef(onChange);
+  const onDragStateChangeRef = useRef(onDragStateChange);
   const snapToStepRef = useRef(snapToStep);
   const rangeRef = useRef({ min, max });
 
   onChangeRef.current = onChange;
+  onDragStateChangeRef.current = onDragStateChange;
   snapToStepRef.current = snapToStep;
   rangeRef.current = { min, max };
 
-  useEffect(() => {
-    onDragStateChange(isDragging);
-  }, [isDragging, onDragStateChange]);
+  const emitPendingChange = useCallback(() => {
+    changeFrameRef.current = undefined;
+    const pendingValue = pendingChangeValueRef.current;
+    pendingChangeValueRef.current = null;
+    if (pendingValue === null || pendingValue === lastEmittedValueRef.current) return;
+
+    lastEmittedValueRef.current = pendingValue;
+    onChangeRef.current({ target: { value: pendingValue } });
+  }, []);
+
+  const scheduleChange = useCallback(
+    (nextValue: number) => {
+      pendingChangeValueRef.current = nextValue;
+      if (changeFrameRef.current === undefined) {
+        changeFrameRef.current = requestAnimationFrame(emitPendingChange);
+      }
+    },
+    [emitPendingChange],
+  );
+
+  const beginDragging = useCallback(() => {
+    onDragStateChangeRef.current(true);
+    setIsDragging(true);
+  }, []);
+
+  const endDragging = useCallback(() => {
+    if (changeFrameRef.current !== undefined) {
+      cancelAnimationFrame(changeFrameRef.current);
+      changeFrameRef.current = undefined;
+    }
+    emitPendingChange();
+    onDragStateChangeRef.current(false);
+    setIsDragging(false);
+  }, [emitPendingChange]);
 
   useEffect(() => {
     if (!disabled) return;
@@ -125,7 +161,13 @@ const Slider = ({
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = undefined;
     }
+    if (changeFrameRef.current !== undefined) {
+      cancelAnimationFrame(changeFrameRef.current);
+      changeFrameRef.current = undefined;
+    }
+    pendingChangeValueRef.current = null;
 
+    onDragStateChangeRef.current(false);
     setIsDragging(false);
     setIsEditing(false);
     setIsLabelHovered(false);
@@ -217,14 +259,14 @@ const Slider = ({
       const snappedValue = snapToStepRef.current(accumulatedValueRef.current);
 
       setDisplayValue(snappedValue);
-      onChangeRef.current({ target: { value: snappedValue } });
+      scheduleChange(snappedValue);
     };
 
     const handlePointerUp = () => {
       lastUpTime.current = Date.now();
       pendingTouchRef.current = null;
       suppressTouchChangeRef.current = false;
-      setIsDragging(false);
+      endDragging();
     };
 
     window.addEventListener('mousemove', handlePointerMove, { passive: false });
@@ -240,7 +282,7 @@ const Slider = ({
       window.removeEventListener('touchend', handlePointerUp);
       window.removeEventListener('touchcancel', handlePointerUp);
     };
-  }, [disabled, isDragging]);
+  }, [disabled, isDragging, scheduleChange, endDragging]);
 
   useEffect(() => {
     if (isDragging) {
@@ -342,9 +384,10 @@ const Slider = ({
     accumulatedValueRef.current = rawValue;
     lastPointerXRef.current = e.clientX;
 
-    setIsDragging(true);
+    beginDragging();
     setDisplayValue(snappedValue);
-    onChange({ target: { value: snappedValue } });
+    lastEmittedValueRef.current = snappedValue;
+    onChangeRef.current({ target: { value: snappedValue } });
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLInputElement>) => {
@@ -412,9 +455,10 @@ const Slider = ({
       e.preventDefault();
     }
 
-    setIsDragging(true);
+    beginDragging();
     setDisplayValue(snappedValue);
-    onChange({ target: { value: snappedValue } });
+    lastEmittedValueRef.current = snappedValue;
+    onChangeRef.current({ target: { value: snappedValue } });
   };
 
   const handleTouchEnd = () => {
