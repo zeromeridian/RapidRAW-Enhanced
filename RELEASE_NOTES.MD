@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.2.21-fix-gui-density — 2026-08-14
+
+### Clearer editor toolbar grouping
+
+- Added subtle spacing around the right editor toolbar separators so related
+  tool groups are easier to distinguish while retaining the compact layout.
+
+## 1.2.20-fix-gui-density — 2026-08-14
+
+### More compact side panels
+
+- Reduced desktop spacing throughout the folder browser and editor side panels
+  so more controls and folders remain visible without scrolling.
+- Refined default sidebar widths, section spacing, corner radii, and the editor
+  tool switcher for a denser Lightroom Classic-style layout.
+- Preserved comfortable touch layouts, resizable panel widths, control
+  readability, and all existing editing features.
+
 ## 1.2.19-fix-responsiveness — 2026-08-14
 
 ### Responsive live histogram and waveform

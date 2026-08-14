@@ -153,6 +153,62 @@
 }
 
 @layer components {
+  /* Use a denser desktop sidebar rhythm without shrinking touch layouts. */
+  @media (pointer: fine) and (min-width: 768px) {
+    .compact-sidebar .p-4 {
+      padding: 0.75rem;
+    }
+
+    .compact-sidebar .px-4 {
+      padding-inline: 0.75rem;
+    }
+
+    .compact-sidebar .py-3 {
+      padding-block: 0.5rem;
+    }
+
+    .compact-sidebar .pb-4 {
+      padding-bottom: 0.75rem;
+    }
+
+    .compact-sidebar .pt-4 {
+      padding-top: 0.75rem;
+    }
+
+    .compact-sidebar .space-y-8 > :not(:last-child) {
+      margin-block-end: 1.25rem;
+    }
+
+    .compact-sidebar .space-y-6 > :not(:last-child) {
+      margin-block-end: 1rem;
+    }
+
+    .compact-sidebar .space-y-5 > :not(:last-child) {
+      margin-block-end: 0.875rem;
+    }
+
+    .compact-sidebar .space-y-4 > :not(:last-child) {
+      margin-block-end: 0.75rem;
+    }
+
+    .compact-sidebar .gap-6 {
+      gap: 1rem;
+    }
+
+    .compact-sidebar .gap-5 {
+      gap: 0.875rem;
+    }
+
+    .compact-sidebar .gap-4 {
+      gap: 0.75rem;
+    }
+
+    .compact-sidebar .rounded-lg,
+    .compact-sidebar .rounded-xl {
+      border-radius: 0.5rem;
+    }
+  }
+
   .slider-input::-webkit-slider-thumb {
     @apply h-4 w-4 appearance-none rounded-full bg-accent;
     transition:
