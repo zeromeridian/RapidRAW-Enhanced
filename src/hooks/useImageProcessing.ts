@@ -38,8 +38,12 @@ export function useImageProcessing(
   const appSettings = useSettingsStore((state) => state.appSettings);
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
 
-  const inFlightCountRef = useRef(0);
-  const pendingApplyRef = useRef<{ adjustments: Adjustments; targetRes?: number } | null>(null);
+  const isApplyInFlightRef = useRef(false);
+  const pendingApplyRef = useRef<{
+    adjustments: Adjustments;
+    dragging: boolean;
+    targetRes?: number;
+  } | null>(null);
   const currentOriginalResRef = useRef<number>(0);
   const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeWaveformChannelRef = useRef(activeWaveformChannel);
@@ -271,16 +275,16 @@ export function useImageProcessing(
   );
 
   const flushPipeline = useCallback(() => {
-    if (inFlightCountRef.current >= 3) return;
+    if (isApplyInFlightRef.current) return;
     if (!pendingApplyRef.current) return;
 
-    const { adjustments, targetRes } = pendingApplyRef.current;
+    const { adjustments, dragging, targetRes } = pendingApplyRef.current;
     pendingApplyRef.current = null;
 
-    inFlightCountRef.current += 1;
+    isApplyInFlightRef.current = true;
 
-    executeApplyAdjustments(adjustments, true, targetRes).finally(() => {
-      inFlightCountRef.current -= 1;
+    executeApplyAdjustments(adjustments, dragging, targetRes).finally(() => {
+      isApplyInFlightRef.current = false;
       if (pendingApplyRef.current) {
         requestAnimationFrame(() => flushPipeline());
       }
@@ -291,13 +295,8 @@ export function useImageProcessing(
     (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
       if (!selectedImage?.isReady) return;
 
-      if (dragging) {
-        pendingApplyRef.current = { adjustments: currentAdjustments, targetRes };
-        flushPipeline();
-      } else {
-        pendingApplyRef.current = null;
-        executeApplyAdjustments(currentAdjustments, false, targetRes);
-      }
+      pendingApplyRef.current = { adjustments: currentAdjustments, dragging, targetRes };
+      flushPipeline();
     },
     [selectedImage?.isReady, flushPipeline, executeApplyAdjustments],
   );
@@ -456,7 +455,7 @@ export function useImageProcessing(
           }
         }
         prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
-      }, 50);
+      }, 0);
     }
 
     return () => {
