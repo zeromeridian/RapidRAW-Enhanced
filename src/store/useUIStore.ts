@@ -158,8 +158,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   isLibraryExportPanelVisible: false,
   isSettingsOpen: false,
 
-  leftPanelWidth: 256,
-  rightPanelWidth: 320,
+  leftPanelWidth: 240,
+  rightPanelWidth: 296,
   bottomPanelHeight: 144,
   compactEditorPanelHeightOverride: null,
 
