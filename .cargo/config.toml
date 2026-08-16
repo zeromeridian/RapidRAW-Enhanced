@@ -1,0 +1,5 @@
+[env]
+# ort-sys 2.0.0-rc.10 probes pkg-config even with load-dynamic enabled and
+# emits link directives when Homebrew exposes libonnxruntime. The application
+# deliberately loads the verified library bundled by build.rs instead.
+LIBONNXRUNTIME_NO_PKG_CONFIG = "1"

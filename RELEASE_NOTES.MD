@@ -7,6 +7,13 @@ description.
 
 ## 1.2.21-fix-gui-density — 2026-08-14
 
+### Reliable macOS installation
+
+- Fixed the Apple Silicon package so ONNX Runtime is loaded only from inside
+  ThisIsRAW instead of a Homebrew path from the build machine.
+- Added package validation that rejects missing ONNX Runtime libraries and
+  non-portable Mach-O dependencies before macOS artifacts are accepted.
+
 ### Clearer editor toolbar grouping
 
 - Added subtle spacing around the right editor toolbar separators so related
