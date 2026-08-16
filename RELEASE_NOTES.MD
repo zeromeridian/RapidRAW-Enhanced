@@ -13,6 +13,8 @@ description.
   ThisIsRAW instead of a Homebrew path from the build machine.
 - Added package validation that rejects missing ONNX Runtime libraries and
   non-portable Mach-O dependencies before macOS artifacts are accepted.
+- Fixed macOS CI packaging when Apple signing secrets are absent or incomplete;
+  ordinary builds skip signing, while releases require complete credentials.
 
 ### Clearer editor toolbar grouping
 
