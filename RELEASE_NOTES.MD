@@ -15,6 +15,8 @@ description.
   non-portable Mach-O dependencies before macOS artifacts are accepted.
 - Fixed macOS CI packaging when Apple signing secrets are absent or incomplete;
   ordinary builds skip signing, while releases require complete credentials.
+- Fixed post-build verification to inspect the application inside Tauri's DMG
+  instead of a temporary app staging directory removed during packaging.
 
 ### Clearer editor toolbar grouping
 
