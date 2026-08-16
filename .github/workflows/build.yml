@@ -132,9 +132,18 @@ jobs:
         if: runner.os == 'macOS'
         env:
           REQUIRE_APPLE_SIGNATURE: ${{ inputs.release-id != '' }}
+          TAURI_ARTIFACT_PATHS: ${{ steps.tauri-build.outputs.artifactPaths }}
         run: |
-          scripts/verify-macos-bundle.sh \
-            "src-tauri/target/${{ inputs.target }}/release/bundle/macos/ThisIsRAW.app"
+          dmg_path=$(node -e '
+            const paths = JSON.parse(process.env.TAURI_ARTIFACT_PATHS);
+            const images = paths.filter((path) => path.endsWith(".dmg"));
+            if (images.length !== 1) {
+              console.error(`Expected one DMG artifact, found ${images.length}.`);
+              process.exit(1);
+            }
+            process.stdout.write(images[0]);
+          ')
+          scripts/verify-macos-bundle.sh "$dmg_path"
 
       - name: Upload workflow artifact
         if: inputs.upload-artifacts
