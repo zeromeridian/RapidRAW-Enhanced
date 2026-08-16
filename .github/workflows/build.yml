@@ -93,11 +93,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NO_STRIP: ${{ runner.os == 'Linux' }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           args: --verbose ${{ inputs.build-args }} --target ${{ inputs.target }}
           assetNamePattern: '[name]_v[version]_${{ inputs.asset-platform }}_[arch][ext]'
           releaseId: ${{ inputs.release-id }}
           retryAttempts: 3
+
+      - name: Verify macOS application bundle
+        if: runner.os == 'macOS'
+        env:
+          REQUIRE_APPLE_SIGNATURE: ${{ inputs.release-id != '' }}
+        run: |
+          scripts/verify-macos-bundle.sh \
+            "src-tauri/target/${{ inputs.target }}/release/bundle/macos/ThisIsRAW.app"
 
       - name: Upload workflow artifact
         if: inputs.upload-artifacts

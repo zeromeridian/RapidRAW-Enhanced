@@ -3,6 +3,7 @@ use std::env;
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 fn verify_sha256(path: &Path, expected_hash: &str) -> Result<bool, io::Error> {
     let mut file = fs::File::open(path)?;
@@ -66,6 +67,39 @@ fn download_and_verify(
             Err(format!("Could not verify file after download: {}", e).into())
         }
     }
+}
+
+fn validate_macos_library(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let install_name_output = Command::new("otool").arg("-D").arg(path).output()?;
+    if !install_name_output.status.success() {
+        return Err(format!(
+            "otool could not inspect ONNX Runtime: {}",
+            String::from_utf8_lossy(&install_name_output.stderr)
+        )
+        .into());
+    }
+
+    let install_names = String::from_utf8(install_name_output.stdout)?;
+    let install_name = install_names
+        .lines()
+        .nth(1)
+        .map(str::trim)
+        .ok_or("ONNX Runtime does not have a Mach-O install name")?;
+
+    if !install_name.starts_with("@rpath/libonnxruntime") || !install_name.ends_with(".dylib") {
+        return Err(format!("ONNX Runtime has a non-portable install name: {install_name}").into());
+    }
+
+    let dependencies = Command::new("otool").arg("-L").arg(path).output()?;
+    if !dependencies.status.success() {
+        return Err("otool could not inspect ONNX Runtime dependencies".into());
+    }
+    let dependencies = String::from_utf8(dependencies.stdout)?;
+    if dependencies.contains("/opt/homebrew/") || dependencies.contains("/usr/local/") {
+        return Err("ONNX Runtime contains a build-machine dependency path".into());
+    }
+
+    Ok(())
 }
 
 fn main() {
@@ -161,6 +195,11 @@ fn main() {
         if let Err(e) = download_and_verify(&download_url, &dest_path, expected_hash) {
             panic!("Failed to download and verify ONNX Runtime library: {}", e);
         }
+    }
+
+    if target_os == "macos" {
+        validate_macos_library(&dest_path)
+            .unwrap_or_else(|e| panic!("Failed to validate ONNX Runtime for macOS: {e}"));
     }
 
     if target_os == "android" {

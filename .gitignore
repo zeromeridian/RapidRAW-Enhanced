@@ -49,3 +49,4 @@ CODE_AUDIT_FINDINGS.md
 /.cargo/.package-cache
 /.cargo/registry/
 /.rustup/
+RapidRAW-Enhanced-ToDo-List.md
