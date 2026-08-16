@@ -87,18 +87,41 @@ jobs:
       - name: Apply branch-qualified build version
         run: node scripts/prepare-build-version.mjs
 
+      - name: Configure Apple signing and notarization
+        if: runner.os == 'macOS' && inputs.release-id != ''
+        shell: bash
+        env:
+          SIGNING_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          NOTARIZATION_APPLE_ID: ${{ secrets.APPLE_ID }}
+          NOTARIZATION_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          NOTARIZATION_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [[ -z "$SIGNING_CERTIFICATE" || -z "$SIGNING_CERTIFICATE_PASSWORD" ]]; then
+            echo "Release signing requires APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD." >&2
+            exit 1
+          fi
+          if [[ -z "$NOTARIZATION_APPLE_ID" || -z "$NOTARIZATION_PASSWORD" || -z "$NOTARIZATION_TEAM_ID" ]]; then
+            echo "Release notarization requires APPLE_ID, APPLE_PASSWORD, and APPLE_TEAM_ID." >&2
+            exit 1
+          fi
+
+          echo "APPLE_CERTIFICATE=$SIGNING_CERTIFICATE" >> "$GITHUB_ENV"
+          echo "APPLE_CERTIFICATE_PASSWORD=$SIGNING_CERTIFICATE_PASSWORD" >> "$GITHUB_ENV"
+          if [[ -n "$SIGNING_IDENTITY" ]]; then
+            echo "APPLE_SIGNING_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
+          fi
+          echo "APPLE_ID=$NOTARIZATION_APPLE_ID" >> "$GITHUB_ENV"
+          echo "APPLE_PASSWORD=$NOTARIZATION_PASSWORD" >> "$GITHUB_ENV"
+          echo "APPLE_TEAM_ID=$NOTARIZATION_TEAM_ID" >> "$GITHUB_ENV"
+
       - id: tauri-build
         name: Build and package application
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NO_STRIP: ${{ runner.os == 'Linux' }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           args: --verbose ${{ inputs.build-args }} --target ${{ inputs.target }}
           assetNamePattern: '[name]_v[version]_${{ inputs.asset-platform }}_[arch][ext]'
