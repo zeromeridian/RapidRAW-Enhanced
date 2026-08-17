@@ -14,6 +14,10 @@ export function useAndroidBackHandler() {
         ui.setUI((state: any) => ({ confirmModalState: { ...state.confirmModalState, isOpen: false } }));
         return;
       }
+      if (ui.lightroomImportModalState.isOpen) {
+        ui.setUI({ lightroomImportModalState: { isOpen: false, targetPaths: [] } });
+        return;
+      }
       if (ui.isCreateFolderModalOpen) {
         ui.setUI({ isCreateFolderModalOpen: false });
         return;

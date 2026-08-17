@@ -20,6 +20,7 @@ import ImportSettingsModal from './ImportSettingsModal';
 import CullingModal from './CullingModal';
 import CollageModal from './CollageModal';
 import PresetBatchModal from './PresetBatchModal';
+import LightroomImportModal from './LightroomImportModal';
 import { AppSettings, Invokes, AlbumItem, Album, AlbumGroup } from '../ui/AppProperties';
 import { CopyPasteSettings } from '../../utils/adjustments';
 
@@ -75,6 +76,7 @@ export default function AppModals(props: AppModalsProps) {
     cullingModalState,
     collageModalState,
     presetBatchModalState,
+    lightroomImportModalState,
     setUI,
   } = useUIStore(
     useShallow((state) => ({
@@ -98,6 +100,7 @@ export default function AppModals(props: AppModalsProps) {
       cullingModalState: state.cullingModalState,
       collageModalState: state.collageModalState,
       presetBatchModalState: state.presetBatchModalState,
+      lightroomImportModalState: state.lightroomImportModalState,
       setUI: state.setUI,
     })),
   );
@@ -141,6 +144,12 @@ export default function AppModals(props: AppModalsProps) {
 
   return (
     <>
+      <LightroomImportModal
+        isOpen={lightroomImportModalState.isOpen}
+        targetPaths={lightroomImportModalState.targetPaths}
+        onClose={() => setUI({ lightroomImportModalState: { isOpen: false, targetPaths: [] } })}
+        onApplied={props.refreshImageList}
+      />
       <PresetBatchModal
         isOpen={presetBatchModalState.isOpen}
         target={presetBatchModalState.target}
