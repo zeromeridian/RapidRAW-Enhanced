@@ -3,9 +3,9 @@ use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::hash::{Hash, Hasher};
-use std::io::Cursor;
+use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
@@ -448,7 +448,7 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
 
     let sidecar_filename = if let Some(id) = copy_id {
         format!(
-            "{}.{}.rrdata",
+            "{}.{}.tirdata",
             source_path
                 .file_name()
                 .unwrap_or_default()
@@ -457,7 +457,7 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
         )
     } else {
         format!(
-            "{}.rrdata",
+            "{}.tirdata",
             source_path
                 .file_name()
                 .unwrap_or_default()
@@ -469,8 +469,8 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
     (source_path, sidecar_path)
 }
 
-fn parse_rrdata_filename(file_name: &str) -> Option<(String, Option<String>)> {
-    let base = file_name.strip_suffix(".rrdata")?;
+fn parse_sidecar_filename(file_name: &str) -> Option<(String, Option<String>)> {
+    let base = file_name.strip_suffix(".tirdata")?;
     if base.len() >= 7 && base.as_bytes()[base.len() - 7] == b'.' {
         let id = &base[base.len() - 6..];
         if id.chars().all(|character| character.is_ascii_hexdigit()) {
@@ -484,8 +484,9 @@ fn parse_rrdata_filename(file_name: &str) -> Option<(String, Option<String>)> {
 mod output_naming_tests {
     use super::{
         apply_preset_adjustments_to_path, collect_preset_batch_folder_paths, extract_app_xmp_value,
-        extract_xmp_stack, parse_rrdata_filename, parse_virtual_path, read_xmp_from_folder,
-        sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
+        extract_xmp_stack, import_rapidraw_sidecars, parse_sidecar_filename, parse_virtual_path,
+        read_xmp_from_folder, sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp,
+        sync_metadata_to_xmp,
     };
     use crate::app_settings::AppSettings;
     use crate::image_processing::ImageMetadata;
@@ -504,20 +505,66 @@ mod output_naming_tests {
         let (source, sidecar) = parse_virtual_path("/photos/image.raw?vc=abc123&name=_select");
 
         assert_eq!(source, PathBuf::from("/photos/image.raw"));
-        assert_eq!(sidecar, PathBuf::from("/photos/image.raw.abc123.rrdata"));
+        assert_eq!(sidecar, PathBuf::from("/photos/image.raw.abc123.tirdata"));
     }
 
     #[test]
-    fn rrdata_names_distinguish_primary_and_virtual_copy_sidecars() {
+    fn tirdata_names_distinguish_primary_and_virtual_copy_sidecars() {
         assert_eq!(
-            parse_rrdata_filename("image.jpg.abc123.rrdata"),
+            parse_sidecar_filename("image.jpg.abc123.tirdata"),
             Some(("image.jpg".to_string(), Some("abc123".to_string())))
         );
         assert_eq!(
-            parse_rrdata_filename("image.jpg.rrdata"),
+            parse_sidecar_filename("image.jpg.tirdata"),
             Some(("image.jpg".to_string(), None))
         );
-        assert_eq!(parse_rrdata_filename("image.jpg"), None);
+        assert_eq!(parse_sidecar_filename("image.jpg"), None);
+    }
+
+    #[test]
+    fn rapidraw_sidecar_import_is_validated_non_destructive_and_never_overwrites() {
+        let folder = tempfile::tempdir().unwrap();
+        let rapidraw_sidecar = folder.path().join("image.jpg.rrdata");
+        let this_is_raw_sidecar = folder.path().join("image.jpg.tirdata");
+        let invalid_sidecar = folder.path().join("broken.jpg.rrdata");
+        let rapidraw_exif = folder.path().join("image.jpg.rrexif");
+        let initial_metadata = ImageMetadata {
+            rating: 4,
+            ..ImageMetadata::default()
+        };
+        let initial_json = serde_json::to_string(&initial_metadata).unwrap();
+        fs::write(&rapidraw_sidecar, &initial_json).unwrap();
+        fs::write(&invalid_sidecar, "not json").unwrap();
+        fs::write(&rapidraw_exif, "legacy").unwrap();
+
+        let first = import_rapidraw_sidecars(folder.path().to_string_lossy().into_owned()).unwrap();
+        assert_eq!(first.imported, 1);
+        assert_eq!(first.skipped, 0);
+        assert_eq!(first.invalid, 1);
+        assert_eq!(first.failed, 0);
+        assert_eq!(
+            fs::read_to_string(&this_is_raw_sidecar).unwrap(),
+            initial_json
+        );
+
+        let changed_json = serde_json::to_string(&ImageMetadata {
+            rating: 1,
+            ..ImageMetadata::default()
+        })
+        .unwrap();
+        fs::write(&rapidraw_sidecar, &changed_json).unwrap();
+        let second =
+            import_rapidraw_sidecars(folder.path().to_string_lossy().into_owned()).unwrap();
+        assert_eq!(second.imported, 0);
+        assert_eq!(second.skipped, 1);
+        assert_eq!(second.invalid, 1);
+        assert_eq!(second.failed, 0);
+        assert_eq!(
+            fs::read_to_string(&this_is_raw_sidecar).unwrap(),
+            initial_json
+        );
+        assert_eq!(fs::read_to_string(&rapidraw_sidecar).unwrap(), changed_json);
+        assert_eq!(fs::read_to_string(&rapidraw_exif).unwrap(), "legacy");
     }
 
     #[test]
@@ -525,8 +572,8 @@ mod output_naming_tests {
         let folder = tempfile::tempdir().unwrap();
         let image = folder.path().join("image.jpg");
         fs::write(&image, []).unwrap();
-        fs::write(folder.path().join("image.jpg.rrdata"), "{}").unwrap();
-        fs::write(folder.path().join("image.jpg.abc123.rrdata"), "{}").unwrap();
+        fs::write(folder.path().join("image.jpg.tirdata"), "{}").unwrap();
+        fs::write(folder.path().join("image.jpg.abc123.tirdata"), "{}").unwrap();
 
         let nested = folder.path().join("nested");
         fs::create_dir(&nested).unwrap();
@@ -571,7 +618,7 @@ mod output_naming_tests {
             ..ImageMetadata::default()
         };
         fs::write(
-            folder.path().join("image.jpg.rrdata"),
+            folder.path().join("image.jpg.tirdata"),
             serde_json::to_string_pretty(&existing).unwrap(),
         )
         .unwrap();
@@ -589,7 +636,7 @@ mod output_naming_tests {
         )
         .unwrap();
 
-        let merged = crate::exif_processing::load_sidecar(&folder.path().join("image.jpg.rrdata"));
+        let merged = crate::exif_processing::load_sidecar(&folder.path().join("image.jpg.tirdata"));
         assert_eq!(merged.adjustments["exposure"], 2.5);
         assert_eq!(merged.adjustments["contrast"], 12.0);
         assert_eq!(merged.adjustments["saturation"], 18.0);
@@ -744,7 +791,7 @@ mod output_naming_tests {
     fn forced_folder_xmp_read_overwrites_metadata_recursively() {
         let folder = tempfile::tempdir().unwrap();
         let image = folder.path().join("image.jpg");
-        let sidecar = folder.path().join("image.jpg.rrdata");
+        let sidecar = folder.path().join("image.jpg.tirdata");
         fs::write(&image, []).unwrap();
         fs::write(
             image.with_extension("xmp"),
@@ -789,7 +836,7 @@ mod output_naming_tests {
             ["user:xmp", "color:blue", "flag:rejected"]
         );
         let nested_metadata =
-            crate::exif_processing::load_sidecar(&nested.join("nested.jpg.rrdata"));
+            crate::exif_processing::load_sidecar(&nested.join("nested.jpg.tirdata"));
         assert_eq!(nested_metadata.rating, 4);
     }
 
@@ -813,7 +860,7 @@ pub async fn read_exif_for_paths(
                 let source_path_str = source_path.to_string_lossy().to_string();
 
                 let map = if let Some(sidecar_exif) =
-                    crate::exif_processing::read_rrexif_sidecar(&source_path)
+                    crate::exif_processing::read_sidecar_exif(&source_path)
                 {
                     sidecar_exif
                 } else if is_cloud_placeholder(&source_path) {
@@ -852,7 +899,7 @@ pub async fn update_exif_fields(
             let temp_metadata = crate::exif_processing::load_sidecar(&primary_path);
 
             let mut exif_data = temp_metadata.exif.unwrap_or_else(|| {
-                if let Some(existing) = crate::exif_processing::read_rrexif_sidecar(original_path) {
+                if let Some(existing) = crate::exif_processing::read_sidecar_exif(original_path) {
                     existing
                 } else if let Ok(mmap) = read_file_mapped(original_path) {
                     crate::exif_processing::read_exif_data_from_bytes(path, &mmap)
@@ -956,7 +1003,7 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
             .into_string()
             .unwrap_or_else(|os| os.to_string_lossy().into_owned());
 
-        if let Some((source_filename, copy_id)) = parse_rrdata_filename(&file_name) {
+        if let Some((source_filename, copy_id)) = parse_sidecar_filename(&file_name) {
             sidecars_by_filename
                 .entry(source_filename)
                 .or_default()
@@ -999,9 +1046,9 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
                 Some(id) => (
                     format!("{}?vc={}", path_str, id),
                     true,
-                    format!("{}.{}.rrdata", file_name, id),
+                    format!("{}.{}.tirdata", file_name, id),
                 ),
-                None => (path_str.clone(), false, format!("{}.rrdata", file_name)),
+                None => (path_str.clone(), false, format!("{}.tirdata", file_name)),
             };
 
             let sidecar_path = path_buf.with_file_name(sidecar_filename);
@@ -1114,7 +1161,7 @@ fn list_images_recursive_sync(
         }
 
         let file_name = entry_path.file_name().unwrap_or_default().to_string_lossy();
-        if let Some((source_filename, copy_id)) = parse_rrdata_filename(&file_name) {
+        if let Some((source_filename, copy_id)) = parse_sidecar_filename(&file_name) {
             if let Some(parent) = entry_path.parent() {
                 sidecars_by_path
                     .entry(parent.join(source_filename))
@@ -1165,9 +1212,9 @@ fn list_images_recursive_sync(
                 Some(id) => (
                     format!("{}?vc={}", path_str, id),
                     true,
-                    format!("{}.{}.rrdata", file_name, id),
+                    format!("{}.{}.tirdata", file_name, id),
                 ),
-                None => (path_str.clone(), false, format!("{}.rrdata", file_name)),
+                None => (path_str.clone(), false, format!("{}.tirdata", file_name)),
             };
 
             let sidecar_path = path_buf.with_file_name(sidecar_filename);
@@ -2810,17 +2857,6 @@ pub fn duplicate_file(
         fs::copy(&source_sidecar_path, &dest_sidecar_path).map_err(|e| e.to_string())?;
     }
 
-    let mut source_rrexif_name = source_path.file_name().unwrap().to_os_string();
-    source_rrexif_name.push(".rrexif");
-    let source_rrexif = source_path.with_file_name(source_rrexif_name);
-
-    if source_rrexif.exists() {
-        let mut dest_rrexif_name = dest_path.file_name().unwrap().to_os_string();
-        dest_rrexif_name.push(".rrexif");
-        let dest_rrexif = dest_path.with_file_name(dest_rrexif_name);
-        let _ = fs::copy(&source_rrexif, &dest_rrexif);
-    }
-
     let dest_path_str = dest_path.to_string_lossy().into_owned();
 
     if let Some(album_id) = target_album_id {
@@ -2833,17 +2869,6 @@ pub fn duplicate_file(
 fn find_all_associated_files(source_image_path: &Path) -> Result<Vec<PathBuf>, String> {
     let mut associated_files = vec![source_image_path.to_path_buf()];
 
-    let mut rrexif_name = source_image_path
-        .file_name()
-        .unwrap_or_default()
-        .to_os_string();
-    rrexif_name.push(".rrexif");
-    let rrexif_path = source_image_path.with_file_name(rrexif_name);
-
-    if rrexif_path.exists() {
-        associated_files.push(rrexif_path);
-    }
-
     let parent_dir = source_image_path
         .parent()
         .ok_or("Could not determine parent directory")?;
@@ -2852,7 +2877,7 @@ fn find_all_associated_files(source_image_path: &Path) -> Result<Vec<PathBuf>, S
         .ok_or("Could not get source filename")?
         .to_string_lossy();
 
-    let primary_sidecar_name = format!("{}.rrdata", source_filename);
+    let primary_sidecar_name = format!("{}.tirdata", source_filename);
     let virtual_copy_prefix = format!("{}.", source_filename);
 
     if let Ok(entries) = fs::read_dir(parent_dir) {
@@ -2867,7 +2892,7 @@ fn find_all_associated_files(source_image_path: &Path) -> Result<Vec<PathBuf>, S
 
             if entry_filename == primary_sidecar_name
                 || (entry_filename.starts_with(&virtual_copy_prefix)
-                    && entry_filename.ends_with(".rrdata"))
+                    && entry_filename.ends_with(".tirdata"))
             {
                 associated_files.push(entry_path);
             }
@@ -3331,7 +3356,7 @@ fn collect_preset_batch_folder_paths(
 
             let entry_path = entry.path();
             let file_name = entry.file_name().to_string_lossy();
-            if let Some((source_filename, copy_id)) = parse_rrdata_filename(&file_name) {
+            if let Some((source_filename, copy_id)) = parse_sidecar_filename(&file_name) {
                 if let Some(parent) = entry_path.parent() {
                     sidecars_by_path
                         .entry(parent.join(source_filename))
@@ -4110,7 +4135,7 @@ pub fn clear_all_sidecars(root_path: String) -> Result<usize, String> {
         let path = entry.path();
         if path.is_file()
             && let Some(extension) = path.extension()
-            && (extension == "rrdata" || extension == "rrexif")
+            && extension == "tirdata"
         {
             if fs::remove_file(path).is_ok() {
                 deleted_count += 1;
@@ -4121,6 +4146,84 @@ pub fn clear_all_sidecars(root_path: String) -> Result<usize, String> {
     }
 
     Ok(deleted_count)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SidecarImportResult {
+    imported: usize,
+    skipped: usize,
+    invalid: usize,
+    failed: usize,
+}
+
+#[tauri::command]
+pub fn import_rapidraw_sidecars(root_path: String) -> Result<SidecarImportResult, String> {
+    let root = Path::new(&root_path);
+    if !root.is_dir() {
+        return Err(format!("Root path is not a directory: {root_path}"));
+    }
+
+    let mut result = SidecarImportResult {
+        imported: 0,
+        skipped: 0,
+        invalid: 0,
+        failed: 0,
+    };
+
+    for entry in WalkDir::new(root).follow_links(false) {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(_) => {
+                result.failed += 1;
+                continue;
+            }
+        };
+        let source = entry.path();
+        if !entry.file_type().is_file()
+            || source.extension().and_then(|extension| extension.to_str()) != Some("rrdata")
+        {
+            continue;
+        }
+
+        let bytes = match fs::read(source) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                result.failed += 1;
+                continue;
+            }
+        };
+        if serde_json::from_slice::<ImageMetadata>(&bytes).is_err() {
+            result.invalid += 1;
+            continue;
+        }
+
+        let destination = source.with_extension("tirdata");
+        let mut destination_file = match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&destination)
+        {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                result.skipped += 1;
+                continue;
+            }
+            Err(_) => {
+                result.failed += 1;
+                continue;
+            }
+        };
+
+        if destination_file.write_all(&bytes).is_ok() {
+            result.imported += 1;
+        } else {
+            let _ = fs::remove_file(destination);
+            result.failed += 1;
+        }
+    }
+
+    Ok(result)
 }
 
 #[tauri::command]
@@ -4264,20 +4367,18 @@ pub fn delete_files_from_disk(paths: Vec<String>, app_handle: AppHandle) -> Resu
 }
 
 fn deletion_stem_for(filename: &str) -> Option<&str> {
-    let image_filename = if filename.ends_with(".rrdata") {
-        let without_rrdata = filename.trim_end_matches(".rrdata");
-        if let Some(dot_pos) = without_rrdata.rfind('.') {
-            let suffix = &without_rrdata[dot_pos + 1..];
+    let image_filename = if filename.ends_with(".tirdata") {
+        let without_sidecar = filename.trim_end_matches(".tirdata");
+        if let Some(dot_pos) = without_sidecar.rfind('.') {
+            let suffix = &without_sidecar[dot_pos + 1..];
             if suffix.len() == 6 && suffix.chars().all(|c| c.is_ascii_hexdigit()) {
-                &without_rrdata[..dot_pos]
+                &without_sidecar[..dot_pos]
             } else {
-                without_rrdata
+                without_sidecar
             }
         } else {
-            without_rrdata
+            without_sidecar
         }
-    } else if filename.ends_with(".rrexif") {
-        filename.trim_end_matches(".rrexif")
     } else if is_supported_image_file(filename) {
         filename
     } else {
@@ -4556,17 +4657,6 @@ pub async fn import_files(
                     fs::copy(&source_sidecar, &dest_sidecar).map_err(|e| e.to_string())?;
                 }
 
-                let mut source_rrexif_name = source_path.file_name().unwrap().to_os_string();
-                source_rrexif_name.push(".rrexif");
-                let source_rrexif = source_path.with_file_name(source_rrexif_name);
-
-                if source_rrexif.exists() {
-                    let mut dest_rrexif_name = dest_file_path.file_name().unwrap().to_os_string();
-                    dest_rrexif_name.push(".rrexif");
-                    let dest_rrexif = dest_file_path.with_file_name(dest_rrexif_name);
-                    let _ = fs::copy(&source_rrexif, &dest_rrexif);
-                }
-
                 if settings.delete_after_import {
                     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
                     {
@@ -4599,9 +4689,6 @@ pub async fn import_files(
                         fs::remove_file(&source_path).map_err(|e| e.to_string())?;
                         if source_sidecar.exists() {
                             fs::remove_file(&source_sidecar).map_err(|e| e.to_string())?;
-                        }
-                        if source_rrexif.exists() {
-                            let _ = fs::remove_file(&source_rrexif);
                         }
                     }
                 }
@@ -4721,31 +4808,20 @@ pub fn rename_files(
                 let entry_filename = entry_os_filename.to_string_lossy();
 
                 if entry_filename.starts_with(&format!("{}.", original_filename_str))
-                    && entry_filename.ends_with(".rrdata")
+                    && entry_filename.ends_with(".tirdata")
                 {
                     let new_sidecar_filename =
                         entry_filename.replacen(&*original_filename_str, &new_filename_str, 1);
                     let new_sidecar_path = parent.join(new_sidecar_filename);
                     sidecar_operations.insert(entry_path, new_sidecar_path);
-                } else if entry_filename == format!("{}.rrdata", original_filename_str) {
+                } else if entry_filename == format!("{}.tirdata", original_filename_str) {
                     let mut new_sidecar_name = new_path.file_name().unwrap().to_os_string();
-                    new_sidecar_name.push(".rrdata");
+                    new_sidecar_name.push(".tirdata");
                     let new_sidecar_path = new_path.with_file_name(new_sidecar_name);
 
                     sidecar_operations.insert(entry_path, new_sidecar_path);
                 }
             }
-        }
-
-        let mut old_rrexif_name = original_path.file_name().unwrap().to_os_string();
-        old_rrexif_name.push(".rrexif");
-        let old_rrexif = original_path.with_file_name(old_rrexif_name);
-
-        if old_rrexif.exists() {
-            let mut new_rrexif_name = new_path.file_name().unwrap().to_os_string();
-            new_rrexif_name.push(".rrexif");
-            let new_rrexif = new_path.with_file_name(new_rrexif_name);
-            sidecar_operations.insert(old_rrexif, new_rrexif);
         }
     }
     operations.extend(sidecar_operations);

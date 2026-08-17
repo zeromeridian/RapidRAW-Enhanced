@@ -42,6 +42,7 @@ export enum Invokes {
   CancelPresetBatch = 'cancel_preset_batch',
   CheckAIConnectorStatus = 'check_ai_connector_status',
   ClearAllSidecars = 'clear_all_sidecars',
+  ImportRapidRawSidecars = 'import_rapidraw_sidecars',
   ClearAiTags = 'clear_ai_tags',
   ClearAllTags = 'clear_all_tags',
   ClearThumbnailCache = 'clear_thumbnail_cache',

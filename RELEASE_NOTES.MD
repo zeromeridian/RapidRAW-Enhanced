@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.3.1-feature-rename-sidecar — 2026-08-17
+
+### ThisIsRAW sidecar format
+
+- ThisIsRAW stores edits, metadata, and virtual copies in proprietary
+  `.tirdata` sidecars, keeping its working data separate from RapidRAW.
+- Added an explicit, non-destructive Settings action to import compatible
+  RapidRAW `.rrdata` sidecars without overwriting `.tirdata` or changing the
+  original RapidRAW files.
+- File operations, folder scanning, tag management, and sidecar cleanup
+  consistently handle `.tirdata` while preserving editing and XMP features.
+
+
 ## 1.2.21-fix-gui-density — 2026-08-14
 
 ### Reliable macOS installation

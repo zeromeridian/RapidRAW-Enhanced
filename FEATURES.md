@@ -24,6 +24,10 @@ details are in `RELEASE_NOTES.MD`.
 - Caps Lock auto-advance after applying ratings, color labels, or flags.
 - Main Settings access from both Library and Develop.
 - Optional launch directly into the last library, bypassing the splash screen.
+- Proprietary `.tirdata` sidecars keep ThisIsRAW edits, metadata, and virtual
+  copies separate from RapidRAW. Settings provides an explicit non-destructive
+  importer for compatible `.rrdata` files that never overwrites existing
+  `.tirdata` data or alters the RapidRAW originals.
 - Bulk preset application for selected images or multiple selected folders,
   with direct-folder and recursive scopes, search, progress, cancellation, and
   background continuation.
@@ -36,7 +40,7 @@ details are in `RELEASE_NOTES.MD`.
   generation-guarded state commits. Cataloged content appears immediately while
   the filesystem is revalidated in the background. Sidecar/XMP reconciliation
   uses bounded background workers, and optional AI indexing yields to visible
-  thumbnails and cannot refresh an unrelated folder. Files, `.rrdata`, and XMP
+  thumbnails and cannot refresh an unrelated folder. Files, `.tirdata`, and XMP
   remain authoritative; the bundled SQLite catalog requires no server.
 - The library catalog location is visible and customizable in General Settings;
   changing it safely moves the existing catalog, with an option to restore the

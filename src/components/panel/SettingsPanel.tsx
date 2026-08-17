@@ -69,6 +69,13 @@ interface DataActionItemProps {
   title: string;
 }
 
+interface SidecarImportResult {
+  imported: number;
+  skipped: number;
+  invalid: number;
+  failed: number;
+}
+
 interface KeybindRowProps {
   def: KeybindDefinition;
   currentCombo?: string[];
@@ -508,6 +515,8 @@ export default function SettingsPanel({
   const { t } = useTranslation();
   const [isClearing, setIsClearing] = useState(false);
   const [clearMessage, setClearMessage] = useState('');
+  const [isImportingSidecars, setIsImportingSidecars] = useState(false);
+  const [sidecarImportMessage, setSidecarImportMessage] = useState('');
   const [isClearingCache, setIsClearingCache] = useState(false);
   const [cacheClearMessage, setCacheClearMessage] = useState('');
   const [isClearingAiTags, setIsClearingAiTags] = useState(false);
@@ -833,6 +842,28 @@ export default function SettingsPanel({
       onConfirm: executeClearSidecars,
       title: t('settings.data.modals.confirmTitle'),
     });
+  };
+
+  const handleImportRapidRawSidecars = async () => {
+    setIsImportingSidecars(true);
+    setSidecarImportMessage(t('settings.data.statuses.importingSidecars'));
+    try {
+      const totals: SidecarImportResult = { imported: 0, skipped: 0, invalid: 0, failed: 0 };
+      for (const root of effectiveRootPaths) {
+        const result = await invoke<SidecarImportResult>(Invokes.ImportRapidRawSidecars, { rootPath: root });
+        totals.imported += result.imported;
+        totals.skipped += result.skipped;
+        totals.invalid += result.invalid;
+        totals.failed += result.failed;
+      }
+      setSidecarImportMessage(t('settings.data.statuses.sidecarImportSuccess', totals));
+      if (totals.imported > 0) onLibraryRefresh();
+    } catch (err: unknown) {
+      console.error('Failed to import RapidRAW sidecars:', err);
+      setSidecarImportMessage(`Error: ${String(err)}`);
+    } finally {
+      setIsImportingSidecars(false);
+    }
   };
 
   const executeClearAiTags = async () => {
@@ -2469,13 +2500,22 @@ export default function SettingsPanel({
                     </Text>
                     <div className="space-y-8">
                       <DataActionItem
+                        buttonAction={handleImportRapidRawSidecars}
+                        buttonText={t('settings.data.importSidecarsButton')}
+                        description={t('settings.data.importSidecarsDesc')}
+                        disabled={effectiveRootPaths.length === 0}
+                        icon={<FolderOpen size={16} className="mr-2" />}
+                        isProcessing={isImportingSidecars}
+                        message={sidecarImportMessage}
+                        title={t('settings.data.importSidecars')}
+                      />
+
+                      <DataActionItem
                         buttonAction={handleClearSidecars}
                         buttonText={t('settings.data.clearSidecarsButton')}
                         description={
                           <Text as="span" variant={TextVariants.small}>
-                            {t('settings.data.clearSidecarsDesc')}{' '}
-                            <code className="bg-bg-primary px-1 rounded-sm text-text-primary">.rrdata</code> files
-                            (containing your edits) within your root folders:
+                            {t('settings.data.clearSidecarsDesc')}
                             <span className="block font-mono bg-bg-primary p-2 rounded-sm mt-2 break-all border border-border-color whitespace-pre-wrap">
                               {effectiveRootPaths.length > 0
                                 ? effectiveRootPaths.join('\n')

@@ -2324,8 +2324,7 @@ async fn save_hdr(
         .map_err(|e| format!("Failed to save hdr image: {}", e))?;
 
     let (real_path, _) = crate::file_management::parse_virtual_path(&first_path_str);
-    let _ =
-        crate::exif_processing::write_rrexif_sidecar(&real_path.to_string_lossy(), &output_path);
+    let _ = crate::exif_processing::write_exif_sidecar(&real_path.to_string_lossy(), &output_path);
 
     Ok(output_path.to_string_lossy().to_string())
 }
@@ -3212,6 +3211,7 @@ pub fn run() {
             file_management::handle_export_presets_to_file,
             file_management::save_community_preset,
             file_management::clear_all_sidecars,
+            file_management::import_rapidraw_sidecars,
             file_management::clear_thumbnail_cache,
             file_management::set_color_label_for_paths,
             file_management::set_rating_for_paths,
