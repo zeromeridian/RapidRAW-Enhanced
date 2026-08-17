@@ -8,7 +8,7 @@ an embedded SQLite snapshot catalog, retained persistent thumbnail
 references, bounded
 sidecar/XMP workers for large direct and recursive folders, progressive root
 tree refinement, scoped AI-indexing events, and foreground-thumbnail yielding.
-The catalog is a disposable acceleration index; source files, `.rrdata`, and
+The catalog is a disposable acceleration index; source files, `.tirdata`, and
 XMP remain authoritative and every restored snapshot is revalidated in the
 background. It uses bundled SQLite and therefore requires no database server.
 The validation and stress scenarios below remain the permanent regression
@@ -341,7 +341,7 @@ virtual-copy behavior may be removed.
 
 - Physical images and multiple virtual copies.
 - XMP synchronization enabled and disabled.
-- Existing `.rrdata`, missing `.rrdata`, and cloud-placeholder sidecars.
+- Existing `.tirdata`, missing `.tirdata`, and cloud-placeholder sidecars.
 - Physical and virtual-copy sidecars with distinct metadata.
 - Images added, removed, renamed, or modified after caching.
 - Corrupt, locked, unreadable, or transient files.
