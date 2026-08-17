@@ -254,6 +254,8 @@
       "shortcutsHeading": "단축키"
     },
     "thumbnail": {
+      "previewLightroomEdits_one": "Preview Lightroom Edits",
+      "previewLightroomEdits_other": "Preview Lightroom Edits for {{count}} Images",
       "addToAlbum": "앨범에 추가",
       "autoAdjust_one": "이미지 자동 조정",
       "autoAdjust_other": "이미지 자동 조정",
@@ -1103,6 +1105,22 @@
     }
   },
   "modals": {
+    "lightroomImport": {
+      "applied_one": "Applied approved Lightroom edits to 1 image",
+      "applied_other": "Applied approved Lightroom edits to {{count}} images",
+      "applySelected_one": "Apply to 1 approved image",
+      "applySelected_other": "Apply to {{count}} approved images",
+      "applying": "Applying approved changes...",
+      "approveImage": "Approve Lightroom changes for {{filename}}",
+      "approximate": "Approximate",
+      "cancel": "Cancel",
+      "close": "Close match",
+      "description": "Review translated Lightroom Classic settings before changing ThisIsRAW sidecars. Unchecked images are not changed.",
+      "reading": "Reading Lightroom XMP sidecars...",
+      "processVersion": "Lightroom PV {{version}}",
+      "safety": "No .tirdata file is changed during preview. Applying merges only the listed supported fields and preserves all other ThisIsRAW data.",
+      "title": "Review Lightroom Edits"
+    },
     "collage": {
       "aspectRatio": "종횡비",
       "background": "배경",

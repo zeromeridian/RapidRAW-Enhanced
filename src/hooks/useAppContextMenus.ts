@@ -43,6 +43,7 @@ import {
   User,
   Album as AlbumIcon,
   SwatchBook,
+  FileSearch,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
@@ -618,6 +619,15 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           icon: ClipboardPaste,
           label: pasteLabel,
           onClick: () => handlePasteAdjustments(finalSelection),
+        },
+        {
+          disabled: finalSelection.length === 0,
+          icon: FileSearch,
+          label: t('contextMenus.thumbnail.previewLightroomEdits', { count: selectionCount }),
+          onClick: () =>
+            setUI({
+              lightroomImportModalState: { isOpen: true, targetPaths: finalSelection },
+            }),
         },
         {
           label: t('contextMenus.editor.productivity'),

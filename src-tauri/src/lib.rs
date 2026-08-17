@@ -29,6 +29,7 @@ mod launch_request;
 mod lens_blur;
 mod lens_correction;
 mod library_catalog;
+mod lightroom_xmp;
 mod lut_processing;
 mod mask_generation;
 mod multi_exposure;
@@ -3177,6 +3178,8 @@ pub fn run() {
             file_management::get_supported_file_types,
             file_management::read_exif_for_paths,
             file_management::read_xmp_from_folder,
+            lightroom_xmp::preview_lightroom_xmp_edits,
+            lightroom_xmp::apply_approved_lightroom_xmp_edits,
             file_management::list_images_in_dir,
             file_management::list_images_recursive,
             file_management::apply_preset_batch,

@@ -5,6 +5,23 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.4.0-feature-migrate-lrc — 2026-08-17
+
+### Lightroom Classic edit translation trial
+
+- Added **Preview Lightroom Edits** for selected physical images with matching
+  XMP sidecars.
+- Review proposed Lightroom-to-ThisIsRAW mappings, previous and proposed
+  values, confidence levels, and unsupported settings before applying them.
+- Previewing never changes `.tirdata` or Lightroom XMP files. Applying requires
+  explicit per-image approval and merges only supported fields while preserving
+  masks and other ThisIsRAW-only editing data.
+- Added change detection that requires another review if the Lightroom XMP or
+  ThisIsRAW sidecar changes after preview.
+- The initial translator supports global tone, presence, HSL, sharpening and
+  noise reduction, color calibration, point curves, monochrome, grain, and
+  post-crop vignette settings.
+
 ## 1.3.1-feature-rename-sidecar — 2026-08-17
 
 ### ThisIsRAW sidecar format

@@ -28,6 +28,10 @@ details are in `RELEASE_NOTES.MD`.
   copies separate from RapidRAW. Settings provides an explicit non-destructive
   importer for compatible `.rrdata` files that never overwrites existing
   `.tirdata` data or alters the RapidRAW originals.
+- Non-destructive Lightroom Classic XMP translation preview for selected
+  physical images. The review lists every proposed mapping and its confidence,
+  leaves `.tirdata` and Lightroom XMP untouched until explicit approval, then
+  merges only approved supported fields while preserving ThisIsRAW-only edits.
 - Bulk preset application for selected images or multiple selected folders,
   with direct-folder and recursive scopes, search, progress, cancellation, and
   background continuation.
@@ -113,6 +117,11 @@ details are in `RELEASE_NOTES.MD`.
 - Recursive **Read XMP from Folder** action that treats XMP as authoritative
   for matching images, recognizes basename and full-filename sidecars, reports
   the imported-image count, and refreshes the currently open folder.
+- Initial Lightroom Classic translation covers global tone, presence, HSL,
+  sharpening/noise reduction, color calibration, point curves, monochrome,
+  grain, and post-crop vignette settings. The review identifies approximate
+  mappings and warns about unsupported absolute white balance, profiles, lens
+  corrections, crop/geometry, masks, and retouching.
 
 ## Application identity and data continuity
 
