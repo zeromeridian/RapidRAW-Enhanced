@@ -34,6 +34,7 @@ interface LightroomImportPreview {
 interface LightroomApplyResult {
   applied: number;
   skipped: number;
+  appliedPaths: string[];
 }
 
 interface LightroomImportModalProps {
@@ -137,9 +138,9 @@ export default function LightroomImportModal({ isOpen, targetPaths, onClose, onA
           sidecarDigest: preview.sidecarDigest!,
         })),
       });
-      const approvedPaths = selected.map((preview) => preview.path);
-      approvedPaths.forEach((path) => globalImageCache.delete(path));
-      await refreshOpenAdjustments(approvedPaths);
+      result.appliedPaths.forEach((path) => globalImageCache.delete(path));
+      await refreshOpenAdjustments(result.appliedPaths);
+      await invoke<number>(Invokes.RegenerateThumbnails, { paths: result.appliedPaths });
       await onApplied();
       toast.success(t('modals.lightroomImport.applied', { count: result.applied }));
       onClose();

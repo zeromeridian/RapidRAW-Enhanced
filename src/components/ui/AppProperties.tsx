@@ -90,6 +90,7 @@ export enum Invokes {
   ReadExifForPaths = 'read_exif_for_paths',
   ReadXmpFromFolder = 'read_xmp_from_folder',
   PreviewLightroomXmpEdits = 'preview_lightroom_xmp_edits',
+  RegenerateThumbnails = 'regenerate_thumbnails',
   RemoveTagForPaths = 'remove_tag_for_paths',
   RenameFiles = 'rename_files',
   RenameFolder = 'rename_folder',
