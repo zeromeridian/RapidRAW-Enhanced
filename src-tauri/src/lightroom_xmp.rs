@@ -49,6 +49,7 @@ pub struct LightroomImportApproval {
 pub struct LightroomApplyResult {
     applied: usize,
     skipped: usize,
+    applied_paths: Vec<String>,
 }
 
 #[derive(Default)]
@@ -684,6 +685,7 @@ pub fn apply_approved_lightroom_xmp_edits(
 ) -> Result<LightroomApplyResult, String> {
     let mut applied = 0;
     let mut skipped = 0;
+    let mut applied_paths = Vec::new();
 
     for approval in approvals {
         let (source_path, sidecar_path) = parse_virtual_path(&approval.path);
@@ -722,9 +724,14 @@ pub fn apply_approved_lightroom_xmp_edits(
         merge_patch(&mut metadata.adjustments, &translation.patch);
         write_metadata_atomically(&sidecar_path, &metadata)?;
         applied += 1;
+        applied_paths.push(approval.path);
     }
 
-    Ok(LightroomApplyResult { applied, skipped })
+    Ok(LightroomApplyResult {
+        applied,
+        skipped,
+        applied_paths,
+    })
 }
 
 #[cfg(test)]
@@ -810,6 +817,7 @@ mod tests {
         }])
         .unwrap();
         assert_eq!(result.applied, 1);
+        assert_eq!(result.applied_paths, vec![image.to_string_lossy()]);
 
         let updated: ImageMetadata = serde_json::from_slice(&fs::read(&sidecar).unwrap()).unwrap();
         assert_eq!(updated.adjustments["exposure"], json!(1.25));

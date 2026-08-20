@@ -2620,6 +2620,44 @@ fn emit_thumbnail_generated(
     );
 }
 
+#[tauri::command]
+pub async fn regenerate_thumbnails(
+    paths: Vec<String>,
+    app_handle: AppHandle,
+) -> Result<usize, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let settings = load_settings(app_handle.clone()).unwrap_or_default();
+        let thumb_cache_dir = resolve_thumbnail_cache_dir(&app_handle)?;
+        let mut generated = 0;
+        let mut seen = HashSet::new();
+
+        for path in paths {
+            if !seen.insert(path.clone()) {
+                continue;
+            }
+            if let Some((thumbnail_path, rating, is_edited)) = generate_single_thumbnail_and_cache(
+                &path,
+                &thumb_cache_dir,
+                None,
+                None,
+                true,
+                &app_handle,
+                &settings,
+            ) {
+                emit_thumbnail_generated(&app_handle, &path, &thumbnail_path, rating, is_edited);
+                generated += 1;
+            } else {
+                log::warn!("Failed to regenerate thumbnail for '{path}'");
+            }
+            thread::yield_now();
+        }
+
+        Ok(generated)
+    })
+    .await
+    .map_err(|error| format!("Thumbnail regeneration task failed: {error}"))?
+}
+
 pub fn resolve_lens_params_in_adjustments(
     adjustments: &mut Value,
     exif_data: &Option<HashMap<String, String>>,

@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.4.1-fix-thumbs-refresh — 2026-08-20
+
+### Accurate thumbnails after Lightroom edits
+
+- Applying reviewed Lightroom Classic edits now regenerates every affected
+  grid thumbnail from the updated ThisIsRAW adjustments.
+- Thumbnail regeneration uses the existing cache and update events, refreshes
+  only images whose edits were actually applied, and runs off the UI thread so
+  Library navigation remains responsive.
+
 ## 1.4.0-feature-migrate-lrc — 2026-08-17
 
 ### Lightroom Classic edit translation trial
@@ -33,7 +43,6 @@ description.
   original RapidRAW files.
 - File operations, folder scanning, tag management, and sidecar cleanup
   consistently handle `.tirdata` while preserving editing and XMP features.
-
 
 ## 1.2.21-fix-gui-density — 2026-08-14
 

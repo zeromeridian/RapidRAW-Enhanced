@@ -32,6 +32,8 @@ details are in `RELEASE_NOTES.MD`.
   physical images. The review lists every proposed mapping and its confidence,
   leaves `.tirdata` and Lightroom XMP untouched until explicit approval, then
   merges only approved supported fields while preserving ThisIsRAW-only edits.
+  Successfully changed images regenerate their grid thumbnails from the new
+  adjustments without reloading or blocking the complete Library.
 - Bulk preset application for selected images or multiple selected folders,
   with direct-folder and recursive scopes, search, progress, cancellation, and
   background continuation.
