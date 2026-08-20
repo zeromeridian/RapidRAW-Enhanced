@@ -41,13 +41,15 @@ details are in `RELEASE_NOTES.MD`.
 - Optional empty-folder hiding that preserves configured and pinned roots while
   removing branches with no supported images.
 - Responsive loading for large direct and recursive folders, with transactional
-  folder/album navigation, embedded catalog snapshots, persistent
-  cross-launch thumbnail references, progressive root-tree refinement, and
-  generation-guarded state commits. Cataloged content appears immediately while
-  the filesystem is revalidated in the background. Sidecar/XMP reconciliation
-  uses bounded background workers, and optional AI indexing yields to visible
-  thumbnails and cannot refresh an unrelated folder. Files, `.tirdata`, and XMP
-  remain authoritative; the bundled SQLite catalog requires no server.
+  folder/album navigation, embedded image and folder-tree catalog snapshots,
+  persistent cross-launch thumbnail references, progressive root-tree
+  refinement, and generation-guarded state commits. Cataloged content and
+  navigation appear immediately while the filesystem is revalidated in the
+  background; temporarily unavailable roots retain their last usable tree.
+  Sidecar/XMP reconciliation uses bounded background workers, and optional AI
+  indexing yields to visible thumbnails and cannot refresh an unrelated folder.
+  Files, `.tirdata`, and XMP remain authoritative; the bundled SQLite catalog
+  requires no server.
 - The library catalog location is visible and customizable in General Settings;
   changing it safely moves the existing catalog, with an option to restore the
   platform-default location.
@@ -55,7 +57,10 @@ details are in `RELEASE_NOTES.MD`.
   background EXIF extraction. Catalog thumbnails display immediately and
   visible Grid/Culling items are then validated against source and current
   sidecar adjustment cache keys. Develop autosaves coalesce superseded
-  thumbnail renders so stale jobs cannot replace the latest edit.
+  thumbnail renders so stale jobs cannot replace the latest edit. All adjusted
+  thumbnail entry points reuse the Develop GPU pipeline and refuse to publish
+  an inaccurate unprocessed fallback; renderer-version changes invalidate
+  incompatible cached thumbnails once.
 
 ## Develop
 

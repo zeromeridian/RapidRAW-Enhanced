@@ -80,6 +80,7 @@ export enum Invokes {
   ListImagesInDir = 'list_images_in_dir',
   ListImagesRecursive = 'list_images_recursive',
   LoadCatalogFolder = 'load_catalog_folder',
+  LoadCatalogFolderTrees = 'load_catalog_folder_trees',
   GetCatalogLocation = 'get_catalog_location',
   MoveLibraryCatalog = 'move_library_catalog',
   LoadImage = 'load_image',

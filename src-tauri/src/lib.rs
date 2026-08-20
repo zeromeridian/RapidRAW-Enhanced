@@ -3185,6 +3185,7 @@ pub fn run() {
             file_management::apply_preset_batch,
             file_management::cancel_preset_batch,
             library_catalog::load_catalog_folder,
+            library_catalog::load_catalog_folder_trees,
             library_catalog::get_catalog_location,
             library_catalog::move_library_catalog,
             file_management::get_folder_tree,

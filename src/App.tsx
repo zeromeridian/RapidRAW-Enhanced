@@ -205,6 +205,7 @@ function App() {
 
   const transformWrapperRef = useRef<any>(null);
   const preloadedDataRef = useRef<{
+    cachedTrees?: Promise<Array<{ path: string }>>;
     trees?: Promise<any>;
     rootPaths?: string[];
   }>({});

@@ -19,6 +19,7 @@ import {
   ThumbnailAspectRatio,
 } from '../components/ui/AppProperties';
 import { useTranslation } from 'react-i18next';
+import { RootFolderTree, mergeRefreshedFolderTrees } from '../utils/folderTreeCache';
 
 interface UseAppInitializationProps {
   preloadedDataRef: React.RefObject<any>;
@@ -196,13 +197,24 @@ export const useAppInitialization = ({
         if (settings?.thumbnailAspectRatio) setThumbnailAspectRatio(settings.thumbnailAspectRatio);
 
         if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
-          void invoke<any[]>(Invokes.GetPinnedFolderTrees, {
-            paths: settings.pinnedFolders,
+          const pinnedPaths = settings.pinnedFolders;
+          const pinnedTreeArgs = {
+            paths: pinnedPaths,
             expandedFolders: settings.lastFolderState?.expandedFolders || [],
             showImageCounts: settings.enableFolderImageCounts || settings.folderTreeSort?.key === 'imageCount',
             hideEmptyFolders: settings.hideEmptyFolders ?? false,
-          })
-            .then((trees) => setLibrary({ pinnedFolderTrees: trees }))
+          };
+          void invoke<RootFolderTree[]>(Invokes.LoadCatalogFolderTrees, pinnedTreeArgs)
+            .then((cachedTrees) => {
+              if (cachedTrees.length > 0) setLibrary({ pinnedFolderTrees: cachedTrees });
+            })
+            .catch((error) => console.warn('Pinned folder-tree catalog could not be read:', error))
+            .then(() => invoke<RootFolderTree[]>(Invokes.GetPinnedFolderTrees, pinnedTreeArgs))
+            .then((refreshedTrees) =>
+              setLibrary((state) => ({
+                pinnedFolderTrees: mergeRefreshedFolderTrees(pinnedPaths, state.pinnedFolderTrees, refreshedTrees),
+              })),
+            )
             .catch((err) => console.error('Failed to load pinned folder trees:', err));
         }
 
@@ -213,14 +225,22 @@ export const useAppInitialization = ({
             : [];
 
         if (!isAndroid && rootFolders.length > 0) {
+          const rootTreeArgs = {
+            paths: rootFolders,
+            expandedFolders: settings.lastFolderState?.expandedFolders ?? rootFolders,
+            showImageCounts: settings.enableFolderImageCounts || settings.folderTreeSort?.key === 'imageCount',
+            hideEmptyFolders: settings.hideEmptyFolders ?? false,
+          };
+          const cachedTrees = invoke<RootFolderTree[]>(Invokes.LoadCatalogFolderTrees, rootTreeArgs);
           preloadedDataRef.current = {
             rootPaths: rootFolders,
-            trees: invoke(Invokes.GetPinnedFolderTrees, {
-              paths: rootFolders,
-              expandedFolders: settings.lastFolderState?.expandedFolders ?? rootFolders,
-              showImageCounts: settings.enableFolderImageCounts || settings.folderTreeSort?.key === 'imageCount',
-              hideEmptyFolders: settings.hideEmptyFolders ?? false,
-            }),
+            cachedTrees,
+            trees: cachedTrees
+              .catch((error) => {
+                console.warn('Library folder-tree catalog could not be read:', error);
+                return [];
+              })
+              .then(() => invoke(Invokes.GetPinnedFolderTrees, rootTreeArgs)),
           };
         }
 

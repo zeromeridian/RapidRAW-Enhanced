@@ -45,6 +45,8 @@ use crate::mask_generation::MaskDefinition;
 use crate::preset_converter;
 use crate::tagging::{COLOR_TAG_PREFIX, FLAG_TAG_PREFIX};
 
+pub const THUMBNAIL_RENDERER_VERSION: &str = "gpu-adjustments-v1";
+
 fn resolve_thumbnail_cache_dir(app_handle: &AppHandle) -> std::result::Result<PathBuf, String> {
     let cache_dir = app_handle
         .path()
@@ -76,6 +78,7 @@ fn compute_thumbnail_cache_hash(path_str: &str, adjustments_bytes: &[u8]) -> Opt
         .as_secs();
 
     let mut hasher = blake3::Hasher::new();
+    hasher.update(THUMBNAIL_RENDERER_VERSION.as_bytes());
     hasher.update(path_str.as_bytes());
     hasher.update(&img_mod_time.to_le_bytes());
     hasher.update(adjustments_bytes);
@@ -483,10 +486,10 @@ fn parse_sidecar_filename(file_name: &str) -> Option<(String, Option<String>)> {
 #[cfg(test)]
 mod output_naming_tests {
     use super::{
-        apply_preset_adjustments_to_path, collect_preset_batch_folder_paths, extract_app_xmp_value,
-        extract_xmp_stack, import_rapidraw_sidecars, parse_sidecar_filename, parse_virtual_path,
-        read_xmp_from_folder, sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp,
-        sync_metadata_to_xmp,
+        apply_preset_adjustments_to_path, collect_preset_batch_folder_paths,
+        compute_thumbnail_cache_hash, extract_app_xmp_value, extract_xmp_stack,
+        import_rapidraw_sidecars, parse_sidecar_filename, parse_virtual_path, read_xmp_from_folder,
+        sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
     };
     use crate::app_settings::AppSettings;
     use crate::image_processing::ImageMetadata;
@@ -519,6 +522,19 @@ mod output_naming_tests {
             Some(("image.jpg".to_string(), None))
         );
         assert_eq!(parse_sidecar_filename("image.jpg"), None);
+    }
+
+    #[test]
+    fn thumbnail_cache_hash_changes_with_persisted_adjustments() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("image.jpg");
+        fs::write(&image, b"image bytes").unwrap();
+        let image_path = image.to_string_lossy();
+
+        let original = compute_thumbnail_cache_hash(&image_path, b"{}").unwrap();
+        let edited = compute_thumbnail_cache_hash(&image_path, br#"{"brightness":0.5}"#).unwrap();
+
+        assert_ne!(original, edited);
     }
 
     #[test]
@@ -1600,7 +1616,7 @@ pub fn get_album_images(
     Ok(result_list)
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FolderNode {
     pub name: String,
@@ -1864,10 +1880,12 @@ pub async fn get_folder_tree(
     expanded_folders: Vec<String>,
     show_image_counts: bool,
     hide_empty_folders: bool,
+    app_handle: AppHandle,
 ) -> Result<FolderNode, String> {
+    let task_path = path.clone();
     match tauri::async_runtime::spawn_blocking(move || {
         get_folder_tree_sync(
-            path,
+            task_path,
             expanded_folders,
             show_image_counts,
             hide_empty_folders,
@@ -1875,7 +1893,17 @@ pub async fn get_folder_tree(
     })
     .await
     {
-        Ok(Ok(folder_node)) => Ok(folder_node),
+        Ok(Ok(folder_node)) => {
+            if let Err(error) = crate::library_catalog::save_folder_tree_snapshots(
+                &app_handle,
+                std::slice::from_ref(&folder_node),
+                show_image_counts,
+                hide_empty_folders,
+            ) {
+                log::warn!("Failed to cache folder tree for {path}: {error}");
+            }
+            Ok(folder_node)
+        }
         Ok(Err(e)) => Err(e),
         Err(e) => Err(format!("Failed to execute folder tree task: {}", e)),
     }
@@ -1887,6 +1915,7 @@ pub async fn get_pinned_folder_trees(
     expanded_folders: Vec<String>,
     show_image_counts: bool,
     hide_empty_folders: bool,
+    app_handle: AppHandle,
 ) -> Result<Vec<FolderNode>, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let results: Vec<Result<FolderNode, String>> = paths
@@ -1913,7 +1942,17 @@ pub async fn get_pinned_folder_trees(
     .await;
 
     match result {
-        Ok(nodes) => Ok(nodes),
+        Ok(nodes) => {
+            if let Err(error) = crate::library_catalog::save_folder_tree_snapshots(
+                &app_handle,
+                &nodes,
+                show_image_counts,
+                hide_empty_folders,
+            ) {
+                log::warn!("Failed to cache folder trees: {error}");
+            }
+            Ok(nodes)
+        }
         Err(e) => Err(format!("Task failed: {}", e)),
     }
 }
@@ -2037,6 +2076,12 @@ pub fn generate_thumbnail_data(
     let adjustments = metadata
         .as_ref()
         .map_or(serde_json::Value::Null, |m| m.adjustments.clone());
+
+    if !adjustments.is_null() && gpu_context.is_none() {
+        anyhow::bail!(
+            "An adjusted thumbnail requires the shared GPU renderer; refusing to publish an unprocessed fallback"
+        );
+    }
 
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let always_decode_raw = settings.always_decode_raw_thumbnails.unwrap_or(false);
@@ -2387,12 +2432,30 @@ fn generate_single_thumbnail_and_cache(
 
     let target_width = settings.thumbnail_resolution.unwrap_or(720);
 
-    if let Ok(thumb_image) =
-        generate_thumbnail_data(path_str, gpu_context, preloaded_image, app_handle)
-        && let Ok(thumb_data) = encode_thumbnail(&thumb_image, target_width)
-    {
-        let _ = fs::write(&cache_path, &thumb_data);
-        return Some((cache_path.to_string_lossy().into_owned(), rating, is_edited));
+    // Every adjusted thumbnail must use the same GPU adjustment pipeline as
+    // Develop. Callers may pass a context to reuse it across a batch; otherwise
+    // initialize the shared application context here so no regeneration path
+    // can silently publish the old incomplete CPU fallback.
+    let initialized_gpu_context = if gpu_context.is_none() {
+        let state = app_handle.state::<AppState>();
+        gpu_processing::get_or_init_gpu_context(&state, app_handle).ok()
+    } else {
+        None
+    };
+    let gpu_context = gpu_context.or(initialized_gpu_context.as_ref());
+
+    match generate_thumbnail_data(path_str, gpu_context, preloaded_image, app_handle) {
+        Ok(thumb_image) => match encode_thumbnail(&thumb_image, target_width) {
+            Ok(thumb_data) => {
+                if let Err(error) = fs::write(&cache_path, &thumb_data) {
+                    log::warn!("Failed to write thumbnail cache for '{path_str}': {error}");
+                    return None;
+                }
+                return Some((cache_path.to_string_lossy().into_owned(), rating, is_edited));
+            }
+            Err(error) => log::warn!("Failed to encode thumbnail for '{path_str}': {error}"),
+        },
+        Err(error) => log::warn!("Failed to render thumbnail for '{path_str}': {error}"),
     }
     None
 }

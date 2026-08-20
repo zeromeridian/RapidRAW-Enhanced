@@ -5,6 +5,29 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.4.3-fix-thumbs-refresh — 2026-08-20
+
+### Thumbnails match Develop edits
+
+- All adjusted thumbnails now use the same GPU adjustment pipeline as Develop,
+  including Lightroom imports, normal editing, presets, resets, and automatic
+  adjustments.
+- The app no longer publishes an unprocessed fallback when an adjusted
+  thumbnail cannot be rendered accurately.
+- Thumbnails created by the previous incomplete renderer are invalidated once
+  and regenerated progressively as they become visible.
+
+## 1.4.2-fix-thumbs-refresh — 2026-08-20
+
+### Immediate folder navigation on launch
+
+- Previously scanned folder trees now restore immediately from the Library
+  catalog while filesystem counts and stale folders refresh in the background.
+- A usable root tree appears even before the first catalog snapshot exists,
+  and temporarily unavailable folders retain their last known navigation tree.
+- Catalog thumbnail restoration now queries only the active folder's images,
+  improving startup efficiency for large libraries.
+
 ## 1.4.1-fix-thumbs-refresh — 2026-08-20
 
 ### Accurate thumbnails after Lightroom edits

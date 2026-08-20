@@ -13,6 +13,7 @@ import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjust
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
+import { createProvisionalFolderTrees, mergeRefreshedFolderTrees } from '../utils/folderTreeCache';
 
 interface CatalogFolderSnapshot {
   images: ImageFile[];
@@ -651,7 +652,14 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       const folderState = appSettings?.lastFolderState;
       const pathToSelect = folderState?.currentFolderPath || rootFolders[0];
 
-      setLibrary({ rootPaths: rootFolders });
+      setLibrary((state) => ({
+        rootPaths: rootFolders,
+        folderTrees: mergeRefreshedFolderTrees(
+          rootFolders,
+          createProvisionalFolderTrees(rootFolders),
+          state.folderTrees,
+        ),
+      }));
 
       if (folderState?.expandedFolders) {
         const newExpandedFolders = new Set<string>(folderState.expandedFolders);
@@ -663,8 +671,22 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       setLibrary({ isTreeLoading: true });
       void (async () => {
         try {
+          const hasMatchingPreload = preloadedDataRef.current?.rootPaths?.join() === rootFolders.join();
+          if (hasMatchingPreload && preloadedDataRef.current.cachedTrees) {
+            const cachedTrees = await preloadedDataRef.current.cachedTrees.catch((error: unknown) => {
+              console.warn('Failed to restore cached folder trees:', error);
+              return [];
+            });
+            preloadedDataRef.current.cachedTrees = undefined;
+            if (cachedTrees.length > 0) {
+              setLibrary((state) => ({
+                folderTrees: mergeRefreshedFolderTrees(rootFolders, state.folderTrees, cachedTrees),
+              }));
+            }
+          }
+
           let treesData;
-          if (preloadedDataRef.current?.rootPaths?.join() === rootFolders.join() && preloadedDataRef.current.trees) {
+          if (hasMatchingPreload && preloadedDataRef.current.trees) {
             treesData = await preloadedDataRef.current.trees;
             preloadedDataRef.current.trees = undefined;
           } else {
@@ -679,7 +701,9 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
               hideEmptyFolders: appSettings?.hideEmptyFolders ?? false,
             });
           }
-          setLibrary({ folderTrees: treesData });
+          setLibrary((state) => ({
+            folderTrees: mergeRefreshedFolderTrees(rootFolders, state.folderTrees, treesData),
+          }));
         } catch (err) {
           console.error('Failed to restore folder trees:', err);
         } finally {
