@@ -5,13 +5,14 @@ use std::sync::{LazyLock, Mutex, OnceLock, mpsc};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
-use crate::file_management::ImageFile;
+use crate::file_management::{FolderNode, ImageFile, THUMBNAIL_RENDERER_VERSION};
 
 const THUMBNAIL_BATCH_SIZE: usize = 256;
+const THUMBNAIL_LOOKUP_BATCH_SIZE: usize = 500;
 static THUMBNAIL_WRITER: OnceLock<mpsc::Sender<(String, String)>> = OnceLock::new();
 static CATALOG_OPERATION_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
@@ -56,7 +57,7 @@ fn database_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn open_at(path: PathBuf) -> Result<Connection, String> {
-    let connection = Connection::open(path).map_err(|error| error.to_string())?;
+    let mut connection = Connection::open(path).map_err(|error| error.to_string())?;
     connection
         .busy_timeout(std::time::Duration::from_secs(2))
         .map_err(|error| error.to_string())?;
@@ -73,9 +74,43 @@ fn open_at(path: PathBuf) -> Result<Connection, String> {
                  image_path TEXT PRIMARY KEY,
                  thumbnail_path TEXT NOT NULL,
                  updated_at INTEGER NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS folder_tree_snapshots (
+                 cache_key TEXT PRIMARY KEY,
+                 tree_json TEXT NOT NULL,
+                 updated_at INTEGER NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS catalog_meta (
+                 key TEXT PRIMARY KEY,
+                 value TEXT NOT NULL
              );",
         )
         .map_err(|error| error.to_string())?;
+
+    let stored_renderer_version = connection
+        .query_row(
+            "SELECT value FROM catalog_meta WHERE key='thumbnail_renderer_version'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|error| error.to_string())?;
+    if stored_renderer_version.as_deref() != Some(THUMBNAIL_RENDERER_VERSION) {
+        let transaction = connection
+            .transaction()
+            .map_err(|error| error.to_string())?;
+        transaction
+            .execute("DELETE FROM thumbnail_index", [])
+            .map_err(|error| error.to_string())?;
+        transaction
+            .execute(
+                "INSERT INTO catalog_meta(key, value) VALUES ('thumbnail_renderer_version', ?1)
+                 ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                [THUMBNAIL_RENDERER_VERSION],
+            )
+            .map_err(|error| error.to_string())?;
+        transaction.commit().map_err(|error| error.to_string())?;
+    }
     Ok(connection)
 }
 
@@ -84,16 +119,36 @@ fn open(app_handle: &AppHandle) -> Result<Connection, String> {
 }
 
 fn cache_key(path: &str, recursive: bool, xmp_sync: bool) -> String {
-    let normalized = if cfg!(target_os = "windows") {
-        path.replace('\\', "/").trim_end_matches('/').to_lowercase()
-    } else {
-        path.replace('\\', "/").trim_end_matches('/').to_owned()
-    };
     format!(
         "{}|{}|{}",
         if recursive { "recursive" } else { "flat" },
         if xmp_sync { "xmp" } else { "sidecar" },
-        normalized
+        normalized_path(path)
+    )
+}
+
+fn normalized_path(path: &str) -> String {
+    if cfg!(target_os = "windows") {
+        path.replace('\\', "/").trim_end_matches('/').to_lowercase()
+    } else {
+        path.replace('\\', "/").trim_end_matches('/').to_owned()
+    }
+}
+
+fn tree_cache_key(path: &str, show_image_counts: bool, hide_empty_folders: bool) -> String {
+    format!(
+        "{}|{}|{}",
+        if show_image_counts {
+            "counts"
+        } else {
+            "no-counts"
+        },
+        if hide_empty_folders {
+            "hide-empty"
+        } else {
+            "show-empty"
+        },
+        normalized_path(path)
     )
 }
 
@@ -184,19 +239,24 @@ pub fn load_catalog_folder(
     };
     let images: Vec<ImageFile> =
         serde_json::from_str(&images_json).map_err(|error| error.to_string())?;
-    let paths: std::collections::HashSet<&str> =
-        images.iter().map(|image| image.path.as_str()).collect();
     let mut thumbnails = HashMap::new();
-    let mut statement = connection
-        .prepare("SELECT image_path, thumbnail_path FROM thumbnail_index")
-        .map_err(|error| error.to_string())?;
-    let rows = statement
-        .query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })
-        .map_err(|error| error.to_string())?;
-    for row in rows.filter_map(Result::ok) {
-        if paths.contains(row.0.as_str()) {
+    for image_batch in images.chunks(THUMBNAIL_LOOKUP_BATCH_SIZE) {
+        let placeholders = std::iter::repeat_n("?", image_batch.len())
+            .collect::<Vec<_>>()
+            .join(",");
+        let query = format!(
+            "SELECT image_path, thumbnail_path FROM thumbnail_index WHERE image_path IN ({placeholders})"
+        );
+        let mut statement = connection
+            .prepare(&query)
+            .map_err(|error| error.to_string())?;
+        let rows = statement
+            .query_map(
+                params_from_iter(image_batch.iter().map(|image| image.path.as_str())),
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .map_err(|error| error.to_string())?;
+        for row in rows.filter_map(Result::ok) {
             thumbnails.insert(row.0, row.1);
         }
     }
@@ -205,6 +265,104 @@ pub fn load_catalog_folder(
         thumbnails,
         updated_at,
     }))
+}
+
+pub fn save_folder_tree_snapshots(
+    app_handle: &AppHandle,
+    trees: &[FolderNode],
+    show_image_counts: bool,
+    hide_empty_folders: bool,
+) -> Result<(), String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    let mut connection = open(app_handle)?;
+    save_folder_tree_snapshots_to_connection(
+        &mut connection,
+        trees,
+        show_image_counts,
+        hide_empty_folders,
+    )
+}
+
+fn save_folder_tree_snapshots_to_connection(
+    connection: &mut Connection,
+    trees: &[FolderNode],
+    show_image_counts: bool,
+    hide_empty_folders: bool,
+) -> Result<(), String> {
+    if trees.is_empty() {
+        return Ok(());
+    }
+
+    let transaction = connection
+        .transaction()
+        .map_err(|error| error.to_string())?;
+    let timestamp = now();
+    for tree in trees {
+        let tree_json = serde_json::to_string(tree).map_err(|error| error.to_string())?;
+        transaction
+            .execute(
+                "INSERT INTO folder_tree_snapshots(cache_key, tree_json, updated_at)
+                 VALUES (?1, ?2, ?3)
+                 ON CONFLICT(cache_key) DO UPDATE SET tree_json=excluded.tree_json,
+                     updated_at=excluded.updated_at",
+                params![
+                    tree_cache_key(&tree.path, show_image_counts, hide_empty_folders),
+                    tree_json,
+                    timestamp
+                ],
+            )
+            .map_err(|error| error.to_string())?;
+    }
+    transaction.commit().map_err(|error| error.to_string())
+}
+
+fn load_folder_tree_snapshots_from_connection(
+    connection: &Connection,
+    paths: &[String],
+    show_image_counts: bool,
+    hide_empty_folders: bool,
+) -> Result<Vec<FolderNode>, String> {
+    let mut trees = Vec::with_capacity(paths.len());
+    for path in paths {
+        let stored = connection
+            .query_row(
+                "SELECT tree_json FROM folder_tree_snapshots WHERE cache_key=?1",
+                [tree_cache_key(path, show_image_counts, hide_empty_folders)],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|error| error.to_string())?;
+        if let Some(tree_json) = stored {
+            match serde_json::from_str(&tree_json) {
+                Ok(tree) => trees.push(tree),
+                Err(error) => {
+                    log::warn!("Ignoring invalid cached folder tree for {path}: {error}")
+                }
+            }
+        }
+    }
+    Ok(trees)
+}
+
+#[tauri::command]
+pub async fn load_catalog_folder_trees(
+    paths: Vec<String>,
+    show_image_counts: bool,
+    hide_empty_folders: bool,
+    app_handle: AppHandle,
+) -> Result<Vec<FolderNode>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+        let connection = open(&app_handle)?;
+        load_folder_tree_snapshots_from_connection(
+            &connection,
+            &paths,
+            show_image_counts,
+            hide_empty_folders,
+        )
+    })
+    .await
+    .map_err(|error| format!("Catalog folder-tree task failed: {error}"))?
 }
 
 pub fn clear_thumbnail_index(app_handle: &AppHandle) -> Result<(), String> {
@@ -370,4 +528,89 @@ pub fn move_library_catalog(
         database_path: target.to_string_lossy().into_owned(),
         directory: configured_directory,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_tree(path: &str) -> FolderNode {
+        FolderNode {
+            name: "Photos".to_owned(),
+            path: path.to_owned(),
+            children: Vec::new(),
+            is_dir: true,
+            image_count: 42,
+            contains_images: true,
+            has_subdirs: true,
+            modified: 10,
+            created: 5,
+        }
+    }
+
+    #[test]
+    fn folder_tree_snapshots_round_trip_and_keep_setting_variants_separate() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut connection = open_at(temporary.path().join("catalog.sqlite3")).unwrap();
+        let path = "/photos".to_owned();
+
+        save_folder_tree_snapshots_to_connection(&mut connection, &[test_tree(&path)], true, true)
+            .unwrap();
+
+        let restored = load_folder_tree_snapshots_from_connection(
+            &connection,
+            std::slice::from_ref(&path),
+            true,
+            true,
+        )
+        .unwrap();
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0].path, path);
+        assert_eq!(restored[0].image_count, 42);
+
+        let different_settings =
+            load_folder_tree_snapshots_from_connection(&connection, &[path], false, true).unwrap();
+        assert!(different_settings.is_empty());
+    }
+
+    #[test]
+    fn renderer_upgrade_invalidates_legacy_thumbnail_index_once() {
+        let temporary = tempfile::tempdir().unwrap();
+        let catalog_path = temporary.path().join("catalog.sqlite3");
+        let connection = open_at(catalog_path.clone()).unwrap();
+        connection
+            .execute(
+                "INSERT INTO thumbnail_index(image_path, thumbnail_path, updated_at)
+                 VALUES ('image.jpg', 'old.jpg', 1)",
+                [],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "UPDATE catalog_meta SET value='legacy' WHERE key='thumbnail_renderer_version'",
+                [],
+            )
+            .unwrap();
+        drop(connection);
+
+        let connection = open_at(catalog_path.clone()).unwrap();
+        let count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM thumbnail_index", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+        connection
+            .execute(
+                "INSERT INTO thumbnail_index(image_path, thumbnail_path, updated_at)
+                 VALUES ('image.jpg', 'current.jpg', 2)",
+                [],
+            )
+            .unwrap();
+        drop(connection);
+
+        let connection = open_at(catalog_path).unwrap();
+        let count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM thumbnail_index", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
 }
