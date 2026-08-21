@@ -7,7 +7,10 @@ details are in `RELEASE_NOTES.MD`.
 ## Library and workflow
 
 - Customizable bottom toolbar shared by Library and Develop, with Productivity,
-  Copy, Stacking, Flags, and direct color-label controls.
+  Copy, Stacking, Flags, direct color-label controls, and a visually distinct
+  expandable **Select by** control. Select by replaces the current selection
+  using any rating, RAW/non-RAW, edit-status, color-label, or flag criterion
+  without changing active filters, and displays the number of matching images.
 - Manual image stacks with collapse/expand, visible stack cues, drag ordering,
   move-to-top covers, and matching Develop-filmstrip presentation.
 - Automatic stacking of physical copies, virtual copies, and exported images,

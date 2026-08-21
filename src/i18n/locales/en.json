@@ -1960,6 +1960,10 @@
     "bottomBar": {
       "customizeToolbar": "Customize Toolbar",
       "imagesSelected": "{{current}} of {{total}} images selected",
+      "selectBy": {
+        "description": "Replace the selection without changing filters",
+        "title": "Select by"
+      },
       "tooltips": {
         "collapseFilmstrip": "Collapse Filmstrip",
         "copyPasteSettings": "Copy & Paste Settings",
