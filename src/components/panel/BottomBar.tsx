@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
   Aperture,
@@ -16,6 +16,7 @@ import {
   LayoutTemplate,
   Layers,
   ListCollapse,
+  MousePointer2,
   Settings,
   SlidersHorizontal,
   SquaresUnite,
@@ -32,7 +33,17 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 
 import Filmstrip from './Filmstrip';
-import { AlbumItem, GLOBAL_KEYS, ImageFile, Invokes, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
+import {
+  AlbumItem,
+  EditedStatus,
+  FilterCriteria,
+  GLOBAL_KEYS,
+  ImageFile,
+  Invokes,
+  RawStatus,
+  SelectedImage,
+  ThumbnailAspectRatio,
+} from '../ui/AppProperties';
 import Text from '../ui/Text';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -57,6 +68,7 @@ import {
   IMAGE_FLAG_FILTER_OPTIONS,
 } from '../../utils/imageFlags';
 import { ImageFlagIcon } from '../ui/ImageFlagBadge';
+import { matchesLibraryFilter } from '../../utils/libraryFilters';
 
 interface BottomBarProps {
   filmstripHeight?: number;
@@ -119,6 +131,7 @@ const COPY_TOOLBAR_IDS = ['physicalCopy', 'virtualCopy'] as const;
 const STACK_TOOLBAR_IDS = ['stackSelected', 'toggleStack', 'setStackCover', 'unstack'] as const;
 const FLAG_TOOLBAR_IDS = ['flagRejected', 'flagSelected', 'flagDeferred', 'flagUnflagged', 'deleteRejected'] as const;
 const COLOR_TOOLBAR_IDS = ['colorRed', 'colorYellow', 'colorGreen', 'colorBlue', 'colorPurple', 'colorNone'] as const;
+const ALL_COLOR_OPTIONS = [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }];
 
 const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
   const { t } = useTranslation();
@@ -226,8 +239,10 @@ export default function BottomBar({
   const showSelectionCounter = numSelected > 1;
 
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  const [isSelectByOpen, setIsSelectByOpen] = useState(false);
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const customizeRef = useRef<HTMLDivElement>(null);
+  const selectByRef = useRef<HTMLDivElement>(null);
   const {
     filterCriteria,
     libraryActivePath,
@@ -256,7 +271,7 @@ export default function BottomBar({
     })),
   );
 
-  const allColors = [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }];
+  const allColors = ALL_COLOR_OPTIONS;
   const toolbarVisibility = appSettings?.bottomToolbarVisibility || {};
   const isToolbarItemVisible = (id: string) => toolbarVisibility[id] !== false;
   const isToolbarGroupVisible = (ids: readonly string[]) => ids.some(isToolbarItemVisible);
@@ -340,12 +355,129 @@ export default function BottomBar({
     { id: 'setStackCover', label: t('contextMenus.thumbnail.moveToTopOfStack') },
     { id: 'unstack', label: t('contextMenus.thumbnail.unstack') },
     { id: 'quickFilter', label: t('ui.bottomBar.tooltips.quickFilter') },
+    { id: 'selectBy', label: t('ui.bottomBar.selectBy.title', 'Select by') },
     { id: 'export', label: t('ui.bottomBar.tooltips.export') },
     { id: 'zoom', label: t('ui.bottomBar.zoomLabel') },
     { id: 'filmstrip', label: t('ui.bottomBar.tooltips.collapseFilmstrip') },
   ];
   const productivityButtonClass =
     'w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed';
+
+  const selectByGroups = useMemo(
+    () => [
+      {
+        label: t('library.header.viewOptions.filterByRating'),
+        options: [
+          { id: 'rating-unrated', label: t('library.filters.rating.unrated'), criteria: { rating: -1 } },
+          { id: 'rating-1', label: t('library.filters.rating.oneAndUp'), criteria: { rating: 1 } },
+          { id: 'rating-2', label: t('library.filters.rating.twoAndUp'), criteria: { rating: 2 } },
+          { id: 'rating-3', label: t('library.filters.rating.threeAndUp'), criteria: { rating: 3 } },
+          { id: 'rating-4', label: t('library.filters.rating.fourAndUp'), criteria: { rating: 4 } },
+          { id: 'rating-5', label: t('library.filters.rating.fiveOnly'), criteria: { rating: 5 } },
+        ],
+      },
+      {
+        label: t('library.header.viewOptions.filterByFileType'),
+        options: [
+          {
+            id: 'raw',
+            label: t('library.filters.raw.rawOnly'),
+            criteria: { rawStatus: RawStatus.RawOnly },
+          },
+          {
+            id: 'non-raw',
+            label: t('library.filters.raw.nonRawOnly'),
+            criteria: { rawStatus: RawStatus.NonRawOnly },
+          },
+        ],
+      },
+      {
+        label: t('library.header.viewOptions.filterByEdited', 'Edit status'),
+        options: [
+          {
+            id: 'edited',
+            label: t('library.filters.edited.editedOnly'),
+            criteria: { editedStatus: EditedStatus.EditedOnly },
+          },
+          {
+            id: 'unedited',
+            label: t('library.filters.edited.uneditedOnly'),
+            criteria: { editedStatus: EditedStatus.UneditedOnly },
+          },
+        ],
+      },
+      {
+        label: t('library.header.viewOptions.filterByColorLabel'),
+        options: allColors.map((color) => ({
+          id: `color-${color.name}`,
+          label:
+            color.name === 'none'
+              ? t('library.header.viewOptions.noLabel')
+              : t(`contextMenus.colors.${color.name}`, {
+                  defaultValue: color.name.charAt(0).toUpperCase() + color.name.slice(1),
+                }),
+          criteria: { colors: [color.name] },
+          color: color.color,
+        })),
+      },
+      {
+        label: t('library.header.viewOptions.filterByFlag'),
+        options: IMAGE_FLAG_FILTER_OPTIONS.map((flag) => ({
+          id: `flag-${flag}`,
+          label: t(`flags.${flag}`),
+          criteria: { flags: [flag] },
+          flag,
+        })),
+      },
+    ],
+    [t],
+  );
+
+  const selectByCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const group of selectByGroups) {
+      for (const option of group.options) {
+        const criteria: FilterCriteria = {
+          colors: [],
+          flags: [],
+          rating: 0,
+          rawStatus: RawStatus.All,
+          editedStatus: EditedStatus.All,
+          ...option.criteria,
+        };
+        counts.set(
+          option.id,
+          allLibraryImages.reduce(
+            (count, image) => count + (matchesLibraryFilter(image, imageRatings || {}, criteria) ? 1 : 0),
+            0,
+          ),
+        );
+      }
+    }
+    return counts;
+  }, [allLibraryImages, imageRatings, selectByGroups]);
+
+  const handleSelectBy = (criteriaOverrides: Partial<FilterCriteria>) => {
+    const criteria: FilterCriteria = {
+      colors: [],
+      flags: [],
+      rating: 0,
+      rawStatus: RawStatus.All,
+      editedStatus: EditedStatus.All,
+      ...criteriaOverrides,
+    };
+    const paths = allLibraryImages
+      .filter((image) => matchesLibraryFilter(image, imageRatings || {}, criteria))
+      .map((image) => image.path);
+    const activePath = libraryActivePath && paths.includes(libraryActivePath) ? libraryActivePath : paths[0] || null;
+    setLibrary({
+      multiSelectedPaths: paths,
+      selectedFolderPaths: [],
+      libraryActivePath: activePath,
+      selectionAnchorPath: activePath,
+    });
+    setIsSelectByOpen(false);
+  };
 
   const handleDeleteRejected = () => {
     if (!onDeleteRejected || rejectedInCurrentFolder.length === 0) return;
@@ -495,6 +627,9 @@ export default function BottomBar({
     const handleClickOutside = (event: MouseEvent) => {
       if (customizeRef.current && !customizeRef.current.contains(event.target as Node)) {
         setIsCustomizeOpen(false);
+      }
+      if (selectByRef.current && !selectByRef.current.contains(event.target as Node)) {
+        setIsSelectByOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -1119,6 +1254,98 @@ export default function BottomBar({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {isToolbarItemVisible('selectBy') && (
+            <div
+              ref={selectByRef}
+              className={clsx(
+                'relative flex h-9 items-center rounded-lg border px-0.5 transition-colors',
+                numSelected > 0 || isSelectByOpen
+                  ? 'border-accent/50 bg-accent/10'
+                  : 'border-border-color/80 bg-bg-primary/40',
+              )}
+            >
+              <button
+                type="button"
+                className={clsx(
+                  'relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors',
+                  numSelected > 0 || isSelectByOpen
+                    ? 'bg-accent/15 text-accent'
+                    : 'text-text-secondary hover:bg-surface hover:text-text-primary',
+                )}
+                onClick={() => setIsSelectByOpen((open) => !open)}
+                aria-expanded={isSelectByOpen}
+                aria-haspopup="menu"
+                data-tooltip={t('ui.bottomBar.selectBy.title', 'Select by')}
+              >
+                <MousePointer2 size={17} />
+                {numSelected > 0 && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-accent" />}
+              </button>
+
+              <AnimatePresence>
+                {isSelectByOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                    transition={{ duration: 0.12 }}
+                    className="absolute bottom-full left-0 z-50 mb-2 w-72 overflow-hidden rounded-lg border border-border-color bg-bg-secondary shadow-xl"
+                    role="menu"
+                  >
+                    <div className="border-b border-border-color px-3 py-2">
+                      <Text as="div" weight="semibold">
+                        {t('ui.bottomBar.selectBy.title', 'Select by')}
+                      </Text>
+                      <Text as="div" className="text-text-secondary">
+                        {t('ui.bottomBar.selectBy.description', 'Replace the selection without changing filters')}
+                      </Text>
+                    </div>
+                    <div className="max-h-[min(28rem,70vh)] overflow-y-auto p-1.5">
+                      {selectByGroups.map((group) => (
+                        <div key={group.label} className="not-last:mb-1.5">
+                          <Text
+                            as="div"
+                            className="px-2 pb-1 pt-1.5 text-[10px] uppercase tracking-wide text-text-secondary"
+                            weight="semibold"
+                          >
+                            {group.label}
+                          </Text>
+                          {group.options.map((option) => {
+                            const count = selectByCounts.get(option.id) || 0;
+                            return (
+                              <button
+                                key={option.id}
+                                type="button"
+                                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-text-primary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40"
+                                disabled={count === 0}
+                                onClick={() => handleSelectBy(option.criteria)}
+                                role="menuitem"
+                              >
+                                <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                                  {'color' in option && option.color ? (
+                                    <span
+                                      className="h-3 w-3 rounded-full border border-white/20"
+                                      style={{ backgroundColor: option.color }}
+                                    />
+                                  ) : 'flag' in option && option.flag ? (
+                                    <ImageFlagIcon flag={option.flag} size={14} />
+                                  ) : (
+                                    <span className="h-1.5 w-1.5 rounded-full bg-text-secondary" />
+                                  )}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                                <span className="tabular-nums text-text-secondary">{count}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           )}
 

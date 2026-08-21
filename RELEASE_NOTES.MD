@@ -5,6 +5,21 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.5.0-feature-selection — 2026-08-21
+
+### Select by image properties
+
+- Added a compact expandable **Select by** control to the shared Library and
+  Develop bottom toolbar.
+- Images can be selected by every existing filter property—rating, file type,
+  edit status, color label, or flag—without changing the active filters or
+  hiding other images.
+- Each choice shows its match count, unavailable choices are disabled, and the
+  control gains a distinct accent treatment whenever an image selection is
+  active.
+- **Select by** can be shown or hidden through the existing toolbar
+  customization menu.
+
 ## 1.4.4-develop — 2026-08-20
 
 ### Active-folder thumbnail priority
