@@ -5,6 +5,13 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.5.2-feature-selection — 2026-08-21
+
+### Clearer selection icon
+
+- Replaced the generic pointer on **Select by** with a checklist icon that more
+  clearly communicates selecting images by matching properties.
+
 ## 1.5.1-feature-selection — 2026-08-21
 
 ### Selection toolbar refinement
