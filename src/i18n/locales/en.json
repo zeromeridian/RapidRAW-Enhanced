@@ -1961,6 +1961,7 @@
       "customizeToolbar": "Customize Toolbar",
       "imagesSelected": "{{current}} of {{total}} images selected",
       "selectBy": {
+        "clear": "Clear selection",
         "description": "Replace the selection without changing filters",
         "title": "Select by"
       },

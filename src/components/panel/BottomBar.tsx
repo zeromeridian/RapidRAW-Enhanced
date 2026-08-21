@@ -25,6 +25,7 @@ import {
   Ungroup,
   Users,
   SwatchBook,
+  X,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -242,7 +243,6 @@ export default function BottomBar({
   const [isSelectByOpen, setIsSelectByOpen] = useState(false);
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const customizeRef = useRef<HTMLDivElement>(null);
-  const selectByRef = useRef<HTMLDivElement>(null);
   const {
     filterCriteria,
     libraryActivePath,
@@ -627,9 +627,6 @@ export default function BottomBar({
     const handleClickOutside = (event: MouseEvent) => {
       if (customizeRef.current && !customizeRef.current.contains(event.target as Node)) {
         setIsCustomizeOpen(false);
-      }
-      if (selectByRef.current && !selectByRef.current.contains(event.target as Node)) {
-        setIsSelectByOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -1259,93 +1256,164 @@ export default function BottomBar({
 
           {isToolbarItemVisible('selectBy') && (
             <div
-              ref={selectByRef}
               className={clsx(
-                'relative flex h-9 items-center rounded-lg border px-0.5 transition-colors',
-                numSelected > 0 || isSelectByOpen
-                  ? 'border-accent/50 bg-accent/10'
-                  : 'border-border-color/80 bg-bg-primary/40',
+                'flex items-center transition-all duration-300',
+                isSelectByOpen ? 'rounded-md bg-surface' : 'bg-transparent',
+                numSelected > 0 && 'ring-1 ring-accent/50',
               )}
             >
               <button
                 type="button"
                 className={clsx(
                   'relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors',
-                  numSelected > 0 || isSelectByOpen
-                    ? 'bg-accent/15 text-accent'
+                  isSelectByOpen || numSelected > 0
+                    ? 'text-accent'
                     : 'text-text-secondary hover:bg-surface hover:text-text-primary',
                 )}
                 onClick={() => setIsSelectByOpen((open) => !open)}
                 aria-expanded={isSelectByOpen}
-                aria-haspopup="menu"
                 data-tooltip={t('ui.bottomBar.selectBy.title', 'Select by')}
               >
-                <MousePointer2 size={17} />
+                <MousePointer2 size={18} />
                 {numSelected > 0 && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-accent" />}
               </button>
 
-              <AnimatePresence>
-                {isSelectByOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                    transition={{ duration: 0.12 }}
-                    className="absolute bottom-full left-0 z-50 mb-2 w-72 overflow-hidden rounded-lg border border-border-color bg-bg-secondary shadow-xl"
-                    role="menu"
-                  >
-                    <div className="border-b border-border-color px-3 py-2">
-                      <Text as="div" weight="semibold">
-                        {t('ui.bottomBar.selectBy.title', 'Select by')}
-                      </Text>
-                      <Text as="div" className="text-text-secondary">
-                        {t('ui.bottomBar.selectBy.description', 'Replace the selection without changing filters')}
-                      </Text>
-                    </div>
-                    <div className="max-h-[min(28rem,70vh)] overflow-y-auto p-1.5">
-                      {selectByGroups.map((group) => (
-                        <div key={group.label} className="not-last:mb-1.5">
-                          <Text
-                            as="div"
-                            className="px-2 pb-1 pt-1.5 text-[10px] uppercase tracking-wide text-text-secondary"
-                            weight="semibold"
-                          >
-                            {group.label}
-                          </Text>
-                          {group.options.map((option) => {
-                            const count = selectByCounts.get(option.id) || 0;
-                            return (
-                              <button
-                                key={option.id}
-                                type="button"
-                                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-text-primary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40"
-                                disabled={count === 0}
-                                onClick={() => handleSelectBy(option.criteria)}
-                                role="menuitem"
-                              >
-                                <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                                  {'color' in option && option.color ? (
-                                    <span
-                                      className="h-3 w-3 rounded-full border border-white/20"
-                                      style={{ backgroundColor: option.color }}
-                                    />
-                                  ) : 'flag' in option && option.flag ? (
-                                    <ImageFlagIcon flag={option.flag} size={14} />
-                                  ) : (
-                                    <span className="h-1.5 w-1.5 rounded-full bg-text-secondary" />
-                                  )}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                                <span className="tabular-nums text-text-secondary">{count}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
+              <div
+                className={clsx(
+                  'flex items-center overflow-hidden transition-all duration-300 ease-in-out',
+                  isSelectByOpen ? 'ml-1 max-w-[48rem] pr-2 opacity-100' : 'ml-0 max-w-0 pr-0 opacity-0',
                 )}
-              </AnimatePresence>
+              >
+                <div className="flex items-center gap-3 whitespace-nowrap">
+                  <button
+                    type="button"
+                    className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={numSelected === 0}
+                    onClick={onClearSelection}
+                    data-tooltip={t('ui.bottomBar.selectBy.clear', 'Clear selection')}
+                  >
+                    <X size={15} />
+                  </button>
+
+                  <div className="h-4 w-px bg-border-color" />
+
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      className="flex h-5 min-w-5 items-center justify-center rounded-sm px-1 text-[10px] text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary disabled:opacity-40"
+                      disabled={(selectByCounts.get('rating-unrated') || 0) === 0}
+                      onClick={() => handleSelectBy({ rating: -1 })}
+                      data-tooltip={`${t('library.filters.rating.unrated')} (${selectByCounts.get('rating-unrated') || 0})`}
+                    >
+                      0
+                    </button>
+                    {[1, 2, 3, 4, 5].map((rating) => (
+                      <button
+                        key={`select-rating-${rating}`}
+                        type="button"
+                        className="p-0.5 text-text-secondary transition-colors hover:text-accent disabled:opacity-40"
+                        disabled={(selectByCounts.get(`rating-${rating}`) || 0) === 0}
+                        onClick={() => handleSelectBy({ rating })}
+                        data-tooltip={`${selectByGroups[0].options[rating].label} (${selectByCounts.get(`rating-${rating}`) || 0})`}
+                      >
+                        <Star size={16} />
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="h-4 w-px bg-border-color" />
+
+                  <div className="flex items-center gap-1">
+                    {(['raw', 'non-raw'] as const).map((id) => {
+                      const isRaw = id === 'raw';
+                      const count = selectByCounts.get(id) || 0;
+                      return (
+                        <button
+                          key={`select-${id}`}
+                          type="button"
+                          className="h-6 rounded-sm px-1.5 text-[10px] font-semibold text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary disabled:opacity-40"
+                          disabled={count === 0}
+                          onClick={() =>
+                            handleSelectBy({ rawStatus: isRaw ? RawStatus.RawOnly : RawStatus.NonRawOnly })
+                          }
+                          data-tooltip={`${t(
+                            isRaw ? 'library.filters.raw.rawOnly' : 'library.filters.raw.nonRawOnly',
+                          )} (${count})`}
+                        >
+                          {isRaw ? 'RAW' : 'IMG'}
+                        </button>
+                      );
+                    })}
+                    {(['edited', 'unedited'] as const).map((id) => {
+                      const isEdited = id === 'edited';
+                      const count = selectByCounts.get(id) || 0;
+                      return (
+                        <button
+                          key={`select-${id}`}
+                          type="button"
+                          className="h-6 rounded-sm px-1.5 text-[10px] text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary disabled:opacity-40"
+                          disabled={count === 0}
+                          onClick={() =>
+                            handleSelectBy({
+                              editedStatus: isEdited ? EditedStatus.EditedOnly : EditedStatus.UneditedOnly,
+                            })
+                          }
+                          data-tooltip={`${t(
+                            isEdited ? 'library.filters.edited.editedOnly' : 'library.filters.edited.uneditedOnly',
+                          )} (${count})`}
+                        >
+                          {isEdited ? 'EDIT' : 'ORIG'}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="h-4 w-px bg-border-color" />
+
+                  <div className="flex items-center gap-1.5">
+                    {allColors.map((color) => {
+                      const count = selectByCounts.get(`color-${color.name}`) || 0;
+                      const label =
+                        color.name === 'none'
+                          ? t('library.header.viewOptions.noLabel')
+                          : t(`contextMenus.colors.${color.name}`, {
+                              defaultValue: color.name.charAt(0).toUpperCase() + color.name.slice(1),
+                            });
+                      return (
+                        <button
+                          key={`select-color-${color.name}`}
+                          type="button"
+                          className="h-4 w-4 rounded-full transition-transform hover:scale-105 disabled:opacity-40"
+                          style={{ backgroundColor: color.color }}
+                          disabled={count === 0}
+                          onClick={() => handleSelectBy({ colors: [color.name] })}
+                          data-tooltip={`${label} (${count})`}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  <div className="h-4 w-px bg-border-color" />
+
+                  <div className="flex items-center gap-1">
+                    {IMAGE_FLAG_FILTER_OPTIONS.map((flag) => {
+                      const count = selectByCounts.get(`flag-${flag}`) || 0;
+                      return (
+                        <button
+                          key={`select-flag-${flag}`}
+                          type="button"
+                          className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary disabled:opacity-40"
+                          disabled={count === 0}
+                          onClick={() => handleSelectBy({ flags: [flag] })}
+                          data-tooltip={`${t(`flags.${flag}`)} (${count})`}
+                        >
+                          <ImageFlagIcon flag={flag} size={15} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

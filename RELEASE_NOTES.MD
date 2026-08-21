@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.5.1-feature-selection — 2026-08-21
+
+### Selection toolbar refinement
+
+- **Select by** now expands inline using the same interaction, animation,
+  spacing, grouped controls, and visual language as **Quick Filter**.
+- Added **Clear selection** directly inside the expanded selection controls.
+- Match counts remain available in each option's tooltip, while the compact
+  selection icon retains its active-selection indicator.
+
 ## 1.5.0-feature-selection — 2026-08-21
 
 ### Select by image properties
