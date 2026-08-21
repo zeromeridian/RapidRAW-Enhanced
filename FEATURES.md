@@ -24,8 +24,10 @@ details are in `RELEASE_NOTES.MD`.
   deletion for the currently loaded folder view.
 - Unified bottom **Quick Filter** controls for unrated and rating thresholds,
   RAW/non-RAW files, edited/original status, color labels, and flags, with an
-  in-place clear-all action and a persistent active-filter indicator. The top
-  **View Options** menu remains focused on display, sorting, metadata, and
+  in-place clear-all action and a persistent active-filter indicator. Rating
+  filters and rating-based selection provide explicit **up to (≤)** and **and
+  up (≥)** comparisons, with star highlights matching the selected range. The
+  top **View Options** menu remains focused on display, sorting, metadata, and
   grouping controls, while the Library header retains its compact active-filter
   summary.
 - Compact neutral file-type badges in Library grid and list metadata, using a

@@ -294,6 +294,7 @@ export interface FilterCriteria {
   colors: Array<string>;
   flags?: Array<'rejected' | 'selected' | 'deferred' | 'unflagged'>;
   rating: number;
+  ratingComparison?: 'atLeast' | 'atMost';
   rawStatus: RawStatus;
   editedStatus?: EditedStatus;
 }

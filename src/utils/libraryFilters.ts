@@ -9,8 +9,11 @@ export function matchesLibraryFilter(
   if (filterCriteria.rating !== 0) {
     const rating = imageRatings[image.path] || 0;
     if (filterCriteria.rating === -1 && rating !== 0) return false;
-    if (filterCriteria.rating === 5 && rating !== 5) return false;
-    if (filterCriteria.rating > 0 && filterCriteria.rating < 5 && rating < filterCriteria.rating) return false;
+    if (filterCriteria.rating > 0) {
+      const comparison = filterCriteria.ratingComparison ?? 'atLeast';
+      if (comparison === 'atMost' && (rating === 0 || rating > filterCriteria.rating)) return false;
+      if (comparison === 'atLeast' && rating < filterCriteria.rating) return false;
+    }
   }
 
   if (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) {

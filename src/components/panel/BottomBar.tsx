@@ -241,6 +241,7 @@ export default function BottomBar({
 
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const [isSelectByOpen, setIsSelectByOpen] = useState(false);
+  const [selectRatingComparison, setSelectRatingComparison] = useState<'atLeast' | 'atMost'>('atLeast');
   const [activeSelectBy, setActiveSelectBy] = useState<{
     criteria: Partial<FilterCriteria>;
     id: string;
@@ -286,6 +287,7 @@ export default function BottomBar({
     setFilterCriteria((previous) => ({
       ...previous,
       rating: 0,
+      ratingComparison: 'atLeast',
       rawStatus: RawStatus.All,
       editedStatus: EditedStatus.All,
       colors: [],
@@ -388,11 +390,11 @@ export default function BottomBar({
         label: t('library.header.viewOptions.filterByRating'),
         options: [
           { id: 'rating-unrated', label: t('library.filters.rating.unrated'), criteria: { rating: -1 } },
-          { id: 'rating-1', label: t('library.filters.rating.oneAndUp'), criteria: { rating: 1 } },
-          { id: 'rating-2', label: t('library.filters.rating.twoAndUp'), criteria: { rating: 2 } },
-          { id: 'rating-3', label: t('library.filters.rating.threeAndUp'), criteria: { rating: 3 } },
-          { id: 'rating-4', label: t('library.filters.rating.fourAndUp'), criteria: { rating: 4 } },
-          { id: 'rating-5', label: t('library.filters.rating.fiveOnly'), criteria: { rating: 5 } },
+          ...[1, 2, 3, 4, 5].map((rating) => ({
+            id: `rating-${selectRatingComparison}-${rating}`,
+            label: `${selectRatingComparison === 'atMost' ? '≤' : '≥'} ${rating}`,
+            criteria: { rating, ratingComparison: selectRatingComparison },
+          })),
         ],
       },
       {
@@ -449,7 +451,7 @@ export default function BottomBar({
         })),
       },
     ],
-    [t],
+    [selectRatingComparison, t],
   );
 
   const selectByCounts = useMemo(() => {
@@ -460,6 +462,7 @@ export default function BottomBar({
           colors: [],
           flags: [],
           rating: 0,
+          ratingComparison: 'atLeast',
           rawStatus: RawStatus.All,
           editedStatus: EditedStatus.All,
           ...option.criteria,
@@ -475,9 +478,8 @@ export default function BottomBar({
     }
     return counts;
   }, [allLibraryImages, imageRatings, selectByGroups]);
-  const activeSelectByRating = activeSelectBy?.id.match(/^rating-[1-5]$/)
-    ? Number(activeSelectBy.id.slice('rating-'.length))
-    : 0;
+  const activeSelectByRatingMatch = activeSelectBy?.id.match(/^rating-(?:atLeast|atMost)-([1-5])$/);
+  const activeSelectByRating = activeSelectByRatingMatch ? Number(activeSelectByRatingMatch[1]) : 0;
 
   const handleClearSelectBy = () => {
     setActiveSelectBy(null);
@@ -502,6 +504,7 @@ export default function BottomBar({
       colors: [],
       flags: [],
       rating: 0,
+      ratingComparison: 'atLeast',
       rawStatus: RawStatus.All,
       editedStatus: EditedStatus.All,
       ...criteriaOverrides,
@@ -1259,8 +1262,33 @@ export default function BottomBar({
                     >
                       0
                     </button>
+                    {(['atMost', 'atLeast'] as const).map((comparison) => (
+                      <button
+                        key={`qf-rating-${comparison}`}
+                        type="button"
+                        onClick={() =>
+                          setFilterCriteria((prev) => ({
+                            ...prev,
+                            ratingComparison: comparison,
+                          }))
+                        }
+                        className={clsx(
+                          'flex h-6 min-w-6 items-center justify-center rounded-sm px-1 text-xs font-semibold transition-colors',
+                          (filterCriteria.ratingComparison ?? 'atLeast') === comparison
+                            ? 'bg-card-active text-accent'
+                            : 'text-text-secondary hover:bg-card-active hover:text-text-primary',
+                        )}
+                        data-tooltip={comparison === 'atMost' ? '≤ 1–5' : '≥ 1–5'}
+                      >
+                        {comparison === 'atMost' ? '≤' : '≥'}
+                      </button>
+                    ))}
                     {[1, 2, 3, 4, 5].map((starValue) => {
-                      const isFilled = filterCriteria.rating > 0 && starValue <= filterCriteria.rating;
+                      const isFilled =
+                        filterCriteria.rating > 0 &&
+                        ((filterCriteria.ratingComparison ?? 'atLeast') === 'atMost'
+                          ? starValue <= filterCriteria.rating
+                          : starValue >= filterCriteria.rating);
                       return (
                         <button
                           key={`qf-star-${starValue}`}
@@ -1271,6 +1299,7 @@ export default function BottomBar({
                             }))
                           }
                           className="p-0.5 focus:outline-none"
+                          data-tooltip={`${(filterCriteria.ratingComparison ?? 'atLeast') === 'atMost' ? '≤' : '≥'} ${starValue}`}
                         >
                           <Star
                             size={16}
@@ -1475,19 +1504,64 @@ export default function BottomBar({
                     >
                       0
                     </button>
+                    {(['atMost', 'atLeast'] as const).map((comparison) => (
+                      <button
+                        key={`select-rating-${comparison}`}
+                        type="button"
+                        className={clsx(
+                          'flex h-6 min-w-6 items-center justify-center rounded-sm px-1 text-xs font-semibold transition-colors',
+                          selectRatingComparison === comparison
+                            ? 'bg-card-active text-accent'
+                            : 'text-text-secondary hover:bg-card-active hover:text-text-primary',
+                        )}
+                        onClick={() => {
+                          if (selectRatingComparison === comparison) return;
+                          setSelectRatingComparison(comparison);
+                          if (activeSelectByRating > 0) {
+                            handleSelectBy(`rating-${comparison}-${activeSelectByRating}`, {
+                              rating: activeSelectByRating,
+                              ratingComparison: comparison,
+                            });
+                          }
+                        }}
+                        data-tooltip={comparison === 'atMost' ? '≤ 1–5' : '≥ 1–5'}
+                      >
+                        {comparison === 'atMost' ? '≤' : '≥'}
+                      </button>
+                    ))}
                     {[1, 2, 3, 4, 5].map((rating) => (
                       <button
                         key={`select-rating-${rating}`}
                         type="button"
                         className={clsx(
                           'p-0.5 transition-colors hover:text-accent disabled:opacity-40',
-                          rating <= activeSelectByRating ? 'text-accent' : 'text-text-secondary',
+                          activeSelectByRating > 0 &&
+                            (selectRatingComparison === 'atMost'
+                              ? rating <= activeSelectByRating
+                              : rating >= activeSelectByRating)
+                            ? 'text-accent'
+                            : 'text-text-secondary',
                         )}
-                        disabled={(selectByCounts.get(`rating-${rating}`) || 0) === 0}
-                        onClick={() => handleSelectBy(`rating-${rating}`, { rating })}
-                        data-tooltip={`${selectByGroups[0].options[rating].label} (${selectByCounts.get(`rating-${rating}`) || 0})`}
+                        disabled={(selectByCounts.get(`rating-${selectRatingComparison}-${rating}`) || 0) === 0}
+                        onClick={() =>
+                          handleSelectBy(`rating-${selectRatingComparison}-${rating}`, {
+                            rating,
+                            ratingComparison: selectRatingComparison,
+                          })
+                        }
+                        data-tooltip={`${selectByGroups[0].options[rating].label} (${selectByCounts.get(`rating-${selectRatingComparison}-${rating}`) || 0})`}
                       >
-                        <Star size={16} className={rating <= activeSelectByRating ? 'fill-accent' : undefined} />
+                        <Star
+                          size={16}
+                          className={
+                            activeSelectByRating > 0 &&
+                            (selectRatingComparison === 'atMost'
+                              ? rating <= activeSelectByRating
+                              : rating >= activeSelectByRating)
+                              ? 'fill-accent'
+                              : undefined
+                          }
+                        />
                       </button>
                     ))}
                   </div>

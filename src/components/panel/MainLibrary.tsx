@@ -253,7 +253,10 @@ export default function MainLibrary(props: MainLibraryProps) {
     const filters: Array<{ key: string; label: string }> = [];
 
     if (filterCriteria.rating !== 0) {
-      const rating = translatedRatingFilterOptions.find((option) => option.value === filterCriteria.rating)?.label;
+      const rating =
+        filterCriteria.rating > 0
+          ? `${filterCriteria.ratingComparison === 'atMost' ? '≤' : '≥'} ${filterCriteria.rating}`
+          : translatedRatingFilterOptions.find((option) => option.value === filterCriteria.rating)?.label;
       if (rating) {
         filters.push({
           key: 'rating',

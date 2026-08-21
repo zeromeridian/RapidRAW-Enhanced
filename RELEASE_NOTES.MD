@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.5.8-fix-filter-cleanup — 2026-08-21
+
+### Directional rating filters and selection
+
+- Rating-based filtering and **Select by** now provide explicit **≤** and
+  **≥** controls for choosing “up to” or “and up” behavior.
+- Star highlights now match the actual criterion: **≤ 4** highlights stars
+  one through four, while **≥ 4** highlights stars four and five.
+- Changing the comparison direction immediately updates the visible images or
+  the current rating-based selection.
+
 ## 1.5.7-fix-filter-cleanup — 2026-08-21
 
 ### Unified Library filtering
