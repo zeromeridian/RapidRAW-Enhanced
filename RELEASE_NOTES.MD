@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.5.3-feature-selection — 2026-08-21
+
+### Rating-based selection fix
+
+- Rating controls in the Library **Select by** bar now receive the loaded
+  folder's rating data, show their correct match counts, and can select rated
+  images.
+
 ## 1.5.2-feature-selection — 2026-08-21
 
 ### Clearer selection icon
