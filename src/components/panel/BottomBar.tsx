@@ -15,8 +15,8 @@ import {
   Images,
   LayoutTemplate,
   Layers,
+  ListChecks,
   ListCollapse,
-  MousePointer2,
   Settings,
   SlidersHorizontal,
   SquaresUnite,
@@ -1274,7 +1274,7 @@ export default function BottomBar({
                 aria-expanded={isSelectByOpen}
                 data-tooltip={t('ui.bottomBar.selectBy.title', 'Select by')}
               >
-                <MousePointer2 size={18} />
+                <ListChecks size={18} />
                 {numSelected > 0 && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-accent" />}
               </button>
 
