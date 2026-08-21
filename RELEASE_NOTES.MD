@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.5.9-fix-filter-cleanup — 2026-08-21
+
+### Consistent selected-rating highlights
+
+- Rating-based selection now keeps every star in the active **≤** or **≥**
+  range visibly enabled, even when an included star has no standalone matches.
+- Filtering and selection now use the same shared star-range calculation.
+
 ## 1.5.8-fix-filter-cleanup — 2026-08-21
 
 ### Directional rating filters and selection
