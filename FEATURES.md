@@ -60,7 +60,11 @@ details are in `RELEASE_NOTES.MD`.
   thumbnail renders so stale jobs cannot replace the latest edit. All adjusted
   thumbnail entry points reuse the Develop GPU pipeline and refuse to publish
   an inaccurate unprocessed fallback; renderer-version changes invalidate
-  incompatible cached thumbnails once.
+  incompatible cached thumbnails once. Folder navigation replaces obsolete
+  visible-thumbnail work with the new active folder's requests. Full-folder
+  thumbnail generation occurs only through explicit **Refresh folders** and
+  uses one separate low-priority worker; direct/recursive scope follows the
+  current Library mode.
 
 ## Develop
 

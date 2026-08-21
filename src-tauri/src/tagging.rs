@@ -424,11 +424,23 @@ pub async fn start_background_indexing(
                     };
 
                     if should_generate_tags {
-                        match file_management::get_cached_or_generate_thumbnail_image(
+                        // AI analysis must not populate the thumbnail cache.
+                        // Cache generation belongs to visible requests and
+                        // explicit folder refreshes only.
+                        let analysis_image = file_management::get_cached_thumbnail_image(
                             &path_str,
                             &app_handle_inner,
-                            gpu_context_inner.as_ref(),
-                        ) {
+                        )
+                        .map(Ok)
+                        .unwrap_or_else(|| {
+                            file_management::generate_thumbnail_data(
+                                &path_str,
+                                gpu_context_inner.as_ref(),
+                                None,
+                                &app_handle_inner,
+                            )
+                        });
+                        match analysis_image {
                             Ok(image) => {
                                 if let Ok(ai_tags) = generate_tags_with_clip(
                                     &image,

@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.4.4-develop — 2026-08-20
+
+### Active-folder thumbnail priority
+
+- Cached thumbnails display immediately when a folder is selected, while only
+  missing visible thumbnails are generated and stored.
+- Selecting another folder now discards queued work from the previous folder
+  and gives the new active folder immediate priority.
+- Full-folder thumbnail generation runs only after an explicit **Refresh
+  folders** action, uses a dedicated low-priority worker, and follows the
+  current direct or recursive Library mode.
+- Missing thumbnail files referenced by the Library catalog are detected and
+  regenerated instead of leaving permanent placeholders.
+
 ## 1.4.3-fix-thumbs-refresh — 2026-08-20
 
 ### Thumbnails match Develop edits

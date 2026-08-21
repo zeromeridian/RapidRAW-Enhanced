@@ -92,9 +92,15 @@ pub struct ThumbnailProgressTracker {
 }
 
 pub struct ThumbnailManager {
+    /// Missing thumbnails requested by the currently visible Library/filmstrip.
     pub queue: Mutex<VecDeque<String>>,
+    /// Low-priority work created only by an explicit folder refresh.
+    pub refresh_queue: Mutex<VecDeque<String>>,
     pub cvar: Condvar,
     pub processing_now: Mutex<HashSet<String>>,
+    active_context: Mutex<Option<String>>,
+    active_context_generation: AtomicUsize,
+    active_paths: Mutex<HashSet<String>>,
     pub rotational_disk: AtomicBool,
     pub io_gate: Mutex<()>,
     live_update_generation: AtomicUsize,
@@ -105,8 +111,12 @@ impl ThumbnailManager {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
             queue: Mutex::new(VecDeque::new()),
+            refresh_queue: Mutex::new(VecDeque::new()),
             cvar: Condvar::new(),
             processing_now: Mutex::new(HashSet::new()),
+            active_context: Mutex::new(None),
+            active_context_generation: AtomicUsize::new(0),
+            active_paths: Mutex::new(HashSet::new()),
             rotational_disk: AtomicBool::new(false),
             io_gate: Mutex::new(()),
             live_update_generation: AtomicUsize::new(0),
@@ -124,6 +134,37 @@ impl ThumbnailManager {
             .unwrap()
             .insert(path.to_string(), generation);
         generation
+    }
+
+    pub fn activate_context(&self, context_id: String) -> bool {
+        let mut active_context = self.active_context.lock().unwrap();
+        if active_context.as_deref() == Some(context_id.as_str()) {
+            return false;
+        }
+
+        *active_context = Some(context_id);
+        self.active_context_generation
+            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        self.queue.lock().unwrap().clear();
+        self.active_paths.lock().unwrap().clear();
+        true
+    }
+
+    pub fn register_active_paths(&self, paths: impl Iterator<Item = String>) {
+        self.active_paths.lock().unwrap().extend(paths);
+    }
+
+    pub fn is_active_path(&self, path: &str) -> bool {
+        self.active_paths.lock().unwrap().contains(path)
+    }
+
+    pub fn foreground_generation(&self) -> usize {
+        self.active_context_generation
+            .load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    pub fn is_current_foreground_generation(&self, generation: usize) -> bool {
+        self.foreground_generation() == generation
     }
 
     pub fn is_latest_live_update(&self, path: &str, generation: usize) -> bool {
@@ -219,5 +260,32 @@ mod thumbnail_manager_tests {
 
         manager.finish_live_update("image.raw", second);
         assert!(!manager.is_latest_live_update("image.raw", second));
+    }
+
+    #[test]
+    fn changing_context_discards_only_old_foreground_work() {
+        let manager = ThumbnailManager::new();
+        assert!(manager.activate_context("folder-a".to_string()));
+        manager
+            .queue
+            .lock()
+            .unwrap()
+            .push_back("old.jpg".to_string());
+        manager.register_active_paths(std::iter::once("old.jpg".to_string()));
+        manager
+            .refresh_queue
+            .lock()
+            .unwrap()
+            .push_back("explicit.jpg".to_string());
+        let old_generation = manager.foreground_generation();
+
+        assert!(!manager.activate_context("folder-a".to_string()));
+        assert_eq!(manager.queue.lock().unwrap().len(), 1);
+
+        assert!(manager.activate_context("folder-b".to_string()));
+        assert!(manager.queue.lock().unwrap().is_empty());
+        assert!(!manager.is_active_path("old.jpg"));
+        assert_eq!(manager.refresh_queue.lock().unwrap().len(), 1);
+        assert!(!manager.is_current_foreground_generation(old_generation));
     }
 }
