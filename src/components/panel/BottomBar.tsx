@@ -134,6 +134,9 @@ const FLAG_TOOLBAR_IDS = ['flagRejected', 'flagSelected', 'flagDeferred', 'flagU
 const COLOR_TOOLBAR_IDS = ['colorRed', 'colorYellow', 'colorGreen', 'colorBlue', 'colorPurple', 'colorNone'] as const;
 const ALL_COLOR_OPTIONS = [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }];
 
+const isRatingInRange = (rating: number, threshold: number, comparison: 'atLeast' | 'atMost') =>
+  threshold > 0 && (comparison === 'atMost' ? rating <= threshold : rating >= threshold);
+
 const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
   const { t } = useTranslation();
 
@@ -1284,11 +1287,11 @@ export default function BottomBar({
                       </button>
                     ))}
                     {[1, 2, 3, 4, 5].map((starValue) => {
-                      const isFilled =
-                        filterCriteria.rating > 0 &&
-                        ((filterCriteria.ratingComparison ?? 'atLeast') === 'atMost'
-                          ? starValue <= filterCriteria.rating
-                          : starValue >= filterCriteria.rating);
+                      const isFilled = isRatingInRange(
+                        starValue,
+                        filterCriteria.rating,
+                        filterCriteria.ratingComparison ?? 'atLeast',
+                      );
                       return (
                         <button
                           key={`qf-star-${starValue}`}
@@ -1529,41 +1532,31 @@ export default function BottomBar({
                         {comparison === 'atMost' ? '≤' : '≥'}
                       </button>
                     ))}
-                    {[1, 2, 3, 4, 5].map((rating) => (
-                      <button
-                        key={`select-rating-${rating}`}
-                        type="button"
-                        className={clsx(
-                          'p-0.5 transition-colors hover:text-accent disabled:opacity-40',
-                          activeSelectByRating > 0 &&
-                            (selectRatingComparison === 'atMost'
-                              ? rating <= activeSelectByRating
-                              : rating >= activeSelectByRating)
-                            ? 'text-accent'
-                            : 'text-text-secondary',
-                        )}
-                        disabled={(selectByCounts.get(`rating-${selectRatingComparison}-${rating}`) || 0) === 0}
-                        onClick={() =>
-                          handleSelectBy(`rating-${selectRatingComparison}-${rating}`, {
-                            rating,
-                            ratingComparison: selectRatingComparison,
-                          })
-                        }
-                        data-tooltip={`${selectByGroups[0].options[rating].label} (${selectByCounts.get(`rating-${selectRatingComparison}-${rating}`) || 0})`}
-                      >
-                        <Star
-                          size={16}
-                          className={
-                            activeSelectByRating > 0 &&
-                            (selectRatingComparison === 'atMost'
-                              ? rating <= activeSelectByRating
-                              : rating >= activeSelectByRating)
-                              ? 'fill-accent'
-                              : undefined
+                    {[1, 2, 3, 4, 5].map((rating) => {
+                      const count = selectByCounts.get(`rating-${selectRatingComparison}-${rating}`) || 0;
+                      const isIncluded = isRatingInRange(rating, activeSelectByRating, selectRatingComparison);
+                      return (
+                        <button
+                          key={`select-rating-${rating}`}
+                          type="button"
+                          className={clsx(
+                            'p-0.5 transition-colors hover:text-accent',
+                            isIncluded ? 'text-accent' : 'text-text-secondary',
+                            count === 0 && !isIncluded && 'opacity-40',
+                          )}
+                          disabled={count === 0}
+                          onClick={() =>
+                            handleSelectBy(`rating-${selectRatingComparison}-${rating}`, {
+                              rating,
+                              ratingComparison: selectRatingComparison,
+                            })
                           }
-                        />
-                      </button>
-                    ))}
+                          data-tooltip={`${selectByGroups[0].options[rating].label} (${count})`}
+                        >
+                          <Star size={16} className={isIncluded ? 'fill-accent' : undefined} />
+                        </button>
+                      );
+                    })}
                   </div>
 
                   <div className="h-4 w-px bg-border-color" />
