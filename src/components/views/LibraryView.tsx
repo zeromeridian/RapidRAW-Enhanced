@@ -180,6 +180,7 @@ export default function LibraryView({
         {rootPaths && rootPaths.length > 0 && (
           <BottomBar
             imageList={imageList}
+            imageRatings={imageRatings}
             isCopied={isCopied}
             isCopyDisabled={multiSelectedPaths.length !== 1}
             isExportDisabled={multiSelectedPaths.length === 0}
