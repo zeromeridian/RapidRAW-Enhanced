@@ -241,6 +241,10 @@ export default function BottomBar({
 
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const [isSelectByOpen, setIsSelectByOpen] = useState(false);
+  const [activeSelectBy, setActiveSelectBy] = useState<{
+    criteria: Partial<FilterCriteria>;
+    id: string;
+  } | null>(null);
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const customizeRef = useRef<HTMLDivElement>(null);
   const {
@@ -456,8 +460,20 @@ export default function BottomBar({
     }
     return counts;
   }, [allLibraryImages, imageRatings, selectByGroups]);
+  const activeSelectByRating = activeSelectBy?.id.match(/^rating-[1-5]$/)
+    ? Number(activeSelectBy.id.slice('rating-'.length))
+    : 0;
 
-  const handleSelectBy = (criteriaOverrides: Partial<FilterCriteria>) => {
+  const handleClearSelectBy = () => {
+    setActiveSelectBy(null);
+    onClearSelection?.();
+  };
+
+  const handleSelectBy = (id: string, criteriaOverrides: Partial<FilterCriteria>) => {
+    if (activeSelectBy?.id === id) {
+      handleClearSelectBy();
+      return;
+    }
     const criteria: FilterCriteria = {
       colors: [],
       flags: [],
@@ -476,7 +492,7 @@ export default function BottomBar({
       libraryActivePath: activePath,
       selectionAnchorPath: activePath,
     });
-    setIsSelectByOpen(false);
+    setActiveSelectBy({ criteria: criteriaOverrides, id });
   };
 
   const handleDeleteRejected = () => {
@@ -632,6 +648,30 @@ export default function BottomBar({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!activeSelectBy) return;
+    const expectedPaths = new Set(
+      allLibraryImages
+        .filter((image) =>
+          matchesLibraryFilter(image, imageRatings || {}, {
+            colors: [],
+            flags: [],
+            rating: 0,
+            rawStatus: RawStatus.All,
+            editedStatus: EditedStatus.All,
+            ...activeSelectBy.criteria,
+          }),
+        )
+        .map((image) => image.path),
+    );
+    if (
+      expectedPaths.size !== multiSelectedPaths.length ||
+      multiSelectedPaths.some((path) => !expectedPaths.has(path))
+    ) {
+      setActiveSelectBy(null);
+    }
+  }, [activeSelectBy, allLibraryImages, imageRatings, multiSelectedPaths]);
 
   useEffect(() => {
     if (isZoomReady && !isDraggingSlider.current) {
@@ -1289,7 +1329,7 @@ export default function BottomBar({
                     type="button"
                     className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
                     disabled={numSelected === 0}
-                    onClick={onClearSelection}
+                    onClick={handleClearSelectBy}
                     data-tooltip={t('ui.bottomBar.selectBy.clear', 'Clear selection')}
                   >
                     <X size={15} />
@@ -1300,9 +1340,12 @@ export default function BottomBar({
                   <div className="flex items-center gap-0.5">
                     <button
                       type="button"
-                      className="flex h-5 min-w-5 items-center justify-center rounded-sm px-1 text-[10px] text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary disabled:opacity-40"
+                      className={clsx(
+                        'flex h-5 min-w-5 items-center justify-center rounded-sm px-1 text-[10px] transition-colors hover:bg-card-active hover:text-text-primary disabled:opacity-40',
+                        activeSelectBy?.id === 'rating-unrated' ? 'bg-card-active text-accent' : 'text-text-secondary',
+                      )}
                       disabled={(selectByCounts.get('rating-unrated') || 0) === 0}
-                      onClick={() => handleSelectBy({ rating: -1 })}
+                      onClick={() => handleSelectBy('rating-unrated', { rating: -1 })}
                       data-tooltip={`${t('library.filters.rating.unrated')} (${selectByCounts.get('rating-unrated') || 0})`}
                     >
                       0
@@ -1311,12 +1354,15 @@ export default function BottomBar({
                       <button
                         key={`select-rating-${rating}`}
                         type="button"
-                        className="p-0.5 text-text-secondary transition-colors hover:text-accent disabled:opacity-40"
+                        className={clsx(
+                          'p-0.5 transition-colors hover:text-accent disabled:opacity-40',
+                          rating <= activeSelectByRating ? 'text-accent' : 'text-text-secondary',
+                        )}
                         disabled={(selectByCounts.get(`rating-${rating}`) || 0) === 0}
-                        onClick={() => handleSelectBy({ rating })}
+                        onClick={() => handleSelectBy(`rating-${rating}`, { rating })}
                         data-tooltip={`${selectByGroups[0].options[rating].label} (${selectByCounts.get(`rating-${rating}`) || 0})`}
                       >
-                        <Star size={16} />
+                        <Star size={16} className={rating <= activeSelectByRating ? 'fill-accent' : undefined} />
                       </button>
                     ))}
                   </div>
@@ -1331,10 +1377,13 @@ export default function BottomBar({
                         <button
                           key={`select-${id}`}
                           type="button"
-                          className="h-6 rounded-sm px-1.5 text-[10px] font-semibold text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary disabled:opacity-40"
+                          className={clsx(
+                            'h-6 rounded-sm px-1.5 text-[10px] font-semibold transition-colors hover:bg-card-active hover:text-text-primary disabled:opacity-40',
+                            activeSelectBy?.id === id ? 'bg-card-active text-accent' : 'text-text-secondary',
+                          )}
                           disabled={count === 0}
                           onClick={() =>
-                            handleSelectBy({ rawStatus: isRaw ? RawStatus.RawOnly : RawStatus.NonRawOnly })
+                            handleSelectBy(id, { rawStatus: isRaw ? RawStatus.RawOnly : RawStatus.NonRawOnly })
                           }
                           data-tooltip={`${t(
                             isRaw ? 'library.filters.raw.rawOnly' : 'library.filters.raw.nonRawOnly',
@@ -1351,10 +1400,13 @@ export default function BottomBar({
                         <button
                           key={`select-${id}`}
                           type="button"
-                          className="h-6 rounded-sm px-1.5 text-[10px] text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary disabled:opacity-40"
+                          className={clsx(
+                            'h-6 rounded-sm px-1.5 text-[10px] transition-colors hover:bg-card-active hover:text-text-primary disabled:opacity-40',
+                            activeSelectBy?.id === id ? 'bg-card-active text-accent' : 'text-text-secondary',
+                          )}
                           disabled={count === 0}
                           onClick={() =>
-                            handleSelectBy({
+                            handleSelectBy(id, {
                               editedStatus: isEdited ? EditedStatus.EditedOnly : EditedStatus.UneditedOnly,
                             })
                           }
@@ -1383,10 +1435,14 @@ export default function BottomBar({
                         <button
                           key={`select-color-${color.name}`}
                           type="button"
-                          className="h-4 w-4 rounded-full transition-transform hover:scale-105 disabled:opacity-40"
+                          className={clsx(
+                            'h-4 w-4 rounded-full transition-transform hover:scale-105 disabled:opacity-40',
+                            activeSelectBy?.id === `color-${color.name}` &&
+                              'ring-2 ring-accent ring-offset-1 ring-offset-bg-primary',
+                          )}
                           style={{ backgroundColor: color.color }}
                           disabled={count === 0}
-                          onClick={() => handleSelectBy({ colors: [color.name] })}
+                          onClick={() => handleSelectBy(`color-${color.name}`, { colors: [color.name] })}
                           data-tooltip={`${label} (${count})`}
                         />
                       );
@@ -1402,9 +1458,14 @@ export default function BottomBar({
                         <button
                           key={`select-flag-${flag}`}
                           type="button"
-                          className="flex h-6 w-6 items-center justify-center rounded-sm text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary disabled:opacity-40"
+                          className={clsx(
+                            'flex h-6 w-6 items-center justify-center rounded-sm transition-colors hover:bg-card-active hover:text-text-primary disabled:opacity-40',
+                            activeSelectBy?.id === `flag-${flag}`
+                              ? 'bg-card-active text-accent'
+                              : 'text-text-secondary',
+                          )}
                           disabled={count === 0}
-                          onClick={() => handleSelectBy({ flags: [flag] })}
+                          onClick={() => handleSelectBy(`flag-${flag}`, { flags: [flag] })}
                           data-tooltip={`${t(`flags.${flag}`)} (${count})`}
                         >
                           <ImageFlagIcon flag={flag} size={15} />
