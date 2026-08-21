@@ -12,7 +12,9 @@ details are in `RELEASE_NOTES.MD`.
   using any rating, RAW/non-RAW, edit-status, color-label, or flag criterion
   without changing active filters. It follows the Quick Filter inline design,
   exposes match counts in tooltips, and provides an in-place clear-selection
-  action.
+  action. The chosen criterion remains visibly active and acts as a toggle;
+  clicking it again clears its selection, while manual selection changes remove
+  stale criterion highlighting.
 - Manual image stacks with collapse/expand, visible stack cues, drag ordering,
   move-to-top covers, and matching Develop-filmstrip presentation.
 - Automatic stacking of physical copies, virtual copies, and exported images,

@@ -5,6 +5,25 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.5.5-feature-selection — 2026-08-21
+
+### Cumulative rating highlight
+
+- Selecting a rating threshold now fills every star through that threshold, so
+  **3 & up** visibly activates stars one through three while retaining the
+  existing toggle behavior.
+
+## 1.5.4-feature-selection — 2026-08-21
+
+### Toggleable selection criteria
+
+- The active **Select by** criterion now has a clear visual highlight across
+  rating, file type, edit status, color-label, and flag controls.
+- Clicking the active criterion again deactivates it and clears its selected
+  images; Clear Selection also removes the active state.
+- Manually changing the resulting image selection removes a stale criterion
+  highlight, and the inline selection bar remains open while criteria change.
+
 ## 1.5.3-feature-selection — 2026-08-21
 
 ### Rating-based selection fix
