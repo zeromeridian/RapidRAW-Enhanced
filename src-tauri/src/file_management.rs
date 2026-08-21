@@ -2381,6 +2381,24 @@ fn encode_thumbnail(image: &DynamicImage, target_width: u32) -> Result<Vec<u8>> 
     Ok(buf.into_inner())
 }
 
+fn thumbnail_adjustments_bytes(sidecar_path: &Path) -> Vec<u8> {
+    fs::read_to_string(sidecar_path)
+        .ok()
+        .and_then(|content| serde_json::from_str::<ImageMetadata>(&content).ok())
+        .and_then(|metadata| serde_json::to_vec(&metadata.adjustments).ok())
+        .unwrap_or_default()
+}
+
+pub fn get_cached_thumbnail_image(path_str: &str, app_handle: &AppHandle) -> Option<DynamicImage> {
+    let (_, sidecar_path) = parse_virtual_path(path_str);
+    let cache_hash =
+        compute_thumbnail_cache_hash(path_str, &thumbnail_adjustments_bytes(&sidecar_path))?;
+    let cache_path = resolve_thumbnail_cache_dir(app_handle)
+        .ok()?
+        .join(format!("{cache_hash}.jpg"));
+    image::open(cache_path).ok()
+}
+
 fn generate_single_thumbnail_and_cache(
     path_str: &str,
     thumb_cache_dir: &Path,
@@ -2490,19 +2508,34 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let thread_count = settings.thumbnail_worker_threads.unwrap_or(4).clamp(1, 16);
 
-    for _ in 0..thread_count {
+    for worker_index in 0..thread_count {
         let app_clone = app_handle.clone();
         let manager_clone = manager.clone();
         let worker_settings = settings.clone();
 
         std::thread::spawn(move || {
             loop {
-                let path_to_process: String = {
+                let (path_to_process, foreground_generation): (String, Option<usize>) = {
                     let mut queue = manager_clone.queue.lock().unwrap();
-                    while queue.is_empty() {
+                    while queue.is_empty()
+                        && (worker_index != 0
+                            || manager_clone.refresh_queue.lock().unwrap().is_empty())
+                    {
                         queue = manager_clone.cvar.wait(queue).unwrap();
                     }
-                    let path = queue.pop_back().unwrap();
+                    let (path, generation) = if let Some(path) = queue.pop_back() {
+                        (path, Some(manager_clone.foreground_generation()))
+                    } else {
+                        // Only one worker services explicit refreshes, leaving
+                        // the rest immediately available to the active folder.
+                        let path = manager_clone
+                            .refresh_queue
+                            .lock()
+                            .unwrap()
+                            .pop_back()
+                            .expect("the refresh queue was checked above");
+                        (path, None)
+                    };
 
                     let mut processing = manager_clone.processing_now.lock().unwrap();
                     if processing.contains(&path) {
@@ -2511,7 +2544,7 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                         continue;
                     }
                     processing.insert(path.clone());
-                    path
+                    (path, generation)
                 };
 
                 let state = app_clone.state::<crate::AppState>();
@@ -2534,13 +2567,29 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                         &worker_settings,
                     );
 
-                    if let Some((thumbnail_path, rating, is_edited)) = result {
+                    let may_publish = foreground_generation.is_some_and(|generation| {
+                        manager_clone.is_current_foreground_generation(generation)
+                    }) || (foreground_generation.is_none()
+                        && manager_clone.is_active_path(&path_to_process));
+                    if may_publish && let Some((thumbnail_path, rating, is_edited)) = result {
                         emit_thumbnail_generated(
                             &app_clone,
                             &path_to_process,
                             &thumbnail_path,
                             rating,
                             is_edited,
+                        );
+                    } else if let Some((thumbnail_path, _, _)) = result
+                        && let Err(error) = crate::library_catalog::record_thumbnail(
+                            &app_clone,
+                            &path_to_process,
+                            &thumbnail_path,
+                        )
+                    {
+                        log::warn!(
+                            "Failed to catalog refreshed thumbnail for '{}': {}",
+                            path_to_process,
+                            error
                         );
                     }
                     increment_thumbnail_progress(&state, &app_clone);
@@ -2558,23 +2607,16 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
 #[tauri::command]
 pub fn update_thumbnail_queue(
     paths: Vec<String>,
+    context_id: String,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let state = app_handle.state::<crate::AppState>();
 
+    state.thumbnail_manager.activate_context(context_id);
+
     let mut queue = state.thumbnail_manager.queue.lock().unwrap();
 
     if paths.is_empty() {
-        queue.clear();
-        let mut tracker = state.thumbnail_progress.lock().unwrap();
-        tracker.total = 0;
-        tracker.completed = 0;
-        drop(tracker);
-
-        let _ = app_handle.emit(
-            "thumbnail-progress",
-            serde_json::json!({ "current": 0, "total": 0 }),
-        );
         state.thumbnail_manager.cvar.notify_all();
         return Ok(());
     }
@@ -2586,6 +2628,11 @@ pub fn update_thumbnail_queue(
             unique_paths.push(path);
         }
     }
+
+    unique_paths.truncate(500);
+    state
+        .thumbnail_manager
+        .register_active_paths(unique_paths.iter().cloned());
 
     queue.retain(|p| !seen.contains(p));
 
@@ -2627,6 +2674,48 @@ pub fn update_thumbnail_queue(
 
     state.thumbnail_manager.cvar.notify_all();
     Ok(())
+}
+
+#[tauri::command]
+pub async fn refresh_folder_thumbnails(
+    folder_paths: Vec<String>,
+    include_subfolders: bool,
+    app_handle: tauri::AppHandle,
+) -> Result<usize, String> {
+    let (paths, failures) = tauri::async_runtime::spawn_blocking(move || {
+        let cancellation_token = AtomicBool::new(false);
+        collect_preset_batch_folder_paths(&folder_paths, include_subfolders, &cancellation_token)
+    })
+    .await
+    .map_err(|error| format!("Thumbnail refresh discovery failed: {error}"))?;
+
+    if failures > 0 {
+        log::warn!("Thumbnail refresh skipped {failures} inaccessible entries");
+    }
+
+    let state = app_handle.state::<crate::AppState>();
+    let foreground = state.thumbnail_manager.queue.lock().unwrap();
+    let processing = state.thumbnail_manager.processing_now.lock().unwrap();
+    let mut refresh_queue = state.thumbnail_manager.refresh_queue.lock().unwrap();
+    let already_queued: HashSet<String> = refresh_queue.iter().cloned().collect();
+    let mut additions: Vec<String> = paths
+        .into_iter()
+        .filter(|path| {
+            !foreground.contains(path)
+                && !processing.contains(path)
+                && !already_queued.contains(path)
+        })
+        .collect();
+    additions.sort();
+    let added = additions.len();
+    refresh_queue.extend(additions.into_iter().rev());
+    drop(refresh_queue);
+    drop(processing);
+    drop(foreground);
+
+    add_to_thumbnail_queue(&state, added, &app_handle);
+    state.thumbnail_manager.cvar.notify_all();
+    Ok(added)
 }
 
 pub fn add_to_thumbnail_queue(state: &AppState, count: usize, app_handle: &AppHandle) {
@@ -3473,18 +3562,10 @@ fn collect_preset_batch_folder_paths(
     let mut paths = HashSet::new();
     for image_path in physical_images {
         let image_path_string = image_path.to_string_lossy().into_owned();
-        match sidecars_by_path.remove(&image_path) {
-            Some(sidecars) => {
-                for copy_id in sidecars {
-                    if let Some(copy_id) = copy_id {
-                        paths.insert(format!("{image_path_string}?vc={copy_id}"));
-                    } else {
-                        paths.insert(image_path_string.clone());
-                    }
-                }
-            }
-            None => {
-                paths.insert(image_path_string);
+        paths.insert(image_path_string.clone());
+        if let Some(sidecars) = sidecars_by_path.remove(&image_path) {
+            for copy_id in sidecars.into_iter().flatten() {
+                paths.insert(format!("{image_path_string}?vc={copy_id}"));
             }
         }
     }
@@ -4582,55 +4663,6 @@ pub fn get_thumb_cache_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
         fs::create_dir_all(&thumb_cache_dir).map_err(|e| e.to_string())?;
     }
     Ok(thumb_cache_dir)
-}
-
-pub fn get_cache_key_hash(path_str: &str) -> Option<String> {
-    let (_, sidecar_path) = parse_virtual_path(path_str);
-
-    let adjustments_bytes = if let Ok(content) = fs::read_to_string(&sidecar_path) {
-        if let Ok(meta) = serde_json::from_str::<ImageMetadata>(&content) {
-            serde_json::to_vec(&meta.adjustments).unwrap_or_default()
-        } else {
-            Vec::new()
-        }
-    } else {
-        Vec::new()
-    };
-
-    compute_thumbnail_cache_hash(path_str, &adjustments_bytes)
-}
-
-pub fn get_cached_or_generate_thumbnail_image(
-    path_str: &str,
-    app_handle: &AppHandle,
-    gpu_context: Option<&GpuContext>,
-) -> Result<DynamicImage> {
-    let thumb_cache_dir = get_thumb_cache_dir(app_handle).map_err(|e| anyhow::anyhow!(e))?;
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let target_width = settings.thumbnail_resolution.unwrap_or(720);
-
-    if let Some(cache_hash) = get_cache_key_hash(path_str) {
-        let cache_filename = format!("{}.jpg", cache_hash);
-        let cache_path = thumb_cache_dir.join(cache_filename);
-
-        if cache_path.exists() {
-            if let Ok(image) = image::open(&cache_path) {
-                return Ok(image);
-            }
-            eprintln!(
-                "Could not open cached thumbnail, regenerating: {:?}",
-                cache_path
-            );
-        }
-
-        let thumb_image = generate_thumbnail_data(path_str, gpu_context, None, app_handle)?;
-        let thumb_data = encode_thumbnail(&thumb_image, target_width)?;
-        fs::write(&cache_path, &thumb_data)?;
-
-        Ok(thumb_image)
-    } else {
-        generate_thumbnail_data(path_str, gpu_context, None, app_handle)
-    }
 }
 
 #[tauri::command]

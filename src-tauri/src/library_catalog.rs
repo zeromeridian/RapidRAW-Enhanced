@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex, OnceLock, mpsc};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -257,7 +257,9 @@ pub fn load_catalog_folder(
             )
             .map_err(|error| error.to_string())?;
         for row in rows.filter_map(Result::ok) {
-            thumbnails.insert(row.0, row.1);
+            if Path::new(&row.1).is_file() {
+                thumbnails.insert(row.0, row.1);
+            }
         }
     }
     Ok(Some(CatalogFolderSnapshot {

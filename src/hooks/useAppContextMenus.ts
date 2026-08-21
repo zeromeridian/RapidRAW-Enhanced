@@ -90,6 +90,18 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
     useEditorActions();
   const { handleRate, handleSetColorLabel, handleTagsChanged } = useLibraryActions();
 
+  const refreshFolders = useCallback(
+    async (folderPaths: string[]) => {
+      await props.refreshAllFolderTrees();
+      const includeSubfolders = useSettingsStore.getState().appSettings?.libraryViewMode === 'recursive';
+      await invoke(Invokes.RefreshFolderThumbnails, { folderPaths, includeSubfolders }).catch((err) => {
+        console.error('Failed to refresh folder thumbnails:', err);
+        toast.error(`Failed to refresh folder thumbnails: ${err}`);
+      });
+    },
+    [props.refreshAllFolderTrees],
+  );
+
   const openPresetBatchForImages = useCallback((imagePaths: string[]) => {
     useUIStore.getState().setUI({
       presetBatchModalState: {
@@ -917,7 +929,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           {
             icon: RefreshCw,
             label: t('contextMenus.folders.refresh'),
-            onClick: () => props.refreshAllFolderTrees(),
+            onClick: () => refreshFolders(useLibraryStore.getState().rootPaths),
           },
         ]);
         return;
@@ -1108,7 +1120,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         {
           icon: RefreshCw,
           label: t('contextMenus.folders.refresh'),
-          onClick: () => props.refreshAllFolderTrees(),
+          onClick: () => refreshFolders(folderTargets),
         },
         {
           icon: FileInput,
