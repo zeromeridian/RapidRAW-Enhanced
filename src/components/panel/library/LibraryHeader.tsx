@@ -1,24 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
-import {
-  Search,
-  Loader2,
-  X,
-  SlidersHorizontal,
-  Check,
-  Star as StarIcon,
-  ChevronUp,
-  ChevronDown,
-  HelpCircle,
-} from 'lucide-react';
+import { Search, Loader2, X, SlidersHorizontal, ChevronUp, ChevronDown, HelpCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import {
-  FilterCriteria,
-  RawStatus,
-  EditedStatus,
   LibraryViewMode,
   SortCriteria,
   SortDirection,
@@ -27,17 +14,14 @@ import {
   ThumbnailSize,
   ThumbnailAspectRatio,
 } from '../../ui/AppProperties';
-import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import Text from '../../ui/Text';
-import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
+import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import Button from '../../ui/Button';
 import Switch from '../../ui/Switch';
 import Dropdown from '../../ui/Dropdown';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { ADVANCED_QUERY_REGEX } from '../../../hooks/useSortedLibrary';
-import { IMAGE_FLAG_FILTER_OPTIONS } from '../../../utils/imageFlags';
-import { ImageFlagIcon } from '../../ui/ImageFlagBadge';
 
 function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName = 'w-56' }: any) {
   const [isOpen, setIsOpen] = useState(false);
@@ -140,101 +124,6 @@ const SegmentedSwitch = ({ options, value, onChange }: SegmentedSwitchProps) => 
             <span className="relative z-10">{option.label}</span>
           </button>
         ))}
-      </div>
-    </div>
-  );
-};
-
-const RatingSegmentedSwitch = ({ rating, onChange, ratingFilterOptions }: any) => {
-  const [bubbleStyle, setBubbleStyle] = useState({});
-  const isInitialAnimation = useRef(true);
-
-  const getActiveIndex = () => {
-    if (rating === 0) return 0;
-    if (rating <= -1) return 1;
-    return 2;
-  };
-
-  const activeIndex = getActiveIndex();
-
-  useEffect(() => {
-    const targetX = `${activeIndex * 100}%`;
-    const targetWidth = '33.333333%';
-
-    if (isInitialAnimation.current) {
-      setBubbleStyle({ x: targetX, width: targetWidth });
-      isInitialAnimation.current = false;
-    } else {
-      setBubbleStyle({ x: targetX, width: targetWidth });
-    }
-  }, [activeIndex]);
-
-  return (
-    <div className="w-full bg-bg-primary p-1 rounded-md">
-      <div className="relative flex w-full">
-        <motion.div
-          className="absolute top-0 bottom-0 left-0 z-0 bg-card-active shadow-xs"
-          style={{ borderRadius: 6 }}
-          animate={bubbleStyle}
-          initial={false}
-          transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-        />
-
-        <button
-          onClick={() => onChange(0)}
-          className={clsx(
-            'relative flex-1 flex items-center justify-center px-1 py-1.5 text-xs rounded-md transition-colors truncate',
-            activeIndex === 0 ? 'text-text-primary font-semibold' : 'text-text-secondary hover:text-text-primary',
-          )}
-        >
-          <span className="relative z-10">{ratingFilterOptions.find((o: any) => o.value === 0)?.label || 'All'}</span>
-        </button>
-
-        <button
-          onClick={() => onChange(-1)}
-          className={clsx(
-            'relative flex-1 flex items-center justify-center px-1 py-1.5 text-xs rounded-md transition-colors truncate',
-            activeIndex === 1 ? 'text-text-primary font-semibold' : 'text-text-secondary hover:text-text-primary',
-          )}
-        >
-          <span className="relative z-10">
-            {ratingFilterOptions.find((o: any) => o.value === -1)?.label || 'Unrated'}
-          </span>
-        </button>
-
-        <div
-          className={clsx(
-            'relative flex-1 flex items-center justify-center gap-0.5 px-1 py-1.5 transition-colors',
-            activeIndex === 2 ? 'text-text-primary' : 'text-text-secondary',
-          )}
-        >
-          <div className="flex items-center z-10">
-            {[...Array(5)].map((_, index) => {
-              const starValue = index + 1;
-              const isFilled = rating > 0 && starValue <= rating;
-              const optionLabel = ratingFilterOptions.find((o: any) => o.value === starValue)?.label;
-
-              return (
-                <button
-                  key={starValue}
-                  data-tooltip={optionLabel}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onChange(rating === starValue ? 0 : starValue);
-                  }}
-                  className="focus:outline-hidden transition-transform hover:scale-110 flex items-center justify-center p-0.5"
-                >
-                  <StarIcon
-                    size={14}
-                    className={`transition-colors duration-150 ${
-                      isFilled ? 'text-accent fill-accent' : 'text-text-secondary hover:text-accent'
-                    }`}
-                  />
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -485,9 +374,6 @@ interface ViewOptionsDropdownProps {
   thumbnailAspectRatio: ThumbnailAspectRatio;
   thumbnailSizeOptions: Array<{ id: ThumbnailSize; label: string; size: number }>;
   thumbnailAspectRatioOptions: Array<{ id: ThumbnailAspectRatio; label: string }>;
-  ratingFilterOptions: Array<{ value: number; label: string }>;
-  rawStatusOptions: Array<{ key: RawStatus; label: string }>;
-  editedStatusOptions: Array<{ key: EditedStatus; label: string }>;
   sortOptions: Array<{ key: string; label: string; disabled?: boolean }>;
 }
 
@@ -501,16 +387,11 @@ export function ViewOptionsDropdown({
   thumbnailAspectRatio,
   thumbnailSizeOptions,
   thumbnailAspectRatioOptions,
-  ratingFilterOptions,
-  rawStatusOptions,
-  editedStatusOptions,
   sortOptions,
 }: ViewOptionsDropdownProps) {
   const { t } = useTranslation();
-  const { filterCriteria, setFilterCriteria, sortCriteria, setSortCriteria } = useLibraryStore(
+  const { sortCriteria, setSortCriteria } = useLibraryStore(
     useShallow((state) => ({
-      filterCriteria: state.filterCriteria,
-      setFilterCriteria: state.setFilterCriteria,
       sortCriteria: state.sortCriteria,
       setSortCriteria: state.setSortCriteria,
     })),
@@ -526,16 +407,6 @@ export function ViewOptionsDropdown({
   const groupingMode: GroupingMode = appSettings?.grouping ?? 'off';
   const requireMatchingExif = appSettings?.requireMatchingExif ?? false;
 
-  const isFilterActive =
-    filterCriteria.rating !== 0 ||
-    (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) ||
-    (filterCriteria.editedStatus && filterCriteria.editedStatus !== EditedStatus.All) ||
-    (filterCriteria.colors && filterCriteria.colors.length > 0) ||
-    (filterCriteria.flags && filterCriteria.flags.length > 0);
-
-  const [lastClickedColor, setLastClickedColor] = useState<string | null>(null);
-  const allColors = useMemo(() => [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }], []);
-
   const metadataOptions = useMemo(
     () => [
       { id: ExifOverlay.Off, label: t('library.header.viewOptions.metadataOff') },
@@ -545,48 +416,14 @@ export function ViewOptionsDropdown({
     [t],
   );
 
-  const handleColorClick = (colorName: string, event: any) => {
-    const { ctrlKey, metaKey, shiftKey } = event;
-    const isCtrlPressed = ctrlKey || metaKey;
-    const currentColors = filterCriteria.colors || [];
-
-    if (shiftKey && lastClickedColor) {
-      const lastIndex = allColors.findIndex((c) => c.name === lastClickedColor);
-      const currentIndex = allColors.findIndex((c) => c.name === colorName);
-      if (lastIndex !== -1 && currentIndex !== -1) {
-        const start = Math.min(lastIndex, currentIndex);
-        const end = Math.max(lastIndex, currentIndex);
-        const range = allColors.slice(start, end + 1).map((c: Color) => c.name);
-        const baseSelection = isCtrlPressed ? currentColors : [lastClickedColor];
-        const newColors = Array.from(new Set([...baseSelection, ...range]));
-        setFilterCriteria((prev: FilterCriteria) => ({ ...prev, colors: newColors }));
-      }
-    } else if (isCtrlPressed) {
-      const newColors = currentColors.includes(colorName)
-        ? currentColors.filter((c: string) => c !== colorName)
-        : [...currentColors, colorName];
-      setFilterCriteria((prev: FilterCriteria) => ({ ...prev, colors: newColors }));
-    } else {
-      const newColors = currentColors.length === 1 && currentColors[0] === colorName ? [] : [colorName];
-      setFilterCriteria((prev: FilterCriteria) => ({ ...prev, colors: newColors }));
-    }
-    setLastClickedColor(colorName);
-  };
-
   return (
     <DropdownMenu
-      buttonContent={
-        <>
-          <SlidersHorizontal className="w-8 h-8" />
-          {isFilterActive && <div className="absolute -top-1 -right-1 bg-accent rounded-full w-3 h-3" />}
-        </>
-      }
+      buttonContent={<SlidersHorizontal className="w-8 h-8" />}
       buttonTitle={t('library.header.viewOptions.title')}
-      contentClassName="library-view-options-menu w-[760px]"
+      contentClassName="library-view-options-menu w-[380px]"
     >
-      <div className="library-view-options-content flex">
-        {/* Left Column (50%) - View Settings */}
-        <div className="library-view-options-section w-1/2 py-4 px-2 border-r border-border-color space-y-5">
+      <div className="library-view-options-content">
+        <div className="library-view-options-section py-4 px-2 space-y-5">
           <div>
             <div className="px-3 py-1 relative flex items-center">
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="uppercase">
@@ -669,81 +506,6 @@ export function ViewOptionsDropdown({
               />
             </div>
           </div>
-        </div>
-
-        {/* Right Column (50%) - Filters & Grouping */}
-        <div className="library-view-options-section w-1/2 py-4 px-2 space-y-5">
-          <div>
-            <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-1 uppercase">
-              {t('library.header.viewOptions.filterByRating')}
-            </Text>
-            <div className="px-3 mt-1">
-              <RatingSegmentedSwitch
-                rating={filterCriteria.rating}
-                onChange={(val: number) => setFilterCriteria((prev: FilterCriteria) => ({ ...prev, rating: val }))}
-                ratingFilterOptions={ratingFilterOptions}
-              />
-            </div>
-          </div>
-
-          <div>
-            <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-1 uppercase">
-              {t('library.header.viewOptions.filterByFileType')}
-            </Text>
-            <div className="px-3 mt-1">
-              <SegmentedSwitch
-                options={rawStatusOptions.map((o) => ({ id: o.key, label: o.label }))}
-                value={filterCriteria.rawStatus || RawStatus.All}
-                onChange={(val) => setFilterCriteria((prev: FilterCriteria) => ({ ...prev, rawStatus: val }))}
-              />
-            </div>
-          </div>
-
-          <div>
-            <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-1 uppercase">
-              {t('library.header.viewOptions.filterByEdited', 'Filter by Edit Status')}
-            </Text>
-            <div className="px-3 mt-1">
-              <SegmentedSwitch
-                options={editedStatusOptions.map((o) => ({ id: o.key, label: o.label }))}
-                value={filterCriteria.editedStatus || EditedStatus.All}
-                onChange={(val) => setFilterCriteria((prev: FilterCriteria) => ({ ...prev, editedStatus: val }))}
-              />
-            </div>
-          </div>
-
-          <div>
-            <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-1 uppercase">
-              {t('library.header.viewOptions.filterByFlag')}
-            </Text>
-            <div className="flex flex-wrap gap-1 px-3 py-1.5">
-              {IMAGE_FLAG_FILTER_OPTIONS.map((flag) => {
-                const isSelected = (filterCriteria.flags || []).includes(flag);
-                return (
-                  <button
-                    key={flag}
-                    type="button"
-                    className={clsx(
-                      'flex h-8 items-center gap-1.5 rounded-md px-2 text-xs transition-colors',
-                      isSelected
-                        ? 'bg-card-active text-text-primary'
-                        : 'bg-surface text-text-secondary hover:text-text-primary',
-                    )}
-                    onClick={() => {
-                      const currentFlags = filterCriteria.flags || [];
-                      const flags = currentFlags.includes(flag)
-                        ? currentFlags.filter((currentFlag) => currentFlag !== flag)
-                        : [...currentFlags, flag];
-                      setFilterCriteria((prev) => ({ ...prev, flags }));
-                    }}
-                  >
-                    <ImageFlagIcon flag={flag} size={14} />
-                    <span>{t(`flags.${flag}`)}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
 
           <div>
             <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-1 uppercase">
@@ -795,41 +557,6 @@ export function ViewOptionsDropdown({
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
-          </div>
-
-          <div>
-            <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-1 uppercase">
-              {t('library.header.viewOptions.filterByColorLabel')}
-            </Text>
-            <div className="flex flex-wrap gap-2.5 px-3 py-1.5">
-              {allColors.map((color: Color) => {
-                const isSelected = (filterCriteria.colors || []).includes(color.name);
-                const title =
-                  color.name === 'none'
-                    ? t('library.header.viewOptions.noLabel')
-                    : t(`contextMenus.colors.${color.name}`, {
-                        defaultValue: color.name.charAt(0).toUpperCase() + color.name.slice(1),
-                      });
-                return (
-                  <button
-                    key={color.name}
-                    data-tooltip={title}
-                    onClick={(e: any) => handleColorClick(color.name, e)}
-                    className="w-5 h-5 rounded-full focus:outline-hidden focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface transition-transform hover:scale-110"
-                    role="menuitem"
-                  >
-                    <div className="relative w-full h-full">
-                      <div className="w-full h-full rounded-full" style={{ backgroundColor: color.color }}></div>
-                      {isSelected && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-full">
-                          <Check size={12} className={TEXT_COLOR_KEYS[TextColors.white]} />
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
             </div>
           </div>
         </div>

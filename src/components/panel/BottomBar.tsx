@@ -276,6 +276,21 @@ export default function BottomBar({
   );
 
   const allColors = ALL_COLOR_OPTIONS;
+  const hasActiveFilters =
+    filterCriteria.rating !== 0 ||
+    filterCriteria.rawStatus !== RawStatus.All ||
+    filterCriteria.editedStatus !== EditedStatus.All ||
+    (filterCriteria.colors || []).length > 0 ||
+    (filterCriteria.flags || []).length > 0;
+  const clearFilters = () =>
+    setFilterCriteria((previous) => ({
+      ...previous,
+      rating: 0,
+      rawStatus: RawStatus.All,
+      editedStatus: EditedStatus.All,
+      colors: [],
+      flags: [],
+    }));
   const toolbarVisibility = appSettings?.bottomToolbarVisibility || {};
   const isToolbarItemVisible = (id: string) => toolbarVisibility[id] !== false;
   const isToolbarGroupVisible = (ids: readonly string[]) => ids.some(isToolbarItemVisible);
@@ -1193,22 +1208,57 @@ export default function BottomBar({
                   'relative w-8 h-8 flex items-center justify-center rounded-md transition-colors shrink-0',
                   isFilterExpanded
                     ? 'text-text-primary'
-                    : 'text-text-secondary hover:bg-surface hover:text-text-primary',
+                    : hasActiveFilters
+                      ? 'bg-card-active text-accent'
+                      : 'text-text-secondary hover:bg-surface hover:text-text-primary',
                 )}
                 onClick={() => setIsFilterExpanded(!isFilterExpanded)}
                 data-tooltip={t('ui.bottomBar.tooltips.quickFilter', 'Quick Filter')}
               >
                 <Filter size={18} />
+                {hasActiveFilters && !isFilterExpanded && (
+                  <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent" />
+                )}
               </button>
 
               <div
                 className={clsx(
                   'flex items-center transition-all duration-300 ease-in-out overflow-hidden',
-                  isFilterExpanded ? 'max-w-[34rem] opacity-100 pr-2 ml-1' : 'max-w-0 opacity-0 pr-0 ml-0',
+                  isFilterExpanded ? 'max-w-[52rem] opacity-100 pr-2 ml-1' : 'max-w-0 opacity-0 pr-0 ml-0',
                 )}
               >
                 <div className="flex items-center gap-3 whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    disabled={!hasActiveFilters}
+                    className={clsx(
+                      'flex h-6 w-6 items-center justify-center rounded-sm transition-colors',
+                      hasActiveFilters
+                        ? 'text-text-secondary hover:bg-card-active hover:text-text-primary'
+                        : 'cursor-default text-text-secondary/30',
+                    )}
+                    data-tooltip={t('library.header.activeFilters.clearAll')}
+                  >
+                    <X size={15} />
+                  </button>
+
+                  <div className="h-4 w-px bg-border-color"></div>
+
                   <div className="flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setFilterCriteria((prev) => ({ ...prev, rating: prev.rating === -1 ? 0 : -1 }))}
+                      className={clsx(
+                        'flex h-6 min-w-6 items-center justify-center rounded-sm px-1 text-xs transition-colors',
+                        filterCriteria.rating === -1
+                          ? 'bg-card-active text-accent'
+                          : 'text-text-secondary hover:bg-card-active hover:text-text-primary',
+                      )}
+                      data-tooltip={t('library.filters.rating.unrated')}
+                    >
+                      0
+                    </button>
                     {[1, 2, 3, 4, 5].map((starValue) => {
                       const isFilled = filterCriteria.rating > 0 && starValue <= filterCriteria.rating;
                       return (
@@ -1232,6 +1282,72 @@ export default function BottomBar({
                         </button>
                       );
                     })}
+                  </div>
+
+                  <div className="h-4 w-px bg-border-color"></div>
+
+                  <div className="flex items-center gap-1">
+                    {[
+                      { status: RawStatus.RawOnly, label: 'RAW', tooltip: t('library.filters.raw.rawOnly') },
+                      { status: RawStatus.NonRawOnly, label: 'IMG', tooltip: t('library.filters.raw.nonRawOnly') },
+                    ].map(({ status, label, tooltip }) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() =>
+                          setFilterCriteria((prev) => ({
+                            ...prev,
+                            rawStatus: prev.rawStatus === status ? RawStatus.All : status,
+                          }))
+                        }
+                        className={clsx(
+                          'h-6 rounded-sm px-1.5 text-[10px] font-semibold transition-colors',
+                          filterCriteria.rawStatus === status
+                            ? 'bg-card-active text-accent'
+                            : 'text-text-secondary hover:bg-card-active hover:text-text-primary',
+                        )}
+                        data-tooltip={tooltip}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="h-4 w-px bg-border-color"></div>
+
+                  <div className="flex items-center gap-1">
+                    {[
+                      {
+                        status: EditedStatus.EditedOnly,
+                        label: 'EDIT',
+                        tooltip: t('library.filters.edited.editedOnly'),
+                      },
+                      {
+                        status: EditedStatus.UneditedOnly,
+                        label: 'ORIG',
+                        tooltip: t('library.filters.edited.uneditedOnly'),
+                      },
+                    ].map(({ status, label, tooltip }) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() =>
+                          setFilterCriteria((prev) => ({
+                            ...prev,
+                            editedStatus: prev.editedStatus === status ? EditedStatus.All : status,
+                          }))
+                        }
+                        className={clsx(
+                          'h-6 rounded-sm px-1.5 text-[10px] font-semibold transition-colors',
+                          filterCriteria.editedStatus === status
+                            ? 'bg-card-active text-accent'
+                            : 'text-text-secondary hover:bg-card-active hover:text-text-primary',
+                        )}
+                        data-tooltip={tooltip}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
 
                   <div className="h-4 w-px bg-border-color"></div>
