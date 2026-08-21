@@ -466,7 +466,16 @@ export default function BottomBar({
 
   const handleClearSelectBy = () => {
     setActiveSelectBy(null);
-    onClearSelection?.();
+    if (isLibraryView) {
+      setLibrary({
+        multiSelectedPaths: [],
+        selectedFolderPaths: [],
+        libraryActivePath: null,
+        selectionAnchorPath: null,
+      });
+    } else {
+      onClearSelection?.();
+    }
   };
 
   const handleSelectBy = (id: string, criteriaOverrides: Partial<FilterCriteria>) => {

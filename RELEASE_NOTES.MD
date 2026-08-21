@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.5.6-feature-selection — 2026-08-21
+
+### Immediate Clear Selection
+
+- **Clear selection** now updates the Library selection store directly and
+  atomically, so thumbnail highlights disappear immediately without closing
+  the expanded selection toolbar.
+- Develop retains its existing current-image selection behavior.
+
 ## 1.5.5-feature-selection — 2026-08-21
 
 ### Cumulative rating highlight
