@@ -194,7 +194,6 @@ export default function MainLibrary(props: MainLibraryProps) {
 
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
   const filterCriteria = useLibraryStore((state) => state.filterCriteria);
-  const setFilterCriteria = useLibraryStore((state) => state.setFilterCriteria);
 
   useEffect(() => {
     const hasStoredLibrary = !!props.appSettings?.lastRootPath || !!props.appSettings?.rootFolders?.length;
@@ -632,23 +631,6 @@ export default function MainLibrary(props: MainLibraryProps) {
                       </span>
                     ))}
                   </div>
-                  <button
-                    type="button"
-                    className="shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] leading-4 text-text-secondary/70 transition-colors hover:bg-surface/70 hover:text-text-primary"
-                    data-tooltip={t('library.header.activeFilters.clearAll')}
-                    onClick={() =>
-                      setFilterCriteria((previous) => ({
-                        ...previous,
-                        rating: 0,
-                        rawStatus: RawStatus.All,
-                        editedStatus: EditedStatus.All,
-                        colors: [],
-                        flags: [],
-                      }))
-                    }
-                  >
-                    {t('library.header.activeFilters.clearAll')}
-                  </button>
                 </>
               )}
               <div
@@ -715,9 +697,6 @@ export default function MainLibrary(props: MainLibraryProps) {
               thumbnailAspectRatio={props.thumbnailAspectRatio}
               thumbnailSizeOptions={translatedThumbnailSizeOptions}
               thumbnailAspectRatioOptions={translatedThumbnailAspectRatioOptions}
-              ratingFilterOptions={translatedRatingFilterOptions}
-              rawStatusOptions={translatedRawStatusOptions}
-              editedStatusOptions={translatedEditedStatusOptions}
               sortOptions={translatedSortOptions}
             />
             <Button

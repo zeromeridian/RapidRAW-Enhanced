@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.5.7-fix-filter-cleanup — 2026-08-21
+
+### Unified Library filtering
+
+- The top **View Options** menu now contains only display, sorting, metadata,
+  and grouping controls; all image-filter criteria live in the bottom toolbar.
+- The expanded bottom **Quick Filter** now includes unrated and rating filters,
+  RAW/non-RAW file types, edited/original status, color labels, and flags.
+- **Clear all filters** is now available directly in the expanded Quick Filter,
+  and the collapsed filter icon clearly indicates when any filter is active.
+
 ## 1.5.6-feature-selection — 2026-08-21
 
 ### Immediate Clear Selection
