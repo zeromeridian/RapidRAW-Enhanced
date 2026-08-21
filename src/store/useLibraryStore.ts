@@ -79,7 +79,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   libraryActiveAdjustments: INITIAL_ADJUSTMENTS,
 
   sortCriteria: { key: 'name', order: SortDirection.Ascending },
-  filterCriteria: { colors: [], flags: [], rating: 0, rawStatus: RawStatus.All },
+  filterCriteria: { colors: [], flags: [], rating: 0, ratingComparison: 'atLeast', rawStatus: RawStatus.All },
   searchCriteria: { tags: [], text: '', mode: 'OR' },
 
   isTreeLoading: false,
