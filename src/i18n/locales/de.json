@@ -1586,6 +1586,8 @@
         "toggle_crop_panel": "Zuschneiden-Panel ein-/ausblenden",
         "toggle_export": "Exportieren-Panel ein-/ausblenden",
         "toggle_fullscreen": "Vollbild umschalten",
+        "cycle_lights_out": "Lights Out durchschalten",
+        "cycle_lights_out_reverse": "Lights Out rückwärts durchschalten",
         "toggle_library_exif": "EXIF-Überlagerung ein-/ausblenden",
         "toggle_masks": "Maskieren-Panel ein-/ausblenden",
         "toggle_metadata": "Metadaten-Panel ein-/ausblenden",

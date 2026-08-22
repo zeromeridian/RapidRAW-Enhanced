@@ -6,6 +6,15 @@ details are in `RELEASE_NOTES.MD`.
 
 ## Library and workflow
 
+- Lightroom-style **Lights Out** viewing across Library and Develop, with
+  session-only Normal, Dim, and Black states; forward/reverse configurable
+  shortcuts; Escape-first restoration; full-brightness photographs,
+  thumbnails, dialogs, and editing overlays; and a distraction-free Develop
+  Black state that removes application chrome from layout so the photograph
+  uses all available space and forces both the web and native GPU surrounds to
+  true black. Black automatically enters true window fullscreen and restores
+  the prior window/fullscreen state on exit. Normal and Dim retain the complete
+  interface.
 - Customizable bottom toolbar shared by Library and Develop, with Productivity,
   Copy, Stacking, Flags, direct color-label controls, and a visually distinct
   expandable **Select by** control. Select by replaces the current selection

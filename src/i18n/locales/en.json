@@ -1726,6 +1726,8 @@
         "toggle_crop_panel": "Toggle Crop panel",
         "toggle_export": "Toggle Export panel",
         "toggle_fullscreen": "Toggle fullscreen",
+        "cycle_lights_out": "Cycle Lights Out",
+        "cycle_lights_out_reverse": "Cycle Lights Out backward",
         "toggle_library_exif": "Toggle EXIF overlay",
         "toggle_masks": "Toggle Masks panel",
         "toggle_mask_overlay": "Toggle mask overlay",

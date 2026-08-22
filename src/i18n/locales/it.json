@@ -1623,6 +1623,8 @@
         "toggle_crop_panel": "Attiva/Disattiva pannello Ritaglio",
         "toggle_export": "Attiva/Disattiva pannello Esportazione",
         "toggle_fullscreen": "Attiva/Disattiva schermo intero",
+        "cycle_lights_out": "Cambia modalità Lights Out",
+        "cycle_lights_out_reverse": "Cambia Lights Out all'indietro",
         "toggle_library_exif": "Attiva/Disattiva overlay EXIF",
         "toggle_masks": "Attiva/Disattiva pannello Maschere",
         "toggle_metadata": "Attiva/Disattiva pannello Metadati",

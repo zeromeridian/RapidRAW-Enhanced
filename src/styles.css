@@ -31,6 +31,36 @@
   }
 }
 
+.lights-out-dim .lights-out-chrome {
+  filter: brightness(0.25);
+}
+
+.lights-out-dim .lights-out-stage,
+.lights-out-black .lights-out-stage {
+  --tw-ring-color: #000;
+  background-color: #000;
+}
+
+.lights-out-black,
+.lights-out-black .lights-out-content,
+.lights-out-black .lights-out-stage {
+  background-color: #000 !important;
+}
+
+.lights-out-black .lights-out-chrome {
+  display: none;
+}
+
+.lights-out-black .lights-out-content {
+  gap: 0;
+  padding: 0;
+}
+
+.lights-out-black .lights-out-stage {
+  border-radius: 0;
+  box-shadow: none;
+}
+
 @utility slider-input {
   &::-webkit-slider-thumb {
     @apply h-4 w-4 appearance-none rounded-full bg-accent;

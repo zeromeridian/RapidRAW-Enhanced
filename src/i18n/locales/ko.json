@@ -1584,6 +1584,8 @@
         "toggle_crop_panel": "자르기 패널 전환",
         "toggle_export": "내보내기 패널 전환",
         "toggle_fullscreen": "전체 화면 전환",
+        "cycle_lights_out": "Lights Out 순환",
+        "cycle_lights_out_reverse": "Lights Out 역순 순환",
         "toggle_library_exif": "EXIF 오버레이 전환",
         "toggle_masks": "마스크 패널 전환",
         "toggle_metadata": "메타데이터 패널 전환",

@@ -1584,6 +1584,8 @@
         "toggle_crop_panel": "切り抜きパネルの表示/非表示",
         "toggle_export": "書き出しパネルの表示/非表示",
         "toggle_fullscreen": "全画面表示の切り替え",
+        "cycle_lights_out": "ライトアウトを切り替え",
+        "cycle_lights_out_reverse": "ライトアウトを逆方向に切り替え",
         "toggle_library_exif": "EXIF重ね合わせ表示の表示/非表示",
         "toggle_masks": "マスクパネルの表示/非表示",
         "toggle_metadata": "メタデータパネルの表示/非表示",

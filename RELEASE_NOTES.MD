@@ -5,6 +5,47 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.6.3-feature-lights-out — 2026-08-21
+
+### Restorable fullscreen Black mode
+
+- Entering Black Lights Out now places the application window in true
+  fullscreen automatically.
+- Leaving Black restores the previous window state: sessions that began
+  windowed return to windowed mode, while existing fullscreen sessions remain
+  fullscreen.
+- Every remaining part of the image stage and application surround is forced to
+  pure black without altering the photograph.
+
+## 1.6.2-feature-lights-out — 2026-08-21
+
+### True-black fullscreen surround
+
+- Black Lights Out now also sets the native GPU preview surface and application
+  window surround to true black, leaving only the photograph visible in the
+  distraction-free fullscreen view.
+- Photograph colors and brightness remain unchanged.
+
+## 1.6.1-feature-lights-out — 2026-08-21
+
+### Distraction-free Black mode
+
+- Black Lights Out now removes the title bar, sidebars, editor toolbar, and
+  filmstrip from the layout so the photograph expands into all available space.
+- Normal and Dim modes retain the complete interface, and leaving Black mode
+  restores every panel in its previous state.
+
+## 1.6.0-feature-lights-out — 2026-08-21
+
+### Lights Out viewing
+
+- Added Lightroom-style **Lights Out** viewing in both Library and Develop.
+- Press **L** to cycle Normal → Dim → Black, or **Shift+L** to cycle backward;
+  both shortcuts are configurable in Settings.
+- Photographs, thumbnails, selection indicators, and editing overlays remain
+  fully visible while surrounding application chrome is subdued.
+- **Escape** restores normal lighting before performing its existing action.
+
 ## 1.5.9-fix-filter-cleanup — 2026-08-21
 
 ### Consistent selected-rating highlights
