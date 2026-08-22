@@ -1623,6 +1623,8 @@
         "toggle_crop_panel": "Alternar painel de Corte",
         "toggle_export": "Alternar painel de Exportação",
         "toggle_fullscreen": "Alternar tela cheia",
+        "cycle_lights_out": "Alternar Lights Out",
+        "cycle_lights_out_reverse": "Alternar Lights Out para trás",
         "toggle_library_exif": "Alternar sobreposição EXIF",
         "toggle_masks": "Alternar painel de Máscaras",
         "toggle_metadata": "Alternar painel de Metadados",

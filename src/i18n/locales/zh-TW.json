@@ -1584,6 +1584,8 @@
         "toggle_crop_panel": "切換裁剪面板",
         "toggle_export": "切換匯出面板",
         "toggle_fullscreen": "切換全屏",
+        "cycle_lights_out": "循環切換熄燈模式",
+        "cycle_lights_out_reverse": "反向循環切換熄燈模式",
         "toggle_library_exif": "切換 EXIF 疊加",
         "toggle_masks": "切換遮色片面板",
         "toggle_metadata": "切換後設資料面板",

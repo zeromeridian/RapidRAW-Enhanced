@@ -92,6 +92,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const isFullScreen = useUIStore((s) => s.isFullScreen);
   const activeRightPanel = useUIStore((s) => s.activeRightPanel);
   const isInstantTransition = useUIStore((s) => s.isInstantTransition);
+  const lightsOutMode = useUIStore((s) => s.lightsOutMode);
   const setUI = useUIStore((s) => s.setUI);
   const isLoading = useLibraryStore((s) => s.isViewLoading);
   const selectedImage = useEditorStore((s) => s.selectedImage);
@@ -1215,6 +1216,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     const rootStyle = getComputedStyle(document.documentElement);
     const bgPrimaryStr = rootStyle.getPropertyValue('--app-bg-primary') || 'rgb(24, 24, 24)';
     const bgSecondaryStr = rootStyle.getPropertyValue('--app-bg-secondary') || 'rgb(35, 35, 35)';
+    const isLightsOutBlack = lightsOutMode === 'black';
+    const bgPrimary = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgPrimaryStr);
+    const bgSecondary = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgSecondaryStr);
 
     wgpuStateRef.current = {
       useWgpuRenderer: appSettings?.useWgpuRenderer,
@@ -1223,8 +1227,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       isCropping,
       uncroppedAdjustedPreviewUrl,
       showOriginal,
-      bgPrimary: parseRgb(bgPrimaryStr),
-      bgSecondary: parseRgb(bgSecondaryStr),
+      bgPrimary,
+      bgSecondary,
     };
   }, [
     appSettings?.useWgpuRenderer,
@@ -1233,6 +1237,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     isCropping,
     uncroppedAdjustedPreviewUrl,
     showOriginal,
+    lightsOutMode,
     appSettings?.theme,
     finalPreviewUrl,
   ]);
@@ -2066,7 +2071,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       {hasRenderedAnyPreview && <div className="hidden" data-bench-id="editor-first-frame" />}
       <div
         className={clsx(
-          'shrink-0 relative z-10',
+          'lights-out-chrome shrink-0 relative z-10',
           !isInstantTransition && 'transition-all duration-300 ease-in-out',
           isFullScreen ? 'max-h-0 opacity-0 m-0' : 'max-h-25 opacity-100',
           toolbarOverflowVisible ? 'overflow-visible' : 'overflow-hidden',
@@ -2095,7 +2100,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
 
       <div
         className={clsx(
-          'flex-1 relative overflow-hidden touch-none',
+          'lights-out-stage flex-1 relative overflow-hidden touch-none',
           isFullScreen ? 'rounded-none' : 'rounded-lg',
           appSettings?.useWgpuRenderer !== false && !isFullScreen && 'ring-[9999px] ring-bg-secondary',
           !isWgpuActive && 'bg-bg-secondary',

@@ -593,9 +593,9 @@ export default function MainLibrary(props: MainLibraryProps) {
   }
 
   return (
-    <div className="relative flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden">
+    <div className="lights-out-stage relative flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden">
       <header
-        className="p-4 shrink-0 flex justify-between items-center border-b border-surface gap-4"
+        className="lights-out-chrome p-4 shrink-0 flex justify-between items-center border-b border-surface gap-4"
         onMouseEnter={() => setIsProgressHovered(true)}
         onMouseLeave={() => setIsProgressHovered(false)}
       >

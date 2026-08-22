@@ -1623,6 +1623,8 @@
         "toggle_crop_panel": "Basculer le panneau de recadrage",
         "toggle_export": "Basculer le panneau d'exportation",
         "toggle_fullscreen": "Basculer en plein écran",
+        "cycle_lights_out": "Parcourir le mode Lights Out",
+        "cycle_lights_out_reverse": "Parcourir Lights Out en sens inverse",
         "toggle_library_exif": "Basculer la superposition EXIF",
         "toggle_masks": "Basculer le panneau des masques",
         "toggle_metadata": "Basculer le panneau des métadonnées",

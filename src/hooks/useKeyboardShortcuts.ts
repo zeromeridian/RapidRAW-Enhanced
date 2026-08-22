@@ -310,6 +310,20 @@ export const useKeyboardShortcuts = ({
           handleToggleFullScreen();
         },
       },
+      cycle_lights_out: {
+        shouldFire: () => true,
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) => {
+          e.preventDefault();
+          s.ui.cycleLightsOut(1);
+        },
+      },
+      cycle_lights_out_reverse: {
+        shouldFire: () => true,
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) => {
+          e.preventDefault();
+          s.ui.cycleLightsOut(-1);
+        },
+      },
       show_original: {
         shouldFire: (s: any) => !!s.editor.selectedImage,
         execute: (e: any, s: any) => {
@@ -525,7 +539,8 @@ export const useKeyboardShortcuts = ({
         match: (e: KeyboardEvent) => e.code === 'Escape',
         execute: (e: KeyboardEvent, s: any) => {
           e.preventDefault();
-          if (s.editor.isStraightenActive) s.editor.setEditor({ isStraightenActive: false });
+          if (s.ui.lightsOutMode !== 'off') s.ui.setUI({ lightsOutMode: 'off' });
+          else if (s.editor.isStraightenActive) s.editor.setEditor({ isStraightenActive: false });
           else if (s.ui.customEscapeHandler) s.ui.customEscapeHandler();
           else if (s.editor.activeAiSubMaskId) s.editor.setEditor({ activeAiSubMaskId: null });
           else if (s.editor.activeAiPatchContainerId) s.editor.setEditor({ activeAiPatchContainerId: null });

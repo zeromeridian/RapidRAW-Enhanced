@@ -22,6 +22,8 @@ export interface CollapsibleSectionsState {
   effects: boolean;
 }
 
+export type LightsOutMode = 'off' | 'dim' | 'black';
+
 export interface ConfirmModalState {
   confirmText?: string;
   confirmVariant?: string;
@@ -104,6 +106,7 @@ interface UIState {
   uiVisibility: UiVisibility;
   isLibraryExportPanelVisible: boolean;
   isSettingsOpen: boolean;
+  lightsOutMode: LightsOutMode;
 
   // Dimensions
   leftPanelWidth: number;
@@ -152,6 +155,7 @@ interface UIState {
   setCustomEscapeHandler: (handler: (() => void) | null) => void;
   searchFocusRequest: number;
   requestSearchFocus: () => void;
+  cycleLightsOut: (direction?: 1 | -1) => void;
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
@@ -163,6 +167,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   uiVisibility: { folderTree: true, filmstrip: true },
   isLibraryExportPanelVisible: false,
   isSettingsOpen: false,
+  lightsOutMode: 'off',
 
   leftPanelWidth: 240,
   rightPanelWidth: 296,
@@ -246,4 +251,10 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   searchFocusRequest: 0,
   requestSearchFocus: () => set((state) => ({ searchFocusRequest: state.searchFocusRequest + 1 })),
+  cycleLightsOut: (direction = 1) =>
+    set((state) => {
+      const modes: LightsOutMode[] = ['off', 'dim', 'black'];
+      const currentIndex = modes.indexOf(state.lightsOutMode);
+      return { lightsOutMode: modes[(currentIndex + direction + modes.length) % modes.length] };
+    }),
 }));

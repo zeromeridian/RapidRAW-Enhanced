@@ -1660,6 +1660,8 @@
         "toggle_crop_panel": "Панель обрезки",
         "toggle_export": "Панель экспорта",
         "toggle_fullscreen": "Полноэкранный режим",
+        "cycle_lights_out": "Переключить Lights Out",
+        "cycle_lights_out_reverse": "Переключить Lights Out назад",
         "toggle_library_exif": "Информация EXIF поверх сетки",
         "toggle_masks": "Панель масок",
         "toggle_metadata": "Панель метаданных",
