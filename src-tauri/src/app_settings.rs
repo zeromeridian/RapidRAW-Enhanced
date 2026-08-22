@@ -348,6 +348,30 @@ const fn default_true() -> bool {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct BlackFrameSettings {
+    pub unit: String,
+    pub locked: bool,
+    pub top: f32,
+    pub right: f32,
+    pub bottom: f32,
+    pub left: f32,
+}
+
+impl Default for BlackFrameSettings {
+    fn default() -> Self {
+        Self {
+            unit: "percent".to_string(),
+            locked: true,
+            top: 5.0,
+            right: 5.0,
+            bottom: 5.0,
+            left: 5.0,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub last_root_path: Option<String>,
     #[serde(default)]
@@ -502,6 +526,8 @@ pub struct AppSettings {
     pub right_panel_width: Option<u32>,
     #[serde(default)]
     pub catalog_directory: Option<String>,
+    #[serde(default)]
+    pub black_frame: BlackFrameSettings,
 }
 
 impl Default for AppSettings {
@@ -607,6 +633,7 @@ impl Default for AppSettings {
             left_panel_width: None,
             right_panel_width: None,
             catalog_directory: None,
+            black_frame: BlackFrameSettings::default(),
         }
     }
 }

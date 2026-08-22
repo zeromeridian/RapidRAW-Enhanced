@@ -15,6 +15,14 @@ export interface RenderSize {
   width: number;
 }
 
+export interface RenderInsets {
+  unit: 'percent' | 'pixels';
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 const DEFAULT_SIZE: RenderSize = {
   width: 0,
   height: 0,
@@ -28,6 +36,7 @@ const DEFAULT_SIZE: RenderSize = {
 export const useImageRenderSize = (
   containerRef: React.RefObject<HTMLElement | null>,
   imageDimensions: ImageDimensions | null,
+  insets?: RenderInsets,
 ) => {
   const [renderSize, setRenderSize] = useState<RenderSize>(DEFAULT_SIZE);
   const imgWidth = imageDimensions?.width;
@@ -43,20 +52,27 @@ export const useImageRenderSize = (
 
     const updateSize = () => {
       const { clientWidth: containerWidth, clientHeight: containerHeight } = container;
+      const insetScale = insets?.unit === 'percent' ? Math.min(containerWidth, containerHeight) / 100 : 1;
+      const insetTop = Math.max(0, (insets?.top ?? 0) * insetScale);
+      const insetRight = Math.max(0, (insets?.right ?? 0) * insetScale);
+      const insetBottom = Math.max(0, (insets?.bottom ?? 0) * insetScale);
+      const insetLeft = Math.max(0, (insets?.left ?? 0) * insetScale);
+      const availableWidth = Math.max(1, containerWidth - insetLeft - insetRight);
+      const availableHeight = Math.max(1, containerHeight - insetTop - insetBottom);
       const imageAspectRatio = imgWidth / imgHeight;
-      const containerAspectRatio = containerWidth / containerHeight;
+      const containerAspectRatio = availableWidth / availableHeight;
 
       let width, height;
       if (imageAspectRatio > containerAspectRatio) {
-        width = containerWidth;
-        height = containerWidth / imageAspectRatio;
+        width = availableWidth;
+        height = availableWidth / imageAspectRatio;
       } else {
-        height = containerHeight;
-        width = containerHeight * imageAspectRatio;
+        height = availableHeight;
+        width = availableHeight * imageAspectRatio;
       }
 
-      const offsetX = (containerWidth - width) / 2;
-      const offsetY = (containerHeight - height) / 2;
+      const offsetX = insetLeft + (availableWidth - width) / 2;
+      const offsetY = insetTop + (availableHeight - height) / 2;
 
       setRenderSize({ width, height, scale: width / imgWidth, offsetX, offsetY, containerWidth, containerHeight });
     };
@@ -70,7 +86,7 @@ export const useImageRenderSize = (
     resizeObserver.observe(container);
 
     return () => resizeObserver.disconnect();
-  }, [containerRef, imgWidth, imgHeight]);
+  }, [containerRef, imgWidth, imgHeight, insets?.unit, insets?.top, insets?.right, insets?.bottom, insets?.left]);
 
   return renderSize;
 };

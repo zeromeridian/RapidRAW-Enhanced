@@ -1540,6 +1540,28 @@
       "system": "システムデフォルト",
       "theme": "テーマ",
       "themeDesc": "アプリケーションのテーマ（外観）を変更します。",
+      "blackFrame": "Black mode frame",
+      "blackFrameDesc": "Set the black border reserved around the photograph in Black Lights Out. Presets populate editable values; the frame affects only Fit view in Black mode.",
+      "blackFrameUnit": "Units",
+      "blackFramePercent": "Percent of short edge",
+      "blackFramePixels": "Pixels",
+      "blackFrameLockSides": "Lock all sides",
+      "blackFrameAllSides": "All sides",
+      "blackFramePreview": "Frame preview",
+      "blackFrameReset": "Reset to default",
+      "blackFramePresets": {
+        "none": "None",
+        "narrow": "Narrow",
+        "standard": "Standard",
+        "wide": "Wide",
+        "cinema": "Cinema"
+      },
+      "blackFrameSides": {
+        "top": "Top",
+        "right": "Right",
+        "bottom": "Bottom",
+        "left": "Left"
+      },
       "title": "全般設定",
       "xmpSync": "XMPメタデータ同期",
       "xmpSyncDesc": "他の写真編集ソフトとの互換性のために、評価、カラーラベル、タグを標準のXMPサイドカーファイルと同期します。"

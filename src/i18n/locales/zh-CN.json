@@ -1540,6 +1540,28 @@
       "system": "系统默认",
       "theme": "主题",
       "themeDesc": "更改应用程序的外观和风格。",
+      "blackFrame": "Black mode frame",
+      "blackFrameDesc": "Set the black border reserved around the photograph in Black Lights Out. Presets populate editable values; the frame affects only Fit view in Black mode.",
+      "blackFrameUnit": "Units",
+      "blackFramePercent": "Percent of short edge",
+      "blackFramePixels": "Pixels",
+      "blackFrameLockSides": "Lock all sides",
+      "blackFrameAllSides": "All sides",
+      "blackFramePreview": "Frame preview",
+      "blackFrameReset": "Reset to default",
+      "blackFramePresets": {
+        "none": "None",
+        "narrow": "Narrow",
+        "standard": "Standard",
+        "wide": "Wide",
+        "cinema": "Cinema"
+      },
+      "blackFrameSides": {
+        "top": "Top",
+        "right": "Right",
+        "bottom": "Bottom",
+        "left": "Left"
+      },
       "title": "通用设置",
       "xmpSync": "XMP 元数据同步",
       "xmpSyncDesc": "将评分、颜色标签和标签同步到标准 XMP 附属文件，以便与其他照片编辑器兼容。"

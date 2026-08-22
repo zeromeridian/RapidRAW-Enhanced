@@ -14,7 +14,10 @@ details are in `RELEASE_NOTES.MD`.
   uses all available space and forces both the web and native GPU surrounds to
   true black. Black automatically enters true window fullscreen and restores
   the prior window/fullscreen state on exit. Normal and Dim retain the complete
-  interface.
+  interface. General Settings provides a persistent configurable Black-mode
+  frame with presets, percentage or pixel units, locked or independent sides,
+  precise values, live preview, and reset; Fit reserves the chosen four-sided
+  margins while zoom and pan remain unrestricted.
 - Customizable bottom toolbar shared by Library and Develop, with Productivity,
   Copy, Stacking, Flags, direct color-label controls, and a visually distinct
   expandable **Select by** control. Select by replaces the current selection

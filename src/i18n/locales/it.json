@@ -1579,6 +1579,28 @@
       "system": "Predefinito di Sistema",
       "theme": "Tema",
       "themeDesc": "Cambia l'aspetto e l'interfaccia dell'applicazione.",
+      "blackFrame": "Black mode frame",
+      "blackFrameDesc": "Set the black border reserved around the photograph in Black Lights Out. Presets populate editable values; the frame affects only Fit view in Black mode.",
+      "blackFrameUnit": "Units",
+      "blackFramePercent": "Percent of short edge",
+      "blackFramePixels": "Pixels",
+      "blackFrameLockSides": "Lock all sides",
+      "blackFrameAllSides": "All sides",
+      "blackFramePreview": "Frame preview",
+      "blackFrameReset": "Reset to default",
+      "blackFramePresets": {
+        "none": "None",
+        "narrow": "Narrow",
+        "standard": "Standard",
+        "wide": "Wide",
+        "cinema": "Cinema"
+      },
+      "blackFrameSides": {
+        "top": "Top",
+        "right": "Right",
+        "bottom": "Bottom",
+        "left": "Left"
+      },
       "title": "Impostazioni Generali",
       "xmpSync": "Sincronizzazione Metadati XMP",
       "xmpSyncDesc": "Sincronizza valutazioni, etichette colore e tag nei file sidecar XMP standard per la compatibilità con altri editor fotografici."
