@@ -5134,6 +5134,63 @@ pub fn create_virtual_copy(
     Ok(new_virtual_path)
 }
 
+#[tauri::command]
+pub fn create_layered_virtual_composition(
+    source_virtual_path: String,
+    canvas_width: u32,
+    canvas_height: u32,
+    target_album_id: Option<String>,
+    copy_name_suffix: Option<String>,
+    app_handle: AppHandle,
+) -> Result<String, String> {
+    if canvas_width == 0 || canvas_height == 0 {
+        return Err("Layered composition canvas dimensions must be positive.".to_string());
+    }
+
+    let (anchor_path, source_sidecar_path) = parse_virtual_path(&source_virtual_path);
+    let source_metadata = crate::exif_processing::load_sidecar(&source_sidecar_path);
+    let composition_path = create_virtual_copy(
+        source_virtual_path,
+        target_album_id,
+        copy_name_suffix,
+        app_handle,
+    )?;
+    let (_, composition_sidecar_path) = parse_virtual_path(&composition_path);
+    let mut composition_metadata = crate::exif_processing::load_sidecar(&composition_sidecar_path);
+    let document = serde_json::json!({
+        "mode": "layered",
+        "documentVersion": 1,
+        "id": Uuid::new_v4().to_string(),
+        "anchorPath": anchor_path,
+        "canvas": {
+            "width": canvas_width,
+            "height": canvas_height,
+            "background": { "mode": "transparent", "color": [0, 0, 0, 0] }
+        },
+        "layers": [{
+            "id": Uuid::new_v4().to_string(),
+            "name": "Background",
+            "kind": "image",
+            "visible": true,
+            "opacity": 100.0,
+            "blendMode": "normal",
+            "locked": false,
+            "source": {
+                "originalPath": anchor_path,
+                "displayName": anchor_path.file_name().and_then(|name| name.to_str()).unwrap_or("Background")
+            },
+            "sourceAdjustments": source_metadata.adjustments,
+            "creativeAdjustments": {},
+            "arrange": { "centerX": 0.5, "centerY": 0.5, "scaleX": 1.0, "scaleY": 1.0, "rotation": 0.0, "flipHorizontal": false, "flipVertical": false }
+        }],
+        "compositeAdjustments": { "masks": [], "aiPatches": [], "crop": null, "geometry": {} }
+    });
+    validate_plus_document(&document)?;
+    composition_metadata.plus_document = Some(document);
+    write_sidecar_atomically(&composition_sidecar_path, &composition_metadata)?;
+    Ok(composition_path)
+}
+
 pub fn extract_xmp_rating(content: &str) -> Option<u8> {
     if let Some(idx) = content.find("xmp:Rating=\"") {
         let start = idx + 12;
