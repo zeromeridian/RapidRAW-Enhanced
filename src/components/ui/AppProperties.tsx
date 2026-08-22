@@ -50,6 +50,7 @@ export enum Invokes {
   CopyFiles = 'copy_files',
   CreateFolder = 'create_folder',
   CreateVirtualCopy = 'create_virtual_copy',
+  CreateLayeredVirtualComposition = 'create_layered_virtual_composition',
   CullImages = 'cull_images',
   DeleteFolder = 'delete_folder',
   DuplicateFile = 'duplicate_file',

@@ -3228,6 +3228,7 @@ pub fn run() {
             file_management::sync_image_stacks_to_xmp,
             file_management::import_files,
             file_management::create_virtual_copy,
+            file_management::create_layered_virtual_composition,
             file_management::get_albums,
             file_management::save_albums,
             file_management::add_to_album,
