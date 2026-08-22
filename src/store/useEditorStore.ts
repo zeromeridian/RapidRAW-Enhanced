@@ -97,6 +97,7 @@ interface EditorState {
   undo: () => void;
   redo: () => void;
   resetHistory: (initialState: Adjustments) => void;
+  resetDocumentHistory: (document: EditorDocument) => void;
   goToHistoryIndex: (index: number) => void;
 }
 
@@ -155,6 +156,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   setEditor: (updater) =>
     set((state) => {
       const patch = typeof updater === 'function' ? updater(state) : updater;
+      if (Object.hasOwn(patch, 'document')) {
+        const document = patch.document as EditorDocument;
+        return { ...patch, document, adjustments: getActiveAdjustments(document) ?? state.adjustments };
+      }
       if (!Object.hasOwn(patch, 'adjustments')) return patch;
       const adjustments = patch.adjustments as Adjustments;
       return { ...patch, adjustments, document: createSinglePhotoDocument(adjustments) };
@@ -198,6 +203,14 @@ export const useEditorStore = create<EditorState>((set) => ({
       document,
     });
   },
+
+  resetDocumentHistory: (document) =>
+    set((state) => ({
+      document,
+      history: [document],
+      historyIndex: 0,
+      adjustments: getActiveAdjustments(document) ?? state.adjustments,
+    })),
 
   goToHistoryIndex: (index) =>
     set((state) => {

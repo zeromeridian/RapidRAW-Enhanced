@@ -27,6 +27,7 @@ export function useImageProcessing(
 
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const adjustments = useEditorStore((state) => state.adjustments);
+  const document = useEditorStore((state) => state.document);
   const previewOverride = useEditorStore((state) => state.previewOverride);
   const isWaveformVisible = useEditorStore((state) => state.isWaveformVisible);
   const activeWaveformChannel = useEditorStore((state) => state.activeWaveformChannel);
@@ -471,7 +472,7 @@ export function useImageProcessing(
 
         applyAdjustments(renderAdjustments, false, targetRes);
 
-        if (previewOverride) return;
+        if (previewOverride || document.mode !== 'single') return;
 
         debouncedSave(selectedImage.path, adjustments);
 
@@ -506,6 +507,7 @@ export function useImageProcessing(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     adjustments,
+    document.mode,
     previewOverride,
     selectedImage?.path,
     selectedImage?.isReady,
