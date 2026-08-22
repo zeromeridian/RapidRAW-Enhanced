@@ -5,6 +5,93 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.13-fix-lightsout — 2026-08-22
+
+### Visible macOS Black Lights Out preview
+
+- Black Lights Out on macOS now presents the existing full-brightness web
+  preview above a deliberately transparent native GPU surface, eliminating the
+  opaque black layer that could hide the photograph.
+- Normal macOS and Windows retain native GPU presentation; Linux and macOS
+  Black use the same established web-preview layout and saved frame geometry.
+
+## 1.7.12-fix-lightsout — 2026-08-22
+
+### Reliable Lights Out image visibility
+
+- Dim Lights Out now preserves the existing preview-stage appearance while
+  dimming only application chrome, keeping the photograph at full brightness.
+- The native GPU preview retains its last valid frame while Black Lights Out
+  enters or exits fullscreen, then applies the saved frame geometry as soon as
+  the resized stage is measured. This removes the transient full-black preview
+  without adding a fallback renderer or changing image processing.
+
+## 1.7.11-fix-lightsout — 2026-08-22
+
+### Stable Lights Out preview
+
+- Restored Lights Out to the proven single preview stage, fixing the missing or
+  clipped photograph in Dim and Black modes on macOS.
+- Black-mode frame sizing remains in the established renderer geometry path;
+  no nested viewport or browser-specific layout units are used.
+
+## 1.7.10-fix-lightsout — 2026-08-22
+
+### Structural Black-mode frame
+
+- Black Lights Out now creates a real inset image viewport from the saved top,
+  right, bottom, and left frame values.
+- Percentage values use the viewport's short edge, while pixel values remain
+  exact; web and native GPU rendering use the same inset viewport.
+- Removed the macOS-specific renderer fallback introduced in the prior fix.
+
+## 1.7.9-fix-lightsout — 2026-08-22
+
+### Correct Black-mode frame rendering on macOS
+
+- Black Lights Out now uses the web image renderer on macOS so the photograph
+  and its configured frame are laid out in the same coordinate system.
+- Normal editing and non-macOS platforms retain the native GPU renderer.
+- Removed the superseded fullscreen remeasurement and repeated Fit-reset
+  workarounds.
+
+## 1.7.8-fix-lightsout — 2026-08-22
+
+### Reliable Black-mode borders on macOS
+
+- Black Lights Out now reapplies Fit after each fullscreen viewport geometry
+  update, so the configured four-sided frame remains intact when macOS finishes
+  resizing the window.
+- Pending zoom and pan animations can no longer overwrite the configured frame
+  while Black mode is entering fullscreen; zoom and pan remain available once
+  the viewport has settled.
+
+## 1.7.7-fix-lightsout — 2026-08-22
+
+### Black-mode frame restored
+
+- Entering Black Lights Out now returns the Develop view to Fit before applying
+  the configured Black-mode frame, so saved borders are visible immediately.
+- Zooming and panning remain available after entering Black mode.
+
+## 1.7.6-fix-lightsout — 2026-08-22
+
+### Visible Black mode image on macOS
+
+- Black Lights Out no longer hides the photograph while macOS simple fullscreen
+  is settling its layout.
+- The image frame is remeasured on fullscreen-style viewport changes, keeping
+  the configured Black-mode margins accurate after entry and exit.
+
+## 1.7.5-fix-lightsout — 2026-08-22
+
+### Reliable Black mode on macOS
+
+- Black Lights Out now uses macOS simple fullscreen, keeping the photograph
+  visible and the application focused while removing window chrome.
+- The **L**, **Shift+L**, and **Escape** controls remain responsive throughout
+  Black mode, and exiting restores the previous window state.
+
 ## 1.7.3-feature-lights-out — 2026-08-22
 
 ### Border-first image navigation
