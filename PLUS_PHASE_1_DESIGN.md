@@ -7,7 +7,9 @@ normalization, persistence, history, commands, feature gating, and tests. It
 does not introduce a Layer UI, composite rendering, library action, thumbnail,
 or export behavior change.
 
-Audit completed on `dev/thisisraw_photoshop`; no product code changed.
+Audit completed on `dev/thisisraw_photoshop`. The initial pure document module
+and default-off developer-only gate are implemented; no UI, persistence,
+rendering, thumbnail, or export behavior has changed.
 
 ## Confirmed Current Architecture
 
@@ -150,9 +152,9 @@ macOS ARM64 local results and Windows/Linux follow-up validation honestly.
 
 ## Implementation Sequence
 
-1. Add pure document types, normalizer, commands, and unit tests with no store
-   or renderer change.
-2. Add default-off typed `plusFeatures` settings transport and backend document
+1. **Completed:** add pure document types, normalizer, commands, and a
+   default-off developer-only Vite gate with no store or renderer change.
+2. Add frontend unit-test coverage, then backend document
    validation/atomic persistence tests.
 3. Migrate the editor store, loader, history, autosave, and cached navigation
    together to the canonical document state while preserving the legacy render
