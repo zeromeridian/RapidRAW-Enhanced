@@ -62,6 +62,8 @@ pub struct ImageMetadata {
     pub version: u32,
     pub rating: u8,
     pub adjustments: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plus_document: Option<Value>,
     #[serde(default)]
     pub tags: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -78,6 +80,7 @@ impl Default for ImageMetadata {
             version: 1,
             rating: 0,
             adjustments: Value::Null,
+            plus_document: None,
             tags: None,
             exif: None,
             copy_name_suffix: None,
