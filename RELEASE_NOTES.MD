@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.18-feature-deselect-shortcut — 2026-08-22
+
+### Deselect All shortcut
+
+- Added a configurable **Deselect All** keyboard shortcut, defaulting to
+  Command+D on macOS and Ctrl+D on Windows and Linux.
+- The shortcut clears Select-by state along with the image selection, keeping
+  its toolbar indicator accurate.
+
+## 1.7.17-fix-selection-indicator — 2026-08-22
+
+### Accurate Select-by state and RAW choices
+
+- The bottom-toolbar **Select by** indicator now activates only when the
+  selection was created through that toolbar, not when an image is selected
+  normally.
+- **Select by** now offers separate DNG, other RAW, and non-RAW choices.
+
 ## 1.7.16-fix-lightsout — 2026-08-22
 
 ### Immediate Black Lights Out frame gating
@@ -12,7 +30,6 @@ description.
 - Black Lights Out now hides an incoming preview synchronously while its frame
   is being calculated. Removing the inherited opacity animation eliminates the
   last borderless flash during image navigation.
-
 
 ## 1.6.0-feature-lights-out — 2026-08-21
 

@@ -1582,6 +1582,7 @@
         "copy_files": "Ausgewählte Datei(en) kopieren",
         "cycle_zoom": "Zoom durchwechseln (Einpassen, 2x Einpassen, 100%)",
         "delete_selected": "Ausgewählte Datei(en) löschen",
+        "deselect_all": "Auswahl aller Bilder aufheben",
         "focus_search": "Suchfeld fokussieren",
         "open_image": "Ausgewähltes Bild öffnen",
         "open_settings": "Einstellungen öffnen",

@@ -137,6 +137,32 @@ const ALL_COLOR_OPTIONS = [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }];
 const isRatingInRange = (rating: number, threshold: number, comparison: 'atLeast' | 'atMost') =>
   threshold > 0 && (comparison === 'atMost' ? rating <= threshold : rating >= threshold);
 
+type SelectByCriteria = Partial<FilterCriteria> & {
+  rawKind?: 'dng' | 'otherRaw';
+};
+
+const isDngImage = (image: ImageFile) => image.is_raw && image.path.split('?')[0].toLocaleLowerCase().endsWith('.dng');
+
+const matchesSelectByCriteria = (
+  image: ImageFile,
+  imageRatings: Record<string, number>,
+  criteria: SelectByCriteria,
+) => {
+  const { rawKind, ...libraryCriteria } = criteria;
+  const matchesSharedCriteria = matchesLibraryFilter(image, imageRatings, {
+    colors: [],
+    flags: [],
+    rating: 0,
+    ratingComparison: 'atLeast',
+    rawStatus: RawStatus.All,
+    editedStatus: EditedStatus.All,
+    ...libraryCriteria,
+  });
+  if (!matchesSharedCriteria || !rawKind) return matchesSharedCriteria;
+  const isDng = isDngImage(image);
+  return rawKind === 'dng' ? isDng : image.is_raw && !isDng;
+};
+
 const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
   const { t } = useTranslation();
 
@@ -246,7 +272,7 @@ export default function BottomBar({
   const [isSelectByOpen, setIsSelectByOpen] = useState(false);
   const [selectRatingComparison, setSelectRatingComparison] = useState<'atLeast' | 'atMost'>('atLeast');
   const [activeSelectBy, setActiveSelectBy] = useState<{
-    criteria: Partial<FilterCriteria>;
+    criteria: SelectByCriteria;
     id: string;
   } | null>(null);
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
@@ -270,7 +296,12 @@ export default function BottomBar({
       setLibrary: state.setLibrary,
     })),
   );
-  const setUI = useUIStore((state) => state.setUI);
+  const { selectionClearRequest, setUI } = useUIStore(
+    useShallow((state) => ({
+      selectionClearRequest: state.selectionClearRequest,
+      setUI: state.setUI,
+    })),
+  );
   const setEditor = useEditorStore((state) => state.setEditor);
   const { appSettings, handleSettingsChange } = useSettingsStore(
     useShallow((state) => ({
@@ -387,6 +418,32 @@ export default function BottomBar({
   const productivityButtonClass =
     'w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed';
 
+  const selectByFileTypes = useMemo<
+    Array<{ criteria: SelectByCriteria; id: string; label: string; shortLabel: string }>
+  >(
+    () => [
+      {
+        criteria: { rawKind: 'dng', rawStatus: RawStatus.RawOnly },
+        id: 'dng',
+        label: t('ui.bottomBar.selectBy.dngOnly'),
+        shortLabel: 'DNG',
+      },
+      {
+        criteria: { rawKind: 'otherRaw', rawStatus: RawStatus.RawOnly },
+        id: 'other-raw',
+        label: t('ui.bottomBar.selectBy.otherRawOnly'),
+        shortLabel: 'RAW',
+      },
+      {
+        criteria: { rawStatus: RawStatus.NonRawOnly },
+        id: 'non-raw',
+        label: t('library.filters.raw.nonRawOnly'),
+        shortLabel: 'IMG',
+      },
+    ],
+    [t],
+  );
+
   const selectByGroups = useMemo(
     () => [
       {
@@ -402,18 +459,7 @@ export default function BottomBar({
       },
       {
         label: t('library.header.viewOptions.filterByFileType'),
-        options: [
-          {
-            id: 'raw',
-            label: t('library.filters.raw.rawOnly'),
-            criteria: { rawStatus: RawStatus.RawOnly },
-          },
-          {
-            id: 'non-raw',
-            label: t('library.filters.raw.nonRawOnly'),
-            criteria: { rawStatus: RawStatus.NonRawOnly },
-          },
-        ],
+        options: selectByFileTypes,
       },
       {
         label: t('library.header.viewOptions.filterByEdited', 'Edit status'),
@@ -454,26 +500,18 @@ export default function BottomBar({
         })),
       },
     ],
-    [selectRatingComparison, t],
+    [selectByFileTypes, selectRatingComparison, t],
   );
 
   const selectByCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const group of selectByGroups) {
       for (const option of group.options) {
-        const criteria: FilterCriteria = {
-          colors: [],
-          flags: [],
-          rating: 0,
-          ratingComparison: 'atLeast',
-          rawStatus: RawStatus.All,
-          editedStatus: EditedStatus.All,
-          ...option.criteria,
-        };
         counts.set(
           option.id,
           allLibraryImages.reduce(
-            (count, image) => count + (matchesLibraryFilter(image, imageRatings || {}, criteria) ? 1 : 0),
+            (count, image) =>
+              count + (matchesSelectByCriteria(image, imageRatings || {}, option.criteria as SelectByCriteria) ? 1 : 0),
             0,
           ),
         );
@@ -498,12 +536,12 @@ export default function BottomBar({
     }
   };
 
-  const handleSelectBy = (id: string, criteriaOverrides: Partial<FilterCriteria>) => {
+  const handleSelectBy = (id: string, criteriaOverrides: SelectByCriteria) => {
     if (activeSelectBy?.id === id) {
       handleClearSelectBy();
       return;
     }
-    const criteria: FilterCriteria = {
+    const criteria: SelectByCriteria = {
       colors: [],
       flags: [],
       rating: 0,
@@ -513,7 +551,7 @@ export default function BottomBar({
       ...criteriaOverrides,
     };
     const paths = allLibraryImages
-      .filter((image) => matchesLibraryFilter(image, imageRatings || {}, criteria))
+      .filter((image) => matchesSelectByCriteria(image, imageRatings || {}, criteria))
       .map((image) => image.path);
     const activePath = libraryActivePath && paths.includes(libraryActivePath) ? libraryActivePath : paths[0] || null;
     setLibrary({
@@ -683,16 +721,7 @@ export default function BottomBar({
     if (!activeSelectBy) return;
     const expectedPaths = new Set(
       allLibraryImages
-        .filter((image) =>
-          matchesLibraryFilter(image, imageRatings || {}, {
-            colors: [],
-            flags: [],
-            rating: 0,
-            rawStatus: RawStatus.All,
-            editedStatus: EditedStatus.All,
-            ...activeSelectBy.criteria,
-          }),
-        )
+        .filter((image) => matchesSelectByCriteria(image, imageRatings || {}, activeSelectBy.criteria))
         .map((image) => image.path),
     );
     if (
@@ -702,6 +731,10 @@ export default function BottomBar({
       setActiveSelectBy(null);
     }
   }, [activeSelectBy, allLibraryImages, imageRatings, multiSelectedPaths]);
+
+  useEffect(() => {
+    setActiveSelectBy(null);
+  }, [selectionClearRequest]);
 
   useEffect(() => {
     if (isZoomReady && !isDraggingSlider.current) {
@@ -1456,14 +1489,14 @@ export default function BottomBar({
               className={clsx(
                 'flex items-center transition-all duration-300',
                 isSelectByOpen ? 'rounded-md bg-surface' : 'bg-transparent',
-                numSelected > 0 && 'ring-1 ring-accent/50',
+                activeSelectBy && 'ring-1 ring-accent/50',
               )}
             >
               <button
                 type="button"
                 className={clsx(
                   'relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors',
-                  isSelectByOpen || numSelected > 0
+                  isSelectByOpen || activeSelectBy
                     ? 'text-accent'
                     : 'text-text-secondary hover:bg-surface hover:text-text-primary',
                 )}
@@ -1472,7 +1505,7 @@ export default function BottomBar({
                 data-tooltip={t('ui.bottomBar.selectBy.title', 'Select by')}
               >
                 <ListChecks size={18} />
-                {numSelected > 0 && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-accent" />}
+                {activeSelectBy && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-accent" />}
               </button>
 
               <div
@@ -1562,8 +1595,7 @@ export default function BottomBar({
                   <div className="h-4 w-px bg-border-color" />
 
                   <div className="flex items-center gap-1">
-                    {(['raw', 'non-raw'] as const).map((id) => {
-                      const isRaw = id === 'raw';
+                    {selectByFileTypes.map(({ criteria, id, label, shortLabel }) => {
                       const count = selectByCounts.get(id) || 0;
                       return (
                         <button
@@ -1574,14 +1606,10 @@ export default function BottomBar({
                             activeSelectBy?.id === id ? 'bg-card-active text-accent' : 'text-text-secondary',
                           )}
                           disabled={count === 0}
-                          onClick={() =>
-                            handleSelectBy(id, { rawStatus: isRaw ? RawStatus.RawOnly : RawStatus.NonRawOnly })
-                          }
-                          data-tooltip={`${t(
-                            isRaw ? 'library.filters.raw.rawOnly' : 'library.filters.raw.nonRawOnly',
-                          )} (${count})`}
+                          onClick={() => handleSelectBy(id, criteria)}
+                          data-tooltip={`${label} (${count})`}
                         >
-                          {isRaw ? 'RAW' : 'IMG'}
+                          {shortLabel}
                         </button>
                       );
                     })}
