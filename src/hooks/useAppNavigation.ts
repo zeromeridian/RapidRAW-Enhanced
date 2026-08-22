@@ -132,6 +132,10 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       if (selectedImage?.path === path) return;
 
       setEditor({ hasRenderedFirstFrame: false });
+      if (useUIStore.getState().lightsOutMode === 'black') {
+        transformWrapperRef.current?.resetTransform(0);
+        setEditor({ zoom: 1 });
+      }
 
       useEditorStore.getState().patchesSentToBackend.clear();
       debouncedSave.flush();
@@ -169,7 +173,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         compactEditorPanelHeightOverride: null,
       });
 
-      if (isFrontendCached) {
+      if (isFrontendCached && cached) {
         setEditor({
           selectedImage: {
             ...cached.selectedImage,

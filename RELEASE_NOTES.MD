@@ -5,6 +5,30 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.16-fix-lightsout — 2026-08-22
+
+### Immediate Black Lights Out frame gating
+
+- Black Lights Out now hides an incoming preview synchronously while its frame
+  is being calculated. Removing the inherited opacity animation eliminates the
+  last borderless flash during image navigation.
+
+## 1.7.15-fix-lightsout — 2026-08-22
+
+### Framed Black Lights Out navigation
+
+- Navigating in Black Lights Out now resets the incoming photograph to Fit
+  before it is displayed, so a carried-over zoom or pan cannot temporarily
+  cover the configured border.
+
+## 1.7.14-fix-lightsout — 2026-08-22
+
+### Black Lights Out border-first navigation
+
+- Every incoming photograph in Black Lights Out now waits for its saved frame
+  geometry before it becomes visible, preventing the transient edge-to-edge
+  image shown while navigating between photographs.
+
 ## 1.7.13-fix-lightsout — 2026-08-22
 
 ### Visible macOS Black Lights Out preview
