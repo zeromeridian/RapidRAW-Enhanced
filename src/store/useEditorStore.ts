@@ -5,6 +5,7 @@ import { ChannelConfig } from '../components/adjustments/Curves';
 import { ImageDimensions } from '../hooks/useImageRenderSize';
 import { ToolType } from '../components/panel/right/Masks';
 import { OverlayMode } from '../components/panel/right/CropPanel';
+import { createSinglePhotoDocument, EditorDocument, getActiveAdjustments } from '../utils/editorDocument';
 
 export interface InteractivePatch {
   url: string;
@@ -31,12 +32,14 @@ export interface GuidedTransformOverlay {
 interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
+  document: EditorDocument;
+  /** Compatibility projection for existing single-photo controls and renderer. */
   adjustments: Adjustments;
   previewOverride: Adjustments | null;
   guidedTransformOverlay: GuidedTransformOverlay | null;
 
   // History State
-  history: Adjustments[];
+  history: EditorDocument[];
   historyIndex: number;
 
   // Previews & Overlays
@@ -100,9 +103,10 @@ interface EditorState {
 export const useEditorStore = create<EditorState>((set) => ({
   selectedImage: null,
   adjustments: INITIAL_ADJUSTMENTS,
+  document: createSinglePhotoDocument(INITIAL_ADJUSTMENTS),
   previewOverride: null,
   guidedTransformOverlay: null,
-  history: [INITIAL_ADJUSTMENTS],
+  history: [createSinglePhotoDocument(INITIAL_ADJUSTMENTS)],
   historyIndex: 0,
 
   finalPreviewUrl: null,
@@ -148,12 +152,19 @@ export const useEditorStore = create<EditorState>((set) => ({
   hasRenderedFirstFrame: false,
   patchesSentToBackend: new Set<string>(),
 
-  setEditor: (updater) => set((state) => (typeof updater === 'function' ? updater(state) : updater)),
+  setEditor: (updater) =>
+    set((state) => {
+      const patch = typeof updater === 'function' ? updater(state) : updater;
+      if (!Object.hasOwn(patch, 'adjustments')) return patch;
+      const adjustments = patch.adjustments as Adjustments;
+      return { ...patch, adjustments, document: createSinglePhotoDocument(adjustments) };
+    }),
 
   pushHistory: (newAdj) =>
     set((state) => {
+      const document = createSinglePhotoDocument(newAdj);
       const newHistory = state.history.slice(0, state.historyIndex + 1);
-      newHistory.push(newAdj);
+      newHistory.push(document);
       if (newHistory.length > 50) newHistory.shift();
       return { history: newHistory, historyIndex: newHistory.length - 1 };
     }),
@@ -162,7 +173,8 @@ export const useEditorStore = create<EditorState>((set) => ({
     set((state) => {
       if (state.historyIndex > 0) {
         const newIndex = state.historyIndex - 1;
-        return { historyIndex: newIndex, adjustments: state.history[newIndex] };
+        const document = state.history[newIndex];
+        return { historyIndex: newIndex, document, adjustments: getActiveAdjustments(document) ?? state.adjustments };
       }
       return state;
     }),
@@ -171,22 +183,27 @@ export const useEditorStore = create<EditorState>((set) => ({
     set((state) => {
       if (state.historyIndex < state.history.length - 1) {
         const newIndex = state.historyIndex + 1;
-        return { historyIndex: newIndex, adjustments: state.history[newIndex] };
+        const document = state.history[newIndex];
+        return { historyIndex: newIndex, document, adjustments: getActiveAdjustments(document) ?? state.adjustments };
       }
       return state;
     }),
 
-  resetHistory: (initialState) =>
+  resetHistory: (initialState) => {
+    const document = createSinglePhotoDocument(initialState);
     set({
-      history: [initialState],
+      history: [document],
       historyIndex: 0,
       adjustments: initialState,
-    }),
+      document,
+    });
+  },
 
   goToHistoryIndex: (index) =>
     set((state) => {
       if (index >= 0 && index < state.history.length) {
-        return { historyIndex: index, adjustments: state.history[index] };
+        const document = state.history[index];
+        return { historyIndex: index, document, adjustments: getActiveAdjustments(document) ?? state.adjustments };
       }
       return state;
     }),
