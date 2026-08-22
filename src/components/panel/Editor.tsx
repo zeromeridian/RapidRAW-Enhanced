@@ -2189,6 +2189,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
             setIsMaskTouchInteracting={setIsMaskTouchInteracting}
             showOriginal={showOriginal}
             transformedOriginalUrl={transformedOriginalUrl}
+            requireRenderSize={lightsOutMode === 'black'}
             useNativePreview={useNativePreview}
             uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
             updateSubMask={updateSubMaskLocal}
