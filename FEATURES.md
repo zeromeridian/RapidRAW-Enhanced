@@ -17,7 +17,10 @@ details are in `RELEASE_NOTES.MD`.
   interface. General Settings provides a persistent configurable Black-mode
   frame with presets, percentage or pixel units, locked or independent sides,
   precise values, live preview, and reset; Fit reserves the chosen four-sided
-  margins while zoom and pan remain unrestricted.
+  margins while zoom and pan remain unrestricted; previous/next navigation
+  invalidates the outgoing preview immediately and keeps those margins in place
+  from the new photograph's first visible web or GPU frame. Active Lights Out cycling and
+  Escape restoration bypass stale focus held by chrome hidden in Black mode.
 - Customizable bottom toolbar shared by Library and Develop, with Productivity,
   Copy, Stacking, Flags, direct color-label controls, and a visually distinct
   expandable **Select by** control. Select by replaces the current selection

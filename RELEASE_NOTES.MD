@@ -5,6 +5,34 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.3-feature-lights-out — 2026-08-22
+
+### Border-first image navigation
+
+- Previous and next navigation now invalidates the outgoing GPU frame
+  immediately instead of retaining its readiness while checking caches.
+- The incoming web or GPU preview remains against the Black-mode surround
+  until its own framed Fit geometry is ready, preventing an edge-to-edge
+  thumbnail or image flash.
+
+## 1.7.2-feature-lights-out — 2026-08-22
+
+### Stable Black-mode frame during navigation
+
+- Moving to the previous or next photograph now applies the configured Black
+  mode frame before publishing the new image.
+- Pending image geometry remains black instead of briefly stretching the
+  photograph edge to edge.
+
+## 1.7.1-feature-lights-out — 2026-08-21
+
+### Reliable Lights Out exit
+
+- Lights Out cycling and Escape restoration now remain available when a hidden
+  sidebar slider or numeric field still owns keyboard focus.
+- Normal text-entry safeguards remain unchanged while Lights Out is off, so
+  typing in visible fields cannot activate a shortcut unexpectedly.
+
 ## 1.7.0-feature-lights-out — 2026-08-21
 
 ### Configurable Black-mode frame

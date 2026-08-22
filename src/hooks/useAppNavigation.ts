@@ -131,6 +131,8 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
 
       if (selectedImage?.path === path) return;
 
+      setEditor({ hasRenderedFirstFrame: false });
+
       useEditorStore.getState().patchesSentToBackend.clear();
       debouncedSave.flush();
       debouncedSetHistory.cancel();
@@ -141,18 +143,6 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
 
       const cached = globalImageCache.get(path);
       const isFrontendCached = Boolean(cached && cached.selectedImage?.isReady);
-      const isCachedInBackend = isFrontendCached
-        ? await invoke<boolean>('is_image_cached', { path }).catch(() => false)
-        : false;
-
-      const hasDifferentResolution =
-        cached &&
-        (useEditorStore.getState().originalSize.width !== cached.originalSize.width ||
-          useEditorStore.getState().originalSize.height !== cached.originalSize.height);
-
-      if (!isCachedInBackend || hasDifferentResolution) {
-        setEditor({ hasRenderedFirstFrame: false });
-      }
 
       selectedImagePathRef.current = path;
 

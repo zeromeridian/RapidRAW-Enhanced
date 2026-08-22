@@ -414,7 +414,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     () => (lightsOutMode === 'black' ? normalizeBlackFrame(appSettings?.blackFrame) : undefined),
     [appSettings?.blackFrame, lightsOutMode],
   );
-  const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions, blackFrame);
+  const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions, blackFrame, selectedImage?.path);
+  const isImageGeometryReady = imageRenderSize.width > 0 && imageRenderSize.height > 0;
   const imageRenderSizeRef = useRef(imageRenderSize);
   imageRenderSizeRef.current = imageRenderSize;
 
@@ -1223,9 +1224,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     const bgSecondaryStr = rootStyle.getPropertyValue('--app-bg-secondary') || 'rgb(35, 35, 35)';
     const isLightsOutBlack = lightsOutMode === 'black';
     const bgPrimary: [number, number, number, number] = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgPrimaryStr);
-    const bgSecondary: [number, number, number, number] = isLightsOutBlack
-      ? [0, 0, 0, 1]
-      : parseRgb(bgSecondaryStr);
+    const bgSecondary: [number, number, number, number] = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgSecondaryStr);
 
     wgpuStateRef.current = {
       useWgpuRenderer: appSettings?.useWgpuRenderer,
@@ -1284,8 +1283,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       const clipY = (currentRect.top - OVERLAP) * dpr;
       const clipW = Math.max((currentRect.width + OVERLAP * 2) * dpr, 1);
       const clipH = Math.max((currentRect.height + OVERLAP * 2) * dpr, 1);
+      const irs = imageRenderSizeRef.current;
+      const hasValidImageGeometry = irs.width > 0 && irs.height > 0;
 
-      if (state.useWgpuRenderer === false || !state.isReady || !state.hasRenderedFirstFrame) {
+      if (state.useWgpuRenderer === false || !state.isReady || !state.hasRenderedFirstFrame || !hasValidImageGeometry) {
         const hiddenTransform = `${windowWidth},${windowHeight},-999999,-999999,1,1,${clipX},${clipY},${clipW},${clipH},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
 
         if (lastWgpuTransformRef.current !== hiddenTransform && !isInvoking) {
@@ -1323,14 +1324,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       const posX = transformStateRef.current.positionX;
       const posY = transformStateRef.current.positionY;
 
-      const cw = currentRect.width;
-      const ch = currentRect.height;
-
-      const irs = imageRenderSizeRef.current;
-      const offsetX = irs.width > 0 ? irs.offsetX : 0;
-      const offsetY = irs.height > 0 ? irs.offsetY : 0;
-      const baseW = irs.width > 0 ? irs.width : cw;
-      const baseH = irs.height > 0 ? irs.height : ch;
+      const offsetX = irs.offsetX;
+      const offsetY = irs.offsetY;
+      const baseW = irs.width;
+      const baseH = irs.height;
 
       let screenX = (currentRect.left + posX + offsetX * scale) * dpr || 0;
       let screenY = (currentRect.top + posY + offsetY * scale) * dpr || 0;
@@ -2136,6 +2133,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
           ref={contentRef}
           className="w-full h-full flex items-center justify-center origin-top-left"
           style={{
+            opacity: lightsOutMode === 'black' && !isImageGeometryReady ? 0 : 1,
             transform: `translate(${transformState.positionX}px, ${transformState.positionY}px) scale(${transformState.scale})`,
           }}
         >
