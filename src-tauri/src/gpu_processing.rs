@@ -41,12 +41,17 @@ pub struct DocumentLayer<'a> {
 fn single_renderable_document_layer<'a>(
     layers: &[DocumentLayer<'a>],
 ) -> Result<&'a DynamicImage, String> {
-    let visible: Vec<&DocumentLayer<'_>> = layers.iter().filter(|layer| layer.visible).collect();
-    let [layer] = visible.as_slice() else {
+    let mut visible_layers = layers.iter().filter(|layer| layer.visible);
+    let Some(layer) = visible_layers.next() else {
         return Err(
             "GPU composition currently requires exactly one visible base layer.".to_string(),
         );
     };
+    if visible_layers.next().is_some() {
+        return Err(
+            "GPU composition currently requires exactly one visible base layer.".to_string(),
+        );
+    }
     if layer.opacity != 100.0 || layer.blend_mode != "normal" {
         return Err("GPU composition blend and opacity support is not available yet.".to_string());
     }
@@ -69,6 +74,30 @@ pub fn process_document_and_get_dynamic_image(
         transform_hash,
         request,
         caller_id,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn process_document_and_get_dynamic_image_with_analytics(
+    context: &GpuContext,
+    state: &tauri::State<AppState>,
+    layers: &[DocumentLayer<'_>],
+    transform_hash: u64,
+    request: RenderRequest,
+    caller_id: &str,
+    output_to_display: bool,
+    analytics_config: Option<crate::AnalyticsConfig>,
+) -> Result<DynamicImage, String> {
+    let base_layer = single_renderable_document_layer(layers)?;
+    process_and_get_dynamic_image_with_analytics(
+        context,
+        state,
+        base_layer,
+        transform_hash,
+        request,
+        caller_id,
+        output_to_display,
+        analytics_config,
     )
 }
 
@@ -2060,8 +2089,61 @@ fn process_and_get_dynamic_image_inner(
 
 #[cfg(test)]
 mod tests {
-    use super::flare_generation_amount;
+    use image::{DynamicImage, ImageBuffer, Rgba};
+
+    use super::{DocumentLayer, flare_generation_amount, single_renderable_document_layer};
     use crate::image_processing::AllAdjustments;
+
+    fn test_image() -> DynamicImage {
+        DynamicImage::ImageRgba8(ImageBuffer::from_pixel(1, 1, Rgba([0, 0, 0, 255])))
+    }
+
+    #[test]
+    fn document_renderer_accepts_one_visible_normal_base_layer() {
+        let image = test_image();
+        let layer = DocumentLayer {
+            image: &image,
+            visible: true,
+            opacity: 100.0,
+            blend_mode: "normal",
+        };
+
+        assert!(single_renderable_document_layer(&[layer]).is_ok());
+    }
+
+    #[test]
+    fn document_renderer_rejects_unsupported_layer_stacks() {
+        let image = test_image();
+        let layers = [
+            DocumentLayer {
+                image: &image,
+                visible: true,
+                opacity: 100.0,
+                blend_mode: "normal",
+            },
+            DocumentLayer {
+                image: &image,
+                visible: true,
+                opacity: 100.0,
+                blend_mode: "normal",
+            },
+        ];
+
+        assert!(single_renderable_document_layer(&layers).is_err());
+    }
+
+    #[test]
+    fn document_renderer_rejects_unsupported_blend_or_opacity() {
+        let image = test_image();
+        let layer = DocumentLayer {
+            image: &image,
+            visible: true,
+            opacity: 50.0,
+            blend_mode: "normal",
+        };
+
+        assert!(single_renderable_document_layer(&[layer]).is_err());
+    }
 
     #[test]
     fn mask_only_flare_activates_flare_generation() {

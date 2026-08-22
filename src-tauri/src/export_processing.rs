@@ -23,12 +23,13 @@ use crate::file_management::{
     generate_filename_from_template, parse_virtual_path, read_file_mapped, sanitize_filename_suffix,
 };
 use crate::formats::is_raw_file;
+use crate::gpu_processing::{DocumentLayer, process_document_and_get_dynamic_image};
 use crate::image_loader::{
     composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
 };
 use crate::image_processing::{
     AllAdjustments, Crop, GpuContext, RenderRequest, downscale_f32_image,
-    get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
+    get_all_adjustments_from_json, get_or_init_gpu_context,
     resolve_tonemapper_override_from_handle,
 };
 use crate::lut_processing::{
@@ -461,7 +462,7 @@ fn process_image_for_export_pipeline(
 
     let unique_hash = calculate_full_job_hash(path, js_adjustments);
 
-    process_and_get_dynamic_image(
+    render_single_document_layer(
         context,
         state,
         transformed_image.as_ref(),
@@ -473,6 +474,30 @@ fn process_image_for_export_pipeline(
             roi: None,
         },
         debug_tag,
+    )
+}
+
+fn render_single_document_layer(
+    context: &GpuContext,
+    state: &tauri::State<AppState>,
+    image: &DynamicImage,
+    transform_hash: u64,
+    request: RenderRequest,
+    caller_id: &str,
+) -> Result<DynamicImage, String> {
+    let layers = [DocumentLayer {
+        image,
+        visible: true,
+        opacity: 100.0,
+        blend_mode: "normal",
+    }];
+    process_document_and_get_dynamic_image(
+        context,
+        state,
+        &layers,
+        transform_hash,
+        request,
+        caller_id,
     )
 }
 
@@ -738,7 +763,7 @@ fn export_masks_for_image(
             let full_white_mask = ImageBuffer::from_fn(img_w, img_h, |_, _| Luma([255u8]));
             let single_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = vec![full_white_mask];
 
-            let processed = process_and_get_dynamic_image(
+            let processed = render_single_document_layer(
                 context,
                 state,
                 transformed_image.as_ref(),
@@ -838,7 +863,7 @@ fn export_adjustments_as_lut(
     let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
     let unique_hash = calculate_full_job_hash(source_path_str, js_adjustments);
 
-    let processed_lut = process_and_get_dynamic_image(
+    let processed_lut = render_single_document_layer(
         context,
         state,
         &identity_image,
@@ -1578,7 +1603,7 @@ pub async fn estimate_export_sizes(
         let unique_hash =
             calculate_full_job_hash(&loaded_image.path, &adjustments_clone).wrapping_add(1);
 
-        let processed_preview = process_and_get_dynamic_image(
+        let processed_preview = render_single_document_layer(
             &context,
             &state,
             &preview_image,
@@ -1716,7 +1741,7 @@ pub async fn estimate_export_sizes(
         let unique_hash =
             calculate_full_job_hash(&source_path_str, &js_adjustments).wrapping_add(1);
 
-        let processed_preview = process_and_get_dynamic_image(
+        let processed_preview = render_single_document_layer(
             &context,
             &state,
             &preview_base,
