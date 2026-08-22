@@ -1324,11 +1324,17 @@ fn process_preview_job(
         None
     };
 
+    let document_layers = [crate::gpu_processing::DocumentLayer {
+        image: processing_image.as_ref(),
+        visible: true,
+        opacity: 100.0,
+        blend_mode: "normal",
+    }];
     let final_processed_image_result =
-        crate::image_processing::process_and_get_dynamic_image_with_analytics(
+        crate::gpu_processing::process_document_and_get_dynamic_image_with_analytics(
             &context,
             &state,
-            &processing_image,
+            &document_layers,
             new_transform_hash,
             RenderRequest {
                 adjustments: final_adjustments,
