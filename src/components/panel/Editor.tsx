@@ -20,6 +20,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useAiMasking } from '../../hooks/useAiMasking';
+import { normalizeBlackFrame } from '../../utils/lightsOutFrame';
 
 const parseRgb = (rgbStr: string): [number, number, number, number] => {
   const match = rgbStr.match(/[\d.]+/g);
@@ -409,7 +410,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     return null;
   }, [selectedImage, adjustments.crop, adjustments.orientationSteps]);
 
-  const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
+  const blackFrame = useMemo(
+    () => (lightsOutMode === 'black' ? normalizeBlackFrame(appSettings?.blackFrame) : undefined),
+    [appSettings?.blackFrame, lightsOutMode],
+  );
+  const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions, blackFrame);
   const imageRenderSizeRef = useRef(imageRenderSize);
   imageRenderSizeRef.current = imageRenderSize;
 
@@ -1217,8 +1222,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     const bgPrimaryStr = rootStyle.getPropertyValue('--app-bg-primary') || 'rgb(24, 24, 24)';
     const bgSecondaryStr = rootStyle.getPropertyValue('--app-bg-secondary') || 'rgb(35, 35, 35)';
     const isLightsOutBlack = lightsOutMode === 'black';
-    const bgPrimary = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgPrimaryStr);
-    const bgSecondary = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgSecondaryStr);
+    const bgPrimary: [number, number, number, number] = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgPrimaryStr);
+    const bgSecondary: [number, number, number, number] = isLightsOutBlack
+      ? [0, 0, 0, 1]
+      : parseRgb(bgSecondaryStr);
 
     wgpuStateRef.current = {
       useWgpuRenderer: appSettings?.useWgpuRenderer,

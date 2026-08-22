@@ -269,6 +269,16 @@ export interface AppSettings {
   toneCurvePresets?: ToneCurvePreset[];
   leftPanelWidth?: number;
   rightPanelWidth?: number;
+  blackFrame?: BlackFrameSettings;
+}
+
+export interface BlackFrameSettings {
+  unit: 'percent' | 'pixels';
+  locked: boolean;
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
 }
 
 export interface BrushSettings {

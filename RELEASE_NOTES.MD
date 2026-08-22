@@ -5,6 +5,21 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.0-feature-lights-out — 2026-08-21
+
+### Configurable Black-mode frame
+
+- Added a persistent **Black mode frame** group to General Settings with None,
+  Narrow, Standard, Wide, and Cinema presets.
+- Frame margins can use percentages of the viewport's short edge or pixels,
+  with a range of 0–25% or 0–400px.
+- All four sides can remain locked to one value or be adjusted independently;
+  the settings include precise numeric slider editing, a live preview, and a
+  default reset.
+- Fit view now reserves the configured black margins before sizing and centering
+  the photograph. Zooming remains unrestricted, and returning to Fit restores
+  the frame.
+
 ## 1.6.3-feature-lights-out — 2026-08-21
 
 ### Restorable fullscreen Black mode

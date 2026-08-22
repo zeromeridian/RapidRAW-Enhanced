@@ -48,6 +48,7 @@ import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
 import { open } from '@tauri-apps/plugin-shell';
+import BlackFrameSettingsControl from '../settings/BlackFrameSettingsControl';
 
 interface ConfirmModalState {
   confirmText: string;
@@ -1385,6 +1386,13 @@ export default function SettingsPanel({
                           value={appSettings?.fontFamily || 'poppins'}
                           triggerClassName="bg-bg-primary"
                         />
+                      </SettingItem>
+
+                      <SettingItem
+                        label={t('settings.general.blackFrame')}
+                        description={t('settings.general.blackFrameDesc')}
+                      >
+                        <BlackFrameSettingsControl appSettings={appSettings} onSettingsChange={onSettingsChange} />
                       </SettingItem>
 
                       {osPlatform === 'linux' && (
