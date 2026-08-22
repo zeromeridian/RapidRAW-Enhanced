@@ -28,7 +28,8 @@ pub struct RenderRequest<'a> {
     pub roi: Option<Roi>,
 }
 
-/// A composition input shared by preview, thumbnail, and export. Phase 2
+/// A composition input shared by preview, thumbnail, and export. Input slices
+/// are ordered from the canvas background to the frontmost layer. Phase 2
 /// starts with a strict base-layer path; unsupported stacks fail rather than
 /// falling back to an inaccurate CPU or single-image render.
 pub struct DocumentLayer<'a> {

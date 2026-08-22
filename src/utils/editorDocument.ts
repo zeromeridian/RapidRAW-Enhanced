@@ -21,6 +21,8 @@ export interface LayerSourceReference {
 }
 
 export interface LayerArrange {
+  /** `fit-to-canvas` is the default; the resolved mode is persisted per layer. */
+  initialSizing?: 'fit-to-canvas' | 'native-pixels';
   centerX: number;
   centerY: number;
   scaleX: number;
@@ -90,6 +92,7 @@ export interface LayeredDocument {
   id: string;
   anchorPath: string;
   canvas: LayerCanvas;
+  /** Ordered from the canvas background (index 0) to the frontmost layer. */
   layers: Layer[];
   compositeAdjustments: CompositeAdjustments;
   /** Opaque future fields survive validation and a future persistence round-trip. */
