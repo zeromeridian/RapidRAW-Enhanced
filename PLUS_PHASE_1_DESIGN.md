@@ -152,10 +152,10 @@ macOS ARM64 local results and Windows/Linux follow-up validation honestly.
 
 ## Implementation Sequence
 
-1. **Completed:** add pure document types, normalizer, commands, and a
-   default-off developer-only Vite gate with no store or renderer change.
-2. Add frontend unit-test coverage, then backend document
-   validation/atomic persistence tests.
+1. **Completed:** add pure document types, normalizer, commands, a default-off
+   developer-only Vite gate, and five focused Vitest cases with no store or
+   renderer change.
+2. Add backend document validation and atomic persistence tests.
 3. Migrate the editor store, loader, history, autosave, and cached navigation
    together to the canonical document state while preserving the legacy render
    payload.
