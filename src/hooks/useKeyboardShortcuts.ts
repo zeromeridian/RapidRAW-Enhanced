@@ -602,6 +602,22 @@ export const useKeyboardShortcuts = ({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const state = getStoreState();
+      const normalized = normalizeCombo(event, state.settings.osPlatform);
+      const action = comboMap.get(normalized.join('+'));
+
+      if (state.ui.lightsOutMode !== 'off') {
+        if (event.code === 'Escape') {
+          event.preventDefault();
+          state.ui.setUI({ lightsOutMode: 'off' });
+          return;
+        }
+
+        if (action === 'cycle_lights_out' || action === 'cycle_lights_out_reverse') {
+          event.preventDefault();
+          state.ui.cycleLightsOut(action === 'cycle_lights_out' ? 1 : -1);
+          return;
+        }
+      }
 
       const isModalOpen =
         state.ui.isCreateFolderModalOpen ||
@@ -637,9 +653,6 @@ export const useKeyboardShortcuts = ({
           return;
         }
       }
-
-      const normalized = normalizeCombo(event, state.settings.osPlatform);
-      const action = comboMap.get(normalized.join('+'));
 
       if (action) {
         const handler = actions[action];

@@ -33,20 +33,36 @@ const DEFAULT_SIZE: RenderSize = {
   containerHeight: 0,
 };
 
+interface RenderSizeState {
+  key: string;
+  size: RenderSize;
+}
+
 export const useImageRenderSize = (
   containerRef: React.RefObject<HTMLElement | null>,
   imageDimensions: ImageDimensions | null,
   insets?: RenderInsets,
+  imageKey?: string,
 ) => {
-  const [renderSize, setRenderSize] = useState<RenderSize>(DEFAULT_SIZE);
   const imgWidth = imageDimensions?.width;
   const imgHeight = imageDimensions?.height;
+  const renderKey = [
+    imageKey ?? '',
+    imgWidth ?? 0,
+    imgHeight ?? 0,
+    insets?.unit ?? 'none',
+    insets?.top ?? 0,
+    insets?.right ?? 0,
+    insets?.bottom ?? 0,
+    insets?.left ?? 0,
+  ].join(':');
+  const [renderState, setRenderState] = useState<RenderSizeState>({ key: '', size: DEFAULT_SIZE });
 
   useLayoutEffect(() => {
     const container = containerRef.current;
 
     if (!container || !imgWidth || !imgHeight) {
-      setRenderSize(DEFAULT_SIZE);
+      setRenderState({ key: renderKey, size: DEFAULT_SIZE });
       return;
     }
 
@@ -74,7 +90,10 @@ export const useImageRenderSize = (
       const offsetX = insetLeft + (availableWidth - width) / 2;
       const offsetY = insetTop + (availableHeight - height) / 2;
 
-      setRenderSize({ width, height, scale: width / imgWidth, offsetX, offsetY, containerWidth, containerHeight });
+      setRenderState({
+        key: renderKey,
+        size: { width, height, scale: width / imgWidth, offsetX, offsetY, containerWidth, containerHeight },
+      });
     };
 
     updateSize();
@@ -86,7 +105,17 @@ export const useImageRenderSize = (
     resizeObserver.observe(container);
 
     return () => resizeObserver.disconnect();
-  }, [containerRef, imgWidth, imgHeight, insets?.unit, insets?.top, insets?.right, insets?.bottom, insets?.left]);
+  }, [
+    containerRef,
+    imgWidth,
+    imgHeight,
+    insets?.unit,
+    insets?.top,
+    insets?.right,
+    insets?.bottom,
+    insets?.left,
+    renderKey,
+  ]);
 
-  return renderSize;
+  return renderState.key === renderKey ? renderState.size : DEFAULT_SIZE;
 };
