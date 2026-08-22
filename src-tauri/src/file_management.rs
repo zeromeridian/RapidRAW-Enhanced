@@ -2412,10 +2412,16 @@ pub fn generate_thumbnail_data(
         meta.adjustments.to_string().hash(&mut hasher);
         let unique_hash = hasher.finish();
 
-        if let Ok(processed_image) = gpu_processing::process_and_get_dynamic_image(
+        let document_layers = [gpu_processing::DocumentLayer {
+            image: cropped_preview.as_ref(),
+            visible: true,
+            opacity: 100.0,
+            blend_mode: "normal",
+        }];
+        if let Ok(processed_image) = gpu_processing::process_document_and_get_dynamic_image(
             context,
             &state,
-            cropped_preview.as_ref(),
+            &document_layers,
             unique_hash,
             gpu_processing::RenderRequest {
                 adjustments: gpu_adjustments,

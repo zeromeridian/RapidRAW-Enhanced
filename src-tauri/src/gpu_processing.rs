@@ -28,6 +28,50 @@ pub struct RenderRequest<'a> {
     pub roi: Option<Roi>,
 }
 
+/// A composition input shared by preview, thumbnail, and export. Phase 2
+/// starts with a strict base-layer path; unsupported stacks fail rather than
+/// falling back to an inaccurate CPU or single-image render.
+pub struct DocumentLayer<'a> {
+    pub image: &'a DynamicImage,
+    pub visible: bool,
+    pub opacity: f32,
+    pub blend_mode: &'a str,
+}
+
+fn single_renderable_document_layer<'a>(
+    layers: &[DocumentLayer<'a>],
+) -> Result<&'a DynamicImage, String> {
+    let visible: Vec<&DocumentLayer<'_>> = layers.iter().filter(|layer| layer.visible).collect();
+    let [layer] = visible.as_slice() else {
+        return Err(
+            "GPU composition currently requires exactly one visible base layer.".to_string(),
+        );
+    };
+    if layer.opacity != 100.0 || layer.blend_mode != "normal" {
+        return Err("GPU composition blend and opacity support is not available yet.".to_string());
+    }
+    Ok(layer.image)
+}
+
+pub fn process_document_and_get_dynamic_image(
+    context: &GpuContext,
+    state: &tauri::State<AppState>,
+    layers: &[DocumentLayer<'_>],
+    transform_hash: u64,
+    request: RenderRequest,
+    caller_id: &str,
+) -> Result<DynamicImage, String> {
+    let base_layer = single_renderable_document_layer(layers)?;
+    process_and_get_dynamic_image(
+        context,
+        state,
+        base_layer,
+        transform_hash,
+        request,
+        caller_id,
+    )
+}
+
 fn flare_generation_amount(adjustments: &AllAdjustments) -> f32 {
     adjustments.mask_adjustments[..(adjustments.mask_count as usize).min(MAX_MASKS)]
         .iter()
