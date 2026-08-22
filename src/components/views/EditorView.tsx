@@ -17,6 +17,7 @@ import MasksPanel from '../panel/right/MasksPanel';
 import AIPanel from '../panel/right/AIPanel';
 import PresetsPanel from '../panel/right/PresetsPanel';
 import ExportPanel from '../panel/right/ExportPanel';
+import LayersPanel from '../panel/right/LayersPanel';
 
 import { useEditorStore } from '../../store/useEditorStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -241,6 +242,7 @@ export default function EditorView({
             {renderedRightPanel === Panel.Crop && <CropPanel />}
             {renderedRightPanel === Panel.Geometry && <GeometryPanel />}
             {renderedRightPanel === Panel.LensCorrection && <LensCorrectionPanel />}
+            {renderedRightPanel === Panel.Layers && <LayersPanel onCompositionCreated={handleLibraryRefresh} />}
             {renderedRightPanel === Panel.Masks && <MasksPanel />}
             {renderedRightPanel === Panel.Presets && (
               <PresetsPanel

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '../../ui/AppProperties';
+import { isPlusFeatureEnabled } from '../../../utils/plusFeatures';
 
 interface PanelOptions {
   icon: LucideIcon;
@@ -35,6 +36,7 @@ const panelGroups: Array<Array<PanelOptions>> = [
     { id: Panel.Crop, icon: Crop, title: 'editor.switcher.tooltips.crop' },
     { id: Panel.Geometry, icon: Scan, title: 'editor.switcher.tooltips.geometry' },
     { id: Panel.LensCorrection, icon: Aperture, title: 'editor.crop.tooltips.lens' },
+    { id: Panel.Layers, icon: Layers, title: 'ThisIsRAW Plus Layers' },
     { id: Panel.Masks, icon: Layers, title: 'editor.switcher.tooltips.masks' },
     { id: Panel.Ai, icon: Paintbrush, title: 'editor.switcher.tooltips.inpaint' },
   ],
@@ -61,38 +63,45 @@ export default function RightPanelSwitcher({
           isHorizontal ? 'flex items-center overflow-x-auto p-1 gap-1' : 'flex flex-col px-0.5 py-1 gap-0.5 h-full'
         }
       >
-        {panelGroups.map((group, groupIndex) => (
-          <div key={groupIndex} className={isHorizontal ? 'flex items-center gap-1' : 'flex flex-col gap-0.5'}>
-            {groupIndex > 0 && (
-              <div
-                className={
-                  isHorizontal ? 'w-px h-6 bg-surface self-stretch my-auto' : 'w-6 h-px bg-surface self-center my-1'
-                }
-              />
-            )}
-            {group.map(({ id, icon: Icon, title }) => (
-              <button
-                className={`relative rounded-md transition-colors duration-200 ${isHorizontal ? 'p-2 shrink-0' : 'p-1.5'} ${
-                  activePanel === id
-                    ? 'text-text-primary'
-                    : 'text-text-secondary hover:bg-surface hover:text-text-primary'
-                }`}
-                key={id}
-                onClick={() => onPanelSelect(id)}
-                data-tooltip={t(title)}
-              >
-                {activePanel === id && (
-                  <motion.div
-                    layoutId="active-panel-indicator"
-                    className="absolute inset-0 bg-surface rounded-md"
-                    transition={isInstantTransition ? { duration: 0 } : { type: 'spring', bounce: 0.2, duration: 0.4 }}
-                  />
-                )}
-                <Icon size={isHorizontal ? 20 : 18} className="relative z-10" />
-              </button>
-            ))}
-          </div>
-        ))}
+        {panelGroups.map((group, groupIndex) => {
+          const visibleGroup = group.filter(({ id }) => id !== Panel.Layers || isPlusFeatureEnabled('layerMode'));
+          if (visibleGroup.length === 0) return null;
+
+          return (
+            <div key={groupIndex} className={isHorizontal ? 'flex items-center gap-1' : 'flex flex-col gap-0.5'}>
+              {groupIndex > 0 && (
+                <div
+                  className={
+                    isHorizontal ? 'w-px h-6 bg-surface self-stretch my-auto' : 'w-6 h-px bg-surface self-center my-1'
+                  }
+                />
+              )}
+              {visibleGroup.map(({ id, icon: Icon, title }) => (
+                <button
+                  className={`relative rounded-md transition-colors duration-200 ${isHorizontal ? 'p-2 shrink-0' : 'p-1.5'} ${
+                    activePanel === id
+                      ? 'text-text-primary'
+                      : 'text-text-secondary hover:bg-surface hover:text-text-primary'
+                  }`}
+                  key={id}
+                  onClick={() => onPanelSelect(id)}
+                  data-tooltip={id === Panel.Layers ? title : t(title)}
+                >
+                  {activePanel === id && (
+                    <motion.div
+                      layoutId="active-panel-indicator"
+                      className="absolute inset-0 bg-surface rounded-md"
+                      transition={
+                        isInstantTransition ? { duration: 0 } : { type: 'spring', bounce: 0.2, duration: 0.4 }
+                      }
+                    />
+                  )}
+                  <Icon size={isHorizontal ? 20 : 18} className="relative z-10" />
+                </button>
+              ))}
+            </div>
+          );
+        })}
       </div>
     </LayoutGroup>
   );

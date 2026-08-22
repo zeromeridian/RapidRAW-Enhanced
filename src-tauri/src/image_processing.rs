@@ -61,7 +61,12 @@ pub struct ImageMetadata {
     pub version: u32,
     pub rating: u8,
     pub adjustments: Value,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "plusDocument",
+        alias = "plus_document",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub plus_document: Option<Value>,
     #[serde(default)]
     pub tags: Option<Vec<String>>,
@@ -3621,11 +3626,32 @@ pub fn calculate_auto_adjustments(
 #[cfg(test)]
 mod tests {
     use super::{
-        GeometryParams, MaskAdjustments, build_transform_matrix, compute_transform_constrain_scale,
-        get_global_adjustments_from_json, get_mask_adjustments_from_json, transform_covers_output,
+        GeometryParams, ImageMetadata, MaskAdjustments, build_transform_matrix,
+        compute_transform_constrain_scale, get_global_adjustments_from_json,
+        get_mask_adjustments_from_json, transform_covers_output,
     };
     use serde_json::json;
     use std::mem::size_of;
+
+    #[test]
+    fn plus_document_uses_the_frontend_metadata_field_name_and_reads_legacy_snake_case() {
+        let metadata = ImageMetadata {
+            plus_document: Some(json!({ "mode": "layered" })),
+            ..ImageMetadata::default()
+        };
+        let serialized = serde_json::to_value(&metadata).unwrap();
+        assert_eq!(serialized["plusDocument"]["mode"], "layered");
+        assert!(serialized.get("plus_document").is_none());
+
+        let legacy: ImageMetadata = serde_json::from_value(json!({
+            "version": 1,
+            "rating": 0,
+            "adjustments": null,
+            "plus_document": { "mode": "layered" }
+        }))
+        .unwrap();
+        assert_eq!(legacy.plus_document, Some(json!({ "mode": "layered" })));
+    }
 
     #[test]
     fn monochrome_defaults_to_disabled() {

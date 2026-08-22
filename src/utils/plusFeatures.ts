@@ -6,9 +6,8 @@ export type InitialImageLayerPlacement = 'fit-to-canvas' | 'native-pixels';
 
 const enabled = (value: string | boolean | undefined): boolean => value === true || value === 'true';
 
-export const parseInitialImageLayerPlacement = (
-  value: string | undefined,
-): InitialImageLayerPlacement => (value === 'native-pixels' ? 'native-pixels' : 'fit-to-canvas');
+export const parseInitialImageLayerPlacement = (value: string | undefined): InitialImageLayerPlacement =>
+  value === 'native-pixels' ? 'native-pixels' : 'fit-to-canvas';
 
 /**
  * ThisIsRAW Plus is developer-only. Vite loads `.env.local` automatically and

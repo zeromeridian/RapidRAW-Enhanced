@@ -100,6 +100,9 @@ export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
           });
 
           setEditor((state) => {
+            if (state.document.mode !== 'single') {
+              return {};
+            }
             if (!state.adjustments.aspectRatio && !state.adjustments.crop) {
               return {
                 adjustments: { ...state.adjustments, aspectRatio: loadImageResult.width / loadImageResult.height },
