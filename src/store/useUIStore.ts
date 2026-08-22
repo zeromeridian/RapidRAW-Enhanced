@@ -156,6 +156,8 @@ interface UIState {
   setCustomEscapeHandler: (handler: (() => void) | null) => void;
   searchFocusRequest: number;
   requestSearchFocus: () => void;
+  selectionClearRequest: number;
+  requestSelectionClear: () => void;
   cycleLightsOut: (direction?: 1 | -1) => void;
 }
 
@@ -252,6 +254,8 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   searchFocusRequest: 0,
   requestSearchFocus: () => set((state) => ({ searchFocusRequest: state.searchFocusRequest + 1 })),
+  selectionClearRequest: 0,
+  requestSelectionClear: () => set((state) => ({ selectionClearRequest: state.selectionClearRequest + 1 })),
   cycleLightsOut: (direction = 1) =>
     set((state) => {
       const modes: LightsOutMode[] = ['off', 'dim', 'black'];

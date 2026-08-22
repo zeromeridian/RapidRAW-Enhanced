@@ -50,6 +50,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'library',
   },
   {
+    action: 'deselect_all',
+    description: 'settings.keybinds.actions.deselect_all',
+    defaultCombo: ['ctrl', 'KeyD'],
+    section: 'library',
+  },
+  {
     action: 'delete_selected',
     description: 'settings.keybinds.actions.delete_selected',
     defaultCombo: ['Delete'],

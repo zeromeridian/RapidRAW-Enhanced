@@ -28,12 +28,15 @@ details are in `RELEASE_NOTES.MD`.
 - Customizable bottom toolbar shared by Library and Develop, with Productivity,
   Copy, Stacking, Flags, direct color-label controls, and a visually distinct
   expandable **Select by** control. Select by replaces the current selection
-  using any rating, RAW/non-RAW, edit-status, color-label, or flag criterion
+  using any rating, DNG/other-RAW/non-RAW, edit-status, color-label, or flag criterion
   without changing active filters. It follows the Quick Filter inline design,
   exposes match counts in tooltips, and provides an in-place clear-selection
   action. The chosen criterion remains visibly active and acts as a toggle;
   clicking it again clears its selection, while manual selection changes remove
-  stale criterion highlighting.
+  stale criterion highlighting. Its active dot and accent frame indicate only
+  selections created through Select by, not ordinary thumbnail selections.
+  **Deselect All** is configurable in Keyboard Shortcuts and defaults to
+  Command+D on macOS or Ctrl+D on Windows and Linux.
 - Manual image stacks with collapse/expand, visible stack cues, drag ordering,
   move-to-top covers, and matching Develop-filmstrip presentation.
 - Automatic stacking of physical copies, virtual copies, and exported images,

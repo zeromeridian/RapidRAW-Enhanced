@@ -13,6 +13,7 @@ import { ImageFlag } from '../utils/imageFlags';
 interface KeyboardShortcutsProps {
   sortedImageList: Array<ImageFile>;
   handleBackToLibrary(): void;
+  handleClearSelection(): void;
   handleDeleteSelected(): void;
   handleImageSelect(path: string): void;
   handlePasteFiles(str: string): void;
@@ -23,6 +24,7 @@ interface KeyboardShortcutsProps {
 export const useKeyboardShortcuts = ({
   sortedImageList,
   handleBackToLibrary,
+  handleClearSelection,
   handleDeleteSelected,
   handleImageSelect,
   handlePasteFiles,
@@ -153,6 +155,15 @@ export const useKeyboardShortcuts = ({
           if (!s.editor.selectedImage) {
             s.library.setLibrary({ libraryActivePath: sortedListRef.current[sortedListRef.current.length - 1].path });
           }
+        },
+      },
+      deselect_all: {
+        shouldFire: (s: ReturnType<typeof getStoreState>) =>
+          s.library.multiSelectedPaths.length > 0 || s.library.selectedFolderPaths.length > 0,
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) => {
+          e.preventDefault();
+          s.ui.requestSelectionClear();
+          handleClearSelection();
         },
       },
       delete_selected: {
@@ -669,6 +680,7 @@ export const useKeyboardShortcuts = ({
     };
   }, [
     handleBackToLibrary,
+    handleClearSelection,
     handleDeleteSelected,
     handleImageSelect,
     handlePasteFiles,
