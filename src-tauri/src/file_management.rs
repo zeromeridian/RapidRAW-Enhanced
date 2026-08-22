@@ -472,6 +472,72 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
     (source_path, sidecar_path)
 }
 
+fn validate_plus_document(document: &Value) -> Result<(), String> {
+    let object = document
+        .as_object()
+        .ok_or_else(|| "Plus document must be an object.".to_string())?;
+    if object.get("mode").and_then(Value::as_str) != Some("layered") {
+        return Err("Plus persistence accepts layered documents only.".to_string());
+    }
+    if object.get("documentVersion").and_then(Value::as_u64) != Some(1) {
+        return Err("Unsupported Plus document version.".to_string());
+    }
+    if object
+        .get("id")
+        .and_then(Value::as_str)
+        .is_none_or(str::is_empty)
+        || object
+            .get("anchorPath")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        || !object.get("layers").is_some_and(Value::is_array)
+    {
+        return Err("Plus document is missing required layered-document fields.".to_string());
+    }
+    Ok(())
+}
+
+fn write_sidecar_atomically(sidecar_path: &Path, metadata: &ImageMetadata) -> Result<(), String> {
+    let parent = sidecar_path.parent().ok_or_else(|| {
+        format!(
+            "Sidecar has no parent directory: {}",
+            sidecar_path.display()
+        )
+    })?;
+    let serialized = serde_json::to_vec_pretty(metadata).map_err(|error| error.to_string())?;
+    let mut temporary =
+        tempfile::NamedTempFile::new_in(parent).map_err(|error| error.to_string())?;
+    temporary
+        .write_all(&serialized)
+        .map_err(|error| error.to_string())?;
+    temporary
+        .as_file()
+        .sync_all()
+        .map_err(|error| error.to_string())?;
+    temporary
+        .persist(sidecar_path)
+        .map_err(|error| error.error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn load_plus_document(path: String) -> Result<Option<Value>, String> {
+    let (_, sidecar_path) = parse_virtual_path(&path);
+    Ok(crate::exif_processing::load_sidecar(&sidecar_path).plus_document)
+}
+
+#[tauri::command]
+pub fn save_plus_document(path: String, document: Value) -> Result<(), String> {
+    if !path.contains("?vc=") {
+        return Err("Layered documents must be saved to a virtual copy.".to_string());
+    }
+    validate_plus_document(&document)?;
+    let (_, sidecar_path) = parse_virtual_path(&path);
+    let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    metadata.plus_document = Some(document);
+    write_sidecar_atomically(&sidecar_path, &metadata)
+}
+
 fn parse_sidecar_filename(file_name: &str) -> Option<(String, Option<String>)> {
     let base = file_name.strip_suffix(".tirdata")?;
     if base.len() >= 7 && base.as_bytes()[base.len() - 7] == b'.' {
@@ -488,8 +554,9 @@ mod output_naming_tests {
     use super::{
         apply_preset_adjustments_to_path, collect_preset_batch_folder_paths,
         compute_thumbnail_cache_hash, extract_app_xmp_value, extract_xmp_stack,
-        import_rapidraw_sidecars, parse_sidecar_filename, parse_virtual_path, read_xmp_from_folder,
-        sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
+        import_rapidraw_sidecars, load_plus_document, parse_sidecar_filename, parse_virtual_path,
+        read_xmp_from_folder, sanitize_filename_suffix, save_plus_document, set_app_xmp_value,
+        sync_metadata_from_xmp, sync_metadata_to_xmp,
     };
     use crate::app_settings::AppSettings;
     use crate::image_processing::ImageMetadata;
@@ -522,6 +589,29 @@ mod output_naming_tests {
             Some(("image.jpg".to_string(), None))
         );
         assert_eq!(parse_sidecar_filename("image.jpg"), None);
+    }
+
+    #[test]
+    fn plus_document_persistence_is_virtual_copy_only_and_preserves_unknown_fields() {
+        let folder = tempfile::tempdir().unwrap();
+        let source = folder.path().join("image.raw");
+        fs::write(&source, b"raw").unwrap();
+        let virtual_path = format!("{}?vc=plus01", source.display());
+        let document = serde_json::json!({
+            "mode": "layered",
+            "documentVersion": 1,
+            "id": "composition-1",
+            "anchorPath": source,
+            "layers": [],
+            "futureField": { "kept": true }
+        });
+
+        assert!(save_plus_document(virtual_path.clone(), document.clone()).is_ok());
+        assert_eq!(load_plus_document(virtual_path).unwrap(), Some(document));
+        assert!(
+            save_plus_document(source.to_string_lossy().into_owned(), serde_json::json!({}))
+                .is_err()
+        );
     }
 
     #[test]
