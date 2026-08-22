@@ -1580,6 +1580,7 @@
         "copy_files": "複製選中的檔案",
         "cycle_zoom": "迴圈縮放（適應、2倍適應、100%）",
         "delete_selected": "刪除選中的檔案",
+        "deselect_all": "取消選擇所有影像",
         "focus_search": "聚焦搜尋框",
         "open_image": "開啟選中的影像",
         "open_settings": "開啟設定",

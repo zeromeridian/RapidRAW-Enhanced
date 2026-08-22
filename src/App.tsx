@@ -457,6 +457,7 @@ function App() {
   useKeyboardShortcuts({
     sortedImageList,
     handleBackToLibrary,
+    handleClearSelection,
     handleDeleteSelected,
     handleImageSelect,
     handlePasteFiles,

@@ -1718,6 +1718,7 @@
         "copy_files": "Copy selected file(s)",
         "cycle_zoom": "Cycle zoom (Fit, 2x Fit, 100%)",
         "delete_selected": "Delete selected file(s)",
+        "deselect_all": "Deselect all images",
         "focus_search": "Focus search field",
         "flag_deferred": "Flag: Deferred",
         "flag_rejected": "Flag: Rejected",
@@ -1987,6 +1988,8 @@
       "selectBy": {
         "clear": "Clear selection",
         "description": "Replace the selection without changing filters",
+        "dngOnly": "DNG only",
+        "otherRawOnly": "Other RAW only",
         "title": "Select by"
       },
       "tooltips": {
