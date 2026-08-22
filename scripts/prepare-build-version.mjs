@@ -57,7 +57,13 @@ if (!baseVersion) {
   throw new Error(`Configured version "${config.version}" does not begin with MAJOR.MINOR.PATCH.`);
 }
 
-const buildVersion = branch === 'main' ? baseVersion : `${baseVersion}-${branch}`;
+const isPlusBranch = branch === 'dev-tir-plus' || branch.startsWith('dev-tir-plus-');
+const existingPlusRevision = Number(config.version.match(/-plus\.(\d+)$/)?.[1] ?? 0);
+const buildVersion = isPlusBranch
+  ? `${baseVersion}-plus.${existingPlusRevision + 1}`
+  : branch === 'main'
+    ? baseVersion
+    : `${baseVersion}-${branch}`;
 if (config.version !== buildVersion) {
   const versionPattern = /("version"\s*:\s*")[^"]+(")/;
   if (!versionPattern.test(configText)) {

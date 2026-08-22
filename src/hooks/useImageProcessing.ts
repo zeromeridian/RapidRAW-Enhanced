@@ -59,10 +59,17 @@ export function useImageProcessing(
 
   const selectedImagePathRef = useRef<string | null>(null);
   useEffect(() => {
+    debouncedSave.cancel();
     selectedImagePathRef.current = selectedImage?.path ?? null;
     lastInteractiveAnalyticsAtRef.current = 0;
     lastInteractiveRenderDurationRef.current = 0;
   }, [selectedImage?.path]);
+
+  useEffect(() => {
+    if (document.mode !== 'single') {
+      debouncedSave.cancel();
+    }
+  }, [document.mode]);
 
   useEffect(() => {
     if (isSliderDragging && !wasSliderDraggingRef.current) {

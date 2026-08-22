@@ -146,7 +146,9 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       }
 
       const cached = globalImageCache.get(path);
-      const isFrontendCached = Boolean(cached && cached.selectedImage?.isReady);
+      // Virtual copies may be layered documents. Their canonical state lives in
+      // the sidecar, while this cache contains only legacy adjustments.
+      const isFrontendCached = !path.includes('?vc=') && Boolean(cached && cached.selectedImage?.isReady);
 
       selectedImagePathRef.current = path;
 
