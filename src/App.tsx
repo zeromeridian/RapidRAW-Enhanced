@@ -176,6 +176,7 @@ function App() {
 
   const selectedImagePathRef = useRef<string | null>(null);
   const wasWindowFullscreenBeforeBlackRef = useRef<boolean | null>(null);
+  const blackFullscreenApiRef = useRef<'native' | 'simple' | null>(null);
   const lightsOutFullscreenTransitionRef = useRef(0);
   useEffect(() => {
     selectedImagePathRef.current = selectedImage?.path ?? null;
@@ -194,9 +195,14 @@ function App() {
 
         wasWindowFullscreenBeforeBlackRef.current = wasFullscreen;
         if (!wasFullscreen) {
-          await appWindow.setFullscreen(true);
+          const fullscreenApi = osPlatform === 'macos' ? 'simple' : 'native';
+          blackFullscreenApiRef.current = fullscreenApi;
+          if (fullscreenApi === 'simple') await appWindow.setSimpleFullscreen(true);
+          else await appWindow.setFullscreen(true);
+
           if (useUIStore.getState().lightsOutMode !== 'black') {
-            await appWindow.setFullscreen(false);
+            if (fullscreenApi === 'simple') await appWindow.setSimpleFullscreen(false);
+            else await appWindow.setFullscreen(false);
           }
         }
         return;
@@ -205,15 +211,20 @@ function App() {
       const wasFullscreen = wasWindowFullscreenBeforeBlackRef.current;
       if (wasFullscreen === null) return;
 
+      const fullscreenApi = blackFullscreenApiRef.current;
       wasWindowFullscreenBeforeBlackRef.current = null;
-      if (!wasFullscreen && (await appWindow.isFullscreen())) {
+      blackFullscreenApiRef.current = null;
+      if (!wasFullscreen && fullscreenApi === 'simple') {
+        if (transition !== lightsOutFullscreenTransitionRef.current) return;
+        await appWindow.setSimpleFullscreen(false);
+      } else if (!wasFullscreen && (await appWindow.isFullscreen())) {
         if (transition !== lightsOutFullscreenTransitionRef.current) return;
         await appWindow.setFullscreen(false);
       }
     };
 
     void synchronizeBlackFullscreen();
-  }, [lightsOutMode]);
+  }, [lightsOutMode, osPlatform]);
 
   const prevAdjustmentsRef = useRef<any>(null);
 

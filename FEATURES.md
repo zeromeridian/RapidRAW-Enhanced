@@ -8,19 +8,22 @@ details are in `RELEASE_NOTES.MD`.
 
 - Lightroom-style **Lights Out** viewing across Library and Develop, with
   session-only Normal, Dim, and Black states; forward/reverse configurable
-  shortcuts; Escape-first restoration; full-brightness photographs,
-  thumbnails, dialogs, and editing overlays; and a distraction-free Develop
+  shortcuts; Escape-first restoration; a full-brightness photograph while Dim
+  darkens only surrounding application chrome; and a distraction-free Develop
   Black state that removes application chrome from layout so the photograph
   uses all available space and forces both the web and native GPU surrounds to
-  true black. Black automatically enters true window fullscreen and restores
-  the prior window/fullscreen state on exit. Normal and Dim retain the complete
+  true black. The native preview retains its last valid frame during a Black
+  layout transition, so it is never replaced by a blank surface. Black
+  automatically enters fullscreen (using focus-preserving simple fullscreen
+  on macOS) and restores the prior window/fullscreen state on exit. Normal and Dim retain the complete
   interface. General Settings provides a persistent configurable Black-mode
   frame with presets, percentage or pixel units, locked or independent sides,
   precise values, live preview, and reset; Fit reserves the chosen four-sided
-  margins while zoom and pan remain unrestricted; previous/next navigation
-  invalidates the outgoing preview immediately and keeps those margins in place
-  from the new photograph's first visible web or GPU frame. Active Lights Out cycling and
-  Escape restoration bypass stale focus held by chrome hidden in Black mode.
+  margins through the established renderer geometry path; previous/next
+  navigation invalidates the outgoing preview immediately and keeps those
+  margins in place from the new photograph's first visible frame. Active Lights
+  Out cycling and Escape
+  restoration bypass stale focus held by chrome hidden in Black mode.
 - Customizable bottom toolbar shared by Library and Develop, with Productivity,
   Copy, Stacking, Flags, direct color-label controls, and a visually distinct
   expandable **Select by** control. Select by replaces the current selection

@@ -62,6 +62,7 @@ interface ImageCanvasProps {
   setIsMaskTouchInteracting(isInteracting: boolean): void;
   showOriginal: boolean;
   transformedOriginalUrl: string | null;
+  useNativePreview: boolean;
   uncroppedAdjustedPreviewUrl: string | null;
   updateSubMask(id: string | null, subMask: Partial<SubMask>): void;
   interactivePatch?: { url: string; normX: number; normY: number; normW: number; normH: number } | null;
@@ -1172,6 +1173,7 @@ const ImageCanvas = memo(
     setIsMaskTouchInteracting,
     showOriginal,
     transformedOriginalUrl,
+    useNativePreview,
     uncroppedAdjustedPreviewUrl,
     updateSubMask,
     isWbPickerActive = false,
@@ -1217,7 +1219,8 @@ const ImageCanvas = memo(
     const [isCtrlPressed, setIsCtrlPressed] = useState(false);
     const retainedPatchRef = useRef<typeof interactivePatch>(null);
 
-    const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
+    const isWgpuActive =
+      useNativePreview && appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
     const { t } = useTranslation();
     const osPlatform = useOsPlatform();
     const modifierKey = osPlatform === 'macos' ? 'Cmd' : 'Ctrl';

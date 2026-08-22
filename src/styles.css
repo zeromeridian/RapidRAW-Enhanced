@@ -35,7 +35,6 @@
   filter: brightness(0.25);
 }
 
-.lights-out-dim .lights-out-stage,
 .lights-out-black .lights-out-stage {
   --tw-ring-color: #000;
   background-color: #000;

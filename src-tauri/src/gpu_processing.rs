@@ -60,87 +60,104 @@ pub struct WgpuDisplay {
     pub transform_buffer: wgpu::Buffer,
     pub latest_transform: DisplayTransform,
     pub current_bind_group: Option<wgpu::BindGroup>,
+    pub is_visible: bool,
 }
 
 impl WgpuDisplay {
     pub fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
-        if let Some(bind_group) = &self.current_bind_group {
-            let output = match self.surface.get_current_texture() {
-                wgpu::CurrentSurfaceTexture::Success(tex)
-                | wgpu::CurrentSurfaceTexture::Suboptimal(tex) => tex,
-                wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
-                    self.surface.configure(device, &self.config);
-                    match self.surface.get_current_texture() {
-                        wgpu::CurrentSurfaceTexture::Success(tex)
-                        | wgpu::CurrentSurfaceTexture::Suboptimal(tex) => tex,
-                        _ => panic!("Failed to acquire surface texture"),
-                    }
-                }
-                _ => return,
-            };
-            let view = output
-                .texture
-                .create_view(&wgpu::TextureViewDescriptor::default());
-            let mut encoder =
-                device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-            {
-                let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: None,
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: self.latest_transform.bg_primary[0] as f64,
-                                g: self.latest_transform.bg_primary[1] as f64,
-                                b: self.latest_transform.bg_primary[2] as f64,
-                                a: self.latest_transform.bg_primary[3] as f64,
-                            }),
-                            store: wgpu::StoreOp::Store,
-                        },
-                        depth_slice: None,
-                    })],
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                    multiview_mask: NonZero::new(0),
-                });
-                let clip_x1 = self.latest_transform.clip[0].max(0.0);
-                let clip_y1 = self.latest_transform.clip[1].max(0.0);
-                let clip_x2 =
-                    (self.latest_transform.clip[0] + self.latest_transform.clip[2]).max(0.0);
-                let clip_y2 =
-                    (self.latest_transform.clip[1] + self.latest_transform.clip[3]).max(0.0);
-
-                let final_clip_x = clip_x1.floor() as u32;
-                let final_clip_y = clip_y1.floor() as u32;
-                let final_clip_w = (clip_x2.ceil() as u32).saturating_sub(final_clip_x);
-                let final_clip_h = (clip_y2.ceil() as u32).saturating_sub(final_clip_y);
-
-                let max_x = self.config.width;
-                let max_y = self.config.height;
-
-                if final_clip_x < max_x && final_clip_y < max_y {
-                    let clamped_width = final_clip_w.min(max_x - final_clip_x);
-                    let clamped_height = final_clip_h.min(max_y - final_clip_y);
-
-                    if clamped_width > 0 && clamped_height > 0 {
-                        rpass.set_scissor_rect(
-                            final_clip_x,
-                            final_clip_y,
-                            clamped_width,
-                            clamped_height,
-                        );
-
-                        rpass.set_pipeline(&self.pipeline);
-                        rpass.set_bind_group(0, bind_group, &[]);
-                        rpass.draw(0..4, 0..1);
-                    }
+        let output = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(tex)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(tex) => tex,
+            wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
+                self.surface.configure(device, &self.config);
+                match self.surface.get_current_texture() {
+                    wgpu::CurrentSurfaceTexture::Success(tex)
+                    | wgpu::CurrentSurfaceTexture::Suboptimal(tex) => tex,
+                    _ => panic!("Failed to acquire surface texture"),
                 }
             }
-            queue.submit(Some(encoder.finish()));
-            queue.present(output);
+            _ => return,
+        };
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder =
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        {
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: if self.is_visible {
+                                self.latest_transform.bg_primary[0] as f64
+                            } else {
+                                0.0
+                            },
+                            g: if self.is_visible {
+                                self.latest_transform.bg_primary[1] as f64
+                            } else {
+                                0.0
+                            },
+                            b: if self.is_visible {
+                                self.latest_transform.bg_primary[2] as f64
+                            } else {
+                                0.0
+                            },
+                            a: if self.is_visible {
+                                self.latest_transform.bg_primary[3] as f64
+                            } else {
+                                0.0
+                            },
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: NonZero::new(0),
+            });
+            let clip_x1 = self.latest_transform.clip[0].max(0.0);
+            let clip_y1 = self.latest_transform.clip[1].max(0.0);
+            let clip_x2 = (self.latest_transform.clip[0] + self.latest_transform.clip[2]).max(0.0);
+            let clip_y2 = (self.latest_transform.clip[1] + self.latest_transform.clip[3]).max(0.0);
+
+            let final_clip_x = clip_x1.floor() as u32;
+            let final_clip_y = clip_y1.floor() as u32;
+            let final_clip_w = (clip_x2.ceil() as u32).saturating_sub(final_clip_x);
+            let final_clip_h = (clip_y2.ceil() as u32).saturating_sub(final_clip_y);
+
+            let max_x = self.config.width;
+            let max_y = self.config.height;
+
+            if self.is_visible
+                && let Some(bind_group) = &self.current_bind_group
+                && final_clip_x < max_x
+                && final_clip_y < max_y
+            {
+                let clamped_width = final_clip_w.min(max_x - final_clip_x);
+                let clamped_height = final_clip_h.min(max_y - final_clip_y);
+
+                if clamped_width > 0 && clamped_height > 0 {
+                    rpass.set_scissor_rect(
+                        final_clip_x,
+                        final_clip_y,
+                        clamped_width,
+                        clamped_height,
+                    );
+
+                    rpass.set_pipeline(&self.pipeline);
+                    rpass.set_bind_group(0, bind_group, &[]);
+                    rpass.draw(0..4, 0..1);
+                }
+            }
         }
+        queue.submit(Some(encoder.finish()));
+        queue.present(output);
     }
 }
 
@@ -403,6 +420,7 @@ pub fn get_or_init_gpu_context(
             },
             sampler,
             current_bind_group: None,
+            is_visible: true,
         })
     } else {
         None

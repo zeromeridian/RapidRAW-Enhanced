@@ -71,6 +71,7 @@ const makeGeometryGuideId = () =>
 
 interface WgpuRenderState {
   useWgpuRenderer: boolean | undefined;
+  nativePreviewVisible: boolean;
   isReady: boolean;
   hasRenderedFirstFrame: boolean;
   isCropping: boolean;
@@ -415,7 +416,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     [appSettings?.blackFrame, lightsOutMode],
   );
   const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions, blackFrame, selectedImage?.path);
-  const isImageGeometryReady = imageRenderSize.width > 0 && imageRenderSize.height > 0;
   const imageRenderSizeRef = useRef(imageRenderSize);
   imageRenderSizeRef.current = imageRenderSize;
 
@@ -1209,6 +1209,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
 
   const wgpuStateRef = useRef<WgpuRenderState>({
     useWgpuRenderer: appSettings?.useWgpuRenderer,
+    nativePreviewVisible: true,
     isReady: selectedImage?.isReady ?? false,
     hasRenderedFirstFrame,
     isCropping,
@@ -1223,11 +1224,13 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     const bgPrimaryStr = rootStyle.getPropertyValue('--app-bg-primary') || 'rgb(24, 24, 24)';
     const bgSecondaryStr = rootStyle.getPropertyValue('--app-bg-secondary') || 'rgb(35, 35, 35)';
     const isLightsOutBlack = lightsOutMode === 'black';
+    const nativePreviewVisible = !(osPlatform === 'macos' && isLightsOutBlack);
     const bgPrimary: [number, number, number, number] = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgPrimaryStr);
     const bgSecondary: [number, number, number, number] = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgSecondaryStr);
 
     wgpuStateRef.current = {
       useWgpuRenderer: appSettings?.useWgpuRenderer,
+      nativePreviewVisible,
       isReady: selectedImage?.isReady ?? false,
       hasRenderedFirstFrame,
       isCropping,
@@ -1244,6 +1247,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     uncroppedAdjustedPreviewUrl,
     showOriginal,
     lightsOutMode,
+    osPlatform,
     appSettings?.theme,
     finalPreviewUrl,
   ]);
@@ -1286,8 +1290,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       const irs = imageRenderSizeRef.current;
       const hasValidImageGeometry = irs.width > 0 && irs.height > 0;
 
-      if (state.useWgpuRenderer === false || !state.isReady || !state.hasRenderedFirstFrame || !hasValidImageGeometry) {
-        const hiddenTransform = `${windowWidth},${windowHeight},-999999,-999999,1,1,${clipX},${clipY},${clipW},${clipH},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
+      if (state.useWgpuRenderer === false || !state.isReady || !state.hasRenderedFirstFrame) {
+        const hiddenTransform = `${windowWidth},${windowHeight},-999999,-999999,1,1,${clipX},${clipY},${clipW},${clipH},${state.nativePreviewVisible},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
 
         if (lastWgpuTransformRef.current !== hiddenTransform && !isInvoking) {
           lastWgpuTransformRef.current = hiddenTransform;
@@ -1304,6 +1308,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
               clipY,
               clipWidth: clipW,
               clipHeight: clipH,
+              visible: state.nativePreviewVisible,
               bgPrimary: state.bgPrimary || [0, 0, 0, 1],
               bgSecondary: state.bgSecondary || [0, 0, 0, 1],
               pixelated: false,
@@ -1314,6 +1319,16 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
               isInvoking = false;
             });
         }
+        if (isEffectActive) {
+          wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
+        }
+        return;
+      }
+
+      // A ResizeObserver publishes the new Fit geometry after a Lights Out
+      // layout/fullscreen transition. Keep the native surface on its last
+      // valid frame during that one-frame gap instead of clearing it black.
+      if (!hasValidImageGeometry) {
         if (isEffectActive) {
           wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
         }
@@ -1346,7 +1361,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         screenH = Math.max(screenH, 1);
       }
 
-      const currentTransform = `${windowWidth},${windowHeight},${screenX},${screenY},${screenW},${screenH},${clipX},${clipY},${clipW},${clipH},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
+      const currentTransform = `${windowWidth},${windowHeight},${screenX},${screenY},${screenW},${screenH},${clipX},${clipY},${clipW},${clipH},${state.nativePreviewVisible},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
 
       if (lastWgpuTransformRef.current !== currentTransform && !isInvoking) {
         lastWgpuTransformRef.current = currentTransform;
@@ -1366,6 +1381,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
             clipY,
             clipWidth: clipW,
             clipHeight: clipH,
+            visible: state.nativePreviewVisible,
             bgPrimary: state.bgPrimary || [0, 0, 0, 1],
             bgSecondary: state.bgSecondary || [0, 0, 0, 1],
             pixelated: isZoomedIn,
@@ -2059,7 +2075,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     }
   }
 
-  const isWgpuActive = appSettings?.useWgpuRenderer !== false && hasRenderedFirstFrame;
+  const useNativePreview = !(osPlatform === 'macos' && lightsOutMode === 'black');
+  const isWgpuActive = useNativePreview && appSettings?.useWgpuRenderer !== false && hasRenderedFirstFrame;
   const hasRenderedAnyPreview = hasRenderedFirstFrame || !!finalPreviewUrl;
 
   return (
@@ -2133,7 +2150,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
           ref={contentRef}
           className="w-full h-full flex items-center justify-center origin-top-left"
           style={{
-            opacity: lightsOutMode === 'black' && !isImageGeometryReady ? 0 : 1,
             transform: `translate(${transformState.positionX}px, ${transformState.positionY}px) scale(${transformState.scale})`,
           }}
         >
@@ -2173,6 +2189,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
             setIsMaskTouchInteracting={setIsMaskTouchInteracting}
             showOriginal={showOriginal}
             transformedOriginalUrl={transformedOriginalUrl}
+            useNativePreview={useNativePreview}
             uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
             updateSubMask={updateSubMaskLocal}
             isWbPickerActive={isWbPickerActive}

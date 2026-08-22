@@ -971,6 +971,7 @@ pub struct WgpuTransformPayload {
     pub bg_primary: [f32; 4],
     pub bg_secondary: [f32; 4],
     pub pixelated: bool,
+    pub visible: bool,
 }
 
 pub fn generate_transformed_preview(
@@ -1122,6 +1123,7 @@ async fn update_wgpu_transform(
             display.latest_transform.bg_primary = payload.bg_primary;
             display.latest_transform.bg_secondary = payload.bg_secondary;
             display.latest_transform.pixelated = if payload.pixelated { 1.0 } else { 0.0 };
+            display.is_visible = payload.visible;
 
             context.queue.write_buffer(
                 &display.transform_buffer,
