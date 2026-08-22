@@ -5145,6 +5145,7 @@ pub fn create_layered_virtual_composition(
     source_virtual_path: String,
     canvas_width: u32,
     canvas_height: u32,
+    initial_image_layer_placement: Option<InitialImageLayerPlacement>,
     target_album_id: Option<String>,
     copy_name_suffix: Option<String>,
     app_handle: AppHandle,
@@ -5153,6 +5154,8 @@ pub fn create_layered_virtual_composition(
         return Err("Layered composition canvas dimensions must be positive.".to_string());
     }
 
+    let initial_image_layer_placement =
+        initial_image_layer_placement.unwrap_or(InitialImageLayerPlacement::FitToCanvas);
     let (anchor_path, source_sidecar_path) = parse_virtual_path(&source_virtual_path);
     let source_metadata = crate::exif_processing::load_sidecar(&source_sidecar_path);
     let composition_path = create_virtual_copy(
@@ -5187,7 +5190,7 @@ pub fn create_layered_virtual_composition(
             },
             "sourceAdjustments": source_metadata.adjustments,
             "creativeAdjustments": {},
-            "arrange": { "centerX": 0.5, "centerY": 0.5, "scaleX": 1.0, "scaleY": 1.0, "rotation": 0.0, "flipHorizontal": false, "flipVertical": false }
+            "arrange": { "initialSizing": initial_image_layer_placement, "centerX": 0.5, "centerY": 0.5, "scaleX": 1.0, "scaleY": 1.0, "rotation": 0.0, "flipHorizontal": false, "flipVertical": false }
         }],
         "compositeAdjustments": { "masks": [], "aiPatches": [], "crop": null, "geometry": {} }
     });
@@ -5195,6 +5198,13 @@ pub fn create_layered_virtual_composition(
     composition_metadata.plus_document = Some(document);
     write_sidecar_atomically(&composition_sidecar_path, &composition_metadata)?;
     Ok(composition_path)
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum InitialImageLayerPlacement {
+    FitToCanvas,
+    NativePixels,
 }
 
 pub fn extract_xmp_rating(content: &str) -> Option<u8> {
