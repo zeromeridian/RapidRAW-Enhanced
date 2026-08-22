@@ -7,7 +7,7 @@ normalization, persistence, history, commands, feature gating, and tests. It
 does not introduce a Layer UI, composite rendering, library action, thumbnail,
 or export behavior change.
 
-Audit completed on `dev/thisisraw_photoshop`. The initial pure document module
+Audit completed on `dev/tir_plus`. The initial pure document module
 and default-off developer-only gate are implemented; no UI, persistence,
 rendering, thumbnail, or export behavior has changed.
 
