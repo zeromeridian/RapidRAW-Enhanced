@@ -6,6 +6,8 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { Invokes } from '../components/ui/AppProperties';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
+import { createSinglePhotoDocument, normalizeEditorDocument } from '../utils/editorDocument';
+import { isPlusFeatureEnabled } from '../utils/plusFeatures';
 
 export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
   const selectedImage = useEditorStore((s) => s.selectedImage);
@@ -19,7 +21,7 @@ export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
   const hasRenderedFirstFrame = useEditorStore((s) => s.hasRenderedFirstFrame);
 
   const setEditor = useEditorStore((s) => s.setEditor);
-  const resetHistory = useEditorStore((s) => s.resetHistory);
+  const resetDocumentHistory = useEditorStore((s) => s.resetDocumentHistory);
   const setLibrary = useLibraryStore((s) => s.setLibrary);
   const appSettings = useSettingsStore((s) => s.appSettings);
 
@@ -37,15 +39,18 @@ export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
           const metadata: any = await invoke(Invokes.LoadMetadata, { path: selectedImage.path });
           if (!isEffectActive) return;
 
-          let initialAdjusts;
-          if (metadata.adjustments && !metadata.adjustments.is_null) {
-            initialAdjusts = normalizeLoadedAdjustments(metadata.adjustments);
-          } else {
-            initialAdjusts = { ...INITIAL_ADJUSTMENTS };
-          }
+          const legacyAdjustments =
+            metadata.adjustments && !metadata.adjustments.is_null
+              ? normalizeLoadedAdjustments(metadata.adjustments)
+              : { ...INITIAL_ADJUSTMENTS };
+          const normalizedPlus = metadata.plusDocument ? normalizeEditorDocument(metadata.plusDocument) : null;
+          const document =
+            isPlusFeatureEnabled('layerMode') && normalizedPlus?.ok
+              ? normalizedPlus.document
+              : createSinglePhotoDocument(legacyAdjustments);
 
-          setEditor({ adjustments: initialAdjusts });
-          resetHistory(initialAdjusts);
+          setEditor({ document });
+          resetDocumentHistory(document);
         } catch (err) {
           console.error('Failed to load metadata early:', err);
         }
@@ -132,7 +137,7 @@ export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
     selectedImage?.path,
     selectedImage?.isReady,
     appSettings?.editorPreviewResolution,
-    resetHistory,
+    resetDocumentHistory,
     setEditor,
     setLibrary,
   ]);
