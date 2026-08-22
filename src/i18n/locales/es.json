@@ -1619,6 +1619,7 @@
         "copy_files": "Copiar archivo(s) seleccionado(s)",
         "cycle_zoom": "Alternar zoom (Ajustar, 2x Ajustar, 100%)",
         "delete_selected": "Eliminar archivo(s) seleccionado(s)",
+        "deselect_all": "Deseleccionar todas las imágenes",
         "focus_search": "Enfocar el campo de búsqueda",
         "open_image": "Abrir imagen seleccionada",
         "open_settings": "Abrir la configuración",
