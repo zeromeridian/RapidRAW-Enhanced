@@ -520,6 +520,24 @@ fn write_sidecar_atomically(sidecar_path: &Path, metadata: &ImageMetadata) -> Re
     Ok(())
 }
 
+fn reject_legacy_adjustment_write(metadata: &ImageMetadata) -> Result<(), String> {
+    if metadata.plus_document.is_some() {
+        return Err(
+            "Layered virtual compositions must be edited through ThisIsRAW Plus document commands."
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
+fn ensure_paths_are_legacy(paths: &[String]) -> Result<(), String> {
+    for path in paths {
+        let (_, sidecar_path) = parse_virtual_path(path);
+        reject_legacy_adjustment_write(&crate::exif_processing::load_sidecar(&sidecar_path))?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn load_plus_document(path: String) -> Result<Option<Value>, String> {
     let (_, sidecar_path) = parse_virtual_path(&path);
@@ -3345,6 +3363,7 @@ pub fn save_metadata_and_update_thumbnail(
     let (source_path, sidecar_path) = parse_virtual_path(&path);
 
     let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    reject_legacy_adjustment_write(&metadata)?;
 
     let mut final_adjustments = adjustments;
     {
@@ -3466,6 +3485,7 @@ pub async fn apply_adjustments_to_paths(
     adjustments: Value,
     app_handle: AppHandle,
 ) -> Result<(), String> {
+    ensure_paths_are_legacy(&paths)?;
     let state = app_handle.state::<AppState>();
     add_to_thumbnail_queue(&state, paths.len(), &app_handle);
 
@@ -3873,6 +3893,7 @@ pub async fn reset_adjustments_for_paths(
     paths: Vec<String>,
     app_handle: AppHandle,
 ) -> Result<(), String> {
+    ensure_paths_are_legacy(&paths)?;
     let state = app_handle.state::<AppState>();
     add_to_thumbnail_queue(&state, paths.len(), &app_handle);
 
