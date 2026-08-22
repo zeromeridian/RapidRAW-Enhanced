@@ -50,3 +50,5 @@ CODE_AUDIT_FINDINGS.md
 /.cargo/registry/
 /.rustup/
 RapidRAW-Enhanced-ToDo-List.md
+PLUS_HANDOFF.md
+PLUS_RELEASE_NOTES.md
