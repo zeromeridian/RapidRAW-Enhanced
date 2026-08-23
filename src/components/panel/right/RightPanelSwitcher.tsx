@@ -9,6 +9,7 @@ import {
   FileInput,
   Scan,
   Aperture,
+  Brush,
   Tag,
   type LucideIcon,
 } from 'lucide-react';
@@ -37,7 +38,7 @@ const panelGroups: Array<Array<PanelOptions>> = [
     { id: Panel.Geometry, icon: Scan, title: 'editor.switcher.tooltips.geometry' },
     { id: Panel.LensCorrection, icon: Aperture, title: 'editor.crop.tooltips.lens' },
     { id: Panel.Layers, icon: Layers, title: 'ThisIsRAW Plus Layers' },
-    { id: Panel.Masks, icon: Layers, title: 'editor.switcher.tooltips.masks' },
+    { id: Panel.Masks, icon: Brush, title: 'editor.switcher.tooltips.masks' },
     { id: Panel.Ai, icon: Paintbrush, title: 'editor.switcher.tooltips.inpaint' },
   ],
   [
@@ -86,6 +87,7 @@ export default function RightPanelSwitcher({
                   key={id}
                   onClick={() => onPanelSelect(id)}
                   data-tooltip={id === Panel.Layers ? title : t(title)}
+                  aria-label={id === Panel.Layers ? title : t(title)}
                 >
                   {activePanel === id && (
                     <motion.div

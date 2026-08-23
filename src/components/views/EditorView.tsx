@@ -61,6 +61,7 @@ interface EditorViewProps {
   handleEditorContextMenu: (...args: any) => void;
   handleThumbnailContextMenu: (...args: any) => void;
   handleImageClick: (...args: any) => void;
+  handleImageSelect: (path: string) => void;
   handleLibraryRefresh: () => Promise<void>;
   handleClearSelection: () => void;
   handleCopyAdjustments: () => void;
@@ -89,6 +90,7 @@ export default function EditorView({
   handleEditorContextMenu,
   handleThumbnailContextMenu,
   handleImageClick,
+  handleImageSelect,
   handleLibraryRefresh,
   handleClearSelection,
   handleCopyAdjustments,
@@ -242,7 +244,14 @@ export default function EditorView({
             {renderedRightPanel === Panel.Crop && <CropPanel />}
             {renderedRightPanel === Panel.Geometry && <GeometryPanel />}
             {renderedRightPanel === Panel.LensCorrection && <LensCorrectionPanel />}
-            {renderedRightPanel === Panel.Layers && <LayersPanel onCompositionCreated={handleLibraryRefresh} />}
+            {renderedRightPanel === Panel.Layers && (
+              <LayersPanel
+                onCompositionCreated={async (path) => {
+                  await handleLibraryRefresh();
+                  handleImageSelect(path);
+                }}
+              />
+            )}
             {renderedRightPanel === Panel.Masks && <MasksPanel />}
             {renderedRightPanel === Panel.Presets && (
               <PresetsPanel
