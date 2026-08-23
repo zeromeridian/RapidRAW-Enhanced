@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Eye, Lock, Plus, SlidersHorizontal, ArrowDown, ArrowUp } from 'lucide-react';
+import { Eye, Lock, Plus, SlidersHorizontal, ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 import { ImageFile, Invokes } from '../../ui/AppProperties';
@@ -229,6 +229,20 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
     updatePreviewState({ order: currentOrder });
   };
 
+  const removePreviewLayer = (id: string) => {
+    const { [id]: _removedOpacity, ...opacity } = previewOpacity;
+    const { [id]: _removedVisibility, ...visibility } = previewVisibility;
+    const { [id]: _removedLock, ...locks } = previewLocks;
+
+    updatePreviewState({
+      layers: previewLayers.filter((layer) => layer.id !== id),
+      order: previewOrder.filter((layerId) => layerId !== id),
+      opacity,
+      visibility,
+      locks,
+    });
+  };
+
   const createLayeredVersion = async () => {
     if (!selectedImage?.isReady || isCreating) return;
 
@@ -367,6 +381,15 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
                   >
                     <Lock size={14} />
                   </button>
+                  {isPreview && (
+                    <button
+                      aria-label={`Remove ${layer.name}`}
+                      className="text-text-secondary hover:text-red-400"
+                      onClick={() => removePreviewLayer(layer.id)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-xs text-text-secondary">
                   <label className="flex flex-1 items-center gap-2">
