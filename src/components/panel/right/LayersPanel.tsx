@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Eye, Lock, Plus, SlidersHorizontal, ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -110,6 +110,7 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
   const [previewOpacity, setPreviewOpacity] = useState<Record<string, number>>({});
   const [previewVisibility, setPreviewVisibility] = useState<Record<string, boolean>>({});
   const [previewLocks, setPreviewLocks] = useState<Record<string, boolean>>({});
+  const [liveOpacity, setLiveOpacity] = useState<Record<string, number>>({});
   const [isSelectingImage, setIsSelectingImage] = useState(false);
   const [imageSearch, setImageSearch] = useState('');
   const document = useEditorStore((state) => state.document);
@@ -118,6 +119,7 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
   const imageList = useLibraryStore((state) => state.imageList);
   const appSettings = useSettingsStore((state) => state.appSettings);
   const setEditor = useEditorStore((state) => state.setEditor);
+  const opacitySaveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   useEffect(() => {
     const state = document.mode === 'layered' ? readPreviewState(document) : emptyPreviewState();
@@ -126,6 +128,9 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
     setPreviewOpacity(state.opacity);
     setPreviewVisibility(state.visibility);
     setPreviewLocks(state.locks);
+    setLiveOpacity({});
+    opacitySaveTimers.current.forEach(clearTimeout);
+    opacitySaveTimers.current.clear();
   }, [document.mode === 'layered' ? document.id : null]);
 
   const persistPreviewState = async (state: LayerDockPreviewState) => {
@@ -289,6 +294,31 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
     });
   };
 
+  const saveDocumentOpacity = (id: string, opacity: number) => {
+    if (document.mode !== 'layered') return;
+    updateDocumentLayer(id, (current) => ({ ...current, opacity }));
+  };
+
+  const scheduleDocumentOpacity = (id: string, opacity: number, immediately = false) => {
+    setLiveOpacity((current) => ({ ...current, [id]: opacity }));
+    const existingTimer = opacitySaveTimers.current.get(id);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    if (immediately) {
+      opacitySaveTimers.current.delete(id);
+      saveDocumentOpacity(id, opacity);
+      return;
+    }
+
+    opacitySaveTimers.current.set(
+      id,
+      setTimeout(() => {
+        opacitySaveTimers.current.delete(id);
+        saveDocumentOpacity(id, opacity);
+      }, 70),
+    );
+  };
+
   const moveDocumentLayer = (id: string, direction: -1 | 1) => {
     if (document.mode !== 'layered') return;
     const frontToBack = [...document.layers].reverse();
@@ -422,7 +452,9 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
             const isPreview = 'isPreview' in layer ? layer.isPreview : true;
             const visible = isPreview ? (previewVisibility[layer.id] ?? layer.visible) : layer.visible;
             const locked = isPreview ? (previewLocks[layer.id] ?? layer.locked) : layer.locked;
-            const opacity = isPreview ? (previewOpacity[layer.id] ?? layer.opacity) : layer.opacity;
+            const opacity = isPreview
+              ? (previewOpacity[layer.id] ?? layer.opacity)
+              : (liveOpacity[layer.id] ?? layer.opacity);
 
             return (
               <div
@@ -503,7 +535,16 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
                         if (isPreview) {
                           updatePreviewState({ opacity: { ...previewOpacity, [layer.id]: nextOpacity } });
                         } else {
-                          updateDocumentLayer(layer.id, (current) => ({ ...current, opacity: nextOpacity }));
+                          scheduleDocumentOpacity(layer.id, nextOpacity);
+                        }
+                      }}
+                      onPointerDown={() => {
+                        if (!isPreview) setEditor({ isSliderDragging: true });
+                      }}
+                      onPointerUp={(event) => {
+                        if (!isPreview) {
+                          scheduleDocumentOpacity(layer.id, Number(event.currentTarget.value), true);
+                          setEditor({ isSliderDragging: false });
                         }
                       }}
                     />
