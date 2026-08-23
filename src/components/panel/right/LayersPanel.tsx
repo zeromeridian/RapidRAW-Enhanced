@@ -146,6 +146,7 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
         path: selectedImage.path,
         document: toPersistedDocument(updatedDocument),
       });
+      await invoke(Invokes.ClearImageCaches);
       setEditor({ document: updatedDocument });
     } catch (error) {
       toast.error(`Could not save layer preview settings: ${error}`);
