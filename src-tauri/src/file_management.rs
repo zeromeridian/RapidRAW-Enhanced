@@ -545,6 +545,24 @@ pub fn load_plus_document(path: String) -> Result<Option<Value>, String> {
 }
 
 #[tauri::command]
+pub fn resolve_layer_source(source_virtual_path: String) -> Result<Value, String> {
+    let (original_path, sidecar_path) = parse_virtual_path(&source_virtual_path);
+    if !original_path.is_file() {
+        return Err(format!(
+            "Layer source is unavailable: {}",
+            original_path.display()
+        ));
+    }
+
+    let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    Ok(serde_json::json!({
+        "originalPath": original_path,
+        "displayName": original_path.file_name().and_then(|name| name.to_str()).unwrap_or("Image layer"),
+        "sourceAdjustments": metadata.adjustments,
+    }))
+}
+
+#[tauri::command]
 pub fn save_plus_document(path: String, document: Value) -> Result<(), String> {
     if !path.contains("?vc=") {
         return Err("Layered documents must be saved to a virtual copy.".to_string());
@@ -573,8 +591,8 @@ mod output_naming_tests {
         apply_preset_adjustments_to_path, collect_preset_batch_folder_paths,
         compute_thumbnail_cache_hash, extract_app_xmp_value, extract_xmp_stack,
         import_rapidraw_sidecars, load_plus_document, parse_sidecar_filename, parse_virtual_path,
-        read_xmp_from_folder, sanitize_filename_suffix, save_plus_document, set_app_xmp_value,
-        sync_metadata_from_xmp, sync_metadata_to_xmp,
+        read_xmp_from_folder, resolve_layer_source, sanitize_filename_suffix, save_plus_document,
+        set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
     };
     use crate::app_settings::AppSettings;
     use crate::image_processing::ImageMetadata;
@@ -630,6 +648,19 @@ mod output_naming_tests {
             save_plus_document(source.to_string_lossy().into_owned(), serde_json::json!({}))
                 .is_err()
         );
+    }
+
+    #[test]
+    fn layer_source_resolution_uses_the_selected_library_images_original_path() {
+        let folder = tempfile::tempdir().unwrap();
+        let source = folder.path().join("source.jpg");
+        fs::write(&source, b"image").unwrap();
+        let virtual_path = format!("{}?vc=abcdef", source.display());
+
+        let resolved = resolve_layer_source(virtual_path).unwrap();
+
+        assert_eq!(resolved["originalPath"], source.to_string_lossy().as_ref());
+        assert_eq!(resolved["displayName"], "source.jpg");
     }
 
     #[test]

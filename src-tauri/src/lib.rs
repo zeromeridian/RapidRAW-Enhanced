@@ -3214,6 +3214,7 @@ pub fn run() {
             file_management::delete_files_with_associated,
             file_management::save_metadata_and_update_thumbnail,
             file_management::load_plus_document,
+            file_management::resolve_layer_source,
             file_management::save_plus_document,
             file_management::apply_adjustments_to_paths,
             file_management::load_metadata,

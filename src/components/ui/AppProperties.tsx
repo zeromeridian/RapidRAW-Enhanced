@@ -88,6 +88,7 @@ export enum Invokes {
   LoadMetadata = 'load_metadata',
   LoadPresets = 'load_presets',
   LoadSettings = 'load_settings',
+  ResolveLayerSource = 'resolve_layer_source',
   MoveFiles = 'move_files',
   ReadExifForPaths = 'read_exif_for_paths',
   ReadXmpFromFolder = 'read_xmp_from_folder',
