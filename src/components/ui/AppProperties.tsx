@@ -46,6 +46,7 @@ export enum Invokes {
   ImportRapidRawSidecars = 'import_rapidraw_sidecars',
   ClearAiTags = 'clear_ai_tags',
   ClearAllTags = 'clear_all_tags',
+  ClearImageCaches = 'clear_image_caches',
   ClearThumbnailCache = 'clear_thumbnail_cache',
   CopyFiles = 'copy_files',
   CreateFolder = 'create_folder',
