@@ -141,12 +141,12 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
   const persistDocument = async (updatedDocument: LayeredDocument) => {
     if (!selectedImage?.path) return;
 
-    setEditor({ document: updatedDocument });
     try {
       await invoke(Invokes.SavePlusDocument, {
         path: selectedImage.path,
         document: toPersistedDocument(updatedDocument),
       });
+      setEditor({ document: updatedDocument });
     } catch (error) {
       toast.error(`Could not save layer preview settings: ${error}`);
     }

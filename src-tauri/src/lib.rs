@@ -48,6 +48,7 @@ use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::io::Write;
 use std::panic;
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
@@ -83,7 +84,9 @@ use crate::cache_utils::{
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::hdr_deghosting::{align_hdr_frames, assert_uniform_dimensions, load_hdr_frames};
-use crate::image_loader::{composite_patches_on_image, load_and_composite};
+use crate::image_loader::{
+    composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
+};
 use crate::image_processing::{
     Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_cpu_default_raw_processing,
     apply_flip, apply_geometry_warp, apply_linear_to_srgb, downscale_f32_image,
@@ -1139,6 +1142,176 @@ async fn update_wgpu_transform(
     Ok(())
 }
 
+pub(crate) fn resolve_layered_preview_image(
+    loaded_image: &LoadedImage,
+    settings: &AppSettings,
+) -> Result<Option<(DynamicImage, u64)>, String> {
+    let (_, sidecar_path) = parse_virtual_path(&loaded_image.path);
+    let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    let Some(document) = metadata.plus_document else {
+        return Ok(None);
+    };
+    let Some(layers) = document.get("layers").and_then(Value::as_array) else {
+        return Ok(None);
+    };
+
+    let canvas = document.get("canvas").and_then(Value::as_object);
+    let canvas_width = canvas
+        .and_then(|canvas| canvas.get("width"))
+        .and_then(Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+        .unwrap_or_else(|| loaded_image.image.width());
+    let canvas_height = canvas
+        .and_then(|canvas| canvas.get("height"))
+        .and_then(Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+        .unwrap_or_else(|| loaded_image.image.height());
+    if canvas_width == 0 || canvas_height == 0 {
+        return Err("Layered composition canvas dimensions must be positive.".to_string());
+    }
+
+    let (anchor_path, _) = parse_virtual_path(&loaded_image.path);
+    let mut images = Vec::new();
+    let mut layer_states = Vec::new();
+    for layer in layers {
+        if layer.get("kind").and_then(Value::as_str) != Some("image") {
+            continue;
+        }
+        let Some(source_path) = layer
+            .get("source")
+            .and_then(Value::as_object)
+            .and_then(|source| source.get("originalPath"))
+            .and_then(Value::as_str)
+        else {
+            return Err("Image layer is missing its source path.".to_string());
+        };
+        let visible = layer
+            .get("visible")
+            .and_then(Value::as_bool)
+            .unwrap_or(true);
+        let opacity = layer
+            .get("opacity")
+            .and_then(Value::as_f64)
+            .unwrap_or(100.0) as f32;
+        let blend_mode = layer
+            .get("blendMode")
+            .and_then(Value::as_str)
+            .unwrap_or("normal");
+
+        let source_image = if Path::new(source_path) == anchor_path {
+            loaded_image.image.as_ref().clone()
+        } else {
+            let bytes = fs::read(source_path).map_err(|error| {
+                format!(
+                    "Could not read image-layer source '{}': {error}",
+                    source_path
+                )
+            })?;
+            load_base_image_from_bytes(&bytes, source_path, true, settings, None).map_err(
+                |error| {
+                    format!(
+                        "Could not decode image-layer source '{}': {error}",
+                        source_path
+                    )
+                },
+            )?
+        };
+        let arrange = layer.get("arrange").and_then(Value::as_object);
+        let initial_sizing = arrange
+            .and_then(|arrange| arrange.get("initialSizing"))
+            .and_then(Value::as_str)
+            .unwrap_or("fit-to-canvas");
+        let center_x = arrange
+            .and_then(|arrange| arrange.get("centerX"))
+            .and_then(Value::as_f64)
+            .unwrap_or(0.5) as f32;
+        let center_y = arrange
+            .and_then(|arrange| arrange.get("centerY"))
+            .and_then(Value::as_f64)
+            .unwrap_or(0.5) as f32;
+        let scale_x = arrange
+            .and_then(|arrange| arrange.get("scaleX"))
+            .and_then(Value::as_f64)
+            .unwrap_or(1.0) as f32;
+        let scale_y = arrange
+            .and_then(|arrange| arrange.get("scaleY"))
+            .and_then(Value::as_f64)
+            .unwrap_or(1.0) as f32;
+        let flip_horizontal = arrange
+            .and_then(|arrange| arrange.get("flipHorizontal"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let flip_vertical = arrange
+            .and_then(|arrange| arrange.get("flipVertical"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        if !center_x.is_finite()
+            || !center_y.is_finite()
+            || !scale_x.is_finite()
+            || !scale_y.is_finite()
+            || scale_x <= 0.0
+            || scale_y <= 0.0
+        {
+            return Err("Layer arrange values must be finite and have positive scale.".to_string());
+        }
+
+        let (source_width, source_height) = source_image.dimensions();
+        let initial_scale = if initial_sizing == "native-pixels" {
+            1.0
+        } else {
+            (canvas_width as f32 / source_width as f32)
+                .min(canvas_height as f32 / source_height as f32)
+        };
+        let target_width = (source_width as f32 * initial_scale * scale_x)
+            .round()
+            .max(1.0) as u32;
+        let target_height = (source_height as f32 * initial_scale * scale_y)
+            .round()
+            .max(1.0) as u32;
+        let mut layer_image = image::imageops::resize(
+            &source_image.to_rgba32f(),
+            target_width,
+            target_height,
+            image::imageops::FilterType::Lanczos3,
+        );
+        if flip_horizontal {
+            layer_image = image::imageops::flip_horizontal(&layer_image);
+        }
+        if flip_vertical {
+            layer_image = image::imageops::flip_vertical(&layer_image);
+        }
+        let mut canvas = ImageBuffer::from_pixel(canvas_width, canvas_height, Rgba([0.0; 4]));
+        let offset_x = (center_x * canvas_width as f32 - target_width as f32 / 2.0).round() as i64;
+        let offset_y =
+            (center_y * canvas_height as f32 - target_height as f32 / 2.0).round() as i64;
+        image::imageops::overlay(&mut canvas, &layer_image, offset_x, offset_y);
+        images.push(DynamicImage::ImageRgba32F(canvas));
+        layer_states.push((visible, opacity, blend_mode.to_string()));
+    }
+    if images.is_empty() {
+        return Ok(None);
+    }
+
+    let document_layers: Vec<_> = images
+        .iter()
+        .zip(layer_states.iter())
+        .map(
+            |(image, (visible, opacity, blend_mode))| crate::gpu_processing::DocumentLayer {
+                image,
+                visible: *visible,
+                opacity: *opacity,
+                blend_mode,
+            },
+        )
+        .collect();
+    let composite =
+        crate::gpu_processing::composited_document_image(&document_layers)?.into_owned();
+    let mut hasher = DefaultHasher::new();
+    document.to_string().hash(&mut hasher);
+
+    Ok(Some((composite, hasher.finish())))
+}
+
 #[allow(clippy::too_many_arguments)]
 fn process_preview_job(
     app_handle: &tauri::AppHandle,
@@ -1157,14 +1330,25 @@ fn process_preview_job(
     let adjustments_clone = adjustments_json;
 
     let loaded_image_guard = state.original_image.lock().unwrap();
-    let loaded_image = loaded_image_guard
+    let mut loaded_image = loaded_image_guard
         .as_ref()
         .ok_or("No original image loaded")?
         .clone();
     drop(loaded_image_guard);
 
-    let new_transform_hash = calculate_transform_hash(&adjustments_clone);
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let document_hash = if let Some((composite, document_hash)) =
+        resolve_layered_preview_image(&loaded_image, &settings)?
+    {
+        loaded_image.image = Arc::new(composite);
+        document_hash
+    } else {
+        0
+    };
+    let mut transform_hasher = DefaultHasher::new();
+    calculate_transform_hash(&adjustments_clone).hash(&mut transform_hasher);
+    document_hash.hash(&mut transform_hasher);
+    let new_transform_hash = transform_hasher.finish();
     let live_quality = settings.live_preview_quality.as_deref().unwrap_or("high");
 
     let default_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);

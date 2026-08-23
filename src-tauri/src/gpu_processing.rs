@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -29,9 +30,8 @@ pub struct RenderRequest<'a> {
 }
 
 /// A composition input shared by preview, thumbnail, and export. Input slices
-/// are ordered from the canvas background to the frontmost layer. Phase 2
-/// starts with a strict base-layer path; unsupported stacks fail rather than
-/// falling back to an inaccurate CPU or single-image render.
+/// are ordered from the canvas background to the frontmost layer. The shared
+/// renderer composites visible normal-blend layers before GPU processing.
 pub struct DocumentLayer<'a> {
     pub image: &'a DynamicImage,
     pub visible: bool,
@@ -39,24 +39,58 @@ pub struct DocumentLayer<'a> {
     pub blend_mode: &'a str,
 }
 
-fn single_renderable_document_layer<'a>(
+pub fn composited_document_image<'a>(
     layers: &[DocumentLayer<'a>],
-) -> Result<&'a DynamicImage, String> {
-    let mut visible_layers = layers.iter().filter(|layer| layer.visible);
-    let Some(layer) = visible_layers.next() else {
-        return Err(
-            "GPU composition currently requires exactly one visible base layer.".to_string(),
-        );
+) -> Result<Cow<'a, DynamicImage>, String> {
+    let visible_layers: Vec<_> = layers.iter().filter(|layer| layer.visible).collect();
+    let Some(first_layer) = visible_layers.first() else {
+        return Err("GPU composition requires at least one visible image layer.".to_string());
     };
-    if visible_layers.next().is_some() {
-        return Err(
-            "GPU composition currently requires exactly one visible base layer.".to_string(),
-        );
+    if visible_layers.len() == 1
+        && first_layer.opacity == 100.0
+        && first_layer.blend_mode == "normal"
+    {
+        return Ok(Cow::Borrowed(first_layer.image));
     }
-    if layer.opacity != 100.0 || layer.blend_mode != "normal" {
-        return Err("GPU composition blend and opacity support is not available yet.".to_string());
+
+    let (width, height) = first_layer.image.dimensions();
+    let mut composite =
+        ImageBuffer::<Rgba<f32>, Vec<f32>>::from_pixel(width, height, Rgba([0.0; 4]));
+
+    for layer in visible_layers {
+        if layer.blend_mode != "normal" {
+            return Err(format!(
+                "GPU composition does not support the '{}' blend mode yet.",
+                layer.blend_mode
+            ));
+        }
+        if !(0.0..=100.0).contains(&layer.opacity) {
+            return Err("Layer opacity must be between 0 and 100.".to_string());
+        }
+        if layer.image.dimensions() != (width, height) {
+            return Err(
+                "Visible image layers must match the composition canvas dimensions.".to_string(),
+            );
+        }
+
+        let source = layer.image.to_rgba32f();
+        let opacity = layer.opacity / 100.0;
+        for (destination, source) in composite.pixels_mut().zip(source.pixels()) {
+            let source_alpha = source[3] * opacity;
+            let destination_alpha = destination[3];
+            let output_alpha = source_alpha + destination_alpha * (1.0 - source_alpha);
+            if output_alpha > 0.0 {
+                for channel in 0..3 {
+                    destination[channel] = (source[channel] * source_alpha
+                        + destination[channel] * destination_alpha * (1.0 - source_alpha))
+                        / output_alpha;
+                }
+            }
+            destination[3] = output_alpha;
+        }
     }
-    Ok(layer.image)
+
+    Ok(Cow::Owned(DynamicImage::ImageRgba32F(composite)))
 }
 
 pub fn process_document_and_get_dynamic_image(
@@ -67,11 +101,11 @@ pub fn process_document_and_get_dynamic_image(
     request: RenderRequest,
     caller_id: &str,
 ) -> Result<DynamicImage, String> {
-    let base_layer = single_renderable_document_layer(layers)?;
+    let composite = composited_document_image(layers)?;
     process_and_get_dynamic_image(
         context,
         state,
-        base_layer,
+        composite.as_ref(),
         transform_hash,
         request,
         caller_id,
@@ -89,11 +123,11 @@ pub fn process_document_and_get_dynamic_image_with_analytics(
     output_to_display: bool,
     analytics_config: Option<crate::AnalyticsConfig>,
 ) -> Result<DynamicImage, String> {
-    let base_layer = single_renderable_document_layer(layers)?;
+    let composite = composited_document_image(layers)?;
     process_and_get_dynamic_image_with_analytics(
         context,
         state,
-        base_layer,
+        composite.as_ref(),
         transform_hash,
         request,
         caller_id,
@@ -2092,7 +2126,7 @@ fn process_and_get_dynamic_image_inner(
 mod tests {
     use image::{DynamicImage, ImageBuffer, Rgba};
 
-    use super::{DocumentLayer, flare_generation_amount, single_renderable_document_layer};
+    use super::{DocumentLayer, composited_document_image, flare_generation_amount};
     use crate::image_processing::AllAdjustments;
 
     fn test_image() -> DynamicImage {
@@ -2109,41 +2143,45 @@ mod tests {
             blend_mode: "normal",
         };
 
-        assert!(single_renderable_document_layer(&[layer]).is_ok());
+        assert!(composited_document_image(&[layer]).is_ok());
     }
 
     #[test]
-    fn document_renderer_rejects_unsupported_layer_stacks() {
-        let image = test_image();
+    fn document_renderer_composites_visible_normal_layers_in_order() {
+        let background =
+            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(1, 1, Rgba([255, 0, 0, 255])));
+        let foreground =
+            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(1, 1, Rgba([0, 0, 255, 255])));
         let layers = [
             DocumentLayer {
-                image: &image,
+                image: &background,
                 visible: true,
                 opacity: 100.0,
                 blend_mode: "normal",
             },
             DocumentLayer {
-                image: &image,
+                image: &foreground,
                 visible: true,
-                opacity: 100.0,
+                opacity: 50.0,
                 blend_mode: "normal",
             },
         ];
 
-        assert!(single_renderable_document_layer(&layers).is_err());
+        let composite = composited_document_image(&layers).unwrap();
+        assert_eq!(composite.to_rgba8().get_pixel(0, 0).0, [128, 0, 128, 255]);
     }
 
     #[test]
-    fn document_renderer_rejects_unsupported_blend_or_opacity() {
+    fn document_renderer_rejects_unsupported_blend_modes() {
         let image = test_image();
         let layer = DocumentLayer {
             image: &image,
             visible: true,
-            opacity: 50.0,
-            blend_mode: "normal",
+            opacity: 100.0,
+            blend_mode: "multiply",
         };
 
-        assert!(single_renderable_document_layer(&[layer]).is_err());
+        assert!(composited_document_image(&[layer]).is_err());
     }
 
     #[test]

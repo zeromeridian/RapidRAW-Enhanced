@@ -1189,6 +1189,16 @@ pub(crate) async fn export_images_impl(
                             }
                         }
                     };
+                    let base_image = crate::resolve_layered_preview_image(
+                        &crate::LoadedImage {
+                            path: image_path_str.clone(),
+                            image: Arc::new(base_image.clone()),
+                            is_raw,
+                        },
+                        &settings,
+                    )
+                    .map_err(|error| format!("Could not resolve layered export sources: {error}"))?
+                    .map_or(base_image, |(composite, _)| composite);
                     ensure_export_not_cancelled(&cancellation_token_clone)?;
 
                     let mut main_export_adjustments = js_adjustments.clone();

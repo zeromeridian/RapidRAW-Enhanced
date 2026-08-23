@@ -514,7 +514,7 @@ export function useImageProcessing(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     adjustments,
-    document.mode,
+    document,
     previewOverride,
     selectedImage?.path,
     selectedImage?.isReady,
