@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Eye, Lock, Plus, SlidersHorizontal, ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -9,7 +9,9 @@ import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { defaultInitialImageLayerPlacement } from '../../../utils/plusFeatures';
 import { getEnabledCopySuffix } from '../../../utils/outputNaming';
-import type { LayeredDocument } from '../../../utils/editorDocument';
+import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../../utils/adjustments';
+import type { AdjustmentLayer, ImageLayer, Layer, LayeredDocument } from '../../../utils/editorDocument';
+import { v4 as uuidv4 } from 'uuid';
 
 interface LayersPanelProps {
   onCompositionCreated(path: string): Promise<void>;
@@ -34,6 +36,12 @@ interface LayerDockPreviewState {
   opacity: Record<string, number>;
   visibility: Record<string, boolean>;
   locks: Record<string, boolean>;
+}
+
+interface ResolvedLayerSource {
+  originalPath: string;
+  displayName: string;
+  sourceAdjustments: unknown;
 }
 
 const emptyPreviewState = (): LayerDockPreviewState => ({
@@ -104,7 +112,6 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
   const [previewLocks, setPreviewLocks] = useState<Record<string, boolean>>({});
   const [isSelectingImage, setIsSelectingImage] = useState(false);
   const [imageSearch, setImageSearch] = useState('');
-  const previewLayerNumber = useRef(0);
   const document = useEditorStore((state) => state.document);
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const activeAlbumId = useLibraryStore((state) => state.activeAlbumId);
@@ -119,10 +126,6 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
     setPreviewOpacity(state.opacity);
     setPreviewVisibility(state.visibility);
     setPreviewLocks(state.locks);
-    previewLayerNumber.current = Math.max(
-      0,
-      ...state.layers.map((layer) => Number(layer.id.match(/^preview-(?:image|adjustment)-(\d+)$/)?.[1]) || 0),
-    );
   }, [document.mode === 'layered' ? document.id : null]);
 
   const persistPreviewState = async (state: LayerDockPreviewState) => {
@@ -132,8 +135,13 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
       ...document,
       unknownFields: { ...document.unknownFields, layerDockPreview: state },
     };
-    setEditor({ document: updatedDocument });
+    await persistDocument(updatedDocument);
+  };
 
+  const persistDocument = async (updatedDocument: LayeredDocument) => {
+    if (!selectedImage?.path) return;
+
+    setEditor({ document: updatedDocument });
     try {
       await invoke(Invokes.SavePlusDocument, {
         path: selectedImage.path,
@@ -161,23 +169,6 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
     void persistPreviewState(nextState);
   };
 
-  const addPreviewLayer = (kind: PreviewLayerKind, source?: ImageFile) => {
-    const number = ++previewLayerNumber.current;
-    const label = source ? source.path.split(/[\\/]/).pop() || 'Image layer' : 'Adjustment layer';
-
-    const layer: PreviewLayer = {
-      id: `preview-${kind}-${number}`,
-      name: source ? label : `${label} ${number}`,
-      kind,
-      visible: true,
-      locked: false,
-      opacity: 100,
-      sourcePath: source?.path,
-    };
-
-    updatePreviewState({ layers: [layer, ...previewLayers], order: [layer.id, ...previewOrder] });
-  };
-
   const availableImages = useMemo(() => {
     const query = imageSearch.trim().toLocaleLowerCase();
 
@@ -187,10 +178,70 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
     });
   }, [imageList, imageSearch, selectedImage?.path]);
 
+  const addDocumentLayer = async (source?: ImageFile) => {
+    if (document.mode !== 'layered') return;
+
+    const imageLayerCount = document.layers.filter((layer) => layer.kind === 'image').length;
+    const adjustmentLayerCount = document.layers.filter((layer) => layer.kind === 'adjustment').length;
+
+    try {
+      let layer: Layer;
+      if (source) {
+        const resolvedSource = await invoke<ResolvedLayerSource>(Invokes.ResolveLayerSource, {
+          sourceVirtualPath: source.path,
+        });
+        const sourceAdjustments =
+          resolvedSource.sourceAdjustments && typeof resolvedSource.sourceAdjustments === 'object'
+            ? normalizeLoadedAdjustments(resolvedSource.sourceAdjustments)
+            : INITIAL_ADJUSTMENTS;
+        layer = {
+          id: uuidv4(),
+          name: resolvedSource.displayName || `Image layer ${imageLayerCount + 1}`,
+          kind: 'image',
+          visible: true,
+          opacity: 100,
+          blendMode: 'normal',
+          locked: false,
+          source: {
+            originalPath: resolvedSource.originalPath,
+            displayName: resolvedSource.displayName || `Image layer ${imageLayerCount + 1}`,
+          },
+          sourceAdjustments,
+          creativeAdjustments: {},
+          arrange: {
+            initialSizing: defaultInitialImageLayerPlacement,
+            centerX: 0.5,
+            centerY: 0.5,
+            scaleX: 1,
+            scaleY: 1,
+            rotation: 0,
+            flipHorizontal: false,
+            flipVertical: false,
+          },
+        } satisfies ImageLayer;
+      } else {
+        layer = {
+          id: uuidv4(),
+          name: `Adjustment layer ${adjustmentLayerCount + 1}`,
+          kind: 'adjustment',
+          visible: true,
+          opacity: 100,
+          blendMode: 'normal',
+          locked: false,
+          creativeAdjustments: {},
+        } satisfies AdjustmentLayer;
+      }
+
+      await persistDocument({ ...document, layers: [...document.layers, layer] });
+      setImageSearch('');
+      setIsSelectingImage(false);
+    } catch (error) {
+      toast.error(`Could not add layer: ${error}`);
+    }
+  };
+
   const selectImageLayerSource = (source: ImageFile) => {
-    addPreviewLayer('image', source);
-    setImageSearch('');
-    setIsSelectingImage(false);
+    void addDocumentLayer(source);
   };
 
   const layerRows = useMemo(
@@ -229,6 +280,25 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
     updatePreviewState({ order: currentOrder });
   };
 
+  const updateDocumentLayer = (id: string, updater: (layer: Layer) => Layer) => {
+    if (document.mode !== 'layered') return;
+    void persistDocument({
+      ...document,
+      layers: document.layers.map((layer) => (layer.id === id ? updater(layer) : layer)),
+    });
+  };
+
+  const moveDocumentLayer = (id: string, direction: -1 | 1) => {
+    if (document.mode !== 'layered') return;
+    const frontToBack = [...document.layers].reverse();
+    const currentIndex = frontToBack.findIndex((layer) => layer.id === id);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= frontToBack.length) return;
+
+    [frontToBack[currentIndex], frontToBack[nextIndex]] = [frontToBack[nextIndex], frontToBack[currentIndex]];
+    void persistDocument({ ...document, layers: frontToBack.reverse() });
+  };
+
   const removePreviewLayer = (id: string) => {
     const { [id]: _removedOpacity, ...opacity } = previewOpacity;
     const { [id]: _removedVisibility, ...visibility } = previewVisibility;
@@ -241,6 +311,11 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
       visibility,
       locks,
     });
+  };
+
+  const removeDocumentLayer = (id: string) => {
+    if (document.mode !== 'layered' || document.layers[0]?.id === id) return;
+    void persistDocument({ ...document, layers: document.layers.filter((layer) => layer.id !== id) });
   };
 
   const createLayeredVersion = async () => {
@@ -343,10 +418,10 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
       ) : (
         <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
           {orderedLayerRows.map((layer, index) => {
-            const visible = previewVisibility[layer.id] ?? layer.visible;
-            const locked = previewLocks[layer.id] ?? layer.locked;
-            const opacity = previewOpacity[layer.id] ?? layer.opacity;
             const isPreview = 'isPreview' in layer ? layer.isPreview : true;
+            const visible = isPreview ? (previewVisibility[layer.id] ?? layer.visible) : layer.visible;
+            const locked = isPreview ? (previewLocks[layer.id] ?? layer.locked) : layer.locked;
+            const opacity = isPreview ? (previewOpacity[layer.id] ?? layer.opacity) : layer.opacity;
 
             return (
               <div
@@ -360,7 +435,13 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
                     aria-label={visible ? 'Hide layer preview' : 'Show layer preview'}
                     aria-pressed={visible}
                     className="text-text-secondary hover:text-text-primary"
-                    onClick={() => updatePreviewState({ visibility: { ...previewVisibility, [layer.id]: !visible } })}
+                    onClick={() => {
+                      if (isPreview) {
+                        updatePreviewState({ visibility: { ...previewVisibility, [layer.id]: !visible } });
+                      } else {
+                        updateDocumentLayer(layer.id, (current) => ({ ...current, visible: !visible }));
+                      }
+                    }}
                   >
                     <Eye size={15} />
                   </button>
@@ -377,15 +458,30 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
                     aria-label={locked ? 'Unlock layer preview' : 'Lock layer preview'}
                     aria-pressed={locked}
                     className="text-text-secondary hover:text-text-primary"
-                    onClick={() => updatePreviewState({ locks: { ...previewLocks, [layer.id]: !locked } })}
+                    onClick={() => {
+                      if (isPreview) {
+                        updatePreviewState({ locks: { ...previewLocks, [layer.id]: !locked } });
+                      } else {
+                        updateDocumentLayer(layer.id, (current) => ({ ...current, locked: !locked }));
+                      }
+                    }}
                   >
                     <Lock size={14} />
                   </button>
-                  {isPreview && (
+                  {isPreview ? (
                     <button
                       aria-label={`Remove ${layer.name}`}
                       className="text-text-secondary hover:text-red-400"
                       onClick={() => removePreviewLayer(layer.id)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  ) : (
+                    <button
+                      aria-label={`Remove ${layer.name}`}
+                      disabled={document.layers[0]?.id === layer.id}
+                      className="text-text-secondary hover:text-red-400 disabled:opacity-50"
+                      onClick={() => removeDocumentLayer(layer.id)}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -401,24 +497,29 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
                       min="0"
                       max="100"
                       className="min-w-0 flex-1"
-                      onChange={(event) =>
-                        updatePreviewState({ opacity: { ...previewOpacity, [layer.id]: Number(event.target.value) } })
-                      }
+                      onChange={(event) => {
+                        const nextOpacity = Number(event.target.value);
+                        if (isPreview) {
+                          updatePreviewState({ opacity: { ...previewOpacity, [layer.id]: nextOpacity } });
+                        } else {
+                          updateDocumentLayer(layer.id, (current) => ({ ...current, opacity: nextOpacity }));
+                        }
+                      }}
                     />
                   </label>
                   <button
                     aria-label="Move layer up in preview stack"
-                    disabled={index === 0}
+                    disabled={isPreview ? index === 0 : document.layers[document.layers.length - 1]?.id === layer.id}
                     className="text-text-secondary hover:text-text-primary disabled:opacity-50"
-                    onClick={() => movePreviewLayer(layer.id, -1)}
+                    onClick={() => (isPreview ? movePreviewLayer(layer.id, -1) : moveDocumentLayer(layer.id, -1))}
                   >
                     <ArrowUp size={14} />
                   </button>
                   <button
                     aria-label="Move layer down in preview stack"
-                    disabled={index === orderedLayerRows.length - 1}
+                    disabled={isPreview ? index === orderedLayerRows.length - 1 : document.layers[0]?.id === layer.id}
                     className="text-text-secondary hover:text-text-primary disabled:opacity-50"
-                    onClick={() => movePreviewLayer(layer.id, 1)}
+                    onClick={() => (isPreview ? movePreviewLayer(layer.id, 1) : moveDocumentLayer(layer.id, 1))}
                   >
                     <ArrowDown size={14} />
                   </button>
@@ -440,7 +541,7 @@ export default function LayersPanel({ onCompositionCreated }: LayersPanelProps) 
           <button
             aria-label="Add preview adjustment layer"
             className="flex flex-1 items-center justify-center gap-1 rounded-md border border-surface px-2 py-2 text-xs text-text-secondary hover:text-text-primary"
-            onClick={() => addPreviewLayer('adjustment')}
+            onClick={() => void addDocumentLayer()}
           >
             <SlidersHorizontal size={14} /> Adjustment layer
           </button>
