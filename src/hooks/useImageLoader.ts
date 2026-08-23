@@ -11,6 +11,7 @@ import { isPlusFeatureEnabled } from '../utils/plusFeatures';
 
 export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
   const selectedImage = useEditorStore((s) => s.selectedImage);
+  const document = useEditorStore((s) => s.document);
   const adjustments = useEditorStore((s) => s.adjustments);
   const histogram = useEditorStore((s) => s.histogram);
   const waveform = useEditorStore((s) => s.waveform);
@@ -149,6 +150,7 @@ export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
     if (selectedImage?.path && selectedImage.isReady && (finalPreviewUrl || isWgpuActive)) {
       cachedEditStateRef.current = {
         adjustments,
+        document,
         histogram,
         waveform,
         finalPreviewUrl,
@@ -163,6 +165,7 @@ export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
   }, [
     selectedImage,
     adjustments,
+    document,
     histogram,
     waveform,
     finalPreviewUrl,

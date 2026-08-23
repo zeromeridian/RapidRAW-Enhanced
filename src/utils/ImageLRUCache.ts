@@ -1,7 +1,9 @@
 import type { Adjustments } from './adjustments';
+import type { EditorDocument } from './editorDocument';
 
 export interface ImageCacheEntry {
   adjustments: Adjustments;
+  document: EditorDocument;
   histogram: any;
   waveform: any;
   finalPreviewUrl: string | null;

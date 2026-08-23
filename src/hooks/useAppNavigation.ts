@@ -146,9 +146,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       }
 
       const cached = globalImageCache.get(path);
-      // Virtual copies may be layered documents. Their canonical state lives in
-      // the sidecar, while this cache contains only legacy adjustments.
-      const isFrontendCached = !path.includes('?vc=') && Boolean(cached && cached.selectedImage?.isReady);
+      const isFrontendCached = Boolean(cached && cached.selectedImage?.isReady);
 
       selectedImagePathRef.current = path;
 
@@ -189,8 +187,8 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
           uncroppedAdjustedPreviewUrl: cached.uncroppedPreviewUrl,
         });
 
-        setEditor({ adjustments: cached.adjustments });
-        resetHistory(cached.adjustments);
+        setEditor({ document: cached.document });
+        useEditorStore.getState().resetDocumentHistory(cached.document);
         prevAdjustmentsRef.current = { path, adjustments: cached.adjustments };
 
         setLibrary({ isViewLoading: false });
@@ -216,6 +214,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         invoke(Invokes.LoadMetadata, { path })
           .then((metadata: any) => {
             if (selectedImagePathRef.current !== path) return;
+            if (cached.document.mode !== 'single') return;
             let freshAdjustments: any;
             if (metadata.adjustments && !metadata.adjustments.is_null) {
               freshAdjustments = normalizeLoadedAdjustments(metadata.adjustments);
