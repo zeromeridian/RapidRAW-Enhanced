@@ -2225,7 +2225,14 @@ pub fn generate_thumbnail_data(
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let always_decode_raw = settings.always_decode_raw_thumbnails.unwrap_or(false);
 
-    if is_raw && adjustments.is_null() && preloaded_image.is_none() && !always_decode_raw {
+    if is_raw
+        && adjustments.is_null()
+        && metadata
+            .as_ref()
+            .is_none_or(|metadata| metadata.plus_document.is_none())
+        && preloaded_image.is_none()
+        && !always_decode_raw
+    {
         let target_res = settings.thumbnail_resolution.unwrap_or(720);
         if let Some(preview) = try_load_embedded_raw_preview(&source_path, target_res) {
             return Ok(preview);
@@ -2233,12 +2240,16 @@ pub fn generate_thumbnail_data(
     }
 
     if let (Some(context), Some(meta)) = (gpu_context, metadata)
-        && !meta.adjustments.is_null()
+        && (!meta.adjustments.is_null() || meta.plus_document.is_some())
     {
         let state = app_handle.state::<AppState>();
         let target_res = settings.thumbnail_resolution.unwrap_or(720);
 
-        let base_cache_hash = crate::cache_utils::calculate_thumbnail_base_hash(&meta.adjustments);
+        let base_cache_hash =
+            crate::cache_utils::calculate_thumbnail_base_hash(&serde_json::json!({
+                "adjustments": meta.adjustments,
+                "plusDocument": meta.plus_document,
+            }));
 
         let crop_data: Option<Crop> = serde_json::from_value(meta.adjustments["crop"].clone()).ok();
 
@@ -2316,6 +2327,21 @@ pub fn generate_thumbnail_data(
                     );
                 }
                 img
+            };
+
+            let layered_input = composite_image.clone();
+            let composite_image = match crate::resolve_layered_preview_image(
+                &crate::LoadedImage {
+                    path: path_str.to_string(),
+                    image: Arc::new(layered_input),
+                    is_raw,
+                },
+                &settings,
+            )
+            .map_err(anyhow::Error::msg)?
+            {
+                Some((image, _)) => image,
+                None => composite_image,
             };
 
             let warped_image =
@@ -2530,7 +2556,9 @@ fn thumbnail_adjustments_bytes(sidecar_path: &Path) -> Vec<u8> {
     fs::read_to_string(sidecar_path)
         .ok()
         .and_then(|content| serde_json::from_str::<ImageMetadata>(&content).ok())
-        .and_then(|metadata| serde_json::to_vec(&metadata.adjustments).ok())
+        .and_then(|metadata| {
+            serde_json::to_vec(&(metadata.adjustments, metadata.plus_document)).ok()
+        })
         .unwrap_or_default()
 }
 
