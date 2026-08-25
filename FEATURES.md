@@ -112,7 +112,7 @@ details are in `RELEASE_NOTES.MD`.
   Transform operates directly on the full Develop image while its controls
   occupy the Geometry panel. Thin blue lines provide precise placement without
   visible endpoint markers, while enlarged invisible endpoint targets preserve
-  easy adjustment. A Reset tile beside the transformation-mode buttons clears
+  easy adjustment. A clearly separated full-width Reset action below the transformation-mode buttons clears
   all transforms while retaining separate lens corrections. It accepts up to
   two vertical and two horizontal lines. Apply and Cancel sit immediately below
   Clear All Guides so preview completion is explicit. Either completed pair
