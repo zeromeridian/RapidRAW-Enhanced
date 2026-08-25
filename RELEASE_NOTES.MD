@@ -5,6 +5,26 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.20-fix-transformation — 2026-08-24
+
+### Reliable automatic perspective
+
+- Auto and Vertical now derive camera rotation from upright structures, while
+  Level derives it only from horizon-like structures.
+- Diagonal features such as fire escapes are excluded from the perspective
+  evidence, preventing them from distorting architectural corrections.
+
+## 1.7.19-fix-transformation — 2026-08-24
+
+### More reliable Upright transforms
+
+- **Level** now confines its adjustment to reliable horizon straightening,
+  avoiding an unwanted perspective warp.
+- **Vertical** applies a valid zero-keystone result for parallel upright
+  structures instead of treating it as a failed correction.
+- **Auto** now continues through adaptive detection passes before falling back
+  to a level-only result, so it can find vertical and horizontal convergence.
+
 ## 1.7.18-feature-deselect-shortcut — 2026-08-22
 
 ### Deselect All shortcut
