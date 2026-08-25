@@ -5,6 +5,13 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.21-fix-transformation — 2026-08-24
+
+### Clearer Geometry reset
+
+- Moved Geometry Reset out of the transformation-mode grid into a prominent,
+  full-width action.
+
 ## 1.7.20-fix-transformation — 2026-08-24
 
 ### Reliable automatic perspective

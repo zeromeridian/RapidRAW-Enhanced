@@ -146,16 +146,6 @@ export default function GeometryPanel() {
                 <span className="text-xs mt-2">{t('editor.crop.labels.guided')}</span>
               </motion.button>
               <motion.button
-                className={`${buttonClass} bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary`}
-                onClick={resetTransforms}
-                data-tooltip={t('editor.geometry.resetTooltip')}
-                whileTap={{ scale: 0.98 }}
-                type="button"
-              >
-                <RotateCcw size={20} />
-                <span className="text-xs mt-2">{t('adjustments.basic.reset')}</span>
-              </motion.button>
-              <motion.button
                 className={clsx(
                   buttonClass,
                   adjustments.transformAutoMode === 'level'
@@ -194,6 +184,16 @@ export default function GeometryPanel() {
                 </span>
               </motion.button>
             </div>
+            <motion.button
+              className="w-full flex items-center justify-center gap-2 rounded-lg border border-text-secondary/40 bg-surface px-3 py-3 text-sm font-medium text-text-primary transition-colors hover:border-accent hover:bg-card-active"
+              onClick={resetTransforms}
+              data-tooltip={t('editor.geometry.resetTooltip')}
+              whileTap={{ scale: 0.98 }}
+              type="button"
+            >
+              <RotateCcw size={18} />
+              <span>{t('adjustments.basic.reset')}</span>
+            </motion.button>
             <div className="rounded-lg bg-surface p-3">
               <Switch
                 checked={adjustments.transformConstrainCrop}
