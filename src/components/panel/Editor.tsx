@@ -2088,6 +2088,30 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     [selectedImage, adjustments.orientationSteps, setAdjustments, liveRotation],
   );
 
+  const handleRotationDragStart = useCallback(
+    (rotation: number) => {
+      setEditor({ isRotationActive: true, liveRotation: rotation });
+    },
+    [setEditor],
+  );
+
+  const handleRotationDragChange = useCallback(
+    (rotation: number) => {
+      setEditor({ liveRotation: rotation });
+    },
+    [setEditor],
+  );
+
+  const handleRotationDragEnd = useCallback(
+    (rotation: number) => {
+      setEditor({ isRotationActive: false, liveRotation: null });
+      setAdjustments((previous: Adjustments) =>
+        previous.rotation === rotation ? previous : { ...previous, rotation },
+      );
+    },
+    [setAdjustments, setEditor],
+  );
+
   if (!selectedImage) {
     return null;
   }
@@ -2211,6 +2235,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
             onGenerateAiMask={handleGenerateAiMask}
             onSelectAiPatchContainer={(id) => setEditor({ activeAiPatchContainerId: id })}
             onSelectMaskContainer={(id) => setEditor({ activeMaskContainerId: id })}
+            onRotationDragStart={handleRotationDragStart}
+            onRotationDragChange={handleRotationDragChange}
+            onRotationDragEnd={handleRotationDragEnd}
             onLiveMaskPreview={handleLiveMaskPreview}
             onManualCleanup={handleManualCleanup}
             onQuickErase={handleQuickErase}

@@ -107,6 +107,10 @@ details are in `RELEASE_NOTES.MD`.
 
 ## Develop
 
+- Crop now opens in unrestricted **Free** aspect ratio for new images; the
+  source ratio remains available as an explicit preset. Its fine rotation can
+  be adjusted either precisely with the existing slider or directly by dragging
+  the rotation handle above the crop frame.
 - Dedicated **Crop** and **Geometry** modules separate composition from
   perspective work. Geometry includes full **Auto** correction that jointly
   balances rotation and both perspective axes (and remains useful for a
