@@ -502,22 +502,28 @@ fn detect_geometry_lines(gray: &GrayImage, pass: usize) -> Vec<(f32, f32)> {
     .collect()
 }
 
-fn estimate_level_rotation(lines: &[(f32, f32)]) -> Option<f32> {
+fn estimate_axis_rotation(lines: &[(f32, f32)], vertical: bool) -> Option<f32> {
     let mut corrections = lines
         .iter()
         .filter_map(|(_, angle)| {
             let normal = normalize_hough_angle(*angle);
-            if normal.abs() <= 30.0 {
-                Some(-normal)
-            } else if normal.abs() >= 60.0 {
-                Some(normal.signum() * 90.0 - normal)
-            } else {
-                None
+            match vertical {
+                true if normal.abs() <= 20.0 => Some(-normal),
+                false if normal.abs() >= 70.0 => Some(normal.signum() * 90.0 - normal),
+                _ => None,
             }
         })
         .collect::<Vec<_>>();
 
     median(&mut corrections).map(|value| value.clamp(-45.0, 45.0))
+}
+
+fn estimate_level_rotation(lines: &[(f32, f32)]) -> Option<f32> {
+    estimate_axis_rotation(lines, false)
+}
+
+fn estimate_vertical_rotation(lines: &[(f32, f32)]) -> Option<f32> {
+    estimate_axis_rotation(lines, true)
 }
 
 fn estimate_vertical_correction(
@@ -532,7 +538,7 @@ fn estimate_vertical_correction(
         .iter()
         .filter_map(|(r, angle)| {
             let normal = normalize_hough_angle(*angle);
-            if normal.abs() > 45.0 {
+            if normal.abs() > 30.0 {
                 return None;
             }
 
@@ -612,7 +618,7 @@ fn estimate_horizontal_correction(
         .iter()
         .filter_map(|(r, angle)| {
             let normal = normalize_hough_angle(*angle);
-            if normal.abs() < 45.0 {
+            if normal.abs() < 60.0 {
                 return None;
             }
 
@@ -679,7 +685,8 @@ fn estimate_horizontal_correction(
 }
 
 fn analyze_geometry_pixels(gray: &GrayImage, mode: &str) -> Result<AutoGeometryResult, String> {
-    let mut found_level_lines = false;
+    let mut found_lines = false;
+    let mut auto_rotation_fallback = None;
     let mut enhanced = None;
 
     for pass in 0..3 {
@@ -689,41 +696,59 @@ fn analyze_geometry_pixels(gray: &GrayImage, mode: &str) -> Result<AutoGeometryR
             enhanced.get_or_insert_with(|| stretch_luma_contrast(gray))
         };
         let lines = detect_geometry_lines(detection_image, pass);
-        let Some(rotate) = estimate_level_rotation(&lines) else {
-            continue;
-        };
-        found_level_lines = true;
+        let level_rotation = estimate_level_rotation(&lines);
+        let vertical_rotation = estimate_vertical_rotation(&lines);
 
-        let (vertical, horizontal) = match mode {
-            "level" => (None, None),
+        let (rotate, vertical, horizontal) = match mode {
+            "level" => {
+                let Some(rotate) = level_rotation else {
+                    continue;
+                };
+                (rotate, None, None)
+            }
             "vertical" => {
-                let Some(correction) = estimate_vertical_correction(
+                let Some(rotate) = vertical_rotation else {
+                    continue;
+                };
+                found_lines = true;
+                let correction = estimate_vertical_correction(
                     &lines,
                     gray.width() as f32,
                     gray.height() as f32,
                     rotate,
-                ) else {
+                );
+                if correction.is_none() {
                     continue;
-                };
-                (Some(correction), None)
+                }
+                (rotate, correction, None)
             }
             "auto" => {
+                let Some(fallback_rotate) = vertical_rotation.or(level_rotation) else {
+                    continue;
+                };
+                found_lines = true;
+                let vertical_rotate = vertical_rotation.unwrap_or(fallback_rotate);
+                let horizontal_rotate = level_rotation.unwrap_or(fallback_rotate);
                 let vertical = estimate_vertical_correction(
                     &lines,
                     gray.width() as f32,
                     gray.height() as f32,
-                    rotate,
+                    vertical_rotate,
                 );
                 let horizontal = estimate_horizontal_correction(
                     &lines,
                     gray.width() as f32,
                     gray.height() as f32,
-                    rotate,
+                    horizontal_rotate,
                 );
                 if vertical.is_none() && horizontal.is_none() {
+                    // Do not let the first, strict pass collapse Auto into
+                    // Level. Keep that rotation as a safe fallback while the
+                    // adaptive passes look for reliable perspective evidence.
+                    auto_rotation_fallback.get_or_insert((fallback_rotate, lines.len()));
                     continue;
                 }
-                (vertical, horizontal)
+                (vertical_rotate, vertical, horizontal)
             }
             _ => return Err("Unsupported automatic geometry mode".to_string()),
         };
@@ -736,7 +761,18 @@ fn analyze_geometry_pixels(gray: &GrayImage, mode: &str) -> Result<AutoGeometryR
         });
     }
 
-    match (mode, found_level_lines) {
+    if mode == "auto"
+        && let Some((rotate, detected_lines)) = auto_rotation_fallback
+    {
+        return Ok(AutoGeometryResult {
+            rotate,
+            vertical: None,
+            horizontal: None,
+            detected_lines,
+        });
+    }
+
+    match (mode, found_lines) {
         ("vertical", true) => Err("No reliable vertical structures were detected".to_string()),
         ("auto", true) => Err("No reliable perspective structures were detected".to_string()),
         _ => Err("No reliable horizontal or vertical lines were detected".to_string()),
@@ -771,6 +807,20 @@ mod geometry_analysis_tests {
     }
 
     #[test]
+    fn diagonal_lines_do_not_produce_perspective_corrections() {
+        let diagonal_lines = vec![(45.0, 45.0), (160.0, 45.0), (275.0, 45.0)];
+
+        assert_eq!(
+            estimate_vertical_correction(&diagonal_lines, 320.0, 240.0, 0.0),
+            None
+        );
+        assert_eq!(
+            estimate_horizontal_correction(&diagonal_lines, 320.0, 240.0, 0.0),
+            None
+        );
+    }
+
+    #[test]
     fn converging_vertical_lines_retain_their_perspective_correction() {
         let center_y = 120.0;
         let lines = [(60.0, -0.1), (160.0, 0.0), (260.0, 0.1)]
@@ -796,6 +846,30 @@ mod geometry_analysis_tests {
 
         let result = analyze_geometry_pixels(&gray, "vertical").unwrap();
         assert_eq!(result.vertical, Some(0.0));
+    }
+
+    #[test]
+    fn level_analysis_only_rotates_the_canvas() {
+        let mut gray = GrayImage::from_pixel(320, 240, Luma([30]));
+        for (y1, y2) in [(35.0, 55.0), (120.0, 120.0), (205.0, 185.0)] {
+            draw_line_segment_mut(&mut gray, (20.0, y1), (300.0, y2), Luma([225]));
+        }
+
+        let result = analyze_geometry_pixels(&gray, "level").unwrap();
+        assert!(result.rotate.abs() < 1.0);
+        assert_eq!(result.horizontal, None);
+        assert_eq!(result.vertical, None);
+    }
+
+    #[test]
+    fn auto_analysis_accepts_a_level_only_scene() {
+        let mut gray = GrayImage::from_pixel(320, 240, Luma([30]));
+        for y in [55.0, 120.0, 185.0] {
+            draw_line_segment_mut(&mut gray, (20.0, y), (300.0, y + 8.0), Luma([225]));
+        }
+
+        let result = analyze_geometry_pixels(&gray, "auto").unwrap();
+        assert!(result.rotate.abs() > 1.0);
     }
 
     #[test]

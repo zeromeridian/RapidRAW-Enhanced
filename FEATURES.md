@@ -105,8 +105,9 @@ details are in `RELEASE_NOTES.MD`.
 
 - Dedicated **Crop** and **Geometry** modules separate composition from
   perspective work. Geometry includes full **Auto** correction that jointly
-  balances rotation and both perspective axes, focused **Level** and
-  **Vertical** correction, pair-based **Guided Transform**, editable **Manual Transform**
+  balances rotation and both perspective axes (and remains useful for a
+  level-only scene), focused horizon-straightening **Level** correction,
+  **Vertical** keystone correction, pair-based **Guided Transform**, editable **Manual Transform**
   controls, and a persistent **Constrain Crop** option. Guided
   Transform operates directly on the full Develop image while its controls
   occupy the Geometry panel. Thin blue lines provide precise placement without
