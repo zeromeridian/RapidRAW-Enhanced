@@ -3,7 +3,7 @@ import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'react-konva';
 import { PercentCrop, Crop } from 'react-image-crop';
-import { Stamp, Bandage } from 'lucide-react';
+import { Stamp, Bandage, RotateCw } from 'lucide-react';
 import { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
 import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
 import { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
@@ -55,6 +55,9 @@ interface ImageCanvasProps {
   onSelectMask(id: string | null): void;
   onSelectAiPatchContainer?: (id: string | null) => void;
   onSelectMaskContainer?: (id: string | null) => void;
+  onRotationDragStart(rotation: number): void;
+  onRotationDragChange(rotation: number): void;
+  onRotationDragEnd(rotation: number): void;
   onStraighten(val: number): void;
   selectedImage: SelectedImage;
   setCrop(crop: Crop, perfentCrop: PercentCrop): void;
@@ -1167,6 +1170,9 @@ const ImageCanvas = memo(
     onSelectMask,
     onSelectAiPatchContainer,
     onSelectMaskContainer,
+    onRotationDragStart,
+    onRotationDragChange,
+    onRotationDragEnd,
     onStraighten,
     selectedImage,
     setCrop,
@@ -1191,6 +1197,12 @@ const ImageCanvas = memo(
   }: ImageCanvasProps) => {
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
     const cropImageRef = useRef<HTMLImageElement>(null);
+    const rotationDragRef = useRef<{
+      currentRotation: number;
+      pointerId: number;
+      startAngle: number;
+      startRotation: number;
+    } | null>(null);
     const [displayedMaskUrl, setDisplayedMaskUrl] = useState<string | null>(null);
     const [originalLoaded, setOriginalLoaded] = useState<boolean>(false);
     const [localInitialDrawParams, setLocalInitialDrawParams] = useState<any>(null);
@@ -2552,6 +2564,66 @@ const ImageCanvas = memo(
       return `rotate(${rotation}deg)`;
     }, [adjustments.rotation, liveRotation]);
 
+    const getRotationDragAngle = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+      const cropFrame = event.currentTarget.closest('.ReactCrop__crop-selection');
+      if (!cropFrame) return null;
+
+      const { left, top, width, height } = cropFrame.getBoundingClientRect();
+      return Math.atan2(event.clientY - (top + height / 2), event.clientX - (left + width / 2)) * (180 / Math.PI);
+    }, []);
+
+    const handleRotationHandlePointerDown = useCallback(
+      (event: React.PointerEvent<HTMLButtonElement>) => {
+        if (event.button !== 0) return;
+
+        const startAngle = getRotationDragAngle(event);
+        if (startAngle === null) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        const startRotation = liveRotation ?? adjustments.rotation ?? 0;
+        rotationDragRef.current = {
+          currentRotation: startRotation,
+          pointerId: event.pointerId,
+          startAngle,
+          startRotation,
+        };
+        event.currentTarget.setPointerCapture(event.pointerId);
+        onRotationDragStart(startRotation);
+      },
+      [adjustments.rotation, getRotationDragAngle, liveRotation, onRotationDragStart],
+    );
+
+    const handleRotationHandlePointerMove = useCallback(
+      (event: React.PointerEvent<HTMLButtonElement>) => {
+        const drag = rotationDragRef.current;
+        if (!drag || drag.pointerId !== event.pointerId) return;
+
+        const currentAngle = getRotationDragAngle(event);
+        if (currentAngle === null) return;
+
+        const nextRotation = Math.max(-45, Math.min(45, drag.startRotation + currentAngle - drag.startAngle));
+        const roundedRotation = Math.round(nextRotation * 10) / 10;
+        drag.currentRotation = roundedRotation;
+        onRotationDragChange(roundedRotation);
+      },
+      [getRotationDragAngle, onRotationDragChange],
+    );
+
+    const handleRotationHandlePointerEnd = useCallback(
+      (event: React.PointerEvent<HTMLButtonElement>) => {
+        const drag = rotationDragRef.current;
+        if (!drag || drag.pointerId !== event.pointerId) return;
+
+        rotationDragRef.current = null;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+        onRotationDragEnd(drag.currentRotation);
+      },
+      [onRotationDragEnd],
+    );
+
     const getCropDimensions = () => {
       if (!crop || !uncroppedImageRenderSize?.width || !uncroppedImageRenderSize?.height) {
         return { width: 0, height: 0 };
@@ -2990,13 +3062,27 @@ const ImageCanvas = memo(
                   const showDenseGrid = isRotationActive && !isStraightenActive;
                   const currentOverlayMode = isRotationActive || isStraightenActive ? 'none' : overlayMode || 'none';
                   return (
-                    <CompositionOverlays
-                      width={width}
-                      height={height}
-                      mode={currentOverlayMode}
-                      rotation={overlayRotation || 0}
-                      denseVisible={showDenseGrid}
-                    />
+                    <>
+                      <CompositionOverlays
+                        width={width}
+                        height={height}
+                        mode={currentOverlayMode}
+                        rotation={overlayRotation || 0}
+                        denseVisible={showDenseGrid}
+                      />
+                      <button
+                        aria-label="Rotate crop"
+                        className="absolute left-1/2 -top-9 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border border-white/80 bg-black/65 text-white shadow-md transition-colors hover:bg-black/85"
+                        onPointerCancel={handleRotationHandlePointerEnd}
+                        onPointerDown={handleRotationHandlePointerDown}
+                        onPointerMove={handleRotationHandlePointerMove}
+                        onPointerUp={handleRotationHandlePointerEnd}
+                        title="Drag to rotate"
+                        type="button"
+                      >
+                        <RotateCw size={15} />
+                      </button>
+                    </>
                   );
                 }}
               >

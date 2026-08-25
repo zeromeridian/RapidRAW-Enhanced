@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.23-fix-crop-rotation — 2026-08-25
+
+### Faster freeform cropping
+
+- New images now open Crop in **Free** aspect ratio; **Original** remains an
+  explicit preset.
+- Drag the rotation handle above the crop frame for a Lightroom-style visual
+  rotation adjustment, while retaining the slider for precise values.
+
 ## 1.7.22-fix-lightsout-native-overlay — 2026-08-25
 
 ### Native Black Lights Out image
