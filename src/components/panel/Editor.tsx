@@ -88,6 +88,39 @@ interface EditorProps {
   transformWrapperRef: any;
 }
 
+function LightsOutOverlay({
+  imageRenderSize,
+  transformState,
+}: {
+  imageRenderSize: RenderSize;
+  transformState: { scale: number; positionX: number; positionY: number };
+}) {
+  const { containerWidth, containerHeight, offsetX, offsetY, width, height } = imageRenderSize;
+  if (!containerWidth || !containerHeight || !width || !height) return null;
+
+  const imageLeft = transformState.positionX + offsetX * transformState.scale;
+  const imageTop = transformState.positionY + offsetY * transformState.scale;
+  const imageRight = imageLeft + width * transformState.scale;
+  const imageBottom = imageTop + height * transformState.scale;
+  const left = Math.max(0, Math.min(containerWidth, imageLeft));
+  const top = Math.max(0, Math.min(containerHeight, imageTop));
+  const right = Math.max(left, Math.min(containerWidth, imageRight));
+  const bottom = Math.max(top, Math.min(containerHeight, imageBottom));
+  const overlayStyle = { backgroundColor: 'rgba(0, 0, 0, 0.95)' };
+
+  return (
+    <div className="absolute inset-0 z-30 pointer-events-none" aria-hidden="true">
+      <div className="absolute top-0 left-0 w-full" style={{ ...overlayStyle, height: top }} />
+      <div className="absolute bottom-0 left-0 w-full" style={{ ...overlayStyle, height: containerHeight - bottom }} />
+      <div className="absolute left-0" style={{ ...overlayStyle, top, width: left, height: bottom - top }} />
+      <div
+        className="absolute right-0"
+        style={{ ...overlayStyle, top, width: containerWidth - right, height: bottom - top }}
+      />
+    </div>
+  );
+}
+
 export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, transformWrapperRef }: EditorProps) {
   const appSettings = useSettingsStore((s) => s.appSettings);
   const osPlatform = useSettingsStore((s) => s.osPlatform);
@@ -1224,7 +1257,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     const bgPrimaryStr = rootStyle.getPropertyValue('--app-bg-primary') || 'rgb(24, 24, 24)';
     const bgSecondaryStr = rootStyle.getPropertyValue('--app-bg-secondary') || 'rgb(35, 35, 35)';
     const isLightsOutBlack = lightsOutMode === 'black';
-    const nativePreviewVisible = !(osPlatform === 'macos' && isLightsOutBlack);
+    const nativePreviewVisible = true;
     const bgPrimary: [number, number, number, number] = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgPrimaryStr);
     const bgSecondary: [number, number, number, number] = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgSecondaryStr);
 
@@ -2075,8 +2108,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     }
   }
 
-  const useNativePreview = !(osPlatform === 'macos' && lightsOutMode === 'black');
+  const useNativePreview = true;
   const isWgpuActive = useNativePreview && appSettings?.useWgpuRenderer !== false && hasRenderedFirstFrame;
+  const showLightsOutOverlay = osPlatform === 'macos' && lightsOutMode === 'black' && isWgpuActive;
   const hasRenderedAnyPreview = hasRenderedFirstFrame || !!finalPreviewUrl;
 
   return (
@@ -2260,6 +2294,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
             </svg>
           )}
         </div>
+        {showLightsOutOverlay && <LightsOutOverlay imageRenderSize={imageRenderSize} transformState={transformState} />}
       </div>
     </div>
   );

@@ -687,6 +687,7 @@ function App() {
 
   const shouldHideFolderTree = isAndroid;
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
+  const isNativeBlackLightsOut = osPlatform === 'macos' && lightsOutMode === 'black' && isWgpuActive;
   const useMacWindowShell = osPlatform === 'macos' && !appSettings?.decorations && !isWindowFullScreen && !isFullScreen;
 
   return (
@@ -703,6 +704,7 @@ function App() {
         className={clsx(
           'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
           `lights-out-${lightsOutMode}`,
+          isNativeBlackLightsOut && 'lights-out-native-black',
           useMacWindowShell && 'macos-window-shell',
           isWgpuActive ? 'bg-transparent' : 'bg-bg-primary',
         )}

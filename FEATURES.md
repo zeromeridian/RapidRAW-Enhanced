@@ -12,9 +12,13 @@ details are in `RELEASE_NOTES.MD`.
   darkens only surrounding application chrome; and a distraction-free Develop
   Black state that removes application chrome from layout so the photograph
   uses all available space and forces both the web and native GPU surrounds to
-  true black. On macOS Black, the web preview is presented above a transparent
-  native GPU surface, preventing that surface from obscuring the photograph;
-  normal macOS and Windows retain native presentation. Black
+  true black. On macOS Black, the native Develop GPU surface remains the sole
+  image renderer while four non-interactive 95%-black panels cover only the
+  area around the transformed image; transparent Black-mode WebView layers
+  prevent the browser from masking that surface. This preserves the exact live
+  Develop image through the transition without a cached web preview, renderer
+  swap, resolution change, or flash; normal macOS and Windows retain native
+  presentation. Black
   automatically enters fullscreen (using focus-preserving simple fullscreen
   on macOS) and restores the prior window/fullscreen state on exit. Normal and Dim retain the complete
   interface. General Settings provides a persistent configurable Black-mode

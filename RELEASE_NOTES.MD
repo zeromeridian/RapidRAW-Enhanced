@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.22-fix-lightsout-native-overlay — 2026-08-25
+
+### Native Black Lights Out image
+
+- Black Lights Out on macOS now keeps the exact live Develop image on screen.
+- Four 95%-black panels dim only the area around the photograph, avoiding
+  cached previews, renderer swaps, resolution changes, and transition flashes.
+
 ## 1.7.21-fix-transformation — 2026-08-24
 
 ### Clearer Geometry reset
