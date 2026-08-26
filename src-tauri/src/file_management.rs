@@ -2965,6 +2965,125 @@ pub fn rename_folder(path: String, new_name: String, app_handle: AppHandle) -> R
     }
 }
 
+fn normalize_folder_sources(source_paths: Vec<String>) -> Result<Vec<PathBuf>, String> {
+    let mut sources: Vec<PathBuf> = source_paths
+        .into_iter()
+        .map(|path| fs::canonicalize(path).map_err(|error| error.to_string()))
+        .collect::<Result<_, _>>()?;
+    sources.sort_by_key(|path| path.components().count());
+    sources.dedup();
+
+    if sources.iter().any(|path| !path.is_dir()) {
+        return Err("A source folder no longer exists or is not a directory.".to_string());
+    }
+
+    let all_sources = sources.clone();
+    Ok(sources
+        .into_iter()
+        .filter(|source| {
+            !all_sources
+                .iter()
+                .any(|candidate| candidate != source && source.starts_with(candidate))
+        })
+        .collect())
+}
+
+fn validate_folder_destination(sources: &[PathBuf], destination: &Path) -> Result<(), String> {
+    if !destination.is_dir() {
+        return Err(format!(
+            "Destination is not a folder: {}",
+            destination.display()
+        ));
+    }
+
+    for source in sources {
+        if source.parent() == Some(destination) {
+            return Err("Cannot transfer a folder into the parent it is already in.".to_string());
+        }
+        if destination.starts_with(source) {
+            return Err(
+                "Cannot transfer a folder into itself or one of its subfolders.".to_string(),
+            );
+        }
+        let target = destination.join(
+            source
+                .file_name()
+                .ok_or("Could not determine source folder name.")?,
+        );
+        if target.exists() {
+            return Err(format!(
+                "Folder already exists at destination: {}",
+                target.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn copy_folder_tree(source: &Path, destination: &Path) -> Result<(), String> {
+    fs::create_dir(destination).map_err(|error| error.to_string())?;
+    for entry in fs::read_dir(source).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let source_path = entry.path();
+        let target_path = destination.join(entry.file_name());
+        let file_type = entry.file_type().map_err(|error| error.to_string())?;
+        if file_type.is_dir() {
+            copy_folder_tree(&source_path, &target_path)?;
+        } else if file_type.is_file() {
+            fs::copy(&source_path, &target_path).map_err(|error| error.to_string())?;
+        } else {
+            return Err(format!(
+                "Unsupported filesystem entry: {}",
+                source_path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn copy_folders(source_paths: Vec<String>, destination_folder: String) -> Result<(), String> {
+    let sources = normalize_folder_sources(source_paths)?;
+    let destination = fs::canonicalize(destination_folder).map_err(|error| error.to_string())?;
+    validate_folder_destination(&sources, &destination)?;
+    for source in sources {
+        let target = destination.join(
+            source
+                .file_name()
+                .ok_or("Could not determine source folder name.")?,
+        );
+        copy_folder_tree(&source, &target)?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn move_folders(
+    source_paths: Vec<String>,
+    destination_folder: String,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let sources = normalize_folder_sources(source_paths)?;
+    let destination = fs::canonicalize(destination_folder).map_err(|error| error.to_string())?;
+    validate_folder_destination(&sources, &destination)?;
+    for source in sources {
+        let target = destination.join(
+            source
+                .file_name()
+                .ok_or("Could not determine source folder name.")?,
+        );
+        copy_folder_tree(&source, &target)?;
+        fs::remove_dir_all(&source).map_err(|error| error.to_string())?;
+        sync_album_path_changes(
+            &app_handle,
+            None,
+            None,
+            Some((&source.to_string_lossy(), &target.to_string_lossy())),
+        );
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn delete_folder(path: String, app_handle: AppHandle) -> Result<(), String> {
     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]

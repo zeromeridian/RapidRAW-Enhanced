@@ -34,6 +34,11 @@ import { useShallow } from 'zustand/react/shallow';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { AlbumItem, AlbumGroup, Album, Invokes, FolderTreeSort, SortDirection } from '../ui/AppProperties';
+import {
+  mayContainLibraryDragPayload,
+  readLibraryDragPayload,
+  writeLibraryDragPayload,
+} from '../../utils/libraryDragDrop';
 
 export interface FolderTree {
   children: FolderTree[];
@@ -56,6 +61,8 @@ interface FolderTreeProps {
   onSelectAlbum(albumId: string, albumName: string, images: string[]): void;
   onToggleFolder(folder: string): void;
   onOpenFolder(): void;
+  onDropFiles(sourcePaths: string[], destinationFolder: string): void;
+  onDropFolders(sourcePaths: string[], destinationFolder: string, copy: boolean): void;
   setIsVisible(visible: boolean): void;
   style: any;
   isInstantTransition: boolean;
@@ -74,6 +81,8 @@ interface TreeNodeProps {
   showImageCounts: boolean;
   isInstantTransition: boolean;
   folderIcons: Record<string, string>;
+  onDropFiles(sourcePaths: string[], destinationFolder: string): void;
+  onDropFolders(sourcePaths: string[], destinationFolder: string, copy: boolean): void;
 }
 
 interface VisibleProps {
@@ -458,11 +467,14 @@ function TreeNode({
   showImageCounts,
   isInstantTransition,
   folderIcons,
+  onDropFiles,
+  onDropFolders,
 }: TreeNodeProps) {
   const hasChildren = node.hasSubdirs || (node.children && node.children.length > 0);
   const isSelected =
     selectedFolderPaths.includes(node.path) || (selectedFolderPaths.length === 0 && node.path === selectedPath);
   const isPinned = pinnedFolders.includes(node.path);
+  const [isDropTarget, setIsDropTarget] = useState(false);
 
   const handleFolderIconClick = (e: any) => {
     e.stopPropagation();
@@ -522,7 +534,34 @@ function TreeNode({
         className={clsx('flex items-center gap-2 p-1.5 rounded-md transition-colors cursor-pointer', {
           'bg-surface': isSelected,
           'hover:bg-card-active': !isSelected,
+          'ring-1 ring-inset ring-accent bg-accent/10': isDropTarget,
         })}
+        draggable
+        onDragStart={(event) => writeLibraryDragPayload(event.dataTransfer, { kind: 'folders', paths: [node.path] })}
+        onDragEnter={(event) => {
+          if (mayContainLibraryDragPayload(event.dataTransfer)) event.preventDefault();
+        }}
+        onDragOver={(event) => {
+          if (!mayContainLibraryDragPayload(event.dataTransfer)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = event.metaKey || event.ctrlKey ? 'copy' : 'move';
+          setIsDropTarget(true);
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsDropTarget(false);
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setIsDropTarget(false);
+          const payload = readLibraryDragPayload(event.dataTransfer);
+          if (!payload) return;
+          if (payload.kind === 'folders') {
+            onDropFolders(payload.paths, node.path, event.metaKey || event.ctrlKey);
+          } else {
+            onDropFiles(payload.paths, node.path);
+          }
+        }}
         onClick={handleNameClick}
         onContextMenu={(e: any) => onContextMenu(e, node.path, isPinned)}
       >
@@ -614,6 +653,8 @@ function TreeNode({
                       showImageCounts={showImageCounts}
                       isInstantTransition={isInstantTransition}
                       folderIcons={folderIcons}
+                      onDropFiles={onDropFiles}
+                      onDropFolders={onDropFolders}
                     />
                   </motion.div>
                 ))}
@@ -638,6 +679,8 @@ export default function FolderTree({
   setIsVisible,
   style,
   isInstantTransition,
+  onDropFiles,
+  onDropFolders,
 }: FolderTreeProps) {
   const { t } = useTranslation();
   const { appSettings, handleSettingsChange } = useSettingsStore(
@@ -952,6 +995,8 @@ export default function FolderTree({
                                   showImageCounts={showImageCounts && isHovering}
                                   isInstantTransition={isInstantTransition}
                                   folderIcons={folderIcons}
+                                  onDropFiles={onDropFiles}
+                                  onDropFolders={onDropFolders}
                                 />
                               </motion.div>
                             ))}
@@ -1073,6 +1118,8 @@ export default function FolderTree({
                                   showImageCounts={showImageCounts && isHovering}
                                   isInstantTransition={isInstantTransition}
                                   folderIcons={folderIcons}
+                                  onDropFiles={onDropFiles}
+                                  onDropFolders={onDropFolders}
                                 />
                               </motion.div>
                             ))}

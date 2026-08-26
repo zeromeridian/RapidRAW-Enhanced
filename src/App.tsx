@@ -399,6 +399,45 @@ function App() {
     sortedImageList,
   );
 
+  const handleDropFiles = useCallback(
+    async (sourcePaths: string[], destinationFolder: string) => {
+      try {
+        await invoke(Invokes.MoveFiles, { sourcePaths, destinationFolder });
+        setLibrary({ libraryActivePath: null, multiSelectedPaths: [] });
+        await Promise.all([handleLibraryRefresh(), refreshAllFolderTrees()]);
+      } catch (error) {
+        toast.error(`Failed to move files: ${error}`);
+      }
+    },
+    [handleLibraryRefresh, refreshAllFolderTrees, setLibrary],
+  );
+
+  const handleDropFolders = useCallback(
+    async (sourcePaths: string[], destinationFolder: string, copy: boolean) => {
+      try {
+        await invoke(copy ? Invokes.CopyFolders : Invokes.MoveFolders, { sourcePaths, destinationFolder });
+        setLibrary({ selectedFolderPaths: [] });
+        await refreshAllFolderTrees();
+
+        const currentFolderWasMoved =
+          !copy &&
+          sourcePaths.some(
+            (sourcePath) =>
+              currentFolderPath === sourcePath ||
+              currentFolderPath?.startsWith(`${sourcePath}${sourcePath.includes('\\') ? '\\' : '/'}`),
+          );
+        if (currentFolderWasMoved) {
+          handleBackToLibrary();
+        } else {
+          await handleLibraryRefresh();
+        }
+      } catch (error) {
+        toast.error(`Failed to ${copy ? 'copy' : 'move'} folder: ${error}`);
+      }
+    },
+    [currentFolderPath, handleBackToLibrary, handleLibraryRefresh, refreshAllFolderTrees, setLibrary],
+  );
+
   const {
     handleStartPanorama,
     handleSavePanorama,
@@ -674,6 +713,8 @@ function App() {
           onFolderSelect={(path) => handleSelectSubfolder(path, false)}
           onToggleFolder={handleToggleFolder}
           onOpenFolder={handleOpenFolder}
+          onDropFiles={handleDropFiles}
+          onDropFolders={handleDropFolders}
           setIsVisible={(value: boolean) =>
             setUI((state) => ({ uiVisibility: { ...state.uiVisibility, folderTree: value } }))
           }

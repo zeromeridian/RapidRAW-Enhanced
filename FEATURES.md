@@ -6,6 +6,10 @@ details are in `RELEASE_NOTES.MD`.
 
 ## Library and workflow
 
+- Drag selected Library images onto a folder to move their image and ThisIsRAW
+  sidecar files. Drag a folder onto another folder to move its complete tree;
+  hold Command on macOS or Ctrl on Windows/Linux to copy a folder tree instead.
+  Transfers prevent same-parent, self/descendant, and name-collision drops.
 - Lightroom-style **Lights Out** viewing across Library and Develop, with
   session-only Normal, Dim, and Black states; forward/reverse configurable
   shortcuts; Escape-first restoration; a full-brightness photograph while Dim
