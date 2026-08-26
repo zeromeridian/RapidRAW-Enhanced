@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.24-feature-dragdrop-files — 2026-08-26
+
+### Library file and folder transfers
+
+- Drag selected Library images onto folders to move image and sidecar files.
+- Drag folders onto folders to move their entire tree, or hold Command/Ctrl to
+  copy a folder tree.
+- Enabled reliable HTML drag-and-drop by disabling Tauri’s native drop handler,
+  which otherwise intercepts WKWebView drag events on macOS.
+
 ## 1.7.23-fix-crop-rotation — 2026-08-25
 
 ### Faster freeform cropping

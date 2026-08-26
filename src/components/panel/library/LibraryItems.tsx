@@ -23,10 +23,12 @@ import { StackMemberPosition, StackVisualInfo } from '../../../utils/imageGroupi
 import { getDisplayFilename, getFileTypeBadgeLabel } from '../../../utils/outputNaming';
 import { getImageFlag, ImageFlag } from '../../../utils/imageFlags';
 import ImageFlagBadge from '../../ui/ImageFlagBadge';
+import { writeLibraryDragPayload } from '../../../utils/libraryDragDrop';
 
 type StackDropEdge = 'before' | 'after';
 
 let draggedStackPath: string | null = null;
+const STACK_DRAG_TYPE = 'application/x-thisisraw-stack';
 
 const STACK_SPINE_POSITION_CLASSES: Record<StackMemberPosition, string> = {
   only: 'top-2 bottom-2 rounded-full',
@@ -92,6 +94,7 @@ const ThumbnailComponent = ({
   onStackDragOver,
   onStackDrop,
   onStackDragEnd,
+  onFileDragStart,
 }: any) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
@@ -214,7 +217,7 @@ const ThumbnailComponent = ({
         isStackDragging && 'opacity-50',
       )}
       data-bench-id="thumbnail"
-      draggable={isStackDraggable}
+      draggable
       onClick={(e: any) => {
         e.stopPropagation();
         onImageClick(path, e);
@@ -222,12 +225,11 @@ const ThumbnailComponent = ({
       onContextMenu={(e: any) => onContextMenu(e, path)}
       onDoubleClick={() => onImageDoubleClick(path)}
       onDragStart={(event) => {
-        if (!isStackDraggable) {
-          event.preventDefault();
-          return;
+        onFileDragStart(path, event);
+        if (isStackDraggable) {
+          setIsStackDragging(true);
+          onStackDragStart(path, event);
         }
-        setIsStackDragging(true);
-        onStackDragStart(path, event);
       }}
       onDragOver={(event) => {
         const edge = onStackDragOver(path, event, 'horizontal');
@@ -608,6 +610,7 @@ const ListItemComponent = ({
   onStackDragOver,
   onStackDrop,
   onStackDragEnd,
+  onFileDragStart,
 }: any) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
@@ -746,7 +749,7 @@ const ListItemComponent = ({
         'relative',
         isStackDragging && 'opacity-50',
       )}
-      draggable={isStackDraggable}
+      draggable
       onClick={(e: any) => {
         e.stopPropagation();
         onImageClick(path, e);
@@ -754,12 +757,11 @@ const ListItemComponent = ({
       onContextMenu={(e: any) => onContextMenu(e, path)}
       onDoubleClick={() => onImageDoubleClick(path)}
       onDragStart={(event) => {
-        if (!isStackDraggable) {
-          event.preventDefault();
-          return;
+        onFileDragStart(path, event);
+        if (isStackDraggable) {
+          setIsStackDragging(true);
+          onStackDragStart(path, event);
         }
-        setIsStackDragging(true);
-        onStackDragStart(path, event);
       }}
       onDragOver={(event) => {
         const edge = onStackDragOver(path, event, 'vertical');
@@ -1006,6 +1008,13 @@ const RowComponent = ({
       .getState()
       .appSettings?.imageStacks?.find((stack) => !stack.collapsed && stack.paths.includes(path));
   }, []);
+  const handleFileDragStart = useCallback(
+    (path: string, event: React.DragEvent<HTMLElement>) => {
+      const paths = multiSelectedSet.has(path) ? Array.from(multiSelectedSet) : [path];
+      writeLibraryDragPayload(event.dataTransfer, { kind: 'files', paths });
+    },
+    [multiSelectedSet],
+  );
   const handleStackDragStart = useCallback(
     (path: string, event: React.DragEvent<HTMLElement>) => {
       if (!getExpandedStackForPath(path)) {
@@ -1014,7 +1023,7 @@ const RowComponent = ({
       }
       draggedStackPath = path;
       event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', path);
+      event.dataTransfer.setData(STACK_DRAG_TYPE, path);
     },
     [getExpandedStackForPath],
   );
@@ -1024,7 +1033,7 @@ const RowComponent = ({
       event: React.DragEvent<HTMLElement>,
       axis: 'horizontal' | 'vertical',
     ): StackDropEdge | null => {
-      const sourcePath = draggedStackPath || event.dataTransfer.getData('text/plain');
+      const sourcePath = draggedStackPath || event.dataTransfer.getData(STACK_DRAG_TYPE);
       if (!sourcePath || sourcePath === targetPath) return null;
 
       const sourceStack = getExpandedStackForPath(sourcePath);
@@ -1043,7 +1052,7 @@ const RowComponent = ({
   );
   const handleStackDrop = useCallback(
     (targetPath: string, event: React.DragEvent<HTMLElement>, axis: 'horizontal' | 'vertical') => {
-      const sourcePath = draggedStackPath || event.dataTransfer.getData('text/plain');
+      const sourcePath = draggedStackPath || event.dataTransfer.getData(STACK_DRAG_TYPE);
       const edge = getStackDropEdge(targetPath, event, axis);
       if (!sourcePath || !edge) return;
 
@@ -1211,6 +1220,7 @@ const RowComponent = ({
                 onStackDragOver={getStackDropEdge}
                 onStackDrop={handleStackDrop}
                 onStackDragEnd={handleStackDragEnd}
+                onFileDragStart={handleFileDragStart}
               />
             ) : (
               <Thumbnail
@@ -1239,6 +1249,7 @@ const RowComponent = ({
                 onStackDragOver={getStackDropEdge}
                 onStackDrop={handleStackDrop}
                 onStackDragEnd={handleStackDragEnd}
+                onFileDragStart={handleFileDragStart}
               />
             )}
           </div>

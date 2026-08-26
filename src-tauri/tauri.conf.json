@@ -12,6 +12,7 @@
     "windows": [
       {
         "label": "main",
+        "dragDropEnabled": false,
         "create": false,
         "title": "ThisIsRAW",
         "width": 1280,
@@ -94,5 +95,5 @@
       }
     }
   },
-  "version": "1.7.23-feature-crop-enhance"
+  "version": "1.7.24-feature-dragdrop-files"
 }
