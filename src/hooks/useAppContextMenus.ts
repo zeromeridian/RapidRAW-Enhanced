@@ -44,6 +44,7 @@ import {
   Album as AlbumIcon,
   SwatchBook,
   FileSearch,
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
@@ -53,7 +54,17 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useUIStore } from '../store/useUIStore';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { Invokes, Option, OPTION_SEPARATOR, Panel, AlbumItem, Album, AlbumGroup } from '../components/ui/AppProperties';
+import {
+  Invokes,
+  Option,
+  OPTION_SEPARATOR,
+  Panel,
+  AlbumItem,
+  Album,
+  AlbumGroup,
+  ExternalEditor,
+} from '../components/ui/AppProperties';
+import { Status, ExportSettings } from '../components/ui/ExportImportProperties';
 import { Color, COLOR_LABELS, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import TaggingSubMenu from '../context/TaggingSubMenu';
 import { useEditorActions } from './useEditorActions';
@@ -566,6 +577,69 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         }
       };
 
+      const startExternalEdit = async (format: 'jpeg' | 'tiff', editor: ExternalEditor) => {
+        const sourcePath = finalSelection[0];
+        const physicalPath = sourcePath.split('?')[0];
+        const slash = Math.max(physicalPath.lastIndexOf('/'), physicalPath.lastIndexOf('\\'));
+        const folder = physicalPath.slice(0, slash + 1);
+        const filename = physicalPath.slice(slash + 1);
+        const dot = filename.lastIndexOf('.');
+        const stem = dot > 0 ? filename.slice(0, dot) : filename;
+        const extension = format === 'tiff' ? 'tiff' : 'jpg';
+        const outputPath = `${folder}${stem}_thisisraw-edit-${Date.now()}.${extension}`;
+        const exportSettings: ExportSettings = {
+          filenameTemplate: null,
+          jpegQuality: 100,
+          keepMetadata: true,
+          preserveTimestamps: false,
+          preserveFolders: false,
+          resize: null,
+          stripGps: false,
+          watermark: null,
+          exportMasks: false,
+          exportToSourceFolder: false,
+        };
+        useProcessStore.getState().setProcess({ externalEditLaunch: { editorPath: editor.path, outputPath } });
+        useProcessStore.getState().setExportState({
+          status: Status.Exporting,
+          progress: { current: 0, total: 1 },
+          errorMessage: '',
+        });
+        try {
+          await invoke(Invokes.ExportImages, {
+            paths: [sourcePath],
+            outputFolderOrFile: outputPath,
+            isExplicitFilePath: true,
+            baseOriginFolders: [],
+            exportSettings,
+            outputFormat: format,
+            trackCreatedImages: true,
+            currentEditPath: selectedImage?.path || null,
+            currentEditAdjustments: useEditorStore.getState().adjustments || null,
+          });
+        } catch (error) {
+          useProcessStore.getState().setProcess({ externalEditLaunch: null });
+          useProcessStore.getState().setExportState({
+            status: Status.Error,
+            errorMessage: typeof error === 'string' ? error : 'External edit export failed',
+          });
+        }
+      };
+
+      const externalEditors = (appSettings?.externalEditors || []).filter((editor: ExternalEditor) => editor.path);
+      const openInOption = {
+        disabled: !isSingleSelection || externalEditors.length === 0,
+        icon: ExternalLink,
+        label: t('contextMenus.thumbnail.openIn'),
+        submenu: (['tiff', 'jpeg'] as const).map((format) => ({
+          label: format === 'tiff' ? 'TIFF' : 'JPEG',
+          submenu: externalEditors.map((editor: ExternalEditor) => ({
+            label: editor.name,
+            onClick: () => startExternalEdit(format, editor),
+          })),
+        })),
+      };
+
       const handleRemoveFromAlbum = async () => {
         if (!activeAlbumId) return;
         const newTree = JSON.parse(JSON.stringify(albumTree));
@@ -620,6 +694,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               { type: OPTION_SEPARATOR },
             ]
           : [{ icon: FileInput, label: exportLabel, onClick: onExportClick }, { type: OPTION_SEPARATOR }]),
+        openInOption,
         {
           disabled: !isSingleSelection,
           icon: Copy,

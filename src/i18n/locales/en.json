@@ -255,6 +255,7 @@
       "shortcutsHeading": "SHORTCUTS"
     },
     "thumbnail": {
+      "openIn": "Open in",
       "addToAlbum": "Add to Album",
       "autoAdjust_one": "Auto Adjust Image",
       "autoAdjust_other": "Auto Adjust Images",

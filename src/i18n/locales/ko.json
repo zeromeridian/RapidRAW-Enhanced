@@ -254,6 +254,7 @@
       "shortcutsHeading": "단축키"
     },
     "thumbnail": {
+      "openIn": "Open in",
       "previewLightroomEdits_one": "Preview Lightroom Edits",
       "previewLightroomEdits_other": "Preview Lightroom Edits for {{count}} Images",
       "addToAlbum": "앨범에 추가",

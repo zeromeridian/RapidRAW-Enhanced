@@ -9,6 +9,11 @@ export interface ExternalEditSession {
   jpegQuality: number;
 }
 
+export interface ExternalEditLaunch {
+  editorPath: string;
+  outputPath: string;
+}
+
 interface ProcessState {
   exportState: ExportState;
   importState: ImportState;
@@ -25,6 +30,8 @@ interface ProcessState {
   isPasted: boolean;
   initialFileToOpen: string | null;
   externalEditSession: ExternalEditSession | null;
+  externalEditLaunch: ExternalEditLaunch | null;
+  externalEditWatch: { path: string; stamp: number } | null;
 
   setProcess: (state: Partial<ProcessState> | ((state: ProcessState) => Partial<ProcessState>)) => void;
   setExportState: (updater: Partial<ExportState> | ((state: ExportState) => Partial<ExportState>)) => void;
@@ -56,6 +63,8 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
   isPasted: false,
   initialFileToOpen: null,
   externalEditSession: null,
+  externalEditLaunch: null,
+  externalEditWatch: null,
 
   setProcess: (updater) => {
     set((prev) => {

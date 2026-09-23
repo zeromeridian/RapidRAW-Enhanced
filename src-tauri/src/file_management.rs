@@ -4595,6 +4595,109 @@ pub fn show_in_finder(path: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Opens a user-configured external editor without using a shell. The editor
+/// path is deliberately passed as one argument, so spaces and file names are
+/// never interpreted as commands.
+#[tauri::command]
+pub fn open_external_editor(editor_path: String, image_path: String) -> Result<(), String> {
+    let editor = Path::new(&editor_path);
+    let image = Path::new(&image_path);
+    if !image.is_file() {
+        return Err(format!(
+            "External-edit image does not exist: {}",
+            image.display()
+        ));
+    }
+    if !editor.exists() {
+        return Err(format!(
+            "External editor does not exist: {}",
+            editor.display()
+        ));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // macOS file pickers commonly return an Adobe product folder, such as
+        // `/Applications/Adobe Photoshop 2026`, rather than its nested app
+        // bundle. Accept that normal install layout when it contains exactly
+        // one direct `.app` bundle.
+        let app_bundle = if editor.extension().and_then(|extension| extension.to_str())
+            == Some("app")
+        {
+            editor.to_path_buf()
+        } else if editor.is_dir() {
+            let bundles = fs::read_dir(editor)
+                .map_err(|error| format!("Failed to inspect external editor folder: {error}"))?
+                .filter_map(|entry| entry.ok())
+                .map(|entry| entry.path())
+                .filter(|path| {
+                    path.extension().and_then(|extension| extension.to_str()) == Some("app")
+                })
+                .collect::<Vec<_>>();
+            match bundles.as_slice() {
+                [bundle] => bundle.clone(),
+                [] => {
+                    return Err(format!(
+                        "Select an application bundle (.app) or a folder containing exactly one .app: {}",
+                        editor.display()
+                    ));
+                }
+                _ => {
+                    return Err(format!(
+                        "The selected folder contains multiple applications; select the intended .app bundle: {}",
+                        editor.display()
+                    ));
+                }
+            }
+        } else {
+            editor.to_path_buf()
+        };
+
+        if app_bundle
+            .extension()
+            .and_then(|extension| extension.to_str())
+            == Some("app")
+        {
+            Command::new("open")
+                .arg("-a")
+                .arg(&app_bundle)
+                .arg(image)
+                .spawn()
+                .map_err(|error| format!("Failed to open external editor: {error}"))?;
+        } else {
+            Command::new(editor)
+                .arg(image)
+                .spawn()
+                .map_err(|error| format!("Failed to start external editor: {error}"))?;
+        }
+    }
+
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    {
+        Command::new(editor)
+            .arg(image)
+            .spawn()
+            .map_err(|error| format!("Failed to start external editor: {error}"))?;
+    }
+
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        return Err("External editors are not supported on mobile.".to_string());
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_file_modification_stamp(path: String) -> Result<u128, String> {
+    fs::metadata(path)
+        .and_then(|metadata| metadata.modified())
+        .map_err(|error| error.to_string())?
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 pub fn delete_files_from_disk(paths: Vec<String>, app_handle: AppHandle) -> Result<(), String> {
     let mut files_to_trash = HashSet::new();

@@ -49,6 +49,10 @@ details are in `RELEASE_NOTES.MD`.
   move-to-top covers, and matching Develop-filmstrip presentation.
 - Automatic stacking of physical copies, virtual copies, and exported images,
   with optional automatic expansion.
+- Configurable external-editor handoff: add Photoshop, Pixelmator Pro, or any
+  desktop editor executable in General Settings, then right-click one image to
+  render a TIFF or JPEG derivative, open it in that editor, and automatically
+  refresh the Library when the derivative is saved.
 - Rejected, Selected, Deferred, and Unflagged states with keyboard shortcuts,
   thumbnail badges, rejected-image dimming, filtering, and rejected-file
   deletion for the currently loaded folder view.

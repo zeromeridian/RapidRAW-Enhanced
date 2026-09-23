@@ -573,6 +573,32 @@ export default function SettingsPanel({
   const [logPathError, setLogPathError] = useState(false);
   const [dpr, setDpr] = useState(() => (typeof window !== 'undefined' ? window.devicePixelRatio : 1));
 
+  const addExternalEditor = async () => {
+    const selected = await openDialog({
+      title: osPlatform === 'macos' ? 'Select an application' : 'Select an editor executable',
+      directory: false,
+      multiple: false,
+      filters: osPlatform === 'macos' ? [{ name: 'Applications', extensions: ['app'] }] : undefined,
+    });
+    if (!selected || Array.isArray(selected)) return;
+    const normalizedPath = selected.replace(/\\/g, '/');
+    const filename = normalizedPath.split('/').pop() || 'External editor';
+    const name = filename.replace(/\.app$/i, '').replace(/\.(exe|bat|cmd)$/i, '');
+    const editors = appSettings?.externalEditors || [];
+    if (editors.some((editor: any) => editor.path === selected)) return;
+    await onSettingsChange({
+      ...appSettings,
+      externalEditors: [...editors, { id: crypto.randomUUID(), name, path: selected }],
+    });
+  };
+
+  const removeExternalEditor = async (id: string) => {
+    await onSettingsChange({
+      ...appSettings,
+      externalEditors: (appSettings?.externalEditors || []).filter((editor: any) => editor.id !== id),
+    });
+  };
+
   const settingCategories = useMemo(
     () => [
       { id: 'general', label: t('settings.categories.general'), icon: SlidersHorizontal },
@@ -1364,6 +1390,32 @@ export default function SettingsPanel({
                             className="max-w-48"
                             bgClassName="bg-bg-primary"
                           />
+                        </div>
+                      </SettingItem>
+
+                      <SettingItem
+                        label="External editors"
+                        description="Rendered TIFF or JPEG copies can be opened in these applications."
+                      >
+                        <div className="flex flex-col items-end gap-2 min-w-64">
+                          {(appSettings?.externalEditors || []).map((editor: any) => (
+                            <div key={editor.id} className="flex items-center gap-2 max-w-full">
+                              <span className="text-sm text-text-primary truncate max-w-48" title={editor.path}>
+                                {editor.name}
+                              </span>
+                              <Button
+                                aria-label={`Remove ${editor.name}`}
+                                className="p-1.5"
+                                onClick={() => removeExternalEditor(editor.id)}
+                                variant="secondary"
+                              >
+                                <Trash2 size={15} />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button className="py-1.5" onClick={addExternalEditor} variant="secondary">
+                            <Plus size={15} /> Add editor
+                          </Button>
                         </div>
                       </SettingItem>
 
