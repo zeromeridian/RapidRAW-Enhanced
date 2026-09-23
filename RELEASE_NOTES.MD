@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.26-feature-thumb-resize — 2026-09-23
+
+### Dynamically resizable Library thumbnails
+
+- Grid thumbnails resize continuously with a slider on the bottom toolbar,
+  replacing the fixed Small/Medium/Large options.
+- Hold Command/Ctrl and scroll over the grid to resize thumbnails in steps.
+- Thumbnail size is remembered between sessions; existing settings carry over
+  automatically.
+
 ## 1.7.25-feature-openin — 2026-09-11
 
 ### External-editor handoff

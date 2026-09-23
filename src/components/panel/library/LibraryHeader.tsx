@@ -11,7 +11,6 @@ import {
   SortDirection,
   ExifOverlay,
   GroupingMode,
-  ThumbnailSize,
   ThumbnailAspectRatio,
 } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
@@ -366,26 +365,20 @@ const groupingOptionKeys = [
 
 interface ViewOptionsDropdownProps {
   libraryViewMode: LibraryViewMode;
-  onSelectSize: (id: ThumbnailSize) => void;
   onSelectAspectRatio: (id: ThumbnailAspectRatio) => void;
   onLibraryRefresh?: () => void;
   setLibraryViewMode: (mode: LibraryViewMode) => void;
-  thumbnailSize: ThumbnailSize;
   thumbnailAspectRatio: ThumbnailAspectRatio;
-  thumbnailSizeOptions: Array<{ id: ThumbnailSize; label: string; size: number }>;
   thumbnailAspectRatioOptions: Array<{ id: ThumbnailAspectRatio; label: string }>;
   sortOptions: Array<{ key: string; label: string; disabled?: boolean }>;
 }
 
 export function ViewOptionsDropdown({
   libraryViewMode,
-  onSelectSize,
   onSelectAspectRatio,
   onLibraryRefresh,
   setLibraryViewMode,
-  thumbnailSize,
   thumbnailAspectRatio,
-  thumbnailSizeOptions,
   thumbnailAspectRatioOptions,
   sortOptions,
 }: ViewOptionsDropdownProps) {
@@ -453,15 +446,6 @@ export function ViewOptionsDropdown({
                 onChange={(val) => setSortCriteria((prev: SortCriteria) => ({ ...prev, key: val }))}
                 triggerClassName="bg-bg-primary w-full"
               />
-            </div>
-          </div>
-
-          <div>
-            <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-1 uppercase">
-              {t('library.header.viewOptions.thumbnailSize')}
-            </Text>
-            <div className="px-3 mt-1">
-              <SegmentedSwitch options={thumbnailSizeOptions} value={thumbnailSize} onChange={onSelectSize} />
             </div>
           </div>
 

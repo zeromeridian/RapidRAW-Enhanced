@@ -17,6 +17,7 @@ import {
   Theme,
   ThumbnailSize,
   ThumbnailAspectRatio,
+  parseThumbnailSize,
 } from '../components/ui/AppProperties';
 import { useTranslation } from 'react-i18next';
 import { RootFolderTree, mergeRefreshedFolderTrees } from '../utils/folderTreeCache';
@@ -119,7 +120,7 @@ export const useAppInitialization = ({
   );
 
   const isAndroid = osPlatform === 'android';
-  const defaultThumbnailSize = isAndroid ? ThumbnailSize.Small : ThumbnailSize.Medium;
+  const defaultThumbnailSize = isAndroid ? 160 : 240;
   const defaultLibraryViewMode = isAndroid ? LibraryViewMode.Recursive : LibraryViewMode.Flat;
   const prevImageCountsNeed = useRef<boolean | undefined>(undefined);
   const prevHideEmptyFolders = useRef<boolean | undefined>(undefined);
@@ -193,7 +194,7 @@ export const useAppInitialization = ({
         if (typeof settings?.waveformHeight === 'number') setEditor({ waveformHeight: settings.waveformHeight });
 
         setLibraryViewMode(settings?.libraryViewMode ?? defaultLibraryViewMode);
-        setThumbnailSize(settings?.thumbnailSize ?? defaultThumbnailSize);
+        setThumbnailSize(parseThumbnailSize(settings?.thumbnailSize, defaultThumbnailSize));
         if (settings?.thumbnailAspectRatio) setThumbnailAspectRatio(settings.thumbnailAspectRatio);
 
         if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
@@ -266,7 +267,7 @@ export const useAppInitialization = ({
         setAppSettings({
           lastRootPath: null,
           theme: DEFAULT_THEME_ID as Theme,
-          thumbnailSize: defaultThumbnailSize,
+          thumbnailSize: String(defaultThumbnailSize),
           libraryViewMode: defaultLibraryViewMode,
         });
       })
@@ -299,8 +300,8 @@ export const useAppInitialization = ({
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;
-    if (appSettings.thumbnailSize !== thumbnailSize) {
-      handleSettingsChange({ ...appSettings, thumbnailSize });
+    if (appSettings.thumbnailSize !== String(thumbnailSize)) {
+      handleSettingsChange({ ...appSettings, thumbnailSize: String(thumbnailSize) });
     }
   }, [thumbnailSize, appSettings, handleSettingsChange]);
 

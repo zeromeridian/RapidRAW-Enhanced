@@ -6,7 +6,13 @@ import { useTranslation } from 'react-i18next';
 import { Row } from './LibraryItems';
 import { useShallow } from 'zustand/react/shallow';
 import { useLibraryStore } from '../../../store/useLibraryStore';
-import { LibraryViewMode, SortDirection, LibraryDisplayMode } from '../../ui/AppProperties';
+import {
+  LibraryViewMode,
+  SortDirection,
+  LibraryDisplayMode,
+  THUMBNAIL_SIZE_WHEEL_STEP,
+  clampThumbnailSize,
+} from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { ExifOverlay } from '../../ui/AppProperties';
@@ -170,7 +176,6 @@ export default function LibraryGrid(props: any) {
     thumbnailAspectRatio,
     imageRatings,
     onRequestThumbnails,
-    thumbnailSizeOptions,
     onThumbnailSizeChange,
     groupBadgeInfo,
   } = props;
@@ -223,17 +228,11 @@ export default function LibraryGrid(props: any) {
 
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault();
-        const currentIndex = thumbnailSizeOptions.findIndex((o: any) => o.id === thumbnailSize);
-        if (currentIndex === -1) {
-          return;
-        }
-
-        const nextIndex =
-          event.deltaY < 0
-            ? Math.min(currentIndex + 1, thumbnailSizeOptions.length - 1)
-            : Math.max(currentIndex - 1, 0);
-        if (nextIndex !== currentIndex) {
-          onThumbnailSizeChange(thumbnailSizeOptions[nextIndex].id);
+        const nextSize = clampThumbnailSize(
+          thumbnailSize + (event.deltaY < 0 ? THUMBNAIL_SIZE_WHEEL_STEP : -THUMBNAIL_SIZE_WHEEL_STEP),
+        );
+        if (nextSize !== thumbnailSize) {
+          onThumbnailSizeChange(nextSize);
         }
       }
     };
@@ -242,7 +241,7 @@ export default function LibraryGrid(props: any) {
     return () => {
       window.removeEventListener('wheel', handleWheel);
     };
-  }, [thumbnailSize, onThumbnailSizeChange, thumbnailSizeOptions]);
+  }, [thumbnailSize, onThumbnailSizeChange]);
 
   const handleScroll = useMemo(
     () =>
@@ -290,7 +289,7 @@ export default function LibraryGrid(props: any) {
     const isListView = libraryDisplayMode === LibraryDisplayMode.List;
     const OUTER_PADDING = isListView ? 0 : 12;
     const ITEM_GAP = isListView ? 0 : 12;
-    const minThumbWidth = thumbnailSizeOptions.find((o: any) => o.id === thumbnailSize)?.size || 240;
+    const minThumbWidth = clampThumbnailSize(thumbnailSize || 240);
 
     const availableWidth = gridSize.width - OUTER_PADDING * 2;
     const columnCount = isListView
@@ -364,7 +363,6 @@ export default function LibraryGrid(props: any) {
     thumbnailSize,
     listColumnWidths.thumbnail,
     currentFolderPath,
-    thumbnailSizeOptions,
   ]);
 
   useEffect(() => {
