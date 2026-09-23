@@ -528,6 +528,16 @@ pub struct AppSettings {
     pub catalog_directory: Option<String>,
     #[serde(default)]
     pub black_frame: BlackFrameSettings,
+    #[serde(default)]
+    pub external_editors: Vec<ExternalEditor>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExternalEditor {
+    pub id: String,
+    pub name: String,
+    pub path: String,
 }
 
 impl Default for AppSettings {
@@ -634,6 +644,7 @@ impl Default for AppSettings {
             right_panel_width: None,
             catalog_directory: None,
             black_frame: BlackFrameSettings::default(),
+            external_editors: Vec::new(),
         }
     }
 }

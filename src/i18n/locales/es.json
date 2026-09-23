@@ -259,6 +259,7 @@
       "shortcutsHeading": "ATAJOS"
     },
     "thumbnail": {
+      "openIn": "Abrir en",
       "previewLightroomEdits_one": "Preview Lightroom Edits",
       "previewLightroomEdits_many": "Preview Lightroom Edits for {{count}} Images",
       "previewLightroomEdits_other": "Preview Lightroom Edits for {{count}} Images",

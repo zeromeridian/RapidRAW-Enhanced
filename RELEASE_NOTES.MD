@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.25-feature-openin — 2026-09-11
+
+### External-editor handoff
+
+- Add Photoshop, Pixelmator Pro, or another desktop editor in General Settings.
+- Right-click a photo to render a TIFF or JPEG derivative and open it directly
+  in that editor.
+- Saved external edits refresh automatically in the ThisIsRAW Library.
+- macOS Adobe installation folders now resolve their contained application
+  bundle automatically, so Photoshop launches from its standard install layout.
+
 ## 1.7.24-feature-dragdrop-files — 2026-08-26
 
 ### Library file and folder transfers

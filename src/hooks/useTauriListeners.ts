@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { Status } from '../components/ui/ExportImportProperties';
 import type { XmpStackMetadata } from '../components/ui/AppProperties';
 import { useProcessStore } from '../store/useProcessStore';
@@ -8,6 +9,7 @@ import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { toast } from 'react-toastify';
 import { autoStackCreatedImages } from '../utils/autoStacking';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
 import { globalImageCache } from '../utils/ImageLRUCache';
@@ -233,14 +235,37 @@ export function useTauriListeners({
           const exports = Array.isArray(event.payload?.exports) ? event.payload.exports : [];
           await autoStackCreatedImages(exports);
           if (useLibraryStore.getState().currentFolderPath) await refs.current.refreshImageList();
+
+          const launch = useProcessStore.getState().externalEditLaunch;
+          if (launch) {
+            useProcessStore.getState().setProcess({ externalEditLaunch: null });
+            try {
+              const stamp = await invoke<number>('get_file_modification_stamp', { path: launch.outputPath });
+              await invoke('open_external_editor', { editorPath: launch.editorPath, imagePath: launch.outputPath });
+              useProcessStore.getState().setProcess({ externalEditWatch: { path: launch.outputPath, stamp } });
+            } catch (error) {
+              const message = typeof error === 'string' ? error : 'Could not open external editor';
+              toast.error(message);
+              useProcessStore.getState().setExportState({
+                status: Status.Error,
+                errorMessage: message,
+              });
+            }
+          }
         }
       }),
       listen('export-error', (event: any) => {
-        if (isEffectActive)
+        if (isEffectActive) {
+          const message = typeof event.payload === 'string' ? event.payload : 'Unknown error';
+          if (useProcessStore.getState().externalEditLaunch) {
+            useProcessStore.getState().setProcess({ externalEditLaunch: null });
+            toast.error(message);
+          }
           useProcessStore.getState().setExportState({
             status: Status.Error,
-            errorMessage: typeof event.payload === 'string' ? event.payload : 'Unknown error',
+            errorMessage: message,
           });
+        }
       }),
       listen('export-cancelling', () => {
         if (isEffectActive) useProcessStore.getState().setExportState({ status: Status.Cancelling });
@@ -438,5 +463,25 @@ export function useTauriListeners({
       ratingBuffer.current = {};
       listeners.forEach((p) => p.then((unlisten) => unlisten()));
     };
+  }, []);
+
+  // An external application has no portable document-close callback. Poll only
+  // the one handed-off derivative and refresh when it is saved.
+  useEffect(() => {
+    const interval = window.setInterval(async () => {
+      const watch = useProcessStore.getState().externalEditWatch;
+      if (!watch) return;
+      try {
+        const stamp = await invoke<number>('get_file_modification_stamp', { path: watch.path });
+        if (stamp !== watch.stamp) {
+          useProcessStore.getState().setProcess({ externalEditWatch: { ...watch, stamp } });
+          if (useLibraryStore.getState().currentFolderPath) await refs.current.refreshImageList();
+        }
+      } catch {
+        // Saving applications often replace the file atomically; the next poll
+        // will observe the replacement once it is present again.
+      }
+    }, 2000);
+    return () => window.clearInterval(interval);
   }, []);
 }

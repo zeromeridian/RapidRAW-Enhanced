@@ -56,6 +56,8 @@ export enum Invokes {
   DuplicateFile = 'duplicate_file',
   EstimateExportSizes = 'estimate_export_sizes',
   ExportImages = 'export_images',
+  OpenExternalEditor = 'open_external_editor',
+  GetFileModificationStamp = 'get_file_modification_stamp',
   FrontendLog = 'frontend_log',
   GenerateAiForegroundMask = 'generate_ai_foreground_mask',
   GenerateAiSkyMask = 'generate_ai_sky_mask',
@@ -272,6 +274,14 @@ export interface AppSettings {
   leftPanelWidth?: number;
   rightPanelWidth?: number;
   blackFrame?: BlackFrameSettings;
+  externalEditors?: ExternalEditor[];
+}
+
+/** A user-approved application that can receive rendered TIFF/JPEG derivatives. */
+export interface ExternalEditor {
+  id: string;
+  name: string;
+  path: string;
 }
 
 export interface BlackFrameSettings {

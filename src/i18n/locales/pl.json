@@ -264,6 +264,7 @@
       "shortcutsHeading": "SKRÓTY"
     },
     "thumbnail": {
+      "openIn": "Open in",
       "previewLightroomEdits_one": "Preview Lightroom Edits",
       "previewLightroomEdits_few": "Preview Lightroom Edits for {{count}} Images",
       "previewLightroomEdits_many": "Preview Lightroom Edits for {{count}} Images",
