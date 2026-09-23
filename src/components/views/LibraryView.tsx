@@ -204,6 +204,8 @@ export default function LibraryView({
             onReset={() => handleResetAdjustments()}
             rating={imageRatings[libraryActivePath || ''] || 0}
             thumbnailAspectRatio={thumbnailAspectRatio}
+            thumbnailSize={thumbnailSize}
+            onThumbnailSizeChange={setThumbnailSize}
             totalImages={imageList.length}
           />
         )}

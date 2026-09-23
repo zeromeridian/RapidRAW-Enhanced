@@ -41,8 +41,11 @@ import {
   GLOBAL_KEYS,
   ImageFile,
   Invokes,
+  MAX_THUMBNAIL_SIZE,
+  MIN_THUMBNAIL_SIZE,
   RawStatus,
   SelectedImage,
+  THUMBNAIL_SIZE_STEP,
   ThumbnailAspectRatio,
 } from '../ui/AppProperties';
 import Text from '../ui/Text';
@@ -98,6 +101,7 @@ interface BottomBarProps {
   onLibraryRefresh?(): Promise<void>;
   onOpenCopyPasteSettings?(): void;
   onRequestThumbnails?(paths: string[]): void;
+  onThumbnailSizeChange?(size: number): void;
   onPaste(): void;
   onRate(rate: number): void;
   onReset?(): void;
@@ -108,6 +112,7 @@ interface BottomBarProps {
   showFilmstrip?: boolean;
   showZoomControls?: boolean;
   thumbnailAspectRatio: ThumbnailAspectRatio;
+  thumbnailSize?: number;
   totalImages?: number;
   groupBadgeInfo?: Map<string, GroupBadgeInfo> | null;
 }
@@ -227,6 +232,7 @@ export default function BottomBar({
   onLibraryRefresh,
   onOpenCopyPasteSettings,
   onRequestThumbnails,
+  onThumbnailSizeChange,
   onPaste,
   onRate,
   onReset,
@@ -237,6 +243,7 @@ export default function BottomBar({
   showFilmstrip = true,
   showZoomControls = true,
   thumbnailAspectRatio,
+  thumbnailSize,
   totalImages,
   groupBadgeInfo,
 }: BottomBarProps) {
@@ -412,6 +419,7 @@ export default function BottomBar({
     { id: 'quickFilter', label: t('ui.bottomBar.tooltips.quickFilter') },
     { id: 'selectBy', label: t('ui.bottomBar.selectBy.title', 'Select by') },
     { id: 'export', label: t('ui.bottomBar.tooltips.export') },
+    { id: 'thumbnailSize', label: t('library.header.viewOptions.thumbnailSize') },
     { id: 'zoom', label: t('ui.bottomBar.zoomLabel') },
     { id: 'filmstrip', label: t('ui.bottomBar.tooltips.collapseFilmstrip') },
   ];
@@ -1713,6 +1721,23 @@ export default function BottomBar({
         <div className="grow" />
         {isLibraryView ? (
           <div className="flex items-center gap-2">
+            {onThumbnailSizeChange && isToolbarItemVisible('thumbnailSize') && (
+              <div className="flex items-center gap-2 w-40" data-tooltip={t('library.header.viewOptions.thumbnailSize')}>
+                <Images size={16} className="text-text-secondary shrink-0" />
+                <div className="relative flex-1 h-5">
+                  <div className="absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/2 bg-surface rounded-full pointer-events-none" />
+                  <input
+                    type="range"
+                    min={MIN_THUMBNAIL_SIZE}
+                    max={MAX_THUMBNAIL_SIZE}
+                    step={THUMBNAIL_SIZE_STEP}
+                    value={thumbnailSize ?? 240}
+                    onChange={(e) => onThumbnailSizeChange(Number(e.target.value))}
+                    className="absolute top-1/2 left-0 w-full h-1.5 mt-[-1.5px] appearance-none bg-transparent cursor-pointer p-0 slider-input z-10"
+                  />
+                </div>
+              </div>
+            )}
             {isToolbarItemVisible('export') && (
               <button
                 className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"

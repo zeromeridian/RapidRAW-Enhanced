@@ -52,7 +52,6 @@ import {
   Panel,
   Theme,
   Orientation,
-  ThumbnailSize,
   ThumbnailAspectRatio,
 } from './components/ui/AppProperties';
 
@@ -159,7 +158,7 @@ function App() {
     })),
   );
 
-  const defaultThumbnailSize = osPlatform === 'android' ? ThumbnailSize.Small : ThumbnailSize.Medium;
+  const defaultThumbnailSize = osPlatform === 'android' ? 160 : 240;
 
   useEffect(() => {
     if (!appSettings) return;

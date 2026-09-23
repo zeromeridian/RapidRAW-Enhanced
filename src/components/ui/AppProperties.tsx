@@ -221,7 +221,7 @@ export interface AppSettings {
   libraryViewMode?: LibraryViewMode;
   sortCriteria?: SortCriteria;
   theme: Theme;
-  thumbnailSize?: ThumbnailSize;
+  thumbnailSize?: string;
   thumbnailAspectRatio?: ThumbnailAspectRatio;
   uiVisibility?: UiVisibility;
   adjustmentVisibility?: { [key: string]: boolean };
@@ -406,10 +406,29 @@ export enum LibraryDisplayMode {
   List = 'list',
 }
 
-export enum ThumbnailSize {
-  Large = 'large',
-  Medium = 'medium',
-  Small = 'small',
+export type ThumbnailSize = number;
+
+export const MIN_THUMBNAIL_SIZE = 100;
+export const MAX_THUMBNAIL_SIZE = 480;
+export const THUMBNAIL_SIZE_STEP = 10;
+export const THUMBNAIL_SIZE_WHEEL_STEP = 20;
+
+const LEGACY_THUMBNAIL_SIZES: Record<string, number> = {
+  small: 160,
+  medium: 240,
+  large: 320,
+};
+
+export function clampThumbnailSize(size: number): number {
+  return Math.max(MIN_THUMBNAIL_SIZE, Math.min(MAX_THUMBNAIL_SIZE, size));
+}
+
+export function parseThumbnailSize(raw: unknown, fallback: number): number {
+  if (typeof raw === 'string' && raw in LEGACY_THUMBNAIL_SIZES) {
+    return LEGACY_THUMBNAIL_SIZES[raw];
+  }
+  const parsed = Number(raw);
+  return isNaN(parsed) ? fallback : clampThumbnailSize(parsed);
 }
 
 export interface TransformState {

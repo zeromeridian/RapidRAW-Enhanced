@@ -308,15 +308,6 @@ export default function MainLibrary(props: MainLibraryProps) {
     return filters;
   }, [filterCriteria, t, translatedEditedStatusOptions, translatedRatingFilterOptions, translatedRawStatusOptions]);
 
-  const translatedThumbnailSizeOptions = useMemo(
-    () => [
-      { id: ThumbnailSize.Small, label: t('library.thumbnailSize.small'), size: 160 },
-      { id: ThumbnailSize.Medium, label: t('library.thumbnailSize.medium'), size: 240 },
-      { id: ThumbnailSize.Large, label: t('library.thumbnailSize.large'), size: 320 },
-    ],
-    [t],
-  );
-
   const translatedThumbnailAspectRatioOptions = useMemo(
     () => [
       { id: ThumbnailAspectRatio.Cover, label: t('library.thumbnailFit.fillSquare') },
@@ -692,13 +683,10 @@ export default function MainLibrary(props: MainLibraryProps) {
             <SearchInput indexingProgress={props.indexingProgress} isIndexing={props.isIndexing} />
             <ViewOptionsDropdown
               libraryViewMode={props.libraryViewMode}
-              onSelectSize={props.onThumbnailSizeChange}
               onSelectAspectRatio={props.onThumbnailAspectRatioChange}
               onLibraryRefresh={props.onLibraryRefresh}
               setLibraryViewMode={props.setLibraryViewMode}
-              thumbnailSize={props.thumbnailSize}
               thumbnailAspectRatio={props.thumbnailAspectRatio}
-              thumbnailSizeOptions={translatedThumbnailSizeOptions}
               thumbnailAspectRatioOptions={translatedThumbnailAspectRatioOptions}
               sortOptions={translatedSortOptions}
             />
@@ -733,11 +721,7 @@ export default function MainLibrary(props: MainLibraryProps) {
         libraryDisplayMode === LibraryDisplayMode.Cull ? (
           <CullingView {...props} />
         ) : (
-          <LibraryGrid
-            {...props}
-            libraryDisplayMode={libraryDisplayMode}
-            thumbnailSizeOptions={translatedThumbnailSizeOptions}
-          />
+          <LibraryGrid {...props} libraryDisplayMode={libraryDisplayMode} />
         )
       ) : props.isLoading ||
         props.isIndexing ||
