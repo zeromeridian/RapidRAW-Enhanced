@@ -39,6 +39,22 @@ const STACK_SPINE_POSITION_CLASSES: Record<StackMemberPosition, string> = {
 
 const STACK_ACCENT_COLOR = '#f97316';
 
+const getImageResolution = (exif: Record<string, string> | null | undefined) => {
+  if (!exif) return '';
+
+  const parseDimension = (keys: string[]) => {
+    for (const key of keys) {
+      const value = Number.parseInt(exif[key] ?? '', 10);
+      if (Number.isFinite(value) && value > 0) return value;
+    }
+    return null;
+  };
+
+  const width = parseDimension(['PixelXDimension', 'ExifImageWidth', 'ImageWidth']);
+  const height = parseDimension(['PixelYDimension', 'ExifImageHeight', 'ImageLength']);
+  return width && height ? `${width} × ${height}` : '';
+};
+
 export const StackVisualCue = ({ info }: { info?: StackVisualInfo }) => {
   if (!info) return null;
 
@@ -125,6 +141,7 @@ const ThumbnailComponent = ({
     return getDisplayFilename(path);
   }, [path]);
   const fileTypeLabel = useMemo(() => getFileTypeBadgeLabel(path, isRaw), [isRaw, path]);
+  const resolution = useMemo(() => getImageResolution(exif), [exif]);
 
   const { shutter, fNumber, iso, focal } = useMemo(() => {
     const e = exif || {};
@@ -459,6 +476,12 @@ const ThumbnailComponent = ({
                   {focal ? (String(focal).endsWith('mm') ? focal : `${focal}mm`) : '-'}
                 </Text>
               </div>
+              <div className="flex items-center gap-1">
+                <ImageIcon className="w-2.5 h-2.5" />
+                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                  {resolution || '-'}
+                </Text>
+              </div>
             </div>
           </div>
         </div>
@@ -569,6 +592,15 @@ const ThumbnailComponent = ({
                 <IconFocalLength className="w-2.5 h-2.5" />
                 <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
                   {focal ? (String(focal).endsWith('mm') ? focal : `${focal}mm`) : '-'}
+                </Text>
+              </div>
+              <div
+                className="flex items-center gap-1 text-text-secondary"
+                data-tooltip={t('library.items.tooltipResolution')}
+              >
+                <ImageIcon className="w-2.5 h-2.5" />
+                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                  {resolution || '-'}
                 </Text>
               </div>
             </div>

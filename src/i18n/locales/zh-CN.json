@@ -1014,6 +1014,7 @@
       "tooltipAperture": "光圈",
       "tooltipFocalLength": "焦距",
       "tooltipIso": "ISO",
+      "tooltipResolution": "分辨率",
       "tooltipShutterSpeed": "快门速度",
       "tooltipVirtualCopy": "虚拟副本"
     },

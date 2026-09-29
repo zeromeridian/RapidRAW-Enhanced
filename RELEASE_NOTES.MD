@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.26-fix-grid-metadata — 2026-09-29
+
+### Grid image resolution
+
+- Library Grid thumbnail metadata now shows each image's pixel dimensions
+  alongside the existing camera settings, including RAW files that omit EXIF
+  pixel-dimension tags.
+
 ## 1.7.26-feature-thumb-resize — 2026-09-23
 
 ### Dynamically resizable Library thumbnails
