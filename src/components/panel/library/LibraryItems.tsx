@@ -39,8 +39,8 @@ const STACK_SPINE_POSITION_CLASSES: Record<StackMemberPosition, string> = {
 
 const STACK_ACCENT_COLOR = '#f97316';
 
-const getImageResolution = (exif: Record<string, string> | null | undefined) => {
-  if (!exif) return '';
+const getImageDimensions = (exif: Record<string, string> | null | undefined) => {
+  if (!exif) return null;
 
   const parseDimension = (keys: string[]) => {
     for (const key of keys) {
@@ -52,7 +52,7 @@ const getImageResolution = (exif: Record<string, string> | null | undefined) => 
 
   const width = parseDimension(['PixelXDimension', 'ExifImageWidth', 'ImageWidth']);
   const height = parseDimension(['PixelYDimension', 'ExifImageHeight', 'ImageLength']);
-  return width && height ? `${width} × ${height}` : '';
+  return width && height ? { width, height } : null;
 };
 
 export const StackVisualCue = ({ info }: { info?: StackVisualInfo }) => {
@@ -141,7 +141,12 @@ const ThumbnailComponent = ({
     return getDisplayFilename(path);
   }, [path]);
   const fileTypeLabel = useMemo(() => getFileTypeBadgeLabel(path, isRaw), [isRaw, path]);
-  const resolution = useMemo(() => getImageResolution(exif), [exif]);
+  const resolution = useMemo(() => {
+    const dimensions = getImageDimensions(exif);
+    return dimensions
+      ? `${dimensions.width} × ${dimensions.height} • ${((dimensions.width * dimensions.height) / 1_000_000).toFixed(1)} MP`
+      : '';
+  }, [exif]);
 
   const { shutter, fNumber, iso, focal } = useMemo(() => {
     const e = exif || {};
