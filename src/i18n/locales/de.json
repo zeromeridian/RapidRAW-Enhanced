@@ -1016,6 +1016,7 @@
       "tooltipAperture": "Blende",
       "tooltipFocalLength": "Brennweite",
       "tooltipIso": "ISO",
+      "tooltipResolution": "Auflösung",
       "tooltipShutterSpeed": "Verschlusszeit",
       "tooltipVirtualCopy": "Virtuelle Kopie"
     },

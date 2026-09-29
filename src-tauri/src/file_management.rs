@@ -875,11 +875,7 @@ pub async fn read_exif_for_paths(
                 let (source_path, _) = parse_virtual_path(virtual_path);
                 let source_path_str = source_path.to_string_lossy().to_string();
 
-                let map = if let Some(sidecar_exif) =
-                    crate::exif_processing::read_sidecar_exif(&source_path)
-                {
-                    sidecar_exif
-                } else if is_cloud_placeholder(&source_path) {
+                let map = if is_cloud_placeholder(&source_path) {
                     HashMap::new()
                 } else if let Ok(mmap) = read_file_mapped(&source_path) {
                     crate::exif_processing::read_exif_data(&source_path_str, &mmap)

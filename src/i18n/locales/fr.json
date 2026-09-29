@@ -1042,6 +1042,7 @@
       "tooltipAperture": "Ouverture",
       "tooltipFocalLength": "Longueur focale",
       "tooltipIso": "ISO",
+      "tooltipResolution": "Résolution",
       "tooltipShutterSpeed": "Vitesse d'obturation",
       "tooltipVirtualCopy": "Copie virtuelle"
     },

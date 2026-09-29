@@ -66,7 +66,9 @@ details are in `RELEASE_NOTES.MD`.
   summary.
 - Compact neutral file-type badges in Library grid and list metadata, using a
   shared `RAW` label for camera formats and normalized labels such as `JPG` and
-  `TIF` for rendered files.
+  `TIF` for rendered files. Grid metadata also shows the image pixel
+  resolution from EXIF, with a metadata-only RAW-decoder fallback for camera
+  formats that omit EXIF pixel-dimension tags.
 - Configurable shortcuts for Library Grid and flag actions.
 - Caps Lock auto-advance after applying ratings, color labels, or flags.
 - Main Settings access from both Library and Develop.

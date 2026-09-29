@@ -1014,6 +1014,7 @@
       "tooltipAperture": "絞り値",
       "tooltipFocalLength": "焦点距離",
       "tooltipIso": "ISO感度",
+      "tooltipResolution": "解像度",
       "tooltipShutterSpeed": "シャッタースピード",
       "tooltipVirtualCopy": "仮想コピー"
     },

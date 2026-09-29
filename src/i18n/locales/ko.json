@@ -1014,6 +1014,7 @@
       "tooltipAperture": "조리개",
       "tooltipFocalLength": "초점 거리",
       "tooltipIso": "ISO",
+      "tooltipResolution": "해상도",
       "tooltipShutterSpeed": "셔터 속도",
       "tooltipVirtualCopy": "가상 복사본"
     },

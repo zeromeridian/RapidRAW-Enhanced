@@ -217,6 +217,41 @@ pub fn read_raw_metadata(file_bytes: &[u8]) -> Option<RawMetadata> {
     decoder.raw_metadata(&raw_source, &Default::default()).ok()
 }
 
+fn add_raw_dimensions(exif: &mut HashMap<String, String>, file_bytes: &[u8]) {
+    let has_width = ["PixelXDimension", "ExifImageWidth", "ImageWidth"]
+        .iter()
+        .any(|key| {
+            exif.get(*key)
+                .is_some_and(|value| value.parse::<usize>().is_ok_and(|dimension| dimension > 0))
+        });
+    let has_height = ["PixelYDimension", "ExifImageHeight", "ImageLength"]
+        .iter()
+        .any(|key| {
+            exif.get(*key)
+                .is_some_and(|value| value.parse::<usize>().is_ok_and(|dimension| dimension > 0))
+        });
+    if has_width && has_height {
+        return;
+    }
+
+    let loader = rawler::RawLoader::new();
+    let raw_source = rawler::rawsource::RawSource::new_from_slice(file_bytes);
+    let Ok(decoder) = loader.get_decoder(&raw_source) else {
+        return;
+    };
+    let Ok(raw_image) = decoder.raw_image(&raw_source, &Default::default(), true) else {
+        return;
+    };
+    if raw_image.width == 0 || raw_image.height == 0 {
+        return;
+    }
+
+    exif.entry("PixelXDimension".to_string())
+        .or_insert_with(|| raw_image.width.to_string());
+    exif.entry("PixelYDimension".to_string())
+        .or_insert_with(|| raw_image.height.to_string());
+}
+
 pub fn read_exposure_time_secs(path: &str, file_bytes: &[u8]) -> Option<f32> {
     if let Some(map) = read_sidecar_exif(Path::new(path))
         && let Some(val_str) = map.get("ExposureTime").or(map.get("ShutterSpeedValue"))
@@ -453,6 +488,8 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
             }
         }
     }
+
+    add_raw_dimensions(&mut map, file_bytes);
 
     if !map.is_empty() {
         return Some(map);
@@ -1326,12 +1363,15 @@ pub fn read_exif_data_from_bytes(path: &str, file_bytes: &[u8]) -> HashMap<Strin
 
 pub fn read_exif_data(path: &str, file_bytes: &[u8]) -> HashMap<String, String> {
     let source_path = Path::new(path);
-    if let Some(sidecar_exif) = read_sidecar_exif(source_path) {
-        return sidecar_exif;
+    let sidecar_exif = read_sidecar_exif(source_path);
+    let has_sidecar_exif = sidecar_exif.is_some();
+    let mut exif_map = sidecar_exif.unwrap_or_else(|| read_exif_data_from_bytes(path, file_bytes));
+
+    if is_raw_file(path) {
+        add_raw_dimensions(&mut exif_map, file_bytes);
     }
 
-    let exif_map = read_exif_data_from_bytes(path, file_bytes);
-    if !exif_map.is_empty() {
+    if !has_sidecar_exif && !exif_map.is_empty() {
         let mut metadata = load_primary_metadata(source_path);
         metadata.exif = Some(exif_map.clone());
         let _ = save_primary_metadata(source_path, &metadata);
