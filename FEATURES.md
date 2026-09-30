@@ -104,6 +104,8 @@ details are in `RELEASE_NOTES.MD`.
   platform-default location.
 - Thumbnail-prioritized cold-folder loading with delayed, bounded, cancelable
   background EXIF extraction. Catalog thumbnails display immediately and
+  previously loaded EXIF remains visible from a bounded in-memory folder cache
+  while that folder is revalidated in the background.
   visible Grid/Culling items are then validated against source and current
   sidecar adjustment cache keys. Develop autosaves coalesce superseded
   thumbnail renders so stale jobs cannot replace the latest edit. All adjusted

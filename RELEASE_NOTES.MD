@@ -12,6 +12,8 @@ description.
 - Library Grid thumbnail metadata now shows each image's pixel dimensions and
   megapixel count alongside the existing camera settings, including RAW files
   that omit EXIF pixel-dimension tags.
+- Returning to a recently viewed folder retains its known Grid metadata while
+  EXIF is refreshed in the background, avoiding an empty metadata flash.
 
 ## 1.7.26-feature-thumb-resize — 2026-09-23
 
