@@ -186,9 +186,11 @@ details are in `RELEASE_NOTES.MD`.
   the imported-image count, and refreshes the currently open folder.
 - Initial Lightroom Classic translation covers global tone, presence, HSL,
   sharpening/noise reduction, color calibration, point curves, monochrome,
-  grain, and post-crop vignette settings. The review identifies approximate
-  mappings and warns about unsupported absolute white balance, profiles, lens
-  corrections, crop/geometry, masks, and retouching.
+  grain, and post-crop vignette settings. Absolute Lightroom temperature and
+  tint are translated approximately to ThisIsRAW's relative white-balance
+  controls. The review identifies approximate mappings and warns about camera
+  profiles, lens corrections, crop/geometry, masks, and retouching that cannot
+  be reproduced safely.
 
 ## Application identity and data continuity
 

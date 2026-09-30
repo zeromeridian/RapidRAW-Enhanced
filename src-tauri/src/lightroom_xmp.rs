@@ -12,6 +12,9 @@ use tempfile::NamedTempFile;
 
 use crate::file_management::{parse_virtual_path, resolve_xmp_path};
 use crate::image_processing::ImageMetadata;
+use crate::preset_converter::{
+    convert_lightroom_absolute_temperature, convert_lightroom_absolute_tint,
+};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -390,6 +393,11 @@ fn translate(parsed: &ParsedXmp, current: &Value) -> Translation {
         ("IncrementalTemperature", "temperature"),
         ("IncrementalTint", "tint"),
     ] {
+        if (source == "IncrementalTemperature" && parsed.scalars.contains_key("Temperature"))
+            || (source == "IncrementalTint" && parsed.scalars.contains_key("Tint"))
+        {
+            continue;
+        }
         let target_path = [target];
         add_number(
             &mut translation,
@@ -502,10 +510,36 @@ fn translate(parsed: &ParsedXmp, current: &Value) -> Translation {
         );
     }
 
-    if parsed.scalars.contains_key("Temperature") || parsed.scalars.contains_key("Tint") {
-        translation.warnings.push(
-            "Absolute Lightroom white balance was not applied because ThisIsRAW uses relative temperature and tint controls."
-                .to_string(),
+    if let Some(temperature) = parse_number(parsed, "Temperature")
+        && let Some(proposed) = convert_lightroom_absolute_temperature(
+            temperature,
+            parse_number(parsed, "AsShotTemperature"),
+        )
+    {
+        add_change(
+            &mut translation,
+            current,
+            "Temperature",
+            &["temperature"],
+            json!(proposed),
+            "approximate",
+        );
+        if !parsed.scalars.contains_key("AsShotTemperature") {
+            translation.warnings.push(
+                "Lightroom temperature was converted approximately using a 5500 K camera baseline because the XMP has no as-shot temperature."
+                    .to_string(),
+            );
+        }
+    }
+
+    if let Some(tint) = parse_number(parsed, "Tint") {
+        add_change(
+            &mut translation,
+            current,
+            "Tint",
+            &["tint"],
+            json!(convert_lightroom_absolute_tint(tint)),
+            "approximate",
         );
     }
     for (field, warning) in [
@@ -783,7 +817,13 @@ mod tests {
             translation
                 .warnings
                 .iter()
-                .any(|warning| warning.contains("white balance"))
+                .any(|warning| warning.contains("5500 K camera baseline"))
+        );
+        assert!(
+            translation
+                .changes
+                .iter()
+                .any(|change| change.source == "Temperature")
         );
     }
 

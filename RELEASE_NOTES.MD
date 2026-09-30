@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.27-fix-lightroom-white-balance — 2026-09-30
+
+### Lightroom white balance import
+
+- Lightroom Classic XMP previews now translate absolute temperature and tint
+  into ThisIsRAW's relative white-balance controls, so an image with only
+  white-balance edits can be approved and applied.
+- The conversion uses the XMP's as-shot temperature when available and labels
+  the result as approximate. Camera profiles and lens-profile corrections
+  remain visible warnings because they cannot be reproduced safely.
+
 ## 1.7.26-fix-grid-metadata — 2026-09-29
 
 ### Grid image resolution
