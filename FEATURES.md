@@ -78,7 +78,8 @@ details are in `RELEASE_NOTES.MD`.
   importer for compatible `.rrdata` files that never overwrites existing
   `.tirdata` data or alters the RapidRAW originals.
 - Non-destructive Lightroom Classic XMP translation preview for selected
-  physical images. The review lists every proposed mapping and its confidence,
+  physical images. Each image's detailed proposed mappings and confidence are
+  available from a collapsed review disclosure,
   leaves `.tirdata` and Lightroom XMP untouched until explicit approval, then
   merges only approved supported fields while preserving ThisIsRAW-only edits.
   Successfully changed images regenerate their grid thumbnails from the new

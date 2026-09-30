@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { AlertTriangle, CheckCircle2, LoaderCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, LoaderCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
@@ -56,6 +56,7 @@ export default function LightroomImportModal({ isOpen, targetPaths, onClose, onA
   const { t } = useTranslation();
   const [previews, setPreviews] = useState<LightroomImportPreview[]>([]);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+  const [expandedChangePaths, setExpandedChangePaths] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +68,7 @@ export default function LightroomImportModal({ isOpen, targetPaths, onClose, onA
     setError(null);
     setPreviews([]);
     setSelectedPaths(new Set());
+    setExpandedChangePaths(new Set());
     invoke<LightroomImportPreview[]>(Invokes.PreviewLightroomXmpEdits, { paths: targetPaths })
       .then((results) => {
         if (cancelled) return;
@@ -96,6 +98,15 @@ export default function LightroomImportModal({ isOpen, targetPaths, onClose, onA
 
   const togglePath = (path: string) => {
     setSelectedPaths((current) => {
+      const next = new Set(current);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  };
+
+  const toggleChangeReview = (path: string) => {
+    setExpandedChangePaths((current) => {
       const next = new Set(current);
       if (next.has(path)) next.delete(path);
       else next.add(path);
@@ -182,7 +193,9 @@ export default function LightroomImportModal({ isOpen, targetPaths, onClose, onA
           )}
           {error && <div className="mb-4 rounded-md bg-red-500/10 p-3 text-red-400">{error}</div>}
           {!isLoading &&
-            previews.map((preview) => {
+            previews.map((preview, index) => {
+              const isChangeReviewExpanded = expandedChangePaths.has(preview.path);
+              const changeReviewId = `lightroom-changes-${index}`;
               const canApply =
                 !preview.error &&
                 Boolean(preview.xmpDigest) &&
@@ -213,34 +226,55 @@ export default function LightroomImportModal({ isOpen, targetPaths, onClose, onA
                         <div className="mt-3 flex items-start gap-2 text-sm text-text-secondary">
                           <AlertTriangle className="mt-0.5 shrink-0" size={16} /> {preview.error}
                         </div>
-                      ) : (
-                        <div className="mt-3 overflow-hidden rounded border border-border-color">
-                          {preview.changes.map((change, index) => (
+                      ) : preview.changes.length > 0 ? (
+                        <div className="mt-3">
+                          <button
+                            aria-controls={changeReviewId}
+                            aria-expanded={isChangeReviewExpanded}
+                            className="flex items-center gap-1 text-sm text-text-secondary transition-colors hover:text-text-primary"
+                            disabled={isApplying}
+                            onClick={() => toggleChangeReview(preview.path)}
+                            type="button"
+                          >
+                            <ChevronRight
+                              className={`transition-transform ${isChangeReviewExpanded ? 'rotate-90' : ''}`}
+                              size={16}
+                            />
+                            {t('modals.lightroomImport.reviewChanges', { count: preview.changes.length })}
+                          </button>
+                          {isChangeReviewExpanded && (
                             <div
-                              className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-3 border-b border-border-color px-3 py-2 text-sm last:border-b-0"
-                              key={`${change.target}-${index}`}
+                              className="mt-2 overflow-hidden rounded border border-border-color"
+                              id={changeReviewId}
                             >
-                              <div className="min-w-0">
-                                <div className="truncate font-medium">{change.target}</div>
-                                <div className="truncate text-xs text-text-secondary">{change.source}</div>
-                              </div>
-                              <div className="truncate text-text-secondary">
-                                {displayValue(change.previous)} →{' '}
-                                <span className="text-text-primary">{displayValue(change.proposed)}</span>
-                              </div>
-                              <span
-                                className={`self-center rounded px-2 py-0.5 text-xs ${
-                                  change.confidence === 'close'
-                                    ? 'bg-green-500/15 text-green-400'
-                                    : 'bg-amber-500/15 text-amber-400'
-                                }`}
-                              >
-                                {t(`modals.lightroomImport.${change.confidence}`)}
-                              </span>
+                              {preview.changes.map((change, index) => (
+                                <div
+                                  className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-3 border-b border-border-color px-3 py-2 text-sm last:border-b-0"
+                                  key={`${change.target}-${index}`}
+                                >
+                                  <div className="min-w-0">
+                                    <div className="truncate font-medium">{change.target}</div>
+                                    <div className="truncate text-xs text-text-secondary">{change.source}</div>
+                                  </div>
+                                  <div className="truncate text-text-secondary">
+                                    {displayValue(change.previous)} →{' '}
+                                    <span className="text-text-primary">{displayValue(change.proposed)}</span>
+                                  </div>
+                                  <span
+                                    className={`self-center rounded px-2 py-0.5 text-xs ${
+                                      change.confidence === 'close'
+                                        ? 'bg-green-500/15 text-green-400'
+                                        : 'bg-amber-500/15 text-amber-400'
+                                    }`}
+                                  >
+                                    {t(`modals.lightroomImport.${change.confidence}`)}
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          )}
                         </div>
-                      )}
+                      ) : null}
                       {preview.warnings.map((warning) => (
                         <div className="mt-2 flex items-start gap-2 text-xs text-amber-400" key={warning}>
                           <AlertTriangle className="mt-0.5 shrink-0" size={14} /> {warning}
