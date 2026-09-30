@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.7.28-improve-lightroom-review — 2026-09-30
+
+### More focused Lightroom review
+
+- The detailed Lightroom change list is now collapsed by default for each
+  image. Expand **Review changes** only when you want to inspect the proposed
+  field-by-field edits; approvals and important warnings remain visible.
+
 ## 1.7.27-fix-lightroom-white-balance — 2026-09-30
 
 ### Lightroom white balance import

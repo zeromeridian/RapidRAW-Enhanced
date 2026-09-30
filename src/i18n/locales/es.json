@@ -1149,6 +1149,7 @@
       "close": "Close match",
       "description": "Review translated Lightroom Classic settings before changing ThisIsRAW sidecars. Unchecked images are not changed.",
       "reading": "Reading Lightroom XMP sidecars...",
+      "reviewChanges": "Review changes ({{count}})",
       "processVersion": "Lightroom PV {{version}}",
       "safety": "No .tirdata file is changed during preview. Applying merges only the listed supported fields and preserves all other ThisIsRAW data.",
       "title": "Review Lightroom Edits"
