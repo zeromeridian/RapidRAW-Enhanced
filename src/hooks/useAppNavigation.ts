@@ -21,6 +21,53 @@ interface CatalogFolderSnapshot {
   updatedAt: number;
 }
 
+const FOLDER_EXIF_CACHE_MAX_ENTRIES = 12;
+const FOLDER_EXIF_CACHE_MAX_IMAGES = 100_000;
+
+type ExifData = Record<string, string>;
+type FolderExifCache = Map<string, Map<string, ExifData>>;
+
+const getFolderExifCacheKey = (path: string, libraryViewMode: LibraryViewMode | undefined, xmpSync: boolean) =>
+  `${libraryViewMode ?? LibraryViewMode.Flat}|${xmpSync ? 'xmp' : 'sidecar'}|${path}`;
+
+const trimFolderExifCache = (cache: FolderExifCache) => {
+  let cachedImageCount = Array.from(cache.values()).reduce((count, images) => count + images.size, 0);
+  while (cache.size > FOLDER_EXIF_CACHE_MAX_ENTRIES || cachedImageCount > FOLDER_EXIF_CACHE_MAX_IMAGES) {
+    const oldestKey = cache.keys().next().value;
+    if (!oldestKey) return;
+    cachedImageCount -= cache.get(oldestKey)?.size ?? 0;
+    cache.delete(oldestKey);
+  }
+};
+
+const getFolderExifCacheEntry = (cache: FolderExifCache, key: string) => {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  cache.delete(key);
+  cache.set(key, entry);
+  return entry;
+};
+
+const mergeCachedExif = (images: ImageFile[], cache: FolderExifCache, key: string) => {
+  const cachedExif = getFolderExifCacheEntry(cache, key);
+  if (!cachedExif) return images;
+  return images.map((image) =>
+    image.exif || !cachedExif.has(image.path) ? image : { ...image, exif: cachedExif.get(image.path)! },
+  );
+};
+
+const cacheExifUpdates = (cache: FolderExifCache, key: string, exifUpdates: Record<string, ExifData>) => {
+  let entry = getFolderExifCacheEntry(cache, key);
+  if (!entry) {
+    entry = new Map();
+    cache.set(key, entry);
+  }
+  Object.entries(exifUpdates).forEach(([imagePath, exif]) => {
+    if (Object.keys(exif).length > 0) entry.set(imagePath, exif);
+  });
+  trimFolderExifCache(cache);
+};
+
 const mergeImportedXmpStacks = (images: ImageFile[]) => {
   const settingsState = useSettingsStore.getState();
   if (!settingsState.appSettings) return;
@@ -46,6 +93,7 @@ export interface AppNavigationProps {
 
 export function useAppNavigation({ refs }: AppNavigationProps) {
   const folderLoadGenerationRef = useRef(0);
+  const folderExifCacheRef = useRef<FolderExifCache>(new Map());
   const {
     transformWrapperRef,
     preloadedDataRef,
@@ -292,6 +340,11 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       const { setUI } = useUIStore.getState();
       const { selectedImage, resetHistory, setEditor } = useEditorStore.getState();
       const libraryViewMode = appSettings?.libraryViewMode;
+      const folderExifCacheKey = getFolderExifCacheKey(
+        path ?? '',
+        libraryViewMode,
+        appSettings?.enableXmpSync ?? false,
+      );
 
       if (!preserveEditor) {
         setLibrary({ isViewLoading: true, pendingFolderPath: path });
@@ -368,6 +421,15 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
           if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
           if (snapshot) {
             mergeImportedXmpStacks(snapshot.images);
+            cacheExifUpdates(
+              folderExifCacheRef.current,
+              folderExifCacheKey,
+              Object.fromEntries(
+                snapshot.images.flatMap((image): [string, ExifData][] =>
+                  image.exif ? [[image.path, image.exif]] : [],
+                ),
+              ),
+            );
             const restoredThumbnails = Object.fromEntries(
               Object.entries(snapshot.thumbnails).map(([imagePath, thumbnailPath]) => [
                 imagePath,
@@ -407,6 +469,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         }
         if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
         mergeImportedXmpStacks(files);
+        files = mergeCachedExif(files, folderExifCacheRef.current, folderExifCacheKey);
 
         const initialRatings: Record<string, number> = {};
         files.forEach((f) => {
@@ -434,6 +497,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
               ...image,
               exif: exifDataMap[image.path] || image.exif || null,
             }));
+            cacheExifUpdates(folderExifCacheRef.current, folderExifCacheKey, exifDataMap);
             commitImages(finalImageList, initialRatings);
           } else {
             commitImages(files, initialRatings);
@@ -473,6 +537,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
                   if (Object.keys(pendingExifData).length >= stateUpdateBatchSize || isLastBatch) {
                     const exifUpdates = pendingExifData;
                     pendingExifData = {};
+                    cacheExifUpdates(folderExifCacheRef.current, folderExifCacheKey, exifUpdates);
                     setLibrary((state) => ({
                       imageList: state.imageList.map((image) =>
                         exifUpdates[image.path] ? { ...image, exif: exifUpdates[image.path] } : image,
