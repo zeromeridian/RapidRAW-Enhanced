@@ -34,6 +34,28 @@ fn get_attr_as_f64(attrs: &HashMap<String, String>, key: &str) -> Option<f64> {
         .and_then(|s| s.trim_start_matches('+').parse::<f64>().ok())
 }
 
+pub(crate) fn convert_lightroom_absolute_temperature(
+    adjusted_kelvin: f64,
+    as_shot_kelvin: Option<f64>,
+) -> Option<f64> {
+    const AS_SHOT_DEFAULT: f64 = 5500.0;
+    const MAX_MIRED_SHIFT: f64 = 150.0;
+
+    if adjusted_kelvin <= 0.0 {
+        return None;
+    }
+    let as_shot_kelvin = as_shot_kelvin
+        .filter(|kelvin| *kelvin > 0.0)
+        .unwrap_or(AS_SHOT_DEFAULT);
+    let mired_adjusted = 1_000_000.0 / adjusted_kelvin;
+    let mired_as_shot = 1_000_000.0 / as_shot_kelvin;
+    Some(((-((mired_adjusted - mired_as_shot) / MAX_MIRED_SHIFT)) * 100.0).clamp(-100.0, 100.0))
+}
+
+pub(crate) fn convert_lightroom_absolute_tint(tint: f64) -> f64 {
+    ((tint / 150.0) * 100.0).clamp(-100.0, 100.0)
+}
+
 fn extract_xmp_name(xmp_content: &str) -> Option<String> {
     let re =
         Regex::new(r#"(?s)<crs:Name>.*?<rdf:Alt>.*?<rdf:li[^>]*>([^<]+)</rdf:li>.*?</crs:Name>"#)
@@ -165,23 +187,20 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
         );
     }
 
-    if let Some(adjusted_k) = get_attr_as_f64(&attrs, "Temperature") {
-        const AS_SHOT_DEFAULT: f64 = 5500.0;
-        const MAX_MIRED_SHIFT: f64 = 150.0;
-        let as_shot_k = get_attr_as_f64(&attrs, "AsShotTemperature").unwrap_or(AS_SHOT_DEFAULT);
-        let mired_adjusted = 1_000_000.0 / adjusted_k;
-        let mired_as_shot = 1_000_000.0 / as_shot_k;
-        let mired_delta = mired_adjusted - mired_as_shot;
-        let temp_value = (-mired_delta / MAX_MIRED_SHIFT) * 100.0;
-        adjustments.insert(
-            "temperature".to_string(),
-            json!(temp_value.clamp(-100.0, 100.0)),
-        );
+    if let Some(adjusted_k) = get_attr_as_f64(&attrs, "Temperature")
+        && let Some(temp_value) = convert_lightroom_absolute_temperature(
+            adjusted_k,
+            get_attr_as_f64(&attrs, "AsShotTemperature"),
+        )
+    {
+        adjustments.insert("temperature".to_string(), json!(temp_value));
     }
 
     if let Some(tint_val) = get_attr_as_f64(&attrs, "Tint") {
-        let scaled_tint = (tint_val / 150.0) * 100.0;
-        adjustments.insert("tint".to_string(), json!(scaled_tint.clamp(-100.0, 100.0)));
+        adjustments.insert(
+            "tint".to_string(),
+            json!(convert_lightroom_absolute_tint(tint_val)),
+        );
     }
 
     let colors = [
