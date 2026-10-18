@@ -61,6 +61,9 @@ export enum ColorGrading {
 }
 
 export enum DetailsAdjustment {
+  AiDenoiseAmount = 'aiDenoiseAmount',
+  AiDenoiseDetail = 'aiDenoiseDetail',
+  AiDenoiseEnabled = 'aiDenoiseEnabled',
   Clarity = 'clarity',
   Dehaze = 'dehaze',
   Structure = 'structure',
@@ -228,6 +231,9 @@ export interface ParametricCurve {
 
 export interface Adjustments {
   [index: string]: any;
+  aiDenoiseAmount: number;
+  aiDenoiseDetail: number;
+  aiDenoiseEnabled: boolean;
   aiPatches: Array<AiPatch>;
   aspectRatio: number | null;
   blacks: number;
@@ -645,6 +651,9 @@ export const INITIAL_MASK_CONTAINER: MaskContainer = {
 };
 
 export const INITIAL_ADJUSTMENTS: Adjustments = {
+  aiDenoiseAmount: 100,
+  aiDenoiseDetail: 0,
+  aiDenoiseEnabled: false,
   aiPatches: [],
   aspectRatio: null,
   blacks: 0,
@@ -922,6 +931,9 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     curveMode: loadedAdjustments.curveMode || INITIAL_ADJUSTMENTS.curveMode,
     masks: normalizedMasks,
     monochrome: loadedAdjustments.monochrome ?? INITIAL_ADJUSTMENTS.monochrome,
+    aiDenoiseAmount: loadedAdjustments.aiDenoiseAmount ?? INITIAL_ADJUSTMENTS.aiDenoiseAmount,
+    aiDenoiseDetail: loadedAdjustments.aiDenoiseDetail ?? INITIAL_ADJUSTMENTS.aiDenoiseDetail,
+    aiDenoiseEnabled: loadedAdjustments.aiDenoiseEnabled ?? INITIAL_ADJUSTMENTS.aiDenoiseEnabled,
     aiPatches: normalizedAiPatches,
     sectionVisibility: {
       ...INITIAL_ADJUSTMENTS.sectionVisibility,
@@ -988,7 +1000,13 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     },
     {
       label: 'modals.copyPaste.groups.noiseReduction',
-      keys: [DetailsAdjustment.LumaNoiseReduction, DetailsAdjustment.ColorNoiseReduction],
+      keys: [
+        DetailsAdjustment.LumaNoiseReduction,
+        DetailsAdjustment.ColorNoiseReduction,
+        DetailsAdjustment.AiDenoiseEnabled,
+        DetailsAdjustment.AiDenoiseAmount,
+        DetailsAdjustment.AiDenoiseDetail,
+      ],
     },
     {
       label: 'modals.copyPaste.groups.chromaticAberration',
@@ -1088,6 +1106,9 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     DetailsAdjustment.SharpnessThreshold,
     DetailsAdjustment.LumaNoiseReduction,
     DetailsAdjustment.ColorNoiseReduction,
+    DetailsAdjustment.AiDenoiseEnabled,
+    DetailsAdjustment.AiDenoiseAmount,
+    DetailsAdjustment.AiDenoiseDetail,
     DetailsAdjustment.ChromaticAberrationRedCyan,
     DetailsAdjustment.ChromaticAberrationBlueYellow,
   ],

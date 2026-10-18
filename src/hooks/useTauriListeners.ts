@@ -118,6 +118,37 @@ export function useTauriListeners({
     };
 
     const listeners = [
+      listen<{ path: string; progress: number }>('ai-denoise-progress', (event) => {
+        if (!isEffectActive) return;
+        const { path, progress } = event.payload;
+        useEditorStore
+          .getState()
+          .setEditor((state) => ({ aiDenoiseProgress: { ...state.aiDenoiseProgress, [path]: progress } }));
+      }),
+      listen<string>('ai-denoise-ready', (event) => {
+        if (!isEffectActive) return;
+        useEditorStore.getState().setEditor((state) => {
+          const { [event.payload]: _, ...aiDenoiseProgress } = state.aiDenoiseProgress;
+          return {
+            aiDenoiseProgress,
+            ...(state.selectedImage?.path === event.payload ? { adjustments: { ...state.adjustments } } : {}),
+          };
+        });
+      }),
+      listen<{ path: string; error: string }>('ai-denoise-error', (event) => {
+        if (!isEffectActive) return;
+        const { path, error } = event.payload;
+        toast.error(`AI denoise failed: ${error}`);
+        useEditorStore.getState().setEditor((state) => {
+          const { [path]: _, ...aiDenoiseProgress } = state.aiDenoiseProgress;
+          return {
+            aiDenoiseProgress,
+            ...(state.selectedImage?.path === path
+              ? { adjustments: { ...state.adjustments, aiDenoiseEnabled: false } }
+              : {}),
+          };
+        });
+      }),
       listen('preview-update-uncropped', (event: any) => {
         if (isEffectActive) useEditorStore.getState().setEditor({ uncroppedAdjustedPreviewUrl: event.payload });
       }),

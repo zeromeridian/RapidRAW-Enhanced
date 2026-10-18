@@ -77,8 +77,19 @@ pub fn calculate_effects_hash(adjustments: &serde_json::Value) -> u64 {
     hasher.finish()
 }
 
+fn hash_ai_denoise(adjustments: &serde_json::Value, hasher: &mut DefaultHasher) {
+    let enabled = crate::ai_denoise::is_enabled(adjustments);
+    enabled.hash(hasher);
+    if enabled {
+        hash_effect_keys(adjustments, &["aiDenoiseAmount", "aiDenoiseDetail"], hasher);
+        crate::ai_denoise::cache_epoch().hash(hasher);
+    }
+}
+
 pub fn calculate_geometry_hash(adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
+
+    hash_ai_denoise(adjustments, &mut hasher);
 
     if let Some(patches) = adjustments.get("aiPatches") {
         patches.to_string().hash(&mut hasher);
@@ -135,6 +146,7 @@ pub fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
     flip_v.hash(&mut hasher);
 
     calculate_effects_hash(adjustments).hash(&mut hasher);
+    hash_ai_denoise(adjustments, &mut hasher);
 
     if let Some(crop_val) = adjustments.get("crop")
         && !crop_val.is_null()

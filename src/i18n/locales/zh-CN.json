@@ -112,6 +112,8 @@
       "resetPoint": "重置 {{channel}} 点曲线"
     },
     "details": {
+      "aiDenoise": "AI 降噪",
+      "aiDenoiseDetail": "细节",
       "blueYellow": "蓝/黄",
       "centre": "居中",
       "chromaticAberration": "色差",
@@ -413,6 +415,7 @@
       },
       "createNewTitle": "创建新的生成式编辑",
       "createNewTooltip": "创建新的 {{name}} 编辑",
+      "denoising": "正在进行 AI 降噪...",
       "dropzoneText": "拖放到此处以创建新编辑",
       "editSettingsTitle": "编辑设置",
       "editsTitle": "编辑",
@@ -1504,6 +1507,7 @@
       "logsButton": "打开",
       "logsDesc": "查看应用程序的日志文件以进行故障排除。日志文件位于：",
       "modals": {
+        "aiDenoiseMessage": "确定要清除 AI 降噪缓存吗？\n\n启用了 AI 降噪的图像需要重新降噪，每张图像可能需要几分钟。",
         "aiMessage": "您确定要从所有活动根文件夹中的所有图像中移除所有 AI 生成的标签吗？\n\n这不会影响用户添加的标签。此操作无法撤销。",
         "allMessage": "您确定要从所有活动根文件夹中的所有图像中移除所有 AI 生成和用户添加的标签吗？\n\n此操作无法撤销。",
         "cacheMessage": "您确定要清除缩略图缓存吗？\n\n所有缩略图将需要重新生成，对于大型文件夹可能会很慢。",
@@ -1537,9 +1541,14 @@
         "processing": "处理中...",
         "sidecarSuccess": "{{count}} 个附属文件已成功删除。",
         "sidecarSuccess_one": "{{count}} 个附属文件已成功删除。",
-        "sidecarSuccess_other": "{{count}} 个附属文件已成功删除。"
+        "sidecarSuccess_other": "{{count}} 个附属文件已成功删除。",
+        "aiDenoiseSuccess": "AI 降噪缓存已成功清除。",
+        "clearingAiDenoise": "正在清除 AI 降噪缓存..."
       },
-      "title": "数据管理"
+      "title": "数据管理",
+      "clearAiDenoise": "清除 AI 降噪缓存",
+      "clearAiDenoiseButton": "清除",
+      "clearAiDenoiseDesc": "删除已缓存的 AI 降噪结果（{{size}}）。启用了 AI 降噪的图像会在下次打开时重新计算。"
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",

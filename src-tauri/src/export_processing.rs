@@ -23,9 +23,7 @@ use crate::file_management::{
     generate_filename_from_template, parse_virtual_path, read_file_mapped, sanitize_filename_suffix,
 };
 use crate::formats::is_raw_file;
-use crate::image_loader::{
-    composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
-};
+use crate::image_loader::{load_base_image_from_bytes, prepare_base_image};
 use crate::image_processing::{
     AllAdjustments, Crop, GpuContext, RenderRequest, downscale_f32_image,
     get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
@@ -296,6 +294,21 @@ fn apply_export_resize_and_watermark(
         apply_watermark(&mut image, watermark_settings)?;
     }
     Ok(image)
+}
+
+fn load_export_source(
+    source_path_str: &str,
+    settings: &crate::app_settings::AppSettings,
+) -> Result<DynamicImage, String> {
+    match read_file_mapped(Path::new(source_path_str)) {
+        Ok(mmap) => load_base_image_from_bytes(&mmap, source_path_str, false, settings, None)
+            .map_err(|e| format!("Failed to load from mmap: {}", e)),
+        Err(_) => {
+            let bytes = fs::read(source_path_str).map_err(|e| e.to_string())?;
+            load_base_image_from_bytes(&bytes, source_path_str, false, settings, None)
+                .map_err(|e| format!("Failed to load from bytes: {}", e))
+        }
+    }
 }
 
 fn ensure_export_not_cancelled(cancellation_token: &AtomicBool) -> Result<(), String> {
@@ -1118,52 +1131,25 @@ pub(crate) async fn export_images_impl(
                         return Ok(());
                     }
 
-                    let base_image = if is_current_edit {
-                        match crate::get_original_image(&state) {
-                            Ok((orig_data_arc, _)) => {
-                                composite_patches_on_image(&orig_data_arc, &js_adjustments)
-                                    .map_err(|e| format!("Failed to composite AI patches: {}", e))?
-                            }
-                            Err(_) => {
-                                let bytes =
-                                    fs::read(&source_path_str).map_err(|e| e.to_string())?;
-                                load_and_composite(
-                                    &bytes,
-                                    &source_path_str,
-                                    &js_adjustments,
-                                    false,
-                                    &settings,
-                                    None,
-                                )
-                                .map_err(|e| format!("Failed to load fallback image: {}", e))?
-                            }
-                        }
-                    } else {
-                        match read_file_mapped(Path::new(&source_path_str)) {
-                            Ok(mmap) => load_and_composite(
-                                &mmap,
-                                &source_path_str,
-                                &js_adjustments,
-                                false,
-                                &settings,
-                                None,
-                            )
-                            .map_err(|e| format!("Failed to load from mmap: {}", e))?,
-                            Err(_) => {
-                                let bytes =
-                                    fs::read(&source_path_str).map_err(|e| e.to_string())?;
-                                load_and_composite(
-                                    &bytes,
-                                    &source_path_str,
-                                    &js_adjustments,
-                                    false,
-                                    &settings,
-                                    None,
-                                )
-                                .map_err(|e| format!("Failed to load from bytes: {}", e))?
-                            }
-                        }
+                    let current_original = is_current_edit
+                        .then(|| crate::get_original_image(&state).ok())
+                        .flatten()
+                        .map(|(image, _)| image);
+                    let decoded_base = match current_original {
+                        Some(image) => image,
+                        None => Arc::new(load_export_source(&source_path_str, &settings)?),
                     };
+                    ensure_export_not_cancelled(&cancellation_token_clone)?;
+                    crate::ai_denoise::ensure_ready_blocking(
+                        &app_handle_clone,
+                        &decoded_base,
+                        &source_path_str,
+                        &js_adjustments,
+                    )?;
+                    let base_image =
+                        prepare_base_image(&decoded_base, &source_path_str, &js_adjustments)
+                            .map_err(|e| format!("Failed to prepare base image: {}", e))?
+                            .into_owned();
                     ensure_export_not_cancelled(&cancellation_token_clone)?;
 
                     let mut main_export_adjustments = js_adjustments.clone();

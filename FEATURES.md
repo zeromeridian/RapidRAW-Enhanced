@@ -178,6 +178,11 @@ details are in `RELEASE_NOTES.MD`.
 - **Fog** in Effects adds depth-aware atmospheric haze from an AI depth map,
   with amount, start, density, ground fog, variation, glow, temperature, and
   tint.
+- Non-destructive **AI Denoise** in Details, with Amount and Detail. Each
+  image is denoised once in the background, and the result is cached on disk
+  (4 GB limit, clearable in Settings). Exports always include it, and
+  thumbnails refresh when it finishes. Settings sync through XMP and
+  copy/paste; the denoised result is regenerated per device.
 - Lens Blur, Relight, and Fog maps stay aligned through lens, transform, and
   Guided geometry changes. Their effects render at preview resolution in
   Develop for fast adjustment. Generated depth and normal maps stay local, and

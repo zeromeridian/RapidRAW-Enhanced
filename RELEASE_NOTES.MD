@@ -5,6 +5,26 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.10.0-dev-ai-denoise — 2026-10-18
+
+### Non-destructive AI Denoise
+
+- New **AI Denoise** section in Details applies AI noise reduction as a
+  regular, reversible adjustment, with **Amount** and **Detail** controls. No
+  new file is created.
+- The image is denoised once in the background, with progress shown in the
+  panel. The result is cached on disk, so reopening the image or changing
+  Amount and Detail is instant.
+- Exports always include AI Denoise. If the result is not cached yet, it is
+  calculated during export.
+- Thumbnails update automatically once denoising finishes.
+- AI Denoise settings sync through XMP and copy/paste. Another device
+  calculates its own denoised result the first time the image is opened.
+- **Settings → Processing** shows the AI Denoise cache size and can clear it.
+  The cache is limited to 4 GB.
+- The existing **Denoise Image** action uses improved tile blending, which
+  removes faint seams between processed tiles.
+
 ## 1.9.0-dev-spatial — 2026-10-18
 
 ### Atmospheric fog

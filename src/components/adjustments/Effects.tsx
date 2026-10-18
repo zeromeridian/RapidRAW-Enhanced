@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useMemo, HTMLAttributes, ReactNode } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'react-toastify';
-import { Loader2, Circle, Hexagon, Octagon, Aperture, Plus, X, CopyPlus, Trash2 } from 'lucide-react';
+import { Circle, Hexagon, Octagon, Aperture, Plus, X, CopyPlus, Trash2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
@@ -16,7 +16,6 @@ import {
   createRelightLight,
   getRelightLightColor,
 } from '../../utils/adjustments';
-import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import LUTControl from '../ui/LUTControl';
 import ColorField, { normalizeHexColor, useParsedTextField } from '../ui/ColorField';
@@ -25,7 +24,7 @@ import { AppSettings } from '../ui/AppProperties';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 import { DepthRangePicker } from '../ui/DepthRangePicker';
-import { useProcessStore } from '../../store/useProcessStore';
+import AiEffectSection from './AiEffectSection';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useContextMenu } from '../../context/ContextMenuContext';
 
@@ -163,86 +162,6 @@ const EFFECT_MAPS: Record<
   },
   relightNormalMap: { command: 'generate_relight_normal_map', enabledKey: 'relightEnabled', errorLabel: 'normal map' },
   fogDepthMap: { command: 'generate_full_image_depth_map', enabledKey: 'fogEnabled', errorLabel: 'depth map' },
-};
-
-interface SpatialEffectSectionProps extends HTMLAttributes<HTMLDivElement> {
-  title: string;
-  enabled: boolean;
-  onEnabledChange(enabled: boolean): void;
-  isGenerating: boolean;
-  generatingLabel: string;
-  isMapMissing: boolean;
-  mapMissingLabel: string;
-  generateMapLabel: string;
-  onGenerateMap(): void;
-  children: ReactNode;
-}
-
-const SpatialEffectSection = ({
-  title,
-  enabled,
-  onEnabledChange,
-  isGenerating,
-  generatingLabel,
-  isMapMissing,
-  mapMissingLabel,
-  generateMapLabel,
-  onGenerateMap,
-  children,
-  ...props
-}: SpatialEffectSectionProps) => {
-  const { t } = useTranslation();
-  const aiModelDownloadStatus = useProcessStore((state) => state.aiModelDownloadStatus);
-
-  return (
-    <div className="p-2 bg-bg-tertiary rounded-md" {...props}>
-      <Text variant={TextVariants.heading} className="mb-2">
-        {title}
-      </Text>
-
-      <Switch label={title} checked={enabled} onChange={onEnabledChange} />
-
-      <div
-        className={`grid transition-all duration-300 ease-in-out ${
-          enabled ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-        }`}
-      >
-        <div className="overflow-hidden">
-          <div className="space-y-4 pt-4 pb-1">
-            {isGenerating ? (
-              <div className="flex flex-col items-center justify-center gap-1 p-4 text-text-secondary text-center">
-                <div className="flex items-center gap-2">
-                  <Loader2 size={16} className="animate-spin shrink-0" />
-                  <Text variant={TextVariants.label}>
-                    {aiModelDownloadStatus ? t('editor.masks.settings.aiModelDownloading') : generatingLabel}
-                  </Text>
-                </div>
-                {aiModelDownloadStatus && (
-                  <Text variant={TextVariants.small} className="text-accent">
-                    {aiModelDownloadStatus}
-                  </Text>
-                )}
-              </div>
-            ) : (
-              <>
-                {enabled && isMapMissing && (
-                  <div className="flex flex-col gap-2 p-3 rounded-md bg-bg-primary">
-                    <Text variant={TextVariants.small} className="text-text-secondary">
-                      {mapMissingLabel}
-                    </Text>
-                    <Button className="bg-surface" onClick={onGenerateMap}>
-                      {generateMapLabel}
-                    </Button>
-                  </div>
-                )}
-                {children}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 };
 
 export default function EffectsPanel({
@@ -434,7 +353,7 @@ export default function EffectsPanel({
 
       {!isForMask && (
         <div className="space-y-4">
-          <SpatialEffectSection
+          <AiEffectSection
             title={t('adjustments.effects.lensBlur')}
             enabled={!!adjustments.lensBlurEnabled}
             onEnabledChange={handleSpatialEffectToggle('lensBlurDepthMap')}
@@ -495,9 +414,9 @@ export default function EffectsPanel({
               }}
               onDragStateChange={onDragStateChange}
             />
-          </SpatialEffectSection>
+          </AiEffectSection>
 
-          <SpatialEffectSection
+          <AiEffectSection
             title={t('adjustments.effects.relight')}
             enabled={!!adjustments.relightEnabled}
             onEnabledChange={handleRelightToggle}
@@ -754,9 +673,9 @@ export default function EffectsPanel({
                 </Text>
               )}
             </div>
-          </SpatialEffectSection>
+          </AiEffectSection>
 
-          <SpatialEffectSection
+          <AiEffectSection
             title={t('adjustments.effects.fog')}
             enabled={!!adjustments.fogEnabled}
             onEnabledChange={handleSpatialEffectToggle('fogDepthMap')}
@@ -853,7 +772,7 @@ export default function EffectsPanel({
               trackClassName="tint-gradient-track"
               onDragStateChange={onDragStateChange}
             />
-          </SpatialEffectSection>
+          </AiEffectSection>
 
           <div className="p-2 bg-bg-tertiary rounded-md">
             <Text variant={TextVariants.heading} className="mb-2">

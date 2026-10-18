@@ -8,6 +8,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 mod adjustment_utils;
 mod ai_commands;
 mod ai_connector;
+mod ai_denoise;
 mod ai_processing;
 mod android_integration;
 mod app_settings;
@@ -86,7 +87,7 @@ use crate::cache_utils::{
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::hdr_deghosting::{align_hdr_frames, assert_uniform_dimensions, load_hdr_frames};
-use crate::image_loader::{composite_patches_on_image, load_and_composite};
+use crate::image_loader::{load_and_composite, prepare_base_image};
 use crate::image_processing::{
     Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_cpu_default_raw_processing,
     apply_flip, apply_geometry_warp, apply_linear_to_srgb, build_full_source_image,
@@ -1218,18 +1219,9 @@ fn compute_patched_and_warped(
     loaded_image: &LoadedImage,
     adjustments: &serde_json::Value,
 ) -> Result<Arc<DynamicImage>, String> {
-    let has_patches = adjustments
-        .get("aiPatches")
-        .and_then(|v| v.as_array())
-        .is_some_and(|a| !a.is_empty());
-    let patched = if has_patches {
-        Arc::new(
-            composite_patches_on_image(&loaded_image.image, adjustments)
-                .map_err(|e| format!("Failed to composite AI patches: {}", e))?,
-        )
-    } else {
-        Arc::clone(&loaded_image.image)
-    };
+    let prepared = prepare_base_image(&loaded_image.image, &loaded_image.path, adjustments)
+        .map_err(|e| format!("Failed to prepare base image: {}", e))?;
+    let patched = into_stage_image(prepared, &loaded_image.image);
 
     let warped = apply_geometry_warp(Cow::Borrowed(patched.as_ref()), adjustments);
     Ok(into_stage_image(warped, &patched))
@@ -1355,6 +1347,8 @@ fn process_preview_job(
         .ok_or("No original image loaded")?
         .clone();
     drop(loaded_image_guard);
+
+    crate::ai_denoise::ensure_generated(app_handle, &loaded_image, &adjustments_clone);
 
     let new_transform_hash = calculate_transform_hash(&adjustments_clone);
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
@@ -1761,22 +1755,12 @@ fn generate_uncropped_preview(
         let path = loaded_image.path.clone();
         let is_raw = loaded_image.is_raw;
         let unique_hash = calculate_full_job_hash(&path, &adjustments_clone);
-        let has_patches = adjustments_clone
-            .get("aiPatches")
-            .and_then(|v| v.as_array())
-            .is_some_and(|a| !a.is_empty());
-        let patched_image = if has_patches {
-            Cow::Owned(
-                composite_patches_on_image(&loaded_image.image, &adjustments_clone).unwrap_or_else(
-                    |e| {
-                        eprintln!("Failed to composite patches for uncropped preview: {}", e);
-                        loaded_image.image.as_ref().clone()
-                    },
-                ),
-            )
-        } else {
-            Cow::Borrowed(loaded_image.image.as_ref())
-        };
+        let patched_image =
+            prepare_base_image(&loaded_image.image, &loaded_image.path, &adjustments_clone)
+                .unwrap_or_else(|e| {
+                    eprintln!("Failed to prepare base image for uncropped preview: {}", e);
+                    Cow::Borrowed(loaded_image.image.as_ref())
+                });
 
         let warped_image = apply_geometry_warp(patched_image, &adjustments_clone);
         let blurred_image =
@@ -3002,6 +2986,10 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
 
+            if let Ok(cache_dir) = app_handle.path().app_cache_dir() {
+                crate::ai_denoise::initialize_cache_dir(cache_dir);
+            }
+
             {
                 let disks_app_handle = app_handle.clone();
                 std::thread::spawn(move || {
@@ -3360,6 +3348,8 @@ pub fn run() {
             ai_commands::test_ai_connector_connection,
             ai_commands::generate_full_image_depth_map,
             ai_commands::generate_relight_normal_map,
+            ai_denoise::get_ai_denoise_cache_size,
+            ai_denoise::clear_ai_denoise_cache,
             inpainting::invoke_generative_replace_with_mask_def,
             inpainting::generate_manual_cleanup_patch,
             denoising::apply_denoising,

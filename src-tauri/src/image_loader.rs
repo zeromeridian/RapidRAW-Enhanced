@@ -17,6 +17,7 @@ use rawler::Orientation;
 use rayon::prelude::*;
 use serde::Deserialize;
 use serde_json::Value;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs;
 use std::panic;
@@ -74,7 +75,29 @@ pub fn load_and_composite(
 ) -> Result<DynamicImage> {
     let base_image =
         load_base_image_from_bytes(base_image, path, use_fast_raw_dev, settings, cancel_token)?;
-    composite_patches_on_image(&base_image, adjustments)
+    prepare_base_image(&base_image, path, adjustments).map(Cow::into_owned)
+}
+
+/// Applies the non-destructive base-image stages that precede geometry: the
+/// cached AI denoise result, then AI patches.
+pub fn prepare_base_image<'a>(
+    base_image: &'a DynamicImage,
+    path: &str,
+    adjustments: &Value,
+) -> Result<Cow<'a, DynamicImage>> {
+    let has_patches = adjustments
+        .get("aiPatches")
+        .and_then(|v| v.as_array())
+        .is_some_and(|a| !a.is_empty());
+
+    let denoised = crate::ai_denoise::apply_ai_denoise(base_image, path, adjustments);
+    if !has_patches {
+        return Ok(denoised);
+    }
+    Ok(Cow::Owned(composite_patches_on_image(
+        &denoised,
+        adjustments,
+    )?))
 }
 
 pub fn load_base_image_from_bytes(

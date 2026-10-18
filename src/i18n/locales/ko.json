@@ -112,6 +112,8 @@
       "resetPoint": "{{channel}} 포인트 커브 초기화"
     },
     "details": {
+      "aiDenoise": "AI 노이즈 제거",
+      "aiDenoiseDetail": "디테일",
       "blueYellow": "파랑/노랑",
       "centre": "중앙",
       "chromaticAberration": "색수차",
@@ -413,6 +415,7 @@
       },
       "createNewTitle": "새 생성형 편집 만들기",
       "createNewTooltip": "새 {{name}} 편집 만들기",
+      "denoising": "AI 노이즈 제거 실행 중...",
       "dropzoneText": "여기에 놓아 새 편집을 만드세요",
       "editSettingsTitle": "편집 설정",
       "editsTitle": "편집",
@@ -1504,6 +1507,7 @@
       "logsButton": "열기",
       "logsDesc": "문제 해결을 위해 애플리케이션 로그 파일을 봅니다. 로그 위치:",
       "modals": {
+        "aiDenoiseMessage": "AI 노이즈 제거 캐시를 지우시겠습니까?\n\nAI 노이즈 제거가 켜진 이미지는 다시 처리해야 하며, 이미지당 몇 분이 걸릴 수 있습니다.",
         "aiMessage": "모든 활성 루트 폴더의 모든 이미지에서 AI가 생성한 태그를 모두 제거하시겠습니까?\n\n사용자가 추가한 태그에는 영향을 주지 않습니다. 이 작업은 취소할 수 없습니다.",
         "allMessage": "모든 활성 루트 폴더의 모든 이미지에서 AI가 생성한 태그와 사용자가 추가한 태그를 모두 제거하시겠습니까?\n\n이 작업은 취소할 수 없습니다.",
         "cacheMessage": "썸네일 캐시를 지우시겠습니까?\n\n모든 썸네일을 다시 생성해야 하며, 대용량 폴더의 경우 느릴 수 있습니다.",
@@ -1537,9 +1541,14 @@
         "processing": "처리 중...",
         "sidecarSuccess": "사이드카 파일 {{count}}개가 성공적으로 삭제되었습니다.",
         "sidecarSuccess_one": "사이드카 파일 {{count}}개가 성공적으로 삭제되었습니다.",
-        "sidecarSuccess_other": "사이드카 파일 {{count}}개가 성공적으로 삭제되었습니다."
+        "sidecarSuccess_other": "사이드카 파일 {{count}}개가 성공적으로 삭제되었습니다.",
+        "aiDenoiseSuccess": "AI 노이즈 제거 캐시를 지웠습니다.",
+        "clearingAiDenoise": "AI 노이즈 제거 캐시를 지우는 중..."
       },
-      "title": "데이터 관리"
+      "title": "데이터 관리",
+      "clearAiDenoise": "AI 노이즈 제거 캐시 지우기",
+      "clearAiDenoiseButton": "지우기",
+      "clearAiDenoiseDesc": "캐시된 AI 노이즈 제거 결과({{size}})를 삭제합니다. AI 노이즈 제거가 켜진 이미지는 다음에 열 때 다시 계산됩니다."
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",
