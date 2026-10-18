@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.10.1-dev-ai-denoise — 2026-10-18
+
+### RAW metadata fix
+
+- Camera, lens, and exposure metadata loads again for RAW formats such as
+  Fujifilm RAF and Olympus ORF. Recent versions showed only the image
+  dimensions for these files.
+- Images affected by the issue repair themselves automatically the next time
+  they are loaded; no manual action is needed.
+
 ## 1.10.0-dev-ai-denoise — 2026-10-18
 
 ### Non-destructive AI Denoise
