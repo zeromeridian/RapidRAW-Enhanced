@@ -104,6 +104,16 @@ export enum Effect {
   RelightShine = 'relightShine',
   RelightShadows = 'relightShadows',
   RelightShadowSoftness = 'relightShadowSoftness',
+  FogEnabled = 'fogEnabled',
+  FogDepthMap = 'fogDepthMap',
+  FogAmount = 'fogAmount',
+  FogStart = 'fogStart',
+  FogDensity = 'fogDensity',
+  FogHeight = 'fogHeight',
+  FogVariation = 'fogVariation',
+  FogGlow = 'fogGlow',
+  FogTemperature = 'fogTemperature',
+  FogTint = 'fogTint',
 }
 
 export interface RelightLight {
@@ -240,6 +250,16 @@ export interface Adjustments {
   flipHorizontal: boolean;
   flipVertical: boolean;
   flareAmount: number;
+  fogAmount: number;
+  fogDensity: number;
+  fogDepthMap: string | null;
+  fogEnabled: boolean;
+  fogGlow: number;
+  fogHeight: number;
+  fogStart: number;
+  fogTemperature: number;
+  fogTint: number;
+  fogVariation: number;
   glowAmount: number;
   grainAmount: number;
   grainRoughness: number;
@@ -647,6 +667,16 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   flipHorizontal: false,
   flipVertical: false,
   flareAmount: 0,
+  fogAmount: 50,
+  fogDensity: 50,
+  fogDepthMap: null,
+  fogEnabled: false,
+  fogGlow: 25,
+  fogHeight: 0,
+  fogStart: 0,
+  fogTemperature: 0,
+  fogTint: 0,
+  fogVariation: 25,
   glowAmount: 0,
   grainAmount: 0,
   grainRoughness: 50,
@@ -826,6 +856,16 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     ...INITIAL_ADJUSTMENTS,
     ...loadedAdjustments,
     flareAmount: loadedAdjustments.flareAmount ?? INITIAL_ADJUSTMENTS.flareAmount,
+    fogAmount: loadedAdjustments.fogAmount ?? INITIAL_ADJUSTMENTS.fogAmount,
+    fogDensity: loadedAdjustments.fogDensity ?? INITIAL_ADJUSTMENTS.fogDensity,
+    fogDepthMap: loadedAdjustments.fogDepthMap ?? INITIAL_ADJUSTMENTS.fogDepthMap,
+    fogEnabled: loadedAdjustments.fogEnabled ?? INITIAL_ADJUSTMENTS.fogEnabled,
+    fogGlow: loadedAdjustments.fogGlow ?? INITIAL_ADJUSTMENTS.fogGlow,
+    fogHeight: loadedAdjustments.fogHeight ?? INITIAL_ADJUSTMENTS.fogHeight,
+    fogStart: loadedAdjustments.fogStart ?? INITIAL_ADJUSTMENTS.fogStart,
+    fogTemperature: loadedAdjustments.fogTemperature ?? INITIAL_ADJUSTMENTS.fogTemperature,
+    fogTint: loadedAdjustments.fogTint ?? INITIAL_ADJUSTMENTS.fogTint,
+    fogVariation: loadedAdjustments.fogVariation ?? INITIAL_ADJUSTMENTS.fogVariation,
     glowAmount: loadedAdjustments.glowAmount ?? INITIAL_ADJUSTMENTS.glowAmount,
     halationAmount: loadedAdjustments.halationAmount ?? INITIAL_ADJUSTMENTS.halationAmount,
     lensBlurAmount: loadedAdjustments.lensBlurAmount ?? INITIAL_ADJUSTMENTS.lensBlurAmount,
@@ -1070,7 +1110,6 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     Effect.LensBlurAmount,
     Effect.lensBlurDiffusion,
     Effect.LensBlurShape,
-    Effect.LensBlurDepthMap,
     Effect.LensBlurMinDepth,
     Effect.LensBlurMaxDepth,
     Effect.LensBlurMinFade,
@@ -1082,5 +1121,14 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     Effect.RelightShine,
     Effect.RelightShadows,
     Effect.RelightShadowSoftness,
+    Effect.FogEnabled,
+    Effect.FogAmount,
+    Effect.FogStart,
+    Effect.FogDensity,
+    Effect.FogHeight,
+    Effect.FogVariation,
+    Effect.FogGlow,
+    Effect.FogTemperature,
+    Effect.FogTint,
   ],
 };

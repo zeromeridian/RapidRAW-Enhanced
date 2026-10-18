@@ -175,6 +175,13 @@ details are in `RELEASE_NOTES.MD`.
   moved, aimed, and duplicated directly on the image. Light settings travel in
   XMP; the image-derived normal map stays local and can be regenerated on
   another device.
+- **Fog** in Effects adds depth-aware atmospheric haze from an AI depth map,
+  with amount, start, density, ground fog, variation, glow, temperature, and
+  tint.
+- Lens Blur, Relight, and Fog maps stay aligned through lens, transform, and
+  Guided geometry changes. Their effects render at preview resolution in
+  Develop for fast adjustment. Generated depth and normal maps stay local, and
+  synced edits offer to regenerate them.
 
 ## Files, export, and metadata
 
