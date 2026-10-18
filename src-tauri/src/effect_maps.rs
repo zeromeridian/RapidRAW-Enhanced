@@ -12,6 +12,7 @@ pub const SOURCE_SPACE_MAP_PREFIX: &str = "data:image/png;space=source;base64,";
 
 const MAP_CACHE_CAPACITY: usize = 4;
 
+static LUMA_MAP_CACHE: Mutex<Vec<(u64, Arc<GrayImage>)>> = Mutex::new(Vec::new());
 static RGBA_MAP_CACHE: Mutex<Vec<(u64, Arc<RgbaImage>)>> = Mutex::new(Vec::new());
 
 pub fn encode_source_space_map(image: &DynamicImage) -> Result<String, String> {
@@ -44,6 +45,21 @@ pub fn effect_map_key(data_url: &str, adjustments: &serde_json::Value) -> u64 {
     }
 
     hasher.finish()
+}
+
+pub fn resolve_luma_map(data_url: &str, adjustments: &serde_json::Value) -> Option<Arc<GrayImage>> {
+    cached_map(
+        &LUMA_MAP_CACHE,
+        effect_map_key(data_url, adjustments),
+        || {
+            let map = decode_data_url(data_url)?;
+            Some(if is_source_space_map(data_url) {
+                warp_effect_map(&map, adjustments).into_luma8()
+            } else {
+                map.into_luma8()
+            })
+        },
+    )
 }
 
 pub fn resolve_rgba_map(data_url: &str, adjustments: &serde_json::Value) -> Option<Arc<RgbaImage>> {

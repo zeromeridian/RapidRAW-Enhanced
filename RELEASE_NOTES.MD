@@ -5,6 +5,22 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.9.0-dev-spatial — 2026-10-18
+
+### Atmospheric fog
+
+- New **Fog** section in Effects adds depth-aware atmospheric haze, using an
+  AI depth map, with amount, start distance, density, ground fog, variation,
+  glow, temperature, and tint.
+
+### Spatial effects
+
+- Lens blur, Relight, and Fog maps now stay aligned with the photo when you
+  change lens corrections, transforms, or Guided Transform.
+- Adjusting Lens Blur, Relight, or Fog updates the Develop preview much faster.
+- Lens blur and fog depth maps are kept locally, like the Relight normal map.
+  Edits synced through XMP offer to regenerate them on another device.
+
 ## 1.8.0-dev-spatial — 2026-10-18
 
 ### Relight

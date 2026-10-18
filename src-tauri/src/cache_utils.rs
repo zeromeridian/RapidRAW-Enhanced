@@ -1,6 +1,8 @@
 use crate::AppState;
 use crate::adjustment_utils::is_effect_enabled;
-use crate::relight::{RELIGHT_KEYS, RELIGHT_NORMAL_MAP_KEY};
+use crate::fog::FOG_KEYS;
+use crate::lens_blur::LENS_BLUR_KEYS;
+use crate::relight::RELIGHT_KEYS;
 use image::DynamicImage;
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
@@ -32,40 +34,44 @@ pub fn calculate_thumbnail_base_hash(adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
 
     calculate_geometry_hash(adjustments).hash(&mut hasher);
+    calculate_effects_hash(adjustments).hash(&mut hasher);
 
-    let blur_enabled = is_effect_enabled(adjustments, "lensBlurEnabled");
-    blur_enabled.hash(&mut hasher);
+    hasher.finish()
+}
 
-    if blur_enabled {
-        let blur_keys = [
-            "lensBlurAmount",
-            "lensBlurDiffusion",
-            "lensBlurShape",
-            "lensBlurMinDepth",
-            "lensBlurMaxDepth",
-            "lensBlurMinFade",
-            "lensBlurMaxFade",
-            "lensBlurDepthMap",
-        ];
-
-        for key in blur_keys {
-            if let Some(val) = adjustments.get(key) {
-                key.hash(&mut hasher);
-                val.to_string().hash(&mut hasher);
+fn hash_effect_keys(adjustments: &serde_json::Value, keys: &[&str], hasher: &mut DefaultHasher) {
+    for key in keys {
+        if let Some(val) = adjustments.get(*key) {
+            key.hash(hasher);
+            match val.as_str() {
+                Some(s) => s.hash(hasher),
+                None => val.to_string().hash(hasher),
             }
         }
     }
+}
 
-    let relight_enabled = is_effect_enabled(adjustments, "relightEnabled");
-    relight_enabled.hash(&mut hasher);
+/// Hashes every input of the post-warp spatial effect stage
+/// (`adjustment_utils::apply_spatial_effects`).
+pub fn calculate_effects_hash(adjustments: &serde_json::Value) -> u64 {
+    let mut hasher = DefaultHasher::new();
 
-    if relight_enabled {
-        for key in RELIGHT_KEYS {
-            if let Some(val) = adjustments.get(key) {
-                key.hash(&mut hasher);
-                val.to_string().hash(&mut hasher);
-            }
+    for (enabled_key, keys) in [
+        ("relightEnabled", RELIGHT_KEYS),
+        ("fogEnabled", FOG_KEYS),
+        ("lensBlurEnabled", LENS_BLUR_KEYS),
+    ] {
+        let enabled = is_effect_enabled(adjustments, enabled_key);
+        enabled.hash(&mut hasher);
+        if enabled {
+            hash_effect_keys(adjustments, keys, &mut hasher);
         }
+    }
+
+    if is_effect_enabled(adjustments, "fogEnabled") {
+        adjustments["orientationSteps"].as_u64().hash(&mut hasher);
+        adjustments["flipHorizontal"].as_bool().hash(&mut hasher);
+        adjustments["flipVertical"].as_bool().hash(&mut hasher);
     }
 
     hasher.finish()
@@ -128,48 +134,7 @@ pub fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
     let flip_v = adjustments["flipVertical"].as_bool().unwrap_or(false);
     flip_v.hash(&mut hasher);
 
-    let blur_enabled = is_effect_enabled(adjustments, "lensBlurEnabled");
-    blur_enabled.hash(&mut hasher);
-    if blur_enabled {
-        if let Some(val) = adjustments.get("lensBlurAmount") {
-            val.to_string().hash(&mut hasher);
-        }
-        if let Some(val) = adjustments.get("lensBlurDiffusion") {
-            val.to_string().hash(&mut hasher);
-        }
-        if let Some(val) = adjustments.get("lensBlurShape") {
-            val.as_str().unwrap_or("").hash(&mut hasher);
-        }
-        if let Some(val) = adjustments.get("lensBlurMinDepth") {
-            val.to_string().hash(&mut hasher);
-        }
-        if let Some(val) = adjustments.get("lensBlurMaxDepth") {
-            val.to_string().hash(&mut hasher);
-        }
-        if let Some(val) = adjustments.get("lensBlurMinFade") {
-            val.to_string().hash(&mut hasher);
-        }
-        if let Some(val) = adjustments.get("lensBlurMaxFade") {
-            val.to_string().hash(&mut hasher);
-        }
-        if let Some(val) = adjustments.get("lensBlurDepthMap") {
-            val.as_str().unwrap_or("").len().hash(&mut hasher);
-        }
-    }
-
-    let relight_enabled = is_effect_enabled(adjustments, "relightEnabled");
-    relight_enabled.hash(&mut hasher);
-    if relight_enabled {
-        for key in RELIGHT_KEYS {
-            if let Some(val) = adjustments.get(key) {
-                if *key == RELIGHT_NORMAL_MAP_KEY {
-                    val.as_str().unwrap_or("").len().hash(&mut hasher);
-                } else {
-                    val.to_string().hash(&mut hasher);
-                }
-            }
-        }
-    }
+    calculate_effects_hash(adjustments).hash(&mut hasher);
 
     if let Some(crop_val) = adjustments.get("crop")
         && !crop_val.is_null()
@@ -309,9 +274,21 @@ pub fn clear_image_caches(state: tauri::State<AppState>) {
     if let Ok(mut warped_cache) = state.full_warped_cache.lock() {
         *warped_cache = None;
     }
-    if let Ok(mut transformed_cache) = state.full_transformed_cache.lock() {
-        *transformed_cache = None;
+    clear_preview_stage_caches(&state);
+}
+
+pub fn clear_preview_stage_caches(state: &AppState) {
+    for cache in [
+        &state.patched_warped_cache,
+        &state.working_cache,
+        &state.effects_cache,
+    ] {
+        *cache.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
+    *state
+        .full_transformed_cache
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = None;
 }
 
 #[tauri::command]

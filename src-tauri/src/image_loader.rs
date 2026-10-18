@@ -760,7 +760,7 @@ pub async fn load_image(
         *state.cached_preview.lock().unwrap() = None;
         *state.gpu_image_cache.lock().unwrap() = None;
         *state.full_warped_cache.lock().unwrap() = None;
-        *state.full_transformed_cache.lock().unwrap() = None;
+        crate::cache_utils::clear_preview_stage_caches(&state);
 
         state.mask_cache.lock().unwrap().clear();
         state.patch_cache.lock().unwrap().clear();

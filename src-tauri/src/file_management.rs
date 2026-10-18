@@ -669,7 +669,7 @@ mod output_naming_tests {
     }
 
     #[test]
-    fn relight_normal_map_stays_local_through_xmp() {
+    fn generated_effect_maps_stay_local_through_xmp() {
         let folder = tempfile::tempdir().unwrap();
         let image = folder.path().join("portrait.jpg");
         fs::write(&image, []).unwrap();
@@ -679,6 +679,9 @@ mod output_naming_tests {
                 "relightEnabled": true,
                 "relightLights": lights,
                 "relightNormalMap": "data:image/png;space=source;base64,AAAA",
+                "fogEnabled": true,
+                "fogDepthMap": "data:image/png;space=source;base64,BBBB",
+                "lensBlurDepthMap": "data:image/png;space=source;base64,CCCC",
             }),
             ..ImageMetadata::default()
         };
@@ -688,8 +691,14 @@ mod output_naming_tests {
         let encoded = extract_app_xmp_value(&xmp, "Adjustments").unwrap();
         let portable: Value =
             serde_json::from_slice(&general_purpose::STANDARD.decode(encoded).unwrap()).unwrap();
-        assert!(portable.get("relightNormalMap").is_none());
+        for key in ["relightNormalMap", "fogDepthMap", "lensBlurDepthMap"] {
+            assert!(
+                portable.get(key).is_none(),
+                "{key} must not be written to XMP"
+            );
+        }
         assert_eq!(portable["relightLights"], lights);
+        assert_eq!(portable["fogEnabled"], true);
 
         let mut other_device = ImageMetadata::default();
         assert!(sync_metadata_from_xmp(
@@ -703,10 +712,9 @@ mod output_naming_tests {
 
         let mut same_device = local.clone();
         sync_metadata_from_xmp(&image, &mut same_device, true, true);
-        assert_eq!(
-            same_device.adjustments["relightNormalMap"],
-            local.adjustments["relightNormalMap"]
-        );
+        for key in ["relightNormalMap", "fogDepthMap", "lensBlurDepthMap"] {
+            assert_eq!(same_device.adjustments[key], local.adjustments[key]);
+        }
     }
 
     #[test]
@@ -5392,7 +5400,11 @@ pub fn extract_xmp_tags(content: &str) -> Vec<String> {
 
 /// Generated, image-derived data that is regenerated on demand rather than
 /// synchronized through XMP.
-const LOCAL_ONLY_ADJUSTMENT_KEYS: &[&str] = &[crate::relight::RELIGHT_NORMAL_MAP_KEY];
+const LOCAL_ONLY_ADJUSTMENT_KEYS: &[&str] = &[
+    crate::relight::RELIGHT_NORMAL_MAP_KEY,
+    crate::fog::FOG_DEPTH_MAP_KEY,
+    crate::lens_blur::LENS_BLUR_DEPTH_MAP_KEY,
+];
 
 fn portable_xmp_adjustments(adjustments: &Value) -> Cow<'_, Value> {
     let Some(object) = adjustments.as_object() else {

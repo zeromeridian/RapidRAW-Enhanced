@@ -17,8 +17,6 @@ struct RelightCache {
 
 static RELIGHT_CACHE: Mutex<Option<RelightCache>> = Mutex::new(None);
 
-/// The generated normal map is derived from the source image, so it stays in
-/// local sidecars and is regenerated on demand instead of travelling in XMP.
 pub const RELIGHT_NORMAL_MAP_KEY: &str = "relightNormalMap";
 
 pub const RELIGHT_KEYS: &[&str] = &[
