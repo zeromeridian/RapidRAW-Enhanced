@@ -1,4 +1,6 @@
 use crate::AppState;
+use crate::adjustment_utils::is_effect_enabled;
+use crate::relight::{RELIGHT_KEYS, RELIGHT_NORMAL_MAP_KEY};
 use image::DynamicImage;
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
@@ -31,13 +33,7 @@ pub fn calculate_thumbnail_base_hash(adjustments: &serde_json::Value) -> u64 {
 
     calculate_geometry_hash(adjustments).hash(&mut hasher);
 
-    let effects_visible = adjustments
-        .get("sectionVisibility")
-        .and_then(|v| v.get("effects"))
-        .and_then(|s| s.as_bool())
-        .unwrap_or(true);
-
-    let blur_enabled = effects_visible && adjustments["lensBlurEnabled"].as_bool().unwrap_or(false);
+    let blur_enabled = is_effect_enabled(adjustments, "lensBlurEnabled");
     blur_enabled.hash(&mut hasher);
 
     if blur_enabled {
@@ -53,6 +49,18 @@ pub fn calculate_thumbnail_base_hash(adjustments: &serde_json::Value) -> u64 {
         ];
 
         for key in blur_keys {
+            if let Some(val) = adjustments.get(key) {
+                key.hash(&mut hasher);
+                val.to_string().hash(&mut hasher);
+            }
+        }
+    }
+
+    let relight_enabled = is_effect_enabled(adjustments, "relightEnabled");
+    relight_enabled.hash(&mut hasher);
+
+    if relight_enabled {
+        for key in RELIGHT_KEYS {
             if let Some(val) = adjustments.get(key) {
                 key.hash(&mut hasher);
                 val.to_string().hash(&mut hasher);
@@ -120,13 +128,7 @@ pub fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
     let flip_v = adjustments["flipVertical"].as_bool().unwrap_or(false);
     flip_v.hash(&mut hasher);
 
-    let effects_visible = adjustments
-        .get("sectionVisibility")
-        .and_then(|v| v.get("effects"))
-        .and_then(|s| s.as_bool())
-        .unwrap_or(true);
-
-    let blur_enabled = effects_visible && adjustments["lensBlurEnabled"].as_bool().unwrap_or(false);
+    let blur_enabled = is_effect_enabled(adjustments, "lensBlurEnabled");
     blur_enabled.hash(&mut hasher);
     if blur_enabled {
         if let Some(val) = adjustments.get("lensBlurAmount") {
@@ -152,6 +154,20 @@ pub fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
         }
         if let Some(val) = adjustments.get("lensBlurDepthMap") {
             val.as_str().unwrap_or("").len().hash(&mut hasher);
+        }
+    }
+
+    let relight_enabled = is_effect_enabled(adjustments, "relightEnabled");
+    relight_enabled.hash(&mut hasher);
+    if relight_enabled {
+        for key in RELIGHT_KEYS {
+            if let Some(val) = adjustments.get(key) {
+                if *key == RELIGHT_NORMAL_MAP_KEY {
+                    val.as_str().unwrap_or("").len().hash(&mut hasher);
+                } else {
+                    val.to_string().hash(&mut hasher);
+                }
+            }
         }
     }
 

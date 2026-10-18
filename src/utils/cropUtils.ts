@@ -89,26 +89,68 @@ export function calculateAreaPreservingCrop(
   return isCropWithinBounds(candidate, W, H, rotation) ? candidate : null;
 }
 
+export function rotatePoint(x: number, y: number, cx: number, cy: number, degrees: number): [number, number] {
+  const rad = (degrees * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const px = x - cx;
+  const py = y - cy;
+  return [cx + px * cos - py * sin, cy + px * sin + py * cos];
+}
+
 export function rotateCropCenter(
   crop: Crop,
   orientedWidth: number,
   orientedHeight: number,
   deltaDegrees: number,
 ): Crop {
-  const rad = (deltaDegrees * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  const cx = orientedWidth / 2;
-  const cy = orientedHeight / 2;
-  const px = crop.x + crop.width / 2 - cx;
-  const py = crop.y + crop.height / 2 - cy;
-  const rx = px * cos - py * sin;
-  const ry = px * sin + py * cos;
+  const [centerX, centerY] = rotatePoint(
+    crop.x + crop.width / 2,
+    crop.y + crop.height / 2,
+    orientedWidth / 2,
+    orientedHeight / 2,
+    deltaDegrees,
+  );
   return {
     unit: 'px',
-    x: Math.round(cx + rx - crop.width / 2),
-    y: Math.round(cy + ry - crop.height / 2),
+    x: Math.round(centerX - crop.width / 2),
+    y: Math.round(centerY - crop.height / 2),
     width: crop.width,
     height: crop.height,
   };
+}
+
+export interface OrientationTransform {
+  orientationSteps?: number;
+  flipHorizontal?: boolean;
+  flipVertical?: boolean;
+}
+
+/** Maps a source-normalized point through coarse orientation and flips to display-normalized space. */
+export function orientNormalizedPoint(x: number, y: number, transform: OrientationTransform): [number, number] {
+  const steps = (transform.orientationSteps || 0) % 4;
+  let oriented: [number, number];
+  if (steps === 1) oriented = [1 - y, x];
+  else if (steps === 2) oriented = [1 - x, 1 - y];
+  else if (steps === 3) oriented = [y, 1 - x];
+  else oriented = [x, y];
+  return [
+    transform.flipHorizontal ? 1 - oriented[0] : oriented[0],
+    transform.flipVertical ? 1 - oriented[1] : oriented[1],
+  ];
+}
+
+/** Inverse of {@link orientNormalizedPoint}. */
+export function unorientNormalizedPoint(
+  displayX: number,
+  displayY: number,
+  transform: OrientationTransform,
+): [number, number] {
+  const steps = (transform.orientationSteps || 0) % 4;
+  const x = transform.flipHorizontal ? 1 - displayX : displayX;
+  const y = transform.flipVertical ? 1 - displayY : displayY;
+  if (steps === 1) return [y, 1 - x];
+  if (steps === 2) return [1 - x, 1 - y];
+  if (steps === 3) return [1 - y, x];
+  return [x, y];
 }

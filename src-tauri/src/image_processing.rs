@@ -1242,6 +1242,14 @@ pub fn apply_cpu_default_raw_processing(image: &mut DynamicImage) {
     *image = DynamicImage::ImageRgb32F(f32_image);
 }
 
+pub fn build_full_source_image(base_image: &DynamicImage, is_raw: bool) -> Cow<'_, DynamicImage> {
+    let mut image = Cow::Borrowed(base_image);
+    if is_raw {
+        apply_cpu_default_raw_processing(image.to_mut());
+    }
+    image
+}
+
 pub fn apply_srgb_to_linear(mut image: DynamicImage) -> DynamicImage {
     let to_linear = |x: f32| -> f32 {
         let x = x.max(0.0);

@@ -90,6 +90,26 @@ pub fn hydrate_adjustments(state: &tauri::State<AppState>, adjustments: &mut ser
     }
 }
 
+pub fn is_effect_enabled(adjustments: &serde_json::Value, enabled_key: &str) -> bool {
+    let effects_visible = adjustments
+        .get("sectionVisibility")
+        .and_then(|v| v.get("effects"))
+        .and_then(|s| s.as_bool())
+        .unwrap_or(true);
+
+    effects_visible && adjustments[enabled_key].as_bool().unwrap_or(false)
+}
+
+/// Applies the CPU effects that operate on the geometry-warped image before
+/// orientation, rotation, and crop.
+pub fn apply_spatial_effects<'a>(
+    warped_image: Cow<'a, DynamicImage>,
+    adjustments: &serde_json::Value,
+) -> Cow<'a, DynamicImage> {
+    let relit_image = crate::relight::apply_relight(warped_image, adjustments);
+    crate::lens_blur::apply_lens_blur(relit_image, adjustments)
+}
+
 pub fn apply_all_transformations<'a, I: IntoCowImage<'a>>(
     image: I,
     adjustments: &serde_json::Value,
@@ -97,7 +117,7 @@ pub fn apply_all_transformations<'a, I: IntoCowImage<'a>>(
     let start_time = std::time::Instant::now();
     let image = image.into_cow();
     let warped_image = apply_geometry_warp(image, adjustments);
-    let blurred_image = crate::lens_blur::apply_lens_blur(warped_image, adjustments);
+    let blurred_image = apply_spatial_effects(warped_image, adjustments);
 
     let orientation_steps = adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
     let rotation_degrees = adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;

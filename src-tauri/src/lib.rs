@@ -15,6 +15,7 @@ mod app_state;
 mod cache_utils;
 mod culling;
 mod denoising;
+mod effect_maps;
 mod exif_processing;
 mod export_processing;
 mod file_management;
@@ -38,6 +39,7 @@ mod panorama_stitching;
 mod panorama_utils;
 mod preset_converter;
 mod raw_processing;
+mod relight;
 mod tagging;
 mod tagging_utils;
 mod window_customizer;
@@ -86,9 +88,10 @@ use crate::hdr_deghosting::{align_hdr_frames, assert_uniform_dimensions, load_hd
 use crate::image_loader::{composite_patches_on_image, load_and_composite};
 use crate::image_processing::{
     Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_cpu_default_raw_processing,
-    apply_flip, apply_geometry_warp, apply_linear_to_srgb, downscale_f32_image,
-    get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
-    resolve_tonemapper_override, resolve_tonemapper_override_from_handle, warp_image_geometry,
+    apply_flip, apply_geometry_warp, apply_linear_to_srgb, build_full_source_image,
+    downscale_f32_image, get_all_adjustments_from_json, get_or_init_gpu_context,
+    process_and_get_dynamic_image, resolve_tonemapper_override,
+    resolve_tonemapper_override_from_handle, warp_image_geometry,
 };
 use crate::mask_generation::{
     MaskDefinition, generate_mask_bitmap, get_cached_or_generate_mask,
@@ -1156,13 +1159,8 @@ pub fn get_cached_full_warped_image(
     }
 
     let (base_arc, is_raw) = get_original_image(state)?;
-    let mut cow_image = Cow::Borrowed(base_arc.as_ref());
-
-    if is_raw {
-        apply_cpu_default_raw_processing(cow_image.to_mut());
-    }
-
-    let warped_image = apply_geometry_warp(cow_image, js_adjustments).into_owned();
+    let source_image = build_full_source_image(base_arc.as_ref(), is_raw);
+    let warped_image = apply_geometry_warp(source_image, js_adjustments).into_owned();
     let warped_arc = Arc::new(warped_image);
 
     {
@@ -1660,7 +1658,8 @@ fn generate_uncropped_preview(
         };
 
         let warped_image = apply_geometry_warp(patched_image, &adjustments_clone);
-        let blurred_image = crate::lens_blur::apply_lens_blur(warped_image, &adjustments_clone);
+        let blurred_image =
+            crate::adjustment_utils::apply_spatial_effects(warped_image, &adjustments_clone);
         let orientation_steps = adjustments_clone["orientationSteps"].as_u64().unwrap_or(0) as u8;
         let coarse_rotated_image = apply_coarse_rotation(blurred_image, orientation_steps);
 
@@ -3236,6 +3235,7 @@ pub fn run() {
             ai_commands::check_ai_connector_status,
             ai_commands::test_ai_connector_connection,
             ai_commands::generate_full_image_depth_map,
+            ai_commands::generate_relight_normal_map,
             inpainting::invoke_generative_replace_with_mask_def,
             inpainting::generate_manual_cleanup_patch,
             denoising::apply_denoising,

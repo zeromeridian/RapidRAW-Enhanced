@@ -168,6 +168,13 @@ details are in `RELEASE_NOTES.MD`.
   persist with the complete editable state in XMP.
 - Clear green enabled styling and dimmed neutral styling for shared toggle
   switches throughout the application.
+- **Relight** in Effects adds point, spot, and directional lights to a photo
+  using an AI-generated surface normal map, with ambient, softness, shine,
+  optional cast shadows, and per-light color, temperature, tint, intensity,
+  depth, falloff, angle, elevation, cone, and feather. Lights are placed,
+  moved, aimed, and duplicated directly on the image. Light settings travel in
+  XMP; the image-derived normal map stays local and can be regenerated on
+  another device.
 
 ## Files, export, and metadata
 
