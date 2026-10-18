@@ -151,6 +151,8 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       activeMaskContainerId: null,
       activeAiPatchContainerId: null,
       isWbPickerActive: false,
+      isRelightPickerActive: false,
+      activeRelightLightId: null,
       activeAiSubMaskId: null,
       transformedOriginalUrl: null,
     });
@@ -213,6 +215,8 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         activeAiPatchContainerId: null,
         activeAiSubMaskId: null,
         isWbPickerActive: false,
+        isRelightPickerActive: false,
+        activeRelightLightId: null,
         transformedOriginalUrl: null,
       });
 

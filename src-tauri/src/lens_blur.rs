@@ -16,13 +16,7 @@ pub fn apply_lens_blur<'a>(
     image: Cow<'a, DynamicImage>,
     adjustments: &serde_json::Value,
 ) -> Cow<'a, DynamicImage> {
-    let effects_visible = adjustments
-        .get("sectionVisibility")
-        .and_then(|v| v.get("effects"))
-        .and_then(|s| s.as_bool())
-        .unwrap_or(true);
-
-    if !adjustments["lensBlurEnabled"].as_bool().unwrap_or(false) || !effects_visible {
+    if !crate::adjustment_utils::is_effect_enabled(adjustments, "lensBlurEnabled") {
         return image;
     }
 
@@ -881,7 +875,7 @@ fn blur_layer_bokeh(
     out
 }
 
-fn dof_box_filter(buf: &mut [f32], w: usize, h: usize, ch: usize, radius: usize) {
+pub(crate) fn dof_box_filter(buf: &mut [f32], w: usize, h: usize, ch: usize, radius: usize) {
     if radius == 0 || w < 2 || h < 2 {
         return;
     }

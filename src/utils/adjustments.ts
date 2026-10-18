@@ -96,7 +96,62 @@ export enum Effect {
   LensBlurMaxDepth = 'lensBlurMaxDepth',
   LensBlurMinFade = 'lensBlurMinFade',
   LensBlurMaxFade = 'lensBlurMaxFade',
+  RelightEnabled = 'relightEnabled',
+  RelightNormalMap = 'relightNormalMap',
+  RelightLights = 'relightLights',
+  RelightAmbient = 'relightAmbient',
+  RelightSoftness = 'relightSoftness',
+  RelightShine = 'relightShine',
+  RelightShadows = 'relightShadows',
+  RelightShadowSoftness = 'relightShadowSoftness',
 }
+
+export interface RelightLight {
+  id: string;
+  type: 'point' | 'spot' | 'directional';
+  x: number;
+  y: number;
+  depth: number;
+  intensity: number;
+  radius: number;
+  angle: number;
+  elevation: number;
+  cone: number;
+  feather: number;
+  temperature: number;
+  tint: number;
+  color: string;
+}
+
+export const createRelightLight = (x: number, y: number): RelightLight => ({
+  id: uuidv4(),
+  type: 'point',
+  x,
+  y,
+  depth: 0,
+  intensity: 60,
+  radius: 30,
+  angle: 135,
+  elevation: 60,
+  cone: 40,
+  feather: 50,
+  temperature: 0,
+  tint: 0,
+  color: '#ffffff',
+});
+
+export const getRelightLightColor = (light: RelightLight): string => {
+  const hex = parseInt((light.color || '#ffffff').slice(1), 16);
+  const t = light.temperature / 100;
+  const m = light.tint / 100;
+  const rgb = [
+    (((hex >> 16) & 255) / 255) * (1 + 0.45 * t + 0.15 * m),
+    (((hex >> 8) & 255) / 255) * (1 - 0.35 * m),
+    ((hex & 255) / 255) * (1 - 0.45 * t + 0.15 * m),
+  ].map((c) => Math.max(0, c));
+  const peak = Math.max(...rgb, 1e-3);
+  return `rgb(${rgb.map((c) => Math.round((c / peak) * 255)).join(', ')})`;
+};
 
 export enum CreativeAdjustment {
   GlowAmount = 'glowAmount',
@@ -231,6 +286,14 @@ export interface Adjustments {
   masks: Array<MaskContainer>;
   monochrome: boolean;
   orientationSteps: number;
+  relightAmbient: number;
+  relightEnabled: boolean;
+  relightLights: Array<RelightLight>;
+  relightNormalMap: string | null;
+  relightShadowSoftness: number;
+  relightShadows: boolean;
+  relightShine: number;
+  relightSoftness: number;
   rotation: number;
   saturation: number;
   sectionVisibility: SectionVisibility;
@@ -629,6 +692,14 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   masks: [],
   monochrome: false,
   orientationSteps: 0,
+  relightAmbient: 0,
+  relightEnabled: false,
+  relightLights: [],
+  relightNormalMap: null,
+  relightShadowSoftness: 15,
+  relightShadows: false,
+  relightShine: 0,
+  relightSoftness: 25,
   rotation: 0,
   saturation: 0,
   sectionVisibility: {
@@ -767,6 +838,16 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     lensBlurMinDepth: loadedAdjustments.lensBlurMinDepth ?? INITIAL_ADJUSTMENTS.lensBlurMinDepth,
     lensBlurMinFade: loadedAdjustments.lensBlurMinFade ?? INITIAL_ADJUSTMENTS.lensBlurMinFade,
     lensCorrectionMode: loadedAdjustments.lensCorrectionMode || 'manual',
+    relightAmbient: loadedAdjustments.relightAmbient ?? INITIAL_ADJUSTMENTS.relightAmbient,
+    relightEnabled: loadedAdjustments.relightEnabled ?? INITIAL_ADJUSTMENTS.relightEnabled,
+    relightLights: (loadedAdjustments.relightLights ?? INITIAL_ADJUSTMENTS.relightLights).map(
+      (light: RelightLight) => ({ ...createRelightLight(light.x, light.y), ...light }),
+    ),
+    relightNormalMap: loadedAdjustments.relightNormalMap ?? INITIAL_ADJUSTMENTS.relightNormalMap,
+    relightShadowSoftness: loadedAdjustments.relightShadowSoftness ?? INITIAL_ADJUSTMENTS.relightShadowSoftness,
+    relightShadows: loadedAdjustments.relightShadows ?? INITIAL_ADJUSTMENTS.relightShadows,
+    relightShine: loadedAdjustments.relightShine ?? INITIAL_ADJUSTMENTS.relightShine,
+    relightSoftness: loadedAdjustments.relightSoftness ?? INITIAL_ADJUSTMENTS.relightSoftness,
     lensMaker: loadedAdjustments.lensMaker ?? INITIAL_ADJUSTMENTS.lensMaker,
     lensModel: loadedAdjustments.lensModel ?? INITIAL_ADJUSTMENTS.lensModel,
     lensDistortionAmount: loadedAdjustments.lensDistortionAmount ?? INITIAL_ADJUSTMENTS.lensDistortionAmount,
@@ -994,5 +1075,12 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     Effect.LensBlurMaxDepth,
     Effect.LensBlurMinFade,
     Effect.LensBlurMaxFade,
+    Effect.RelightEnabled,
+    Effect.RelightLights,
+    Effect.RelightAmbient,
+    Effect.RelightSoftness,
+    Effect.RelightShine,
+    Effect.RelightShadows,
+    Effect.RelightShadowSoftness,
   ],
 };

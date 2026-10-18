@@ -8,6 +8,7 @@ import Text from '../ui/Text';
 import { useEditorStore } from '../../store/useEditorStore';
 import { TextColors, TextVariants } from '../../types/typography';
 import { Adjustments, GeometryGuide, GuidedTransformGuides, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import { orientNormalizedPoint, unorientNormalizedPoint } from '../../utils/cropUtils';
 
 interface GuidedResult {
   horizontal: number;
@@ -40,17 +41,7 @@ const mapGuide = (guide: GeometryGuide, mapPoint: (x: number, y: number) => [num
 
 const orientGuidesForDisplay = (guides: GuidedTransformGuides, adjustments: Adjustments): GuidedTransformGuides => {
   const steps = (adjustments.orientationSteps || 0) % 4;
-  const mapPoint = (x: number, y: number): [number, number] => {
-    let oriented: [number, number];
-    if (steps === 1) oriented = [1 - y, x];
-    else if (steps === 2) oriented = [1 - x, 1 - y];
-    else if (steps === 3) oriented = [y, 1 - x];
-    else oriented = [x, y];
-    return [
-      adjustments.flipHorizontal ? 1 - oriented[0] : oriented[0],
-      adjustments.flipVertical ? 1 - oriented[1] : oriented[1],
-    ];
-  };
+  const mapPoint = (x: number, y: number) => orientNormalizedPoint(x, y, adjustments);
   const horizontal = guides.horizontal.map((guide) => mapGuide(guide, mapPoint));
   const vertical = guides.vertical.map((guide) => mapGuide(guide, mapPoint));
   return steps % 2 === 1 ? { horizontal: vertical, vertical: horizontal } : { horizontal, vertical };
@@ -58,14 +49,7 @@ const orientGuidesForDisplay = (guides: GuidedTransformGuides, adjustments: Adju
 
 const unorientGuidesForStorage = (guides: GuidedTransformGuides, adjustments: Adjustments): GuidedTransformGuides => {
   const steps = (adjustments.orientationSteps || 0) % 4;
-  const mapPoint = (displayX: number, displayY: number): [number, number] => {
-    const x = adjustments.flipHorizontal ? 1 - displayX : displayX;
-    const y = adjustments.flipVertical ? 1 - displayY : displayY;
-    if (steps === 1) return [y, 1 - x];
-    if (steps === 2) return [1 - x, 1 - y];
-    if (steps === 3) return [1 - y, x];
-    return [x, y];
-  };
+  const mapPoint = (x: number, y: number) => unorientNormalizedPoint(x, y, adjustments);
   const horizontal = guides.horizontal.map((guide) => mapGuide(guide, mapPoint));
   const vertical = guides.vertical.map((guide) => mapGuide(guide, mapPoint));
   return steps % 2 === 1 ? { horizontal: vertical, vertical: horizontal } : { horizontal, vertical };

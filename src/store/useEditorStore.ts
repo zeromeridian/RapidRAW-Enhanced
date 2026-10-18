@@ -68,6 +68,8 @@ interface EditorState {
   overlayRotation: number;
   isStraightenActive: boolean;
   isWbPickerActive: boolean;
+  isRelightPickerActive: boolean;
+  activeRelightLightId: string | null;
   liveRotation: number | null;
   brushSettings: BrushSettings | null;
 
@@ -134,6 +136,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   transformedOriginalUrl: null,
   isStraightenActive: false,
   isWbPickerActive: false,
+  isRelightPickerActive: false,
+  activeRelightLightId: null,
   liveRotation: null,
 
   copiedSectionAdjustments: null,

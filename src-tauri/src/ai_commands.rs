@@ -206,6 +206,30 @@ pub async fn generate_full_image_depth_map(
     Ok(format!("data:image/png;base64,{}", base64_str))
 }
 
+#[tauri::command]
+pub async fn generate_relight_normal_map(
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    let normal_model = crate::ai_processing::get_or_init_normal_model(
+        &app_handle,
+        &state.ai_state,
+        &state.ai_init_lock,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let (base_image, is_raw) = crate::get_original_image(&state)?;
+    let source_image =
+        crate::image_processing::build_full_source_image(base_image.as_ref(), is_raw);
+
+    let normal_img =
+        crate::ai_processing::run_normal_model(source_image.as_ref(), normal_model.as_ref())
+            .map_err(|e| e.to_string())?;
+
+    crate::effect_maps::encode_source_space_map(&image::DynamicImage::ImageRgba8(normal_img))
+}
+
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn generate_ai_subject_mask(

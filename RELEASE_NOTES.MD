@@ -5,6 +5,22 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.8.0-dev-spatial — 2026-10-18
+
+### Relight
+
+- New **Relight** section in Effects adds point, spot, and directional lights
+  that shape the photo using an AI-generated surface normal map.
+- Click the image to place a light, drag it to move it, and drag its aim handle
+  to point spot and directional lights. Right-click a light to duplicate or
+  remove it.
+- Adjust ambient light, softness, shine, and optional cast shadows, plus each
+  light's color, temperature, tint, intensity, depth, falloff, angle,
+  elevation, cone, and feather.
+- The normal-map model downloads the first time Relight is used.
+- Light settings sync through XMP. The normal map is kept locally; when an edit
+  arrives from another device, Relight offers to regenerate it.
+
 ## 1.7.28-improve-lightroom-review — 2026-09-30
 
 ### More focused Lightroom review

@@ -4,14 +4,25 @@ import 'react-image-crop/dist/ReactCrop.css';
 import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'react-konva';
 import { PercentCrop, Crop } from 'react-image-crop';
 import { Stamp, Bandage, RotateCw } from 'lucide-react';
-import { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
+import {
+  Adjustments,
+  AiPatch,
+  Coord,
+  MaskContainer,
+  RelightLight,
+  createRelightLight,
+} from '../../../utils/adjustments';
 import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
-import { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
+import { AppSettings, BrushSettings, Panel, SelectedImage } from '../../ui/AppProperties';
 import { RenderSize } from '../../../hooks/useImageRenderSize';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import { useTranslation } from 'react-i18next';
 import type { OverlayMode } from '../right/CropPanel';
 import CompositionOverlays from './overlays/CompositionOverlays';
+import RelightLightShape, { RelightBasis } from './overlays/RelightLightShape';
+import { useEditorStore } from '../../../store/useEditorStore';
+import { useUIStore } from '../../../store/useUIStore';
+import { orientNormalizedPoint, rotatePoint, unorientNormalizedPoint } from '../../../utils/cropUtils';
 
 interface CursorPreview {
   visible: boolean;
@@ -1465,6 +1476,114 @@ const ImageCanvas = memo(
       : 0;
 
     const effectiveZoomScale = transformState.scale > 0 ? transformState.scale : 1;
+
+    const isRelightPickerActive = useEditorStore((state) => state.isRelightPickerActive);
+    const activeRelightLightId = useEditorStore((state) => state.activeRelightLightId);
+    const setEditor = useEditorStore((state) => state.setEditor);
+    const isRelightToolOpen = useUIStore(
+      (state) => state.activeRightPanel === Panel.Adjustments && state.collapsibleSectionsState.effects,
+    );
+    const activeRotation = liveRotation ?? adjustments.rotation ?? 0;
+
+    const mapRelightUvToCanvas = useCallback(
+      (uv: Coord): Coord => {
+        const { width, height } = effectiveImageDimensions;
+        if (!width || !height) return { x: 0, y: 0 };
+        const [displayX, displayY] = orientNormalizedPoint(uv.x, uv.y, adjustments);
+        const [x, y] = rotatePoint(displayX * width, displayY * height, width / 2, height / 2, activeRotation);
+        const scale = imageRenderSize.scale || 1;
+        return { x: (x - cropX) * scale, y: (y - cropY) * scale };
+      },
+      [effectiveImageDimensions, adjustments, activeRotation, imageRenderSize.scale, cropX, cropY],
+    );
+
+    const mapCanvasPointToRelightUv = useCallback(
+      (pos: Coord): Coord => {
+        const { width, height } = effectiveImageDimensions;
+        if (!width || !height) return { x: 0, y: 0 };
+        const scale = imageRenderSize.scale || 1;
+        const [x, y] = rotatePoint(
+          pos.x / scale + cropX,
+          pos.y / scale + cropY,
+          width / 2,
+          height / 2,
+          -activeRotation,
+        );
+        const [u, v] = unorientNormalizedPoint(x / width, y / height, adjustments);
+        return { x: Math.max(0, Math.min(1, u)), y: Math.max(0, Math.min(1, v)) };
+      },
+      [effectiveImageDimensions, adjustments, activeRotation, imageRenderSize.scale, cropX, cropY],
+    );
+
+    const addRelightLight = useCallback(
+      (pos: Coord) => {
+        const uv = mapCanvasPointToRelightUv(pos);
+        const light = createRelightLight(uv.x, uv.y);
+        setAdjustments((prev: Adjustments) => ({ ...prev, relightLights: [...(prev.relightLights || []), light] }));
+        setEditor({ activeRelightLightId: light.id });
+      },
+      [mapCanvasPointToRelightUv, setAdjustments, setEditor],
+    );
+
+    const moveRelightLight = useCallback(
+      (id: string, pos: Coord) => {
+        const uv = mapCanvasPointToRelightUv(pos);
+        setAdjustments((prev: Adjustments) => ({
+          ...prev,
+          relightLights: (prev.relightLights || []).map((l: RelightLight) =>
+            l.id === id ? { ...l, x: uv.x, y: uv.y } : l,
+          ),
+        }));
+      },
+      [mapCanvasPointToRelightUv, setAdjustments],
+    );
+
+    const aimRelightLight = useCallback(
+      (id: string, angle: number, elevation: number) => {
+        setAdjustments((prev: Adjustments) => ({
+          ...prev,
+          relightLights: (prev.relightLights || []).map((l: RelightLight) =>
+            l.id === id ? { ...l, angle, elevation } : l,
+          ),
+        }));
+      },
+      [setAdjustments],
+    );
+
+    const relightBasis = useMemo((): RelightBasis => {
+      const width = selectedImage.width || 1920;
+      const height = selectedImage.height || 1080;
+      const longSide = Math.max(width, height);
+      const step = 0.01;
+      const origin = mapRelightUvToCanvas({ x: 0.5, y: 0.5 });
+      const px = mapRelightUvToCanvas({ x: 0.5 + (step * longSide) / width, y: 0.5 });
+      const py = mapRelightUvToCanvas({ x: 0.5, y: 0.5 + (step * longSide) / height });
+      return {
+        ex: { x: (px.x - origin.x) / step, y: (px.y - origin.y) / step },
+        ey: { x: (py.x - origin.x) / step, y: (py.y - origin.y) / step },
+      };
+    }, [mapRelightUvToCanvas, selectedImage.width, selectedImage.height]);
+
+    const showRelightLights = isRelightPickerActive && isRelightToolOpen && !!adjustments.relightEnabled;
+
+    useEffect(() => {
+      if (isRelightPickerActive && (!isRelightToolOpen || !adjustments.relightEnabled)) {
+        setEditor({ isRelightPickerActive: false });
+      }
+    }, [isRelightPickerActive, isRelightToolOpen, adjustments.relightEnabled, setEditor]);
+
+    useEffect(() => {
+      if (!isRelightPickerActive) return;
+
+      const handlePointerDown = (e: PointerEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.konvajs-content') || target.closest('[data-relight-lights]')) return;
+        setEditor({ isRelightPickerActive: false });
+      };
+
+      window.addEventListener('pointerdown', handlePointerDown, true);
+      return () => window.removeEventListener('pointerdown', handlePointerDown, true);
+    }, [isRelightPickerActive, setEditor]);
     const brushStageSize = (brushSettings?.size ?? 0) / effectiveZoomScale;
     const brushImageSpaceSize = brushStageSize / (imageRenderSize.scale || 1);
 
@@ -1760,6 +1879,23 @@ const ImageCanvas = memo(
 
         if (e.evt && e.evt.cancelable) e.evt.preventDefault();
 
+        if (showRelightLights) {
+          if (e.target !== e.target.getStage()) return;
+          const pos = getCanvasPointer(e.target.getStage());
+          if (!pos || pos.x < 0 || pos.y < 0 || pos.x > imageRenderSize.width || pos.y > imageRenderSize.height) {
+            return;
+          }
+          const activeLight = adjustments.relightLights?.find((l) => l.id === activeRelightLightId);
+          if (activeLight) {
+            if (activeLight.type !== 'directional') {
+              moveRelightLight(activeLight.id, pos);
+            }
+          } else {
+            addRelightLight(pos);
+          }
+          return;
+        }
+
         if (isWbPickerActive) {
           handleWbClick(e);
           return;
@@ -1956,6 +2092,10 @@ const ImageCanvas = memo(
         }
       },
       [
+        showRelightLights,
+        activeRelightLightId,
+        moveRelightLight,
+        addRelightLight,
         isWbPickerActive,
         handleWbClick,
         isInitialDrawing,
@@ -2636,7 +2776,7 @@ const ImageCanvas = memo(
     };
 
     const effectiveCursor = useMemo(() => {
-      if (isWbPickerActive) return 'crosshair';
+      if (isWbPickerActive || showRelightLights) return 'crosshair';
       if (isParametricActive) return 'crosshair';
       if (isInitialDrawing) return 'crosshair';
 
@@ -2662,6 +2802,7 @@ const ImageCanvas = memo(
       return cursorStyle;
     }, [
       isWbPickerActive,
+      showRelightLights,
       isInitialDrawing,
       isBrushActive,
       isManualCleanupActive,
@@ -2910,7 +3051,7 @@ const ImageCanvas = memo(
             </div>
           </div>
 
-          {(isMasking || isAiEditing || isWbPickerActive) && (
+          {(isMasking || isAiEditing || isWbPickerActive || showRelightLights) && (
             <div
               style={{
                 position: 'absolute',
@@ -3025,6 +3166,23 @@ const ImageCanvas = memo(
                             y={cursorPreview.y}
                           />
                         )}
+                      {showRelightLights &&
+                        (adjustments.relightLights || []).map((light: RelightLight) => (
+                          <RelightLightShape
+                            key={light.id}
+                            light={light}
+                            pos={mapRelightUvToCanvas(light)}
+                            basis={relightBasis}
+                            zoomScale={effectiveZoomScale}
+                            isActive={light.id === activeRelightLightId}
+                            onSelect={() => setEditor({ activeRelightLightId: light.id })}
+                            onMove={(pos) => moveRelightLight(light.id, pos)}
+                            onAim={(angle, elevation) => aimRelightLight(light.id, angle, elevation)}
+                            onDragStateChange={(isDragging) => setEditor({ isSliderDragging: isDragging })}
+                            onHoverChange={setIsMaskHovered}
+                            onTouchInteraction={() => setIsMaskTouchInteracting(true)}
+                          />
+                        ))}
                     </Group>
                   </Group>
                 </Layer>

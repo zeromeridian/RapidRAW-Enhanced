@@ -493,6 +493,8 @@ mod output_naming_tests {
     };
     use crate::app_settings::AppSettings;
     use crate::image_processing::ImageMetadata;
+    use base64::{Engine as _, engine::general_purpose};
+    use serde_json::Value;
     use std::fs;
     use std::path::PathBuf;
     use std::sync::atomic::AtomicBool;
@@ -664,6 +666,47 @@ mod output_naming_tests {
         assert_eq!(imported.adjustments["exposure"], 2.5);
         assert_eq!(imported.adjustments["contrast"], 12.0);
         assert_eq!(imported.adjustments["saturation"], 18.0);
+    }
+
+    #[test]
+    fn relight_normal_map_stays_local_through_xmp() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("portrait.jpg");
+        fs::write(&image, []).unwrap();
+        let lights = serde_json::json!([{ "id": "light-1", "x": 0.25, "y": 0.75 }]);
+        let local = ImageMetadata {
+            adjustments: serde_json::json!({
+                "relightEnabled": true,
+                "relightLights": lights,
+                "relightNormalMap": "data:image/png;space=source;base64,AAAA",
+            }),
+            ..ImageMetadata::default()
+        };
+
+        sync_metadata_to_xmp(&image, &local, true, true);
+        let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
+        let encoded = extract_app_xmp_value(&xmp, "Adjustments").unwrap();
+        let portable: Value =
+            serde_json::from_slice(&general_purpose::STANDARD.decode(encoded).unwrap()).unwrap();
+        assert!(portable.get("relightNormalMap").is_none());
+        assert_eq!(portable["relightLights"], lights);
+
+        let mut other_device = ImageMetadata::default();
+        assert!(sync_metadata_from_xmp(
+            &image,
+            &mut other_device,
+            true,
+            true
+        ));
+        assert!(other_device.adjustments.get("relightNormalMap").is_none());
+        assert_eq!(other_device.adjustments["relightLights"], lights);
+
+        let mut same_device = local.clone();
+        sync_metadata_from_xmp(&image, &mut same_device, true, true);
+        assert_eq!(
+            same_device.adjustments["relightNormalMap"],
+            local.adjustments["relightNormalMap"]
+        );
     }
 
     #[test]
@@ -2178,7 +2221,8 @@ pub fn generate_thumbnail_data(
             let warped_image =
                 apply_geometry_warp(Cow::Borrowed(&composite_image), &meta.adjustments);
 
-            let blurred_image = crate::lens_blur::apply_lens_blur(warped_image, &meta.adjustments);
+            let blurred_image =
+                crate::adjustment_utils::apply_spatial_effects(warped_image, &meta.adjustments);
 
             let orientation_steps =
                 meta.adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
@@ -5346,6 +5390,41 @@ pub fn extract_xmp_tags(content: &str) -> Vec<String> {
     tags
 }
 
+/// Generated, image-derived data that is regenerated on demand rather than
+/// synchronized through XMP.
+const LOCAL_ONLY_ADJUSTMENT_KEYS: &[&str] = &[crate::relight::RELIGHT_NORMAL_MAP_KEY];
+
+fn portable_xmp_adjustments(adjustments: &Value) -> Cow<'_, Value> {
+    let Some(object) = adjustments.as_object() else {
+        return Cow::Borrowed(adjustments);
+    };
+    if !LOCAL_ONLY_ADJUSTMENT_KEYS
+        .iter()
+        .any(|key| object.contains_key(*key))
+    {
+        return Cow::Borrowed(adjustments);
+    }
+
+    let mut portable = object.clone();
+    for key in LOCAL_ONLY_ADJUSTMENT_KEYS {
+        portable.remove(*key);
+    }
+    Cow::Owned(Value::Object(portable))
+}
+
+fn restore_local_only_adjustments(imported: &mut Value, local: &Value) {
+    let Some(imported) = imported.as_object_mut() else {
+        return;
+    };
+    for key in LOCAL_ONLY_ADJUSTMENT_KEYS {
+        if !imported.contains_key(*key)
+            && let Some(value) = local.get(*key)
+        {
+            imported.insert((*key).to_string(), value.clone());
+        }
+    }
+}
+
 fn extract_app_xmp_value(content: &str, field: &str) -> Option<String> {
     let attribute = Regex::new(&format!(r#"rr:{field}\s*=\s*"([^"]*)""#)).ok()?;
     if let Some(captures) = attribute.captures(content) {
@@ -5534,13 +5613,15 @@ pub fn sync_metadata_from_xmp(
         if include_app_fields {
             if let Some(encoded_adjustments) = extract_app_xmp_value(&content, "Adjustments")
                 && let Ok(bytes) = general_purpose::STANDARD.decode(encoded_adjustments)
-                && let Ok(imported_adjustments) = serde_json::from_slice::<Value>(&bytes)
+                && let Ok(mut imported_adjustments) = serde_json::from_slice::<Value>(&bytes)
                 && imported_adjustments.is_object()
                 && (force || metadata.adjustments.is_null())
-                && metadata.adjustments != imported_adjustments
             {
-                metadata.adjustments = imported_adjustments;
-                changed = true;
+                restore_local_only_adjustments(&mut imported_adjustments, &metadata.adjustments);
+                if metadata.adjustments != imported_adjustments {
+                    metadata.adjustments = imported_adjustments;
+                    changed = true;
+                }
             }
 
             let xmp_stack = extract_xmp_stack(&content);
@@ -5708,7 +5789,9 @@ pub fn sync_metadata_to_xmp(
         }
 
         if include_app_fields {
-            let adjustments_json = serde_json::to_vec(&metadata.adjustments).unwrap_or_default();
+            let adjustments_json =
+                serde_json::to_vec(&portable_xmp_adjustments(&metadata.adjustments))
+                    .unwrap_or_default();
             let encoded_adjustments = general_purpose::STANDARD.encode(adjustments_json);
             set_app_xmp_value(&mut content, "AdjustmentsVersion", Some("1"));
             set_app_xmp_value(&mut content, "Adjustments", Some(&encoded_adjustments));
