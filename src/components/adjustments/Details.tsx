@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next';
-import Slider from '../ui/Slider';
+import Slider, { SliderChangeEvent } from '../ui/Slider';
 import { Adjustments, DetailsAdjustment } from '../../utils/adjustments';
 import { AppSettings } from '../ui/AppProperties';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
+import AiEffectSection from './AiEffectSection';
+import { useEditorStore } from '../../store/useEditorStore';
 
 interface DetailsPanelProps {
   adjustments: Adjustments;
@@ -21,6 +23,9 @@ export default function DetailsPanel({
   onDragStateChange,
 }: DetailsPanelProps) {
   const { t } = useTranslation();
+  const aiDenoiseProgress = useEditorStore((state) =>
+    state.selectedImage ? state.aiDenoiseProgress[state.selectedImage.path] : undefined,
+  );
 
   const handleAdjustmentChange = (key: string, value: string) => {
     const numericValue = parseInt(value, 10);
@@ -129,6 +134,44 @@ export default function DetailsPanel({
             onDragStateChange={onDragStateChange}
           />
         </div>
+      )}
+
+      {!isForMask && adjustmentVisibility.noiseReduction !== false && (
+        <AiEffectSection
+          title={t('adjustments.details.aiDenoise')}
+          enabled={!!adjustments.aiDenoiseEnabled}
+          onEnabledChange={(enabled: boolean) =>
+            setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, aiDenoiseEnabled: enabled }))
+          }
+          isGenerating={aiDenoiseProgress !== undefined}
+          generatingLabel={t('editor.ai.denoising')}
+          generationProgress={aiDenoiseProgress}
+        >
+          <Slider
+            label={t('adjustments.effects.amount')}
+            max={100}
+            min={0}
+            defaultValue={100}
+            onChange={(e: SliderChangeEvent) =>
+              handleAdjustmentChange(DetailsAdjustment.AiDenoiseAmount, String(e.target.value))
+            }
+            step={1}
+            value={adjustments.aiDenoiseAmount ?? 100}
+            onDragStateChange={onDragStateChange}
+            fillOrigin="min"
+          />
+          <Slider
+            label={t('adjustments.details.aiDenoiseDetail')}
+            max={100}
+            min={0}
+            onChange={(e: SliderChangeEvent) =>
+              handleAdjustmentChange(DetailsAdjustment.AiDenoiseDetail, String(e.target.value))
+            }
+            step={1}
+            value={adjustments.aiDenoiseDetail ?? 0}
+            onDragStateChange={onDragStateChange}
+          />
+        </AiEffectSection>
       )}
 
       {!isForMask && adjustmentVisibility.chromaticAberration !== false && (

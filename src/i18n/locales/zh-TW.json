@@ -112,6 +112,8 @@
       "resetPoint": "重置 {{channel}} 點曲線"
     },
     "details": {
+      "aiDenoise": "AI 降噪",
+      "aiDenoiseDetail": "細節",
       "blueYellow": "藍/黃",
       "centre": "置中",
       "chromaticAberration": "色差",
@@ -413,6 +415,7 @@
       },
       "createNewTitle": "建立新的生成式編輯",
       "createNewTooltip": "建立新的 {{name}} 編輯",
+      "denoising": "正在進行 AI 降噪...",
       "dropzoneText": "拖放到此處以建立新編輯",
       "editSettingsTitle": "編輯設定",
       "editsTitle": "編輯",
@@ -1504,6 +1507,7 @@
       "logsButton": "開啟",
       "logsDesc": "檢視應用程式的日誌檔案以進行故障排除。日誌檔案位於：",
       "modals": {
+        "aiDenoiseMessage": "確定要清除 AI 降噪快取嗎？\n\n啟用 AI 降噪的影像需要重新降噪，每張影像可能需要數分鐘。",
         "aiMessage": "您確定要從所有活動根資料夾中的所有影像中移除所有 AI 生成的標籤嗎？\n\n這不會影響使用者新增的標籤。此操作無法復原。",
         "allMessage": "您確定要從所有活動根資料夾中的所有影像中移除所有 AI 生成和使用者新增的標籤嗎？\n\n此操作無法復原。",
         "cacheMessage": "您確定要清除縮圖快取嗎？\n\n所有縮圖將需要重新生成，對於大型資料夾可能會很慢。",
@@ -1537,9 +1541,14 @@
         "processing": "處理中...",
         "sidecarSuccess": "{{count}} 個附屬檔案已成功刪除。",
         "sidecarSuccess_one": "{{count}} 個附屬檔案已成功刪除。",
-        "sidecarSuccess_other": "{{count}} 個附屬檔案已成功刪除。"
+        "sidecarSuccess_other": "{{count}} 個附屬檔案已成功刪除。",
+        "aiDenoiseSuccess": "AI 降噪快取已成功清除。",
+        "clearingAiDenoise": "正在清除 AI 降噪快取..."
       },
-      "title": "資料管理"
+      "title": "資料管理",
+      "clearAiDenoise": "清除 AI 降噪快取",
+      "clearAiDenoiseButton": "清除",
+      "clearAiDenoiseDesc": "刪除已快取的 AI 降噪結果（{{size}}）。啟用 AI 降噪的影像會在下次開啟時重新計算。"
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",

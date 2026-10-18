@@ -90,14 +90,23 @@ pub fn hydrate_adjustments(state: &tauri::State<AppState>, adjustments: &mut ser
     }
 }
 
-pub fn is_effect_enabled(adjustments: &serde_json::Value, enabled_key: &str) -> bool {
-    let effects_visible = adjustments
+/// Whether a toggled feature is on and its adjustment section is visible.
+pub fn is_section_feature_enabled(
+    adjustments: &serde_json::Value,
+    section: &str,
+    enabled_key: &str,
+) -> bool {
+    let section_visible = adjustments
         .get("sectionVisibility")
-        .and_then(|v| v.get("effects"))
+        .and_then(|v| v.get(section))
         .and_then(|s| s.as_bool())
         .unwrap_or(true);
 
-    effects_visible && adjustments[enabled_key].as_bool().unwrap_or(false)
+    section_visible && adjustments[enabled_key].as_bool().unwrap_or(false)
+}
+
+pub fn is_effect_enabled(adjustments: &serde_json::Value, enabled_key: &str) -> bool {
+    is_section_feature_enabled(adjustments, "effects", enabled_key)
 }
 
 /// Applies the CPU effects that operate on the geometry-warped image before

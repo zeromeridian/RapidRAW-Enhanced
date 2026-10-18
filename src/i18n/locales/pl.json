@@ -112,6 +112,8 @@
       "resetPoint": "Resetuj krzywą punktową ({{channel}})"
     },
     "details": {
+      "aiDenoise": "Odszumianie AI",
+      "aiDenoiseDetail": "Szczegóły",
       "blueYellow": "Niebieski/Żółty",
       "centre": "Środek",
       "chromaticAberration": "Aberracja chromatyczna",
@@ -449,6 +451,7 @@
       },
       "createNewTitle": "Utwórz nową edycję generatywną",
       "createNewTooltip": "Utwórz nową edycję {{name}}",
+      "denoising": "Trwa odszumianie AI...",
       "dropzoneText": "Upuść tutaj, aby utworzyć nową edycję",
       "editSettingsTitle": "Ustawienia edycji",
       "editsTitle": "Edycje",
@@ -1574,6 +1577,7 @@
       "logsButton": "Otwórz",
       "logsDesc": "Zobacz plik dziennika aplikacji w celu rozwiązywania problemów. Plik znajduje się w:",
       "modals": {
+        "aiDenoiseMessage": "Czy na pewno chcesz wyczyścić pamięć podręczną odszumiania AI?\n\nZdjęcia z włączonym odszumianiem AI trzeba będzie odszumić ponownie, co może zająć kilka minut na zdjęcie.",
         "aiMessage": "Czy na pewno chcesz usunąć wszystkie tagi generowane przez AI z wszystkich obrazów we wszystkich aktywnych folderach głównych?\n\nTo nie wpłynie na tagi dodane przez użytkownika. Tej akcji nie można cofnąć.",
         "allMessage": "Czy na pewno chcesz usunąć wszystkie tagi generowane przez AI i dodane przez użytkownika z wszystkich obrazów we wszystkich aktywnych folderach głównych?\n\nTej akcji nie można cofnąć.",
         "cacheMessage": "Czy na pewno chcesz wyczyścić pamięć podręczną miniatur?\n\nWszystkie miniatury będą musiały zostać wygenerowane ponownie, co może zająć dużo czasu przy dużych folderach.",
@@ -1613,9 +1617,14 @@
         "sidecarSuccess_few": "Pomyślnie usunięto {{count}} pliki sidecar.",
         "sidecarSuccess_many": "Pomyślnie usunięto {{count}} plików sidecar.",
         "sidecarSuccess_one": "Pomyślnie usunięto {{count}} plik sidecar.",
-        "sidecarSuccess_other": "Pomyślnie usunięto {{count}} plików sidecar."
+        "sidecarSuccess_other": "Pomyślnie usunięto {{count}} plików sidecar.",
+        "aiDenoiseSuccess": "Pamięć podręczna odszumiania AI została wyczyszczona.",
+        "clearingAiDenoise": "Czyszczenie pamięci podręcznej odszumiania AI..."
       },
-      "title": "Zarządzanie danymi"
+      "title": "Zarządzanie danymi",
+      "clearAiDenoise": "Wyczyść pamięć podręczną odszumiania AI",
+      "clearAiDenoiseButton": "Wyczyść",
+      "clearAiDenoiseDesc": "Usuwa zapisane wyniki odszumiania AI ({{size}}). Zdjęcia z włączonym odszumianiem AI przeliczą je przy następnym otwarciu."
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",
