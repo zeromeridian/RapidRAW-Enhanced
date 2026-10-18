@@ -59,6 +59,14 @@ pub fn load_sidecar(sidecar_path: &Path) -> ImageMetadata {
         }
     }
 
+    if meta
+        .exif
+        .as_ref()
+        .is_some_and(|exif| !has_descriptive_exif(exif))
+    {
+        meta.exif = None;
+    }
+
     if healed && let Ok(json) = serde_json::to_string_pretty(&meta) {
         let _ = fs::write(sidecar_path, json);
         log::info!(
@@ -217,19 +225,27 @@ pub fn read_raw_metadata(file_bytes: &[u8]) -> Option<RawMetadata> {
     decoder.raw_metadata(&raw_source, &Default::default()).ok()
 }
 
+const EXIF_WIDTH_KEYS: [&str; 3] = ["PixelXDimension", "ExifImageWidth", "ImageWidth"];
+const EXIF_HEIGHT_KEYS: [&str; 3] = ["PixelYDimension", "ExifImageHeight", "ImageLength"];
+
+/// Whether an EXIF map carries anything beyond image dimensions. A map with
+/// only dimensions is not a usable metadata cache: it is what a RAW file whose
+/// descriptive fields could not be read produces.
+pub fn has_descriptive_exif(exif: &HashMap<String, String>) -> bool {
+    exif.keys().any(|key| {
+        !EXIF_WIDTH_KEYS.contains(&key.as_str()) && !EXIF_HEIGHT_KEYS.contains(&key.as_str())
+    })
+}
+
 fn add_raw_dimensions(exif: &mut HashMap<String, String>, file_bytes: &[u8]) {
-    let has_width = ["PixelXDimension", "ExifImageWidth", "ImageWidth"]
-        .iter()
-        .any(|key| {
+    let has_dimension = |keys: &[&str]| {
+        keys.iter().any(|key| {
             exif.get(*key)
                 .is_some_and(|value| value.parse::<usize>().is_ok_and(|dimension| dimension > 0))
-        });
-    let has_height = ["PixelYDimension", "ExifImageHeight", "ImageLength"]
-        .iter()
-        .any(|key| {
-            exif.get(*key)
-                .is_some_and(|value| value.parse::<usize>().is_ok_and(|dimension| dimension > 0))
-        });
+        })
+    };
+    let has_width = has_dimension(&EXIF_WIDTH_KEYS);
+    let has_height = has_dimension(&EXIF_HEIGHT_KEYS);
     if has_width && has_height {
         return;
     }
@@ -355,6 +371,12 @@ pub fn read_iso(path: &str, file_bytes: &[u8]) -> Option<u32> {
 }
 
 pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
+    let mut map = extract_metadata_fields(file_bytes).unwrap_or_default();
+    add_raw_dimensions(&mut map, file_bytes);
+    (!map.is_empty()).then_some(map)
+}
+
+fn extract_metadata_fields(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
     let mut map = HashMap::new();
 
     if let Some(exif_obj) = read_exif(file_bytes) {
@@ -488,8 +510,6 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
             }
         }
     }
-
-    add_raw_dimensions(&mut map, file_bytes);
 
     if !map.is_empty() {
         return Some(map);
@@ -1371,7 +1391,7 @@ pub fn read_exif_data(path: &str, file_bytes: &[u8]) -> HashMap<String, String> 
         add_raw_dimensions(&mut exif_map, file_bytes);
     }
 
-    if !has_sidecar_exif && !exif_map.is_empty() {
+    if !has_sidecar_exif && has_descriptive_exif(&exif_map) {
         let mut metadata = load_primary_metadata(source_path);
         metadata.exif = Some(exif_map.clone());
         let _ = save_primary_metadata(source_path, &metadata);
@@ -1388,7 +1408,7 @@ pub fn persist_exif_if_missing(source_path: &Path, source_path_str: &str, file_b
     }
 
     let exif_map = read_exif_data_from_bytes(source_path_str, file_bytes);
-    if exif_map.is_empty() {
+    if !has_descriptive_exif(&exif_map) {
         return;
     }
 
@@ -1525,5 +1545,45 @@ mod tests {
         );
 
         let _ = fs::remove_file(source_path);
+    }
+
+    #[test]
+    fn dimension_only_exif_is_not_descriptive() {
+        let dimensions = HashMap::from([
+            ("PixelXDimension".to_string(), "6384".to_string()),
+            ("PixelYDimension".to_string(), "4182".to_string()),
+        ]);
+        assert!(!has_descriptive_exif(&dimensions));
+
+        let mut descriptive = dimensions.clone();
+        descriptive.insert("Model".to_string(), "X-T3".to_string());
+        assert!(has_descriptive_exif(&descriptive));
+        assert!(!has_descriptive_exif(&HashMap::new()));
+    }
+
+    #[test]
+    fn dimension_only_sidecar_exif_is_ignored_so_it_is_read_again() {
+        let folder = tempfile::tempdir().unwrap();
+        let sidecar = folder.path().join("image.raf.tirdata");
+        let dimension_only = ImageMetadata {
+            exif: Some(HashMap::from([
+                ("PixelXDimension".to_string(), "6384".to_string()),
+                ("PixelYDimension".to_string(), "4182".to_string()),
+            ])),
+            rating: 3,
+            ..ImageMetadata::default()
+        };
+        fs::write(&sidecar, serde_json::to_string(&dimension_only).unwrap()).unwrap();
+
+        let loaded = load_sidecar(&sidecar);
+        assert!(loaded.exif.is_none());
+        assert_eq!(loaded.rating, 3);
+
+        let complete = ImageMetadata {
+            exif: Some(HashMap::from([("Model".to_string(), "X-T3".to_string())])),
+            ..ImageMetadata::default()
+        };
+        fs::write(&sidecar, serde_json::to_string(&complete).unwrap()).unwrap();
+        assert_eq!(load_sidecar(&sidecar).exif, complete.exif);
     }
 }
