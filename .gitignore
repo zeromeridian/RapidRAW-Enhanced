@@ -42,7 +42,10 @@ src-tauri/libs/
 # bench/replay.js result dumps
 bench/out/
 HANDOFF.md
+HANDOFF-ARCHIVE.md
 AGENTS.md
+CLAUDE.md
+CLAUDE.local.md
 CODE_AUDIT_FINDINGS.md
 
 
@@ -50,3 +53,4 @@ CODE_AUDIT_FINDINGS.md
 /.cargo/registry/
 /.rustup/
 RapidRAW-Enhanced-ToDo-List.md
+UPSTREAM_FEATURE_GAP.md
