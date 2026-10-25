@@ -158,6 +158,10 @@ details are in `RELEASE_NOTES.MD`.
 - Persisted Color / Black & White mode in the global Color section.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.
+- AI sky masks use EfficientSAM3 and AI foreground masks use BiRefNet, as in
+  upstream RapidRAW; AI subject masks are edge-refined. Each mask type
+  downloads its model on first use, and existing masks keep their stored
+  result.
 - Local masks support Black & White conversion, Color Calibration, Light
   Flares, Gaussian Blur, Vignette, and Grain in addition to the existing tonal,
   color, detail, curve, glow, and halation adjustments.
@@ -183,8 +187,8 @@ details are in `RELEASE_NOTES.MD`.
   (4 GB limit, clearable in Settings). Exports always include it, and
   thumbnails refresh when it finishes. Settings sync through XMP and
   copy/paste; the denoised result is regenerated per device.
-- On macOS, AI Denoise, AI sky and foreground masks, and Fog and Lens Blur
-  depth maps run on the GPU and Neural Engine through CoreML, with an
+- On macOS, AI Denoise and the depth maps for Fog, Lens Blur, and depth masks
+  run on the GPU and Neural Engine through CoreML, with an
   automatic CPU fallback and a **GPU Acceleration** switch in Settings →
   Processing. AI models load only when first needed.
 - Lens Blur, Relight, and Fog maps stay aligned through lens, transform, and

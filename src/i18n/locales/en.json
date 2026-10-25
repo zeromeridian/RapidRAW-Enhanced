@@ -1873,7 +1873,7 @@
           "feature2": "Automatic Image Tagging",
           "feature3": "Simple on-device Generative Replace",
           "gpuAcceleration": "GPU Acceleration",
-          "gpuAccelerationDesc": "Run AI Denoise, sky and foreground masks, and depth maps for Fog and Lens Blur on your graphics card for faster results. Disable this if you experience crashes or incorrect AI results.",
+          "gpuAccelerationDesc": "Run AI Denoise and the depth maps for Fog, Lens Blur, and depth masks on your graphics card for faster results. Disable this if you experience crashes or incorrect AI results.",
           "gpuAccelerationLabel": "Use GPU for AI models",
           "title": "Built-in AI"
         },
@@ -2006,15 +2006,16 @@
     "thanks": {
       "description": "A huge thank you to the following projects that were very important in the development of ThisIsRAW:",
       "list": {
+        "birefnet": "For the high-resolution segmentation model that powers the AI foreground detection.",
         "darktable": "For some reference implementations that guided parts of this work.",
         "depth": "For the powerful monocular depth estimation model that enables the AI depth masking capabilities.",
+        "efficientsam3": "For the efficient promptable segmentation model distilled from SAM 3 that powers the AI sky and text masks.",
         "lama": "For the powerful & simple image inpainting model, which enables content-aware fill and object removal.",
         "lensfun": "For its invaluable open-source library and comprehensive database for automatic lens correction.",
         "negpy": "For the inspiration behind the negative conversion logic.",
         "nind": "For providing AI models that power the AI noise reduction capabilities in ThisIsRAW.",
         "rawler": "For the excellent Rust crate that provides the foundation for RAW file processing in this project.",
         "sam2": "For providing the foundation model used for the AI subject detection capabilities.",
-        "u2net": "For providing the robust architecture used for the AI sky and foreground detection capabilities.",
         "you": "For using and supporting ThisIsRAW. Your interest keeps this project alive and evolving.",
         "youLabel": "You"
       },

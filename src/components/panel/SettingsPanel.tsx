@@ -1929,14 +1929,25 @@ export default function SettingsPanel({
                       </li>
                       <li>
                         <a
-                          href="https://github.com/xuebinqin/U-2-Net"
+                          href="https://github.com/SimonZeng7108/efficientsam3"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="font-semibold text-accent hover:underline"
                         >
-                          U-2-Net
+                          EfficientSAM3
                         </a>
-                        : {t('settings.thanks.list.u2net')}
+                        : {t('settings.thanks.list.efficientsam3')}
+                      </li>
+                      <li>
+                        <a
+                          href="https://github.com/ZhengPeng7/BiRefNet"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-accent hover:underline"
+                        >
+                          BiRefNet
+                        </a>
+                        : {t('settings.thanks.list.birefnet')}
                       </li>
                       <li>
                         <a
