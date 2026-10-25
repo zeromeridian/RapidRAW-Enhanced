@@ -8,10 +8,47 @@ use crate::ai_connector;
 use crate::ai_processing;
 use crate::app_settings::load_settings;
 use crate::app_state::AppState;
-use crate::image_loader::composite_patches_on_image;
+use crate::image_loader::prepare_base_image;
 use crate::image_processing::apply_linear_to_srgb;
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
 use crate::resolve_warped_image_for_masks;
+
+/// The image a patch samples from (AI denoise, then every other patch) in sRGB, and whether it was raw.
+fn prepare_source_image(
+    state: &AppState,
+    current_adjustments: &Value,
+    patch_id: &str,
+) -> Result<(DynamicImage, bool), String> {
+    let mut source_image_adjustments = current_adjustments.clone();
+    if let Some(patches) = source_image_adjustments
+        .get_mut("aiPatches")
+        .and_then(|v| v.as_array_mut())
+    {
+        patches.retain(|p| p.get("id").and_then(|id| id.as_str()) != Some(patch_id));
+    }
+
+    let loaded_image = state
+        .original_image
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or("No original image loaded")?;
+
+    let composited = prepare_base_image(
+        &loaded_image.image,
+        &loaded_image.path,
+        &source_image_adjustments,
+    )
+    .map_err(|e| format!("Failed to prepare source image: {}", e))?
+    .into_owned();
+
+    let source_image = if loaded_image.is_raw {
+        apply_linear_to_srgb(composited)
+    } else {
+        composited
+    };
+    Ok((source_image, loaded_image.is_raw))
+}
 
 #[tauri::command]
 pub async fn generate_manual_cleanup_patch(
@@ -20,28 +57,8 @@ pub async fn generate_manual_cleanup_patch(
     source_point: (f64, f64),
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
-    let mut source_image_adjustments = current_adjustments.clone();
-    if let Some(patches) = source_image_adjustments
-        .get_mut("aiPatches")
-        .and_then(|v| v.as_array_mut())
-    {
-        patches.retain(|p| p.get("id").and_then(|id| id.as_str()) != Some(&patch_definition.id));
-    }
-
-    let is_raw = {
-        let guard = state.original_image.lock().unwrap();
-        guard.as_ref().map(|img| img.is_raw).unwrap_or(false)
-    };
-
-    let (base_image, _) = crate::get_original_image(&state)?;
-    let composited = composite_patches_on_image(&base_image, &source_image_adjustments)
-        .map_err(|e| format!("Failed to prepare source image: {}", e))?;
-
-    let source_image = if is_raw {
-        apply_linear_to_srgb(composited)
-    } else {
-        composited
-    };
+    let (source_image, is_raw) =
+        prepare_source_image(&state, &current_adjustments, &patch_definition.id)?;
 
     let (img_w, img_h) = source_image.dimensions();
 
@@ -330,28 +347,8 @@ pub async fn invoke_generative_replace_with_mask_def(
 ) -> Result<String, String> {
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
 
-    let mut source_image_adjustments = current_adjustments.clone();
-    if let Some(patches) = source_image_adjustments
-        .get_mut("aiPatches")
-        .and_then(|v| v.as_array_mut())
-    {
-        patches.retain(|p| p.get("id").and_then(|id| id.as_str()) != Some(&patch_definition.id));
-    }
-
-    let is_raw = {
-        let guard = state.original_image.lock().unwrap();
-        guard.as_ref().map(|img| img.is_raw).unwrap_or(false)
-    };
-
-    let (base_image, _) = crate::get_original_image(&state)?;
-    let composited = composite_patches_on_image(&base_image, &source_image_adjustments)
-        .map_err(|e| format!("Failed to prepare source image: {}", e))?;
-
-    let source_image = if is_raw {
-        apply_linear_to_srgb(composited)
-    } else {
-        composited
-    };
+    let (source_image, is_raw) =
+        prepare_source_image(&state, &current_adjustments, &patch_definition.id)?;
 
     let (img_w, img_h) = source_image.dimensions();
 
