@@ -1,6 +1,7 @@
 use crate::Cursor;
 use crate::app_settings::{AppSettings, load_settings};
 use crate::app_state::{AppState, LoadedImage};
+use crate::cache_utils::DecodeFingerprint;
 use crate::exif_processing;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
@@ -757,15 +758,21 @@ pub fn composite_patches_on_image(
 }
 
 #[tauri::command]
-pub fn is_image_cached(path: String, state: tauri::State<'_, AppState>) -> bool {
+pub fn is_image_cached(
+    path: String,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> bool {
     let (source_path, _) = parse_virtual_path(&path);
-    let source_path_str = source_path.to_string_lossy().to_string();
+    let settings = load_settings(app_handle).unwrap_or_default();
+    let Some(fingerprint) = DecodeFingerprint::for_file(&source_path, &settings) else {
+        return false;
+    };
     state
         .decoded_image_cache
         .lock()
         .unwrap()
-        .get(&source_path_str)
-        .is_some()
+        .contains(&source_path.to_string_lossy(), &fingerprint)
 }
 
 #[tauri::command]
@@ -803,11 +810,15 @@ pub async fn load_image(
 
     let path_clone = source_path_str.clone();
 
-    let cached_data = state
-        .decoded_image_cache
-        .lock()
-        .unwrap()
-        .get(&source_path_str);
+    // Taken before decoding so a file rewritten mid-decode is a miss next time.
+    let fingerprint = DecodeFingerprint::for_file(&source_path, &settings);
+    let cached_data = fingerprint.as_ref().and_then(|fp| {
+        state
+            .decoded_image_cache
+            .lock()
+            .unwrap()
+            .get(&source_path_str, fp)
+    });
 
     let (pristine_arc, exif_data) = if let Some((cached_img, cached_exif)) = cached_data {
         (cached_img, cached_exif)
@@ -875,11 +886,14 @@ pub async fn load_image(
 
         let arc_img = Arc::new(pristine_img);
 
-        state.decoded_image_cache.lock().unwrap().insert(
-            source_path_str.clone(),
-            arc_img.clone(),
-            exif_data_loaded.clone(),
-        );
+        if let Some(fp) = fingerprint {
+            state.decoded_image_cache.lock().unwrap().insert(
+                source_path_str.clone(),
+                fp,
+                arc_img.clone(),
+                exif_data_loaded.clone(),
+            );
+        }
 
         (arc_img, exif_data_loaded)
     };

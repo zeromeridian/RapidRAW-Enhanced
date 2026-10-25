@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::adjustment_utils::is_effect_enabled;
+use crate::app_settings::AppSettings;
 use crate::fog::FOG_KEYS;
 use crate::lens_blur::LENS_BLUR_KEYS;
 use crate::relight::RELIGHT_KEYS;
@@ -7,7 +8,9 @@ use image::DynamicImage;
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::path::Path;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 pub const GEOMETRY_KEYS: &[&str] = &[
     "transformDistortion",
@@ -222,9 +225,50 @@ pub fn calculate_full_job_hash(path: &str, adjustments: &serde_json::Value) -> u
     hasher.finish()
 }
 
+/// A path alone goes stale: files are rewritten in place and raw settings change the pixels.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DecodeFingerprint {
+    len: u64,
+    modified: Option<SystemTime>,
+    settings_hash: u64,
+}
+
+impl DecodeFingerprint {
+    pub fn for_file(path: &Path, settings: &AppSettings) -> Option<Self> {
+        let metadata = std::fs::metadata(path).ok()?;
+        let mut hasher = DefaultHasher::new();
+        settings
+            .raw_highlight_compression
+            .map(f32::to_bits)
+            .hash(&mut hasher);
+        settings.linear_raw_mode.hash(&mut hasher);
+        settings
+            .raw_preprocessing_color_nr
+            .map(f32::to_bits)
+            .hash(&mut hasher);
+        settings
+            .raw_preprocessing_sharpening
+            .map(f32::to_bits)
+            .hash(&mut hasher);
+        settings.apply_preprocessing_to_non_raws.hash(&mut hasher);
+        Some(Self {
+            len: metadata.len(),
+            modified: metadata.modified().ok(),
+            settings_hash: hasher.finish(),
+        })
+    }
+}
+
+struct DecodedEntry {
+    path: String,
+    fingerprint: DecodeFingerprint,
+    image: Arc<DynamicImage>,
+    exif: HashMap<String, String>,
+}
+
 pub struct DecodedImageCache {
     capacity: usize,
-    items: Vec<(String, Arc<DynamicImage>, HashMap<String, String>)>,
+    items: Vec<DecodedEntry>,
 }
 
 impl DecodedImageCache {
@@ -242,15 +286,25 @@ impl DecodedImageCache {
         }
     }
 
-    pub fn get(&mut self, path: &str) -> Option<(Arc<DynamicImage>, HashMap<String, String>)> {
-        if let Some(pos) = self.items.iter().position(|(p, _, _)| p == path) {
-            let item = self.items.remove(pos);
-            let result = (item.1.clone(), item.2.clone());
-            self.items.push(item);
-            Some(result)
-        } else {
-            None
+    pub fn contains(&self, path: &str, fingerprint: &DecodeFingerprint) -> bool {
+        self.items
+            .iter()
+            .any(|e| e.path == path && e.fingerprint == *fingerprint)
+    }
+
+    pub fn get(
+        &mut self,
+        path: &str,
+        fingerprint: &DecodeFingerprint,
+    ) -> Option<(Arc<DynamicImage>, HashMap<String, String>)> {
+        let pos = self.items.iter().position(|e| e.path == path)?;
+        let entry = self.items.remove(pos);
+        if entry.fingerprint != *fingerprint {
+            return None;
         }
+        let result = (Arc::clone(&entry.image), entry.exif.clone());
+        self.items.push(entry);
+        Some(result)
     }
 
     pub fn clear(&mut self) {
@@ -260,15 +314,21 @@ impl DecodedImageCache {
     pub fn insert(
         &mut self,
         path: String,
+        fingerprint: DecodeFingerprint,
         image: Arc<DynamicImage>,
         exif: HashMap<String, String>,
     ) {
-        if let Some(pos) = self.items.iter().position(|(p, _, _)| *p == path) {
+        if let Some(pos) = self.items.iter().position(|e| e.path == path) {
             self.items.remove(pos);
         } else if self.items.len() >= self.capacity {
             self.items.remove(0);
         }
-        self.items.push((path, image, exif));
+        self.items.push(DecodedEntry {
+            path,
+            fingerprint,
+            image,
+            exif,
+        });
     }
 }
 
@@ -313,5 +373,52 @@ pub fn clear_session_caches(state: tauri::State<AppState>) {
     }
     if let Ok(mut geometry_cache) = state.geometry_cache.lock() {
         geometry_cache.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fingerprint(len: u64) -> DecodeFingerprint {
+        DecodeFingerprint {
+            len,
+            modified: None,
+            settings_hash: 0,
+        }
+    }
+
+    #[test]
+    fn decoded_cache_drops_entries_whose_fingerprint_changed() {
+        let mut cache = DecodedImageCache::new(2);
+        cache.insert(
+            "a.raf".to_string(),
+            fingerprint(1),
+            Arc::new(DynamicImage::new_rgb8(1, 1)),
+            HashMap::new(),
+        );
+
+        assert!(cache.contains("a.raf", &fingerprint(1)));
+        assert!(cache.get("a.raf", &fingerprint(1)).is_some());
+        assert!(!cache.contains("a.raf", &fingerprint(2)));
+        assert!(cache.get("a.raf", &fingerprint(2)).is_none());
+        assert!(!cache.contains("a.raf", &fingerprint(1)));
+    }
+
+    #[test]
+    fn decode_fingerprint_tracks_raw_preprocessing_settings() {
+        let path = std::env::temp_dir().join("thisisraw-decode-fingerprint-test");
+        std::fs::write(&path, b"x").unwrap();
+        let settings = AppSettings::default();
+        let changed = AppSettings {
+            raw_preprocessing_sharpening: Some(0.9),
+            ..AppSettings::default()
+        };
+
+        let base = DecodeFingerprint::for_file(&path, &settings);
+        assert!(base.is_some());
+        assert_eq!(base, DecodeFingerprint::for_file(&path, &settings));
+        assert_ne!(base, DecodeFingerprint::for_file(&path, &changed));
+        let _ = std::fs::remove_file(&path);
     }
 }

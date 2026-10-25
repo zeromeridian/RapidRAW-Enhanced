@@ -5,6 +5,22 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.10.2-fix-upstream-fixes — 2026-10-24
+
+### Fixes
+
+- Relight lights now strike surfaces from the correct direction after
+  rotating, straightening, or applying perspective and Guided Transform
+  corrections.
+- Healing and generative replace now sample the AI-denoised image, so patches
+  on a denoised photo no longer show noise.
+- Photos changed on disk under the same name, for example after saving from an
+  external editor, now reload with their new content instead of an outdated
+  copy. Changed RAW preprocessing settings likewise apply to recently opened
+  images the next time they are opened.
+- Photos on network shares and other drives that do not support file locking
+  load their embedded previews and as-shot white balance correctly again.
+
 ## 1.10.1-dev-ai-denoise — 2026-10-18
 
 ### RAW metadata fix
