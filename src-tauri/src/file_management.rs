@@ -18,7 +18,7 @@ use chrono::{DateTime, Utc};
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
 use rayon::prelude::*;
-use regex::Regex;
+use regex::{NoExpand, Regex};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sysinfo::Disks;
@@ -66,7 +66,11 @@ fn emit_thumbnail_cache_setup_error(app_handle: &AppHandle, path: &str, reason: 
     );
 }
 
-fn compute_thumbnail_cache_hash(path_str: &str, adjustments_bytes: &[u8]) -> Option<String> {
+fn compute_thumbnail_cache_hash(
+    path_str: &str,
+    adjustments_bytes: &[u8],
+    settings: &AppSettings,
+) -> Option<String> {
     let (source_path, _) = parse_virtual_path(path_str);
 
     let img_mod_time = fs::metadata(&source_path)
@@ -82,6 +86,13 @@ fn compute_thumbnail_cache_hash(path_str: &str, adjustments_bytes: &[u8]) -> Opt
     hasher.update(path_str.as_bytes());
     hasher.update(&img_mod_time.to_le_bytes());
     hasher.update(adjustments_bytes);
+    let render_key = format!(
+        "{}|{:?}|{:?}",
+        crate::cache_utils::raw_decode_settings_key(settings),
+        crate::image_processing::resolve_tonemapper_override(settings, is_raw_file(path_str)),
+        settings.always_decode_raw_thumbnails,
+    );
+    hasher.update(render_key.as_bytes());
     Some(hasher.finalize().to_hex().to_string())
 }
 
@@ -483,13 +494,20 @@ fn parse_sidecar_filename(file_name: &str) -> Option<(String, Option<String>)> {
     Some((base.to_string(), None))
 }
 
+/// True for `<image_filename>.tirdata` and its virtual-copy sidecars, but not for the sidecar of
+/// another image whose name merely starts with `image_filename` (e.g. `IMG.CR2.jpg.tirdata`).
+fn is_sidecar_of(sidecar_filename: &str, image_filename: &str) -> bool {
+    parse_sidecar_filename(sidecar_filename).is_some_and(|(name, _)| name == image_filename)
+}
+
 #[cfg(test)]
 mod output_naming_tests {
     use super::{
         apply_preset_adjustments_to_path, collect_preset_batch_folder_paths,
-        compute_thumbnail_cache_hash, extract_app_xmp_value, extract_xmp_stack,
-        import_rapidraw_sidecars, parse_sidecar_filename, parse_virtual_path, read_xmp_from_folder,
-        sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
+        compute_thumbnail_cache_hash, ensure_transfer_destination_free, extract_app_xmp_value,
+        extract_xmp_stack, find_all_associated_files, import_rapidraw_sidecars, is_sidecar_of,
+        parse_sidecar_filename, parse_virtual_path, read_xmp_from_folder, sanitize_filename_suffix,
+        set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
     };
     use crate::app_settings::AppSettings;
     use crate::image_processing::ImageMetadata;
@@ -533,8 +551,10 @@ mod output_naming_tests {
         fs::write(&image, b"image bytes").unwrap();
         let image_path = image.to_string_lossy();
 
-        let original = compute_thumbnail_cache_hash(&image_path, b"{}").unwrap();
-        let edited = compute_thumbnail_cache_hash(&image_path, br#"{"brightness":0.5}"#).unwrap();
+        let settings = AppSettings::default();
+        let original = compute_thumbnail_cache_hash(&image_path, b"{}", &settings).unwrap();
+        let edited =
+            compute_thumbnail_cache_hash(&image_path, br#"{"brightness":0.5}"#, &settings).unwrap();
 
         assert_ne!(original, edited);
     }
@@ -715,6 +735,79 @@ mod output_naming_tests {
         for key in ["relightNormalMap", "fogDepthMap", "lensBlurDepthMap"] {
             assert_eq!(same_device.adjustments[key], local.adjustments[key]);
         }
+    }
+
+    #[test]
+    fn sidecar_matching_ignores_other_images_with_longer_names() {
+        assert!(is_sidecar_of("IMG.CR2.tirdata", "IMG.CR2"));
+        assert!(is_sidecar_of("IMG.CR2.abc123.tirdata", "IMG.CR2"));
+        assert!(!is_sidecar_of("IMG.CR2.jpg.tirdata", "IMG.CR2"));
+        assert!(!is_sidecar_of("IMG.CR2.jpg.abc123.tirdata", "IMG.CR2"));
+        assert!(!is_sidecar_of("IMG.CR2.xmp", "IMG.CR2"));
+
+        let folder = tempfile::tempdir().unwrap();
+        for name in [
+            "IMG.CR2",
+            "IMG.CR2.tirdata",
+            "IMG.CR2.abc123.tirdata",
+            "IMG.CR2.jpg",
+            "IMG.CR2.jpg.tirdata",
+        ] {
+            fs::write(folder.path().join(name), []).unwrap();
+        }
+        let mut associated: Vec<String> = find_all_associated_files(&folder.path().join("IMG.CR2"))
+            .unwrap()
+            .iter()
+            .map(|path| path.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        associated.sort();
+        assert_eq!(
+            associated,
+            ["IMG.CR2", "IMG.CR2.abc123.tirdata", "IMG.CR2.tirdata"]
+        );
+    }
+
+    #[test]
+    fn transfer_rejects_destinations_already_planned() {
+        let folder = tempfile::tempdir().unwrap();
+        let destination = folder.path().join("IMG_1.CR2");
+        let planned = vec![(PathBuf::from("/a/IMG_1.CR2"), destination.clone())];
+
+        assert!(ensure_transfer_destination_free(&destination, &[]).is_ok());
+        assert!(ensure_transfer_destination_free(&destination, &planned).is_err());
+
+        let existing = folder.path().join("IMG_2.CR2");
+        fs::write(&existing, []).unwrap();
+        assert!(ensure_transfer_destination_free(&existing, &[]).is_err());
+    }
+
+    #[test]
+    fn tags_with_xml_and_replacement_characters_round_trip_through_xmp() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("image.jpg");
+        fs::write(&image, []).unwrap();
+        let tags = vec![
+            "R&D".to_string(),
+            "<draft>".to_string(),
+            "cost $5".to_string(),
+            "$0".to_string(),
+        ];
+        let metadata = ImageMetadata {
+            tags: Some(tags.clone()),
+            ..ImageMetadata::default()
+        };
+
+        // The second write replaces the existing subject bag, where "$0" used to expand.
+        sync_metadata_to_xmp(&image, &metadata, true, false);
+        sync_metadata_to_xmp(&image, &metadata, true, false);
+        let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
+        assert!(xmp.contains("<rdf:li>R&amp;D</rdf:li>"));
+        assert!(xmp.contains("<rdf:li>&lt;draft&gt;</rdf:li>"));
+        assert_eq!(xmp.matches("<dc:subject>").count(), 1);
+
+        let mut imported = ImageMetadata::default();
+        sync_metadata_from_xmp(&image, &mut imported, false, true);
+        assert_eq!(imported.tags, Some(tags));
     }
 
     #[test]
@@ -2440,8 +2533,12 @@ fn thumbnail_adjustments_bytes(sidecar_path: &Path) -> Vec<u8> {
 
 pub fn get_cached_thumbnail_image(path_str: &str, app_handle: &AppHandle) -> Option<DynamicImage> {
     let (_, sidecar_path) = parse_virtual_path(path_str);
-    let cache_hash =
-        compute_thumbnail_cache_hash(path_str, &thumbnail_adjustments_bytes(&sidecar_path))?;
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let cache_hash = compute_thumbnail_cache_hash(
+        path_str,
+        &thumbnail_adjustments_bytes(&sidecar_path),
+        &settings,
+    )?;
     let cache_path = resolve_thumbnail_cache_dir(app_handle)
         .ok()?
         .join(format!("{cache_hash}.jpg"));
@@ -2484,7 +2581,7 @@ fn generate_single_thumbnail_and_cache(
         (0, false, Vec::new())
     };
 
-    let cache_hash = compute_thumbnail_cache_hash(path_str, &adjustments_bytes)?;
+    let cache_hash = compute_thumbnail_cache_hash(path_str, &adjustments_bytes, settings)?;
 
     let cache_filename = format!("{}.jpg", cache_hash);
     let cache_path = thumb_cache_dir.join(cache_filename);
@@ -3235,9 +3332,6 @@ fn find_all_associated_files(source_image_path: &Path) -> Result<Vec<PathBuf>, S
         .ok_or("Could not get source filename")?
         .to_string_lossy();
 
-    let primary_sidecar_name = format!("{}.tirdata", source_filename);
-    let virtual_copy_prefix = format!("{}.", source_filename);
-
     if let Ok(entries) = fs::read_dir(parent_dir) {
         for entry in entries.filter_map(Result::ok) {
             let entry_path = entry.path();
@@ -3248,10 +3342,7 @@ fn find_all_associated_files(source_image_path: &Path) -> Result<Vec<PathBuf>, S
             let entry_os_filename = entry.file_name();
             let entry_filename = entry_os_filename.to_string_lossy();
 
-            if entry_filename == primary_sidecar_name
-                || (entry_filename.starts_with(&virtual_copy_prefix)
-                    && entry_filename.ends_with(".tirdata"))
-            {
+            if is_sidecar_of(&entry_filename, &source_filename) {
                 associated_files.push(entry_path);
             }
         }
@@ -3274,6 +3365,8 @@ pub fn copy_files(source_paths: Vec<String>, destination_folder: String) -> Resu
         .iter()
         .map(|p| parse_virtual_path(p).0)
         .collect();
+
+    let mut operations_to_perform: Vec<(PathBuf, PathBuf)> = Vec::new();
 
     for source_image_path in unique_source_images {
         let all_files_to_copy = find_all_associated_files(&source_image_path)?;
@@ -3308,17 +3401,37 @@ pub fn copy_files(source_paths: Vec<String>, destination_folder: String) -> Resu
                 let new_dest_filename =
                     original_full_filename.replacen(&*source_base_filename, &new_filename, 1);
                 let final_dest_path = dest_path.join(new_dest_filename);
-
-                fs::copy(&original_file, &final_dest_path).map_err(|e| e.to_string())?;
+                operations_to_perform.push((original_file, final_dest_path));
             }
         } else {
             for file_to_copy in all_files_to_copy {
                 if let Some(file_name) = file_to_copy.file_name() {
                     let dest_file_path = dest_path.join(file_name);
-                    fs::copy(&file_to_copy, &dest_file_path).map_err(|e| e.to_string())?;
+                    ensure_transfer_destination_free(&dest_file_path, &operations_to_perform)?;
+                    operations_to_perform.push((file_to_copy, dest_file_path));
                 }
             }
         }
+    }
+
+    for (source, dest) in operations_to_perform {
+        fs::copy(&source, &dest)
+            .map_err(|e| format!("Copy failed for {}: {}", source.display(), e))?;
+    }
+    Ok(())
+}
+
+/// Rejects a destination that exists on disk or that an earlier planned transfer already targets,
+/// so same-named files from different folders cannot overwrite each other.
+fn ensure_transfer_destination_free(
+    dest_file_path: &Path,
+    planned: &[(PathBuf, PathBuf)],
+) -> Result<(), String> {
+    if dest_file_path.exists() || planned.iter().any(|(_, dest)| dest == dest_file_path) {
+        return Err(format!(
+            "File already exists at destination: {}",
+            dest_file_path.display()
+        ));
     }
     Ok(())
 }
@@ -3342,7 +3455,7 @@ pub fn move_files(
         .map(|p| parse_virtual_path(p).0)
         .collect();
 
-    let mut all_files_to_trash = Vec::new();
+    let mut operations_to_perform: Vec<(PathBuf, PathBuf)> = Vec::new();
     let mut renames = HashMap::new();
 
     for source_image_path in unique_source_images {
@@ -3353,24 +3466,11 @@ pub fn move_files(
             return Err("Cannot move files into the same folder they are already in.".to_string());
         }
 
-        let files_to_move = find_all_associated_files(&source_image_path)?;
-
-        for file_to_move in &files_to_move {
+        for file_to_move in find_all_associated_files(&source_image_path)? {
             if let Some(file_name) = file_to_move.file_name() {
                 let dest_file_path = dest_path.join(file_name);
-                if dest_file_path.exists() {
-                    return Err(format!(
-                        "File already exists at destination: {}",
-                        dest_file_path.display()
-                    ));
-                }
-            }
-        }
-
-        for file_to_move in &files_to_move {
-            if let Some(file_name) = file_to_move.file_name() {
-                let dest_file_path = dest_path.join(file_name);
-                fs::copy(file_to_move, &dest_file_path).map_err(|e| e.to_string())?;
+                ensure_transfer_destination_free(&dest_file_path, &operations_to_perform)?;
+                operations_to_perform.push((file_to_move, dest_file_path));
             }
         }
 
@@ -3379,9 +3479,17 @@ pub fn move_files(
             source_image_path.to_string_lossy().into_owned(),
             dest_image_path.to_string_lossy().into_owned(),
         );
-
-        all_files_to_trash.extend(files_to_move);
     }
+
+    for (source, dest) in &operations_to_perform {
+        fs::copy(source, dest)
+            .map_err(|e| format!("Move failed for {}: {}", source.display(), e))?;
+    }
+
+    let all_files_to_trash: Vec<PathBuf> = operations_to_perform
+        .into_iter()
+        .map(|(source, _)| source)
+        .collect();
 
     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
     if !all_files_to_trash.is_empty()
@@ -4851,28 +4959,30 @@ pub fn delete_files_with_associated(
         return Ok(());
     }
 
-    let mut stems_to_delete = HashSet::new();
-    let mut parent_dirs = HashSet::new();
+    let mut stems_by_dir: HashMap<PathBuf, HashSet<String>> = HashMap::new();
     let mut deletions = HashSet::new();
 
     for path_str in &paths {
         deletions.insert(path_str.clone());
         let (source_path, _) = parse_virtual_path(path_str);
-        if let Some(stem) = source_path.file_stem().and_then(|s| s.to_str()) {
-            stems_to_delete.insert(stem.to_string());
-        }
-        if let Some(parent) = source_path.parent() {
-            parent_dirs.insert(parent.to_path_buf());
+        if let (Some(stem), Some(parent)) = (
+            source_path.file_stem().and_then(|s| s.to_str()),
+            source_path.parent(),
+        ) {
+            stems_by_dir
+                .entry(parent.to_path_buf())
+                .or_default()
+                .insert(stem.to_string());
         }
     }
 
-    if stems_to_delete.is_empty() {
+    if stems_by_dir.is_empty() {
         return Ok(());
     }
 
     let mut files_to_trash = HashSet::new();
 
-    for parent_dir in parent_dirs {
+    for (parent_dir, stems_to_delete) in stems_by_dir {
         if let Ok(entries) = fs::read_dir(parent_dir) {
             for entry in entries.filter_map(Result::ok) {
                 let entry_path = entry.path();
@@ -5157,14 +5267,21 @@ pub fn rename_files(
         return Ok(Vec::new());
     }
 
-    let mut operations: HashMap<PathBuf, PathBuf> = HashMap::new();
-    let mut final_new_paths = Vec::with_capacity(paths.len());
+    // An image and its virtual copies share one file, so rename each file once.
+    let mut original_paths: Vec<PathBuf> = Vec::new();
+    for path_str in &paths {
+        let (original_path, _) = parse_virtual_path(path_str);
+        if !original_paths.contains(&original_path) {
+            original_paths.push(original_path);
+        }
+    }
+
+    let mut operations: Vec<(PathBuf, PathBuf)> = Vec::new();
     let mut renames = HashMap::new();
 
-    for (i, path_str) in paths.iter().enumerate() {
-        let (original_path, _) = parse_virtual_path(path_str);
+    for (i, original_path) in original_paths.iter().enumerate() {
         if !original_path.exists() {
-            return Err(format!("File not found: {}", path_str));
+            return Err(format!("File not found: {}", original_path.display()));
         }
 
         let parent = original_path
@@ -5175,29 +5292,31 @@ pub fn rename_files(
             .and_then(|s| s.to_str())
             .unwrap_or("");
 
-        let file_date = exif_processing::get_creation_date_from_path(&original_path);
+        let file_date = exif_processing::get_creation_date_from_path(original_path);
 
         let new_stem = generate_filename_from_template(
             &name_template,
-            &original_path,
+            original_path,
             i + 1,
-            paths.len(),
+            original_paths.len(),
             &file_date,
         );
         let new_filename = format!("{}.{}", new_stem, extension);
         let new_path = parent.join(new_filename);
 
-        if new_path.exists() && new_path != original_path {
+        if (new_path.exists() && new_path != *original_path)
+            || operations.iter().any(|(_, planned)| *planned == new_path)
+        {
             return Err(format!(
                 "A file with the name {} already exists.",
                 new_path.display()
             ));
         }
 
-        operations.insert(original_path, new_path);
+        operations.push((original_path.clone(), new_path));
     }
 
-    let mut sidecar_operations: HashMap<PathBuf, PathBuf> = HashMap::new();
+    let mut sidecar_operations: Vec<(PathBuf, PathBuf)> = Vec::new();
     for (original_path, new_path) in &operations {
         let parent = original_path
             .parent()
@@ -5207,23 +5326,13 @@ pub fn rename_files(
 
         if let Ok(entries) = fs::read_dir(parent) {
             for entry in entries.filter_map(Result::ok) {
-                let entry_path = entry.path();
                 let entry_os_filename = entry.file_name();
                 let entry_filename = entry_os_filename.to_string_lossy();
 
-                if entry_filename.starts_with(&format!("{}.", original_filename_str))
-                    && entry_filename.ends_with(".tirdata")
-                {
+                if is_sidecar_of(&entry_filename, &original_filename_str) {
                     let new_sidecar_filename =
                         entry_filename.replacen(&*original_filename_str, &new_filename_str, 1);
-                    let new_sidecar_path = parent.join(new_sidecar_filename);
-                    sidecar_operations.insert(entry_path, new_sidecar_path);
-                } else if entry_filename == format!("{}.tirdata", original_filename_str) {
-                    let mut new_sidecar_name = new_path.file_name().unwrap().to_os_string();
-                    new_sidecar_name.push(".tirdata");
-                    let new_sidecar_path = new_path.with_file_name(new_sidecar_name);
-
-                    sidecar_operations.insert(entry_path, new_sidecar_path);
+                    sidecar_operations.push((entry.path(), parent.join(new_sidecar_filename)));
                 }
             }
         }
@@ -5240,17 +5349,26 @@ pub fn rename_files(
             )
         })?;
 
-        let old_str = old_path.to_string_lossy().into_owned();
-        let new_str = new_path.to_string_lossy().into_owned();
-
-        renames.insert(old_str, new_str.clone());
-
-        if is_supported_image_file(&new_path) {
-            final_new_paths.push(new_str);
-        }
+        renames.insert(
+            old_path.to_string_lossy().into_owned(),
+            new_path.to_string_lossy().into_owned(),
+        );
     }
 
     sync_album_path_changes(&app_handle, Some(&renames), None, None);
+
+    // One entry per input path, in order, keeping virtual-copy queries; unrenamed files keep their path.
+    let final_new_paths = paths
+        .iter()
+        .map(|path_str| {
+            let (base, copy_query) = match path_str.rsplit_once("?vc=") {
+                Some((base, query)) => (base, format!("?vc={}", query)),
+                None => (path_str.as_str(), String::new()),
+            };
+            let new_base = renames.get(base).map_or(base, String::as_str);
+            format!("{}{}", new_base, copy_query)
+        })
+        .collect();
 
     Ok(final_new_paths)
 }
@@ -5369,12 +5487,12 @@ pub fn extract_xmp_label(content: &str) -> Option<String> {
     if let Some(idx) = content.find("xmp:Label=\"") {
         let start = idx + 11;
         let end = content[start..].find('"').map(|i| start + i)?;
-        return Some(content[start..end].to_string());
+        return Some(unescape_xmp_text(&content[start..end]));
     }
     if let Some(idx) = content.find("<xmp:Label>") {
         let start = idx + 11;
         let end = content[start..].find('<').map(|i| start + i)?;
-        return Some(content[start..end].to_string());
+        return Some(unescape_xmp_text(&content[start..end]));
     }
     None
 }
@@ -5389,7 +5507,9 @@ pub fn extract_xmp_tags(content: &str) -> Vec<String> {
         while let Some(li_start) = subject_block[current_idx..].find("<rdf:li>") {
             let val_start = current_idx + li_start + 8;
             if let Some(li_end) = subject_block[val_start..].find("</rdf:li>") {
-                tags.push(subject_block[val_start..val_start + li_end].to_string());
+                tags.push(unescape_xmp_text(
+                    &subject_block[val_start..val_start + li_end],
+                ));
                 current_idx = val_start + li_end + 9;
             } else {
                 break;
@@ -5441,14 +5561,16 @@ fn restore_local_only_adjustments(imported: &mut Value, local: &Value) {
 fn extract_app_xmp_value(content: &str, field: &str) -> Option<String> {
     let attribute = Regex::new(&format!(r#"rr:{field}\s*=\s*"([^"]*)""#)).ok()?;
     if let Some(captures) = attribute.captures(content) {
-        return captures.get(1).map(|value| value.as_str().to_string());
+        return captures
+            .get(1)
+            .map(|value| unescape_xmp_text(value.as_str()));
     }
 
     let element = Regex::new(&format!(r#"<rr:{field}(?:\s+[^>]*)?>([^<]*)</rr:{field}>"#)).ok()?;
     element
         .captures(content)
         .and_then(|captures| captures.get(1))
-        .map(|value| value.as_str().to_string())
+        .map(|value| unescape_xmp_text(value.as_str()))
 }
 
 fn extract_xmp_stack(content: &str) -> Option<XmpStackMetadata> {
@@ -5479,6 +5601,11 @@ fn escape_xmp_text(value: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
+}
+
+/// Inverse of `escape_xmp_text`; text that is not valid escaped XML is kept as written.
+fn unescape_xmp_text(value: &str) -> String {
+    quick_xml::escape::unescape(value).map_or_else(|_| value.to_string(), Cow::into_owned)
 }
 
 fn set_app_xmp_value(content: &mut String, field: &str, value: Option<&str>) {
@@ -5779,16 +5906,20 @@ pub fn sync_metadata_to_xmp(
         }
 
         if let Some(lbl) = label {
+            let lbl = escape_xmp_text(&lbl);
             let re_label_attr = Regex::new(r#"xmp:Label\s*=\s*"[^"]*""#).unwrap();
             let re_label_tag = Regex::new(r#"<xmp:Label\s*>[^<]*</xmp:Label>"#).unwrap();
 
             if re_label_attr.is_match(&content) {
                 content = re_label_attr
-                    .replace(&content, format!("xmp:Label=\"{}\"", lbl))
+                    .replace(&content, NoExpand(&format!("xmp:Label=\"{}\"", lbl)))
                     .to_string();
             } else if re_label_tag.is_match(&content) {
                 content = re_label_tag
-                    .replace(&content, format!("<xmp:Label>{}</xmp:Label>", lbl))
+                    .replace(
+                        &content,
+                        NoExpand(&format!("<xmp:Label>{}</xmp:Label>", lbl)),
+                    )
                     .to_string();
             } else if let Some(last_index) = content.rfind("</rdf:Description>") {
                 let (start, end) = content.split_at(last_index);
@@ -5885,12 +6016,12 @@ pub fn sync_metadata_to_xmp(
         } else {
             let mut bag = String::from("<dc:subject>\n    <rdf:Bag>\n");
             for t in normal_tags {
-                bag.push_str(&format!("     <rdf:li>{}</rdf:li>\n", t));
+                bag.push_str(&format!("     <rdf:li>{}</rdf:li>\n", escape_xmp_text(&t)));
             }
             bag.push_str("    </rdf:Bag>\n   </dc:subject>");
 
             if re_subject.is_match(&content) {
-                content = re_subject.replace(&content, bag).to_string();
+                content = re_subject.replace(&content, NoExpand(&bag)).to_string();
             } else if let Some(last_index) = content.rfind("</rdf:Description>") {
                 let (start, end) = content.split_at(last_index);
                 content = format!("{} {}\n  {}", start, bag, end);
