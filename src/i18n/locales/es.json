@@ -417,7 +417,7 @@
       "comingSoon": "Próximamente",
       "connection": {
         "backendLabel": "Backend de IA:",
-        "builtinDesc": "Usando CPU local básica. Selecciona Cloud o AI Connector en ajustes para relleno generativo.",
+        "builtinDesc": "Usando la IA integrada básica. Selecciona Cloud o AI Connector en ajustes para relleno generativo.",
         "builtinLabel": "IA integrada:",
         "cloudLabel": "IA en la nube:",
         "connectorConnectedDesc": "Conectado al backend generativo local.",
@@ -1767,14 +1767,14 @@
           "description": "Integradas directamente en ThisIsRAW, estas funciones se ejecutan completamente en tu computadora. Son rápidas, gratuitas y no requieren configuración, lo que las hace ideales para acelerar el flujo de trabajo diario.",
           "feature1": "Enmascaramiento de IA (Sujeto, Cielo, Primer plano)",
           "feature2": "Etiquetado automático de imágenes",
-          "feature3": "Relleno generativo simple basado en CPU",
-          "title": "IA integrada (CPU)"
+          "feature3": "Relleno generativo simple en el dispositivo",
+          "title": "IA integrada"
         },
         "description": "La IA de ThisIsRAW está diseñada para la flexibilidad. Elige tu flujo de trabajo ideal, desde herramientas locales rápidas hasta un potente autoalojamiento.",
         "providers": {
           "aiConnector": "AI Connector",
           "cloud": "Nube",
-          "cpu": "CPU"
+          "cpu": "Integrada"
         },
         "title": "IA Generativa"
       },

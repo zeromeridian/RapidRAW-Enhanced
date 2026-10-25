@@ -204,6 +204,7 @@ export interface XmpStackMetadata {
 export interface AppSettings {
   catalogDirectory?: string;
   aiConnectorAddress?: string;
+  aiGpuAcceleration?: boolean;
   aiProvider?: string;
   decorations?: any;
   editorPreviewResolution?: number;

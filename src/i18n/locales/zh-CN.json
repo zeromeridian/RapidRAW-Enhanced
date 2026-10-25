@@ -399,7 +399,7 @@
       "comingSoon": "即将推出",
       "connection": {
         "backendLabel": "AI 后端：",
-        "builtinDesc": "使用基础本地 CPU。在设置中选择云端或 AI 连接器以使用生成式替换。",
+        "builtinDesc": "使用基础内置 AI。在设置中选择云端或 AI 连接器以使用生成式替换。",
         "builtinLabel": "内置 AI：",
         "cloudLabel": "云端 AI：",
         "connectorConnectedDesc": "已连接到本地生成式后端。",
@@ -1728,14 +1728,14 @@
           "description": "直接集成到 ThisIsRAW 中，这些功能完全在您的计算机上运行。它们快速、免费且无需设置，非常适合日常加速工作流程。",
           "feature1": "AI 蒙版（主体、天空、前景）",
           "feature2": "自动图像标签",
-          "feature3": "简单的 CPU 生成式替换",
-          "title": "内置 AI（CPU）"
+          "feature3": "简单的本地生成式替换",
+          "title": "内置 AI"
         },
         "description": "ThisIsRAW 的 AI 专为灵活性而设计。选择您理想的工作流程，从快速的本地工具到强大的自托管。",
         "providers": {
           "aiConnector": "AI 连接器",
           "cloud": "云端",
-          "cpu": "CPU"
+          "cpu": "内置"
         },
         "title": "生成式 AI"
       },

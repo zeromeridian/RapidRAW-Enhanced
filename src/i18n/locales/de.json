@@ -399,7 +399,7 @@
       "comingSoon": "Demnächst",
       "connection": {
         "backendLabel": "KI-Backend:",
-        "builtinDesc": "Nutzt lokale CPU. Für generatives Ersetzen wählen Sie Cloud oder AI Connector.",
+        "builtinDesc": "Nutzt die integrierte KI. Für generatives Ersetzen wählen Sie Cloud oder AI Connector.",
         "builtinLabel": "Integrierte KI:",
         "cloudLabel": "Cloud-KI:",
         "connectorConnectedDesc": "Verbunden mit lokalem generativen Backend.",
@@ -1730,14 +1730,14 @@
           "description": "Diese Funktionen sind direkt in ThisIsRAW integriert und laufen vollständig auf Ihrem Computer. Sie sind schnell, kostenlos und erfordern keine Einrichtung.",
           "feature1": "KI-Maskierung (Motiv, Himmel, Vordergrund)",
           "feature2": "Automatisches Bild-Tagging",
-          "feature3": "Einfaches CPU-basiertes generatives Ersetzen",
-          "title": "Integrierte KI (CPU)"
+          "feature3": "Einfaches generatives Ersetzen auf dem Gerät",
+          "title": "Integrierte KI"
         },
         "description": "Die KI von ThisIsRAW ist auf Flexibilität ausgelegt. Wählen Sie Ihren idealen Workflow.",
         "providers": {
           "aiConnector": "AI Connector",
           "cloud": "Cloud",
-          "cpu": "CPU"
+          "cpu": "Integriert"
         },
         "title": "Generative KI"
       },

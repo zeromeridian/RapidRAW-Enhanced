@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.11.0-dev-port-features-from-rr — 2026-10-25
+
+### Faster AI on Mac
+
+- AI Denoise, the AI sky and foreground masks, and the depth maps used by Fog
+  and Lens Blur now run on the Mac's graphics card and Neural Engine when
+  available, for faster results.
+- New **Settings → Processing → Built-in AI → GPU Acceleration** switch, on by
+  default. Turn it off if AI results look wrong or AI features crash; the
+  change applies immediately.
+- If the graphics card cannot run a model, ThisIsRAW automatically switches
+  that feature, and every later AI task, back to the processor.
+- AI models now load only when a feature first needs them, which lowers memory
+  use.
+- An error while rendering the editor preview no longer stops later previews
+  from updating.
+- "Built-in AI (CPU)" is now called "Built-in AI".
+
 ## 1.10.3-fix-upstream-fixes — 2026-10-25
 
 ### File safety

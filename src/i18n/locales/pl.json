@@ -435,7 +435,7 @@
       "comingSoon": "Wkrótce",
       "connection": {
         "backendLabel": "Backend AI:",
-        "builtinDesc": "Używanie podstawowego lokalnego procesora. Wybierz Chmurę lub Złącze AI w ustawieniach do zastępowania generatywnego.",
+        "builtinDesc": "Używanie podstawowego wbudowanego AI. Wybierz Chmurę lub Złącze AI w ustawieniach do zastępowania generatywnego.",
         "builtinLabel": "Wbudowane AI:",
         "cloudLabel": "AI w Chmurze:",
         "connectorConnectedDesc": "Połączono z lokalnym backendem generatywnym.",
@@ -1804,14 +1804,14 @@
           "description": "Zintegrowane bezpośrednio z ThisIsRAW, te funkcje działają całkowicie na Twoim komputerze. Są szybkie, bezpłatne i nie wymagają konfiguracji, stanowiąc idealne usprawnienie dla codziennej pracy.",
           "feature1": "Maskowanie AI (Temat, Niebo, Pierwszy plan)",
           "feature2": "Automatyczne tagowanie obrazów",
-          "feature3": "Proste zastępowanie generatywne oparte na CPU",
-          "title": "Wbudowane AI (CPU)"
+          "feature3": "Proste zastępowanie generatywne na urządzeniu",
+          "title": "Wbudowane AI"
         },
         "description": "AI w ThisIsRAW została zbudowana z myślą o elastyczności. Wybierz swój idealny przepływ pracy, od szybkich lokalnych narzędzi po potężne rozwiązania serwerowe.",
         "providers": {
           "aiConnector": "Złącze AI",
           "cloud": "Chmura",
-          "cpu": "CPU"
+          "cpu": "Wbudowane"
         },
         "title": "Generatywne AI"
       },

@@ -425,7 +425,7 @@
       "comingSoon": "Coming Soon",
       "connection": {
         "backendLabel": "AI Backend:",
-        "builtinDesc": "Using basic local CPU. Select Cloud or AI Connector in settings for generative replace.",
+        "builtinDesc": "Using basic built-in AI. Select Cloud or AI Connector in settings for generative replace.",
         "builtinLabel": "Built-in AI:",
         "cloudLabel": "Cloud AI:",
         "connectorConnectedDesc": "Connected to local generative backend.",
@@ -1871,14 +1871,17 @@
           "description": "Integrated directly into ThisIsRAW, these features run entirely on your computer. They are fast, free, and require no setup, making them ideal for everyday workflow acceleration.",
           "feature1": "AI Masking (Subject, Sky, Foreground)",
           "feature2": "Automatic Image Tagging",
-          "feature3": "Simple CPU-based Generative Replace",
-          "title": "Built-in AI (CPU)"
+          "feature3": "Simple on-device Generative Replace",
+          "gpuAcceleration": "GPU Acceleration",
+          "gpuAccelerationDesc": "Run AI Denoise, sky and foreground masks, and depth maps for Fog and Lens Blur on your graphics card for faster results. Disable this if you experience crashes or incorrect AI results.",
+          "gpuAccelerationLabel": "Use GPU for AI models",
+          "title": "Built-in AI"
         },
         "description": "ThisIsRAW's AI is built for flexibility. Choose your ideal workflow, from fast local tools to powerful self-hosting.",
         "providers": {
           "aiConnector": "AI Connector",
           "cloud": "Cloud",
-          "cpu": "CPU"
+          "cpu": "Built-in"
         },
         "title": "Generative AI"
       },

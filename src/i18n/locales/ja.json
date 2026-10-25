@@ -399,7 +399,7 @@
       "comingSoon": "近日公開",
       "connection": {
         "backendLabel": "AI バックエンド:",
-        "builtinDesc": "ローカルCPUを使用しています。生成塗りつぶしを使用するには、設定でクラウドまたはAI Connectorを選択してください。",
+        "builtinDesc": "基本的な内蔵AIを使用しています。生成塗りつぶしを使用するには、設定でクラウドまたはAI Connectorを選択してください。",
         "builtinLabel": "内蔵AI:",
         "cloudLabel": "クラウドAI:",
         "connectorConnectedDesc": "ローカルの生成バックエンドに接続されました。",
@@ -1728,14 +1728,14 @@
           "description": "ThisIsRAWに直接内蔵されており、お使いのコンピューター上のみで動作します。高速かつ無料でセットアップも不要です。",
           "feature1": "AIマスク機能 (被写体、空、手前)",
           "feature2": "自動画像タグ付け機能",
-          "feature3": "CPUベースの簡易生成塗りつぶし",
-          "title": "内蔵AI (CPU)"
+          "feature3": "デバイス上での簡易生成塗りつぶし",
+          "title": "内蔵AI"
         },
         "description": "ThisIsRAWのAIは、優れた柔軟性を備えています。高速なローカル処理から本格的なセルフホストまで、最適なワークフローを選択してください。",
         "providers": {
           "aiConnector": "AI Connector",
           "cloud": "クラウド",
-          "cpu": "CPU"
+          "cpu": "内蔵"
         },
         "title": "生成AI"
       },
