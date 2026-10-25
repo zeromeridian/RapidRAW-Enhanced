@@ -2438,6 +2438,23 @@ export default function SettingsPanel({
                               <li>{t('settings.processing.ai.cpu.feature2')}</li>
                               <li>{t('settings.processing.ai.cpu.feature3')}</li>
                             </Text>
+                            {osPlatform === 'macos' && (
+                              <div className="mt-8">
+                                <SettingItem
+                                  label={t('settings.processing.ai.cpu.gpuAcceleration')}
+                                  description={t('settings.processing.ai.cpu.gpuAccelerationDesc')}
+                                >
+                                  <Switch
+                                    checked={appSettings?.aiGpuAcceleration ?? true}
+                                    id="ai-gpu-acceleration-toggle"
+                                    label={t('settings.processing.ai.cpu.gpuAccelerationLabel')}
+                                    onChange={(checked) =>
+                                      onSettingsChange({ ...appSettings, aiGpuAcceleration: checked })
+                                    }
+                                  />
+                                </SettingItem>
+                              </div>
+                            )}
                           </motion.div>
                         )}
 

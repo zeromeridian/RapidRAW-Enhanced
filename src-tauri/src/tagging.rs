@@ -211,7 +211,9 @@ pub fn generate_tags_with_clip(
     let mask_val = Tensor::from_array(mask_layout.into_owned())?;
 
     let mut clip_session = clip_session_mutex.lock().unwrap();
-    let outputs = clip_session.run(ort::inputs![ids_val, image_val, mask_val])?;
+    let outputs = crate::ai_processing::gpu_inference(
+        clip_session.run(ort::inputs![ids_val, image_val, mask_val]),
+    )?;
 
     let logits_dyn = outputs[0].try_extract_array::<f32>()?.to_owned();
     let logits = logits_dyn.into_dimensionality::<ndarray::Dim<[usize; 2]>>()?;

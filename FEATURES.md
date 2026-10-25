@@ -183,6 +183,10 @@ details are in `RELEASE_NOTES.MD`.
   (4 GB limit, clearable in Settings). Exports always include it, and
   thumbnails refresh when it finishes. Settings sync through XMP and
   copy/paste; the denoised result is regenerated per device.
+- On macOS, AI Denoise, AI sky and foreground masks, and Fog and Lens Blur
+  depth maps run on the GPU and Neural Engine through CoreML, with an
+  automatic CPU fallback and a **GPU Acceleration** switch in Settings →
+  Processing. AI models load only when first needed.
 - Lens Blur, Relight, and Fog maps stay aligned through lens, transform, and
   Guided geometry changes. Their effects render at preview resolution in
   Develop for fast adjustment. Generated depth and normal maps stay local, and

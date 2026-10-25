@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -9,8 +10,12 @@ use image::{
     DynamicImage, GenericImageView, GrayImage, ImageBuffer, Luma, Rgb32FImage, Rgba, RgbaImage,
 };
 use ndarray::{Array, Array4, IxDyn};
-use ort::session::Session;
-use ort::value::Tensor;
+use ort::editor::{Graph, Model, Node, ONNX_DOMAIN, Opset, Outlet};
+use ort::execution_providers::{CPUExecutionProvider, ExecutionProviderDispatch};
+use ort::memory::Allocator;
+use ort::session::{Output, Session};
+use ort::tensor::{Shape, SymbolicDimensions, TensorElementType};
+use ort::value::{Tensor, ValueType};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -66,12 +71,226 @@ const NORMAL_MAX_SIZE: u32 = 768;
 const NORMAL_NUM_TOKENS: i64 = 2500;
 const NORMAL_SHA256: &str = "24eacb5dc7a2c54c7bc98f7de085ffbed79ad006ea5b664c2c2cdc02ff3a52f0";
 
+type SharedSession = Arc<Mutex<Session>>;
+
+const GPU_IDLE: u8 = 0;
+const GPU_ACTIVE: u8 = 1;
+const GPU_FAILED: u8 = 2;
+const GPU_DISABLED: u8 = 3;
+
+static GPU_STATUS: AtomicU8 = AtomicU8::new(GPU_IDLE);
+
 pub struct AiModels {
-    pub sam_encoder: Mutex<Session>,
-    pub sam_decoder: Mutex<Session>,
-    pub u2netp: Mutex<Session>,
-    pub sky_seg: Mutex<Session>,
-    pub depth_anything: Mutex<Session>,
+    models_dir: PathBuf,
+    use_gpu: bool,
+    sam_encoder: Mutex<Option<SharedSession>>,
+    sam_decoder: Mutex<Option<SharedSession>>,
+    u2netp: Mutex<Option<SharedSession>>,
+    sky_seg: Mutex<Option<SharedSession>>,
+    depth_anything: Mutex<Option<SharedSession>>,
+}
+
+impl AiModels {
+    fn session(
+        &self,
+        slot: &Mutex<Option<SharedSession>>,
+        filename: &str,
+        use_gpu: bool,
+    ) -> Result<SharedSession> {
+        let mut slot = slot.lock().unwrap();
+        if let Some(session) = slot.as_ref() {
+            return Ok(Arc::clone(session));
+        }
+        let session = Arc::new(Mutex::new(build_session(
+            &self.models_dir.join(filename),
+            SessionKind::OneShot,
+            self.use_gpu && use_gpu,
+            None,
+        )?));
+        *slot = Some(Arc::clone(&session));
+        Ok(session)
+    }
+
+    pub fn sam_encoder(&self) -> Result<SharedSession> {
+        self.session(&self.sam_encoder, ENCODER_FILENAME, false)
+    }
+
+    pub fn sam_decoder(&self) -> Result<SharedSession> {
+        self.session(&self.sam_decoder, DECODER_FILENAME, false)
+    }
+
+    pub fn u2netp(&self) -> Result<SharedSession> {
+        self.session(&self.u2netp, U2NETP_FILENAME, true)
+    }
+
+    pub fn sky_seg(&self) -> Result<SharedSession> {
+        self.session(&self.sky_seg, SKYSEG_FILENAME, true)
+    }
+
+    pub fn depth_anything(&self) -> Result<SharedSession> {
+        self.session(&self.depth_anything, DEPTH_FILENAME, true)
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SessionKind {
+    OneShot,
+    Persistent,
+}
+
+#[cfg(target_os = "macos")]
+fn gpu_execution_provider() -> Option<ExecutionProviderDispatch> {
+    use ort::execution_providers::coreml::{CoreMLComputeUnits, CoreMLModelFormat};
+
+    Some(
+        ort::execution_providers::CoreMLExecutionProvider::default()
+            .with_model_format(CoreMLModelFormat::MLProgram)
+            .with_compute_units(CoreMLComputeUnits::All)
+            .build()
+            .error_on_failure(),
+    )
+}
+
+// DirectML on Windows needs a DirectML build of ONNX Runtime plus DirectML.dll,
+// which ThisIsRAW does not ship yet; Windows and Linux run AI models on the CPU.
+#[cfg(not(target_os = "macos"))]
+fn gpu_execution_provider() -> Option<ExecutionProviderDispatch> {
+    None
+}
+
+/// Models that hang or crash under CoreML stay on the CPU on macOS.
+fn gpu_allowed_on_platform() -> bool {
+    !cfg!(target_os = "macos")
+}
+
+type GpuModelPatch = fn() -> ort::Result<(Model, Vec<Output>)>;
+
+fn i64_initializer(values: &[i64]) -> ort::Result<Tensor<i64>> {
+    let mut tensor = Tensor::<i64>::new(&Allocator::default(), [values.len()])?;
+    tensor.extract_tensor_mut().1.copy_from_slice(values);
+    Ok(tensor)
+}
+
+fn denoise_crop_as_slice() -> ort::Result<(Model, Vec<Output>)> {
+    let output_type = ValueType::Tensor {
+        ty: TensorElementType::Float32,
+        shape: Shape::new([1, 3, -1, -1]),
+        dimension_symbols: SymbolicDimensions::empty(4),
+    };
+
+    let mut graph = Graph::new()?;
+    graph.add_initializer("crop_starts", i64_initializer(&[2, 2])?, false)?;
+    graph.add_initializer("crop_ends", i64_initializer(&[-2, -2])?, false)?;
+    graph.add_initializer("crop_axes", i64_initializer(&[2, 3])?, false)?;
+    graph.add_node(Node::new(
+        "Slice",
+        ONNX_DOMAIN,
+        "crop_slice",
+        ["conv2d_9", "crop_starts", "crop_ends", "crop_axes"],
+        ["denoised"],
+        [],
+    )?)?;
+    graph.set_outputs([Outlet::new("denoised", &output_type)?])?;
+
+    let mut model = Model::new([Opset::new(ONNX_DOMAIN, 18)?])?;
+    model.add_graph(graph)?;
+    Ok((
+        model,
+        vec![Output {
+            name: "denoised".to_string(),
+            output_type,
+        }],
+    ))
+}
+
+fn create_session(
+    model_path: &Path,
+    kind: SessionKind,
+    gpu_provider: Option<ExecutionProviderDispatch>,
+    gpu_patch: Option<GpuModelPatch>,
+) -> Result<Session> {
+    let use_gpu = gpu_provider.is_some();
+    let cpu_provider = CPUExecutionProvider::default()
+        .with_arena_allocator(kind == SessionKind::Persistent)
+        .build();
+    let providers: Vec<_> = gpu_provider.into_iter().chain([cpu_provider]).collect();
+
+    let mut builder = Session::builder()?;
+    if use_gpu || kind == SessionKind::OneShot {
+        builder = builder.with_memory_pattern(false)?;
+    }
+    let builder = builder.with_execution_providers(providers)?;
+    match gpu_patch {
+        Some(patch) => {
+            let (model, outputs) = patch()?;
+            let mut session = builder.edit_from_file(model_path)?;
+            session.apply_model(&model)?;
+            let mut session = session.into_session()?;
+            session.outputs = outputs;
+            Ok(session)
+        }
+        None => Ok(builder.commit_from_file(model_path)?),
+    }
+}
+
+fn build_session(
+    model_path: &Path,
+    kind: SessionKind,
+    use_gpu: bool,
+    gpu_patch: Option<GpuModelPatch>,
+) -> Result<Session> {
+    if use_gpu
+        && GPU_STATUS.load(Ordering::Acquire) < GPU_FAILED
+        && let Some(gpu_provider) = gpu_execution_provider()
+    {
+        match create_session(model_path, kind, Some(gpu_provider), gpu_patch) {
+            Ok(session) => {
+                let _ = GPU_STATUS.compare_exchange(
+                    GPU_IDLE,
+                    GPU_ACTIVE,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                );
+                return Ok(session);
+            }
+            Err(e) => log::warn!(
+                "GPU acceleration unavailable for {}, falling back to CPU: {}",
+                model_path.display(),
+                e
+            ),
+        }
+    }
+    create_session(model_path, kind, None, None)
+}
+
+pub fn gpu_acceleration_enabled(app_handle: &tauri::AppHandle) -> bool {
+    GPU_STATUS.load(Ordering::Acquire) < GPU_FAILED
+        && crate::app_settings::load_settings(app_handle.clone())
+            .map(|settings| settings.ai_gpu_acceleration)
+            .unwrap_or(true)
+}
+
+/// Marks GPU inference as failed so every session is rebuilt on the CPU.
+pub fn gpu_inference<T>(result: ort::Result<T>) -> Result<T> {
+    result.map_err(|e| {
+        if GPU_STATUS
+            .compare_exchange(GPU_ACTIVE, GPU_FAILED, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+        {
+            log::warn!(
+                "GPU inference failed, using the CPU for AI models from now on: {}",
+                e
+            );
+        }
+        e.into()
+    })
+}
+
+pub fn reset_ai_sessions(ai_state_mutex: &Mutex<Option<AiState>>) {
+    if let Some(ai_state) = ai_state_mutex.lock().unwrap().as_mut() {
+        ai_state.release_sessions();
+    }
+    GPU_STATUS.store(GPU_IDLE, Ordering::Release);
 }
 
 pub struct ClipModels {
@@ -93,6 +312,7 @@ pub struct CachedDepthMap {
     pub original_size: (u32, u32),
 }
 
+#[derive(Default)]
 pub struct AiState {
     pub models: Option<Arc<AiModels>>,
     pub denoise_model: Option<Arc<Mutex<Session>>>,
@@ -101,6 +321,38 @@ pub struct AiState {
     pub normal_model: Option<Arc<Mutex<Session>>>,
     pub embeddings: Option<ImageEmbeddings>,
     pub depth_map: Option<CachedDepthMap>,
+}
+
+impl AiState {
+    pub fn release_sessions(&mut self) {
+        self.models = None;
+        self.denoise_model = None;
+        self.clip_models = None;
+        self.lama_model = None;
+        self.normal_model = None;
+    }
+}
+
+/// Reads a cached AI state entry, first dropping every session once after a
+/// GPU inference failure so they are rebuilt on the CPU.
+fn cached_ai_state<T>(
+    ai_state_mutex: &Mutex<Option<AiState>>,
+    get: impl Fn(&AiState) -> Option<T>,
+) -> Option<T> {
+    let mut ai_state = ai_state_mutex.lock().unwrap();
+    if GPU_STATUS
+        .compare_exchange(
+            GPU_FAILED,
+            GPU_DISABLED,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        )
+        .is_ok()
+        && let Some(ai_state) = ai_state.as_mut()
+    {
+        ai_state.release_sessions();
+    }
+    ai_state.as_ref().and_then(get)
 }
 
 fn edt_1d(f: &mut [f32], v: &mut [usize], z: &mut [f32], d: &mut [f32]) {
@@ -314,23 +566,13 @@ pub async fn get_or_init_ai_models(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<AiModels>> {
-    if let Some(models) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.models.clone())
-    {
+    if let Some(models) = cached_ai_state(ai_state_mutex, |state| state.models.clone()) {
         return Ok(models);
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(models) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.models.clone())
-    {
+    if let Some(models) = cached_ai_state(ai_state_mutex, |state| state.models.clone()) {
         return Ok(models);
     }
 
@@ -384,42 +626,23 @@ pub async fn get_or_init_ai_models(
 
     let _ = ort::init().with_name("AI").commit();
 
-    let encoder_path = models_dir.join(ENCODER_FILENAME);
-    let decoder_path = models_dir.join(DECODER_FILENAME);
-    let u2netp_path = models_dir.join(U2NETP_FILENAME);
-    let sky_seg_path = models_dir.join(SKYSEG_FILENAME);
-    let depth_path = models_dir.join(DEPTH_FILENAME);
-
-    let sam_encoder = Session::builder()?.commit_from_file(encoder_path)?;
-    let sam_decoder = Session::builder()?.commit_from_file(decoder_path)?;
-    let u2netp = Session::builder()?.commit_from_file(u2netp_path)?;
-    let sky_seg = Session::builder()?.commit_from_file(sky_seg_path)?;
-    let depth_anything = Session::builder()?.commit_from_file(depth_path)?;
-
     crate::register_exit_handler();
 
     let models = Arc::new(AiModels {
-        sam_encoder: Mutex::new(sam_encoder),
-        sam_decoder: Mutex::new(sam_decoder),
-        u2netp: Mutex::new(u2netp),
-        sky_seg: Mutex::new(sky_seg),
-        depth_anything: Mutex::new(depth_anything),
+        models_dir,
+        use_gpu: gpu_acceleration_enabled(app_handle),
+        sam_encoder: Mutex::new(None),
+        sam_decoder: Mutex::new(None),
+        u2netp: Mutex::new(None),
+        sky_seg: Mutex::new(None),
+        depth_anything: Mutex::new(None),
     });
 
-    let mut ai_state_lock = ai_state_mutex.lock().unwrap();
-    if let Some(state) = ai_state_lock.as_mut() {
-        state.models = Some(models.clone());
-    } else {
-        *ai_state_lock = Some(AiState {
-            models: Some(models.clone()),
-            denoise_model: None,
-            clip_models: None,
-            lama_model: None,
-            normal_model: None,
-            embeddings: None,
-            depth_map: None,
-        });
-    }
+    ai_state_mutex
+        .lock()
+        .unwrap()
+        .get_or_insert_with(AiState::default)
+        .models = Some(models.clone());
 
     Ok(models)
 }
@@ -429,22 +652,16 @@ pub async fn get_or_init_denoise_model(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<Mutex<Session>>> {
-    if let Some(denoise_model) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.denoise_model.clone())
+    if let Some(denoise_model) =
+        cached_ai_state(ai_state_mutex, |state| state.denoise_model.clone())
     {
         return Ok(denoise_model);
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(denoise_model) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.denoise_model.clone())
+    if let Some(denoise_model) =
+        cached_ai_state(ai_state_mutex, |state| state.denoise_model.clone())
     {
         return Ok(denoise_model);
     }
@@ -462,25 +679,21 @@ pub async fn get_or_init_denoise_model(
 
     let _ = ort::init().with_name("AI-Denoise").commit();
     let model_path = models_dir.join(DENOISE_FILENAME);
-    let session = Session::builder()?.commit_from_file(model_path)?;
+    let session = build_session(
+        &model_path,
+        SessionKind::Persistent,
+        gpu_acceleration_enabled(app_handle),
+        Some(denoise_crop_as_slice),
+    )?;
     let denoise_model = Arc::new(Mutex::new(session));
 
     crate::register_exit_handler();
 
-    let mut ai_state_lock = ai_state_mutex.lock().unwrap();
-    if let Some(state) = ai_state_lock.as_mut() {
-        state.denoise_model = Some(denoise_model.clone());
-    } else {
-        *ai_state_lock = Some(AiState {
-            models: None,
-            denoise_model: Some(denoise_model.clone()),
-            clip_models: None,
-            lama_model: None,
-            normal_model: None,
-            embeddings: None,
-            depth_map: None,
-        });
-    }
+    ai_state_mutex
+        .lock()
+        .unwrap()
+        .get_or_insert_with(AiState::default)
+        .denoise_model = Some(denoise_model.clone());
 
     Ok(denoise_model)
 }
@@ -490,23 +703,13 @@ pub async fn get_or_init_clip_models(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<ClipModels>> {
-    if let Some(clip_models) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.clip_models.clone())
-    {
+    if let Some(clip_models) = cached_ai_state(ai_state_mutex, |state| state.clip_models.clone()) {
         return Ok(clip_models);
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(clip_models) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.clip_models.clone())
-    {
+    if let Some(clip_models) = cached_ai_state(ai_state_mutex, |state| state.clip_models.clone()) {
         return Ok(clip_models);
     }
 
@@ -532,7 +735,12 @@ pub async fn get_or_init_clip_models(
 
     let _ = ort::init().with_name("AI-Tagging").commit();
     let clip_model_path = models_dir.join(CLIP_MODEL_FILENAME);
-    let model = Mutex::new(Session::builder()?.commit_from_file(clip_model_path)?);
+    let model = Mutex::new(build_session(
+        &clip_model_path,
+        SessionKind::Persistent,
+        gpu_allowed_on_platform() && gpu_acceleration_enabled(app_handle),
+        None,
+    )?);
     let tokenizer =
         Tokenizer::from_file(clip_tokenizer_path).map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
@@ -540,20 +748,11 @@ pub async fn get_or_init_clip_models(
 
     let clip_models = Arc::new(ClipModels { model, tokenizer });
 
-    let mut ai_state_lock = ai_state_mutex.lock().unwrap();
-    if let Some(state) = ai_state_lock.as_mut() {
-        state.clip_models = Some(clip_models.clone());
-    } else {
-        *ai_state_lock = Some(AiState {
-            models: None,
-            denoise_model: None,
-            clip_models: Some(clip_models.clone()),
-            lama_model: None,
-            normal_model: None,
-            embeddings: None,
-            depth_map: None,
-        });
-    }
+    ai_state_mutex
+        .lock()
+        .unwrap()
+        .get_or_insert_with(AiState::default)
+        .clip_models = Some(clip_models.clone());
 
     Ok(clip_models)
 }
@@ -563,23 +762,13 @@ pub async fn get_or_init_lama_model(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<Mutex<Session>>> {
-    if let Some(lama_model) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.lama_model.clone())
-    {
+    if let Some(lama_model) = cached_ai_state(ai_state_mutex, |state| state.lama_model.clone()) {
         return Ok(lama_model);
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(lama_model) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.lama_model.clone())
-    {
+    if let Some(lama_model) = cached_ai_state(ai_state_mutex, |state| state.lama_model.clone()) {
         return Ok(lama_model);
     }
 
@@ -596,25 +785,16 @@ pub async fn get_or_init_lama_model(
 
     let _ = ort::init().with_name("AI-Inpainting").commit();
     let model_path = models_dir.join(LAMA_FILENAME);
-    let session = Session::builder()?.commit_from_file(model_path)?;
+    let session = build_session(&model_path, SessionKind::OneShot, false, None)?;
     let lama_model = Arc::new(Mutex::new(session));
 
     crate::register_exit_handler();
 
-    let mut ai_state_lock = ai_state_mutex.lock().unwrap();
-    if let Some(state) = ai_state_lock.as_mut() {
-        state.lama_model = Some(lama_model.clone());
-    } else {
-        *ai_state_lock = Some(AiState {
-            models: None,
-            denoise_model: None,
-            clip_models: None,
-            lama_model: Some(lama_model.clone()),
-            normal_model: None,
-            embeddings: None,
-            depth_map: None,
-        });
-    }
+    ai_state_mutex
+        .lock()
+        .unwrap()
+        .get_or_insert_with(AiState::default)
+        .lama_model = Some(lama_model.clone());
 
     Ok(lama_model)
 }
@@ -624,22 +804,14 @@ pub async fn get_or_init_normal_model(
     ai_state_mutex: &Mutex<Option<AiState>>,
     ai_init_lock: &TokioMutex<()>,
 ) -> Result<Arc<Mutex<Session>>> {
-    if let Some(normal_model) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.normal_model.clone())
+    if let Some(normal_model) = cached_ai_state(ai_state_mutex, |state| state.normal_model.clone())
     {
         return Ok(normal_model);
     }
 
     let _guard = ai_init_lock.lock().await;
 
-    if let Some(normal_model) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.normal_model.clone())
+    if let Some(normal_model) = cached_ai_state(ai_state_mutex, |state| state.normal_model.clone())
     {
         return Ok(normal_model);
     }
@@ -657,25 +829,21 @@ pub async fn get_or_init_normal_model(
 
     let _ = ort::init().with_name("AI-Normal").commit();
     let model_path = models_dir.join(NORMAL_FILENAME);
-    let session = Session::builder()?.commit_from_file(model_path)?;
+    let session = build_session(
+        &model_path,
+        SessionKind::OneShot,
+        gpu_allowed_on_platform() && gpu_acceleration_enabled(app_handle),
+        None,
+    )?;
     let normal_model = Arc::new(Mutex::new(session));
 
     crate::register_exit_handler();
 
-    let mut ai_state_lock = ai_state_mutex.lock().unwrap();
-    if let Some(state) = ai_state_lock.as_mut() {
-        state.normal_model = Some(normal_model.clone());
-    } else {
-        *ai_state_lock = Some(AiState {
-            models: None,
-            denoise_model: None,
-            clip_models: None,
-            lama_model: None,
-            normal_model: Some(normal_model.clone()),
-            embeddings: None,
-            depth_map: None,
-        });
-    }
+    ai_state_mutex
+        .lock()
+        .unwrap()
+        .get_or_insert_with(AiState::default)
+        .normal_model = Some(normal_model.clone());
 
     Ok(normal_model)
 }
@@ -795,7 +963,7 @@ fn run_native_denoise(
 
         let tile = {
             let mut sess = session.lock().unwrap();
-            let outputs = sess.run(ort::inputs![t_input])?;
+            let outputs = gpu_inference(sess.run(ort::inputs![t_input]))?;
             outputs[0]
                 .try_extract_array::<f32>()?
                 .to_owned()
@@ -1302,7 +1470,7 @@ pub fn run_sky_seg_model(
     let t_input = Tensor::from_array(input_tensor_dyn.as_standard_layout().into_owned())?;
 
     let mut session = sky_seg_session.lock().unwrap();
-    let outputs = session.run(ort::inputs![t_input])?;
+    let outputs = gpu_inference(session.run(ort::inputs![t_input]))?;
     let output_tensor = outputs[0].try_extract_array::<f32>()?.to_owned();
     let out_slice = output_tensor.as_slice().unwrap();
 
@@ -1383,7 +1551,7 @@ pub fn run_u2netp_model(
     let t_input = Tensor::from_array(input_tensor_dyn.as_standard_layout().into_owned())?;
 
     let mut session = u2netp_session.lock().unwrap();
-    let outputs = session.run(ort::inputs![t_input])?;
+    let outputs = gpu_inference(session.run(ort::inputs![t_input]))?;
     let output_tensor = outputs[0].try_extract_array::<f32>()?.to_owned();
     let out_slice = output_tensor.as_slice().unwrap();
 
@@ -1462,7 +1630,7 @@ pub fn run_depth_anything_model(
     let t_input = Tensor::from_array(input_tensor_dyn.as_standard_layout().into_owned())?;
 
     let mut session = depth_session.lock().unwrap();
-    let outputs = session.run(ort::inputs![t_input])?;
+    let outputs = gpu_inference(session.run(ort::inputs![t_input]))?;
     let output_tensor = outputs[0].try_extract_array::<f32>()?.to_owned();
     let out_slice = output_tensor.as_slice().unwrap();
 
@@ -1573,10 +1741,10 @@ pub fn run_normal_model(
     let t_num_tokens = Tensor::from_array(ndarray::arr0(NORMAL_NUM_TOKENS))?;
 
     let mut session = normal_session.lock().unwrap();
-    let outputs = session.run(ort::inputs![
+    let outputs = gpu_inference(session.run(ort::inputs![
         "image" => t_image,
         "num_tokens" => t_num_tokens,
-    ])?;
+    ]))?;
 
     let normal_tensor = outputs["normal"].try_extract_array::<f32>()?;
     let mask_tensor = outputs["mask"].try_extract_array::<f32>()?;

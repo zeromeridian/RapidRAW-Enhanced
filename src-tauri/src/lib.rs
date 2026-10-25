@@ -1001,17 +1001,31 @@ async fn analyze_geometry(
 }
 
 #[cfg(target_os = "macos")]
+static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
+
+#[cfg(target_os = "macos")]
+extern "C" fn mark_shutting_down() {
+    SHUTTING_DOWN.store(true, Ordering::SeqCst);
+}
+
+#[cfg(target_os = "macos")]
 extern "C" fn force_exit(_signal: libc::c_int) {
-    unsafe {
-        libc::_exit(0);
+    if SHUTTING_DOWN.load(Ordering::SeqCst) {
+        unsafe {
+            libc::_exit(0);
+        }
     }
 }
 
 #[cfg(target_os = "macos")]
 pub fn register_exit_handler() {
+    static ATEXIT: std::sync::Once = std::sync::Once::new();
     unsafe {
         libc::signal(libc::SIGABRT, force_exit as *const () as libc::sighandler_t);
     }
+    ATEXIT.call_once(|| unsafe {
+        libc::atexit(mark_shutting_down);
+    });
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -1665,17 +1679,21 @@ fn start_preview_worker(app_handle: tauri::AppHandle) {
 
             let state = app_handle.state::<AppState>();
             let responder = job.responder;
-            match process_preview_job(
-                &app_handle,
-                state,
-                job.adjustments,
-                job.is_interactive,
-                job.target_resolution,
-                job.roi,
-                job.compute_analytics,
-                job.compute_waveform,
-                job.active_waveform_channel.as_deref(),
-            ) {
+            let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                process_preview_job(
+                    &app_handle,
+                    state,
+                    job.adjustments,
+                    job.is_interactive,
+                    job.target_resolution,
+                    job.roi,
+                    job.compute_analytics,
+                    job.compute_waveform,
+                    job.active_waveform_channel.as_deref(),
+                )
+            }))
+            .unwrap_or_else(|_| Err("Preview rendering panicked".to_string()));
+            match result {
                 Ok(bytes) => {
                     let _ = responder.send(bytes);
                 }
@@ -3264,7 +3282,6 @@ pub fn run() {
                 });
             }
 
-            crate::register_exit_handler();
             Ok(())
         })
         .manage(AppState {
