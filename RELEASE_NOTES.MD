@@ -5,6 +5,32 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.12.0-dev-port-features-from-rr — 2026-10-25
+
+### New AI sky and foreground masks
+
+- AI sky masks now use EfficientSAM3, the model RapidRAW uses. It recognizes
+  overcast, stormy, and dark skies that the previous model missed, and
+  follows treelines and fine structures much more precisely.
+- AI foreground masks now use BiRefNet, with sharper, more detailed edges
+  around hair, branches, and thin objects.
+- AI subject masks follow image edges more closely. Masks drawn for
+  generative replace keep their original shape.
+- Each AI mask type now downloads its model the first time it is used,
+  instead of downloading every mask model at once.
+- Existing masks in your edits are unchanged. Only new masks, or masks you
+  regenerate, use the new models.
+- The previous sky and foreground model files are removed automatically once
+  their replacements have downloaded, freeing about 350 MB.
+- When no sky or foreground is found, a clear message is shown.
+
+## 1.11.1-dev-port-features-from-rr — 2026-10-25
+
+### Fixes
+
+- AI sky and foreground masks run on the processor again on Mac, as they did
+  before 1.11.0. AI Denoise and depth maps still use the graphics card.
+
 ## 1.11.0-dev-port-features-from-rr — 2026-10-25
 
 ### Faster AI on Mac

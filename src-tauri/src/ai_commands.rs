@@ -1,20 +1,70 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
+use std::sync::{Arc, Mutex};
 
 use base64::{Engine as _, engine::general_purpose};
-use image::{GrayImage, ImageFormat};
+use image::{DynamicImage, GrayImage, ImageFormat};
 
 use crate::ai_connector;
 use crate::ai_processing::{
-    AiDepthMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters,
-    AiSubjectMaskParameters, CachedDepthMap, generate_image_embeddings, get_or_init_ai_models,
-    run_depth_anything_model, run_sam_decoder, run_sky_seg_model, run_u2netp_model,
+    AiDepthMaskParameters, AiForegroundMaskParameters, AiMaskModel, AiModels, AiSkyMaskParameters,
+    AiState, AiSubjectMaskParameters, CachedDepthMap, ESAM3_SKY_REFINE_EPS,
+    ESAM3_SKY_SCORE_THRESHOLD, Esam3Features, generate_image_embeddings, get_or_init_ai_models,
+    run_birefnet_model, run_depth_anything_model, run_esam3_decoder, run_esam3_image_encoder,
+    run_sam_decoder,
 };
 use crate::app_settings::load_settings;
 use crate::app_state::AppState;
 use crate::cache_utils::GEOMETRY_KEYS;
 use crate::get_cached_full_warped_image;
+
+const NO_FOREGROUND_FOUND: &str = "No foreground found";
+const NO_SKY_FOUND: &str = "No sky found";
+
+pub fn ai_cache_key(path: &str, adjustments: &serde_json::Value) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(path.as_bytes());
+    let mut geo_hasher = DefaultHasher::new();
+    for key in GEOMETRY_KEYS {
+        if let Some(val) = adjustments.get(key) {
+            key.hash(&mut geo_hasher);
+            val.to_string().hash(&mut geo_hasher);
+        }
+    }
+    hasher.update(&geo_hasher.finish().to_le_bytes());
+    hasher.finalize().to_hex().to_string()
+}
+
+fn cached_esam3_features(
+    ai_state: &Mutex<Option<AiState>>,
+    models: &AiModels,
+    cache_key: &str,
+    warped_image: &DynamicImage,
+) -> Result<Arc<Esam3Features>, String> {
+    if let Some(cached) = ai_state
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|s| s.esam3_features.clone())
+        .filter(|cached| cached.path_hash == cache_key)
+    {
+        return Ok(cached);
+    }
+
+    let mut features = run_esam3_image_encoder(
+        warped_image,
+        &*models.esam3_image_encoder().map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    features.path_hash = cache_key.to_string();
+    let features = Arc::new(features);
+
+    if let Some(state) = ai_state.lock().unwrap().as_mut() {
+        state.esam3_features = Some(features.clone());
+    }
+    Ok(features)
+}
 
 fn encode_to_base64_png(image: &GrayImage) -> Result<String, String> {
     let mut buf = Cursor::new(Vec::new());
@@ -35,17 +85,25 @@ pub async fn generate_ai_foreground_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiForegroundMaskParameters, String> {
-    let models = get_or_init_ai_models(&app_handle, &state.ai_state, &state.ai_init_lock)
-        .await
-        .map_err(|e| e.to_string())?;
+    let models = get_or_init_ai_models(
+        &app_handle,
+        &state.ai_state,
+        &state.ai_init_lock,
+        AiMaskModel::Foreground,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
     let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
 
-    let full_mask_image = run_u2netp_model(
+    let full_mask_image = run_birefnet_model(
         warped_image.as_ref(),
-        &*models.u2netp().map_err(|e| e.to_string())?,
+        &*models.birefnet().map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
+    if full_mask_image.iter().all(|&v| v < 128) {
+        return Err(NO_FOREGROUND_FOUND.to_string());
+    }
     let base64_data = encode_to_base64_png(&full_mask_image)?;
 
     Ok(AiForegroundMaskParameters {
@@ -57,9 +115,11 @@ pub async fn generate_ai_foreground_mask(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn generate_ai_sky_mask(
     js_adjustments: serde_json::Value,
+    path: String,
     rotation: f32,
     flip_horizontal: bool,
     flip_vertical: bool,
@@ -67,17 +127,34 @@ pub async fn generate_ai_sky_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiSkyMaskParameters, String> {
-    let models = get_or_init_ai_models(&app_handle, &state.ai_state, &state.ai_init_lock)
-        .await
-        .map_err(|e| e.to_string())?;
+    let models = get_or_init_ai_models(
+        &app_handle,
+        &state.ai_state,
+        &state.ai_init_lock,
+        AiMaskModel::Sky,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
     let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
 
-    let full_mask_image = run_sky_seg_model(
-        warped_image.as_ref(),
-        &*models.sky_seg().map_err(|e| e.to_string())?,
+    let features = cached_esam3_features(
+        &state.ai_state,
+        &models,
+        &ai_cache_key(&path, &js_adjustments),
+        &warped_image,
+    )?;
+    let prompt = models.esam3_sky_prompt().map_err(|e| e.to_string())?;
+    let full_mask_image = run_esam3_decoder(
+        &*models.esam3_decoder().map_err(|e| e.to_string())?,
+        &features,
+        &prompt,
+        &warped_image,
+        ESAM3_SKY_SCORE_THRESHOLD,
+        ESAM3_SKY_REFINE_EPS,
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| e.to_string())?
+    .ok_or_else(|| NO_SKY_FOUND.to_string())?;
     let base64_data = encode_to_base64_png(&full_mask_image)?;
 
     Ok(AiSkyMaskParameters {
@@ -106,23 +183,16 @@ pub async fn generate_ai_depth_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiDepthMaskParameters, String> {
-    let models = get_or_init_ai_models(&app_handle, &state.ai_state, &state.ai_init_lock)
-        .await
-        .map_err(|e| e.to_string())?;
+    let models = get_or_init_ai_models(
+        &app_handle,
+        &state.ai_state,
+        &state.ai_init_lock,
+        AiMaskModel::Depth,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
-    let path_hash = {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(path.as_bytes());
-        let mut geo_hasher = DefaultHasher::new();
-        for key in GEOMETRY_KEYS {
-            if let Some(val) = js_adjustments.get(key) {
-                key.hash(&mut geo_hasher);
-                val.to_string().hash(&mut geo_hasher);
-            }
-        }
-        hasher.update(&geo_hasher.finish().to_le_bytes());
-        hasher.finalize().to_hex().to_string()
-    };
+    let path_hash = ai_cache_key(&path, &js_adjustments);
 
     let cached_depth = {
         let mut ai_state_lock = state.ai_state.lock().unwrap();
@@ -191,10 +261,11 @@ pub async fn generate_full_image_depth_map(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
-    let models = crate::ai_processing::get_or_init_ai_models(
+    let models = get_or_init_ai_models(
         &app_handle,
         &state.ai_state,
         &state.ai_init_lock,
+        AiMaskModel::Depth,
     )
     .await
     .map_err(|e| e.to_string())?;
@@ -247,26 +318,20 @@ pub async fn generate_ai_subject_mask(
     flip_horizontal: bool,
     flip_vertical: bool,
     orientation_steps: u8,
+    skip_refinement: Option<bool>,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiSubjectMaskParameters, String> {
-    let models = get_or_init_ai_models(&app_handle, &state.ai_state, &state.ai_init_lock)
-        .await
-        .map_err(|e| e.to_string())?;
+    let models = get_or_init_ai_models(
+        &app_handle,
+        &state.ai_state,
+        &state.ai_init_lock,
+        AiMaskModel::Subject,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
-    let path_hash = {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(path.as_bytes());
-        let mut geo_hasher = DefaultHasher::new();
-        for key in GEOMETRY_KEYS {
-            if let Some(val) = js_adjustments.get(key) {
-                key.hash(&mut geo_hasher);
-                val.to_string().hash(&mut geo_hasher);
-            }
-        }
-        hasher.update(&geo_hasher.finish().to_le_bytes());
-        hasher.finalize().to_hex().to_string()
-    };
+    let path_hash = ai_cache_key(&path, &js_adjustments);
 
     let embeddings = {
         let mut ai_state_lock = state.ai_state.lock().unwrap();
@@ -371,11 +436,17 @@ pub async fn generate_ai_subject_mask(
     let unrotated_start_point = (min_x, min_y);
     let unrotated_end_point = (max_x, max_y);
 
+    let refinement_image = if skip_refinement.unwrap_or(false) {
+        None
+    } else {
+        Some(get_cached_full_warped_image(&state, &js_adjustments)?)
+    };
     let mask_bitmap = run_sam_decoder(
         &*models.sam_decoder().map_err(|e| e.to_string())?,
         &embeddings,
         unrotated_start_point,
         unrotated_end_point,
+        refinement_image.as_deref(),
     )
     .map_err(|e| e.to_string())?;
     let base64_data = encode_to_base64_png(&mask_bitmap)?;
@@ -400,23 +471,16 @@ pub async fn precompute_ai_subject_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    let models = get_or_init_ai_models(&app_handle, &state.ai_state, &state.ai_init_lock)
-        .await
-        .map_err(|e| e.to_string())?;
+    let models = get_or_init_ai_models(
+        &app_handle,
+        &state.ai_state,
+        &state.ai_init_lock,
+        AiMaskModel::Subject,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
-    let path_hash = {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(path.as_bytes());
-        let mut geo_hasher = DefaultHasher::new();
-        for key in GEOMETRY_KEYS {
-            if let Some(val) = js_adjustments.get(key) {
-                key.hash(&mut geo_hasher);
-                val.to_string().hash(&mut geo_hasher);
-            }
-        }
-        hasher.update(&geo_hasher.finish().to_le_bytes());
-        hasher.finalize().to_hex().to_string()
-    };
+    let path_hash = ai_cache_key(&path, &js_adjustments);
 
     let mut ai_state_lock = state.ai_state.lock().unwrap();
     let ai_state = ai_state_lock.as_mut().unwrap();

@@ -1899,15 +1899,16 @@
     "thanks": {
       "description": "Um enorme obrigado aos seguintes projetos que foram muito importantes no desenvolvimento do ThisIsRAW:",
       "list": {
+        "birefnet": "Pelo modelo de segmentação de alta resolução que alimenta a detecção de primeiro plano por IA.",
         "darktable": "Por algumas implementações de referência que guiaram partes deste trabalho.",
         "depth": "Pelo poderoso modelo de estimativa de profundidade monocular que permite as capacidades de mascaramento de profundidade por IA.",
+        "efficientsam3": "Pelo eficiente modelo de segmentação por prompts, destilado do SAM 3, que alimenta as máscaras de céu e de texto por IA.",
         "lama": "Pelo modelo poderoso e simples de preenchimento de imagens, que permite o preenchimento sensível ao conteúdo e a remoção de objetos.",
         "lensfun": "Pela sua valiosa biblioteca de código aberto e banco de dados abrangente para correção automática de lente.",
         "negpy": "Pela inspiração por trás da lógica de conversão de negativo.",
         "nind": "Por fornecer modelos de IA que alimentam os recursos de redução de ruído por IA no ThisIsRAW.",
         "rawler": "Pelo excelente crate Rust que fornece a base para o processamento de arquivos RAW neste projeto.",
         "sam2": "Por fornecer o modelo base usado para os recursos de detecção de motivos por IA.",
-        "u2net": "Por fornecer a arquitetura robusta usada para as capacidades de detecção de céu e primeiro plano por IA.",
         "you": "Por usar e apoiar o ThisIsRAW. Seu interesse mantém este projeto vivo e em evolução.",
         "youLabel": "Você"
       },

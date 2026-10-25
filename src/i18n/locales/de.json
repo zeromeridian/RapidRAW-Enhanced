@@ -1862,15 +1862,16 @@
     "thanks": {
       "description": "Ein großes Dankeschön an die folgenden Projekte, die für die Entwicklung von ThisIsRAW sehr wichtig waren:",
       "list": {
+        "birefnet": "Für das hochauflösende Segmentierungsmodell der KI-Vordergrunderkennung.",
         "darktable": "Für Referenzimplementierungen, die Teile dieser Arbeit leiteten.",
         "depth": "Für das Modell zur monokularen Tiefenschätzung (Tiefenmasken).",
+        "efficientsam3": "Für das effiziente, aus SAM 3 destillierte Segmentierungsmodell der KI-Himmel- und Textmasken.",
         "lama": "Für das leistungsstarke Bild-Inpainting-Modell.",
         "lensfun": "Für die unschätzbare Open-Source-Bibliothek für Objektivkorrektur.",
         "negpy": "Für die Inspiration hinter der Negativumwandlungslogik.",
         "nind": "Für die Bereitstellung von KI-Modellen für die Rauschreduzierung.",
         "rawler": "Für die hervorragende Rust-Crate zur RAW-Bildverarbeitung.",
         "sam2": "Für das grundlegende Modell der KI-Motiverkennung.",
-        "u2net": "Für die Architektur zur Erkennung von Himmel und Vordergrund.",
         "you": "Dafür, dass Sie ThisIsRAW nutzen. Ihr Interesse hält dieses Projekt am Leben.",
         "youLabel": "Ihnen"
       },
