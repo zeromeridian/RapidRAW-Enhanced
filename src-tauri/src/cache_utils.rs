@@ -225,6 +225,19 @@ pub fn calculate_full_job_hash(path: &str, adjustments: &serde_json::Value) -> u
     hasher.finish()
 }
 
+/// Every setting `load_base_image_from_bytes` reads, so caches of decoded pixels can key on it.
+/// The text is stable across builds, which on-disk cache keys rely on.
+pub fn raw_decode_settings_key(settings: &AppSettings) -> String {
+    format!(
+        "{:?}|{}|{:?}|{:?}|{:?}",
+        settings.raw_highlight_compression,
+        settings.linear_raw_mode,
+        settings.raw_preprocessing_color_nr,
+        settings.raw_preprocessing_sharpening,
+        settings.apply_preprocessing_to_non_raws,
+    )
+}
+
 /// A path alone goes stale: files are rewritten in place and raw settings change the pixels.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DecodeFingerprint {
@@ -237,20 +250,7 @@ impl DecodeFingerprint {
     pub fn for_file(path: &Path, settings: &AppSettings) -> Option<Self> {
         let metadata = std::fs::metadata(path).ok()?;
         let mut hasher = DefaultHasher::new();
-        settings
-            .raw_highlight_compression
-            .map(f32::to_bits)
-            .hash(&mut hasher);
-        settings.linear_raw_mode.hash(&mut hasher);
-        settings
-            .raw_preprocessing_color_nr
-            .map(f32::to_bits)
-            .hash(&mut hasher);
-        settings
-            .raw_preprocessing_sharpening
-            .map(f32::to_bits)
-            .hash(&mut hasher);
-        settings.apply_preprocessing_to_non_raws.hash(&mut hasher);
+        raw_decode_settings_key(settings).hash(&mut hasher);
         Some(Self {
             len: metadata.len(),
             modified: metadata.modified().ok(),

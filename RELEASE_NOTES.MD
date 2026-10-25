@@ -5,6 +5,45 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.10.3-fix-upstream-fixes — 2026-10-25
+
+### File safety
+
+- Deleting images from several folders at once no longer also deletes
+  unrelated files that share a name with a selected image in another folder.
+- Copying or moving images with the same file name from different folders
+  into one folder is now refused before any file is changed, instead of one
+  file overwriting the other. Copying into another folder also no longer
+  overwrites existing files there.
+- The edits of an image whose name begins with another image's full name (for
+  example `IMG.CR2.jpg` next to `IMG.CR2`) are no longer moved, copied,
+  deleted, or renamed together with the other image.
+- Tags containing characters such as `&`, `<`, or `$` are now written to XMP
+  correctly instead of producing an invalid or altered XMP file.
+
+### Renaming
+
+- Renaming an image together with its virtual copies renames the file once
+  and keeps the sequence numbers continuous.
+- After renaming several images, the selection and the open image follow the
+  renamed files correctly.
+- Renaming several images to the same name is now refused instead of
+  overwriting files.
+- Renaming a folder no longer affects the view of a different folder whose
+  name starts the same way, and pinned folders and nested library folders
+  inside the renamed folder follow the new name.
+
+### Library
+
+- Thumbnails now update when RAW processing or tonemapper settings change.
+  Existing thumbnails are regenerated once as they come into view.
+- Searching for ordinary words such as "sunset" or "flowers" no longer treats
+  them as camera-setting filters.
+- Opening a folder expands the correct library folder when one folder's name
+  begins with another's, such as `Photos` and `Photos-2022`.
+- After deleting an image that has virtual copies, the next remaining image is
+  selected.
+
 ## 1.10.2-fix-upstream-fixes — 2026-10-24
 
 ### Fixes

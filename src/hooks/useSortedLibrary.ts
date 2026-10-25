@@ -8,7 +8,7 @@ import { getImageFlag } from '../utils/imageFlags';
 import { matchesLibraryFilter } from '../utils/libraryFilters';
 
 export const ADVANCED_QUERY_REGEX =
-  /^(iso|aperture|f|shutter|s|focal|mm|rating|color|flag|camera|make|model|lens)\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
+  /^(iso|aperture|f|shutter|s|focal|mm|rating|color|flag|camera|make|model|lens)(?=\s*[:<>=])\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
 
 export const parseShutter = (val: string | undefined): number => {
   if (!val) return 0;
