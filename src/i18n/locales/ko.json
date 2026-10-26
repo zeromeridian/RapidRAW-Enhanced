@@ -645,6 +645,7 @@
         "applyPreset": "프리셋 적용",
         "componentPropertiesTitle": "{{name}} 속성",
         "copySectionSettings": "{{section}} 설정 복사",
+        "generateTextMask": "마스크 생성",
         "invertComponent": "구성 요소 반전",
         "invertMask": "마스크 반전",
         "maskPropertiesTitle": "마스크 속성",
@@ -654,7 +655,8 @@
         "pasteSettings": "설정 붙여넣기",
         "resetSectionSettings": "{{section}} 설정 초기화",
         "select": "선택",
-        "selectPresetTooltip": "적용할 프리셋 선택"
+        "selectPresetTooltip": "적용할 프리셋 선택",
+        "textPromptPlaceholder": "예: 사람, 자동차, 물"
       },
       "toggleAnalyticsTooltip": "분석 표시 전환",
       "tooltips": {
@@ -1131,7 +1133,8 @@
       "quickEraser": "빠른 지우개",
       "radial": "원형",
       "sky": "하늘",
-      "subject": "피사체"
+      "subject": "피사체",
+      "text": "텍스트"
     }
   },
   "menus": {

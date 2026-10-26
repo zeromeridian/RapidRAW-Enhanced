@@ -670,6 +670,7 @@
         "applyPreset": "Aplicar ajuste preestablecido",
         "componentPropertiesTitle": "Propiedades de {{name}}",
         "copySectionSettings": "Copiar ajustes de {{section}}",
+        "generateTextMask": "Generar máscara",
         "invertComponent": "Invertir componente",
         "invertMask": "Invertir máscara",
         "maskPropertiesTitle": "Propiedades de la máscara",
@@ -679,7 +680,8 @@
         "pasteSettings": "Pegar ajustes",
         "resetSectionSettings": "Restablecer ajustes de {{section}}",
         "select": "Seleccionar",
-        "selectPresetTooltip": "Selecciona un ajuste preestablecido para aplicar"
+        "selectPresetTooltip": "Selecciona un ajuste preestablecido para aplicar",
+        "textPromptPlaceholder": "ej., persona, coche, agua"
       },
       "toggleAnalyticsTooltip": "Alternar vista de análisis",
       "tooltips": {
@@ -1159,7 +1161,8 @@
       "quickEraser": "Borrador rápido",
       "radial": "Radial",
       "sky": "Cielo",
-      "subject": "Sujeto"
+      "subject": "Sujeto",
+      "text": "Texto"
     }
   },
   "menus": {

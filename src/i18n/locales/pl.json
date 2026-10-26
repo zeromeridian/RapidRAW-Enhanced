@@ -693,6 +693,7 @@
         "applyPreset": "Zastosuj preset",
         "componentPropertiesTitle": "Właściwości dla {{name}}",
         "copySectionSettings": "Kopiuj ustawienia sekcji {{section}}",
+        "generateTextMask": "Generuj maskę",
         "invertComponent": "Odwróć komponent",
         "invertMask": "Odwróć maskę",
         "maskPropertiesTitle": "Właściwości maski",
@@ -702,7 +703,8 @@
         "pasteSettings": "Wklej ustawienia",
         "resetSectionSettings": "Resetuj ustawienia sekcji {{section}}",
         "select": "Wybierz",
-        "selectPresetTooltip": "Wybierz preset do zastosowania"
+        "selectPresetTooltip": "Wybierz preset do zastosowania",
+        "textPromptPlaceholder": "np. osoba, samochód, woda"
       },
       "toggleAnalyticsTooltip": "Przełącz widok analityki",
       "tooltips": {
@@ -1185,7 +1187,8 @@
       "quickEraser": "Szybka gumka",
       "radial": "Radialny",
       "sky": "Niebo",
-      "subject": "Temat"
+      "subject": "Temat",
+      "text": "Tekst"
     }
   },
   "menus": {

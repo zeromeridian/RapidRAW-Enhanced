@@ -645,6 +645,7 @@
         "applyPreset": "应用预设",
         "componentPropertiesTitle": "{{name}} 属性",
         "copySectionSettings": "复制 {{section}} 设置",
+        "generateTextMask": "生成蒙版",
         "invertComponent": "反转组件",
         "invertMask": "反转蒙版",
         "maskPropertiesTitle": "蒙版属性",
@@ -654,7 +655,8 @@
         "pasteSettings": "粘贴设置",
         "resetSectionSettings": "重置 {{section}} 设置",
         "select": "选择",
-        "selectPresetTooltip": "选择一个预设以应用"
+        "selectPresetTooltip": "选择一个预设以应用",
+        "textPromptPlaceholder": "例如，人物、汽车、水面"
       },
       "toggleAnalyticsTooltip": "切换分析显示",
       "tooltips": {
@@ -1131,7 +1133,8 @@
       "quickEraser": "快速橡皮擦",
       "radial": "径向",
       "sky": "天空",
-      "subject": "主体"
+      "subject": "主体",
+      "text": "文本"
     }
   },
   "menus": {

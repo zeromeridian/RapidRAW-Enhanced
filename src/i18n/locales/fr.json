@@ -670,6 +670,7 @@
         "applyPreset": "Appliquer le paramètre prédéfini",
         "componentPropertiesTitle": "Propriétés de {{name}}",
         "copySectionSettings": "Copier les paramètres de la section {{section}}",
+        "generateTextMask": "Générer le masque",
         "invertComponent": "Inverser le composant",
         "invertMask": "Inverser le masque",
         "maskPropertiesTitle": "Propriétés du masque",
@@ -679,7 +680,8 @@
         "pasteSettings": "Coller les paramètres",
         "resetSectionSettings": "Réinitialiser les paramètres de la section {{section}}",
         "select": "Sélectionner",
-        "selectPresetTooltip": "Sélectionner un paramètre prédéfini à appliquer"
+        "selectPresetTooltip": "Sélectionner un paramètre prédéfini à appliquer",
+        "textPromptPlaceholder": "ex. : personne, voiture, eau"
       },
       "toggleAnalyticsTooltip": "Basculer l'affichage des analyses",
       "tooltips": {
@@ -1159,7 +1161,8 @@
       "quickEraser": "Gomme rapide",
       "radial": "Radial",
       "sky": "Ciel",
-      "subject": "Sujet"
+      "subject": "Sujet",
+      "text": "Texte"
     }
   },
   "menus": {

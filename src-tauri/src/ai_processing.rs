@@ -58,6 +58,10 @@ const ESAM3_DECODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Mode
 const ESAM3_DECODER_FILENAME: &str = "efficientsam3_ev_m_decoder.onnx";
 const ESAM3_DECODER_SHA256: &str =
     "16accc22a07ee99c73ef8a14e286ec567f94c116e0d8efa1a3a6c0bc9a2596a8";
+const ESAM3_TEXT_ENCODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/efficientsam3_ev_m_text_encoder.onnx?download=true";
+const ESAM3_TEXT_ENCODER_FILENAME: &str = "efficientsam3_ev_m_text_encoder.onnx";
+const ESAM3_TEXT_ENCODER_SHA256: &str =
+    "3065ea6116f21f6e22bc70a0c041e5da9ae05fdec7b48df953394f5657609590";
 const ESAM3_SKY_PROMPT_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/efficientsam3_sky_prompt.bin?download=true";
 const ESAM3_SKY_PROMPT_FILENAME: &str = "efficientsam3_sky_prompt.bin";
 const ESAM3_SKY_PROMPT_SHA256: &str =
@@ -68,11 +72,14 @@ const ESAM3_PROMPT_TOKENS: usize = 16;
 const ESAM3_EMBED_DIM: usize = 256;
 const ESAM3_EXEMPLAR_SLOTS: usize = 8;
 pub const ESAM3_SKY_SCORE_THRESHOLD: f32 = 0.6;
+pub const ESAM3_TEXT_SCORE_THRESHOLD: f32 = 0.3;
 const ESAM3_MASK_LOW: f32 = 0.3;
 const ESAM3_MASK_HIGH: f32 = 0.7;
 const ESAM3_REFINE_SIZE: u32 = 1024;
 const ESAM3_REFINE_RADIUS: usize = 16;
 pub const ESAM3_SKY_REFINE_EPS: f32 = 0.001;
+pub const ESAM3_TEXT_REFINE_EPS: f32 = 0.01;
+const ESAM3_ZOOM_MIN_IOU: f32 = 0.3;
 
 /// Model files replaced by EfficientSAM3 and BiRefNet, removed once a
 /// replacement has downloaded.
@@ -158,6 +165,12 @@ const ESAM3_DECODER_ASSET: ModelAsset = ModelAsset {
     sha256: Some(ESAM3_DECODER_SHA256),
     name: "EfficientSAM3 Decoder",
 };
+const ESAM3_TEXT_ENCODER_ASSET: ModelAsset = ModelAsset {
+    filename: ESAM3_TEXT_ENCODER_FILENAME,
+    url: ESAM3_TEXT_ENCODER_URL,
+    sha256: Some(ESAM3_TEXT_ENCODER_SHA256),
+    name: "EfficientSAM3 Text Encoder",
+};
 const ESAM3_SKY_PROMPT_ASSET: ModelAsset = ModelAsset {
     filename: ESAM3_SKY_PROMPT_FILENAME,
     url: ESAM3_SKY_PROMPT_URL,
@@ -206,6 +219,7 @@ pub enum AiMaskModel {
     Subject,
     Foreground,
     Sky,
+    Text,
     Depth,
 }
 
@@ -220,6 +234,12 @@ impl AiMaskModel {
                 ESAM3_DECODER_ASSET,
                 ESAM3_SKY_PROMPT_ASSET,
             ],
+            AiMaskModel::Text => &[
+                ESAM3_IMAGE_ENCODER_ASSET,
+                ESAM3_DECODER_ASSET,
+                ESAM3_TEXT_ENCODER_ASSET,
+                CLIP_TOKENIZER_ASSET,
+            ],
             AiMaskModel::Depth => &[DEPTH_ASSET],
         }
     }
@@ -228,7 +248,7 @@ impl AiMaskModel {
         match self {
             AiMaskModel::Foreground => RETIRED_FOREGROUND_FILES,
             AiMaskModel::Sky => RETIRED_SKY_FILES,
-            AiMaskModel::Subject | AiMaskModel::Depth => &[],
+            AiMaskModel::Subject | AiMaskModel::Text | AiMaskModel::Depth => &[],
         }
     }
 }
@@ -253,7 +273,9 @@ pub struct AiModels {
     birefnet: Mutex<Option<SharedSession>>,
     esam3_image_encoder: Mutex<Option<SharedSession>>,
     esam3_decoder: Mutex<Option<SharedSession>>,
+    esam3_text_encoder: Mutex<Option<SharedSession>>,
     esam3_sky_prompt: Mutex<Option<Arc<Esam3Prompt>>>,
+    clip_tokenizer: Mutex<Option<Arc<Tokenizer>>>,
     depth_anything: Mutex<Option<SharedSession>>,
 }
 
@@ -355,6 +377,49 @@ impl AiModels {
         });
         *slot = Some(Arc::clone(&prompt));
         Ok(prompt)
+    }
+
+    pub fn esam3_text_prompt(&self, text: &str) -> Result<Esam3Prompt> {
+        let tokenizer = {
+            let mut slot = self.clip_tokenizer.lock().unwrap();
+            match slot.as_ref() {
+                Some(tokenizer) => Arc::clone(tokenizer),
+                None => {
+                    let tokenizer = Arc::new(
+                        Tokenizer::from_file(self.models_dir.join(CLIP_TOKENIZER_FILENAME))
+                            .map_err(|e| anyhow::anyhow!(e.to_string()))?,
+                    );
+                    *slot = Some(Arc::clone(&tokenizer));
+                    tokenizer
+                }
+            }
+        };
+        let encoding = tokenizer
+            .encode(text.trim(), true)
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let ids = encoding.get_ids();
+        let mut tokens = Array::<i64, _>::zeros((1, ESAM3_PROMPT_TOKENS));
+        let kept = ids.len().min(ESAM3_PROMPT_TOKENS);
+        for (i, &id) in ids[..kept].iter().enumerate() {
+            tokens[[0, i]] = id as i64;
+        }
+        if let Some(&end) = ids.last()
+            && ids.len() > ESAM3_PROMPT_TOKENS
+        {
+            tokens[[0, ESAM3_PROMPT_TOKENS - 1]] = end as i64;
+        }
+
+        let session = self.session(&self.esam3_text_encoder, ESAM3_TEXT_ENCODER_FILENAME, false)?;
+        let mut session = session.lock().unwrap();
+        let outputs = session.run(ort::inputs!["tokens" => Tensor::from_array(tokens)?])?;
+        Ok(Esam3Prompt {
+            features: outputs["language_features"]
+                .try_extract_array::<f32>()?
+                .to_owned(),
+            padding: outputs["language_padding"]
+                .try_extract_array::<f32>()?
+                .to_owned(),
+        })
     }
 }
 
@@ -1052,7 +1117,9 @@ pub async fn get_or_init_ai_models(
                 birefnet: Mutex::new(None),
                 esam3_image_encoder: Mutex::new(None),
                 esam3_decoder: Mutex::new(None),
+                esam3_text_encoder: Mutex::new(None),
                 esam3_sky_prompt: Mutex::new(None),
+                clip_tokenizer: Mutex::new(None),
                 depth_anything: Mutex::new(None),
             });
             ai_state_mutex
@@ -2006,6 +2073,49 @@ pub fn run_esam3_decoder(
     )))
 }
 
+pub fn run_esam3_zoomed_decoder(
+    encoder_session: &Mutex<Session>,
+    decoder_session: &Mutex<Session>,
+    features: &Esam3Features,
+    prompt: &Esam3Prompt,
+    image: &DynamicImage,
+    score_threshold: f32,
+    refine_eps: f32,
+) -> Result<Option<GrayImage>> {
+    let Some(mut mask) = run_esam3_decoder(
+        decoder_session,
+        features,
+        prompt,
+        image,
+        score_threshold,
+        refine_eps,
+    )?
+    else {
+        return Ok(None);
+    };
+
+    let (width, height) = image.dimensions();
+    let grid_size = ZOOM_MIN_SIDE as u32;
+    let grid = imageops::resize(&mask, grid_size, grid_size, FilterType::Triangle);
+    if let Some((x, y, crop_width, crop_height)) = zoom_region(&grid, width, height) {
+        let crop = image.crop_imm(x, y, crop_width, crop_height);
+        let crop_features = run_esam3_image_encoder(&crop, encoder_session)?;
+        if let Some(detail) = run_esam3_decoder(
+            decoder_session,
+            &crop_features,
+            prompt,
+            &crop,
+            score_threshold,
+            refine_eps,
+        )? && mask_iou(&mask, &detail, x, y) >= ESAM3_ZOOM_MIN_IOU
+        {
+            blend_feathered(&mut mask, &detail, x, y);
+        }
+    }
+
+    Ok(Some(mask))
+}
+
 pub fn run_birefnet_model(
     image: &DynamicImage,
     birefnet_session: &Mutex<Session>,
@@ -2363,6 +2473,23 @@ pub struct AiSubjectMaskParameters {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AiSkyMaskParameters {
+    #[serde(default)]
+    pub mask_data_base64: Option<String>,
+    #[serde(default)]
+    pub rotation: Option<f32>,
+    #[serde(default)]
+    pub flip_horizontal: Option<bool>,
+    #[serde(default)]
+    pub flip_vertical: Option<bool>,
+    #[serde(default)]
+    pub orientation_steps: Option<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTextMaskParameters {
+    #[serde(default)]
+    pub prompt: String,
     #[serde(default)]
     pub mask_data_base64: Option<String>,
     #[serde(default)]

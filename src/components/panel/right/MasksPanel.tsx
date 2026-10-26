@@ -38,6 +38,7 @@ import {
   Plus,
   PlusSquare,
   RotateCcw,
+  Send,
   Trash2,
   SwatchBook,
   SquaresIntersect,
@@ -47,6 +48,8 @@ import CollapsibleSection from '../../ui/CollapsibleSection';
 import Switch from '../../ui/Switch';
 import Slider from '../../ui/Slider';
 import Dropdown from '../../ui/Dropdown';
+import Input from '../../ui/Input';
+import Button from '../../ui/Button';
 import BasicAdjustments from '../../adjustments/Basic';
 import CurveGraph from '../../adjustments/Curves';
 import ColorPanel from '../../adjustments/Color';
@@ -150,6 +153,12 @@ const SUB_MASK_CONFIG: Record<Mask, any> = {
       { key: 'feather', min: 0, max: 100, step: 1, defaultValue: 0 },
     ],
   },
+  [Mask.AiText]: {
+    parameters: [
+      { key: 'grow', min: -100, max: 100, step: 1, defaultValue: 0 },
+      { key: 'feather', min: 0, max: 100, step: 1, defaultValue: 0 },
+    ],
+  },
   [Mask.QuickEraser]: { parameters: [] },
 };
 
@@ -242,7 +251,12 @@ const FlowBrushTool = ({
 export default function MasksPanel() {
   const { t } = useTranslation();
   const { setAdjustments } = useEditorActions();
-  const { handleGenerateAiDepthMask, handleGenerateAiForegroundMask, handleGenerateAiSkyMask } = useAiMasking();
+  const {
+    handleGenerateAiDepthMask,
+    handleGenerateAiForegroundMask,
+    handleGenerateAiSkyMask,
+    handleGenerateAiTextMask,
+  } = useAiMasking();
   const setCustomEscapeHandler = useUIStore((s) => s.setCustomEscapeHandler);
   const { appSettings } = useSettingsStore(
     useShallow((state) => ({
@@ -347,7 +361,8 @@ export default function MasksPanel() {
   const activeContainer = adjustments.masks?.find((m) => m.id === activeMaskContainerId);
   const activeSubMaskData = activeContainer?.subMasks?.find((sm) => sm.id === activeMaskId);
   const isAiMask =
-    activeSubMaskData && [Mask.AiSubject, Mask.AiForeground, Mask.AiSky, Mask.AiDepth].includes(activeSubMaskData.type);
+    activeSubMaskData &&
+    [Mask.AiSubject, Mask.AiForeground, Mask.AiSky, Mask.AiDepth, Mask.AiText].includes(activeSubMaskData.type);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -1143,6 +1158,7 @@ export default function MasksPanel() {
                   setSettingsSectionOpen={setSettingsSectionOpen}
                   presets={presets}
                   handleGenerateAiDepthMask={handleGenerateAiDepthMask}
+                  handleGenerateAiTextMask={handleGenerateAiTextMask}
                 />
               </motion.div>
             )}
@@ -1837,7 +1853,7 @@ function SettingsPanel({
   updateSubMask,
   histogram,
   appSettings,
-  isGeneratingAiMask: _isGeneratingAiMask,
+  isGeneratingAiMask,
   setIsMaskControlHovered,
   collapsibleState,
   setCollapsibleState,
@@ -1848,11 +1864,17 @@ function SettingsPanel({
   setSettingsSectionOpen,
   presets,
   handleGenerateAiDepthMask,
+  handleGenerateAiTextMask,
 }: any) {
   const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
   const isActive = !!container;
   const presetButtonRef = useRef<HTMLButtonElement>(null);
+  const [textPrompt, setTextPrompt] = useState(activeSubMask?.parameters?.prompt || '');
+
+  useEffect(() => {
+    setTextPrompt(activeSubMask?.parameters?.prompt || '');
+  }, [activeSubMask?.id]);
 
   const placeholderContainer = {
     ...INITIAL_MASK_CONTAINER,
@@ -1932,8 +1954,17 @@ function SettingsPanel({
   };
 
   const subMaskConfig = activeSubMask ? SUB_MASK_CONFIG[activeSubMask.type] || {} : {};
-  const isAiMask = activeSubMask && ['ai-subject', 'ai-foreground', 'ai-sky', 'ai-depth'].includes(activeSubMask.type);
+  const isAiMask =
+    activeSubMask &&
+    [Mask.AiSubject, Mask.AiForeground, Mask.AiSky, Mask.AiDepth, Mask.AiText].includes(activeSubMask.type);
   const isComponentMode = !!activeSubMask;
+  const isTextMask = activeSubMask?.type === Mask.AiText;
+
+  const handleGenerateTextMaskClick = () => {
+    if (!isActive || !isTextMask || isGeneratingAiMask || !textPrompt.trim()) return;
+    updateSubMask(activeSubMask.id, { parameters: { ...activeSubMask.parameters, prompt: textPrompt } });
+    handleGenerateAiTextMask(activeSubMask.id, textPrompt);
+  };
 
   const setMaskContainerAdjustments = (updater: any) => {
     if (!isActive) return;
@@ -2070,6 +2101,39 @@ function SettingsPanel({
         isContentVisible={true}
       >
         <div className="space-y-4 pt-2">
+          {isTextMask && (
+            <>
+              <Input
+                autoFocus={!activeSubMask.parameters?.prompt}
+                disabled={isGeneratingAiMask}
+                key={activeSubMask.id}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setTextPrompt(e.target.value)}
+                onBlur={() =>
+                  isActive &&
+                  updateSubMask(activeSubMask.id, { parameters: { ...activeSubMask.parameters, prompt: textPrompt } })
+                }
+                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                  if (e.key === 'Enter') handleGenerateTextMaskClick();
+                }}
+                placeholder={t('editor.masks.settings.textPromptPlaceholder')}
+                type="text"
+                value={textPrompt}
+              />
+              <Button
+                className="w-full"
+                disabled={isGeneratingAiMask || !textPrompt.trim()}
+                onClick={handleGenerateTextMaskClick}
+              >
+                {isGeneratingAiMask ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                <span className="ml-2">
+                  {isGeneratingAiMask
+                    ? t('editor.ai.settings.generating')
+                    : t('editor.masks.settings.generateTextMask')}
+                </span>
+              </Button>
+            </>
+          )}
+
           <Switch
             checked={!!(isComponentMode ? activeSubMask.invert : displayContainer.invert)}
             label={isComponentMode ? t('editor.masks.settings.invertComponent') : t('editor.masks.settings.invertMask')}

@@ -693,6 +693,7 @@
         "applyPreset": "Применить пресет",
         "componentPropertiesTitle": "Свойства компонента {{name}}",
         "copySectionSettings": "Копировать настройки раздела {{section}}",
+        "generateTextMask": "Создать маску",
         "invertComponent": "Инвертировать компонент",
         "invertMask": "Инвертировать маску",
         "maskPropertiesTitle": "Свойства маски",
@@ -702,7 +703,8 @@
         "pasteSettings": "Вставить настройки",
         "resetSectionSettings": "Сбросить настройки раздела {{section}}",
         "select": "Выбрать",
-        "selectPresetTooltip": "Выберите пресет для применения"
+        "selectPresetTooltip": "Выберите пресет для применения",
+        "textPromptPlaceholder": "например, человек, машина, вода"
       },
       "toggleAnalyticsTooltip": "Показать/скрыть панель гистограммы",
       "tooltips": {
@@ -1185,7 +1187,8 @@
       "quickEraser": "Быстрый ластик",
       "radial": "Радиальный градиент",
       "sky": "Небо",
-      "subject": "Объект"
+      "subject": "Объект",
+      "text": "Текст"
     }
   },
   "menus": {
