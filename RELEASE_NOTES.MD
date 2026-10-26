@@ -5,6 +5,12 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.14.4 — 2026-10-26
+
+### Maintenance
+
+- Maintenance release with no changes to features or behavior.
+
 ## 1.14.3-dev-brush-fix — 2026-10-26
 
 ### Masking
