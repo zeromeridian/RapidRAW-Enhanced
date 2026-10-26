@@ -58,6 +58,14 @@ if (!baseVersion) {
 }
 
 const buildVersion = branch === 'main' ? baseVersion : `${baseVersion}-${branch}`;
+
+// --print-version reports the version without touching the tracked config, so
+// local builds can pass it to Tauri via --config and leave the file clean.
+if (process.argv.includes('--print-version')) {
+  process.stdout.write(buildVersion);
+  process.exit(0);
+}
+
 if (config.version !== buildVersion) {
   const versionPattern = /("version"\s*:\s*")[^"]+(")/;
   if (!versionPattern.test(configText)) {
