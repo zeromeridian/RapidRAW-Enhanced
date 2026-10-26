@@ -5,6 +5,22 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.14.3-dev-brush-fix — 2026-10-26
+
+### Masking
+
+- Brush and Flow masks now show their adjustments while you paint, not only
+  after you release the mouse.
+- Brush strokes follow fast mouse movements more smoothly instead of forming
+  sharp corners.
+- Change the brush size with **[** and **]**, as in Lightroom Classic. The
+  shortcuts also work for the brushes in the AI panel, and each press changes
+  the size by about 10%.
+- The maximum brush size is now 1000 (previously 200).
+- Rotate 90° moves to **Command+[** and **Command+]** on Mac
+  (**Ctrl+[** and **Ctrl+]** on Windows and Linux). Shortcuts you have
+  customized in Settings are kept.
+
 ## 1.14.2-dev-dev-module-top — 2026-10-26
 
 ### Develop

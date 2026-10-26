@@ -38,6 +38,50 @@ interface DrawnLine {
   tool: ToolType;
 }
 
+const STROKE_SMOOTHING_SPACING = 4;
+const STROKE_SMOOTHING_MAX_STEPS = 16;
+
+// Centripetal Catmull-Rom through the sampled pointer positions, so fast strokes
+// curve instead of forming polygon corners between sparse mouse samples.
+function smoothStrokePoints(points: Array<Coord>): Array<Coord> {
+  if (points.length < 3) {
+    return points;
+  }
+
+  const knot = (a: Coord, b: Coord) => Math.max(Math.sqrt(Math.hypot(b.x - a.x, b.y - a.y)), 1e-4);
+  const mix = (a: Coord, b: Coord, ta: number, tb: number, t: number) => {
+    const w = (t - ta) / (tb - ta);
+    return { x: a.x + (b.x - a.x) * w, y: a.y + (b.y - a.y) * w };
+  };
+
+  const smoothed: Array<Coord> = [points[0]];
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+
+    const t1 = knot(p0, p1);
+    const t2 = t1 + knot(p1, p2);
+    const t3 = t2 + knot(p2, p3);
+    const steps = Math.min(
+      STROKE_SMOOTHING_MAX_STEPS,
+      Math.max(1, Math.ceil(Math.hypot(p2.x - p1.x, p2.y - p1.y) / STROKE_SMOOTHING_SPACING)),
+    );
+
+    for (let s = 1; s <= steps; s++) {
+      const t = t1 + ((t2 - t1) * s) / steps;
+      const a1 = mix(p0, p1, 0, t1, t);
+      const a2 = mix(p1, p2, t1, t2, t);
+      const a3 = mix(p2, p3, t2, t3, t);
+      const b1 = mix(a1, a2, 0, t2, t);
+      const b2 = mix(a2, a3, t1, t3, t);
+      smoothed.push(mix(b1, b2, t1, t2, t));
+    }
+  }
+  return smoothed;
+}
+
 interface ImageCanvasProps {
   appSettings: AppSettings | null;
   activeAiPatchContainerId: string | null;
@@ -1227,6 +1271,10 @@ const ImageCanvas = memo(
     const previewBoxRef = useRef<{ start: Coord; end: Coord } | null>(null);
     const [previewBox, setPreviewBox] = useState<{ start: Coord; end: Coord } | null>(null);
     const activeStrokeIndex = useRef<number | null>(null);
+    const [isBrushStrokeActive, setIsBrushStrokeActive] = useState(false);
+    const pendingStrokePreview = useRef<MaskContainer | AiPatch | null>(null);
+    const strokePreviewFrame = useRef<number | null>(null);
+    const isStrokeOverrideActive = useRef(false);
 
     const [cursorPreview, setCursorPreview] = useState<CursorPreview>({ x: 0, y: 0, visible: false });
     const [straightenLine, setStraightenLine] = useState<any>(null);
@@ -1601,6 +1649,71 @@ const ImageCanvas = memo(
 
     const activeLineFlow = activeSubMask?.type === Mask.Flow ? (activeSubMask?.parameters?.flow ?? 10) : undefined;
 
+    const toImageSpaceLine = useCallback(
+      (line: DrawnLine): DrawnLine => {
+        const { scale } = imageRenderSize;
+        return {
+          brushSize: brushImageSpaceSize,
+          feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
+          flow: activeLineFlow,
+          points: smoothStrokePoints(line.points).map((p: Coord) => ({
+            x: p.x / scale + cropX,
+            y: p.y / scale + cropY,
+          })),
+          tool: line.tool,
+        };
+      },
+      [imageRenderSize, brushImageSpaceSize, brushSettings?.feather, activeLineFlow, cropX, cropY],
+    );
+
+    // Coalesces in-progress brush strokes to one preview per frame. In the Masks panel the
+    // stroke also renders the mask's adjustments live, through the interactive pipeline and
+    // `previewOverride`, so history and autosave only see the committed stroke.
+    const flushStrokePreview = useCallback(() => {
+      strokePreviewFrame.current = null;
+      const container = pendingStrokePreview.current;
+      pendingStrokePreview.current = null;
+      if (!container) return;
+
+      onLiveMaskPreview?.(container);
+      if (isMasking) {
+        const maskContainer = container as MaskContainer;
+        isStrokeOverrideActive.current = true;
+        setEditor((state) => ({
+          isSliderDragging: true,
+          previewOverride: {
+            ...state.adjustments,
+            masks: state.adjustments.masks.map((c: MaskContainer) => (c.id === maskContainer.id ? maskContainer : c)),
+          },
+        }));
+      }
+    }, [onLiveMaskPreview, isMasking, setEditor]);
+
+    const scheduleStrokePreview = useCallback(
+      (container: MaskContainer | AiPatch) => {
+        pendingStrokePreview.current = container;
+        if (strokePreviewFrame.current === null) {
+          strokePreviewFrame.current = requestAnimationFrame(flushStrokePreview);
+        }
+      },
+      [flushStrokePreview],
+    );
+
+    const endStrokePreview = useCallback(() => {
+      if (strokePreviewFrame.current !== null) {
+        cancelAnimationFrame(strokePreviewFrame.current);
+        strokePreviewFrame.current = null;
+      }
+      pendingStrokePreview.current = null;
+      setIsBrushStrokeActive(false);
+      if (isStrokeOverrideActive.current) {
+        isStrokeOverrideActive.current = false;
+        setEditor({ isSliderDragging: false, previewOverride: null });
+      }
+    }, [setEditor]);
+
+    useEffect(() => endStrokePreview, [endStrokePreview]);
+
     const brushCursorPreview = useMemo(() => {
       const radius = Math.max(0.1, brushStageSize / 2);
       const feather = Math.max(0, Math.min(1, (brushSettings?.feather ?? 0) / 100));
@@ -1683,7 +1796,8 @@ const ImageCanvas = memo(
       setPreviewBox(null);
       previewBoxRef.current = null;
       setLocalInitialDrawParams(null);
-    }, [isToolActive]);
+      endStrokePreview();
+    }, [isToolActive, endStrokePreview]);
 
     useEffect(() => {
       if (!isMasking && !isAiEditing) {
@@ -2080,6 +2194,9 @@ const ImageCanvas = memo(
             tool: effectiveTool,
           };
           currentLine.current = newLine;
+          if (isBrushActive && isMasking) {
+            setIsBrushStrokeActive(true);
+          }
         } else {
           if (e.target === e.target.getStage()) {
             if (isMasking) {
@@ -2251,19 +2368,7 @@ const ImageCanvas = memo(
           const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
 
           if (isManualCleanupActive && activeId) {
-            const { scale } = imageRenderSize;
-
-            const imageSpaceLine: DrawnLine = {
-              brushSize: brushImageSpaceSize,
-              feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
-              flow: activeLineFlow,
-              points: updatedLine.points.map((p: Coord) => ({
-                x: p.x / scale + cropX,
-                y: p.y / scale + cropY,
-              })),
-              tool: updatedLine.tool,
-            };
-
+            const imageSpaceLine = toImageSpaceLine(updatedLine);
             const existingLines = activeSubMask?.parameters?.lines ? [...activeSubMask.parameters.lines] : [];
 
             if (activeStrokeIndex.current !== null) {
@@ -2285,37 +2390,22 @@ const ImageCanvas = memo(
             if (sourceX !== undefined && sourceY !== undefined) {
               triggerManualCleanup(activeId, sourceX, sourceY);
             }
-          } else if (onLiveMaskPreview && activeContainer && activeSubMask && isBrushActive) {
-            const { scale } = imageRenderSize;
-
-            const imageSpaceLine: DrawnLine = {
-              brushSize: brushImageSpaceSize,
-              feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
-              flow: activeLineFlow,
-              points: updatedLine.points.map((p: Coord) => ({
-                x: p.x / scale + cropX,
-                y: p.y / scale + cropY,
-              })),
-              tool: updatedLine.tool,
-            };
-
+          } else if (activeContainer && activeSubMask && isBrushActive) {
             const existingLines = activeSubMask.parameters?.lines || [];
             const previewSubMask = {
               ...activeSubMask,
               parameters: {
                 ...activeSubMask.parameters,
-                lines: [...existingLines, imageSpaceLine],
+                lines: [...existingLines, toImageSpaceLine(updatedLine)],
               },
             };
 
-            const previewContainer = {
+            scheduleStrokePreview({
               ...activeContainer,
               subMasks: activeContainer.subMasks.map((sm: SubMask) =>
                 sm.id === activeSubMask.id ? previewSubMask : sm,
               ),
-            };
-
-            onLiveMaskPreview(previewContainer);
+            });
           }
           if (e.evt && e.evt.cancelable) e.evt.preventDefault();
         }
@@ -2333,17 +2423,15 @@ const ImageCanvas = memo(
         isBrushActive,
         isManualCleanupActive,
         onManualCleanup,
-        activeLineFlow,
         isAiSubjectActive,
         imageRenderSize,
         cropX,
         cropY,
         effectiveImageDimensions,
-        brushSettings,
         isMasking,
         localInitialDrawParams,
-        brushImageSpaceSize,
-        baseTool,
+        toImageSpaceLine,
+        scheduleStrokePreview,
         getCanvasPointer,
       ],
     );
@@ -2444,17 +2532,7 @@ const ImageCanvas = memo(
       const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
 
       if (isBrushActive) {
-        const imageSpaceLine: DrawnLine = {
-          brushSize: brushImageSpaceSize,
-          feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
-          flow: activeLineFlow,
-          points: line.points.map((p: Coord) => ({
-            x: p.x / scale + cropX,
-            y: p.y / scale + cropY,
-          })),
-          tool: line.tool,
-        };
-
+        const imageSpaceLine = toImageSpaceLine(line);
         const existingLines = activeSubMask?.parameters?.lines ? [...activeSubMask.parameters.lines] : [];
 
         if (activeStrokeIndex.current !== null) {
@@ -2469,6 +2547,7 @@ const ImageCanvas = memo(
             lines: existingLines,
           },
         });
+        endStrokePreview();
 
         activeStrokeIndex.current = null;
 
@@ -2495,22 +2574,19 @@ const ImageCanvas = memo(
       activeSubMask,
       cropX,
       cropY,
-      brushSettings,
       imageRenderSize.scale,
       isAiEditing,
       isBrushActive,
       isManualCleanupActive,
       triggerManualCleanup,
-      activeLineFlow,
       isMasking,
       onGenerateAiMask,
       onQuickErase,
       updateSubMask,
       effectiveImageDimensions,
       localInitialDrawParams,
-      brushImageSpaceSize,
-      brushStageSize,
-      baseTool,
+      toImageSpaceLine,
+      endStrokePreview,
     ]);
 
     const handleMouseEnter = useCallback(() => {
@@ -2843,7 +2919,7 @@ const ImageCanvas = memo(
 
     const currentActiveSubMaskId = activeAiSubMaskId || activeMaskId;
     const maskOpacity =
-      isShowingOriginal || isSliderDragging || isMaskInteractionActive
+      isShowingOriginal || (isSliderDragging && !isBrushStrokeActive) || isMaskInteractionActive
         ? 0
         : isCloneOrHealActive
           ? hoveredMarkerId === currentActiveSubMaskId || isMaskControlHovered

@@ -183,6 +183,9 @@ details are in `RELEASE_NOTES.MD`.
   color, detail, curve, glow, and halation adjustments.
 - Mask overlays can be hidden without disabling the selected mask through a
   dedicated Masking-panel control or configurable `O` shortcut.
+- Brush and Flow masks preview their adjustments live while painting, with
+  smoothed strokes, a brush size of up to 1000, and Lightroom-style `[` / `]`
+  size shortcuts (Rotate 90° uses Command/Ctrl+`[` / `]`).
 - Mask containers can be drag-reordered and composited with Normal, darkening,
   lightening, contrast, and component blend modes. Mask order and blend mode
   persist with the complete editable state in XMP.

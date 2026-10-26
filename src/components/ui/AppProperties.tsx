@@ -312,6 +312,14 @@ export interface BrushSettings {
   tool: ToolType;
 }
 
+export const BRUSH_SIZE_MIN = 1;
+export const BRUSH_SIZE_MAX = 1000;
+
+export const stepBrushSize = (size: number, direction: 1 | -1) => {
+  const step = Math.max(1, Math.round(size * 0.1));
+  return Math.min(BRUSH_SIZE_MAX, Math.max(BRUSH_SIZE_MIN, size + direction * step));
+};
+
 export enum LibraryViewMode {
   Flat = 'flat',
   Recursive = 'recursive',
