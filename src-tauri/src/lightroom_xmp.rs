@@ -55,10 +55,75 @@ pub struct LightroomApplyResult {
     applied_paths: Vec<String>,
 }
 
+/// The renderer's curves hold a fixed number of points.
+const MAX_CURVE_POINTS: usize = 16;
+
+#[derive(Default)]
+struct XmpProperties {
+    scalars: HashMap<String, String>,
+    /// Array items of every property written as an element; simple and
+    /// structured properties are present with no items.
+    lists: HashMap<String, Vec<String>>,
+}
+
+impl XmpProperties {
+    fn contains(&self, field: &str) -> bool {
+        self.scalars.contains_key(field) || self.lists.contains_key(field)
+    }
+}
+
+/// The user's own settings, kept apart from the applied profile (`crs:Look`).
+/// A profile's `crs:Parameters` reuse the same names (tone curves, clarity,
+/// grayscale) but Lightroom renders them beneath the user's settings.
 #[derive(Default)]
 struct ParsedXmp {
-    scalars: HashMap<String, String>,
-    lists: HashMap<String, Vec<String>>,
+    settings: XmpProperties,
+    profile: XmpProperties,
+}
+
+/// Selects which properties a `rdf:Description` holds from its element path.
+/// Other descriptions (camera profiles, masks, history) are not settings.
+fn description_properties<'a>(
+    parsed: &'a mut ParsedXmp,
+    path: &[String],
+) -> Option<&'a mut XmpProperties> {
+    let path: Vec<&str> = path
+        .iter()
+        .skip_while(|name| *name != "RDF")
+        .skip(1)
+        .map(String::as_str)
+        .collect();
+    match path.as_slice() {
+        ["Description"] => Some(&mut parsed.settings),
+        ["Description", "Look", "Description"]
+        | [
+            "Description",
+            "Look",
+            "Description",
+            "Parameters",
+            "Description",
+        ] => Some(&mut parsed.profile),
+        _ => None,
+    }
+}
+
+fn insert_description_attributes(
+    parsed: &mut ParsedXmp,
+    path: &[String],
+    element: &quick_xml::events::BytesStart<'_>,
+    reader: &Reader<&[u8]>,
+) -> Result<(), String> {
+    let Some(properties) = description_properties(parsed, path) else {
+        return Ok(());
+    };
+    for attribute in element.attributes().flatten() {
+        let key = local_name(attribute.key.as_ref());
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| format!("Could not decode XMP attribute {key}: {error}"))?;
+        properties.scalars.insert(key, value.into_owned());
+    }
+    Ok(())
 }
 
 #[derive(Default)]
@@ -92,26 +157,22 @@ fn parse_xmp(content: &str) -> Result<ParsedXmp, String> {
     loop {
         match reader.read_event() {
             Ok(Event::Start(element)) => {
-                for attribute in element.attributes().flatten() {
-                    let key = local_name(attribute.key.as_ref());
-                    let value = attribute
-                        .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                        .map_err(|error| {
-                            format!("Could not decode XMP attribute {key}: {error}")
-                        })?;
-                    parsed.scalars.insert(key, value.into_owned());
+                let name = local_name(element.name().as_ref());
+                if let Some(properties) = description_properties(&mut parsed, &stack) {
+                    properties.lists.entry(name.clone()).or_default();
                 }
-                stack.push(local_name(element.name().as_ref()));
+                stack.push(name);
+                if stack.last().is_some_and(|name| name == "Description") {
+                    insert_description_attributes(&mut parsed, &stack, &element, &reader)?;
+                }
             }
             Ok(Event::Empty(element)) => {
-                for attribute in element.attributes().flatten() {
-                    let key = local_name(attribute.key.as_ref());
-                    let value = attribute
-                        .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                        .map_err(|error| {
-                            format!("Could not decode XMP attribute {key}: {error}")
-                        })?;
-                    parsed.scalars.insert(key, value.into_owned());
+                if local_name(element.name().as_ref()) == "Description" {
+                    stack.push("Description".to_string());
+                    let inserted =
+                        insert_description_attributes(&mut parsed, &stack, &element, &reader);
+                    stack.pop();
+                    inserted?;
                 }
             }
             Ok(Event::Text(text)) => {
@@ -123,16 +184,21 @@ fn parse_xmp(content: &str) -> Result<ParsedXmp, String> {
                 if value.is_empty() {
                     continue;
                 }
-                if stack.last().is_some_and(|name| name == "li") {
-                    if let Some(parent) = stack
-                        .iter()
-                        .rev()
-                        .find(|name| !matches!(name.as_str(), "li" | "Seq" | "Bag" | "Alt"))
+                let depth = stack.len();
+                if depth >= 3
+                    && stack[depth - 1] == "li"
+                    && matches!(stack[depth - 2].as_str(), "Seq" | "Bag" | "Alt")
+                {
+                    let property = stack[depth - 3].clone();
+                    if let Some(properties) =
+                        description_properties(&mut parsed, &stack[..depth - 3])
                     {
-                        parsed.lists.entry(parent.clone()).or_default().push(value);
+                        properties.lists.entry(property).or_default().push(value);
                     }
-                } else if let Some(name) = stack.last() {
-                    parsed.scalars.insert(name.clone(), value);
+                } else if let Some((property, description)) = stack.split_last()
+                    && let Some(properties) = description_properties(&mut parsed, description)
+                {
+                    properties.scalars.insert(property.clone(), value);
                 }
             }
             Ok(Event::End(_)) => {
@@ -214,6 +280,7 @@ fn add_change(
 
 fn parse_number(parsed: &ParsedXmp, field: &str) -> Option<f64> {
     parsed
+        .settings
         .scalars
         .get(field)?
         .trim_start_matches('+')
@@ -246,22 +313,35 @@ fn add_curve(
     source: &str,
     channel: &str,
 ) {
-    let Some(points) = parsed.lists.get(source) else {
+    let Some(points) = parsed.settings.lists.get(source) else {
         return;
     };
-    let converted: Vec<Value> = points
+    let mut parsed_points: Vec<(f64, f64)> = points
         .iter()
         .filter_map(|point| {
             let (x, y) = point.split_once(',')?;
             let x = x.trim().parse::<f64>().ok()?.clamp(0.0, 255.0);
             let y = y.trim().parse::<f64>().ok()?.clamp(0.0, 255.0);
-            Some(json!({ "x": x, "y": y }))
+            Some((x, y))
         })
-        .take(16)
         .collect();
-    if converted.len() < 2 {
+    // The editor and renderer interpolate between neighbours in order.
+    parsed_points.sort_by(|a, b| a.0.total_cmp(&b.0));
+    parsed_points.dedup_by(|next, previous| next.0 == previous.0);
+    if parsed_points.len() > MAX_CURVE_POINTS {
+        translation.warnings.push(format!(
+            "Lightroom {source} has {} points; ThisIsRAW curves hold at most {MAX_CURVE_POINTS}, so it was not imported.",
+            parsed_points.len()
+        ));
         return;
     }
+    if parsed_points.len() < 2 {
+        return;
+    }
+    let converted: Vec<Value> = parsed_points
+        .into_iter()
+        .map(|(x, y)| json!({ "x": x, "y": y }))
+        .collect();
     add_change(
         translation,
         current,
@@ -393,8 +473,9 @@ fn translate(parsed: &ParsedXmp, current: &Value) -> Translation {
         ("IncrementalTemperature", "temperature"),
         ("IncrementalTint", "tint"),
     ] {
-        if (source == "IncrementalTemperature" && parsed.scalars.contains_key("Temperature"))
-            || (source == "IncrementalTint" && parsed.scalars.contains_key("Tint"))
+        if (source == "IncrementalTemperature"
+            && parsed.settings.scalars.contains_key("Temperature"))
+            || (source == "IncrementalTint" && parsed.settings.scalars.contains_key("Tint"))
         {
             continue;
         }
@@ -495,9 +576,13 @@ fn translate(parsed: &ParsedXmp, current: &Value) -> Translation {
         "blue",
     );
 
+    // Black-and-white profiles such as Adobe Monochrome may set grayscale only
+    // in their own parameters; the user's setting wins when present.
     if parsed
+        .settings
         .scalars
         .get("ConvertToGrayscale")
+        .or_else(|| parsed.profile.scalars.get("ConvertToGrayscale"))
         .is_some_and(|value| value.eq_ignore_ascii_case("true"))
     {
         add_change(
@@ -524,7 +609,7 @@ fn translate(parsed: &ParsedXmp, current: &Value) -> Translation {
             json!(proposed),
             "approximate",
         );
-        if !parsed.scalars.contains_key("AsShotTemperature") {
+        if !parsed.settings.scalars.contains_key("AsShotTemperature") {
             translation.warnings.push(
                 "Lightroom temperature was converted approximately using a 5500 K camera baseline because the XMP has no as-shot temperature."
                     .to_string(),
@@ -564,9 +649,14 @@ fn translate(parsed: &ParsedXmp, current: &Value) -> Translation {
             "Lightroom healing and retouch operations were not imported.",
         ),
     ] {
-        if parsed.scalars.contains_key(field) || parsed.lists.contains_key(field) {
+        if parsed.settings.contains(field) {
             translation.warnings.push(warning.to_string());
         }
+    }
+    if let Some(name) = parsed.profile.scalars.get("Name") {
+        translation.warnings.push(format!(
+            "The Lightroom profile \"{name}\" was not imported; its built-in tone curve and settings are not applied."
+        ));
     }
 
     translation
@@ -653,7 +743,7 @@ fn build_preview(path: String) -> LightroomImportPreview {
                 xmp_path: Some(xmp_path.to_string_lossy().into_owned()),
                 xmp_digest: Some(blake3::hash(content.as_bytes()).to_hex().to_string()),
                 sidecar_digest: None,
-                process_version: parsed.scalars.get("ProcessVersion").cloned(),
+                process_version: parsed.settings.scalars.get("ProcessVersion").cloned(),
                 changes: Vec::new(),
                 warnings: Vec::new(),
                 error: Some(error),
@@ -661,7 +751,7 @@ fn build_preview(path: String) -> LightroomImportPreview {
         }
     };
     let translation = translate(&parsed, &metadata.adjustments);
-    let process_version = parsed.scalars.get("ProcessVersion").cloned();
+    let process_version = parsed.settings.scalars.get("ProcessVersion").cloned();
     let error = if translation.changes.is_empty() {
         Some(
             "No supported Lightroom adjustments differ from the current ThisIsRAW edits."
@@ -792,8 +882,11 @@ mod tests {
     #[test]
     fn parses_attributes_and_curve_sequences() {
         let parsed = parse_xmp(SAMPLE_XMP).unwrap();
-        assert_eq!(parsed.scalars.get("Exposure2012").unwrap(), "+1.25");
-        assert_eq!(parsed.lists["ToneCurvePV2012"].len(), 3);
+        assert_eq!(
+            parsed.settings.scalars.get("Exposure2012").unwrap(),
+            "+1.25"
+        );
+        assert_eq!(parsed.settings.lists["ToneCurvePV2012"].len(), 3);
     }
 
     #[test]
@@ -824,6 +917,67 @@ mod tests {
                 .changes
                 .iter()
                 .any(|change| change.source == "Temperature")
+        );
+    }
+
+    /// Lightroom Classic layout for an image using the Adobe Monochrome
+    /// profile: the profile repeats tone-curve and clarity settings inside
+    /// `crs:Look`, and only it sets grayscale.
+    const PROFILE_XMP: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+    xmlns:stCamera="http://ns.adobe.com/photoshop/1.0/camera-profile"
+    crs:ProcessVersion="15.4" crs:Clarity2012="-34">
+   <crs:ToneCurvePV2012><rdf:Seq><rdf:li>0, 0</rdf:li><rdf:li>253, 245</rdf:li></rdf:Seq></crs:ToneCurvePV2012>
+   <crs:ToneCurvePV2012Red><rdf:Seq><rdf:li>255, 255</rdf:li><rdf:li>0, 0</rdf:li><rdf:li>0, 10</rdf:li></rdf:Seq></crs:ToneCurvePV2012Red>
+   <crs:CameraProfiles><rdf:Seq><rdf:li><rdf:Description stCamera:Model="OM-3" crs:Exposure2012="+3"/></rdf:li></rdf:Seq></crs:CameraProfiles>
+   <crs:Look>
+    <rdf:Description crs:Name="Adobe Monochrome" crs:Amount="1">
+    <crs:Parameters>
+     <rdf:Description crs:ProcessVersion="11.0" crs:Clarity2012="+8" crs:ConvertToGrayscale="True">
+     <crs:ToneCurvePV2012><rdf:Seq><rdf:li>0, 0</rdf:li><rdf:li>64, 56</rdf:li><rdf:li>128, 128</rdf:li><rdf:li>192, 197</rdf:li><rdf:li>255, 255</rdf:li></rdf:Seq></crs:ToneCurvePV2012>
+     </rdf:Description>
+    </crs:Parameters>
+    </rdf:Description>
+   </crs:Look>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>"#;
+
+    #[test]
+    fn profile_parameters_do_not_override_user_settings() {
+        let parsed = parse_xmp(PROFILE_XMP).unwrap();
+        let translation = translate(&parsed, &json!({}));
+        let mut merged = json!({});
+        merge_patch(&mut merged, &translation.patch);
+
+        assert_eq!(
+            merged["curves"]["luma"],
+            json!([{"x": 0.0, "y": 0.0}, {"x": 253.0, "y": 245.0}])
+        );
+        assert_eq!(merged["pointCurves"]["luma"], merged["curves"]["luma"]);
+        assert_eq!(merged["clarity"], json!(-34.0));
+        assert_eq!(merged["monochrome"], json!(true));
+        assert!(merged.get("exposure").is_none());
+        assert_eq!(parsed.settings.scalars["ProcessVersion"], "15.4");
+        assert!(
+            translation
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("\"Adobe Monochrome\""))
+        );
+    }
+
+    #[test]
+    fn curve_points_are_sorted_and_unique() {
+        let parsed = parse_xmp(PROFILE_XMP).unwrap();
+        let translation = translate(&parsed, &json!({}));
+
+        assert_eq!(
+            translation.patch["curves"]["red"],
+            json!([{"x": 0.0, "y": 0.0}, {"x": 255.0, "y": 255.0}])
         );
     }
 
