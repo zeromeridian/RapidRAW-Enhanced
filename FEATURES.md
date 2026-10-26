@@ -70,6 +70,16 @@ details are in `RELEASE_NOTES.MD`.
   resolution and megapixel count from EXIF, with a metadata-only RAW-decoder
   fallback for camera formats that omit EXIF pixel-dimension tags.
 - Configurable shortcuts for Library Grid and flag actions.
+- Library back/forward history across folders and albums, grid-row Up/Down
+  navigation, Copy Image Path (Command/Ctrl+L), and copying adjustments with
+  several images selected.
+- Rating filters and Select by offer ≤, =, and ≥ comparisons; the Quick
+  Filter's open state and every filter choice persist between launches, and
+  filters apply before RAW+JPEG grouping.
+- The selection advances when a rating, flag, label, or tag change hides the
+  active image under the current filter.
+- `{original_filename_number}` naming token for rename, import, and export,
+  with a warning when a multi-file template is not unique.
 - Caps Lock auto-advance after applying ratings, color labels, or flags.
 - Main Settings access from both Library and Develop.
 - Optional launch directly into the last library, bypassing the splash screen.
@@ -121,7 +131,9 @@ details are in `RELEASE_NOTES.MD`.
 ## Develop
 
 - Crop now opens in unrestricted **Free** aspect ratio for new images; the
-  source ratio remains available as an explicit preset. Its fine rotation can
+  source ratio remains available as an explicit preset. Custom aspect ratios
+  can be saved as presets.
+- Optional neutral grey editor canvas and click-to-100% zoom. Its fine rotation can
   be adjusted either precisely with the existing slider or directly by dragging
   the rotation handle above the crop frame.
 - Dedicated **Crop** and **Geometry** modules separate composition from
@@ -204,7 +216,13 @@ details are in `RELEASE_NOTES.MD`.
 
 - Optional, remembered filename suffixes for exports and separate suffixes for
   physical and virtual copies.
-- Export directly beside each source image.
+- Export directly beside each source image, optionally into a named
+  subfolder.
+- True 8-bit or 16-bit TIFF export, a DPI setting for JPEG, PNG, and TIFF, an
+  embedded sRGB profile in JPEG and PNG, colored borders, and padding to an
+  aspect ratio, all saved in export presets.
+- Several preset files can be imported at once, and the LUT browser lists
+  HALD image LUTs.
 - Consolidated EXIF export controls with optional GPS removal.
 - Complete readable EXIF preservation for JPEG and a safe allowlist for TIFF,
   with ThisIsRAW recorded as the exporting software.

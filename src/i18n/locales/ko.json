@@ -469,7 +469,10 @@
         "hPlaceholder": "높이",
         "hTooltip": "높이",
         "wPlaceholder": "너비",
-        "wTooltip": "너비"
+        "wTooltip": "너비",
+        "saveTooltip": "종횡비를 프리셋으로 저장",
+        "savedTooltip": "저장된 종횡비 {{ratio}}",
+        "removeTooltip": "저장된 종횡비 삭제"
       },
       "geometryHeading": "지오메트리",
       "labels": {
@@ -820,7 +823,12 @@
     },
     "file": {
       "quality": "품질",
-      "qualityLossless": "품질 (무손실)"
+      "tiffBitDepth": "TIFF 비트 심도",
+      "tiffBitDepth8": "8비트",
+      "tiffBitDepth16": "16비트",
+      "qualityLossless": "품질 (무손실)",
+      "resolution": "해상도",
+      "dpi": "DPI"
     },
     "labels": {
       "image": "이미지",
@@ -890,6 +898,32 @@
       "scale": "크기",
       "spacing": "간격",
       "watermarkImage": "워터마크 이미지"
+    },
+    "border": {
+      "addBorder": "테두리 추가",
+      "bases": {
+        "eachEdge": "각 변",
+        "longEdge": "긴 변",
+        "shortEdge": "짧은 변"
+      },
+      "basis": "두께 기준",
+      "color": "테두리 색상",
+      "invalidPercent": "둘 다 0에서 100 사이의 숫자를 입력하세요.",
+      "leftRight": "좌우",
+      "percent": "%",
+      "topBottom": "상하"
+    },
+    "pad": {
+      "aspectRatio": "종횡비",
+      "backgroundColor": "배경색",
+      "invalidRatio": "너비와 높이에 양수를 입력하세요.",
+      "padToAspectRatio": "종횡비에 맞춰 여백 추가",
+      "ratioHeight": "종횡비 높이",
+      "ratioWidth": "종횡비 너비"
+    },
+    "destination": {
+      "subfolder": "하위 폴더",
+      "subfolderPlaceholder": "예: final, WebP"
     }
   },
   "library": {
@@ -982,7 +1016,9 @@
         "clearSearch": "검색 지우기",
         "collapse": "접기",
         "expand": "펼치기",
-        "sortFolders": "폴더 정렬"
+        "sortFolders": "폴더 정렬",
+        "navBack": "뒤로",
+        "navForward": "앞으로"
       }
     },
     "grid": {
@@ -1337,6 +1373,7 @@
       "deleteWarning": "파일이 시스템 휴지통으로 이동됩니다.",
       "fileNaming": "파일 이름 지정",
       "folderOrganization": "폴더 정리",
+      "notUniqueWarning": "{original_filename}, {original_filename_number}, {sequence} 중 하나도 없으면 파일 이름이 중복될 수 있습니다. 중복된 파일은 가져오지 않습니다.",
       "organizeByDate": "날짜별 하위 폴더로 정리",
       "sourceFiles": "원본 파일",
       "startImport": "가져오기 시작",
@@ -1424,6 +1461,7 @@
       "cancel": "취소",
       "fileNamingTemplate": "파일 이름 템플릿",
       "newName": "새 이름",
+      "notUniqueWarning": "{original_filename}, {original_filename_number}, {sequence} 중 하나도 없으면 파일 이름이 중복될 수 있습니다. 이 경우 아무 파일도 이름이 변경되지 않습니다.",
       "save": "저장",
       "titleMultiple": "이미지 {{count}}개 이름 변경",
       "titleMultiple_one": "이미지 {{count}}개 이름 변경",
@@ -1493,7 +1531,10 @@
       "speed": "속도",
       "title": "마우스 컨트롤",
       "zoom": "확대/축소 속도 배율",
-      "zoomDesc": "스크롤 휠이나 핀치 제스처를 사용할 때 캔버스가 확대/축소되는 속도를 조정합니다."
+      "zoomDesc": "스크롤 휠이나 핀치 제스처를 사용할 때 캔버스가 확대/축소되는 속도를 조정합니다.",
+      "zoomClick": "사진 100% 확대",
+      "zoomClickDesc": "클릭 시 에디터의 사진을 100% 확대",
+      "zoomClickInfo": "사진을 클릭하면 즉시 100%(1:1 픽셀)로 확대되어 선명도와 노이즈를 평가할 수 있습니다. 비활성화된 경우 클릭하면 점진적으로 확대됩니다."
     },
     "data": {
       "clearSidecars": "모든 사이드카 파일 지우기",
@@ -1613,7 +1654,10 @@
       },
       "title": "일반 설정",
       "xmpSync": "XMP 메타데이터 동기화",
-      "xmpSyncDesc": "다른 사진 편집기와의 호환성을 위해 평점, 색상 레이블, 태그를 표준 XMP 사이드카 파일에 동기화합니다."
+      "xmpSyncDesc": "다른 사진 편집기와의 호환성을 위해 평점, 색상 레이블, 태그를 표준 XMP 사이드카 파일에 동기화합니다.",
+      "neutralGreyCanvas": "뉴트럴 그레이 캔버스",
+      "neutralGreyCanvasDesc": "앱 테마를 변경하지 않고 더 정확한 색상 및 노출 보정을 위해 뉴트럴 그레이 캔버스를 사용합니다.",
+      "enableNeutralGreyCanvas": "뉴트럴 그레이 배경 활성화"
     },
     "keybinds": {
       "actions": {
@@ -1635,6 +1679,7 @@
         "open_settings": "설정 열기",
         "paste_adjustments": "복사한 조정값 붙여넣기",
         "paste_files": "현재 폴더에 파일 붙여넣기",
+        "copy_image_path": "선택한 이미지의 경로 복사",
         "preview_next": "다음 이미지",
         "preview_prev": "이전 이미지",
         "rate_0": "별점: 0",

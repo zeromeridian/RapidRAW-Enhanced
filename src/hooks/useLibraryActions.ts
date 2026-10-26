@@ -10,6 +10,48 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { computeSortedLibrary } from './useSortedLibrary';
 import { ImageFlag, IMAGE_FLAG_PREFIX } from '../utils/imageFlags';
 
+export const clearLibrarySelection = () => {
+  useLibraryStore.getState().setLibrary({
+    multiSelectedPaths: [],
+    libraryActivePath: null,
+    selectionAnchorPath: null,
+  });
+};
+
+const applyWithAutoAdvance = (changedPaths: string[], applyChange: () => void) => {
+  const { selectedImage } = useEditorStore.getState();
+  const activePath = selectedImage?.path ?? useLibraryStore.getState().libraryActivePath;
+
+  if (!activePath || !changedPaths.includes(activePath) || useUIStore.getState().cullingModalState.isOpen) {
+    applyChange();
+    return;
+  }
+
+  const before = computeSortedLibrary(useLibraryStore.getState(), useSettingsStore.getState());
+  applyChange();
+  const after = computeSortedLibrary(useLibraryStore.getState(), useSettingsStore.getState());
+
+  const visible = new Set(after.map((img) => img.path));
+  const activeIndex = before.findIndex((img) => img.path === activePath);
+  if (activeIndex === -1 || visible.has(activePath)) return;
+
+  const next =
+    before.slice(activeIndex + 1).find((img) => visible.has(img.path)) ??
+    before
+      .slice(0, activeIndex)
+      .reverse()
+      .find((img) => visible.has(img.path));
+
+  if (next) {
+    useLibraryStore
+      .getState()
+      .setLibrary({ libraryActivePath: next.path, multiSelectedPaths: [next.path], selectionAnchorPath: next.path });
+    if (selectedImage) useUIStore.getState().imageSelectHandler?.(next.path);
+  } else if (!selectedImage) {
+    clearLibrarySelection();
+  }
+};
+
 export function useLibraryActions(handleImageSelect?: (path: string) => void) {
   const handleRate = useCallback((newRating: number, paths?: string[]) => {
     const { multiSelectedPaths, imageRatings, setLibrary } = useLibraryStore.getState();
@@ -22,13 +64,15 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     const currentRating = imageRatings[pathsToRate[0]] || 0;
     const finalRating = newRating === currentRating ? 0 : newRating;
 
-    setLibrary((state) => {
-      const newRatings = { ...state.imageRatings };
-      pathsToRate.forEach((p) => {
-        newRatings[p] = finalRating;
-      });
-      return { imageRatings: newRatings };
-    });
+    applyWithAutoAdvance(pathsToRate, () =>
+      setLibrary((state) => {
+        const newRatings = { ...state.imageRatings };
+        pathsToRate.forEach((p) => {
+          newRatings[p] = finalRating;
+        });
+        return { imageRatings: newRatings };
+      }),
+    );
 
     invoke(Invokes.SetRatingForPaths, { paths: pathsToRate, rating: finalRating }).catch((err) => {
       console.error(err);
@@ -55,16 +99,18 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
 
     try {
       await invoke(Invokes.SetColorLabelForPaths, { paths: pathsToUpdate, color: finalColor });
-      setLibrary((state) => ({
-        imageList: state.imageList.map((image: ImageFile) => {
-          if (pathsToUpdate.includes(image.path)) {
-            const otherTags = (image.tags || []).filter((tag: string) => !tag.startsWith('color:'));
-            const newTags = finalColor ? [...otherTags, `color:${finalColor}`] : otherTags;
-            return { ...image, tags: newTags };
-          }
-          return image;
-        }),
-      }));
+      applyWithAutoAdvance(pathsToUpdate, () =>
+        setLibrary((state) => ({
+          imageList: state.imageList.map((image: ImageFile) => {
+            if (pathsToUpdate.includes(image.path)) {
+              const otherTags = (image.tags || []).filter((tag: string) => !tag.startsWith('color:'));
+              const newTags = finalColor ? [...otherTags, `color:${finalColor}`] : otherTags;
+              return { ...image, tags: newTags };
+            }
+            return image;
+          }),
+        })),
+      );
     } catch (err) {
       toast.error(`Failed to set color label: ${err}`);
     }
@@ -87,33 +133,37 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     try {
       await invoke(Invokes.SetFlagForPaths, { paths: pathsToUpdate, flag });
       const updatedPaths = new Set(pathsToUpdate);
-      setLibrary((state) => ({
-        imageList: state.imageList.map((image) => {
-          if (!updatedPaths.has(image.path)) return image;
-          const tags = (image.tags || []).filter((tag) => !tag.startsWith(IMAGE_FLAG_PREFIX));
-          if (flag !== ImageFlag.Unflagged) tags.push(`${IMAGE_FLAG_PREFIX}${flag}`);
-          return { ...image, tags: tags.length > 0 ? tags : null };
-        }),
-      }));
+      applyWithAutoAdvance(pathsToUpdate, () =>
+        setLibrary((state) => ({
+          imageList: state.imageList.map((image) => {
+            if (!updatedPaths.has(image.path)) return image;
+            const tags = (image.tags || []).filter((tag) => !tag.startsWith(IMAGE_FLAG_PREFIX));
+            if (flag !== ImageFlag.Unflagged) tags.push(`${IMAGE_FLAG_PREFIX}${flag}`);
+            return { ...image, tags: tags.length > 0 ? tags : null };
+          }),
+        })),
+      );
     } catch (err) {
       toast.error(`Failed to set flag: ${err}`);
     }
   }, []);
 
   const handleTagsChanged = useCallback((changedPaths: string[], newTags: { tag: string; isUser: boolean }[]) => {
-    useLibraryStore.getState().setLibrary((state) => ({
-      imageList: state.imageList.map((image) => {
-        if (changedPaths.includes(image.path)) {
-          const systemTags = (image.tags || []).filter(
-            (t) => t.startsWith('color:') || t.startsWith(IMAGE_FLAG_PREFIX),
-          );
-          const prefixedNewTags = newTags.map((t) => (t.isUser ? `user:${t.tag}` : t.tag));
-          const finalTags = [...systemTags, ...prefixedNewTags].sort();
-          return { ...image, tags: finalTags.length > 0 ? finalTags : null };
-        }
-        return image;
-      }),
-    }));
+    applyWithAutoAdvance(changedPaths, () =>
+      useLibraryStore.getState().setLibrary((state) => ({
+        imageList: state.imageList.map((image) => {
+          if (changedPaths.includes(image.path)) {
+            const systemTags = (image.tags || []).filter(
+              (t) => t.startsWith('color:') || t.startsWith(IMAGE_FLAG_PREFIX),
+            );
+            const prefixedNewTags = newTags.map((t) => (t.isUser ? `user:${t.tag}` : t.tag));
+            const finalTags = [...systemTags, ...prefixedNewTags].sort();
+            return { ...image, tags: finalTags.length > 0 ? finalTags : null };
+          }
+          return image;
+        }),
+      })),
+    );
   }, []);
 
   const handleUpdateExif = useCallback(async (paths: Array<string> | undefined, updates: Record<string, string>) => {

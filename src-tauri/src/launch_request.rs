@@ -1,6 +1,26 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicI32, Ordering};
 use tauri::Emitter;
+
+static PROCESS_EXIT_CODE: AtomicI32 = AtomicI32::new(0);
+
+pub fn set_process_exit_code(code: i32) {
+    PROCESS_EXIT_CODE.store(code, Ordering::SeqCst);
+}
+
+pub fn process_exit_code() -> i32 {
+    PROCESS_EXIT_CODE.load(Ordering::SeqCst)
+}
+
+/// A non-zero code requested at exit wins; otherwise a failure recorded
+/// earlier (for example by a headless export) is kept.
+pub fn resolve_exit_code(requested: Option<i32>, recorded: i32) -> i32 {
+    match requested {
+        Some(code) if code != 0 => code,
+        _ => recorded,
+    }
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -160,5 +180,28 @@ pub fn emit_launch_request(app_handle: &tauri::AppHandle, request: LaunchRequest
             );
         }
         LaunchRequest::None => {}
+    }
+}
+
+#[cfg(test)]
+mod exit_code_tests {
+    use super::resolve_exit_code;
+
+    #[test]
+    fn requested_failures_keep_their_codes() {
+        assert_eq!(resolve_exit_code(Some(1), 0), 1);
+        assert_eq!(resolve_exit_code(Some(2), 1), 2);
+    }
+
+    #[test]
+    fn recorded_failure_survives_a_plain_exit() {
+        assert_eq!(resolve_exit_code(None, 1), 1);
+        assert_eq!(resolve_exit_code(Some(0), 1), 1);
+    }
+
+    #[test]
+    fn success_and_window_close_exit_zero() {
+        assert_eq!(resolve_exit_code(Some(0), 0), 0);
+        assert_eq!(resolve_exit_code(None, 0), 0);
     }
 }

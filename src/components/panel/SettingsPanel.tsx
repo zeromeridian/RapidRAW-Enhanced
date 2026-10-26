@@ -1337,6 +1337,18 @@ export default function SettingsPanel({
                       </SettingItem>
 
                       <SettingItem
+                        label={t('settings.general.neutralGreyCanvas')}
+                        description={t('settings.general.neutralGreyCanvasDesc')}
+                      >
+                        <Switch
+                          checked={appSettings?.editorNeutralGreyBg ?? false}
+                          id="neutral-grey-bg-toggle"
+                          label={t('settings.general.enableNeutralGreyCanvas')}
+                          onChange={(checked) => onSettingsChange({ ...appSettings, editorNeutralGreyBg: checked })}
+                        />
+                      </SettingItem>
+
+                      <SettingItem
                         label={t('settings.general.displayEditIcon')}
                         description={t('settings.general.displayEditIconDesc')}
                       >
@@ -2751,6 +2763,17 @@ export default function SettingsPanel({
                             onSettingsChange({ ...appSettings, zoomSpeedMultiplier: parseFloat(e.target.value) })
                           }
                           fillOrigin="min"
+                        />
+                      </SettingItem>
+                      <SettingItem
+                        label={t('settings.controls.zoomClick')}
+                        description={t('settings.controls.zoomClickInfo')}
+                      >
+                        <Switch
+                          checked={appSettings?.zoomPhotoToPixelClick ?? false}
+                          id="zoom-photo-to-pixel-click"
+                          label={t('settings.controls.zoomClickDesc')}
+                          onChange={(checked) => onSettingsChange({ ...appSettings, zoomPhotoToPixelClick: checked })}
                         />
                       </SettingItem>
                     </div>

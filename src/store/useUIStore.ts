@@ -153,6 +153,8 @@ interface UIState {
   setRightPanel: (panel: Panel | null) => void;
   customEscapeHandler: (() => void) | null;
   setCustomEscapeHandler: (handler: (() => void) | null) => void;
+  imageSelectHandler: ((path: string) => void) | null;
+  setImageSelectHandler: (handler: ((path: string) => void) | null) => void;
   searchFocusRequest: number;
   requestSearchFocus: () => void;
   selectionClearRequest: number;
@@ -166,7 +168,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   isWindowFullScreen: false,
   isInstantTransition: false,
   isLayoutReady: false,
-  uiVisibility: { folderTree: true, filmstrip: true },
+  uiVisibility: { folderTree: true, filmstrip: true, quickFilter: false },
   isLibraryExportPanelVisible: false,
   isSettingsOpen: false,
   lightsOutMode: 'off',
@@ -250,6 +252,8 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   customEscapeHandler: null,
   setCustomEscapeHandler: (handler) => set({ customEscapeHandler: handler }),
+  imageSelectHandler: null,
+  setImageSelectHandler: (handler) => set({ imageSelectHandler: handler }),
 
   searchFocusRequest: 0,
   requestSearchFocus: () => set((state) => ({ searchFocusRequest: state.searchFocusRequest + 1 })),

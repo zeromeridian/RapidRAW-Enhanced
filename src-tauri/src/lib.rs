@@ -1012,7 +1012,7 @@ extern "C" fn mark_shutting_down() {
 extern "C" fn force_exit(_signal: libc::c_int) {
     if SHUTTING_DOWN.load(Ordering::SeqCst) {
         unsafe {
-            libc::_exit(0);
+            libc::_exit(process_exit_code());
         }
     }
 }
@@ -2659,11 +2659,6 @@ async fn generate_preview_for_path(
     .map_err(|e| format!("Task execution failed: {}", e))?
 }
 
-#[cfg(target_os = "linux")]
-fn is_nvidia_gpu() -> bool {
-    std::path::Path::new("/proc/driver/nvidia/version").exists()
-}
-
 fn setup_logging(app_handle: &tauri::AppHandle) {
     let log_dir = match app_handle.path().app_log_dir() {
         Ok(dir) => dir,
@@ -2934,11 +2929,18 @@ pub fn run() {
         .stack_size(8 * 1024 * 1024)
         .build_global();
 
-    let mut builder = tauri::Builder::default();
-
     let args: Vec<String> = std::env::args().skip(1).collect();
     let launch_req = parse_launch_args(&args);
     let is_headless = matches!(launch_req, LaunchRequest::HeadlessExport(_));
+
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(target_os = "linux")]
+    {
+        if !is_headless {
+            builder = builder.plugin(tauri_plugin_wayland_nvidia_quirk::init());
+        }
+    }
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
@@ -3058,8 +3060,6 @@ pub fn run() {
                         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
                         std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
                         std::env::set_var("NODEVICE_SELECT", "1");
-                    } else if is_nvidia_gpu() {
-                        std::env::set_var("__NV_DISABLE_EXPLICIT_SYNC", "1");
                     }
                 }
 
@@ -3096,9 +3096,11 @@ pub fn run() {
             {
                 if settings.linux_gpu_optimization.unwrap_or(false) {
                     log::info!("Applied Linux Compatibility Mode (forced software compositing).");
-                } else if is_nvidia_gpu() {
-                    log::info!("Applied Nvidia explicit-sync workaround (hardware compositing kept).");
                 }
+                log::info!(
+                    "Wayland Nvidia quirk status: {:?}",
+                    tauri_plugin_wayland_nvidia_quirk::status()
+                );
             }
 
             if let LaunchRequest::HeadlessExport(session) = launch_req {
@@ -3111,6 +3113,7 @@ pub fn run() {
                         }
                         Err(e) => {
                             eprintln!("Headless export failed: {}", e);
+                            set_process_exit_code(1);
                             app_handle_clone.exit(1);
                         }
                     }
@@ -3426,6 +3429,7 @@ pub fn run() {
             file_management::apply_auto_adjustments_to_paths,
             file_management::handle_import_presets_from_file,
             file_management::handle_import_legacy_presets_from_file,
+            file_management::handle_import_presets_from_files,
             file_management::handle_export_presets_to_file,
             file_management::save_community_preset,
             file_management::clear_all_sidecars,
@@ -3469,21 +3473,24 @@ pub fn run() {
                         log::info!("macOS initial open: Stored path {} for later.", path_str);
                     }
                 }
-                tauri::RunEvent::ExitRequested { api, .. } => {
+                tauri::RunEvent::ExitRequested { api, code, .. } => {
                     api.prevent_exit();
+                    let code = resolve_exit_code(code, process_exit_code());
 
                     #[cfg(target_os = "macos")]
-                    unsafe { libc::_exit(0); }
+                    unsafe { libc::_exit(code); }
 
                     #[cfg(not(target_os = "macos"))]
-                    std::process::exit(0);
+                    std::process::exit(code);
                 }
                 tauri::RunEvent::Exit => {
+                    let code = process_exit_code();
+
                     #[cfg(target_os = "macos")]
-                    unsafe { libc::_exit(0); }
+                    unsafe { libc::_exit(code); }
 
                     #[cfg(not(target_os = "macos"))]
-                    std::process::exit(0);
+                    std::process::exit(code);
                 }
                 _ => {}
             }

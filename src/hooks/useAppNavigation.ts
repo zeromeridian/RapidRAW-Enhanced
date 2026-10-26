@@ -12,6 +12,8 @@ import { Invokes, LibraryViewMode, ImageFile } from '../components/ui/AppPropert
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
+import { clearLibrarySelection } from './useLibraryActions';
+import { computeSortedLibrary } from './useSortedLibrary';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
 import { createProvisionalFolderTrees, mergeRefreshedFolderTrees } from '../utils/folderTreeCache';
 
@@ -159,7 +161,16 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
 
     selectedImagePathRef.current = null;
 
-    setLibrary({ libraryActivePath: lastActivePath });
+    const isStillVisible =
+      lastActivePath !== null &&
+      computeSortedLibrary(useLibraryStore.getState(), useSettingsStore.getState()).some(
+        (img) => img.path === lastActivePath,
+      );
+    if (isStillVisible) {
+      setLibrary({ libraryActivePath: lastActivePath });
+    } else {
+      clearLibrarySelection();
+    }
     setUI({ slideDirection: 1 });
 
     setEditor({ adjustments: INITIAL_ADJUSTMENTS });
@@ -336,7 +347,11 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       preloadedImages?: ImageFile[],
       expandParents = true,
       preserveEditor = false,
+      skipHistory = false,
     ) => {
+      if (!skipHistory && path) {
+        useLibraryStore.getState().pushNavHistory({ type: 'folder', path });
+      }
       const folderLoadGeneration = ++folderLoadGenerationRef.current;
       const { appSettings, handleSettingsChange } = useSettingsStore.getState();
       const { pinnedFolders } = appSettings || { pinnedFolders: [] };
@@ -583,7 +598,10 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
   );
 
   const handleSelectAlbum = useCallback(
-    async (albumId: string, albumName: string, imagePaths: string[], preserveEditor = false) => {
+    async (albumId: string, albumName: string, imagePaths: string[], preserveEditor = false, skipHistory = false) => {
+      if (!skipHistory) {
+        useLibraryStore.getState().pushNavHistory({ type: 'album', path: albumId, albumName, images: imagePaths });
+      }
       const folderLoadGeneration = ++folderLoadGenerationRef.current;
       const { setLibrary } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
@@ -632,6 +650,26 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
     },
     [],
   );
+
+  const handleNavStep = useCallback(
+    (step: 1 | -1) => {
+      const { navHistory, navIndex, setLibrary } = useLibraryStore.getState();
+      const targetIndex = navIndex + step;
+      const target = navHistory[targetIndex];
+      if (!target) return;
+
+      setLibrary({ navIndex: targetIndex });
+      if (target.type === 'folder') {
+        handleSelectSubfolder(target.path, false, undefined, true, false, true);
+      } else {
+        handleSelectAlbum(target.path, target.albumName!, target.images!, false, true);
+      }
+    },
+    [handleSelectSubfolder, handleSelectAlbum],
+  );
+
+  const handleNavBack = useCallback(() => handleNavStep(-1), [handleNavStep]);
+  const handleNavForward = useCallback(() => handleNavStep(1), [handleNavStep]);
 
   const handleOpenFolder = async () => {
     const { osPlatform, appSettings, handleSettingsChange } = useSettingsStore.getState();
@@ -829,6 +867,8 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
     handleSelectSubfolder,
     handleSelectAlbum,
     handleOpenFolder,
+    handleNavBack,
+    handleNavForward,
     handleContinueSession,
   };
 }

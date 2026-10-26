@@ -471,7 +471,10 @@
         "hPlaceholder": "H",
         "hTooltip": "Höhe",
         "wPlaceholder": "B",
-        "wTooltip": "Breite"
+        "wTooltip": "Breite",
+        "saveTooltip": "Seitenverhältnis als Vorgabe speichern",
+        "savedTooltip": "Gespeichertes Seitenverhältnis {{ratio}}",
+        "removeTooltip": "Gespeichertes Seitenverhältnis entfernen"
       },
       "geometryHeading": "Geometrie",
       "labels": {
@@ -822,7 +825,12 @@
     },
     "file": {
       "quality": "Qualität",
-      "qualityLossless": "Qualität (Verlustfrei)"
+      "tiffBitDepth": "TIFF-Bittiefe",
+      "tiffBitDepth8": "8 Bit",
+      "tiffBitDepth16": "16 Bit",
+      "qualityLossless": "Qualität (Verlustfrei)",
+      "resolution": "Auflösung",
+      "dpi": "DPI"
     },
     "labels": {
       "image": "Bild",
@@ -892,6 +900,32 @@
       "scale": "Skalierung",
       "spacing": "Abstand",
       "watermarkImage": "Wasserzeichen-Bild"
+    },
+    "border": {
+      "addBorder": "Rahmen hinzufügen",
+      "bases": {
+        "eachEdge": "Jeweilige Kante",
+        "longEdge": "Lange Kante",
+        "shortEdge": "Kurze Kante"
+      },
+      "basis": "Basis der Stärke",
+      "color": "Rahmenfarbe",
+      "invalidPercent": "Geben Sie für beide eine Zahl zwischen 0 und 100 ein.",
+      "leftRight": "Links & Rechts",
+      "percent": "%",
+      "topBottom": "Oben & Unten"
+    },
+    "pad": {
+      "aspectRatio": "Seitenverhältnis",
+      "backgroundColor": "Hintergrundfarbe",
+      "invalidRatio": "Geben Sie für Breite und Höhe eine positive Zahl ein.",
+      "padToAspectRatio": "Auf Seitenverhältnis erweitern",
+      "ratioHeight": "Höhe des Seitenverhältnisses",
+      "ratioWidth": "Breite des Seitenverhältnisses"
+    },
+    "destination": {
+      "subfolder": "Unterordner",
+      "subfolderPlaceholder": "z. B. final, WebP"
     }
   },
   "library": {
@@ -984,7 +1018,9 @@
         "clearSearch": "Suche löschen",
         "collapse": "Zuklappen",
         "expand": "Aufklappen",
-        "sortFolders": "Ordner sortieren"
+        "sortFolders": "Ordner sortieren",
+        "navBack": "Zurück",
+        "navForward": "Vorwärts"
       }
     },
     "grid": {
@@ -1339,6 +1375,7 @@
       "deleteWarning": "Dateien werden in den Systempapierkorb verschoben.",
       "fileNaming": "Dateibenennung",
       "folderOrganization": "Ordnerorganisation",
+      "notUniqueWarning": "Ohne {original_filename}, {original_filename_number} oder {sequence} können Dateien denselben Namen erhalten. Diese Dateien werden nicht importiert.",
       "organizeByDate": "In Unterordner nach Datum organisieren",
       "sourceFiles": "Quelldateien",
       "startImport": "Import starten",
@@ -1426,6 +1463,7 @@
       "cancel": "Abbrechen",
       "fileNamingTemplate": "Dateibenennungsvorlage",
       "newName": "Neuer Name",
+      "notUniqueWarning": "Ohne {original_filename}, {original_filename_number} oder {sequence} können Dateien denselben Namen erhalten. Dann wird nichts umbenannt.",
       "save": "Speichern",
       "titleMultiple": "{{count}} Bilder umbenennen",
       "titleMultiple_one": "{{count}} Bild umbenennen",
@@ -1495,7 +1533,10 @@
       "speed": "Geschwindigkeit",
       "title": "Maussteuerung",
       "zoom": "Zoom-Geschwindigkeitsfaktor",
-      "zoomDesc": "Passen Sie an, wie schnell das Bild beim Scrollen oder Kneifen zoomt."
+      "zoomDesc": "Passen Sie an, wie schnell das Bild beim Scrollen oder Kneifen zoomt.",
+      "zoomClick": "Foto auf 100% zoomen",
+      "zoomClickDesc": "Foto im Editor bei Mausklick auf 100% zoomen",
+      "zoomClickInfo": "Klicken Sie auf das Foto, um sofort auf 100% (1:1 Pixel) zu zoomen, um Schärfe und Rauschen zu beurteilen. Wenn deaktiviert, wird beim Klicken stufenweise herangezoomt."
     },
     "data": {
       "clearSidecars": "Alle Filialdateien löschen",
@@ -1615,7 +1656,10 @@
       },
       "title": "Allgemeine Einstellungen",
       "xmpSync": "XMP-Metadaten-Sync",
-      "xmpSyncDesc": "Synchronisieren Sie Bewertungen, Farbmarkierungen und Tags in Standard-XMP-Filialdateien für Kompatibilität mit anderen Foto-Editoren."
+      "xmpSyncDesc": "Synchronisieren Sie Bewertungen, Farbmarkierungen und Tags in Standard-XMP-Filialdateien für Kompatibilität mit anderen Foto-Editoren.",
+      "neutralGreyCanvas": "Neutralgraue Arbeitsfläche",
+      "neutralGreyCanvasDesc": "Verwenden Sie eine neutralgraue Arbeitsfläche für eine genauere Farb- und Belichtungskorrektur, ohne das App-Design zu ändern.",
+      "enableNeutralGreyCanvas": "Neutralgrauen Hintergrund aktivieren"
     },
     "keybinds": {
       "actions": {
@@ -1637,6 +1681,7 @@
         "open_settings": "Einstellungen öffnen",
         "paste_adjustments": "Kopierte Anpassungen einfügen",
         "paste_files": "Datei(en) in aktuellen Ordner einfügen",
+        "copy_image_path": "Pfad des/der ausgewählten Bilder kopieren",
         "preview_next": "Nächstes Bild",
         "preview_prev": "Vorheriges Bild",
         "rate_0": "Sternbewertung: 0",

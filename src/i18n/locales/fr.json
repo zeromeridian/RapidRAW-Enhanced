@@ -493,7 +493,10 @@
         "hPlaceholder": "H",
         "hTooltip": "Hauteur",
         "wPlaceholder": "L",
-        "wTooltip": "Largeur"
+        "wTooltip": "Largeur",
+        "saveTooltip": "Enregistrer le rapport d'aspect comme préréglage",
+        "savedTooltip": "Rapport d'aspect enregistré {{ratio}}",
+        "removeTooltip": "Supprimer le rapport d'aspect enregistré"
       },
       "geometryHeading": "Géométrie",
       "labels": {
@@ -846,7 +849,12 @@
     },
     "file": {
       "quality": "Qualité",
-      "qualityLossless": "Qualité (Sans perte)"
+      "tiffBitDepth": "Profondeur de bits TIFF",
+      "tiffBitDepth8": "8 bits",
+      "tiffBitDepth16": "16 bits",
+      "qualityLossless": "Qualité (Sans perte)",
+      "resolution": "Résolution",
+      "dpi": "PPP"
     },
     "labels": {
       "image": "Image",
@@ -917,6 +925,32 @@
       "scale": "Échelle",
       "spacing": "Espacement",
       "watermarkImage": "Image en filigrane"
+    },
+    "border": {
+      "addBorder": "Ajouter une bordure",
+      "bases": {
+        "eachEdge": "Chaque bord respectif",
+        "longEdge": "Bord long",
+        "shortEdge": "Bord court"
+      },
+      "basis": "Base de l'épaisseur",
+      "color": "Couleur de la bordure",
+      "invalidPercent": "Saisissez un nombre entre 0 et 100 pour les deux.",
+      "leftRight": "Gauche et droite",
+      "percent": "%",
+      "topBottom": "Haut et bas"
+    },
+    "pad": {
+      "aspectRatio": "Rapport d'aspect",
+      "backgroundColor": "Couleur d'arrière-plan",
+      "invalidRatio": "Saisissez un nombre positif pour la largeur et la hauteur.",
+      "padToAspectRatio": "Étendre au rapport d'aspect",
+      "ratioHeight": "Hauteur du rapport d'aspect",
+      "ratioWidth": "Largeur du rapport d'aspect"
+    },
+    "destination": {
+      "subfolder": "Sous-dossier",
+      "subfolderPlaceholder": "ex. final, WebP"
     }
   },
   "library": {
@@ -1009,7 +1043,9 @@
         "clearSearch": "Effacer la recherche",
         "collapse": "Réduire",
         "expand": "Développer",
-        "sortFolders": "Trier les dossiers"
+        "sortFolders": "Trier les dossiers",
+        "navBack": "Retour",
+        "navForward": "Suivant"
       }
     },
     "grid": {
@@ -1370,6 +1406,7 @@
       "deleteWarning": "Les fichiers seront déplacés vers la corbeille du système.",
       "fileNaming": "Nommage des fichiers",
       "folderOrganization": "Organisation des dossiers",
+      "notUniqueWarning": "Sans {original_filename}, {original_filename_number} ou {sequence}, plusieurs fichiers peuvent recevoir le même nom. Ces fichiers ne sont pas importés.",
       "organizeByDate": "Organiser dans des sous-dossiers par date",
       "sourceFiles": "Fichiers sources",
       "startImport": "Démarrer l'importation",
@@ -1459,6 +1496,7 @@
       "cancel": "Annuler",
       "fileNamingTemplate": "Modèle de nommage de fichier",
       "newName": "Nouveau nom",
+      "notUniqueWarning": "Sans {original_filename}, {original_filename_number} ou {sequence}, plusieurs fichiers peuvent recevoir le même nom. Dans ce cas, rien n'est renommé.",
       "save": "Enregistrer",
       "titleMultiple": "Renommer {{count}} images",
       "titleMultiple_many": "Renommer {{count}} images",
@@ -1529,7 +1567,10 @@
       "speed": "Vitesse",
       "title": "Contrôles de la souris",
       "zoom": "Multiplicateur de vitesse de zoom",
-      "zoomDesc": "Ajustez la vitesse de zoom de la toile lorsque vous utilisez la molette de défilement ou le geste de pincement."
+      "zoomDesc": "Ajustez la vitesse de zoom de la toile lorsque vous utilisez la molette de défilement ou le geste de pincement.",
+      "zoomClick": "Zoomer la photo à 100 %",
+      "zoomClickDesc": "Zoomer la photo dans l'éditeur à 100 % au clic",
+      "zoomClickInfo": "Cliquez sur la photo pour zoomer instantanément à 100 % (pixels 1:1) afin d'évaluer la netteté et le bruit. S'il est désactivé, le clic effectue un zoom progressif."
     },
     "data": {
       "clearSidecars": "Effacer tous les fichiers annexes",
@@ -1652,7 +1693,10 @@
       },
       "title": "Paramètres généraux",
       "xmpSync": "Synchronisation des métadonnées XMP",
-      "xmpSyncDesc": "Synchroniser les notes, les étiquettes de couleur et les tags vers des fichiers annexes XMP standard pour la compatibilité avec d'autres éditeurs de photos."
+      "xmpSyncDesc": "Synchroniser les notes, les étiquettes de couleur et les tags vers des fichiers annexes XMP standard pour la compatibilité avec d'autres éditeurs de photos.",
+      "neutralGreyCanvas": "Toile gris neutre",
+      "neutralGreyCanvasDesc": "Utilisez une toile gris neutre pour un étalonnage des couleurs et de l'exposition plus précis sans modifier le thème de l'application.",
+      "enableNeutralGreyCanvas": "Activer le fond gris neutre"
     },
     "keybinds": {
       "actions": {
@@ -1674,6 +1718,7 @@
         "open_settings": "Ouvrir les paramètres",
         "paste_adjustments": "Coller les ajustements copiés",
         "paste_files": "Coller le(s) fichier(s) dans le dossier actuel",
+        "copy_image_path": "Copier le chemin de la ou des images sélectionnées",
         "preview_next": "Image suivante",
         "preview_prev": "Image précédente",
         "rate_0": "Note : 0",

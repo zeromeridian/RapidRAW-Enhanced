@@ -493,7 +493,10 @@
         "hPlaceholder": "A",
         "hTooltip": "Altezza",
         "wPlaceholder": "L",
-        "wTooltip": "Larghezza"
+        "wTooltip": "Larghezza",
+        "saveTooltip": "Salva le proporzioni come preimpostazione",
+        "savedTooltip": "Proporzioni salvate {{ratio}}",
+        "removeTooltip": "Rimuovi le proporzioni salvate"
       },
       "geometryHeading": "Geometria",
       "labels": {
@@ -846,7 +849,12 @@
     },
     "file": {
       "quality": "Qualità",
-      "qualityLossless": "Qualità (Senza Perdita)"
+      "tiffBitDepth": "Profondità bit TIFF",
+      "tiffBitDepth8": "8 bit",
+      "tiffBitDepth16": "16 bit",
+      "qualityLossless": "Qualità (Senza Perdita)",
+      "resolution": "Risoluzione",
+      "dpi": "DPI"
     },
     "labels": {
       "image": "Immagine",
@@ -917,6 +925,32 @@
       "scale": "Scala",
       "spacing": "Spaziatura",
       "watermarkImage": "Immagine Filigrana"
+    },
+    "border": {
+      "addBorder": "Aggiungi Bordo",
+      "bases": {
+        "eachEdge": "Ogni Lato Rispettivo",
+        "longEdge": "Lato Lungo",
+        "shortEdge": "Lato Corto"
+      },
+      "basis": "Base dello Spessore",
+      "color": "Colore Bordo",
+      "invalidPercent": "Inserisci un numero tra 0 e 100 per entrambi.",
+      "leftRight": "Sinistra e Destra",
+      "percent": "%",
+      "topBottom": "Alto e Basso"
+    },
+    "pad": {
+      "aspectRatio": "Proporzioni",
+      "backgroundColor": "Colore Sfondo",
+      "invalidRatio": "Inserisci un numero positivo per larghezza e altezza.",
+      "padToAspectRatio": "Estendi alle Proporzioni",
+      "ratioHeight": "Altezza delle proporzioni",
+      "ratioWidth": "Larghezza delle proporzioni"
+    },
+    "destination": {
+      "subfolder": "Sottocartella",
+      "subfolderPlaceholder": "es. final, WebP"
     }
   },
   "library": {
@@ -1009,7 +1043,9 @@
         "clearSearch": "Cancella ricerca",
         "collapse": "Comprimi",
         "expand": "Espandi",
-        "sortFolders": "Ordina cartelle"
+        "sortFolders": "Ordina cartelle",
+        "navBack": "Indietro",
+        "navForward": "Avanti"
       }
     },
     "grid": {
@@ -1370,6 +1406,7 @@
       "deleteWarning": "I file verranno spostati nel cestino di sistema.",
       "fileNaming": "Nomenclatura File",
       "folderOrganization": "Organizzazione Cartelle",
+      "notUniqueWarning": "Senza {original_filename}, {original_filename_number} o {sequence}, più file possono ricevere lo stesso nome. Questi file non vengono importati.",
       "organizeByDate": "Organizza in sottocartelle per data",
       "sourceFiles": "File Sorgente",
       "startImport": "Inizia Importazione",
@@ -1459,6 +1496,7 @@
       "cancel": "Annulla",
       "fileNamingTemplate": "Modello Nomenclatura File",
       "newName": "Nuovo Nome",
+      "notUniqueWarning": "Senza {original_filename}, {original_filename_number} o {sequence}, più file possono ricevere lo stesso nome. In tal caso non viene rinominato nulla.",
       "save": "Salva",
       "titleMultiple": "Rinomina {{count}} Immagini",
       "titleMultiple_many": "Rinomina {{count}} Immagini",
@@ -1529,7 +1567,10 @@
       "speed": "Velocità",
       "title": "Controlli Mouse",
       "zoom": "Moltiplicatore Velocità Zoom",
-      "zoomDesc": "Regola la velocità dello zoom dell'area di lavoro quando utilizzi la rotellina di scorrimento o il gesto del pizzico."
+      "zoomDesc": "Regola la velocità dello zoom dell'area di lavoro quando utilizzi la rotellina di scorrimento o il gesto del pizzico.",
+      "zoomClick": "Zoom foto al 100%",
+      "zoomClickDesc": "Zoom della foto nell'editor al 100% al clic",
+      "zoomClickInfo": "Fai clic sulla foto per ingrandirla istantaneamente al 100% (pixel 1:1) per valutare nitidezza e rumore. Se disabilitato, il clic ingrandisce gradualmente."
     },
     "data": {
       "clearSidecars": "Cancella Tutti i File Sidecar",
@@ -1652,7 +1693,10 @@
       },
       "title": "Impostazioni Generali",
       "xmpSync": "Sincronizzazione Metadati XMP",
-      "xmpSyncDesc": "Sincronizza valutazioni, etichette colore e tag nei file sidecar XMP standard per la compatibilità con altri editor fotografici."
+      "xmpSyncDesc": "Sincronizza valutazioni, etichette colore e tag nei file sidecar XMP standard per la compatibilità con altri editor fotografici.",
+      "neutralGreyCanvas": "Tela grigio neutro",
+      "neutralGreyCanvasDesc": "Usa una tela grigio neutro per una correzione del colore e dell'esposizione più precisa senza cambiare il tema dell'app.",
+      "enableNeutralGreyCanvas": "Abilita sfondo grigio neutro"
     },
     "keybinds": {
       "actions": {
@@ -1674,6 +1718,7 @@
         "open_settings": "Apri le impostazioni",
         "paste_adjustments": "Incolla regolazioni copiate",
         "paste_files": "Incolla file nella cartella corrente",
+        "copy_image_path": "Copia il percorso delle immagini selezionate",
         "preview_next": "Immagine successiva",
         "preview_prev": "Immagine precedente",
         "rate_0": "Valutazione stelle: 0",

@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { toast } from 'react-toastify';
 import { ImageFile, Panel, ExifOverlay, LibraryDisplayMode } from '../components/ui/AppProperties';
 import { KEYBIND_DEFINITIONS, normalizeCombo } from '../utils/keyboardUtils';
 import { useEditorStore } from '../store/useEditorStore';
@@ -38,6 +39,19 @@ export const useKeyboardShortcuts = ({
   useEffect(() => {
     sortedListRef.current = sortedImageList;
   }, [sortedImageList]);
+
+  const handleCopyImagePaths = useCallback(async (paths: Array<string>) => {
+    const physicalPaths = [...new Set(paths.map((path) => path.split('?vc=')[0]))];
+    if (physicalPaths.length === 0) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(physicalPaths.join('\n'));
+    } catch (err) {
+      console.error('Failed to copy image path to clipboard', err);
+      toast.error(`Failed to copy path: ${err}`);
+    }
+  }, []);
 
   useEffect(() => {
     const getStoreState = () => ({
@@ -96,6 +110,21 @@ export const useKeyboardShortcuts = ({
       if (shouldAutoAdvance) advanceToNextImage(state);
     };
 
+    const getImagePathsForCopy = (s: ReturnType<typeof getStoreState>): Array<string> => {
+      if (s.editor.selectedImage) {
+        return [s.editor.selectedImage.path];
+      }
+      const { libraryActivePath, multiSelectedPaths } = s.library;
+      if (multiSelectedPaths.length > 0) {
+        const listOrder = new Map(sortedListRef.current.map((image: ImageFile, index: number) => [image.path, index]));
+        return [...multiSelectedPaths].sort(
+          (a: string, b: string) =>
+            (listOrder.get(a) ?? Number.MAX_SAFE_INTEGER) - (listOrder.get(b) ?? Number.MAX_SAFE_INTEGER),
+        );
+      }
+      return libraryActivePath ? [libraryActivePath] : [];
+    };
+
     const actions: Record<string, any> = {
       open_image: {
         shouldFire: (s: any) => !s.editor.selectedImage && s.library.libraryActivePath !== null,
@@ -131,6 +160,13 @@ export const useKeyboardShortcuts = ({
         execute: (e: any) => {
           e.preventDefault();
           handlePasteAdjustments();
+        },
+      },
+      copy_image_path: {
+        shouldFire: (s: ReturnType<typeof getStoreState>) => getImagePathsForCopy(s).length > 0,
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) => {
+          e.preventDefault();
+          handleCopyImagePaths(getImagePathsForCopy(s));
         },
       },
       copy_files: {
@@ -595,18 +631,32 @@ export const useKeyboardShortcuts = ({
           !s.editor.selectedImage && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code),
         execute: (e: KeyboardEvent, s: any) => {
           e.preventDefault();
-          const isNext = e.code === 'ArrowRight' || e.code === 'ArrowDown';
           const activePath = s.library.libraryActivePath;
           if (!activePath || sortedListRef.current.length === 0) return;
+          const selectPath = (path: string) => {
+            s.library.setLibrary({ libraryActivePath: path, multiSelectedPaths: [path] });
+          };
+          const isVertical = e.code === 'ArrowUp' || e.code === 'ArrowDown';
+          const isNext = e.code === 'ArrowRight' || e.code === 'ArrowDown';
+          const gridRows: Array<Array<{ path: string; center: number }>> = s.library.libraryGridRows;
+          const rowIndex = isVertical ? gridRows.findIndex((row) => row.some((item) => item.path === activePath)) : -1;
+          if (rowIndex !== -1) {
+            const targetRow = gridRows[rowIndex + (isNext ? 1 : -1)];
+            if (!targetRow) return;
+            const center = gridRows[rowIndex].find((item) => item.path === activePath)!.center;
+            const closest = targetRow.reduce((best, item) =>
+              Math.abs(item.center - center) < Math.abs(best.center - center) ? item : best,
+            );
+            selectPath(closest.path);
+            return;
+          }
           const currentIndex = sortedListRef.current.findIndex((img) => img.path === activePath);
           if (currentIndex === -1) return;
           let nextIndex = isNext ? currentIndex + 1 : currentIndex - 1;
           if (nextIndex >= sortedListRef.current.length) nextIndex = 0;
           if (nextIndex < 0) nextIndex = sortedListRef.current.length - 1;
           const nextImage = sortedListRef.current[nextIndex];
-          if (nextImage) {
-            s.library.setLibrary({ libraryActivePath: nextImage.path, multiSelectedPaths: [nextImage.path] });
-          }
+          if (nextImage) selectPath(nextImage.path);
         },
       },
     ];
@@ -692,5 +742,6 @@ export const useKeyboardShortcuts = ({
     handleRate,
     handleSetColorLabel,
     handleSetFlag,
+    handleCopyImagePaths,
   ]);
 };

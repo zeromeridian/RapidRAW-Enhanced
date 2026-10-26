@@ -53,6 +53,10 @@ pub fn get_luts_dir(app_data_dir: &Path) -> anyhow::Result<PathBuf> {
     Ok(luts_dir)
 }
 
+/// LUT file types the browser lists and `load_lut` can read: text LUTs and
+/// HALD images.
+const SUPPORTED_LUT_EXTENSIONS: &[&str] = &["cube", "3dl", "png", "jpg", "jpeg", "tif", "tiff"];
+
 pub fn list_luts_in_dir(dir: &Path) -> anyhow::Result<Vec<LutEntry>> {
     let mut entries: Vec<LutEntry> = Vec::new();
     if !dir.exists() {
@@ -65,7 +69,7 @@ pub fn list_luts_in_dir(dir: &Path) -> anyhow::Result<Vec<LutEntry>> {
             .and_then(|s| s.to_str())
             .unwrap_or("")
             .to_lowercase();
-        if extension == "cube" || extension == "3dl" {
+        if SUPPORTED_LUT_EXTENSIONS.contains(&extension.as_str()) {
             let name = path
                 .file_stem()
                 .and_then(|s| s.to_str())
@@ -383,7 +387,7 @@ pub fn parse_lut_file(path_str: &str) -> anyhow::Result<Lut> {
                 parse_3dl(BufReader::new(file))
             }
         }
-        "png" | "jpg" | "jpeg" | "tiff" => {
+        "png" | "jpg" | "jpeg" | "tif" | "tiff" => {
             let img = if let Some(b) = bytes {
                 image::load_from_memory(&b)?
             } else {
@@ -495,7 +499,7 @@ fn list_luts_in_cache() -> anyhow::Result<Vec<LutEntry>> {
             .and_then(|s| s.to_str())
             .unwrap_or("")
             .to_lowercase();
-        if extension == "cube" || extension == "3dl" {
+        if SUPPORTED_LUT_EXTENSIONS.contains(&extension.as_str()) {
             let name = path
                 .file_stem()
                 .and_then(|s| s.to_str())

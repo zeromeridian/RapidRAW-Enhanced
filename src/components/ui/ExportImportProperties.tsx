@@ -25,6 +25,7 @@ export const FILE_FORMATS: Array<FileFormat> = [
 
 export const FILENAME_VARIABLES: Array<string> = [
   '{original_filename}',
+  '{original_filename_number}',
   '{sequence}',
   '{YYYY}',
   '{MM}',
@@ -33,10 +34,21 @@ export const FILENAME_VARIABLES: Array<string> = [
   '{mm}',
 ];
 
+const UNIQUE_FILENAME_VARIABLES: Array<string> = ['{original_filename}', '{original_filename_number}', '{sequence}'];
+
+export const isUniqueFilenameTemplate = (template: string): boolean =>
+  UNIQUE_FILENAME_VARIABLES.some((variable) => template.includes(variable));
+
+export type TiffBitDepth = 8 | 16;
+
+export const DEFAULT_EXPORT_DPI = 300;
+export const MAX_EXPORT_DPI = 65535;
+
 export interface ExportSettings {
   filenameTemplate: string | null;
   filenameSuffix?: string | null;
   jpegQuality: number;
+  tiffBitDepth: TiffBitDepth;
   keepMetadata: boolean;
   inheritAllExif?: boolean;
   preserveTimestamps: boolean;
@@ -45,11 +57,30 @@ export interface ExportSettings {
     value: number;
     dontEnlarge: boolean;
   } | null;
+  border: {
+    basis: BorderBasis;
+    horizontalPercent: number;
+    verticalPercent: number;
+    color: string;
+  } | null;
+  pad: {
+    ratioWidth: number;
+    ratioHeight: number;
+    color: string;
+  } | null;
   stripGps: boolean;
   watermark: WatermarkSettings | null;
   exportMasks?: boolean;
   preserveFolders?: boolean;
   exportToSourceFolder?: boolean;
+  subfolder?: string;
+  dpi?: number;
+}
+
+export enum BorderBasis {
+  LongEdge = 'longEdge',
+  ShortEdge = 'shortEdge',
+  EachEdge = 'eachEdge',
 }
 
 export enum WatermarkAnchor {
@@ -106,16 +137,28 @@ export interface ExportPreset {
   name: string;
   fileFormat: string;
   jpegQuality: number;
+  tiffBitDepth?: TiffBitDepth;
+  dpi?: number;
   enableResize: boolean;
   resizeMode: string;
   resizeValue: number;
   dontEnlarge: boolean;
+  enablePad?: boolean;
+  padRatioWidth?: number;
+  padRatioHeight?: number;
+  padColor?: string;
+  enableBorder?: boolean;
+  borderBasis?: string;
+  borderHorizontalPercent?: number;
+  borderVerticalPercent?: number;
+  borderColor?: string;
   keepMetadata: boolean;
   preserveTimestamps: boolean;
   stripGps: boolean;
   exportMasks?: boolean;
   preserveFolders?: boolean;
   exportToSourceFolder?: boolean;
+  subfolder?: string;
   filenameTemplate: string;
   enableWatermark: boolean;
   watermarkPath: string | null;

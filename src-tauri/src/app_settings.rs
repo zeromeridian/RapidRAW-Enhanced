@@ -18,21 +18,27 @@ pub struct SortCriteria {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FilterCriteria {
-    pub rating: u8,
+    pub rating: i8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rating_comparison: Option<String>,
     pub raw_status: String,
     #[serde(default)]
     pub edited_status: Option<String>,
     #[serde(default)]
     pub colors: Vec<String>,
+    #[serde(default)]
+    pub flags: Vec<String>,
 }
 
 impl Default for FilterCriteria {
     fn default() -> Self {
         Self {
             rating: 0,
+            rating_comparison: None,
             raw_status: "all".to_string(),
             edited_status: Some("all".to_string()),
             colors: Vec::new(),
+            flags: Vec::new(),
         }
     }
 }
@@ -70,6 +76,12 @@ pub struct LastFolderState {
 pub struct MyLens {
     pub maker: String,
     pub model: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct CustomAspectRatio {
+    pub width: f64,
+    pub height: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -230,6 +242,10 @@ pub struct ExportPreset {
     pub name: String,
     pub file_format: String,
     pub jpeg_quality: u8,
+    #[serde(default)]
+    pub tiff_bit_depth: Option<u8>,
+    #[serde(default)]
+    pub dpi: Option<u16>,
     pub enable_resize: bool,
     pub resize_mode: String,
     pub resize_value: u32,
@@ -252,6 +268,26 @@ pub struct ExportPreset {
     #[serde(default)]
     pub export_to_source_folder: Option<bool>,
     #[serde(default)]
+    pub subfolder: Option<String>,
+    #[serde(default)]
+    pub enable_pad: Option<bool>,
+    #[serde(default)]
+    pub pad_ratio_width: Option<f32>,
+    #[serde(default)]
+    pub pad_ratio_height: Option<f32>,
+    #[serde(default)]
+    pub pad_color: Option<String>,
+    #[serde(default)]
+    pub enable_border: Option<bool>,
+    #[serde(default)]
+    pub border_basis: Option<String>,
+    #[serde(default)]
+    pub border_horizontal_percent: Option<f32>,
+    #[serde(default)]
+    pub border_vertical_percent: Option<f32>,
+    #[serde(default)]
+    pub border_color: Option<String>,
+    #[serde(default)]
     pub last_export_path: Option<String>,
 }
 
@@ -262,6 +298,8 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             name: "High Quality".to_string(),
             file_format: "jpeg".to_string(),
             jpeg_quality: 95,
+            tiff_bit_depth: Some(16),
+            dpi: Some(300),
             enable_resize: false,
             resize_mode: "longEdge".to_string(),
             resize_value: 2048,
@@ -279,6 +317,16 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             export_masks: Some(false),
             preserve_folders: Some(false),
             export_to_source_folder: Some(false),
+            subfolder: Some(String::new()),
+            enable_pad: Some(false),
+            pad_ratio_width: Some(1.0),
+            pad_ratio_height: Some(1.0),
+            pad_color: Some("#ffffff".to_string()),
+            enable_border: Some(false),
+            border_basis: Some("longEdge".to_string()),
+            border_horizontal_percent: Some(2.0),
+            border_vertical_percent: Some(2.0),
+            border_color: Some("#ffffff".to_string()),
             last_export_path: None,
         },
         ExportPreset {
@@ -286,6 +334,8 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             name: "Fast (Web)".to_string(),
             file_format: "jpeg".to_string(),
             jpeg_quality: 80,
+            tiff_bit_depth: Some(16),
+            dpi: Some(300),
             enable_resize: true,
             resize_mode: "width".to_string(),
             resize_value: 2048,
@@ -303,6 +353,16 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             export_masks: Some(false),
             preserve_folders: Some(false),
             export_to_source_folder: Some(false),
+            subfolder: Some(String::new()),
+            enable_pad: Some(false),
+            pad_ratio_width: Some(1.0),
+            pad_ratio_height: Some(1.0),
+            pad_color: Some("#ffffff".to_string()),
+            enable_border: Some(false),
+            border_basis: Some("longEdge".to_string()),
+            border_horizontal_percent: Some(2.0),
+            border_vertical_percent: Some(2.0),
+            border_color: Some("#ffffff".to_string()),
             last_export_path: None,
         },
     ]
@@ -457,6 +517,10 @@ pub struct AppSettings {
     #[serde(default)]
     pub canvas_input_mode: Option<String>,
     #[serde(default)]
+    pub editor_neutral_grey_bg: Option<bool>,
+    #[serde(default)]
+    pub zoom_photo_to_pixel_click: Option<bool>,
+    #[serde(default)]
     pub zoom_speed_multiplier: Option<f32>,
     #[serde(default)]
     pub keybinds: HashMap<String, Vec<String>>,
@@ -502,6 +566,8 @@ pub struct AppSettings {
     pub group_preferred_type: Option<String>,
     #[serde(default)]
     pub always_decode_raw_thumbnails: Option<bool>,
+    #[serde(default)]
+    pub custom_aspect_ratios: Vec<CustomAspectRatio>,
     #[serde(default)]
     pub bottom_toolbar_visibility: HashMap<String, bool>,
     #[serde(default)]
@@ -605,6 +671,8 @@ impl Default for AppSettings {
             #[cfg(not(any(target_os = "linux", target_os = "android")))]
             use_wgpu_renderer: Some(true),
             canvas_input_mode: Some("mouse".to_string()),
+            editor_neutral_grey_bg: Some(false),
+            zoom_photo_to_pixel_click: Some(false),
             zoom_speed_multiplier: Some(1.0),
             keybinds: HashMap::new(),
             #[cfg(target_os = "android")]
@@ -633,6 +701,7 @@ impl Default for AppSettings {
             group_associated_files: Some(false),
             group_preferred_type: Some("raw".to_string()),
             always_decode_raw_thumbnails: Some(false),
+            custom_aspect_ratios: Vec::new(),
             bottom_toolbar_visibility: HashMap::new(),
             image_stacks: None,
             auto_stack_created_images: true,
@@ -779,5 +848,22 @@ mod tests {
         let restored: AppSettings =
             serde_json::from_str(&serialized).expect("settings should deserialize");
         assert_eq!(restored.tone_curve_presets, settings.tone_curve_presets);
+    }
+
+    #[test]
+    fn quick_filter_criteria_round_trip_through_settings() {
+        let filter = json!({
+            "rating": -1,
+            "ratingComparison": "exactly",
+            "rawStatus": "rawOnly",
+            "editedStatus": "all",
+            "colors": ["red"],
+            "flags": ["rejected", "unflagged"]
+        });
+        let settings: AppSettings = serde_json::from_value(json!({ "filterCriteria": filter }))
+            .expect("settings with an unrated filter should deserialize");
+
+        let restored = serde_json::to_value(&settings).expect("settings should serialize");
+        assert_eq!(restored["filterCriteria"], filter);
     }
 }

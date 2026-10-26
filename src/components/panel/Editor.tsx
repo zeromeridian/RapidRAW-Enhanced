@@ -30,6 +30,8 @@ const parseRgb = (rgbStr: string): [number, number, number, number] => {
   return [0, 0, 0, 1.0];
 };
 
+const NEUTRAL_GREY_RGB: [number, number, number, number] = [128 / 255, 128 / 255, 128 / 255, 1.0];
+
 const checkCropValid = (pixelCrop: Partial<Crop>, imageW: number, imageH: number, rotation: number) => {
   if (pixelCrop.x === undefined || pixelCrop.y === undefined || !pixelCrop.width || !pixelCrop.height) {
     return false;
@@ -1052,9 +1054,13 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        let zoomTarget = savedZoomState.current
-          ? savedZoomState.current.scale
-          : Math.min(currentScale * 2, maxScaleRef.current);
+        let zoomTarget = Math.min(currentScale * 2, maxScaleRef.current);
+        if (appSettings?.zoomPhotoToPixelClick ?? false) {
+          const scaleFor100Percent = imageRenderSizeRef.current.scale ? 1 / imageRenderSizeRef.current.scale : 1;
+          zoomTarget = Math.min(scaleFor100Percent, maxScaleRef.current);
+        } else {
+          zoomTarget = savedZoomState.current ? savedZoomState.current.scale : zoomTarget;
+        }
         const ratio = zoomTarget / currentScale;
 
         const newPositionX = mouseX - (mouseX - currentPositionX) * ratio;
@@ -1063,7 +1069,15 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         animateTransform(newPositionX, newPositionY, zoomTarget, clickAnimationTime);
       }
     },
-    [isCropping, isMasking, isAiEditing, isWbPickerActive, isRelightPickerActive, animateTransform],
+    [
+      isCropping,
+      isMasking,
+      isAiEditing,
+      isWbPickerActive,
+      isRelightPickerActive,
+      animateTransform,
+      appSettings?.zoomPhotoToPixelClick,
+    ],
   );
 
   useEffect(() => {
@@ -1261,7 +1275,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     const isLightsOutBlack = lightsOutMode === 'black';
     const nativePreviewVisible = true;
     const bgPrimary: [number, number, number, number] = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgPrimaryStr);
-    const bgSecondary: [number, number, number, number] = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgSecondaryStr);
+    const bgSecondary: [number, number, number, number] = isLightsOutBlack
+      ? [0, 0, 0, 1]
+      : appSettings?.editorNeutralGreyBg
+        ? NEUTRAL_GREY_RGB
+        : parseRgb(bgSecondaryStr);
 
     wgpuStateRef.current = {
       useWgpuRenderer: appSettings?.useWgpuRenderer,
@@ -1276,6 +1294,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     };
   }, [
     appSettings?.useWgpuRenderer,
+    appSettings?.editorNeutralGreyBg,
     selectedImage?.isReady,
     hasRenderedFirstFrame,
     isCropping,
@@ -2184,7 +2203,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
           'lights-out-stage flex-1 relative overflow-hidden touch-none',
           isFullScreen ? 'rounded-none' : 'rounded-lg',
           appSettings?.useWgpuRenderer !== false && !isFullScreen && 'ring-[9999px] ring-bg-secondary',
-          !isWgpuActive && 'bg-bg-secondary',
+          !isWgpuActive &&
+            (appSettings?.editorNeutralGreyBg && lightsOutMode !== 'black' ? 'bg-[#808080]' : 'bg-bg-secondary'),
         )}
         style={{ cursor: cursorStyle }}
         onContextMenu={onContextMenu}

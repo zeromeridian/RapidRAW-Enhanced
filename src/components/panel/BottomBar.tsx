@@ -43,6 +43,9 @@ import {
   Invokes,
   MAX_THUMBNAIL_SIZE,
   MIN_THUMBNAIL_SIZE,
+  RATING_COMPARISON_SYMBOLS,
+  RATING_COMPARISONS,
+  RatingComparison,
   RawStatus,
   SelectedImage,
   THUMBNAIL_SIZE_STEP,
@@ -139,8 +142,13 @@ const FLAG_TOOLBAR_IDS = ['flagRejected', 'flagSelected', 'flagDeferred', 'flagU
 const COLOR_TOOLBAR_IDS = ['colorRed', 'colorYellow', 'colorGreen', 'colorBlue', 'colorPurple', 'colorNone'] as const;
 const ALL_COLOR_OPTIONS = [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }];
 
-const isRatingInRange = (rating: number, threshold: number, comparison: 'atLeast' | 'atMost') =>
-  threshold > 0 && (comparison === 'atMost' ? rating <= threshold : rating >= threshold);
+const isRatingInRange = (rating: number, threshold: number, comparison: RatingComparison) =>
+  threshold > 0 &&
+  (comparison === 'atMost'
+    ? rating <= threshold
+    : comparison === 'exactly'
+      ? rating === threshold
+      : rating >= threshold);
 
 type SelectByCriteria = Partial<FilterCriteria> & {
   rawKind?: 'dng' | 'otherRaw';
@@ -275,9 +283,8 @@ export default function BottomBar({
   const total = totalImages ?? 0;
   const showSelectionCounter = numSelected > 1;
 
-  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const [isSelectByOpen, setIsSelectByOpen] = useState(false);
-  const [selectRatingComparison, setSelectRatingComparison] = useState<'atLeast' | 'atMost'>('atLeast');
+  const [selectRatingComparison, setSelectRatingComparison] = useState<RatingComparison>('atLeast');
   const [activeSelectBy, setActiveSelectBy] = useState<{
     criteria: SelectByCriteria;
     id: string;
@@ -303,12 +310,22 @@ export default function BottomBar({
       setLibrary: state.setLibrary,
     })),
   );
-  const { selectionClearRequest, setUI } = useUIStore(
+  const { selectionClearRequest, setUI, isFilterExpanded } = useUIStore(
     useShallow((state) => ({
       selectionClearRequest: state.selectionClearRequest,
       setUI: state.setUI,
+      isFilterExpanded: Boolean(state.uiVisibility.quickFilter),
     })),
   );
+
+  const toggleQuickFilter = () => {
+    setUI((s) => ({
+      uiVisibility: {
+        ...s.uiVisibility,
+        quickFilter: !s.uiVisibility.quickFilter,
+      },
+    }));
+  };
   const setEditor = useEditorStore((state) => state.setEditor);
   const { appSettings, handleSettingsChange } = useSettingsStore(
     useShallow((state) => ({
@@ -460,7 +477,7 @@ export default function BottomBar({
           { id: 'rating-unrated', label: t('library.filters.rating.unrated'), criteria: { rating: -1 } },
           ...[1, 2, 3, 4, 5].map((rating) => ({
             id: `rating-${selectRatingComparison}-${rating}`,
-            label: `${selectRatingComparison === 'atMost' ? '≤' : '≥'} ${rating}`,
+            label: `${RATING_COMPARISON_SYMBOLS[selectRatingComparison]} ${rating}`,
             criteria: { rating, ratingComparison: selectRatingComparison },
           })),
         ],
@@ -527,7 +544,7 @@ export default function BottomBar({
     }
     return counts;
   }, [allLibraryImages, imageRatings, selectByGroups]);
-  const activeSelectByRatingMatch = activeSelectBy?.id.match(/^rating-(?:atLeast|atMost)-([1-5])$/);
+  const activeSelectByRatingMatch = activeSelectBy?.id.match(/^rating-(?:atLeast|exactly|atMost)-([1-5])$/);
   const activeSelectByRating = activeSelectByRatingMatch ? Number(activeSelectByRatingMatch[1]) : 0;
 
   const handleClearSelectBy = () => {
@@ -1259,7 +1276,7 @@ export default function BottomBar({
                       ? 'bg-card-active text-accent'
                       : 'text-text-secondary hover:bg-surface hover:text-text-primary',
                 )}
-                onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+                onClick={toggleQuickFilter}
                 data-tooltip={t('ui.bottomBar.tooltips.quickFilter', 'Quick Filter')}
               >
                 <Filter size={18} />
@@ -1306,7 +1323,7 @@ export default function BottomBar({
                     >
                       0
                     </button>
-                    {(['atMost', 'atLeast'] as const).map((comparison) => (
+                    {RATING_COMPARISONS.map((comparison) => (
                       <button
                         key={`qf-rating-${comparison}`}
                         type="button"
@@ -1322,9 +1339,9 @@ export default function BottomBar({
                             ? 'bg-card-active text-accent'
                             : 'text-text-secondary hover:bg-card-active hover:text-text-primary',
                         )}
-                        data-tooltip={comparison === 'atMost' ? '≤ 1–5' : '≥ 1–5'}
+                        data-tooltip={`${RATING_COMPARISON_SYMBOLS[comparison]} 1–5`}
                       >
-                        {comparison === 'atMost' ? '≤' : '≥'}
+                        {RATING_COMPARISON_SYMBOLS[comparison]}
                       </button>
                     ))}
                     {[1, 2, 3, 4, 5].map((starValue) => {
@@ -1343,7 +1360,7 @@ export default function BottomBar({
                             }))
                           }
                           className="p-0.5 focus:outline-none"
-                          data-tooltip={`${(filterCriteria.ratingComparison ?? 'atLeast') === 'atMost' ? '≤' : '≥'} ${starValue}`}
+                          data-tooltip={`${RATING_COMPARISON_SYMBOLS[filterCriteria.ratingComparison ?? 'atLeast']} ${starValue}`}
                         >
                           <Star
                             size={16}
@@ -1548,7 +1565,7 @@ export default function BottomBar({
                     >
                       0
                     </button>
-                    {(['atMost', 'atLeast'] as const).map((comparison) => (
+                    {RATING_COMPARISONS.map((comparison) => (
                       <button
                         key={`select-rating-${comparison}`}
                         type="button"
@@ -1568,9 +1585,9 @@ export default function BottomBar({
                             });
                           }
                         }}
-                        data-tooltip={comparison === 'atMost' ? '≤ 1–5' : '≥ 1–5'}
+                        data-tooltip={`${RATING_COMPARISON_SYMBOLS[comparison]} 1–5`}
                       >
-                        {comparison === 'atMost' ? '≤' : '≥'}
+                        {RATING_COMPARISON_SYMBOLS[comparison]}
                       </button>
                     ))}
                     {[1, 2, 3, 4, 5].map((rating) => {
@@ -1722,7 +1739,10 @@ export default function BottomBar({
         {isLibraryView ? (
           <div className="flex items-center gap-2">
             {onThumbnailSizeChange && isToolbarItemVisible('thumbnailSize') && (
-              <div className="flex items-center gap-2 w-40" data-tooltip={t('library.header.viewOptions.thumbnailSize')}>
+              <div
+                className="flex items-center gap-2 w-40"
+                data-tooltip={t('library.header.viewOptions.thumbnailSize')}
+              >
                 <Images size={16} className="text-text-secondary shrink-0" />
                 <div className="relative flex-1 h-5">
                   <div className="absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/2 bg-surface rounded-full pointer-events-none" />

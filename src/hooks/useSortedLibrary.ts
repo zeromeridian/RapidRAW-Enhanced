@@ -145,12 +145,12 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
     return tagsMatch && textMatch;
   };
 
-  let processedList = imageList;
+  let processedList = imageList.filter((image: ImageFile) => matchesLibraryFilter(image, imageRatings, filterCriteria));
   let searchMatchingGroupIds: Set<string> | null = null;
 
   if (isGroupingActive) {
     const groupEditedFiles = appSettings?.groupEditedFiles ?? true;
-    const groupingResult = buildImageGroups(imageList, groupingMode, groupEditedFiles);
+    const groupingResult = buildImageGroups(processedList, groupingMode, groupEditedFiles);
     processedList = groupingResult.displayList;
 
     if (isSearchActive) {
@@ -164,13 +164,9 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
     }
   }
 
-  const filteredList = processedList.filter((image: ImageFile) =>
-    matchesLibraryFilter(image, imageRatings, filterCriteria),
-  );
-
   const filteredBySearch = !isSearchActive
-    ? filteredList
-    : filteredList.filter((image: ImageFile) => {
+    ? processedList
+    : processedList.filter((image: ImageFile) => {
         if (searchMatchingGroupIds && image.group_id && searchMatchingGroupIds.has(image.group_id)) return true;
         return matchesSearch(image);
       });

@@ -493,7 +493,10 @@
         "hPlaceholder": "Al",
         "hTooltip": "Altura",
         "wPlaceholder": "An",
-        "wTooltip": "Anchura"
+        "wTooltip": "Anchura",
+        "saveTooltip": "Guardar la relación de aspecto como preajuste",
+        "savedTooltip": "Relación de aspecto guardada {{ratio}}",
+        "removeTooltip": "Eliminar la relación de aspecto guardada"
       },
       "geometryHeading": "Geometría",
       "labels": {
@@ -846,7 +849,12 @@
     },
     "file": {
       "quality": "Calidad",
-      "qualityLossless": "Calidad (Sin pérdida)"
+      "tiffBitDepth": "Profundidad de bits TIFF",
+      "tiffBitDepth8": "8 bits",
+      "tiffBitDepth16": "16 bits",
+      "qualityLossless": "Calidad (Sin pérdida)",
+      "resolution": "Resolución",
+      "dpi": "PPP"
     },
     "labels": {
       "image": "Imagen",
@@ -917,6 +925,32 @@
       "scale": "Escala",
       "spacing": "Espaciado",
       "watermarkImage": "Imagen de la marca de agua"
+    },
+    "border": {
+      "addBorder": "Añadir borde",
+      "bases": {
+        "eachEdge": "Cada borde respectivo",
+        "longEdge": "Borde largo",
+        "shortEdge": "Borde corto"
+      },
+      "basis": "Base del grosor",
+      "color": "Color del borde",
+      "invalidPercent": "Introduce un número entre 0 y 100 para ambos.",
+      "leftRight": "Izquierda y Derecha",
+      "percent": "%",
+      "topBottom": "Arriba y Abajo"
+    },
+    "pad": {
+      "aspectRatio": "Relación de aspecto",
+      "backgroundColor": "Color de fondo",
+      "invalidRatio": "Introduce un número positivo para la anchura y la altura.",
+      "padToAspectRatio": "Ampliar a la relación de aspecto",
+      "ratioHeight": "Altura de la relación de aspecto",
+      "ratioWidth": "Anchura de la relación de aspecto"
+    },
+    "destination": {
+      "subfolder": "Subcarpeta",
+      "subfolderPlaceholder": "p. ej. final, WebP"
     }
   },
   "library": {
@@ -1009,7 +1043,9 @@
         "clearSearch": "Borrar búsqueda",
         "collapse": "Contraer",
         "expand": "Expandir",
-        "sortFolders": "Ordenar carpetas"
+        "sortFolders": "Ordenar carpetas",
+        "navBack": "Atrás",
+        "navForward": "Adelante"
       }
     },
     "grid": {
@@ -1370,6 +1406,7 @@
       "deleteWarning": "Los archivos se moverán a la papelera del sistema.",
       "fileNaming": "Nomenclatura de archivos",
       "folderOrganization": "Organización de carpetas",
+      "notUniqueWarning": "Sin {original_filename}, {original_filename_number} o {sequence}, varios archivos pueden recibir el mismo nombre. Esos archivos no se importan.",
       "organizeByDate": "Organizar en subcarpetas por fecha",
       "sourceFiles": "Archivos de origen",
       "startImport": "Iniciar importación",
@@ -1459,6 +1496,7 @@
       "cancel": "Cancelar",
       "fileNamingTemplate": "Plantilla de nombre de archivo",
       "newName": "Nuevo nombre",
+      "notUniqueWarning": "Sin {original_filename}, {original_filename_number} o {sequence}, varios archivos pueden recibir el mismo nombre. En ese caso no se renombra nada.",
       "save": "Guardar",
       "titleMultiple": "Renombrar {{count}} imágenes",
       "titleMultiple_many": "Renombrar {{count}} imágenes",
@@ -1529,7 +1567,10 @@
       "speed": "Velocidad",
       "title": "Controles del ratón",
       "zoom": "Multiplicador de velocidad de zoom",
-      "zoomDesc": "Ajusta qué tan rápido se acerca y aleja el lienzo al usar la rueda de desplazamiento o el gesto de pellizcar."
+      "zoomDesc": "Ajusta qué tan rápido se acerca y aleja el lienzo al usar la rueda de desplazamiento o el gesto de pellizcar.",
+      "zoomClick": "Zoom de foto al 100%",
+      "zoomClickDesc": "Ampliar foto en el editor al 100% al hacer clic",
+      "zoomClickInfo": "Haz clic en la foto para ampliarla directamente al 100% (píxeles 1:1) para evaluar la nitidez y el ruido. Cuando está desactivado, al hacer clic se acerca gradualmente."
     },
     "data": {
       "clearSidecars": "Borrar todos los archivos sidecar",
@@ -1652,7 +1693,10 @@
       },
       "title": "Ajustes generales",
       "xmpSync": "Sincronización de metadatos XMP",
-      "xmpSyncDesc": "Sincroniza puntuaciones, etiquetas de color y etiquetas a archivos sidecar XMP estándar para compatibilidad con otros editores de fotos."
+      "xmpSyncDesc": "Sincroniza puntuaciones, etiquetas de color y etiquetas a archivos sidecar XMP estándar para compatibilidad con otros editores de fotos.",
+      "neutralGreyCanvas": "Lienzo gris neutro",
+      "neutralGreyCanvasDesc": "Utiliza un lienzo gris neutro para una gradación de color y exposición más precisa sin cambiar el tema de la aplicación.",
+      "enableNeutralGreyCanvas": "Activar fondo gris neutro"
     },
     "keybinds": {
       "actions": {
@@ -1674,6 +1718,7 @@
         "open_settings": "Abrir la configuración",
         "paste_adjustments": "Pegar ajustes copiados",
         "paste_files": "Pegar archivo(s) a la carpeta actual",
+        "copy_image_path": "Copiar la ruta de la(s) imagen(es) seleccionada(s)",
         "preview_next": "Siguiente imagen",
         "preview_prev": "Imagen anterior",
         "rate_0": "Puntuación de estrellas: 0",
