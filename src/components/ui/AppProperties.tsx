@@ -79,6 +79,7 @@ export enum Invokes {
   GetSupportedFileTypes = 'get_supported_file_types',
   HandleExportPresetsToFile = 'handle_export_presets_to_file',
   HandleImportPresetsFromFile = 'handle_import_presets_from_file',
+  HandleImportPresetsFromFiles = 'handle_import_presets_from_files',
   HandleImportLegacyPresetsFromFile = 'handle_import_legacy_presets_from_file',
   ImportFiles = 'import_files',
   InvokeGenerativeReplace = 'invoke_generative_replace',
@@ -185,6 +186,11 @@ export enum ThumbnailAspectRatio {
   Contain = 'contain',
 }
 
+export interface CustomAspectRatio {
+  width: number;
+  height: number;
+}
+
 export type GroupPreference = 'jpeg' | 'raw';
 export type GroupingMode = 'off' | GroupPreference;
 
@@ -234,6 +240,7 @@ export interface AppSettings {
   linuxGpuOptimization?: boolean;
   exportPresets?: ExportPreset[];
   myLenses?: any;
+  customAspectRatios?: CustomAspectRatio[];
   enableFolderImageCounts?: boolean;
   hideEmptyFolders?: boolean;
   displayEditIcon?: boolean;
@@ -244,8 +251,10 @@ export interface AppSettings {
   waveformHeight?: number;
   activeWaveformChannel?: string;
   useWgpuRenderer?: boolean;
+  editorNeutralGreyBg?: boolean;
   canvasInputMode?: 'mouse' | 'trackpad';
   zoomSpeedMultiplier?: number;
+  zoomPhotoToPixelClick?: boolean;
   keybinds?: { [action: string]: string[] };
   tonemapperOverrideEnabled?: boolean;
   defaultRawTonemapper?: string;
@@ -316,11 +325,21 @@ export const EditedStatus = {
 
 export type EditedStatus = (typeof EditedStatus)[keyof typeof EditedStatus];
 
+export type RatingComparison = 'atMost' | 'exactly' | 'atLeast';
+
+export const RATING_COMPARISONS: Array<RatingComparison> = ['atMost', 'exactly', 'atLeast'];
+
+export const RATING_COMPARISON_SYMBOLS: Record<RatingComparison, string> = {
+  atMost: '≤',
+  exactly: '=',
+  atLeast: '≥',
+};
+
 export interface FilterCriteria {
   colors: Array<string>;
   flags?: Array<'rejected' | 'selected' | 'deferred' | 'unflagged'>;
   rating: number;
-  ratingComparison?: 'atLeast' | 'atMost';
+  ratingComparison?: RatingComparison;
   rawStatus: RawStatus;
   editedStatus?: EditedStatus;
 }
@@ -444,6 +463,7 @@ export interface TransformState {
 export interface UiVisibility {
   folderTree: boolean;
   filmstrip: boolean;
+  quickFilter?: boolean;
 }
 
 export interface WaveformData {

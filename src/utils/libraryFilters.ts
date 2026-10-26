@@ -12,6 +12,7 @@ export function matchesLibraryFilter(
     if (filterCriteria.rating > 0) {
       const comparison = filterCriteria.ratingComparison ?? 'atLeast';
       if (comparison === 'atMost' && (rating === 0 || rating > filterCriteria.rating)) return false;
+      if (comparison === 'exactly' && rating !== filterCriteria.rating) return false;
       if (comparison === 'atLeast' && rating < filterCriteria.rating) return false;
     }
   }

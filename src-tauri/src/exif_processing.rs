@@ -867,6 +867,7 @@ pub fn write_image_with_metadata(
     keep_metadata: bool,
     strip_gps: bool,
     inherit_all_exif: bool,
+    dpi: Option<u16>,
 ) -> Result<(), String> {
     if !keep_metadata {
         return Ok(());
@@ -1323,6 +1324,16 @@ pub fn write_image_with_metadata(
     metadata.set_tag(ExifTag::Orientation(vec![1u16]));
     metadata.set_tag(ExifTag::ColorSpace(vec![1u16]));
 
+    if let Some(dpi) = dpi {
+        let resolution = vec![uR64 {
+            nominator: dpi.into(),
+            denominator: 1,
+        }];
+        metadata.set_tag(ExifTag::XResolution(resolution.clone()));
+        metadata.set_tag(ExifTag::YResolution(resolution));
+        metadata.set_tag(ExifTag::ResolutionUnit(vec![2u16]));
+    }
+
     if let Err(e) = metadata.write_to_vec(image_bytes, file_type) {
         log::warn!("Failed to write metadata: {}", e);
     }
@@ -1499,6 +1510,7 @@ mod tests {
             true,
             false,
             true,
+            None,
         )
         .unwrap();
 
@@ -1533,6 +1545,7 @@ mod tests {
             true,
             true,
             true,
+            None,
         )
         .unwrap();
         image::load_from_memory_with_format(&gps_stripped_bytes, image::ImageFormat::Tiff).unwrap();

@@ -590,10 +590,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         const exportSettings: ExportSettings = {
           filenameTemplate: null,
           jpegQuality: 100,
+          tiffBitDepth: 16,
           keepMetadata: true,
           preserveTimestamps: false,
           preserveFolders: false,
           resize: null,
+          border: null,
+          pad: null,
           stripGps: false,
           watermark: null,
           exportMasks: false,
@@ -696,10 +699,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           : [{ icon: FileInput, label: exportLabel, onClick: onExportClick }, { type: OPTION_SEPARATOR }]),
         openInOption,
         {
-          disabled: !isSingleSelection,
           icon: Copy,
           label: t('contextMenus.editor.copyAdjustments'),
-          onClick: () => handleCopyAdjustments(finalSelection[0]),
+          onClick: () => handleCopyAdjustments(path),
         },
         {
           disabled: copiedAdjustments === null,

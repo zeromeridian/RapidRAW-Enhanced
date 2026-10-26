@@ -32,6 +32,7 @@ import {
   RawStatus,
   EditedStatus,
   LibraryDisplayMode,
+  RATING_COMPARISON_SYMBOLS,
 } from '../ui/AppProperties';
 import { GroupBadgeInfo, GroupId } from '../../utils/imageGrouping';
 import { ImportState, Status } from '../ui/ExportImportProperties';
@@ -255,7 +256,7 @@ export default function MainLibrary(props: MainLibraryProps) {
     if (filterCriteria.rating !== 0) {
       const rating =
         filterCriteria.rating > 0
-          ? `${filterCriteria.ratingComparison === 'atMost' ? '≤' : '≥'} ${filterCriteria.rating}`
+          ? `${RATING_COMPARISON_SYMBOLS[filterCriteria.ratingComparison ?? 'atLeast']} ${filterCriteria.rating}`
           : translatedRatingFilterOptions.find((option) => option.value === filterCriteria.rating)?.label;
       if (rating) {
         filters.push({

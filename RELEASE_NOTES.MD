@@ -5,6 +5,67 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.14.0-dev-port-features-from-rr — 2026-10-26
+
+### Library
+
+- **Back** and **Forward** buttons in the folder panel step through the
+  folders and albums you have visited.
+- Up and Down arrow keys in the Library grid now move to the image above or
+  below instead of the previous or next image.
+- Copy Adjustments now works with several images selected; it copies from the
+  image you right-clicked or the active image.
+- **Copy Image Path** (Command+L on Mac, Ctrl+L on Windows and Linux) copies
+  the file paths of the open or selected images. The shortcut can be changed
+  in Settings.
+- The Quick Filter remembers whether it was open, and all of its choices,
+  including flags and the ≤/≥ rating comparison, are kept between launches.
+- Rating filters and Select by gain an **=** option for an exact star rating.
+- When a rating, flag, color label, or tag change hides the active image under
+  the current filter, the selection moves to the next visible image.
+- Filters are now applied before RAW+JPEG grouping, so a "RAW only" filter no
+  longer hides pairs where the JPEG is shown.
+- New `{original_filename_number}` naming token uses the number at the end of
+  the file name, for example `1234` from `IMG_1234`. Rename and import no
+  longer add a hidden `_{sequence}`; a warning appears instead when several
+  files could end up with the same name.
+
+### Export
+
+- TIFF exports can be saved as true 8-bit or 16-bit files. 16-bit TIFFs now
+  keep the full precision of the edit.
+- New **Resolution (DPI)** setting under Advanced for JPEG, PNG, and TIFF
+  exports, set to 300 by default.
+- JPEG and PNG exports include an sRGB color profile, so color-managed apps
+  and print services show them correctly.
+- **Add Border** adds a colored border measured from the long edge, short
+  edge, or each edge.
+- **Pad to Aspect Ratio** places the photo on a colored canvas of the chosen
+  shape, for example 1:1 for social media.
+- **Export to same folder as source** can now export into a subfolder, such
+  as `final`.
+- Bit depth, DPI, border, padding, and subfolder choices are saved in export
+  presets.
+
+### Editing
+
+- Custom crop aspect ratios can be saved as presets and removed again.
+- New **Neutral grey canvas** setting shows the photo on 50% grey for color
+  and exposure judgement.
+- New **Zoom photo to 100%** setting: clicking the photo zooms straight to
+  1:1 pixels.
+- Several preset files can be imported at once; files that cannot be read
+  are skipped instead of stopping the import.
+- The LUT browser now also lists and imports HALD image LUTs (PNG, JPEG,
+  TIFF).
+
+### Fixes
+
+- Settings were not saved while the Quick Filter showed only unrated images.
+- On Linux with Wayland and an Nvidia graphics card, ThisIsRAW uses a more
+  reliable workaround for the window crash.
+- Failed exports from the command line now end with an error exit code.
+
 ## 1.13.0-dev-port-features-from-rr — 2026-10-26
 
 ### AI text masks

@@ -469,7 +469,10 @@
         "hPlaceholder": "高",
         "hTooltip": "高度",
         "wPlaceholder": "宽",
-        "wTooltip": "宽度"
+        "wTooltip": "宽度",
+        "saveTooltip": "将宽高比保存为预设",
+        "savedTooltip": "已保存的宽高比 {{ratio}}",
+        "removeTooltip": "删除已保存的宽高比"
       },
       "geometryHeading": "几何",
       "labels": {
@@ -820,7 +823,12 @@
     },
     "file": {
       "quality": "质量",
-      "qualityLossless": "质量（无损）"
+      "tiffBitDepth": "TIFF 位深",
+      "tiffBitDepth8": "8 位",
+      "tiffBitDepth16": "16 位",
+      "qualityLossless": "质量（无损）",
+      "resolution": "分辨率",
+      "dpi": "DPI"
     },
     "labels": {
       "image": "图像",
@@ -890,6 +898,32 @@
       "scale": "缩放",
       "spacing": "间距",
       "watermarkImage": "水印图像"
+    },
+    "border": {
+      "addBorder": "添加边框",
+      "bases": {
+        "eachEdge": "各自边长",
+        "longEdge": "长边",
+        "shortEdge": "短边"
+      },
+      "basis": "厚度基准",
+      "color": "边框颜色",
+      "invalidPercent": "请为两者输入 0 到 100 之间的数字。",
+      "leftRight": "左右",
+      "percent": "%",
+      "topBottom": "上下"
+    },
+    "pad": {
+      "aspectRatio": "宽高比",
+      "backgroundColor": "背景颜色",
+      "invalidRatio": "请为宽度和高度输入正数。",
+      "padToAspectRatio": "填充至宽高比",
+      "ratioHeight": "宽高比高度",
+      "ratioWidth": "宽高比宽度"
+    },
+    "destination": {
+      "subfolder": "子文件夹",
+      "subfolderPlaceholder": "例如：final, WebP"
     }
   },
   "library": {
@@ -982,7 +1016,9 @@
         "clearSearch": "清除搜索",
         "collapse": "折叠",
         "expand": "展开",
-        "sortFolders": "对文件夹排序"
+        "sortFolders": "对文件夹排序",
+        "navBack": "后退",
+        "navForward": "前进"
       }
     },
     "grid": {
@@ -1337,6 +1373,7 @@
       "deleteWarning": "文件将被移至系统回收站。",
       "fileNaming": "文件命名",
       "folderOrganization": "文件夹组织",
+      "notUniqueWarning": "如果不包含 {original_filename}、{original_filename_number} 或 {sequence}，文件可能会重名。重名的文件不会被导入。",
       "organizeByDate": "按日期组织到子文件夹",
       "sourceFiles": "源文件",
       "startImport": "开始导入",
@@ -1424,6 +1461,7 @@
       "cancel": "取消",
       "fileNamingTemplate": "文件命名模板",
       "newName": "新名称",
+      "notUniqueWarning": "如果不包含 {original_filename}、{original_filename_number} 或 {sequence}，文件可能会重名。此时不会重命名任何文件。",
       "save": "保存",
       "titleMultiple": "重命名 {{count}} 张图像",
       "titleMultiple_one": "重命名 {{count}} 张图像",
@@ -1493,7 +1531,10 @@
       "speed": "速度",
       "title": "鼠标控制",
       "zoom": "缩放速度倍率",
-      "zoomDesc": "调整使用滚轮或捏合手势时画布缩放的速度。"
+      "zoomDesc": "调整使用滚轮或捏合手势时画布缩放的速度。",
+      "zoomClick": "缩放照片至 100%",
+      "zoomClickDesc": "点击时将编辑器中的照片缩放至 100%",
+      "zoomClickInfo": "点击照片可立即缩放至 100%（1:1 像素），以评估清晰度和噪点。禁用时，点击会逐步放大。"
     },
     "data": {
       "clearSidecars": "清除所有附属文件",
@@ -1613,7 +1654,10 @@
       },
       "title": "通用设置",
       "xmpSync": "XMP 元数据同步",
-      "xmpSyncDesc": "将评分、颜色标签和标签同步到标准 XMP 附属文件，以便与其他照片编辑器兼容。"
+      "xmpSyncDesc": "将评分、颜色标签和标签同步到标准 XMP 附属文件，以便与其他照片编辑器兼容。",
+      "neutralGreyCanvas": "中性灰画布",
+      "neutralGreyCanvasDesc": "使用中性灰画布，以便在不更改应用主题的情况下进行更准确的色彩和曝光分级。",
+      "enableNeutralGreyCanvas": "启用中性灰背景"
     },
     "keybinds": {
       "actions": {
@@ -1635,6 +1679,7 @@
         "open_settings": "打开设置",
         "paste_adjustments": "粘贴复制的调整",
         "paste_files": "将文件粘贴到当前文件夹",
+        "copy_image_path": "复制所选图片的路径",
         "preview_next": "下一张",
         "preview_prev": "上一张",
         "rate_0": "星级评分：0",

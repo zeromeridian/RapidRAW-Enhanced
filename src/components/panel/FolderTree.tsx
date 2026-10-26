@@ -21,6 +21,8 @@ import {
   Car,
   Briefcase,
   ArrowUpDown,
+  ArrowLeft,
+  ArrowRight,
   Check,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -61,6 +63,8 @@ interface FolderTreeProps {
   onSelectAlbum(albumId: string, albumName: string, images: string[]): void;
   onToggleFolder(folder: string): void;
   onOpenFolder(): void;
+  onNavBack(): void;
+  onNavForward(): void;
   onDropFiles(sourcePaths: string[], destinationFolder: string): void;
   onDropFolders(sourcePaths: string[], destinationFolder: string, copy: boolean): void;
   setIsVisible(visible: boolean): void;
@@ -676,6 +680,8 @@ export default function FolderTree({
   onSelectAlbum,
   onToggleFolder,
   onOpenFolder,
+  onNavBack,
+  onNavForward,
   setIsVisible,
   style,
   isInstantTransition,
@@ -699,6 +705,8 @@ export default function FolderTree({
     activeAlbumId,
     expandedAlbumGroups,
     selectedFolderPaths,
+    navHistory,
+    navIndex,
   } = useLibraryStore(
     useShallow((state) => ({
       folderTrees: state.folderTrees,
@@ -710,6 +718,8 @@ export default function FolderTree({
       activeAlbumId: state.activeAlbumId,
       expandedAlbumGroups: state.expandedAlbumGroups,
       selectedFolderPaths: state.selectedFolderPaths,
+      navHistory: state.navHistory,
+      navIndex: state.navIndex,
     })),
   );
 
@@ -928,6 +938,22 @@ export default function FolderTree({
                       isSortMenuOpen ? 'overflow-visible' : 'overflow-hidden',
                     )}
                   >
+                    <button
+                      className="bg-surface rounded-md hover:bg-card-active flex items-center justify-center shrink-0 transition-colors w-9 h-9 mr-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={navIndex <= 0}
+                      onClick={onNavBack}
+                      data-tooltip={t('library.folders.tooltips.navBack')}
+                    >
+                      <ArrowLeft size={16} className="text-text-secondary" />
+                    </button>
+                    <button
+                      className="bg-surface rounded-md hover:bg-card-active flex items-center justify-center shrink-0 transition-colors w-9 h-9 mr-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={navIndex >= navHistory.length - 1}
+                      onClick={onNavForward}
+                      data-tooltip={t('library.folders.tooltips.navForward')}
+                    >
+                      <ArrowRight size={16} className="text-text-secondary" />
+                    </button>
                     <FolderSortMenu
                       sort={folderTreeSort}
                       onChange={(newSort) => {

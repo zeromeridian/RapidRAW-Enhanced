@@ -515,7 +515,10 @@
         "hPlaceholder": "Wys.",
         "hTooltip": "Wysokość",
         "wPlaceholder": "Szer.",
-        "wTooltip": "Szerokość"
+        "wTooltip": "Szerokość",
+        "saveTooltip": "Zapisz proporcje jako ustawienie",
+        "savedTooltip": "Zapisane proporcje {{ratio}}",
+        "removeTooltip": "Usuń zapisane proporcje"
       },
       "geometryHeading": "Geometria",
       "labels": {
@@ -870,7 +873,12 @@
     },
     "file": {
       "quality": "Jakość",
-      "qualityLossless": "Jakość (Bezstratna)"
+      "tiffBitDepth": "Głębia bitowa TIFF",
+      "tiffBitDepth8": "8 bitów",
+      "tiffBitDepth16": "16 bitów",
+      "qualityLossless": "Jakość (Bezstratna)",
+      "resolution": "Rozdzielczość",
+      "dpi": "DPI"
     },
     "labels": {
       "image": "Obraz",
@@ -942,6 +950,32 @@
       "scale": "Skala",
       "spacing": "Odstępy",
       "watermarkImage": "Obraz znaku wodnego"
+    },
+    "border": {
+      "addBorder": "Dodaj ramkę",
+      "bases": {
+        "eachEdge": "Odpowiednia krawędź",
+        "longEdge": "Dłuższa krawędź",
+        "shortEdge": "Krótsza krawędź"
+      },
+      "basis": "Podstawa grubości",
+      "color": "Kolor ramki",
+      "invalidPercent": "Wprowadź liczbę od 0 do 100 dla obu.",
+      "leftRight": "Lewo i prawo",
+      "percent": "%",
+      "topBottom": "Góra i dół"
+    },
+    "pad": {
+      "aspectRatio": "Proporcje",
+      "backgroundColor": "Kolor tła",
+      "invalidRatio": "Wprowadź liczbę dodatnią dla szerokości i wysokości.",
+      "padToAspectRatio": "Rozszerz do proporcji",
+      "ratioHeight": "Wysokość proporcji",
+      "ratioWidth": "Szerokość proporcji"
+    },
+    "destination": {
+      "subfolder": "Podfolder",
+      "subfolderPlaceholder": "np. final, WebP"
     }
   },
   "library": {
@@ -1034,7 +1068,9 @@
         "clearSearch": "Wyczyść wyszukiwanie",
         "collapse": "Zwiń",
         "expand": "Rozwiń",
-        "sortFolders": "Sortuj foldery"
+        "sortFolders": "Sortuj foldery",
+        "navBack": "Wstecz",
+        "navForward": "Dalej"
       }
     },
     "grid": {
@@ -1401,6 +1437,7 @@
       "deleteWarning": "Pliki zostaną przeniesione do systemowego kosza.",
       "fileNaming": "Nazewnictwo plików",
       "folderOrganization": "Organizacja folderów",
+      "notUniqueWarning": "Bez {original_filename}, {original_filename_number} lub {sequence} pliki mogą otrzymać tę samą nazwę. Takie pliki nie zostaną zaimportowane.",
       "organizeByDate": "Organizuj w podfolderach według daty",
       "sourceFiles": "Pliki źródłowe",
       "startImport": "Rozpocznij import",
@@ -1492,6 +1529,7 @@
       "cancel": "Anuluj",
       "fileNamingTemplate": "Szablon nazywania plików",
       "newName": "Nowa nazwa",
+      "notUniqueWarning": "Bez {original_filename}, {original_filename_number} lub {sequence} pliki mogą otrzymać tę samą nazwę. Wtedy żaden plik nie zostanie przemianowany.",
       "save": "Zapisz",
       "titleMultiple": "Zmień nazwę {{count}} obrazów",
       "titleMultiple_few": "Zmień nazwy {{count}} obrazów",
@@ -1563,7 +1601,10 @@
       "speed": "Prędkość",
       "title": "Sterowanie myszą",
       "zoom": "Mnożnik szybkości przybliżania",
-      "zoomDesc": "Dostosuj, jak szybko płótno się powiększa i pomniejsza przy użyciu kółka myszy lub gestu szczypania."
+      "zoomDesc": "Dostosuj, jak szybko płótno się powiększa i pomniejsza przy użyciu kółka myszy lub gestu szczypania.",
+      "zoomClick": "Powiększ zdjęcie do 100%",
+      "zoomClickDesc": "Powiększ zdjęcie w edytorze do 100% po kliknięciu",
+      "zoomClickInfo": "Kliknij zdjęcie, aby natychmiast powiększyć je do 100% (piksele 1:1) w celu oceny ostrości i szumu. Jeśli wyłączone, kliknięcie przybliża stopniowo."
     },
     "data": {
       "clearSidecars": "Wyczyść wszystkie pliki poboczne (Sidecar)",
@@ -1689,7 +1730,10 @@
       },
       "title": "Ustawienia ogólne",
       "xmpSync": "Synchronizacja metadanych XMP",
-      "xmpSyncDesc": "Synchronizuj oceny, etykiety kolorów i tagi do standardowych plików XMP w celu zachowania kompatybilności z innymi edytorami zdjęć."
+      "xmpSyncDesc": "Synchronizuj oceny, etykiety kolorów i tagi do standardowych plików XMP w celu zachowania kompatybilności z innymi edytorami zdjęć.",
+      "neutralGreyCanvas": "Neutralne szare płótno",
+      "neutralGreyCanvasDesc": "Użyj neutralnego, szarego płótna do dokładniejszej korekcji kolorów i ekspozycji bez zmiany motywu aplikacji.",
+      "enableNeutralGreyCanvas": "Włącz neutralne szare tło"
     },
     "keybinds": {
       "actions": {
@@ -1711,6 +1755,7 @@
         "open_settings": "Otwórz ustawienia",
         "paste_adjustments": "Wklej skopiowane ustawienia",
         "paste_files": "Wklej pliki do bieżącego folderu",
+        "copy_image_path": "Kopiuj ścieżkę wybranych zdjęć",
         "preview_next": "Następny obraz",
         "preview_prev": "Poprzedni obraz",
         "rate_0": "Ocena: 0",

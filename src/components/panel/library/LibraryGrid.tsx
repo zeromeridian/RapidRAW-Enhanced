@@ -12,6 +12,7 @@ import {
   LibraryDisplayMode,
   THUMBNAIL_SIZE_WHEEL_STEP,
   clampThumbnailSize,
+  ImageFile,
 } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
@@ -439,6 +440,24 @@ export default function LibraryGrid(props: any) {
       }
     }
   }, [activePath, gridData, multiSelectedPaths.length, listHandle, currentFolderPath, imageList, libraryViewMode]);
+
+  useEffect(() => {
+    if (!gridData) {
+      setLibrary({ libraryGridRows: [] });
+      return;
+    }
+    const navRows = gridData.rows
+      .filter((row) => row.type === 'images')
+      .map((row) =>
+        row.images.map((image: ImageFile, i: number) => ({
+          path: image.path,
+          center: i * (gridData.itemWidth + gridData.ITEM_GAP) + gridData.itemWidth / 2,
+        })),
+      );
+    setLibrary({ libraryGridRows: navRows });
+  }, [gridData, setLibrary]);
+
+  useEffect(() => () => setLibrary({ libraryGridRows: [] }), [setLibrary]);
 
   const memoizedRowProps = useMemo(() => {
     if (!gridData) return {};

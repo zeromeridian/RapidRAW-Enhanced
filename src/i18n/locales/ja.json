@@ -469,7 +469,10 @@
         "hPlaceholder": "H",
         "hTooltip": "高さ",
         "wPlaceholder": "W",
-        "wTooltip": "幅"
+        "wTooltip": "幅",
+        "saveTooltip": "アスペクト比をプリセットとして保存",
+        "savedTooltip": "保存したアスペクト比 {{ratio}}",
+        "removeTooltip": "保存したアスペクト比を削除"
       },
       "geometryHeading": "ジオメトリ",
       "labels": {
@@ -820,7 +823,12 @@
     },
     "file": {
       "quality": "画質",
-      "qualityLossless": "画質 (ロスレス)"
+      "tiffBitDepth": "TIFF ビット深度",
+      "tiffBitDepth8": "8 ビット",
+      "tiffBitDepth16": "16 ビット",
+      "qualityLossless": "画質 (ロスレス)",
+      "resolution": "解像度",
+      "dpi": "DPI"
     },
     "labels": {
       "image": "画像",
@@ -890,6 +898,32 @@
       "scale": "倍率",
       "spacing": "間隔",
       "watermarkImage": "ウォーターマーク画像"
+    },
+    "border": {
+      "addBorder": "枠を追加",
+      "bases": {
+        "eachEdge": "それぞれの辺",
+        "longEdge": "長辺",
+        "shortEdge": "短辺"
+      },
+      "basis": "太さの基準",
+      "color": "枠の色",
+      "invalidPercent": "両方に0から100までの数値を入力してください。",
+      "leftRight": "左右",
+      "percent": "%",
+      "topBottom": "上下"
+    },
+    "pad": {
+      "aspectRatio": "アスペクト比",
+      "backgroundColor": "背景色",
+      "invalidRatio": "幅と高さに正の数を入力してください。",
+      "padToAspectRatio": "アスペクト比に合わせて余白を追加",
+      "ratioHeight": "アスペクト比の高さ",
+      "ratioWidth": "アスペクト比の幅"
+    },
+    "destination": {
+      "subfolder": "サブフォルダー",
+      "subfolderPlaceholder": "例：final, WebP"
     }
   },
   "library": {
@@ -982,7 +1016,9 @@
         "clearSearch": "検索をクリア",
         "collapse": "折りたたむ",
         "expand": "展開",
-        "sortFolders": "フォルダーを並べ替え"
+        "sortFolders": "フォルダーを並べ替え",
+        "navBack": "戻る",
+        "navForward": "進む"
       }
     },
     "grid": {
@@ -1337,6 +1373,7 @@
       "deleteWarning": "ファイルはシステムのゴミ箱に移動されます。",
       "fileNaming": "ファイル名の命名",
       "folderOrganization": "フォルダ構成",
+      "notUniqueWarning": "{original_filename}、{original_filename_number}、{sequence} のいずれも含まれない場合、ファイル名が重複することがあります。重複したファイルはインポートされません。",
       "organizeByDate": "日付ごとにサブフォルダに整理する",
       "sourceFiles": "ソースファイル",
       "startImport": "インポートを開始",
@@ -1424,6 +1461,7 @@
       "cancel": "キャンセル",
       "fileNamingTemplate": "ファイル命名テンプレート",
       "newName": "新しい名前",
+      "notUniqueWarning": "{original_filename}、{original_filename_number}、{sequence} のいずれも含まれない場合、ファイル名が重複することがあります。その場合、名前は一切変更されません。",
       "save": "保存",
       "titleMultiple": "{{count}} 件の画像名を変更",
       "titleMultiple_one": "{{count}} 件の画像名を変更",
@@ -1493,7 +1531,10 @@
       "speed": "速度",
       "title": "マウス操作設定",
       "zoom": "ズーム速度の倍率",
-      "zoomDesc": "スクロールホイールやピンチジェスチャを使用したときのズーム速度を調整します。"
+      "zoomDesc": "スクロールホイールやピンチジェスチャを使用したときのズーム速度を調整します。",
+      "zoomClick": "写真を100%にズーム",
+      "zoomClickDesc": "クリック時にエディターの写真を100%にズーム",
+      "zoomClickInfo": "写真をクリックするとすぐに100%（1:1 ピクセル）にズームされ、シャープネスとノイズを確認できます。無効の場合、クリックすると段階的にズームインします。"
     },
     "data": {
       "clearSidecars": "すべてのサイドカーファイルを削除",
@@ -1613,7 +1654,10 @@
       },
       "title": "全般設定",
       "xmpSync": "XMPメタデータ同期",
-      "xmpSyncDesc": "他の写真編集ソフトとの互換性のために、評価、カラーラベル、タグを標準のXMPサイドカーファイルと同期します。"
+      "xmpSyncDesc": "他の写真編集ソフトとの互換性のために、評価、カラーラベル、タグを標準のXMPサイドカーファイルと同期します。",
+      "neutralGreyCanvas": "ニュートラルグレーのキャンバス",
+      "neutralGreyCanvasDesc": "アプリのテーマを変更せずに、より正確な色と露出のグレーディングを行うために、ニュートラルグレーのキャンバスを使用します。",
+      "enableNeutralGreyCanvas": "ニュートラルグレーの背景を有効にする"
     },
     "keybinds": {
       "actions": {
@@ -1635,6 +1679,7 @@
         "open_settings": "設定を開く",
         "paste_adjustments": "コピーした補正設定を貼り付け",
         "paste_files": "現在のフォルダにファイルを貼り付け",
+        "copy_image_path": "選択した画像のパスをコピー",
         "preview_next": "次の画像",
         "preview_prev": "前の画像",
         "rate_0": "星評価: 0",

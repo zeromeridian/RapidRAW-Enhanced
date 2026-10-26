@@ -8,17 +8,20 @@ import {
   RotateCcw,
   RotateCw,
   Ruler,
+  Save,
   X,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import clsx from 'clsx';
-import { Orientation } from '../../ui/AppProperties';
+import { CustomAspectRatio, Orientation } from '../../ui/AppProperties';
 import { motion } from 'framer-motion';
 import Text from '../../ui/Text';
 import Slider from '../../ui/Slider';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { useEditorStore } from '../../../store/useEditorStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { calculateAreaPreservingCrop, calculateCenteredCrop } from '../../../utils/cropUtils';
 import { Crop } from 'react-image-crop';
@@ -41,8 +44,28 @@ interface OverlayOption {
   tooltip: string;
 }
 
+const greatestCommonDivisor = (a: number, b: number): number => (b === 0 ? a : greatestCommonDivisor(b, a % b));
+
+const formatRatioLabel = (width: number, height: number): string => {
+  if (Number.isInteger(width) && Number.isInteger(height)) {
+    const divisor = greatestCommonDivisor(width, height);
+    const reducedWidth = width / divisor;
+    const reducedHeight = height / divisor;
+    if (reducedWidth <= 99 && reducedHeight <= 99) {
+      return `${reducedWidth}:${reducedHeight}`;
+    }
+  }
+  return `${Number((width / height).toFixed(2))}:1`;
+};
+
 export default function CropPanel() {
   const { t } = useTranslation();
+  const { appSettings, handleSettingsChange } = useSettingsStore(
+    useShallow((state) => ({
+      appSettings: state.appSettings,
+      handleSettingsChange: state.handleSettingsChange,
+    })),
+  );
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const adjustments = useEditorStore((s) => s.adjustments);
   const isStraightenActive = useEditorStore((s) => s.isStraightenActive);
@@ -54,6 +77,7 @@ export default function CropPanel() {
   const [isRotationActive, setIsRotationActive] = useState(false);
   const [preferPortrait, setPreferPortrait] = useState(false);
   const [isEditingCustom, setIsEditingCustom] = useState(false);
+  const [isCustomMode, setIsCustomMode] = useState(false);
 
   const [localRotation, setLocalRotation] = useState<number | null>(null);
   const localRotationRef = useRef<number | null>(null);
@@ -76,6 +100,24 @@ export default function CropPanel() {
     ],
     [t],
   );
+
+  const savedAspectRatios = useMemo<Array<CustomAspectRatio>>(
+    () =>
+      (appSettings?.customAspectRatios ?? []).filter((ratio: CustomAspectRatio) => ratio.width > 0 && ratio.height > 0),
+    [appSettings?.customAspectRatios],
+  );
+
+  const SAVED_PRESETS = useMemo<Array<CropPreset>>(
+    () =>
+      savedAspectRatios.map((ratio: CustomAspectRatio) => ({
+        name: formatRatioLabel(ratio.width, ratio.height),
+        value: ratio.width / ratio.height,
+        tooltip: t('editor.crop.custom.savedTooltip', { ratio: `${ratio.width}:${ratio.height}` }),
+      })),
+    [savedAspectRatios, t],
+  );
+
+  const ALL_PRESETS = useMemo<Array<CropPreset>>(() => [...PRESETS, ...SAVED_PRESETS], [PRESETS, SAVED_PRESETS]);
 
   const OVERLAYS = useMemo<Array<OverlayOption>>(
     () => [
@@ -182,7 +224,7 @@ export default function CropPanel() {
       return PRESETS.find((p: CropPreset) => p.value === null);
     }
 
-    const numericPresetMatch = PRESETS.find(
+    const numericPresetMatch = ALL_PRESETS.find(
       (p: CropPreset) =>
         p.value &&
         p.value !== ORIGINAL_RATIO &&
@@ -199,7 +241,7 @@ export default function CropPanel() {
     }
 
     return null;
-  }, [aspectRatio, getEffectiveOriginalRatio, PRESETS]);
+  }, [aspectRatio, getEffectiveOriginalRatio, PRESETS, ALL_PRESETS]);
 
   let orientation = Orientation.Horizontal;
   if (activePreset && activePreset.value && activePreset.value !== 1) {
@@ -212,7 +254,12 @@ export default function CropPanel() {
     }
   }
 
-  const isCustomActive = aspectRatio !== null && !activePreset;
+  const isCustomActive = aspectRatio !== null && (isCustomMode || !activePreset);
+  const selectedPreset = isCustomActive ? null : activePreset;
+
+  useEffect(() => {
+    setIsCustomMode(false);
+  }, [selectedImage?.path]);
 
   useEffect(() => {
     if (aspectRatio && aspectRatio !== 1) {
@@ -261,13 +308,13 @@ export default function CropPanel() {
   );
 
   useEffect(() => {
-    if (activePreset?.value === ORIGINAL_RATIO) {
+    if (selectedPreset?.value === ORIGINAL_RATIO) {
       const newOriginalRatio = getEffectiveOriginalRatio();
       if (newOriginalRatio !== null && aspectRatio && Math.abs(aspectRatio - newOriginalRatio) > RATIO_TOLERANCE) {
         applyAspectRatio(newOriginalRatio);
       }
     }
-  }, [orientationSteps, activePreset, aspectRatio, getEffectiveOriginalRatio, applyAspectRatio]);
+  }, [orientationSteps, selectedPreset, aspectRatio, getEffectiveOriginalRatio, applyAspectRatio]);
 
   const handleCustomInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -313,14 +360,50 @@ export default function CropPanel() {
     }
   };
 
+  const customRatioToSave = useMemo(() => {
+    const numW = parseFloat(customW);
+    const numH = parseFloat(customH);
+    if (!(numW > 0) || !(numH > 0)) {
+      return null;
+    }
+
+    const width = Math.max(numW, numH);
+    const height = Math.min(numW, numH);
+    const ratio = width / height;
+    const isDuplicate = ALL_PRESETS.some(
+      (p: CropPreset) => p.value && p.value !== ORIGINAL_RATIO && Math.abs(ratio - p.value) < RATIO_TOLERANCE,
+    );
+
+    return isDuplicate ? null : { width, height };
+  }, [customW, customH, ALL_PRESETS]);
+
+  const handleSaveCustomRatio = () => {
+    if (!appSettings || !customRatioToSave) {
+      return;
+    }
+    handleSettingsChange({ ...appSettings, customAspectRatios: [...savedAspectRatios, customRatioToSave] });
+  };
+
+  const handleRemoveSavedRatio = (index: number) => {
+    if (!appSettings) {
+      return;
+    }
+    handleSettingsChange({
+      ...appSettings,
+      customAspectRatios: savedAspectRatios.filter((_: CustomAspectRatio, i: number) => i !== index),
+    });
+  };
+
   const handlePresetClick = (preset: CropPreset) => {
+    setIsCustomMode(false);
+
     if (preset.value === ORIGINAL_RATIO) {
       applyAspectRatio(getEffectiveOriginalRatio());
       return;
     }
 
     const targetRatio = preset.value;
-    if (activePreset === preset && targetRatio && targetRatio !== 1) {
+    if (selectedPreset === preset && targetRatio && targetRatio !== 1) {
       const newRatio = 1 / (adjustments.aspectRatio ? adjustments.aspectRatio : 1);
       setPreferPortrait(newRatio < 1);
       applyAspectRatio(newRatio);
@@ -350,6 +433,7 @@ export default function CropPanel() {
   const handleReset = () => {
     setPreferPortrait(false);
     setIsEditingCustom(false);
+    setIsCustomMode(false);
     lastSyncedRatio.current = null;
     updateLocalRotation(null);
 
@@ -366,8 +450,8 @@ export default function CropPanel() {
     }));
   };
 
-  const isPresetActive = (preset: CropPreset) => preset === activePreset;
-  const isOrientationToggleDisabled = !aspectRatio || aspectRatio === 1 || activePreset?.value === ORIGINAL_RATIO;
+  const isPresetActive = (preset: CropPreset) => preset === selectedPreset;
+  const isOrientationToggleDisabled = !aspectRatio || aspectRatio === 1 || selectedPreset?.value === ORIGINAL_RATIO;
 
   const fineRotation = useMemo(() => {
     return rotation || 0;
@@ -375,8 +459,8 @@ export default function CropPanel() {
 
   const displayRotation = localRotation !== null ? localRotation : fineRotation;
 
-  const handleFineRotationChange = (e: any) => {
-    const newFineRotation = parseFloat(e.target.value);
+  const handleFineRotationChange = (e: { target: { value: number | string } }) => {
+    const newFineRotation = parseFloat(String(e.target.value));
     if (isRotationActive) {
       updateLocalRotation(newFineRotation);
     } else {
@@ -491,21 +575,38 @@ export default function CropPanel() {
                 </div>
               </Text>
               <div className="grid grid-cols-3 gap-2">
-                {PRESETS.map((preset: CropPreset) => (
-                  <motion.div
-                    className={clsx(
-                      'px-2 py-1.5 rounded-md transition-colors text-center cursor-pointer',
-                      isPresetActive(preset) ? 'bg-accent' : 'bg-surface hover:bg-card-active',
-                    )}
-                    key={preset.name}
-                    onClick={() => handlePresetClick(preset)}
-                    data-tooltip={preset.tooltip}
-                    whileTap={{ scale: 0.98 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-                  >
-                    <Text color={isPresetActive(preset) ? TextColors.button : TextColors.secondary}>{preset.name}</Text>
-                  </motion.div>
-                ))}
+                {ALL_PRESETS.map((preset: CropPreset, index: number) => {
+                  const savedIndex = index - PRESETS.length;
+                  return (
+                    <motion.div
+                      className={clsx(
+                        'relative group px-2 py-1.5 rounded-md transition-colors text-center cursor-pointer',
+                        isPresetActive(preset) ? 'bg-accent' : 'bg-surface hover:bg-card-active',
+                      )}
+                      key={savedIndex < 0 ? preset.name : `saved-${savedIndex}`}
+                      onClick={() => handlePresetClick(preset)}
+                      data-tooltip={preset.tooltip}
+                      whileTap={{ scale: 0.98 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                    >
+                      <Text color={isPresetActive(preset) ? TextColors.button : TextColors.secondary}>
+                        {preset.name}
+                      </Text>
+                      {savedIndex >= 0 && (
+                        <button
+                          className="absolute -top-1 -right-1 z-10 p-0.5 rounded-full bg-card-active text-text-secondary opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-500 transition-all"
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            handleRemoveSavedRatio(savedIndex);
+                          }}
+                          data-tooltip={t('editor.crop.custom.removeTooltip')}
+                        >
+                          <X size={10} />
+                        </button>
+                      )}
+                    </motion.div>
+                  );
+                })}
               </div>
               <div>
                 <motion.div
@@ -519,6 +620,7 @@ export default function CropPanel() {
                     if (preferPortrait || (imageRatio && imageRatio < 1)) {
                       newAspectRatio = 1 / BASE_RATIO;
                     }
+                    setIsCustomMode(true);
                     applyAspectRatio(newAspectRatio);
                   }}
                   data-tooltip={t('editor.crop.presets.custom.tooltip')}
@@ -563,6 +665,14 @@ export default function CropPanel() {
                       type="number"
                       value={customH}
                     />
+                    <button
+                      className="shrink-0 p-1.5 rounded-md text-text-secondary hover:bg-card-active hover:text-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      disabled={!appSettings || !customRatioToSave}
+                      onClick={handleSaveCustomRatio}
+                      data-tooltip={t('editor.crop.custom.saveTooltip')}
+                    >
+                      <Save size={16} />
+                    </button>
                   </div>
                 </div>
               </div>

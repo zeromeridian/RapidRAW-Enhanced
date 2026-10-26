@@ -497,7 +497,10 @@
         "hPlaceholder": "H",
         "hTooltip": "Height",
         "wPlaceholder": "W",
-        "wTooltip": "Width"
+        "wTooltip": "Width",
+        "saveTooltip": "Save aspect ratio as preset",
+        "savedTooltip": "Saved aspect ratio {{ratio}}",
+        "removeTooltip": "Remove saved aspect ratio"
       },
       "geometryHeading": "Geometry",
       "autoGeometryFailed": "Automatic geometry correction failed: {{error}}",
@@ -883,7 +886,12 @@
     },
     "file": {
       "quality": "Quality",
-      "qualityLossless": "Quality (Lossless)"
+      "tiffBitDepth": "TIFF bit depth",
+      "tiffBitDepth8": "8-bit",
+      "tiffBitDepth16": "16-bit",
+      "qualityLossless": "Quality (Lossless)",
+      "resolution": "Resolution",
+      "dpi": "DPI"
     },
     "labels": {
       "image": "Image",
@@ -953,6 +961,32 @@
       "scale": "Scale",
       "spacing": "Spacing",
       "watermarkImage": "Watermark Image"
+    },
+    "border": {
+      "addBorder": "Add Border",
+      "bases": {
+        "eachEdge": "Each Respective Edge",
+        "longEdge": "Longest Edge",
+        "shortEdge": "Shortest Edge"
+      },
+      "basis": "Thickness Basis",
+      "color": "Border Color",
+      "invalidPercent": "Enter a number between 0 and 100 for both.",
+      "leftRight": "Left & Right",
+      "percent": "%",
+      "topBottom": "Top & Bottom"
+    },
+    "pad": {
+      "aspectRatio": "Aspect Ratio",
+      "backgroundColor": "Background Color",
+      "invalidRatio": "Enter a positive number for both width and height.",
+      "padToAspectRatio": "Pad to Aspect Ratio",
+      "ratioHeight": "Aspect ratio height",
+      "ratioWidth": "Aspect ratio width"
+    },
+    "destination": {
+      "subfolder": "Subfolder",
+      "subfolderPlaceholder": "e.g. final, WebP"
     }
   },
   "library": {
@@ -1045,7 +1079,9 @@
         "clearSearch": "Clear search",
         "collapse": "Collapse",
         "expand": "Expand",
-        "sortFolders": "Sort Folders"
+        "sortFolders": "Sort Folders",
+        "navBack": "Go Back",
+        "navForward": "Go Forward"
       }
     },
     "grid": {
@@ -1410,6 +1446,7 @@
       "deleteWarning": "Files will be moved to the system trash.",
       "fileNaming": "File Naming",
       "folderOrganization": "Folder Organization",
+      "notUniqueWarning": "Without {original_filename}, {original_filename_number} or {sequence}, files may get the same name. Those files are not imported.",
       "organizeByDate": "Organize into subfolders by date",
       "sourceFiles": "Source Files",
       "startImport": "Start Import",
@@ -1497,6 +1534,7 @@
       "cancel": "Cancel",
       "fileNamingTemplate": "File Naming Template",
       "newName": "New Name",
+      "notUniqueWarning": "Without {original_filename}, {original_filename_number} or {sequence}, files may get the same name. Then nothing is renamed.",
       "save": "Save",
       "titleMultiple": "Rename {{count}} Images",
       "titleMultiple_one": "Rename {{count}} Image",
@@ -1618,7 +1656,10 @@
       "speed": "Speed",
       "title": "Mouse Controls",
       "zoom": "Zoom Speed Multiplier",
-      "zoomDesc": "Adjust how fast the canvas zooms in and out when using the scroll wheel or pinch gesture."
+      "zoomDesc": "Adjust how fast the canvas zooms in and out when using the scroll wheel or pinch gesture.",
+      "zoomClick": "Zoom photo to 100%",
+      "zoomClickDesc": "Zoom photo in editor to 100% on mouse click",
+      "zoomClickInfo": "Click the photo to instantly zoom to 100% (1:1 pixels) to assess sharpness and noise. When disabled, clicking zooms in gradually."
     },
     "data": {
       "clearSidecars": "Clear All Sidecar Files",
@@ -1751,7 +1792,10 @@
       },
       "title": "General Settings",
       "xmpSync": "XMP Metadata Sync",
-      "xmpSyncDesc": "Sync ratings, color labels, tags, flags and physical stack information to XMP sidecar files. Application-specific fields transfer flags and stacks between ThisIsRAW installations."
+      "xmpSyncDesc": "Sync ratings, color labels, tags, flags and physical stack information to XMP sidecar files. Application-specific fields transfer flags and stacks between ThisIsRAW installations.",
+      "neutralGreyCanvas": "Neutral Grey Canvas",
+      "neutralGreyCanvasDesc": "Use a neutral grey canvas for more accurate color and exposure grading without changing the app theme.",
+      "enableNeutralGreyCanvas": "Enable Neutral Grey Background"
     },
     "keybinds": {
       "actions": {
@@ -1777,6 +1821,7 @@
         "open_settings": "Open settings",
         "paste_adjustments": "Paste copied adjustments",
         "paste_files": "Paste file(s) to current folder",
+        "copy_image_path": "Copy path of selected image(s)",
         "preview_next": "Next image",
         "preview_prev": "Previous image",
         "rate_0": "Star rating: 0",
