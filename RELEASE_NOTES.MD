@@ -5,6 +5,18 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.14.5-fix-lrc-curve — 2026-10-26
+
+### Fixes
+
+- **Preview Lightroom Edits** no longer mixes a Lightroom profile's built-in
+  settings into your own. With profiles such as Adobe Monochrome, tone curves
+  previously showed extra points and a second line, and Clarity could take
+  the profile's value instead of yours. Run **Preview Lightroom Edits** again
+  on affected images to correct them.
+- Black-and-white Lightroom profiles still import as Black & White, and the
+  review now names the profile whose built-in settings were not applied.
+
 ## 1.14.3-dev-brush-fix — 2026-10-26
 
 ### Masking
