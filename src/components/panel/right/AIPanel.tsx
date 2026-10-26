@@ -54,7 +54,7 @@ import {
   getSubMaskName,
 } from './Masks';
 import { Adjustments, AiPatch } from '../../../utils/adjustments';
-import { OPTION_SEPARATOR } from '../../ui/AppProperties';
+import { BRUSH_SIZE_MAX, BRUSH_SIZE_MIN, OPTION_SEPARATOR } from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
 import Text from '../../ui/Text';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
@@ -126,8 +126,8 @@ const BrushTools = ({ settings, onSettingsChange }: { settings: any; onSettingsC
       <Slider
         defaultValue={100}
         label={t('editor.ai.brush.size')}
-        max={200}
-        min={1}
+        max={BRUSH_SIZE_MAX}
+        min={BRUSH_SIZE_MIN}
         onChange={(e: any) => onSettingsChange((s: any) => ({ ...s, size: Number(e.target.value) }))}
         step={1}
         value={settings.size}

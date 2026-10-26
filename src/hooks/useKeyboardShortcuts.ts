@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
-import { ImageFile, Panel, ExifOverlay, LibraryDisplayMode } from '../components/ui/AppProperties';
+import { ImageFile, Panel, ExifOverlay, LibraryDisplayMode, stepBrushSize } from '../components/ui/AppProperties';
 import { KEYBIND_DEFINITIONS, normalizeCombo } from '../utils/keyboardUtils';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
@@ -72,6 +72,11 @@ export const useKeyboardShortcuts = ({
         comboMap.set(effective.join('+'), def.action);
       }
     }
+
+    const isBrushPanelActive = (s: ReturnType<typeof getStoreState>) =>
+      !!s.editor.selectedImage &&
+      !!s.editor.brushSettings &&
+      (s.ui.activeRightPanel === Panel.Masks || s.ui.activeRightPanel === Panel.Ai);
 
     const advanceToNextImage = (state: ReturnType<typeof getStoreState>) => {
       const currentPath = state.editor.selectedImage?.path || state.library.libraryActivePath;
@@ -562,21 +567,21 @@ export const useKeyboardShortcuts = ({
           executeCullingShortcut(e, s, () => handleSetFlag(ImageFlag.Unflagged)),
       },
       brush_size_up: {
-        shouldFire: (s: any) =>
-          !!s.editor.selectedImage && !!s.editor.brushSettings && s.ui.activeRightPanel === Panel.Masks,
+        shouldFire: isBrushPanelActive,
         execute: (e: any, s: any) => {
           e.preventDefault();
-          const newSize = Math.min((s.editor.brushSettings.size || 50) + 10, 200);
-          s.editor.setEditor({ brushSettings: { ...s.editor.brushSettings, size: newSize } });
+          s.editor.setEditor({
+            brushSettings: { ...s.editor.brushSettings, size: stepBrushSize(s.editor.brushSettings.size || 50, 1) },
+          });
         },
       },
       brush_size_down: {
-        shouldFire: (s: any) =>
-          !!s.editor.selectedImage && !!s.editor.brushSettings && s.ui.activeRightPanel === Panel.Masks,
+        shouldFire: isBrushPanelActive,
         execute: (e: any, s: any) => {
           e.preventDefault();
-          const newSize = Math.max((s.editor.brushSettings.size || 50) - 10, 1);
-          s.editor.setEditor({ brushSettings: { ...s.editor.brushSettings, size: newSize } });
+          s.editor.setEditor({
+            brushSettings: { ...s.editor.brushSettings, size: stepBrushSize(s.editor.brushSettings.size || 50, -1) },
+          });
         },
       },
     };

@@ -81,7 +81,7 @@ import {
   ADJUSTMENT_SECTIONS,
 } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
+import { BRUSH_SIZE_MAX, BRUSH_SIZE_MIN, OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
 import { usePresets } from '../../../hooks/usePresets';
 import Text from '../../ui/Text';
@@ -178,8 +178,8 @@ const BrushTools = ({
       <Slider
         defaultValue={100}
         label={t('editor.masks.brush.size')}
-        max={200}
-        min={1}
+        max={BRUSH_SIZE_MAX}
+        min={BRUSH_SIZE_MIN}
         onChange={(e: any) => onSettingsChange((s: any) => ({ ...s, size: Number(e.target.value) }))}
         step={1}
         value={settings.size}
