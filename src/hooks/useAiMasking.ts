@@ -406,6 +406,36 @@ export function useAiMasking() {
     }
   };
 
+  const handleGenerateAiTextMask = async (subMaskId: string, prompt: string) => {
+    const { selectedImage, adjustments, patchesSentToBackend } = useEditorStore.getState();
+    if (!selectedImage?.path || !prompt.trim()) return;
+    setEditor({ isGeneratingAiMask: true });
+
+    try {
+      const transformAdjustments = getTransformAdjustments(adjustments);
+      const newParameters = await invoke<Record<string, unknown>>(Invokes.GenerateAiTextMask, {
+        jsAdjustments: transformAdjustments,
+        path: selectedImage.path,
+        prompt: prompt.trim(),
+        flipHorizontal: adjustments.flipHorizontal,
+        flipVertical: adjustments.flipVertical,
+        orientationSteps: adjustments.orientationSteps,
+        rotation: adjustments.rotation,
+      });
+
+      const subMask =
+        adjustments.masks?.flatMap((m: MaskContainer) => m.subMasks).find((sm: SubMask) => sm.id === subMaskId) ||
+        adjustments.aiPatches?.flatMap((p: AiPatch) => p.subMasks).find((sm: SubMask) => sm.id === subMaskId);
+      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
+      patchesSentToBackend.delete(subMaskId);
+      updateSubMask(subMaskId, { parameters: mergedParameters });
+    } catch (error) {
+      toast.error(`AI Text Mask Failed: ${error}`);
+    } finally {
+      setEditor({ isGeneratingAiMask: false });
+    }
+  };
+
   useEffect(() => {
     const { activeMaskId, activeAiSubMaskId, adjustments, selectedImage } = useEditorStore.getState();
     const activeSubMask =
@@ -437,5 +467,6 @@ export function useAiMasking() {
     handleGenerateAiDepthMask,
     handleGenerateAiForegroundMask,
     handleGenerateAiSkyMask,
+    handleGenerateAiTextMask,
   };
 }

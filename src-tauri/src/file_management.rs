@@ -948,6 +948,42 @@ mod output_naming_tests {
     }
 
     #[test]
+    fn ai_text_masks_round_trip_through_xmp() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("lake.raw");
+        fs::write(&image, []).unwrap();
+
+        let source = ImageMetadata {
+            adjustments: serde_json::json!({
+                "masks": [{
+                    "id": "container",
+                    "subMasks": [{
+                        "id": "text",
+                        "type": "ai-text",
+                        "name": "",
+                        "parameters": {
+                            "prompt": "boat",
+                            "maskDataBase64": "data:image/png;base64,AAAA",
+                            "grow": 10,
+                            "feather": 20,
+                            "rotation": 0.0,
+                            "flipHorizontal": false,
+                            "flipVertical": false,
+                            "orientationSteps": 0
+                        }
+                    }]
+                }]
+            }),
+            ..ImageMetadata::default()
+        };
+        sync_metadata_to_xmp(&image, &source, true, true);
+
+        let mut imported = ImageMetadata::default();
+        assert!(sync_metadata_from_xmp(&image, &mut imported, true, true));
+        assert_eq!(imported.adjustments["masks"], source.adjustments["masks"]);
+    }
+
+    #[test]
     fn forced_folder_xmp_read_overwrites_metadata_recursively() {
         let folder = tempfile::tempdir().unwrap();
         let image = folder.path().join("image.jpg");

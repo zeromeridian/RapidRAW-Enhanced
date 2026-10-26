@@ -159,8 +159,9 @@ details are in `RELEASE_NOTES.MD`.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.
 - AI sky masks use EfficientSAM3 and AI foreground masks use BiRefNet, as in
-  upstream RapidRAW; AI subject masks are edge-refined. Each mask type
-  downloads its model on first use, and existing masks keep their stored
+  upstream RapidRAW; AI subject masks are edge-refined. AI text masks select
+  whatever a typed description names, such as "water" or "boat". Each mask
+  type downloads its model on first use, and existing masks keep their stored
   result.
 - Local masks support Black & White conversion, Color Calibration, Light
   Flares, Gaussian Blur, Vignette, and Grain in addition to the existing tonal,

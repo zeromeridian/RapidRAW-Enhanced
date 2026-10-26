@@ -670,6 +670,7 @@
         "applyPreset": "Applica Predefinito",
         "componentPropertiesTitle": "Proprietà {{name}}",
         "copySectionSettings": "Copia Impostazioni {{section}}",
+        "generateTextMask": "Genera maschera",
         "invertComponent": "Inverti Componente",
         "invertMask": "Inverti Maschera",
         "maskPropertiesTitle": "Proprietà Maschera",
@@ -679,7 +680,8 @@
         "pasteSettings": "Incolla Impostazioni",
         "resetSectionSettings": "Ripristina Impostazioni {{section}}",
         "select": "Seleziona",
-        "selectPresetTooltip": "Seleziona un predefinito da applicare"
+        "selectPresetTooltip": "Seleziona un predefinito da applicare",
+        "textPromptPlaceholder": "es. persona, auto, acqua"
       },
       "toggleAnalyticsTooltip": "Attiva/Disattiva Visualizzazione Analitiche",
       "tooltips": {
@@ -1159,7 +1161,8 @@
       "quickEraser": "Gomma Rapida",
       "radial": "Radiale",
       "sky": "Cielo",
-      "subject": "Soggetto"
+      "subject": "Soggetto",
+      "text": "Testo"
     }
   },
   "menus": {

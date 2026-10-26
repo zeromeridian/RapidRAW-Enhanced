@@ -645,6 +645,7 @@
         "applyPreset": "プリセットを適用",
         "componentPropertiesTitle": "{{name}} のプロパティ",
         "copySectionSettings": "{{section}}設定をコピー",
+        "generateTextMask": "マスクを生成",
         "invertComponent": "コンポーネントを反転",
         "invertMask": "マスクを反転",
         "maskPropertiesTitle": "マスクのプロパティ",
@@ -654,7 +655,8 @@
         "pasteSettings": "設定を貼り付け",
         "resetSectionSettings": "{{section}}設定をリセット",
         "select": "選択",
-        "selectPresetTooltip": "適用するプリセットを選択"
+        "selectPresetTooltip": "適用するプリセットを選択",
+        "textPromptPlaceholder": "例: 人物、車、水"
       },
       "toggleAnalyticsTooltip": "アナリティクス表示の切り替え",
       "tooltips": {
@@ -1131,7 +1133,8 @@
       "quickEraser": "クイック消しゴム",
       "radial": "円形",
       "sky": "空",
-      "subject": "被写体"
+      "subject": "被写体",
+      "text": "テキスト"
     }
   },
   "menus": {

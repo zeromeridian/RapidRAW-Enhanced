@@ -645,6 +645,7 @@
         "applyPreset": "應用預設",
         "componentPropertiesTitle": "{{name}} 屬性",
         "copySectionSettings": "複製 {{section}} 設定",
+        "generateTextMask": "產生遮罩",
         "invertComponent": "反轉元件",
         "invertMask": "反轉遮色片",
         "maskPropertiesTitle": "遮色片屬性",
@@ -654,7 +655,8 @@
         "pasteSettings": "貼上設定",
         "resetSectionSettings": "重置 {{section}} 設定",
         "select": "選擇",
-        "selectPresetTooltip": "選擇一個預設以應用"
+        "selectPresetTooltip": "選擇一個預設以應用",
+        "textPromptPlaceholder": "例如，人物、汽車、水面"
       },
       "toggleAnalyticsTooltip": "切換分析顯示",
       "tooltips": {
@@ -1131,7 +1133,8 @@
       "quickEraser": "快速橡皮擦",
       "radial": "徑向",
       "sky": "天空",
-      "subject": "主體"
+      "subject": "主體",
+      "text": "文字"
     }
   },
   "menus": {

@@ -692,6 +692,7 @@
         "applyPreset": "Apply Preset",
         "componentPropertiesTitle": "{{name}} Properties",
         "copySectionSettings": "Copy {{section}} Settings",
+        "generateTextMask": "Generate Mask",
         "invertComponent": "Invert Component",
         "invertMask": "Invert Mask",
         "maskPropertiesTitle": "Mask Properties",
@@ -701,7 +702,8 @@
         "pasteSettings": "Paste Settings",
         "resetSectionSettings": "Reset {{section}} Settings",
         "select": "Select",
-        "selectPresetTooltip": "Select a preset to apply"
+        "selectPresetTooltip": "Select a preset to apply",
+        "textPromptPlaceholder": "e.g., person, car, water"
       },
       "toggleAnalyticsTooltip": "Toggle Analytics Display",
       "toggleOverlayTooltip": "Toggle Mask Overlay (O)",
@@ -1204,7 +1206,8 @@
       "quickEraser": "Quick Eraser",
       "radial": "Radial",
       "sky": "Sky",
-      "subject": "Subject"
+      "subject": "Subject",
+      "text": "Text"
     }
   },
   "menus": {

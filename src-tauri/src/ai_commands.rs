@@ -9,10 +9,10 @@ use image::{DynamicImage, GrayImage, ImageFormat};
 use crate::ai_connector;
 use crate::ai_processing::{
     AiDepthMaskParameters, AiForegroundMaskParameters, AiMaskModel, AiModels, AiSkyMaskParameters,
-    AiState, AiSubjectMaskParameters, CachedDepthMap, ESAM3_SKY_REFINE_EPS,
-    ESAM3_SKY_SCORE_THRESHOLD, Esam3Features, generate_image_embeddings, get_or_init_ai_models,
-    run_birefnet_model, run_depth_anything_model, run_esam3_decoder, run_esam3_image_encoder,
-    run_sam_decoder,
+    AiState, AiSubjectMaskParameters, AiTextMaskParameters, CachedDepthMap, ESAM3_SKY_REFINE_EPS,
+    ESAM3_SKY_SCORE_THRESHOLD, ESAM3_TEXT_REFINE_EPS, ESAM3_TEXT_SCORE_THRESHOLD, Esam3Features,
+    generate_image_embeddings, get_or_init_ai_models, run_birefnet_model, run_depth_anything_model,
+    run_esam3_decoder, run_esam3_image_encoder, run_esam3_zoomed_decoder, run_sam_decoder,
 };
 use crate::app_settings::load_settings;
 use crate::app_state::AppState;
@@ -21,6 +21,7 @@ use crate::get_cached_full_warped_image;
 
 const NO_FOREGROUND_FOUND: &str = "No foreground found";
 const NO_SKY_FOUND: &str = "No sky found";
+const NO_MATCH_FOUND: &str = "No match found for";
 
 pub fn ai_cache_key(path: &str, adjustments: &serde_json::Value) -> String {
     let mut hasher = blake3::Hasher::new();
@@ -158,6 +159,62 @@ pub async fn generate_ai_sky_mask(
     let base64_data = encode_to_base64_png(&full_mask_image)?;
 
     Ok(AiSkyMaskParameters {
+        mask_data_base64: Some(base64_data),
+        rotation: Some(rotation),
+        flip_horizontal: Some(flip_horizontal),
+        flip_vertical: Some(flip_vertical),
+        orientation_steps: Some(orientation_steps),
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub async fn generate_ai_text_mask(
+    js_adjustments: serde_json::Value,
+    path: String,
+    prompt: String,
+    rotation: f32,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    orientation_steps: u8,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<AiTextMaskParameters, String> {
+    let models = get_or_init_ai_models(
+        &app_handle,
+        &state.ai_state,
+        &state.ai_init_lock,
+        AiMaskModel::Text,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
+
+    let features = cached_esam3_features(
+        &state.ai_state,
+        &models,
+        &ai_cache_key(&path, &js_adjustments),
+        &warped_image,
+    )?;
+    let text_prompt = models
+        .esam3_text_prompt(&prompt)
+        .map_err(|e| e.to_string())?;
+    let full_mask_image = run_esam3_zoomed_decoder(
+        &*models.esam3_image_encoder().map_err(|e| e.to_string())?,
+        &*models.esam3_decoder().map_err(|e| e.to_string())?,
+        &features,
+        &text_prompt,
+        &warped_image,
+        ESAM3_TEXT_SCORE_THRESHOLD,
+        ESAM3_TEXT_REFINE_EPS,
+    )
+    .map_err(|e| e.to_string())?
+    .ok_or_else(|| format!("{} \"{}\"", NO_MATCH_FOUND, prompt.trim()))?;
+    let base64_data = encode_to_base64_png(&full_mask_image)?;
+
+    Ok(AiTextMaskParameters {
+        prompt,
         mask_data_base64: Some(base64_data),
         rotation: Some(rotation),
         flip_horizontal: Some(flip_horizontal),

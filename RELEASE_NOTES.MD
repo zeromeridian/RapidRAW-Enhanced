@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.13.0-dev-port-features-from-rr — 2026-10-26
+
+### AI text masks
+
+- New **Text** mask: describe what to select, for example "water", "boat",
+  or "person", and ThisIsRAW masks it. Type the description in the mask
+  settings and press Enter or **Generate Mask**.
+- Text masks are named after their description, can be grown and feathered
+  like other AI masks, and are saved with your edits, including in XMP.
+- The text model downloads the first time you generate a text mask. A sky
+  mask and a text mask on the same image share the image analysis, so the
+  second one is faster.
+
 ## 1.12.0-dev-port-features-from-rr — 2026-10-25
 
 ### New AI sky and foreground masks
