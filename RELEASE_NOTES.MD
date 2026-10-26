@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.14.2-dev-dev-module-top — 2026-10-26
+
+### Develop
+
+- The photo information at the top of Develop now shows the file name,
+  resolution, shutter speed, aperture, ISO, focal length, and capture date and
+  time in a single row. Click it to hide or show the camera details; your
+  choice is remembered.
+
 ## 1.14.1-dev-port-features-from-rr — 2026-10-26
 
 ### Fixes

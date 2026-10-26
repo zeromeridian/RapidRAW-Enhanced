@@ -817,7 +817,8 @@
         "showEdited": "Afficher l'image modifiée (B)",
         "showOriginal": "Afficher l'original (B)",
         "shutterSpeed": "Vitesse d'obturation",
-        "undo": "Annuler (Ctrl+Z) ou Historique (Clic-droit)"
+        "undo": "Annuler (Ctrl+Z) ou Historique (Clic-droit)",
+        "toggleImageDetails": "Afficher ou masquer les détails de la photo"
       },
       "vc": "CV"
     }

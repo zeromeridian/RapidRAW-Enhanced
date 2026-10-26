@@ -792,7 +792,8 @@
         "showEdited": "显示编辑后（B）",
         "showOriginal": "显示原始（B）",
         "shutterSpeed": "快门速度",
-        "undo": "撤销（Ctrl+Z）或历史记录（右键单击）"
+        "undo": "撤销（Ctrl+Z）或历史记录（右键单击）",
+        "toggleImageDetails": "显示或隐藏照片详情"
       },
       "vc": "VC"
     }

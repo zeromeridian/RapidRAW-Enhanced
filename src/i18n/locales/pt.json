@@ -817,7 +817,8 @@
         "showEdited": "Mostrar Editado (B)",
         "showOriginal": "Mostrar Original (B)",
         "shutterSpeed": "Velocidade do Obturador",
-        "undo": "Desfazer (Ctrl+Z) ou Histórico (Botão Direito)"
+        "undo": "Desfazer (Ctrl+Z) ou Histórico (Botão Direito)",
+        "toggleImageDetails": "Mostrar ou ocultar detalhes da foto"
       },
       "vc": "CV"
     }

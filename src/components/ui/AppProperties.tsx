@@ -464,6 +464,7 @@ export interface UiVisibility {
   folderTree: boolean;
   filmstrip: boolean;
   quickFilter?: boolean;
+  editorExif?: boolean;
 }
 
 export interface WaveformData {

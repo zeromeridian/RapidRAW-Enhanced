@@ -840,7 +840,8 @@
         "showEdited": "Pokaż po edycji (B)",
         "showOriginal": "Pokaż oryginał (B)",
         "shutterSpeed": "Czas otwarcia migawki",
-        "undo": "Cofnij (Ctrl+Z) lub Historia (Prawy przycisk)"
+        "undo": "Cofnij (Ctrl+Z) lub Historia (Prawy przycisk)",
+        "toggleImageDetails": "Pokaż lub ukryj szczegóły zdjęcia"
       },
       "vc": "VC"
     }
