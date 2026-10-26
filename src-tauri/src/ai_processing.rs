@@ -73,6 +73,13 @@ const ESAM3_EMBED_DIM: usize = 256;
 const ESAM3_EXEMPLAR_SLOTS: usize = 8;
 pub const ESAM3_SKY_SCORE_THRESHOLD: f32 = 0.6;
 pub const ESAM3_TEXT_SCORE_THRESHOLD: f32 = 0.3;
+/// Once the best query passes the caller's threshold, weaker queries down to
+/// this score are merged too. The model can split one region at a hard
+/// contrast edge (a bright band under dark clouds) and score the parts
+/// differently. Deliberate deviation from upstream RapidRAW, which merges only
+/// queries above the threshold; see "Deliberate fork deviations" in
+/// UPSTREAM_FEATURE_GAP.md before changing it.
+const ESAM3_SUPPORT_SCORE_THRESHOLD: f32 = 0.3;
 const ESAM3_MASK_LOW: f32 = 0.3;
 const ESAM3_MASK_HIGH: f32 = 0.7;
 const ESAM3_REFINE_SIZE: u32 = 1024;
@@ -2001,6 +2008,21 @@ fn run_esam3_queries<T>(
     ))
 }
 
+/// Queries to merge into a mask: none unless the best query beats
+/// `score_threshold`, then every query above the support threshold.
+fn select_esam3_queries(scores: &[f32], score_threshold: f32) -> Vec<usize> {
+    if !scores.iter().any(|&score| score > score_threshold) {
+        return Vec::new();
+    }
+    let support_threshold = score_threshold.min(ESAM3_SUPPORT_SCORE_THRESHOLD);
+    scores
+        .iter()
+        .enumerate()
+        .filter(|&(_, &score)| score > support_threshold)
+        .map(|(query, _)| query)
+        .collect()
+}
+
 pub fn run_esam3_decoder(
     decoder_session: &Mutex<Session>,
     features: &Esam3Features,
@@ -2013,10 +2035,7 @@ pub fn run_esam3_decoder(
         run_esam3_queries(decoder_session, features, prompt, |scores, _, masks| {
             let (mask_h, mask_w) = (masks.shape()[2], masks.shape()[3]);
             let mut coarse_mask: Option<Vec<f32>> = None;
-            for (query, &score) in scores.iter().enumerate() {
-                if score <= score_threshold {
-                    continue;
-                }
+            for query in select_esam3_queries(&scores, score_threshold) {
                 let combined = coarse_mask.get_or_insert_with(|| vec![0.0; mask_h * mask_w]);
                 let query_mask = masks.slice(s![0, query, .., ..]);
                 for (out, &value) in combined.iter_mut().zip(query_mask.iter()) {
@@ -2540,4 +2559,33 @@ pub struct AiDepthMaskParameters {
     pub flip_vertical: Option<bool>,
     #[serde(default)]
     pub orientation_steps: Option<u8>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ESAM3_SKY_SCORE_THRESHOLD, ESAM3_TEXT_SCORE_THRESHOLD, select_esam3_queries};
+
+    #[test]
+    fn sky_masks_merge_weaker_parts_of_a_detected_sky() {
+        let scores = [0.05, 0.738, 0.548, 0.314, 0.176];
+        assert_eq!(
+            select_esam3_queries(&scores, ESAM3_SKY_SCORE_THRESHOLD),
+            vec![1, 2, 3]
+        );
+    }
+
+    #[test]
+    fn weak_queries_alone_do_not_produce_a_sky_mask() {
+        let scores = [0.55, 0.4, 0.31];
+        assert!(select_esam3_queries(&scores, ESAM3_SKY_SCORE_THRESHOLD).is_empty());
+    }
+
+    #[test]
+    fn text_masks_keep_their_single_threshold() {
+        let scores = [0.29, 0.31, 0.9];
+        assert_eq!(
+            select_esam3_queries(&scores, ESAM3_TEXT_SCORE_THRESHOLD),
+            vec![1, 2]
+        );
+    }
 }

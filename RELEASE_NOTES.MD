@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.14.1-dev-port-features-from-rr — 2026-10-26
+
+### Fixes
+
+- AI sky masks no longer stop partway down the sky when it has a sharp change
+  in brightness, such as a bright band below dark clouds. Regenerate an
+  existing sky mask to get the complete sky.
+
 ## 1.14.0-dev-port-features-from-rr — 2026-10-26
 
 ### Library
