@@ -794,7 +794,8 @@
         "showEdited": "Bearbeitet anzeigen (B)",
         "showOriginal": "Original anzeigen (B)",
         "shutterSpeed": "Verschlusszeit",
-        "undo": "Rückgängig (Strg+Z) oder Verlauf (Rechtsklick)"
+        "undo": "Rückgängig (Strg+Z) oder Verlauf (Rechtsklick)",
+        "toggleImageDetails": "Bilddetails ein- oder ausblenden"
       },
       "vc": "VK"
     }

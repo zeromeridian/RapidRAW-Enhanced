@@ -26,8 +26,6 @@ interface EditorToolbarProps {
   onUndo(): void;
   selectedImage: SelectedImage;
   showOriginal: boolean;
-  showDateView: boolean;
-  onToggleDateView(): void;
   adjustmentsHistory: any[];
   adjustmentsHistoryIndex: number;
   goToAdjustmentsHistoryIndex(index: number): void;
@@ -47,8 +45,6 @@ const EditorToolbar = memo(
     onUndo,
     selectedImage,
     showOriginal,
-    showDateView,
-    onToggleDateView,
     adjustmentsHistory,
     adjustmentsHistoryIndex,
     goToAdjustmentsHistoryIndex,
@@ -61,7 +57,6 @@ const EditorToolbar = memo(
     const hideTimeoutRef = useRef<number | null>(null);
     const prevIsLoadingRef = useRef(isLoading);
     const [isVcHovered, setIsVcHovered] = useState(false);
-    const [isInfoHovered, setIsInfoHovered] = useState(false);
     const [isHistoryVisible, setIsHistoryVisible] = useState(false);
     const historyContainerRef = useRef<HTMLDivElement>(null);
     const historyButtonRef = useRef<HTMLDivElement>(null);
@@ -72,6 +67,12 @@ const EditorToolbar = memo(
     const imageList = useLibraryStore((s) => s.imageList);
     const groupingMode: GroupingMode = useSettingsStore((s) => s.appSettings?.grouping) ?? 'off';
     const setUI = useUIStore((state) => state.setUI);
+    const isExifVisible = useUIStore((state) => state.uiVisibility.editorExif ?? true);
+
+    const toggleExifVisible = () =>
+      setUI((state) => ({
+        uiVisibility: { ...state.uiVisibility, editorExif: !(state.uiVisibility.editorExif ?? true) },
+      }));
 
     const variantOptions = useMemo(() => {
       if (groupingMode === 'off' || !onImageSelect) return [];
@@ -356,7 +357,24 @@ const EditorToolbar = memo(
       e.currentTarget.blur();
     };
 
-    const isExpanded = isInfoHovered && (hasExif || isLoading);
+    const exifItems = [
+      {
+        key: 'shutter',
+        Icon: IconShutter,
+        value: exifData.shutter,
+        tooltip: t('editor.toolbar.tooltips.shutterSpeed'),
+      },
+      { key: 'aperture', Icon: IconAperture, value: exifData.fNumber, tooltip: t('editor.toolbar.tooltips.aperture') },
+      { key: 'iso', Icon: IconIso, value: exifData.iso, tooltip: t('editor.toolbar.tooltips.iso') },
+      {
+        key: 'focal',
+        Icon: IconFocalLength,
+        value: exifData.focal && (String(exifData.focal).endsWith('mm') ? exifData.focal : `${exifData.focal}mm`),
+        tooltip: t('editor.toolbar.tooltips.focalLength'),
+      },
+      { key: 'date', Icon: IconCalendar, value: exifData.captureDate, tooltip: undefined },
+      { key: 'time', Icon: IconClock, value: exifData.captureTime, tooltip: undefined },
+    ].filter((item) => item.value);
 
     return (
       <div className="relative shrink-0 flex items-center justify-between px-4 h-14 gap-4 z-40">
@@ -390,21 +408,18 @@ const EditorToolbar = memo(
         <div className="flex-1 flex justify-center min-w-0 relative h-full">
           <div
             className={clsx(
-              'bg-surface flex flex-col items-center overflow-hidden transition-all duration-200 ease-out pt-2',
-              isExpanded
-                ? 'h-18 px-8 rounded-2xl absolute min-w-[340px] whitespace-nowrap shadow-2xl shadow-black/50'
-                : 'h-9 px-4 rounded-[18px] absolute min-w-0 w-auto max-w-full shadow-none',
+              'bg-surface absolute flex items-center h-9 px-4 rounded-[18px] max-w-full transition-colors duration-200',
+              hasExif && 'cursor-pointer hover:bg-card-active',
             )}
-            onMouseEnter={() => setIsInfoHovered(true)}
-            onMouseLeave={() => setIsInfoHovered(false)}
+            onClick={() => hasExif && toggleExifVisible()}
+            data-tooltip={hasExif ? t('editor.toolbar.tooltips.toggleImageDetails') : undefined}
             style={{
               top: '10px',
               transform: 'translateX(-50%)',
               left: '50%',
-              zIndex: isExpanded ? 50 : 0,
             }}
           >
-            <div className="flex items-center justify-center max-w-full h-5 shrink-0">
+            <div className="flex items-center justify-center max-w-full h-5 min-w-0">
               <Text
                 as="span"
                 variant={TextVariants.small}
@@ -450,7 +465,10 @@ const EditorToolbar = memo(
                           isActive ? 'bg-surface text-text-primary' : 'text-text-secondary hover:bg-surface/50',
                         )}
                         data-tooltip={t('editor.toolbar.switchToVariant', { label: v.label })}
-                        onClick={(e) => onImageSelect?.(v.path, e)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onImageSelect?.(v.path, e);
+                        }}
                         onKeyDown={handleButtonKeyDown}
                       >
                         {v.label}
@@ -492,90 +510,25 @@ const EditorToolbar = memo(
               >
                 {isLoaderMounted && <Loader2 size={12} className="text-text-secondary animate-spin" />}
               </div>
-            </div>
-
-            <div
-              className={clsx(
-                'relative mt-2 w-full grow justify-center border-t border-text-secondary/10 pt-2 transition-opacity duration-200',
-                isExpanded ? 'opacity-100 delay-75' : 'opacity-0 hidden',
-                hasExif && 'cursor-pointer',
-              )}
-              onClick={() => hasExif && onToggleDateView()}
-            >
-              <div
-                className={clsx(
-                  'absolute inset-0 flex items-center justify-center gap-6 transition-opacity duration-200',
-                  showDateView ? 'opacity-0 pointer-events-none' : 'opacity-100',
-                )}
-              >
-                {exifData.shutter && (
-                  <div className="flex items-center gap-1.5" data-tooltip={t('editor.toolbar.tooltips.shutterSpeed')}>
-                    <Text as="span">
-                      <IconShutter />
-                    </Text>
-                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
-                      {exifData.shutter}
-                    </Text>
-                  </div>
-                )}
-                {exifData.fNumber && (
-                  <div className="flex items-center gap-1.5" data-tooltip={t('editor.toolbar.tooltips.aperture')}>
-                    <Text as="span">
-                      <IconAperture />
-                    </Text>
-                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
-                      {exifData.fNumber}
-                    </Text>
-                  </div>
-                )}
-                {exifData.iso && (
-                  <div className="flex items-center gap-1.5" data-tooltip={t('editor.toolbar.tooltips.iso')}>
-                    <Text as="span">
-                      <IconIso />
-                    </Text>
-                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
-                      {exifData.iso}
-                    </Text>
-                  </div>
-                )}
-                {exifData.focal && (
-                  <div className="flex items-center gap-1.5" data-tooltip={t('editor.toolbar.tooltips.focalLength')}>
-                    <Text as="span">
-                      <IconFocalLength />
-                    </Text>
-                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
-                      {String(exifData.focal).endsWith('mm') ? exifData.focal : `${exifData.focal}mm`}
-                    </Text>
-                  </div>
-                )}
-              </div>
 
               <div
                 className={clsx(
-                  'absolute inset-0 flex items-center justify-center gap-6 transition-opacity duration-200',
-                  showDateView ? 'opacity-100' : 'opacity-0 pointer-events-none',
+                  'flex items-center gap-4 overflow-hidden whitespace-nowrap shrink-0 transition-all duration-300 ease-out',
+                  isExifVisible && exifItems.length > 0
+                    ? 'max-w-[40rem] opacity-100 ml-3 pl-3 border-l border-text-secondary/20'
+                    : 'max-w-0 opacity-0 ml-0 pl-0 border-l-0',
                 )}
               >
-                {exifData.captureDate && (
-                  <div className="flex items-center gap-2">
+                {exifItems.map(({ key, Icon, value, tooltip }) => (
+                  <div className="flex items-center gap-1.5" data-tooltip={tooltip} key={key}>
                     <Text as="span">
-                      <IconCalendar />
+                      <Icon />
                     </Text>
                     <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
-                      {exifData.captureDate}
+                      {value}
                     </Text>
                   </div>
-                )}
-                {exifData.captureTime && (
-                  <div className="flex items-center gap-2">
-                    <Text as="span">
-                      <IconClock />
-                    </Text>
-                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
-                      {exifData.captureTime}
-                    </Text>
-                  </div>
-                )}
+                ))}
               </div>
             </div>
           </div>

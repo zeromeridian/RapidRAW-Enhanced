@@ -133,7 +133,10 @@ details are in `RELEASE_NOTES.MD`.
 - Crop now opens in unrestricted **Free** aspect ratio for new images; the
   source ratio remains available as an explicit preset. Custom aspect ratios
   can be saved as presets.
-- Optional neutral grey editor canvas and click-to-100% zoom. Its fine rotation can
+- Optional neutral grey editor canvas and click-to-100% zoom.
+- Single-row photo information bar in Develop (file name, resolution, and
+  capture details); clicking it hides or shows the capture details, and the
+  choice persists. Its fine rotation can
   be adjusted either precisely with the existing slider or directly by dragging
   the rotation handle above the crop frame.
 - Dedicated **Crop** and **Geometry** modules separate composition from

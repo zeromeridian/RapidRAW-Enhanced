@@ -168,7 +168,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   isWindowFullScreen: false,
   isInstantTransition: false,
   isLayoutReady: false,
-  uiVisibility: { folderTree: true, filmstrip: true, quickFilter: false },
+  uiVisibility: { folderTree: true, filmstrip: true, quickFilter: false, editorExif: true },
   isLibraryExportPanelVisible: false,
   isSettingsOpen: false,
   lightsOutMode: 'off',

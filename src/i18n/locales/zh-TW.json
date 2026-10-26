@@ -792,7 +792,8 @@
         "showEdited": "顯示編輯後（B）",
         "showOriginal": "顯示原始（B）",
         "shutterSpeed": "快門速度",
-        "undo": "復原（Ctrl+Z）或歷史記錄（右鍵單擊）"
+        "undo": "復原（Ctrl+Z）或歷史記錄（右鍵單擊）",
+        "toggleImageDetails": "顯示或隱藏照片詳細資訊"
       },
       "vc": "VC"
     }

@@ -817,7 +817,8 @@
         "showEdited": "Mostra Modificata (B)",
         "showOriginal": "Mostra Originale (B)",
         "shutterSpeed": "Tempo di Esposizione",
-        "undo": "Annulla (Ctrl+Z) o Cronologia (Tasto destro)"
+        "undo": "Annulla (Ctrl+Z) o Cronologia (Tasto destro)",
+        "toggleImageDetails": "Mostra o nascondi i dettagli della foto"
       },
       "vc": "CV"
     }

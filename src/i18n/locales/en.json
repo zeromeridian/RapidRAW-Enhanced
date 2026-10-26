@@ -855,7 +855,8 @@
         "showEdited": "Show Edited (B)",
         "showOriginal": "Show Original (B)",
         "shutterSpeed": "Shutter Speed",
-        "undo": "Undo (Ctrl+Z) or History (Right-click)"
+        "undo": "Undo (Ctrl+Z) or History (Right-click)",
+        "toggleImageDetails": "Show or hide photo details"
       },
       "vc": "VC"
     }
