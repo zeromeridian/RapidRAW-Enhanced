@@ -1768,6 +1768,9 @@
     "lenses": {
       "addButton": "Añadir a Mis Lentes",
       "addNew": "Añadir nueva lente",
+      "autoApplyProfile": "Aplicar perfil de objetivo automáticamente",
+      "autoApplyProfileDesc": "Las imágenes RAW sin editar empiezan con el perfil de objetivo detectado a partir de sus datos EXIF. Las imágenes sin un perfil coincidente permanecen en modo manual. Las imágenes que ya has editado no se modifican.",
+      "autoApplyProfileLabel": "Aplicar el perfil de objetivo detectado a las imágenes RAW",
       "description": "Crea una lista de las lentes que usas frecuentemente para acceder a ellas rápidamente en el panel de Corrección de lente.",
       "manufacturerPlaceholder": "Seleccionar fabricante",
       "modelPlaceholder": "Seleccionar modelo de lente",

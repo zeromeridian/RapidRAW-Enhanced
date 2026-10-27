@@ -154,6 +154,24 @@ impl Default for GeometryParams {
     }
 }
 
+impl GeometryParams {
+    fn without_lens_profile(self) -> Self {
+        let identity = Self::default();
+        Self {
+            lens_dist_k1: identity.lens_dist_k1,
+            lens_dist_k2: identity.lens_dist_k2,
+            lens_dist_k3: identity.lens_dist_k3,
+            lens_model: identity.lens_model,
+            tca_vr: identity.tca_vr,
+            tca_vb: identity.tca_vb,
+            vig_k1: identity.vig_k1,
+            vig_k2: identity.vig_k2,
+            vig_k3: identity.vig_k3,
+            ..self
+        }
+    }
+}
+
 pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> GeometryParams {
     let lens_params = adjustments
         .get("lensDistortionParams")
@@ -2149,7 +2167,11 @@ pub fn is_image_edited(
         return true;
     }
 
-    let geo = get_geometry_params_from_json(adj);
+    let mut geo = get_geometry_params_from_json(adj);
+    if adj.get("lensCorrectionMode").and_then(|v| v.as_str()) == Some("auto") {
+        // An automatically linked lens profile at its default strength is not an edit.
+        geo = geo.without_lens_profile();
+    }
     if !is_geometry_identity(&geo) {
         return true;
     }

@@ -1587,6 +1587,18 @@ export default function SettingsPanel({
                     <Text className="mb-6">{t('settings.lenses.description')}</Text>
 
                     <div className="space-y-8">
+                      <SettingItem
+                        label={t('settings.lenses.autoApplyProfile')}
+                        description={t('settings.lenses.autoApplyProfileDesc')}
+                      >
+                        <Switch
+                          checked={appSettings?.autoApplyLensProfile ?? true}
+                          id="auto-apply-lens-profile-toggle"
+                          label={t('settings.lenses.autoApplyProfileLabel')}
+                          onChange={(checked) => onSettingsChange({ ...appSettings, autoApplyLensProfile: checked })}
+                        />
+                      </SettingItem>
+
                       <div className="bg-bg-primary rounded-lg p-4 border border-border-color">
                         <Text variant={TextVariants.heading} className="mb-3">
                           {t('settings.lenses.addNew')}

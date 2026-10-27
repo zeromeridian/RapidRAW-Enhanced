@@ -1872,6 +1872,9 @@
     "lenses": {
       "addButton": "Add to My Lenses",
       "addNew": "Add New Lens",
+      "autoApplyProfile": "Apply Lens Profile Automatically",
+      "autoApplyProfileDesc": "Unedited RAW images start with the lens profile detected from their EXIF data. Images without a matching profile stay in manual mode. Images you have already edited are not changed.",
+      "autoApplyProfileLabel": "Apply detected lens profile to RAW images",
       "description": "Create a list of your frequently used lenses to quickly access them in the Lens Correction panel.",
       "manufacturerPlaceholder": "Select Manufacturer",
       "modelPlaceholder": "Select Lens Model",

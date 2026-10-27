@@ -1731,6 +1731,9 @@
     "lenses": {
       "addButton": "Zu meinen Objektiven hinzufügen",
       "addNew": "Neues Objektiv hinzufügen",
+      "autoApplyProfile": "Objektivprofil automatisch anwenden",
+      "autoApplyProfileDesc": "Unbearbeitete RAW-Bilder starten mit dem Objektivprofil, das anhand ihrer EXIF-Daten erkannt wird. Bilder ohne passendes Profil bleiben im manuellen Modus. Bereits bearbeitete Bilder werden nicht verändert.",
+      "autoApplyProfileLabel": "Erkanntes Objektivprofil auf RAW-Bilder anwenden",
       "description": "Erstellen Sie eine Liste Ihrer häufig verwendeten Objektive, um im Objektivkorrektur-Panel schnell darauf zuzugreifen.",
       "manufacturerPlaceholder": "Hersteller auswählen",
       "modelPlaceholder": "Objektivmodell auswählen",

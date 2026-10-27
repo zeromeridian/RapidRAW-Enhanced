@@ -1729,6 +1729,9 @@
     "lenses": {
       "addButton": "新增到我的鏡頭",
       "addNew": "新增新鏡頭",
+      "autoApplyProfile": "自動套用鏡頭描述檔",
+      "autoApplyProfileDesc": "未編輯的 RAW 影像會使用根據 EXIF 資料偵測到的鏡頭描述檔。沒有相符描述檔的影像維持手動模式。已編輯的影像不會變更。",
+      "autoApplyProfileLabel": "對 RAW 影像套用偵測到的鏡頭描述檔",
       "description": "建立您常用的鏡頭列表，以便在鏡頭校正面板中快速訪問。",
       "manufacturerPlaceholder": "選擇製造商",
       "modelPlaceholder": "選擇鏡頭型號",

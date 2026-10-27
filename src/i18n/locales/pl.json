@@ -1805,6 +1805,9 @@
     "lenses": {
       "addButton": "Dodaj do Moich obiektywów",
       "addNew": "Dodaj nowy obiektyw",
+      "autoApplyProfile": "Automatycznie stosuj profil obiektywu",
+      "autoApplyProfileDesc": "Nieedytowane zdjęcia RAW zaczynają z profilem obiektywu wykrytym na podstawie danych EXIF. Zdjęcia bez pasującego profilu pozostają w trybie ręcznym. Zdjęcia już edytowane nie są zmieniane.",
+      "autoApplyProfileLabel": "Stosuj wykryty profil obiektywu do zdjęć RAW",
       "description": "Utwórz listę często używanych obiektywów, aby uzyskać do nich szybki dostęp w panelu Korekcji obiektywu.",
       "manufacturerPlaceholder": "Wybierz producenta",
       "modelPlaceholder": "Wybierz model obiektywu",
