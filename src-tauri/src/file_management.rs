@@ -87,10 +87,11 @@ fn compute_thumbnail_cache_hash(
     hasher.update(&img_mod_time.to_le_bytes());
     hasher.update(adjustments_bytes);
     let render_key = format!(
-        "{}|{:?}|{:?}",
+        "{}|{:?}|{:?}|{}",
         crate::cache_utils::raw_decode_settings_key(settings),
         crate::image_processing::resolve_tonemapper_override(settings, is_raw_file(path_str)),
         settings.always_decode_raw_thumbnails,
+        settings.auto_apply_lens_profile,
     );
     hasher.update(render_key.as_bytes());
     Some(hasher.finalize().to_hex().to_string())
@@ -1073,6 +1074,132 @@ mod output_naming_tests {
         assert!(!super::should_defer_metadata(499));
         assert!(super::should_defer_metadata(500));
         assert!(super::should_defer_metadata(30_000));
+    }
+
+    fn olympus_lens_db() -> crate::lens_correction::LensDatabase {
+        quick_xml::de::from_str(include_str!("../lensfun_db/mil-olympus.xml")).unwrap()
+    }
+
+    fn olympus_12_40_exif() -> Option<std::collections::HashMap<String, String>> {
+        Some(
+            [
+                ("Make", "Olympus"),
+                ("LensModel", "Olympus M.Zuiko Digital ED 12-40mm f/2.8 Pro"),
+                ("FocalLength", "12 mm"),
+            ]
+            .into_iter()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect(),
+        )
+    }
+
+    #[test]
+    fn default_lens_profile_links_detected_profile_for_unedited_raw() {
+        let db = olympus_lens_db();
+        let mut adjustments = serde_json::json!({ "rating": 3 });
+        super::link_default_lens_profile(
+            &mut adjustments,
+            true,
+            &AppSettings::default(),
+            Some(&db),
+            olympus_12_40_exif,
+        );
+
+        assert_eq!(adjustments["lensCorrectionMode"], "auto");
+        assert_eq!(adjustments["lensMaker"], "Olympus");
+        assert!(adjustments["lensDistortionParams"].is_object());
+        assert_eq!(adjustments["rating"], 3);
+
+        let mut unadjusted = Value::Null;
+        super::link_default_lens_profile(
+            &mut unadjusted,
+            true,
+            &AppSettings::default(),
+            Some(&db),
+            olympus_12_40_exif,
+        );
+        assert_eq!(unadjusted["lensCorrectionMode"], "auto");
+    }
+
+    #[test]
+    fn default_lens_profile_stays_manual_without_a_match() {
+        let db = olympus_lens_db();
+        let mut adjustments = serde_json::json!({ "rating": 3 });
+        super::link_default_lens_profile(
+            &mut adjustments,
+            true,
+            &AppSettings::default(),
+            Some(&db),
+            || None,
+        );
+        assert_eq!(adjustments, serde_json::json!({ "rating": 3 }));
+    }
+
+    #[test]
+    fn default_lens_profile_keeps_existing_choices_and_edits() {
+        let db = olympus_lens_db();
+        let disabled = AppSettings {
+            auto_apply_lens_profile: false,
+            ..AppSettings::default()
+        };
+        let cases = [
+            (
+                serde_json::json!({ "lensCorrectionMode": "manual" }),
+                true,
+                AppSettings::default(),
+            ),
+            (
+                serde_json::json!({ "exposure": 1.0 }),
+                true,
+                AppSettings::default(),
+            ),
+            (serde_json::json!({}), false, AppSettings::default()),
+            (serde_json::json!({}), true, disabled),
+        ];
+        for (original, is_raw, settings) in cases {
+            let mut adjustments = original.clone();
+            super::link_default_lens_profile(
+                &mut adjustments,
+                is_raw,
+                &settings,
+                Some(&db),
+                || panic!("EXIF must not be read for an ineligible image"),
+            );
+            assert_eq!(adjustments, original);
+        }
+    }
+
+    #[test]
+    fn automatic_lens_profile_alone_is_not_an_edit() {
+        let db = olympus_lens_db();
+        let mut adjustments = serde_json::json!({});
+        super::link_default_lens_profile(
+            &mut adjustments,
+            true,
+            &AppSettings::default(),
+            Some(&db),
+            olympus_12_40_exif,
+        );
+        assert!(!crate::image_processing::is_image_edited(
+            &adjustments,
+            true,
+            None
+        ));
+
+        adjustments["lensDistortionAmount"] = serde_json::json!(50);
+        assert!(crate::image_processing::is_image_edited(
+            &adjustments,
+            true,
+            None
+        ));
+
+        adjustments["lensDistortionAmount"] = serde_json::json!(100);
+        adjustments["lensCorrectionMode"] = serde_json::json!("manual");
+        assert!(crate::image_processing::is_image_edited(
+            &adjustments,
+            true,
+            None
+        ));
     }
 }
 
@@ -2268,7 +2395,9 @@ pub fn generate_thumbnail_data(
     let source_path_str = source_path.to_string_lossy().to_string();
     let is_raw = is_raw_file(&source_path_str);
 
-    let metadata: Option<ImageMetadata> = if is_cloud_placeholder(&sidecar_path) {
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+
+    let mut metadata: Option<ImageMetadata> = if is_cloud_placeholder(&sidecar_path) {
         enqueue_metadata(
             app_handle,
             path_str.to_string(),
@@ -2282,6 +2411,18 @@ pub fn generate_thumbnail_data(
             .and_then(|content| serde_json::from_str(&content).ok())
     };
 
+    if let Some(meta) = metadata.as_mut()
+        && !meta.adjustments.is_null()
+    {
+        apply_default_lens_profile(
+            &mut meta.adjustments,
+            &meta.exif,
+            &source_path,
+            &settings,
+            app_handle,
+        );
+    }
+
     let adjustments = metadata
         .as_ref()
         .map_or(serde_json::Value::Null, |m| m.adjustments.clone());
@@ -2292,7 +2433,6 @@ pub fn generate_thumbnail_data(
         );
     }
 
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let always_decode_raw = settings.always_decode_raw_thumbnails.unwrap_or(false);
 
     if is_raw && adjustments.is_null() && preloaded_image.is_none() && !always_decode_raw {
@@ -3119,6 +3259,65 @@ pub fn resolve_lens_params_in_adjustments(
     }
 }
 
+/// Starts an unedited RAW image in automatic lens correction when
+/// `auto_apply_lens_profile` is on. Images that already store a lens-correction
+/// choice or any edit are left unchanged, as are images without a matching
+/// profile, which therefore stay in manual mode. Deliberate fork deviation
+/// (upstream defaults to manual); see `UPSTREAM_FEATURE_GAP.md`.
+pub fn apply_default_lens_profile(
+    adjustments: &mut Value,
+    sidecar_exif: &Option<HashMap<String, String>>,
+    source_path: &Path,
+    settings: &AppSettings,
+    app_handle: &AppHandle,
+) {
+    let lens_db = app_handle
+        .state::<AppState>()
+        .lens_db
+        .lock()
+        .unwrap()
+        .clone();
+    link_default_lens_profile(
+        adjustments,
+        is_raw_file(source_path),
+        settings,
+        lens_db.as_deref(),
+        || exif_processing::exif_for_lens_lookup(sidecar_exif, source_path),
+    );
+}
+
+fn link_default_lens_profile(
+    adjustments: &mut Value,
+    is_raw: bool,
+    settings: &AppSettings,
+    lens_db: Option<&crate::lens_correction::LensDatabase>,
+    load_exif: impl FnOnce() -> Option<HashMap<String, String>>,
+) {
+    if !settings.auto_apply_lens_profile
+        || !is_raw
+        || adjustments.get("lensCorrectionMode").is_some()
+        || crate::image_processing::is_image_edited(
+            adjustments,
+            is_raw,
+            crate::image_processing::resolve_tonemapper_override(settings, is_raw),
+        )
+    {
+        return;
+    }
+
+    let mut candidate = if adjustments.is_object() {
+        adjustments.clone()
+    } else {
+        serde_json::json!({})
+    };
+    candidate["lensCorrectionMode"] = serde_json::json!("auto");
+    resolve_lens_params_in_adjustments(&mut candidate, &load_exif(), lens_db);
+
+    if candidate.get("lensDistortionParams").is_some() {
+        *adjustments = candidate;
+    }
+}
+
 #[tauri::command]
 pub fn get_supported_file_types() -> Result<serde_json::Value, String> {
     let raw_extensions: Vec<&str> = crate::formats::RAW_EXTENSIONS
@@ -3605,7 +3804,7 @@ pub fn save_metadata_and_update_thumbnail(
         let lens_db_guard = state.lens_db.lock().unwrap();
         resolve_lens_params_in_adjustments(
             &mut final_adjustments,
-            &metadata.exif,
+            &exif_processing::exif_for_lens_lookup(&metadata.exif, &source_path),
             lens_db_guard.as_deref(),
         );
     }
@@ -3736,7 +3935,7 @@ pub async fn apply_adjustments_to_paths(
             .clone();
 
         paths.par_iter().for_each(|path| {
-            let (_, sidecar_path) = parse_virtual_path(path);
+            let (source_path, sidecar_path) = parse_virtual_path(path);
 
             let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
@@ -3755,7 +3954,7 @@ pub async fn apply_adjustments_to_paths(
 
             resolve_lens_params_in_adjustments(
                 &mut new_adjustments,
-                &existing_metadata.exif,
+                &exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
                 lens_db.as_deref(),
             );
 
@@ -3766,7 +3965,6 @@ pub async fn apply_adjustments_to_paths(
             }
 
             if enable_xmp_sync {
-                let source_path = parse_virtual_path(path).0;
                 sync_metadata_to_xmp(
                     &source_path,
                     &existing_metadata,
@@ -3948,7 +4146,7 @@ fn apply_preset_adjustments_to_path(
 
     resolve_lens_params_in_adjustments(
         &mut existing_metadata.adjustments,
-        &existing_metadata.exif,
+        &exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
         lens_db,
     );
     let json_string =
@@ -4140,7 +4338,9 @@ pub async fn reset_adjustments_for_paths(
 
             let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
-            existing_metadata.adjustments = serde_json::json!({});
+            // Reset unlinks the lens profile; the explicit manual mode keeps
+            // `apply_default_lens_profile` from linking it again.
+            existing_metadata.adjustments = serde_json::json!({ "lensCorrectionMode": "manual" });
 
             if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
                 let _ = std::fs::write(&sidecar_path, json_string);
@@ -4396,7 +4596,7 @@ pub fn set_rating_for_paths(
 
 #[tauri::command]
 pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadata, String> {
-    let settings = load_settings(app_handle).unwrap_or_default();
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
     let (source_path, sidecar_path) = parse_virtual_path(&path);
@@ -4408,6 +4608,14 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
     {
         let _ = fs::write(&sidecar_path, json);
     }
+
+    apply_default_lens_profile(
+        &mut metadata.adjustments,
+        &metadata.exif,
+        &source_path,
+        &settings,
+        &app_handle,
+    );
 
     Ok(metadata)
 }

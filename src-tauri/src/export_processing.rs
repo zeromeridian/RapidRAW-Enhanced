@@ -26,7 +26,8 @@ use tiff::tags::ResolutionUnit;
 use crate::AppState;
 use crate::exif_processing;
 use crate::file_management::{
-    generate_filename_from_template, parse_virtual_path, read_file_mapped, sanitize_filename_suffix,
+    apply_default_lens_profile, generate_filename_from_template, parse_virtual_path,
+    read_file_mapped, sanitize_filename_suffix,
 };
 use crate::formats::is_raw_file;
 use crate::image_loader::{load_base_image_from_bytes, prepare_base_image};
@@ -1718,20 +1719,24 @@ pub(crate) async fn export_images_impl(
                     ExportAdjustmentsMode::GlobalOverride(_) => false,
                 };
 
+                let load_sidecar_adjustments = || {
+                    let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+                    apply_default_lens_profile(
+                        &mut metadata.adjustments,
+                        &metadata.exif,
+                        &source_path,
+                        &settings,
+                        &app_handle_clone,
+                    );
+                    metadata.adjustments
+                };
                 let mut js_adjustments = match &adjustments_mode {
                     ExportAdjustmentsMode::UseSidecars {
                         active_adjustments, ..
-                    } => {
-                        if is_current_edit {
-                            if let Some(adj) = active_adjustments {
-                                adj.clone()
-                            } else {
-                                crate::exif_processing::load_sidecar(&sidecar_path).adjustments
-                            }
-                        } else {
-                            crate::exif_processing::load_sidecar(&sidecar_path).adjustments
-                        }
-                    }
+                    } => match active_adjustments {
+                        Some(adj) if is_current_edit => adj.clone(),
+                        _ => load_sidecar_adjustments(),
+                    },
                     ExportAdjustmentsMode::GlobalOverride(adj) => adj.clone(),
                 };
 

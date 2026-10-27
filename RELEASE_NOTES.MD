@@ -5,6 +5,25 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.15.0-feature-auto-lens-profile — 2026-10-27
+
+### Lens Correction
+
+- RAW images you have not edited yet now open with their lens profile
+  applied automatically, using the lens recorded in the photo. Exports and
+  thumbnails match what you see in Develop.
+- If no matching profile is found, lens correction stays in Manual mode.
+- Images you have already edited keep their own lens settings.
+- **Reset** returns lens correction to Manual with no profile linked.
+- An automatically applied profile alone does not mark an image as edited.
+- Turn this off with **Apply Lens Profile Automatically** in Settings →
+  My Lenses.
+
+### Fixes
+
+- Automatic lens correction is no longer removed when you save a virtual copy
+  or paste settings onto an image whose camera details were not loaded yet.
+
 ## 1.14.5-fix-lrc-curve — 2026-10-26
 
 ### Fixes
@@ -16,6 +35,12 @@ description.
   on affected images to correct them.
 - Black-and-white Lightroom profiles still import as Black & White, and the
   review now names the profile whose built-in settings were not applied.
+
+## 1.14.4 — 2026-10-26
+
+### Maintenance
+
+- Maintenance release with no changes to features or behavior.
 
 ## 1.14.3-dev-brush-fix — 2026-10-26
 

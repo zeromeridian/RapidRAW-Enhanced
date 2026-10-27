@@ -240,6 +240,7 @@ export interface AppSettings {
   linuxGpuOptimization?: boolean;
   exportPresets?: ExportPreset[];
   myLenses?: any;
+  autoApplyLensProfile?: boolean;
   customAspectRatios?: CustomAspectRatio[];
   enableFolderImageCounts?: boolean;
   hideEmptyFolders?: boolean;

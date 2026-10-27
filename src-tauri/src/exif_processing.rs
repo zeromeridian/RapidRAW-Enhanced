@@ -1363,6 +1363,23 @@ pub fn read_sidecar_exif(image_path: &Path) -> Option<HashMap<String, String>> {
     metadata.exif
 }
 
+/// EXIF for lens-profile lookup: the sidecar's own, then the physical image's
+/// cached EXIF (virtual-copy sidecars store none), then the image file.
+pub fn exif_for_lens_lookup(
+    sidecar_exif: &Option<HashMap<String, String>>,
+    image_path: &Path,
+) -> Option<HashMap<String, String>> {
+    if let Some(exif) = sidecar_exif {
+        return Some(exif.clone());
+    }
+    if let Some(exif) = read_sidecar_exif(image_path) {
+        return Some(exif);
+    }
+    let file_bytes = crate::file_management::read_file_mapped(image_path).ok()?;
+    let exif = read_exif_data_from_bytes(&image_path.to_string_lossy(), &file_bytes);
+    has_descriptive_exif(&exif).then_some(exif)
+}
+
 pub fn read_exif_data_from_bytes(path: &str, file_bytes: &[u8]) -> HashMap<String, String> {
     if is_raw_file(path)
         && let Some(map) = extract_metadata(file_bytes)

@@ -166,6 +166,12 @@ details are in `RELEASE_NOTES.MD`.
   independent distortion, chromatic-aberration, and vignetting controls. Lens
   settings, including Auto mode, persist in Tool and Style presets without
   requiring crop and transform data to be included.
+- **Apply Lens Profile Automatically** (Settings → My Lenses, on by default)
+  starts unedited RAW images in Auto lens correction with the profile detected
+  from EXIF, in Develop, exports, and thumbnails. Images without a matching
+  profile stay in Manual mode, edited images keep their own lens settings,
+  Reset returns to Manual with no profile, and an automatic profile alone does
+  not mark an image as edited.
 - The Masking module presents every mask source directly, without an additional
   **Others** submenu.
 - A dedicated **Tagging** module adds and removes tags across the current image

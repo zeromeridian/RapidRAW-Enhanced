@@ -1768,6 +1768,9 @@
     "lenses": {
       "addButton": "Aggiungi ai Miei Obiettivi",
       "addNew": "Aggiungi Nuovo Obiettivo",
+      "autoApplyProfile": "Applica automaticamente il profilo obiettivo",
+      "autoApplyProfileDesc": "Le immagini RAW non modificate partono con il profilo obiettivo rilevato dai dati EXIF. Le immagini senza un profilo corrispondente restano in modalità manuale. Le immagini già modificate non vengono cambiate.",
+      "autoApplyProfileLabel": "Applica il profilo obiettivo rilevato alle immagini RAW",
       "description": "Crea una lista dei tuoi obiettivi usati di frequente per accedervi rapidamente nel pannello Correzione Obiettivo.",
       "manufacturerPlaceholder": "Seleziona Produttore",
       "modelPlaceholder": "Seleziona Modello Obiettivo",

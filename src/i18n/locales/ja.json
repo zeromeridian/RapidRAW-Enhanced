@@ -1729,6 +1729,9 @@
     "lenses": {
       "addButton": "マイレンズに追加",
       "addNew": "新しいレンズを追加",
+      "autoApplyProfile": "レンズプロファイルを自動適用",
+      "autoApplyProfileDesc": "未編集のRAW画像には、EXIFデータから検出したレンズプロファイルが最初から適用されます。一致するプロファイルがない画像は手動モードのままです。編集済みの画像は変更されません。",
+      "autoApplyProfileLabel": "検出したレンズプロファイルをRAW画像に適用",
       "description": "よく使うレンズのリストを作成して、レンズ補正パネルからすばやくアクセスできるようにします。",
       "manufacturerPlaceholder": "メーカーを選択",
       "modelPlaceholder": "レンズモデルを選択",

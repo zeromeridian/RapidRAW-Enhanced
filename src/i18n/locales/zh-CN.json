@@ -1729,6 +1729,9 @@
     "lenses": {
       "addButton": "添加到我的镜头",
       "addNew": "添加新镜头",
+      "autoApplyProfile": "自动应用镜头配置文件",
+      "autoApplyProfileDesc": "未编辑的 RAW 图像会使用根据 EXIF 数据检测到的镜头配置文件。没有匹配配置文件的图像保持手动模式。已编辑的图像不会改变。",
+      "autoApplyProfileLabel": "对 RAW 图像应用检测到的镜头配置文件",
       "description": "创建您常用的镜头列表，以便在镜头校正面板中快速访问。",
       "manufacturerPlaceholder": "选择制造商",
       "modelPlaceholder": "选择镜头型号",
