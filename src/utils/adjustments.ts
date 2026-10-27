@@ -1074,6 +1074,46 @@ export const COPYABLE_ADJUSTMENT_KEYS: string[] = Object.values(ADJUSTMENT_GROUP
   .flat()
   .flatMap((group) => group.keys);
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const diffAdjustmentValue = (previous: unknown, next: unknown): unknown => {
+  if (isPlainObject(previous) && isPlainObject(next)) {
+    const changes: Record<string, unknown> = {};
+    for (const key of Object.keys(next)) {
+      const change = diffAdjustmentValue(previous[key], next[key]);
+      if (change !== undefined) changes[key] = change;
+    }
+    return Object.keys(changes).length > 0 ? changes : undefined;
+  }
+  return JSON.stringify(previous) === JSON.stringify(next) ? undefined : next;
+};
+
+/**
+ * Describes what changed between two adjustment states, limited to `keys`.
+ * `changes` holds only the changed controls (nested objects such as HSL keep
+ * just the changed channel and field; arrays stay whole), and `complete` holds
+ * the full value of each changed key, as `apply_adjustments_to_paths` expects.
+ */
+export const getAdjustmentChanges = (
+  previous: Adjustments,
+  next: Adjustments,
+  keys: Array<string>,
+): { changes: Partial<Adjustments>; complete: Partial<Adjustments> } | null => {
+  const changes: Record<string, unknown> = {};
+  const complete: Record<string, unknown> = {};
+  for (const key of keys) {
+    const change = diffAdjustmentValue(previous[key as keyof Adjustments], next[key as keyof Adjustments]);
+    if (change !== undefined) {
+      changes[key] = change;
+      complete[key] = next[key as keyof Adjustments];
+    }
+  }
+  return Object.keys(changes).length > 0
+    ? { changes: changes as Partial<Adjustments>, complete: complete as Partial<Adjustments> }
+    : null;
+};
+
 export const ADJUSTMENT_SECTIONS: Sections = {
   basic: [
     BasicAdjustment.Brightness,

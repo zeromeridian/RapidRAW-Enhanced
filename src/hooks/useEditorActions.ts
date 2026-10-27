@@ -29,6 +29,17 @@ export const debouncedSave = debounce((path: string, adjustmentsToSave: Adjustme
   });
 }, 300);
 
+/** Turns Develop Auto Sync on or off; it syncs edits to every selected image. */
+export const toggleAutoSync = () => {
+  const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+  if (!appSettings?.copyPasteSettings) return;
+  const { copyPasteSettings } = appSettings;
+  void handleSettingsChange({
+    ...appSettings,
+    copyPasteSettings: { ...copyPasteSettings, autoSync: !copyPasteSettings.autoSync },
+  });
+};
+
 export function useEditorActions() {
   const setEditor = useEditorStore((s) => s.setEditor);
 

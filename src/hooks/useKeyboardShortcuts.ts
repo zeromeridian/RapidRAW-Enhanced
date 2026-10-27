@@ -7,7 +7,7 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { useProcessStore } from '../store/useProcessStore';
-import { useEditorActions } from './useEditorActions';
+import { toggleAutoSync, useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
 import { ImageFlag } from '../utils/imageFlags';
 
@@ -165,6 +165,13 @@ export const useKeyboardShortcuts = ({
         execute: (e: any) => {
           e.preventDefault();
           handlePasteAdjustments();
+        },
+      },
+      toggle_auto_sync: {
+        shouldFire: (s: ReturnType<typeof getStoreState>) => !!s.editor.selectedImage,
+        execute: (e: KeyboardEvent) => {
+          e.preventDefault();
+          toggleAutoSync();
         },
       },
       copy_image_path: {

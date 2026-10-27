@@ -509,6 +509,16 @@
         "useBasicInpaint": "Использовать простое восстановление"
       }
     },
+    "autoSync": {
+      "chooseSettings": "Choose which settings sync",
+      "off": "Edits apply only to this image",
+      "single": "Select more images in the filmstrip to sync",
+      "syncing_one": "Syncing edits to {{count}} selected images",
+      "syncing_few": "Syncing edits to {{count}} selected images",
+      "syncing_many": "Syncing edits to {{count}} selected images",
+      "syncing_other": "Syncing edits to {{count}} selected images",
+      "title": "Auto Sync"
+    },
     "crop": {
       "aspectRatioHeading": "Соотношение сторон",
       "custom": {
@@ -1799,7 +1809,8 @@
         "zoom_in": "Приблизить",
         "zoom_in_step": "Приблизить по шагам",
         "zoom_out": "Отдалить",
-        "zoom_out_step": "Отдалить по шагам"
+        "zoom_out_step": "Отдалить по шагам",
+        "toggle_auto_sync": "Toggle Auto Sync"
       },
       "sections": {
         "editing": "Редактирование",

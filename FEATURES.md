@@ -133,6 +133,12 @@ details are in `RELEASE_NOTES.MD`.
 
 ## Develop
 
+- Lightroom-style **Auto Sync**: with several images selected, each edit made
+  in Develop is applied to every selected image. Only the changed control is
+  synced (one Color Mixer channel, for example), and the Copy & Paste Settings
+  checkboxes choose which sections sync. Its switch and sync status are always
+  visible at the bottom of the Develop sidebar; Command/Ctrl+Option/Alt+Shift+A
+  also toggles it.
 - Crop now opens in unrestricted **Free** aspect ratio for new images; the
   source ratio remains available as an explicit preset. Custom aspect ratios
   can be saved as presets.

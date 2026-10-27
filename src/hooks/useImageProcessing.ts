@@ -5,7 +5,7 @@ import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useLibraryStore } from '../store/useLibraryStore';
-import { Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
+import { Adjustments, COPYABLE_ADJUSTMENT_KEYS, getAdjustmentChanges } from '../utils/adjustments';
 import { Invokes, Panel } from '../components/ui/AppProperties';
 import { debouncedSave } from './useEditorActions';
 import { globalImageCache } from '../utils/ImageLRUCache';
@@ -50,6 +50,7 @@ export function useImageProcessing(
   } | null>(null);
   const currentOriginalResRef = useRef<number>(0);
   const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoSyncQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const lastInteractiveAnalyticsAtRef = useRef(0);
   const lastInteractiveRenderDurationRef = useRef(0);
   const wasSliderDraggingRef = useRef(false);
@@ -479,20 +480,22 @@ export function useImageProcessing(
         if (appSettings?.copyPasteSettings?.autoSync && otherPaths.length > 0) {
           const prev = prevAdjustmentsRef.current;
           if (prev && prev.path === selectedImage.path) {
-            const delta: Partial<Adjustments> = {};
             const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
-            for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
-              if (includedKeys.includes(key as string)) {
-                if (JSON.stringify(adjustments[key]) !== JSON.stringify(prev.adjustments[key])) {
-                  (delta as any)[key] = adjustments[key];
-                }
-              }
-            }
-            if (Object.keys(delta).length > 0) {
+            const sync = getAdjustmentChanges(prev.adjustments, adjustments, includedKeys);
+            if (sync) {
               otherPaths.forEach((p) => globalImageCache.delete(p));
-              invoke(Invokes.ApplyAdjustmentsToPaths, { paths: otherPaths, adjustments: delta }).catch((err) => {
-                console.error('Failed to apply adjustments to multi-selection:', err);
-              });
+              // Apply updates in order so a later change to the same control always wins.
+              autoSyncQueueRef.current = autoSyncQueueRef.current
+                .then(() =>
+                  invoke(Invokes.ApplyAdjustmentsToPaths, {
+                    paths: otherPaths,
+                    adjustments: sync.complete,
+                    changes: sync.changes,
+                  }),
+                )
+                .catch((err) => {
+                  console.error('Failed to apply adjustments to multi-selection:', err);
+                });
             }
           }
         }
