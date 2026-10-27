@@ -463,6 +463,14 @@
         "useBasicInpaint": "기본 인페인팅 사용"
       }
     },
+    "autoSync": {
+      "chooseSettings": "Choose which settings sync",
+      "off": "Edits apply only to this image",
+      "single": "Select more images in the filmstrip to sync",
+      "syncing_one": "Syncing edits to {{count}} selected images",
+      "syncing_other": "Syncing edits to {{count}} selected images",
+      "title": "Auto Sync"
+    },
     "crop": {
       "aspectRatioHeading": "종횡비",
       "custom": {
@@ -1719,7 +1727,8 @@
         "zoom_in": "확대",
         "zoom_in_step": "확대 (단계별)",
         "zoom_out": "축소",
-        "zoom_out_step": "축소 (단계별)"
+        "zoom_out_step": "축소 (단계별)",
+        "toggle_auto_sync": "Toggle Auto Sync"
       },
       "sections": {
         "editing": "편집",

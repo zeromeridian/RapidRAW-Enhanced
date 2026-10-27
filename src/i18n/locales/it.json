@@ -487,6 +487,15 @@
         "useBasicInpaint": "Usa inpainting semplice"
       }
     },
+    "autoSync": {
+      "chooseSettings": "Choose which settings sync",
+      "off": "Edits apply only to this image",
+      "single": "Select more images in the filmstrip to sync",
+      "syncing_one": "Syncing edits to {{count}} selected images",
+      "syncing_many": "Syncing edits to {{count}} selected images",
+      "syncing_other": "Syncing edits to {{count}} selected images",
+      "title": "Auto Sync"
+    },
     "crop": {
       "aspectRatioHeading": "Proporzioni",
       "custom": {
@@ -1760,7 +1769,8 @@
         "zoom_in": "Ingrandisci",
         "zoom_in_step": "Ingrandisci (a step)",
         "zoom_out": "Riduci",
-        "zoom_out_step": "Riduci (a step)"
+        "zoom_out_step": "Riduci (a step)",
+        "toggle_auto_sync": "Toggle Auto Sync"
       },
       "sections": {
         "editing": "Modifica",

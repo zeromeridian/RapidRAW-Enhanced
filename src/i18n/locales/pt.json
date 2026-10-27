@@ -487,6 +487,15 @@
         "useBasicInpaint": "Usar preenchimento básico"
       }
     },
+    "autoSync": {
+      "chooseSettings": "Choose which settings sync",
+      "off": "Edits apply only to this image",
+      "single": "Select more images in the filmstrip to sync",
+      "syncing_one": "Syncing edits to {{count}} selected images",
+      "syncing_many": "Syncing edits to {{count}} selected images",
+      "syncing_other": "Syncing edits to {{count}} selected images",
+      "title": "Auto Sync"
+    },
     "crop": {
       "aspectRatioHeading": "Proporção de Tela",
       "custom": {
@@ -1760,7 +1769,8 @@
         "zoom_in": "Mais zoom",
         "zoom_in_step": "Mais zoom (por etapas)",
         "zoom_out": "Menos zoom",
-        "zoom_out_step": "Menos zoom (por etapas)"
+        "zoom_out_step": "Menos zoom (por etapas)",
+        "toggle_auto_sync": "Toggle Auto Sync"
       },
       "sections": {
         "editing": "Edição",

@@ -463,6 +463,14 @@
         "useBasicInpaint": "簡易インペインティングを使用"
       }
     },
+    "autoSync": {
+      "chooseSettings": "Choose which settings sync",
+      "off": "Edits apply only to this image",
+      "single": "Select more images in the filmstrip to sync",
+      "syncing_one": "Syncing edits to {{count}} selected images",
+      "syncing_other": "Syncing edits to {{count}} selected images",
+      "title": "Auto Sync"
+    },
     "crop": {
       "aspectRatioHeading": "アスペクト比",
       "custom": {
@@ -1719,7 +1727,8 @@
         "zoom_in": "ズームイン",
         "zoom_in_step": "段階的にズームイン",
         "zoom_out": "ズームアウト",
-        "zoom_out_step": "段階的にズームアウト"
+        "zoom_out_step": "段階的にズームアウト",
+        "toggle_auto_sync": "Toggle Auto Sync"
       },
       "sections": {
         "editing": "編集",

@@ -298,6 +298,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'editing',
   },
   {
+    action: 'toggle_auto_sync',
+    description: 'settings.keybinds.actions.toggle_auto_sync',
+    defaultCombo: ['ctrl', 'shift', 'alt', 'KeyA'],
+    section: 'editing',
+  },
+  {
     action: 'rotate_left',
     description: 'settings.keybinds.actions.rotate_left',
     defaultCombo: ['ctrl', 'BracketLeft'],

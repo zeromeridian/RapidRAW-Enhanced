@@ -17,6 +17,7 @@ import MasksPanel from '../panel/right/MasksPanel';
 import AIPanel from '../panel/right/AIPanel';
 import PresetsPanel from '../panel/right/PresetsPanel';
 import ExportPanel from '../panel/right/ExportPanel';
+import AutoSyncFooter from '../panel/right/AutoSyncFooter';
 
 import { useEditorStore } from '../../store/useEditorStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -304,6 +305,7 @@ export default function EditorView({
               />
             )}
             <div className="min-h-0 flex-1 overflow-hidden">{editorRightPanelContent}</div>
+            {activeRightPanel && <AutoSyncFooter />}
             <div className="shrink-0 border-t border-surface">
               <RightPanelSwitcher
                 activePanel={activeRightPanel}
@@ -325,8 +327,9 @@ export default function EditorView({
                 )}
                 style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
               >
-                <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
-                  {editorRightPanelContent}
+                <div style={{ width: `${rightPanelWidth}px` }} className="h-full flex flex-col">
+                  <div className="min-h-0 flex-1">{editorRightPanelContent}</div>
+                  <AutoSyncFooter />
                 </div>
               </div>
               <div

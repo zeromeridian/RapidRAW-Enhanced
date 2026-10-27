@@ -8,8 +8,8 @@ use std::hash::{Hash, Hasher};
 use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 use anyhow::Result;
@@ -1167,6 +1167,47 @@ mod output_naming_tests {
             );
             assert_eq!(adjustments, original);
         }
+    }
+
+    #[test]
+    fn adjustment_changes_merge_nested_controls_only() {
+        let complete = serde_json::json!({
+            "hsl": { "reds": { "hue": 0, "saturation": 30 }, "blues": { "hue": 0 } },
+            "colorGrading": { "shadows": { "hue": 200, "saturation": 10 } },
+            "curves": { "luma": [{ "x": 0, "y": 0 }] },
+            "crop": { "x": 5, "y": 6, "width": 50 },
+            "contrast": 12,
+        });
+        let changes = serde_json::json!({
+            "hsl": { "reds": { "saturation": 30 } },
+            "colorGrading": { "shadows": { "hue": 200 } },
+            "curves": { "luma": [{ "x": 0, "y": 0 }] },
+            "crop": { "x": 5 },
+            "contrast": 12,
+        });
+        let mut target = serde_json::json!({
+            "exposure": 0.5,
+            "hsl": { "reds": { "hue": 10, "saturation": 5 }, "blues": { "hue": -20 } },
+            "curves": { "luma": [{ "x": 0, "y": 0 }, { "x": 128, "y": 140 }] },
+            "crop": null,
+        });
+        super::merge_adjustment_changes(&mut target, &changes, &complete);
+        assert_eq!(
+            target,
+            serde_json::json!({
+                "exposure": 0.5,
+                "hsl": { "reds": { "hue": 10, "saturation": 30 }, "blues": { "hue": -20 } },
+                "colorGrading": { "shadows": { "hue": 200, "saturation": 10 } },
+                "curves": { "luma": [{ "x": 0, "y": 0 }] },
+                "crop": { "x": 5, "y": 6, "width": 50 },
+                "contrast": 12,
+            })
+        );
+
+        let mut pasted = serde_json::json!({ "hsl": { "reds": { "hue": 10 } }, "exposure": 1 });
+        super::merge_adjustment_changes(&mut pasted, &complete, &complete);
+        assert_eq!(pasted["hsl"], complete["hsl"]);
+        assert_eq!(pasted["exposure"], 1);
     }
 
     #[test]
@@ -3913,77 +3954,133 @@ pub fn save_metadata_and_update_thumbnail(
     Ok(())
 }
 
+/// Serializes the read-merge-write cycle of `apply_adjustments_to_paths`, so
+/// overlapping pastes or Auto Sync updates cannot overwrite each other's
+/// sidecar changes.
+static ADJUSTMENT_MERGE_LOCK: Mutex<()> = Mutex::new(());
+
+/// Writes the values of `complete` that `changes` selects into `target`.
+/// `changes` is a subset of `complete`: where it and both other values are
+/// objects, only its keys are visited, so changing one nested control (one
+/// HSL channel, one color-grading wheel) keeps the target's other values.
+/// Everywhere else the complete value is written, so a section the target
+/// lacks or holds as `null` never receives a partial object.
+fn merge_adjustment_changes(target: &mut Value, changes: &Value, complete: &Value) {
+    match (target, changes, complete) {
+        (Value::Object(target_map), Value::Object(changes_map), Value::Object(complete_map)) => {
+            for (key, change) in changes_map {
+                let complete_value = complete_map.get(key).unwrap_or(change);
+                match target_map.get_mut(key) {
+                    Some(existing) => merge_adjustment_changes(existing, change, complete_value),
+                    None => {
+                        target_map.insert(key.clone(), complete_value.clone());
+                    }
+                }
+            }
+        }
+        (target, _, complete) => *target = complete.clone(),
+    }
+}
+
+/// Writes `adjustments` into each image's sidecar and resolves its lens
+/// profile. Paste passes complete sections, which replace the target's.
+/// Develop Auto Sync also passes `changes`, the controls that changed, which
+/// are merged individually (see `merge_adjustment_changes`). Resolves once
+/// every sidecar is written; thumbnails regenerate afterwards, skipping
+/// images that a newer update superseded.
 #[tauri::command]
 pub async fn apply_adjustments_to_paths(
     paths: Vec<String>,
     adjustments: Value,
+    changes: Option<Value>,
     app_handle: AppHandle,
 ) -> Result<(), String> {
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let write_handle = app_handle.clone();
+    let write_paths = paths.clone();
+    let write_settings = settings.clone();
+
+    let live_updates = tauri::async_runtime::spawn_blocking(move || {
+        let state = write_handle.state::<AppState>();
+        let enable_xmp_sync = write_settings.enable_xmp_sync.unwrap_or(false);
+        let create_xmp_if_missing = write_settings.create_xmp_if_missing.unwrap_or(false);
+        let lens_db = state.lens_db.lock().unwrap().clone();
+        let _merge_guard = ADJUSTMENT_MERGE_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        write_paths
+            .par_iter()
+            .map(|path| {
+                let (source_path, sidecar_path) = parse_virtual_path(path);
+                let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+
+                let mut new_adjustments = existing_metadata.adjustments;
+                if !new_adjustments.is_object() {
+                    new_adjustments = serde_json::json!({});
+                }
+                // Persist the automatic lens profile an unedited RAW shows in
+                // Develop before this change marks the image as edited.
+                link_default_lens_profile(
+                    &mut new_adjustments,
+                    is_raw_file(&source_path),
+                    &write_settings,
+                    lens_db.as_deref(),
+                    || exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
+                );
+                merge_adjustment_changes(
+                    &mut new_adjustments,
+                    changes.as_ref().unwrap_or(&adjustments),
+                    &adjustments,
+                );
+                resolve_lens_params_in_adjustments(
+                    &mut new_adjustments,
+                    &exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
+                    lens_db.as_deref(),
+                );
+
+                existing_metadata.adjustments = new_adjustments;
+
+                if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
+                    let _ = std::fs::write(&sidecar_path, json_string);
+                }
+
+                if enable_xmp_sync {
+                    sync_metadata_to_xmp(
+                        &source_path,
+                        &existing_metadata,
+                        create_xmp_if_missing,
+                        !path.contains("?vc="),
+                    );
+                }
+
+                (
+                    path.clone(),
+                    state.thumbnail_manager.begin_live_update(path),
+                )
+            })
+            .collect::<Vec<_>>()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
     let state = app_handle.state::<AppState>();
-    add_to_thumbnail_queue(&state, paths.len(), &app_handle);
+    add_to_thumbnail_queue(&state, live_updates.len(), &app_handle);
 
     tauri::async_runtime::spawn_blocking(move || {
-        let settings = load_settings(app_handle.clone()).unwrap_or_default();
-        let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
-        let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
-
-        let lens_db = app_handle
-            .state::<AppState>()
-            .lens_db
-            .lock()
-            .unwrap()
-            .clone();
-
-        paths.par_iter().for_each(|path| {
-            let (source_path, sidecar_path) = parse_virtual_path(path);
-
-            let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-
-            let mut new_adjustments = existing_metadata.adjustments;
-            if new_adjustments.is_null() {
-                new_adjustments = serde_json::json!({});
-            }
-
-            if let (Some(new_map), Some(pasted_map)) =
-                (new_adjustments.as_object_mut(), adjustments.as_object())
-            {
-                for (k, v) in pasted_map {
-                    new_map.insert(k.clone(), v.clone());
-                }
-            }
-
-            resolve_lens_params_in_adjustments(
-                &mut new_adjustments,
-                &exif_processing::exif_for_lens_lookup(&existing_metadata.exif, &source_path),
-                lens_db.as_deref(),
-            );
-
-            existing_metadata.adjustments = new_adjustments;
-
-            if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
-                let _ = std::fs::write(&sidecar_path, json_string);
-            }
-
-            if enable_xmp_sync {
-                sync_metadata_to_xmp(
-                    &source_path,
-                    &existing_metadata,
-                    create_xmp_if_missing,
-                    !path.contains("?vc="),
-                );
-            }
-        });
-
         let state = app_handle.state::<AppState>();
+        let finish = |path: &str, generation: usize| {
+            state.thumbnail_manager.finish_live_update(path, generation);
+            increment_thumbnail_progress(&state, &app_handle);
+        };
+
         let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
             Ok(dir) => dir,
             Err(e) => {
                 log::warn!("Unable to initialize thumbnail cache directory: {}", e);
-                for path in &paths {
+                for (path, generation) in &live_updates {
                     emit_thumbnail_cache_setup_error(&app_handle, path, &e);
-                }
-                for _ in 0..paths.len() {
-                    increment_thumbnail_progress(&state, &app_handle);
+                    finish(path, *generation);
                 }
                 return;
             }
@@ -3991,22 +4088,28 @@ pub async fn apply_adjustments_to_paths(
 
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
 
-        paths.par_iter().for_each(|path_str| {
-            let result = generate_single_thumbnail_and_cache(
-                path_str,
-                &thumb_cache_dir,
-                gpu_context.as_ref(),
-                None,
-                true,
-                &app_handle,
-                &settings,
-            );
-
-            if let Some((thumbnail_path, rating, is_edited)) = result {
+        live_updates.par_iter().for_each(|(path_str, generation)| {
+            if state
+                .thumbnail_manager
+                .is_latest_live_update(path_str, *generation)
+                && let Some((thumbnail_path, rating, is_edited)) =
+                    generate_single_thumbnail_and_cache(
+                        path_str,
+                        &thumb_cache_dir,
+                        gpu_context.as_ref(),
+                        None,
+                        true,
+                        &app_handle,
+                        &settings,
+                    )
+                && state
+                    .thumbnail_manager
+                    .is_latest_live_update(path_str, *generation)
+            {
                 emit_thumbnail_generated(&app_handle, path_str, &thumbnail_path, rating, is_edited);
             }
 
-            increment_thumbnail_progress(&state, &app_handle);
+            finish(path_str, *generation);
         });
     });
 

@@ -5,6 +5,36 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.16.1-dev-edit-multiple-images — 2026-10-27
+
+### Develop
+
+- **Auto Sync** now sits at the bottom of the Develop sidebar and is always
+  visible, whichever panel is open. It shows whether edits are being synced
+  and to how many images, and its settings button chooses which settings
+  sync. It is no longer in the bottom toolbar.
+
+## 1.16.0-dev-edit-multiple-images — 2026-10-27
+
+### Develop
+
+- **Auto Sync** edits across several images, as in Lightroom Classic. Select
+  images in the filmstrip, turn on Auto Sync in the Develop bottom bar (or
+  press Command/Ctrl+Option/Alt+Shift+A), and every change you make is
+  applied to all selected images.
+- Only the control you change is synced. Adjusting one Color Mixer channel,
+  color-grading wheel, or curve channel no longer replaces that whole section
+  on the other images.
+- Choose which sections Auto Sync includes with the checkboxes in **Copy &
+  Paste Settings**, for example to leave crop or masks out.
+
+### Fixes
+
+- Fast edits with Auto Sync on, or pastes in quick succession, no longer lose
+  changes on the other images.
+- Pasting or syncing edits onto an unedited RAW keeps its automatic lens
+  profile.
+
 ## 1.15.2-develop — 2026-10-27
 
 ### Fixes
