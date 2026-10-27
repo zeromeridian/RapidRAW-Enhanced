@@ -41,7 +41,6 @@ interface LightroomImportModalProps {
   isOpen: boolean;
   targetPaths: string[];
   onClose: () => void;
-  onApplied: () => Promise<void>;
 }
 
 const displayValue = (value: unknown) => {
@@ -52,7 +51,21 @@ const displayValue = (value: unknown) => {
 
 const filename = (path: string) => path.split(/[\\/]/).pop() || path;
 
-export default function LightroomImportModal({ isOpen, targetPaths, onClose, onApplied }: LightroomImportModalProps) {
+const defaultValueAt = (target: string): unknown =>
+  target
+    .split('.')
+    .reduce<unknown>(
+      (value, key) => (value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined),
+      INITIAL_ADJUSTMENTS,
+    );
+
+// A change replaces an existing edit when the image's current value is set and differs from the default.
+const replacesEdit = (change: LightroomAdjustmentChange) =>
+  change.previous !== null &&
+  change.previous !== undefined &&
+  JSON.stringify(change.previous) !== JSON.stringify(defaultValueAt(change.target));
+
+export default function LightroomImportModal({ isOpen, targetPaths, onClose }: LightroomImportModalProps) {
   const { t } = useTranslation();
   const [previews, setPreviews] = useState<LightroomImportPreview[]>([]);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
@@ -94,6 +107,11 @@ export default function LightroomImportModal({ isOpen, targetPaths, onClose, onA
         (preview) => !preview.error && preview.xmpDigest && preview.sidecarDigest && preview.changes.length > 0,
       ),
     [previews],
+  );
+
+  const selectedReplacingCount = useMemo(
+    () => approvable.filter((preview) => selectedPaths.has(preview.path) && preview.changes.some(replacesEdit)).length,
+    [approvable, selectedPaths],
   );
 
   const togglePath = (path: string) => {
@@ -151,8 +169,11 @@ export default function LightroomImportModal({ isOpen, targetPaths, onClose, onA
       });
       result.appliedPaths.forEach((path) => globalImageCache.delete(path));
       await refreshOpenAdjustments(result.appliedPaths);
-      await invoke<number>(Invokes.RegenerateThumbnails, { paths: result.appliedPaths });
-      await onApplied();
+      // Thumbnails update the Library through `thumbnail-generated` events, so neither they nor a folder
+      // rescan (which reads every image's EXIF) need to hold the dialog open.
+      invoke<number>(Invokes.RegenerateThumbnails, { paths: result.appliedPaths }).catch((reason) =>
+        console.error('Failed to regenerate Lightroom-imported thumbnails:', reason),
+      );
       toast.success(t('modals.lightroomImport.applied', { count: result.applied }));
       onClose();
     } catch (reason) {
@@ -201,6 +222,7 @@ export default function LightroomImportModal({ isOpen, targetPaths, onClose, onA
                 Boolean(preview.xmpDigest) &&
                 Boolean(preview.sidecarDigest) &&
                 preview.changes.length > 0;
+              const replacedEditCount = preview.changes.filter(replacesEdit).length;
               return (
                 <section key={preview.path} className="mb-4 rounded-lg border border-border-color bg-bg-secondary p-4">
                   <div className="flex items-start gap-3">
@@ -242,6 +264,12 @@ export default function LightroomImportModal({ isOpen, targetPaths, onClose, onA
                             />
                             {t('modals.lightroomImport.reviewChanges', { count: preview.changes.length })}
                           </button>
+                          {replacedEditCount > 0 && (
+                            <div className="mt-2 flex items-start gap-2 text-sm text-amber-400">
+                              <AlertTriangle className="mt-0.5 shrink-0" size={16} />
+                              {t('modals.lightroomImport.replacesEdits', { count: replacedEditCount })}
+                            </div>
+                          )}
                           {isChangeReviewExpanded && (
                             <div
                               className="mt-2 overflow-hidden rounded border border-border-color"
@@ -256,9 +284,16 @@ export default function LightroomImportModal({ isOpen, targetPaths, onClose, onA
                                     <div className="truncate font-medium">{change.target}</div>
                                     <div className="truncate text-xs text-text-secondary">{change.source}</div>
                                   </div>
-                                  <div className="truncate text-text-secondary">
-                                    {displayValue(change.previous)} →{' '}
-                                    <span className="text-text-primary">{displayValue(change.proposed)}</span>
+                                  <div className="min-w-0 text-text-secondary">
+                                    <div className="truncate">
+                                      {displayValue(change.previous)} →{' '}
+                                      <span className="text-text-primary">{displayValue(change.proposed)}</span>
+                                    </div>
+                                    {replacesEdit(change) && (
+                                      <div className="truncate text-xs text-amber-400">
+                                        {t('modals.lightroomImport.replacesEdit')}
+                                      </div>
+                                    )}
                                   </div>
                                   <span
                                     className={`self-center rounded px-2 py-0.5 text-xs ${
@@ -292,6 +327,12 @@ export default function LightroomImportModal({ isOpen, targetPaths, onClose, onA
             <CheckCircle2 className="mt-0.5 shrink-0" size={16} />
             {t('modals.lightroomImport.safety')}
           </div>
+          {selectedReplacingCount > 0 && (
+            <div className="mb-4 flex items-start gap-2 rounded-md bg-amber-500/10 p-3 text-sm text-amber-300">
+              <AlertTriangle className="mt-0.5 shrink-0" size={16} />
+              {t('modals.lightroomImport.selectedReplaceEdits', { count: selectedReplacingCount })}
+            </div>
+          )}
           <div className="flex justify-end gap-3">
             <Button disabled={isApplying} onClick={onClose} variant="ghost">
               {t('modals.lightroomImport.cancel')}

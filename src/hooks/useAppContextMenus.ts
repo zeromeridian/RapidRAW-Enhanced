@@ -67,7 +67,7 @@ import {
 import { Status, ExportSettings } from '../components/ui/ExportImportProperties';
 import { Color, COLOR_LABELS, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import TaggingSubMenu from '../context/TaggingSubMenu';
-import { useEditorActions } from './useEditorActions';
+import { debouncedSave, useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import {
@@ -246,6 +246,14 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           icon: ClipboardPaste,
           onClick: () => handlePasteAdjustments(),
           disabled: copiedAdjustments === null,
+        },
+        {
+          label: t('contextMenus.thumbnail.previewLightroomEdits', { count: 1 }),
+          icon: FileSearch,
+          onClick: () => {
+            debouncedSave.flush();
+            setUI({ lightroomImportModalState: { isOpen: true, targetPaths: [selectedImage.path] } });
+          },
         },
         {
           label: t('contextMenus.editor.productivity'),
@@ -713,10 +721,10 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           disabled: finalSelection.length === 0,
           icon: FileSearch,
           label: t('contextMenus.thumbnail.previewLightroomEdits', { count: selectionCount }),
-          onClick: () =>
-            setUI({
-              lightroomImportModalState: { isOpen: true, targetPaths: finalSelection },
-            }),
+          onClick: () => {
+            debouncedSave.flush();
+            setUI({ lightroomImportModalState: { isOpen: true, targetPaths: finalSelection } });
+          },
         },
         {
           label: t('contextMenus.editor.productivity'),
