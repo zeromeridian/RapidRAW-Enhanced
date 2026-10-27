@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.15.2-develop — 2026-10-27
+
+### Fixes
+
+- Applying Lightroom edits now finishes right away. Previously the dialog
+  waited while the whole folder was reloaded, which could take minutes on
+  network drives and made Develop unresponsive in the meantime.
+
+## 1.15.1-develop — 2026-10-27
+
+### Lightroom Import
+
+- **Preview Lightroom Edits** is now also available when you right-click the
+  image in Develop.
+- The review now warns when Lightroom settings would replace edits you have
+  already made in ThisIsRAW. Each affected change is marked, and a summary
+  shows how many approved images would lose existing edits.
+
 ## 1.15.0-feature-auto-lens-profile — 2026-10-27
 
 ### Lens Correction

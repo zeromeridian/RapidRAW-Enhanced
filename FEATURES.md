@@ -93,7 +93,10 @@ details are in `RELEASE_NOTES.MD`.
   leaves `.tirdata` and Lightroom XMP untouched until explicit approval, then
   merges only approved supported fields while preserving ThisIsRAW-only edits.
   Successfully changed images regenerate their grid thumbnails from the new
-  adjustments without reloading or blocking the complete Library.
+  adjustments without reloading or blocking the complete Library. Available
+  from the Library and Develop thumbnail menus and the Develop image menu; the
+  review warns, per image, per change, and for the approved selection, when a
+  change would replace an existing ThisIsRAW edit.
 - Bulk preset application for selected images or multiple selected folders,
   with direct-folder and recursive scopes, search, progress, cancellation, and
   background continuation.

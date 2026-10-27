@@ -148,7 +148,6 @@ export default function AppModals(props: AppModalsProps) {
         isOpen={lightroomImportModalState.isOpen}
         targetPaths={lightroomImportModalState.targetPaths}
         onClose={() => setUI({ lightroomImportModalState: { isOpen: false, targetPaths: [] } })}
-        onApplied={props.refreshImageList}
       />
       <PresetBatchModal
         isOpen={presetBatchModalState.isOpen}
