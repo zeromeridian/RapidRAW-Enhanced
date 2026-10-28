@@ -78,6 +78,8 @@ export enum DetailsAdjustment {
 
 export enum Effect {
   GaussianBlurAmount = 'gaussianBlurAmount',
+  MotionBlurAmount = 'motionBlurAmount',
+  MotionBlurAngle = 'motionBlurAngle',
   GrainAmount = 'grainAmount',
   GrainRoughness = 'grainRoughness',
   GrainSize = 'grainSize',
@@ -311,6 +313,8 @@ export interface Adjustments {
   lutSize?: number;
   masks: Array<MaskContainer>;
   monochrome: boolean;
+  motionBlurAmount: number;
+  motionBlurAngle: number;
   orientationSteps: number;
   relightAmbient: number;
   relightEnabled: boolean;
@@ -448,6 +452,8 @@ export interface MaskAdjustments {
   id?: string;
   lumaNoiseReduction: number;
   monochrome: boolean;
+  motionBlurAmount: number;
+  motionBlurAngle: number;
   saturation: number;
   sectionVisibility: SectionVisibility;
   shadows: number;
@@ -618,6 +624,8 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   hue: 0,
   lumaNoiseReduction: 0,
   monochrome: false,
+  motionBlurAmount: 0,
+  motionBlurAngle: 0,
   saturation: 0,
   sectionVisibility: {
     basic: true,
@@ -730,6 +738,8 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   lutSize: 0,
   masks: [],
   monochrome: false,
+  motionBlurAmount: 0,
+  motionBlurAngle: 0,
   orientationSteps: 0,
   relightAmbient: 0,
   relightEnabled: false,
@@ -1023,6 +1033,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
       label: 'modals.copyPaste.groups.halationGlow',
       keys: [CreativeAdjustment.GlowAmount, CreativeAdjustment.HalationAmount, CreativeAdjustment.FlareAmount],
     },
+    { label: 'modals.copyPaste.groups.motionBlur', keys: [Effect.MotionBlurAmount, Effect.MotionBlurAngle] },
     {
       label: 'modals.copyPaste.groups.lut',
       keys: [Effect.LutIntensity, Effect.LutName, Effect.LutPath, Effect.LutSize, Effect.LutData],
@@ -1156,6 +1167,8 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     CreativeAdjustment.GlowAmount,
     CreativeAdjustment.HalationAmount,
     CreativeAdjustment.FlareAmount,
+    Effect.MotionBlurAmount,
+    Effect.MotionBlurAngle,
     Effect.GrainAmount,
     Effect.GrainRoughness,
     Effect.GrainSize,

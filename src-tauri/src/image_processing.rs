@@ -1636,6 +1636,11 @@ pub struct GlobalAdjustments {
     pub halation_amount: f32,
     pub flare_amount: f32,
     pub sharpness_threshold: f32,
+
+    pub motion_blur_amount: f32,
+    pub motion_blur_angle: f32,
+    _pad_motion1: f32,
+    _pad_motion2: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
@@ -1676,10 +1681,10 @@ pub struct MaskAdjustments {
     pub grain_size: f32,
     pub grain_roughness: f32,
     pub gaussian_blur_amount: f32,
+    pub motion_blur_amount: f32,
+    pub motion_blur_angle: f32,
 
     pub hue: f32,
-    _pad_cg1: f32,
-    _pad_cg2: f32,
     pub color_grading_shadows: ColorGradeSettings,
     pub color_grading_midtones: ColorGradeSettings,
     pub color_grading_highlights: ColorGradeSettings,
@@ -1766,6 +1771,7 @@ struct AdjustmentScales {
     glow: f32,
     halation: f32,
     flares: f32,
+    motion_blur: f32,
 }
 
 const SCALES: AdjustmentScales = AdjustmentScales {
@@ -1815,7 +1821,18 @@ const SCALES: AdjustmentScales = AdjustmentScales {
     glow: 100.0,
     halation: 100.0,
     flares: 100.0,
+    motion_blur: 100.0,
 };
+
+/// The blur direction only matters while the blur has a length, so an angle
+/// without an amount stays neutral and does not mark the image as edited.
+fn motion_blur_angle_radians(amount: f32, angle_degrees: f32) -> f32 {
+    if amount > 0.0 {
+        angle_degrees.to_radians()
+    } else {
+        0.0
+    }
+}
 
 fn parse_hsl_adjustments(js_hsl: &serde_json::Value) -> [HslColor; 8] {
     let mut hsl_array = [HslColor::default(); 8];
@@ -2288,6 +2305,7 @@ fn get_global_adjustments_from_json(
     };
 
     let tone_mapper = js_adjustments["toneMapper"].as_str().unwrap_or("basic");
+    let motion_blur_amount = get_val("effects", "motionBlurAmount", SCALES.motion_blur, None);
     let (pipe_to_rendering, rendering_to_pipe) = calculate_agx_matrices();
 
     let (has_lut, lut_intensity) = if is_visible("effects") {
@@ -2475,6 +2493,14 @@ fn get_global_adjustments_from_json(
             SCALES.sharpness_threshold,
             Some(15.0),
         ),
+
+        motion_blur_amount,
+        motion_blur_angle: motion_blur_angle_radians(
+            motion_blur_amount,
+            get_val("effects", "motionBlurAngle", 1.0, None),
+        ),
+        _pad_motion1: 0.0,
+        _pad_motion2: 0.0,
     }
 }
 
@@ -2521,6 +2547,7 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         Vec::new()
     };
     let cg_obj = adj.get("colorGrading").cloned().unwrap_or_default();
+    let motion_blur_amount = get_val("effects", "motionBlurAmount", SCALES.motion_blur);
 
     MaskAdjustments {
         exposure: get_val("basic", "exposure", SCALES.exposure),
@@ -2569,10 +2596,13 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         grain_roughness: adj["grainRoughness"].as_f64().unwrap_or(50.0) as f32
             / SCALES.grain_roughness,
         gaussian_blur_amount: get_val("effects", "gaussianBlurAmount", 100.0),
+        motion_blur_amount,
+        motion_blur_angle: motion_blur_angle_radians(
+            motion_blur_amount,
+            get_val("effects", "motionBlurAngle", 1.0),
+        ),
 
         hue: get_val("color", "hue", 1.0),
-        _pad_cg1: 0.0,
-        _pad_cg2: 0.0,
         color_grading_shadows: if is_visible("color") {
             parse_color_grade_settings(&cg_obj["shadows"])
         } else {
@@ -3649,8 +3679,9 @@ pub fn calculate_auto_adjustments(
 #[cfg(test)]
 mod tests {
     use super::{
-        GeometryParams, MaskAdjustments, build_transform_matrix, compute_transform_constrain_scale,
-        get_global_adjustments_from_json, get_mask_adjustments_from_json, transform_covers_output,
+        AllAdjustments, GeometryParams, GlobalAdjustments, MaskAdjustments, build_transform_matrix,
+        compute_transform_constrain_scale, get_global_adjustments_from_json,
+        get_mask_adjustments_from_json, transform_covers_output,
     };
     use serde_json::json;
     use std::mem::size_of;
@@ -3717,7 +3748,9 @@ mod tests {
             "grainAmount": 80,
             "grainSize": 25,
             "grainRoughness": 50,
-            "gaussianBlurAmount": 65
+            "gaussianBlurAmount": 65,
+            "motionBlurAmount": 40,
+            "motionBlurAngle": 90
         }));
 
         assert_eq!(adjustments.monochrome, 1);
@@ -3733,6 +3766,8 @@ mod tests {
         assert!((adjustments.grain_size - 0.5).abs() < f32::EPSILON);
         assert!((adjustments.grain_roughness - 0.5).abs() < f32::EPSILON);
         assert!((adjustments.gaussian_blur_amount - 0.65).abs() < f32::EPSILON);
+        assert!((adjustments.motion_blur_amount - 0.4).abs() < f32::EPSILON);
+        assert!((adjustments.motion_blur_angle - std::f32::consts::FRAC_PI_2).abs() < 1e-6);
         assert_eq!(size_of::<MaskAdjustments>() % 16, 0);
     }
 
@@ -3745,6 +3780,8 @@ mod tests {
             "vignetteAmount": -100,
             "grainAmount": 100,
             "gaussianBlurAmount": 100,
+            "motionBlurAmount": 100,
+            "motionBlurAngle": 45,
             "sectionVisibility": {
                 "color": false,
                 "effects": false
@@ -3757,6 +3794,8 @@ mod tests {
         assert_eq!(adjustments.vignette_amount, 0.0);
         assert_eq!(adjustments.grain_amount, 0.0);
         assert_eq!(adjustments.gaussian_blur_amount, 0.0);
+        assert_eq!(adjustments.motion_blur_amount, 0.0);
+        assert_eq!(adjustments.motion_blur_angle, 0.0);
     }
 
     #[test]
@@ -3771,5 +3810,32 @@ mod tests {
         validator
             .validate(&module)
             .expect("image-processing WGSL should validate");
+    }
+
+    #[test]
+    fn shader_adjustment_structs_match_rust_layout() {
+        let module = wgpu::naga::front::wgsl::parse_str(include_str!("shaders/shader.wgsl"))
+            .expect("image-processing WGSL should parse");
+        let shader_size = |name: &str| {
+            module
+                .types
+                .iter()
+                .find_map(|(_, ty)| match (&ty.name, &ty.inner) {
+                    (Some(ty_name), wgpu::naga::TypeInner::Struct { span, .. })
+                        if ty_name == name =>
+                    {
+                        Some(*span as usize)
+                    }
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("shader struct {name} should exist"))
+        };
+
+        assert_eq!(
+            shader_size("GlobalAdjustments"),
+            size_of::<GlobalAdjustments>()
+        );
+        assert_eq!(shader_size("MaskAdjustments"), size_of::<MaskAdjustments>());
+        assert_eq!(shader_size("AllAdjustments"), size_of::<AllAdjustments>());
     }
 }

@@ -139,6 +139,8 @@ pub fn all_available_adjustments() -> HashSet<String> {
         "glowAmount",
         "halationAmount",
         "flareAmount",
+        "motionBlurAmount",
+        "motionBlurAngle",
         "crop",
         "aspectRatio",
         "rotation",

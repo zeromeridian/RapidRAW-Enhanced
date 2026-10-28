@@ -115,6 +115,11 @@ struct GlobalAdjustments {
     halation_amount: f32,
     flare_amount: f32,
     sharpness_threshold: f32,
+
+    motion_blur_amount: f32,
+    motion_blur_angle: f32,
+    _pad_motion1: f32,
+    _pad_motion2: f32,
 }
 
 struct MaskAdjustments {
@@ -153,10 +158,10 @@ struct MaskAdjustments {
     grain_size: f32,
     grain_roughness: f32,
     gaussian_blur_amount: f32,
+    motion_blur_amount: f32,
+    motion_blur_angle: f32,
 
     hue: f32,
-    _pad_cg1: f32,
-    _pad_cg2: f32,
     color_grading_shadows: ColorGradeSettings,
     color_grading_midtones: ColorGradeSettings,
     color_grading_highlights: ColorGradeSettings,
@@ -223,7 +228,7 @@ const HSL_RANGES: array<HslRange, 8> = array<HslRange, 8>(
 @group(0) @binding(9) var structure_blur_texture: texture_2d<f32>;
 
 @group(0) @binding(10) var flare_texture: texture_2d<f32>;
-@group(0) @binding(11) var flare_sampler: sampler;
+@group(0) @binding(11) var linear_sampler: sampler;
 
 override HIGH_PRECISION_OUTPUT: u32 = 0u;
 
@@ -949,6 +954,39 @@ fn apply_centre_tonal_and_color(
     processed_color = apply_creative_color(processed_color, total_saturation_effect, vibrance_center_boost);
 
     return processed_color;
+}
+
+// Motion blur length at full amount, in pixels of a 1080-pixel short edge.
+const MOTION_BLUR_MAX_LENGTH: f32 = 120.0;
+const MOTION_BLUR_MAX_TAPS: u32 = 128u;
+
+// Averages the source in linear light along a line centred on the pixel, like
+// a straight camera or subject movement. The angle is counter-clockwise from
+// horizontal in the displayed image.
+fn sample_motion_blur(
+    coords: vec2<u32>,
+    amount: f32,
+    angle: f32,
+    scale: f32,
+    is_raw: u32
+) -> vec3<f32> {
+    let full_dims = vec2<f32>(textureDimensions(input_texture));
+    let blur_length = amount * MOTION_BLUR_MAX_LENGTH * scale;
+    let taps = clamp(u32(ceil(blur_length)) + 1u, 2u, MOTION_BLUR_MAX_TAPS);
+    let step = vec2<f32>(cos(angle), -sin(angle)) * (blur_length / f32(taps - 1u));
+    let start = vec2<f32>(coords) + 0.5 - step * (f32(taps - 1u) * 0.5);
+
+    var total = vec3<f32>(0.0);
+    for (var i = 0u; i < taps; i = i + 1u) {
+        let uv = (start + step * f32(i)) / full_dims;
+        let sample_color = textureSampleLevel(input_texture, linear_sampler, uv, 0.0).rgb;
+        if (is_raw == 0u) {
+            total += srgb_to_linear(sample_color);
+        } else {
+            total += sample_color;
+        }
+    }
+    return total / f32(taps);
 }
 
 fn apply_vignette_effect(
@@ -1713,8 +1751,24 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let clarity_blurred = textureLoad(clarity_blur_texture, id.xy, 0).rgb;
     let structure_blurred = textureLoad(structure_blur_texture, id.xy, 0).rgb;
 
+    let motion_blur_amount = adjustments.global.motion_blur_amount;
+    if (motion_blur_amount > 0.0) {
+        initial_linear_rgb = sample_motion_blur(
+            absolute_coord, motion_blur_amount, adjustments.global.motion_blur_angle, scale, is_raw
+        );
+    }
+
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
+        let mask_motion_blur_amount = adjustments.mask_adjustments[i].motion_blur_amount;
+        if (mask_motion_blur_amount > 0.0 && influence > 0.001) {
+            let motion_blurred = sample_motion_blur(
+                absolute_coord, mask_motion_blur_amount,
+                adjustments.mask_adjustments[i].motion_blur_angle, scale, is_raw
+            );
+            initial_linear_rgb = mix(initial_linear_rgb, motion_blurred, clamp(influence, 0.0, 1.0));
+        }
+
         let blur_amount = adjustments.mask_adjustments[i].gaussian_blur_amount * influence;
         if (blur_amount > 0.001) {
             let blurred_linear = select(
@@ -1769,7 +1823,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     if (t_flare > 0.0) {
         let uv = vec2<f32>(absolute_coord) / full_dims;
-        var flare_color = textureSampleLevel(flare_texture, flare_sampler, uv, 0.0).rgb;
+        var flare_color = textureSampleLevel(flare_texture, linear_sampler, uv, 0.0).rgb;
         flare_color *= 1.4;
         flare_color = flare_color * flare_color;
         let linear_luma = get_luma(max(processed_rgb, vec3<f32>(0.0)));

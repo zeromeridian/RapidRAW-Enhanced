@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import Slider, { SliderChangeEvent } from '../ui/Slider';
+import AngleDial from '../ui/AngleDial';
 import Switch from '../ui/Switch';
 import {
   Adjustments,
@@ -810,6 +811,44 @@ export default function EffectsPanel({
           />
         </div>
       )}
+
+      <div className="p-2 bg-bg-tertiary rounded-md">
+        <Text variant={TextVariants.heading} className="mb-2">
+          {t('adjustments.effects.motionBlur')}
+        </Text>
+        <Slider
+          label={t('adjustments.effects.amount')}
+          max={100}
+          min={0}
+          defaultValue={0}
+          onChange={(e: SliderChangeEvent) => handleAdjustmentChange(Effect.MotionBlurAmount, e.target.value)}
+          step={1}
+          value={adjustments.motionBlurAmount ?? 0}
+          onDragStateChange={onDragStateChange}
+          fillOrigin="min"
+        />
+        <div className="flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <Slider
+              label={t('adjustments.effects.motionBlurAngle')}
+              max={90}
+              min={-90}
+              defaultValue={0}
+              onChange={(e: SliderChangeEvent) => handleAdjustmentChange(Effect.MotionBlurAngle, e.target.value)}
+              step={1}
+              suffix="°"
+              value={adjustments.motionBlurAngle ?? 0}
+              onDragStateChange={onDragStateChange}
+            />
+          </div>
+          <AngleDial
+            label={t('adjustments.effects.motionBlurDirection')}
+            onChange={(angle: number) => handleAdjustmentChange(Effect.MotionBlurAngle, angle)}
+            onDragStateChange={onDragStateChange}
+            value={adjustments.motionBlurAngle ?? 0}
+          />
+        </div>
+      </div>
 
       {adjustmentVisibility.vignette !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">

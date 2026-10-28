@@ -193,9 +193,12 @@ details are in `RELEASE_NOTES.MD`.
   whatever a typed description names, such as "water" or "boat". Each mask
   type downloads its model on first use, and existing masks keep their stored
   result.
+- **Motion Blur** in Effects blurs the photo along a straight line. Amount
+  sets the blur length relative to the image size; the direction is set with
+  a compass dial (Shift snaps to 15°) or a typed angle from −90° to 90°.
 - Local masks support Black & White conversion, Color Calibration, Light
-  Flares, Gaussian Blur, Vignette, and Grain in addition to the existing tonal,
-  color, detail, curve, glow, and halation adjustments.
+  Flares, Gaussian Blur, Motion Blur, Vignette, and Grain in addition to the
+  existing tonal, color, detail, curve, glow, and halation adjustments.
 - Mask overlays can be hidden without disabling the selected mask through a
   dedicated Masking-panel control or configurable `O` shortcut.
 - Brush and Flow masks preview their adjustments live while painting, with
