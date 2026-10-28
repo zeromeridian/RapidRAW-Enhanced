@@ -229,6 +229,8 @@ const EditorToolbar = memo(
           flareAmount: 'Flare Amount',
           glowAmount: 'Glow Amount',
           halationAmount: 'Halation Amount',
+          motionBlurAmount: 'Motion Blur Amount',
+          motionBlurAngle: 'Motion Blur Angle',
           grainAmount: 'Grain Amount',
           grainRoughness: 'Grain Roughness',
           grainSize: 'Grain Size',

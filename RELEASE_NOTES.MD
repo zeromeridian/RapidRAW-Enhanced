@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.17.0-dev-motion-blur — 2026-10-28
+
+### Effects
+
+- New **Motion Blur** effect that blurs the photo along a straight line, as
+  if the camera or subject moved. **Amount** sets the length of the blur.
+- Set the direction with the compass dial (hold Shift to snap to 15° steps,
+  double-click to reset), or type the **Angle** from −90° to 90°.
+- Motion Blur is also available in masks, so you can blur only part of the
+  photo, such as a moving car or the background behind it.
+- Motion Blur settings are included in presets, copy & paste, Auto Sync,
+  and XMP.
+
 ## 1.16.1-dev-edit-multiple-images — 2026-10-27
 
 ### Develop
