@@ -3306,7 +3306,7 @@ const ImageCanvas = memo(
                       />
                       <button
                         aria-label="Rotate crop"
-                        className="absolute left-1/2 -top-9 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border border-white/80 bg-black/65 text-white shadow-md transition-colors hover:bg-black/85"
+                        className="absolute left-1/2 top-4 flex h-9 w-9 -translate-x-1/2 cursor-grab items-center justify-center rounded-full border-2 border-white bg-black/70 text-white shadow-lg ring-1 ring-black/40 transition-colors hover:bg-black/90 active:cursor-grabbing"
                         onPointerCancel={handleRotationHandlePointerEnd}
                         onPointerDown={handleRotationHandlePointerDown}
                         onPointerMove={handleRotationHandlePointerMove}
@@ -3314,7 +3314,7 @@ const ImageCanvas = memo(
                         title="Drag to rotate"
                         type="button"
                       >
-                        <RotateCw size={15} />
+                        <RotateCw size={18} />
                       </button>
                     </>
                   );
