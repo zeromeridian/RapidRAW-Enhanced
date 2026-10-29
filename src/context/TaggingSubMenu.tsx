@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { X, Plus } from 'lucide-react';
+import { Loader2, Plus, Sparkles, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { Invokes } from '../components/ui/AppProperties';
+import { useAiKeywordSuggestions } from '../hooks/useAiKeywordSuggestions';
 import Text from '../components/ui/Text';
 import { TextVariants } from '../types/typography';
 import { USER_TAG_PREFIX, formatKeyword, getActiveKeywordSet, parseKeywordInput } from '../utils/keywords';
@@ -41,8 +42,9 @@ export default function TaggingSubMenu({
     inputRef.current?.focus();
   }, []);
 
-  const handleAddTag = async (tagToAdd: string) => {
-    const newTagValue = parseKeywordInput(tagToAdd);
+  const handleAddTag = (input: string) => addKeyword(parseKeywordInput(input));
+
+  const addKeyword = async (newTagValue: string) => {
     if (newTagValue && !tags.some((t) => t.tag === newTagValue)) {
       try {
         const prefixedTag = `${USER_TAG_PREFIX}${newTagValue}`;
@@ -81,6 +83,7 @@ export default function TaggingSubMenu({
 
   const keywordSet = getActiveKeywordSet(appSettings);
   const shortcuts = keywordSet?.keywords.filter(Boolean) ?? [];
+  const ai = useAiKeywordSuggestions(paths[0] ?? null);
 
   return (
     <div
@@ -154,7 +157,7 @@ export default function TaggingSubMenu({
             {shortcuts.map((shortcut: string) => (
               <button
                 key={shortcut}
-                onClick={() => handleAddTag(shortcut)}
+                onClick={() => addKeyword(shortcut)}
                 className="bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary text-xs font-medium px-2 py-1 rounded-sm"
               >
                 {formatKeyword(shortcut)}
@@ -163,6 +166,37 @@ export default function TaggingSubMenu({
           </div>
         </div>
       )}
+
+      <div className="mt-2">
+        <button
+          className="flex items-center gap-1 text-xs font-medium text-text-secondary hover:text-text-primary px-1 py-1 disabled:opacity-40"
+          disabled={paths.length === 0 || ai.isLoading}
+          onClick={() => void ai.requestSuggestions()}
+          type="button"
+        >
+          {ai.isLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+          {t('editor.tagging.suggestWithAi')}
+        </button>
+        {ai.suggestions && (
+          <div className="flex flex-wrap gap-1">
+            {ai.suggestions.length > 0 ? (
+              ai.suggestions.map((keyword) => (
+                <button
+                  key={keyword}
+                  onClick={() => addKeyword(keyword)}
+                  className="bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary text-xs font-medium px-2 py-1 rounded-sm"
+                >
+                  {formatKeyword(keyword)}
+                </button>
+              ))
+            ) : (
+              <Text variant={TextVariants.small} className="italic px-1">
+                {t('editor.tagging.noAiSuggestions')}
+              </Text>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

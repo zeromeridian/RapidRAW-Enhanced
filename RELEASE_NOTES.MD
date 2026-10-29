@@ -5,6 +5,31 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.20.1-dev-advanced-tags — 2026-10-29
+
+### Keywords
+
+- Keyword suggestions now depend on the photo: they come from photos taken
+  around the same time and from keywords used together with the ones the
+  photo already has. Keywords you added elsewhere no longer stay suggested
+  on every photo.
+- **AI Suggestions** is now its own part of the Tagging panel, with a
+  **Suggest with AI** button and its results directly below it, separate
+  from the other suggestions.
+
+## 1.20.0-dev-advanced-tags — 2026-10-29
+
+### Keywords
+
+- New **Keyword Suggestions** in the Tagging panel, as in Lightroom Classic.
+  They come from keywords you added recently, keywords on photos taken
+  around the same time, and keywords used in the folder. Click a suggestion
+  to add it.
+- **Suggest with AI** looks at the photo and suggests keywords, preferring
+  your own keywords (with their hierarchy) when they match. It runs only
+  when you click it, in the Tagging panel or in the right-click tagging menu.
+  The first use downloads the AI model.
+
 ## 1.19.0-dev-advanced-tags — 2026-10-29
 
 ### Keywords

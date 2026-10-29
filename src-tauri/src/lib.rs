@@ -3449,6 +3449,7 @@ pub fn run() {
             tagging::clear_all_tags,
             tagging::add_tag_for_paths,
             tagging::remove_tag_for_paths,
+            tagging::suggest_ai_keywords,
             tagging::set_flag_for_paths,
             culling::cull_images,
             lens_correction::get_lensfun_makers,

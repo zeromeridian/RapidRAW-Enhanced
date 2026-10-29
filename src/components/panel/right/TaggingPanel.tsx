@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Invokes } from '../../ui/AppProperties';
 import KeywordSetSection from './KeywordSetSection';
+import KeywordSuggestionsSection from './KeywordSuggestionsSection';
 import Text from '../../ui/Text';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useLibraryStore } from '../../../store/useLibraryStore';
@@ -27,7 +28,11 @@ export default function TaggingPanel() {
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
   const imageList = useLibraryStore((state) => state.imageList);
   const setLibrary = useLibraryStore((state) => state.setLibrary);
-  const targetPaths = multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
+  const targetPaths = useMemo(
+    () => (multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : []),
+    [multiSelectedPaths, selectedImage],
+  );
+  const activePath = selectedImage?.path ?? targetPaths[0] ?? null;
   const targetSet = useMemo(() => new Set(targetPaths), [targetPaths]);
 
   const tags = useMemo(() => {
@@ -171,6 +176,8 @@ export default function TaggingPanel() {
                 {t('editor.tagging.hierarchyHint')}
               </Text>
             </div>
+
+            <KeywordSuggestionsSection activePath={activePath} targetPaths={targetPaths} />
 
             <KeywordSetSection targetPaths={targetPaths} />
           </div>
