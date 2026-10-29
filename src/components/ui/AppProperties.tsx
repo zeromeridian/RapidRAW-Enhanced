@@ -119,6 +119,7 @@ export enum Invokes {
   SyncImageStacksToXmp = 'sync_image_stacks_to_xmp',
   ShowInFinder = 'show_in_finder',
   StartBackgroundIndexing = 'start_background_indexing',
+  SuggestAiKeywords = 'suggest_ai_keywords',
   StitchPanorama = 'stitch_panorama',
   MergeHdr = 'merge_hdr',
   TestAIConnectorConnection = 'test_ai_connector_connection',

@@ -193,6 +193,10 @@ details are in `RELEASE_NOTES.MD`.
   Option/Alt+1…9 shortcuts (Option/Alt+0 cycles sets, Caps Lock
   auto-advances). The active set also feeds the tagging context menu and the
   Metadata panel.
+- Per-photo **Keyword Suggestions** from photos taken around the same time
+  and keywords used together with the photo's own, plus a separate
+  on-demand **AI Suggestions** part (CLIP) that prefers the user's own
+  keyword paths, in the Tagging panel and the tagging context menu.
 - Persisted **Black & White** switch in the global Color section.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.

@@ -7,15 +7,14 @@ import Dropdown from '../../ui/Dropdown';
 import Input from '../../ui/Input';
 import Text from '../../ui/Text';
 import ConfirmModal from '../../modals/ConfirmModal';
+import KeywordTile, { useAppliedKeywordCounts } from './KeywordTile';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
-import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
-import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { TextColors, TextVariants } from '../../../types/typography';
 import { KEYBIND_DEFINITIONS, formatKeyCode, getEffectiveCombo } from '../../../utils/keyboardUtils';
 import {
   KEYWORD_SET_SIZE,
   KeywordSet,
-  USER_TAG_PREFIX,
   formatKeyword,
   getActiveKeywordSet,
   getKeywordSets,
@@ -34,7 +33,6 @@ export default function KeywordSetSection({ targetPaths }: KeywordSetSectionProp
   const appSettings = useSettingsStore((state) => state.appSettings);
   const handleSettingsChange = useSettingsStore((state) => state.handleSettingsChange);
   const osPlatform = useSettingsStore((state) => state.osPlatform);
-  const imageList = useLibraryStore((state) => state.imageList);
   const { handleToggleKeyword } = useLibraryActions();
   const [draft, setDraft] = useState<KeywordSet | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -42,17 +40,7 @@ export default function KeywordSetSection({ targetPaths }: KeywordSetSectionProp
   const keywordSets = useMemo(() => getKeywordSets(appSettings), [appSettings]);
   const activeSet = useMemo(() => getActiveKeywordSet(appSettings), [appSettings]);
 
-  const appliedCounts = useMemo(() => {
-    const targets = new Set(targetPaths);
-    const counts = new Map<string, number>();
-    for (const image of imageList) {
-      if (!targets.has(image.path)) continue;
-      for (const tag of image.tags || []) {
-        if (tag.startsWith(USER_TAG_PREFIX)) counts.set(tag, (counts.get(tag) || 0) + 1);
-      }
-    }
-    return counts;
-  }, [imageList, targetPaths]);
+  const appliedCounts = useAppliedKeywordCounts(targetPaths);
 
   const shortcutLabels = useMemo(
     () =>
@@ -207,40 +195,16 @@ export default function KeywordSetSection({ targetPaths }: KeywordSetSectionProp
 
           {activeSet && (
             <div className="grid grid-cols-3 gap-1.5">
-              {activeSet.keywords.map((keyword, index) => {
-                const count = keyword ? appliedCounts.get(`${USER_TAG_PREFIX}${keyword}`) || 0 : 0;
-                const isApplied = targetPaths.length > 0 && count === targetPaths.length;
-                return (
-                  <button
-                    className={clsx(
-                      'relative h-12 rounded-md border px-2 pb-3 text-left transition-colors disabled:cursor-not-allowed',
-                      isApplied
-                        ? 'bg-accent/20 border-accent'
-                        : count > 0
-                          ? 'bg-surface/50 border-dashed border-text-tertiary/60 hover:border-text-tertiary'
-                          : 'bg-surface border-surface hover:border-text-tertiary/50',
-                      !keyword && 'opacity-40',
-                    )}
-                    data-tooltip={keyword ? formatKeyword(keyword) : undefined}
-                    disabled={!keyword || targetPaths.length === 0}
-                    key={index}
-                    onClick={() => handleToggleKeyword(keyword, targetPaths)}
-                    type="button"
-                  >
-                    <Text as="span" variant={TextVariants.small} weight={TextWeights.medium} className="block truncate">
-                      {keyword ? formatKeyword(keyword) : '—'}
-                    </Text>
-                    <Text
-                      as="span"
-                      variant={TextVariants.small}
-                      color={TextColors.secondary}
-                      className="absolute bottom-0.5 right-1.5 text-[10px]"
-                    >
-                      {shortcutLabels[index]}
-                    </Text>
-                  </button>
-                );
-              })}
+              {activeSet.keywords.map((keyword, index) => (
+                <KeywordTile
+                  appliedCounts={appliedCounts}
+                  key={index}
+                  keyword={keyword}
+                  label={shortcutLabels[index]}
+                  onToggle={(toggled) => handleToggleKeyword(toggled, targetPaths)}
+                  targetCount={targetPaths.length}
+                />
+              ))}
             </div>
           )}
         </div>

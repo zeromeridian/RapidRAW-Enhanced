@@ -17,7 +17,7 @@ use walkdir::WalkDir;
 use crate::file_management::{self, parse_virtual_path};
 use crate::formats::is_supported_image_file;
 use crate::hierarchy::TAG_HIERARCHY;
-use crate::image_processing::ImageMetadata;
+use crate::image_processing::{GpuContext, ImageMetadata};
 use crate::{AppState, candidates::TAG_CANDIDATES};
 
 pub const COLOR_TAG_PREFIX: &str = "color:";
@@ -259,24 +259,30 @@ pub fn extract_color_tags(image: &DynamicImage) -> Vec<String> {
     }
 }
 
-pub fn generate_tags_with_clip(
+/// CLIP probabilities below this are not treated as a match.
+const CLIP_CONFIDENCE_THRESHOLD: f32 = 0.005;
+
+/// The words AI tagging compares an image with: the custom AI tag list when the user set one,
+/// otherwise the built-in list.
+fn clip_candidates(custom_tags: Option<&[String]>) -> Vec<String> {
+    match custom_tags {
+        Some(tags) if !tags.is_empty() => tags.to_vec(),
+        _ => TAG_CANDIDATES.iter().map(|&s| s.to_string()).collect(),
+    }
+}
+
+/// Scores every candidate text against the image with CLIP and returns the candidates whose
+/// probability passes `CLIP_CONFIDENCE_THRESHOLD`, best first.
+fn score_clip_candidates(
     image: &DynamicImage,
     clip_session_mutex: &Mutex<Session>,
     tokenizer: &Tokenizer,
-    custom_tags: Option<Vec<String>>,
-    max_tags: usize,
-) -> Result<Vec<String>> {
+    text_inputs: &[String],
+) -> Result<Vec<(String, f32)>> {
     let image_input = preprocess_clip_image(image);
 
-    let is_custom = custom_tags.as_ref().map(|t| !t.is_empty()).unwrap_or(false);
-    let text_inputs: Vec<String> = if is_custom {
-        custom_tags.as_ref().unwrap().clone()
-    } else {
-        TAG_CANDIDATES.iter().map(|&s| s.to_string()).collect()
-    };
-
     let encodings = tokenizer
-        .encode_batch(text_inputs.clone(), true)
+        .encode_batch(text_inputs.to_vec(), true)
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     let max_len = encodings
@@ -328,17 +334,29 @@ pub fn generate_tags_with_clip(
     let logits = logits_dyn.into_dimensionality::<ndarray::Dim<[usize; 2]>>()?;
     let probs = softmax(&logits);
 
-    let confidence_threshold = 0.005;
     let mut scored_tags: Vec<(String, f32)> = Vec::new();
 
     let prob_row = probs.row(0);
     for (i, &prob) in prob_row.iter().enumerate() {
-        if prob > confidence_threshold {
+        if prob > CLIP_CONFIDENCE_THRESHOLD {
             scored_tags.push((text_inputs[i].clone(), prob));
         }
     }
 
-    scored_tags.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    scored_tags.sort_by(|a, b| b.1.total_cmp(&a.1));
+    Ok(scored_tags)
+}
+
+pub fn generate_tags_with_clip(
+    image: &DynamicImage,
+    clip_session_mutex: &Mutex<Session>,
+    tokenizer: &Tokenizer,
+    custom_tags: Option<Vec<String>>,
+    max_tags: usize,
+) -> Result<Vec<String>> {
+    let is_custom = custom_tags.as_ref().is_some_and(|tags| !tags.is_empty());
+    let text_inputs = clip_candidates(custom_tags.as_deref());
+    let scored_tags = score_clip_candidates(image, clip_session_mutex, tokenizer, &text_inputs)?;
     let initial_tags: Vec<String> = scored_tags
         .into_iter()
         .take(max_tags)
@@ -365,6 +383,103 @@ pub fn generate_tags_with_clip(
     let final_tags = final_tags_set.into_iter().collect();
 
     Ok(final_tags)
+}
+
+/// The image AI tagging analyses: the cached thumbnail, or a freshly rendered one. AI analysis
+/// must not populate the thumbnail cache; cache generation belongs to visible requests and
+/// explicit folder refreshes only.
+fn clip_analysis_image(
+    path: &str,
+    gpu_context: Option<&GpuContext>,
+    app_handle: &AppHandle,
+) -> Result<DynamicImage> {
+    file_management::get_cached_thumbnail_image(path, app_handle)
+        .map(Ok)
+        .unwrap_or_else(|| {
+            file_management::generate_thumbnail_data(path, gpu_context, None, app_handle)
+        })
+}
+
+/// Picks AI keyword suggestions from CLIP scores. A candidate that is the last level of one of
+/// the user's keyword paths is suggested as that path; scores may contain both.
+fn select_ai_keyword_suggestions(
+    scored: &[(String, f32)],
+    user_keywords: &[String],
+    limit: usize,
+) -> Vec<String> {
+    let mut paths_by_level: HashMap<String, &str> = HashMap::new();
+    for path in user_keywords {
+        if let Some(level) = path.rsplit(KEYWORD_PATH_SEPARATOR).next() {
+            paths_by_level
+                .entry(level.trim().to_lowercase())
+                .or_insert(path.as_str());
+        }
+    }
+
+    let mut suggestions = Vec::new();
+    for (candidate, _) in scored {
+        if suggestions.len() == limit {
+            break;
+        }
+        let keyword = paths_by_level
+            .get(&candidate.to_lowercase())
+            .map_or(candidate.as_str(), |path| path);
+        push_unique(&mut suggestions, keyword);
+    }
+    suggestions
+}
+
+/// Suggests keyword paths (without the `user:` prefix) for one image with CLIP. The image is
+/// compared with the usual AI tag candidates plus the last level of each of `user_keywords`,
+/// so the user's own keywords are suggested with their hierarchy.
+#[tauri::command]
+pub async fn suggest_ai_keywords(
+    path: String,
+    user_keywords: Vec<String>,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Vec<String>, String> {
+    const SUGGESTION_COUNT: usize = 9;
+
+    let settings = crate::load_settings(app_handle.clone())?;
+    let clip_models = crate::ai_processing::get_or_init_clip_models(
+        &app_handle,
+        &state.ai_state,
+        &state.ai_init_lock,
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+    let gpu_context = crate::gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
+
+    tokio::task::spawn_blocking(move || {
+        let image = clip_analysis_image(&path, gpu_context.as_ref(), &app_handle)
+            .map_err(|error| error.to_string())?;
+        let mut candidates = clip_candidates(settings.custom_ai_tags.as_deref());
+        for path in &user_keywords {
+            let level = path
+                .rsplit(KEYWORD_PATH_SEPARATOR)
+                .next()
+                .unwrap_or_default();
+            let level = level.trim().to_lowercase();
+            if !level.is_empty() {
+                push_unique(&mut candidates, &level);
+            }
+        }
+        let scored = score_clip_candidates(
+            &image,
+            &clip_models.model,
+            &clip_models.tokenizer,
+            &candidates,
+        )
+        .map_err(|error| error.to_string())?;
+        Ok(select_ai_keyword_suggestions(
+            &scored,
+            &user_keywords,
+            SUGGESTION_COUNT,
+        ))
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -533,22 +648,11 @@ pub async fn start_background_indexing(
                     };
 
                     if should_generate_tags {
-                        // AI analysis must not populate the thumbnail cache.
-                        // Cache generation belongs to visible requests and
-                        // explicit folder refreshes only.
-                        let analysis_image = file_management::get_cached_thumbnail_image(
+                        let analysis_image = clip_analysis_image(
                             &path_str,
+                            gpu_context_inner.as_ref(),
                             &app_handle_inner,
-                        )
-                        .map(Ok)
-                        .unwrap_or_else(|| {
-                            file_management::generate_thumbnail_data(
-                                &path_str,
-                                gpu_context_inner.as_ref(),
-                                None,
-                                &app_handle_inner,
-                            )
-                        });
+                        );
                         match analysis_image {
                             Ok(image) => {
                                 if let Ok(ai_tags) = generate_tags_with_clip(
@@ -813,6 +917,20 @@ mod keyword_tests {
         assert_eq!(
             tags,
             strings(&["sky", "tree", "color:red", "user:Germany|Berlin"])
+        );
+    }
+
+    #[test]
+    fn ai_suggestions_use_the_users_keyword_paths() {
+        let scored: Vec<(String, f32)> =
+            [("berlin", 0.4), ("sky", 0.3), ("dog", 0.2), ("cat", 0.1)]
+                .iter()
+                .map(|(candidate, score)| (candidate.to_string(), *score))
+                .collect();
+        let user_keywords = strings(&["places|germany|Berlin", "animals|dog"]);
+        assert_eq!(
+            select_ai_keyword_suggestions(&scored, &user_keywords, 3),
+            strings(&["places|germany|Berlin", "sky", "animals|dog"])
         );
     }
 
