@@ -238,6 +238,10 @@ fn get_luma(c: vec3<f32>) -> f32 {
     return dot(c, LUMA_COEFF);
 }
 
+fn monochrome_srgb(c: vec3<f32>) -> vec3<f32> {
+    return linear_to_srgb(vec3<f32>(get_luma(srgb_to_linear(max(c, vec3<f32>(0.0))))));
+}
+
 fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
     let cutoff = vec3<f32>(0.04045);
     let a = vec3<f32>(0.055);
@@ -1945,15 +1949,12 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 
     if (adjustments.global.monochrome == 1u) {
-        let monochrome_luma = get_luma(srgb_to_linear(max(final_rgb, vec3<f32>(0.0))));
-        final_rgb = linear_to_srgb(vec3<f32>(monochrome_luma));
+        final_rgb = monochrome_srgb(final_rgb);
     }
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001 && adjustments.mask_adjustments[i].monochrome == 1u) {
-            let monochrome_luma = get_luma(srgb_to_linear(max(final_rgb, vec3<f32>(0.0))));
-            let monochrome_rgb = linear_to_srgb(vec3<f32>(monochrome_luma));
-            final_rgb = mix(final_rgb, monochrome_rgb, influence);
+            final_rgb = mix(final_rgb, monochrome_srgb(final_rgb), influence);
         }
     }
 
@@ -1982,12 +1983,18 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     // Normal retains the established local-adjustment rendering. Other modes
     // composite that adjusted result against the input in mask-list order.
+    // A Black & White image blends against a monochrome input so the
+    // backdrop cannot reintroduce color.
+    var backdrop_rgb = blend_backdrop_rgb;
+    if (adjustments.global.monochrome == 1u) {
+        backdrop_rgb = monochrome_srgb(backdrop_rgb);
+    }
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
         let mode = adjustments.mask_adjustments[i].blend_mode;
         if (mode != 0u) {
             let influence = get_mask_influence(i, absolute_coord);
             if (influence > 0.001) {
-                let blended = blend_colors(blend_backdrop_rgb, final_rgb, mode);
+                let blended = blend_colors(backdrop_rgb, final_rgb, mode);
                 final_rgb = mix(final_rgb, blended, influence);
             }
         }
