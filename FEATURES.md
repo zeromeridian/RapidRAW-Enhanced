@@ -185,7 +185,7 @@ details are in `RELEASE_NOTES.MD`.
   **Others** submenu.
 - A dedicated **Tagging** module adds and removes tags across the current image
   or multi-image selection, with common and mixed tags clearly distinguished.
-- Persisted Color / Black & White mode in the global Color section.
+- Persisted **Black & White** switch in the global Color section.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.
 - AI sky masks use EfficientSAM3 and AI foreground masks use BiRefNet, as in

@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.17.2-fix-tweaks — 2026-10-29
+
+### Fixes
+
+- Black & White photos stay black and white when a mask uses a blend mode
+  other than Normal. Previously the masked area could turn back to color.
+- The Color panel switch is now always labelled **Black & White**; turning it
+  on or off switches black and white on or off.
+
 ## 1.17.1-fix-tweaks — 2026-10-29
 
 ### Fixes

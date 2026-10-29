@@ -478,7 +478,7 @@ export default function ColorPanel({
       <div className="p-2 bg-bg-tertiary rounded-md">
         <Switch
           checked={!!adjustments.monochrome}
-          label={adjustments.monochrome ? t('adjustments.color.blackAndWhite') : t('adjustments.color.colorModeColor')}
+          label={t('adjustments.color.blackAndWhite')}
           onChange={handleMonochromeChange}
           tooltip={t('adjustments.color.monochromeDesc')}
         />
