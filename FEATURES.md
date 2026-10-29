@@ -147,7 +147,7 @@ details are in `RELEASE_NOTES.MD`.
   capture details); clicking it hides or shows the capture details, and the
   choice persists. Its fine rotation can
   be adjusted either precisely with the existing slider or directly by dragging
-  the rotation handle above the crop frame.
+  the rotation handle inside the top of the crop frame.
 - Dedicated **Crop** and **Geometry** modules separate composition from
   perspective work. Geometry includes full **Auto** correction that jointly
   balances rotation and both perspective axes (and remains useful for a

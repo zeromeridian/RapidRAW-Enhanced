@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.17.1-fix-tweaks — 2026-10-29
+
+### Fixes
+
+- The crop rotation handle now sits inside the top of the crop frame instead
+  of above it, so it is always visible and easy to grab, even when the photo
+  fills the window. It is also larger and stands out on both bright and dark
+  photos.
+
 ## 1.17.0-dev-motion-blur — 2026-10-28
 
 ### Effects
