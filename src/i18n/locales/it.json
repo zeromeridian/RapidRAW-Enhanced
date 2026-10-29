@@ -1218,8 +1218,7 @@
       "addTagTooltip": "Aggiungi tag",
       "noTags": "Nessun tag aggiunto",
       "placeholder": "Aggiungi un tag...",
-      "removeTooltip": "Rimuovi tag \"{{tag}}\"",
-      "shortcutsHeading": "SCORCIATOIE"
+      "removeTooltip": "Rimuovi tag \"{{tag}}\""
     }
   },
   "modals": {
@@ -1773,14 +1772,25 @@
         "zoom_in_step": "Ingrandisci (a step)",
         "zoom_out": "Riduci",
         "zoom_out_step": "Riduci (a step)",
-        "toggle_auto_sync": "Toggle Auto Sync"
+        "toggle_auto_sync": "Toggle Auto Sync",
+        "apply_keyword_1": "Toggle keyword 1 of the keyword set",
+        "apply_keyword_2": "Toggle keyword 2 of the keyword set",
+        "apply_keyword_3": "Toggle keyword 3 of the keyword set",
+        "apply_keyword_4": "Toggle keyword 4 of the keyword set",
+        "apply_keyword_5": "Toggle keyword 5 of the keyword set",
+        "apply_keyword_6": "Toggle keyword 6 of the keyword set",
+        "apply_keyword_7": "Toggle keyword 7 of the keyword set",
+        "apply_keyword_8": "Toggle keyword 8 of the keyword set",
+        "apply_keyword_9": "Toggle keyword 9 of the keyword set",
+        "next_keyword_set": "Next keyword set"
       },
       "sections": {
         "editing": "Modifica",
         "library": "Libreria",
         "panels": "Pannelli",
         "rating": "Valutazioni ed Etichette",
-        "view": "Visualizza"
+        "view": "Visualizza",
+        "keywords": "Keywords"
       }
     },
     "language": "Lingua",
@@ -1943,8 +1953,6 @@
     "tagging": {
       "addCustomPlaceholder": "Aggiungi tag AI personalizzati (separati da virgola)...",
       "addCustomTooltip": "Aggiungi tag AI",
-      "addShortcutTooltip": "Aggiungi Scorciatoia",
-      "addShortcutsPlaceholder": "Aggiungi scorciatoie (separate da virgola)...",
       "aiTagging": "Tagging AI",
       "aiTaggingDesc": "Abilita il tagging automatico delle immagini utilizzando un modello AI (CLIP). Questo scaricherà un modello aggiuntivo e influenzerà le prestazioni durante l'esplorazione delle cartelle. I tag vengono utilizzati per la ricerca in una cartella.",
       "amount": "Quantità",
@@ -1955,17 +1963,12 @@
       "clearAllTagsDesc": "Questo rimuoverà tutti i tag generati dall'AI e aggiunti dall'utente dai file .tirdata in tutte le cartelle principali attive. Le etichette di colore verranno mantenute.",
       "clearAllTagsTitle": "Cancella Tutti i Tag",
       "clearCustomTooltip": "Cancella Lista Tag AI",
-      "clearShortcutsTooltip": "Cancella Lista Tag Scorciatoie",
       "customList": "Lista Tag AI Personalizzata",
       "customListDesc": "Se fornito, l'AI utilizzerà SOLO i tag da questa lista, ignorando la lista predefinita di ThisIsRAW. Il tagging funziona solo in inglese.",
       "maxAiTags": "Tag AI Massimi",
       "maxAiTagsDesc": "Il numero massimo di tag da generare per immagine.",
       "noCustomTags": "Nessun tag AI personalizzato (Usando la lista integrata)",
-      "noShortcuts": "Nessuna scorciatoia aggiunta",
       "removeCustomTooltip": "Rimuovi tag \"{{tag}}\"",
-      "removeShortcutTooltip": "Rimuovi scorciatoia \"{{shortcut}}\"",
-      "shortcuts": "Scorciatoie Tagging",
-      "shortcutsDesc": "Una lista di tag che appariranno come scorciatoie nel menu contestuale del tagging.",
       "title": "Tagging"
     },
     "thanks": {

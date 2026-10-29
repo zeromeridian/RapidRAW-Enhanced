@@ -5,6 +5,44 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.19.0-dev-advanced-tags — 2026-10-29
+
+### Keywords
+
+- New **Keyword Sets**, as in Lightroom Classic: groups of nine keywords
+  shown as a grid in the Tagging panel. Click a keyword to add it to the
+  selected photos, or click it again to remove it. A keyword already on some
+  of the selected photos is shown with a dashed outline.
+- Press Option+1 to Option+9 (Alt+1 to Alt+9 on Windows and Linux) to add or
+  remove the matching keyword; Option/Alt+0 switches to the next set. With
+  Caps Lock on, the selection then moves to the next photo. All shortcuts can
+  be changed in Settings → Shortcuts.
+- Create, rename, edit, and delete sets in the Tagging panel. Outdoor,
+  Portrait, and Event sets are included to start with.
+- Your existing tagging shortcuts become the **My Keywords** set. The
+  right-click tagging menu and the Metadata panel now offer the keywords of
+  the active set, and the shortcut list in Settings has been removed.
+
+## 1.18.0-dev-advanced-tags — 2026-10-29
+
+### Keywords
+
+- Keywords can now have levels, as in Lightroom Classic. Type `>` between
+  levels, for example `places > germany > berlin`. Searching for any level,
+  such as "germany", finds the photo.
+- Keywords are written to XMP the way Lightroom Classic writes them, with
+  the full keyword hierarchy, so Lightroom and other apps show them as
+  normal keywords.
+- Keywords from Lightroom Classic and other apps, including their hierarchy,
+  are read as your own keywords. **Clear AI Tags** no longer removes them.
+- Adding or removing a keyword now updates the XMP file right away when XMP
+  sync is on. Previously a removed keyword could come back from the XMP file.
+
+### Fixes
+
+- AI tagging now also tags flagged photos. Previously a photo with a flag was
+  skipped.
+
 ## 1.17.2-fix-tweaks — 2026-10-29
 
 ### Fixes

@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Invokes } from '../components/ui/AppProperties';
 import Text from '../components/ui/Text';
 import { TextVariants } from '../types/typography';
+import { USER_TAG_PREFIX, formatKeyword, getActiveKeywordSet, parseKeywordInput } from '../utils/keywords';
 
 interface TaggingSubMenuProps {
   paths: string[];
@@ -14,8 +15,6 @@ interface TaggingSubMenuProps {
   appSettings: any;
   hideContextMenu: () => void;
 }
-
-const USER_TAG_PREFIX = 'user:';
 
 const tagVariants = {
   visible: { opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 500, damping: 30 } },
@@ -43,7 +42,7 @@ export default function TaggingSubMenu({
   }, []);
 
   const handleAddTag = async (tagToAdd: string) => {
-    const newTagValue = tagToAdd.trim().toLowerCase();
+    const newTagValue = parseKeywordInput(tagToAdd);
     if (newTagValue && !tags.some((t) => t.tag === newTagValue)) {
       try {
         const prefixedTag = `${USER_TAG_PREFIX}${newTagValue}`;
@@ -80,7 +79,8 @@ export default function TaggingSubMenu({
     }
   };
 
-  const shortcuts = appSettings?.taggingShortcuts || [];
+  const keywordSet = getActiveKeywordSet(appSettings);
+  const shortcuts = keywordSet?.keywords.filter(Boolean) ?? [];
 
   return (
     <div
@@ -101,10 +101,10 @@ export default function TaggingSubMenu({
                   animate="visible"
                   exit="exit"
                   onClick={() => handleRemoveTag(tagItem)}
-                  data-tooltip={t('menus.tagging.removeTooltip', { tag: tagItem.tag })}
+                  data-tooltip={t('menus.tagging.removeTooltip', { tag: formatKeyword(tagItem.tag) })}
                   className="flex items-center gap-1 bg-bg-primary text-text-primary text-xs font-medium px-2 py-1 rounded-sm group cursor-pointer"
                 >
-                  <span>{tagItem.tag}</span>
+                  <span>{formatKeyword(tagItem.tag)}</span>
                   <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
                     <X size={12} />
                   </span>
@@ -149,7 +149,7 @@ export default function TaggingSubMenu({
 
       {shortcuts.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-text-primary px-1 py-1">{t('menus.tagging.shortcutsHeading')}</p>
+          <p className="text-xs font-semibold text-text-primary px-1 py-1">{keywordSet?.name}</p>
           <div className="flex flex-wrap gap-1">
             {shortcuts.map((shortcut: string) => (
               <button
@@ -157,7 +157,7 @@ export default function TaggingSubMenu({
                 onClick={() => handleAddTag(shortcut)}
                 className="bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary text-xs font-medium px-2 py-1 rounded-sm"
               >
-                {shortcut}
+                {formatKeyword(shortcut)}
               </button>
             ))}
           </div>

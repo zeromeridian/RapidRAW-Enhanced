@@ -374,6 +374,106 @@ pub fn default_linear_raw_mode() -> String {
     "auto".to_string()
 }
 
+/// Number of keywords in a keyword set, one per Option/Alt+1…9 shortcut.
+pub const KEYWORD_SET_SIZE: usize = 9;
+
+/// A named group of nine keyword paths (stored without the `user:` prefix) that the
+/// Tagging panel and the Option/Alt+1…9 shortcuts apply; empty slots are empty strings.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct KeywordSet {
+    pub id: String,
+    pub name: String,
+    pub keywords: Vec<String>,
+}
+
+impl KeywordSet {
+    fn new(id: &str, name: &str, keywords: &[&str]) -> Self {
+        let mut keywords: Vec<String> = keywords.iter().map(|k| k.to_string()).collect();
+        keywords.resize(KEYWORD_SET_SIZE, String::new());
+        Self {
+            id: id.to_string(),
+            name: name.to_string(),
+            keywords,
+        }
+    }
+}
+
+/// The starting keyword sets: the former tagging shortcuts in sets of nine, then examples.
+fn default_keyword_sets(tagging_shortcuts: &[String]) -> Vec<KeywordSet> {
+    let shortcuts: Vec<&str> = tagging_shortcuts
+        .iter()
+        .map(|shortcut| shortcut.trim())
+        .filter(|shortcut| !shortcut.is_empty())
+        .collect();
+    let mut sets: Vec<KeywordSet> = shortcuts
+        .chunks(KEYWORD_SET_SIZE)
+        .enumerate()
+        .map(|(index, keywords)| {
+            let suffix = if index == 0 {
+                String::new()
+            } else {
+                format!(" {}", index + 1)
+            };
+            KeywordSet::new(
+                &format!("my-keywords{}", suffix.replace(' ', "-")),
+                &format!("My Keywords{suffix}"),
+                keywords,
+            )
+        })
+        .collect();
+    sets.push(KeywordSet::new(
+        "outdoor",
+        "Outdoor",
+        &[
+            "landscape",
+            "nature",
+            "wildlife",
+            "mountains",
+            "water",
+            "sky",
+            "sunset",
+            "flowers",
+            "macro",
+        ],
+    ));
+    sets.push(KeywordSet::new(
+        "portrait",
+        "Portrait",
+        &[
+            "portrait", "headshot", "family", "couple", "child", "group", "studio", "outdoor",
+            "candid",
+        ],
+    ));
+    sets.push(KeywordSet::new(
+        "event",
+        "Event",
+        &[
+            "event",
+            "wedding",
+            "ceremony",
+            "reception",
+            "party",
+            "concert",
+            "speech",
+            "guests",
+            "details",
+        ],
+    ));
+    sets
+}
+
+/// Creates the keyword sets once, from the tagging shortcuts they replace.
+fn migrate_keyword_sets(settings: &mut AppSettings) -> bool {
+    if settings.keyword_sets.is_some() {
+        return false;
+    }
+    settings.keyword_sets = Some(default_keyword_sets(
+        settings.tagging_shortcuts.as_deref().unwrap_or_default(),
+    ));
+    true
+}
+
 pub fn default_tagging_shortcuts_option() -> Option<Vec<String>> {
     Some(vec![
         "portrait".to_string(),
@@ -465,8 +565,13 @@ pub struct AppSettings {
     pub ui_visibility: Option<Value>,
     pub enable_ai_tagging: Option<bool>,
     pub tagging_thread_count: Option<u32>,
-    #[serde(default = "default_tagging_shortcuts_option")]
+    /// Replaced by `keyword_sets`; read only to migrate older settings.
+    #[serde(default = "default_tagging_shortcuts_option", skip_serializing)]
     pub tagging_shortcuts: Option<Vec<String>>,
+    #[serde(default)]
+    pub keyword_sets: Option<Vec<KeywordSet>>,
+    #[serde(default)]
+    pub active_keyword_set: Option<String>,
     #[serde(default)]
     pub custom_ai_tags: Option<Vec<String>>,
     #[serde(default)]
@@ -638,6 +743,8 @@ impl Default for AppSettings {
             enable_ai_tagging: Some(false),
             tagging_thread_count: Some(3),
             tagging_shortcuts: default_tagging_shortcuts_option(),
+            keyword_sets: None,
+            active_keyword_set: None,
             custom_ai_tags: Some(Vec::new()),
             ai_tag_count: Some(10),
             #[cfg(target_os = "android")]
@@ -799,6 +906,8 @@ pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
         }
     }
 
+    settings_modified |= migrate_keyword_sets(&mut settings);
+
     if settings_modified && let Ok(json_string) = serde_json::to_string_pretty(&settings) {
         let _ = fs::write(&path, json_string);
     }
@@ -831,8 +940,42 @@ pub fn save_settings(settings: AppSettings, app_handle: AppHandle) -> Result<(),
 
 #[cfg(test)]
 mod tests {
-    use super::AppSettings;
+    use super::{AppSettings, KEYWORD_SET_SIZE, migrate_keyword_sets};
     use serde_json::json;
+
+    #[test]
+    fn tagging_shortcuts_become_keyword_sets_once() {
+        let shortcuts: Vec<String> = (1..=11).map(|n| format!("keyword {n}")).collect();
+        let mut settings: AppSettings =
+            serde_json::from_value(json!({ "taggingShortcuts": shortcuts })).unwrap();
+
+        assert!(migrate_keyword_sets(&mut settings));
+        let sets = settings.keyword_sets.clone().unwrap();
+        let names: Vec<&str> = sets.iter().map(|set| set.name.as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                "My Keywords",
+                "My Keywords 2",
+                "Outdoor",
+                "Portrait",
+                "Event"
+            ]
+        );
+        assert!(
+            sets.iter()
+                .all(|set| set.keywords.len() == KEYWORD_SET_SIZE)
+        );
+        assert_eq!(sets[0].keywords[8], "keyword 9");
+        assert_eq!(sets[1].id, "my-keywords-2");
+        assert_eq!(sets[1].keywords[..3], ["keyword 10", "keyword 11", ""]);
+        assert!(!migrate_keyword_sets(&mut settings));
+
+        let serialized = serde_json::to_value(&settings).unwrap();
+        assert!(serialized.get("taggingShortcuts").is_none());
+        let restored: AppSettings = serde_json::from_value(serialized).unwrap();
+        assert_eq!(restored.keyword_sets, settings.keyword_sets);
+    }
 
     #[test]
     fn tone_curve_presets_round_trip_through_settings() {

@@ -1,6 +1,7 @@
 import { ExportPreset } from './ExportImportProperties';
 import { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
 import { ToneCurvePreset } from '../../utils/toneCurvePresets';
+import { KeywordSet } from '../../utils/keywords';
 import { ToolType } from '../panel/right/Masks';
 
 export const GLOBAL_KEYS = [
@@ -268,7 +269,8 @@ export interface AppSettings {
   language?: string;
   fontFamily?: string;
   folderTreeSort?: FolderTreeSort;
-  taggingShortcuts?: string[];
+  keywordSets?: KeywordSet[];
+  activeKeywordSet?: string | null;
   libraryDisplayMode?: LibraryDisplayMode;
   grouping?: GroupingMode;
   requireMatchingExif?: boolean;

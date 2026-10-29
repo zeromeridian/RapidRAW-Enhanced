@@ -1218,8 +1218,7 @@
       "addTagTooltip": "Ajouter une étiquette",
       "noTags": "Aucune étiquette ajoutée",
       "placeholder": "Ajouter une étiquette...",
-      "removeTooltip": "Supprimer l'étiquette \"{{tag}}\"",
-      "shortcutsHeading": "RACCOURCIS"
+      "removeTooltip": "Supprimer l'étiquette \"{{tag}}\""
     }
   },
   "modals": {
@@ -1773,14 +1772,25 @@
         "zoom_in_step": "Zoom avant (par palier)",
         "zoom_out": "Zoom arrière",
         "zoom_out_step": "Zoom arrière (par palier)",
-        "toggle_auto_sync": "Toggle Auto Sync"
+        "toggle_auto_sync": "Toggle Auto Sync",
+        "apply_keyword_1": "Toggle keyword 1 of the keyword set",
+        "apply_keyword_2": "Toggle keyword 2 of the keyword set",
+        "apply_keyword_3": "Toggle keyword 3 of the keyword set",
+        "apply_keyword_4": "Toggle keyword 4 of the keyword set",
+        "apply_keyword_5": "Toggle keyword 5 of the keyword set",
+        "apply_keyword_6": "Toggle keyword 6 of the keyword set",
+        "apply_keyword_7": "Toggle keyword 7 of the keyword set",
+        "apply_keyword_8": "Toggle keyword 8 of the keyword set",
+        "apply_keyword_9": "Toggle keyword 9 of the keyword set",
+        "next_keyword_set": "Next keyword set"
       },
       "sections": {
         "editing": "Retouche",
         "library": "Bibliothèque",
         "panels": "Panneaux",
         "rating": "Notes & Étiquettes",
-        "view": "Affichage"
+        "view": "Affichage",
+        "keywords": "Keywords"
       }
     },
     "language": "Langue",
@@ -1943,8 +1953,6 @@
     "tagging": {
       "addCustomPlaceholder": "Ajouter des étiquettes IA perso. (séparées par des virgules)...",
       "addCustomTooltip": "Ajouter une étiquette IA",
-      "addShortcutTooltip": "Ajouter un raccourci",
-      "addShortcutsPlaceholder": "Ajouter des raccourcis (séparés par des virgules)...",
       "aiTagging": "Marquage IA",
       "aiTaggingDesc": "Active le marquage automatique des images à l'aide d'un modèle IA (CLIP). Ceci téléchargera un modèle supplémentaire et aura un impact sur les performances lors de la navigation dans les dossiers. Les étiquettes sont utilisées pour rechercher dans un dossier.",
       "amount": "Quantité",
@@ -1955,17 +1963,12 @@
       "clearAllTagsDesc": "Ceci supprimera toutes les étiquettes générées par l'IA et celles ajoutées par l'utilisateur de vos fichiers .tirdata dans tous les dossiers racine actifs. Les étiquettes de couleur seront conservées.",
       "clearAllTagsTitle": "Effacer toutes les étiquettes",
       "clearCustomTooltip": "Effacer la liste d'étiquettes IA",
-      "clearShortcutsTooltip": "Effacer la liste d'étiquettes de raccourcis",
       "customList": "Liste d'étiquettes IA personnalisée",
       "customListDesc": "Si renseignée, l'IA utilisera UNIQUEMENT les étiquettes de cette liste, ignorant la liste intégrée de ThisIsRAW. Le marquage ne fonctionne qu'en anglais.",
       "maxAiTags": "Maximum d'étiquettes IA",
       "maxAiTagsDesc": "Le nombre maximum d'étiquettes à générer par image.",
       "noCustomTags": "Aucune étiquette IA personnalisée (Utilisation de la liste intégrée)",
-      "noShortcuts": "Aucun raccourci ajouté",
       "removeCustomTooltip": "Supprimer l'étiquette \"{{tag}}\"",
-      "removeShortcutTooltip": "Supprimer le raccourci \"{{shortcut}}\"",
-      "shortcuts": "Raccourcis de marquage",
-      "shortcutsDesc": "Une liste d'étiquettes qui apparaîtront comme raccourcis dans le menu contextuel de marquage.",
       "title": "Marquage"
     },
     "thanks": {

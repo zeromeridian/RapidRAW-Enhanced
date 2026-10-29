@@ -9,6 +9,7 @@ import { globalImageCache } from '../utils/ImageLRUCache';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { computeSortedLibrary } from './useSortedLibrary';
 import { ImageFlag, IMAGE_FLAG_PREFIX } from '../utils/imageFlags';
+import { USER_TAG_PREFIX } from '../utils/keywords';
 
 export const clearLibrarySelection = () => {
   useLibraryStore.getState().setLibrary({
@@ -16,6 +17,15 @@ export const clearLibrarySelection = () => {
     libraryActivePath: null,
     selectionAnchorPath: null,
   });
+};
+
+// The images a flag or keyword action applies to when no paths are given.
+const getActionPaths = (): string[] => {
+  const { multiSelectedPaths, libraryActivePath } = useLibraryStore.getState();
+  const { selectedImage } = useEditorStore.getState();
+  if (multiSelectedPaths.length > 0) return multiSelectedPaths;
+  if (selectedImage) return [selectedImage.path];
+  return libraryActivePath ? [libraryActivePath] : [];
 };
 
 const applyWithAutoAdvance = (changedPaths: string[], applyChange: () => void) => {
@@ -117,17 +127,8 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
   }, []);
 
   const handleSetFlag = useCallback(async (flag: ImageFlag, paths?: string[]) => {
-    const { multiSelectedPaths, libraryActivePath, setLibrary } = useLibraryStore.getState();
-    const { selectedImage } = useEditorStore.getState();
-    const pathsToUpdate =
-      paths ||
-      (multiSelectedPaths.length > 0
-        ? multiSelectedPaths
-        : selectedImage
-          ? [selectedImage.path]
-          : libraryActivePath
-            ? [libraryActivePath]
-            : []);
+    const { setLibrary } = useLibraryStore.getState();
+    const pathsToUpdate = paths || getActionPaths();
     if (pathsToUpdate.length === 0) return;
 
     try {
@@ -148,6 +149,34 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     }
   }, []);
 
+  // Adds a keyword to every target image, or removes it when every target already has it.
+  const handleToggleKeyword = useCallback(async (keyword: string, paths?: string[]) => {
+    const { imageList, setLibrary } = useLibraryStore.getState();
+    const pathsToUpdate = paths || getActionPaths();
+    if (!keyword || pathsToUpdate.length === 0) return;
+
+    const tag = `${USER_TAG_PREFIX}${keyword}`;
+    const updatedPaths = new Set(pathsToUpdate);
+    const targets = imageList.filter((image) => updatedPaths.has(image.path));
+    const isApplied = targets.length > 0 && targets.every((image) => image.tags?.includes(tag));
+
+    try {
+      await invoke(isApplied ? Invokes.RemoveTagForPaths : Invokes.AddTagForPaths, { paths: pathsToUpdate, tag });
+      applyWithAutoAdvance(pathsToUpdate, () =>
+        setLibrary((state) => ({
+          imageList: state.imageList.map((image) => {
+            if (!updatedPaths.has(image.path)) return image;
+            const otherTags = (image.tags || []).filter((imageTag) => imageTag !== tag);
+            const tags = isApplied ? otherTags : [...otherTags, tag].sort();
+            return { ...image, tags: tags.length > 0 ? tags : null };
+          }),
+        })),
+      );
+    } catch (err) {
+      toast.error(`Failed to update keyword: ${err}`);
+    }
+  }, []);
+
   const handleTagsChanged = useCallback((changedPaths: string[], newTags: { tag: string; isUser: boolean }[]) => {
     applyWithAutoAdvance(changedPaths, () =>
       useLibraryStore.getState().setLibrary((state) => ({
@@ -156,7 +185,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
             const systemTags = (image.tags || []).filter(
               (t) => t.startsWith('color:') || t.startsWith(IMAGE_FLAG_PREFIX),
             );
-            const prefixedNewTags = newTags.map((t) => (t.isUser ? `user:${t.tag}` : t.tag));
+            const prefixedNewTags = newTags.map((t) => (t.isUser ? `${USER_TAG_PREFIX}${t.tag}` : t.tag));
             const finalTags = [...systemTags, ...prefixedNewTags].sort();
             return { ...image, tags: finalTags.length > 0 ? finalTags : null };
           }
@@ -494,6 +523,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     handleRate,
     handleSetColorLabel,
     handleSetFlag,
+    handleToggleKeyword,
     handleTagsChanged,
     handleUpdateExif,
     handleClearSelection,

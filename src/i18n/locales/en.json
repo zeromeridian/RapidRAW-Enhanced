@@ -836,6 +836,7 @@
       "addFailed": "Could not add tag: {{error}}",
       "addTag": "Add Tag",
       "currentTags": "Current Tags",
+      "hierarchyHint": "Use > for a keyword hierarchy, e.g. places > germany > berlin",
       "mixedTagTooltip": "This tag is set on some selected images. Click to remove it from all.",
       "noTags": "No tags",
       "placeholder": "Enter a tag…",
@@ -843,7 +844,17 @@
       "removeTooltip": "Remove tag from selected images",
       "selectionCount_one": "Tagging {{count}} image",
       "selectionCount_other": "Tagging {{count}} images",
-      "title": "Tagging"
+      "title": "Tagging",
+      "cancelKeywordSet": "Cancel",
+      "deleteKeywordSet": "Delete keyword set",
+      "deleteKeywordSetMessage": "Delete the keyword set \"{{name}}\"? Keywords already on photos are not removed.",
+      "editKeywordSet": "Edit keyword set",
+      "keywordSet": "Keyword Set",
+      "keywordSetName": "Set name",
+      "keywordSetSelected": "Keyword set: {{name}}",
+      "newKeywordSet": "New keyword set",
+      "newKeywordSetName": "New Set",
+      "saveKeywordSet": "Save"
     },
     "toolbar": {
       "switchToVariant": "Switch to {{label}}",
@@ -1262,8 +1273,7 @@
       "addTagTooltip": "Add tag",
       "noTags": "No tags added",
       "placeholder": "Add a tag...",
-      "removeTooltip": "Remove tag \"{{tag}}\"",
-      "shortcutsHeading": "SHORTCUTS"
+      "removeTooltip": "Remove tag \"{{tag}}\""
     }
   },
   "modals": {
@@ -1874,14 +1884,25 @@
         "zoom_in_step": "Zoom in (by step)",
         "zoom_out": "Zoom out",
         "zoom_out_step": "Zoom out (by step)",
-        "toggle_auto_sync": "Toggle Auto Sync"
+        "toggle_auto_sync": "Toggle Auto Sync",
+        "apply_keyword_1": "Toggle keyword 1 of the keyword set",
+        "apply_keyword_2": "Toggle keyword 2 of the keyword set",
+        "apply_keyword_3": "Toggle keyword 3 of the keyword set",
+        "apply_keyword_4": "Toggle keyword 4 of the keyword set",
+        "apply_keyword_5": "Toggle keyword 5 of the keyword set",
+        "apply_keyword_6": "Toggle keyword 6 of the keyword set",
+        "apply_keyword_7": "Toggle keyword 7 of the keyword set",
+        "apply_keyword_8": "Toggle keyword 8 of the keyword set",
+        "apply_keyword_9": "Toggle keyword 9 of the keyword set",
+        "next_keyword_set": "Next keyword set"
       },
       "sections": {
         "editing": "Editing",
         "library": "Library",
         "panels": "Panels",
         "rating": "Rating & Labels",
-        "view": "View"
+        "view": "View",
+        "keywords": "Keywords"
       }
     },
     "language": "Language",
@@ -2047,8 +2068,6 @@
     "tagging": {
       "addCustomPlaceholder": "Add custom AI tags (comma separated)...",
       "addCustomTooltip": "Add AI tag",
-      "addShortcutTooltip": "Add Shortcut",
-      "addShortcutsPlaceholder": "Add shortcuts (comma separated)...",
       "aiTagging": "AI Tagging",
       "aiTaggingDesc": "Enables automatic image tagging using an AI (CLIP) model. This will download an additional model and impact performance while browsing folders. Tags are used for searching a folder.",
       "amount": "Amount",
@@ -2059,17 +2078,12 @@
       "clearAllTagsDesc": "This will remove all AI-generated and user-added tags from your .tirdata files in all active root folders. Color labels will be kept.",
       "clearAllTagsTitle": "Clear All Tags",
       "clearCustomTooltip": "Clear AI Tag List",
-      "clearShortcutsTooltip": "Clear Shortcuts Tag List",
       "customList": "Custom AI Tag List",
       "customListDesc": "If provided, the AI will ONLY use tags from this list, overriding ThisIsRAW’s built-in list. Tagging works only in English.",
       "maxAiTags": "Maximum AI Tags",
       "maxAiTagsDesc": "The maximum number of tags to generate per image.",
       "noCustomTags": "No custom AI tags (Using built-in list)",
-      "noShortcuts": "No shortcuts added",
       "removeCustomTooltip": "Remove tag \"{{tag}}\"",
-      "removeShortcutTooltip": "Remove shortcut \"{{shortcut}}\"",
-      "shortcuts": "Tagging Shortcuts",
-      "shortcutsDesc": "A list of tags that will appear as shortcuts in the tagging context menu.",
       "title": "Tagging"
     },
     "thanks": {

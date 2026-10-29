@@ -545,7 +545,6 @@ export default function SettingsPanel({
 
   const [aiProvider, setAiProvider] = useState(appSettings?.aiProvider || 'cpu');
   const [aiConnectorAddress, setAiConnectorAddress] = useState<string>(appSettings?.aiConnectorAddress || '');
-  const [newShortcut, setNewShortcut] = useState('');
   const [newAiTag, setNewAiTag] = useState('');
 
   const [lensMakers, setLensMakers] = useState<string[]>([]);
@@ -679,7 +678,6 @@ export default function SettingsPanel({
   }, []);
 
   const customAiTags = Array.from(new Set<string>(appSettings?.customAiTags || []));
-  const taggingShortcuts = Array.from(new Set<string>(appSettings?.taggingShortcuts || []));
 
   useEffect(() => {
     if (appSettings?.aiConnectorAddress !== aiConnectorAddress) {
@@ -1052,31 +1050,6 @@ export default function SettingsPanel({
 
   const closeConfirmModal = () => {
     setConfirmModalState({ ...confirmModalState, isOpen: false });
-  };
-
-  const handleAddShortcut = () => {
-    const parsedTags = newShortcut
-      .split(',')
-      .map((t) => t.trim().toLowerCase())
-      .filter((t) => t.length > 0);
-
-    if (parsedTags.length > 0) {
-      const uniqueShortcuts = Array.from(new Set([...taggingShortcuts, ...parsedTags])).sort();
-      onSettingsChange({ ...appSettings, taggingShortcuts: uniqueShortcuts });
-    }
-    setNewShortcut('');
-  };
-
-  const handleRemoveShortcut = (shortcutToRemove: string) => {
-    const uniqueShortcuts = taggingShortcuts.filter((s) => s !== shortcutToRemove);
-    onSettingsChange({ ...appSettings, taggingShortcuts: uniqueShortcuts });
-  };
-
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddShortcut();
-    }
   };
 
   const handleAddAiTag = () => {
@@ -1789,79 +1762,6 @@ export default function SettingsPanel({
                           )}
                         </AnimatePresence>
                       </div>
-
-                      <SettingItem
-                        label={t('settings.tagging.shortcuts')}
-                        description={t('settings.tagging.shortcutsDesc')}
-                      >
-                        <div>
-                          <div className="flex flex-wrap gap-2 p-2 bg-bg-primary rounded-md min-h-10 border border-border-color mb-2 items-center">
-                            <AnimatePresence>
-                              {taggingShortcuts.length > 0 ? (
-                                taggingShortcuts.map((shortcut: string) => (
-                                  <motion.div
-                                    key={shortcut}
-                                    layout
-                                    variants={shortcutTagVariants}
-                                    initial={false}
-                                    animate="visible"
-                                    exit="exit"
-                                    onClick={() => handleRemoveShortcut(shortcut)}
-                                    data-tooltip={t('settings.tagging.removeShortcutTooltip', { shortcut })}
-                                    className="flex items-center gap-1 bg-surface px-2 py-1 rounded-sm group cursor-pointer"
-                                  >
-                                    <Text variant={TextVariants.label} color={TextColors.primary}>
-                                      {shortcut}
-                                    </Text>
-                                    <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
-                                      <X size={14} />
-                                    </span>
-                                  </motion.div>
-                                ))
-                              ) : (
-                                <motion.span
-                                  key="no-shortcuts-placeholder"
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  exit={{ opacity: 0 }}
-                                  transition={{ duration: 0.2 }}
-                                  className="text-sm text-text-secondary italic px-1 select-none"
-                                >
-                                  {t('settings.tagging.noShortcuts')}
-                                </motion.span>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="relative flex-1">
-                              <Input
-                                type="text"
-                                value={newShortcut}
-                                onChange={(e) => setNewShortcut(e.target.value)}
-                                onKeyDown={handleInputKeyDown}
-                                placeholder={t('settings.tagging.addShortcutsPlaceholder')}
-                                className="pr-10"
-                                bgClassName="bg-bg-primary"
-                              />
-                              <button
-                                onClick={handleAddShortcut}
-                                className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface"
-                                data-tooltip={t('settings.tagging.addShortcutTooltip')}
-                              >
-                                <Plus size={18} />
-                              </button>
-                            </div>
-                            <button
-                              onClick={() => onSettingsChange({ ...appSettings, taggingShortcuts: [] })}
-                              disabled={taggingShortcuts.length === 0}
-                              className="p-2 text-text-secondary hover:text-red-400 hover:bg-surface rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-secondary disabled:hover:bg-transparent"
-                              data-tooltip={t('settings.tagging.clearShortcutsTooltip')}
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        </div>
-                      </SettingItem>
 
                       <div className="pt-8 border-t border-border-color">
                         <div className="space-y-8">

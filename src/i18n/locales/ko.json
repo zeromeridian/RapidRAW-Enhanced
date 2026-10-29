@@ -1189,8 +1189,7 @@
       "addTagTooltip": "태그 추가",
       "noTags": "추가된 태그 없음",
       "placeholder": "태그 추가...",
-      "removeTooltip": "\"{{tag}}\" 태그 제거",
-      "shortcutsHeading": "단축키"
+      "removeTooltip": "\"{{tag}}\" 태그 제거"
     }
   },
   "modals": {
@@ -1731,14 +1730,25 @@
         "zoom_in_step": "확대 (단계별)",
         "zoom_out": "축소",
         "zoom_out_step": "축소 (단계별)",
-        "toggle_auto_sync": "Toggle Auto Sync"
+        "toggle_auto_sync": "Toggle Auto Sync",
+        "apply_keyword_1": "Toggle keyword 1 of the keyword set",
+        "apply_keyword_2": "Toggle keyword 2 of the keyword set",
+        "apply_keyword_3": "Toggle keyword 3 of the keyword set",
+        "apply_keyword_4": "Toggle keyword 4 of the keyword set",
+        "apply_keyword_5": "Toggle keyword 5 of the keyword set",
+        "apply_keyword_6": "Toggle keyword 6 of the keyword set",
+        "apply_keyword_7": "Toggle keyword 7 of the keyword set",
+        "apply_keyword_8": "Toggle keyword 8 of the keyword set",
+        "apply_keyword_9": "Toggle keyword 9 of the keyword set",
+        "next_keyword_set": "Next keyword set"
       },
       "sections": {
         "editing": "편집",
         "library": "라이브러리",
         "panels": "패널",
         "rating": "평점 및 레이블",
-        "view": "보기"
+        "view": "보기",
+        "keywords": "Keywords"
       }
     },
     "language": "언어",
@@ -1901,8 +1911,6 @@
     "tagging": {
       "addCustomPlaceholder": "사용자 지정 AI 태그 추가 (쉼표로 구분)...",
       "addCustomTooltip": "AI 태그 추가",
-      "addShortcutTooltip": "단축키 추가",
-      "addShortcutsPlaceholder": "단축키 추가 (쉼표로 구분)...",
       "aiTagging": "AI 태그 지정",
       "aiTaggingDesc": "AI(CLIP) 모델을 사용한 자동 이미지 태그 지정을 활성화합니다. 추가 모델을 다운로드하며 폴더를 탐색하는 동안 성능에 영향을 줍니다. 태그는 폴더 검색에 사용됩니다.",
       "amount": "양",
@@ -1913,17 +1921,12 @@
       "clearAllTagsDesc": "모든 활성 루트 폴더의 .tirdata 파일에서 AI가 생성한 태그와 사용자가 추가한 태그를 모두 제거합니다. 색상 레이블은 유지됩니다.",
       "clearAllTagsTitle": "모든 태그 지우기",
       "clearCustomTooltip": "AI 태그 목록 지우기",
-      "clearShortcutsTooltip": "단축키 태그 목록 지우기",
       "customList": "사용자 지정 AI 태그 목록",
       "customListDesc": "이 목록이 제공되면 AI는 ThisIsRAW의 내장 목록을 무시하고 이 목록의 태그만 사용합니다. 태그 지정은 영어로만 작동합니다.",
       "maxAiTags": "최대 AI 태그 수",
       "maxAiTagsDesc": "이미지당 생성할 최대 태그 수입니다.",
       "noCustomTags": "사용자 지정 AI 태그 없음 (내장 목록 사용 중)",
-      "noShortcuts": "추가된 단축키 없음",
       "removeCustomTooltip": "\"{{tag}}\" 태그 제거",
-      "removeShortcutTooltip": "\"{{shortcut}}\" 단축키 제거",
-      "shortcuts": "태그 지정 단축키",
-      "shortcutsDesc": "태그 지정 컨텍스트 메뉴에 단축키로 표시될 태그 목록입니다.",
       "title": "태그 지정"
     },
     "thanks": {

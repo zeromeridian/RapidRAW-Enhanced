@@ -1191,8 +1191,7 @@
       "addTagTooltip": "Tag hinzufügen",
       "noTags": "Keine Tags hinzugefügt",
       "placeholder": "Tag hinzufügen...",
-      "removeTooltip": "Tag \"{{tag}}\" entfernen",
-      "shortcutsHeading": "TASTENKÜRZEL"
+      "removeTooltip": "Tag \"{{tag}}\" entfernen"
     }
   },
   "modals": {
@@ -1733,14 +1732,25 @@
         "zoom_in_step": "Vergrößern (schrittweise)",
         "zoom_out": "Verkleinern",
         "zoom_out_step": "Verkleinern (schrittweise)",
-        "toggle_auto_sync": "Toggle Auto Sync"
+        "toggle_auto_sync": "Toggle Auto Sync",
+        "apply_keyword_1": "Toggle keyword 1 of the keyword set",
+        "apply_keyword_2": "Toggle keyword 2 of the keyword set",
+        "apply_keyword_3": "Toggle keyword 3 of the keyword set",
+        "apply_keyword_4": "Toggle keyword 4 of the keyword set",
+        "apply_keyword_5": "Toggle keyword 5 of the keyword set",
+        "apply_keyword_6": "Toggle keyword 6 of the keyword set",
+        "apply_keyword_7": "Toggle keyword 7 of the keyword set",
+        "apply_keyword_8": "Toggle keyword 8 of the keyword set",
+        "apply_keyword_9": "Toggle keyword 9 of the keyword set",
+        "next_keyword_set": "Next keyword set"
       },
       "sections": {
         "editing": "Bearbeitung",
         "library": "Bibliothek",
         "panels": "Panels",
         "rating": "Bewertungen & Markierungen",
-        "view": "Ansicht"
+        "view": "Ansicht",
+        "keywords": "Keywords"
       }
     },
     "language": "Sprache",
@@ -1903,8 +1913,6 @@
     "tagging": {
       "addCustomPlaceholder": "Benutzerdefinierte KI-Tags hinzufügen (kommagetrennt)...",
       "addCustomTooltip": "KI-Tag hinzufügen",
-      "addShortcutTooltip": "Shortcut hinzufügen",
-      "addShortcutsPlaceholder": "Shortcuts hinzufügen (kommagetrennt)...",
       "aiTagging": "KI-Tagging",
       "aiTaggingDesc": "Aktiviert automatisches Bild-Tagging mit einem KI-Modell (CLIP). Dies lädt ein zusätzliches Modell herunter und beeinträchtigt die Leistung beim Durchsuchen.",
       "amount": "Betrag",
@@ -1915,17 +1923,12 @@
       "clearAllTagsDesc": "Dies entfernt alle KI-generierten und benutzerdefinierten Tags aus Ihren .tirdata-Dateien. Farbmarkierungen bleiben erhalten.",
       "clearAllTagsTitle": "Alle Tags löschen",
       "clearCustomTooltip": "KI-Tag-Liste löschen",
-      "clearShortcutsTooltip": "Shortcut-Tag-Liste löschen",
       "customList": "Benutzerdefinierte KI-Tag-Liste",
       "customListDesc": "Falls angegeben, verwendet die KI NUR Tags aus dieser Liste. Tagging funktioniert nur auf Englisch.",
       "maxAiTags": "Maximale KI-Tags",
       "maxAiTagsDesc": "Die maximale Anzahl an Tags, die pro Bild generiert werden.",
       "noCustomTags": "Keine benutzerdefinierten KI-Tags (Interne Liste wird verwendet)",
-      "noShortcuts": "Keine Shortcuts hinzugefügt",
       "removeCustomTooltip": "Tag \"{{tag}}\" entfernen",
-      "removeShortcutTooltip": "Shortcut \"{{shortcut}}\" entfernen",
-      "shortcuts": "Tagging-Shortcuts",
-      "shortcutsDesc": "Eine Liste von Tags, die als Shortcuts im Kontextmenü erscheinen.",
       "title": "Tagging"
     },
     "thanks": {

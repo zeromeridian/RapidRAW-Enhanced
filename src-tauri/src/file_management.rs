@@ -43,7 +43,10 @@ use crate::image_processing::{
 };
 use crate::mask_generation::MaskDefinition;
 use crate::preset_converter;
-use crate::tagging::{COLOR_TAG_PREFIX, FLAG_TAG_PREFIX};
+use crate::tagging::{
+    COLOR_TAG_PREFIX, FLAG_TAG_PREFIX, USER_TAG_PREFIX, XmpKeywordOrigin, XmpKeywords,
+    merge_xmp_keyword_tags, tags_from_xmp_keywords,
+};
 
 pub const THUMBNAIL_RENDERER_VERSION: &str = "gpu-adjustments-v1";
 
@@ -518,8 +521,9 @@ fn is_sidecar_of(sidecar_filename: &str, image_filename: &str) -> bool {
 #[cfg(test)]
 mod output_naming_tests {
     use super::{
-        apply_preset_adjustments_to_path, collect_preset_batch_folder_paths,
-        compute_thumbnail_cache_hash, ensure_transfer_destination_free, extract_app_xmp_value,
+        DC_SUBJECT, LR_HIERARCHICAL_SUBJECT, apply_preset_adjustments_to_path,
+        collect_preset_batch_folder_paths, compute_thumbnail_cache_hash,
+        ensure_transfer_destination_free, extract_app_xmp_value, extract_xmp_bag,
         extract_xmp_stack, find_all_associated_files, generate_filename_from_template,
         import_rapidraw_sidecars, is_sidecar_of, parse_sidecar_filename, parse_virtual_path,
         read_xmp_from_folder, sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp,
@@ -803,10 +807,10 @@ mod output_naming_tests {
         let image = folder.path().join("image.jpg");
         fs::write(&image, []).unwrap();
         let tags = vec![
-            "R&D".to_string(),
-            "<draft>".to_string(),
-            "cost $5".to_string(),
-            "$0".to_string(),
+            "user:R&D".to_string(),
+            "user:<draft>".to_string(),
+            "user:cost $5".to_string(),
+            "user:$0".to_string(),
         ];
         let metadata = ImageMetadata {
             tags: Some(tags.clone()),
@@ -819,11 +823,105 @@ mod output_naming_tests {
         let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
         assert!(xmp.contains("<rdf:li>R&amp;D</rdf:li>"));
         assert!(xmp.contains("<rdf:li>&lt;draft&gt;</rdf:li>"));
+        assert!(!xmp.contains("user:"));
         assert_eq!(xmp.matches("<dc:subject>").count(), 1);
+        assert_eq!(xmp.matches("<lr:hierarchicalSubject").count(), 1);
 
         let mut imported = ImageMetadata::default();
         sync_metadata_from_xmp(&image, &mut imported, false, true);
         assert_eq!(imported.tags, Some(tags));
+    }
+
+    #[test]
+    fn keyword_paths_and_ai_keywords_round_trip_through_xmp() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("image.jpg");
+        fs::write(&image, []).unwrap();
+        let tags = vec!["sky".to_string(), "user:places|germany|berlin".to_string()];
+        let metadata = ImageMetadata {
+            tags: Some(tags.clone()),
+            ..ImageMetadata::default()
+        };
+
+        sync_metadata_to_xmp(&image, &metadata, true, true);
+        let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
+        assert_eq!(
+            extract_xmp_bag(&xmp, DC_SUBJECT),
+            ["sky", "places", "germany", "berlin"]
+        );
+        assert_eq!(
+            extract_xmp_bag(&xmp, LR_HIERARCHICAL_SUBJECT),
+            ["places|germany|berlin"]
+        );
+
+        let mut imported = ImageMetadata::default();
+        sync_metadata_from_xmp(&image, &mut imported, true, true);
+        let mut imported_tags = imported.tags.unwrap();
+        imported_tags.sort();
+        assert_eq!(imported_tags, ["sky", "user:places|germany|berlin"]);
+
+        // Removing every keyword removes both keyword bags.
+        sync_metadata_to_xmp(&image, &ImageMetadata::default(), true, true);
+        let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
+        assert!(!xmp.contains("<dc:subject"));
+        assert!(!xmp.contains("<lr:hierarchicalSubject"));
+    }
+
+    #[test]
+    fn lightroom_keywords_import_as_user_keyword_paths() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("image.orf");
+        fs::write(&image, []).unwrap();
+        fs::write(
+            image.with_extension("xmp"),
+            r#"<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0-c000">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:lr="http://ns.adobe.com/lightroom/1.0/">
+   <dc:subject>
+    <rdf:Bag>
+     <rdf:li>Berlin</rdf:li>
+     <rdf:li>Germany</rdf:li>
+     <rdf:li>Places</rdf:li>
+     <rdf:li>sunset</rdf:li>
+    </rdf:Bag>
+   </dc:subject>
+   <lr:hierarchicalSubject>
+    <rdf:Bag>
+     <rdf:li>Places|Germany|Berlin</rdf:li>
+     <rdf:li>sunset</rdf:li>
+    </rdf:Bag>
+   </lr:hierarchicalSubject>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>"#,
+        )
+        .unwrap();
+
+        // An earlier version imported every Lightroom keyword as an AI tag.
+        let mut metadata = ImageMetadata {
+            tags: Some(vec![
+                "Berlin".to_string(),
+                "Germany".to_string(),
+                "Places".to_string(),
+                "sunset".to_string(),
+            ]),
+            ..ImageMetadata::default()
+        };
+        assert!(sync_metadata_from_xmp(&image, &mut metadata, true, false));
+        assert_eq!(
+            metadata.tags.clone().unwrap(),
+            ["user:Places|Germany|Berlin", "user:sunset"]
+        );
+
+        sync_metadata_to_xmp(&image, &metadata, false, true);
+        let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
+        assert_eq!(xmp.matches("<lr:hierarchicalSubject").count(), 1);
+        assert_eq!(xmp.matches("<dc:subject>").count(), 1);
+        let mut reread = ImageMetadata::default();
+        sync_metadata_from_xmp(&image, &mut reread, true, true);
+        assert_eq!(reread.tags, metadata.tags);
     }
 
     #[test]
@@ -5922,26 +6020,84 @@ pub fn extract_xmp_label(content: &str) -> Option<String> {
     None
 }
 
-pub fn extract_xmp_tags(content: &str) -> Vec<String> {
-    let mut tags = Vec::new();
-    if let Some(start_idx) = content.find("<dc:subject>")
-        && let Some(end_idx) = content[start_idx..].find("</dc:subject>")
-    {
-        let subject_block = &content[start_idx..start_idx + end_idx];
-        let mut current_idx = 0;
-        while let Some(li_start) = subject_block[current_idx..].find("<rdf:li>") {
-            let val_start = current_idx + li_start + 8;
-            if let Some(li_end) = subject_block[val_start..].find("</rdf:li>") {
-                tags.push(unescape_xmp_text(
-                    &subject_block[val_start..val_start + li_end],
-                ));
-                current_idx = val_start + li_end + 9;
-            } else {
-                break;
-            }
-        }
+const APP_XMP_NAMESPACE: &str = "https://colrbent.com/ns/this-is-raw/1.0/";
+const LIGHTROOM_XMP_NAMESPACE: &str = "http://ns.adobe.com/lightroom/1.0/";
+const DC_SUBJECT: &str = "dc:subject";
+const LR_HIERARCHICAL_SUBJECT: &str = "lr:hierarchicalSubject";
+
+/// Reads the items of an `rdf:Bag` property such as `dc:subject`.
+fn extract_xmp_bag(content: &str, property: &str) -> Vec<String> {
+    let block = Regex::new(&format!(
+        r#"(?s)<{property}(?:\s[^>]*)?>(.*?)</{property}>"#
+    ))
+    .unwrap();
+    let item = Regex::new(r#"(?s)<rdf:li(?:\s[^>]*)?>(.*?)</rdf:li>"#).unwrap();
+    block
+        .captures(content)
+        .and_then(|captures| captures.get(1))
+        .map(|bag| {
+            item.captures_iter(bag.as_str())
+                .filter_map(|captures| captures.get(1))
+                .map(|value| unescape_xmp_text(value.as_str()))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Replaces or adds an `rdf:Bag` property, or removes it when `items` is empty.
+fn set_xmp_bag(content: &mut String, property: &str, namespace: Option<&str>, items: &[String]) {
+    let existing = Regex::new(&format!(
+        r#"(?s)<{property}(?:\s[^>]*)?>\s*<rdf:Bag(?:\s[^>]*)?>.*?</rdf:Bag>\s*</{property}>"#
+    ))
+    .unwrap();
+    if items.is_empty() {
+        *content = existing.replace_all(content, "").to_string();
+        return;
     }
-    tags
+
+    let declaration = namespace
+        .and_then(|uri| {
+            let prefix = property.split_once(':')?.0;
+            Some(format!(" xmlns:{prefix}=\"{uri}\""))
+        })
+        .unwrap_or_default();
+    let mut bag = format!("<{property}{declaration}>\n    <rdf:Bag>\n");
+    for item in items {
+        bag.push_str(&format!(
+            "     <rdf:li>{}</rdf:li>\n",
+            escape_xmp_text(item)
+        ));
+    }
+    bag.push_str(&format!("    </rdf:Bag>\n   </{property}>"));
+
+    if existing.is_match(content) {
+        *content = existing.replace(content, NoExpand(&bag)).to_string();
+    } else if let Some(last_index) = content.rfind("</rdf:Description>") {
+        let (start, end) = content.split_at(last_index);
+        *content = format!("{} {}\n  {}", start, bag, end);
+    }
+}
+
+/// Reads the keywords of an XMP file as stored tags, together with its plain `dc:subject`
+/// keywords for `merge_xmp_keyword_tags`.
+fn extract_xmp_keyword_tags(content: &str) -> (Vec<String>, Vec<String>) {
+    let subject = extract_xmp_bag(content, DC_SUBJECT);
+    let hierarchical = extract_xmp_bag(content, LR_HIERARCHICAL_SUBJECT);
+    let origin = if let Some(ai_keywords) = extract_app_xmp_value(content, "AiKeywords") {
+        XmpKeywordOrigin::ThisIsRaw {
+            ai_keywords: serde_json::from_str(&ai_keywords).unwrap_or_default(),
+        }
+    } else if content.contains(APP_XMP_NAMESPACE)
+        || subject
+            .iter()
+            .any(|keyword| keyword.starts_with(USER_TAG_PREFIX))
+    {
+        XmpKeywordOrigin::LegacyThisIsRaw
+    } else {
+        XmpKeywordOrigin::Other
+    };
+    let tags = tags_from_xmp_keywords(&subject, &hierarchical, &origin);
+    (tags, subject)
 }
 
 /// Generated, image-derived data that is regenerated on demand rather than
@@ -6047,7 +6203,7 @@ fn set_app_xmp_value(content: &mut String, field: &str, value: Option<&str>) {
         && let Some(last_index) = content.rfind("</rdf:Description>")
     {
         let node = format!(
-            " <rr:{field} xmlns:rr=\"https://colrbent.com/ns/this-is-raw/1.0/\">{}</rr:{field}>\n",
+            " <rr:{field} xmlns:rr=\"{APP_XMP_NAMESPACE}\">{}</rr:{field}>\n",
             escape_xmp_text(value)
         );
         content.insert_str(last_index, &node);
@@ -6128,7 +6284,7 @@ pub fn sync_metadata_from_xmp(
         }
 
         let xmp_label = extract_xmp_label(&content);
-        let xmp_tags = extract_xmp_tags(&content);
+        let (xmp_tags, xmp_subject) = extract_xmp_keyword_tags(&content);
         let xmp_flag = include_app_fields
             .then(|| extract_app_xmp_value(&content, "Flag"))
             .flatten();
@@ -6141,11 +6297,7 @@ pub fn sync_metadata_from_xmp(
         let original_tags = current_tags.clone();
         let had_no_tags = metadata.tags.is_none();
 
-        for tag in xmp_tags {
-            if !current_tags.contains(&tag) {
-                current_tags.push(tag);
-            }
-        }
+        merge_xmp_keyword_tags(&mut current_tags, &xmp_subject, &xmp_tags);
 
         if let Some(label) = xmp_label {
             let label_tag = format!("{}{}", COLOR_TAG_PREFIX, label.to_lowercase());
@@ -6434,23 +6586,17 @@ pub fn sync_metadata_to_xmp(
             set_app_xmp_value(&mut content, "ConstrainCrop", Some(&constrain_crop));
         }
 
-        let re_subject =
-            Regex::new(r#"(?s)<dc:subject>\s*<rdf:Bag>.*?</rdf:Bag>\s*</dc:subject>"#).unwrap();
-        if normal_tags.is_empty() {
-            content = re_subject.replace_all(&content, "").to_string();
-        } else {
-            let mut bag = String::from("<dc:subject>\n    <rdf:Bag>\n");
-            for t in normal_tags {
-                bag.push_str(&format!("     <rdf:li>{}</rdf:li>\n", escape_xmp_text(&t)));
-            }
-            bag.push_str("    </rdf:Bag>\n   </dc:subject>");
-
-            if re_subject.is_match(&content) {
-                content = re_subject.replace(&content, NoExpand(&bag)).to_string();
-            } else if let Some(last_index) = content.rfind("</rdf:Description>") {
-                let (start, end) = content.split_at(last_index);
-                content = format!("{} {}\n  {}", start, bag, end);
-            }
+        let keywords = XmpKeywords::from_tags(&normal_tags);
+        set_xmp_bag(&mut content, DC_SUBJECT, None, &keywords.subject);
+        set_xmp_bag(
+            &mut content,
+            LR_HIERARCHICAL_SUBJECT,
+            Some(LIGHTROOM_XMP_NAMESPACE),
+            &keywords.hierarchical,
+        );
+        if include_app_fields {
+            let ai_keywords = serde_json::to_string(&keywords.ai).unwrap_or_default();
+            set_app_xmp_value(&mut content, "AiKeywords", Some(&ai_keywords));
         }
 
         let _ = fs::write(&xmp_file, content);

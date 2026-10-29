@@ -23,11 +23,120 @@ use crate::{AppState, candidates::TAG_CANDIDATES};
 pub const COLOR_TAG_PREFIX: &str = "color:";
 pub const FLAG_TAG_PREFIX: &str = "flag:";
 pub const USER_TAG_PREFIX: &str = "user:";
+/// Separates the levels of a user keyword path such as `user:places|germany|berlin`,
+/// as in Lightroom Classic's `lr:hierarchicalSubject`.
+pub const KEYWORD_PATH_SEPARATOR: char = '|';
 
 fn apply_flag_to_tags(tags: &mut Vec<String>, flag: &str) {
     tags.retain(|tag| !tag.starts_with(FLAG_TAG_PREFIX));
     if flag != "unflagged" {
         tags.push(format!("{FLAG_TAG_PREFIX}{flag}"));
+    }
+}
+
+/// AI keywords are stored without a prefix; user keywords, color labels, and flags have one.
+pub fn is_ai_tag(tag: &str) -> bool {
+    !tag.starts_with(COLOR_TAG_PREFIX)
+        && !tag.starts_with(FLAG_TAG_PREFIX)
+        && !tag.starts_with(USER_TAG_PREFIX)
+}
+
+fn push_unique(values: &mut Vec<String>, value: &str) {
+    if !values.iter().any(|existing| existing == value) {
+        values.push(value.to_string());
+    }
+}
+
+/// The keyword bags ThisIsRAW writes to XMP for an image's keyword tags.
+#[derive(Debug, Default, PartialEq)]
+pub struct XmpKeywords {
+    /// `dc:subject`: every level of each user keyword path, plus the AI keywords.
+    pub subject: Vec<String>,
+    /// `lr:hierarchicalSubject`: the complete user keyword paths.
+    pub hierarchical: Vec<String>,
+    /// AI keywords, listed so that another installation keeps them apart from user keywords.
+    pub ai: Vec<String>,
+}
+
+impl XmpKeywords {
+    /// `tags` must not contain color-label or flag tags.
+    pub fn from_tags(tags: &[String]) -> Self {
+        let mut keywords = Self::default();
+        for tag in tags {
+            if let Some(path) = tag.strip_prefix(USER_TAG_PREFIX) {
+                push_unique(&mut keywords.hierarchical, path);
+                for level in path.split(KEYWORD_PATH_SEPARATOR) {
+                    push_unique(&mut keywords.subject, level);
+                }
+            } else {
+                push_unique(&mut keywords.subject, tag);
+                push_unique(&mut keywords.ai, tag);
+            }
+        }
+        keywords
+    }
+}
+
+/// Which application wrote the plain `dc:subject` keywords of an XMP file.
+pub enum XmpKeywordOrigin {
+    /// ThisIsRAW 1.18 or later, which lists its AI keywords.
+    ThisIsRaw { ai_keywords: Vec<String> },
+    /// Earlier ThisIsRAW and RapidRAW versions, which wrote AI keywords plainly and user
+    /// keywords with the `user:` prefix.
+    LegacyThisIsRaw,
+    /// Another application, such as Lightroom Classic, whose keywords are all user keywords.
+    Other,
+}
+
+/// Converts the keyword bags of an XMP file into stored tags.
+pub fn tags_from_xmp_keywords(
+    subject: &[String],
+    hierarchical: &[String],
+    origin: &XmpKeywordOrigin,
+) -> Vec<String> {
+    let mut tags = Vec::new();
+    let mut path_levels = HashSet::new();
+    for path in hierarchical {
+        let levels: Vec<&str> = path
+            .split(KEYWORD_PATH_SEPARATOR)
+            .map(str::trim)
+            .filter(|level| !level.is_empty())
+            .collect();
+        if levels.is_empty() {
+            continue;
+        }
+        path_levels.extend(levels.iter().copied());
+        let joined = levels.join(&KEYWORD_PATH_SEPARATOR.to_string());
+        push_unique(&mut tags, &format!("{USER_TAG_PREFIX}{joined}"));
+    }
+
+    for keyword in subject.iter().map(|keyword| keyword.trim()) {
+        let is_listed_ai_keyword = matches!(
+            origin,
+            XmpKeywordOrigin::ThisIsRaw { ai_keywords } if ai_keywords.iter().any(|ai| ai == keyword)
+        );
+        if keyword.is_empty() || (!is_listed_ai_keyword && path_levels.contains(keyword)) {
+            continue;
+        }
+        let tag = if keyword.starts_with(USER_TAG_PREFIX)
+            || is_listed_ai_keyword
+            || matches!(origin, XmpKeywordOrigin::LegacyThisIsRaw)
+        {
+            keyword.to_string()
+        } else {
+            format!("{USER_TAG_PREFIX}{keyword}")
+        };
+        push_unique(&mut tags, &tag);
+    }
+    tags
+}
+
+/// Adds the tags read from XMP to `tags`. Earlier versions stored every plain `dc:subject`
+/// keyword as an AI tag; such a tag is dropped when the XMP now yields it as a user keyword.
+pub fn merge_xmp_keyword_tags(tags: &mut Vec<String>, subject: &[String], xmp_tags: &[String]) {
+    tags.retain(|tag| !is_ai_tag(tag) || !subject.contains(tag) || xmp_tags.contains(tag));
+    for tag in xmp_tags {
+        push_unique(tags, tag);
     }
 }
 
@@ -420,9 +529,7 @@ pub async fn start_background_indexing(
 
                     let should_generate_tags = match &metadata.tags {
                         None => true,
-                        Some(tags) => !tags.iter().any(|tag| {
-                            !tag.starts_with(COLOR_TAG_PREFIX) && !tag.starts_with(USER_TAG_PREFIX)
-                        }),
+                        Some(tags) => !tags.iter().any(|tag| is_ai_tag(tag)),
                     };
 
                     if should_generate_tags {
@@ -518,53 +625,78 @@ pub async fn start_background_indexing(
 fn modify_tags_for_path(
     path_str: &str,
     modify_fn: impl Fn(&mut Vec<String>),
-) -> Result<(), String> {
+) -> Result<ImageMetadata, String> {
     let (_, sidecar_path) = parse_virtual_path(path_str);
 
     let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
-    let mut tags = metadata.tags.unwrap_or_default();
+    let mut tags = metadata.tags.take().unwrap_or_default();
     modify_fn(&mut tags);
 
     tags.sort_unstable();
     tags.dedup();
 
-    if tags.is_empty() {
-        metadata.tags = None;
-    } else {
+    if !tags.is_empty() {
         metadata.tags = Some(tags);
     }
 
     let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
-    fs::write(sidecar_path, json_string).map_err(|e| e.to_string())
+    fs::write(sidecar_path, json_string).map_err(|e| e.to_string())?;
+    Ok(metadata)
 }
 
-#[tauri::command]
-pub fn add_tag_for_paths(paths: Vec<String>, tag: String) -> Result<(), String> {
-    paths.par_iter().for_each(|path| {
-        let tag_clone = tag.clone();
-        if let Err(e) = modify_tags_for_path(path, |tags| {
-            if !tags.contains(&tag_clone) {
-                tags.push(tag_clone.clone());
+/// Changes the tags of every path and synchronizes physical images to XMP.
+fn modify_tags_for_paths(
+    paths: &[String],
+    app_handle: AppHandle,
+    modify_fn: impl Fn(&mut Vec<String>) + Sync,
+) -> Result<(), String> {
+    let settings = crate::app_settings::load_settings(app_handle).unwrap_or_default();
+    let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
+    let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
+
+    paths
+        .par_iter()
+        .try_for_each(|path| -> Result<(), String> {
+            let metadata = modify_tags_for_path(path, &modify_fn)?;
+
+            if enable_xmp_sync && !path.contains("?vc=") {
+                let (source_path, _) = parse_virtual_path(path);
+                file_management::sync_metadata_to_xmp(
+                    &source_path,
+                    &metadata,
+                    create_xmp_if_missing,
+                    true,
+                );
             }
-        }) {
-            eprintln!("Failed to add tag to {}: {}", path, e);
-        }
-    });
-    Ok(())
+            Ok(())
+        })
+        .map_err(|error| {
+            eprintln!("{error}");
+            error
+        })
 }
 
 #[tauri::command]
-pub fn remove_tag_for_paths(paths: Vec<String>, tag: String) -> Result<(), String> {
-    paths.par_iter().for_each(|path| {
-        let tag_clone = tag.clone();
-        if let Err(e) = modify_tags_for_path(path, |tags| {
-            tags.retain(|t| t != &tag_clone);
-        }) {
-            eprintln!("Failed to remove tag from {}: {}", path, e);
+pub fn add_tag_for_paths(
+    paths: Vec<String>,
+    tag: String,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    modify_tags_for_paths(&paths, app_handle, |tags| {
+        if !tags.contains(&tag) {
+            tags.push(tag.clone());
         }
-    });
-    Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn remove_tag_for_paths(
+    paths: Vec<String>,
+    tag: String,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    modify_tags_for_paths(&paths, app_handle, |tags| tags.retain(|t| t != &tag))
 }
 
 #[tauri::command]
@@ -580,34 +712,7 @@ pub fn set_flag_for_paths(
         return Err(format!("Unsupported image flag: {flag}"));
     }
 
-    let settings = crate::app_settings::load_settings(app_handle).unwrap_or_default();
-    let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
-    let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
-
-    paths
-        .par_iter()
-        .try_for_each(|path| -> Result<(), String> {
-            modify_tags_for_path(path, |tags| {
-                apply_flag_to_tags(tags, &flag);
-            })?;
-
-            if enable_xmp_sync && !path.contains("?vc=") {
-                let (source_path, sidecar_path) = parse_virtual_path(path);
-                let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-                file_management::sync_metadata_to_xmp(
-                    &source_path,
-                    &metadata,
-                    create_xmp_if_missing,
-                    true,
-                );
-            }
-            Ok(())
-        })
-        .map_err(|error| {
-            eprintln!("{error}");
-            error
-        })?;
-    Ok(())
+    modify_tags_for_paths(&paths, app_handle, |tags| apply_flag_to_tags(tags, &flag))
 }
 
 #[cfg(test)]
@@ -630,6 +735,96 @@ mod flag_tests {
     }
 }
 
+#[cfg(test)]
+mod keyword_tests {
+    use super::*;
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    #[test]
+    fn keyword_paths_are_written_as_lightroom_keyword_bags() {
+        let keywords = XmpKeywords::from_tags(&strings(&[
+            "sky",
+            "user:places|germany|berlin",
+            "user:places|germany|munich",
+            "user:dog",
+        ]));
+        assert_eq!(
+            keywords.hierarchical,
+            strings(&["places|germany|berlin", "places|germany|munich", "dog"])
+        );
+        assert_eq!(
+            keywords.subject,
+            strings(&["sky", "places", "germany", "berlin", "munich", "dog"])
+        );
+        assert_eq!(keywords.ai, strings(&["sky"]));
+    }
+
+    #[test]
+    fn written_keywords_read_back_unchanged() {
+        let tags = strings(&["sky", "user:places|germany|berlin", "user:sky", "user:R&D"]);
+        let keywords = XmpKeywords::from_tags(&tags);
+        let origin = XmpKeywordOrigin::ThisIsRaw {
+            ai_keywords: keywords.ai.clone(),
+        };
+        let mut read = tags_from_xmp_keywords(&keywords.subject, &keywords.hierarchical, &origin);
+        read.sort();
+        let mut expected = tags;
+        expected.sort();
+        assert_eq!(read, expected);
+    }
+
+    #[test]
+    fn lightroom_keywords_are_user_keywords() {
+        let subject = strings(&["Berlin", "Germany", "Places", "sunset"]);
+        let hierarchical = strings(&["Places|Germany|Berlin", " | ", "sunset"]);
+        assert_eq!(
+            tags_from_xmp_keywords(&subject, &hierarchical, &XmpKeywordOrigin::Other),
+            strings(&["user:Places|Germany|Berlin", "user:sunset"])
+        );
+        assert_eq!(
+            tags_from_xmp_keywords(&subject, &[], &XmpKeywordOrigin::Other),
+            strings(&["user:Berlin", "user:Germany", "user:Places", "user:sunset"])
+        );
+    }
+
+    #[test]
+    fn earlier_this_is_raw_keywords_keep_their_meaning() {
+        let subject = strings(&["sky", "user:portrait"]);
+        assert_eq!(
+            tags_from_xmp_keywords(&subject, &[], &XmpKeywordOrigin::LegacyThisIsRaw),
+            subject
+        );
+    }
+
+    #[test]
+    fn merging_replaces_keywords_earlier_imported_as_ai_tags() {
+        let subject = strings(&["Berlin", "Germany", "sky"]);
+        let hierarchical = strings(&["Germany|Berlin"]);
+        let origin = XmpKeywordOrigin::ThisIsRaw {
+            ai_keywords: strings(&["sky"]),
+        };
+        let xmp_tags = tags_from_xmp_keywords(&subject, &hierarchical, &origin);
+
+        let mut tags = strings(&["Berlin", "Germany", "sky", "tree", "color:red"]);
+        merge_xmp_keyword_tags(&mut tags, &subject, &xmp_tags);
+        assert_eq!(
+            tags,
+            strings(&["sky", "tree", "color:red", "user:Germany|Berlin"])
+        );
+    }
+
+    #[test]
+    fn only_unprefixed_tags_are_ai_tags() {
+        assert!(is_ai_tag("sky"));
+        assert!(!is_ai_tag("user:sky"));
+        assert!(!is_ai_tag("flag:selected"));
+        assert!(!is_ai_tag("color:red"));
+    }
+}
+
 #[tauri::command]
 pub fn clear_ai_tags(root_path: String) -> Result<usize, String> {
     if !Path::new(&root_path).exists() {
@@ -648,12 +843,7 @@ pub fn clear_ai_tags(root_path: String) -> Result<usize, String> {
             && let Some(tags) = &mut metadata.tags
         {
             let original_len = tags.len();
-            // Keep user-controlled metadata tags, remove only generated AI tags.
-            tags.retain(|tag| {
-                tag.starts_with(COLOR_TAG_PREFIX)
-                    || tag.starts_with(FLAG_TAG_PREFIX)
-                    || tag.starts_with(USER_TAG_PREFIX)
-            });
+            tags.retain(|tag| !is_ai_tag(tag));
 
             if tags.len() < original_len {
                 if tags.is_empty() {
