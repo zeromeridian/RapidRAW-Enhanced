@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { ImageFile, Panel, ExifOverlay, LibraryDisplayMode, stepBrushSize } from '../components/ui/AppProperties';
-import { KEYBIND_DEFINITIONS, normalizeCombo } from '../utils/keyboardUtils';
+import i18n from 'i18next';
+import { KEYBIND_DEFINITIONS, getEffectiveCombo, normalizeCombo } from '../utils/keyboardUtils';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -10,6 +11,7 @@ import { useProcessStore } from '../store/useProcessStore';
 import { toggleAutoSync, useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
 import { ImageFlag } from '../utils/imageFlags';
+import { KEYWORD_SET_SIZE, getActiveKeywordSet, getKeywordSets } from '../utils/keywords';
 
 interface KeyboardShortcutsProps {
   sortedImageList: Array<ImageFile>;
@@ -33,7 +35,7 @@ export const useKeyboardShortcuts = ({
   handleZoomChange,
 }: KeyboardShortcutsProps) => {
   const { handleRotate, handleCopyAdjustments, handlePasteAdjustments } = useEditorActions();
-  const { handleRate, handleSetColorLabel, handleSetFlag } = useLibraryActions();
+  const { handleRate, handleSetColorLabel, handleSetFlag, handleToggleKeyword } = useLibraryActions();
 
   const sortedListRef = useRef(sortedImageList);
   useEffect(() => {
@@ -66,8 +68,7 @@ export const useKeyboardShortcuts = ({
     const keybinds = useSettingsStore.getState().appSettings?.keybinds;
 
     for (const def of KEYBIND_DEFINITIONS) {
-      const userCombo = keybinds?.[def.action];
-      const effective = userCombo && userCombo.length > 0 ? userCombo : def.defaultCombo;
+      const effective = getEffectiveCombo(def, keybinds);
       if (effective) {
         comboMap.set(effective.join('+'), def.action);
       }
@@ -100,6 +101,16 @@ export const useKeyboardShortcuts = ({
           multiSelectedPaths: [nextImage.path],
         });
       }
+    };
+
+    const selectNextKeywordSet = () => {
+      const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+      const sets = getKeywordSets(appSettings);
+      const activeIndex = sets.findIndex((set) => set.id === getActiveKeywordSet(appSettings)?.id);
+      const next = sets[(activeIndex + 1) % sets.length];
+      if (!appSettings || !next) return;
+      void handleSettingsChange({ ...appSettings, activeKeywordSet: next.id });
+      toast.info(i18n.t('editor.tagging.keywordSetSelected', { name: next.name }));
     };
 
     const executeCullingShortcut = (
@@ -573,6 +584,25 @@ export const useKeyboardShortcuts = ({
         execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
           executeCullingShortcut(e, s, () => handleSetFlag(ImageFlag.Unflagged)),
       },
+      ...Object.fromEntries(
+        Array.from({ length: KEYWORD_SET_SIZE }, (_, index) => [
+          `apply_keyword_${index + 1}`,
+          {
+            shouldFire: () => !!getActiveKeywordSet(useSettingsStore.getState().appSettings)?.keywords[index],
+            execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+              executeCullingShortcut(e, s, () =>
+                handleToggleKeyword(getActiveKeywordSet(s.settings.appSettings)?.keywords[index] ?? ''),
+              ),
+          },
+        ]),
+      ),
+      next_keyword_set: {
+        shouldFire: () => true,
+        execute: (e: KeyboardEvent) => {
+          e.preventDefault();
+          selectNextKeywordSet();
+        },
+      },
       brush_size_up: {
         shouldFire: isBrushPanelActive,
         execute: (e: any, s: any) => {
@@ -754,6 +784,7 @@ export const useKeyboardShortcuts = ({
     handleRate,
     handleSetColorLabel,
     handleSetFlag,
+    handleToggleKeyword,
     handleCopyImagePaths,
   ]);
 };

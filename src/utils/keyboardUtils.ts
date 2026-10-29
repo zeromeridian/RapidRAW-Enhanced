@@ -1,8 +1,10 @@
+import { KEYWORD_SET_SIZE } from './keywords';
+
 export interface KeybindDefinition {
   action: string;
   description: string;
   defaultCombo: string[];
-  section: 'library' | 'view' | 'rating' | 'panels' | 'editing';
+  section: 'library' | 'view' | 'rating' | 'keywords' | 'panels' | 'editing';
 }
 
 export interface KeybindSection {
@@ -15,6 +17,7 @@ export const KEYBIND_SECTIONS: KeybindSection[] = [
   { id: 'editing', label: 'settings.keybinds.sections.editing' },
   { id: 'view', label: 'settings.keybinds.sections.view' },
   { id: 'rating', label: 'settings.keybinds.sections.rating' },
+  { id: 'keywords', label: 'settings.keybinds.sections.keywords' },
   { id: 'panels', label: 'settings.keybinds.sections.panels' },
 ];
 
@@ -211,6 +214,18 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     defaultCombo: ['shift', 'Digit5'],
     section: 'rating',
   },
+  ...Array.from({ length: KEYWORD_SET_SIZE }, (_, index): KeybindDefinition => ({
+    action: `apply_keyword_${index + 1}`,
+    description: `settings.keybinds.actions.apply_keyword_${index + 1}`,
+    defaultCombo: ['alt', `Digit${index + 1}`],
+    section: 'keywords',
+  })),
+  {
+    action: 'next_keyword_set',
+    description: 'settings.keybinds.actions.next_keyword_set',
+    defaultCombo: ['alt', 'Digit0'],
+    section: 'keywords',
+  },
   {
     action: 'toggle_adjustments',
     description: 'settings.keybinds.actions.toggle_adjustments',
@@ -373,6 +388,12 @@ const symMap: Record<string, string> = {
   CapsLock: 'Caps Lock',
   PrintScreen: 'PrtSc',
 };
+
+/** The user's combo for a shortcut, or its default when none is set. */
+export function getEffectiveCombo(definition: KeybindDefinition, keybinds?: Record<string, string[]>): string[] {
+  const userCombo = keybinds?.[definition.action];
+  return userCombo && userCombo.length > 0 ? userCombo : definition.defaultCombo;
+}
 
 export function normalizeCombo(event: KeyboardEvent, osPlatform?: string): string[] {
   const isMacDelete = osPlatform === 'macos' && event.code === 'Backspace' && (event.ctrlKey || event.metaKey);

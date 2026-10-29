@@ -28,6 +28,7 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import { isImageFlagTag } from '../../../utils/imageFlags';
+import { USER_TAG_PREFIX, formatKeyword, parseKeywordInput } from '../../../utils/keywords';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
 import { getDisplayFilename } from '../../../utils/outputNaming';
 
@@ -93,7 +94,6 @@ function CullingPreview({
   const [tagInputValue, setTagInputValue] = useState('');
   const [fitScale, setFitScale] = useState<number | null>(null);
   const { handleRate, handleSetColorLabel, handleTagsChanged } = useLibraryActions();
-  const USER_TAG_PREFIX = 'user:';
 
   const currentColor = useMemo(() => {
     return image.tags?.find((t) => t.startsWith('color:'))?.substring(6) || null;
@@ -159,7 +159,7 @@ function CullingPreview({
   const imageHeight = (image as any).height || image.exif?.ExifImageHeight || image.exif?.PixelYDimension;
 
   const handleAddTag = async (tagToAdd: string) => {
-    const newTagValue = tagToAdd.trim().toLowerCase();
+    const newTagValue = parseKeywordInput(tagToAdd);
     if (newTagValue && !currentTags.some((t) => t.tag === newTagValue)) {
       try {
         const prefixedTag = `${USER_TAG_PREFIX}${newTagValue}`;
@@ -732,7 +732,7 @@ function CullingPreview({
                       onClick={() => handleRemoveTag(tagItem)}
                     >
                       <Text as="span" variant={TextVariants.small} className="text-white/90 text-xs">
-                        {tagItem.tag}
+                        {formatKeyword(tagItem.tag)}
                       </Text>
                       <X size={10} className="text-white/50 group-hover:text-white" />
                     </motion.div>

@@ -7,16 +7,17 @@ import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 
 import { Invokes } from '../../ui/AppProperties';
+import KeywordSetSection from './KeywordSetSection';
 import Text from '../../ui/Text';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { isImageFlagTag } from '../../../utils/imageFlags';
-
-const USER_TAG_PREFIX = 'user:';
+import { USER_TAG_PREFIX, formatKeyword, parseKeywordInput } from '../../../utils/keywords';
 
 const isEditableTag = (tag: string) => !tag.startsWith('color:') && !isImageFlagTag(tag);
-const displayTag = (tag: string) => (tag.startsWith(USER_TAG_PREFIX) ? tag.slice(USER_TAG_PREFIX.length) : tag);
+const displayTag = (tag: string) =>
+  formatKeyword(tag.startsWith(USER_TAG_PREFIX) ? tag.slice(USER_TAG_PREFIX.length) : tag);
 
 export default function TaggingPanel() {
   const { t } = useTranslation();
@@ -45,7 +46,7 @@ export default function TaggingPanel() {
   }, [imageList, targetPaths]);
 
   const addTag = async () => {
-    const normalized = tagInput.trim().toLowerCase();
+    const normalized = parseKeywordInput(tagInput);
     if (!normalized || targetPaths.length === 0) return;
     const storedTag = `${USER_TAG_PREFIX}${normalized}`;
     try {
@@ -166,7 +167,12 @@ export default function TaggingPanel() {
                   <Plus size={16} />
                 </button>
               </div>
+              <Text variant={TextVariants.small} color={TextColors.secondary} className="mt-2">
+                {t('editor.tagging.hierarchyHint')}
+              </Text>
             </div>
+
+            <KeywordSetSection targetPaths={targetPaths} />
           </div>
         ) : (
           <Text

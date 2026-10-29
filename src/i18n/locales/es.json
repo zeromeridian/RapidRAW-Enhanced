@@ -1218,8 +1218,7 @@
       "addTagTooltip": "Añadir etiqueta",
       "noTags": "No se añadieron etiquetas",
       "placeholder": "Añadir una etiqueta...",
-      "removeTooltip": "Eliminar etiqueta \"{{tag}}\"",
-      "shortcutsHeading": "ATAJOS"
+      "removeTooltip": "Eliminar etiqueta \"{{tag}}\""
     }
   },
   "modals": {
@@ -1773,14 +1772,25 @@
         "zoom_in_step": "Acercar (por pasos)",
         "zoom_out": "Alejar",
         "zoom_out_step": "Alejar (por pasos)",
-        "toggle_auto_sync": "Toggle Auto Sync"
+        "toggle_auto_sync": "Toggle Auto Sync",
+        "apply_keyword_1": "Toggle keyword 1 of the keyword set",
+        "apply_keyword_2": "Toggle keyword 2 of the keyword set",
+        "apply_keyword_3": "Toggle keyword 3 of the keyword set",
+        "apply_keyword_4": "Toggle keyword 4 of the keyword set",
+        "apply_keyword_5": "Toggle keyword 5 of the keyword set",
+        "apply_keyword_6": "Toggle keyword 6 of the keyword set",
+        "apply_keyword_7": "Toggle keyword 7 of the keyword set",
+        "apply_keyword_8": "Toggle keyword 8 of the keyword set",
+        "apply_keyword_9": "Toggle keyword 9 of the keyword set",
+        "next_keyword_set": "Next keyword set"
       },
       "sections": {
         "editing": "Edición",
         "library": "Biblioteca",
         "panels": "Paneles",
         "rating": "Puntuación y etiquetas",
-        "view": "Ver"
+        "view": "Ver",
+        "keywords": "Keywords"
       }
     },
     "language": "Idioma",
@@ -1943,8 +1953,6 @@
     "tagging": {
       "addCustomPlaceholder": "Añadir etiquetas de IA personalizadas (separadas por comas)...",
       "addCustomTooltip": "Añadir etiqueta de IA",
-      "addShortcutTooltip": "Añadir atajo",
-      "addShortcutsPlaceholder": "Añadir atajos (separados por comas)...",
       "aiTagging": "Etiquetado por IA",
       "aiTaggingDesc": "Habilita el etiquetado automático de imágenes mediante un modelo de IA (CLIP). Esto descargará un modelo adicional y afectará el rendimiento al navegar por las carpetas. Las etiquetas se utilizan para buscar en una carpeta.",
       "amount": "Cantidad",
@@ -1955,17 +1963,12 @@
       "clearAllTagsDesc": "Esto eliminará todas las etiquetas generadas por IA y las añadidas por los usuarios de tus archivos .tirdata en todas las carpetas raíz activas. Se mantendrán las etiquetas de color.",
       "clearAllTagsTitle": "Borrar todas las etiquetas",
       "clearCustomTooltip": "Borrar lista de etiquetas de IA",
-      "clearShortcutsTooltip": "Borrar lista de etiquetas de atajos",
       "customList": "Lista de etiquetas de IA personalizada",
       "customListDesc": "Si se proporciona, la IA SOLO utilizará las etiquetas de esta lista, anulando la lista incorporada de ThisIsRAW. El etiquetado funciona solo en inglés.",
       "maxAiTags": "Máximo de etiquetas de IA",
       "maxAiTagsDesc": "El número máximo de etiquetas a generar por imagen.",
       "noCustomTags": "No hay etiquetas de IA personalizadas (Usando la lista incorporada)",
-      "noShortcuts": "No se añadieron atajos",
       "removeCustomTooltip": "Eliminar etiqueta \"{{tag}}\"",
-      "removeShortcutTooltip": "Eliminar atajo \"{{shortcut}}\"",
-      "shortcuts": "Atajos de etiquetado",
-      "shortcutsDesc": "Una lista de etiquetas que aparecerán como atajos en el menú contextual de etiquetado.",
       "title": "Etiquetado"
     },
     "thanks": {

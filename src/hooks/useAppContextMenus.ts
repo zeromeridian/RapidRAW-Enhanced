@@ -80,6 +80,7 @@ import {
 import { autoStackCreatedImages } from '../utils/autoStacking';
 import { getEnabledCopySuffix } from '../utils/outputNaming';
 import { isImageFlagTag } from '../utils/imageFlags';
+import { USER_TAG_PREFIX } from '../utils/keywords';
 
 export interface UseAppContextMenusProps {
   handleImageSelect: (path: string) => void;
@@ -168,8 +169,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
     return Array.from(commonTagsWithPrefix)
       .map((tag: string) => ({
-        tag: tag.startsWith('user:') ? tag.substring(5) : tag,
-        isUser: tag.startsWith('user:'),
+        tag: tag.startsWith(USER_TAG_PREFIX) ? tag.substring(USER_TAG_PREFIX.length) : tag,
+        isUser: tag.startsWith(USER_TAG_PREFIX),
       }))
       .sort((a, b) => a.tag.localeCompare(b.tag));
   }, []);

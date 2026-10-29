@@ -1189,8 +1189,7 @@
       "addTagTooltip": "添加标签",
       "noTags": "未添加标签",
       "placeholder": "添加标签...",
-      "removeTooltip": "移除标签 \"{{tag}}\"",
-      "shortcutsHeading": "快捷方式"
+      "removeTooltip": "移除标签 \"{{tag}}\""
     }
   },
   "modals": {
@@ -1731,14 +1730,25 @@
         "zoom_in_step": "放大（步进）",
         "zoom_out": "缩小",
         "zoom_out_step": "缩小（步进）",
-        "toggle_auto_sync": "Toggle Auto Sync"
+        "toggle_auto_sync": "Toggle Auto Sync",
+        "apply_keyword_1": "Toggle keyword 1 of the keyword set",
+        "apply_keyword_2": "Toggle keyword 2 of the keyword set",
+        "apply_keyword_3": "Toggle keyword 3 of the keyword set",
+        "apply_keyword_4": "Toggle keyword 4 of the keyword set",
+        "apply_keyword_5": "Toggle keyword 5 of the keyword set",
+        "apply_keyword_6": "Toggle keyword 6 of the keyword set",
+        "apply_keyword_7": "Toggle keyword 7 of the keyword set",
+        "apply_keyword_8": "Toggle keyword 8 of the keyword set",
+        "apply_keyword_9": "Toggle keyword 9 of the keyword set",
+        "next_keyword_set": "Next keyword set"
       },
       "sections": {
         "editing": "编辑",
         "library": "图库",
         "panels": "面板",
         "rating": "评分与标签",
-        "view": "视图"
+        "view": "视图",
+        "keywords": "Keywords"
       }
     },
     "language": "语言",
@@ -1901,8 +1911,6 @@
     "tagging": {
       "addCustomPlaceholder": "添加自定义 AI 标签（逗号分隔）...",
       "addCustomTooltip": "添加 AI 标签",
-      "addShortcutTooltip": "添加快捷方式",
-      "addShortcutsPlaceholder": "添加快捷方式（逗号分隔）...",
       "aiTagging": "AI 标签",
       "aiTaggingDesc": "使用 AI（CLIP）模型启用自动图像标签。这将下载额外的模型，并在浏览文件夹时影响性能。标签用于搜索文件夹。",
       "amount": "数量",
@@ -1913,17 +1921,12 @@
       "clearAllTagsDesc": "这将从所有活动根文件夹中的 .tirdata 文件中移除所有 AI 生成和用户添加的标签。颜色标签将被保留。",
       "clearAllTagsTitle": "清除所有标签",
       "clearCustomTooltip": "清除 AI 标签列表",
-      "clearShortcutsTooltip": "清除快捷方式标签列表",
       "customList": "自定义 AI 标签列表",
       "customListDesc": "如果提供，AI 将仅使用此列表中的标签，覆盖 ThisIsRAW 内置的标签列表。标签功能仅支持英文。",
       "maxAiTags": "最大 AI 标签数",
       "maxAiTagsDesc": "每张图像生成的最大标签数量。",
       "noCustomTags": "无自定义 AI 标签（使用内置列表）",
-      "noShortcuts": "未添加快捷方式",
       "removeCustomTooltip": "移除标签 \"{{tag}}\"",
-      "removeShortcutTooltip": "移除快捷方式 \"{{shortcut}}\"",
-      "shortcuts": "标签快捷方式",
-      "shortcutsDesc": "将出现在标签上下文菜单中作为快捷方式的标签列表。",
       "title": "标签"
     },
     "thanks": {

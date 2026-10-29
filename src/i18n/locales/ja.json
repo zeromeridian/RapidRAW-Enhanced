@@ -1189,8 +1189,7 @@
       "addTagTooltip": "タグを追加",
       "noTags": "タグが追加されていません",
       "placeholder": "タグを追加...",
-      "removeTooltip": "タグ「{{tag}}」を削除",
-      "shortcutsHeading": "ショートカット"
+      "removeTooltip": "タグ「{{tag}}」を削除"
     }
   },
   "modals": {
@@ -1731,14 +1730,25 @@
         "zoom_in_step": "段階的にズームイン",
         "zoom_out": "ズームアウト",
         "zoom_out_step": "段階的にズームアウト",
-        "toggle_auto_sync": "Toggle Auto Sync"
+        "toggle_auto_sync": "Toggle Auto Sync",
+        "apply_keyword_1": "Toggle keyword 1 of the keyword set",
+        "apply_keyword_2": "Toggle keyword 2 of the keyword set",
+        "apply_keyword_3": "Toggle keyword 3 of the keyword set",
+        "apply_keyword_4": "Toggle keyword 4 of the keyword set",
+        "apply_keyword_5": "Toggle keyword 5 of the keyword set",
+        "apply_keyword_6": "Toggle keyword 6 of the keyword set",
+        "apply_keyword_7": "Toggle keyword 7 of the keyword set",
+        "apply_keyword_8": "Toggle keyword 8 of the keyword set",
+        "apply_keyword_9": "Toggle keyword 9 of the keyword set",
+        "next_keyword_set": "Next keyword set"
       },
       "sections": {
         "editing": "編集",
         "library": "ライブラリ",
         "panels": "パネル",
         "rating": "評価とラベル",
-        "view": "表示"
+        "view": "表示",
+        "keywords": "Keywords"
       }
     },
     "language": "言語",
@@ -1901,8 +1911,6 @@
     "tagging": {
       "addCustomPlaceholder": "カスタムAIタグを入力（カンマ区切り）...",
       "addCustomTooltip": "AIタグを追加",
-      "addShortcutTooltip": "ショートカットを追加",
-      "addShortcutsPlaceholder": "ショートカットを入力（カンマ区切り）...",
       "aiTagging": "AIタグ付け",
       "aiTaggingDesc": "AI（CLIP）モデルを使用した自動画像タグ付けを有効にします。追加のモデルがダウンロードされ、フォルダ閲覧時のパフォーマンスに影響します。タグはフォルダ内検索に使用されます。",
       "amount": "適用度",
@@ -1913,17 +1921,12 @@
       "clearAllTagsDesc": "アクティブなすべてのルートフォルダ内にある .tirdata ファイルから、すべてのタグ（AI生成および手動）を削除します。カラーラベルは維持されます。",
       "clearAllTagsTitle": "すべてのタグをクリア",
       "clearCustomTooltip": "AIタグリストをクリア",
-      "clearShortcutsTooltip": "ショートカットリストをクリア",
       "customList": "カスタムAIタグリスト",
       "customListDesc": "タグを指定した場合、AIはリスト内のタグのみを使用し、ThisIsRAWの内蔵リストは使用されません。タグ付け機能は英語のみ対応しています。",
       "maxAiTags": "最大AIタグ数",
       "maxAiTagsDesc": "画像ごとに生成されるAIタグの最大数。",
       "noCustomTags": "カスタムAIタグなし（内蔵リストを使用中）",
-      "noShortcuts": "ショートカット未登録",
       "removeCustomTooltip": "タグ「{{tag}}」を削除",
-      "removeShortcutTooltip": "ショートカット「{{shortcut}}」を削除",
-      "shortcuts": "タグ用ショートカット",
-      "shortcutsDesc": "タグコンテキストメニューにショートカットとして表示されるタグのリスト。",
       "title": "タグ付け"
     },
     "thanks": {

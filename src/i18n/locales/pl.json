@@ -1245,8 +1245,7 @@
       "addTagTooltip": "Dodaj tag",
       "noTags": "Brak dodanych tagów",
       "placeholder": "Dodaj tag...",
-      "removeTooltip": "Usuń tag \"{{tag}}\"",
-      "shortcutsHeading": "SKRÓTY"
+      "removeTooltip": "Usuń tag \"{{tag}}\""
     }
   },
   "modals": {
@@ -1813,14 +1812,25 @@
         "zoom_in_step": "Przybliż (krokowo)",
         "zoom_out": "Oddal",
         "zoom_out_step": "Oddal (krokowo)",
-        "toggle_auto_sync": "Toggle Auto Sync"
+        "toggle_auto_sync": "Toggle Auto Sync",
+        "apply_keyword_1": "Toggle keyword 1 of the keyword set",
+        "apply_keyword_2": "Toggle keyword 2 of the keyword set",
+        "apply_keyword_3": "Toggle keyword 3 of the keyword set",
+        "apply_keyword_4": "Toggle keyword 4 of the keyword set",
+        "apply_keyword_5": "Toggle keyword 5 of the keyword set",
+        "apply_keyword_6": "Toggle keyword 6 of the keyword set",
+        "apply_keyword_7": "Toggle keyword 7 of the keyword set",
+        "apply_keyword_8": "Toggle keyword 8 of the keyword set",
+        "apply_keyword_9": "Toggle keyword 9 of the keyword set",
+        "next_keyword_set": "Next keyword set"
       },
       "sections": {
         "editing": "Edycja",
         "library": "Biblioteka",
         "panels": "Panele",
         "rating": "Oceny i Etykiety",
-        "view": "Widok"
+        "view": "Widok",
+        "keywords": "Keywords"
       }
     },
     "language": "Język",
@@ -1983,8 +1993,6 @@
     "tagging": {
       "addCustomPlaceholder": "Dodaj własne tagi AI (oddzielone przecinkiem)...",
       "addCustomTooltip": "Dodaj tag AI",
-      "addShortcutTooltip": "Dodaj skrót",
-      "addShortcutsPlaceholder": "Dodaj skróty (oddzielone przecinkiem)...",
       "aiTagging": "Tagowanie przez AI",
       "aiTaggingDesc": "Włącza automatyczne tagowanie przy użyciu modelu AI (CLIP). Wymaga to pobrania dodatkowego modelu AI i wpłynie na wydajność podczas przeglądania folderów. Tagi ułatwią późniejsze wyszukiwanie.",
       "amount": "Ilość",
@@ -1995,17 +2003,12 @@
       "clearAllTagsDesc": "To usunie wszystkie tagi dodane przez użytkownika i wygenerowane przez AI z plików .tirdata w aktywnych katalogach głównych. Etykiety kolorów zostaną zachowane.",
       "clearAllTagsTitle": "Wyczyść wszystkie tagi",
       "clearCustomTooltip": "Wyczyść listę tagów AI",
-      "clearShortcutsTooltip": "Wyczyść listę skrótów do tagów",
       "customList": "Niestandardowa lista tagów AI",
       "customListDesc": "Jeżeli ją podasz, sztuczna inteligencja wygeneruje TYLKO tagi obecne na tej liście, omijając domyślną listę ThisIsRAW. Tagowanie działa jedynie w języku angielskim.",
       "maxAiTags": "Maksymalna liczba tagów AI",
       "maxAiTagsDesc": "Maksymalna liczba wygenerowanych tagów na jeden obraz.",
       "noCustomTags": "Brak własnych tagów (używana domyślna lista)",
-      "noShortcuts": "Brak dodanych skrótów",
       "removeCustomTooltip": "Usuń tag \"{{tag}}\"",
-      "removeShortcutTooltip": "Usuń skrót \"{{shortcut}}\"",
-      "shortcuts": "Skróty do tagowania",
-      "shortcutsDesc": "Lista tagów, które będą widoczne jako szybkie skróty w menu kontekstowym tagowania.",
       "title": "Tagowanie"
     },
     "thanks": {

@@ -16,6 +16,7 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { getDisplayFilename } from '../../../utils/outputNaming';
 import { isImageFlagTag } from '../../../utils/imageFlags';
+import { USER_TAG_PREFIX, formatKeyword, getActiveKeywordSet, parseKeywordInput } from '../../../utils/keywords';
 
 interface CameraSetting {
   format?(value: number): string | number;
@@ -41,8 +42,6 @@ interface MetaDataItemProps {
   label: string;
   value: any;
 }
-
-const USER_TAG_PREFIX = 'user:';
 
 function formatExifTag(str: string) {
   if (!str) return '';
@@ -342,8 +341,10 @@ export default function MetadataPanel() {
       ? ((selectedImage.width * selectedImage.height) / 1000000).toFixed(1)
       : null;
 
+  const keywordSetShortcuts = getActiveKeywordSet(appSettings)?.keywords.filter(Boolean) ?? [];
+
   const handleAddTag = async (tagToAdd: string) => {
-    const newTagValue = tagToAdd.trim().toLowerCase();
+    const newTagValue = parseKeywordInput(tagToAdd);
     if (newTagValue && !currentTags.some((t) => t.tag === newTagValue)) {
       try {
         const prefixedTag = `${USER_TAG_PREFIX}${newTagValue}`;
@@ -681,7 +682,7 @@ export default function MetadataPanel() {
                                       color={TextColors.primary}
                                       weight={TextWeights.medium}
                                     >
-                                      {tagItem.tag}
+                                      {formatKeyword(tagItem.tag)}
                                     </Text>
                                     <X size={10} className="opacity-50 group-hover:opacity-100" />
                                   </motion.div>
@@ -718,15 +719,15 @@ export default function MetadataPanel() {
                               <Plus size={14} />
                             </button>
                           </div>
-                          {appSettings?.taggingShortcuts && appSettings.taggingShortcuts.length > 0 && (
+                          {keywordSetShortcuts.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1">
-                              {appSettings.taggingShortcuts.map((shortcut) => (
+                              {keywordSetShortcuts.map((shortcut) => (
                                 <button
                                   key={shortcut}
                                   onClick={() => handleAddTag(shortcut)}
                                   className="text-xs font-medium bg-bg-secondary hover:bg-card-active text-text-secondary px-1.5 py-0.5 rounded-sm border border-transparent hover:border-border-color transition-all"
                                 >
-                                  {shortcut}
+                                  {formatKeyword(shortcut)}
                                 </button>
                               ))}
                             </div>

@@ -185,6 +185,14 @@ details are in `RELEASE_NOTES.MD`.
   **Others** submenu.
 - A dedicated **Tagging** module adds and removes tags across the current image
   or multi-image selection, with common and mixed tags clearly distinguished.
+- Hierarchical keywords, as in Lightroom Classic: type `places > germany >
+  berlin` to file a keyword under its parents. Searching any level finds the
+  photo.
+- Lightroom-style **Keyword Sets**: editable named sets of nine keywords,
+  shown as a toggle grid in the Tagging panel and applied with configurable
+  Option/Alt+1…9 shortcuts (Option/Alt+0 cycles sets, Caps Lock
+  auto-advances). The active set also feeds the tagging context menu and the
+  Metadata panel.
 - Persisted **Black & White** switch in the global Color section.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.
@@ -252,6 +260,9 @@ details are in `RELEASE_NOTES.MD`.
   with ThisIsRAW recorded as the exporting software.
 - XMP synchronization for ratings, color labels, keywords, physical-image
   flags, and physical stack membership, order, cover, and collapsed state.
+  Keywords are written and read in Lightroom Classic's format, including the
+  keyword hierarchy; keywords from other applications become user keywords,
+  and AI keywords stay distinguishable between ThisIsRAW installations.
 - Recursive **Read XMP from Folder** action that treats XMP as authoritative
   for matching images, recognizes basename and full-filename sidecars, reports
   the imported-image count, and refreshes the currently open folder.

@@ -1245,8 +1245,7 @@
       "addTagTooltip": "Добавить тег",
       "noTags": "Теги не добавлены",
       "placeholder": "Добавить тег...",
-      "removeTooltip": "Удалить тег \"{{tag}}\"",
-      "shortcutsHeading": "ГОРЯЧИЕ КЛАВИШИ"
+      "removeTooltip": "Удалить тег \"{{tag}}\""
     }
   },
   "modals": {
@@ -1813,14 +1812,25 @@
         "zoom_in_step": "Приблизить по шагам",
         "zoom_out": "Отдалить",
         "zoom_out_step": "Отдалить по шагам",
-        "toggle_auto_sync": "Toggle Auto Sync"
+        "toggle_auto_sync": "Toggle Auto Sync",
+        "apply_keyword_1": "Toggle keyword 1 of the keyword set",
+        "apply_keyword_2": "Toggle keyword 2 of the keyword set",
+        "apply_keyword_3": "Toggle keyword 3 of the keyword set",
+        "apply_keyword_4": "Toggle keyword 4 of the keyword set",
+        "apply_keyword_5": "Toggle keyword 5 of the keyword set",
+        "apply_keyword_6": "Toggle keyword 6 of the keyword set",
+        "apply_keyword_7": "Toggle keyword 7 of the keyword set",
+        "apply_keyword_8": "Toggle keyword 8 of the keyword set",
+        "apply_keyword_9": "Toggle keyword 9 of the keyword set",
+        "next_keyword_set": "Next keyword set"
       },
       "sections": {
         "editing": "Редактирование",
         "library": "Библиотека",
         "panels": "Панели",
         "rating": "Оценки и метки",
-        "view": "Отображение"
+        "view": "Отображение",
+        "keywords": "Keywords"
       }
     },
     "language": "Язык",
@@ -1983,8 +1993,6 @@
     "tagging": {
       "addCustomPlaceholder": "Добавить пользовательские AI-теги (через запятую)...",
       "addCustomTooltip": "Добавить ИИ-тег",
-      "addShortcutTooltip": "Добавить быстрый выбор",
-      "addShortcutsPlaceholder": "Добавить ярлыки (через запятую)...",
       "aiTagging": "Тегирование силами ИИ",
       "aiTaggingDesc": "Включает автоматический анализ содержимого кадра и присвоение тегов ИИ-моделью (CLIP). Потребуется загрузка файла весов модели, что может временно снизить производительность при первом чтении каталогов. Теги используются для поиска по ключевым словам.",
       "amount": "Интенсивность",
@@ -1995,17 +2003,12 @@
       "clearAllTagsDesc": "Это приведет к очистке всех тегов (сгенерированных ИИ и созданных вами) в файлах .tirdata во всех активных корневых папках. Цветовые метки сохранятся.",
       "clearAllTagsTitle": "Удалить абсолютно все теги",
       "clearCustomTooltip": "Очистить список тегов ИИ",
-      "clearShortcutsTooltip": "Очистить список быстрого выбора",
       "customList": "Индивидуальный ИИ-словарь",
       "customListDesc": "Если указано, ИИ-модель будет выбирать теги исключительно из этого списка, игнорируя встроенный словарь ThisIsRAW. Тегирование производится на английском языке.",
       "maxAiTags": "Максимум ИИ-тегов",
       "maxAiTagsDesc": "Максимальное количество ключевых слов, генерируемых моделью для одного кадра.",
       "noCustomTags": "Индивидуальный словарь пуст (используется встроенный список)",
-      "noShortcuts": "Ярлыки быстрого выбора не настроены",
       "removeCustomTooltip": "Удалить тег \"{{tag}}\"",
-      "removeShortcutTooltip": "Удалить ярлык \"{{shortcut}}\"",
-      "shortcuts": "Ярлыки быстрого тегирования",
-      "shortcutsDesc": "Список тегов, которые будут отображаться в качестве кнопок быстрого клика в меню тегирования.",
       "title": "Тегирование"
     },
     "thanks": {
