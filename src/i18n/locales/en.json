@@ -850,7 +850,7 @@
       "newKeywordSet": "New keyword set",
       "newKeywordSetName": "New Set",
       "noAiSuggestions": "No AI suggestions for this photo",
-      "noSuggestions": "No suggestions for this photo yet. They come from photos taken around the same time and keywords used together.",
+      "noSuggestions": "Add a keyword to see keywords you often use together with it.",
       "noTags": "No tags",
       "placeholder": "Enter a tag…",
       "removeFailed": "Could not remove tag: {{error}}",

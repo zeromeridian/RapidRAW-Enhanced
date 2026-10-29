@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.20.2-dev-advanced-tags — 2026-10-29
+
+### Keywords
+
+- Keyword suggestions no longer come from photos taken around the same time,
+  which carried keywords over to unrelated photos from the same shoot. They
+  now show keywords you often use together with the ones the photo already
+  has, so a photo without keywords shows none until you add one.
+
 ## 1.20.1-dev-advanced-tags — 2026-10-29
 
 ### Keywords
