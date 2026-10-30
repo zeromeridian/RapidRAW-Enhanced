@@ -202,7 +202,8 @@ details are in `RELEASE_NOTES.MD`.
   group); clicking a keyword shows every library photo with it or its child
   keywords. Library-wide rename, move, merge, and delete as a cancellable
   background job. The Tagging panel is available in the editor and next to
-  the Library grid (drop photos on a keyword to tag them). Collapsible
+  the Library grid (stays open across restarts; drop photos on a keyword to
+  tag them). Collapsible
   sections and a `keyword:` search query.
 - Persisted **Black & White** switch in the global Color section.
 - Named tone-curve presets with unique names, built-in Linear and contrast

@@ -4,7 +4,7 @@ import CommunityPage from '../panel/CommunityPage';
 import MainLibrary from '../panel/MainLibrary';
 import BottomBar from '../panel/BottomBar';
 
-import { LibraryRightPanel, useUIStore } from '../../store/useUIStore';
+import { useUIStore } from '../../store/useUIStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useProcessStore } from '../../store/useProcessStore';
@@ -79,8 +79,15 @@ export default function LibraryView({
       setUI: state.setUI,
     })),
   );
-  const toggleLibraryRightPanel = (panel: LibraryRightPanel) =>
-    setUI((state) => ({ libraryRightPanel: state.libraryRightPanel === panel ? null : panel }));
+  // Shows the Tagging panel in place of an open Export panel, or hides it; the choice is remembered.
+  const toggleTaggingPanel = () =>
+    setUI((state) => ({
+      isLibraryExportPanelVisible: false,
+      uiVisibility: {
+        ...state.uiVisibility,
+        libraryTagging: state.isLibraryExportPanelVisible || !state.uiVisibility.libraryTagging,
+      },
+    }));
 
   const {
     rootPaths,
@@ -193,8 +200,10 @@ export default function LibraryView({
             isResetDisabled={multiSelectedPaths.length === 0}
             multiSelectedPaths={multiSelectedPaths}
             onCopy={handleCopyAdjustments}
-            onExportClick={() => toggleLibraryRightPanel('export')}
-            onTaggingClick={() => toggleLibraryRightPanel('tagging')}
+            onExportClick={() =>
+              setUI((state) => ({ isLibraryExportPanelVisible: !state.isLibraryExportPanelVisible }))
+            }
+            onTaggingClick={toggleTaggingPanel}
             onDeleteRejected={handleDeleteRejected}
             onFlag={handleSetFlag}
             onSetColorLabel={handleSetColorLabel}

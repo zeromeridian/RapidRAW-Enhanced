@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.22.1-dev-advanced-tags — 2026-10-29
+
+### Keywords
+
+- The Tagging panel next to the Library grid now stays open until you hide
+  it, also after opening a photo in the editor and after restarting the
+  app. Opening Export shows it in place of the Tagging panel; closing Export
+  brings the Tagging panel back.
+
 ## 1.22.0-dev-advanced-tags — 2026-10-29
 
 ### Keywords
