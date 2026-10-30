@@ -4,21 +4,20 @@
 //! their modification times and only speeds up the Keyword List and keyword views.
 
 use std::collections::HashSet;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::UNIX_EPOCH;
 
 use rayon::prelude::*;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use walkdir::WalkDir;
 
+use crate::embedded_xmp::can_embed_xmp;
 use crate::file_management::{
-    is_cloud_placeholder, parse_sidecar_filename, parse_virtual_path, resolve_xmp_path,
-    sync_metadata_from_xmp,
+    is_cloud_placeholder, modified_nanos, parse_sidecar_filename, parse_virtual_path,
+    resolve_xmp_path, sync_metadata_from_xmp,
 };
 use crate::formats::is_supported_image_file;
 use crate::library_catalog::{self, KeywordIndexEntry};
@@ -71,21 +70,20 @@ fn entry_key(virtual_path: &str) -> String {
     }
 }
 
-fn modified_nanos(path: &Path) -> u128 {
-    fs::metadata(path)
-        .and_then(|metadata| metadata.modified())
-        .ok()
-        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0)
-}
-
-/// Changes whenever the sidecar, the XMP file, or the XMP sync setting changes.
+/// Changes whenever the sidecar, the XMP file or embedded XMP, or the XMP sync setting changes.
 fn index_stamp(source_path: &Path, sidecar_path: &Path, enable_xmp_sync: bool) -> String {
-    let xmp_modified = enable_xmp_sync
-        .then(|| resolve_xmp_path(source_path))
-        .flatten()
-        .map_or(0, |xmp_path| modified_nanos(&xmp_path));
+    // Embedded XMP changes with the image itself.
+    let xmp_modified = if enable_xmp_sync {
+        let sidecar_xmp = resolve_xmp_path(source_path).map_or(0, |path| modified_nanos(&path));
+        let embedded_xmp = if can_embed_xmp(source_path) {
+            modified_nanos(source_path)
+        } else {
+            0
+        };
+        sidecar_xmp.max(embedded_xmp)
+    } else {
+        0
+    };
     format!(
         "{}:{}:{}",
         u8::from(enable_xmp_sync),
@@ -313,6 +311,7 @@ pub fn get_keyword_image_paths(tag: String, app_handle: AppHandle) -> Result<Vec
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn virtual_copy_names_do_not_change_the_entry_key() {

@@ -286,9 +286,13 @@ details are in `RELEASE_NOTES.MD`.
   Keywords are written and read in Lightroom Classic's format, including the
   keyword hierarchy; keywords from other applications become user keywords,
   and AI keywords stay distinguishable between ThisIsRAW installations.
+  XMP that Lightroom Classic embeds in JPEG, TIFF, DNG, and PNG files is read
+  too (never written): when a folder opens it is imported again only after
+  the file changes, and it wins over an older sidecar.
 - Recursive **Read XMP from Folder** action that treats XMP as authoritative
-  for matching images, recognizes basename and full-filename sidecars, reports
-  the imported-image count, and refreshes the currently open folder.
+  for matching images, recognizes basename and full-filename sidecars and
+  embedded XMP, reports the imported-image count, and refreshes the currently
+  open folder.
 - Initial Lightroom Classic translation covers global tone, presence, HSL,
   sharpening/noise reduction, color calibration, point curves, monochrome
   (including black-and-white profiles such as Adobe Monochrome), grain, and
