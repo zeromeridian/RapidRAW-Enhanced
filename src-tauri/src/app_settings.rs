@@ -69,6 +69,8 @@ pub struct LastFolderState {
     #[serde(default)]
     pub active_album_id: Option<String>,
     #[serde(default)]
+    pub active_keyword: Option<String>,
+    #[serde(default)]
     pub expanded_album_groups: Vec<String>,
 }
 

@@ -197,6 +197,10 @@ details are in `RELEASE_NOTES.MD`.
   photo's own, plus a separate on-demand **AI Suggestions** part (CLIP) that
   prefers the user's own keyword paths, in the Tagging panel and the tagging
   context menu.
+- Library-wide **Keyword List** in the Tagging panel (tree, counts, search,
+  checkboxes that add or remove a keyword for the selection, a separate AI tag
+  group); clicking a keyword shows every library photo with it or its child
+  keywords. Collapsible Tagging panel sections and a `keyword:` search query.
 - Persisted **Black & White** switch in the global Color section.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.

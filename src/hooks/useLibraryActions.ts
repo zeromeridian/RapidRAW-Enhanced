@@ -28,6 +28,21 @@ const getActionPaths = (): string[] => {
   return libraryActivePath ? [libraryActivePath] : [];
 };
 
+const persistTag = (tag: string, paths: string[], apply: boolean) =>
+  invoke(apply ? Invokes.AddTagForPaths : Invokes.RemoveTagForPaths, { paths, tag });
+
+const setTagInLibrary = (tag: string, paths: string[], apply: boolean) => {
+  const updatedPaths = new Set(paths);
+  useLibraryStore.getState().setLibrary((state) => ({
+    imageList: state.imageList.map((image) => {
+      if (!updatedPaths.has(image.path)) return image;
+      const otherTags = (image.tags || []).filter((imageTag) => imageTag !== tag);
+      const tags = apply ? [...otherTags, tag].sort() : otherTags;
+      return { ...image, tags: tags.length > 0 ? tags : null };
+    }),
+  }));
+};
+
 const applyWithAutoAdvance = (changedPaths: string[], applyChange: () => void) => {
   const { selectedImage } = useEditorStore.getState();
   const activePath = selectedImage?.path ?? useLibraryStore.getState().libraryActivePath;
@@ -151,7 +166,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
 
   // Adds a keyword to every target image, or removes it when every target already has it.
   const handleToggleKeyword = useCallback(async (keyword: string, paths?: string[]) => {
-    const { imageList, setLibrary } = useLibraryStore.getState();
+    const { imageList } = useLibraryStore.getState();
     const pathsToUpdate = paths || getActionPaths();
     if (!keyword || pathsToUpdate.length === 0) return;
 
@@ -161,20 +176,18 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     const isApplied = targets.length > 0 && targets.every((image) => image.tags?.includes(tag));
 
     try {
-      await invoke(isApplied ? Invokes.RemoveTagForPaths : Invokes.AddTagForPaths, { paths: pathsToUpdate, tag });
-      applyWithAutoAdvance(pathsToUpdate, () =>
-        setLibrary((state) => ({
-          imageList: state.imageList.map((image) => {
-            if (!updatedPaths.has(image.path)) return image;
-            const otherTags = (image.tags || []).filter((imageTag) => imageTag !== tag);
-            const tags = isApplied ? otherTags : [...otherTags, tag].sort();
-            return { ...image, tags: tags.length > 0 ? tags : null };
-          }),
-        })),
-      );
+      await persistTag(tag, pathsToUpdate, !isApplied);
+      applyWithAutoAdvance(pathsToUpdate, () => setTagInLibrary(tag, pathsToUpdate, !isApplied));
     } catch (err) {
       toast.error(`Failed to update keyword: ${err}`);
     }
+  }, []);
+
+  // Adds a stored tag to, or removes it from, the given images; throws when saving fails.
+  const handleSetTag = useCallback(async (tag: string, paths: string[], apply: boolean) => {
+    if (paths.length === 0) return;
+    await persistTag(tag, paths, apply);
+    setTagInLibrary(tag, paths, apply);
   }, []);
 
   const handleTagsChanged = useCallback((changedPaths: string[], newTags: { tag: string; isUser: boolean }[]) => {
@@ -524,6 +537,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     handleSetColorLabel,
     handleSetFlag,
     handleToggleKeyword,
+    handleSetTag,
     handleTagsChanged,
     handleUpdateExif,
     handleClearSelection,

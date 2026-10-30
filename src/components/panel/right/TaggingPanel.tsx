@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { Plus, Tag, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 
-import { Invokes } from '../../ui/AppProperties';
+import KeywordListSection from './KeywordListSection';
 import KeywordSetSection from './KeywordSetSection';
 import KeywordSuggestionsSection from './KeywordSuggestionsSection';
+import TaggingSection from './TaggingSection';
 import Text from '../../ui/Text';
+import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
@@ -27,13 +28,12 @@ export default function TaggingPanel() {
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
   const imageList = useLibraryStore((state) => state.imageList);
-  const setLibrary = useLibraryStore((state) => state.setLibrary);
   const targetPaths = useMemo(
     () => (multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : []),
     [multiSelectedPaths, selectedImage],
   );
   const activePath = selectedImage?.path ?? targetPaths[0] ?? null;
-  const targetSet = useMemo(() => new Set(targetPaths), [targetPaths]);
+  const { handleSetTag } = useLibraryActions();
 
   const tags = useMemo(() => {
     const counts = new Map<string, number>();
@@ -49,40 +49,63 @@ export default function TaggingPanel() {
       }))
       .sort((left, right) => left.label.localeCompare(right.label));
   }, [imageList, targetPaths]);
+  const userTags = tags.filter((tag) => tag.storedTag.startsWith(USER_TAG_PREFIX));
+  const aiTags = tags.filter((tag) => !tag.storedTag.startsWith(USER_TAG_PREFIX));
+
+  const setTag = async (storedTag: string, apply: boolean) => {
+    try {
+      await handleSetTag(storedTag, targetPaths, apply);
+      return true;
+    } catch (error) {
+      toast.error(t('editor.tagging.updateFailed', { error: String(error) }));
+      return false;
+    }
+  };
 
   const addTag = async () => {
     const normalized = parseKeywordInput(tagInput);
-    if (!normalized || targetPaths.length === 0) return;
-    const storedTag = `${USER_TAG_PREFIX}${normalized}`;
-    try {
-      await invoke(Invokes.AddTagForPaths, { paths: targetPaths, tag: storedTag });
-      setLibrary((state) => ({
-        imageList: state.imageList.map((image) => {
-          if (!targetSet.has(image.path)) return image;
-          const imageTags = image.tags || [];
-          return imageTags.includes(storedTag) ? image : { ...image, tags: [...imageTags, storedTag].sort() };
-        }),
-      }));
-      setTagInput('');
-    } catch (error) {
-      toast.error(t('editor.tagging.addFailed', { error: String(error) }));
-    }
+    if (normalized && (await setTag(`${USER_TAG_PREFIX}${normalized}`, true))) setTagInput('');
   };
 
-  const removeTag = async (storedTag: string) => {
-    try {
-      await invoke(Invokes.RemoveTagForPaths, { paths: targetPaths, tag: storedTag });
-      setLibrary((state) => ({
-        imageList: state.imageList.map((image) => {
-          if (!targetSet.has(image.path)) return image;
-          const nextTags = (image.tags || []).filter((tag) => tag !== storedTag);
-          return { ...image, tags: nextTags.length > 0 ? nextTags : null };
-        }),
-      }));
-    } catch (error) {
-      toast.error(t('editor.tagging.removeFailed', { error: String(error) }));
-    }
-  };
+  const renderTagChips = (chips: typeof tags) => (
+    <div className="flex flex-wrap gap-2">
+      <AnimatePresence>
+        {chips.map((tag) => (
+          <motion.div
+            key={tag.storedTag}
+            layout
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: tag.common ? 1 : 0.65, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.85 }}
+            className={clsx(
+              'flex items-center rounded-md border bg-bg-primary transition-colors',
+              tag.common ? 'border-transparent' : 'border-dashed border-text-tertiary/60',
+            )}
+          >
+            <button
+              className="pl-2.5 pr-1 py-1.5 text-left disabled:cursor-default"
+              data-tooltip={tag.common ? undefined : t('editor.tagging.mixedTagTooltip')}
+              disabled={tag.common}
+              onClick={() => void setTag(tag.storedTag, true)}
+              type="button"
+            >
+              <Text as="span" variant={TextVariants.small} weight={TextWeights.medium}>
+                {tag.label}
+              </Text>
+            </button>
+            <button
+              className="pr-2 pl-1 py-1.5 text-text-secondary hover:text-red-400 transition-colors"
+              data-tooltip={t('editor.tagging.removeTooltip')}
+              onClick={() => void setTag(tag.storedTag, false)}
+              type="button"
+            >
+              <X size={11} />
+            </button>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -92,50 +115,10 @@ export default function TaggingPanel() {
       </div>
       <div className="grow overflow-y-auto p-4 custom-scrollbar">
         {targetPaths.length > 0 ? (
-          <div className="space-y-5">
+          <div className="space-y-3">
             <Text variant={TextVariants.small} color={TextColors.secondary}>
               {t('editor.tagging.selectionCount', { count: targetPaths.length })}
             </Text>
-
-            <div>
-              <Text variant={TextVariants.heading} className="mb-3">
-                {t('editor.tagging.currentTags')}
-              </Text>
-              <div className="flex flex-wrap gap-2">
-                <AnimatePresence>
-                  {tags.map((tag) => (
-                    <motion.button
-                      key={tag.storedTag}
-                      layout
-                      initial={{ opacity: 0, scale: 0.85 }}
-                      animate={{ opacity: tag.common ? 1 : 0.65, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.85 }}
-                      className={clsx(
-                        'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-left transition-colors',
-                        tag.common
-                          ? 'bg-surface border-surface hover:border-text-tertiary/50'
-                          : 'bg-surface/50 border-dashed border-text-tertiary/40 hover:border-text-tertiary',
-                      )}
-                      onClick={() => removeTag(tag.storedTag)}
-                      data-tooltip={
-                        tag.common ? t('editor.tagging.removeTooltip') : t('editor.tagging.mixedTagTooltip')
-                      }
-                      type="button"
-                    >
-                      <Text as="span" variant={TextVariants.small} weight={TextWeights.medium}>
-                        {tag.label}
-                      </Text>
-                      <X size={11} />
-                    </motion.button>
-                  ))}
-                </AnimatePresence>
-                {tags.length === 0 && (
-                  <Text variant={TextVariants.small} color={TextColors.secondary} className="italic">
-                    {t('editor.tagging.noTags')}
-                  </Text>
-                )}
-              </div>
-            </div>
 
             <div>
               <Text variant={TextVariants.heading} className="mb-3">
@@ -177,9 +160,31 @@ export default function TaggingPanel() {
               </Text>
             </div>
 
+            <TaggingSection id="currentTags" title={t('editor.tagging.currentTagsCount', { count: tags.length })}>
+              {tags.length === 0 ? (
+                <Text variant={TextVariants.small} color={TextColors.secondary} className="italic">
+                  {t('editor.tagging.noTags')}
+                </Text>
+              ) : (
+                <div className="space-y-3">
+                  {userTags.length > 0 && renderTagChips(userTags)}
+                  {aiTags.length > 0 && (
+                    <div className="space-y-2">
+                      <Text variant={TextVariants.small} color={TextColors.secondary}>
+                        {t('editor.tagging.aiTags')}
+                      </Text>
+                      {renderTagChips(aiTags)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </TaggingSection>
+
             <KeywordSuggestionsSection activePath={activePath} targetPaths={targetPaths} />
 
             <KeywordSetSection targetPaths={targetPaths} />
+
+            <KeywordListSection targetPaths={targetPaths} />
           </div>
         ) : (
           <Text

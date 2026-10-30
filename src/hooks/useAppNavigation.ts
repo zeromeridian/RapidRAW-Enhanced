@@ -16,6 +16,8 @@ import { clearLibrarySelection } from './useLibraryActions';
 import { computeSortedLibrary } from './useSortedLibrary';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
 import { createProvisionalFolderTrees, mergeRefreshedFolderTrees } from '../utils/folderTreeCache';
+import { USER_TAG_PREFIX, formatKeyword } from '../utils/keywords';
+import { ALBUM_VIEW_PREFIX, KEYWORD_VIEW_PREFIX } from '../utils/libraryViews';
 
 interface CatalogFolderSnapshot {
   images: ImageFile[];
@@ -114,6 +116,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       currentFolderPath: null,
       pendingFolderPath: null,
       activeAlbumId: null,
+      activeKeyword: null,
       imageList: [],
       imageRatings: {},
       folderTrees: [],
@@ -421,6 +424,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
             imageList,
             imageRatings: ratings,
             activeAlbumId: null,
+            activeKeyword: null,
             isViewLoading: false,
             ...(destinationCommitted
               ? {}
@@ -597,11 +601,14 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
     [refs],
   );
 
-  const handleSelectAlbum = useCallback(
-    async (albumId: string, albumName: string, imagePaths: string[], preserveEditor = false, skipHistory = false) => {
-      if (!skipHistory) {
-        useLibraryStore.getState().pushNavHistory({ type: 'album', path: albumId, albumName, images: imagePaths });
-      }
+  // Lists images from anywhere in the library, for album and keyword views.
+  const loadImageCollection = useCallback(
+    async (
+      viewPath: string,
+      getImagePaths: () => Promise<string[]>,
+      collection: { activeAlbumId: string | null; activeKeyword: string | null },
+      preserveEditor: boolean,
+    ) => {
       const folderLoadGeneration = ++folderLoadGenerationRef.current;
       const { setLibrary } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
@@ -613,10 +620,11 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
 
       setLibrary({
         isViewLoading: true,
-        pendingFolderPath: `Album: ${albumName}`,
+        pendingFolderPath: viewPath,
       });
 
       try {
+        const imagePaths = await getImagePaths();
         const files: ImageFile[] = await invoke(Invokes.GetAlbumImages, { paths: imagePaths });
         if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
         mergeImportedXmpStacks(files);
@@ -629,9 +637,9 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         setLibrary({
           imageList: files,
           imageRatings: initialRatings,
-          currentFolderPath: `Album: ${albumName}`,
+          currentFolderPath: viewPath,
           pendingFolderPath: null,
-          activeAlbumId: albumId,
+          ...collection,
           libraryScrollTop: 0,
           ...(preserveEditor ? {} : { multiSelectedPaths: [], libraryActivePath: null }),
         });
@@ -640,8 +648,8 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         }
       } catch (err) {
         if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
-        console.error('Failed to load album images:', err);
-        toast.error(`Failed to load album: ${err}`);
+        console.error(`Failed to load ${viewPath}:`, err);
+        toast.error(`Failed to load ${viewPath}: ${err}`);
       } finally {
         if (folderLoadGenerationRef.current === folderLoadGeneration) {
           setLibrary({ isViewLoading: false, pendingFolderPath: null });
@@ -649,6 +657,38 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       }
     },
     [],
+  );
+
+  const handleSelectAlbum = useCallback(
+    async (albumId: string, albumName: string, imagePaths: string[], preserveEditor = false, skipHistory = false) => {
+      if (!skipHistory) {
+        useLibraryStore.getState().pushNavHistory({ type: 'album', path: albumId, albumName, images: imagePaths });
+      }
+      await loadImageCollection(
+        `${ALBUM_VIEW_PREFIX}${albumName}`,
+        async () => imagePaths,
+        { activeAlbumId: albumId, activeKeyword: null },
+        preserveEditor,
+      );
+    },
+    [loadImageCollection],
+  );
+
+  /** Shows every library image carrying a stored tag; a user keyword includes its child keywords. */
+  const handleSelectKeyword = useCallback(
+    async (tag: string, preserveEditor = false, skipHistory = false) => {
+      if (!skipHistory) {
+        useLibraryStore.getState().pushNavHistory({ type: 'keyword', path: tag });
+      }
+      const label = formatKeyword(tag.startsWith(USER_TAG_PREFIX) ? tag.slice(USER_TAG_PREFIX.length) : tag);
+      await loadImageCollection(
+        `${KEYWORD_VIEW_PREFIX}${label}`,
+        () => invoke<string[]>(Invokes.GetKeywordImagePaths, { tag }),
+        { activeAlbumId: null, activeKeyword: tag },
+        preserveEditor,
+      );
+    },
+    [loadImageCollection],
   );
 
   const handleNavStep = useCallback(
@@ -661,11 +701,13 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       setLibrary({ navIndex: targetIndex });
       if (target.type === 'folder') {
         handleSelectSubfolder(target.path, false, undefined, true, false, true);
+      } else if (target.type === 'keyword') {
+        handleSelectKeyword(target.path, false, true);
       } else {
         handleSelectAlbum(target.path, target.albumName!, target.images!, false, true);
       }
     },
-    [handleSelectSubfolder, handleSelectAlbum],
+    [handleSelectSubfolder, handleSelectAlbum, handleSelectKeyword],
   );
 
   const handleNavBack = useCallback(() => handleNavStep(-1), [handleNavStep]);
@@ -816,7 +858,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         }
       })();
 
-      if (pathToSelect && pathToSelect.startsWith('Album: ')) {
+      if (pathToSelect && pathToSelect.startsWith(ALBUM_VIEW_PREFIX)) {
         const activeAlbumId = folderState?.activeAlbumId;
         if (activeAlbumId) {
           try {
@@ -847,6 +889,12 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         } else {
           await handleSelectSubfolder(rootFolders[0], false, undefined, false);
         }
+      } else if (pathToSelect && pathToSelect.startsWith(KEYWORD_VIEW_PREFIX)) {
+        if (folderState?.activeKeyword) {
+          await handleSelectKeyword(folderState.activeKeyword);
+        } else {
+          await handleSelectSubfolder(rootFolders[0], false, undefined, false);
+        }
       } else {
         await handleSelectSubfolder(pathToSelect, false, undefined, false);
       }
@@ -866,6 +914,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
     handleImageSelect,
     handleSelectSubfolder,
     handleSelectAlbum,
+    handleSelectKeyword,
     handleOpenFolder,
     handleNavBack,
     handleNavForward,

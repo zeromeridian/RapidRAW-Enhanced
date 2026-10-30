@@ -13,6 +13,7 @@ import { toast } from 'react-toastify';
 import { autoStackCreatedImages } from '../utils/autoStacking';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
 import { globalImageCache } from '../utils/ImageLRUCache';
+import { isCollectionView } from '../utils/libraryViews';
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;
@@ -325,7 +326,7 @@ export function useTauriListeners({
           useProcessStore.getState().setImportState({ status: Status.Success });
           refs.current.refreshAllFolderTrees();
           const currentPath = useLibraryStore.getState().currentFolderPath;
-          if (currentPath) {
+          if (currentPath && !isCollectionView(currentPath)) {
             refs.current.handleSelectSubfolder(currentPath, false);
           }
         }

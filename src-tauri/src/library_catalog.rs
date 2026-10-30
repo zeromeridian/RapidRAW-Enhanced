@@ -83,7 +83,18 @@ fn open_at(path: PathBuf) -> Result<Connection, String> {
              CREATE TABLE IF NOT EXISTS catalog_meta (
                  key TEXT PRIMARY KEY,
                  value TEXT NOT NULL
-             );",
+             );
+             CREATE TABLE IF NOT EXISTS keyword_index_files (
+                 entry_key TEXT PRIMARY KEY,
+                 image_path TEXT NOT NULL,
+                 stamp TEXT NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS keyword_index_tags (
+                 entry_key TEXT NOT NULL,
+                 tag TEXT NOT NULL,
+                 PRIMARY KEY (entry_key, tag)
+             );
+             CREATE INDEX IF NOT EXISTS keyword_index_tags_by_tag ON keyword_index_tags(tag);",
         )
         .map_err(|error| error.to_string())?;
 
@@ -412,6 +423,139 @@ pub fn rebase_thumbnail_paths(
     transaction.commit().map_err(|error| error.to_string())
 }
 
+/// One library image in the keyword index, keyed independently of its virtual-copy display name.
+pub struct KeywordIndexEntry {
+    pub key: String,
+    pub image_path: String,
+    pub stamp: String,
+    /// User keyword and AI tags only.
+    pub tags: Vec<String>,
+}
+
+pub fn load_keyword_index_stamps(
+    app_handle: &AppHandle,
+) -> Result<HashMap<String, String>, String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    load_keyword_index_stamps_from_connection(&open(app_handle)?)
+}
+
+fn load_keyword_index_stamps_from_connection(
+    connection: &Connection,
+) -> Result<HashMap<String, String>, String> {
+    let mut statement = connection
+        .prepare("SELECT entry_key, stamp FROM keyword_index_files")
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|error| error.to_string())?;
+    Ok(rows.filter_map(Result::ok).collect())
+}
+
+/// Replaces the given entries and removes `removed_keys` in one transaction.
+pub fn write_keyword_index(
+    app_handle: &AppHandle,
+    entries: &[KeywordIndexEntry],
+    removed_keys: &[String],
+) -> Result<(), String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    write_keyword_index_to_connection(&mut open(app_handle)?, entries, removed_keys)
+}
+
+fn write_keyword_index_to_connection(
+    connection: &mut Connection,
+    entries: &[KeywordIndexEntry],
+    removed_keys: &[String],
+) -> Result<(), String> {
+    let transaction = connection
+        .transaction()
+        .map_err(|error| error.to_string())?;
+    for key in removed_keys
+        .iter()
+        .chain(entries.iter().map(|entry| &entry.key))
+    {
+        transaction
+            .execute("DELETE FROM keyword_index_tags WHERE entry_key=?1", [key])
+            .map_err(|error| error.to_string())?;
+    }
+    for key in removed_keys {
+        transaction
+            .execute("DELETE FROM keyword_index_files WHERE entry_key=?1", [key])
+            .map_err(|error| error.to_string())?;
+    }
+    for entry in entries {
+        transaction
+            .execute(
+                "INSERT INTO keyword_index_files(entry_key, image_path, stamp) VALUES (?1, ?2, ?3)
+                 ON CONFLICT(entry_key) DO UPDATE SET image_path=excluded.image_path,
+                     stamp=excluded.stamp",
+                params![entry.key, entry.image_path, entry.stamp],
+            )
+            .map_err(|error| error.to_string())?;
+        for tag in &entry.tags {
+            transaction
+                .execute(
+                    "INSERT OR IGNORE INTO keyword_index_tags(entry_key, tag) VALUES (?1, ?2)",
+                    params![entry.key, tag],
+                )
+                .map_err(|error| error.to_string())?;
+        }
+    }
+    transaction.commit().map_err(|error| error.to_string())
+}
+
+/// How many indexed images carry each tag.
+pub fn keyword_tag_counts(app_handle: &AppHandle) -> Result<Vec<(String, usize)>, String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    keyword_tag_counts_from_connection(&open(app_handle)?)
+}
+
+fn keyword_tag_counts_from_connection(
+    connection: &Connection,
+) -> Result<Vec<(String, usize)>, String> {
+    let mut statement = connection
+        .prepare("SELECT tag, COUNT(*) FROM keyword_index_tags GROUP BY tag")
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as usize))
+        })
+        .map_err(|error| error.to_string())?;
+    Ok(rows.filter_map(Result::ok).collect())
+}
+
+/// The images carrying `tag`, or any tag starting with `descendant_prefix`.
+pub fn keyword_image_paths(
+    app_handle: &AppHandle,
+    tag: &str,
+    descendant_prefix: Option<&str>,
+) -> Result<Vec<String>, String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    keyword_image_paths_from_connection(&open(app_handle)?, tag, descendant_prefix)
+}
+
+fn keyword_image_paths_from_connection(
+    connection: &Connection,
+    tag: &str,
+    descendant_prefix: Option<&str>,
+) -> Result<Vec<String>, String> {
+    let mut statement = connection
+        .prepare(
+            "SELECT DISTINCT files.image_path FROM keyword_index_tags tags
+             JOIN keyword_index_files files ON files.entry_key = tags.entry_key
+             WHERE tags.tag = ?1 OR (?2 IS NOT NULL AND substr(tags.tag, 1, length(?2)) = ?2)
+             ORDER BY files.image_path",
+        )
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map(params![tag, descendant_prefix], |row| {
+            row.get::<_, String>(0)
+        })
+        .map_err(|error| error.to_string())?;
+    Ok(rows.filter_map(Result::ok).collect())
+}
+
 #[tauri::command]
 pub fn get_catalog_location(app_handle: AppHandle) -> Result<String, String> {
     database_path(&app_handle).map(|path| path.to_string_lossy().into_owned())
@@ -614,5 +758,61 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM thumbnail_index", [], |row| row.get(0))
             .unwrap();
         assert_eq!(count, 1);
+    }
+    #[test]
+    fn keyword_index_finds_child_keywords_and_replaces_entries() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut connection = open_at(temporary.path().join("catalog.sqlite3")).unwrap();
+        let entry = |key: &str, tags: &[&str]| KeywordIndexEntry {
+            key: key.to_owned(),
+            image_path: format!("{key}&name=copy"),
+            stamp: "1".to_owned(),
+            tags: tags.iter().map(|tag| tag.to_string()).collect(),
+        };
+        write_keyword_index_to_connection(
+            &mut connection,
+            &[
+                entry("/a.jpg", &["user:places", "sky"]),
+                entry("/b.jpg", &["user:places|berlin"]),
+                entry("/c.jpg", &["user:places|bonn", "user:placesx"]),
+            ],
+            &[],
+        )
+        .unwrap();
+
+        let paths = |tag: &str, prefix: Option<&str>| {
+            keyword_image_paths_from_connection(&connection, tag, prefix).unwrap()
+        };
+        assert_eq!(
+            paths("user:places", Some("user:places|")),
+            ["/a.jpg&name=copy", "/b.jpg&name=copy", "/c.jpg&name=copy"]
+        );
+        assert_eq!(
+            paths("user:places|b", Some("user:places|b|")),
+            Vec::<String>::new()
+        );
+        assert_eq!(paths("sky", None), ["/a.jpg&name=copy"]);
+
+        write_keyword_index_to_connection(
+            &mut connection,
+            &[entry("/a.jpg", &["user:dog"])],
+            &["/c.jpg".to_owned()],
+        )
+        .unwrap();
+        let mut counts = keyword_tag_counts_from_connection(&connection).unwrap();
+        counts.sort();
+        assert_eq!(
+            counts,
+            [
+                ("user:dog".to_owned(), 1),
+                ("user:places|berlin".to_owned(), 1)
+            ]
+        );
+        assert_eq!(
+            load_keyword_index_stamps_from_connection(&connection)
+                .unwrap()
+                .len(),
+            2
+        );
     }
 }

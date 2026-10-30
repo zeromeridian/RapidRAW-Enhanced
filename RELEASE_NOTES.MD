@@ -5,6 +5,30 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.21.0-dev-advanced-tags — 2026-10-29
+
+### Keywords
+
+- New **Keyword List** in the Tagging panel: every keyword in your library,
+  shown as a tree with photo counts and a search box.
+  - Tick a keyword to add it to the selected photos, or untick it to remove
+    it. A dash means only some of the selected photos have it.
+  - Click a keyword to see every photo in your library that has it, or any
+    keyword under it.
+  - AI tags are listed in their own group, separate from your keywords.
+- All Tagging panel sections can now be collapsed, so long tag lists no
+  longer push everything else out of view.
+- **Current Tags** shows your keywords and AI tags separately. A keyword on
+  only some of the selected photos is outlined; click it to add it to the
+  rest. Use × to remove a keyword from all selected photos.
+- Search the library with `keyword:places>germany` to find photos with that
+  keyword or any keyword under it.
+
+### Fixes
+
+- **Clear AI Tags** and **Clear All Tags** now also update the photos' XMP
+  files, so the cleared tags no longer come back.
+
 ## 1.20.2-dev-advanced-tags — 2026-10-29
 
 ### Keywords

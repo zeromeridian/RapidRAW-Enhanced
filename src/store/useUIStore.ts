@@ -155,6 +155,11 @@ interface UIState {
   setCustomEscapeHandler: (handler: (() => void) | null) => void;
   imageSelectHandler: ((path: string) => void) | null;
   setImageSelectHandler: (handler: ((path: string) => void) | null) => void;
+  keywordSelectHandler: ((tag: string) => void) | null;
+  setKeywordSelectHandler: (handler: ((tag: string) => void) | null) => void;
+  // Open state of the Tagging panel sections that the user has toggled, by section id
+  taggingSectionsOpen: Record<string, boolean>;
+  toggleTaggingSection: (section: string, defaultOpen: boolean) => void;
   searchFocusRequest: number;
   requestSearchFocus: () => void;
   selectionClearRequest: number;
@@ -254,6 +259,16 @@ export const useUIStore = create<UIState>((set, get) => ({
   setCustomEscapeHandler: (handler) => set({ customEscapeHandler: handler }),
   imageSelectHandler: null,
   setImageSelectHandler: (handler) => set({ imageSelectHandler: handler }),
+  keywordSelectHandler: null,
+  setKeywordSelectHandler: (handler) => set({ keywordSelectHandler: handler }),
+  taggingSectionsOpen: {},
+  toggleTaggingSection: (section, defaultOpen) =>
+    set((state) => ({
+      taggingSectionsOpen: {
+        ...state.taggingSectionsOpen,
+        [section]: !(state.taggingSectionsOpen[section] ?? defaultOpen),
+      },
+    })),
 
   searchFocusRequest: 0,
   requestSearchFocus: () => set((state) => ({ searchFocusRequest: state.searchFocusRequest + 1 })),

@@ -78,6 +78,7 @@ import {
   unstackImagePaths,
 } from '../utils/imageStacks';
 import { autoStackCreatedImages } from '../utils/autoStacking';
+import { isCollectionView } from '../utils/libraryViews';
 import { getEnabledCopySuffix } from '../utils/outputNaming';
 import { isImageFlagTag } from '../utils/imageFlags';
 import { USER_TAG_PREFIX } from '../utils/keywords';
@@ -1516,6 +1517,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const addCopiedToAlbumLabel = t('contextMenus.library.addCopiedToAlbum', { count: numCopied });
 
       const isAlbumView = !!activeAlbumId;
+      const hasNoFolder = isCollectionView(currentFolderPath);
 
       const pasteOption = isAlbumView
         ? {
@@ -1537,7 +1539,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         : {
             label: t('contextMenus.folders.paste'),
             icon: ClipboardPaste,
-            disabled: copiedFilePaths.length === 0,
+            disabled: copiedFilePaths.length === 0 || hasNoFolder,
             submenu: [
               {
                 label: copyPastedLabel,
@@ -1581,7 +1583,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           icon: FolderInput,
           label: t('contextMenus.folders.importImages'),
           onClick: () => props.handleImportClick(currentFolderPath as string),
-          disabled: !currentFolderPath || isAlbumView,
+          disabled: !currentFolderPath || hasNoFolder,
         },
       ];
 

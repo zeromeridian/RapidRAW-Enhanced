@@ -54,6 +54,7 @@ import {
   Orientation,
   ThumbnailAspectRatio,
 } from './components/ui/AppProperties';
+import { ALBUM_VIEW_PREFIX, KEYWORD_VIEW_PREFIX } from './utils/libraryViews';
 
 import ImageProcessingManager from './components/managers/ImageProcessingManager';
 import ImageLoaderManager from './components/managers/ImageLoaderManager';
@@ -332,6 +333,7 @@ function App() {
     handleImageSelect,
     handleSelectSubfolder,
     handleSelectAlbum,
+    handleSelectKeyword,
     handleOpenFolder,
     handleNavBack,
     handleNavForward,
@@ -365,11 +367,20 @@ function App() {
     return () => setImageSelectHandler(null);
   }, [handleImageSelect]);
 
+  useEffect(() => {
+    const { setKeywordSelectHandler } = useUIStore.getState();
+    setKeywordSelectHandler(handleSelectKeyword);
+    return () => setKeywordSelectHandler(null);
+  }, [handleSelectKeyword]);
+
   const { displayList: sortedImageList, badges: groupBadgeInfo } = useSortedLibrary();
 
   const handleLibraryRefresh = useCallback(async () => {
     if (currentFolderPath) {
-      if (currentFolderPath.startsWith('Album: ')) {
+      if (currentFolderPath.startsWith(KEYWORD_VIEW_PREFIX)) {
+        const { activeKeyword } = useLibraryStore.getState();
+        if (activeKeyword) await handleSelectKeyword(activeKeyword, true, true);
+      } else if (currentFolderPath.startsWith(ALBUM_VIEW_PREFIX)) {
         const { activeAlbumId, albumTree } = useLibraryStore.getState();
         if (activeAlbumId) {
           const findObj = (nodes: any[]): any => {
@@ -389,7 +400,7 @@ function App() {
         await handleSelectSubfolder(currentFolderPath, false, undefined, false, true);
       }
     }
-  }, [currentFolderPath, handleSelectSubfolder, handleSelectAlbum]);
+  }, [currentFolderPath, handleSelectSubfolder, handleSelectAlbum, handleSelectKeyword]);
 
   const {
     executeDelete,

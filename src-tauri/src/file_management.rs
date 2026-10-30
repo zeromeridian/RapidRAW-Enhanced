@@ -501,7 +501,7 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
     (source_path, sidecar_path)
 }
 
-fn parse_sidecar_filename(file_name: &str) -> Option<(String, Option<String>)> {
+pub(crate) fn parse_sidecar_filename(file_name: &str) -> Option<(String, Option<String>)> {
     let base = file_name.strip_suffix(".tirdata")?;
     if base.len() >= 7 && base.as_bytes()[base.len() - 7] == b'.' {
         let id = &base[base.len() - 6..];

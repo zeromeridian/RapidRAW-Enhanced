@@ -95,6 +95,7 @@ export const useAppInitialization = ({
     currentFolderPath,
     expandedFolders,
     activeAlbumId,
+    activeKeyword,
     expandedAlbumGroups,
     setSortCriteria,
     setFilterCriteria,
@@ -106,6 +107,7 @@ export const useAppInitialization = ({
       currentFolderPath: state.currentFolderPath,
       expandedFolders: state.expandedFolders,
       activeAlbumId: state.activeAlbumId,
+      activeKeyword: state.activeKeyword,
       expandedAlbumGroups: state.expandedAlbumGroups,
       setSortCriteria: state.setSortCriteria,
       setFilterCriteria: state.setFilterCriteria,
@@ -351,27 +353,38 @@ export const useAppInitialization = ({
       currentFolderPath: null,
       expandedFolders: [],
       activeAlbumId: null,
+      activeKeyword: null,
       expandedAlbumGroups: [],
     };
 
     const pathChanged = prevFolderState.currentFolderPath !== currentFolderPath;
     const expandedChanged = JSON.stringify(prevFolderState.expandedFolders || []) !== JSON.stringify(currentExpanded);
     const albumChanged = prevFolderState.activeAlbumId !== activeAlbumId;
+    const keywordChanged = (prevFolderState.activeKeyword ?? null) !== activeKeyword;
     const albumExpandedChanged =
       JSON.stringify(prevFolderState.expandedAlbumGroups || []) !== JSON.stringify(currentExpandedAlbums);
 
-    if (pathChanged || expandedChanged || albumChanged || albumExpandedChanged) {
+    if (pathChanged || expandedChanged || albumChanged || keywordChanged || albumExpandedChanged) {
       handleSettingsChange({
         ...appSettings,
         lastFolderState: {
           currentFolderPath,
           expandedFolders: currentExpanded,
           activeAlbumId,
+          activeKeyword,
           expandedAlbumGroups: currentExpandedAlbums,
         },
       });
     }
-  }, [currentFolderPath, expandedFolders, activeAlbumId, expandedAlbumGroups, appSettings, handleSettingsChange]);
+  }, [
+    currentFolderPath,
+    expandedFolders,
+    activeAlbumId,
+    activeKeyword,
+    expandedAlbumGroups,
+    appSettings,
+    handleSettingsChange,
+  ]);
 
   useEffect(() => {
     if (!appSettings) return;

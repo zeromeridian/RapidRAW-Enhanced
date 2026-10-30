@@ -1106,7 +1106,7 @@
         "matchAll": "Dopasuj WSZYSTKIE tagi",
         "matchAny": "Dopasuj DOWOLNE tagi",
         "searchOrQuery": "Wyszukaj lub dodaj zapytanie",
-        "tooltipAdvancedQueries": "Zaawansowane zapytania: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony",
+        "tooltipAdvancedQueries": "Zaawansowane zapytania: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony, keyword:places>germany",
         "tooltipClearSearch": "Wyczyść wyszukiwanie",
         "tooltipSearchFilter": "Wyszukaj lub Filtruj"
       },

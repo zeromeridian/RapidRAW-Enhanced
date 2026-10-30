@@ -1,3 +1,5 @@
+import { isCollectionView } from './libraryViews';
+
 export const IMAGE_FLAG_PREFIX = 'flag:';
 
 export const ImageFlag = {
@@ -32,6 +34,6 @@ export const getRejectedPathsForLoadedFolder = (
   images: Array<{ path: string; tags: string[] | null }>,
   folderPath: string | null,
 ) => {
-  if (!folderPath || folderPath.startsWith('Album: ')) return [];
+  if (!folderPath || isCollectionView(folderPath)) return [];
   return images.filter((image) => getImageFlag(image.tags) === ImageFlag.Rejected).map((image) => image.path);
 };
