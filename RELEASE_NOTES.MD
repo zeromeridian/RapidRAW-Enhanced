@@ -5,6 +5,26 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.23.1-dev-gui-tweaks — 2026-10-30
+
+### Interface
+
+- Compact layout: the adjustment sections (Basic, Curves, Color, Details,
+  Effects) now have a little space between them, and their titles are larger
+  and easier to read.
+
+## 1.23.0-dev-gui-tweaks — 2026-10-30
+
+### Interface
+
+- New **Compact** layout, now the default: the side panels and the top bars
+  of the Library and Develop take far less space, similar to Lightroom
+  Classic, so you see many more controls without scrolling. Sliders show the
+  name, slider, and value on one line, and panel sections are separated by
+  slim title bars instead of floating cards. Every control works as before.
+- Prefer the previous roomier layout? Choose **Settings → General → Panel
+  Density → Comfortable**. The setting applies immediately.
+
 ## 1.22.1-dev-advanced-tags — 2026-10-29
 
 ### Keywords

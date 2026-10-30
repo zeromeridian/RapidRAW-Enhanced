@@ -35,10 +35,10 @@ export default function DetailsPanel({
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 compact:space-y-2">
       {adjustmentVisibility.sharpening !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">
+        <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+          <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
             {t('adjustments.details.sharpening')}
           </Text>
           <Slider
@@ -65,8 +65,8 @@ export default function DetailsPanel({
       )}
 
       {adjustmentVisibility.presence !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">
+        <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+          <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
             {t('adjustments.details.presence')}
           </Text>
           <Slider
@@ -111,8 +111,8 @@ export default function DetailsPanel({
       )}
 
       {adjustmentVisibility.noiseReduction !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">
+        <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+          <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
             {t('adjustments.details.noiseReduction')}
           </Text>
           <Slider
@@ -175,8 +175,8 @@ export default function DetailsPanel({
       )}
 
       {!isForMask && adjustmentVisibility.chromaticAberration !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">
+        <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+          <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
             {t('adjustments.details.chromaticAberration')}
           </Text>
           <Slider

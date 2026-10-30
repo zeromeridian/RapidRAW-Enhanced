@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @source not "../src-tauri";
 
+/* Settings → General → Panel Density sets data-density on <html>. */
+@custom-variant compact (&:where([data-density='compact'] *));
+
 @theme {
   --color-bg-primary: var(--app-bg-primary);
   --color-bg-secondary: var(--app-bg-secondary);
@@ -90,6 +93,18 @@
 
   &.slider-thumb-active::-moz-range-thumb {
     @apply scale-110;
+  }
+}
+
+/* Smaller slider thumb for compact panels; the whole track stays clickable. */
+@utility slider-thumb-sm {
+  &::-webkit-slider-thumb {
+    @apply h-3 w-3;
+    margin-top: -3px;
+  }
+
+  &::-moz-range-thumb {
+    @apply h-3 w-3;
   }
 }
 

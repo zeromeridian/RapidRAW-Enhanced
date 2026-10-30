@@ -9,6 +9,7 @@ import { useProcessStore } from '../store/useProcessStore';
 import { THEMES, DEFAULT_THEME_ID, ThemeProps } from '../utils/themes';
 import { COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
 import {
+  DEFAULT_PANEL_DENSITY,
   FilterCriteria,
   Invokes,
   LibraryViewMode,
@@ -480,4 +481,8 @@ export const useAppInitialization = ({
         : "'Poppins', system-ui, sans-serif";
     root.style.setProperty('--font-family', fontStack);
   }, [theme, appSettings?.fontFamily]);
+
+  useEffect(() => {
+    document.documentElement.dataset.density = appSettings?.panelDensity || DEFAULT_PANEL_DENSITY;
+  }, [appSettings?.panelDensity]);
 };

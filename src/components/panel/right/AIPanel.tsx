@@ -57,6 +57,7 @@ import { Adjustments, AiPatch } from '../../../utils/adjustments';
 import { BRUSH_SIZE_MAX, BRUSH_SIZE_MIN, OPTION_SEPARATOR } from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
 import Text from '../../ui/Text';
+import PanelHeader from '../../ui/PanelHeader';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { useUser, useAuth } from '@clerk/react';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -251,7 +252,7 @@ const ConnectionStatus = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className={`flex items-center gap-2 px-4 ${hoverContent ? 'pt-2' : 'py-2'}`}>
+      <div className={`flex items-center gap-2 px-4 compact:px-3 ${hoverContent ? 'pt-2' : 'py-2'}`}>
         <div className={`w-2.5 h-2.5 rounded-full ${statusColor}`} />
         <Text variant={TextVariants.label}>{titleText}</Text>
         <Text
@@ -263,7 +264,7 @@ const ConnectionStatus = ({
         </Text>
       </div>
       {hoverContent && (
-        <div className="px-4 pb-3">
+        <div className="px-4 compact:px-3 pb-3">
           <motion.div
             animate={{ height: isHovered ? 'auto' : 0, opacity: isHovered ? 1 : 0, marginTop: isHovered ? '2px' : 0 }}
             className="overflow-hidden"
@@ -1016,18 +1017,20 @@ export default function AIPanel() {
       collisionDetection={pointerWithin}
     >
       <div className="flex flex-col h-full select-none overflow-hidden" onContextMenu={handlePanelContextMenu}>
-        <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-          <Text variant={TextVariants.title}>{t('editor.ai.inpaintingTitle')}</Text>
-          <button
-            className="p-2 rounded-full hover:bg-surface transition-colors"
-            onClick={handleResetAllAiEdits}
-            data-tooltip={t('editor.ai.resetInpaintingTooltip')}
-          >
-            <RotateCcw size={18} />
-          </button>
-        </div>
+        <PanelHeader
+          title={t('editor.ai.inpaintingTitle')}
+          actions={
+            <button
+              className="p-2 rounded-full hover:bg-surface transition-colors"
+              onClick={handleResetAllAiEdits}
+              data-tooltip={t('editor.ai.resetInpaintingTooltip')}
+            >
+              <RotateCcw size={18} />
+            </button>
+          }
+        />
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0 p-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0 p-4 compact:p-2.5">
           <AnimatePresence mode="wait">
             {(adjustments.aiPatches || []).length === 0 ? (
               <motion.div
@@ -1058,10 +1061,13 @@ export default function AIPanel() {
                       cloudUsage={cloudUsage}
                     />
 
-                    <Text variant={TextVariants.heading} className="mb-2 mt-6">
+                    <Text variant={TextVariants.heading} className="mb-2 mt-6 compact:mt-3 compact:text-sm">
                       {t('editor.ai.manualCleanupTitle')}
                     </Text>
-                    <div className="grid grid-cols-3 gap-2 mb-6" onClick={(e) => e.stopPropagation()}>
+                    <div
+                      className="grid grid-cols-3 gap-2 compact:gap-1.5 mb-6 compact:mb-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {AI_MANUAL_CLEANUP_TYPES.map((maskType: MaskType) => (
                         <DraggableGridItem
                           key={maskType.type}
@@ -1072,10 +1078,10 @@ export default function AIPanel() {
                       ))}
                     </div>
 
-                    <Text variant={TextVariants.heading} className="mb-2">
+                    <Text variant={TextVariants.heading} className="mb-2 compact:text-sm">
                       {t('editor.ai.generativeEditTitle')}
                     </Text>
-                    <div className="grid grid-cols-3 gap-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="grid grid-cols-3 gap-2 compact:gap-1.5" onClick={(e) => e.stopPropagation()}>
                       {AI_GENERATIVE_CREATION_TYPES.map((maskType: MaskType) => (
                         <DraggableGridItem
                           key={maskType.type}
@@ -1099,7 +1105,7 @@ export default function AIPanel() {
                 className={`flex flex-col transition-colors ${isRootOver ? 'bg-surface' : ''}`}
                 onClick={handleDeselect}
               >
-                <Text variant={TextVariants.heading} className="mb-2">
+                <Text variant={TextVariants.heading} className="mb-2 compact:text-sm">
                   {t('editor.ai.editsTitle')}
                 </Text>
 
@@ -1164,7 +1170,7 @@ export default function AIPanel() {
                 <Text
                   as="div"
                   weight={TextWeights.medium}
-                  className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
+                  className="flex items-center gap-2 p-2 compact:py-1 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
                   onClick={(e) => handleAddAiContextMenu(e, null)}
                 >
                   <div className="p-0.5">
@@ -1187,7 +1193,7 @@ export default function AIPanel() {
                 transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="flex-1 min-h-0"
               >
-                <Text variant={TextVariants.heading} className="mb-2">
+                <Text variant={TextVariants.heading} className="mb-2 compact:text-sm">
                   {t('editor.ai.editSettingsTitle')}
                 </Text>
                 <SettingsPanel
@@ -1219,7 +1225,7 @@ export default function AIPanel() {
                 as="div"
                 color={TextColors.primary}
                 weight={TextWeights.medium}
-                className="flex items-center gap-2 p-2 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10"
+                className="flex items-center gap-2 p-2 compact:py-1 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10"
               >
                 {(() => {
                   const item = activeDragItem.item as AiPatch;
@@ -1236,7 +1242,7 @@ export default function AIPanel() {
                 as="div"
                 color={TextColors.primary}
                 weight={TextWeights.medium}
-                className="flex items-center gap-2 p-2 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10 ml-3.75"
+                className="flex items-center gap-2 p-2 compact:py-1 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10 ml-3.75"
               >
                 {(() => {
                   const sm = activeDragItem.item as SubMask;
@@ -1283,7 +1289,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
       animate={{ opacity: 1, height: 'auto', marginTop: '4px' }}
       exit={{ opacity: 0, height: 0, marginTop: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className={`p-4 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
+      className={`p-4 compact:p-2.5 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
     >
       <Text weight={TextWeights.medium}>{t('editor.ai.dropzoneText')}</Text>
     </motion.div>
@@ -1303,7 +1309,7 @@ function DraggableGridItem({ maskType, isGenerating, onClick }: any) {
       {...listeners}
       {...attributes}
       onClick={onClick}
-      className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-2 aspect-square transition-colors
+      className={`bg-surface text-text-primary rounded-lg p-2 compact:py-1.5 flex flex-col items-center justify-center gap-2 compact:gap-1 aspect-square compact:aspect-auto transition-colors
             ${
               maskType.disabled || isGenerating
                 ? 'opacity-50 cursor-not-allowed'
@@ -1318,7 +1324,7 @@ function DraggableGridItem({ maskType, isGenerating, onClick }: any) {
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
     >
-      <maskType.icon size={24} />{' '}
+      <maskType.icon size={24} className="compact:size-5" />{' '}
       <Text as="span" variant={TextVariants.small} color={TextColors.primary}>
         {formatMaskTypeName(maskType.type)}
       </Text>
@@ -1463,7 +1469,7 @@ function ContainerRow({
       <div
         {...listeners}
         {...attributes}
-        className={`flex items-center gap-2 p-2 rounded-md transition-colors group
+        className={`flex items-center gap-2 p-2 compact:py-1 rounded-md transition-colors group
                 ${isRowSelected ? 'bg-surface' : 'hover:bg-card-active'}
                 ${borderClass}`}
         onClick={(e) => {
@@ -1605,7 +1611,7 @@ function ContainerRow({
                   <Text
                     as="div"
                     weight={TextWeights.medium}
-                    className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
+                    className="flex items-center gap-2 p-2 compact:py-1 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
                     onClick={(e) => {
                       e.stopPropagation();
                       onAddComponent(e);
@@ -1731,7 +1737,7 @@ function SubMaskRow({
       {...listeners}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`flex items-center gap-2 p-2 rounded-md transition-colors group cursor-pointer
+      className={`flex items-center gap-2 p-2 compact:py-1 rounded-md transition-colors group cursor-pointer
             ${isActive ? 'bg-surface' : 'hover:bg-card-active'}
             ${isOver && !isDraggingContainer ? 'border-t-2 border-accent' : ''}
             ${isDragging ? 'opacity-40 z-50' : ''}
@@ -1925,14 +1931,14 @@ function SettingsPanel({
           canToggleVisibility={false}
           isContentVisible={true}
         >
-          <div className="space-y-4 pt-2">
+          <div className="space-y-4 compact:space-y-2 pt-2">
             {aiModelDownloadStatus && aiModelDownloadStatus.includes('Inpainting') && (
               <Text
                 as="div"
                 variant={TextVariants.small}
                 color={TextColors.accent}
                 weight={TextWeights.medium}
-                className="p-3 bg-card-active rounded-md border border-surface flex items-center gap-3"
+                className="p-3 compact:p-2 bg-card-active rounded-md border border-surface flex items-center gap-3 compact:gap-2"
               >
                 <Loader2 size={16} className="animate-spin shrink-0" />
                 <div className="leading-relaxed">
@@ -2028,7 +2034,7 @@ function SettingsPanel({
         canToggleVisibility={false}
         isContentVisible={true}
       >
-        <div className="space-y-4 pt-2">
+        <div className="space-y-4 compact:space-y-2 pt-2">
           {!isCloneOrHealPatch && (
             <Switch
               checked={!!(isComponentMode ? activeSubMask.invert : displayContainer.invert)}
@@ -2053,7 +2059,7 @@ function SettingsPanel({
                   variant={TextVariants.small}
                   color={TextColors.accent}
                   weight={TextWeights.medium}
-                  className="p-3 bg-card-active rounded-md border border-surface flex items-center gap-3"
+                  className="p-3 compact:p-2 bg-card-active rounded-md border border-surface flex items-center gap-3 compact:gap-2"
                 >
                   <Loader2 size={16} className="animate-spin shrink-0" />
                   <div className="leading-relaxed">

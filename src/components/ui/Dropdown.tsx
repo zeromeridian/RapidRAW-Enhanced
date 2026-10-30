@@ -110,7 +110,7 @@ const Dropdown = <T extends React.Key>({
         aria-haspopup="listbox"
         disabled={disabled}
         className={clsx(
-          'w-full border border-border-color rounded-md px-3 mr-4 py-2 flex justify-between items-center text-left disabled:opacity-50 disabled:cursor-not-allowed',
+          'w-full border border-border-color rounded-md px-3 mr-4 py-2 compact:py-1 flex justify-between items-center text-left disabled:opacity-50 disabled:cursor-not-allowed',
           'focus:ring-accent focus:border-accent focus:outline-hidden focus:ring-2',
           triggerClassName || 'bg-surface',
         )}
@@ -118,13 +118,13 @@ const Dropdown = <T extends React.Key>({
         type="button"
       >
         <span className="flex min-w-0 items-center gap-1">
-          <Text as="span" variant={TextVariants.label} color={TextColors.primary} className="truncate">
+          <Text as="span" variant={TextVariants.label} color={TextColors.primary} className="truncate compact:text-xs">
             {selectedOption ? selectedOption.label : placeholder}
           </Text>
           {selectedOption && selectedSuffix}
         </span>
         <ChevronDown
-          className={`${TEXT_COLOR_KEYS[TextColors.secondary]} transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`${TEXT_COLOR_KEYS[TextColors.secondary]} transition-transform duration-200 compact:size-4 ${isOpen ? 'rotate-180' : ''}`}
           size={20}
         />
       </button>

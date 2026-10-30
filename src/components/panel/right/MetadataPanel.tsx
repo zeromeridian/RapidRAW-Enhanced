@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import { Invokes } from '../../ui/AppProperties';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import Text from '../../ui/Text';
+import PanelHeader from '../../ui/PanelHeader';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { IconAperture, IconShutter, IconIso, IconFocalLength, IconLens } from '../editor/ExifIcons';
 import { useEditorStore } from '../../../store/useEditorStore';
@@ -85,7 +86,7 @@ function MetadataItem({ label, value }: MetaDataItemProps) {
   };
 
   return (
-    <div className="flex justify-between items-start gap-4 py-1.5 px-2 rounded-md hover:bg-card-active transition-colors cursor-default">
+    <div className="flex justify-between items-start gap-4 compact:gap-2 py-1.5 px-2 rounded-md hover:bg-card-active transition-colors cursor-default">
       <Text
         variant={TextVariants.small}
         color={TextColors.secondary}
@@ -162,7 +163,7 @@ function EditableMetadataItem({ label, value, onSave }: EditableMetadataItemProp
   };
 
   return (
-    <div className="flex justify-between items-center gap-4 py-1 px-2 rounded-md">
+    <div className="flex justify-between items-center gap-4 compact:gap-2 py-1 px-2 rounded-md">
       <Text
         variant={TextVariants.small}
         color={TextColors.secondary}
@@ -383,17 +384,15 @@ export default function MetadataPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <Text variant={TextVariants.title}>{t('editor.metadata.title')}</Text>
-      </div>
-      <div className="grow overflow-y-auto p-4 custom-scrollbar">
+      <PanelHeader title={t('editor.metadata.title')} />
+      <div className="grow overflow-y-auto p-4 compact:p-2.5 custom-scrollbar">
         {selectedImage ? (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-6 compact:gap-3">
             <div>
-              <Text variant={TextVariants.heading} className="mb-3">
+              <Text variant={TextVariants.heading} className="mb-3 compact:mb-1.5 compact:text-sm">
                 {t('editor.metadata.fileInfo.title')}
               </Text>
-              <div className="bg-surface border border-surface rounded-xl p-3.5 flex flex-col gap-2 cursor-default relative min-h-[5.5rem] overflow-hidden">
+              <div className="bg-surface border border-surface rounded-xl p-3.5 compact:p-2 flex flex-col gap-2 cursor-default relative min-h-[5.5rem] overflow-hidden">
                 {(liveThumbnailUrl || selectedImage?.thumbnailUrl) && (
                   <div
                     className="absolute inset-y-0 right-0 w-2/3 pointer-events-none opacity-20"
@@ -408,7 +407,7 @@ export default function MetadataPanel() {
                   />
                 )}
 
-                <div className="flex justify-between items-start gap-4 relative z-10">
+                <div className="flex justify-between items-start gap-4 compact:gap-2 relative z-10">
                   <Text weight={TextWeights.semibold} color={TextColors.primary} className="truncate drop-shadow-sm">
                     {fileName || '-'}
                   </Text>
@@ -445,7 +444,7 @@ export default function MetadataPanel() {
             </div>
 
             <div>
-              <Text variant={TextVariants.heading} className="mb-3">
+              <Text variant={TextVariants.heading} className="mb-3 compact:mb-1.5 compact:text-sm">
                 {t('editor.metadata.camera.title')}
               </Text>
               <div className="flex flex-col gap-2">
@@ -500,13 +499,13 @@ export default function MetadataPanel() {
             </div>
 
             <div>
-              <Text variant={TextVariants.heading} className="mb-3">
+              <Text variant={TextVariants.heading} className="mb-3 compact:mb-1.5 compact:text-sm">
                 {t('editor.metadata.author.title')}
               </Text>
               <div className="bg-surface rounded-xl overflow-hidden">
                 <button
                   onClick={() => setIsAuthorExpanded(!isAuthorExpanded)}
-                  className="w-full flex items-center justify-between p-3 hover:bg-card-active transition-colors"
+                  className="w-full flex items-center justify-between p-3 compact:p-2 hover:bg-card-active transition-colors"
                 >
                   <Text
                     as="span"
@@ -554,13 +553,13 @@ export default function MetadataPanel() {
             </div>
 
             <div>
-              <Text variant={TextVariants.heading} className="mb-3">
+              <Text variant={TextVariants.heading} className="mb-3 compact:mb-1.5 compact:text-sm">
                 {t('editor.metadata.organization.title')}
               </Text>
               <div className="bg-surface rounded-xl overflow-hidden">
                 <button
                   onClick={() => setIsOrganizationExpanded(!isOrganizationExpanded)}
-                  className="w-full flex items-center justify-between p-3 hover:bg-card-active transition-colors"
+                  className="w-full flex items-center justify-between p-3 compact:p-2 hover:bg-card-active transition-colors"
                 >
                   <Text
                     as="span"
@@ -584,7 +583,7 @@ export default function MetadataPanel() {
                       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
                       className="overflow-hidden"
                     >
-                      <div className="px-4 pb-4 pt-2 border-t border-surface/50 flex flex-col gap-4">
+                      <div className="px-4 compact:px-3 pb-4 compact:pb-2.5 pt-2 border-t border-surface/50 flex flex-col gap-4 compact:gap-2">
                         <div>
                           <Text
                             variant={TextVariants.small}
@@ -742,10 +741,10 @@ export default function MetadataPanel() {
 
             {hasGps && gpsData?.lat && gpsData?.lon && (
               <div>
-                <Text variant={TextVariants.heading} className="mb-3">
+                <Text variant={TextVariants.heading} className="mb-3 compact:mb-1.5 compact:text-sm">
                   {t('editor.metadata.gps.title')}
                 </Text>
-                <div className="bg-surface border border-surface rounded-xl p-3 flex flex-col gap-3">
+                <div className="bg-surface border border-surface rounded-xl p-3 compact:p-2 flex flex-col gap-3 compact:gap-2">
                   <div className="relative rounded-md overflow-hidden shadow-sm">
                     <iframe
                       className="pointer-events-none"
@@ -783,10 +782,10 @@ export default function MetadataPanel() {
 
             {otherExifEntries.length > 0 && (
               <div>
-                <Text variant={TextVariants.heading} className="mb-3">
+                <Text variant={TextVariants.heading} className="mb-3 compact:mb-1.5 compact:text-sm">
                   {t('editor.metadata.extendedExif.title')}
                 </Text>
-                <div className="bg-surface border border-surface rounded-xl p-3 flex flex-col gap-0.5 overflow-hidden">
+                <div className="bg-surface border border-surface rounded-xl p-3 compact:p-2 flex flex-col gap-0.5 overflow-hidden">
                   {otherExifEntries.map(([tag, value]) => (
                     <MetadataItem key={tag} label={formatExifTag(tag)} value={value} />
                   ))}

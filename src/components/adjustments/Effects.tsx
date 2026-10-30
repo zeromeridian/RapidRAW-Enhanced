@@ -87,7 +87,7 @@ const BokehShapeSwitch = ({ selectedShape, onShapeChange }: BokehShapeSwitchProp
   };
 
   return (
-    <div className="flex flex-col gap-2 mt-3">
+    <div className="flex flex-col gap-2 mt-3 compact:mt-2">
       <div
         className="grid w-fit cursor-pointer"
         onClick={handleReset}
@@ -130,7 +130,7 @@ const BokehShapeSwitch = ({ selectedShape, onShapeChange }: BokehShapeSwitchProp
                 data-tooltip={shape.title}
                 onClick={() => onShapeChange(shape.id)}
                 className={clsx(
-                  'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                  'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 compact:py-1 text-sm compact:text-xs font-medium rounded-md transition-colors',
                   {
                     'text-text-secondary hover:text-text-primary hover:bg-surface': selectedShape !== shape.id,
                     'text-button-text': selectedShape === shape.id,
@@ -315,9 +315,9 @@ export default function EffectsPanel({
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
 
   return (
-    <div className="space-y-4">
-      <div className="p-2 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-2">
+    <div className="space-y-4 compact:space-y-2">
+      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+        <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
           {t('adjustments.effects.creative')}
         </Text>
 
@@ -353,7 +353,7 @@ export default function EffectsPanel({
       </div>
 
       {!isForMask && (
-        <div className="space-y-4">
+        <div className="space-y-4 compact:space-y-2">
           <AiEffectSection
             title={t('adjustments.effects.lensBlur')}
             enabled={!!adjustments.lensBlurEnabled}
@@ -483,7 +483,7 @@ export default function EffectsPanel({
               />
             )}
 
-            <div className="p-3 rounded-md bg-bg-primary space-y-4">
+            <div className="p-3 compact:p-2 rounded-md bg-bg-primary space-y-4 compact:space-y-2">
               <div className="flex flex-wrap items-center gap-3 px-1">
                 {relightLights.map((light, index) => (
                   <div
@@ -775,8 +775,8 @@ export default function EffectsPanel({
             />
           </AiEffectSection>
 
-          <div className="p-2 bg-bg-tertiary rounded-md">
-            <Text variant={TextVariants.heading} className="mb-2">
+          <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+            <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
               {t('adjustments.effects.lut')}
             </Text>
             <LUTControl
@@ -794,8 +794,8 @@ export default function EffectsPanel({
       )}
 
       {isForMask && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">
+        <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+          <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
             {t('adjustments.effects.gaussianBlur')}
           </Text>
           <Slider
@@ -812,8 +812,8 @@ export default function EffectsPanel({
         </div>
       )}
 
-      <div className="p-2 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-2">
+      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+        <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
           {t('adjustments.effects.motionBlur')}
         </Text>
         <Slider
@@ -851,8 +851,8 @@ export default function EffectsPanel({
       </div>
 
       {adjustmentVisibility.vignette !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">
+        <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+          <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
             {t('adjustments.effects.vignette')}
           </Text>
           <Slider
@@ -899,8 +899,8 @@ export default function EffectsPanel({
       )}
 
       {adjustmentVisibility.grain !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">
+        <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+          <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
             {t('adjustments.effects.grain')}
           </Text>
           <Slider

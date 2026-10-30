@@ -204,7 +204,7 @@ export default function KeywordListSection({ targetPaths }: KeywordListSectionPr
     return (
       <div
         className={clsx(
-          'flex items-center gap-1.5 h-7 rounded-sm',
+          'flex items-center gap-1.5 h-7 compact:h-6 rounded-sm',
           dropTarget === tag && 'bg-accent/20 ring-1 ring-accent',
         )}
         draggable={isUserKeyword && !keywordJob}
@@ -294,8 +294,8 @@ export default function KeywordListSection({ targetPaths }: KeywordListSectionPr
 
   return (
     <TaggingSection id="keywordList" title={t('editor.tagging.keywordList')}>
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 bg-bg-primary rounded-md px-3 h-9">
+      <div className="space-y-3 compact:space-y-2">
+        <div className="flex items-center gap-2 bg-bg-primary rounded-md px-3 h-9 compact:h-7">
           <Search size={14} className="text-text-tertiary shrink-0" />
           <input
             className="bg-transparent border-none outline-hidden text-sm w-full text-text-primary placeholder-text-tertiary"
@@ -360,7 +360,7 @@ export default function KeywordListSection({ targetPaths }: KeywordListSectionPr
         </div>
 
         {aiTags.length > 0 && (
-          <div className="border-t border-bg-primary pt-3">
+          <div className="border-t border-bg-primary pt-3 compact:pt-2">
             <button
               className="w-full flex items-center gap-1.5 text-left"
               onClick={() => toggleTaggingSection(AI_GROUP_SECTION, false)}

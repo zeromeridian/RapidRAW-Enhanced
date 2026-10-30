@@ -84,8 +84,8 @@ const ToneMapperSwitch = ({
   }, [selectedMapper, toneMapperOptions]);
 
   return (
-    <div className="group mb-3">
-      <div className="flex justify-between items-center mb-2">
+    <div className="group mb-3 compact:mb-1.5">
+      <div className="flex justify-between items-center mb-2 compact:mb-1">
         <div
           className="grid cursor-pointer"
           onClick={handleReset}
@@ -95,7 +95,7 @@ const ToneMapperSwitch = ({
         >
           <span
             aria-hidden={isLabelHovered}
-            className={`col-start-1 row-start-1 text-sm font-medium text-text-secondary select-none transition-opacity duration-200 ease-in-out ${
+            className={`col-start-1 row-start-1 text-sm compact:text-xs font-medium text-text-secondary select-none transition-opacity duration-200 ease-in-out ${
               isLabelHovered ? 'opacity-0' : 'opacity-100'
             }`}
           >
@@ -103,7 +103,7 @@ const ToneMapperSwitch = ({
           </span>
           <span
             aria-hidden={!isLabelHovered}
-            className={`col-start-1 row-start-1 text-sm font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none ${
+            className={`col-start-1 row-start-1 text-sm compact:text-xs font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none ${
               isLabelHovered ? 'opacity-100' : 'opacity-0'
             }`}
           >
@@ -111,7 +111,7 @@ const ToneMapperSwitch = ({
           </span>
         </div>
       </div>
-      <div className="w-full p-2 pb-1 bg-card-active rounded-md">
+      <div className="w-full p-2 pb-1 compact:p-1 compact:pb-0.5 bg-card-active rounded-md">
         <div className="relative flex w-full">
           <motion.div
             className="absolute top-0 bottom-0 z-0 bg-accent"
@@ -125,7 +125,7 @@ const ToneMapperSwitch = ({
               data-tooltip={mapper.title}
               onClick={() => onMapperChange(mapper.id)}
               className={clsx(
-                'relative flex-1 flex items-center justify-center gap-2 px-3 p-1.5 text-sm font-medium rounded-md transition-colors',
+                'relative flex-1 flex items-center justify-center gap-2 px-3 p-1.5 compact:py-1 text-sm compact:text-xs font-medium rounded-md transition-colors',
                 {
                   'text-text-primary hover:bg-surface': selectedMapper !== mapper.id,
                   'text-button-text': selectedMapper === mapper.id,
@@ -137,7 +137,7 @@ const ToneMapperSwitch = ({
             </button>
           ))}
         </div>
-        <div className="mt-2.5 px-1">
+        <div className="mt-2.5 compact:mt-1 px-1">
           <Slider
             label={t('adjustments.basic.evShift')}
             max={5}

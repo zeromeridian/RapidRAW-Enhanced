@@ -881,11 +881,11 @@ export default function CurveGraph({
                 </span>
               ) : undefined
             }
-            triggerClassName="bg-surface-secondary h-9 px-2"
+            triggerClassName="bg-surface-secondary h-9 compact:h-7 px-2"
             value={selectedPresetId}
           />
           <button
-            className="w-9 h-9 shrink-0 rounded-md bg-surface-secondary text-text-secondary hover:text-text-primary hover:bg-surface transition-colors flex items-center justify-center"
+            className="w-9 h-9 compact:w-7 compact:h-7 shrink-0 rounded-md bg-surface-secondary text-text-secondary hover:text-text-primary hover:bg-surface transition-colors flex items-center justify-center"
             data-tooltip={
               isSelectedPresetDirty && !selectedPreset?.builtIn
                 ? t('adjustments.curves.updatePreset')
@@ -903,7 +903,7 @@ export default function CurveGraph({
             <Save size={16} />
           </button>
           <button
-            className="w-9 h-9 shrink-0 rounded-md bg-surface-secondary text-text-secondary hover:text-red-400 hover:bg-surface transition-colors flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-text-secondary"
+            className="w-9 h-9 compact:w-7 compact:h-7 shrink-0 rounded-md bg-surface-secondary text-text-secondary hover:text-red-400 hover:bg-surface transition-colors flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-text-secondary"
             data-tooltip={t('adjustments.curves.deletePreset')}
             disabled={!selectedPreset || selectedPreset.builtIn}
             onClick={() => setIsDeletePresetOpen(true)}
@@ -1090,7 +1090,7 @@ export default function CurveGraph({
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             className="overflow-hidden origin-top"
           >
-            <div className="pt-4 pb-1 flex flex-col gap-5" onContextMenu={handleContextMenu}>
+            <div className="pt-4 compact:pt-2 pb-1 flex flex-col gap-5 compact:gap-2" onContextMenu={handleContextMenu}>
               <div className="px-1">
                 <div className="relative" ref={splitterContainerRef}>
                   <div className="h-7 rounded-md bg-surface overflow-hidden relative">

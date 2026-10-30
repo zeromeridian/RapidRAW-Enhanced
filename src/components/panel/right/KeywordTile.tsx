@@ -35,7 +35,7 @@ export default function KeywordTile({ appliedCounts, keyword, label, onToggle, t
   return (
     <button
       className={clsx(
-        'relative h-12 rounded-md border px-2 text-left transition-colors disabled:cursor-not-allowed',
+        'relative h-12 compact:h-10 rounded-md border px-2 text-left transition-colors disabled:cursor-not-allowed',
         label && 'pb-3',
         isApplied
           ? 'bg-accent/20 border-accent'

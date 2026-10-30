@@ -18,6 +18,7 @@ import clsx from 'clsx';
 import { CustomAspectRatio, Orientation } from '../../ui/AppProperties';
 import { motion } from 'framer-motion';
 import Text from '../../ui/Text';
+import PanelHeader from '../../ui/PanelHeader';
 import Slider from '../../ui/Slider';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { useEditorStore } from '../../../store/useEditorStore';
@@ -535,22 +536,24 @@ export default function CropPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <Text variant={TextVariants.title}>{t('editor.crop.title')}</Text>
-        <button
-          className="p-2 rounded-full hover:bg-surface transition-colors"
-          onClick={handleReset}
-          data-tooltip={t('editor.crop.resetTooltip')}
-        >
-          <RotateCcw size={18} />
-        </button>
-      </div>
+      <PanelHeader
+        title={t('editor.crop.title')}
+        actions={
+          <button
+            className="p-2 rounded-full hover:bg-surface transition-colors"
+            onClick={handleReset}
+            data-tooltip={t('editor.crop.resetTooltip')}
+          >
+            <RotateCcw size={18} />
+          </button>
+        }
+      />
 
-      <div className="grow overflow-y-auto p-4 space-y-8">
+      <div className="grow overflow-y-auto p-4 compact:p-2.5 space-y-8 compact:space-y-4">
         {selectedImage ? (
           <>
-            <div className="space-y-4">
-              <Text variant={TextVariants.heading} className="mb-2 flex items-center justify-between">
+            <div className="space-y-4 compact:space-y-2">
+              <Text variant={TextVariants.heading} className="mb-2 flex items-center justify-between compact:text-sm">
                 {t('editor.crop.aspectRatioHeading')}
                 <div className="flex items-center gap-2">
                   <button
@@ -678,11 +681,11 @@ export default function CropPanel() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              <Text variant={TextVariants.heading} className="mb-2">
+            <div className="space-y-4 compact:space-y-2">
+              <Text variant={TextVariants.heading} className="mb-2 compact:text-sm">
                 {t('editor.crop.rotationHeading')}
               </Text>
-              <div className="bg-surface px-4 pt-3 pb-4 rounded-lg">
+              <div className="bg-surface px-4 compact:px-3 pt-3 compact:pt-2 pb-4 compact:pb-2.5 rounded-lg">
                 <Slider
                   label={
                     <div className="flex items-center gap-2">
@@ -729,13 +732,13 @@ export default function CropPanel() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              <Text variant={TextVariants.heading} className="mb-2">
+            <div className="space-y-4 compact:space-y-2">
+              <Text variant={TextVariants.heading} className="mb-2 compact:text-sm">
                 {t('editor.crop.orientationHeading')}
               </Text>
               <div className="grid grid-cols-2 gap-2">
                 <motion.div
-                  className="flex flex-col items-center justify-center p-3 cursor-pointer rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary"
+                  className="flex flex-col items-center justify-center p-3 compact:p-2 cursor-pointer rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary"
                   onClick={() => handleStepRotate(-90)}
                   data-tooltip={t('editor.crop.tooltips.rotateLeft')}
                   whileTap={{ scale: 0.98 }}
@@ -745,7 +748,7 @@ export default function CropPanel() {
                   <span className="text-xs mt-2 transition-none">{t('editor.crop.labels.rotateLeft')}</span>
                 </motion.div>
                 <motion.div
-                  className="flex flex-col items-center justify-center p-3 cursor-pointer rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary"
+                  className="flex flex-col items-center justify-center p-3 compact:p-2 cursor-pointer rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary"
                   onClick={() => handleStepRotate(90)}
                   data-tooltip={t('editor.crop.tooltips.rotateRight')}
                   whileTap={{ scale: 0.98 }}
@@ -756,7 +759,7 @@ export default function CropPanel() {
                 </motion.div>
                 <motion.div
                   className={clsx(
-                    'flex flex-col items-center justify-center p-3 cursor-pointer rounded-lg transition-colors',
+                    'flex flex-col items-center justify-center p-3 compact:p-2 cursor-pointer rounded-lg transition-colors',
                     flipHorizontal
                       ? 'bg-accent text-button-text'
                       : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
@@ -776,7 +779,7 @@ export default function CropPanel() {
                 </motion.div>
                 <motion.div
                   className={clsx(
-                    'flex flex-col items-center justify-center p-3 cursor-pointer rounded-lg transition-colors',
+                    'flex flex-col items-center justify-center p-3 compact:p-2 cursor-pointer rounded-lg transition-colors',
                     flipVertical
                       ? 'bg-accent text-button-text'
                       : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',

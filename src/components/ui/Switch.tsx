@@ -52,7 +52,7 @@ const Switch = ({
       htmlFor={uniqueId}
       data-tooltip={tooltip}
     >
-      <Text variant={TextVariants.label} className="select-none">
+      <Text variant={TextVariants.label} className="select-none compact:text-xs">
         {label}
       </Text>
       <div className="relative w-10 h-5">

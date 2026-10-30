@@ -379,10 +379,10 @@ const EditorToolbar = memo(
     ].filter((item) => item.value);
 
     return (
-      <div className="relative shrink-0 flex items-center justify-between px-4 h-14 gap-4 z-40">
+      <div className="relative shrink-0 flex items-center justify-between px-4 compact:px-2 h-14 compact:h-11 gap-4 compact:gap-2 z-40">
         <div className="flex items-center gap-2 shrink-0 z-40">
           <button
-            className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors shrink-0"
+            className="bg-surface text-text-primary p-2 compact:p-1.5 rounded-full hover:bg-card-active transition-colors shrink-0"
             onClick={onBackToLibrary}
             onKeyDown={handleButtonKeyDown}
             data-tooltip={t('editor.toolbar.tooltips.backToLibrary')}
@@ -392,16 +392,16 @@ const EditorToolbar = memo(
           </button>
 
           <div className="hidden 2xl:flex items-center gap-2" aria-hidden="true">
-            <div className="p-2 invisible pointer-events-none">
+            <div className="p-2 compact:p-1.5 invisible pointer-events-none">
               <Undo size={20} />
             </div>
-            <div className="p-2 invisible pointer-events-none">
+            <div className="p-2 compact:p-1.5 invisible pointer-events-none">
               <Undo size={20} />
             </div>
-            <div className="p-2 invisible pointer-events-none">
+            <div className="p-2 compact:p-1.5 invisible pointer-events-none">
               <Undo size={20} />
             </div>
-            <div className="p-2 invisible pointer-events-none">
+            <div className="p-2 compact:p-1.5 invisible pointer-events-none">
               <Undo size={20} />
             </div>
           </div>
@@ -410,13 +410,12 @@ const EditorToolbar = memo(
         <div className="flex-1 flex justify-center min-w-0 relative h-full">
           <div
             className={clsx(
-              'bg-surface absolute flex items-center h-9 px-4 rounded-[18px] max-w-full transition-colors duration-200',
+              'bg-surface absolute top-2.5 compact:top-1.5 flex items-center h-9 compact:h-8 px-4 compact:px-3 rounded-[18px] max-w-full transition-colors duration-200',
               hasExif && 'cursor-pointer hover:bg-card-active',
             )}
             onClick={() => hasExif && toggleExifVisible()}
             data-tooltip={hasExif ? t('editor.toolbar.tooltips.toggleImageDetails') : undefined}
             style={{
-              top: '10px',
               transform: 'translateX(-50%)',
               left: '50%',
             }}
@@ -539,7 +538,7 @@ const EditorToolbar = memo(
         <div className="flex items-center gap-2 shrink-0 z-40">
           <div className="relative flex items-center gap-2" ref={historyButtonRef}>
             <button
-              className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-surface text-text-primary p-2 compact:p-1.5 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!canUndo}
               onClick={onUndo}
               onKeyDown={handleButtonKeyDown}
@@ -553,7 +552,7 @@ const EditorToolbar = memo(
               <Undo size={20} />
             </button>
             <button
-              className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-surface text-text-primary p-2 compact:p-1.5 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!canRedo}
               onClick={onRedo}
               onKeyDown={handleButtonKeyDown}
@@ -625,7 +624,7 @@ const EditorToolbar = memo(
           </div>
 
           <button
-            className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors"
+            className="bg-surface text-text-primary p-2 compact:p-1.5 rounded-full hover:bg-card-active transition-colors"
             onClick={() => setUI({ isSettingsOpen: true })}
             onKeyDown={handleButtonKeyDown}
             data-tooltip={t('library.splash.goToSettings')}
@@ -648,7 +647,7 @@ const EditorToolbar = memo(
             {showOriginal ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
           <button
-            className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+            className="bg-surface text-text-primary p-2 compact:p-1.5 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
             onClick={onToggleFullScreen}
             onKeyDown={handleButtonKeyDown}
             data-tooltip={t('editor.toolbar.tooltips.fullscreen')}

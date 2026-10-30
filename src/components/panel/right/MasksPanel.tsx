@@ -85,6 +85,7 @@ import { BRUSH_SIZE_MAX, BRUSH_SIZE_MIN, OPTION_SEPARATOR, Orientation } from '.
 import { createSubMask } from '../../../utils/maskUtils';
 import { usePresets } from '../../../hooks/usePresets';
 import Text from '../../ui/Text';
+import PanelHeader from '../../ui/PanelHeader';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -231,7 +232,7 @@ const FlowBrushTool = ({
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-4 border-t border-surface">
+    <div className="space-y-4 compact:space-y-2 border-t border-surface">
       <Slider
         defaultValue={10}
         label={t('editor.masks.brush.flow')}
@@ -940,41 +941,43 @@ export default function MasksPanel() {
       collisionDetection={pointerWithin}
     >
       <div className="flex flex-col h-full select-none overflow-hidden" onContextMenu={handlePanelContextMenu}>
-        <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-          <Text variant={TextVariants.title}>{t('editor.masks.maskingTitle')}</Text>
-          <div className="flex items-center gap-1">
-            <button
-              className={clsx(
-                'p-2 rounded-full transition-colors',
-                maskOverlayVisible
-                  ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                  : 'text-text-secondary opacity-60 hover:opacity-100 hover:bg-surface',
-              )}
-              onClick={() => setEditor({ maskOverlayVisible: !maskOverlayVisible })}
-              data-tooltip={t('editor.masks.toggleOverlayTooltip')}
-              aria-pressed={maskOverlayVisible}
-            >
-              {maskOverlayVisible ? <Eye size={18} /> : <EyeOff size={18} />}
-            </button>
-            <button
-              className={clsx(
-                'p-2 rounded-full transition-colors',
-                isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
-              )}
-              onClick={onToggleWaveform}
-              data-tooltip={t('editor.masks.toggleAnalyticsTooltip')}
-            >
-              <ChartArea size={18} />
-            </button>
-            <button
-              className="p-2 rounded-full hover:bg-surface transition-colors"
-              onClick={handleResetAllMasks}
-              data-tooltip={t('editor.masks.resetMaskingTooltip')}
-            >
-              <RotateCcw size={18} />
-            </button>
-          </div>
-        </div>
+        <PanelHeader
+          title={t('editor.masks.maskingTitle')}
+          actions={
+            <>
+              <button
+                className={clsx(
+                  'p-2 rounded-full transition-colors',
+                  maskOverlayVisible
+                    ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                    : 'text-text-secondary opacity-60 hover:opacity-100 hover:bg-surface',
+                )}
+                onClick={() => setEditor({ maskOverlayVisible: !maskOverlayVisible })}
+                data-tooltip={t('editor.masks.toggleOverlayTooltip')}
+                aria-pressed={maskOverlayVisible}
+              >
+                {maskOverlayVisible ? <Eye size={18} /> : <EyeOff size={18} />}
+              </button>
+              <button
+                className={clsx(
+                  'p-2 rounded-full transition-colors',
+                  isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
+                )}
+                onClick={onToggleWaveform}
+                data-tooltip={t('editor.masks.toggleAnalyticsTooltip')}
+              >
+                <ChartArea size={18} />
+              </button>
+              <button
+                className="p-2 rounded-full hover:bg-surface transition-colors"
+                onClick={handleResetAllMasks}
+                data-tooltip={t('editor.masks.resetMaskingTooltip')}
+              >
+                <RotateCcw size={18} />
+              </button>
+            </>
+          }
+        />
 
         <AnimatePresence initial={false}>
           {isWaveformVisible && (
@@ -985,7 +988,7 @@ export default function MasksPanel() {
               transition={{ duration: isResizingWaveform ? 0 : 0.2, ease: 'easeOut' }}
               className="shrink-0 flex flex-col relative border-b border-surface overflow-hidden"
             >
-              <div className="grow w-full h-full p-4 pb-2 min-h-0">
+              <div className="grow w-full h-full p-4 pb-2 compact:p-2 min-h-0">
                 <Waveform
                   waveformData={waveform || null}
                   histogram={histogram}
@@ -1005,7 +1008,7 @@ export default function MasksPanel() {
           )}
         </AnimatePresence>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0 p-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0 p-4 compact:p-2.5">
           <AnimatePresence mode="wait">
             {!adjustments.masks || adjustments.masks.length === 0 ? (
               <motion.div
@@ -1017,10 +1020,10 @@ export default function MasksPanel() {
                 className="z-10 shrink-0"
                 onClick={handleDeselect}
               >
-                <Text variant={TextVariants.heading} className="mb-2">
+                <Text variant={TextVariants.heading} className="mb-2 compact:text-sm">
                   {t('editor.masks.createNewTitle')}
                 </Text>
-                <div className="grid grid-cols-3 gap-2" onClick={(e) => e.stopPropagation()}>
+                <div className="grid grid-cols-3 gap-2 compact:gap-1.5" onClick={(e) => e.stopPropagation()}>
                   {ALL_MASK_CREATION_TYPES.map((maskType: MaskType) => (
                     <DraggableGridItem
                       key={maskType.type || maskType.id}
@@ -1044,7 +1047,7 @@ export default function MasksPanel() {
                 className={`flex-col transition-colors ${isRootOver ? 'bg-surface' : ''}`}
                 onClick={handleDeselect}
               >
-                <Text variant={TextVariants.heading} className="mb-2">
+                <Text variant={TextVariants.heading} className="mb-2 compact:text-sm">
                   {t('editor.masks.masksTitle')}
                 </Text>
 
@@ -1110,7 +1113,7 @@ export default function MasksPanel() {
                 <Text
                   as="div"
                   weight={TextWeights.medium}
-                  className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
+                  className="flex items-center gap-2 p-2 compact:py-1 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
                   onClick={(e) => handleAddMaskContextMenu(e, null)}
                 >
                   <div className="p-0.5">
@@ -1134,7 +1137,7 @@ export default function MasksPanel() {
                 transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="flex-1 min-h-0"
               >
-                <Text variant={TextVariants.heading} className="mb-2">
+                <Text variant={TextVariants.heading} className="mb-2 compact:text-sm">
                   {t('editor.masks.maskAdjustmentsTitle')}
                 </Text>
                 <SettingsPanel
@@ -1174,7 +1177,7 @@ export default function MasksPanel() {
                 as="div"
                 color={TextColors.primary}
                 weight={TextWeights.medium}
-                className="flex items-center gap-2 p-2 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10"
+                className="flex items-center gap-2 p-2 compact:py-1 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10"
               >
                 <FolderIcon size={18} className={TEXT_COLOR_KEYS[TextColors.secondary]} />
                 <span className="flex-1 truncate">{(activeDragItem.item as MaskContainer).name}</span>
@@ -1186,7 +1189,7 @@ export default function MasksPanel() {
                 as="div"
                 color={TextColors.primary}
                 weight={TextWeights.medium}
-                className="flex items-center gap-2 p-2 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10 ml-3.75"
+                className="flex items-center gap-2 p-2 compact:py-1 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10 ml-3.75"
               >
                 {(() => {
                   const sm = activeDragItem.item as SubMask;
@@ -1236,7 +1239,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
       animate={{ opacity: 1, height: 'auto', marginTop: '4px' }}
       exit={{ opacity: 0, height: 0, marginTop: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className={`p-4 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
+      className={`p-4 compact:p-2.5 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
     >
       <Text weight={TextWeights.medium}>{t('editor.masks.dropzoneText')}</Text>
     </motion.div>
@@ -1273,13 +1276,13 @@ function DraggableGridItem({ maskType, onClick, onRightClick, isDraggable, activ
         if (event.button !== 2) return;
         onRightClick(event);
       }}
-      className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-2 aspect-square transition-colors
+      className={`bg-surface text-text-primary rounded-lg p-2 compact:py-1.5 flex flex-col items-center justify-center gap-2 compact:gap-1 aspect-square compact:aspect-auto transition-colors
                 ${maskType.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'} ${isDragging ? 'opacity-50' : ''}`}
       data-tooltip={tooltip}
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
     >
-      <maskType.icon size={24} />{' '}
+      <maskType.icon size={24} className="compact:size-5" />{' '}
       <Text as="span" variant={TextVariants.small} color={TextColors.primary}>
         {getMaskTypeName(maskType)}
       </Text>
@@ -1453,7 +1456,7 @@ function ContainerRow({
       <div
         {...listeners}
         {...attributes}
-        className={`flex items-center gap-2 p-2 rounded-md transition-colors group
+        className={`flex items-center gap-2 p-2 compact:py-1 rounded-md transition-colors group
              ${isSelected ? 'bg-surface' : 'hover:bg-card-active'}
              ${borderClass}`}
         onClick={(e) => {
@@ -1575,7 +1578,7 @@ function ContainerRow({
                   <Text
                     as="div"
                     weight={TextWeights.medium}
-                    className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
+                    className="flex items-center gap-2 p-2 compact:py-1 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
                     onClick={(e) => {
                       e.stopPropagation();
                       onAddComponent(e);
@@ -1711,7 +1714,7 @@ function SubMaskRow({
       {...listeners}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`flex items-center gap-2 p-2 rounded-md transition-colors group cursor-pointer
+      className={`flex items-center gap-2 p-2 compact:py-1 rounded-md transition-colors group cursor-pointer
             ${isActive ? 'bg-surface' : 'hover:bg-card-active'}
             ${isOver && !isDraggingContainer ? 'border-t-2 border-accent' : ''}
             ${isDragging ? 'opacity-40 z-50' : ''}
@@ -2100,7 +2103,7 @@ function SettingsPanel({
         canToggleVisibility={false}
         isContentVisible={true}
       >
-        <div className="space-y-4 pt-2">
+        <div className="space-y-4 compact:space-y-2 pt-2">
           {isTextMask && (
             <>
               <Input
@@ -2195,7 +2198,7 @@ function SettingsPanel({
                   variant={TextVariants.small}
                   color={TextColors.accent}
                   weight={TextWeights.medium}
-                  className="p-3 bg-card-active rounded-md border border-surface flex items-center gap-3"
+                  className="p-3 compact:p-2 bg-card-active rounded-md border border-surface flex items-center gap-3 compact:gap-2"
                 >
                   <Loader2 size={16} className="animate-spin shrink-0" />
                   <div className="leading-relaxed">

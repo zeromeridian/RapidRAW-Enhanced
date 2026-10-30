@@ -23,7 +23,7 @@ import {
 } from '../../../utils/keywords';
 
 const iconButtonClassName =
-  'w-9 h-9 shrink-0 rounded-md bg-surface-secondary text-text-secondary hover:text-text-primary hover:bg-surface transition-colors flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed';
+  'w-9 h-9 compact:w-7 compact:h-7 shrink-0 rounded-md bg-surface-secondary text-text-secondary hover:text-text-primary hover:bg-surface transition-colors flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed';
 
 interface KeywordSetSectionProps {
   targetPaths: string[];
@@ -117,7 +117,7 @@ export default function KeywordSetSection({ targetPaths }: KeywordSetSectionProp
             {draft.keywords.map((keyword, index) => (
               <Input
                 bgClassName="bg-bg-primary"
-                className="h-9 px-2"
+                className="h-9 compact:h-7 px-2"
                 key={index}
                 onChange={(event) =>
                   setDraft({
@@ -159,7 +159,7 @@ export default function KeywordSetSection({ targetPaths }: KeywordSetSectionProp
               onChange={(id: string) => saveKeywordSets(keywordSets, id)}
               options={keywordSets.map((set) => ({ label: set.name, value: set.id }))}
               placeholder={t('editor.tagging.keywordSet')}
-              triggerClassName="bg-surface-secondary h-9 px-2"
+              triggerClassName="bg-surface-secondary h-9 compact:h-7 px-2"
               value={activeSet?.id ?? null}
             />
             <button

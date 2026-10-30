@@ -10,6 +10,7 @@ import GuidedTransformModal from '../../modals/GuidedTransformModal';
 import TransformModal from '../../modals/TransformModal';
 import Switch from '../../ui/Switch';
 import Text from '../../ui/Text';
+import PanelHeader from '../../ui/PanelHeader';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
@@ -70,7 +71,7 @@ export default function GeometryPanel() {
   };
 
   const buttonClass =
-    'flex flex-col items-center justify-center p-3 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-50';
+    'flex flex-col items-center justify-center p-3 compact:p-2 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-50';
 
   if (isGuidedModalOpen) {
     return (
@@ -94,13 +95,11 @@ export default function GeometryPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <Text variant={TextVariants.title}>{t('editor.geometry.title')}</Text>
-      </div>
+      <PanelHeader title={t('editor.geometry.title')} />
 
-      <div className="grow overflow-y-auto p-4 custom-scrollbar">
+      <div className="grow overflow-y-auto p-4 compact:p-2.5 custom-scrollbar">
         {selectedImage ? (
-          <div className="space-y-4">
+          <div className="space-y-4 compact:space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <motion.button
                 className={clsx(
@@ -185,7 +184,7 @@ export default function GeometryPanel() {
               </motion.button>
             </div>
             <motion.button
-              className="w-full flex items-center justify-center gap-2 rounded-lg border border-text-secondary/40 bg-surface px-3 py-3 text-sm font-medium text-text-primary transition-colors hover:border-accent hover:bg-card-active"
+              className="w-full flex items-center justify-center gap-2 rounded-lg border border-text-secondary/40 bg-surface px-3 py-3 compact:py-2 text-sm font-medium text-text-primary transition-colors hover:border-accent hover:bg-card-active"
               onClick={resetTransforms}
               data-tooltip={t('editor.geometry.resetTooltip')}
               whileTap={{ scale: 0.98 }}
@@ -194,7 +193,7 @@ export default function GeometryPanel() {
               <RotateCcw size={18} />
               <span>{t('adjustments.basic.reset')}</span>
             </motion.button>
-            <div className="rounded-lg bg-surface p-3">
+            <div className="rounded-lg bg-surface p-3 compact:p-2">
               <Switch
                 checked={adjustments.transformConstrainCrop}
                 label={t('editor.crop.labels.constrainCrop')}
