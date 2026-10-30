@@ -6,7 +6,7 @@ import { useLibraryStore } from '../../../store/useLibraryStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { USER_TAG_PREFIX, formatKeyword } from '../../../utils/keywords';
 
-/** How many of the target images carry each user keyword tag. */
+/** How many of the target images carry each stored tag. */
 export function useAppliedKeywordCounts(targetPaths: string[]) {
   const imageList = useLibraryStore((state) => state.imageList);
   return useMemo(() => {
@@ -14,9 +14,7 @@ export function useAppliedKeywordCounts(targetPaths: string[]) {
     const counts = new Map<string, number>();
     for (const image of imageList) {
       if (!targets.has(image.path)) continue;
-      for (const tag of image.tags || []) {
-        if (tag.startsWith(USER_TAG_PREFIX)) counts.set(tag, (counts.get(tag) || 0) + 1);
-      }
+      for (const tag of new Set(image.tags || [])) counts.set(tag, (counts.get(tag) || 0) + 1);
     }
     return counts;
   }, [imageList, targetPaths]);
@@ -42,8 +40,8 @@ export default function KeywordTile({ appliedCounts, keyword, label, onToggle, t
         isApplied
           ? 'bg-accent/20 border-accent'
           : count > 0
-            ? 'bg-surface/50 border-dashed border-text-tertiary/60 hover:border-text-tertiary'
-            : 'bg-surface border-surface hover:border-text-tertiary/50',
+            ? 'bg-bg-primary/50 border-dashed border-text-tertiary/60 hover:border-text-tertiary'
+            : 'bg-bg-primary border-transparent hover:border-text-tertiary/50',
         !keyword && 'opacity-40',
       )}
       data-tooltip={keyword ? formatKeyword(keyword) : undefined}

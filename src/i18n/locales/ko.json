@@ -1052,7 +1052,7 @@
         "matchAll": "모든 태그 일치",
         "matchAny": "임의의 태그 일치",
         "searchOrQuery": "검색 또는 쿼리 추가",
-        "tooltipAdvancedQueries": "고급 쿼리: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony",
+        "tooltipAdvancedQueries": "고급 쿼리: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony, keyword:places>germany",
         "tooltipClearSearch": "검색 지우기",
         "tooltipSearchFilter": "검색 또는 필터"
       },

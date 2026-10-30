@@ -1080,7 +1080,7 @@
         "matchAll": "Corrispondenza di TUTTI i tag",
         "matchAny": "Corrispondenza di QUALSIASI tag",
         "searchOrQuery": "Cerca o aggiungi query",
-        "tooltipAdvancedQueries": "Query Avanzate: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony",
+        "tooltipAdvancedQueries": "Query Avanzate: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony, keyword:places>germany",
         "tooltipClearSearch": "Cancella ricerca",
         "tooltipSearchFilter": "Cerca o Filtra"
       },

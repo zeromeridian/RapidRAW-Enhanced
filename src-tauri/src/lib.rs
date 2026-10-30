@@ -28,6 +28,7 @@ mod identifier_migration;
 mod image_loader;
 mod image_processing;
 mod inpainting;
+mod keyword_index;
 mod launch_request;
 mod lens_blur;
 mod lens_correction;
@@ -3450,6 +3451,9 @@ pub fn run() {
             tagging::add_tag_for_paths,
             tagging::remove_tag_for_paths,
             tagging::suggest_ai_keywords,
+            keyword_index::refresh_keyword_index,
+            keyword_index::get_keyword_index,
+            keyword_index::get_keyword_image_paths,
             tagging::set_flag_for_paths,
             culling::cull_images,
             lens_correction::get_lensfun_makers,

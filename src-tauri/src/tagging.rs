@@ -755,13 +755,13 @@ fn modify_tags_for_paths(
     app_handle: AppHandle,
     modify_fn: impl Fn(&mut Vec<String>) + Sync,
 ) -> Result<(), String> {
-    let settings = crate::app_settings::load_settings(app_handle).unwrap_or_default();
+    let settings = crate::app_settings::load_settings(app_handle.clone()).unwrap_or_default();
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
     let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
-    paths
+    let updated_tags = paths
         .par_iter()
-        .try_for_each(|path| -> Result<(), String> {
+        .map(|path| -> Result<(String, Option<Vec<String>>), String> {
             let metadata = modify_tags_for_path(path, &modify_fn)?;
 
             if enable_xmp_sync && !path.contains("?vc=") {
@@ -773,12 +773,15 @@ fn modify_tags_for_paths(
                     true,
                 );
             }
-            Ok(())
+            Ok((path.clone(), metadata.tags))
         })
+        .collect::<Result<Vec<_>, String>>()
         .map_err(|error| {
             eprintln!("{error}");
             error
-        })
+        })?;
+    crate::keyword_index::record_tags(&app_handle, &updated_tags);
+    Ok(())
 }
 
 #[tauri::command]
@@ -943,75 +946,54 @@ mod keyword_tests {
     }
 }
 
-#[tauri::command]
-pub fn clear_ai_tags(root_path: String) -> Result<usize, String> {
-    if !Path::new(&root_path).exists() {
+/// Removes the tags that `keep` rejects from every image under `root_path` like any other tag
+/// change, so XMP and the keyword index follow, and returns how many images changed.
+fn clear_tags_under_root(
+    root_path: &str,
+    app_handle: AppHandle,
+    keep: impl Fn(&str) -> bool + Sync,
+) -> Result<usize, String> {
+    if !Path::new(root_path).exists() {
         return Err(format!("Root path does not exist: {}", root_path));
     }
 
-    let mut updated_count = 0;
-    let walker = WalkDir::new(root_path).into_iter();
-
-    for entry in walker.filter_map(|e| e.ok()) {
-        let path = entry.path();
-        if path.is_file()
-            && path.extension().and_then(|s| s.to_str()) == Some("tirdata")
-            && let Ok(content) = fs::read_to_string(path)
-            && let Ok(mut metadata) = serde_json::from_str::<ImageMetadata>(&content)
-            && let Some(tags) = &mut metadata.tags
-        {
-            let original_len = tags.len();
-            tags.retain(|tag| !is_ai_tag(tag));
-
-            if tags.len() < original_len {
-                if tags.is_empty() {
-                    metadata.tags = None;
-                }
-                if let Ok(json_string) = serde_json::to_string_pretty(&metadata)
-                    && fs::write(path, json_string).is_ok()
-                {
-                    updated_count += 1;
-                }
+    let paths: Vec<String> = WalkDir::new(root_path)
+        .into_iter()
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| {
+            let path = entry.path();
+            let file_name = path.file_name()?.to_string_lossy();
+            let (source_name, copy_id) = file_management::parse_sidecar_filename(&file_name)?;
+            let content = fs::read_to_string(path).ok()?;
+            let metadata = serde_json::from_str::<ImageMetadata>(&content).ok()?;
+            if !metadata.tags?.iter().any(|tag| !keep(tag)) {
+                return None;
             }
-        }
-    }
-    Ok(updated_count)
+            let source = path
+                .parent()?
+                .join(source_name)
+                .to_string_lossy()
+                .into_owned();
+            Some(match copy_id {
+                Some(id) => format!("{source}?vc={id}"),
+                None => source,
+            })
+        })
+        .collect();
+
+    modify_tags_for_paths(&paths, app_handle, |tags| tags.retain(|tag| keep(tag)))?;
+    Ok(paths.len())
 }
 
 #[tauri::command]
-pub fn clear_all_tags(root_path: String) -> Result<usize, String> {
-    if !Path::new(&root_path).exists() {
-        return Err(format!("Root path does not exist: {}", root_path));
-    }
+pub fn clear_ai_tags(root_path: String, app_handle: AppHandle) -> Result<usize, String> {
+    clear_tags_under_root(&root_path, app_handle, |tag| !is_ai_tag(tag))
+}
 
-    let mut updated_count = 0;
-    let walker = WalkDir::new(root_path).into_iter();
-
-    for entry in walker.filter_map(|e| e.ok()) {
-        let path = entry.path();
-        if path.is_file()
-            && path.extension().and_then(|s| s.to_str()) == Some("tirdata")
-            && let Ok(content) = fs::read_to_string(path)
-            && let Ok(mut metadata) = serde_json::from_str::<ImageMetadata>(&content)
-            && let Some(tags) = &mut metadata.tags
-        {
-            let original_len = tags.len();
-            // Flags and color labels are independent of the editable tag list.
-            tags.retain(|tag| {
-                tag.starts_with(COLOR_TAG_PREFIX) || tag.starts_with(FLAG_TAG_PREFIX)
-            });
-
-            if tags.len() < original_len {
-                if tags.is_empty() {
-                    metadata.tags = None;
-                }
-                if let Ok(json_string) = serde_json::to_string_pretty(&metadata)
-                    && fs::write(path, json_string).is_ok()
-                {
-                    updated_count += 1;
-                }
-            }
-        }
-    }
-    Ok(updated_count)
+#[tauri::command]
+pub fn clear_all_tags(root_path: String, app_handle: AppHandle) -> Result<usize, String> {
+    // Flags and color labels are independent of the editable tag list.
+    clear_tags_under_root(&root_path, app_handle, |tag| {
+        tag.starts_with(COLOR_TAG_PREFIX) || tag.starts_with(FLAG_TAG_PREFIX)
+    })
 }

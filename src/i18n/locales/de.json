@@ -1054,7 +1054,7 @@
         "matchAll": "ALLE Tags übereinstimmend",
         "matchAny": "EINE der Tags übereinstimmend",
         "searchOrQuery": "Suchen oder Abfrage hinzufügen",
-        "tooltipAdvancedQueries": "Erweiterte Abfragen: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony",
+        "tooltipAdvancedQueries": "Erweiterte Abfragen: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony, keyword:places>germany",
         "tooltipClearSearch": "Suche löschen",
         "tooltipSearchFilter": "Suchen oder Filtern"
       },

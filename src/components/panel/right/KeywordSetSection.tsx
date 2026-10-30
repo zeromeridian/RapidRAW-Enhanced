@@ -8,6 +8,7 @@ import Input from '../../ui/Input';
 import Text from '../../ui/Text';
 import ConfirmModal from '../../modals/ConfirmModal';
 import KeywordTile, { useAppliedKeywordCounts } from './KeywordTile';
+import TaggingSection from './TaggingSection';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants } from '../../../types/typography';
@@ -101,11 +102,7 @@ export default function KeywordSetSection({ targetPaths }: KeywordSetSectionProp
   };
 
   return (
-    <div>
-      <Text variant={TextVariants.heading} className="mb-3">
-        {t('editor.tagging.keywordSet')}
-      </Text>
-
+    <TaggingSection id="keywordSet" title={t('editor.tagging.keywordSet')}>
       {draft ? (
         <div className="space-y-2">
           <Input
@@ -219,6 +216,6 @@ export default function KeywordSetSection({ targetPaths }: KeywordSetSectionProp
         onConfirm={deleteActiveSet}
         title={t('editor.tagging.deleteKeywordSet')}
       />
-    </div>
+    </TaggingSection>
   );
 }

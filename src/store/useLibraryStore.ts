@@ -11,7 +11,7 @@ import { Adjustments, INITIAL_ADJUSTMENTS } from '../utils/adjustments';
 import { ColumnWidths } from '../components/panel/MainLibrary';
 
 export interface NavHistoryItem {
-  type: 'folder' | 'album';
+  type: 'folder' | 'album' | 'keyword';
   path: string;
   albumName?: string;
   images?: string[];
@@ -36,6 +36,9 @@ interface LibraryState {
   albumTree: AlbumItem[];
   activeAlbumId: string | null;
   expandedAlbumGroups: Set<string>;
+
+  // Keyword view: the stored tag whose images are listed
+  activeKeyword: string | null;
 
   // Images & Selection
   imageList: Array<ImageFile>;
@@ -82,6 +85,8 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   albumTree: [],
   activeAlbumId: null,
   expandedAlbumGroups: new Set<string>(),
+
+  activeKeyword: null,
 
   imageList: [],
   imageRatings: {},

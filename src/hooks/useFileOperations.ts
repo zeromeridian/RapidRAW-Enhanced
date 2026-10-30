@@ -9,6 +9,7 @@ import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { Invokes } from '../components/ui/AppProperties';
 import { Status } from '../components/ui/ExportImportProperties';
+import { isCollectionView } from '../utils/libraryViews';
 
 export function useFileOperations(
   refreshImageList: () => Promise<void>,
@@ -373,7 +374,7 @@ export function useFileOperations(
       const { copiedFilePaths, setProcess } = useProcessStore.getState();
       const { currentFolderPath, setLibrary } = useLibraryStore.getState();
 
-      if (copiedFilePaths.length === 0 || !currentFolderPath) return;
+      if (copiedFilePaths.length === 0 || !currentFolderPath || isCollectionView(currentFolderPath)) return;
 
       try {
         if (mode === 'copy') {

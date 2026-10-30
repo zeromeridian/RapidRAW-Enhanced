@@ -6,9 +6,10 @@ import { buildImageGroups, GroupBadgeInfo, GroupId } from '../utils/imageGroupin
 import { applyImageStacks } from '../utils/imageStacks';
 import { getImageFlag } from '../utils/imageFlags';
 import { matchesLibraryFilter } from '../utils/libraryFilters';
+import { hasKeywordOrChild } from '../utils/keywords';
 
 export const ADVANCED_QUERY_REGEX =
-  /^(iso|aperture|f|shutter|s|focal|mm|rating|color|flag|camera|make|model|lens)(?=\s*[:<>=])\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
+  /^(iso|aperture|f|shutter|s|focal|mm|rating|color|flag|camera|make|model|lens|keyword)(?=\s*[:<>=])\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
 
 export const parseShutter = (val: string | undefined): number => {
   if (!val) return 0;
@@ -106,6 +107,8 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
         imgStr = (image.tags || []).find((t: string) => t.startsWith('color:'))?.substring(6) || '';
       } else if (field === 'flag') {
         imgStr = getImageFlag(image.tags);
+      } else if (field === 'keyword') {
+        return (operator === '=' || operator === ':') && hasKeywordOrChild(image.tags, value);
       }
 
       return operator === '=' || operator === ':' ? imgStr.includes(value) : false;

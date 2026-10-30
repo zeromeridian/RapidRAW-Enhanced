@@ -1080,7 +1080,7 @@
         "matchAll": "Coincidir TODAS las etiquetas",
         "matchAny": "Coincidir CUALQUIER etiqueta",
         "searchOrQuery": "Buscar o añadir consulta",
-        "tooltipAdvancedQueries": "Consultas avanzadas: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony",
+        "tooltipAdvancedQueries": "Consultas avanzadas: iso:>800, f:<=2.8, s:1/200, mm:50, camera:sony, keyword:places>germany",
         "tooltipClearSearch": "Borrar búsqueda",
         "tooltipSearchFilter": "Buscar o Filtrar"
       },

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import Text from '../../ui/Text';
 import KeywordTile, { useAppliedKeywordCounts } from './KeywordTile';
+import TaggingSection from './TaggingSection';
 import { useAiKeywordSuggestions } from '../../../hooks/useAiKeywordSuggestions';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { useLibraryStore } from '../../../store/useLibraryStore';
@@ -44,10 +45,7 @@ export default function KeywordSuggestionsSection({ activePath, targetPaths }: K
 
   return (
     <>
-      <div>
-        <Text variant={TextVariants.heading} className="mb-3">
-          {t('editor.tagging.suggestions')}
-        </Text>
+      <TaggingSection id="suggestions" title={t('editor.tagging.suggestions')}>
         {suggestions.length > 0 ? (
           renderTiles(suggestions)
         ) : (
@@ -55,31 +53,30 @@ export default function KeywordSuggestionsSection({ activePath, targetPaths }: K
             {t('editor.tagging.noSuggestions')}
           </Text>
         )}
-      </div>
+      </TaggingSection>
 
-      <div className="space-y-2">
-        <Text variant={TextVariants.heading} className="mb-3">
-          {t('editor.tagging.aiSuggestions')}
-        </Text>
-        <button
-          className="w-full h-9 flex items-center justify-center gap-2 rounded-md bg-surface-secondary border border-surface text-sm text-text-primary hover:bg-surface hover:border-text-tertiary/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          data-tooltip={t('editor.tagging.suggestWithAiTooltip')}
-          disabled={!activePath || ai.isLoading}
-          onClick={() => void ai.requestSuggestions()}
-          type="button"
-        >
-          {ai.isLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-          {t('editor.tagging.suggestWithAi')}
-        </button>
-        {ai.suggestions &&
-          (ai.suggestions.length > 0 ? (
-            renderTiles(ai.suggestions)
-          ) : (
-            <Text variant={TextVariants.small} color={TextColors.secondary} className="italic">
-              {t('editor.tagging.noAiSuggestions')}
-            </Text>
-          ))}
-      </div>
+      <TaggingSection id="aiSuggestions" title={t('editor.tagging.aiSuggestions')}>
+        <div className="space-y-2">
+          <button
+            className="w-full h-9 flex items-center justify-center gap-2 rounded-md bg-bg-primary border border-transparent text-sm text-text-primary hover:border-text-tertiary/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            data-tooltip={t('editor.tagging.suggestWithAiTooltip')}
+            disabled={!activePath || ai.isLoading}
+            onClick={() => void ai.requestSuggestions()}
+            type="button"
+          >
+            {ai.isLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            {t('editor.tagging.suggestWithAi')}
+          </button>
+          {ai.suggestions &&
+            (ai.suggestions.length > 0 ? (
+              renderTiles(ai.suggestions)
+            ) : (
+              <Text variant={TextVariants.small} color={TextColors.secondary} className="italic">
+                {t('editor.tagging.noAiSuggestions')}
+              </Text>
+            ))}
+        </div>
+      </TaggingSection>
     </>
   );
 }
