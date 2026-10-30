@@ -39,6 +39,7 @@ import CreateFolderModal from '../../modals/CreateFolderModal';
 import RenameFolderModal from '../../modals/RenameFolderModal';
 import Button from '../../ui/Button';
 import Text from '../../ui/Text';
+import PanelHeader from '../../ui/PanelHeader';
 import Slider from '../../ui/Slider';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { Adjustments, INITIAL_ADJUSTMENTS, ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
@@ -225,7 +226,7 @@ function PresetItemDisplay({
 
   return (
     <div className="flex flex-col p-2 rounded-lg bg-surface cursor-grabbing">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 compact:gap-2">
         <div
           className="w-20 h-14 bg-bg-tertiary rounded-md flex items-center justify-center shrink-0 relative overflow-hidden"
           data-tooltip={tooltipContent}
@@ -286,7 +287,7 @@ function PresetItemDisplay({
             onClick={(e: any) => e.stopPropagation()}
             onPointerDown={(e: any) => e.stopPropagation()}
           >
-            <div className="mt-3 px-1 pb-1">
+            <div className="mt-3 compact:mt-2 px-1 pb-1">
               <Slider
                 min={0}
                 max={200}
@@ -1138,45 +1139,47 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex flex-col h-full">
-        <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-          <Text variant={TextVariants.title}>{t('editor.presets.title')}</Text>
-          <div className="flex items-center gap-1">
-            <button
-              className="p-2 rounded-full hover:bg-surface transition-colors"
-              onClick={onNavigateToCommunity}
-              data-tooltip={t('editor.presets.tooltips.explore')}
-            >
-              <Users size={18} />
-            </button>
-            <button
-              className="p-2 rounded-full hover:bg-surface transition-colors"
-              disabled={isLoading}
-              onClick={handleImportPresets}
-              data-tooltip={t('editor.presets.tooltips.import')}
-            >
-              <FileUp size={18} />
-            </button>
-            <button
-              className="p-2 rounded-full hover:bg-surface transition-colors"
-              disabled={presets.length === 0 || isLoading}
-              onClick={handleExportAllPresets}
-              data-tooltip={t('editor.presets.tooltips.export')}
-            >
-              <FileDown size={18} />
-            </button>
-            <button
-              className="p-2 rounded-full hover:bg-surface transition-colors"
-              disabled={isLoading}
-              onClick={() => setConfigureModalState({ isOpen: true, preset: null })}
-              data-tooltip={t('editor.presets.tooltips.saveNew')}
-            >
-              <Plus size={18} />
-            </button>
-          </div>
-        </div>
+        <PanelHeader
+          title={t('editor.presets.title')}
+          actions={
+            <>
+              <button
+                className="p-2 rounded-full hover:bg-surface transition-colors"
+                onClick={onNavigateToCommunity}
+                data-tooltip={t('editor.presets.tooltips.explore')}
+              >
+                <Users size={18} />
+              </button>
+              <button
+                className="p-2 rounded-full hover:bg-surface transition-colors"
+                disabled={isLoading}
+                onClick={handleImportPresets}
+                data-tooltip={t('editor.presets.tooltips.import')}
+              >
+                <FileUp size={18} />
+              </button>
+              <button
+                className="p-2 rounded-full hover:bg-surface transition-colors"
+                disabled={presets.length === 0 || isLoading}
+                onClick={handleExportAllPresets}
+                data-tooltip={t('editor.presets.tooltips.export')}
+              >
+                <FileDown size={18} />
+              </button>
+              <button
+                className="p-2 rounded-full hover:bg-surface transition-colors"
+                disabled={isLoading}
+                onClick={() => setConfigureModalState({ isOpen: true, preset: null })}
+                data-tooltip={t('editor.presets.tooltips.saveNew')}
+              >
+                <Plus size={18} />
+              </button>
+            </>
+          }
+        />
 
         <div
-          className={`grow overflow-y-auto p-4 space-y-2 rounded-lg transition-colors ${
+          className={`grow overflow-y-auto p-4 compact:p-2 space-y-2 compact:space-y-1 rounded-lg transition-colors ${
             isRootOver ? 'bg-surface-hover' : ''
           }`}
           onContextMenu={handleBackgroundContextMenu}
@@ -1194,7 +1197,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
             </Text>
           )}
           {!isLoading && presets.length === 0 ? (
-            <div className="text-center text-text-secondary flex flex-col items-center gap-4 pt-4">
+            <div className="text-center text-text-secondary flex flex-col items-center gap-4 compact:gap-2 pt-4 compact:pt-2">
               <Text className="max-w-xs">{t('editor.presets.status.empty')}</Text>
               <Button variant="secondary" onClick={onNavigateToCommunity}>
                 <Users size={16} className="mr-2" />

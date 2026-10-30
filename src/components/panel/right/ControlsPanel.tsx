@@ -14,8 +14,7 @@ import Resizer from '../../ui/Resizer';
 import { Adjustments, SectionVisibility, INITIAL_ADJUSTMENTS, ADJUSTMENT_SECTIONS } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
-import Text from '../../ui/Text';
-import { TextVariants } from '../../../types/typography';
+import PanelHeader from '../../ui/PanelHeader';
 import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -209,37 +208,39 @@ export default function Controls() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <Text variant={TextVariants.title}>{t('editor.adjustments.title')}</Text>
-        <div className="flex items-center gap-1">
-          <button
-            className="p-2 rounded-full hover:bg-surface disabled:cursor-not-allowed transition-colors"
-            disabled={!selectedImage?.isReady}
-            onClick={handleAutoAdjustments}
-            data-tooltip={t('editor.adjustments.tooltips.autoAdjust')}
-          >
-            <Aperture size={18} />
-          </button>
-          <button
-            className={clsx(
-              'p-2 rounded-full transition-colors',
-              isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
-            )}
-            onClick={onToggleWaveform}
-            data-tooltip={t('editor.adjustments.tooltips.toggleAnalytics')}
-          >
-            <ChartArea size={18} />
-          </button>
-          <button
-            className="p-2 rounded-full hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            disabled={!selectedImage}
-            onClick={handleResetAdjustments}
-            data-tooltip={t('editor.adjustments.tooltips.resetAdjustments')}
-          >
-            <RotateCcw size={18} />
-          </button>
-        </div>
-      </div>
+      <PanelHeader
+        title={t('editor.adjustments.title')}
+        actions={
+          <>
+            <button
+              className="p-2 rounded-full hover:bg-surface disabled:cursor-not-allowed transition-colors"
+              disabled={!selectedImage?.isReady}
+              onClick={handleAutoAdjustments}
+              data-tooltip={t('editor.adjustments.tooltips.autoAdjust')}
+            >
+              <Aperture size={18} />
+            </button>
+            <button
+              className={clsx(
+                'p-2 rounded-full transition-colors',
+                isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
+              )}
+              onClick={onToggleWaveform}
+              data-tooltip={t('editor.adjustments.tooltips.toggleAnalytics')}
+            >
+              <ChartArea size={18} />
+            </button>
+            <button
+              className="p-2 rounded-full hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              disabled={!selectedImage}
+              onClick={handleResetAdjustments}
+              data-tooltip={t('editor.adjustments.tooltips.resetAdjustments')}
+            >
+              <RotateCcw size={18} />
+            </button>
+          </>
+        }
+      />
 
       <AnimatePresence initial={false}>
         {isWaveformVisible && (
@@ -250,7 +251,7 @@ export default function Controls() {
             transition={{ duration: isResizingWaveform ? 0 : 0.2, ease: 'easeOut' }}
             className="shrink-0 flex flex-col relative border-b border-surface overflow-hidden"
           >
-            <div className="grow w-full h-full p-4 pb-2 min-h-0">
+            <div className="grow w-full h-full p-4 pb-2 compact:p-2 min-h-0">
               <Waveform
                 waveformData={waveform || null}
                 histogram={histogram}
@@ -271,7 +272,7 @@ export default function Controls() {
         )}
       </AnimatePresence>
 
-      <div className="grow overflow-y-scroll p-4 flex flex-col gap-2">
+      <div className="grow overflow-y-scroll p-4 compact:p-0 flex flex-col gap-2 compact:gap-1.5">
         {Object.keys(ADJUSTMENT_SECTIONS).map((sectionName: string) => {
           const SectionComponent: any = {
             basic: BasicAdjustments,

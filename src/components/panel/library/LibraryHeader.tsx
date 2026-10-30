@@ -41,7 +41,7 @@ function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName =
       <Button
         aria-expanded={isOpen}
         aria-haspopup="true"
-        className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
+        className="h-12 compact:h-9 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
         onClick={() => setIsOpen(!isOpen)}
         data-tooltip={buttonTitle}
       >
@@ -244,13 +244,13 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
   return (
     <motion.div
       animate={{ width: isActive ? calculatedWidth : INACTIVE_WIDTH }}
-      className="relative flex items-center bg-surface rounded-md h-12 overflow-hidden"
+      className="relative flex items-center bg-surface rounded-md h-12 compact:h-9 overflow-hidden"
       initial={false}
       transition={{ type: 'spring', stiffness: 400, damping: 35 }}
       onClick={() => inputRef.current?.focus()}
     >
       <button
-        className="h-12 w-12 flex items-center justify-center text-text-primary z-10 shrink-0 bg-surface outline-hidden"
+        className="h-12 compact:h-9 w-12 flex items-center justify-center text-text-primary z-10 shrink-0 bg-surface outline-hidden"
         onClick={(e) => {
           e.stopPropagation();
           if (!isActive) setIsSearchActive(true);
@@ -411,7 +411,7 @@ export function ViewOptionsDropdown({
 
   return (
     <DropdownMenu
-      buttonContent={<SlidersHorizontal className="w-8 h-8" />}
+      buttonContent={<SlidersHorizontal className="w-8 h-8 compact:w-5 compact:h-5" />}
       buttonTitle={t('library.header.viewOptions.title')}
       contentClassName="library-view-options-menu w-[380px]"
     >

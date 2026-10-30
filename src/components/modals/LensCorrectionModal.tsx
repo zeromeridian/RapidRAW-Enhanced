@@ -26,6 +26,7 @@ import { Adjustments } from '../../utils/adjustments';
 import { SelectedImage } from '../ui/AppProperties';
 import clsx from 'clsx';
 import Text from '../ui/Text';
+import PanelHeader from '../ui/PanelHeader';
 import { TextColors, TextVariants } from '../../types/typography';
 
 interface GeometryParams {
@@ -623,17 +624,19 @@ export default function LensCorrectionModal({
         inline ? 'w-full' : 'w-80 shrink-0 border-l border-surface',
       )}
     >
-      <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <Text variant={TextVariants.title}>{t('modals.lensCorrection.title')}</Text>
-        <button
-          onClick={handleReset}
-          data-tooltip={t('modals.lensCorrection.resetTooltip')}
-          className="p-2 rounded-full hover:bg-surface transition-colors"
-        >
-          <RotateCcw size={18} />
-        </button>
-      </div>
-      <div className="grow overflow-y-auto p-4 flex flex-col gap-6 text-text-secondary">
+      <PanelHeader
+        title={t('modals.lensCorrection.title')}
+        actions={
+          <button
+            onClick={handleReset}
+            data-tooltip={t('modals.lensCorrection.resetTooltip')}
+            className="p-2 rounded-full hover:bg-surface transition-colors"
+          >
+            <RotateCcw size={18} />
+          </button>
+        }
+      />
+      <div className="grow overflow-y-auto p-4 compact:p-2.5 flex flex-col gap-6 compact:gap-3 text-text-secondary">
         <div className="w-full p-2 bg-card-active rounded-md">
           <div className="relative flex w-full">
             <motion.div

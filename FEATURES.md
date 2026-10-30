@@ -6,6 +6,11 @@ details are in `RELEASE_NOTES.MD`.
 
 ## Library and workflow
 
+- **Panel Density** (Settings → General): **Compact**, the default, tightens
+  the left and right panels and the Library and Develop top bars to a
+  Lightroom Classic-like density, with one-row sliders, flat section bars, and
+  smaller headers; **Comfortable** keeps the original roomier layout. The
+  bottom bar and filmstrip are the same in both.
 - Drag selected Library images onto a folder to move their image and ThisIsRAW
   sidecar files. Drag a folder onto another folder to move its complete tree;
   hold Command on macOS or Ctrl on Windows/Linux to copy a folder tree instead.

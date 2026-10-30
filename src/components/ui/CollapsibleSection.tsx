@@ -79,19 +79,23 @@ export default function CollapsibleSection({
   };
 
   return (
-    <div className="bg-surface rounded-lg overflow-hidden shrink-0" onContextMenu={onContextMenu}>
+    <div className="bg-surface rounded-lg compact:rounded-none overflow-hidden shrink-0" onContextMenu={onContextMenu}>
       <div
-        className="w-full px-4 py-3 flex min-h-10 items-center justify-between text-left hover:bg-card-active transition-colors duration-200"
+        className="w-full px-4 py-3 compact:px-3 compact:py-1 flex min-h-10 compact:min-h-7 items-center justify-between text-left hover:bg-card-active transition-colors duration-200"
         onClick={onToggle}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
         <div className="flex items-center gap-2">
-          <Text variant={TextVariants.title} weight={TextWeights.normal}>
+          <Text
+            variant={TextVariants.title}
+            weight={TextWeights.normal}
+            className="compact:text-[17px] compact:font-medium"
+          >
             {title}
           </Text>
           {canToggleVisibility && (
-            <div className="w-6 h-6 flex items-center justify-center">
+            <div className="w-6 h-6 compact:w-5 compact:h-5 flex items-center justify-center">
               <button
                 className={clsx(
                   'p-1 rounded-full text-text-secondary hover:bg-bg-primary z-10 transition-opacity duration-300',
@@ -104,20 +108,24 @@ export default function CollapsibleSection({
                     : t('ui.collapsibleSection.enableSection')
                 }
               >
-                {isContentVisible ? <Eye size={16} /> : <EyeOff size={16} />}
+                {isContentVisible ? (
+                  <Eye size={16} className="compact:size-3.5" />
+                ) : (
+                  <EyeOff size={16} className="compact:size-3.5" />
+                )}
               </button>
             </div>
           )}
         </div>
         <ChevronDown
-          className={clsx('text-accent transition-transform duration-300', { 'rotate-180': isOpen })}
+          className={clsx('text-accent transition-transform duration-300 compact:size-4', { 'rotate-180': isOpen })}
           size={20}
         />
       </div>
       <div ref={wrapperRef} className="overflow-hidden transition-all duration-300 ease-in-out">
         <div
           className={clsx(
-            'px-4 pb-4 transition-opacity duration-300',
+            'px-4 pb-4 compact:px-3 compact:pb-2.5 transition-opacity duration-300',
             !isContentVisible && 'opacity-30 pointer-events-none',
           )}
           ref={contentRef}

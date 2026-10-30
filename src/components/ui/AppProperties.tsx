@@ -146,6 +146,13 @@ export enum ExifOverlay {
   Always = 'always',
 }
 
+export enum PanelDensity {
+  Comfortable = 'comfortable',
+  Compact = 'compact',
+}
+
+export const DEFAULT_PANEL_DENSITY = PanelDensity.Compact;
+
 export enum Panel {
   Adjustments = 'adjustments',
   Ai = 'ai',
@@ -274,6 +281,7 @@ export interface AppSettings {
   exifOverlay?: ExifOverlay;
   language?: string;
   fontFamily?: string;
+  panelDensity?: PanelDensity;
   folderTreeSort?: FolderTreeSort;
   keywordSets?: KeywordSet[];
   activeKeywordSet?: string | null;

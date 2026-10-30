@@ -31,6 +31,7 @@ import ExportPresetsList from '../../ui/ExportPresetsList';
 import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import Text from '../../ui/Text';
+import PanelHeader from '../../ui/PanelHeader';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { getEnabledExportSuffix } from '../../../utils/outputNaming';
@@ -100,7 +101,7 @@ interface SectionProps {
 function Section({ title, children }: SectionProps) {
   return (
     <div>
-      <Text variant={TextVariants.heading} className="mb-2">
+      <Text variant={TextVariants.heading} className="mb-2 compact:text-sm">
         {title}
       </Text>
       <div className="space-y-2">{children}</div>
@@ -702,18 +703,20 @@ export default function ExportPanel({
 
   return (
     <div className={onClose ? 'h-full bg-bg-secondary rounded-lg flex flex-col' : 'flex flex-col h-full'}>
-      <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <Text variant={TextVariants.title}>{t('export.title')}</Text>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="p-1 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary"
-          >
-            <X size={20} />
-          </button>
-        )}
-      </div>
-      <div className="grow overflow-y-auto p-4 space-y-8">
+      <PanelHeader
+        title={t('export.title')}
+        actions={
+          onClose && (
+            <button
+              onClick={onClose}
+              className="p-1 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary"
+            >
+              <X size={20} />
+            </button>
+          )
+        }
+      />
+      <div className="grow overflow-y-auto p-4 compact:p-2.5 space-y-8 compact:space-y-4">
         {canExport ? (
           <>
             <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
@@ -810,7 +813,7 @@ export default function ExportPanel({
                     trackClassName="bg-surface"
                   />
                   {enableBorder && (
-                    <div className="space-y-4 pl-2 border-l-2 border-surface">
+                    <div className="space-y-4 compact:space-y-2 pl-2 border-l-2 border-surface">
                       <div>
                         <Text variant={TextVariants.label} className="mb-2 block">
                           {t('export.border.basis')}
@@ -869,7 +872,7 @@ export default function ExportPanel({
                     trackClassName="bg-surface"
                   />
                   {enablePad && (
-                    <div className="space-y-4 pl-2 border-l-2 border-surface">
+                    <div className="space-y-4 compact:space-y-2 pl-2 border-l-2 border-surface">
                       <div className="flex items-center gap-2">
                         <Text variant={TextVariants.label} className="flex-1">
                           {t('export.pad.aspectRatio')}
@@ -908,7 +911,7 @@ export default function ExportPanel({
                     trackClassName="bg-surface"
                   />
                   {enableResize && (
-                    <div className="space-y-4 pl-2 border-l-2 border-surface">
+                    <div className="space-y-4 compact:space-y-2 pl-2 border-l-2 border-surface">
                       <div className="flex items-center gap-2">
                         <Dropdown
                           options={resizeModeOptions}
@@ -947,7 +950,7 @@ export default function ExportPanel({
                     trackClassName="bg-surface"
                   />
                   {enableWatermark && (
-                    <div className="space-y-4 pl-2 border-l-2 border-surface">
+                    <div className="space-y-4 compact:space-y-2 pl-2 border-l-2 border-surface">
                       <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
                         <ImagePicker
                           label={t('export.watermark.watermarkImage')}
@@ -1015,14 +1018,14 @@ export default function ExportPanel({
             )}
 
             <div>
-              <Text variant={TextVariants.heading} className="mb-2">
+              <Text variant={TextVariants.heading} className="mb-2 compact:text-sm">
                 {t('export.sections.advanced')}
               </Text>
               <div className="bg-surface rounded-xl overflow-hidden">
                 <button
                   onClick={() => setIsAdvancedExpanded(!isAdvancedExpanded)}
                   disabled={isExporting}
-                  className="w-full flex items-center justify-between p-3.5 hover:bg-card-active transition-colors"
+                  className="w-full flex items-center justify-between p-3.5 compact:p-2 hover:bg-card-active transition-colors"
                 >
                   <Text
                     as="span"
@@ -1045,7 +1048,7 @@ export default function ExportPanel({
                       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
                       className="overflow-hidden"
                     >
-                      <div className="px-4 pb-4 pt-2 border-t border-surface/50 flex flex-col gap-4">
+                      <div className="px-4 compact:px-3 pb-4 compact:pb-2.5 pt-2 border-t border-surface/50 flex flex-col gap-4 compact:gap-2">
                         <Switch
                           label={t('export.advanced.preserveFolders')}
                           checked={preserveFolders}
@@ -1064,7 +1067,7 @@ export default function ExportPanel({
                           trackClassName="bg-surface"
                         />
                         {exportToSourceFolder && (
-                          <div className="flex items-center gap-3 pl-2 border-l-2 border-surface">
+                          <div className="flex items-center gap-3 compact:gap-2 pl-2 border-l-2 border-surface">
                             <Text variant={TextVariants.label} className="whitespace-nowrap min-w-[70px]">
                               {t('export.destination.subfolder')}
                             </Text>
@@ -1153,7 +1156,7 @@ export default function ExportPanel({
         )}
       </div>
 
-      <div className="p-4 border-t border-surface shrink-0 space-y-2">
+      <div className="p-4 compact:p-2.5 border-t border-surface shrink-0 space-y-2">
         <Text as="div" variant={TextVariants.small} color={TextColors.primary} className="text-center">
           {isEstimating ? (
             <span className="italic">{t('export.status.estimatingSize')}</span>

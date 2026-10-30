@@ -36,7 +36,7 @@ import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import { useTranslation } from 'react-i18next';
-import { Invokes } from '../ui/AppProperties';
+import { DEFAULT_PANEL_DENSITY, Invokes, PanelDensity } from '../ui/AppProperties';
 import {
   formatKeyCode,
   KeybindDefinition,
@@ -657,6 +657,14 @@ export default function SettingsPanel({
     () => [
       { value: 'poppins', label: t('settings.general.poppins') },
       { value: 'system', label: t('settings.general.system') },
+    ],
+    [t],
+  );
+
+  const panelDensityOptions = useMemo<OptionItem<PanelDensity>[]>(
+    () => [
+      { value: PanelDensity.Compact, label: t('settings.general.panelDensityCompact') },
+      { value: PanelDensity.Comfortable, label: t('settings.general.panelDensityComfortable') },
     ],
     [t],
   );
@@ -1462,6 +1470,18 @@ export default function SettingsPanel({
                           onChange={(value: any) => onSettingsChange({ ...appSettings, fontFamily: value })}
                           options={fontOptions}
                           value={appSettings?.fontFamily || 'poppins'}
+                          triggerClassName="bg-bg-primary"
+                        />
+                      </SettingItem>
+
+                      <SettingItem
+                        label={t('settings.general.panelDensity')}
+                        description={t('settings.general.panelDensityDesc')}
+                      >
+                        <Dropdown
+                          onChange={(value: PanelDensity) => onSettingsChange({ ...appSettings, panelDensity: value })}
+                          options={panelDensityOptions}
+                          value={appSettings?.panelDensity || DEFAULT_PANEL_DENSITY}
                           triggerClassName="bg-bg-primary"
                         />
                       </SettingItem>

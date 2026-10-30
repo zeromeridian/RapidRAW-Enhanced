@@ -10,6 +10,7 @@ import KeywordSetSection from './KeywordSetSection';
 import KeywordSuggestionsSection from './KeywordSuggestionsSection';
 import TaggingSection from './TaggingSection';
 import Text from '../../ui/Text';
+import PanelHeader from '../../ui/PanelHeader';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useLibraryStore } from '../../../store/useLibraryStore';
@@ -89,7 +90,7 @@ export default function TaggingPanel({ onClose }: TaggingPanelProps) {
             )}
           >
             <button
-              className="pl-2.5 pr-1 py-1.5 text-left disabled:cursor-default"
+              className="pl-2.5 pr-1 py-1.5 compact:py-1 text-left disabled:cursor-default"
               data-tooltip={tag.common ? undefined : t('editor.tagging.mixedTagTooltip')}
               disabled={tag.common}
               onClick={() => void setTag(tag.storedTag, true)}
@@ -100,7 +101,7 @@ export default function TaggingPanel({ onClose }: TaggingPanelProps) {
               </Text>
             </button>
             <button
-              className="pr-2 pl-1 py-1.5 text-text-secondary hover:text-red-400 transition-colors"
+              className="pr-2 pl-1 py-1.5 compact:py-1 text-text-secondary hover:text-red-400 transition-colors"
               data-tooltip={t('editor.tagging.removeTooltip')}
               onClick={() => void setTag(tag.storedTag, false)}
               type="button"
@@ -115,30 +116,30 @@ export default function TaggingPanel({ onClose }: TaggingPanelProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 flex items-center gap-2 shrink-0 border-b border-surface">
-        <Tag size={18} />
-        <Text variant={TextVariants.title} className="grow">
-          {t('editor.tagging.title')}
-        </Text>
-        {onClose && (
-          <button
-            className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
-            onClick={onClose}
-            type="button"
-          >
-            <X size={18} />
-          </button>
-        )}
-      </div>
-      <div className="grow overflow-y-auto p-4 custom-scrollbar">
+      <PanelHeader
+        icon={<Tag size={18} />}
+        title={t('editor.tagging.title')}
+        actions={
+          onClose && (
+            <button
+              className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
+              onClick={onClose}
+              type="button"
+            >
+              <X size={18} />
+            </button>
+          )
+        }
+      />
+      <div className="grow overflow-y-auto p-4 compact:p-2.5 custom-scrollbar">
         {targetPaths.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-3 compact:space-y-2">
             <Text variant={TextVariants.small} color={TextColors.secondary}>
               {t('editor.tagging.selectionCount', { count: targetPaths.length })}
             </Text>
 
             <div>
-              <Text variant={TextVariants.heading} className="mb-3">
+              <Text variant={TextVariants.heading} className="mb-3 compact:mb-1.5 compact:text-sm">
                 {t('editor.tagging.addTag')}
               </Text>
               <div
@@ -200,7 +201,7 @@ export default function TaggingPanel({ onClose }: TaggingPanelProps) {
             <KeywordListSection targetPaths={targetPaths} />
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 compact:space-y-2">
             <Text
               variant={TextVariants.heading}
               color={TextColors.secondary}

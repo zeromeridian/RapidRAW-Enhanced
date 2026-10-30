@@ -58,7 +58,7 @@ export default function KeywordSuggestionsSection({ activePath, targetPaths }: K
       <TaggingSection id="aiSuggestions" title={t('editor.tagging.aiSuggestions')}>
         <div className="space-y-2">
           <button
-            className="w-full h-9 flex items-center justify-center gap-2 rounded-md bg-bg-primary border border-transparent text-sm text-text-primary hover:border-text-tertiary/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full h-9 compact:h-7 flex items-center justify-center gap-2 rounded-md bg-bg-primary border border-transparent text-sm text-text-primary hover:border-text-tertiary/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             data-tooltip={t('editor.tagging.suggestWithAiTooltip')}
             disabled={!activePath || ai.isLoading}
             onClick={() => void ai.requestSuggestions()}

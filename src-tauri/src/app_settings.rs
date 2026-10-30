@@ -560,6 +560,8 @@ pub struct AppSettings {
     pub theme: Option<String>,
     #[serde(default)]
     pub font_family: Option<String>,
+    #[serde(default)]
+    pub panel_density: Option<String>,
     pub decorations: Option<bool>,
     #[serde(alias = "comfyuiAddress")]
     pub ai_connector_address: Option<String>,
@@ -738,6 +740,7 @@ impl Default for AppSettings {
             filter_criteria: None,
             theme: Some("dark".to_string()),
             font_family: None,
+            panel_density: None,
             decorations: Some(false),
             ai_connector_address: None,
             last_folder_state: None,

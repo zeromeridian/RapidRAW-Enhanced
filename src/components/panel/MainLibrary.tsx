@@ -137,7 +137,7 @@ function DisplayModeSwitch({ displayMode, setDisplayMode, t }: DisplayModeSwitch
   const safeIndex = selectedIndex >= 0 ? selectedIndex : 0;
 
   return (
-    <div className="flex items-center bg-surface p-1 rounded-lg border border-border-color/20 h-14 w-40 select-none">
+    <div className="flex items-center bg-surface p-1 rounded-lg border border-border-color/20 h-14 compact:h-9 w-40 compact:w-32 select-none">
       <div className="relative flex w-full h-full">
         <motion.div
           className="absolute top-0 bottom-0 z-0 bg-bg-primary rounded-md shadow-sm"
@@ -587,12 +587,14 @@ export default function MainLibrary(props: MainLibraryProps) {
   return (
     <div className="lights-out-stage relative flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden">
       <header
-        className="lights-out-chrome p-4 shrink-0 flex justify-between items-center border-b border-surface gap-4"
+        className="lights-out-chrome p-4 compact:px-3 compact:py-2 shrink-0 flex justify-between items-center border-b border-surface gap-4 compact:gap-3"
         onMouseEnter={() => setIsProgressHovered(true)}
         onMouseLeave={() => setIsProgressHovered(false)}
       >
         <div className="min-w-0 flex-1">
-          <Text variant={TextVariants.headline}>{t('library.header.title')}</Text>
+          <Text variant={TextVariants.headline} className="compact:text-lg">
+            {t('library.header.title')}
+          </Text>
           {!props.isAndroid && (
             <div className="flex h-5 min-w-0 items-center gap-2 overflow-hidden">
               {props.currentFolderPath ? (
@@ -654,7 +656,7 @@ export default function MainLibrary(props: MainLibraryProps) {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-4 shrink-0">
+        <div className="flex items-center gap-4 compact:gap-2 shrink-0">
           {props.importState.status === Status.Importing && (
             <Text as="div" color={TextColors.accent} className="flex items-center gap-2 animate-pulse">
               <FolderInput size={16} />
@@ -692,7 +694,7 @@ export default function MainLibrary(props: MainLibraryProps) {
               sortOptions={translatedSortOptions}
             />
             <Button
-              className="h-12 w-12 bg-transparent text-text-primary shadow-none p-0 flex items-center justify-center"
+              className="h-12 compact:h-9 w-12 bg-transparent text-text-primary shadow-none p-0 flex items-center justify-center"
               onClick={() => setUI({ isSettingsOpen: true })}
               data-tooltip={t('library.splash.goToSettings')}
             >
@@ -700,7 +702,7 @@ export default function MainLibrary(props: MainLibraryProps) {
             </Button>
             {!props.isAndroid && (
               <Button
-                className="h-12 w-12 bg-transparent text-text-primary shadow-none p-0 flex items-center justify-center"
+                className="h-12 compact:h-9 w-12 bg-transparent text-text-primary shadow-none p-0 flex items-center justify-center"
                 onClick={props.onNavigateToCommunity}
                 data-tooltip={t('library.tooltips.communityPresets')}
               >
@@ -708,7 +710,7 @@ export default function MainLibrary(props: MainLibraryProps) {
               </Button>
             )}
             <Button
-              className="h-12 w-12 bg-transparent text-text-primary shadow-none p-0 flex items-center justify-center"
+              className="h-12 compact:h-9 w-12 bg-transparent text-text-primary shadow-none p-0 flex items-center justify-center"
               onClick={props.onGoHome}
               data-tooltip={t('library.tooltips.goHome')}
             >

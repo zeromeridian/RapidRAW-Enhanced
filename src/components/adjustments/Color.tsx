@@ -157,14 +157,14 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
 
   return (
     <div>
-      <div className="flex items-center justify-start gap-2 mb-4 mt-2">
+      <div className="flex items-center justify-start gap-2 mb-4 compact:mb-2 mt-2">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as '3way' | 'global')}
-              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all focus:outline-none
+              className={`w-7 h-7 compact:w-6 compact:h-6 rounded-full flex items-center justify-center transition-all focus:outline-none
                 ${
                   isActive
                     ? 'ring-2 ring-offset-2 ring-offset-surface ring-accent text-text-primary'
@@ -180,7 +180,7 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
 
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className={`w-7 h-7 rounded-full flex items-center justify-center transition-all focus:outline-none
+          className={`w-7 h-7 compact:w-6 compact:h-6 rounded-full flex items-center justify-center transition-all focus:outline-none
             ${
               isExpanded
                 ? 'bg-accent text-button-text'
@@ -192,7 +192,7 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
         </button>
       </div>
 
-      <div className="relative w-full mb-4">
+      <div className="relative w-full mb-4 compact:mb-2">
         <AnimatePresence mode="wait">
           {activeTab === '3way' ? (
             <motion.div
@@ -203,7 +203,7 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
               transition={{ duration: 0.2 }}
               className="w-full"
             >
-              <div className="flex justify-center mb-4">
+              <div className="flex justify-center mb-4 compact:mb-2">
                 <div className="w-[calc(50%-0.5rem)]">
                   <ColorWheel
                     defaultValue={INITIAL_ADJUSTMENTS.colorGrading.midtones}
@@ -331,8 +331,8 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
   const trackSuffix = `${activePrimary}s`;
 
   return (
-    <div className="p-2 bg-bg-tertiary rounded-md mt-4">
-      <Text variant={TextVariants.heading} className="mb-2">
+    <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md mt-4 compact:mt-2">
+      <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
         {t('adjustments.color.calibration.title')}
       </Text>
       <div>
@@ -351,11 +351,11 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
           trackClassName="tint-gradient-track"
         />
       </div>
-      <div className="mt-3">
+      <div className="mt-3 compact:mt-2">
         <Text color={TextColors.primary} weight={TextWeights.medium} className="mb-3">
           {t('adjustments.color.calibration.primaries')}
         </Text>
-        <div className="flex justify-center gap-6 mb-4 px-1">
+        <div className="flex justify-center gap-6 mb-4 compact:mb-2 px-1">
           {PRIMARY_COLORS.map(({ name, color, label }) => (
             <ColorSwatch
               color={color}
@@ -474,8 +474,8 @@ export default function ColorPanel({
   const luminance_slider = `lum-slider-${activeColor}`;
 
   return (
-    <div className="space-y-4">
-      <div className="p-2 bg-bg-tertiary rounded-md">
+    <div className="space-y-4 compact:space-y-2">
+      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
         <Switch
           checked={!!adjustments.monochrome}
           label={t('adjustments.color.blackAndWhite')}
@@ -484,7 +484,7 @@ export default function ColorPanel({
         />
       </div>
 
-      <div className="p-2 bg-bg-tertiary rounded-md">
+      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
         <div className="flex justify-between items-center mb-2">
           <Text variant={TextVariants.heading}>{t('adjustments.color.whiteBalance')}</Text>
           {!isForMask && toggleWbPicker && (
@@ -528,8 +528,8 @@ export default function ColorPanel({
         />
       </div>
 
-      <div className="p-2 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-2">
+      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+        <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
           {t('adjustments.color.presence')}
         </Text>
         <Slider
@@ -552,8 +552,8 @@ export default function ColorPanel({
         />
       </div>
 
-      <div className="p-2 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-2">
+      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+        <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
           {isForMask ? t('adjustments.color.localHue') : t('adjustments.color.hue')}
         </Text>
         <Slider
@@ -568,8 +568,8 @@ export default function ColorPanel({
         />
       </div>
 
-      <div className="p-2 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-3">
+      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+        <Text variant={TextVariants.heading} className="mb-3 compact:mb-1 compact:text-sm">
           {t('adjustments.color.colorGrading')}
         </Text>
         <ColorGradingPanel
@@ -580,11 +580,11 @@ export default function ColorPanel({
         />
       </div>
 
-      <div className="p-2 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-3">
+      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+        <Text variant={TextVariants.heading} className="mb-3 compact:mb-1 compact:text-sm">
           {t('adjustments.color.colorMixer')}
         </Text>
-        <div className="flex justify-between mb-4 px-1">
+        <div className="flex justify-between mb-4 compact:mb-2 px-1">
           {HSL_COLORS.map(({ name, color, label }) => (
             <ColorSwatch
               color={color}

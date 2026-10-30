@@ -42,8 +42,8 @@ export default function AiEffectSection({
     aiModelDownloadStatus || (generationProgress !== undefined ? `${Math.round(generationProgress * 100)}%` : null);
 
   return (
-    <div className="p-2 bg-bg-tertiary rounded-md" {...props}>
-      <Text variant={TextVariants.heading} className="mb-2">
+    <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md" {...props}>
+      <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
         {title}
       </Text>
 
@@ -55,7 +55,7 @@ export default function AiEffectSection({
         }`}
       >
         <div className="overflow-hidden">
-          <div className="space-y-4 pt-4 pb-1">
+          <div className="space-y-4 compact:space-y-2 pt-4 compact:pt-2 pb-1">
             {isGenerating ? (
               <div className="flex flex-col items-center justify-center gap-1 p-4 text-text-secondary text-center">
                 <div className="flex items-center gap-2">

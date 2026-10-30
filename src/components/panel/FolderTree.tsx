@@ -226,7 +226,7 @@ function FolderSortMenu({
     <div className="relative" ref={menuRef}>
       <button
         className={clsx(
-          'bg-surface rounded-md hover:bg-card-active flex items-center justify-center shrink-0 overflow-hidden transition-colors w-9 h-9',
+          'bg-surface rounded-md hover:bg-card-active flex items-center justify-center shrink-0 overflow-hidden transition-colors w-9 h-9 compact:w-7 compact:h-7',
           isOpen && 'bg-card-active',
         )}
         onClick={() => setIsOpen(!isOpen)}
@@ -311,7 +311,7 @@ function SectionHeader({ title, isOpen, onToggle }: { title: string; isOpen: boo
       as="div"
       variant={TextVariants.small}
       weight={TextWeights.bold}
-      className="flex items-center w-full px-1 py-1.5 cursor-pointer group"
+      className="flex items-center w-full px-1 py-1.5 compact:py-1 cursor-pointer group"
       onClick={onToggle}
       data-tooltip={
         isOpen
@@ -368,10 +368,13 @@ function AlbumTreeNode({
   return (
     <Text as="div" color={TextColors.primary} weight={TextWeights.medium}>
       <div
-        className={clsx('flex items-center gap-2 p-1.5 rounded-md transition-colors cursor-pointer', {
-          'bg-surface': isSelected,
-          'hover:bg-card-active': !isSelected,
-        })}
+        className={clsx(
+          'flex items-center gap-2 p-1.5 compact:py-0.5 compact:text-xs rounded-md transition-colors cursor-pointer',
+          {
+            'bg-surface': isSelected,
+            'hover:bg-card-active': !isSelected,
+          },
+        )}
         onClick={() => (isGroup ? onToggle(item.id) : onSelectAlbum(item.id, item.name, (item as Album).images))}
         onContextMenu={(e) => onContextMenu(e, item)}
       >
@@ -535,11 +538,14 @@ function TreeNode({
   return (
     <Text as="div" color={TextColors.primary} weight={TextWeights.medium}>
       <div
-        className={clsx('flex items-center gap-2 p-1.5 rounded-md transition-colors cursor-pointer', {
-          'bg-surface': isSelected,
-          'hover:bg-card-active': !isSelected,
-          'ring-1 ring-inset ring-accent bg-accent/10': isDropTarget,
-        })}
+        className={clsx(
+          'flex items-center gap-2 p-1.5 compact:py-0.5 compact:text-xs rounded-md transition-colors cursor-pointer',
+          {
+            'bg-surface': isSelected,
+            'hover:bg-card-active': !isSelected,
+            'ring-1 ring-inset ring-accent bg-accent/10': isDropTarget,
+          },
+        )}
         draggable
         onDragStart={(event) => writeLibraryDragPayload(event.dataTransfer, { kind: 'folders', paths: [node.path] })}
         onDragEnter={(event) => {
@@ -896,7 +902,7 @@ export default function FolderTree({
                     className="flex items-center shrink-0 overflow-hidden"
                   >
                     <button
-                      className="bg-surface rounded-md hover:bg-card-active flex items-center justify-center shrink-0 transition-colors w-9 h-9"
+                      className="bg-surface rounded-md hover:bg-card-active flex items-center justify-center shrink-0 transition-colors w-9 h-9 compact:w-7 compact:h-7"
                       onClick={() => setIsVisible(false)}
                       data-tooltip={t('library.folders.tooltips.collapse')}
                     >
@@ -913,7 +919,7 @@ export default function FolderTree({
                   placeholder={t('library.folders.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-surface border border-transparent rounded-md pl-9 pr-8 py-2 text-sm focus:outline-hidden truncate"
+                  className="w-full bg-surface border border-transparent rounded-md pl-9 pr-8 py-2 compact:py-1 text-sm compact:text-xs focus:outline-hidden truncate"
                 />
                 {searchQuery && (
                   <button
@@ -939,7 +945,7 @@ export default function FolderTree({
                     )}
                   >
                     <button
-                      className="bg-surface rounded-md hover:bg-card-active flex items-center justify-center shrink-0 transition-colors w-9 h-9 mr-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-surface rounded-md hover:bg-card-active flex items-center justify-center shrink-0 transition-colors w-9 h-9 compact:w-7 compact:h-7 mr-1 disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={navIndex <= 0}
                       onClick={onNavBack}
                       data-tooltip={t('library.folders.tooltips.navBack')}
@@ -947,7 +953,7 @@ export default function FolderTree({
                       <ArrowLeft size={16} className="text-text-secondary" />
                     </button>
                     <button
-                      className="bg-surface rounded-md hover:bg-card-active flex items-center justify-center shrink-0 transition-colors w-9 h-9 mr-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-surface rounded-md hover:bg-card-active flex items-center justify-center shrink-0 transition-colors w-9 h-9 compact:w-7 compact:h-7 mr-1 disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={navIndex >= navHistory.length - 1}
                       onClick={onNavForward}
                       data-tooltip={t('library.folders.tooltips.navForward')}
@@ -1163,7 +1169,7 @@ export default function FolderTree({
                                 <Text
                                   as="div"
                                   weight={TextWeights.medium}
-                                  className="flex items-center gap-2 p-2 mt-1 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
+                                  className="flex items-center gap-2 p-2 compact:py-1 mt-1 compact:mt-0.5 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
                                   onClick={(e: React.MouseEvent) => {
                                     e.stopPropagation();
                                     onOpenFolder();
