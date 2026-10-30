@@ -16,15 +16,18 @@ export interface KeywordSet {
 }
 
 /**
- * Normalizes typed keyword text into a stored keyword path; `>` separates hierarchy levels, so
- * `Places > Germany` becomes `places|germany`. Returns an empty string when nothing remains.
+ * Turns typed keyword text into a stored keyword path, keeping its case; `>` separates hierarchy
+ * levels, so `Places > Germany` becomes `Places|Germany`. Returns an empty string when nothing remains.
  */
-export const parseKeywordInput = (input: string) =>
+export const parseKeywordPath = (input: string) =>
   input
     .split(KEYWORD_INPUT_SEPARATOR)
-    .map((level) => level.trim().toLowerCase())
+    .map((level) => level.trim())
     .filter(Boolean)
     .join(KEYWORD_PATH_SEPARATOR);
+
+/** Like `parseKeywordPath`, lowercased, as new keywords are stored: `Places > Germany` is `places|germany`. */
+export const parseKeywordInput = (input: string) => parseKeywordPath(input.toLowerCase());
 
 /** Displays a keyword path such as `places|germany` as `places › germany`; `' > '` gives editable text. */
 export const formatKeyword = (keyword: string, separator = ' › ') =>
@@ -104,13 +107,47 @@ export const filterKeywordTree = (nodes: KeywordTreeNode[], query: string): Keyw
   });
 };
 
+/** True for `keywordPath` itself and its child keyword paths. */
+const isKeywordOrChild = (path: string, keywordPath: string) =>
+  path === keywordPath || path.startsWith(`${keywordPath}${KEYWORD_PATH_SEPARATOR}`);
+
 /** True when `tags` has the typed keyword path (e.g. `places > germany`) or one of its child keywords. */
 export const hasKeywordOrChild = (tags: string[] | null | undefined, input: string) => {
   const path = parseKeywordInput(input);
-  if (!path) return false;
-  return (tags || []).some((tag) => {
-    if (!tag.startsWith(USER_TAG_PREFIX)) return false;
-    const keyword = tag.slice(USER_TAG_PREFIX.length).toLowerCase();
-    return keyword === path || keyword.startsWith(`${path}${KEYWORD_PATH_SEPARATOR}`);
-  });
+  return (
+    !!path &&
+    (tags || []).some(
+      (tag) =>
+        tag.startsWith(USER_TAG_PREFIX) && isKeywordOrChild(tag.slice(USER_TAG_PREFIX.length).toLowerCase(), path),
+    )
+  );
 };
+
+/** A library-wide change to one stored tag, run by the backend's `start_keyword_job`. */
+export type KeywordOperation = { kind: 'rename'; from: string; to: string } | { kind: 'delete'; tag: string };
+
+/** The stored tag a keyword operation changes. */
+export const keywordOperationTag = (operation: KeywordOperation) =>
+  operation.kind === 'rename' ? operation.from : operation.tag;
+
+/**
+ * The stored tag after a keyword operation: renamed, or `null` when deleted. A user keyword
+ * operation also applies to the keyword's child keywords; other tags are returned unchanged.
+ */
+export const applyKeywordOperationToTag = (tag: string, operation: KeywordOperation): string | null => {
+  const target = keywordOperationTag(operation);
+  const isAffected = target.startsWith(USER_TAG_PREFIX) ? isKeywordOrChild(tag, target) : tag === target;
+  if (!isAffected) return tag;
+  return operation.kind === 'rename' ? `${operation.to}${tag.slice(target.length)}` : null;
+};
+
+/** Applies a keyword operation to the keyword paths of the keyword sets; a deleted slot becomes empty. */
+export const applyKeywordOperationToSets = (sets: KeywordSet[], operation: KeywordOperation): KeywordSet[] =>
+  sets.map((set) => ({
+    ...set,
+    keywords: set.keywords.map((keyword) => {
+      if (!keyword) return keyword;
+      const tag = applyKeywordOperationToTag(`${USER_TAG_PREFIX}${keyword}`, operation);
+      return tag ? tag.slice(USER_TAG_PREFIX.length) : '';
+    }),
+  }));

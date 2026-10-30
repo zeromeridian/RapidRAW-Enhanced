@@ -4,7 +4,7 @@ import CommunityPage from '../panel/CommunityPage';
 import MainLibrary from '../panel/MainLibrary';
 import BottomBar from '../panel/BottomBar';
 
-import { useUIStore } from '../../store/useUIStore';
+import { LibraryRightPanel, useUIStore } from '../../store/useUIStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useProcessStore } from '../../store/useProcessStore';
@@ -79,6 +79,8 @@ export default function LibraryView({
       setUI: state.setUI,
     })),
   );
+  const toggleLibraryRightPanel = (panel: LibraryRightPanel) =>
+    setUI((state) => ({ libraryRightPanel: state.libraryRightPanel === panel ? null : panel }));
 
   const {
     rootPaths,
@@ -191,9 +193,8 @@ export default function LibraryView({
             isResetDisabled={multiSelectedPaths.length === 0}
             multiSelectedPaths={multiSelectedPaths}
             onCopy={handleCopyAdjustments}
-            onExportClick={() =>
-              setUI((state) => ({ isLibraryExportPanelVisible: !state.isLibraryExportPanelVisible }))
-            }
+            onExportClick={() => toggleLibraryRightPanel('export')}
+            onTaggingClick={() => toggleLibraryRightPanel('tagging')}
             onDeleteRejected={handleDeleteRejected}
             onFlag={handleSetFlag}
             onSetColorLabel={handleSetColorLabel}

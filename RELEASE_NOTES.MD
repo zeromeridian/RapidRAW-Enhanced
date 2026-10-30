@@ -5,6 +5,25 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.22.0-dev-advanced-tags — 2026-10-29
+
+### Keywords
+
+- Rename, move, merge, and delete keywords across your whole library.
+  Right-click a keyword in the Keyword List and choose **Rename or Move…**
+  (type a path such as `places > germany` to move it) or **Delete…**, or
+  drag a keyword onto another keyword to move it there. Renaming onto an
+  existing keyword merges the two. You first see how many photos will
+  change, then the progress, and you can cancel at any time.
+- Keywords under the changed keyword follow it, and your keyword sets are
+  updated too.
+- The Tagging panel is now also available next to the Library grid: click
+  the tag button in the bottom bar. Drag photos from the grid onto a keyword
+  in the Keyword List to add it to them.
+- Consistent English wording: what you add is called a **keyword**, and
+  **AI tags** are only the tags the AI suggested. The Tagging panel shows
+  them in separate **Keywords** and **AI Tags** sections.
+
 ## 1.21.0-dev-advanced-tags — 2026-10-29
 
 ### Keywords

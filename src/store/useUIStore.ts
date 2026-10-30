@@ -24,6 +24,8 @@ export interface CollapsibleSectionsState {
 
 export type LightsOutMode = 'off' | 'dim' | 'black';
 
+export type LibraryRightPanel = 'export' | 'tagging';
+
 export interface ConfirmModalState {
   confirmText?: string;
   confirmVariant?: string;
@@ -104,7 +106,8 @@ interface UIState {
   isInstantTransition: boolean;
   isLayoutReady: boolean;
   uiVisibility: UiVisibility;
-  isLibraryExportPanelVisible: boolean;
+  // The side panel shown next to the library grid
+  libraryRightPanel: LibraryRightPanel | null;
   isSettingsOpen: boolean;
   lightsOutMode: LightsOutMode;
 
@@ -174,7 +177,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   isInstantTransition: false,
   isLayoutReady: false,
   uiVisibility: { folderTree: true, filmstrip: true, quickFilter: false, editorExif: true },
-  isLibraryExportPanelVisible: false,
+  libraryRightPanel: null,
   isSettingsOpen: false,
   lightsOutMode: 'off',
 

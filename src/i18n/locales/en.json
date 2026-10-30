@@ -760,13 +760,13 @@
         "title": "GPS Location"
       },
       "organization": {
-        "addTagPlaceholder": "Add tag...",
+        "addTagPlaceholder": "Add keyword…",
         "colorLabel": "Color Label",
-        "noTags": "No tags",
+        "noTags": "No keywords",
         "none": "None",
         "rating": "Rating",
         "ratingLabels": "Rating & Labels",
-        "tags": "Tags",
+        "tags": "Keywords",
         "title": "Organization"
       },
       "title": "Metadata"
@@ -833,31 +833,58 @@
       }
     },
     "tagging": {
-      "addTag": "Add Tag",
+      "addTag": "Add Keyword",
       "aiSuggestions": "AI Suggestions",
       "aiSuggestionsFailed": "Could not suggest keywords: {{error}}",
       "aiTags": "AI Tags",
+      "aiTagsCount": "AI Tags ({{count}})",
+      "cancelKeywordJob": "Cancel",
       "cancelKeywordSet": "Cancel",
-      "currentTagsCount": "Current Tags ({{count}})",
+      "confirmDeleteAiTag_one": "Remove the AI tag “{{keyword}}” from {{count}} photo? This cannot be undone.",
+      "confirmDeleteAiTag_other": "Remove the AI tag “{{keyword}}” from {{count}} photos? This cannot be undone.",
+      "confirmDeleteKeyword_one": "Remove “{{keyword}}” and the keywords under it from {{count}} photo? This cannot be undone.",
+      "confirmDeleteKeyword_other": "Remove “{{keyword}}” and the keywords under it from {{count}} photos? This cannot be undone.",
+      "confirmMergeKeyword_one": "Merge “{{from}}” into the existing keyword “{{to}}” on {{count}} photo?",
+      "confirmMergeKeyword_other": "Merge “{{from}}” into the existing keyword “{{to}}” on {{count}} photos?",
+      "confirmRenameKeyword_one": "Change “{{from}}” to “{{to}}” on {{count}} photo?",
+      "confirmRenameKeyword_other": "Change “{{from}}” to “{{to}}” on {{count}} photos?",
+      "deleteAiTag": "Delete AI Tag",
+      "deleteButton": "Delete",
+      "deleteKeyword": "Delete Keyword",
       "deleteKeywordSet": "Delete keyword set",
       "deleteKeywordSetMessage": "Delete the keyword set \"{{name}}\"? Keywords already on photos are not removed.",
+      "deleteMenu": "Delete…",
       "editKeywordSet": "Edit keyword set",
       "hierarchyHint": "Use > for a keyword hierarchy, e.g. places > germany > berlin",
       "keywordCheckboxTooltip": "Add to or remove from the selected images",
+      "keywordJobCancelled_one": "Keyword change stopped after {{count}} photo",
+      "keywordJobCancelled_other": "Keyword change stopped after {{count}} photos",
+      "keywordJobDone_one": "Keywords updated on {{count}} photo",
+      "keywordJobDone_other": "Keywords updated on {{count}} photos",
+      "keywordJobFailed_one": "{{count}} photo could not be updated",
+      "keywordJobFailed_other": "{{count}} photos could not be updated",
+      "keywordJobProgress": "Updating keywords: {{done}} of {{total}} photos",
       "keywordList": "Keyword List",
+      "keywordsCount": "Keywords ({{count}})",
       "keywordSet": "Keyword Set",
       "keywordSetName": "Set name",
       "keywordSetSelected": "Keyword set: {{name}}",
       "mixedTagTooltip": "On some of the selected images. Click to add it to all of them.",
+      "moveIntoItself": "A keyword cannot be moved into itself.",
+      "moveToTopLevel": "Drop here to move to the top level",
       "newKeywordSet": "New keyword set",
       "newKeywordSetName": "New Set",
       "noAiSuggestions": "No AI suggestions for this photo",
       "noKeywordMatches": "No matching keywords",
       "noKeywords": "No keywords in your library yet",
       "noSuggestions": "Add a keyword to see keywords you often use together with it.",
-      "noTags": "No tags",
-      "placeholder": "Enter a tag…",
+      "noTags": "No keywords",
+      "placeholder": "Enter a keyword…",
       "removeTooltip": "Remove from the selected images",
+      "renameKeyword": "Rename or Move Keyword",
+      "renameKeywordButton": "Rename",
+      "renameKeywordMenu": "Rename or Move…",
+      "renameKeywordPlaceholder": "e.g. places > germany > berlin",
       "saveKeywordSet": "Save",
       "searchKeywords": "Search keywords…",
       "selectionCount_one": "Tagging {{count}} image",
@@ -867,7 +894,7 @@
       "suggestWithAi": "Suggest with AI",
       "suggestWithAiTooltip": "Suggest keywords for this photo with AI. The first use downloads the AI model.",
       "title": "Tagging",
-      "updateFailed": "Could not update tag: {{error}}",
+      "updateFailed": "Could not update keywords: {{error}}",
       "updatingKeywordList": "Updating the keyword list…"
     },
     "toolbar": {
@@ -1043,7 +1070,7 @@
       }
     },
     "culling": {
-      "addTagPlaceholder": "Add tag...",
+      "addTagPlaceholder": "Add keyword…",
       "altCullingPreviewHighRes": "Culling Preview High Res",
       "altThumbnailLoading": "Thumbnail Loading",
       "aperture": "Aperture",
@@ -1056,14 +1083,14 @@
       "iso": "ISO",
       "metadata": "Metadata",
       "noMetadataAvailable": "No metadata available",
-      "noTagsAdded": "No tags added",
+      "noTagsAdded": "No keywords added",
       "none": "None",
       "rateAndLabel": "Rate & Label",
       "rating": "Rating",
       "selectImagesToCompare": "Select images to compare",
       "shutterSpeed": "Shutter Speed",
       "syncZoomAndPan": "Sync Zoom and Pan",
-      "tags": "Tags",
+      "tags": "Keywords",
       "toggleFit": "Toggle 1:1 / Fit",
       "vc": "VC"
     },
@@ -1205,7 +1232,7 @@
     "search": {
       "noResults": "No Results Found",
       "noResultsAiHint": " For a more comprehensive search, enable automatic tagging in Settings.",
-      "noResultsDesc": "Could not find an image based on filename or tags."
+      "noResultsDesc": "Could not find an image based on filename or keywords."
     },
     "sort": {
       "aperture": "Aperture",
@@ -1284,10 +1311,10 @@
   },
   "menus": {
     "tagging": {
-      "addTagTooltip": "Add tag",
-      "noTags": "No tags added",
-      "placeholder": "Add a tag...",
-      "removeTooltip": "Remove tag \"{{tag}}\""
+      "addTagTooltip": "Add keyword",
+      "noTags": "No keywords",
+      "placeholder": "Add a keyword…",
+      "removeTooltip": "Remove keyword \"{{tag}}\""
     }
   },
   "modals": {

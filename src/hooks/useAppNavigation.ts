@@ -124,7 +124,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       libraryActivePath: null,
       expandedFolders: new Set(),
     });
-    useUIStore.getState().setUI({ isLibraryExportPanelVisible: false });
+    useUIStore.getState().setUI({ libraryRightPanel: null });
   }, []);
 
   const handleBackToLibrary = useCallback(() => {
@@ -235,7 +235,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       });
 
       setUI({
-        isLibraryExportPanelVisible: false,
+        libraryRightPanel: null,
         compactEditorPanelHeightOverride: null,
       });
 
