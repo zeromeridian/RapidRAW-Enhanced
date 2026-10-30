@@ -123,6 +123,8 @@ export enum Invokes {
   RefreshKeywordIndex = 'refresh_keyword_index',
   GetKeywordIndex = 'get_keyword_index',
   GetKeywordImagePaths = 'get_keyword_image_paths',
+  StartKeywordJob = 'start_keyword_job',
+  CancelKeywordJob = 'cancel_keyword_job',
   StitchPanorama = 'stitch_panorama',
   MergeHdr = 'merge_hdr',
   TestAIConnectorConnection = 'test_ai_connector_connection',

@@ -5,9 +5,11 @@ use ndarray::{Array, Axis};
 use ort::session::Session;
 use ort::value::Tensor;
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokenizers::Tokenizer;
@@ -26,6 +28,8 @@ pub const USER_TAG_PREFIX: &str = "user:";
 /// Separates the levels of a user keyword path such as `user:places|germany|berlin`,
 /// as in Lightroom Classic's `lr:hierarchicalSubject`.
 pub const KEYWORD_PATH_SEPARATOR: char = '|';
+/// A library path with its stored tags.
+pub type PathTags = (String, Option<Vec<String>>);
 
 fn apply_flag_to_tags(tags: &mut Vec<String>, flag: &str) {
     tags.retain(|tag| !tag.starts_with(FLAG_TAG_PREFIX));
@@ -749,19 +753,20 @@ fn modify_tags_for_path(
     Ok(metadata)
 }
 
-/// Changes the tags of every path and synchronizes physical images to XMP.
+/// Changes the tags of every path, synchronizes physical images to XMP, and returns each
+/// path's new tags.
 fn modify_tags_for_paths(
     paths: &[String],
     app_handle: AppHandle,
     modify_fn: impl Fn(&mut Vec<String>) + Sync,
-) -> Result<(), String> {
+) -> Result<Vec<PathTags>, String> {
     let settings = crate::app_settings::load_settings(app_handle.clone()).unwrap_or_default();
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
     let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
     let updated_tags = paths
         .par_iter()
-        .map(|path| -> Result<(String, Option<Vec<String>>), String> {
+        .map(|path| -> Result<PathTags, String> {
             let metadata = modify_tags_for_path(path, &modify_fn)?;
 
             if enable_xmp_sync && !path.contains("?vc=") {
@@ -781,7 +786,7 @@ fn modify_tags_for_paths(
             error
         })?;
     crate::keyword_index::record_tags(&app_handle, &updated_tags);
-    Ok(())
+    Ok(updated_tags)
 }
 
 #[tauri::command]
@@ -794,7 +799,8 @@ pub fn add_tag_for_paths(
         if !tags.contains(&tag) {
             tags.push(tag.clone());
         }
-    })
+    })?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -803,7 +809,8 @@ pub fn remove_tag_for_paths(
     tag: String,
     app_handle: AppHandle,
 ) -> Result<(), String> {
-    modify_tags_for_paths(&paths, app_handle, |tags| tags.retain(|t| t != &tag))
+    modify_tags_for_paths(&paths, app_handle, |tags| tags.retain(|t| t != &tag))?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -819,7 +826,8 @@ pub fn set_flag_for_paths(
         return Err(format!("Unsupported image flag: {flag}"));
     }
 
-    modify_tags_for_paths(&paths, app_handle, |tags| apply_flag_to_tags(tags, &flag))
+    modify_tags_for_paths(&paths, app_handle, |tags| apply_flag_to_tags(tags, &flag))?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -996,4 +1004,217 @@ pub fn clear_all_tags(root_path: String, app_handle: AppHandle) -> Result<usize,
     clear_tags_under_root(&root_path, app_handle, |tag| {
         tag.starts_with(COLOR_TAG_PREFIX) || tag.starts_with(FLAG_TAG_PREFIX)
     })
+}
+
+/// A library-wide change to one stored tag. Renaming a user keyword also renames its child
+/// keywords; renaming onto an existing keyword merges the two; moving is renaming the path.
+#[derive(Deserialize, Debug, Clone)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum KeywordOperation {
+    Rename { from: String, to: String },
+    Delete { tag: String },
+}
+
+const KEYWORD_JOB_BATCH_SIZE: usize = 100;
+static KEYWORD_JOB_RUNNING: AtomicBool = AtomicBool::new(false);
+static KEYWORD_JOB_CANCELLED: AtomicBool = AtomicBool::new(false);
+
+/// True for `keyword_tag` itself and, for a user keyword, its child keywords.
+fn matches_keyword(tag: &str, keyword_tag: &str) -> bool {
+    tag == keyword_tag
+        || (keyword_tag.starts_with(USER_TAG_PREFIX)
+            && tag
+                .strip_prefix(keyword_tag)
+                .is_some_and(|rest| rest.starts_with(KEYWORD_PATH_SEPARATOR)))
+}
+
+impl KeywordOperation {
+    fn tag(&self) -> &str {
+        match self {
+            Self::Rename { from, .. } => from,
+            Self::Delete { tag } => tag,
+        }
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if let Self::Rename { from, to } = self {
+            if !from.starts_with(USER_TAG_PREFIX) || !to.starts_with(USER_TAG_PREFIX) {
+                return Err("Only user keywords can be renamed or moved.".to_string());
+            }
+            if to.len() <= USER_TAG_PREFIX.len() || from == to {
+                return Err("The new keyword is empty or unchanged.".to_string());
+            }
+            if matches_keyword(to, from) {
+                return Err("A keyword cannot be moved under itself.".to_string());
+            }
+        }
+        Ok(())
+    }
+
+    fn apply(&self, tags: &mut Vec<String>) {
+        match self {
+            Self::Rename { from, to } => {
+                for tag in tags.iter_mut() {
+                    if matches_keyword(tag, from) {
+                        *tag = format!("{to}{}", &tag[from.len()..]);
+                    }
+                }
+            }
+            Self::Delete { tag } => tags.retain(|existing| !matches_keyword(existing, tag)),
+        }
+    }
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct KeywordJobProgress {
+    done: usize,
+    total: usize,
+    /// The new tags of the images changed since the previous event.
+    updated: Vec<PathTags>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct KeywordJobFinished {
+    done: usize,
+    total: usize,
+    failed: usize,
+    cancelled: bool,
+}
+
+/// Applies a keyword operation to every library image carrying the tag in the background,
+/// reporting `keyword-job-progress` and `keyword-job-finished`. Returns the number of images.
+#[tauri::command]
+pub fn start_keyword_job(
+    operation: KeywordOperation,
+    app_handle: AppHandle,
+) -> Result<usize, String> {
+    operation.validate()?;
+    if KEYWORD_JOB_RUNNING.swap(true, Ordering::SeqCst) {
+        return Err("Another keyword change is still running.".to_string());
+    }
+    let paths = match crate::keyword_index::get_keyword_image_paths(
+        operation.tag().to_string(),
+        app_handle.clone(),
+    ) {
+        Ok(paths) => paths,
+        Err(error) => {
+            KEYWORD_JOB_RUNNING.store(false, Ordering::SeqCst);
+            return Err(error);
+        }
+    };
+    let total = paths.len();
+    KEYWORD_JOB_CANCELLED.store(false, Ordering::SeqCst);
+
+    std::thread::spawn(move || {
+        let mut done = 0;
+        let mut failed = 0;
+        for batch in paths.chunks(KEYWORD_JOB_BATCH_SIZE) {
+            if KEYWORD_JOB_CANCELLED.load(Ordering::SeqCst) {
+                break;
+            }
+            let updated =
+                modify_tags_for_paths(batch, app_handle.clone(), |tags| operation.apply(tags))
+                    .unwrap_or_else(|_| {
+                        failed += batch.len();
+                        Vec::new()
+                    });
+            done += batch.len();
+            let _ = app_handle.emit(
+                "keyword-job-progress",
+                KeywordJobProgress {
+                    done,
+                    total,
+                    updated,
+                },
+            );
+        }
+        KEYWORD_JOB_RUNNING.store(false, Ordering::SeqCst);
+        let _ = app_handle.emit(
+            "keyword-job-finished",
+            KeywordJobFinished {
+                done,
+                total,
+                failed,
+                cancelled: KEYWORD_JOB_CANCELLED.load(Ordering::SeqCst),
+            },
+        );
+    });
+    Ok(total)
+}
+
+#[tauri::command]
+pub fn cancel_keyword_job() {
+    KEYWORD_JOB_CANCELLED.store(true, Ordering::SeqCst);
+}
+
+#[cfg(test)]
+mod keyword_operation_tests {
+    use super::*;
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    fn rename(from: &str, to: &str) -> KeywordOperation {
+        KeywordOperation::Rename {
+            from: from.to_string(),
+            to: to.to_string(),
+        }
+    }
+
+    #[test]
+    fn renaming_moves_child_keywords_and_merges_duplicates() {
+        let mut tags = strings(&[
+            "user:places|germany",
+            "user:places|germany|berlin",
+            "user:places|germanyx",
+            "user:de",
+            "sky",
+        ]);
+        rename("user:places|germany", "user:de").apply(&mut tags);
+        assert_eq!(
+            tags,
+            strings(&[
+                "user:de",
+                "user:de|berlin",
+                "user:places|germanyx",
+                "user:de",
+                "sky"
+            ])
+        );
+    }
+
+    #[test]
+    fn deleting_removes_the_keyword_and_its_children_only() {
+        let mut tags = strings(&[
+            "user:dog",
+            "user:dog|puppy",
+            "user:dogs",
+            "dog",
+            "flag:selected",
+        ]);
+        KeywordOperation::Delete {
+            tag: "user:dog".to_string(),
+        }
+        .apply(&mut tags);
+        assert_eq!(tags, strings(&["user:dogs", "dog", "flag:selected"]));
+
+        KeywordOperation::Delete {
+            tag: "dog".to_string(),
+        }
+        .apply(&mut tags);
+        assert_eq!(tags, strings(&["user:dogs", "flag:selected"]));
+    }
+
+    #[test]
+    fn invalid_renames_are_rejected() {
+        assert!(rename("user:a", "user:a|b").validate().is_err());
+        assert!(rename("user:a", "user:a").validate().is_err());
+        assert!(rename("user:a", "user:").validate().is_err());
+        assert!(rename("sky", "user:sky").validate().is_err());
+        assert!(rename("user:a|b", "user:a").validate().is_ok());
+        assert!(rename("user:a", "user:ab").validate().is_ok());
+    }
 }

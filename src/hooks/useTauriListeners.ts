@@ -14,6 +14,20 @@ import { autoStackCreatedImages } from '../utils/autoStacking';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { isCollectionView } from '../utils/libraryViews';
+import { applyKeywordOperationToSets, applyKeywordOperationToTag, getKeywordSets } from '../utils/keywords';
+import i18n from 'i18next';
+
+interface KeywordJobProgress {
+  done: number;
+  total: number;
+  updated: Array<[string, string[] | null]>;
+}
+
+interface KeywordJobFinished {
+  done: number;
+  failed: number;
+  cancelled: boolean;
+}
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;
@@ -337,6 +351,43 @@ export function useTauriListeners({
             status: Status.Error,
             errorMessage: typeof event.payload === 'string' ? event.payload : 'Unknown error',
           });
+      }),
+      listen<KeywordJobProgress>('keyword-job-progress', (event) => {
+        if (!isEffectActive) return;
+        const { done, total, updated } = event.payload;
+        useProcessStore
+          .getState()
+          .setProcess((state) => ({ keywordJob: state.keywordJob && { ...state.keywordJob, done, total } }));
+        const newTags = new Map(updated);
+        useLibraryStore.getState().setLibrary((state) => ({
+          imageList: state.imageList.map((image) =>
+            newTags.has(image.path) ? { ...image, tags: newTags.get(image.path) ?? null } : image,
+          ),
+        }));
+      }),
+      listen<KeywordJobFinished>('keyword-job-finished', (event) => {
+        if (!isEffectActive) return;
+        const { done, failed, cancelled } = event.payload;
+        const operation = useProcessStore.getState().keywordJob?.operation;
+        useProcessStore.getState().setProcess({ keywordJob: null });
+        if (failed > 0) toast.error(i18n.t('editor.tagging.keywordJobFailed', { count: failed }));
+        else if (cancelled) toast.info(i18n.t('editor.tagging.keywordJobCancelled', { count: done }));
+        else toast.success(i18n.t('editor.tagging.keywordJobDone', { count: done }));
+        if (!operation) return;
+
+        const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+        if (appSettings && !cancelled) {
+          void handleSettingsChange({
+            ...appSettings,
+            keywordSets: applyKeywordOperationToSets(getKeywordSets(appSettings), operation),
+          });
+        }
+        const { activeKeyword } = useLibraryStore.getState();
+        const nextKeyword = activeKeyword && applyKeywordOperationToTag(activeKeyword, operation);
+        if (activeKeyword && nextKeyword !== activeKeyword) {
+          if (nextKeyword) useUIStore.getState().keywordSelectHandler?.(nextKeyword);
+          else refs.current.refreshImageList();
+        }
       }),
       listen('denoise-progress', (event: any) => {
         if (isEffectActive)

@@ -21,18 +21,24 @@ const isEditableTag = (tag: string) => !tag.startsWith('color:') && !isImageFlag
 const displayTag = (tag: string) =>
   formatKeyword(tag.startsWith(USER_TAG_PREFIX) ? tag.slice(USER_TAG_PREFIX.length) : tag);
 
-export default function TaggingPanel() {
+interface TaggingPanelProps {
+  // Shown next to the library grid, which has no panel switcher to close it with
+  onClose?(): void;
+}
+
+export default function TaggingPanel({ onClose }: TaggingPanelProps) {
   const { t } = useTranslation();
   const [tagInput, setTagInput] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
   const imageList = useLibraryStore((state) => state.imageList);
+  const libraryActivePath = useLibraryStore((state) => state.libraryActivePath);
+  const activePath = selectedImage?.path ?? libraryActivePath ?? multiSelectedPaths[0] ?? null;
   const targetPaths = useMemo(
-    () => (multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : []),
-    [multiSelectedPaths, selectedImage],
+    () => (multiSelectedPaths.length > 0 ? multiSelectedPaths : activePath ? [activePath] : []),
+    [multiSelectedPaths, activePath],
   );
-  const activePath = selectedImage?.path ?? targetPaths[0] ?? null;
   const { handleSetTag } = useLibraryActions();
 
   const tags = useMemo(() => {
@@ -111,7 +117,18 @@ export default function TaggingPanel() {
     <div className="flex flex-col h-full">
       <div className="p-4 flex items-center gap-2 shrink-0 border-b border-surface">
         <Tag size={18} />
-        <Text variant={TextVariants.title}>{t('editor.tagging.title')}</Text>
+        <Text variant={TextVariants.title} className="grow">
+          {t('editor.tagging.title')}
+        </Text>
+        {onClose && (
+          <button
+            className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
+            onClick={onClose}
+            type="button"
+          >
+            <X size={18} />
+          </button>
+        )}
       </div>
       <div className="grow overflow-y-auto p-4 custom-scrollbar">
         {targetPaths.length > 0 ? (
@@ -160,25 +177,21 @@ export default function TaggingPanel() {
               </Text>
             </div>
 
-            <TaggingSection id="currentTags" title={t('editor.tagging.currentTagsCount', { count: tags.length })}>
-              {tags.length === 0 ? (
+            <TaggingSection id="currentTags" title={t('editor.tagging.keywordsCount', { count: userTags.length })}>
+              {userTags.length > 0 ? (
+                renderTagChips(userTags)
+              ) : (
                 <Text variant={TextVariants.small} color={TextColors.secondary} className="italic">
                   {t('editor.tagging.noTags')}
                 </Text>
-              ) : (
-                <div className="space-y-3">
-                  {userTags.length > 0 && renderTagChips(userTags)}
-                  {aiTags.length > 0 && (
-                    <div className="space-y-2">
-                      <Text variant={TextVariants.small} color={TextColors.secondary}>
-                        {t('editor.tagging.aiTags')}
-                      </Text>
-                      {renderTagChips(aiTags)}
-                    </div>
-                  )}
-                </div>
               )}
             </TaggingSection>
+
+            {aiTags.length > 0 && (
+              <TaggingSection id="currentAiTags" title={t('editor.tagging.aiTagsCount', { count: aiTags.length })}>
+                {renderTagChips(aiTags)}
+              </TaggingSection>
+            )}
 
             <KeywordSuggestionsSection activePath={activePath} targetPaths={targetPaths} />
 
@@ -187,14 +200,17 @@ export default function TaggingPanel() {
             <KeywordListSection targetPaths={targetPaths} />
           </div>
         ) : (
-          <Text
-            variant={TextVariants.heading}
-            color={TextColors.secondary}
-            weight={TextWeights.normal}
-            className="text-center mt-4"
-          >
-            {t('editor.ai.noImageSelected')}
-          </Text>
+          <div className="space-y-3">
+            <Text
+              variant={TextVariants.heading}
+              color={TextColors.secondary}
+              weight={TextWeights.normal}
+              className="text-center my-4"
+            >
+              {t('editor.ai.noImageSelected')}
+            </Text>
+            <KeywordListSection targetPaths={targetPaths} />
+          </div>
         )}
       </div>
     </div>

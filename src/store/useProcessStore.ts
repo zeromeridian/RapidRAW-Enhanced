@@ -1,12 +1,19 @@
 import { create } from 'zustand';
 import { Progress } from '../components/ui/AppProperties';
 import { ExportState, ImportState, Status } from '../components/ui/ExportImportProperties';
+import { KeywordOperation } from '../utils/keywords';
 
 export interface ExternalEditSession {
   source: string;
   output: string;
   format: string;
   jpegQuality: number;
+}
+
+export interface KeywordJob {
+  operation: KeywordOperation;
+  done: number;
+  total: number;
 }
 
 export interface ExternalEditLaunch {
@@ -32,6 +39,8 @@ interface ProcessState {
   externalEditSession: ExternalEditSession | null;
   externalEditLaunch: ExternalEditLaunch | null;
   externalEditWatch: { path: string; stamp: number } | null;
+  // The running library-wide keyword rename, move, merge, or delete
+  keywordJob: KeywordJob | null;
 
   setProcess: (state: Partial<ProcessState> | ((state: ProcessState) => Partial<ProcessState>)) => void;
   setExportState: (updater: Partial<ExportState> | ((state: ExportState) => Partial<ExportState>)) => void;
@@ -65,6 +74,7 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
   externalEditSession: null,
   externalEditLaunch: null,
   externalEditWatch: null,
+  keywordJob: null,
 
   setProcess: (updater) => {
     set((prev) => {

@@ -10,6 +10,7 @@ import TitleBar from './window/TitleBar';
 import FolderTree from './components/panel/FolderTree';
 import SettingsPanel from './components/panel/SettingsPanel';
 import ExportPanel from './components/panel/right/ExportPanel';
+import TaggingPanel from './components/panel/right/TaggingPanel';
 import Resizer from './components/ui/Resizer';
 import GlobalTooltip from './components/ui/GlobalTooltip';
 import AppModals from './components/modals/AppModals';
@@ -103,7 +104,7 @@ function App() {
     isInstantTransition,
     isLayoutReady,
     uiVisibility,
-    isLibraryExportPanelVisible,
+    libraryRightPanel,
     leftPanelWidth,
     rightPanelWidth,
     compactEditorPanelHeightOverride,
@@ -119,7 +120,7 @@ function App() {
       isInstantTransition: state.isInstantTransition,
       isLayoutReady: state.isLayoutReady,
       uiVisibility: state.uiVisibility,
-      isLibraryExportPanelVisible: state.isLibraryExportPanelVisible,
+      libraryRightPanel: state.libraryRightPanel,
       leftPanelWidth: state.leftPanelWidth,
       rightPanelWidth: state.rightPanelWidth,
       compactEditorPanelHeightOverride: state.compactEditorPanelHeightOverride,
@@ -875,7 +876,7 @@ function App() {
                 </div>
               )}
             </div>
-            {!selectedImage && isLibraryExportPanelVisible && (
+            {!selectedImage && libraryRightPanel && (
               <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
             )}
             <div
@@ -883,19 +884,27 @@ function App() {
                 'lights-out-chrome shrink-0 overflow-hidden',
                 !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
               )}
-              style={{ width: isLibraryExportPanelVisible && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
+              style={{ width: libraryRightPanel && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
             >
-              <ExportPanel
-                exportState={exportState}
-                multiSelectedPaths={multiSelectedPaths}
-                selectedImage={null}
-                setExportState={setExportState}
-                appSettings={appSettings}
-                onSettingsChange={handleSettingsChange}
-                rootPaths={rootPaths}
-                isVisible={isLibraryExportPanelVisible}
-                onClose={() => setUI({ isLibraryExportPanelVisible: false })}
-              />
+              {libraryRightPanel === 'tagging' && (
+                <div className="h-full bg-bg-secondary rounded-lg">
+                  <TaggingPanel onClose={() => setUI({ libraryRightPanel: null })} />
+                </div>
+              )}
+              {/* Kept mounted so the export settings survive switching panels. */}
+              <div className={clsx('h-full', libraryRightPanel === 'tagging' && 'hidden')}>
+                <ExportPanel
+                  exportState={exportState}
+                  multiSelectedPaths={multiSelectedPaths}
+                  selectedImage={null}
+                  setExportState={setExportState}
+                  appSettings={appSettings}
+                  onSettingsChange={handleSettingsChange}
+                  rootPaths={rootPaths}
+                  isVisible={libraryRightPanel === 'export'}
+                  onClose={() => setUI({ libraryRightPanel: null })}
+                />
+              </div>
             </div>
           </div>
         </div>

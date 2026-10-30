@@ -3454,6 +3454,8 @@ pub fn run() {
             keyword_index::refresh_keyword_index,
             keyword_index::get_keyword_index,
             keyword_index::get_keyword_image_paths,
+            tagging::start_keyword_job,
+            tagging::cancel_keyword_job,
             tagging::set_flag_for_paths,
             culling::cull_images,
             lens_correction::get_lensfun_makers,

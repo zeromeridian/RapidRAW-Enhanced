@@ -22,7 +22,7 @@ use crate::file_management::{
 };
 use crate::formats::is_supported_image_file;
 use crate::library_catalog::{self, KeywordIndexEntry};
-use crate::tagging::{KEYWORD_PATH_SEPARATOR, USER_TAG_PREFIX, is_ai_tag};
+use crate::tagging::{KEYWORD_PATH_SEPARATOR, PathTags, USER_TAG_PREFIX, is_ai_tag};
 
 const KEYWORD_INDEX_UPDATED_EVENT: &str = "keyword-index-updated";
 const WRITE_BATCH_SIZE: usize = 500;
@@ -243,7 +243,7 @@ pub fn refresh_keyword_index(root_paths: Vec<String>, app_handle: AppHandle) {
 }
 
 /// Records tags just written for library paths, so the Keyword List updates without a scan.
-pub fn record_tags(app_handle: &AppHandle, updates: &[(String, Option<Vec<String>>)]) {
+pub fn record_tags(app_handle: &AppHandle, updates: &[PathTags]) {
     let settings = crate::app_settings::load_settings(app_handle.clone()).unwrap_or_default();
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
     let entries: Vec<KeywordIndexEntry> = updates

@@ -21,6 +21,7 @@ import {
   SlidersHorizontal,
   SquaresUnite,
   Star,
+  Tag,
   Trash2,
   Ungroup,
   Users,
@@ -97,6 +98,7 @@ interface BottomBarProps {
   onContextMenu?(event: any, path: string): void;
   onCopy(): void;
   onExportClick?(): void;
+  onTaggingClick?(): void;
   onDeleteRejected?(paths: string[]): void;
   onFlag(flag: ImageFlag): void;
   onSetColorLabel(color: string | null, paths?: string[]): Promise<void>;
@@ -233,6 +235,7 @@ export default function BottomBar({
   onContextMenu,
   onCopy,
   onExportClick,
+  onTaggingClick,
   onDeleteRejected,
   onFlag,
   onSetColorLabel,
@@ -435,6 +438,7 @@ export default function BottomBar({
     { id: 'unstack', label: t('contextMenus.thumbnail.unstack') },
     { id: 'quickFilter', label: t('ui.bottomBar.tooltips.quickFilter') },
     { id: 'selectBy', label: t('ui.bottomBar.selectBy.title', 'Select by') },
+    { id: 'tagging', label: t('editor.tagging.title') },
     { id: 'export', label: t('ui.bottomBar.tooltips.export') },
     { id: 'thumbnailSize', label: t('library.header.viewOptions.thumbnailSize') },
     { id: 'zoom', label: t('ui.bottomBar.zoomLabel') },
@@ -1757,6 +1761,15 @@ export default function BottomBar({
                   />
                 </div>
               </div>
+            )}
+            {onTaggingClick && isToolbarItemVisible('tagging') && (
+              <button
+                className={productivityButtonClass}
+                onClick={onTaggingClick}
+                data-tooltip={t('editor.tagging.title')}
+              >
+                <Tag size={18} />
+              </button>
             )}
             {isToolbarItemVisible('export') && (
               <button
