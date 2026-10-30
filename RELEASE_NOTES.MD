@@ -5,6 +5,13 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.24.1-dev-advanced-stack — 2026-10-30
+
+### Fixes
+
+- Auto-Stack by Capture Time now reads the photos' capture times. Before,
+  it reported that every photo had no capture time and created no stacks.
+
 ## 1.24.0-dev-advanced-stack — 2026-10-30
 
 ### Stacking
