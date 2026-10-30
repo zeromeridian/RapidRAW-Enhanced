@@ -96,6 +96,11 @@ export interface LightroomImportModalState {
   targetPaths: string[];
 }
 
+export interface CaptureTimeStackModalState {
+  isOpen: boolean;
+  targetPaths: string[];
+}
+
 interface UIState {
   // View & Layout
   activeView: string;
@@ -147,6 +152,7 @@ interface UIState {
   collageModalState: CollageModalState;
   presetBatchModalState: PresetBatchModalState;
   lightroomImportModalState: LightroomImportModalState;
+  captureTimeStackModalState: CaptureTimeStackModalState;
 
   // Actions
   setUI: (updater: Partial<UIState> | ((state: UIState) => Partial<UIState>)) => void;
@@ -237,6 +243,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     target: { folderPaths: [], imagePaths: [], includeSubfolders: false },
   },
   lightroomImportModalState: { isOpen: false, targetPaths: [] },
+  captureTimeStackModalState: { isOpen: false, targetPaths: [] },
 
   setUI: (updater) => set((state) => (typeof updater === 'function' ? updater(state) : updater)),
 

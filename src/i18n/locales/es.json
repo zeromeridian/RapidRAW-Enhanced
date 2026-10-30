@@ -345,7 +345,8 @@
       "resetAdjustments_one": "Restablecer ajustes",
       "resetAdjustments_other": "Restablecer ajustes en {{count}} imágenes",
       "showExplorer": "Mostrar en el Explorador de archivos",
-      "virtualCopy": "Copia virtual"
+      "virtualCopy": "Copia virtual",
+      "autoStackByCaptureTime": "Auto-Stack by Capture Time…"
     },
     "toasts": {
       "couldNotShowExplorer": "No se pudo mostrar el archivo en el explorador: {{err}}",
@@ -1556,6 +1557,29 @@
       "yAxis": "Eje Y",
       "zoomInTooltip": "Acercar",
       "zoomOutTooltip": "Alejar"
+    },
+    "captureTimeStack": {
+      "hours_one": "{{count}} hour",
+      "hours_many": "{{count}} hours",
+      "hours_other": "{{count}} hours",
+      "minutes_one": "{{count}} minute",
+      "minutes_many": "{{count}} minutes",
+      "minutes_other": "{{count}} minutes",
+      "result_one": "Creates {{count}} stack from {{photos}} photos.",
+      "result_many": "Creates {{count}} stacks from {{photos}} photos.",
+      "result_other": "Creates {{count}} stacks from {{photos}} photos.",
+      "scope_one": "Checks {{count}} photo. Photos already in a stack stay as they are.",
+      "scope_many": "Checks {{count}} photos. Photos already in a stack stay as they are.",
+      "scope_other": "Checks {{count}} photos. Photos already in a stack stay as they are.",
+      "seconds_one": "{{count}} second",
+      "seconds_many": "{{count}} seconds",
+      "seconds_other": "{{count}} seconds",
+      "stack": "Stack",
+      "timeBetweenStacks": "Time between stacks",
+      "title": "Auto-Stack by Capture Time",
+      "undated_one": "{{count}} photo has no capture time yet and is skipped.",
+      "undated_many": "{{count}} photos have no capture time yet and are skipped.",
+      "undated_other": "{{count}} photos have no capture time yet and are skipped."
     }
   },
   "settings": {
@@ -1786,7 +1810,9 @@
         "apply_keyword_7": "Toggle keyword 7 of the keyword set",
         "apply_keyword_8": "Toggle keyword 8 of the keyword set",
         "apply_keyword_9": "Toggle keyword 9 of the keyword set",
-        "next_keyword_set": "Next keyword set"
+        "next_keyword_set": "Next keyword set",
+        "stack_selected": "Stack selected photos",
+        "move_to_top_of_stack": "Move to top of stack"
       },
       "sections": {
         "editing": "Edición",

@@ -9,7 +9,13 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { toggleAutoSync, useEditorActions } from './useEditorActions';
-import { useLibraryActions } from './useLibraryActions';
+import {
+  getActionPaths,
+  getStackTargetPath,
+  moveImageToStackTop,
+  stackImages,
+  useLibraryActions,
+} from './useLibraryActions';
 import { ImageFlag } from '../utils/imageFlags';
 import { KEYWORD_SET_SIZE, getActiveKeywordSet, getKeywordSets } from '../utils/keywords';
 
@@ -223,6 +229,23 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
           s.ui.requestSelectionClear();
           handleClearSelection();
+        },
+      },
+      stack_selected: {
+        shouldFire: () => getActionPaths().length >= 2,
+        execute: (e: KeyboardEvent) => {
+          e.preventDefault();
+          const paths = getActionPaths();
+          const coverPath = getStackTargetPath(paths);
+          if (coverPath) stackImages(paths, coverPath);
+        },
+      },
+      move_to_top_of_stack: {
+        shouldFire: () => !!getStackTargetPath(getActionPaths()),
+        execute: (e: KeyboardEvent) => {
+          e.preventDefault();
+          const path = getStackTargetPath(getActionPaths());
+          if (path) moveImageToStackTop(path);
         },
       },
       delete_selected: {

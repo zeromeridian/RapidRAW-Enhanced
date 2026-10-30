@@ -51,7 +51,13 @@ details are in `RELEASE_NOTES.MD`.
   **Deselect All** is configurable in Keyboard Shortcuts and defaults to
   Command+D on macOS or Ctrl+D on Windows and Linux.
 - Manual image stacks with collapse/expand, visible stack cues, drag ordering,
-  move-to-top covers, and matching Develop-filmstrip presentation.
+  move-to-top covers, and matching Develop-filmstrip presentation. Stacking a
+  selection adds it to, or merges, the stacks it touches (Lightroom's Group
+  into Stack); configurable Command/Ctrl+G and Shift+S shortcuts stack the
+  selection and move the active photo to the top of its stack.
+- Lightroom-style **Auto-Stack by Capture Time** for the selection or the
+  current view, with a 5-second to 1-hour gap and a preview of the resulting
+  stacks; photos already in a stack are left unchanged.
 - Automatic stacking of physical copies, virtual copies, and exported images,
   with optional automatic expansion.
 - Configurable external-editor handoff: add Photoshop, Pixelmator Pro, or any

@@ -335,7 +335,8 @@
       "stackSelected_one": "Stack Selected Photo",
       "stackSelected_other": "Stack {{count}} Selected Photos",
       "unstack": "Unstack Photos",
-      "virtualCopy": "Virtual Copy"
+      "virtualCopy": "Virtual Copy",
+      "autoStackByCaptureTime": "Auto-Stack by Capture Time…"
     },
     "toasts": {
       "couldNotShowExplorer": "Could not show file in explorer: {{err}}",
@@ -1661,6 +1662,23 @@
       "yAxis": "Y Axis",
       "zoomInTooltip": "Zoom In",
       "zoomOutTooltip": "Zoom Out"
+    },
+    "captureTimeStack": {
+      "hours_one": "{{count}} hour",
+      "hours_other": "{{count}} hours",
+      "minutes_one": "{{count}} minute",
+      "minutes_other": "{{count}} minutes",
+      "result_one": "Creates {{count}} stack from {{photos}} photos.",
+      "result_other": "Creates {{count}} stacks from {{photos}} photos.",
+      "scope_one": "Checks {{count}} photo. Photos already in a stack stay as they are.",
+      "scope_other": "Checks {{count}} photos. Photos already in a stack stay as they are.",
+      "seconds_one": "{{count}} second",
+      "seconds_other": "{{count}} seconds",
+      "stack": "Stack",
+      "timeBetweenStacks": "Time between stacks",
+      "title": "Auto-Stack by Capture Time",
+      "undated_one": "{{count}} photo has no capture time yet and is skipped.",
+      "undated_other": "{{count}} photos have no capture time yet and are skipped."
     }
   },
   "presetBatch": {
@@ -1939,7 +1957,9 @@
         "apply_keyword_7": "Toggle keyword 7 of the keyword set",
         "apply_keyword_8": "Toggle keyword 8 of the keyword set",
         "apply_keyword_9": "Toggle keyword 9 of the keyword set",
-        "next_keyword_set": "Next keyword set"
+        "next_keyword_set": "Next keyword set",
+        "stack_selected": "Stack selected photos",
+        "move_to_top_of_stack": "Move to top of stack"
       },
       "sections": {
         "editing": "Editing",

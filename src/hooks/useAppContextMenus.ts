@@ -4,6 +4,7 @@ import {
   Aperture,
   Check,
   ClipboardPaste,
+  Clock,
   Copy,
   CopyPlus,
   Edit,
@@ -68,15 +69,15 @@ import { Status, ExportSettings } from '../components/ui/ExportImportProperties'
 import { Color, COLOR_LABELS, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import TaggingSubMenu from '../context/TaggingSubMenu';
 import { debouncedSave, useEditorActions } from './useEditorActions';
-import { useLibraryActions } from './useLibraryActions';
-import { globalImageCache } from '../utils/ImageLRUCache';
 import {
-  createImageStack,
-  findImageStack,
-  moveImageToTopOfStack,
-  toggleImageStack,
-  unstackImagePaths,
-} from '../utils/imageStacks';
+  moveImageToStackTop,
+  openCaptureTimeStackModal,
+  saveImageStacks,
+  stackImages,
+  useLibraryActions,
+} from './useLibraryActions';
+import { globalImageCache } from '../utils/ImageLRUCache';
+import { findImageStack, toggleImageStack, unstackImagePaths } from '../utils/imageStacks';
 import { autoStackCreatedImages } from '../utils/autoStacking';
 import { isCollectionView } from '../utils/libraryViews';
 import { getEnabledCopySuffix } from '../utils/outputNaming';
@@ -503,29 +504,21 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         stack.paths.some((stackPath) => finalSelection.includes(stackPath)),
       );
 
-      const saveImageStacks = (nextStacks: typeof imageStacks) => {
-        if (!appSettings) return;
-        useSettingsStore.getState().handleSettingsChange({ ...appSettings, imageStacks: nextStacks });
-      };
-
       const handleStackSelected = () => {
         if (finalSelection.length < 2) return;
-        saveImageStacks(createImageStack(imageStacks, finalSelection, path));
+        stackImages(finalSelection, path);
       };
 
       const handleUnstackSelected = () => {
-        saveImageStacks(unstackImagePaths(imageStacks, finalSelection));
+        saveImageStacks((stacks) => unstackImagePaths(stacks, finalSelection));
       };
 
       const handleToggleStack = () => {
         if (!targetStack) return;
-        saveImageStacks(toggleImageStack(imageStacks, targetStack.id));
+        saveImageStacks((stacks) => toggleImageStack(stacks, targetStack.id));
       };
 
-      const handleMoveToTopOfStack = () => {
-        if (!targetStack) return;
-        saveImageStacks(moveImageToTopOfStack(imageStacks, targetStack.id, path));
-      };
+      const handleMoveToTopOfStack = () => moveImageToStackTop(path);
 
       const handleCreateVirtualCopy = async (sourcePath: string) => {
         try {
@@ -853,6 +846,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: Layers,
               disabled: !hasSelectedStacks,
               onClick: handleUnstackSelected,
+            },
+            {
+              label: t('contextMenus.thumbnail.autoStackByCaptureTime'),
+              icon: Clock,
+              onClick: () => openCaptureTimeStackModal(finalSelection),
             },
           ],
         },

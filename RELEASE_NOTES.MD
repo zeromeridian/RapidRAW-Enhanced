@@ -5,6 +5,23 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.24.0-dev-advanced-stack — 2026-10-30
+
+### Stacking
+
+- **Auto-Stack by Capture Time**, as in Lightroom Classic: choose it from the
+  Stacking menu or the new clock button in the bottom bar, set the time
+  between stacks (5 seconds to 1 hour), and see how many stacks it will
+  create before you confirm. It stacks the selected photos, or every photo in
+  the current view when nothing is selected. Photos that are already in a
+  stack stay as they are.
+- **Stack Selected Photos** now adds to an existing stack: select a stack and
+  other photos, and they join that stack instead of breaking it apart.
+  Selecting photos from several stacks merges them into one.
+- New keyboard shortcuts: **Command+G** (Ctrl+G on Windows and Linux) stacks
+  the selected photos, and **Shift+S** moves the active photo to the top of
+  its stack. Both can be changed in Settings → Shortcuts.
+
 ## 1.23.2-dev-advanced-stack — 2026-10-30
 
 ### Fixes
