@@ -104,7 +104,8 @@ function App() {
     isInstantTransition,
     isLayoutReady,
     uiVisibility,
-    libraryRightPanel,
+    isLibraryExportPanelVisible,
+    activeView,
     leftPanelWidth,
     rightPanelWidth,
     compactEditorPanelHeightOverride,
@@ -120,7 +121,8 @@ function App() {
       isInstantTransition: state.isInstantTransition,
       isLayoutReady: state.isLayoutReady,
       uiVisibility: state.uiVisibility,
-      libraryRightPanel: state.libraryRightPanel,
+      isLibraryExportPanelVisible: state.isLibraryExportPanelVisible,
+      activeView: state.activeView,
       leftPanelWidth: state.leftPanelWidth,
       rightPanelWidth: state.rightPanelWidth,
       compactEditorPanelHeightOverride: state.compactEditorPanelHeightOverride,
@@ -375,6 +377,14 @@ function App() {
   }, [handleSelectKeyword]);
 
   const { displayList: sortedImageList, badges: groupBadgeInfo } = useSortedLibrary();
+
+  // Export is opened per task; the Tagging panel stays open, also across restarts, until hidden.
+  const isLibraryGridShown = activeView === 'library' && !selectedImage;
+  const libraryRightPanel = isLibraryExportPanelVisible
+    ? 'export'
+    : isLibraryGridShown && uiVisibility.libraryTagging
+      ? 'tagging'
+      : null;
 
   const handleLibraryRefresh = useCallback(async () => {
     if (currentFolderPath) {
@@ -888,7 +898,11 @@ function App() {
             >
               {libraryRightPanel === 'tagging' && (
                 <div className="h-full bg-bg-secondary rounded-lg">
-                  <TaggingPanel onClose={() => setUI({ libraryRightPanel: null })} />
+                  <TaggingPanel
+                    onClose={() =>
+                      setUI((state) => ({ uiVisibility: { ...state.uiVisibility, libraryTagging: false } }))
+                    }
+                  />
                 </div>
               )}
               {/* Kept mounted so the export settings survive switching panels. */}
@@ -902,7 +916,7 @@ function App() {
                   onSettingsChange={handleSettingsChange}
                   rootPaths={rootPaths}
                   isVisible={libraryRightPanel === 'export'}
-                  onClose={() => setUI({ libraryRightPanel: null })}
+                  onClose={() => setUI({ isLibraryExportPanelVisible: false })}
                 />
               </div>
             </div>

@@ -583,7 +583,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           setRightPanel(Panel.Export);
         } else {
           setLibrary({ multiSelectedPaths: finalSelection });
-          setUI({ libraryRightPanel: 'export' });
+          setUI({ isLibraryExportPanelVisible: true });
         }
       };
 

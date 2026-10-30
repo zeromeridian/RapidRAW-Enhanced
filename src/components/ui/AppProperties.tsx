@@ -482,6 +482,8 @@ export interface UiVisibility {
   filmstrip: boolean;
   quickFilter?: boolean;
   editorExif?: boolean;
+  // The Tagging panel next to the library grid
+  libraryTagging?: boolean;
 }
 
 export interface WaveformData {
