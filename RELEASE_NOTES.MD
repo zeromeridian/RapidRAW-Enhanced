@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.23.2-dev-advanced-stack — 2026-10-30
+
+### Fixes
+
+- Stacking photos no longer freezes the app. The freeze could last until the
+  background update of the Keyword List had finished, which takes a long time
+  on large libraries and network drives.
+- Stacking, unstacking, and expanding or collapsing a stack now update only
+  the photos whose stack actually changed, instead of every stacked photo in
+  the library.
+
 ## 1.23.1-dev-gui-tweaks — 2026-10-30
 
 ### Interface

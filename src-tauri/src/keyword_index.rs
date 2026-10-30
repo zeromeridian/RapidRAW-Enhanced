@@ -26,6 +26,9 @@ use crate::tagging::{KEYWORD_PATH_SEPARATOR, PathTags, USER_TAG_PREFIX, is_ai_ta
 
 const KEYWORD_INDEX_UPDATED_EVENT: &str = "keyword-index-updated";
 const WRITE_BATCH_SIZE: usize = 500;
+/// Scan reads are blocking file I/O, often on network volumes. They run on their own small pool
+/// so they cannot occupy the global Rayon pool that rendering and other commands share.
+const SCAN_THREADS: usize = 4;
 
 static IS_SCANNING: AtomicBool = AtomicBool::new(false);
 static RESCAN_REQUESTED: AtomicBool = AtomicBool::new(false);
@@ -167,31 +170,38 @@ fn scan_library(app_handle: &AppHandle, root_paths: &[String]) -> Result<(), Str
         .flat_map(library_entries)
         .collect();
 
-    let changed: Vec<KeywordIndexEntry> = entries
-        .par_iter()
-        .filter_map(|(source_path, copy_id)| {
-            let key = source_key(source_path, copy_id.as_deref());
-            let (_, sidecar_path) = parse_virtual_path(&key);
-            // Reading a cloud placeholder would download it; keep what the index already has.
-            if is_cloud_placeholder(&sidecar_path)
-                || (enable_xmp_sync
-                    && resolve_xmp_path(source_path).is_some_and(|xmp| is_cloud_placeholder(&xmp)))
-            {
-                return None;
-            }
-            let stamp = index_stamp(source_path, &sidecar_path, enable_xmp_sync);
-            (stored.get(&key) != Some(&stamp)).then(|| {
-                read_entry(
-                    source_path,
-                    &sidecar_path,
-                    key,
-                    copy_id.is_some(),
-                    enable_xmp_sync,
-                    stamp,
-                )
+    let scan_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(SCAN_THREADS)
+        .build()
+        .map_err(|error| error.to_string())?;
+    let changed: Vec<KeywordIndexEntry> = scan_pool.install(|| {
+        entries
+            .par_iter()
+            .filter_map(|(source_path, copy_id)| {
+                let key = source_key(source_path, copy_id.as_deref());
+                let (_, sidecar_path) = parse_virtual_path(&key);
+                // Reading a cloud placeholder would download it; keep what the index already has.
+                if is_cloud_placeholder(&sidecar_path)
+                    || (enable_xmp_sync
+                        && resolve_xmp_path(source_path)
+                            .is_some_and(|xmp| is_cloud_placeholder(&xmp)))
+                {
+                    return None;
+                }
+                let stamp = index_stamp(source_path, &sidecar_path, enable_xmp_sync);
+                (stored.get(&key) != Some(&stamp)).then(|| {
+                    read_entry(
+                        source_path,
+                        &sidecar_path,
+                        key,
+                        copy_id.is_some(),
+                        enable_xmp_sync,
+                        stamp,
+                    )
+                })
             })
-        })
-        .collect();
+            .collect()
+    });
 
     let seen: HashSet<String> = entries
         .iter()

@@ -84,6 +84,29 @@ const createStackBadge = (
 export const findImageStack = (stacks: ImageStack[], path: string) =>
   stacks.find((stack) => stack.paths.includes(path));
 
+// The per-image stack fields that `sync_image_stacks_to_xmp` writes, keyed by physical path.
+const getXmpStackStates = (stacks: ImageStack[]) => {
+  const states = new Map<string, string>();
+  for (const stack of stacks) {
+    const physicalPaths = stack.paths.filter((path) => !path.includes('?vc='));
+    if (physicalPaths.length < 2) continue;
+    physicalPaths.forEach((path, order) => {
+      if (!states.has(path)) {
+        states.set(path, JSON.stringify([stack.id, order, path === stack.coverPath, stack.collapsed]));
+      }
+    });
+  }
+  return states;
+};
+
+export const getChangedXmpStackPaths = (previousStacks: ImageStack[], nextStacks: ImageStack[]): string[] => {
+  const previousStates = getXmpStackStates(previousStacks);
+  const nextStates = getXmpStackStates(nextStacks);
+  return Array.from(new Set([...previousStates.keys(), ...nextStates.keys()])).filter(
+    (path) => previousStates.get(path) !== nextStates.get(path),
+  );
+};
+
 export function mergeXmpImageStacks(stacks: ImageStack[], images: ImageFile[]): ImageStack[] {
   const membersByStack = new Map<string, ImageFile[]>();
   for (const image of images) {

@@ -4052,9 +4052,10 @@ pub fn save_metadata_and_update_thumbnail(
     Ok(())
 }
 
-/// Serializes the read-merge-write cycle of `apply_adjustments_to_paths`, so
-/// overlapping pastes or Auto Sync updates cannot overwrite each other's
-/// sidecar changes.
+/// Serializes the sidecar read-merge-write cycles of
+/// `apply_adjustments_to_paths` and `sync_image_stacks_to_xmp`, so
+/// overlapping pastes, Auto Sync updates, or stack changes cannot overwrite
+/// each other's sidecar changes.
 static ADJUSTMENT_MERGE_LOCK: Mutex<()> = Mutex::new(());
 
 /// Writes the values of `complete` that `changes` selects into `target`.
@@ -5959,7 +5960,7 @@ pub struct XmpImageStack {
 }
 
 #[tauri::command]
-pub fn sync_image_stacks_to_xmp(
+pub async fn sync_image_stacks_to_xmp(
     stacks: Vec<XmpImageStack>,
     affected_paths: Vec<String>,
     app_handle: AppHandle,
@@ -5969,6 +5970,22 @@ pub fn sync_image_stacks_to_xmp(
         return Ok(());
     }
     let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
+
+    tauri::async_runtime::spawn_blocking(move || {
+        write_image_stacks_to_xmp(&stacks, &affected_paths, create_xmp_if_missing)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn write_image_stacks_to_xmp(
+    stacks: &[XmpImageStack],
+    affected_paths: &[String],
+    create_xmp_if_missing: bool,
+) -> Result<(), String> {
+    let _merge_guard = ADJUSTMENT_MERGE_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     affected_paths.par_iter().try_for_each(|path| {
         if path.contains("?vc=") {
