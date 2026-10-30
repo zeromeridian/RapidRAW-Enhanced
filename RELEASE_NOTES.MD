@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.25.0-dev-read-embedded-xmp — 2026-10-30
+
+### Keywords
+
+- Keywords, ratings, and color labels that Lightroom Classic saved inside
+  JPEG, TIFF, DNG, and PNG files now carry over to ThisIsRAW. Lightroom
+  stores these formats' metadata in the file itself rather than in a
+  separate `.xmp` file, which ThisIsRAW previously did not read.
+- With **Enable XMP Sync** on, they are picked up when a folder opens, and
+  again only after Lightroom changes the file, so keywords you remove in
+  ThisIsRAW do not come back. **Read XMP from Folder** always reads them.
+- ThisIsRAW does not change these files; your own changes stay in its own
+  data.
+
 ## 1.24.1-dev-advanced-stack — 2026-10-30
 
 ### Fixes

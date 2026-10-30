@@ -17,6 +17,7 @@ mod cache_utils;
 mod culling;
 mod denoising;
 mod effect_maps;
+mod embedded_xmp;
 mod exif_processing;
 mod export_processing;
 mod file_management;
