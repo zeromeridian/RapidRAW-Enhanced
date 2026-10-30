@@ -138,23 +138,80 @@ export function mergeXmpImageStacks(stacks: ImageStack[], images: ImageFile[]): 
   return [...retainedStacks, ...importedStacks];
 }
 
+/**
+ * Stacks `paths` together, as Lightroom Classic's Group into Stack: every stack they touch is merged
+ * in, so selecting a stack and other photos adds them to it. The stack holding `coverPath` keeps its
+ * id, cover, and collapsed state; otherwise `coverPath` tops a new collapsed stack.
+ */
 export const createImageStack = (stacks: ImageStack[], paths: string[], coverPath: string): ImageStack[] => {
-  if (paths.length < 2) return stacks;
+  const touchedStacks = stacks.filter((stack) => stack.paths.some((path) => paths.includes(path)));
+  const coverStack = touchedStacks.find((stack) => stack.paths.includes(coverPath)) ?? touchedStacks[0];
+  const orderedStacks = coverStack ? [coverStack, ...touchedStacks.filter((stack) => stack !== coverStack)] : [];
+  const memberPaths = Array.from(new Set([...orderedStacks.flatMap((stack) => stack.paths), ...paths]));
+  if (memberPaths.length < 2 || (touchedStacks.length === 1 && memberPaths.length === coverStack?.paths.length)) {
+    return stacks;
+  }
 
-  const selectedPaths = new Set(paths);
-  const remainingStacks = removePathsFromStacks(stacks, selectedPaths);
-  const resolvedCoverPath = paths.includes(coverPath) ? coverPath : paths[0];
-
+  const resolvedCoverPath = coverStack?.coverPath ?? (paths.includes(coverPath) ? coverPath : paths[0]);
   return [
-    ...remainingStacks,
+    ...stacks.filter((stack) => !touchedStacks.includes(stack)),
     {
-      id: createStackId(),
-      paths: [resolvedCoverPath, ...paths.filter((path) => path !== resolvedCoverPath)],
+      id: coverStack?.id ?? createStackId(),
+      paths: [resolvedCoverPath, ...memberPaths.filter((path) => path !== resolvedCoverPath)],
       coverPath: resolvedCoverPath,
-      collapsed: true,
+      collapsed: coverStack?.collapsed ?? true,
     },
   ];
 };
+
+/** Capture time in seconds, from EXIF `DateTimeOriginal` (`YYYY:MM:DD HH:MM:SS`). */
+const getCaptureTime = (image: ImageFile): number | null => {
+  const match = image.exif?.DateTimeOriginal?.match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (!match) return null;
+  const [year, month, day, hours, minutes, seconds] = match.slice(1).map(Number);
+  return Date.UTC(year, month - 1, day, hours, minutes, seconds) / 1000;
+};
+
+export interface CaptureTimeStackPlan {
+  groups: string[][];
+  // Unstacked candidates whose capture time is unknown (EXIF missing or not loaded yet).
+  undatedCount: number;
+}
+
+/**
+ * Lightroom-style Auto-Stack by Capture Time: unstacked `images` taken at most `maxGapSeconds`
+ * after the previous one form a group. Photos already in a stack are left alone.
+ */
+export function planCaptureTimeStacks(
+  images: ImageFile[],
+  stacks: ImageStack[],
+  maxGapSeconds: number,
+): CaptureTimeStackPlan {
+  const stackedPaths = new Set(stacks.flatMap((stack) => stack.paths));
+  const candidates = images.filter((image) => !stackedPaths.has(image.path));
+  const dated = candidates
+    .map((image) => ({ path: image.path, time: getCaptureTime(image) }))
+    .filter((entry): entry is { path: string; time: number } => entry.time !== null)
+    .sort((left, right) => left.time - right.time);
+
+  const groups: string[][] = [];
+  let current: string[] = [];
+  dated.forEach((entry, index) => {
+    if (index > 0 && entry.time - dated[index - 1].time > maxGapSeconds) {
+      if (current.length >= 2) groups.push(current);
+      current = [];
+    }
+    current.push(entry.path);
+  });
+  if (current.length >= 2) groups.push(current);
+
+  return { groups, undatedCount: candidates.length - dated.length };
+}
+
+export const addCaptureTimeStacks = (stacks: ImageStack[], groups: string[][]): ImageStack[] => [
+  ...stacks,
+  ...groups.map((paths) => ({ id: createStackId(), paths, coverPath: paths[0], collapsed: true })),
+];
 
 export const toggleImageStack = (stacks: ImageStack[], stackId: string): ImageStack[] =>
   stacks.map((stack) => (stack.id === stackId ? { ...stack, collapsed: !stack.collapsed } : stack));

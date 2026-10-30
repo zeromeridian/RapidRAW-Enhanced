@@ -65,6 +65,18 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'library',
   },
   {
+    action: 'stack_selected',
+    description: 'settings.keybinds.actions.stack_selected',
+    defaultCombo: ['ctrl', 'KeyG'],
+    section: 'library',
+  },
+  {
+    action: 'move_to_top_of_stack',
+    description: 'settings.keybinds.actions.move_to_top_of_stack',
+    defaultCombo: ['shift', 'KeyS'],
+    section: 'library',
+  },
+  {
     action: 'delete_selected',
     description: 'settings.keybinds.actions.delete_selected',
     defaultCombo: ['Delete'],

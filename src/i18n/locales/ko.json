@@ -327,7 +327,8 @@
       "resetAdjustments_one": "조정값 초기화",
       "resetAdjustments_other": "이미지 {{count}}개의 조정값 초기화",
       "showExplorer": "파일 탐색기에서 표시",
-      "virtualCopy": "가상 복사본"
+      "virtualCopy": "가상 복사본",
+      "autoStackByCaptureTime": "Auto-Stack by Capture Time…"
     },
     "toasts": {
       "couldNotShowExplorer": "탐색기에서 파일을 표시할 수 없습니다: {{err}}",
@@ -1517,6 +1518,23 @@
       "yAxis": "Y축",
       "zoomInTooltip": "확대",
       "zoomOutTooltip": "축소"
+    },
+    "captureTimeStack": {
+      "hours_one": "{{count}} hour",
+      "hours_other": "{{count}} hours",
+      "minutes_one": "{{count}} minute",
+      "minutes_other": "{{count}} minutes",
+      "result_one": "Creates {{count}} stack from {{photos}} photos.",
+      "result_other": "Creates {{count}} stacks from {{photos}} photos.",
+      "scope_one": "Checks {{count}} photo. Photos already in a stack stay as they are.",
+      "scope_other": "Checks {{count}} photos. Photos already in a stack stay as they are.",
+      "seconds_one": "{{count}} second",
+      "seconds_other": "{{count}} seconds",
+      "stack": "Stack",
+      "timeBetweenStacks": "Time between stacks",
+      "title": "Auto-Stack by Capture Time",
+      "undated_one": "{{count}} photo has no capture time yet and is skipped.",
+      "undated_other": "{{count}} photos have no capture time yet and are skipped."
     }
   },
   "settings": {
@@ -1744,7 +1762,9 @@
         "apply_keyword_7": "Toggle keyword 7 of the keyword set",
         "apply_keyword_8": "Toggle keyword 8 of the keyword set",
         "apply_keyword_9": "Toggle keyword 9 of the keyword set",
-        "next_keyword_set": "Next keyword set"
+        "next_keyword_set": "Next keyword set",
+        "stack_selected": "Stack selected photos",
+        "move_to_top_of_stack": "Move to top of stack"
       },
       "sections": {
         "editing": "편집",

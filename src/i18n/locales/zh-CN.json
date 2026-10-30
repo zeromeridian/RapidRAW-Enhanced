@@ -327,7 +327,8 @@
       "resetAdjustments_one": "重置调整",
       "resetAdjustments_other": "重置 {{count}} 张图像的调整",
       "showExplorer": "在文件资源管理器中显示",
-      "virtualCopy": "虚拟副本"
+      "virtualCopy": "虚拟副本",
+      "autoStackByCaptureTime": "Auto-Stack by Capture Time…"
     },
     "toasts": {
       "couldNotShowExplorer": "无法在文件资源管理器中显示文件：{{err}}",
@@ -1517,6 +1518,23 @@
       "yAxis": "Y 轴",
       "zoomInTooltip": "放大",
       "zoomOutTooltip": "缩小"
+    },
+    "captureTimeStack": {
+      "hours_one": "{{count}} hour",
+      "hours_other": "{{count}} hours",
+      "minutes_one": "{{count}} minute",
+      "minutes_other": "{{count}} minutes",
+      "result_one": "Creates {{count}} stack from {{photos}} photos.",
+      "result_other": "Creates {{count}} stacks from {{photos}} photos.",
+      "scope_one": "Checks {{count}} photo. Photos already in a stack stay as they are.",
+      "scope_other": "Checks {{count}} photos. Photos already in a stack stay as they are.",
+      "seconds_one": "{{count}} second",
+      "seconds_other": "{{count}} seconds",
+      "stack": "Stack",
+      "timeBetweenStacks": "Time between stacks",
+      "title": "Auto-Stack by Capture Time",
+      "undated_one": "{{count}} photo has no capture time yet and is skipped.",
+      "undated_other": "{{count}} photos have no capture time yet and are skipped."
     }
   },
   "settings": {
@@ -1744,7 +1762,9 @@
         "apply_keyword_7": "Toggle keyword 7 of the keyword set",
         "apply_keyword_8": "Toggle keyword 8 of the keyword set",
         "apply_keyword_9": "Toggle keyword 9 of the keyword set",
-        "next_keyword_set": "Next keyword set"
+        "next_keyword_set": "Next keyword set",
+        "stack_selected": "Stack selected photos",
+        "move_to_top_of_stack": "Move to top of stack"
       },
       "sections": {
         "editing": "编辑",

@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardPaste,
+  Clock,
   Copy,
   CopyPlus,
   Film,
@@ -59,13 +60,14 @@ import { useUIStore } from '../../store/useUIStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { COLOR_LABELS, normalizeLoadedAdjustments } from '../../utils/adjustments';
 import { globalImageCache } from '../../utils/ImageLRUCache';
+import { findImageStack, toggleImageStack, unstackImagePaths } from '../../utils/imageStacks';
 import {
-  createImageStack,
-  findImageStack,
-  moveImageToTopOfStack,
-  toggleImageStack,
-  unstackImagePaths,
-} from '../../utils/imageStacks';
+  getStackTargetPath,
+  moveImageToStackTop,
+  openCaptureTimeStackModal,
+  saveImageStacks,
+  stackImages,
+} from '../../hooks/useLibraryActions';
 import { autoStackCreatedImages } from '../../utils/autoStacking';
 import { getEnabledCopySuffix } from '../../utils/outputNaming';
 import { GroupBadgeInfo } from '../../utils/imageGrouping';
@@ -139,7 +141,7 @@ const PRODUCTIVITY_TOOLBAR_IDS = [
   'cullImage',
 ] as const;
 const COPY_TOOLBAR_IDS = ['physicalCopy', 'virtualCopy'] as const;
-const STACK_TOOLBAR_IDS = ['stackSelected', 'toggleStack', 'setStackCover', 'unstack'] as const;
+const STACK_TOOLBAR_IDS = ['stackSelected', 'toggleStack', 'setStackCover', 'unstack', 'autoStack'] as const;
 const FLAG_TOOLBAR_IDS = ['flagRejected', 'flagSelected', 'flagDeferred', 'flagUnflagged', 'deleteRejected'] as const;
 const COLOR_TOOLBAR_IDS = ['colorRed', 'colorYellow', 'colorGreen', 'colorBlue', 'colorPurple', 'colorNone'] as const;
 const ALL_COLOR_OPTIONS = [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }];
@@ -394,10 +396,7 @@ export default function BottomBar({
   const activeFlag = getImageFlag(firstProductivityImage?.tags);
   const rejectedInCurrentFolder = getRejectedPathsForLoadedFolder(allLibraryImages, currentFolderPath);
   const imageStacks = appSettings?.imageStacks || [];
-  const stackTargetPath =
-    (libraryActivePath && productivityPaths.includes(libraryActivePath) ? libraryActivePath : null) ||
-    (selectedImage?.path && productivityPaths.includes(selectedImage.path) ? selectedImage.path : null) ||
-    productivityPaths[0];
+  const stackTargetPath = getStackTargetPath(productivityPaths);
   const targetStack = stackTargetPath ? findImageStack(imageStacks, stackTargetPath) : undefined;
   const hasSelectedStacks = imageStacks.some((stack) =>
     stack.paths.some((stackPath) => productivityPaths.includes(stackPath)),
@@ -436,6 +435,7 @@ export default function BottomBar({
     { id: 'toggleStack', label: t('ui.bottomBar.tooltips.toggleStack') },
     { id: 'setStackCover', label: t('contextMenus.thumbnail.moveToTopOfStack') },
     { id: 'unstack', label: t('contextMenus.thumbnail.unstack') },
+    { id: 'autoStack', label: t('contextMenus.thumbnail.autoStackByCaptureTime') },
     { id: 'quickFilter', label: t('ui.bottomBar.tooltips.quickFilter') },
     { id: 'selectBy', label: t('ui.bottomBar.selectBy.title', 'Select by') },
     { id: 'tagging', label: t('editor.tagging.title') },
@@ -711,29 +711,24 @@ export default function BottomBar({
     }
   };
 
-  const saveImageStacks = (nextStacks: typeof imageStacks) => {
-    if (!appSettings) return;
-    void handleSettingsChange({ ...appSettings, imageStacks: nextStacks });
-  };
-
   const handleStackSelected = () => {
     if (productivityCount < 2 || !stackTargetPath) return;
-    saveImageStacks(createImageStack(imageStacks, productivityPaths, stackTargetPath));
+    stackImages(productivityPaths, stackTargetPath);
   };
 
   const handleToggleStack = () => {
     if (!targetStack) return;
-    saveImageStacks(toggleImageStack(imageStacks, targetStack.id));
+    saveImageStacks((stacks) => toggleImageStack(stacks, targetStack.id));
   };
 
   const handleMoveToTopOfStack = () => {
-    if (!targetStack || !stackTargetPath) return;
-    saveImageStacks(moveImageToTopOfStack(imageStacks, targetStack.id, stackTargetPath));
+    if (!stackTargetPath) return;
+    moveImageToStackTop(stackTargetPath);
   };
 
   const handleUnstack = () => {
     if (!hasSelectedStacks) return;
-    saveImageStacks(unstackImagePaths(imageStacks, productivityPaths));
+    saveImageStacks((stacks) => unstackImagePaths(stacks, productivityPaths));
   };
 
   useEffect(() => {
@@ -1258,6 +1253,15 @@ export default function BottomBar({
                 data-tooltip={t('contextMenus.thumbnail.unstack')}
               >
                 <Ungroup size={18} />
+              </button>
+            )}
+            {isToolbarItemVisible('autoStack') && (
+              <button
+                className={productivityButtonClass}
+                onClick={() => openCaptureTimeStackModal(productivityPaths)}
+                data-tooltip={t('contextMenus.thumbnail.autoStackByCaptureTime')}
+              >
+                <Clock size={18} />
               </button>
             )}
           </div>

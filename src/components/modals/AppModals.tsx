@@ -21,6 +21,7 @@ import CullingModal from './CullingModal';
 import CollageModal from './CollageModal';
 import PresetBatchModal from './PresetBatchModal';
 import LightroomImportModal from './LightroomImportModal';
+import CaptureTimeStackModal from './CaptureTimeStackModal';
 import { AppSettings, Invokes, AlbumItem, Album, AlbumGroup } from '../ui/AppProperties';
 import { CopyPasteSettings } from '../../utils/adjustments';
 
@@ -77,6 +78,7 @@ export default function AppModals(props: AppModalsProps) {
     collageModalState,
     presetBatchModalState,
     lightroomImportModalState,
+    captureTimeStackModalState,
     setUI,
   } = useUIStore(
     useShallow((state) => ({
@@ -101,6 +103,7 @@ export default function AppModals(props: AppModalsProps) {
       collageModalState: state.collageModalState,
       presetBatchModalState: state.presetBatchModalState,
       lightroomImportModalState: state.lightroomImportModalState,
+      captureTimeStackModalState: state.captureTimeStackModalState,
       setUI: state.setUI,
     })),
   );
@@ -148,6 +151,15 @@ export default function AppModals(props: AppModalsProps) {
         isOpen={lightroomImportModalState.isOpen}
         targetPaths={lightroomImportModalState.targetPaths}
         onClose={() => setUI({ lightroomImportModalState: { isOpen: false, targetPaths: [] } })}
+      />
+      <CaptureTimeStackModal
+        isOpen={captureTimeStackModalState.isOpen}
+        targetPaths={captureTimeStackModalState.targetPaths}
+        onClose={() =>
+          setUI((state) => ({
+            captureTimeStackModalState: { ...state.captureTimeStackModalState, isOpen: false },
+          }))
+        }
       />
       <PresetBatchModal
         isOpen={presetBatchModalState.isOpen}

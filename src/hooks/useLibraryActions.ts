@@ -4,7 +4,8 @@ import { toast } from 'react-toastify';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
-import { Invokes, ImageFile, AlbumItem, Album, AlbumGroup } from '../components/ui/AppProperties';
+import { Invokes, ImageFile, ImageStack, AlbumItem, Album, AlbumGroup } from '../components/ui/AppProperties';
+import { createImageStack, findImageStack, moveImageToTopOfStack } from '../utils/imageStacks';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { computeSortedLibrary } from './useSortedLibrary';
@@ -19,14 +20,47 @@ export const clearLibrarySelection = () => {
   });
 };
 
-// The images a flag or keyword action applies to when no paths are given.
-const getActionPaths = (): string[] => {
+// The images a flag, keyword, or stack action applies to when no paths are given.
+export const getActionPaths = (): string[] => {
   const { multiSelectedPaths, libraryActivePath } = useLibraryStore.getState();
   const { selectedImage } = useEditorStore.getState();
   if (multiSelectedPaths.length > 0) return multiSelectedPaths;
   if (selectedImage) return [selectedImage.path];
   return libraryActivePath ? [libraryActivePath] : [];
 };
+
+// The photo a stack command targets among `paths`: the active one when it is included.
+export const getStackTargetPath = (paths: string[]): string | undefined => {
+  const { libraryActivePath } = useLibraryStore.getState();
+  const selectedPath = useEditorStore.getState().selectedImage?.path;
+  return [libraryActivePath, selectedPath].find((path) => path && paths.includes(path)) ?? paths[0];
+};
+
+export const saveImageStacks = (update: (stacks: ImageStack[]) => ImageStack[]) => {
+  const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+  if (!appSettings) return;
+  const stacks = appSettings.imageStacks || [];
+  const imageStacks = update(stacks);
+  if (imageStacks !== stacks) void handleSettingsChange({ ...appSettings, imageStacks });
+};
+
+export const stackImages = (paths: string[], coverPath: string) =>
+  saveImageStacks((stacks) => createImageStack(stacks, paths, coverPath));
+
+// Auto-stacks the selection, or every photo in the current view when fewer than two are selected.
+export const openCaptureTimeStackModal = (selection: string[] = getActionPaths()) => {
+  const targetPaths =
+    selection.length >= 2
+      ? selection
+      : computeSortedLibrary(useLibraryStore.getState(), useSettingsStore.getState()).map((image) => image.path);
+  useUIStore.getState().setUI({ captureTimeStackModalState: { isOpen: true, targetPaths } });
+};
+
+export const moveImageToStackTop = (path: string) =>
+  saveImageStacks((stacks) => {
+    const stack = findImageStack(stacks, path);
+    return stack && stack.coverPath !== path ? moveImageToTopOfStack(stacks, stack.id, path) : stacks;
+  });
 
 const persistTag = (tag: string, paths: string[], apply: boolean) =>
   invoke(apply ? Invokes.AddTagForPaths : Invokes.RemoveTagForPaths, { paths, tag });
