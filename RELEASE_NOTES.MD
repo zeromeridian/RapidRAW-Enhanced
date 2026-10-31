@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.25.1-develop — 2026-10-31
+
+### Fixes
+
+- With the **RAW** or **IMG** filter on, a collapsed stack no longer shows a
+  top photo that the filter excludes. The stack now appears as its first
+  matching photo; for example, a TIFF export stacked on top of its RAW no
+  longer shows up under the RAW filter. The same applies to search and the
+  other filters.
+
 ## 1.25.0-dev-read-embedded-xmp — 2026-10-30
 
 ### Keywords
