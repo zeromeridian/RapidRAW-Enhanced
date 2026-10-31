@@ -54,7 +54,9 @@ details are in `RELEASE_NOTES.MD`.
   move-to-top covers, and matching Develop-filmstrip presentation. Stacking a
   selection adds it to, or merges, the stacks it touches (Lightroom's Group
   into Stack); configurable Command/Ctrl+G and Shift+S shortcuts stack the
-  selection and move the active photo to the top of its stack.
+  selection and move the active photo to the top of its stack. When filters
+  or search hide a collapsed stack's cover, its first matching member
+  represents the stack.
 - Lightroom-style **Auto-Stack by Capture Time** for the selection or the
   current view, with a 5-second to 1-hour gap and a preview of the resulting
   stacks; photos already in a stack are left unchanged.

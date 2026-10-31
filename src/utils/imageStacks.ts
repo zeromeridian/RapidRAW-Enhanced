@@ -332,17 +332,19 @@ export function applyImageStacks(
     const insertionIndex = Math.min(...visibleMembers.map((image) => displayList.indexOf(image)));
     displayList = displayList.filter((image) => !memberPaths.has(image.path));
 
+    const visibleByPath = new Map(visibleMembers.map((image) => [image.path, image]));
+    const orderedMembers = stack.paths
+      .map((path) => visibleByPath.get(path))
+      .filter((image): image is ImageFile => Boolean(image));
+
     if (stack.collapsed) {
-      const cover = availableByPath.get(stack.coverPath) || visibleMembers[0];
+      // Filters and search may hide the cover; the first visible member then stands in for it.
+      const cover = orderedMembers[0];
       displayList.splice(insertionIndex, 0, cover);
       badges.set(cover.path, createStackBadge(stack, cover.path, 0, 1));
       continue;
     }
 
-    const visibleByPath = new Map(visibleMembers.map((image) => [image.path, image]));
-    const orderedMembers = stack.paths
-      .map((path) => visibleByPath.get(path))
-      .filter((image): image is ImageFile => Boolean(image));
     displayList.splice(insertionIndex, 0, ...orderedMembers);
     orderedMembers.forEach((member, index) => {
       badges.set(member.path, createStackBadge(stack, member.path, index, orderedMembers.length));
