@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.25.2-dev-photocraft-integration — 2026-11-01
+
+### Fixes
+
+- TIFF exports, including copies opened with **Open in**, now carry an sRGB
+  colour profile, as JPEG and PNG exports already did. Photoshop, Photo
+  Craft, and other colour-managed apps now show their colours correctly
+  instead of guessing the colour space.
+
 ## 1.25.1-develop — 2026-10-31
 
 ### Fixes

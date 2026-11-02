@@ -21,7 +21,7 @@ use serde_json::Value;
 use tauri::Emitter;
 use tauri::Manager;
 use tiff::encoder::{Rational, TiffEncoder, TiffValue, colortype};
-use tiff::tags::ResolutionUnit;
+use tiff::tags::{ResolutionUnit, Tag, Type};
 
 use crate::AppState;
 use crate::exif_processing;
@@ -1225,6 +1225,23 @@ fn encode_grayscale_to_png(bitmap: &GrayImage) -> Result<Vec<u8>, String> {
 /// Exports are sRGB-encoded; tagging them lets color-managed apps read them correctly.
 const SRGB_ICC_PROFILE: &[u8] = include_bytes!("../icc/sRGB-v2-magic.icc");
 
+/// An ICC profile for TIFF tag 34675, which the TIFF/EP and Photoshop
+/// specifications type as UNDEFINED rather than the crate's default BYTE.
+struct TiffIccProfile(&'static [u8]);
+
+impl TiffValue for TiffIccProfile {
+    const BYTE_LEN: u8 = 1;
+    const FIELD_TYPE: Type = Type::UNDEFINED;
+
+    fn count(&self) -> usize {
+        self.0.len()
+    }
+
+    fn data(&self) -> Cow<'_, [u8]> {
+        Cow::Borrowed(self.0)
+    }
+}
+
 fn encode_image_to_bytes(
     image: &DynamicImage,
     output_format: &str,
@@ -1349,6 +1366,10 @@ where
 {
     let mut image = encoder
         .new_image::<C>(width, height)
+        .map_err(|e| e.to_string())?;
+    image
+        .encoder()
+        .write_tag(Tag::IccProfile, TiffIccProfile(SRGB_ICC_PROFILE))
         .map_err(|e| e.to_string())?;
     if let Some(dpi) = dpi {
         image.resolution(
@@ -2571,6 +2592,12 @@ mod tests {
             .get_tag_u32_vec(tiff::tags::Tag::XResolution)
             .expect("XResolution tag");
         assert_eq!(x_resolution, vec![300, 1]);
+        assert_eq!(
+            decoder
+                .get_tag_u8_vec(tiff::tags::Tag::IccProfile)
+                .expect("ICC profile tag"),
+            SRGB_ICC_PROFILE
+        );
 
         let png_bytes = encode_image_to_bytes(&source, "png", &settings).expect("encode PNG");
         let phys = png_bytes
@@ -2620,6 +2647,12 @@ mod tests {
                 .get_tag_u32_vec(tiff::tags::Tag::XResolution)
                 .expect("XResolution tag"),
             vec![300, 1]
+        );
+        assert_eq!(
+            decoder
+                .get_tag_u8_vec(tiff::tags::Tag::IccProfile)
+                .expect("ICC profile tag"),
+            SRGB_ICC_PROFILE
         );
     }
 
