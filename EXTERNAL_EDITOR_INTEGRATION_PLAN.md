@@ -2,10 +2,51 @@
 
 ## Status
 
-Proposal only, written 2026-10-27 at the owner's request; no code has been
-changed. Nothing here is decided until the owner answers the questions in
-"Owner decisions". Revise this file as phases land, and record shipped
-behaviour in `FEATURES.md` and `RELEASE_NOTES.MD`.
+In progress on branch `dev/photocraft-integration` (started 2026-11-01).
+Owner decisions 1, 4, and 6 were made on 2026-11-01. Decisions 2, 3, and 5
+are still open; 2 and 3 only need a hands-on check in Photo Craft.
+
+**Owner rule (2026-11-01):** update this progress list, and `HANDOFF.md`,
+after every edit to this work, so progress and the remaining tasks are
+always current. Record shipped behaviour in `FEATURES.md` and
+`RELEASE_NOTES.MD`.
+
+### Progress
+
+The steps implement the phases under "Strategy". Each one ships on its own.
+
+1. **Step 1: TIFF colour profile and shared safe-write helper** (`1.25.2`):
+   built; waiting for the owner's hands-on checks.
+   - Done: TIFF exports embed the sRGB ICC profile (`TiffIccProfile` in
+     `export_processing.rs`, tag 34675, UNDEFINED type).
+     `file_management::write_file_atomically` is extracted from
+     `lightroom_xmp.rs`, which now uses it. The two TIFF DPI tests also
+     check that the profile is present, including after the metadata merge
+     that **Open in** uses. Release notes, version `1.25.2`, and
+     `CODE_AUDIT_FINDINGS.md` item 1 are updated.
+   - Validation: `cargo fmt -p ThisIsRAW -- --check` passes; `cargo clippy
+     --all-targets --all-features -- -D warnings` exits 0; `cargo test
+     --lib` 105 passed (Homebrew rustc 1.97.1; the pinned 1.96.1 toolchain
+     is not installed in the sandbox).
+   - Built: `1.25.2-dev-photocraft-integration` `.app` (checksums in
+     `HANDOFF.md`). Not yet committed.
+   - Remaining: the owner's hands-on checks (`sips -g profile` on
+     an exported TIFF; Photoshop or Photo Craft shows sRGB; Preview
+     Lightroom Edits still applies).
+2. **Step 2: backend session manager** (Phase 1.1–1.3 and 1.7; MINOR
+   release): not started. Covers staging in the app cache (with the Linux
+   Flatpak fallback still to be confirmed), the `external_edit.rs` manager
+   and `external_edit_sessions` catalog table, stable-save detection,
+   promotion with the `-Edit` suffix, the `external-edit-saved` event, a
+   single-image Library insert, and removing `externalEditLaunch`,
+   `externalEditWatch`, and `get_file_modification_stamp`.
+3. **Step 3: cleanup and Edit Original** (Phase 1.4–1.5): not started.
+   Removes unsaved sessions after 7 days; adds the Settings → Data
+   Management control and the *Edit Original* menu item.
+4. **Step 4: Photo Craft entry** (Phase 2): not started. Adds
+   `detect_external_editors` and a ready-made 16-bit TIFF entry.
+5. **Step 5: RAW integration** (Phase 3): deferred. Document and test the
+   `--edit` exit codes first.
 
 ## Goal
 
@@ -59,20 +100,47 @@ selection):
 | One frontend watch at a time                               | Starting a second edit stops watching the first; the watch is forgotten on restart                                                    |
 | A save reloads the whole folder                            | On network drives this runs `read_exif_for_paths` across the folder and can stall Develop (`CODE_AUDIT_FINDINGS.md` item 6)           |
 | Only the modification time is compared                     | A refresh can pick up a file the editor is still writing                                                                              |
-| TIFF exports carry no ICC profile                          | `export_processing.rs` embeds `SRGB_ICC_PROFILE` for JPEG and PNG only, so editors must guess the colour space of the round-trip TIFF |
 | No "edit the existing copy" path                           | Running **Open in** on a `_thisisraw-edit` file renders a new copy of it instead of reopening it                                      |
 
-## Photo Craft facts (v0.16.0)
+## Photo Craft facts (v0.19.0, checked 2026-11-01)
 
-From its README and `docs/control-protocol.md`:
+From its README, `docs/control-protocol.md`, `docs/development.md`,
+`docs/user/guides/open-and-save-files.md`, and `apps/photocraft/src`.
+Re-checked against `v0.19.0` (released 2026-11-01; `v0.17.0` and `v0.18.0`
+in between). The original `v0.16.0` reading was wrong about RAW support
+and did not cover single-instance launching; both are corrected below.
 
 - An open-source (MIT or Apache-2.0) reimplementation of Photoshop in pure
   Rust (egui UI, wgpu compositor), in early alpha. Builds exist for macOS,
-  Windows, Linux, and FreeBSD.
+  Windows, Linux (including Flatpak), and FreeBSD.
 - It reads and writes PSD/PSB (8/16/32-bit, CMYK, Lab) and layered TIFF, and
-  reads XCF, Krita, OpenRaster, Paint.NET, and Affinity files. It lists no
-  camera RAW formats; its sibling app, LightCraft, covers RAW development.
+  reads XCF, Krita, OpenRaster, Paint.NET, and Affinity files.
+- **It already develops camera RAW itself** (since before `v0.16.0`):
+  `crates/raw` is a clean-room decoder for DNG, CR2, CR3, NEF, ARW, and
+  others. Opening a RAW shows its own Camera Raw dialog, which reads and
+  writes Adobe `crs:` `.xmp` sidecars (never beside a DNG, and never over a
+  sidecar another app wrote). `v0.19.0` added encrypted Sony SR2 metadata
+  and more DNG opcodes. There is still no external-RAW-processor setting.
 - It opens a file passed as a command-line argument (`photocraft image.psd`).
+  **Single instance:** on Windows and Linux a later launch hands its files
+  to the running window as new tabs and exits (`single_instance.rs`); macOS
+  does the same through LaunchServices. `--new-instance` and every
+  `--control` launch opt out.
+- **Save:** File › Save on an opened flat file writes back to that file in
+  the format its extension names (JPEG keeps its quality). Layered saves
+  go through Save As (PSD or `.pcraft`), or a TIFF with layers. Whether
+  Save on a flat 16-bit TIFF prompts first still needs a hands-on check.
+- **Flatpak sandbox:** the Linux Flatpak can only read and write
+  `xdg-documents` and `xdg-pictures`. It cannot open a file in ThisIsRAW's
+  app cache, so staging in the cache fails for the Flatpak build.
+- It runs the same kind of round trip for vector smart objects
+  (`external_svg.rs`, `docs/embedded-vector-editing.md`, new in `v0.17`–
+  `v0.19`). It writes a private working copy to its cache, watches it off
+  the UI thread, and accepts only a stable, validated save. Deleting the
+  session removes the temporary folder without closing the editor. This is
+  the design Phase 1 proposes.
+- macOS bundle: `PhotoCraft.app`. Windows: per-user install under
+  `Programs\ArtCraft\PhotoCraft` by default, or all users if chosen.
 - `photocraft-cli` provides `run`, `batch`, `serve` (headless, stdio or TCP),
   and `mcp`.
 - The desktop control channel is `photocraft --control <port>
@@ -81,11 +149,10 @@ From its README and `docs/control-protocol.md`:
   methods include `app.open {path}`, `app.save {path?}`, `app.quit`, and
   `ui.*`. Opens and saves are confined to
   `--automation-read-root`/`--automation-write-root`.
-- The control channel has **no save or close notifications** and no
-  protocol version. `file.saveAs` and `file.saveACopy` are refused. Idle
-  connections close after 30 s.
-- Plug-in compatibility is listed as a gap, and there is no
-  external-raw-processor setting.
+- The control channel still has **no save or close notifications** and no
+  protocol version (unchanged in `v0.19.0`). `file.saveAs` and
+  `file.saveACopy` are refused. Idle connections close after 30 s.
+- Plug-in compatibility is still listed as a gap (G16).
 
 Implications:
 
@@ -94,6 +161,13 @@ Implications:
   image a Photoshop-style layered TIFF stores in its main image.
 - Detecting saves must rely on the file system. The control channel cannot
   report them.
+- Staging must use a folder the Linux Flatpak can reach (for example under
+  `xdg-pictures`), or fall back to a hidden folder beside the source when
+  the editor is the Flatpak. This affects owner decision 1.
+- Phase 3 no longer has to give Photo Craft RAW support, which it already
+  has. What it adds is letting the user choose ThisIsRAW's look over Photo
+  Craft's own Camera Raw. Photo Craft writes `crs:` sidecars beside RAWs,
+  but ThisIsRAW's XMP sync leaves sidecars written by other apps alone.
 
 ## Strategy
 
@@ -129,9 +203,10 @@ Implications:
    promoted round-trip file, **Open in** offers _Edit Original_ (open it
    directly, without rendering) alongside _Edit a Copy with ThisIsRAW
    Adjustments_, as Lightroom does.
-6. **Colour profile.** Embed the sRGB ICC profile in TIFF exports, which
-   also fixes normal TIFF exports. Optionally add a wide-gamut 16-bit
-   working space for round trips; that needs a decision.
+6. **Colour profile.** Done in `1.25.2`: TIFF exports embed the sRGB ICC
+   profile (tag 34675, UNDEFINED type), which also fixes normal TIFF
+   exports. A wide-gamut 16-bit working space for round trips is still
+   owner decision 5.
 7. **Shared session recovery.** Because sessions live in the catalog, a
    restart resumes watching, and a save made while ThisIsRAW was closed is
    promoted on the next launch.
@@ -139,9 +214,8 @@ Implications:
 Reuse: `ExportImages` and its `isExplicitFilePath` mode,
 `open_external_editor`, `get_file_modification_stamp`'s logic (moved into
 the manager), `autoStackCreatedImages`, the `thumbnail-generated` event
-path, and the existing atomic-write helper in `lightroom_xmp.rs`
-(`write_metadata_atomically`, which `CODE_AUDIT_FINDINGS.md` item 1 already
-proposes to share).
+path, and `file_management::write_file_atomically` (shared in `1.25.2`;
+`CODE_AUDIT_FINDINGS.md` item 1).
 
 Cross-platform: staging uses the Tauri app cache directory on all three
 platforms, and promotion is a copy (sources may be on another volume). On
@@ -152,7 +226,8 @@ reads it, and a failed read is retried on the next poll.
 
 1. **Ready-made editor entry.** Offer Photo Craft in Settings → External
    Editors when it is found: `/Applications/PhotoCraft.app` on macOS,
-   `photocraft` on `PATH` for Linux, the standard install location on
+   `photocraft` on `PATH` or the Flatpak `ai.storyteller.photocraft` on
+   Linux, the per-user or all-users `ArtCraft\PhotoCraft` folder on
    Windows. Default its format to 16-bit TIFF.
 2. **Launch** through the existing `open_external_editor` with the staging
    file as the only argument. No new process code is needed.
@@ -178,18 +253,26 @@ reads it, and a failed read is retried on the next poll.
 
 ## Owner decisions
 
-1. **Staging folder (recommended) or a hidden file beside the original.**
-   Staging leaves nothing behind for abandoned edits.
-2. **Photo Craft's Save on an opened TIFF.** Verify whether Cmd/Ctrl+S writes
-   back to the TIFF or asks for a PSD. If it saves a PSD, either the session
-   watches the folder for any saved file, or ThisIsRAW gains PSD reading
-   (Photo Craft's standalone PSD crate is MIT/Apache).
-3. **Single instance.** Verify whether launching Photo Craft with a file
-   while it is running opens the file in the existing window.
-4. **File-name suffix.** Keep `_thisisraw-edit` or adopt Lightroom's `-Edit`.
+1. **Decided 2026-11-01: stage in the app cache.** Staging leaves nothing
+   behind for abandoned edits. The Linux Flatpak editor cannot read the app
+   cache, so it stages under the Pictures folder instead
+   (`~/Pictures/.ThisIsRAW External Edits/`), as recommended. Confirm this
+   fallback before implementing it.
+2. **Photo Craft's Save on an opened TIFF.** The docs (`v0.19.0`) say Save
+   writes back to the opened file in its own format; confirm hands-on for a
+   16-bit TIFF. If the user does Save As to PSD, the session either watches
+   the folder for any saved file, or ThisIsRAW gains PSD reading (Photo
+   Craft's standalone PSD crate is MIT/Apache).
+3. **Single instance.** Answered by the docs (`v0.19.0`): yes on every
+   platform, so the file opens as a new tab in the running window. Still
+   confirm hands-on on macOS.
+4. **Decided 2026-11-01: Lightroom's `-Edit` suffix** (`<stem>-Edit.tif`,
+   collision-safe as `<stem>-Edit-2.tif`, …), replacing
+   `_thisisraw-edit-<timestamp>`. Existing `_thisisraw-edit` files are left
+   as they are.
 5. **Round-trip colour space.** sRGB only, or also a wide-gamut 16-bit
    option.
-6. **Retention** for unsaved sessions (proposed: 7 days).
+6. **Decided 2026-11-01: keep unsaved sessions for 7 days.**
 
 ## Validation (per phase)
 

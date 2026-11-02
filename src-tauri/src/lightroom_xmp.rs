@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fs;
-use std::io::Write;
 use std::path::Path;
 
 use quick_xml::Reader;
@@ -8,9 +7,8 @@ use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
-use tempfile::NamedTempFile;
 
-use crate::file_management::{parse_virtual_path, resolve_xmp_path};
+use crate::file_management::{parse_virtual_path, resolve_xmp_path, write_file_atomically};
 use crate::image_processing::ImageMetadata;
 use crate::preset_converter::{
     convert_lightroom_absolute_temperature, convert_lightroom_absolute_tint,
@@ -778,31 +776,6 @@ pub fn preview_lightroom_xmp_edits(paths: Vec<String>) -> Vec<LightroomImportPre
     paths.into_iter().map(build_preview).collect()
 }
 
-fn write_metadata_atomically(
-    path: &Path,
-    metadata: &crate::image_processing::ImageMetadata,
-) -> Result<(), String> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| format!("Could not determine sidecar folder for {}", path.display()))?;
-    let mut temporary = NamedTempFile::new_in(parent)
-        .map_err(|error| format!("Could not create temporary sidecar: {error}"))?;
-    let json = serde_json::to_vec_pretty(metadata)
-        .map_err(|error| format!("Could not serialize sidecar: {error}"))?;
-    temporary
-        .write_all(&json)
-        .and_then(|()| temporary.flush())
-        .map_err(|error| format!("Could not write temporary sidecar: {error}"))?;
-    temporary.persist(path).map_err(|error| {
-        format!(
-            "Could not replace sidecar {}: {}",
-            path.display(),
-            error.error
-        )
-    })?;
-    Ok(())
-}
-
 #[tauri::command]
 pub fn apply_approved_lightroom_xmp_edits(
     approvals: Vec<LightroomImportApproval>,
@@ -846,7 +819,9 @@ pub fn apply_approved_lightroom_xmp_edits(
             continue;
         }
         merge_patch(&mut metadata.adjustments, &translation.patch);
-        write_metadata_atomically(&sidecar_path, &metadata)?;
+        let json = serde_json::to_vec_pretty(&metadata)
+            .map_err(|error| format!("Could not serialize sidecar: {error}"))?;
+        write_file_atomically(&sidecar_path, &json)?;
         applied += 1;
         applied_paths.push(approval.path);
     }

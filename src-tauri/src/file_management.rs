@@ -6538,6 +6538,33 @@ pub(crate) fn modified_nanos(path: &Path) -> u64 {
         .map_or(0, |duration| duration.as_nanos() as u64)
 }
 
+/// Replaces `path` with `bytes` through a temporary file in the same folder, so
+/// a crash or full disk never leaves a truncated file behind.
+pub(crate) fn write_file_atomically(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("Could not determine the folder of {}", path.display()))?;
+    let mut temporary = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
+        format!(
+            "Could not create a temporary file in {}: {error}",
+            parent.display()
+        )
+    })?;
+    temporary
+        .write_all(bytes)
+        .and_then(|()| temporary.flush())
+        .map_err(|error| {
+            format!(
+                "Could not write a temporary file for {}: {error}",
+                path.display()
+            )
+        })?;
+    temporary
+        .persist(path)
+        .map_err(|error| format!("Could not replace {}: {}", path.display(), error.error))?;
+    Ok(())
+}
+
 pub fn sync_metadata_to_xmp(
     source_path: &Path,
     metadata: &ImageMetadata,
