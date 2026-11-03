@@ -5341,8 +5341,7 @@ pub fn show_in_finder(path: String) -> Result<(), String> {
 /// Opens a user-configured external editor without using a shell. The editor
 /// path is deliberately passed as one argument, so spaces and file names are
 /// never interpreted as commands.
-#[tauri::command]
-pub fn open_external_editor(editor_path: String, image_path: String) -> Result<(), String> {
+pub(crate) fn open_external_editor(editor_path: String, image_path: String) -> Result<(), String> {
     let editor = Path::new(&editor_path);
     let image = Path::new(&image_path);
     if !image.is_file() {
@@ -5429,16 +5428,6 @@ pub fn open_external_editor(editor_path: String, image_path: String) -> Result<(
     }
 
     Ok(())
-}
-
-#[tauri::command]
-pub fn get_file_modification_stamp(path: String) -> Result<u128, String> {
-    fs::metadata(path)
-        .and_then(|metadata| metadata.modified())
-        .map_err(|error| error.to_string())?
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_millis())
-        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -6538,31 +6527,50 @@ pub(crate) fn modified_nanos(path: &Path) -> u64 {
         .map_or(0, |duration| duration.as_nanos() as u64)
 }
 
-/// Replaces `path` with `bytes` through a temporary file in the same folder, so
-/// a crash or full disk never leaves a truncated file behind.
-pub(crate) fn write_file_atomically(path: &Path, bytes: &[u8]) -> Result<(), String> {
+/// Replaces `path` with what `fill` writes, through a temporary file in the
+/// same folder, so a crash or full disk never leaves a truncated file behind.
+/// The result gets the same permissions as a file created with `fs::write`.
+fn replace_file_atomically(
+    path: &Path,
+    fill: impl FnOnce(&mut fs::File) -> std::io::Result<()>,
+) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| format!("Could not determine the folder of {}", path.display()))?;
-    let mut temporary = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
+    let mut builder = tempfile::Builder::new();
+    // Temporary files default to owner-only access; the umask still applies.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(fs::Permissions::from_mode(0o666));
+    }
+    let mut temporary = builder.tempfile_in(parent).map_err(|error| {
         format!(
             "Could not create a temporary file in {}: {error}",
             parent.display()
         )
     })?;
-    temporary
-        .write_all(bytes)
-        .and_then(|()| temporary.flush())
-        .map_err(|error| {
-            format!(
-                "Could not write a temporary file for {}: {error}",
-                path.display()
-            )
-        })?;
+    let file = temporary.as_file_mut();
+    fill(file).and_then(|()| file.flush()).map_err(|error| {
+        format!(
+            "Could not write a temporary file for {}: {error}",
+            path.display()
+        )
+    })?;
     temporary
         .persist(path)
         .map_err(|error| format!("Could not replace {}: {}", path.display(), error.error))?;
     Ok(())
+}
+
+pub(crate) fn write_file_atomically(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    replace_file_atomically(path, |file| file.write_all(bytes))
+}
+
+pub(crate) fn copy_file_atomically(source: &Path, destination: &Path) -> Result<(), String> {
+    replace_file_atomically(destination, |file| {
+        std::io::copy(&mut fs::File::open(source)?, file).map(|_| ())
+    })
 }
 
 pub fn sync_metadata_to_xmp(

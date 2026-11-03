@@ -65,7 +65,7 @@ import {
   AlbumGroup,
   ExternalEditor,
 } from '../components/ui/AppProperties';
-import { Status, ExportSettings } from '../components/ui/ExportImportProperties';
+import { Status } from '../components/ui/ExportImportProperties';
 import { Color, COLOR_LABELS, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import TaggingSubMenu from '../context/TaggingSubMenu';
 import { debouncedSave, useEditorActions } from './useEditorActions';
@@ -581,54 +581,23 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       };
 
       const startExternalEdit = async (format: 'jpeg' | 'tiff', editor: ExternalEditor) => {
-        const sourcePath = finalSelection[0];
-        const physicalPath = sourcePath.split('?')[0];
-        const slash = Math.max(physicalPath.lastIndexOf('/'), physicalPath.lastIndexOf('\\'));
-        const folder = physicalPath.slice(0, slash + 1);
-        const filename = physicalPath.slice(slash + 1);
-        const dot = filename.lastIndexOf('.');
-        const stem = dot > 0 ? filename.slice(0, dot) : filename;
-        const extension = format === 'tiff' ? 'tiff' : 'jpg';
-        const outputPath = `${folder}${stem}_thisisraw-edit-${Date.now()}.${extension}`;
-        const exportSettings: ExportSettings = {
-          filenameTemplate: null,
-          jpegQuality: 100,
-          tiffBitDepth: 16,
-          keepMetadata: true,
-          preserveTimestamps: false,
-          preserveFolders: false,
-          resize: null,
-          border: null,
-          pad: null,
-          stripGps: false,
-          watermark: null,
-          exportMasks: false,
-          exportToSourceFolder: false,
-        };
-        useProcessStore.getState().setProcess({ externalEditLaunch: { editorPath: editor.path, outputPath } });
         useProcessStore.getState().setExportState({
           status: Status.Exporting,
           progress: { current: 0, total: 1 },
           errorMessage: '',
         });
         try {
-          await invoke(Invokes.ExportImages, {
-            paths: [sourcePath],
-            outputFolderOrFile: outputPath,
-            isExplicitFilePath: true,
-            baseOriginFolders: [],
-            exportSettings,
-            outputFormat: format,
-            trackCreatedImages: true,
+          await invoke(Invokes.StartEditorRoundTrip, {
+            sourcePath: finalSelection[0],
+            editorPath: editor.path,
+            format,
             currentEditPath: selectedImage?.path || null,
             currentEditAdjustments: useEditorStore.getState().adjustments || null,
           });
         } catch (error) {
-          useProcessStore.getState().setProcess({ externalEditLaunch: null });
-          useProcessStore.getState().setExportState({
-            status: Status.Error,
-            errorMessage: typeof error === 'string' ? error : 'External edit export failed',
-          });
+          const message = typeof error === 'string' ? error : 'External edit failed';
+          toast.error(message);
+          useProcessStore.getState().setExportState({ status: Status.Error, errorMessage: message });
         }
       };
 

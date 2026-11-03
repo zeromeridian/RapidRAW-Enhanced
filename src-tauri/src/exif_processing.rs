@@ -884,7 +884,7 @@ pub fn write_image_with_metadata(
         "png" => FileExtension::PNG {
             as_zTXt_chunk: true,
         },
-        "tiff" => FileExtension::TIFF,
+        "tif" | "tiff" => FileExtension::TIFF,
         _ => return Ok(()),
     };
 

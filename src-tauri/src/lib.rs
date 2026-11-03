@@ -16,6 +16,7 @@ mod app_state;
 mod cache_utils;
 mod culling;
 mod denoising;
+mod editor_round_trip;
 mod effect_maps;
 mod embedded_xmp;
 mod exif_processing;
@@ -3105,6 +3106,10 @@ pub fn run() {
                 );
             }
 
+            if !is_headless {
+                editor_round_trip::start_watcher(app_handle.clone());
+            }
+
             if let LaunchRequest::HeadlessExport(session) = launch_req {
                 let app_handle_clone = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
@@ -3385,8 +3390,7 @@ pub fn run() {
             export_processing::export_images,
             export_processing::cancel_export,
             export_processing::estimate_export_sizes,
-            file_management::open_external_editor,
-            file_management::get_file_modification_stamp,
+            editor_round_trip::start_editor_round_trip,
             image_processing::calculate_auto_adjustments,
             mask_generation::generate_mask_overlay,
             file_management::update_exif_fields,

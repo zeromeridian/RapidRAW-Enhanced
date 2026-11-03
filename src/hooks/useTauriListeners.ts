@@ -3,7 +3,8 @@ import { listen } from '@tauri-apps/api/event';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { invoke } from '@tauri-apps/api/core';
 import { Status } from '../components/ui/ExportImportProperties';
-import type { XmpStackMetadata } from '../components/ui/AppProperties';
+import { Invokes, LibraryViewMode } from '../components/ui/AppProperties';
+import type { ImageFile, XmpStackMetadata } from '../components/ui/AppProperties';
 import { useProcessStore } from '../store/useProcessStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
@@ -37,6 +38,26 @@ interface TauriListenerProps {
 }
 
 const EVENT_BATCH_INTERVAL_MS = 200;
+
+/** Payload of the backend's `editor-round-trip-saved` event. */
+interface EditorRoundTripSaved {
+  sourcePath: string;
+  outputPath: string;
+  /** The first save of this copy, which the Library has not listed yet. */
+  isNew: boolean;
+}
+
+/** Whether `path` belongs in the open folder view, flat or recursive. */
+const isShownInLibrary = (path: string) => {
+  const folder = useLibraryStore.getState().currentFolderPath;
+  if (!folder || isCollectionView(folder)) return false;
+  const parent = path.slice(0, Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')));
+  if (parent === folder) return true;
+  return (
+    useSettingsStore.getState().appSettings?.libraryViewMode === LibraryViewMode.Recursive &&
+    (path.startsWith(`${folder}/`) || path.startsWith(`${folder}\\`))
+  );
+};
 
 export function useTauriListeners({
   refreshAllFolderTrees,
@@ -280,33 +301,40 @@ export function useTauriListeners({
           useProcessStore.getState().setExportState({ status: Status.Success });
           const exports = Array.isArray(event.payload?.exports) ? event.payload.exports : [];
           await autoStackCreatedImages(exports);
-          if (useLibraryStore.getState().currentFolderPath) await refs.current.refreshImageList();
-
-          const launch = useProcessStore.getState().externalEditLaunch;
-          if (launch) {
-            useProcessStore.getState().setProcess({ externalEditLaunch: null });
-            try {
-              const stamp = await invoke<number>('get_file_modification_stamp', { path: launch.outputPath });
-              await invoke('open_external_editor', { editorPath: launch.editorPath, imagePath: launch.outputPath });
-              useProcessStore.getState().setProcess({ externalEditWatch: { path: launch.outputPath, stamp } });
-            } catch (error) {
-              const message = typeof error === 'string' ? error : 'Could not open external editor';
-              toast.error(message);
-              useProcessStore.getState().setExportState({
-                status: Status.Error,
-                errorMessage: message,
-              });
-            }
+          // Untracked exports (external-edit renders, `--edit` sessions) add nothing to the Library.
+          if (exports.length > 0 && useLibraryStore.getState().currentFolderPath) {
+            await refs.current.refreshImageList();
           }
         }
+      }),
+      listen<EditorRoundTripSaved>('editor-round-trip-saved', async (event) => {
+        if (!isEffectActive) return;
+        const { sourcePath, outputPath, isNew } = event.payload;
+        if (!isNew) {
+          globalImageCache.delete(outputPath);
+          invoke<number>(Invokes.RegenerateThumbnails, { paths: [outputPath] }).catch((reason) =>
+            console.error('Failed to regenerate the external-edit thumbnail:', reason),
+          );
+          return;
+        }
+        if (isShownInLibrary(outputPath)) {
+          // Add only the new copy; rescanning the folder would reread every image's EXIF.
+          const [image] = await invoke<ImageFile[]>(Invokes.GetAlbumImages, { paths: [outputPath] });
+          if (image) {
+            useLibraryStore
+              .getState()
+              .setLibrary((state) =>
+                state.imageList.some((listed) => listed.path === image.path)
+                  ? {}
+                  : { imageList: [...state.imageList, image] },
+              );
+          }
+        }
+        await autoStackCreatedImages([{ sourcePath, outputPath }]);
       }),
       listen('export-error', (event: any) => {
         if (isEffectActive) {
           const message = typeof event.payload === 'string' ? event.payload : 'Unknown error';
-          if (useProcessStore.getState().externalEditLaunch) {
-            useProcessStore.getState().setProcess({ externalEditLaunch: null });
-            toast.error(message);
-          }
           useProcessStore.getState().setExportState({
             status: Status.Error,
             errorMessage: message,
@@ -546,25 +574,5 @@ export function useTauriListeners({
       ratingBuffer.current = {};
       listeners.forEach((p) => p.then((unlisten) => unlisten()));
     };
-  }, []);
-
-  // An external application has no portable document-close callback. Poll only
-  // the one handed-off derivative and refresh when it is saved.
-  useEffect(() => {
-    const interval = window.setInterval(async () => {
-      const watch = useProcessStore.getState().externalEditWatch;
-      if (!watch) return;
-      try {
-        const stamp = await invoke<number>('get_file_modification_stamp', { path: watch.path });
-        if (stamp !== watch.stamp) {
-          useProcessStore.getState().setProcess({ externalEditWatch: { ...watch, stamp } });
-          if (useLibraryStore.getState().currentFolderPath) await refs.current.refreshImageList();
-        }
-      } catch {
-        // Saving applications often replace the file atomically; the next poll
-        // will observe the replacement once it is present again.
-      }
-    }, 2000);
-    return () => window.clearInterval(interval);
   }, []);
 }

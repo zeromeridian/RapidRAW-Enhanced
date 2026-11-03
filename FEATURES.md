@@ -62,10 +62,13 @@ details are in `RELEASE_NOTES.MD`.
   stacks; photos already in a stack are left unchanged.
 - Automatic stacking of physical copies, virtual copies, and exported images,
   with optional automatic expansion.
-- Configurable external-editor handoff: add Photoshop, Pixelmator Pro, or any
-  desktop editor executable in General Settings, then right-click one image to
-  render a TIFF or JPEG derivative, open it in that editor, and automatically
-  refresh the Library when the derivative is saved.
+- Configurable external-editor round trip, like Lightroom's Edit In: add
+  Photoshop, Pixelmator Pro, or any desktop editor executable in General
+  Settings, then right-click one image to open a 16-bit TIFF or JPEG copy in
+  that editor. The copy appears beside the original as `<name>-Edit` only
+  once it is saved in the editor, later saves update it in place, several
+  edits can run at once, and saves made while ThisIsRAW was closed are
+  picked up on the next launch.
 - Rejected, Selected, Deferred, and Unflagged states with keyboard shortcuts,
   thumbnail badges, rejected-image dimming, filtering, and rejected-file
   deletion for the currently loaded folder view.
