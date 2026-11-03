@@ -1796,7 +1796,14 @@
       "xmpSyncDesc": "Synchronizuj oceny, etykiety kolorów i tagi do standardowych plików XMP w celu zachowania kompatybilności z innymi edytorami zdjęć.",
       "neutralGreyCanvas": "Neutralne szare płótno",
       "neutralGreyCanvasDesc": "Użyj neutralnego, szarego płótna do dokładniejszej korekcji kolorów i ekspozycji bez zmiany motywu aplikacji.",
-      "enableNeutralGreyCanvas": "Włącz neutralne szare tło"
+      "enableNeutralGreyCanvas": "Włącz neutralne szare tło",
+      "externalEditors": "Edytory zewnętrzne",
+      "externalEditorsDesc": "Wyrenderowane kopie TIFF lub JPEG można otwierać w tych aplikacjach. Wybierz format dla każdego edytora albo pozwól ThisIsRAW pytać za każdym razem.",
+      "externalEditorAskFormat": "Pytaj za każdym razem",
+      "addExternalEditor": "Dodaj edytor",
+      "removeExternalEditor": "Usuń {{name}}",
+      "externalEditorFound": "Znaleziono {{name}}",
+      "addFoundExternalEditor": "Dodaj"
     },
     "keybinds": {
       "actions": {

@@ -22,6 +22,7 @@ use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::AppState;
+use crate::app_settings::ExternalEditFormat;
 use crate::export_processing::{
     ExportAdjustmentsMode, ExportSettings, TiffBitDepth, export_images_impl,
 };
@@ -88,16 +89,15 @@ fn round_trip_export_settings() -> ExportSettings {
 pub async fn start_editor_round_trip(
     source_path: String,
     editor_path: String,
-    format: String,
+    format: ExternalEditFormat,
     current_edit_path: Option<String>,
     current_edit_adjustments: Option<Value>,
     state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<(), String> {
-    let extension = match format.as_str() {
-        "tiff" => "tif",
-        "jpeg" => "jpg",
-        _ => return Err(format!("Unsupported external-edit format: {format}")),
+    let (extension, output_format) = match format {
+        ExternalEditFormat::Tiff => ("tif", "tiff"),
+        ExternalEditFormat::Jpeg => ("jpg", "jpeg"),
     };
     let id = uuid::Uuid::new_v4().to_string();
     let staging_dir = staging_root(&app_handle)?.join(&id);
@@ -118,7 +118,7 @@ pub async fn start_editor_round_trip(
             true,
             Vec::new(),
             round_trip_export_settings(),
-            format,
+            output_format.to_owned(),
             ExportAdjustmentsMode::UseSidecars {
                 active_path: current_edit_path,
                 active_adjustments: current_edit_adjustments,
@@ -194,6 +194,70 @@ pub fn start_editing_original(
     }
     ORIGINALS.lock().unwrap().insert(physical, stamp);
     Ok(())
+}
+
+/// An editor installed in its standard location, offered in Settings.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DetectedEditor {
+    name: &'static str,
+    path: String,
+    format: ExternalEditFormat,
+}
+
+/// Finds editors that ThisIsRAW can set up without a file picker. Settings
+/// lists them; nothing is added until the user chooses to.
+#[tauri::command]
+pub fn detect_external_editors() -> Vec<DetectedEditor> {
+    photo_craft_candidates(|name| std::env::var_os(name))
+        .into_iter()
+        .find(|path| path.exists())
+        .map(|path| DetectedEditor {
+            name: "Photo Craft",
+            path: path.to_string_lossy().into_owned(),
+            format: ExternalEditFormat::Tiff,
+        })
+        .into_iter()
+        .collect()
+}
+
+/// Photo Craft's install locations (`packaging/` in its repository, checked
+/// at `v0.19.0`), most common first. The Linux Flatpak is not supported yet.
+fn photo_craft_candidates(env: impl Fn(&str) -> Option<std::ffi::OsString>) -> Vec<PathBuf> {
+    #[cfg(target_os = "macos")]
+    {
+        std::iter::once(PathBuf::from("/"))
+            .chain(env("HOME").map(PathBuf::from))
+            .map(|root| root.join("Applications").join("PhotoCraft.app"))
+            .collect()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // The MSI installs into Program Files, or into
+        // `%LOCALAPPDATA%\Programs` when installed for one user.
+        [
+            env("ProgramFiles").map(PathBuf::from),
+            env("LOCALAPPDATA").map(|folder| PathBuf::from(folder).join("Programs")),
+        ]
+        .into_iter()
+        .flatten()
+        .map(|root| {
+            root.join("ArtCraft")
+                .join("PhotoCraft")
+                .join("photocraft.exe")
+        })
+        .collect()
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        env("PATH")
+            .map(|path| {
+                std::env::split_paths(&path)
+                    .map(|folder| folder.join("photocraft"))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
 }
 
 /// The total size of all staging folders.
@@ -570,6 +634,38 @@ mod tests {
         assert!(orphan.is_dir());
         remove_orphaned_staging(root.path(), SystemTime::now() + RETENTION * 2);
         assert!(!orphan.exists());
+    }
+
+    #[test]
+    fn photo_craft_is_looked_for_in_its_install_locations() {
+        let env = |name: &str| {
+            let value = match name {
+                "HOME" => "/Users/me",
+                "ProgramFiles" => r"C:\Program Files",
+                "LOCALAPPDATA" => r"C:\Users\me\AppData\Local",
+                "PATH" => "/usr/local/bin:/usr/bin",
+                _ => return None,
+            };
+            Some(std::ffi::OsString::from(value))
+        };
+        let expected: Vec<PathBuf> = if cfg!(target_os = "macos") {
+            vec![
+                "/Applications/PhotoCraft.app".into(),
+                "/Users/me/Applications/PhotoCraft.app".into(),
+            ]
+        } else if cfg!(target_os = "windows") {
+            vec![
+                r"C:\Program Files\ArtCraft\PhotoCraft\photocraft.exe".into(),
+                r"C:\Users\me\AppData\Local\Programs\ArtCraft\PhotoCraft\photocraft.exe".into(),
+            ]
+        } else {
+            vec![
+                "/usr/local/bin/photocraft".into(),
+                "/usr/bin/photocraft".into(),
+            ]
+        };
+        assert_eq!(photo_craft_candidates(env), expected);
+        assert!(photo_craft_candidates(|_| None).len() <= 1);
     }
 
     #[test]

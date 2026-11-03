@@ -36,7 +36,16 @@ import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import { useTranslation } from 'react-i18next';
-import { DEFAULT_PANEL_DENSITY, Invokes, PanelDensity } from '../ui/AppProperties';
+import {
+  DEFAULT_PANEL_DENSITY,
+  DetectedEditor,
+  EXTERNAL_EDIT_FORMAT_LABELS,
+  EXTERNAL_EDIT_FORMATS,
+  ExternalEditFormat,
+  ExternalEditor,
+  Invokes,
+  PanelDensity,
+} from '../ui/AppProperties';
 import {
   formatKeyCode,
   KeybindDefinition,
@@ -119,6 +128,8 @@ interface CatalogMoveResult {
 }
 
 const EXECUTE_TIMEOUT = 3000;
+/** The format dropdown's value for an editor without a preferred format. */
+const ASK_FOR_FORMAT = 'ask';
 
 const adjustmentVisibilityDefaults = {
   sharpening: true,
@@ -612,6 +623,16 @@ export default function SettingsPanel({
   const [logPathLoading, setLogPathLoading] = useState(true);
   const [logPathError, setLogPathError] = useState(false);
   const [dpr, setDpr] = useState(() => (typeof window !== 'undefined' ? window.devicePixelRatio : 1));
+  const [detectedEditors, setDetectedEditors] = useState<DetectedEditor[]>([]);
+  const externalEditors: ExternalEditor[] = appSettings?.externalEditors || [];
+
+  useEffect(() => {
+    if (activeCategory !== 'general') return;
+    invoke<DetectedEditor[]>(Invokes.DetectExternalEditors).then(setDetectedEditors).catch(console.error);
+  }, [activeCategory]);
+
+  const saveExternalEditors = (editors: ExternalEditor[]) =>
+    onSettingsChange({ ...appSettings, externalEditors: editors });
 
   const addExternalEditor = async () => {
     const selected = await openDialog({
@@ -624,20 +645,23 @@ export default function SettingsPanel({
     const normalizedPath = selected.replace(/\\/g, '/');
     const filename = normalizedPath.split('/').pop() || 'External editor';
     const name = filename.replace(/\.app$/i, '').replace(/\.(exe|bat|cmd)$/i, '');
-    const editors = appSettings?.externalEditors || [];
-    if (editors.some((editor: any) => editor.path === selected)) return;
-    await onSettingsChange({
-      ...appSettings,
-      externalEditors: [...editors, { id: crypto.randomUUID(), name, path: selected }],
-    });
+    if (externalEditors.some((editor) => editor.path === selected)) return;
+    await saveExternalEditors([...externalEditors, { id: crypto.randomUUID(), name, path: selected }]);
   };
 
-  const removeExternalEditor = async (id: string) => {
-    await onSettingsChange({
-      ...appSettings,
-      externalEditors: (appSettings?.externalEditors || []).filter((editor: any) => editor.id !== id),
-    });
-  };
+  const addDetectedEditor = (detected: DetectedEditor) =>
+    saveExternalEditors([...externalEditors, { id: crypto.randomUUID(), ...detected }]);
+
+  const removeExternalEditor = (id: string) =>
+    saveExternalEditors(externalEditors.filter((editor) => editor.id !== id));
+
+  const setExternalEditorFormat = (id: string, format: ExternalEditFormat | undefined) =>
+    saveExternalEditors(externalEditors.map((editor) => (editor.id === id ? { ...editor, format } : editor)));
+
+  const externalEditorFormatOptions: OptionItem<string>[] = [
+    { value: ASK_FOR_FORMAT, label: t('settings.general.externalEditorAskFormat') },
+    ...EXTERNAL_EDIT_FORMATS.map((format) => ({ value: format, label: EXTERNAL_EDIT_FORMAT_LABELS[format] })),
+  ];
 
   const settingCategories = useMemo(
     () => [
@@ -1469,17 +1493,28 @@ export default function SettingsPanel({
                       </SettingItem>
 
                       <SettingItem
-                        label="External editors"
-                        description="Rendered TIFF or JPEG copies can be opened in these applications."
+                        label={t('settings.general.externalEditors')}
+                        description={t('settings.general.externalEditorsDesc')}
                       >
                         <div className="flex flex-col items-end gap-2 min-w-64">
-                          {(appSettings?.externalEditors || []).map((editor: any) => (
+                          {externalEditors.map((editor) => (
                             <div key={editor.id} className="flex items-center gap-2 max-w-full">
                               <span className="text-sm text-text-primary truncate max-w-48" title={editor.path}>
                                 {editor.name}
                               </span>
+                              <Dropdown
+                                onChange={(value: string) =>
+                                  setExternalEditorFormat(
+                                    editor.id,
+                                    value === ASK_FOR_FORMAT ? undefined : (value as ExternalEditFormat),
+                                  )
+                                }
+                                options={externalEditorFormatOptions}
+                                value={editor.format ?? ASK_FOR_FORMAT}
+                                triggerClassName="bg-bg-primary"
+                              />
                               <Button
-                                aria-label={`Remove ${editor.name}`}
+                                aria-label={t('settings.general.removeExternalEditor', { name: editor.name })}
                                 className="p-1.5"
                                 onClick={() => removeExternalEditor(editor.id)}
                                 variant="secondary"
@@ -1488,8 +1523,24 @@ export default function SettingsPanel({
                               </Button>
                             </div>
                           ))}
+                          {detectedEditors
+                            .filter((detected) => !externalEditors.some((editor) => editor.path === detected.path))
+                            .map((detected) => (
+                              <div key={detected.path} className="flex items-center gap-2 max-w-full">
+                                <span className="text-sm text-text-secondary truncate max-w-48" title={detected.path}>
+                                  {t('settings.general.externalEditorFound', { name: detected.name })}
+                                </span>
+                                <Button
+                                  className="py-1.5"
+                                  onClick={() => addDetectedEditor(detected)}
+                                  variant="secondary"
+                                >
+                                  <Plus size={15} /> {t('settings.general.addFoundExternalEditor')}
+                                </Button>
+                              </div>
+                            ))}
                           <Button className="py-1.5" onClick={addExternalEditor} variant="secondary">
-                            <Plus size={15} /> Add editor
+                            <Plus size={15} /> {t('settings.general.addExternalEditor')}
                           </Button>
                         </div>
                       </SettingItem>

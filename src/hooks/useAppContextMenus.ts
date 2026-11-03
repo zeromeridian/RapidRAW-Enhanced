@@ -64,6 +64,9 @@ import {
   Album,
   AlbumGroup,
   ExternalEditor,
+  ExternalEditFormat,
+  EXTERNAL_EDIT_FORMATS,
+  EXTERNAL_EDIT_FORMAT_LABELS,
 } from '../components/ui/AppProperties';
 import { Status } from '../components/ui/ExportImportProperties';
 import { Color, COLOR_LABELS, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
@@ -580,7 +583,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         }
       };
 
-      const startExternalEdit = async (format: 'jpeg' | 'tiff', editor: ExternalEditor) => {
+      const startExternalEdit = async (format: ExternalEditFormat, editor: ExternalEditor) => {
         useProcessStore.getState().setExportState({
           status: Status.Exporting,
           progress: { current: 0, total: 1 },
@@ -617,13 +620,22 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         icon: ExternalLink,
         label: t('contextMenus.thumbnail.openIn'),
         submenu: [
-          ...(['tiff', 'jpeg'] as const).map((format) => ({
-            label: format === 'tiff' ? 'TIFF' : 'JPEG',
-            submenu: externalEditors.map((editor: ExternalEditor) => ({
-              label: editor.name,
-              onClick: () => startExternalEdit(format, editor),
-            })),
-          })),
+          ...externalEditors.map((editor: ExternalEditor) => {
+            const { format } = editor;
+            return format
+              ? {
+                  label: `${editor.name} (${EXTERNAL_EDIT_FORMAT_LABELS[format]})`,
+                  onClick: () => startExternalEdit(format, editor),
+                }
+              : {
+                  label: editor.name,
+                  submenu: EXTERNAL_EDIT_FORMATS.map((choice) => ({
+                    label: EXTERNAL_EDIT_FORMAT_LABELS[choice],
+                    onClick: () => startExternalEdit(choice, editor),
+                  })),
+                };
+          }),
+          { type: OPTION_SEPARATOR },
           {
             disabled: !canEditOriginal,
             label: t('contextMenus.thumbnail.originalFile'),

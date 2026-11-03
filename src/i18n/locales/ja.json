@@ -1702,7 +1702,14 @@
       "xmpSyncDesc": "他の写真編集ソフトとの互換性のために、評価、カラーラベル、タグを標準のXMPサイドカーファイルと同期します。",
       "neutralGreyCanvas": "ニュートラルグレーのキャンバス",
       "neutralGreyCanvasDesc": "アプリのテーマを変更せずに、より正確な色と露出のグレーディングを行うために、ニュートラルグレーのキャンバスを使用します。",
-      "enableNeutralGreyCanvas": "ニュートラルグレーの背景を有効にする"
+      "enableNeutralGreyCanvas": "ニュートラルグレーの背景を有効にする",
+      "externalEditors": "外部エディター",
+      "externalEditorsDesc": "レンダリングした TIFF または JPEG のコピーをこれらのアプリケーションで開けます。エディターごとに形式を選ぶか、毎回 ThisIsRAW に確認させます。",
+      "externalEditorAskFormat": "毎回確認",
+      "addExternalEditor": "エディターを追加",
+      "removeExternalEditor": "{{name}} を削除",
+      "externalEditorFound": "{{name}} が見つかりました",
+      "addFoundExternalEditor": "追加"
     },
     "keybinds": {
       "actions": {

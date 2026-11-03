@@ -1892,7 +1892,14 @@
       "xmpSyncDesc": "Sync ratings, color labels, tags, flags and physical stack information to XMP sidecar files. Application-specific fields transfer flags and stacks between ThisIsRAW installations.",
       "neutralGreyCanvas": "Neutral Grey Canvas",
       "neutralGreyCanvasDesc": "Use a neutral grey canvas for more accurate color and exposure grading without changing the app theme.",
-      "enableNeutralGreyCanvas": "Enable Neutral Grey Background"
+      "enableNeutralGreyCanvas": "Enable Neutral Grey Background",
+      "externalEditors": "External Editors",
+      "externalEditorsDesc": "Rendered TIFF or JPEG copies can be opened in these applications. Choose the format each editor receives, or have ThisIsRAW ask each time.",
+      "externalEditorAskFormat": "Ask each time",
+      "addExternalEditor": "Add Editor",
+      "removeExternalEditor": "Remove {{name}}",
+      "externalEditorFound": "{{name}} found",
+      "addFoundExternalEditor": "Add"
     },
     "keybinds": {
       "actions": {
