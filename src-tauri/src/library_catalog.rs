@@ -94,7 +94,17 @@ fn open_at(path: PathBuf) -> Result<Connection, String> {
                  tag TEXT NOT NULL,
                  PRIMARY KEY (entry_key, tag)
              );
-             CREATE INDEX IF NOT EXISTS keyword_index_tags_by_tag ON keyword_index_tags(tag);",
+             CREATE INDEX IF NOT EXISTS keyword_index_tags_by_tag ON keyword_index_tags(tag);
+             CREATE TABLE IF NOT EXISTS editor_round_trips (
+                 id TEXT PRIMARY KEY,
+                 source_path TEXT NOT NULL,
+                 staging_dir TEXT NOT NULL,
+                 destination TEXT,
+                 saved_file TEXT NOT NULL,
+                 saved_len INTEGER NOT NULL,
+                 saved_modified INTEGER NOT NULL,
+                 created_at INTEGER NOT NULL
+             );",
         )
         .map_err(|error| error.to_string())?;
 
@@ -556,6 +566,88 @@ fn keyword_image_paths_from_connection(
     Ok(rows.filter_map(Result::ok).collect())
 }
 
+/// One external-editor round trip (`editor_round_trip.rs`). `saved_*` describe
+/// the staged file that was last handled, so only a newer save is promoted.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EditorRoundTripRow {
+    pub id: String,
+    pub source_path: String,
+    pub staging_dir: String,
+    pub destination: Option<String>,
+    pub saved_file: String,
+    pub saved_len: u64,
+    pub saved_modified: u64,
+    pub created_at: i64,
+}
+
+pub fn save_editor_round_trip(
+    app_handle: &AppHandle,
+    row: &EditorRoundTripRow,
+) -> Result<(), String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    save_editor_round_trip_to_connection(&open(app_handle)?, row)
+}
+
+fn save_editor_round_trip_to_connection(
+    connection: &Connection,
+    row: &EditorRoundTripRow,
+) -> Result<(), String> {
+    connection
+        .execute(
+            "INSERT INTO editor_round_trips
+                 (id, source_path, staging_dir, destination, saved_file, saved_len, saved_modified, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+             ON CONFLICT(id) DO UPDATE SET
+                 destination=excluded.destination,
+                 saved_file=excluded.saved_file,
+                 saved_len=excluded.saved_len,
+                 saved_modified=excluded.saved_modified",
+            params![
+                row.id,
+                row.source_path,
+                row.staging_dir,
+                row.destination,
+                row.saved_file,
+                row.saved_len as i64,
+                row.saved_modified as i64,
+                row.created_at,
+            ],
+        )
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
+pub fn load_editor_round_trips(app_handle: &AppHandle) -> Result<Vec<EditorRoundTripRow>, String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    load_editor_round_trips_from_connection(&open(app_handle)?)
+}
+
+fn load_editor_round_trips_from_connection(
+    connection: &Connection,
+) -> Result<Vec<EditorRoundTripRow>, String> {
+    let mut statement = connection
+        .prepare(
+            "SELECT id, source_path, staging_dir, destination, saved_file, saved_len, saved_modified, created_at
+             FROM editor_round_trips ORDER BY created_at",
+        )
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok(EditorRoundTripRow {
+                id: row.get(0)?,
+                source_path: row.get(1)?,
+                staging_dir: row.get(2)?,
+                destination: row.get(3)?,
+                saved_file: row.get(4)?,
+                saved_len: row.get::<_, i64>(5)? as u64,
+                saved_modified: row.get::<_, i64>(6)? as u64,
+                created_at: row.get(7)?,
+            })
+        })
+        .map_err(|error| error.to_string())?;
+    Ok(rows.filter_map(Result::ok).collect())
+}
+
 #[tauri::command]
 pub fn get_catalog_location(app_handle: AppHandle) -> Result<String, String> {
     database_path(&app_handle).map(|path| path.to_string_lossy().into_owned())
@@ -692,6 +784,41 @@ mod tests {
             modified: 10,
             created: 5,
         }
+    }
+
+    #[test]
+    fn editor_round_trips_insert_then_update_saved_state() {
+        let temporary = tempfile::tempdir().unwrap();
+        let connection = open_at(temporary.path().join("catalog.sqlite3")).unwrap();
+        let mut row = EditorRoundTripRow {
+            id: "session".to_owned(),
+            source_path: "/photos/IMG_1.CR3?vc=2".to_owned(),
+            staging_dir: "/cache/external-edits/session".to_owned(),
+            destination: None,
+            saved_file: "/cache/external-edits/session/IMG_1-Edit.tif".to_owned(),
+            saved_len: 10,
+            saved_modified: 1_800_000_000_000_000_000,
+            created_at: 7,
+        };
+        save_editor_round_trip_to_connection(&connection, &row).unwrap();
+
+        let saved = EditorRoundTripRow {
+            destination: Some("/photos/IMG_1-Edit.tif".to_owned()),
+            saved_len: 20,
+            saved_modified: row.saved_modified + 1,
+            // The source, staging folder, and creation time never change.
+            created_at: 99,
+            ..row.clone()
+        };
+        save_editor_round_trip_to_connection(&connection, &saved).unwrap();
+
+        row.destination = saved.destination.clone();
+        row.saved_len = saved.saved_len;
+        row.saved_modified = saved.saved_modified;
+        assert_eq!(
+            load_editor_round_trips_from_connection(&connection).unwrap(),
+            vec![row]
+        );
     }
 
     #[test]

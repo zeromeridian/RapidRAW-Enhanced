@@ -5,6 +5,26 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.26.0-dev-photocraft-integration — 2026-11-02
+
+### External editors
+
+- **Open in** now works like Lightroom's **Edit In**. The copy for the
+  editor is prepared in ThisIsRAW's own cache, and appears beside the
+  original as `<name>-Edit.tif` (or `.jpg`) only once you save it in the
+  editor. Edits you abandon no longer leave files next to your photos or in
+  your Library.
+- Saving again in the editor updates the same `-Edit` copy and its
+  thumbnail, without reloading the whole folder.
+- Several photos can be open in external editors at once, and saves made
+  while ThisIsRAW was closed are picked up when it starts again.
+- The new copy is stacked with its original, as before, when automatic
+  stacking is on.
+
+### Fixes
+
+- TIFF exports saved with a `.tif` extension now keep the photo's metadata.
+
 ## 1.25.2-dev-photocraft-integration — 2026-11-01
 
 ### Fixes

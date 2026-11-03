@@ -34,12 +34,58 @@ The steps implement the phases under "Strategy". Each one ships on its own.
      an exported TIFF; Photoshop or Photo Craft shows sRGB; Preview
      Lightroom Edits still applies).
 2. **Step 2: backend session manager** (Phase 1.1–1.3 and 1.7; MINOR
-   release): not started. Covers staging in the app cache (with the Linux
-   Flatpak fallback still to be confirmed), the `external_edit.rs` manager
-   and `external_edit_sessions` catalog table, stable-save detection,
-   promotion with the `-Edit` suffix, the `external-edit-saved` event, a
-   single-image Library insert, and removing `externalEditLaunch`,
-   `externalEditWatch`, and `get_file_modification_stamp`.
+   release `1.26.0`): built; waiting for the owner's hands-on checks.
+   - Done (backend): new `src-tauri/src/editor_round_trip.rs` (named
+     "round trip" so it is not confused with the reverse `--edit`
+     `ExternalEditSession`). `start_editor_round_trip` renders through
+     `export_images_impl` into `<app cache>/external-edits/<uuid>/<stem>-Edit.<tif|jpg>`
+     (16-bit TIFF or quality-100 JPEG, metadata kept), records the rendered
+     file's size and mtime, and opens the editor with
+     `open_external_editor`. A failed render or launch removes the staging
+     folder. Sessions are kept in memory and in the new catalog table
+     `editor_round_trips` (`library_catalog::save_editor_round_trip` /
+     `load_editor_round_trips`).
+   - Watcher: `start_watcher`, started in the Tauri setup hook except for
+     headless export, resumes sessions whose staging folder still exists,
+     then polls every 1.5 s. It takes the newest supported, non-hidden image
+     in the staging folder (so PSDs and editor temporaries are ignored), and
+     promotes it once two polls see the same size and mtime and it differs
+     from the last handled file. Promotion copies it with the new
+     `file_management::copy_file_atomically` to `<stem>-Edit.<ext>` beside
+     the source (`-Edit-2`, … when taken); later saves replace that copy
+     unless the extension changed. It emits `editor-round-trip-saved`
+     `{sourcePath, outputPath, isNew}`. A failed copy is retried on the
+     next poll.
+   - Also: the shared atomic-write core now gives files normal permissions
+     (`0o666` minus umask on Unix) instead of owner-only `0o600`; the TIFF
+     metadata writer now accepts the `.tif` extension (a `.tif` export
+     previously got no EXIF); `get_file_modification_stamp` is removed.
+   - Validation so far: strict Clippy exits 0; `cargo test --lib` 109
+     passed (new: `editor_round_trip` ×3,
+     `editor_round_trips_insert_then_update_saved_state`).
+   - Done (frontend): **Open in** calls `start_editor_round_trip`
+     (`Invokes.StartEditorRoundTrip`); the `editor-round-trip-saved`
+     listener in `useTauriListeners.ts` adds a new copy to the open folder
+     view (flat or recursive) through `get_album_images`, then calls
+     `autoStackCreatedImages`; a later save drops its cached preview and
+     calls `regenerate_thumbnails`. `export-complete` now refreshes the
+     Library only when exports were tracked. Removed: `externalEditLaunch`,
+     `externalEditWatch`, the 2 s polling effect, `ExternalEditLaunch`, and
+     the `open_external_editor` and `get_file_modification_stamp` commands
+     (`open_external_editor` is now backend-only). Prettier passes; no
+     ESLint or `tsc` diagnostics on changed lines (two `tsc` errors in
+     `useAppContextMenus.ts` exist at `HEAD`).
+   - Release notes, `FEATURES.md`, and version `1.26.0` updated.
+   - Final checks: `cargo fmt --check` passes, strict Clippy exits 0,
+     `cargo test --lib` 109 passed.
+   - Built: `1.26.0-dev-photocraft-integration` `.app` (checksums in
+     `HANDOFF.md`). Not yet committed.
+   - Remaining: the owner's hands-on checks
+     (abandon an edit; save, save again; save while ThisIsRAW is closed;
+     two edits at once; recursive view; auto-stacking off). Not handled
+     yet: a copy that is open in Develop does not reload when the editor
+     saves again. The Linux Flatpak staging fallback waits for owner
+     confirmation.
 3. **Step 3: cleanup and Edit Original** (Phase 1.4–1.5): not started.
    Removes unsaved sessions after 7 days; adds the Settings → Data
    Management control and the *Edit Original* menu item.
@@ -61,7 +107,10 @@ external editor, and integrate [Photo Craft](https://github.com/storytold/photoc
 4. RAW integration: Photo Craft can use ThisIsRAW to develop a RAW file, the
    way Photoshop uses Camera Raw.
 
-## Current implementation
+## Implementation before `1.26.0`
+
+Kept for reference. Step 2 replaced the **Open in** flow and the gaps
+below, except Edit Original (step 3); see "Progress".
 
 **Open in → TIFF/JPEG → editor** (Library and Develop thumbnail menus, single
 selection):

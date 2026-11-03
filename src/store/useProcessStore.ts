@@ -16,11 +16,6 @@ export interface KeywordJob {
   total: number;
 }
 
-export interface ExternalEditLaunch {
-  editorPath: string;
-  outputPath: string;
-}
-
 interface ProcessState {
   exportState: ExportState;
   importState: ImportState;
@@ -37,8 +32,6 @@ interface ProcessState {
   isPasted: boolean;
   initialFileToOpen: string | null;
   externalEditSession: ExternalEditSession | null;
-  externalEditLaunch: ExternalEditLaunch | null;
-  externalEditWatch: { path: string; stamp: number } | null;
   // The running library-wide keyword rename, move, merge, or delete
   keywordJob: KeywordJob | null;
 
@@ -72,8 +65,6 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
   isPasted: false,
   initialFileToOpen: null,
   externalEditSession: null,
-  externalEditLaunch: null,
-  externalEditWatch: null,
   keywordJob: null,
 
   setProcess: (updater) => {
