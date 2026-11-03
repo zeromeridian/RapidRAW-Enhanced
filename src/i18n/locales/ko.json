@@ -328,7 +328,8 @@
       "resetAdjustments_other": "이미지 {{count}}개의 조정값 초기화",
       "showExplorer": "파일 탐색기에서 표시",
       "virtualCopy": "가상 복사본",
-      "autoStackByCaptureTime": "Auto-Stack by Capture Time…"
+      "autoStackByCaptureTime": "Auto-Stack by Capture Time…",
+      "originalFile": "원본 파일"
     },
     "toasts": {
       "couldNotShowExplorer": "탐색기에서 파일을 표시할 수 없습니다: {{err}}",
@@ -1598,7 +1599,8 @@
         "confirmClearCache": "캐시 지우기",
         "confirmDeleteAllEdits": "모든 편집 삭제",
         "confirmTitle": "삭제 확인",
-        "sidecarMessage": "모든 사이드카 파일을 삭제하시겠습니까?\n\n모든 활성 루트 폴더 및 하위 폴더 내의 모든 이미지에 대한 편집 내용이 영구적으로 제거됩니다."
+        "sidecarMessage": "모든 사이드카 파일을 삭제하시겠습니까?\n\n모든 활성 루트 폴더 및 하위 폴더 내의 모든 이미지에 대한 편집 내용이 영구적으로 제거됩니다.",
+        "externalEditsMessage": "외부 편집 사본을 지우시겠습니까?\n\n외부 편집기에서 아직 열려 있는 편집 내용은 더 이상 ThisIsRAW로 돌아오지 않습니다. 사진 옆에 이미 저장된 사본은 유지됩니다."
       },
       "noFolders": "선택된 폴더 없음",
       "statuses": {
@@ -1621,12 +1623,17 @@
         "sidecarSuccess_one": "사이드카 파일 {{count}}개가 성공적으로 삭제되었습니다.",
         "sidecarSuccess_other": "사이드카 파일 {{count}}개가 성공적으로 삭제되었습니다.",
         "aiDenoiseSuccess": "AI 노이즈 제거 캐시를 지웠습니다.",
-        "clearingAiDenoise": "AI 노이즈 제거 캐시를 지우는 중..."
+        "clearingAiDenoise": "AI 노이즈 제거 캐시를 지우는 중...",
+        "clearingExternalEdits": "외부 편집 사본을 지우는 중...",
+        "externalEditsSuccess": "외부 편집 사본을 지웠습니다."
       },
       "title": "데이터 관리",
       "clearAiDenoise": "AI 노이즈 제거 캐시 지우기",
       "clearAiDenoiseButton": "지우기",
-      "clearAiDenoiseDesc": "캐시된 AI 노이즈 제거 결과({{size}})를 삭제합니다. AI 노이즈 제거가 켜진 이미지는 다음에 열 때 다시 계산됩니다."
+      "clearAiDenoiseDesc": "캐시된 AI 노이즈 제거 결과({{size}})를 삭제합니다. AI 노이즈 제거가 켜진 이미지는 다음에 열 때 다시 계산됩니다.",
+      "clearExternalEdits": "외부 편집 사본 지우기",
+      "clearExternalEditsButton": "지우기",
+      "clearExternalEditsDesc": "외부 편집기에서 연 작업 사본({{size}})을 삭제합니다. 사진 옆에 이미 저장된 사본은 유지됩니다. 7일 동안 저장되지 않은 사본은 자동으로 삭제됩니다."
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",

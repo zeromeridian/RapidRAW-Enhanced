@@ -346,7 +346,8 @@
       "resetAdjustments_other": "Réinitialiser les ajustements sur {{count}} images",
       "showExplorer": "Afficher dans l'explorateur",
       "virtualCopy": "Copie virtuelle",
-      "autoStackByCaptureTime": "Auto-Stack by Capture Time…"
+      "autoStackByCaptureTime": "Auto-Stack by Capture Time…",
+      "originalFile": "Fichier original"
     },
     "toasts": {
       "couldNotShowExplorer": "Impossible d'afficher le fichier dans l'explorateur : {{err}}",
@@ -1643,7 +1644,8 @@
         "confirmClearCache": "Effacer le cache",
         "confirmDeleteAllEdits": "Supprimer toutes les retouches",
         "confirmTitle": "Confirmer la suppression",
-        "sidecarMessage": "Êtes-vous sûr de vouloir supprimer tous les fichiers annexes ?\n\nCeci supprimera définitivement toutes vos retouches pour toutes les images à l'intérieur de tous les dossiers racine actifs et de leurs sous-dossiers."
+        "sidecarMessage": "Êtes-vous sûr de vouloir supprimer tous les fichiers annexes ?\n\nCeci supprimera définitivement toutes vos retouches pour toutes les images à l'intérieur de tous les dossiers racine actifs et de leurs sous-dossiers.",
+        "externalEditsMessage": "Voulez-vous vraiment effacer les copies d’édition externe ?\n\nLes modifications encore ouvertes dans un éditeur externe ne seront plus renvoyées à ThisIsRAW. Les copies déjà enregistrées à côté de vos photos sont conservées."
       },
       "noFolders": "Aucun dossier sélectionné",
       "statuses": {
@@ -1669,12 +1671,17 @@
         "sidecarSuccess_one": "{{count}} fichier annexe supprimé avec succès.",
         "sidecarSuccess_other": "{{count}} fichiers annexes supprimés avec succès.",
         "aiDenoiseSuccess": "Cache du débruitage IA vidé avec succès.",
-        "clearingAiDenoise": "Vidage du cache du débruitage IA..."
+        "clearingAiDenoise": "Vidage du cache du débruitage IA...",
+        "clearingExternalEdits": "Effacement des copies d’édition externe...",
+        "externalEditsSuccess": "Copies d’édition externe effacées avec succès."
       },
       "title": "Gestion des données",
       "clearAiDenoise": "Vider le cache du débruitage IA",
       "clearAiDenoiseButton": "Vider",
-      "clearAiDenoiseDesc": "Supprime les résultats du débruitage IA mis en cache ({{size}}). Les images avec le débruitage IA activé le recalculeront à leur prochaine ouverture."
+      "clearAiDenoiseDesc": "Supprime les résultats du débruitage IA mis en cache ({{size}}). Les images avec le débruitage IA activé le recalculeront à leur prochaine ouverture.",
+      "clearExternalEdits": "Effacer les copies d’édition externe",
+      "clearExternalEditsButton": "Effacer",
+      "clearExternalEditsDesc": "Supprime les copies de travail ouvertes dans des éditeurs externes ({{size}}). Les copies déjà enregistrées à côté de vos photos sont conservées. Les copies sont supprimées automatiquement après 7 jours sans enregistrement."
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",

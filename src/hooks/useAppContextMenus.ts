@@ -601,18 +601,38 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         }
       };
 
+      const editOriginal = async (editor: ExternalEditor) => {
+        try {
+          await invoke(Invokes.StartEditingOriginal, { path: finalSelection[0], editorPath: editor.path });
+        } catch (error) {
+          toast.error(typeof error === 'string' ? error : 'External edit failed');
+        }
+      };
+
       const externalEditors = (appSettings?.externalEditors || []).filter((editor: ExternalEditor) => editor.path);
+      // RAW files have no pixels an editor could save back, so only a rendered copy is offered.
+      const canEditOriginal = imageList.some((image) => image.path === finalSelection[0] && !image.is_raw);
       const openInOption = {
         disabled: !isSingleSelection || externalEditors.length === 0,
         icon: ExternalLink,
         label: t('contextMenus.thumbnail.openIn'),
-        submenu: (['tiff', 'jpeg'] as const).map((format) => ({
-          label: format === 'tiff' ? 'TIFF' : 'JPEG',
-          submenu: externalEditors.map((editor: ExternalEditor) => ({
-            label: editor.name,
-            onClick: () => startExternalEdit(format, editor),
+        submenu: [
+          ...(['tiff', 'jpeg'] as const).map((format) => ({
+            label: format === 'tiff' ? 'TIFF' : 'JPEG',
+            submenu: externalEditors.map((editor: ExternalEditor) => ({
+              label: editor.name,
+              onClick: () => startExternalEdit(format, editor),
+            })),
           })),
-        })),
+          {
+            disabled: !canEditOriginal,
+            label: t('contextMenus.thumbnail.originalFile'),
+            submenu: externalEditors.map((editor: ExternalEditor) => ({
+              label: editor.name,
+              onClick: () => editOriginal(editor),
+            })),
+          },
+        ],
       };
 
       const handleRemoveFromAlbum = async () => {

@@ -617,6 +617,21 @@ fn save_editor_round_trip_to_connection(
         .map_err(|error| error.to_string())
 }
 
+pub fn delete_editor_round_trip(app_handle: &AppHandle, id: &str) -> Result<(), String> {
+    let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
+    delete_editor_round_trip_from_connection(&open(app_handle)?, id)
+}
+
+fn delete_editor_round_trip_from_connection(
+    connection: &Connection,
+    id: &str,
+) -> Result<(), String> {
+    connection
+        .execute("DELETE FROM editor_round_trips WHERE id=?1", params![id])
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
 pub fn load_editor_round_trips(app_handle: &AppHandle) -> Result<Vec<EditorRoundTripRow>, String> {
     let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
     load_editor_round_trips_from_connection(&open(app_handle)?)
@@ -787,7 +802,7 @@ mod tests {
     }
 
     #[test]
-    fn editor_round_trips_insert_then_update_saved_state() {
+    fn editor_round_trips_insert_update_and_delete() {
         let temporary = tempfile::tempdir().unwrap();
         let connection = open_at(temporary.path().join("catalog.sqlite3")).unwrap();
         let mut row = EditorRoundTripRow {
@@ -818,6 +833,13 @@ mod tests {
         assert_eq!(
             load_editor_round_trips_from_connection(&connection).unwrap(),
             vec![row]
+        );
+
+        delete_editor_round_trip_from_connection(&connection, "session").unwrap();
+        assert!(
+            load_editor_round_trips_from_connection(&connection)
+                .unwrap()
+                .is_empty()
         );
     }
 

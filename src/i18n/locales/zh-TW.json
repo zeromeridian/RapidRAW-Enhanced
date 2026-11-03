@@ -328,7 +328,8 @@
       "resetAdjustments_other": "重置 {{count}} 張影像的調整",
       "showExplorer": "在檔案資源管理器中顯示",
       "virtualCopy": "虛擬副本",
-      "autoStackByCaptureTime": "Auto-Stack by Capture Time…"
+      "autoStackByCaptureTime": "Auto-Stack by Capture Time…",
+      "originalFile": "原始檔案"
     },
     "toasts": {
       "couldNotShowExplorer": "無法在檔案資源管理器中顯示檔案：{{err}}",
@@ -1598,7 +1599,8 @@
         "confirmClearCache": "清除快取",
         "confirmDeleteAllEdits": "刪除所有編輯",
         "confirmTitle": "確認刪除",
-        "sidecarMessage": "您確定要刪除所有附屬檔案嗎？\n\n這將永久刪除所有活動根資料夾及其子資料夾中所有影像的所有編輯資料。"
+        "sidecarMessage": "您確定要刪除所有附屬檔案嗎？\n\n這將永久刪除所有活動根資料夾及其子資料夾中所有影像的所有編輯資料。",
+        "externalEditsMessage": "確定要清除外部編輯副本嗎？\n\n仍在外部編輯器中開啟的編輯將不再回傳到 ThisIsRAW。已儲存在相片旁邊的副本會保留。"
       },
       "noFolders": "未選擇資料夾",
       "statuses": {
@@ -1621,12 +1623,17 @@
         "sidecarSuccess_one": "{{count}} 個附屬檔案已成功刪除。",
         "sidecarSuccess_other": "{{count}} 個附屬檔案已成功刪除。",
         "aiDenoiseSuccess": "AI 降噪快取已成功清除。",
-        "clearingAiDenoise": "正在清除 AI 降噪快取..."
+        "clearingAiDenoise": "正在清除 AI 降噪快取...",
+        "clearingExternalEdits": "正在清除外部編輯副本...",
+        "externalEditsSuccess": "外部編輯副本已成功清除。"
       },
       "title": "資料管理",
       "clearAiDenoise": "清除 AI 降噪快取",
       "clearAiDenoiseButton": "清除",
-      "clearAiDenoiseDesc": "刪除已快取的 AI 降噪結果（{{size}}）。啟用 AI 降噪的影像會在下次開啟時重新計算。"
+      "clearAiDenoiseDesc": "刪除已快取的 AI 降噪結果（{{size}}）。啟用 AI 降噪的影像會在下次開啟時重新計算。",
+      "clearExternalEdits": "清除外部編輯副本",
+      "clearExternalEditsButton": "清除",
+      "clearExternalEditsDesc": "刪除在外部編輯器中開啟的工作副本（{{size}}）。已儲存在相片旁邊的副本會保留。7 天內未儲存的副本會自動刪除。"
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",

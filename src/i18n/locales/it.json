@@ -346,7 +346,8 @@
       "resetAdjustments_other": "Ripristina Regolazioni su {{count}} Immagini",
       "showExplorer": "Mostra in Esplora File",
       "virtualCopy": "Copia Virtuale",
-      "autoStackByCaptureTime": "Auto-Stack by Capture Time…"
+      "autoStackByCaptureTime": "Auto-Stack by Capture Time…",
+      "originalFile": "File originale"
     },
     "toasts": {
       "couldNotShowExplorer": "Impossibile mostrare il file in esplora risorse: {{err}}",
@@ -1643,7 +1644,8 @@
         "confirmClearCache": "Cancella Cache",
         "confirmDeleteAllEdits": "Elimina Tutte le Modifiche",
         "confirmTitle": "Conferma Eliminazione",
-        "sidecarMessage": "Sei sicuro di voler eliminare tutti i file sidecar?\n\nQuesto rimuoverà permanentemente tutte le tue modifiche per tutte le immagini all'interno di tutte le cartelle principali attive e le relative sottocartelle."
+        "sidecarMessage": "Sei sicuro di voler eliminare tutti i file sidecar?\n\nQuesto rimuoverà permanentemente tutte le tue modifiche per tutte le immagini all'interno di tutte le cartelle principali attive e le relative sottocartelle.",
+        "externalEditsMessage": "Vuoi davvero cancellare le copie di modifica esterna?\n\nLe modifiche ancora aperte in un editor esterno non verranno più restituite a ThisIsRAW. Le copie già salvate accanto alle tue foto vengono mantenute."
       },
       "noFolders": "Nessuna cartella selezionata",
       "statuses": {
@@ -1669,12 +1671,17 @@
         "sidecarSuccess_one": "{{count}} file sidecar eliminato con successo.",
         "sidecarSuccess_other": "{{count}} file sidecar eliminati con successo.",
         "aiDenoiseSuccess": "Cache della riduzione rumore IA svuotata correttamente.",
-        "clearingAiDenoise": "Svuotamento della cache della riduzione rumore IA..."
+        "clearingAiDenoise": "Svuotamento della cache della riduzione rumore IA...",
+        "clearingExternalEdits": "Cancellazione delle copie di modifica esterna...",
+        "externalEditsSuccess": "Copie di modifica esterna cancellate correttamente."
       },
       "title": "Gestione Dati",
       "clearAiDenoise": "Svuota cache riduzione rumore IA",
       "clearAiDenoiseButton": "Svuota",
-      "clearAiDenoiseDesc": "Elimina i risultati salvati della riduzione rumore IA ({{size}}). Le immagini con la riduzione rumore IA attiva la ricalcoleranno alla prossima apertura."
+      "clearAiDenoiseDesc": "Elimina i risultati salvati della riduzione rumore IA ({{size}}). Le immagini con la riduzione rumore IA attiva la ricalcoleranno alla prossima apertura.",
+      "clearExternalEdits": "Cancella copie di modifica esterna",
+      "clearExternalEditsButton": "Cancella",
+      "clearExternalEditsDesc": "Elimina le copie di lavoro aperte negli editor esterni ({{size}}). Le copie già salvate accanto alle tue foto vengono mantenute. Le copie vengono rimosse automaticamente dopo 7 giorni senza salvataggi."
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",

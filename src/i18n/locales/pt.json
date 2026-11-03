@@ -346,7 +346,8 @@
       "resetAdjustments_other": "Redefinir Ajustes em {{count}} Imagens",
       "showExplorer": "Mostrar no Explorador de Arquivos",
       "virtualCopy": "Cópia Virtual",
-      "autoStackByCaptureTime": "Auto-Stack by Capture Time…"
+      "autoStackByCaptureTime": "Auto-Stack by Capture Time…",
+      "originalFile": "Arquivo original"
     },
     "toasts": {
       "couldNotShowExplorer": "Não foi possível mostrar o arquivo no explorador: {{err}}",
@@ -1643,7 +1644,8 @@
         "confirmClearCache": "Limpar Cache",
         "confirmDeleteAllEdits": "Excluir Todas as Edições",
         "confirmTitle": "Confirmar Exclusão",
-        "sidecarMessage": "Tem certeza de que deseja excluir todos os arquivos sidecar?\n\nIsso removerá permanentemente todas as suas edições para todas as imagens dentro de todas as pastas raiz ativas e suas subpastas."
+        "sidecarMessage": "Tem certeza de que deseja excluir todos os arquivos sidecar?\n\nIsso removerá permanentemente todas as suas edições para todas as imagens dentro de todas as pastas raiz ativas e suas subpastas.",
+        "externalEditsMessage": "Tem certeza de que deseja limpar as cópias de edição externa?\n\nEdições ainda abertas em um editor externo não serão mais devolvidas ao ThisIsRAW. As cópias já salvas ao lado das suas fotos são mantidas."
       },
       "noFolders": "Nenhuma pasta selecionada",
       "statuses": {
@@ -1669,12 +1671,17 @@
         "sidecarSuccess_one": "{{count}} arquivo sidecar excluído com sucesso.",
         "sidecarSuccess_other": "{{count}} arquivos sidecar excluídos com sucesso.",
         "aiDenoiseSuccess": "Cache da redução de ruído IA limpa com sucesso.",
-        "clearingAiDenoise": "A limpar a cache da redução de ruído IA..."
+        "clearingAiDenoise": "A limpar a cache da redução de ruído IA...",
+        "clearingExternalEdits": "Limpando cópias de edição externa...",
+        "externalEditsSuccess": "Cópias de edição externa limpas com sucesso."
       },
       "title": "Gerenciamento de Dados",
       "clearAiDenoise": "Limpar cache da redução de ruído IA",
       "clearAiDenoiseButton": "Limpar",
-      "clearAiDenoiseDesc": "Elimina os resultados guardados da redução de ruído IA ({{size}}). As imagens com a redução de ruído IA ativada voltam a calculá-la da próxima vez que forem abertas."
+      "clearAiDenoiseDesc": "Elimina os resultados guardados da redução de ruído IA ({{size}}). As imagens com a redução de ruído IA ativada voltam a calculá-la da próxima vez que forem abertas.",
+      "clearExternalEdits": "Limpar cópias de edição externa",
+      "clearExternalEditsButton": "Limpar",
+      "clearExternalEditsDesc": "Exclui as cópias de trabalho abertas em editores externos ({{size}}). As cópias já salvas ao lado das suas fotos são mantidas. As cópias são removidas automaticamente após 7 dias sem salvar."
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",

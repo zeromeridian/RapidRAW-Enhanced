@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.27.0-dev-photocraft-integration — 2026-11-02
+
+### External editors
+
+- **Open in → Original File** opens a TIFF, JPEG, or other non-RAW photo
+  itself in the editor, like Lightroom's **Edit Original**. Saving it
+  refreshes its thumbnail. Use it to keep working on an `-Edit` copy
+  without making another one.
+- Working copies for external editors are removed automatically after 7
+  days without a save. Copies already saved beside your photos are never
+  removed.
+- **Settings → Data Management → Clear External Edit Copies** shows how
+  much space the working copies use and removes them.
+
 ## 1.26.0-dev-photocraft-integration — 2026-11-02
 
 ### External editors

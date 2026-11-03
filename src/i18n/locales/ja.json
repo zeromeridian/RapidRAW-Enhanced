@@ -328,7 +328,8 @@
       "resetAdjustments_other": "{{count}} 枚の画像の補正設定をリセット",
       "showExplorer": "エクスプローラーで表示",
       "virtualCopy": "仮想コピー",
-      "autoStackByCaptureTime": "Auto-Stack by Capture Time…"
+      "autoStackByCaptureTime": "Auto-Stack by Capture Time…",
+      "originalFile": "元のファイル"
     },
     "toasts": {
       "couldNotShowExplorer": "エクスプローラーでファイルを表示できませんでした: {{err}}",
@@ -1598,7 +1599,8 @@
         "confirmClearCache": "キャッシュを削除",
         "confirmDeleteAllEdits": "すべての編集を削除",
         "confirmTitle": "削除の確認",
-        "sidecarMessage": "本当にすべてのサイドカーファイルを削除しますか？\n\nアクティブなルートフォルダとそのサブフォルダ内にある、すべての画像の編集内容が完全に削除されます。"
+        "sidecarMessage": "本当にすべてのサイドカーファイルを削除しますか？\n\nアクティブなルートフォルダとそのサブフォルダ内にある、すべての画像の編集内容が完全に削除されます。",
+        "externalEditsMessage": "外部編集用コピーを消去してもよろしいですか？\n\n外部エディターで開いたままの編集は ThisIsRAW に戻されなくなります。写真の横にすでに保存されたコピーは残ります。"
       },
       "noFolders": "フォルダが選択されていません",
       "statuses": {
@@ -1621,12 +1623,17 @@
         "sidecarSuccess_one": "{{count}} 件のサイドカーファイルを正常に削除しました。",
         "sidecarSuccess_other": "{{count}} 件のサイドカーファイルを正常に削除しました。",
         "aiDenoiseSuccess": "AIノイズ除去キャッシュを消去しました。",
-        "clearingAiDenoise": "AIノイズ除去キャッシュを消去中..."
+        "clearingAiDenoise": "AIノイズ除去キャッシュを消去中...",
+        "clearingExternalEdits": "外部編集用コピーを消去しています...",
+        "externalEditsSuccess": "外部編集用コピーを消去しました。"
       },
       "title": "データ管理",
       "clearAiDenoise": "AIノイズ除去キャッシュを消去",
       "clearAiDenoiseButton": "消去",
-      "clearAiDenoiseDesc": "キャッシュされたAIノイズ除去の結果（{{size}}）を削除します。AIノイズ除去が有効な画像は、次に開いたときに再計算されます。"
+      "clearAiDenoiseDesc": "キャッシュされたAIノイズ除去の結果（{{size}}）を削除します。AIノイズ除去が有効な画像は、次に開いたときに再計算されます。",
+      "clearExternalEdits": "外部編集用コピーを消去",
+      "clearExternalEditsButton": "消去",
+      "clearExternalEditsDesc": "外部エディターで開いている作業用コピー（{{size}}）を削除します。写真の横にすでに保存されたコピーは残ります。保存されないまま7日経過したコピーは自動的に削除されます。"
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",

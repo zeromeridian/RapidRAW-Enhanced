@@ -68,7 +68,9 @@ details are in `RELEASE_NOTES.MD`.
   that editor. The copy appears beside the original as `<name>-Edit` only
   once it is saved in the editor, later saves update it in place, several
   edits can run at once, and saves made while ThisIsRAW was closed are
-  picked up on the next launch.
+  picked up on the next launch. Unsaved working copies are removed after 7
+  days or from Settings → Data Management. **Open in → Original File**
+  opens a non-RAW file itself and refreshes its thumbnail when it is saved.
 - Rejected, Selected, Deferred, and Unflagged states with keyboard shortcuts,
   thumbnail badges, rejected-image dimming, filtering, and rejected-file
   deletion for the currently loaded folder view.
