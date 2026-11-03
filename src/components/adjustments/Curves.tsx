@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Copy, ClipboardPaste, Spline, Settings2, Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -255,6 +255,16 @@ function isDefaultParametricCurve(settings: ParametricCurveSettings | undefined)
     settings.split3 === DEFAULT_PARAMETRIC_CURVE_SETTINGS.split3
   );
 }
+
+/**
+ * The colour a colour channel's curve adds above the diagonal, and its
+ * complement below, tinted behind the graph as in Lightroom Classic.
+ */
+const CHANNEL_TINTS: Partial<Record<ActiveChannel, { raise: string; lower: string }>> = {
+  [ActiveChannel.Red]: { raise: '#FF4D4D', lower: '#2EC4C4' },
+  [ActiveChannel.Green]: { raise: '#4CC45A', lower: '#D04CD0' },
+  [ActiveChannel.Blue]: { raise: '#4D7DFF', lower: '#E0C23A' },
+};
 
 function getSplitterGradient(channel: ActiveChannel) {
   switch (channel) {
@@ -556,6 +566,7 @@ export default function CurveGraph({
 
   const isLightTheme = theme === Theme.Light || theme === Theme.Arctic;
   const histogramOpacity = isLightTheme ? 0.6 : 0.15;
+  const curveTintOpacity = isLightTheme ? 0.35 : 0.3;
 
   const channelConfig: ChannelConfig = useMemo(
     () => ({
@@ -572,6 +583,13 @@ export default function CurveGraph({
     : (localPoints ?? adjustments?.curves?.[activeChannel]);
 
   const { color, data: histogramData } = channelConfig[activeChannel];
+  const channelTint = CHANNEL_TINTS[activeChannel];
+  const tintId = `curve-tint-${useId()}`;
+  const isChannelAdjusted = (channel: ActiveChannel) => {
+    if (isParametricMode) return !isDefaultParametricCurve(parametricCurves[channel]);
+    const points = adjustments?.curves?.[channel];
+    return Boolean(points) && !isDefaultCurve(points);
+  };
 
   const handlePointStart = (e: any, index: number) => {
     if (isParametricMode || e.button === 2) return;
@@ -962,24 +980,33 @@ export default function CurveGraph({
           {Object.keys(channelConfig).map((channel: any) => {
             const selected = activeChannel === channel;
             const channelLabel = t(`adjustments.curves.channels.${channel}`);
+            const isAdjusted = isChannelAdjusted(channel as ActiveChannel);
             return (
-              <button
-                key={channel}
-                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                  selected ? 'ring-2 ring-offset-2 ring-offset-surface ring-accent' : 'bg-surface-secondary'
-                } ${channel === ActiveChannel.Luma ? 'text-text-primary' : ''}`}
-                onClick={() => setActiveChannel(channel as ActiveChannel)}
-                type="button"
-                style={{
-                  backgroundColor:
-                    channel !== ActiveChannel.Luma && !selected ? channelConfig[channel].color + '40' : undefined,
-                }}
-                title={t('adjustments.curves.channelTitle', { channel: channelLabel })}
-              >
-                <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.bold}>
-                  {channelLabel.charAt(0).toUpperCase()}
-                </Text>
-              </button>
+              <div key={channel} className="flex flex-col items-center gap-1.5">
+                <button
+                  className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                    selected ? 'ring-2 ring-offset-2 ring-offset-surface ring-accent' : 'bg-surface-secondary'
+                  } ${channel === ActiveChannel.Luma ? 'text-text-primary' : ''}`}
+                  onClick={() => setActiveChannel(channel as ActiveChannel)}
+                  type="button"
+                  style={{
+                    backgroundColor:
+                      channel !== ActiveChannel.Luma && !selected ? channelConfig[channel].color + '40' : undefined,
+                  }}
+                  title={t(isAdjusted ? 'adjustments.curves.channelTitleAdjusted' : 'adjustments.curves.channelTitle', {
+                    channel: channelLabel,
+                  })}
+                >
+                  <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.bold}>
+                    {channelLabel.charAt(0).toUpperCase()}
+                  </Text>
+                </button>
+                <span
+                  aria-hidden="true"
+                  className={`w-1 h-1 rounded-full transition-opacity ${isAdjusted ? 'opacity-100' : 'opacity-0'}`}
+                  style={{ backgroundColor: channelConfig[channel].color }}
+                />
+              </div>
             );
           })}
         </div>
@@ -994,6 +1021,19 @@ export default function CurveGraph({
           onContextMenu={handleContextMenu}
         >
           <svg ref={svgRef} viewBox="0 0 255 255" className="w-full h-full overflow-visible">
+            {channelTint && (
+              <>
+                <defs>
+                  <linearGradient id={tintId} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="255" y2="255">
+                    <stop offset="0" stopColor={channelTint.raise} stopOpacity={curveTintOpacity} />
+                    <stop offset="0.5" stopColor={channelTint.raise} stopOpacity="0" />
+                    <stop offset="0.5" stopColor={channelTint.lower} stopOpacity="0" />
+                    <stop offset="1" stopColor={channelTint.lower} stopOpacity={curveTintOpacity} />
+                  </linearGradient>
+                </defs>
+                <rect fill={`url(#${tintId})`} height="255" width="255" />
+              </>
+            )}
             <path
               d={
                 isParametricMode

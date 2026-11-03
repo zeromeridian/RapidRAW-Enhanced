@@ -108,7 +108,8 @@
       "resetAllParametric": "Alle parametrischen Kurven zurücksetzen",
       "resetAllPoint": "Alle Punktkurven zurücksetzen",
       "resetParametric": "Parametrische {{channel}}-Kurve zurücksetzen",
-      "resetPoint": "Punktkurve ({{channel}}) zurücksetzen"
+      "resetPoint": "Punktkurve ({{channel}}) zurücksetzen",
+      "channelTitleAdjusted": "{{channel}}-Kanal (angepasst)"
     },
     "details": {
       "aiDenoise": "KI-Entrauschen",

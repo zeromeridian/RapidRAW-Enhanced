@@ -227,6 +227,10 @@ details are in `RELEASE_NOTES.MD`.
 - Persisted **Black & White** switch in the global Color section.
 - Named tone-curve presets with unique names, built-in Linear and contrast
   presets, modification indicators, update, save-as-new, and delete actions.
+- Tone Curve channel buttons show a dot under each adjusted channel, and the
+  Red, Green, and Blue graphs are tinted with the channel's colour above the
+  diagonal and its complement (cyan, magenta, yellow) below, as in Lightroom
+  Classic.
 - AI sky masks use EfficientSAM3 and AI foreground masks use BiRefNet, as in
   upstream RapidRAW; AI subject masks are edge-refined. AI text masks select
   whatever a typed description names, such as "water" or "boat". Each mask

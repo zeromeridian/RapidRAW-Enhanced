@@ -108,7 +108,8 @@
       "resetAllParametric": "重置所有参数曲线",
       "resetAllPoint": "重置所有点曲线",
       "resetParametric": "重置 {{channel}} 参数曲线",
-      "resetPoint": "重置 {{channel}} 点曲线"
+      "resetPoint": "重置 {{channel}} 点曲线",
+      "channelTitleAdjusted": "{{channel}} 通道（已调整）"
     },
     "details": {
       "aiDenoise": "AI 降噪",

@@ -108,7 +108,8 @@
       "resetAllParametric": "Сбросить все параметрические кривые",
       "resetAllPoint": "Сбросить все точечные кривые",
       "resetParametric": "Сбросить параметрическую кривую {{channel}}",
-      "resetPoint": "Сбросить точечную кривую {{channel}}"
+      "resetPoint": "Сбросить точечную кривую {{channel}}",
+      "channelTitleAdjusted": "Канал {{channel}} (изменён)"
     },
     "details": {
       "aiDenoise": "ИИ-шумоподавление",
