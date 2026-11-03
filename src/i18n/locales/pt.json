@@ -1750,7 +1750,14 @@
       "xmpSyncDesc": "Sincronize avaliações, rótulos de cores e etiquetas em arquivos sidecar XMP padrão para compatibilidade com outros editores de fotos.",
       "neutralGreyCanvas": "Tela cinza neutro",
       "neutralGreyCanvasDesc": "Use uma tela cinza neutro para uma gradação de cores e exposição mais precisa sem alterar o tema do aplicativo.",
-      "enableNeutralGreyCanvas": "Ativar fundo cinza neutro"
+      "enableNeutralGreyCanvas": "Ativar fundo cinza neutro",
+      "externalEditors": "Editores externos",
+      "externalEditorsDesc": "Cópias TIFF ou JPEG renderizadas podem ser abertas nestes aplicativos. Escolha o formato que cada editor recebe ou deixe o ThisIsRAW perguntar a cada vez.",
+      "externalEditorAskFormat": "Perguntar a cada vez",
+      "addExternalEditor": "Adicionar editor",
+      "removeExternalEditor": "Remover {{name}}",
+      "externalEditorFound": "{{name}} encontrado",
+      "addFoundExternalEditor": "Adicionar"
     },
     "keybinds": {
       "actions": {

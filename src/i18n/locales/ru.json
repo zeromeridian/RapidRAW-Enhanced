@@ -1796,7 +1796,14 @@
       "xmpSyncDesc": "Записывать рейтинги, цветовые метки и теги в стандартные файлы сопутствующих данных XMP для совместимости с другими фоторедакторами.",
       "neutralGreyCanvas": "Нейтрально-серый холст",
       "neutralGreyCanvasDesc": "Используйте нейтрально-серый холст для более точной цветокоррекции и настройки экспозиции без изменения темы приложения.",
-      "enableNeutralGreyCanvas": "Включить нейтрально-серый фон"
+      "enableNeutralGreyCanvas": "Включить нейтрально-серый фон",
+      "externalEditors": "Внешние редакторы",
+      "externalEditorsDesc": "Отрендеренные копии TIFF или JPEG можно открывать в этих приложениях. Выберите формат для каждого редактора или пусть ThisIsRAW спрашивает каждый раз.",
+      "externalEditorAskFormat": "Спрашивать каждый раз",
+      "addExternalEditor": "Добавить редактор",
+      "removeExternalEditor": "Удалить {{name}}",
+      "externalEditorFound": "Найден {{name}}",
+      "addFoundExternalEditor": "Добавить"
     },
     "keybinds": {
       "actions": {

@@ -61,6 +61,7 @@ export enum Invokes {
   ExportImages = 'export_images',
   StartEditorRoundTrip = 'start_editor_round_trip',
   StartEditingOriginal = 'start_editing_original',
+  DetectExternalEditors = 'detect_external_editors',
   GetAiDenoiseCacheSize = 'get_ai_denoise_cache_size',
   GetEditorRoundTripCacheSize = 'get_editor_round_trip_cache_size',
   FrontendLog = 'frontend_log',
@@ -309,11 +310,24 @@ export interface AppSettings {
   externalEditors?: ExternalEditor[];
 }
 
+export type ExternalEditFormat = 'tiff' | 'jpeg';
+export const EXTERNAL_EDIT_FORMATS: ExternalEditFormat[] = ['tiff', 'jpeg'];
+export const EXTERNAL_EDIT_FORMAT_LABELS: Record<ExternalEditFormat, string> = { tiff: 'TIFF', jpeg: 'JPEG' };
+
 /** A user-approved application that can receive rendered TIFF/JPEG derivatives. */
 export interface ExternalEditor {
   id: string;
   name: string;
   path: string;
+  /** The copy to render for this editor; missing asks each time. */
+  format?: ExternalEditFormat;
+}
+
+/** An editor found in its standard install location (`detect_external_editors`). */
+export interface DetectedEditor {
+  name: string;
+  path: string;
+  format: ExternalEditFormat;
 }
 
 export interface BlackFrameSettings {

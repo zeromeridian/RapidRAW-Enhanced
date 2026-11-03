@@ -84,8 +84,7 @@ The steps implement the phases under "Strategy". Each one ships on its own.
      (abandon an edit; save, save again; save while ThisIsRAW is closed;
      two edits at once; recursive view; auto-stacking off). Not handled
      yet: a copy that is open in Develop does not reload when the editor
-     saves again. The Linux Flatpak staging fallback waits for owner
-     confirmation.
+     saves again. The Linux Flatpak is deferred (owner decision 8).
 3. **Step 3: cleanup and Edit Original** (Phase 1.4–1.5; MINOR release
    `1.27.0`): built; waiting for the owner's hands-on checks.
    - Done (backend, `editor_round_trip.rs`): a session ends once it has
@@ -118,8 +117,51 @@ The steps implement the phases under "Strategy". Each one ships on its own.
      with an edit open; Original File on a `-Edit.tif`, save, thumbnail
      refreshes; Original File disabled for RAW). Expiry after 7 days is
      covered by unit tests only.
-4. **Step 4: Photo Craft entry** (Phase 2): not started. Adds
-   `detect_external_editors` and a ready-made 16-bit TIFF entry.
+4. **Step 4: Photo Craft entry** (Phase 2; MINOR release `1.28.0`):
+   built; waiting for the owner's hands-on checks. Owner decisions 7 and 8 (2026-11-02): each editor gets a
+   preferred format, and the Linux Flatpak is deferred (see "Deferred:
+   Linux Flatpak").
+   - Install layout checked in Photo Craft `v0.19.0` packaging: macOS
+     `PhotoCraft.app` (`packaging/macos/package.sh`); Windows
+     `ArtCraft\PhotoCraft\photocraft.exe` under `ProgramFiles6432Folder`,
+     which a per-user MSI maps to `%LOCALAPPDATA%\Programs`
+     (`packaging/windows/photocraft.wxs`); Linux deb/rpm `/usr/bin/photocraft`
+     (`packaging/linux/nfpm.yaml`), tarball and AppImage wherever the user
+     puts them.
+   - Plan: `detect_external_editors` (Rust, explicit guard per platform:
+     `/Applications` and `~/Applications` on macOS; Program Files and
+     `%LOCALAPPDATA%\Programs` on Windows; `photocraft` on `PATH` on Linux),
+     run only when Settings opens and never added without a click. The
+     editor entry gains an optional `format` (`tiff`/`jpeg`; missing means
+     ask each time, so saved settings keep working); a detected Photo Craft
+     is added with `tiff`. **Open in** becomes editor-first: an editor with
+     a format opens directly, one without shows TIFF/JPEG, and **Original
+     File** stays last.
+   - Done (backend): `app_settings::ExternalEditor` gains
+     `format: Option<ExternalEditFormat>` (`tiff`/`jpeg`, omitted when
+     unset); `start_editor_round_trip` now takes that enum instead of a
+     string. `editor_round_trip::detect_external_editors` and
+     `photo_craft_candidates` (unit-tested for the platform being built).
+     Strict Clippy exits 0; `cargo test --lib` 113 passed. The Linux and
+     Windows branches were reviewed but not compiled.
+   - Done (frontend): `ExternalEditor.format`, `DetectedEditor`, and the
+     shared `EXTERNAL_EDIT_FORMATS` / `EXTERNAL_EDIT_FORMAT_LABELS` in
+     `AppProperties.tsx`. Settings → General → External Editors (strings
+     now localized in all 12 locales) runs detection when the General tab
+     opens, lists a found editor not yet added with an **Add** button, and
+     has a format dropdown per editor (Ask each time / TIFF / JPEG).
+     **Open in** lists editors first (`Photo Craft (TIFF)` opens directly;
+     an editor without a format has a TIFF/JPEG submenu), then a separator
+     and **Original File**. Prettier passes; no ESLint or `tsc`
+     diagnostics on changed lines; `i18n:check` output identical to
+     `HEAD`'s.
+   - Built: `1.28.0-dev-photocraft-integration` `.app` (checksums in
+     `HANDOFF.md`). Not yet committed.
+   - Remaining: the owner's hands-on checks (with Photo Craft in
+     `/Applications`: Settings shows "Photo Craft found", Add, the menu
+     shows `Photo Craft (TIFF)`; change a format and the menu follows; an
+     older settings file without formats still loads). Windows and Linux
+     detection need a check on those machines.
 5. **Step 5: RAW integration** (Phase 3): deferred. Document and test the
    `--edit` exit codes first.
 
@@ -304,9 +346,10 @@ reads it, and a failed read is retried on the next poll.
 
 1. **Ready-made editor entry.** Offer Photo Craft in Settings → External
    Editors when it is found: `/Applications/PhotoCraft.app` on macOS,
-   `photocraft` on `PATH` or the Flatpak `ai.storyteller.photocraft` on
-   Linux, the per-user or all-users `ArtCraft\PhotoCraft` folder on
-   Windows. Default its format to 16-bit TIFF.
+   `photocraft` on `PATH` on Linux (the Flatpak `ai.storyteller.photocraft`
+   is deferred, see "Deferred: Linux Flatpak"), the per-user or all-users
+   `ArtCraft\PhotoCraft` folder on Windows. Default its format to 16-bit
+   TIFF (owner decision 7).
 2. **Launch** through the existing `open_external_editor` with the staging
    file as the only argument. No new process code is needed.
 3. **Control channel: deferred.** Revisit it when Photo Craft adds save or
@@ -351,6 +394,32 @@ reads it, and a failed read is retried on the next poll.
 5. **Round-trip colour space.** sRGB only, or also a wide-gamut 16-bit
    option.
 6. **Decided 2026-11-01: keep unsaved sessions for 7 days.**
+7. **Decided 2026-11-02: a preferred format per editor.** Each configured
+   editor stores TIFF, JPEG, or "ask each time"; Photo Craft defaults to
+   TIFF.
+8. **Decided 2026-11-02: defer the Linux Flatpak.** Step 4 detects only a
+   `photocraft` executable on `PATH`. See "Deferred: Linux Flatpak".
+
+## Deferred: Linux Flatpak
+
+Not implemented; the owner deferred it on 2026-11-02. Supporting the
+Flatpak `ai.storyteller.photocraft` needs all three:
+
+1. **Detection:** `flatpak info ai.storyteller.photocraft` (or the exported
+   `.desktop` file under `/var/lib/flatpak/exports` or
+   `~/.local/share/flatpak/exports`).
+2. **Launch:** `flatpak run ai.storyteller.photocraft <file>`. Today
+   `open_external_editor` requires the editor path to exist on disk, so it
+   needs a Linux-only launch form for a Flatpak app ID.
+3. **Staging:** the Flatpak can read only `xdg-documents` and
+   `xdg-pictures`, not ThisIsRAW's app cache, so its sessions must stage
+   under `~/Pictures/.ThisIsRAW External Edits/` (owner decision 1's
+   fallback, still unconfirmed). Cleanup and Clear External Edit Copies
+   must cover that folder too.
+
+Until then, a Flatpak user can add the editor by hand only if it is also
+installed another way, and the round trip will not work with the Flatpak
+build.
 
 ## Validation (per phase)
 

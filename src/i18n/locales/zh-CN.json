@@ -1702,7 +1702,14 @@
       "xmpSyncDesc": "将评分、颜色标签和标签同步到标准 XMP 附属文件，以便与其他照片编辑器兼容。",
       "neutralGreyCanvas": "中性灰画布",
       "neutralGreyCanvasDesc": "使用中性灰画布，以便在不更改应用主题的情况下进行更准确的色彩和曝光分级。",
-      "enableNeutralGreyCanvas": "启用中性灰背景"
+      "enableNeutralGreyCanvas": "启用中性灰背景",
+      "externalEditors": "外部编辑器",
+      "externalEditorsDesc": "渲染后的 TIFF 或 JPEG 副本可以在这些应用程序中打开。为每个编辑器选择格式，或让 ThisIsRAW 每次询问。",
+      "externalEditorAskFormat": "每次询问",
+      "addExternalEditor": "添加编辑器",
+      "removeExternalEditor": "移除 {{name}}",
+      "externalEditorFound": "已找到 {{name}}",
+      "addFoundExternalEditor": "添加"
     },
     "keybinds": {
       "actions": {

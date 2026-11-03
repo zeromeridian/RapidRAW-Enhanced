@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.28.0-dev-photocraft-integration — 2026-11-02
+
+### External editors
+
+- Settings → General → External Editors finds an installed Photo Craft and
+  offers to add it, set up for 16-bit TIFF.
+- Each editor can now have a preferred format (TIFF or JPEG), so **Open
+  in** opens it in one click. Editors without one still ask each time.
+- **Open in** now lists your editors first; **Original File** follows them.
+- The External Editors settings are now translated.
+
 ## 1.27.0-dev-photocraft-integration — 2026-11-02
 
 ### External editors

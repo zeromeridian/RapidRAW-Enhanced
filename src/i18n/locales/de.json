@@ -1704,7 +1704,14 @@
       "xmpSyncDesc": "Synchronisieren Sie Bewertungen, Farbmarkierungen und Tags in Standard-XMP-Filialdateien für Kompatibilität mit anderen Foto-Editoren.",
       "neutralGreyCanvas": "Neutralgraue Arbeitsfläche",
       "neutralGreyCanvasDesc": "Verwenden Sie eine neutralgraue Arbeitsfläche für eine genauere Farb- und Belichtungskorrektur, ohne das App-Design zu ändern.",
-      "enableNeutralGreyCanvas": "Neutralgrauen Hintergrund aktivieren"
+      "enableNeutralGreyCanvas": "Neutralgrauen Hintergrund aktivieren",
+      "externalEditors": "Externe Editoren",
+      "externalEditorsDesc": "Gerenderte TIFF- oder JPEG-Kopien können in diesen Anwendungen geöffnet werden. Wählen Sie das Format für jeden Editor, oder lassen Sie ThisIsRAW jedes Mal fragen.",
+      "externalEditorAskFormat": "Jedes Mal fragen",
+      "addExternalEditor": "Editor hinzufügen",
+      "removeExternalEditor": "{{name}} entfernen",
+      "externalEditorFound": "{{name}} gefunden",
+      "addFoundExternalEditor": "Hinzufügen"
     },
     "keybinds": {
       "actions": {

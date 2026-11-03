@@ -3392,6 +3392,7 @@ pub fn run() {
             export_processing::estimate_export_sizes,
             editor_round_trip::start_editor_round_trip,
             editor_round_trip::start_editing_original,
+            editor_round_trip::detect_external_editors,
             editor_round_trip::get_editor_round_trip_cache_size,
             editor_round_trip::clear_editor_round_trips,
             image_processing::calculate_auto_adjustments,

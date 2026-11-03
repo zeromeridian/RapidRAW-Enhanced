@@ -1750,7 +1750,14 @@
       "xmpSyncDesc": "Sincroniza puntuaciones, etiquetas de color y etiquetas a archivos sidecar XMP estándar para compatibilidad con otros editores de fotos.",
       "neutralGreyCanvas": "Lienzo gris neutro",
       "neutralGreyCanvasDesc": "Utiliza un lienzo gris neutro para una gradación de color y exposición más precisa sin cambiar el tema de la aplicación.",
-      "enableNeutralGreyCanvas": "Activar fondo gris neutro"
+      "enableNeutralGreyCanvas": "Activar fondo gris neutro",
+      "externalEditors": "Editores externos",
+      "externalEditorsDesc": "Las copias TIFF o JPEG renderizadas se pueden abrir en estas aplicaciones. Elige el formato que recibe cada editor o deja que ThisIsRAW pregunte cada vez.",
+      "externalEditorAskFormat": "Preguntar cada vez",
+      "addExternalEditor": "Añadir editor",
+      "removeExternalEditor": "Quitar {{name}}",
+      "externalEditorFound": "{{name}} encontrado",
+      "addFoundExternalEditor": "Añadir"
     },
     "keybinds": {
       "actions": {

@@ -719,6 +719,16 @@ pub struct ExternalEditor {
     pub id: String,
     pub name: String,
     pub path: String,
+    /// The copy to render for this editor; `None` asks each time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<ExternalEditFormat>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ExternalEditFormat {
+    Tiff,
+    Jpeg,
 }
 
 impl Default for AppSettings {
