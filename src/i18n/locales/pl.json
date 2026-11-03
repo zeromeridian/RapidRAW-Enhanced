@@ -108,7 +108,8 @@
       "resetAllParametric": "Resetuj wszystkie krzywe parametryczne",
       "resetAllPoint": "Resetuj wszystkie krzywe punktowe",
       "resetParametric": "Resetuj krzywą parametryczną ({{channel}})",
-      "resetPoint": "Resetuj krzywą punktową ({{channel}})"
+      "resetPoint": "Resetuj krzywą punktową ({{channel}})",
+      "channelTitleAdjusted": "Kanał {{channel}} (dostosowany)"
     },
     "details": {
       "aiDenoise": "Odszumianie AI",

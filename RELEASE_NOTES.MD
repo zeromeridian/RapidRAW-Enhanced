@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.28.1-dev-curves — 2026-11-03
+
+### Tone Curve
+
+- A dot under each channel button shows which curves you have adjusted.
+- The Red, Green, and Blue curves are tinted with the colour they add when
+  raised and its complement when lowered (cyan, magenta, or yellow), as in
+  Lightroom Classic.
+
 ## 1.28.0-dev-photocraft-integration — 2026-11-02
 
 ### External editors

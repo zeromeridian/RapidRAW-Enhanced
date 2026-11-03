@@ -108,7 +108,8 @@
       "resetAllParametric": "Restablecer todas las curvas paramétricas",
       "resetAllPoint": "Restablecer todas las curvas de puntos",
       "resetParametric": "Restablecer curva paramétrica de {{channel}}",
-      "resetPoint": "Restablecer curva de puntos de {{channel}}"
+      "resetPoint": "Restablecer curva de puntos de {{channel}}",
+      "channelTitleAdjusted": "Canal {{channel}} (ajustado)"
     },
     "details": {
       "aiDenoise": "Reducción de ruido IA",
