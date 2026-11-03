@@ -336,7 +336,8 @@
       "stackSelected_other": "Stack {{count}} Selected Photos",
       "unstack": "Unstack Photos",
       "virtualCopy": "Virtual Copy",
-      "autoStackByCaptureTime": "Auto-Stack by Capture Time…"
+      "autoStackByCaptureTime": "Auto-Stack by Capture Time…",
+      "originalFile": "Original File"
     },
     "toasts": {
       "couldNotShowExplorer": "Could not show file in explorer: {{err}}",
@@ -1775,7 +1776,8 @@
         "confirmClearCache": "Clear Cache",
         "confirmDeleteAllEdits": "Delete All Edits",
         "confirmTitle": "Confirm Deletion",
-        "sidecarMessage": "Are you sure you want to delete all sidecar files?\n\nThis will permanently remove all your edits for all images inside all active root folders and their subfolders."
+        "sidecarMessage": "Are you sure you want to delete all sidecar files?\n\nThis will permanently remove all your edits for all images inside all active root folders and their subfolders.",
+        "externalEditsMessage": "Are you sure you want to clear the external edit copies?\n\nEdits still open in an external editor will no longer be saved back to ThisIsRAW. Copies already saved beside your photos are kept."
       },
       "noFolders": "No folders selected",
       "statuses": {
@@ -1798,12 +1800,17 @@
         "sidecarSuccess_one": "{{count}} sidecar file deleted successfully.",
         "sidecarSuccess_other": "{{count}} sidecar files deleted successfully.",
         "aiDenoiseSuccess": "AI Denoise cache cleared successfully.",
-        "clearingAiDenoise": "Clearing AI Denoise cache..."
+        "clearingAiDenoise": "Clearing AI Denoise cache...",
+        "clearingExternalEdits": "Clearing external edit copies...",
+        "externalEditsSuccess": "External edit copies cleared successfully."
       },
       "title": "Data Management",
       "clearAiDenoise": "Clear AI Denoise Cache",
       "clearAiDenoiseButton": "Clear",
-      "clearAiDenoiseDesc": "Deletes the cached AI Denoise results ({{size}}). Images with AI Denoise enabled recalculate it the next time they are opened."
+      "clearAiDenoiseDesc": "Deletes the cached AI Denoise results ({{size}}). Images with AI Denoise enabled recalculate it the next time they are opened.",
+      "clearExternalEdits": "Clear External Edit Copies",
+      "clearExternalEditsButton": "Clear",
+      "clearExternalEditsDesc": "Deletes the working copies opened in external editors ({{size}}). Copies already saved beside your photos are kept. Copies are removed automatically after 7 days without a save."
     },
     "general": {
       "autoStackCreatedImages": "Automatically Stack Created Images",

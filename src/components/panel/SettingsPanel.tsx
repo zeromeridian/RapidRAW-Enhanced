@@ -269,6 +269,46 @@ const DataActionItem = ({
   );
 };
 
+/** The size of an app cache that Data Management can clear, and its clear action. */
+const useClearableCache = (
+  getSize: Invokes,
+  clear: Invokes,
+  isVisible: boolean,
+  statuses: { clearing: string; success: string },
+) => {
+  const [size, setSize] = useState<number | null>(null);
+  const [isClearing, setIsClearing] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const refreshSize = useCallback(() => {
+    invoke<number>(getSize).then(setSize).catch(console.error);
+  }, [getSize]);
+
+  useEffect(() => {
+    if (isVisible) refreshSize();
+  }, [isVisible, refreshSize]);
+
+  const clearCache = async () => {
+    setIsClearing(true);
+    setMessage(statuses.clearing);
+    try {
+      await invoke(clear);
+      setMessage(statuses.success);
+    } catch (err) {
+      console.error(`Failed to run ${clear}:`, err);
+      setMessage(`Error: ${err}`);
+    } finally {
+      refreshSize();
+      setTimeout(() => {
+        setIsClearing(false);
+        setMessage('');
+      }, EXECUTE_TIMEOUT);
+    }
+  };
+
+  return { size, isClearing, message, clearCache };
+};
+
 interface AiProviderSwitchProps {
   selectedProvider: string;
   onProviderChange: (provider: string) => void;
@@ -521,9 +561,6 @@ export default function SettingsPanel({
   const [sidecarImportMessage, setSidecarImportMessage] = useState('');
   const [isClearingCache, setIsClearingCache] = useState(false);
   const [cacheClearMessage, setCacheClearMessage] = useState('');
-  const [aiDenoiseCacheSize, setAiDenoiseCacheSize] = useState<number | null>(null);
-  const [isClearingAiDenoiseCache, setIsClearingAiDenoiseCache] = useState(false);
-  const [aiDenoiseCacheMessage, setAiDenoiseCacheMessage] = useState('');
   const [isClearingAiTags, setIsClearingAiTags] = useState(false);
   const [aiTagsClearMessage, setAiTagsClearMessage] = useState('');
   const [isClearingTags, setIsClearingTags] = useState(false);
@@ -1003,31 +1040,24 @@ export default function SettingsPanel({
     });
   };
 
-  const refreshAiDenoiseCacheSize = useCallback(() => {
-    invoke<number>(Invokes.GetAiDenoiseCacheSize).then(setAiDenoiseCacheSize).catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    if (activeCategory === 'processing') refreshAiDenoiseCacheSize();
-  }, [activeCategory, refreshAiDenoiseCacheSize]);
-
-  const executeClearAiDenoiseCache = async () => {
-    setIsClearingAiDenoiseCache(true);
-    setAiDenoiseCacheMessage(t('settings.data.statuses.clearingAiDenoise'));
-    try {
-      await invoke(Invokes.ClearAiDenoiseCache);
-      setAiDenoiseCacheMessage(t('settings.data.statuses.aiDenoiseSuccess'));
-    } catch (err) {
-      console.error('Failed to clear AI denoise cache:', err);
-      setAiDenoiseCacheMessage(`Error: ${err}`);
-    } finally {
-      refreshAiDenoiseCacheSize();
-      setTimeout(() => {
-        setIsClearingAiDenoiseCache(false);
-        setAiDenoiseCacheMessage('');
-      }, EXECUTE_TIMEOUT);
-    }
-  };
+  const aiDenoiseCache = useClearableCache(
+    Invokes.GetAiDenoiseCacheSize,
+    Invokes.ClearAiDenoiseCache,
+    activeCategory === 'processing',
+    {
+      clearing: t('settings.data.statuses.clearingAiDenoise'),
+      success: t('settings.data.statuses.aiDenoiseSuccess'),
+    },
+  );
+  const externalEditCache = useClearableCache(
+    Invokes.GetEditorRoundTripCacheSize,
+    Invokes.ClearEditorRoundTrips,
+    activeCategory === 'processing',
+    {
+      clearing: t('settings.data.statuses.clearingExternalEdits'),
+      success: t('settings.data.statuses.externalEditsSuccess'),
+    },
+  );
 
   const handleClearAiDenoiseCache = () => {
     setConfirmModalState({
@@ -1035,7 +1065,18 @@ export default function SettingsPanel({
       confirmVariant: 'destructive',
       isOpen: true,
       message: t('settings.data.modals.aiDenoiseMessage'),
-      onConfirm: executeClearAiDenoiseCache,
+      onConfirm: aiDenoiseCache.clearCache,
+      title: t('settings.data.modals.confirmCacheTitle'),
+    });
+  };
+
+  const handleClearExternalEdits = () => {
+    setConfirmModalState({
+      confirmText: t('settings.data.modals.confirmClearCache'),
+      confirmVariant: 'destructive',
+      isOpen: true,
+      message: t('settings.data.modals.externalEditsMessage'),
+      onConfirm: externalEditCache.clearCache,
       title: t('settings.data.modals.confirmCacheTitle'),
     });
   };
@@ -2617,13 +2658,26 @@ export default function SettingsPanel({
                         buttonAction={handleClearAiDenoiseCache}
                         buttonText={t('settings.data.clearAiDenoiseButton')}
                         description={t('settings.data.clearAiDenoiseDesc', {
-                          size: aiDenoiseCacheSize === null ? '…' : formatBytes(aiDenoiseCacheSize, t),
+                          size: aiDenoiseCache.size === null ? '…' : formatBytes(aiDenoiseCache.size, t),
                         })}
-                        disabled={!aiDenoiseCacheSize}
+                        disabled={!aiDenoiseCache.size}
                         icon={<Trash2 size={16} className="mr-2" />}
-                        isProcessing={isClearingAiDenoiseCache}
-                        message={aiDenoiseCacheMessage}
+                        isProcessing={aiDenoiseCache.isClearing}
+                        message={aiDenoiseCache.message}
                         title={t('settings.data.clearAiDenoise')}
+                      />
+
+                      <DataActionItem
+                        buttonAction={handleClearExternalEdits}
+                        buttonText={t('settings.data.clearExternalEditsButton')}
+                        description={t('settings.data.clearExternalEditsDesc', {
+                          size: externalEditCache.size === null ? '…' : formatBytes(externalEditCache.size, t),
+                        })}
+                        disabled={!externalEditCache.size}
+                        icon={<Trash2 size={16} className="mr-2" />}
+                        isProcessing={externalEditCache.isClearing}
+                        message={externalEditCache.message}
+                        title={t('settings.data.clearExternalEdits')}
                       />
 
                       <DataActionItem

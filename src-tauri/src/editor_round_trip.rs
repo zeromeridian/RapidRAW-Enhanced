@@ -5,7 +5,10 @@
 //! the source (`<stem>-Edit.<ext>`) and added to the Library, so abandoned
 //! edits leave nothing behind. Later saves replace the same copy. Sessions are
 //! kept in the catalog, so a save made while ThisIsRAW was closed is picked up
-//! on the next launch.
+//! on the next launch, and end once they have seen no new save for
+//! [`RETENTION`]. Ending a session deletes only its staging folder.
+//!
+//! Edit Original opens a non-RAW file itself and watches it in place.
 
 use std::collections::HashMap;
 use std::fs;
@@ -35,8 +38,12 @@ const SAVED_EVENT: &str = "editor-round-trip-saved";
 /// consecutive polls see the same size and modification time. Polling, rather
 /// than change notifications, also works on network volumes.
 const POLL_INTERVAL: Duration = Duration::from_millis(1500);
+const RETENTION: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 
 static SESSIONS: LazyLock<Mutex<Vec<EditorRoundTripRow>>> = LazyLock::new(Default::default);
+/// Files opened with Edit Original and the stamp last reported for each. They
+/// are watched until ThisIsRAW quits.
+static ORIGINALS: LazyLock<Mutex<HashMap<String, FileStamp>>> = LazyLock::new(Default::default);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct FileStamp {
@@ -93,12 +100,7 @@ pub async fn start_editor_round_trip(
         _ => return Err(format!("Unsupported external-edit format: {format}")),
     };
     let id = uuid::Uuid::new_v4().to_string();
-    let staging_dir = app_handle
-        .path()
-        .app_cache_dir()
-        .map_err(|error| error.to_string())?
-        .join(STAGING_FOLDER)
-        .join(&id);
+    let staging_dir = staging_root(&app_handle)?.join(&id);
     fs::create_dir_all(&staging_dir)
         .map_err(|error| format!("Could not create the external-edit folder: {error}"))?;
     let (physical_source, _) = parse_virtual_path(&source_path);
@@ -165,44 +167,216 @@ pub async fn start_editor_round_trip(
     Ok(())
 }
 
-/// Resumes the catalog's sessions and polls their staging folders.
+/// Opens a file itself in the editor and refreshes its thumbnail whenever the
+/// editor saves it.
+#[tauri::command]
+pub fn start_editing_original(
+    path: String,
+    editor_path: String,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let (physical, _) = parse_virtual_path(&path);
+    let stamp =
+        file_stamp(&physical).ok_or_else(|| format!("{} was not found", physical.display()))?;
+    let physical = physical.to_string_lossy().into_owned();
+    open_external_editor(editor_path, physical.clone())?;
+
+    // A round trip saving into this file would overwrite the direct edits.
+    let replaced: Vec<String> = SESSIONS
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|session| session.destination.as_deref() == Some(physical.as_str()))
+        .map(|session| session.id.clone())
+        .collect();
+    for id in replaced {
+        end_session(&app_handle, &id);
+    }
+    ORIGINALS.lock().unwrap().insert(physical, stamp);
+    Ok(())
+}
+
+/// The total size of all staging folders.
+#[tauri::command]
+pub fn get_editor_round_trip_cache_size(app_handle: AppHandle) -> Result<u64, String> {
+    Ok(folder_size(&staging_root(&app_handle)?))
+}
+
+/// Ends every session. Copies already saved beside their sources are kept.
+#[tauri::command]
+pub fn clear_editor_round_trips(app_handle: AppHandle) -> Result<(), String> {
+    let ids: Vec<String> = SESSIONS
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|session| session.id.clone())
+        .collect();
+    for id in ids {
+        end_session(&app_handle, &id);
+    }
+    match fs::remove_dir_all(staging_root(&app_handle)?) {
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+            Err(format!("Could not clear the external-edit folder: {error}"))
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Resumes the catalog's sessions and polls their staging folders and the
+/// files opened with Edit Original.
 pub fn start_watcher(app_handle: AppHandle) {
     thread::spawn(move || {
         match library_catalog::load_editor_round_trips(&app_handle) {
-            Ok(rows) => SESSIONS.lock().unwrap().extend(
-                rows.into_iter()
-                    .filter(|row| Path::new(&row.staging_dir).is_dir()),
-            ),
+            Ok(rows) => SESSIONS.lock().unwrap().extend(rows),
             Err(error) => log::warn!("Could not resume external edits: {error}"),
+        }
+        if let Ok(root) = staging_root(&app_handle) {
+            remove_orphaned_staging(&root, SystemTime::now());
         }
 
         let mut unsettled: HashMap<String, (PathBuf, FileStamp)> = HashMap::new();
         loop {
-            thread::sleep(POLL_INTERVAL);
+            let now = SystemTime::now();
             let sessions = SESSIONS.lock().unwrap().clone();
-            unsettled.retain(|id, _| sessions.iter().any(|session| &session.id == id));
+            let originals = ORIGINALS.lock().unwrap().clone();
+            unsettled.retain(|key, _| {
+                originals.contains_key(key) || sessions.iter().any(|session| &session.id == key)
+            });
             for session in sessions {
-                let Some(latest) = latest_saved_file(Path::new(&session.staging_dir)) else {
-                    unsettled.remove(&session.id);
-                    continue;
-                };
-                if is_handled(&session, &latest) {
-                    unsettled.remove(&session.id);
-                } else if unsettled.get(&session.id) != Some(&latest) {
-                    unsettled.insert(session.id.clone(), latest);
-                } else {
-                    // A failure (for example a file the editor still has
-                    // locked on Windows) stays unsettled and retries next poll.
-                    match promote(&app_handle, session, &latest) {
-                        Ok(id) => {
-                            unsettled.remove(&id);
+                let staging_dir = Path::new(&session.staging_dir);
+                match latest_saved_file(staging_dir) {
+                    Some(latest) if !is_handled(&session, &latest) => {
+                        if is_settled(&mut unsettled, &session.id, latest.clone()) {
+                            // A failure (for example a file the editor still
+                            // has locked on Windows) retries next poll.
+                            let id = session.id.clone();
+                            match promote(&app_handle, session, &latest) {
+                                Ok(()) => {
+                                    unsettled.remove(&id);
+                                }
+                                Err(error) => log::warn!("Could not save external edit: {error}"),
+                            }
                         }
-                        Err(error) => log::warn!("Could not save external edit: {error}"),
+                    }
+                    _ => {
+                        unsettled.remove(&session.id);
+                        if !staging_dir.is_dir() || is_expired(&session, now) {
+                            end_session(&app_handle, &session.id);
+                        }
                     }
                 }
             }
+            for (path, handled) in originals {
+                let Some(stamp) = file_stamp(Path::new(&path)) else {
+                    ORIGINALS.lock().unwrap().remove(&path);
+                    continue;
+                };
+                if stamp == handled {
+                    unsettled.remove(&path);
+                } else if is_settled(&mut unsettled, &path, (PathBuf::from(&path), stamp)) {
+                    unsettled.remove(&path);
+                    ORIGINALS.lock().unwrap().insert(path.clone(), stamp);
+                    let _ = app_handle.emit(
+                        SAVED_EVENT,
+                        RoundTripSaved {
+                            source_path: path.clone(),
+                            output_path: path,
+                            is_new: false,
+                        },
+                    );
+                }
+            }
+            thread::sleep(POLL_INTERVAL);
         }
     });
+}
+
+fn staging_root(app_handle: &AppHandle) -> Result<PathBuf, String> {
+    app_handle
+        .path()
+        .app_cache_dir()
+        .map(|cache| cache.join(STAGING_FOLDER))
+        .map_err(|error| error.to_string())
+}
+
+/// Forgets a session and deletes its staging folder.
+fn end_session(app_handle: &AppHandle, id: &str) {
+    let removed = {
+        let mut sessions = SESSIONS.lock().unwrap();
+        sessions
+            .iter()
+            .position(|session| session.id == id)
+            .map(|index| sessions.remove(index))
+    };
+    let Some(session) = removed else { return };
+    if let Err(error) = fs::remove_dir_all(&session.staging_dir)
+        && error.kind() != std::io::ErrorKind::NotFound
+    {
+        log::warn!("Could not remove external-edit folder: {error}");
+    }
+    if let Err(error) = library_catalog::delete_editor_round_trip(app_handle, id) {
+        log::warn!("Could not forget external edit: {error}");
+    }
+}
+
+/// Deletes staging folders that no session owns, for example after the catalog
+/// was moved, once they are older than [`RETENTION`].
+fn remove_orphaned_staging(root: &Path, now: SystemTime) {
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    let sessions = SESSIONS.lock().unwrap().clone();
+    for path in entries.filter_map(Result::ok).map(|entry| entry.path()) {
+        let owned = sessions
+            .iter()
+            .any(|session| Path::new(&session.staging_dir) == path);
+        let is_old = fs::metadata(&path)
+            .and_then(|metadata| metadata.modified())
+            .is_ok_and(|modified| {
+                now.duration_since(modified)
+                    .is_ok_and(|age| age > RETENTION)
+            });
+        if !owned && is_old && path.is_dir() {
+            let _ = fs::remove_dir_all(&path);
+        }
+    }
+}
+
+fn folder_size(path: &Path) -> u64 {
+    let Ok(entries) = fs::read_dir(path) else {
+        return 0;
+    };
+    entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let metadata = entry.metadata().ok()?;
+            Some(if metadata.is_dir() {
+                folder_size(&entry.path())
+            } else {
+                metadata.len()
+            })
+        })
+        .sum()
+}
+
+/// No save has been handled for [`RETENTION`]. The last handled file is the
+/// render itself until the editor saves.
+fn is_expired(session: &EditorRoundTripRow, now: SystemTime) -> bool {
+    now.duration_since(UNIX_EPOCH + Duration::from_nanos(session.saved_modified))
+        .is_ok_and(|age| age > RETENTION)
+}
+
+/// Records `latest` and reports whether the previous poll saw the same file.
+fn is_settled(
+    unsettled: &mut HashMap<String, (PathBuf, FileStamp)>,
+    key: &str,
+    latest: (PathBuf, FileStamp),
+) -> bool {
+    if unsettled.get(key) == Some(&latest) {
+        return true;
+    }
+    unsettled.insert(key.to_owned(), latest);
+    false
 }
 
 fn file_stamp(path: &Path) -> Option<FileStamp> {
@@ -257,12 +431,12 @@ fn free_destination(source_path: &str, extension: &str) -> PathBuf {
 }
 
 /// Copies a settled save beside the source, replacing this session's earlier
-/// copy unless the editor changed the file type. Returns the session id.
+/// copy unless the editor changed the file type.
 fn promote(
     app_handle: &AppHandle,
     mut session: EditorRoundTripRow,
     (file, stamp): &(PathBuf, FileStamp),
-) -> Result<String, String> {
+) -> Result<(), String> {
     let extension = file
         .extension()
         .and_then(|extension| extension.to_str())
@@ -305,7 +479,7 @@ fn promote(
             is_new,
         },
     );
-    Ok(session.id)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -352,6 +526,50 @@ mod tests {
             &session,
             &latest_saved_file(staging.path()).unwrap()
         ));
+    }
+
+    #[test]
+    fn a_save_settles_once_two_polls_agree() {
+        let mut unsettled = HashMap::new();
+        let reading = |len| {
+            (
+                PathBuf::from("IMG_1-Edit.tif"),
+                FileStamp { len, modified: 1 },
+            )
+        };
+        assert!(!is_settled(&mut unsettled, "session", reading(1)));
+        assert!(!is_settled(&mut unsettled, "session", reading(2)));
+        assert!(is_settled(&mut unsettled, "session", reading(2)));
+    }
+
+    #[test]
+    fn sessions_expire_after_a_week_without_a_save() {
+        let saved = UNIX_EPOCH + Duration::from_secs(1_800_000_000);
+        let session = session_for(
+            Path::new("/cache/external-edits/session/IMG_1-Edit.tif"),
+            FileStamp {
+                len: 1,
+                modified: saved.duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64,
+            },
+        );
+        assert!(!is_expired(&session, saved + RETENTION));
+        assert!(is_expired(
+            &session,
+            saved + RETENTION + Duration::from_secs(1)
+        ));
+    }
+
+    #[test]
+    fn only_old_unowned_staging_folders_are_removed() {
+        let root = tempfile::tempdir().unwrap();
+        let orphan = root.path().join("orphan");
+        fs::create_dir(&orphan).unwrap();
+        fs::write(orphan.join("IMG_1-Edit.tif"), b"render").unwrap();
+
+        remove_orphaned_staging(root.path(), SystemTime::now());
+        assert!(orphan.is_dir());
+        remove_orphaned_staging(root.path(), SystemTime::now() + RETENTION * 2);
+        assert!(!orphan.exists());
     }
 
     #[test]

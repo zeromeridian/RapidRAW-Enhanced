@@ -364,7 +364,8 @@
       "resetAdjustments_other": "Resetuj ustawienia w {{count}} obrazach",
       "showExplorer": "Pokaż w eksploratorze plików",
       "virtualCopy": "Kopia wirtualna",
-      "autoStackByCaptureTime": "Auto-Stack by Capture Time…"
+      "autoStackByCaptureTime": "Auto-Stack by Capture Time…",
+      "originalFile": "Oryginalny plik"
     },
     "toasts": {
       "couldNotShowExplorer": "Nie można pokazać pliku w eksploratorze: {{err}}",
@@ -1686,7 +1687,8 @@
         "confirmClearCache": "Wyczyść pamięć podręczną",
         "confirmDeleteAllEdits": "Usuń wszystkie edycje",
         "confirmTitle": "Potwierdź usunięcie",
-        "sidecarMessage": "Czy na pewno chcesz usunąć wszystkie pliki sidecar?\n\nTo trwale usunie wszystkie twoje edycje dla wszystkich obrazów wewnątrz wszystkich aktywnych folderów głównych oraz ich podfolderów."
+        "sidecarMessage": "Czy na pewno chcesz usunąć wszystkie pliki sidecar?\n\nTo trwale usunie wszystkie twoje edycje dla wszystkich obrazów wewnątrz wszystkich aktywnych folderów głównych oraz ich podfolderów.",
+        "externalEditsMessage": "Czy na pewno chcesz wyczyścić kopie edycji zewnętrznej?\n\nEdycje nadal otwarte w zewnętrznym edytorze nie wrócą już do ThisIsRAW. Kopie już zapisane obok zdjęć zostają zachowane."
       },
       "noFolders": "Nie wybrano żadnych folderów",
       "statuses": {
@@ -1715,12 +1717,17 @@
         "sidecarSuccess_one": "Pomyślnie usunięto {{count}} plik sidecar.",
         "sidecarSuccess_other": "Pomyślnie usunięto {{count}} plików sidecar.",
         "aiDenoiseSuccess": "Pamięć podręczna odszumiania AI została wyczyszczona.",
-        "clearingAiDenoise": "Czyszczenie pamięci podręcznej odszumiania AI..."
+        "clearingAiDenoise": "Czyszczenie pamięci podręcznej odszumiania AI...",
+        "clearingExternalEdits": "Czyszczenie kopii edycji zewnętrznej...",
+        "externalEditsSuccess": "Kopie edycji zewnętrznej zostały wyczyszczone."
       },
       "title": "Zarządzanie danymi",
       "clearAiDenoise": "Wyczyść pamięć podręczną odszumiania AI",
       "clearAiDenoiseButton": "Wyczyść",
-      "clearAiDenoiseDesc": "Usuwa zapisane wyniki odszumiania AI ({{size}}). Zdjęcia z włączonym odszumianiem AI przeliczą je przy następnym otwarciu."
+      "clearAiDenoiseDesc": "Usuwa zapisane wyniki odszumiania AI ({{size}}). Zdjęcia z włączonym odszumianiem AI przeliczą je przy następnym otwarciu.",
+      "clearExternalEdits": "Wyczyść kopie edycji zewnętrznej",
+      "clearExternalEditsButton": "Wyczyść",
+      "clearExternalEditsDesc": "Usuwa kopie robocze otwarte w zewnętrznych edytorach ({{size}}). Kopie już zapisane obok zdjęć zostają zachowane. Kopie są usuwane automatycznie po 7 dniach bez zapisu."
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",

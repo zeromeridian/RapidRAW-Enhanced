@@ -86,9 +86,38 @@ The steps implement the phases under "Strategy". Each one ships on its own.
      yet: a copy that is open in Develop does not reload when the editor
      saves again. The Linux Flatpak staging fallback waits for owner
      confirmation.
-3. **Step 3: cleanup and Edit Original** (Phase 1.4–1.5): not started.
-   Removes unsaved sessions after 7 days; adds the Settings → Data
-   Management control and the *Edit Original* menu item.
+3. **Step 3: cleanup and Edit Original** (Phase 1.4–1.5; MINOR release
+   `1.27.0`): built; waiting for the owner's hands-on checks.
+   - Done (backend, `editor_round_trip.rs`): a session ends once it has
+     seen no new save for 7 days (`RETENTION`, measured from the last
+     handled file's mtime, so an unhandled save is always promoted first),
+     or when its staging folder is gone. Ending deletes only the staging
+     folder and the catalog row (`library_catalog::delete_editor_round_trip`);
+     promoted copies are never touched. Saved sessions expire the same way,
+     after which **Edit Original** is how the copy is edited again. On
+     start, staging folders that no session owns are removed once older
+     than 7 days. New commands: `get_editor_round_trip_cache_size`,
+     `clear_editor_round_trips` (ends every session and empties the
+     staging root), and `start_editing_original` (opens a file itself,
+     ends any round trip whose copy it is so a later staged save cannot
+     overwrite the direct edits, and watches it in memory until quit,
+     emitting `editor-round-trip-saved` with `isNew: false` after a
+     settled save). Strict Clippy exits 0; `cargo test --lib` 112 passed.
+   - Done (frontend): Settings → Data Management → **Clear External Edit
+     Copies** (size shown, confirm dialog), sharing a new
+     `useClearableCache` hook in `SettingsPanel.tsx` with the AI Denoise
+     cache control, which now uses it too. **Open in → Original File →
+     editor** (`Invokes.StartEditingOriginal`) is enabled only for a
+     non-RAW image; the existing `editor-round-trip-saved` listener
+     refreshes its thumbnail. New strings in all 12 locales. Prettier
+     passes; no ESLint or `tsc` diagnostics on changed lines; the
+     `i18n:check` output is identical to `HEAD`'s (pre-existing failures).
+   - Built: `1.27.0-dev-photocraft-integration` `.app` (checksums in
+     `HANDOFF.md`). Not yet committed.
+   - Remaining: the owner's hands-on checks (Clear External Edit Copies
+     with an edit open; Original File on a `-Edit.tif`, save, thumbnail
+     refreshes; Original File disabled for RAW). Expiry after 7 days is
+     covered by unit tests only.
 4. **Step 4: Photo Craft entry** (Phase 2): not started. Adds
    `detect_external_editors` and a ready-made 16-bit TIFF entry.
 5. **Step 5: RAW integration** (Phase 3): deferred. Document and test the

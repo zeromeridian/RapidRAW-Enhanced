@@ -328,7 +328,8 @@
       "resetAdjustments_other": "Einstellungen bei {{count}} Bildern zurücksetzen",
       "showExplorer": "Im Explorer anzeigen",
       "virtualCopy": "Virtuelle Kopie",
-      "autoStackByCaptureTime": "Auto-Stack by Capture Time…"
+      "autoStackByCaptureTime": "Auto-Stack by Capture Time…",
+      "originalFile": "Originaldatei"
     },
     "toasts": {
       "couldNotShowExplorer": "Datei konnte nicht im Explorer angezeigt werden: {{err}}",
@@ -1600,7 +1601,8 @@
         "confirmClearCache": "Cache löschen",
         "confirmDeleteAllEdits": "Alle Bearbeitungen löschen",
         "confirmTitle": "Löschen bestätigen",
-        "sidecarMessage": "Sind Sie sicher, dass Sie alle Filialdateien löschen möchten?\n\nDies entfernt dauerhaft alle Ihre Bearbeitungen für alle Bilder in allen aktiven Stammordnern."
+        "sidecarMessage": "Sind Sie sicher, dass Sie alle Filialdateien löschen möchten?\n\nDies entfernt dauerhaft alle Ihre Bearbeitungen für alle Bilder in allen aktiven Stammordnern.",
+        "externalEditsMessage": "Möchten Sie die Kopien für externe Bearbeitung wirklich löschen?\n\nNoch in einem externen Editor geöffnete Bearbeitungen werden nicht mehr an ThisIsRAW zurückgegeben. Bereits neben Ihren Fotos gespeicherte Kopien bleiben erhalten."
       },
       "noFolders": "Keine Ordner ausgewählt",
       "statuses": {
@@ -1623,12 +1625,17 @@
         "sidecarSuccess_one": "{{count}} Filialdatei erfolgreich gelöscht.",
         "sidecarSuccess_other": "{{count}} Filialdateien erfolgreich gelöscht.",
         "aiDenoiseSuccess": "KI-Entrauschen-Cache erfolgreich geleert.",
-        "clearingAiDenoise": "KI-Entrauschen-Cache wird geleert..."
+        "clearingAiDenoise": "KI-Entrauschen-Cache wird geleert...",
+        "clearingExternalEdits": "Kopien für externe Bearbeitung werden gelöscht...",
+        "externalEditsSuccess": "Kopien für externe Bearbeitung erfolgreich gelöscht."
       },
       "title": "Datenverwaltung",
       "clearAiDenoise": "KI-Entrauschen-Cache leeren",
       "clearAiDenoiseButton": "Leeren",
-      "clearAiDenoiseDesc": "Löscht die zwischengespeicherten KI-Entrauschen-Ergebnisse ({{size}}). Bilder mit aktiviertem KI-Entrauschen berechnen es beim nächsten Öffnen neu."
+      "clearAiDenoiseDesc": "Löscht die zwischengespeicherten KI-Entrauschen-Ergebnisse ({{size}}). Bilder mit aktiviertem KI-Entrauschen berechnen es beim nächsten Öffnen neu.",
+      "clearExternalEdits": "Kopien für externe Bearbeitung löschen",
+      "clearExternalEditsButton": "Löschen",
+      "clearExternalEditsDesc": "Löscht die in externen Editoren geöffneten Arbeitskopien ({{size}}). Bereits neben Ihren Fotos gespeicherte Kopien bleiben erhalten. Kopien werden nach 7 Tagen ohne Speichern automatisch entfernt."
     },
     "general": {
       "copyNameSuffix": "Copy Name Suffix",
