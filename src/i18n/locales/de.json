@@ -491,6 +491,7 @@
       },
       "geometryHeading": "Geometrie",
       "labels": {
+        "autoStrength": "Auto Strength",
         "flipHoriz": "Horiz. spiegeln",
         "flipVert": "Vert. spiegeln",
         "lens": "Objektiv",
@@ -575,6 +576,7 @@
       "rotationHeading": "Drehung",
       "title": "Zuschnitt",
       "tooltips": {
+        "autoStrength": "How much of the automatic perspective correction to apply; leveling always stays complete",
         "compositionOverlay": "Kompositions-Überlagerung",
         "flipHoriz": "Bild horizontal spiegeln",
         "flipVert": "Bild vertikal spiegeln",

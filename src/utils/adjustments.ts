@@ -176,6 +176,7 @@ export enum CreativeAdjustment {
 
 export enum TransformAdjustment {
   TransformAutoMode = 'transformAutoMode',
+  TransformAutoStrength = 'transformAutoStrength',
   TransformGuides = 'transformGuides',
   TransformDistortion = 'transformDistortion',
   TransformVertical = 'transformVertical',
@@ -336,6 +337,7 @@ export interface Adjustments {
   tint: number;
   toneMapper: 'agx' | 'basic';
   transformAutoMode: 'auto' | 'level' | 'vertical' | 'guided' | null;
+  transformAutoStrength: number;
   transformGuides: GuidedTransformGuides;
   transformDistortion: number;
   transformVertical: number;
@@ -767,6 +769,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   tint: 0,
   toneMapper: 'basic',
   transformAutoMode: null,
+  transformAutoStrength: 100,
   transformGuides: { horizontal: [], vertical: [] },
   transformDistortion: 0,
   transformVertical: 0,
@@ -917,6 +920,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     lensVignetteEnabled: loadedAdjustments.lensVignetteEnabled ?? INITIAL_ADJUSTMENTS.lensVignetteEnabled,
     lensDistortionParams: loadedAdjustments.lensDistortionParams ?? INITIAL_ADJUSTMENTS.lensDistortionParams,
     transformAutoMode: loadedAdjustments.transformAutoMode ?? INITIAL_ADJUSTMENTS.transformAutoMode,
+    transformAutoStrength: loadedAdjustments.transformAutoStrength ?? INITIAL_ADJUSTMENTS.transformAutoStrength,
     transformGuides: {
       horizontal: (loadedAdjustments.transformGuides?.horizontal || []).slice(0, 2).map((guide) => ({ ...guide })),
       vertical: (loadedAdjustments.transformGuides?.vertical || []).slice(0, 2).map((guide) => ({ ...guide })),
@@ -1049,6 +1053,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         'flipVertical',
         'orientationSteps',
         TransformAdjustment.TransformAutoMode,
+        TransformAdjustment.TransformAutoStrength,
         TransformAdjustment.TransformGuides,
         TransformAdjustment.TransformDistortion,
         TransformAdjustment.TransformVertical,

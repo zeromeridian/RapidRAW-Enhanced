@@ -514,6 +514,7 @@
       },
       "geometryHeading": "Geometria",
       "labels": {
+        "autoStrength": "Auto Strength",
         "flipHoriz": "Rifletti Orizz.",
         "flipVert": "Rifletti Vert.",
         "lens": "Obiettivo",
@@ -598,6 +599,7 @@
       "rotationHeading": "Rotazione",
       "title": "Ritaglio",
       "tooltips": {
+        "autoStrength": "How much of the automatic perspective correction to apply; leveling always stays complete",
         "compositionOverlay": "Sovrapposizione Composizione",
         "flipHoriz": "Rifletti immagine orizzontalmente",
         "flipVert": "Rifletti immagine verticalmente",

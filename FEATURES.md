@@ -172,7 +172,15 @@ details are in `RELEASE_NOTES.MD`.
   balances rotation and both perspective axes (and remains useful for a
   level-only scene), focused horizon-straightening **Level** correction,
   **Vertical** keystone correction, pair-based **Guided Transform**, editable **Manual Transform**
-  controls, and a persistent **Constrain Crop** option. Guided
+  controls, and a persistent **Constrain Crop** option. Auto straightens
+  verticals first, adds a horizontal keystone only when it keeps them
+  straight, and picks a balanced strength that limits uneven stretch and
+  lost frame; Vertical corrects fully. After either, an **Auto Strength**
+  slider scales the perspective correction while leveling stays complete.
+  Automatic modes
+  measure sub-pixel line segments in the lens-corrected image, keep only
+  lines that share a vanishing point beyond the frame (so receding streets
+  and tabletops are ignored), and follow quarter-turn orientation. Guided
   Transform operates directly on the full Develop image while its controls
   occupy the Geometry panel. Thin blue lines provide precise placement without
   visible endpoint markers, while enlarged invisible endpoint targets preserve

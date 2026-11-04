@@ -489,6 +489,7 @@
       },
       "geometryHeading": "지오메트리",
       "labels": {
+        "autoStrength": "Auto Strength",
         "flipHoriz": "좌우 반전",
         "flipVert": "상하 반전",
         "lens": "렌즈",
@@ -573,6 +574,7 @@
       "rotationHeading": "회전",
       "title": "자르기",
       "tooltips": {
+        "autoStrength": "How much of the automatic perspective correction to apply; leveling always stays complete",
         "compositionOverlay": "구도 오버레이",
         "flipHoriz": "이미지를 좌우로 반전",
         "flipVert": "이미지를 상하로 반전",

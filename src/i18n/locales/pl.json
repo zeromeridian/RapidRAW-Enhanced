@@ -537,6 +537,7 @@
       },
       "geometryHeading": "Geometria",
       "labels": {
+        "autoStrength": "Auto Strength",
         "flipHoriz": "Przerzuć w poziomie",
         "flipVert": "Przerzuć w pionie",
         "lens": "Obiektyw",
@@ -621,6 +622,7 @@
       "rotationHeading": "Obrót",
       "title": "Kadrowanie",
       "tooltips": {
+        "autoStrength": "How much of the automatic perspective correction to apply; leveling always stays complete",
         "compositionOverlay": "Nakładka kompozycji",
         "flipHoriz": "Przerzuć obraz w poziomie",
         "flipVert": "Przerzuć obraz w pionie",
