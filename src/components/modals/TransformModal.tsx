@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import throttle from 'lodash.throttle';
-import { Adjustments } from '../../utils/adjustments';
+import { Adjustments, GuidedPerspective } from '../../utils/adjustments';
 import clsx from 'clsx';
 import Text from '../ui/Text';
 import { TextColors, TextVariants } from '../../types/typography';
@@ -21,6 +21,7 @@ interface GeometryParams {
   x_offset: number;
   y_offset: number;
   constrain_crop: boolean;
+  guided_perspective: GuidedPerspective;
   lens_distortion_amount: number;
   lens_vignette_amount: number;
   lens_tca_amount: number;
@@ -56,6 +57,7 @@ type TransformParams = Omit<
   | 'lens_tca_enabled'
   | 'lens_vignette_enabled'
   | 'constrain_crop'
+  | 'guided_perspective'
 >;
 
 interface TransformModalProps {
@@ -208,6 +210,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         const fullParams: GeometryParams = {
           ...currentParams,
           constrain_crop: currentAdjustments.transformConstrainCrop,
+          guided_perspective: currentAdjustments.guidedPerspective,
           lens_distortion_amount: (currentAdjustments.lensDistortionAmount ?? 100) / SLIDER_DIVISOR,
           lens_vignette_amount: (currentAdjustments.lensVignetteAmount ?? 100) / SLIDER_DIVISOR,
           lens_tca_amount: (currentAdjustments.lensTcaAmount ?? 100) / SLIDER_DIVISOR,
@@ -302,6 +305,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
       const fullParams: GeometryParams = {
         ...DEFAULT_PARAMS,
         constrain_crop: currentAdjustments.transformConstrainCrop,
+        guided_perspective: currentAdjustments.guidedPerspective,
         lens_distortion_amount: (currentAdjustments.lensDistortionAmount ?? 100) / SLIDER_DIVISOR,
         lens_vignette_amount: (currentAdjustments.lensVignetteAmount ?? 100) / SLIDER_DIVISOR,
         lens_tca_amount: (currentAdjustments.lensTcaAmount ?? 100) / SLIDER_DIVISOR,

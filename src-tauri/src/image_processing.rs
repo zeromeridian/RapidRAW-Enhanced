@@ -1,4 +1,5 @@
 use crate::gpu_processing::WgpuDisplay;
+use crate::guided_perspective::GuidedPerspective;
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat3, Vec2, Vec3};
 use image::{DynamicImage, GenericImageView, Rgb32FImage, Rgba};
@@ -110,6 +111,9 @@ pub struct GeometryParams {
     pub y_offset: f32,
     #[serde(default)]
     pub constrain_crop: bool,
+    /// Applied first, under every slider (see `guided_perspective`).
+    #[serde(default)]
+    pub guided_perspective: GuidedPerspective,
     pub lens_distortion_amount: f32,
     pub lens_vignette_amount: f32,
     pub lens_tca_amount: f32,
@@ -139,6 +143,7 @@ impl Default for GeometryParams {
             x_offset: 0.0,
             y_offset: 0.0,
             constrain_crop: false,
+            guided_perspective: GuidedPerspective::default(),
             lens_distortion_amount: 1.0,
             lens_vignette_amount: 1.0,
             lens_tca_amount: 1.0,
@@ -193,6 +198,7 @@ pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> Geometr
         constrain_crop: adjustments["transformConstrainCrop"]
             .as_bool()
             .unwrap_or(false),
+        guided_perspective: GuidedPerspective::from_adjustments(adjustments),
 
         lens_distortion_amount: adjustments["lensDistortionAmount"]
             .as_f64()
@@ -497,7 +503,13 @@ pub(crate) fn build_transform_matrix(
     );
     let m_offset = NaMatrix3::new(1.0, 0.0, off_x, 0.0, 1.0, off_y, 0.0, 0.0, 1.0);
 
-    t_center * m_offset * m_perspective * m_rotate * m_scale * t_uncenter
+    // The guided homography works in centered coordinates, like the sliders.
+    let m_guided = params
+        .guided_perspective
+        .homography(width, height)
+        .map_or_else(NaMatrix3::identity, |homography| homography.cast::<f32>());
+
+    t_center * m_offset * m_perspective * m_rotate * m_scale * m_guided * t_uncenter
 }
 
 fn transform_point(matrix: &NaMatrix3<f32>, x: f32, y: f32) -> Option<(f32, f32)> {
@@ -1487,6 +1499,7 @@ pub fn is_geometry_identity(params: &GeometryParams) -> bool {
         && params.scale == 100.0
         && params.x_offset == 0.0
         && params.y_offset == 0.0
+        && !params.guided_perspective.is_active()
         && dist_identity
         && tca_identity
         && vig_identity

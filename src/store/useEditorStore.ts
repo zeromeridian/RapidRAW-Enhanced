@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Adjustments, INITIAL_ADJUSTMENTS, MaskContainer, AiPatch, GuidedTransformGuides } from '../utils/adjustments';
+import { Adjustments, INITIAL_ADJUSTMENTS, MaskContainer, AiPatch } from '../utils/adjustments';
 import { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
 import { ChannelConfig } from '../components/adjustments/Curves';
 import { ImageDimensions } from '../hooks/useImageRenderSize';
@@ -21,19 +21,13 @@ interface BaseRenderSize extends ImageDimensions {
   offsetY: number;
 }
 
-export interface GuidedTransformOverlay {
-  activeOrientation: keyof GuidedTransformGuides;
-  guides: GuidedTransformGuides;
-  interactive: boolean;
-  revision: number;
-}
-
 interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
   adjustments: Adjustments;
   previewOverride: Adjustments | null;
-  guidedTransformOverlay: GuidedTransformOverlay | null;
+  /** Guided Perspective guides are being drawn on the image. */
+  isGuidedPerspectiveActive: boolean;
 
   // History State
   history: Adjustments[];
@@ -104,7 +98,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedImage: null,
   adjustments: INITIAL_ADJUSTMENTS,
   previewOverride: null,
-  guidedTransformOverlay: null,
+  isGuidedPerspectiveActive: false,
   history: [INITIAL_ADJUSTMENTS],
   historyIndex: 0,
 

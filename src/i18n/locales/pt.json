@@ -837,6 +837,20 @@
         "toggleImageDetails": "Mostrar ou ocultar detalhes da foto"
       },
       "vc": "CV"
+    },
+    "geometry": {
+      "guided": {
+        "angleRejected": "The line is too far from vertical or horizontal",
+        "clearAll": "Clear All Guides",
+        "done": "Done",
+        "hint": "Draw along edges in your photo that should be vertical or horizontal. Drag the ends of a guide to adjust it.",
+        "horizontalGuide": "Horizontal Guide {{number}}",
+        "linesStatus": "Guide Lines",
+        "maxLines": "At most 2 vertical and 2 horizontal guides",
+        "overlayLabel": "Guided Perspective guides",
+        "removeGuide": "Remove guide",
+        "verticalGuide": "Vertical Guide {{number}}"
+      }
     }
   },
   "export": {

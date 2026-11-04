@@ -61,6 +61,7 @@ export enum Invokes {
   ExportImages = 'export_images',
   StartEditorRoundTrip = 'start_editor_round_trip',
   StartEditingOriginal = 'start_editing_original',
+  GetGuidedPerspectiveFrame = 'get_guided_perspective_frame',
   DetectExternalEditors = 'detect_external_editors',
   GetAiDenoiseCacheSize = 'get_ai_denoise_cache_size',
   GetEditorRoundTripCacheSize = 'get_editor_round_trip_cache_size',

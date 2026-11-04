@@ -5,6 +5,22 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.29.0-fix-geometry — 2026-11-04
+
+### Geometry
+
+- New **Guided Perspective**, from RapidRAW, replaces Guided Transform. Draw
+  guides directly on the image along edges that should be vertical or
+  horizontal, and see the correction live. Drag a guide's ends to refine it.
+- Any combination of up to two vertical and two horizontal guides is
+  straightened exactly, including all four at once. Two guides of the same kind
+  can also simply level a tilted photo.
+- When you finish, the photo is cropped to the largest area without empty
+  borders, keeping a fixed aspect ratio if one is set.
+- **Manual Transform** sliders now fine-tune on top of the guides instead of
+  replacing them.
+- Photos edited with Guided Transform keep their look.
+
 ## 1.28.4-fix-geometry — 2026-11-04
 
 ### Geometry

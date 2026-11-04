@@ -26,7 +26,14 @@ export function useImageProcessing(
   const { previewJobIdRef, latestRenderedJobIdRef, currentResRef } = renderRefs;
 
   const selectedImage = useEditorStore((state) => state.selectedImage);
-  const adjustments = useEditorStore((state) => state.adjustments);
+  const storedAdjustments = useEditorStore((state) => state.adjustments);
+  const isGuidedPerspectiveActive = useEditorStore((state) => state.isGuidedPerspectiveActive);
+  // While guides are drawn, the preview shows the whole warped frame:
+  // uncropped and unstraightened. Saving always uses the stored adjustments.
+  const adjustments = useMemo(
+    () => (isGuidedPerspectiveActive ? { ...storedAdjustments, crop: null, rotation: 0 } : storedAdjustments),
+    [isGuidedPerspectiveActive, storedAdjustments],
+  );
   const previewOverride = useEditorStore((state) => state.previewOverride);
   const isWaveformVisible = useEditorStore((state) => state.isWaveformVisible);
   const activeWaveformChannel = useEditorStore((state) => state.activeWaveformChannel);
@@ -474,14 +481,14 @@ export function useImageProcessing(
 
         if (previewOverride) return;
 
-        debouncedSave(selectedImage.path, adjustments);
+        debouncedSave(selectedImage.path, storedAdjustments);
 
         const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
         if (appSettings?.copyPasteSettings?.autoSync && otherPaths.length > 0) {
           const prev = prevAdjustmentsRef.current;
           if (prev && prev.path === selectedImage.path) {
             const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
-            const sync = getAdjustmentChanges(prev.adjustments, adjustments, includedKeys);
+            const sync = getAdjustmentChanges(prev.adjustments, storedAdjustments, includedKeys);
             if (sync) {
               otherPaths.forEach((p) => globalImageCache.delete(p));
               // Apply updates in order so a later change to the same control always wins.
@@ -499,7 +506,7 @@ export function useImageProcessing(
             }
           }
         }
-        prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
+        prevAdjustmentsRef.current = { path: selectedImage.path, adjustments: storedAdjustments };
       }, 0);
     }
 

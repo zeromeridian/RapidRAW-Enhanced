@@ -22,7 +22,7 @@ import Slider from '../ui/Slider';
 import Dropdown from '../ui/Dropdown';
 import Switch from '../ui/Switch';
 import throttle from 'lodash.throttle';
-import { Adjustments } from '../../utils/adjustments';
+import { Adjustments, GuidedPerspective } from '../../utils/adjustments';
 import { SelectedImage } from '../ui/AppProperties';
 import clsx from 'clsx';
 import Text from '../ui/Text';
@@ -39,6 +39,7 @@ interface GeometryParams {
   x_offset: number;
   y_offset: number;
   constrain_crop: boolean;
+  guided_perspective: GuidedPerspective;
   lens_distortion_amount: number;
   lens_vignette_amount: number;
   lens_tca_amount: number;
@@ -279,6 +280,7 @@ export default function LensCorrectionModal({
           x_offset: currentAdjustments.transformXOffset ?? 0,
           y_offset: currentAdjustments.transformYOffset ?? 0,
           constrain_crop: currentAdjustments.transformConstrainCrop,
+          guided_perspective: currentAdjustments.guidedPerspective,
 
           lens_distortion_amount: currentParams.lensDistortionAmount / SLIDER_DIVISOR,
           lens_vignette_amount: currentParams.lensVignetteAmount / SLIDER_DIVISOR,
@@ -534,6 +536,7 @@ export default function LensCorrectionModal({
         x_offset: currentAdjustments.transformXOffset ?? 0,
         y_offset: currentAdjustments.transformYOffset ?? 0,
         constrain_crop: currentAdjustments.transformConstrainCrop,
+        guided_perspective: currentAdjustments.guidedPerspective,
 
         lens_distortion_amount: (currentAdjustments.lensDistortionAmount ?? 100) / SLIDER_DIVISOR,
         lens_vignette_amount: (currentAdjustments.lensVignetteAmount ?? 100) / SLIDER_DIVISOR,

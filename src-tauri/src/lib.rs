@@ -26,6 +26,7 @@ mod fog;
 mod formats;
 mod geometry_analysis;
 mod gpu_processing;
+mod guided_perspective;
 mod hdr_deghosting;
 mod identifier_migration;
 mod image_loader;
@@ -2449,7 +2450,7 @@ pub fn run() {
             generate_uncropped_preview,
             preview_geometry_transform,
             geometry_analysis::analyze_geometry,
-            geometry_analysis::solve_guided_transform,
+            guided_perspective::get_guided_perspective_frame,
             get_log_file_path,
             frontend_log,
             save_collage,

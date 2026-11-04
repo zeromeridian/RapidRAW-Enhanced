@@ -1,11 +1,14 @@
-//! Automatic (Auto, Level, Vertical) and Guided perspective correction.
+//! Automatic perspective correction (Auto, Level, Vertical).
 //!
-//! Both solve for `transformRotate`, `transformVertical`, and
+//! It solves for `transformRotate`, `transformVertical`, and
 //! `transformHorizontal` with the exact matrix the geometry warp renders
 //! with (`build_transform_matrix`), in the warp's own coordinate space: the
 //! unoriented, lens-corrected source image. Coarse orientation and flips are
 //! applied after the warp, so they only decide which source axis is vertical
 //! on screen.
+//!
+//! Guided Perspective (`guided_perspective.rs`) is separate: its homography
+//! is built from the guides at render time, and the analysis ignores it.
 
 use image::{GrayImage, ImageBuffer, Luma};
 use imageproc::edges::canny;
@@ -16,6 +19,7 @@ use nalgebra::{Matrix3, Vector3};
 use serde::{Deserialize, Serialize};
 
 use crate::AppState;
+use crate::guided_perspective::GuidedPerspective;
 use crate::image_processing::{
     GeometryParams, build_transform_matrix, compute_transform_constrain_scale, downscale_f32_image,
     get_geometry_params_from_json, is_geometry_identity, warp_image_geometry,
@@ -76,32 +80,6 @@ pub struct AutoGeometryResult {
     /// Suggested Auto Strength in percent; 100 except for Auto.
     strength: f32,
     detected_lines: usize,
-}
-
-#[derive(Clone, Copy, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct GuidedGeometryGuide {
-    x1: f32,
-    y1: f32,
-    x2: f32,
-    y2: f32,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct GuidedGeometryGuides {
-    #[serde(default)]
-    horizontal: Vec<GuidedGeometryGuide>,
-    #[serde(default)]
-    vertical: Vec<GuidedGeometryGuide>,
-}
-
-#[derive(Clone, Copy, Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct GuidedGeometryResult {
-    rotate: f32,
-    vertical: f32,
-    horizontal: f32,
-    residual: f32,
 }
 
 /// A source-space axis. Lines converging along `Vertical` are corrected by
@@ -908,7 +886,7 @@ fn warp_naturalness(matrix: &Matrix3<f32>, width: f32, height: f32) -> (f32, f32
 }
 
 /// Sutherland–Hodgman clip of a polygon against the output frame.
-fn clip_to_frame(polygon: Vec<Point>, width: f32, height: f32) -> Vec<Point> {
+pub(crate) fn clip_to_frame(polygon: Vec<Point>, width: f32, height: f32) -> Vec<Point> {
     type Edge = (fn(Point, f32) -> f32, f32);
     // Each edge keeps points where `inside(point, limit)` is not negative.
     let edges: [Edge; 4] = [
@@ -1033,6 +1011,7 @@ fn without_perspective(params: &GeometryParams) -> GeometryParams {
         x_offset: identity.x_offset,
         y_offset: identity.y_offset,
         constrain_crop: identity.constrain_crop,
+        guided_perspective: identity.guided_perspective,
         ..*params
     }
 }
@@ -1048,7 +1027,12 @@ pub async fn analyze_geometry(
         guard.as_ref().ok_or("No image loaded")?.image.clone()
     };
     let orientation_steps = js_adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
-    let base = get_geometry_params_from_json(&js_adjustments);
+    // Auto, Level, and Vertical replace Guided Perspective, so its guides
+    // do not shape the analysis.
+    let base = GeometryParams {
+        guided_perspective: GuidedPerspective::default(),
+        ..get_geometry_params_from_json(&js_adjustments)
+    };
 
     tokio::task::spawn_blocking(move || {
         let preview = downscale_f32_image(&original, ANALYSIS_SIZE, ANALYSIS_SIZE);
@@ -1062,194 +1046,6 @@ pub async fn analyze_geometry(
     })
     .await
     .map_err(|error| error.to_string())?
-}
-
-fn unorient_guided_point(
-    point: (f32, f32),
-    orientation_steps: u8,
-    flip_horizontal: bool,
-    flip_vertical: bool,
-) -> (f32, f32) {
-    let mut x = if flip_horizontal {
-        1.0 - point.0
-    } else {
-        point.0
-    };
-    let mut y = if flip_vertical {
-        1.0 - point.1
-    } else {
-        point.1
-    };
-    (x, y) = match orientation_steps % 4 {
-        1 => (y, 1.0 - x),
-        2 => (1.0 - x, 1.0 - y),
-        3 => (1.0 - y, x),
-        _ => (x, y),
-    };
-    (x, y)
-}
-
-fn unorient_guided_geometry(
-    guides: GuidedGeometryGuides,
-    orientation_steps: u8,
-    flip_horizontal: bool,
-    flip_vertical: bool,
-) -> GuidedGeometryGuides {
-    let convert_pair = |pair: Vec<GuidedGeometryGuide>| {
-        pair.into_iter()
-            .map(|guide| {
-                let first = unorient_guided_point(
-                    (guide.x1, guide.y1),
-                    orientation_steps,
-                    flip_horizontal,
-                    flip_vertical,
-                );
-                let second = unorient_guided_point(
-                    (guide.x2, guide.y2),
-                    orientation_steps,
-                    flip_horizontal,
-                    flip_vertical,
-                );
-                GuidedGeometryGuide {
-                    x1: first.0,
-                    y1: first.1,
-                    x2: second.0,
-                    y2: second.1,
-                }
-            })
-            .collect::<Vec<_>>()
-    };
-    let horizontal = convert_pair(guides.horizontal);
-    let vertical = convert_pair(guides.vertical);
-    if orientation_steps % 2 == 1 {
-        GuidedGeometryGuides {
-            horizontal: vertical,
-            vertical: horizontal,
-        }
-    } else {
-        GuidedGeometryGuides {
-            horizontal,
-            vertical,
-        }
-    }
-}
-
-fn validate_guided_pair(
-    pair: &[GuidedGeometryGuide],
-    width: f32,
-    height: f32,
-) -> Result<(), String> {
-    if pair.len() > 2 {
-        return Err("A guided orientation can contain at most two lines".to_string());
-    }
-    for guide in pair {
-        if ![guide.x1, guide.y1, guide.x2, guide.y2]
-            .into_iter()
-            .all(|value| value.is_finite() && (0.0..=1.0).contains(&value))
-        {
-            return Err("Guided line coordinates must be normalized to the image".to_string());
-        }
-        let length = (((guide.x2 - guide.x1) * width).powi(2)
-            + ((guide.y2 - guide.y1) * height).powi(2))
-        .sqrt();
-        if length < width.min(height) * 0.04 {
-            return Err("Guided lines must cover a meaningful image edge".to_string());
-        }
-    }
-    Ok(())
-}
-
-/// Guides are drawn on the preview without rotation or perspective, which
-/// still shows the user's aspect, scale, and offset. They are mapped back
-/// through that transform into the space the correction applies to.
-fn guided_axis_segments(
-    guides: &GuidedGeometryGuides,
-    base: &GeometryParams,
-    width: f32,
-    height: f32,
-) -> Option<Vec<AxisSegment>> {
-    let drawn_inverse =
-        build_transform_matrix(&Correction::NONE.apply_to(base), width, height, 1.0)
-            .try_inverse()?;
-    let unproject = |x: f32, y: f32| project(&drawn_inverse, (x * width, y * height));
-    let mut segments = Vec::new();
-    for (pair, axis) in [
-        (&guides.vertical, Axis::Vertical),
-        (&guides.horizontal, Axis::Horizontal),
-    ] {
-        if pair.len() != 2 {
-            continue;
-        }
-        for guide in pair {
-            segments.push(AxisSegment {
-                segment: LineSegment {
-                    start: unproject(guide.x1, guide.y1)?,
-                    end: unproject(guide.x2, guide.y2)?,
-                },
-                axis,
-                weight: 1.0,
-            });
-        }
-    }
-    Some(segments)
-}
-
-fn solve_guided_geometry(
-    guides: &GuidedGeometryGuides,
-    base: &GeometryParams,
-    width: f32,
-    height: f32,
-) -> Result<GuidedGeometryResult, String> {
-    validate_guided_pair(&guides.vertical, width, height)?;
-    validate_guided_pair(&guides.horizontal, width, height)?;
-    let free = FreeAxes {
-        vertical: guides.vertical.len() == 2,
-        horizontal: guides.horizontal.len() == 2,
-    };
-    if !free.vertical && !free.horizontal {
-        return Err("Complete a pair of vertical or horizontal guides first".to_string());
-    }
-
-    let unstable = || "The selected guides do not produce a stable correction".to_string();
-    let segments = guided_axis_segments(guides, base, width, height).ok_or_else(unstable)?;
-    let (correction, residual) = AlignmentProblem {
-        segments: &segments,
-        base,
-        width,
-        height,
-        free,
-    }
-    .solve()
-    .ok_or_else(unstable)?;
-    if residual > 0.01 {
-        return Err(unstable());
-    }
-    Ok(GuidedGeometryResult {
-        rotate: correction.rotate,
-        vertical: correction.vertical,
-        horizontal: correction.horizontal,
-        residual,
-    })
-}
-
-#[tauri::command]
-pub fn solve_guided_transform(
-    guides: GuidedGeometryGuides,
-    js_adjustments: serde_json::Value,
-    state: tauri::State<'_, AppState>,
-) -> Result<GuidedGeometryResult, String> {
-    let (width, height) = {
-        let guard = state.original_image.lock().unwrap();
-        let image = &guard.as_ref().ok_or("No image loaded")?.image;
-        (image.width() as f32, image.height() as f32)
-    };
-    let orientation_steps = js_adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
-    let flip_horizontal = js_adjustments["flipHorizontal"].as_bool().unwrap_or(false);
-    let flip_vertical = js_adjustments["flipVertical"].as_bool().unwrap_or(false);
-    let guides =
-        unorient_guided_geometry(guides, orientation_steps, flip_horizontal, flip_vertical);
-    let base = get_geometry_params_from_json(&js_adjustments);
-    solve_guided_geometry(&guides, &base, width, height)
 }
 
 #[cfg(test)]
@@ -1627,77 +1423,5 @@ mod tests {
 
         let result = analyze(&gray, AutoGeometryMode::Auto, 0);
         assert!(result.rotate.abs() > 1.0);
-    }
-
-    fn guide(x1: f32, y1: f32, x2: f32, y2: f32) -> GuidedGeometryGuide {
-        GuidedGeometryGuide { x1, y1, x2, y2 }
-    }
-
-    fn guided_cost_before(guides: &GuidedGeometryGuides) -> f32 {
-        let base = GeometryParams::default();
-        let segments = guided_axis_segments(guides, &base, 1200.0, 800.0).unwrap();
-        alignment_cost(&segments, &base, 1200.0, 800.0, 1.0, Correction::NONE)
-    }
-
-    fn solve_guided(guides: &GuidedGeometryGuides) -> Result<GuidedGeometryResult, String> {
-        solve_guided_geometry(guides, &GeometryParams::default(), 1200.0, 800.0)
-    }
-
-    #[test]
-    fn guided_vertical_pair_removes_convergence() {
-        let guides = GuidedGeometryGuides {
-            vertical: vec![guide(0.32, 0.1, 0.22, 0.9), guide(0.68, 0.1, 0.78, 0.9)],
-            horizontal: Vec::new(),
-        };
-        let result = solve_guided(&guides).unwrap();
-        assert!(result.residual < guided_cost_before(&guides) * 0.05);
-        assert!(result.vertical.abs() > 1.0);
-        assert_eq!(result.horizontal, 0.0);
-    }
-
-    #[test]
-    fn guided_horizontal_pair_removes_convergence() {
-        let guides = GuidedGeometryGuides {
-            vertical: Vec::new(),
-            horizontal: vec![guide(0.1, 0.32, 0.9, 0.22), guide(0.1, 0.68, 0.9, 0.78)],
-        };
-        let result = solve_guided(&guides).unwrap();
-        assert!(result.residual < guided_cost_before(&guides) * 0.05);
-        assert!(result.horizontal.abs() > 1.0);
-        assert_eq!(result.vertical, 0.0);
-    }
-
-    #[test]
-    fn guided_combined_pairs_solve_both_axes() {
-        let guides = GuidedGeometryGuides {
-            vertical: vec![guide(0.32, 0.1, 0.22, 0.9), guide(0.68, 0.1, 0.78, 0.9)],
-            horizontal: vec![guide(0.1, 0.32, 0.9, 0.22), guide(0.1, 0.68, 0.9, 0.78)],
-        };
-        let result = solve_guided(&guides).unwrap();
-        assert!(result.residual < guided_cost_before(&guides) * 0.05);
-        assert!(result.vertical.abs() > 1.0);
-        assert!(result.horizontal.abs() > 1.0);
-    }
-
-    #[test]
-    fn guided_solver_requires_a_complete_pair() {
-        let guides = GuidedGeometryGuides {
-            vertical: vec![guide(0.3, 0.1, 0.3, 0.9)],
-            horizontal: Vec::new(),
-        };
-        assert!(solve_guided(&guides).is_err());
-    }
-
-    #[test]
-    fn guided_pairs_follow_coarse_orientation_and_flips() {
-        let guides = GuidedGeometryGuides {
-            vertical: vec![guide(0.2, 0.1, 0.2, 0.9), guide(0.8, 0.1, 0.8, 0.9)],
-            horizontal: Vec::new(),
-        };
-        let restored = unorient_guided_geometry(guides, 1, true, false);
-        assert_eq!(restored.vertical.len(), 0);
-        assert_eq!(restored.horizontal.len(), 2);
-        let first = restored.horizontal[0];
-        assert!((first.y1 - first.y2).abs() < 1e-6);
     }
 }

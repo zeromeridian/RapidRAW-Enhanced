@@ -1072,12 +1072,13 @@ mod output_naming_tests {
                 "transformVertical": 21.5,
                 "transformHorizontal": -8.25,
                 "transformConstrainCrop": true,
-                "transformGuides": {
-                    "vertical": [
-                        { "id": "v1", "x1": 0.2, "y1": 0.1, "x2": 0.25, "y2": 0.9 },
-                        { "id": "v2", "x1": 0.8, "y1": 0.1, "x2": 0.75, "y2": 0.9 }
-                    ],
-                    "horizontal": []
+                "guidedPerspective": {
+                    "enabled": true,
+                    "autoCrop": true,
+                    "lines": [
+                        { "id": "v1", "type": "vertical", "p1": { "x": 0.2, "y": 0.1 }, "p2": { "x": 0.25, "y": 0.9 } },
+                        { "id": "v2", "type": "vertical", "p1": { "x": 0.8, "y": 0.1 }, "p2": { "x": 0.75, "y": 0.9 } }
+                    ]
                 }
             }),
             ..ImageMetadata::default()

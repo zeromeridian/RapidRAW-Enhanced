@@ -1,21 +1,34 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Building2, Minus, MoveDiagonal2, RotateCcw, Scan, WandSparkles } from 'lucide-react';
+import {
+  Building2,
+  Check,
+  Columns3,
+  Minus,
+  MoveDiagonal2,
+  RotateCcw,
+  Rows3,
+  Scan,
+  Trash2,
+  WandSparkles,
+  X,
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 
-import GuidedTransformModal from '../../modals/GuidedTransformModal';
 import TransformModal from '../../modals/TransformModal';
 import Slider, { SliderChangeEvent } from '../../ui/Slider';
 import Switch from '../../ui/Switch';
 import Text from '../../ui/Text';
 import PanelHeader from '../../ui/PanelHeader';
 import { useEditorActions } from '../../../hooks/useEditorActions';
+import { useGuidedPerspectiveSession } from '../../../hooks/useGuidedPerspectiveSession';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { Adjustments, GuideLine, INITIAL_ADJUSTMENTS, hasGuidedPerspective } from '../../../utils/adjustments';
+import { swapOrientationForQuarterTurn, withGuideLines } from '../../../utils/guidedPerspective';
 
 type AutoGeometryMode = 'auto' | 'level' | 'vertical';
 
@@ -25,20 +38,21 @@ export default function GeometryPanel() {
   const adjustments = useEditorStore((state) => state.adjustments);
   const { setAdjustments } = useEditorActions();
   const [isTransformModalOpen, setIsTransformModalOpen] = useState(false);
-  const [isGuidedModalOpen, setIsGuidedModalOpen] = useState(false);
   const setEditor = useEditorStore((state) => state.setEditor);
+  const isGuidedPerspectiveActive = useEditorStore((state) => state.isGuidedPerspectiveActive);
   const [analyzingGeometry, setAnalyzingGeometry] = useState<AutoGeometryMode | null>(null);
-  const hasAppliedGuidedTransform =
-    adjustments.transformAutoMode === 'guided' ||
-    adjustments.transformGuides.vertical.length === 2 ||
-    adjustments.transformGuides.horizontal.length === 2;
+  useGuidedPerspectiveSession();
+  const guideLines = adjustments.guidedPerspective.lines;
+  // Automatic and manual corrections replace or stack on the guides, so
+  // they wait until guide drawing ends.
+  const isBusy = analyzingGeometry !== null || isGuidedPerspectiveActive;
 
   const resetTransforms = () => {
     setAdjustments((previous: Adjustments) => ({
       ...previous,
       transformAutoMode: INITIAL_ADJUSTMENTS.transformAutoMode,
       transformAutoStrength: INITIAL_ADJUSTMENTS.transformAutoStrength,
-      transformGuides: INITIAL_ADJUSTMENTS.transformGuides,
+      guidedPerspective: INITIAL_ADJUSTMENTS.guidedPerspective,
       transformDistortion: INITIAL_ADJUSTMENTS.transformDistortion,
       transformVertical: INITIAL_ADJUSTMENTS.transformVertical,
       transformHorizontal: INITIAL_ADJUSTMENTS.transformHorizontal,
@@ -79,7 +93,7 @@ export default function GeometryPanel() {
           ...previous,
           transformAutoMode: mode,
           transformAutoStrength: strength,
-          transformGuides: INITIAL_ADJUSTMENTS.transformGuides,
+          guidedPerspective: INITIAL_ADJUSTMENTS.guidedPerspective,
           transformRotate: result.rotate,
           transformVertical: ((result.vertical ?? 0) * strength) / 100,
           transformHorizontal: ((result.horizontal ?? 0) * strength) / 100,
@@ -115,25 +129,15 @@ export default function GeometryPanel() {
   const buttonClass =
     'flex flex-col items-center justify-center p-3 compact:p-2 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-50';
 
-  if (isGuidedModalOpen) {
-    return (
-      <GuidedTransformModal
-        isOpen
-        onClose={() => setIsGuidedModalOpen(false)}
-        onApply={(result, guides) => {
-          setAdjustments((previous: Adjustments) => ({
-            ...previous,
-            transformAutoMode: 'guided',
-            transformGuides: guides,
-            transformRotate: result.rotate,
-            transformVertical: result.vertical,
-            transformHorizontal: result.horizontal,
-          }));
-        }}
-        currentAdjustments={adjustments}
-      />
-    );
-  }
+  const setGuideLines = (update: (lines: GuideLine[]) => GuideLine[]) =>
+    setAdjustments((previous: Adjustments) => withGuideLines(previous, update(previous.guidedPerspective.lines)));
+
+  // Guides are listed by their on-screen orientation and numbered within it.
+  const listedGuides = (['vertical', 'horizontal'] as const).flatMap((orientation) =>
+    guideLines
+      .filter((line) => swapOrientationForQuarterTurn(line.type, adjustments.orientationSteps || 0) === orientation)
+      .map((line, index) => ({ line, orientation, number: index + 1 })),
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -150,7 +154,7 @@ export default function GeometryPanel() {
                     ? 'bg-accent text-button-text shadow-sm'
                     : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
                 )}
-                disabled={analyzingGeometry !== null}
+                disabled={isBusy}
                 onClick={() => handleAutoGeometry('auto')}
                 data-tooltip={t('editor.crop.tooltips.auto')}
                 whileTap={{ scale: 0.98 }}
@@ -163,6 +167,7 @@ export default function GeometryPanel() {
               </motion.button>
               <motion.button
                 className={`${buttonClass} bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary`}
+                disabled={isBusy}
                 onClick={() => setIsTransformModalOpen(true)}
                 data-tooltip={t('editor.crop.tooltips.manualTransform')}
                 whileTap={{ scale: 0.98 }}
@@ -174,11 +179,12 @@ export default function GeometryPanel() {
               <motion.button
                 className={clsx(
                   buttonClass,
-                  hasAppliedGuidedTransform
+                  isGuidedPerspectiveActive || hasGuidedPerspective(adjustments.guidedPerspective)
                     ? 'bg-accent text-button-text shadow-sm'
                     : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
                 )}
-                onClick={() => setIsGuidedModalOpen(true)}
+                disabled={analyzingGeometry !== null}
+                onClick={() => setEditor({ isGuidedPerspectiveActive: !isGuidedPerspectiveActive })}
                 data-tooltip={t('editor.crop.tooltips.guided')}
                 whileTap={{ scale: 0.98 }}
                 type="button"
@@ -193,7 +199,7 @@ export default function GeometryPanel() {
                     ? 'bg-accent text-button-text shadow-sm'
                     : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
                 )}
-                disabled={analyzingGeometry !== null}
+                disabled={isBusy}
                 onClick={() => handleAutoGeometry('level')}
                 data-tooltip={t('editor.crop.tooltips.level')}
                 whileTap={{ scale: 0.98 }}
@@ -211,7 +217,7 @@ export default function GeometryPanel() {
                     ? 'bg-accent text-button-text shadow-sm'
                     : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
                 )}
-                disabled={analyzingGeometry !== null}
+                disabled={isBusy}
                 onClick={() => handleAutoGeometry('vertical')}
                 data-tooltip={t('editor.crop.tooltips.vertical')}
                 whileTap={{ scale: 0.98 }}
@@ -225,6 +231,57 @@ export default function GeometryPanel() {
                 </span>
               </motion.button>
             </div>
+            {isGuidedPerspectiveActive && (
+              <div className="space-y-3 compact:space-y-2 rounded-lg bg-surface p-3 compact:p-2">
+                <Text variant={TextVariants.small} color={TextColors.secondary} className="leading-relaxed">
+                  {t('editor.geometry.guided.hint')}
+                </Text>
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span>{t('editor.geometry.guided.linesStatus')}</span>
+                  <span className={guideLines.length >= 2 ? 'text-accent' : 'text-text-secondary'}>
+                    {guideLines.length} / 4
+                  </span>
+                </div>
+                {listedGuides.map(({ line, orientation, number }) => (
+                  <div
+                    className="flex items-center gap-2 rounded-md bg-bg-secondary px-2 py-1.5 text-xs text-text-secondary"
+                    key={line.id}
+                  >
+                    {orientation === 'vertical' ? <Columns3 size={14} /> : <Rows3 size={14} />}
+                    <span className="grow text-text-primary">
+                      {t(`editor.geometry.guided.${orientation}Guide`, { number })}
+                    </span>
+                    <button
+                      className="rounded-sm p-1 hover:bg-card-active hover:text-text-primary"
+                      data-tooltip={t('editor.geometry.guided.removeGuide')}
+                      onClick={() => setGuideLines((lines) => lines.filter((guide) => guide.id !== line.id))}
+                      type="button"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex gap-2">
+                  <button
+                    className="flex grow items-center justify-center gap-2 rounded-md px-3 py-2 text-sm text-text-secondary hover:bg-card-active hover:text-text-primary disabled:opacity-40"
+                    disabled={guideLines.length === 0}
+                    onClick={() => setGuideLines(() => [])}
+                    type="button"
+                  >
+                    <Trash2 size={16} />
+                    {t('editor.geometry.guided.clearAll')}
+                  </button>
+                  <button
+                    className="flex grow items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm text-button-text"
+                    onClick={() => setEditor({ isGuidedPerspectiveActive: false })}
+                    type="button"
+                  >
+                    <Check size={16} />
+                    {t('editor.geometry.guided.done')}
+                  </button>
+                </div>
+              </div>
+            )}
             {autoPerspectiveMode && (
               <div
                 className="rounded-lg bg-surface px-3 compact:px-2 pt-2 pb-3 compact:py-2"
@@ -238,7 +295,7 @@ export default function GeometryPanel() {
                   value={adjustments.transformAutoStrength}
                   defaultValue={INITIAL_ADJUSTMENTS.transformAutoStrength}
                   suffix="%"
-                  disabled={analyzingGeometry !== null}
+                  disabled={isBusy}
                   onChange={handleAutoStrengthChange}
                   onDragStateChange={handleSliderDragStateChange}
                 />
@@ -286,8 +343,8 @@ export default function GeometryPanel() {
         onApply={(parameters) => {
           setAdjustments((previous: Adjustments) => ({
             ...previous,
-            transformAutoMode: null,
-            transformGuides: INITIAL_ADJUSTMENTS.transformGuides,
+            // Manual values stack on Guided Perspective, which stays active.
+            transformAutoMode: previous.transformAutoMode === 'guided' ? 'guided' : null,
             transformDistortion: parameters.distortion,
             transformVertical: parameters.vertical,
             transformHorizontal: parameters.horizontal,
