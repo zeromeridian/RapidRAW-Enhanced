@@ -171,7 +171,7 @@ details are in `RELEASE_NOTES.MD`.
   perspective work. Geometry includes full **Auto** correction that jointly
   balances rotation and both perspective axes (and remains useful for a
   level-only scene), focused horizon-straightening **Level** correction,
-  **Vertical** keystone correction, pair-based **Guided Transform**, editable **Manual Transform**
+  **Vertical** keystone correction, **Guided Perspective**, editable **Manual Transform**
   controls, and a persistent **Constrain Crop** option. Auto straightens
   verticals first, adds a horizontal keystone only when it keeps them
   straight, and picks a balanced strength that limits uneven stretch and
@@ -180,20 +180,19 @@ details are in `RELEASE_NOTES.MD`.
   Automatic modes
   measure sub-pixel line segments in the lens-corrected image, keep only
   lines that share a vanishing point beyond the frame (so receding streets
-  and tabletops are ignored), and follow quarter-turn orientation. Guided
-  Transform operates directly on the full Develop image while its controls
-  occupy the Geometry panel. Thin blue lines provide precise placement without
-  visible endpoint markers, while enlarged invisible endpoint targets preserve
-  easy adjustment. A clearly separated full-width Reset action below the transformation-mode buttons clears
-  all transforms while retaining separate lens corrections. It accepts up to
-  two vertical and two horizontal lines. Apply and Cancel sit immediately below
-  Clear All Guides so preview completion is explicit. Either completed pair
-  corrects its parallel structures, while both
-  pairs produce a combined perpendicular correction. Guide coordinates and
-  resolved geometry persist through presets, adjustment copying, and XMP.
-  Active automatic modes remain highlighted; Guided also recognizes its
-  completed persisted guide pairs when restored. All modes synchronize their
-  rotation, vertical, and horizontal correction values through XMP. Adaptive
+  and tabletops are ignored), and follow quarter-turn orientation.
+  Guided Perspective (ported from upstream RapidRAW) draws up to two vertical
+  and two horizontal guides directly on the uncropped, live-corrected image,
+  with draggable endpoints and a guide list in the Geometry panel. Any two or
+  more guides (1V+1H, 2V, 2H, 2V+1H, 2H+1V, 2V+2H) become exactly vertical and
+  horizontal through an exact homography under the manual sliders. Leaving
+  guide drawing crops to the largest rectangle without empty borders,
+  honouring a fixed aspect ratio. Guides persist through presets, adjustment
+  copying, and XMP. A clearly separated full-width Reset action below the
+  transformation-mode buttons clears all transforms while retaining separate
+  lens corrections. Active modes remain highlighted. Automatic modes
+  synchronize their rotation, vertical, and horizontal correction values
+  through XMP. Adaptive
   contrast and line-length analysis recognizes shorter, lower-contrast
   structures, while robust grouped-line perspective estimation handles both
   parallel and converging architectural edges.
@@ -280,7 +279,7 @@ details are in `RELEASE_NOTES.MD`.
   automatic CPU fallback and a **GPU Acceleration** switch in Settings →
   Processing. AI models load only when first needed.
 - Lens Blur, Relight, and Fog maps stay aligned through lens, transform, and
-  Guided geometry changes. Their effects render at preview resolution in
+  Guided Perspective geometry changes. Their effects render at preview resolution in
   Develop for fast adjustment. Generated depth and normal maps stay local, and
   synced edits offer to regenerate them.
 

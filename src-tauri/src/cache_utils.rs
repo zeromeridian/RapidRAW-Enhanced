@@ -22,6 +22,7 @@ pub const GEOMETRY_KEYS: &[&str] = &[
     "transformXOffset",
     "transformYOffset",
     "transformConstrainCrop",
+    "guidedPerspective",
     "lensDistortionAmount",
     "lensVignetteAmount",
     "lensTcaAmount",

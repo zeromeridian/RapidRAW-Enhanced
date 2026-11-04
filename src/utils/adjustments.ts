@@ -177,7 +177,6 @@ export enum CreativeAdjustment {
 export enum TransformAdjustment {
   TransformAutoMode = 'transformAutoMode',
   TransformAutoStrength = 'transformAutoStrength',
-  TransformGuides = 'transformGuides',
   TransformDistortion = 'transformDistortion',
   TransformVertical = 'transformVertical',
   TransformHorizontal = 'transformHorizontal',
@@ -273,6 +272,7 @@ export interface Adjustments {
   grainAmount: number;
   grainRoughness: number;
   grainSize: number;
+  guidedPerspective: GuidedPerspective;
   halationAmount: number;
   highlights: number;
   hsl: Hsl;
@@ -338,7 +338,6 @@ export interface Adjustments {
   toneMapper: 'agx' | 'basic';
   transformAutoMode: 'auto' | 'level' | 'vertical' | 'guided' | null;
   transformAutoStrength: number;
-  transformGuides: GuidedTransformGuides;
   transformDistortion: number;
   transformVertical: number;
   transformHorizontal: number;
@@ -356,18 +355,27 @@ export interface Adjustments {
   whites: number;
 }
 
-export interface GeometryGuide {
+export type GuideOrientation = 'vertical' | 'horizontal';
+
+/**
+ * A Guided Perspective line in normalized coordinates of the unoriented,
+ * lens-corrected source image (before the geometry warp).
+ */
+export interface GuideLine {
   id: string;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
+  type: GuideOrientation;
+  p1: Coord;
+  p2: Coord;
 }
 
-export interface GuidedTransformGuides {
-  horizontal: GeometryGuide[];
-  vertical: GeometryGuide[];
+export interface GuidedPerspective {
+  enabled: boolean;
+  lines: GuideLine[];
+  autoCrop: boolean;
 }
+
+/** At most this many guides of each orientation. */
+export const MAX_GUIDES_PER_ORIENTATION = 2;
 
 export interface AiPatch {
   id: string;
@@ -700,6 +708,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   grainAmount: 0,
   grainRoughness: 50,
   grainSize: 25,
+  guidedPerspective: { enabled: false, lines: [], autoCrop: true },
   halationAmount: 0,
   highlights: 0,
   hsl: {
@@ -770,7 +779,6 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   toneMapper: 'basic',
   transformAutoMode: null,
   transformAutoStrength: 100,
-  transformGuides: { horizontal: [], vertical: [] },
   transformDistortion: 0,
   transformVertical: 0,
   transformHorizontal: 0,
@@ -813,6 +821,29 @@ const deepCloneParametric = (pCurve: any): ParametricCurve => ({
   green: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS, ...(pCurve?.green || {}) },
   blue: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS, ...(pCurve?.blue || {}) },
 });
+
+const clampUnit = (value: unknown, fallback: number) =>
+  Math.min(1, Math.max(0, typeof value === 'number' && Number.isFinite(value) ? value : fallback));
+
+/** Upstream's normalization: valid coordinates and at most two guides per orientation. */
+export const normalizeGuidedPerspective = (loaded?: Partial<GuidedPerspective>): GuidedPerspective => {
+  const lines: GuideLine[] = (loaded?.lines || []).map((line) => ({
+    id: line.id || uuidv4(),
+    type: line.type === 'horizontal' ? 'horizontal' : 'vertical',
+    p1: { x: clampUnit(line.p1?.x, 0), y: clampUnit(line.p1?.y, 0) },
+    p2: { x: clampUnit(line.p2?.x, 1), y: clampUnit(line.p2?.y, 1) },
+  }));
+  const ofType = (type: GuideOrientation) =>
+    lines.filter((line) => line.type === type).slice(0, MAX_GUIDES_PER_ORIENTATION);
+  return {
+    enabled: loaded?.enabled ?? false,
+    lines: [...ofType('vertical'), ...ofType('horizontal')],
+    autoCrop: loaded?.autoCrop ?? true,
+  };
+};
+
+/** Whether Guided Perspective has enough guides to correct the image. */
+export const hasGuidedPerspective = (guided: GuidedPerspective) => guided.enabled && guided.lines.length >= 2;
 
 export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any => {
   if (!loadedAdjustments) {
@@ -874,9 +905,16 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     subMasks: normalizeSubMasks(patch.subMasks),
   }));
 
+  // Guided Transform (before `1.29.0`) stored guides that solved into the
+  // sliders. Those edits keep their slider values; the guides are dropped.
+  const { transformGuides: _legacyGuides, ...current } = loadedAdjustments as Adjustments & {
+    transformGuides?: unknown;
+  };
+  const guidedPerspective = normalizeGuidedPerspective(current.guidedPerspective);
+
   return {
     ...INITIAL_ADJUSTMENTS,
-    ...loadedAdjustments,
+    ...current,
     flareAmount: loadedAdjustments.flareAmount ?? INITIAL_ADJUSTMENTS.flareAmount,
     fogAmount: loadedAdjustments.fogAmount ?? INITIAL_ADJUSTMENTS.fogAmount,
     fogDensity: loadedAdjustments.fogDensity ?? INITIAL_ADJUSTMENTS.fogDensity,
@@ -919,12 +957,12 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     lensTcaEnabled: loadedAdjustments.lensTcaEnabled ?? INITIAL_ADJUSTMENTS.lensTcaEnabled,
     lensVignetteEnabled: loadedAdjustments.lensVignetteEnabled ?? INITIAL_ADJUSTMENTS.lensVignetteEnabled,
     lensDistortionParams: loadedAdjustments.lensDistortionParams ?? INITIAL_ADJUSTMENTS.lensDistortionParams,
-    transformAutoMode: loadedAdjustments.transformAutoMode ?? INITIAL_ADJUSTMENTS.transformAutoMode,
+    guidedPerspective,
+    transformAutoMode:
+      current.transformAutoMode === 'guided' && !hasGuidedPerspective(guidedPerspective)
+        ? INITIAL_ADJUSTMENTS.transformAutoMode
+        : (current.transformAutoMode ?? INITIAL_ADJUSTMENTS.transformAutoMode),
     transformAutoStrength: loadedAdjustments.transformAutoStrength ?? INITIAL_ADJUSTMENTS.transformAutoStrength,
-    transformGuides: {
-      horizontal: (loadedAdjustments.transformGuides?.horizontal || []).slice(0, 2).map((guide) => ({ ...guide })),
-      vertical: (loadedAdjustments.transformGuides?.vertical || []).slice(0, 2).map((guide) => ({ ...guide })),
-    },
     transformDistortion: loadedAdjustments.transformDistortion ?? INITIAL_ADJUSTMENTS.transformDistortion,
     transformVertical: loadedAdjustments.transformVertical ?? INITIAL_ADJUSTMENTS.transformVertical,
     transformHorizontal: loadedAdjustments.transformHorizontal ?? INITIAL_ADJUSTMENTS.transformHorizontal,
@@ -1054,7 +1092,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         'orientationSteps',
         TransformAdjustment.TransformAutoMode,
         TransformAdjustment.TransformAutoStrength,
-        TransformAdjustment.TransformGuides,
+        'guidedPerspective',
         TransformAdjustment.TransformDistortion,
         TransformAdjustment.TransformVertical,
         TransformAdjustment.TransformHorizontal,
