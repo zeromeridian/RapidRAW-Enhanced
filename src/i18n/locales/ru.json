@@ -537,6 +537,7 @@
       },
       "geometryHeading": "Геометрия",
       "labels": {
+        "autoStrength": "Auto Strength",
         "flipHoriz": "Отразить по гориз.",
         "flipVert": "Отразить по верт.",
         "lens": "Объектив",
@@ -621,6 +622,7 @@
       "rotationHeading": "Вращение",
       "title": "Обрезка",
       "tooltips": {
+        "autoStrength": "How much of the automatic perspective correction to apply; leveling always stays complete",
         "compositionOverlay": "Сетка композиции",
         "flipHoriz": "Отразить горизонтально",
         "flipVert": "Отразить вертикально",

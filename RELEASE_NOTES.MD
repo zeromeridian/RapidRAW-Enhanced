@@ -5,6 +5,43 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.28.4-fix-geometry — 2026-11-04
+
+### Geometry
+
+- **Auto**, **Level**, and **Vertical** no longer let a few strong edges,
+  such as the splayed legs of stacked chairs, outweigh the real verticals
+  and horizontals of a scene, which could tilt an almost straight photo.
+
+## 1.28.3-fix-geometry — 2026-11-04
+
+### Geometry
+
+- **Auto** now picks a balanced strength: steep upward shots keep a little
+  convergence instead of being pinched at the bottom and losing much of the
+  frame. Gentle corrections are still applied in full, and **Auto
+  Strength** shows the chosen amount so you can change it.
+- **Auto** straightens verticals first and adds a horizontal correction only
+  when it keeps them straight, so railings, tabletops, and string lights no
+  longer skew the photo.
+- **Vertical** still applies the full correction.
+
+## 1.28.2-fix-geometry — 2026-11-04
+
+### Geometry
+
+- Fixed streaks of repeated edge pixels along the borders after a
+  perspective correction on photos with a lens profile.
+- **Auto**, **Level**, and **Vertical** are much more accurate: they measure
+  straight edges precisely, account for lens correction and Constrain Crop,
+  and no longer mistake lines receding into the scene (a street, a
+  tabletop) for tilted horizontals.
+- **Vertical** and **Auto** now work on photos rotated a quarter turn.
+- New **Auto Strength** slider after Auto or Vertical: 100 % straightens
+  fully; lower values keep some convergence for a more natural look.
+  Leveling always stays complete.
+- **Guided** now accounts for Scale, Aspect, and Constrain Crop.
+
 ## 1.28.1-dev-curves — 2026-11-03
 
 ### Tone Curve

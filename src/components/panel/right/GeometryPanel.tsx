@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import GuidedTransformModal from '../../modals/GuidedTransformModal';
 import TransformModal from '../../modals/TransformModal';
+import Slider, { SliderChangeEvent } from '../../ui/Slider';
 import Switch from '../../ui/Switch';
 import Text from '../../ui/Text';
 import PanelHeader from '../../ui/PanelHeader';
@@ -16,6 +17,8 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 
+type AutoGeometryMode = 'auto' | 'level' | 'vertical';
+
 export default function GeometryPanel() {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
@@ -23,7 +26,8 @@ export default function GeometryPanel() {
   const { setAdjustments } = useEditorActions();
   const [isTransformModalOpen, setIsTransformModalOpen] = useState(false);
   const [isGuidedModalOpen, setIsGuidedModalOpen] = useState(false);
-  const [analyzingGeometry, setAnalyzingGeometry] = useState<'auto' | 'level' | 'vertical' | null>(null);
+  const setEditor = useEditorStore((state) => state.setEditor);
+  const [analyzingGeometry, setAnalyzingGeometry] = useState<AutoGeometryMode | null>(null);
   const hasAppliedGuidedTransform =
     adjustments.transformAutoMode === 'guided' ||
     adjustments.transformGuides.vertical.length === 2 ||
@@ -33,6 +37,7 @@ export default function GeometryPanel() {
     setAdjustments((previous: Adjustments) => ({
       ...previous,
       transformAutoMode: INITIAL_ADJUSTMENTS.transformAutoMode,
+      transformAutoStrength: INITIAL_ADJUSTMENTS.transformAutoStrength,
       transformGuides: INITIAL_ADJUSTMENTS.transformGuides,
       transformDistortion: INITIAL_ADJUSTMENTS.transformDistortion,
       transformVertical: INITIAL_ADJUSTMENTS.transformVertical,
@@ -46,29 +51,66 @@ export default function GeometryPanel() {
     }));
   };
 
-  const handleAutoGeometry = async (mode: 'auto' | 'level' | 'vertical') => {
+  const autoPerspectiveMode =
+    adjustments.transformAutoMode === 'auto' || adjustments.transformAutoMode === 'vertical'
+      ? adjustments.transformAutoMode
+      : null;
+
+  // `keepStrength` re-applies the analysis at the strength the user chose
+  // instead of the one the backend suggests.
+  const handleAutoGeometry = async (mode: AutoGeometryMode, keepStrength = false) => {
     if (!selectedImage || analyzingGeometry) return;
 
     setAnalyzingGeometry(mode);
     try {
-      const result = await invoke<{ horizontal?: number; rotate: number; vertical?: number }>('analyze_geometry', {
-        mode,
-        jsAdjustments: adjustments,
+      // The backend reports only the axes the mode corrected; on a
+      // quarter-turned photo the on-screen verticals are the horizontal axis.
+      // Auto suggests a balanced strength; Vertical and Level suggest 100 %.
+      const result = await invoke<{
+        horizontal: number | null;
+        rotate: number;
+        strength: number;
+        vertical: number | null;
+      }>('analyze_geometry', { mode, jsAdjustments: adjustments });
+      setAdjustments((previous: Adjustments) => {
+        const strength = keepStrength ? previous.transformAutoStrength : result.strength;
+        // Auto Strength scales only the perspective; leveling stays complete.
+        return {
+          ...previous,
+          transformAutoMode: mode,
+          transformAutoStrength: strength,
+          transformGuides: INITIAL_ADJUSTMENTS.transformGuides,
+          transformRotate: result.rotate,
+          transformVertical: ((result.vertical ?? 0) * strength) / 100,
+          transformHorizontal: ((result.horizontal ?? 0) * strength) / 100,
+        };
       });
-      setAdjustments((previous: Adjustments) => ({
-        ...previous,
-        transformAutoMode: mode,
-        transformGuides: INITIAL_ADJUSTMENTS.transformGuides,
-        transformRotate: result.rotate,
-        transformVertical: mode !== 'level' && result.vertical !== undefined ? result.vertical : 0,
-        transformHorizontal: mode === 'auto' && result.horizontal !== undefined ? result.horizontal : 0,
-      }));
     } catch (error) {
       toast.error(t('editor.crop.autoGeometryFailed', { error: String(error) }));
     } finally {
       setAnalyzingGeometry(null);
     }
   };
+
+  const handleAutoStrengthChange = (event: SliderChangeEvent) => {
+    const strength = Number(event.target.value);
+    // At 0 % the full correction is no longer stored, so analyze again.
+    const needsAnalysis = adjustments.transformAutoStrength <= 0 && strength > 0;
+    setAdjustments((previous: Adjustments) => {
+      const ratio = previous.transformAutoStrength > 0 ? strength / previous.transformAutoStrength : 0;
+      return {
+        ...previous,
+        transformAutoStrength: strength,
+        transformVertical: previous.transformVertical * ratio,
+        transformHorizontal: previous.transformHorizontal * ratio,
+      };
+    });
+    if (needsAnalysis && autoPerspectiveMode) {
+      void handleAutoGeometry(autoPerspectiveMode, true);
+    }
+  };
+
+  const handleSliderDragStateChange = (isDragging: boolean) => setEditor({ isSliderDragging: isDragging });
 
   const buttonClass =
     'flex flex-col items-center justify-center p-3 compact:p-2 rounded-lg transition-colors disabled:cursor-wait disabled:opacity-50';
@@ -183,6 +225,25 @@ export default function GeometryPanel() {
                 </span>
               </motion.button>
             </div>
+            {autoPerspectiveMode && (
+              <div
+                className="rounded-lg bg-surface px-3 compact:px-2 pt-2 pb-3 compact:py-2"
+                data-tooltip={t('editor.crop.tooltips.autoStrength')}
+              >
+                <Slider
+                  label={t('editor.crop.labels.autoStrength')}
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={adjustments.transformAutoStrength}
+                  defaultValue={INITIAL_ADJUSTMENTS.transformAutoStrength}
+                  suffix="%"
+                  disabled={analyzingGeometry !== null}
+                  onChange={handleAutoStrengthChange}
+                  onDragStateChange={handleSliderDragStateChange}
+                />
+              </div>
+            )}
             <motion.button
               className="w-full flex items-center justify-center gap-2 rounded-lg border border-text-secondary/40 bg-surface px-3 py-3 compact:py-2 text-sm font-medium text-text-primary transition-colors hover:border-accent hover:bg-card-active"
               onClick={resetTransforms}

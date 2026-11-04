@@ -489,6 +489,7 @@
       },
       "geometryHeading": "ジオメトリ",
       "labels": {
+        "autoStrength": "Auto Strength",
         "flipHoriz": "水平反転",
         "flipVert": "垂直反転",
         "lens": "レンズ",
@@ -573,6 +574,7 @@
       "rotationHeading": "回転",
       "title": "切り抜き",
       "tooltips": {
+        "autoStrength": "How much of the automatic perspective correction to apply; leveling always stays complete",
         "compositionOverlay": "構図ガイド",
         "flipHoriz": "画像を水平方向に反転",
         "flipVert": "画像を垂直方向に反転",

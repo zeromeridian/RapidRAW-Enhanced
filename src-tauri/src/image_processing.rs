@@ -396,6 +396,18 @@ pub fn downscale_f32_image(image: &DynamicImage, nwidth: u32, nheight: u32) -> D
     result
 }
 
+/// Output pixels whose source position falls outside the image stay black
+/// instead of repeating edge pixels.
+#[inline(always)]
+fn is_outside_source(x: f32, y: f32, src_width: usize, src_height: usize) -> bool {
+    x.is_nan()
+        || y.is_nan()
+        || x < 0.0
+        || y < 0.0
+        || x >= (src_width as f32 - 1.0)
+        || y >= (src_height as f32 - 1.0)
+}
+
 #[inline(always)]
 fn interpolate_pixel(
     src_raw: &[f32],
@@ -405,13 +417,7 @@ fn interpolate_pixel(
     y: f32,
     pixel_out: &mut [f32],
 ) {
-    if x.is_nan()
-        || y.is_nan()
-        || x < 0.0
-        || y < 0.0
-        || x >= (src_width as f32 - 1.0)
-        || y >= (src_height as f32 - 1.0)
-    {
+    if is_outside_source(x, y, src_width, src_height) {
         return;
     }
 
@@ -448,7 +454,7 @@ fn interpolate_pixel(
     }
 }
 
-fn build_transform_matrix(
+pub(crate) fn build_transform_matrix(
     params: &GeometryParams,
     width: f32,
     height: f32,
@@ -520,7 +526,11 @@ fn transform_covers_output(matrix: &NaMatrix3<f32>, width: f32, height: f32) -> 
         })
 }
 
-fn compute_transform_constrain_scale(params: &GeometryParams, width: f32, height: f32) -> f32 {
+pub(crate) fn compute_transform_constrain_scale(
+    params: &GeometryParams,
+    width: f32,
+    height: f32,
+) -> f32 {
     let base = build_transform_matrix(params, width, height, 1.0);
     if transform_covers_output(&base, width, height) {
         return 1.0;
@@ -601,6 +611,11 @@ fn interpolate_pixel_with_tca(
     let src_raw = tca.src_raw;
     let src_width = tca.src_width;
     let src_height = tca.src_height;
+    // The red and blue channels below may still clamp by their sub-pixel
+    // TCA shift at the image edge.
+    if is_outside_source(base_x, base_y, src_width, src_height) {
+        return;
+    }
     let cx = tca.cx;
     let cy = tca.cy;
     let gx = base_x;
@@ -3685,8 +3700,9 @@ mod tests {
     use super::{
         AllAdjustments, GeometryParams, GlobalAdjustments, MaskAdjustments, build_transform_matrix,
         compute_transform_constrain_scale, get_global_adjustments_from_json,
-        get_mask_adjustments_from_json, transform_covers_output,
+        get_mask_adjustments_from_json, transform_covers_output, warp_image_geometry,
     };
+    use image::{DynamicImage, Rgb, Rgb32FImage};
     use serde_json::json;
     use std::mem::size_of;
 
@@ -3713,6 +3729,28 @@ mod tests {
         assert!(scale > 1.0);
         let constrained = build_transform_matrix(&params, 1600.0, 1000.0, scale);
         assert!(transform_covers_output(&constrained, 1600.0, 1000.0));
+    }
+
+    #[test]
+    fn tca_warp_leaves_pixels_outside_the_source_black() {
+        let source = DynamicImage::ImageRgb32F(Rgb32FImage::from_pixel(64, 48, Rgb([1.0; 3])));
+        let params = GeometryParams {
+            x_offset: 50.0,
+            tca_vr: 1.002,
+            tca_vb: 0.998,
+            ..GeometryParams::default()
+        };
+        let warped = warp_image_geometry(&source, params).into_rgb32f();
+        // The offset shifts the source right by half the width, so the left
+        // half of the output has no source pixels.
+        assert_eq!(warped.get_pixel(4, 24).0, [0.0; 3]);
+        assert!(
+            warped
+                .get_pixel(48, 24)
+                .0
+                .iter()
+                .all(|value| (value - 1.0).abs() < 1e-4)
+        );
     }
 
     #[test]

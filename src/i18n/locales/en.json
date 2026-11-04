@@ -512,6 +512,7 @@
       "labels": {
         "analyzing": "Analyzing…",
         "auto": "Auto",
+        "autoStrength": "Auto Strength",
         "constrainCrop": "Constrain Crop",
         "flipHoriz": "Flip Horiz",
         "flipVert": "Flip Vert",
@@ -602,6 +603,7 @@
       "title": "Crop",
       "tooltips": {
         "auto": "Automatically balance rotation and vertical and horizontal perspective",
+        "autoStrength": "How much of the automatic perspective correction to apply; leveling always stays complete",
         "compositionOverlay": "Composition Overlay",
         "constrainCrop": "Automatically zoom to prevent empty edges after geometry corrections",
         "flipHoriz": "Flip image horizontally",

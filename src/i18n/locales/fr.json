@@ -514,6 +514,7 @@
       },
       "geometryHeading": "Géométrie",
       "labels": {
+        "autoStrength": "Auto Strength",
         "flipHoriz": "Miroir Horiz",
         "flipVert": "Miroir Vert",
         "lens": "Objectif",
@@ -598,6 +599,7 @@
       "rotationHeading": "Rotation",
       "title": "Recadrage",
       "tooltips": {
+        "autoStrength": "How much of the automatic perspective correction to apply; leveling always stays complete",
         "compositionOverlay": "Superposition de composition",
         "flipHoriz": "Retourner l'image horizontalement",
         "flipVert": "Retourner l'image verticalement",

@@ -489,6 +489,7 @@
       },
       "geometryHeading": "几何",
       "labels": {
+        "autoStrength": "Auto Strength",
         "flipHoriz": "水平翻转",
         "flipVert": "垂直翻转",
         "lens": "镜头",
@@ -573,6 +574,7 @@
       "rotationHeading": "旋转",
       "title": "裁剪",
       "tooltips": {
+        "autoStrength": "How much of the automatic perspective correction to apply; leveling always stays complete",
         "compositionOverlay": "构图叠加",
         "flipHoriz": "水平翻转图像",
         "flipVert": "垂直翻转图像",
