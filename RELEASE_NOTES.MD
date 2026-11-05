@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.29.1-fix-top-bar — 2026-11-05
+
+### Develop
+
+- **Open in** is now also available when you right-click the image you are
+  editing, so you can send it to Photoshop, Photo Craft, or another external
+  editor without going back to the Library.
+
 ## 1.29.0-fix-geometry — 2026-11-04
 
 ### Geometry
