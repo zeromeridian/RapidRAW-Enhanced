@@ -216,6 +216,76 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
     [albumIcons, t],
   );
 
+  const buildOpenInOption = useCallback(
+    (sourcePath: string, { disabled, canEditOriginal }: { disabled: boolean; canEditOriginal: boolean }): Option => {
+      const startExternalEdit = async (format: ExternalEditFormat, editor: ExternalEditor) => {
+        const { selectedImage, adjustments } = useEditorStore.getState();
+        useProcessStore.getState().setExportState({
+          status: Status.Exporting,
+          progress: { current: 0, total: 1 },
+          errorMessage: '',
+        });
+        try {
+          await invoke(Invokes.StartEditorRoundTrip, {
+            sourcePath,
+            editorPath: editor.path,
+            format,
+            currentEditPath: selectedImage?.path || null,
+            currentEditAdjustments: adjustments || null,
+          });
+        } catch (error) {
+          const message = typeof error === 'string' ? error : 'External edit failed';
+          toast.error(message);
+          useProcessStore.getState().setExportState({ status: Status.Error, errorMessage: message });
+        }
+      };
+
+      const editOriginal = async (editor: ExternalEditor) => {
+        try {
+          await invoke(Invokes.StartEditingOriginal, { path: sourcePath, editorPath: editor.path });
+        } catch (error) {
+          toast.error(typeof error === 'string' ? error : 'External edit failed');
+        }
+      };
+
+      const externalEditors = (useSettingsStore.getState().appSettings?.externalEditors || []).filter(
+        (editor: ExternalEditor) => editor.path,
+      );
+      return {
+        disabled: disabled || externalEditors.length === 0,
+        icon: ExternalLink,
+        label: t('contextMenus.thumbnail.openIn'),
+        submenu: [
+          ...externalEditors.map((editor: ExternalEditor) => {
+            const { format } = editor;
+            return format
+              ? {
+                  label: `${editor.name} (${EXTERNAL_EDIT_FORMAT_LABELS[format]})`,
+                  onClick: () => startExternalEdit(format, editor),
+                }
+              : {
+                  label: editor.name,
+                  submenu: EXTERNAL_EDIT_FORMATS.map((choice) => ({
+                    label: EXTERNAL_EDIT_FORMAT_LABELS[choice],
+                    onClick: () => startExternalEdit(choice, editor),
+                  })),
+                };
+          }),
+          { type: OPTION_SEPARATOR },
+          {
+            disabled: !canEditOriginal,
+            label: t('contextMenus.thumbnail.originalFile'),
+            submenu: externalEditors.map((editor: ExternalEditor) => ({
+              label: editor.name,
+              onClick: () => editOriginal(editor),
+            })),
+          },
+        ],
+      };
+    },
+    [t],
+  );
+
   const handleEditorContextMenu = useCallback(
     (event: any) => {
       event.preventDefault();
@@ -238,6 +308,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           icon: FileInput,
           onClick: () => setRightPanel(Panel.Export),
         },
+        // RAW files have no pixels an editor could save back, so only a rendered copy is offered.
+        buildOpenInOption(selectedImage.path, { disabled: false, canEditOriginal: !selectedImage.isRaw }),
         { type: OPTION_SEPARATOR },
         { label: t('contextMenus.editor.undo'), icon: Undo, onClick: undo, disabled: !canUndo },
         { label: t('contextMenus.editor.redo'), icon: Redo, onClick: redo, disabled: !canRedo },
@@ -380,6 +452,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       showContextMenu(event.clientX, event.clientY, options);
     },
     [
+      buildOpenInOption,
       getCommonTags,
       handleCopyAdjustments,
       handlePasteAdjustments,
@@ -583,69 +656,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         }
       };
 
-      const startExternalEdit = async (format: ExternalEditFormat, editor: ExternalEditor) => {
-        useProcessStore.getState().setExportState({
-          status: Status.Exporting,
-          progress: { current: 0, total: 1 },
-          errorMessage: '',
-        });
-        try {
-          await invoke(Invokes.StartEditorRoundTrip, {
-            sourcePath: finalSelection[0],
-            editorPath: editor.path,
-            format,
-            currentEditPath: selectedImage?.path || null,
-            currentEditAdjustments: useEditorStore.getState().adjustments || null,
-          });
-        } catch (error) {
-          const message = typeof error === 'string' ? error : 'External edit failed';
-          toast.error(message);
-          useProcessStore.getState().setExportState({ status: Status.Error, errorMessage: message });
-        }
-      };
-
-      const editOriginal = async (editor: ExternalEditor) => {
-        try {
-          await invoke(Invokes.StartEditingOriginal, { path: finalSelection[0], editorPath: editor.path });
-        } catch (error) {
-          toast.error(typeof error === 'string' ? error : 'External edit failed');
-        }
-      };
-
-      const externalEditors = (appSettings?.externalEditors || []).filter((editor: ExternalEditor) => editor.path);
       // RAW files have no pixels an editor could save back, so only a rendered copy is offered.
-      const canEditOriginal = imageList.some((image) => image.path === finalSelection[0] && !image.is_raw);
-      const openInOption = {
-        disabled: !isSingleSelection || externalEditors.length === 0,
-        icon: ExternalLink,
-        label: t('contextMenus.thumbnail.openIn'),
-        submenu: [
-          ...externalEditors.map((editor: ExternalEditor) => {
-            const { format } = editor;
-            return format
-              ? {
-                  label: `${editor.name} (${EXTERNAL_EDIT_FORMAT_LABELS[format]})`,
-                  onClick: () => startExternalEdit(format, editor),
-                }
-              : {
-                  label: editor.name,
-                  submenu: EXTERNAL_EDIT_FORMATS.map((choice) => ({
-                    label: EXTERNAL_EDIT_FORMAT_LABELS[choice],
-                    onClick: () => startExternalEdit(choice, editor),
-                  })),
-                };
-          }),
-          { type: OPTION_SEPARATOR },
-          {
-            disabled: !canEditOriginal,
-            label: t('contextMenus.thumbnail.originalFile'),
-            submenu: externalEditors.map((editor: ExternalEditor) => ({
-              label: editor.name,
-              onClick: () => editOriginal(editor),
-            })),
-          },
-        ],
-      };
+      const openInOption = buildOpenInOption(finalSelection[0], {
+        disabled: !isSingleSelection,
+        canEditOriginal: imageList.some((image) => image.path === finalSelection[0] && !image.is_raw),
+      });
 
       const handleRemoveFromAlbum = async () => {
         if (!activeAlbumId) return;
@@ -991,6 +1006,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       showContextMenu(event.clientX, event.clientY, options);
     },
     [
+      buildOpenInOption,
       getCommonTags,
       buildAddToAlbumMenu,
       handleCopyAdjustments,

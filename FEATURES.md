@@ -66,7 +66,8 @@ details are in `RELEASE_NOTES.MD`.
   Photoshop, Pixelmator Pro, or any desktop editor executable in General
   Settings (an installed Photo Craft is found and offered automatically),
   choose TIFF, JPEG, or ask-each-time per editor, then right-click one image
-  to open a 16-bit TIFF or JPEG copy in that editor. The copy appears beside the original as `<name>-Edit` only
+  in the Library or the image being edited in Develop (**Open in**) to open a
+  16-bit TIFF or JPEG copy in that editor. The copy appears beside the original as `<name>-Edit` only
   once it is saved in the editor, later saves update it in place, several
   edits can run at once, and saves made while ThisIsRAW was closed are
   picked up on the next launch. Unsaved working copies are removed after 7
