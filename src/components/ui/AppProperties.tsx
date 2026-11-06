@@ -175,7 +175,7 @@ export type LightsOutDimLevel = (typeof LIGHTS_OUT_DIM_LEVELS)[number];
 export const DEFAULT_LIGHTS_OUT_DIM_LEVEL: LightsOutDimLevel = 80;
 
 /** Width in pixels of the border drawn around the photograph in full Lights Out; 0 draws none. */
-export const LIGHTS_OUT_BORDER_WIDTHS = [0, 1, 2, 4, 8, 16, 32] as const;
+export const LIGHTS_OUT_BORDER_WIDTHS = [0, 1, 2, 4, 8, 16, 32, 48, 64, 96, 128] as const;
 export type LightsOutBorderWidth = (typeof LIGHTS_OUT_BORDER_WIDTHS)[number];
 export const DEFAULT_LIGHTS_OUT_BORDER_WIDTH: LightsOutBorderWidth = 0;
 export const DEFAULT_LIGHTS_OUT_BORDER_COLOR = LightsOutScreenColor.White;

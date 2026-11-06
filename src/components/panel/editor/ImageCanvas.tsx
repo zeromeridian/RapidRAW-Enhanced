@@ -2955,7 +2955,7 @@ const ImageCanvas = memo(
             <div className="absolute inset-0 w-full h-full">
               <svg
                 className="pointer-events-none"
-                {...lightsOutTarget(hasRenderSize && !isCropViewVisible)}
+                {...lightsOutTarget(hasRenderSize && !isCropViewVisible, 0, true)}
                 viewBox={thumbnailSize ? `0 0 ${thumbnailSize.width} ${thumbnailSize.height}` : undefined}
                 style={
                   hasRenderSize
@@ -2982,7 +2982,7 @@ const ImageCanvas = memo(
                     fill="none"
                     height={thumbnailSize.height}
                     width={thumbnailSize.width}
-                    {...lightsOutTarget(!isCropViewVisible)}
+                    {...lightsOutTarget(!isCropViewVisible, 0, true)}
                   />
                 )}
                 {displayState.base && !isWgpuActive && (
@@ -3291,7 +3291,7 @@ const ImageCanvas = memo(
         >
           {cropPreviewUrl && uncroppedImageRenderSize && (
             <div
-              {...lightsOutTarget(isCropViewVisible)}
+              {...lightsOutTarget(isCropViewVisible, 0, true)}
               style={{
                 height: uncroppedImageRenderSize.height,
                 position: 'relative',

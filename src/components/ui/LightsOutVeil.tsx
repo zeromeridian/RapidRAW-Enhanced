@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
@@ -34,6 +34,8 @@ export default function LightsOutVeil() {
   const opacity = lightsOutMode === 'off' ? 0 : isOut ? 1 : dimLevel / 100;
   const pathRef = useRef<SVGPathElement>(null);
   const borderPathRef = useRef<SVGPathElement>(null);
+  const borderClipRef = useRef<SVGPathElement>(null);
+  const borderClipId = `lights-out-border-clip-${useId().replace(/:/g, '')}`;
   // The last active mode keeps its colour while the layer fades out.
   const [shownMode, setShownMode] = useState<Exclude<LightsOutMode, 'off'>>('dim');
   const [isTracking, setIsTracking] = useState(false);
@@ -71,13 +73,17 @@ export default function LightsOutVeil() {
   useEffect(() => {
     const path = pathRef.current;
     const borderPath = borderPathRef.current;
-    if (!isTracking || !path || !borderPath) return;
+    const borderClip = borderClipRef.current;
+    if (!isTracking || !path || !borderPath || !borderClip) return;
 
     let frame = 0;
     let last = { veil: '', border: '' };
     const track = () => {
       const next = buildLightsOutPaths(shownBorderWidth);
-      if (next.veil !== last.veil) path.setAttribute('d', next.veil);
+      if (next.veil !== last.veil) {
+        path.setAttribute('d', next.veil);
+        borderClip.setAttribute('d', next.veil);
+      }
       if (next.border !== last.border) borderPath.setAttribute('d', next.border);
       last = next;
       frame = requestAnimationFrame(track);
@@ -88,6 +94,7 @@ export default function LightsOutVeil() {
       cancelAnimationFrame(frame);
       path.removeAttribute('d');
       borderPath.removeAttribute('d');
+      borderClip.removeAttribute('d');
     };
   }, [isTracking, shownBorderWidth]);
 
@@ -106,9 +113,15 @@ export default function LightsOutVeil() {
         ref={pathRef}
         style={{ fill, transition: `fill ${LIGHTS_OUT_FADE_MS}ms ease-in-out` }}
       />
+      <defs>
+        <clipPath id={borderClipId}>
+          <path clipRule="evenodd" ref={borderClipRef} />
+        </clipPath>
+      </defs>
       <path
+        clipPath={`url(#${borderClipId})`}
         fill={LIGHTS_OUT_SCREEN_COLORS[borderColor]}
-        fillRule="evenodd"
+        fillRule="nonzero"
         pointerEvents={pointerEvents}
         ref={borderPathRef}
       />
