@@ -2098,6 +2098,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
             crop={crop}
             finalPreviewUrl={finalPreviewUrl}
             handleCropComplete={handleCropComplete}
+            imageFitInset={lightsOutBorderInset}
             imageRenderSize={imageRenderSize}
             interactivePatch={interactivePatch}
             isAiEditing={isAiEditing}
