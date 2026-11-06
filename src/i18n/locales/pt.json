@@ -1745,7 +1745,7 @@
       "lightsOutScreenColor": "Lights Out screen color",
       "lightsOutScreenColorDesc": "The color that covers everything except the photo in Lights Out.",
       "lightsOutBorderWidth": "Lights Out border",
-      "lightsOutBorderWidthDesc": "A border of this width around the photo in Lights Out.",
+      "lightsOutBorderWidthDesc": "A border of this width around the photo in Develop in Lights Out.",
       "lightsOutBorderNone": "None",
       "lightsOutBorderColor": "Lights Out border color",
       "lightsOutBorderColorDesc": "The color of the border around the photo in Lights Out.",

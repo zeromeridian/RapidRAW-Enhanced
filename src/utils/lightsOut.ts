@@ -13,6 +13,8 @@ import type { LightsOutMode } from '../store/useUIStore';
 
 /** Marks an element that stays lit in Lights Out; its value is the corner radius in pixels. */
 export const LIGHTS_OUT_TARGET_ATTRIBUTE = 'data-lights-out-target';
+/** Marks a lit element that also gets the Lights Out border; only the photo being edited does. */
+export const LIGHTS_OUT_BORDER_ATTRIBUTE = 'data-lights-out-border';
 /** Marks a scroll or viewport container whose bounds clip the lit areas inside it. */
 export const LIGHTS_OUT_CLIP_ATTRIBUTE = 'data-lights-out-clip';
 
@@ -49,8 +51,10 @@ export const normalizeLightsOutBorderWidth = (value?: number | null): LightsOutB
   LIGHTS_OUT_BORDER_WIDTHS.find((width) => width === value) ?? DEFAULT_LIGHTS_OUT_BORDER_WIDTH;
 
 /** Spread onto an element to keep it lit in Lights Out. */
-export const lightsOutTarget = (isLit = true, radius = 0) =>
-  isLit ? { [LIGHTS_OUT_TARGET_ATTRIBUTE]: String(radius) } : {};
+export const lightsOutTarget = (isLit = true, radius = 0, hasBorder = false) =>
+  isLit
+    ? { [LIGHTS_OUT_TARGET_ATTRIBUTE]: String(radius), ...(hasBorder && { [LIGHTS_OUT_BORDER_ATTRIBUTE]: '' }) }
+    : {};
 
 export const lightsOutClip = { [LIGHTS_OUT_CLIP_ATTRIBUTE]: '' };
 
@@ -67,6 +71,7 @@ interface LitArea {
   bounds: Hole;
   /** The part of the viewport the lit element may show in. */
   visible: Omit<Hole, 'radius'>;
+  hasBorder: boolean;
 }
 
 const clipHole = (hole: Hole, visible: LitArea['visible']): Hole | null => {
@@ -106,6 +111,7 @@ const collectLitAreas = (): LitArea[] =>
         right: Math.min(clip?.right ?? window.innerWidth, window.innerWidth),
         bottom: Math.min(clip?.bottom ?? window.innerHeight, window.innerHeight),
       },
+      hasBorder: element.hasAttribute(LIGHTS_OUT_BORDER_ATTRIBUTE),
     };
   });
 
@@ -118,19 +124,21 @@ const expandHole = ({ left, top, right, bottom, radius }: Hole, by: number): Hol
 });
 
 /**
- * Even-odd paths in viewport pixels: `veil` covers the whole viewport except the lit elements, and `border` is a
- * ring of `borderWidth` around each of them (empty when the width is 0). Both stay inside each element's clip.
+ * Paths in viewport pixels. `veil` (even-odd) covers the whole viewport except the lit elements. `border`
+ * (nonzero, every subpath wound the same way) is the union of the bordered lit elements grown by `borderWidth`,
+ * empty when the width is 0; drawing it clipped to `veil` keeps it off every lit element. Both stay inside each
+ * element's clip.
  */
 export const buildLightsOutPaths = (borderWidth: number) => {
   const { innerWidth: width, innerHeight: height } = window;
   const veil = [`M0 0H${width}V${height}H0Z`];
   const border: string[] = [];
-  collectLitAreas().forEach(({ bounds, visible }) => {
+  collectLitAreas().forEach(({ bounds, visible, hasBorder }) => {
     const hole = clipHole(bounds, visible);
     if (!hole) return;
     veil.push(roundedRectPath(hole));
-    const outer = borderWidth > 0 ? clipHole(expandHole(bounds, borderWidth), visible) : null;
-    if (outer) border.push(roundedRectPath(outer), roundedRectPath(hole));
+    const outer = hasBorder && borderWidth > 0 ? clipHole(expandHole(bounds, borderWidth), visible) : null;
+    if (outer) border.push(roundedRectPath(outer));
   });
   return { veil: veil.join(''), border: border.join('') };
 };

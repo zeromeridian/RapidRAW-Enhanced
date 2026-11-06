@@ -5,6 +5,23 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.30.8-feature-lights-out — 2026-11-06
+
+### Lights Out
+
+- The **Lights Out border** now appears only around the photo in Develop.
+  The Library and Culling show just the photos on the Lights Out background.
+
+## 1.30.7-feature-lights-out — 2026-11-06
+
+### Lights Out
+
+- The **Lights Out border** can now be up to 128 px wide (new sizes 48, 64,
+  96, and 128 px).
+- In the Library grid, the border no longer shows black stripes or covers
+  parts of neighboring thumbnails: the borders of adjacent photos merge into
+  one even frame.
+
 ## 1.30.6-feature-lights-out — 2026-11-06
 
 ### Lights Out
