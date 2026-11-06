@@ -112,6 +112,7 @@ function App() {
     compactEditorPanelHeightOverride,
     activeRightPanel,
     isSettingsOpen,
+    isLightsOut,
     setUI,
     setRightPanel,
   } = useUIStore(
@@ -128,6 +129,7 @@ function App() {
       compactEditorPanelHeightOverride: state.compactEditorPanelHeightOverride,
       activeRightPanel: state.activeRightPanel,
       isSettingsOpen: state.isSettingsOpen,
+      isLightsOut: state.lightsOutMode !== 'off',
       setUI: state.setUI,
       setRightPanel: state.setRightPanel,
     })),
@@ -715,7 +717,9 @@ function App() {
 
   const shouldHideFolderTree = isAndroid;
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
-  const useMacWindowShell = osPlatform === 'macos' && !appSettings?.decorations && !isWindowFullScreen && !isFullScreen;
+  // Lights Out squares the window so its corners darken with the screen covers.
+  const useMacWindowShell =
+    osPlatform === 'macos' && !appSettings?.decorations && !isWindowFullScreen && !isFullScreen && !isLightsOut;
 
   return (
     <>

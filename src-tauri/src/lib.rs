@@ -38,6 +38,7 @@ mod lens_blur;
 mod lens_correction;
 mod library_catalog;
 mod lightroom_xmp;
+mod lights_out_cover;
 mod lut_processing;
 mod mask_generation;
 mod multi_exposure;
@@ -102,7 +103,7 @@ use crate::mask_generation::{
     MaskDefinition, generate_mask_bitmap, get_cached_or_generate_mask,
     resolve_warped_image_for_masks,
 };
-use crate::window_customizer::PinchZoomDisablePlugin;
+use crate::window_customizer::{MAIN_WINDOW_LABEL, PinchZoomDisablePlugin};
 pub use adjustment_utils::*;
 pub use android_integration::*;
 pub use app_settings::*;
@@ -2082,7 +2083,9 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(PinchZoomDisablePlugin)
-        .on_window_event(|window, event| if let tauri::WindowEvent::Resized(size) = event {
+        .on_window_event(|window, event| if let tauri::WindowEvent::Resized(size) = event
+            && window.label() == MAIN_WINDOW_LABEL
+        {
             let state = window.state::<AppState>();
             if let Some(ctx) = state.gpu_context.lock().unwrap().as_ref()
                 && let Ok(mut display_lock) = ctx.display.try_lock()
@@ -2350,6 +2353,8 @@ pub fn run() {
                     }
                 });
 
+                lights_out_cover::install(&window);
+
                 let window_for_handler = window.clone();
                 let pending_state_for_handler = pending_window_state.clone();
 
@@ -2580,6 +2585,7 @@ pub fn run() {
             lens_correction::get_lens_distortion_params,
             negative_conversion::preview_negative_conversion,
             negative_conversion::convert_negatives,
+            lights_out_cover::set_lights_out_cover,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -119,6 +119,7 @@ export enum Invokes {
   SaveSettings = 'save_settings',
   SetColorLabelForPaths = 'set_color_label_for_paths',
   SetFlagForPaths = 'set_flag_for_paths',
+  SetLightsOutCover = 'set_lights_out_cover',
   SetRatingForPaths = 'set_rating_for_paths',
   SyncImageStacksToXmp = 'sync_image_stacks_to_xmp',
   ShowInFinder = 'show_in_finder',

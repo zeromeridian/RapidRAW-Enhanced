@@ -18,7 +18,10 @@ details are in `RELEASE_NOTES.MD`.
 - Lightroom-style **Lights Out** in Library and Develop: **L** cycles Normal →
   Lights Dim → Lights Out (**Shift+L** backward, both configurable; Escape
   restores Normal first). One fading layer darkens everything except the
-  photo without changing the layout: in Develop only the photo being edited
+  photo without changing the layout, and covers the rest of every screen,
+  including the menu bar, Dock, and notification banners on macOS (not on Wayland, where only the app
+  window darkens). Lights Out turns off when the window loses focus, for
+  example when switching apps. In Develop only the photo being edited
   stays lit; in the Library Grid or List every thumbnail stays lit unless two
   or more photos are selected, in which case only those do; in Culling the
   compared photos stay lit. Dim keeps the interface usable; Lights Out blocks
