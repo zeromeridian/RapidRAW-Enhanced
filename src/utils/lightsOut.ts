@@ -5,13 +5,17 @@ import {
   LightsOutDimLevel,
   LightsOutScreenColor,
 } from '../components/ui/AppProperties';
+import type { LightsOutMode } from '../store/useUIStore';
 
 /** Marks an element that stays lit in Lights Out; its value is the corner radius in pixels. */
 export const LIGHTS_OUT_TARGET_ATTRIBUTE = 'data-lights-out-target';
 /** Marks a scroll or viewport container whose bounds clip the lit areas inside it. */
 export const LIGHTS_OUT_CLIP_ATTRIBUTE = 'data-lights-out-clip';
 
+/** Also used by `public/lights-out-cover.html` and `FADE_DURATION` in `src-tauri/src/lights_out_cover.rs`. */
 export const LIGHTS_OUT_FADE_MS = 300;
+/** Emitted by the backend when the main window loses focus; matches `DEACTIVATED_EVENT` in `lights_out_cover.rs`. */
+export const LIGHTS_OUT_DEACTIVATED_EVENT = 'lights-out-deactivated';
 
 export const LIGHTS_OUT_SCREEN_COLORS: Record<LightsOutScreenColor, string> = {
   [LightsOutScreenColor.Black]: '#000000',
@@ -20,6 +24,10 @@ export const LIGHTS_OUT_SCREEN_COLORS: Record<LightsOutScreenColor, string> = {
   [LightsOutScreenColor.LightGray]: '#c8c8c8',
   [LightsOutScreenColor.White]: '#ffffff',
 };
+
+/** Lights Dim always darkens with black; Lights Out uses the chosen screen colour. */
+export const lightsOutColor = (mode: Exclude<LightsOutMode, 'off'>, screenColor: LightsOutScreenColor) =>
+  mode === 'out' ? LIGHTS_OUT_SCREEN_COLORS[screenColor] : LIGHTS_OUT_SCREEN_COLORS[LightsOutScreenColor.Black];
 
 export const normalizeLightsOutDimLevel = (value?: number | null): LightsOutDimLevel =>
   LIGHTS_OUT_DIM_LEVELS.find((level) => level === value) ?? DEFAULT_LIGHTS_OUT_DIM_LEVEL;

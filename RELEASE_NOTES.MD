@@ -5,6 +5,27 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.30.2-feature-lights-out — 2026-11-06
+
+### Lights Out
+
+- On macOS, notification banners no longer appear on top of Lights Dim or
+  Lights Out.
+- The thin light line along the window edge and the uncovered window corners
+  are gone in Lights Dim and Lights Out.
+
+## 1.30.1-feature-lights-out — 2026-11-06
+
+### Lights Out
+
+- **Lights Dim** and **Lights Out** now darken the entire screen, like
+  Lightroom Classic: the desktop, other monitors, and on macOS the menu bar
+  and Dock fade together with the interface.
+- Lights Dim still lets you click anything on screen. Lights Out also blocks
+  clicks outside the app window.
+- Switching to another app, or opening a system dialog, turns Lights Out off;
+  it stays off when you come back.
+
 ## 1.30.0-feature-lights-out — 2026-11-05
 
 ### Lights Out
