@@ -1,7 +1,11 @@
 import {
+  DEFAULT_LIGHTS_OUT_BORDER_COLOR,
+  DEFAULT_LIGHTS_OUT_BORDER_WIDTH,
   DEFAULT_LIGHTS_OUT_DIM_LEVEL,
   DEFAULT_LIGHTS_OUT_SCREEN_COLOR,
+  LIGHTS_OUT_BORDER_WIDTHS,
   LIGHTS_OUT_DIM_LEVELS,
+  LightsOutBorderWidth,
   LightsOutDimLevel,
   LightsOutScreenColor,
 } from '../components/ui/AppProperties';
@@ -32,8 +36,17 @@ export const lightsOutColor = (mode: Exclude<LightsOutMode, 'off'>, screenColor:
 export const normalizeLightsOutDimLevel = (value?: number | null): LightsOutDimLevel =>
   LIGHTS_OUT_DIM_LEVELS.find((level) => level === value) ?? DEFAULT_LIGHTS_OUT_DIM_LEVEL;
 
+const findLightsOutColor = (value?: string | null) =>
+  Object.values(LightsOutScreenColor).find((color) => color === value);
+
 export const normalizeLightsOutScreenColor = (value?: string | null): LightsOutScreenColor =>
-  Object.values(LightsOutScreenColor).find((color) => color === value) ?? DEFAULT_LIGHTS_OUT_SCREEN_COLOR;
+  findLightsOutColor(value) ?? DEFAULT_LIGHTS_OUT_SCREEN_COLOR;
+
+export const normalizeLightsOutBorderColor = (value?: string | null): LightsOutScreenColor =>
+  findLightsOutColor(value) ?? DEFAULT_LIGHTS_OUT_BORDER_COLOR;
+
+export const normalizeLightsOutBorderWidth = (value?: number | null): LightsOutBorderWidth =>
+  LIGHTS_OUT_BORDER_WIDTHS.find((width) => width === value) ?? DEFAULT_LIGHTS_OUT_BORDER_WIDTH;
 
 /** Spread onto an element to keep it lit in Lights Out. */
 export const lightsOutTarget = (isLit = true, radius = 0) =>
@@ -49,6 +62,24 @@ interface Hole {
   radius: number;
 }
 
+interface LitArea {
+  /** The lit element's bounds, unclipped. */
+  bounds: Hole;
+  /** The part of the viewport the lit element may show in. */
+  visible: Omit<Hole, 'radius'>;
+}
+
+const clipHole = (hole: Hole, visible: LitArea['visible']): Hole | null => {
+  const clipped = {
+    left: Math.max(hole.left, visible.left),
+    top: Math.max(hole.top, visible.top),
+    right: Math.min(hole.right, visible.right),
+    bottom: Math.min(hole.bottom, visible.bottom),
+    radius: hole.radius,
+  };
+  return clipped.right - clipped.left >= 1 && clipped.bottom - clipped.top >= 1 ? clipped : null;
+};
+
 const round = (value: number) => Math.round(value * 100) / 100;
 
 const roundedRectPath = ({ left, top, right, bottom, radius }: Hole) => {
@@ -62,26 +93,44 @@ const roundedRectPath = ({ left, top, right, bottom, radius }: Hole) => {
   );
 };
 
-/** The visible part of every lit element, in viewport pixels. */
-const collectHoles = (): Hole[] => {
-  const holes: Hole[] = [];
-  document.querySelectorAll<Element>(`[${LIGHTS_OUT_TARGET_ATTRIBUTE}]`).forEach((element) => {
-    const rect = element.getBoundingClientRect();
+/** Every lit element, in viewport pixels. */
+const collectLitAreas = (): LitArea[] =>
+  Array.from(document.querySelectorAll<Element>(`[${LIGHTS_OUT_TARGET_ATTRIBUTE}]`), (element) => {
+    const { left, top, right, bottom } = element.getBoundingClientRect();
     const clip = element.closest(`[${LIGHTS_OUT_CLIP_ATTRIBUTE}]`)?.getBoundingClientRect();
-    const hole = {
-      left: Math.max(rect.left, clip?.left ?? 0, 0),
-      top: Math.max(rect.top, clip?.top ?? 0, 0),
-      right: Math.min(rect.right, clip?.right ?? window.innerWidth, window.innerWidth),
-      bottom: Math.min(rect.bottom, clip?.bottom ?? window.innerHeight, window.innerHeight),
-      radius: Number(element.getAttribute(LIGHTS_OUT_TARGET_ATTRIBUTE)) || 0,
+    return {
+      bounds: { left, top, right, bottom, radius: Number(element.getAttribute(LIGHTS_OUT_TARGET_ATTRIBUTE)) || 0 },
+      visible: {
+        left: Math.max(clip?.left ?? 0, 0),
+        top: Math.max(clip?.top ?? 0, 0),
+        right: Math.min(clip?.right ?? window.innerWidth, window.innerWidth),
+        bottom: Math.min(clip?.bottom ?? window.innerHeight, window.innerHeight),
+      },
     };
-    if (hole.right - hole.left >= 1 && hole.bottom - hole.top >= 1) holes.push(hole);
   });
-  return holes;
-};
 
-/** An even-odd path covering the whole viewport except the lit elements. */
-export const buildLightsOutPath = () => {
+const expandHole = ({ left, top, right, bottom, radius }: Hole, by: number): Hole => ({
+  left: left - by,
+  top: top - by,
+  right: right + by,
+  bottom: bottom + by,
+  radius: radius > 0 ? radius + by : 0,
+});
+
+/**
+ * Even-odd paths in viewport pixels: `veil` covers the whole viewport except the lit elements, and `border` is a
+ * ring of `borderWidth` around each of them (empty when the width is 0). Both stay inside each element's clip.
+ */
+export const buildLightsOutPaths = (borderWidth: number) => {
   const { innerWidth: width, innerHeight: height } = window;
-  return [`M0 0H${width}V${height}H0Z`, ...collectHoles().map(roundedRectPath)].join('');
+  const veil = [`M0 0H${width}V${height}H0Z`];
+  const border: string[] = [];
+  collectLitAreas().forEach(({ bounds, visible }) => {
+    const hole = clipHole(bounds, visible);
+    if (!hole) return;
+    veil.push(roundedRectPath(hole));
+    const outer = borderWidth > 0 ? clipHole(expandHole(bounds, borderWidth), visible) : null;
+    if (outer) border.push(roundedRectPath(outer), roundedRectPath(hole));
+  });
+  return { veil: veil.join(''), border: border.join('') };
 };

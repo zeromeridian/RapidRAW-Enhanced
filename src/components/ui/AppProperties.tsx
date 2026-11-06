@@ -174,6 +174,12 @@ export const LIGHTS_OUT_DIM_LEVELS = [50, 70, 80, 90] as const;
 export type LightsOutDimLevel = (typeof LIGHTS_OUT_DIM_LEVELS)[number];
 export const DEFAULT_LIGHTS_OUT_DIM_LEVEL: LightsOutDimLevel = 80;
 
+/** Width in pixels of the border drawn around the photograph in full Lights Out; 0 draws none. */
+export const LIGHTS_OUT_BORDER_WIDTHS = [0, 1, 2, 4, 8, 16, 32] as const;
+export type LightsOutBorderWidth = (typeof LIGHTS_OUT_BORDER_WIDTHS)[number];
+export const DEFAULT_LIGHTS_OUT_BORDER_WIDTH: LightsOutBorderWidth = 0;
+export const DEFAULT_LIGHTS_OUT_BORDER_COLOR = LightsOutScreenColor.White;
+
 export enum Panel {
   Adjustments = 'adjustments',
   Ai = 'ai',
@@ -324,9 +330,10 @@ export interface AppSettings {
   toneCurvePresets?: ToneCurvePreset[];
   leftPanelWidth?: number;
   rightPanelWidth?: number;
-  blackFrame?: BlackFrameSettings;
   lightsOutDimLevel?: LightsOutDimLevel;
   lightsOutScreenColor?: LightsOutScreenColor;
+  lightsOutBorderWidth?: LightsOutBorderWidth;
+  lightsOutBorderColor?: LightsOutScreenColor;
   externalEditors?: ExternalEditor[];
 }
 
@@ -348,15 +355,6 @@ export interface DetectedEditor {
   name: string;
   path: string;
   format: ExternalEditFormat;
-}
-
-export interface BlackFrameSettings {
-  unit: 'percent' | 'pixels';
-  locked: boolean;
-  top: number;
-  right: number;
-  bottom: number;
-  left: number;
 }
 
 export interface BrushSettings {

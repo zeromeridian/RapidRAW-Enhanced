@@ -21,8 +21,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useAiMasking } from '../../hooks/useAiMasking';
-import { lightsOutClip } from '../../utils/lightsOut';
-import { normalizeBlackFrame } from '../../utils/lightsOutFrame';
+import { lightsOutClip, normalizeLightsOutBorderWidth } from '../../utils/lightsOut';
 
 const parseRgb = (rgbStr: string): [number, number, number, number] => {
   const match = rgbStr.match(/[\d.]+/g);
@@ -308,11 +307,15 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     return null;
   }, [selectedImage, adjustments.crop, adjustments.orientationSteps, isGuidedPerspectiveActive]);
 
-  const lightsOutFrame = useMemo(
-    () => (lightsOutMode === 'out' ? normalizeBlackFrame(appSettings?.blackFrame) : undefined),
-    [appSettings?.blackFrame, lightsOutMode],
+  // Fit leaves room for the Lights Out border, which is drawn outside the photo and clipped to the stage.
+  const lightsOutBorderInset =
+    lightsOutMode === 'out' ? normalizeLightsOutBorderWidth(appSettings?.lightsOutBorderWidth) : 0;
+  const imageRenderSize = useImageRenderSize(
+    imageContainerRef,
+    croppedDimensions,
+    lightsOutBorderInset,
+    selectedImage?.path,
   );
-  const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions, lightsOutFrame, selectedImage?.path);
   const imageRenderSizeRef = useRef(imageRenderSize);
   imageRenderSizeRef.current = imageRenderSize;
 

@@ -5,6 +5,23 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.30.4-feature-lights-out — 2026-11-06
+
+### Lights Out
+
+- The **Lights Out frame** setting is gone: the whole screen around the
+  photo now darkens, so it no longer added anything.
+- At Fit zoom the photo shrinks just enough to keep the **Lights Out
+  border** fully visible, even with the panels hidden.
+
+## 1.30.3-feature-lights-out — 2026-11-06
+
+### Lights Out
+
+- New **Lights Out border** setting in **General**: draw a border of 1 to
+  32 px around the photo in Lights Out, in black, gray, or white, for example
+  a white border on a black screen. The frame preview shows it.
+
 ## 1.30.2-feature-lights-out — 2026-11-06
 
 ### Lights Out
