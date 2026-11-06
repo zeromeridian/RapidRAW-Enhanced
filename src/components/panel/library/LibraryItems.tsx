@@ -24,6 +24,7 @@ import { getDisplayFilename, getFileTypeBadgeLabel } from '../../../utils/output
 import { getImageFlag, ImageFlag } from '../../../utils/imageFlags';
 import ImageFlagBadge from '../../ui/ImageFlagBadge';
 import { writeLibraryDragPayload } from '../../../utils/libraryDragDrop';
+import { lightsOutTarget } from '../../../utils/lightsOut';
 
 type StackDropEdge = 'before' | 'after';
 
@@ -38,6 +39,8 @@ const STACK_SPINE_POSITION_CLASSES: Record<StackMemberPosition, string> = {
 };
 
 const STACK_ACCENT_COLOR = '#f97316';
+// Corner radius of a grid thumbnail (`rounded-md`), so Lights Out lights exactly its shape.
+const THUMBNAIL_RADIUS = 6;
 
 const getImageDimensions = (exif: Record<string, string> | null | undefined) => {
   if (!exif) return null;
@@ -1224,6 +1227,10 @@ const RowComponent = ({
         return (
           <div
             key={imageFile.path}
+            {...lightsOutTarget(
+              multiSelectedSet.size < 2 || multiSelectedSet.has(imageFile.path),
+              isListView ? 0 : THUMBNAIL_RADIUS,
+            )}
             style={{
               width: isListView ? '100%' : itemWidth,
               height: itemHeight,

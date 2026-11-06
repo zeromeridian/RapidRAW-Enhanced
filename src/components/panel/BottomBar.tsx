@@ -614,7 +614,7 @@ export default function BottomBar({
   };
 
   return (
-    <div ref={rootRef} className="lights-out-chrome shrink-0 bg-bg-secondary rounded-lg flex flex-col">
+    <div ref={rootRef} className="shrink-0 bg-bg-secondary rounded-lg flex flex-col">
       {!isLibraryView && showFilmstrip && (
         <div
           className={clsx('overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}

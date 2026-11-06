@@ -1692,8 +1692,8 @@
       "system": "系统默认",
       "theme": "主题",
       "themeDesc": "更改应用程序的外观和风格。",
-      "blackFrame": "Black mode frame",
-      "blackFrameDesc": "Set the black border reserved around the photograph in Black Lights Out. Presets populate editable values; the frame affects only Fit view in Black mode.",
+      "blackFrame": "Lights Out frame",
+      "blackFrameDesc": "The smallest distance between the photo and the window edges in Lights Out, at Fit zoom. It only takes effect where the photo would otherwise come closer to an edge, for example with the panels hidden.",
       "blackFrameUnit": "Units",
       "blackFramePercent": "Percent of short edge",
       "blackFramePixels": "Pixels",
@@ -1713,6 +1713,17 @@
         "right": "Right",
         "bottom": "Bottom",
         "left": "Left"
+      },
+      "lightsOutDimLevel": "Lights Dim level",
+      "lightsOutDimLevelDesc": "How strongly Lights Dim darkens everything except the photo.",
+      "lightsOutScreenColor": "Lights Out screen color",
+      "lightsOutScreenColorDesc": "The color that covers everything except the photo in Lights Out.",
+      "lightsOutScreenColors": {
+        "black": "Black",
+        "darkGray": "Dark Gray",
+        "mediumGray": "Medium Gray",
+        "lightGray": "Light Gray",
+        "white": "White"
       },
       "title": "通用设置",
       "xmpSync": "XMP 元数据同步",

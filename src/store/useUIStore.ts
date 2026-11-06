@@ -22,7 +22,7 @@ export interface CollapsibleSectionsState {
   effects: boolean;
 }
 
-export type LightsOutMode = 'off' | 'dim' | 'black';
+export type LightsOutMode = 'off' | 'dim' | 'out';
 
 export interface ConfirmModalState {
   confirmText?: string;
@@ -287,7 +287,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   requestSelectionClear: () => set((state) => ({ selectionClearRequest: state.selectionClearRequest + 1 })),
   cycleLightsOut: (direction = 1) =>
     set((state) => {
-      const modes: LightsOutMode[] = ['off', 'dim', 'black'];
+      const modes: LightsOutMode[] = ['off', 'dim', 'out'];
       const currentIndex = modes.indexOf(state.lightsOutMode);
       return { lightsOutMode: modes[(currentIndex + direction + modes.length) % modes.length] };
     }),

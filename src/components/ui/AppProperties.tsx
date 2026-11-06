@@ -157,6 +157,22 @@ export enum PanelDensity {
 
 export const DEFAULT_PANEL_DENSITY = PanelDensity.Compact;
 
+/** Fill of the screen around the photograph in full Lights Out. */
+export enum LightsOutScreenColor {
+  Black = 'black',
+  DarkGray = 'darkGray',
+  MediumGray = 'mediumGray',
+  LightGray = 'lightGray',
+  White = 'white',
+}
+
+export const DEFAULT_LIGHTS_OUT_SCREEN_COLOR = LightsOutScreenColor.Black;
+
+/** How strongly Lights Dim darkens the interface, in percent. */
+export const LIGHTS_OUT_DIM_LEVELS = [50, 70, 80, 90] as const;
+export type LightsOutDimLevel = (typeof LIGHTS_OUT_DIM_LEVELS)[number];
+export const DEFAULT_LIGHTS_OUT_DIM_LEVEL: LightsOutDimLevel = 80;
+
 export enum Panel {
   Adjustments = 'adjustments',
   Ai = 'ai',
@@ -308,6 +324,8 @@ export interface AppSettings {
   leftPanelWidth?: number;
   rightPanelWidth?: number;
   blackFrame?: BlackFrameSettings;
+  lightsOutDimLevel?: LightsOutDimLevel;
+  lightsOutScreenColor?: LightsOutScreenColor;
   externalEditors?: ExternalEditor[];
 }
 

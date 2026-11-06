@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.30.0-feature-lights-out — 2026-11-05
+
+### Lights Out
+
+- **Lights Out** now works like Lightroom Classic. Press **L** to go from
+  Normal to Lights Dim to Lights Out: everything except your photo fades
+  darker while the panels and the photo stay exactly where they are.
+- In the Library, all thumbnails stay lit; select two or more photos and only
+  those stay lit. In Develop only the photo you are editing stays lit.
+- Lights Dim keeps the interface usable. Lights Out covers it completely and
+  ignores clicks outside the photo.
+- New settings in **General**: **Lights Dim level** (50–90 %) and **Lights Out
+  screen color** (black, dark gray, medium gray, light gray, or white).
+- The **Lights Out frame** now sets the minimum distance between the photo and
+  the window edges. Hide the panels with **F** to see your photo framed.
+- Lights Out no longer switches the window to fullscreen or rearranges the
+  interface.
+
 ## 1.29.2-fix-top-bar — 2026-11-05
 
 ### Library and Develop

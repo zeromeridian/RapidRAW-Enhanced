@@ -18,6 +18,7 @@ import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { ExifOverlay } from '../../ui/AppProperties';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+import { lightsOutClip } from '../../../utils/lightsOut';
 
 function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: any) {
   const { t } = useTranslation();
@@ -554,6 +555,7 @@ export default function LibraryGrid(props: any) {
         <div
           key={`${gridSize.width}-${thumbnailSize}-${libraryViewMode}-${sortCriteria.key}-${sortCriteria.order}-${thumbnailAspectRatio}`}
           style={{ height: gridData.isListView ? gridSize.height - 36 : gridSize.height, width: gridSize.width }}
+          {...lightsOutClip}
         >
           <List
             listRef={setListHandle}

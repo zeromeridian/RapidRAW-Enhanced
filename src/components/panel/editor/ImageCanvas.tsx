@@ -23,6 +23,7 @@ import RelightLightShape, { RelightBasis } from './overlays/RelightLightShape';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { orientNormalizedPoint, rotatePoint, unorientNormalizedPoint } from '../../../utils/cropUtils';
+import { lightsOutTarget } from '../../../utils/lightsOut';
 
 interface CursorPreview {
   visible: boolean;
@@ -120,7 +121,6 @@ interface ImageCanvasProps {
   setIsMaskTouchInteracting(isInteracting: boolean): void;
   showOriginal: boolean;
   transformedOriginalUrl: string | null;
-  requireRenderSize: boolean;
   useNativePreview: boolean;
   uncroppedAdjustedPreviewUrl: string | null;
   updateSubMask(id: string | null, subMask: Partial<SubMask>): void;
@@ -1235,7 +1235,6 @@ const ImageCanvas = memo(
     setIsMaskTouchInteracting,
     showOriginal,
     transformedOriginalUrl,
-    requireRenderSize,
     useNativePreview,
     uncroppedAdjustedPreviewUrl,
     updateSubMask,
@@ -1294,7 +1293,6 @@ const ImageCanvas = memo(
 
     const isWgpuActive =
       useNativePreview && appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
-    const isRenderSizeReady = imageRenderSize.width > 0 && imageRenderSize.height > 0;
     const { t } = useTranslation();
     const osPlatform = useOsPlatform();
     const modifierKey = osPlatform === 'macos' ? 'Cmd' : 'Ctrl';
@@ -2934,9 +2932,8 @@ const ImageCanvas = memo(
         <div
           className="absolute inset-0 w-full h-full transition-opacity duration-200 flex items-center justify-center"
           style={{
-            opacity: isCropViewVisible || (requireRenderSize && !isRenderSizeReady) ? 0 : 1,
-            pointerEvents: isCropViewVisible || (requireRenderSize && !isRenderSizeReady) ? 'none' : 'auto',
-            transition: requireRenderSize ? 'none' : undefined,
+            opacity: isCropViewVisible ? 0 : 1,
+            pointerEvents: isCropViewVisible ? 'none' : 'auto',
           }}
         >
           <div
@@ -2950,6 +2947,7 @@ const ImageCanvas = memo(
             <div className="absolute inset-0 w-full h-full">
               <svg
                 className="pointer-events-none"
+                {...lightsOutTarget(!isCropViewVisible)}
                 style={
                   imageRenderSize.width > 0 && imageRenderSize.height > 0
                     ? {
@@ -3276,6 +3274,7 @@ const ImageCanvas = memo(
         >
           {cropPreviewUrl && uncroppedImageRenderSize && (
             <div
+              {...lightsOutTarget(isCropViewVisible)}
               style={{
                 height: uncroppedImageRenderSize.height,
                 position: 'relative',

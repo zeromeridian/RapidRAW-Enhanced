@@ -13,6 +13,7 @@ import {
   DEFAULT_BLACK_FRAME,
   normalizeBlackFrame,
 } from '../../utils/lightsOutFrame';
+import { LIGHTS_OUT_SCREEN_COLORS, normalizeLightsOutScreenColor } from '../../utils/lightsOut';
 
 interface BlackFrameSettingsControlProps {
   appSettings: AppSettings;
@@ -38,6 +39,7 @@ export default function BlackFrameSettingsControl({ appSettings, onSettingsChang
   };
 
   const previewScale = frame.unit === 'percent' ? 1 : 25 / BLACK_FRAME_LIMITS.pixels.max;
+  const previewColor = LIGHTS_OUT_SCREEN_COLORS[normalizeLightsOutScreenColor(appSettings.lightsOutScreenColor)];
   const previewPadding = SIDE_KEYS.map((side) => `${Math.min(25, frame[side] * previewScale)}%`).join(' ');
 
   return (
@@ -93,9 +95,7 @@ export default function BlackFrameSettingsControl({ appSettings, onSettingsChang
             fillOrigin="min"
             key={side}
             label={
-              frame.locked
-                ? t('settings.general.blackFrameAllSides')
-                : t(`settings.general.blackFrameSides.${side}`)
+              frame.locked ? t('settings.general.blackFrameAllSides') : t(`settings.general.blackFrameSides.${side}`)
             }
             max={limits.max}
             min={limits.min}
@@ -108,7 +108,10 @@ export default function BlackFrameSettingsControl({ appSettings, onSettingsChang
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-[minmax(180px,1fr)_auto] gap-4 items-center">
-        <div className="h-32 rounded-lg border border-border-color bg-black p-1" style={{ padding: previewPadding }}>
+        <div
+          className="h-32 rounded-lg border border-border-color p-1"
+          style={{ backgroundColor: previewColor, padding: previewPadding }}
+        >
           <div className="h-full w-full bg-text-secondary/60 rounded-xs" />
         </div>
         <div className="space-y-3">

@@ -13,6 +13,7 @@ import ExportPanel from './components/panel/right/ExportPanel';
 import TaggingPanel from './components/panel/right/TaggingPanel';
 import Resizer from './components/ui/Resizer';
 import GlobalTooltip from './components/ui/GlobalTooltip';
+import LightsOutVeil from './components/ui/LightsOutVeil';
 import AppModals from './components/modals/AppModals';
 
 import EditorView from './components/views/EditorView';
@@ -111,7 +112,6 @@ function App() {
     compactEditorPanelHeightOverride,
     activeRightPanel,
     isSettingsOpen,
-    lightsOutMode,
     setUI,
     setRightPanel,
   } = useUIStore(
@@ -128,7 +128,6 @@ function App() {
       compactEditorPanelHeightOverride: state.compactEditorPanelHeightOverride,
       activeRightPanel: state.activeRightPanel,
       isSettingsOpen: state.isSettingsOpen,
-      lightsOutMode: state.lightsOutMode,
       setUI: state.setUI,
       setRightPanel: state.setRightPanel,
     })),
@@ -178,56 +177,9 @@ function App() {
   const defaultLibraryViewMode = osPlatform === 'android' ? LibraryViewMode.Recursive : LibraryViewMode.Flat;
 
   const selectedImagePathRef = useRef<string | null>(null);
-  const wasWindowFullscreenBeforeBlackRef = useRef<boolean | null>(null);
-  const blackFullscreenApiRef = useRef<'native' | 'simple' | null>(null);
-  const lightsOutFullscreenTransitionRef = useRef(0);
   useEffect(() => {
     selectedImagePathRef.current = selectedImage?.path ?? null;
   }, [selectedImage?.path]);
-
-  useEffect(() => {
-    const transition = ++lightsOutFullscreenTransitionRef.current;
-    const appWindow = getCurrentWindow();
-
-    const synchronizeBlackFullscreen = async () => {
-      if (lightsOutMode === 'black') {
-        if (wasWindowFullscreenBeforeBlackRef.current !== null) return;
-
-        const wasFullscreen = await appWindow.isFullscreen();
-        if (transition !== lightsOutFullscreenTransitionRef.current) return;
-
-        wasWindowFullscreenBeforeBlackRef.current = wasFullscreen;
-        if (!wasFullscreen) {
-          const fullscreenApi = osPlatform === 'macos' ? 'simple' : 'native';
-          blackFullscreenApiRef.current = fullscreenApi;
-          if (fullscreenApi === 'simple') await appWindow.setSimpleFullscreen(true);
-          else await appWindow.setFullscreen(true);
-
-          if (useUIStore.getState().lightsOutMode !== 'black') {
-            if (fullscreenApi === 'simple') await appWindow.setSimpleFullscreen(false);
-            else await appWindow.setFullscreen(false);
-          }
-        }
-        return;
-      }
-
-      const wasFullscreen = wasWindowFullscreenBeforeBlackRef.current;
-      if (wasFullscreen === null) return;
-
-      const fullscreenApi = blackFullscreenApiRef.current;
-      wasWindowFullscreenBeforeBlackRef.current = null;
-      blackFullscreenApiRef.current = null;
-      if (!wasFullscreen && fullscreenApi === 'simple') {
-        if (transition !== lightsOutFullscreenTransitionRef.current) return;
-        await appWindow.setSimpleFullscreen(false);
-      } else if (!wasFullscreen && (await appWindow.isFullscreen())) {
-        if (transition !== lightsOutFullscreenTransitionRef.current) return;
-        await appWindow.setFullscreen(false);
-      }
-    };
-
-    void synchronizeBlackFullscreen();
-  }, [lightsOutMode, osPlatform]);
 
   const prevAdjustmentsRef = useRef<any>(null);
 
@@ -729,7 +681,7 @@ function App() {
     return (
       <div
         className={clsx(
-          'lights-out-chrome flex h-full overflow-hidden shrink-0',
+          'flex h-full overflow-hidden shrink-0',
           !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
         )}
         style={{
@@ -763,7 +715,6 @@ function App() {
 
   const shouldHideFolderTree = isAndroid;
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
-  const isNativeBlackLightsOut = osPlatform === 'macos' && lightsOutMode === 'black' && isWgpuActive;
   const useMacWindowShell = osPlatform === 'macos' && !appSettings?.decorations && !isWindowFullScreen && !isFullScreen;
 
   return (
@@ -778,16 +729,14 @@ function App() {
       <ImageLoaderManager cachedEditStateRef={cachedEditStateRef} />
       <div
         className={clsx(
-          'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
-          `lights-out-${lightsOutMode}`,
-          isNativeBlackLightsOut && 'lights-out-native-black',
+          'relative flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
           useMacWindowShell && 'macos-window-shell',
           isWgpuActive ? 'bg-transparent' : 'bg-bg-primary',
         )}
       >
         <div
           className={clsx(
-            'lights-out-chrome shrink-0 overflow-hidden z-50',
+            'shrink-0 overflow-hidden z-50',
             !isInstantTransition && 'transition-all duration-300 ease-in-out',
             isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
           )}
@@ -796,7 +745,7 @@ function App() {
         </div>
         <div
           className={clsx(
-            'lights-out-content flex-1 flex flex-col min-h-0',
+            'flex-1 flex flex-col min-h-0',
             isLayoutReady && hasMainContent && !isInstantTransition && 'transition-all duration-300 ease-in-out',
             [hasMainContent && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2')],
           )}
@@ -805,14 +754,12 @@ function App() {
             {!shouldHideFolderTree && renderFolderTree()}
             <div className="relative flex-1 flex flex-col min-w-0">
               {selectedImage && externalEditSession && (
-                <div className="lights-out-chrome">
-                  <ExternalEditBar
-                    session={externalEditSession}
-                    isFinishing={isExternalEditFinishing}
-                    errorMessage={exportState.status === Status.Error ? exportState.errorMessage : ''}
-                    onDone={finishExternalEdit}
-                  />
-                </div>
+                <ExternalEditBar
+                  session={externalEditSession}
+                  isFinishing={isExternalEditFinishing}
+                  errorMessage={exportState.status === Status.Error ? exportState.errorMessage : ''}
+                  onDone={finishExternalEdit}
+                />
               )}
               {selectedImage ? (
                 <EditorView
@@ -892,7 +839,7 @@ function App() {
             )}
             <div
               className={clsx(
-                'lights-out-chrome shrink-0 overflow-hidden',
+                'shrink-0 overflow-hidden',
                 !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
               )}
               style={{ width: libraryRightPanel && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
@@ -923,6 +870,7 @@ function App() {
             </div>
           </div>
         </div>
+        <LightsOutVeil />
         <AppModals
           handleImageSelect={handleImageSelect}
           handleSavePanorama={handleSavePanorama}
