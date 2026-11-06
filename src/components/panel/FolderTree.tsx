@@ -717,7 +717,8 @@ export default function FolderTree({
     useShallow((state) => ({
       folderTrees: state.folderTrees,
       pinnedFolderTrees: state.pinnedFolderTrees,
-      currentFolderPath: state.currentFolderPath,
+      // The folder being opened is selected at once, before its images are listed.
+      currentFolderPath: state.pendingFolderPath ?? state.currentFolderPath,
       expandedFolders: state.expandedFolders,
       isTreeLoading: state.isTreeLoading,
       albumTree: state.albumTree,

@@ -2430,6 +2430,7 @@ pub fn run() {
             denoise_result: Arc::new(Mutex::new(None)),
             indexing_task_handle: Mutex::new(None),
             indexing_generation: AtomicUsize::new(0),
+            library_scan_generation: AtomicUsize::new(0),
             lut_cache: Mutex::new(HashMap::new()),
             initial_file_path: Mutex::new(None),
             pending_edit_session: Mutex::new(None),

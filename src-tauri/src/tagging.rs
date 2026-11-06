@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokenizers::Tokenizer;
@@ -520,7 +520,7 @@ pub async fn start_background_indexing(
     if !settings.enable_ai_tagging.unwrap_or(false) {
         let _ = app_handle.emit(
             "indexing-finished",
-            serde_json::json!({ "jobId": job_id, "folderPath": folder_path }),
+            serde_json::json!({ "jobId": job_id, "folderPath": folder_path, "changedCount": 0 }),
         );
         return Ok(());
     }
@@ -607,6 +607,8 @@ pub async fn start_background_indexing(
         );
         let total_images = image_paths.len();
         let processed_count = Arc::new(Mutex::new(0));
+        // Images whose sidecar received new AI tags; the Library reloads only if any did.
+        let changed_count = Arc::new(AtomicUsize::new(0));
         let custom_ai_tags_shared = Arc::new(custom_ai_tags);
 
         stream::iter(image_paths)
@@ -615,6 +617,7 @@ pub async fn start_background_indexing(
                 let clip_models_inner = clip_models.clone();
                 let gpu_context_inner = gpu_context.clone();
                 let processed_count_inner = Arc::clone(&processed_count);
+                let changed_count_inner = Arc::clone(&changed_count);
                 let tags_inner = Arc::clone(&custom_ai_tags_shared);
                 let indexed_folder_path_inner = indexed_folder_path.clone();
 
@@ -680,8 +683,9 @@ pub async fn start_background_indexing(
                                     metadata.tags = Some(final_tags);
 
                                     if let Ok(json_string) = serde_json::to_string_pretty(&metadata)
+                                        && fs::write(sidecar_path, json_string).is_ok()
                                     {
-                                        let _ = fs::write(sidecar_path, json_string);
+                                        changed_count_inner.fetch_add(1, Ordering::Relaxed);
                                     }
                                 }
                             }
@@ -712,7 +716,11 @@ pub async fn start_background_indexing(
         println!("Background indexing finished for: {}", folder_path);
         let _ = app_handle_clone.emit(
             "indexing-finished",
-            serde_json::json!({ "jobId": job_id, "folderPath": indexed_folder_path }),
+            serde_json::json!({
+                "jobId": job_id,
+                "folderPath": indexed_folder_path,
+                "changedCount": changed_count.load(Ordering::Relaxed)
+            }),
         );
 
         let app_state = app_handle_clone.state::<AppState>();

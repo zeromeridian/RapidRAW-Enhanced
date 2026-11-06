@@ -107,6 +107,21 @@ struct ImageFileMetadata {
     is_raw: bool,
     copy_name_suffix: Option<String>,
     xmp_stack: Option<XmpStackMetadata>,
+    /// Defaults standing in until a metadata worker resolves the image.
+    pending: bool,
+}
+
+/// Placeholder metadata for an image whose sidecar/XMP was handed to the metadata workers.
+fn pending_image_metadata(image_path: &Path) -> ImageFileMetadata {
+    ImageFileMetadata {
+        is_edited: false,
+        tags: None,
+        rating: 0,
+        is_raw: crate::formats::is_raw_file(image_path),
+        copy_name_suffix: None,
+        xmp_stack: None,
+        pending: true,
+    }
 }
 
 fn resolve_image_metadata(
@@ -136,6 +151,7 @@ fn resolve_image_metadata(
         is_raw,
         copy_name_suffix: metadata.copy_name_suffix,
         xmp_stack: metadata.xmp_stack,
+        pending: false,
     }
 }
 
@@ -358,7 +374,32 @@ pub struct ImageFile {
     group_id: Option<String>,
     #[serde(rename = "xmpStack")]
     xmp_stack: Option<XmpStackMetadata>,
+    /// Rating, edit state, tags, and stack are placeholders until the metadata
+    /// workers emit `image-metadata-loaded` for this image.
+    #[serde(
+        rename = "metadataPending",
+        default,
+        skip_serializing_if = "std::ops::Not::not"
+    )]
+    metadata_pending: bool,
 }
+
+/// Starts a folder listing. Older listings and EXIF reads stop at their next image,
+/// so a folder the user has left no longer competes with the one being opened.
+fn begin_library_scan(app_handle: &AppHandle) -> usize {
+    app_handle
+        .state::<crate::AppState>()
+        .library_scan_generation
+        .fetch_add(1, Ordering::AcqRel)
+        + 1
+}
+
+fn is_library_scan_current(state: &crate::AppState, generation: usize) -> bool {
+    state.library_scan_generation.load(Ordering::Acquire) == generation
+}
+
+/// Returned by a listing that a newer listing superseded; the frontend ignores it.
+const LIBRARY_SCAN_SUPERSEDED: &str = "Folder listing superseded by a newer one";
 
 fn make_group_key(source_path: &Path) -> String {
     let parent = source_path.parent().unwrap_or(Path::new(""));
@@ -1240,6 +1281,28 @@ mod output_naming_tests {
         assert!(super::should_defer_metadata(30_000));
     }
 
+    #[test]
+    fn pending_metadata_flag_is_optional_in_catalog_snapshots() {
+        // Snapshots saved before the flag existed still load, and resolved images omit it.
+        let stored = r#"{"path":"/a.jpg","modified":1,"is_edited":false,"rating":3,"tags":null,
+            "exif":null,"is_virtual_copy":false,"is_cloud_placeholder":false,"is_raw":false,
+            "group_id":null,"xmpStack":null}"#;
+        let mut image: super::ImageFile = serde_json::from_str(stored).unwrap();
+        assert!(!image.metadata_pending);
+        assert!(
+            !serde_json::to_string(&image)
+                .unwrap()
+                .contains("metadataPending")
+        );
+
+        image.metadata_pending = true;
+        assert!(
+            serde_json::to_string(&image)
+                .unwrap()
+                .contains(r#""metadataPending":true"#)
+        );
+    }
+
     fn olympus_lens_db() -> crate::lens_correction::LensDatabase {
         quick_xml::de::from_str(include_str!("../lensfun_db/mil-olympus.xml")).unwrap()
     }
@@ -1411,15 +1474,33 @@ mod output_naming_tests {
 #[tauri::command]
 pub async fn read_exif_for_paths(
     paths: Vec<String>,
+    app_handle: AppHandle,
 ) -> Result<HashMap<String, HashMap<String, String>>, String> {
+    // Belongs to the folder listed last; a newer listing makes the rest pointless.
+    let generation = app_handle
+        .state::<crate::AppState>()
+        .library_scan_generation
+        .load(Ordering::Acquire);
     tauri::async_runtime::spawn_blocking(move || {
+        let state = app_handle.state::<crate::AppState>();
         let exif_data: HashMap<String, HashMap<String, String>> = paths
             .par_iter()
             .filter_map(|virtual_path| {
+                if !is_library_scan_current(&state, generation) {
+                    return None;
+                }
                 let (source_path, _) = parse_virtual_path(virtual_path);
                 let source_path_str = source_path.to_string_lossy().to_string();
 
-                let map = if is_cloud_placeholder(&source_path) {
+                // EXIF cached in the sidecar needs no access to the image file.
+                let cached =
+                    crate::exif_processing::read_sidecar_exif(&source_path).filter(|exif| {
+                        !is_raw_file(&source_path_str)
+                            || crate::exif_processing::has_pixel_dimensions(exif)
+                    });
+                let map = if let Some(exif) = cached {
+                    exif
+                } else if is_cloud_placeholder(&source_path) {
                     HashMap::new()
                 } else if let Ok(mmap) = read_file_mapped(&source_path) {
                     crate::exif_processing::read_exif_data(&source_path_str, &mmap)
@@ -1540,11 +1621,174 @@ fn update_rotational_disk_flag(path: &str, app_handle: &AppHandle) {
     }
 }
 
-#[tauri::command]
-pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<ImageFile>, String> {
+/// One image file found by a folder listing, with the copy IDs of its sidecars
+/// (`None` is the physical image's own sidecar).
+struct ListingTask {
+    path_str: String,
+    file_name: String,
+    path_buf: PathBuf,
+    sidecars: Vec<Option<String>>,
+}
+
+/// Lists one image and its virtual copies. Returns nothing once a newer listing started.
+fn list_image_entries(
+    task: ListingTask,
+    defer_physical_metadata: bool,
+    enable_xmp_sync: bool,
+    settings: &AppSettings,
+    app_handle: &AppHandle,
+    is_current: &(impl Fn() -> bool + Sync),
+) -> Vec<ImageFile> {
+    if !is_current() {
+        return Vec::new();
+    }
+    let ListingTask {
+        path_str,
+        file_name,
+        path_buf,
+        sidecars,
+    } = task;
+    let modified = fs::metadata(&path_buf)
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let is_cloud_placeholder = is_cloud_placeholder(&path_buf);
+
+    let mut file_results = Vec::with_capacity(sidecars.len());
+
+    for copy_id_opt in sidecars {
+        let (mut virtual_path, is_virtual_copy, sidecar_filename) = match copy_id_opt {
+            Some(id) => (
+                format!("{}?vc={}", path_str, id),
+                true,
+                format!("{}.{}.tirdata", file_name, id),
+            ),
+            None => (path_str.clone(), false, format!("{}.tirdata", file_name)),
+        };
+
+        let sidecar_path = path_buf.with_file_name(sidecar_filename);
+
+        let xmp_path = enable_xmp_sync
+            .then(|| resolve_xmp_path(&path_buf))
+            .flatten();
+        let xmp_is_placeholder = xmp_path
+            .as_deref()
+            .is_some_and(crate::file_management::is_cloud_placeholder);
+        let sidecar_is_placeholder = crate::file_management::is_cloud_placeholder(&sidecar_path);
+
+        // A missing primary sidecar already has known default metadata. Do not
+        // enqueue tens of thousands of no-op filesystem reads for a new large
+        // library; only persisted metadata (or XMP that may be imported) needs
+        // to be resolved by the background workers.
+        let has_persisted_metadata = sidecar_path.is_file() || xmp_path.is_some();
+        let metadata = if (!is_virtual_copy && defer_physical_metadata && has_persisted_metadata)
+            || sidecar_is_placeholder
+            || xmp_is_placeholder
+        {
+            enqueue_metadata(
+                app_handle,
+                virtual_path.clone(),
+                path_buf.clone(),
+                sidecar_path.clone(),
+            );
+            pending_image_metadata(&path_buf)
+        } else {
+            resolve_image_metadata(
+                &path_buf,
+                &sidecar_path,
+                enable_xmp_sync,
+                !is_virtual_copy,
+                settings,
+            )
+        };
+
+        if is_virtual_copy
+            && let Some(copy_suffix) = metadata
+                .copy_name_suffix
+                .as_deref()
+                .filter(|suffix| !suffix.is_empty())
+        {
+            virtual_path.push_str("&name=");
+            virtual_path.push_str(copy_suffix);
+        }
+
+        file_results.push(ImageFile {
+            path: virtual_path,
+            modified,
+            is_edited: metadata.is_edited,
+            tags: metadata.tags,
+            exif: None,
+            is_virtual_copy,
+            is_raw: metadata.is_raw,
+            group_id: None,
+            rating: metadata.rating,
+            is_cloud_placeholder,
+            xmp_stack: metadata.xmp_stack,
+            metadata_pending: metadata.pending,
+        });
+    }
+
+    file_results
+}
+
+/// Resolves the listed images, groups them, and saves the catalog snapshot, unless a
+/// newer listing superseded this one (then nothing is saved).
+fn finish_listing(
+    path: &str,
+    recursive: bool,
+    tasks: Vec<ListingTask>,
+    generation: usize,
+    settings: &AppSettings,
+    app_handle: &AppHandle,
+) -> Result<Vec<ImageFile>, String> {
+    let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
+    let state = app_handle.state::<crate::AppState>();
+    let is_current = || is_library_scan_current(&state, generation);
+    let defer_physical_metadata = should_defer_metadata(tasks.len());
+    let process_task = |task| {
+        list_image_entries(
+            task,
+            defer_physical_metadata,
+            enable_xmp_sync,
+            settings,
+            app_handle,
+            &is_current,
+        )
+    };
+
+    // Large folders already defer persisted metadata to a bounded worker pool.
+    // Reconciliation is dominated by filesystem calls (including macOS
+    // placeholder lstat checks), so spreading it over every Rayon thread only
+    // saturates the machine and starves the WebKit UI process.
+    let mut result_list: Vec<ImageFile> = if defer_physical_metadata {
+        tasks.into_iter().flat_map(process_task).collect()
+    } else {
+        tasks.into_par_iter().flat_map(process_task).collect()
+    };
+    if !is_current() {
+        return Err(LIBRARY_SCAN_SUPERSEDED.to_string());
+    }
+
+    assign_group_ids(&mut result_list, settings);
+    if let Err(error) = crate::library_catalog::save_folder_snapshot(
+        app_handle,
+        path,
+        recursive,
+        enable_xmp_sync,
+        &result_list,
+    ) {
+        eprintln!("Failed to update library catalog for {path}: {error}");
+    }
+    Ok(result_list)
+}
+
+fn list_images_in_dir_sync(path: String, app_handle: AppHandle) -> Result<Vec<ImageFile>, String> {
+    let generation = begin_library_scan(&app_handle);
     clear_pending_metadata(&app_handle);
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
     update_rotational_disk_flag(&path, &app_handle);
 
@@ -1571,146 +1815,50 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
 
     let tasks: Vec<_> = images
         .into_iter()
-        .map(|(file_name, path_buf)| {
-            let sidecars = sidecars_by_filename
+        .map(|(file_name, path_buf)| ListingTask {
+            sidecars: sidecars_by_filename
                 .remove(&file_name)
-                .unwrap_or_else(|| vec![None]);
-            let path_str = path_buf.to_string_lossy().into_owned();
-            (path_str, file_name, path_buf, sidecars)
+                .unwrap_or_else(|| vec![None]),
+            path_str: path_buf.to_string_lossy().into_owned(),
+            file_name,
+            path_buf,
         })
         .collect();
-    let defer_physical_metadata = should_defer_metadata(tasks.len());
-    let process_task = |(path_str, file_name, path_buf, sidecars): (
-        String,
-        String,
-        PathBuf,
-        Vec<Option<String>>,
-    )| {
-        let modified = fs::metadata(&path_buf)
-            .ok()
-            .and_then(|m| m.modified().ok())
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+    finish_listing(&path, false, tasks, generation, &settings, &app_handle)
+}
 
-        let is_cloud_placeholder = is_cloud_placeholder(&path_buf);
-
-        let mut file_results = Vec::with_capacity(sidecars.len());
-
-        for copy_id_opt in sidecars {
-            let (mut virtual_path, is_virtual_copy, sidecar_filename) = match copy_id_opt {
-                Some(id) => (
-                    format!("{}?vc={}", path_str, id),
-                    true,
-                    format!("{}.{}.tirdata", file_name, id),
-                ),
-                None => (path_str.clone(), false, format!("{}.tirdata", file_name)),
-            };
-
-            let sidecar_path = path_buf.with_file_name(sidecar_filename);
-
-            let xmp_path = enable_xmp_sync
-                .then(|| resolve_xmp_path(&path_buf))
-                .flatten();
-            let xmp_is_placeholder = xmp_path
-                .as_deref()
-                .is_some_and(crate::file_management::is_cloud_placeholder);
-            let sidecar_is_placeholder =
-                crate::file_management::is_cloud_placeholder(&sidecar_path);
-
-            let has_persisted_metadata = sidecar_path.is_file() || xmp_path.is_some();
-            let metadata =
-                if (!is_virtual_copy && defer_physical_metadata && has_persisted_metadata)
-                    || sidecar_is_placeholder
-                    || xmp_is_placeholder
-                {
-                    enqueue_metadata(
-                        &app_handle,
-                        virtual_path.clone(),
-                        path_buf.clone(),
-                        sidecar_path.clone(),
-                    );
-                    ImageFileMetadata {
-                        is_edited: false,
-                        tags: None,
-                        rating: 0,
-                        is_raw: crate::formats::is_raw_file(&path_buf),
-                        copy_name_suffix: None,
-                        xmp_stack: None,
-                    }
-                } else {
-                    resolve_image_metadata(
-                        &path_buf,
-                        &sidecar_path,
-                        enable_xmp_sync,
-                        !is_virtual_copy,
-                        &settings,
-                    )
-                };
-
-            if is_virtual_copy
-                && let Some(copy_suffix) = metadata
-                    .copy_name_suffix
-                    .as_deref()
-                    .filter(|suffix| !suffix.is_empty())
-            {
-                virtual_path.push_str("&name=");
-                virtual_path.push_str(copy_suffix);
-            }
-
-            file_results.push(ImageFile {
-                path: virtual_path,
-                modified,
-                is_edited: metadata.is_edited,
-                tags: metadata.tags,
-                exif: None,
-                is_virtual_copy,
-                is_raw: metadata.is_raw,
-                group_id: None,
-                rating: metadata.rating,
-                is_cloud_placeholder,
-                xmp_stack: metadata.xmp_stack,
-            });
-        }
-
-        file_results
-    };
-
-    let mut result_list: Vec<ImageFile> = if defer_physical_metadata {
-        tasks.into_iter().flat_map(process_task).collect()
-    } else {
-        tasks.into_par_iter().flat_map(process_task).collect()
-    };
-
-    assign_group_ids(&mut result_list, &settings);
-    if let Err(error) = crate::library_catalog::save_folder_snapshot(
-        &app_handle,
-        &path,
-        false,
-        enable_xmp_sync,
-        &result_list,
-    ) {
-        eprintln!("Failed to update library catalog for {path}: {error}");
-    }
-    Ok(result_list)
+// Runs off the main thread: a synchronous command would block every other IPC
+// call (and the window) until a large or network folder is listed.
+#[tauri::command]
+pub async fn list_images_in_dir(
+    path: String,
+    app_handle: AppHandle,
+) -> Result<Vec<ImageFile>, String> {
+    tauri::async_runtime::spawn_blocking(move || list_images_in_dir_sync(path, app_handle))
+        .await
+        .map_err(|error| format!("Image scan task failed: {error}"))?
 }
 
 fn list_images_recursive_sync(
     path: String,
     app_handle: AppHandle,
 ) -> Result<Vec<ImageFile>, String> {
+    let generation = begin_library_scan(&app_handle);
     clear_pending_metadata(&app_handle);
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
     update_rotational_disk_flag(&path, &app_handle);
 
+    let state = app_handle.state::<crate::AppState>();
     let root_path = Path::new(&path);
     let mut images = Vec::new();
 
     let mut sidecars_by_path: HashMap<PathBuf, Vec<Option<String>>> = HashMap::new();
 
     for entry in WalkDir::new(root_path).into_iter().filter_map(Result::ok) {
+        if !is_library_scan_current(&state, generation) {
+            return Err(LIBRARY_SCAN_SUPERSEDED.to_string());
+        }
         let entry_path = entry.path();
         if !entry_path.is_file() {
             continue;
@@ -1731,142 +1879,20 @@ fn list_images_recursive_sync(
 
     let tasks: Vec<_> = images
         .into_iter()
-        .map(|path_buf| {
-            let sidecars = sidecars_by_path
+        .map(|path_buf| ListingTask {
+            sidecars: sidecars_by_path
                 .remove(&path_buf)
-                .unwrap_or_else(|| vec![None]);
-            let path_str = path_buf.to_string_lossy().into_owned();
-            let file_name = path_buf
+                .unwrap_or_else(|| vec![None]),
+            path_str: path_buf.to_string_lossy().into_owned(),
+            file_name: path_buf
                 .file_name()
                 .unwrap_or_default()
                 .to_string_lossy()
-                .into_owned();
-            (path_str, file_name, path_buf, sidecars)
+                .into_owned(),
+            path_buf,
         })
         .collect();
-    let defer_physical_metadata = should_defer_metadata(tasks.len());
-
-    let process_task = |(path_str, file_name, path_buf, sidecars): (
-        String,
-        String,
-        PathBuf,
-        Vec<Option<String>>,
-    )| {
-        let modified = fs::metadata(&path_buf)
-            .ok()
-            .and_then(|m| m.modified().ok())
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-
-        let is_cloud_placeholder = is_cloud_placeholder(&path_buf);
-
-        let mut file_results = Vec::with_capacity(sidecars.len());
-
-        for copy_id_opt in sidecars {
-            let (mut virtual_path, is_virtual_copy, sidecar_filename) = match copy_id_opt {
-                Some(id) => (
-                    format!("{}?vc={}", path_str, id),
-                    true,
-                    format!("{}.{}.tirdata", file_name, id),
-                ),
-                None => (path_str.clone(), false, format!("{}.tirdata", file_name)),
-            };
-
-            let sidecar_path = path_buf.with_file_name(sidecar_filename);
-
-            let xmp_path = enable_xmp_sync
-                .then(|| resolve_xmp_path(&path_buf))
-                .flatten();
-            let xmp_is_placeholder = xmp_path
-                .as_deref()
-                .is_some_and(crate::file_management::is_cloud_placeholder);
-            let sidecar_is_placeholder =
-                crate::file_management::is_cloud_placeholder(&sidecar_path);
-
-            // A missing primary sidecar already has known default metadata. Do not
-            // enqueue tens of thousands of no-op filesystem reads for a new large
-            // library; only persisted metadata (or XMP that may be imported) needs
-            // to be resolved by the background workers.
-            let has_persisted_metadata = sidecar_path.is_file() || xmp_path.is_some();
-            let metadata =
-                if (!is_virtual_copy && defer_physical_metadata && has_persisted_metadata)
-                    || sidecar_is_placeholder
-                    || xmp_is_placeholder
-                {
-                    enqueue_metadata(
-                        &app_handle,
-                        virtual_path.clone(),
-                        path_buf.clone(),
-                        sidecar_path.clone(),
-                    );
-                    ImageFileMetadata {
-                        is_edited: false,
-                        tags: None,
-                        rating: 0,
-                        is_raw: crate::formats::is_raw_file(&path_buf),
-                        copy_name_suffix: None,
-                        xmp_stack: None,
-                    }
-                } else {
-                    resolve_image_metadata(
-                        &path_buf,
-                        &sidecar_path,
-                        enable_xmp_sync,
-                        !is_virtual_copy,
-                        &settings,
-                    )
-                };
-
-            if is_virtual_copy
-                && let Some(copy_suffix) = metadata
-                    .copy_name_suffix
-                    .as_deref()
-                    .filter(|suffix| !suffix.is_empty())
-            {
-                virtual_path.push_str("&name=");
-                virtual_path.push_str(copy_suffix);
-            }
-
-            file_results.push(ImageFile {
-                path: virtual_path,
-                modified,
-                is_edited: metadata.is_edited,
-                tags: metadata.tags,
-                exif: None,
-                is_virtual_copy,
-                is_raw: metadata.is_raw,
-                group_id: None,
-                rating: metadata.rating,
-                is_cloud_placeholder,
-                xmp_stack: metadata.xmp_stack,
-            });
-        }
-
-        file_results
-    };
-
-    // Large recursive libraries already defer persisted metadata to a bounded
-    // worker pool. Reconciliation is dominated by filesystem calls (including
-    // macOS placeholder lstat checks), so spreading it over every Rayon thread
-    // only saturates the machine and starves the WebKit UI process.
-    let mut result_list: Vec<ImageFile> = if defer_physical_metadata {
-        tasks.into_iter().flat_map(process_task).collect()
-    } else {
-        tasks.into_par_iter().flat_map(process_task).collect()
-    };
-
-    assign_group_ids(&mut result_list, &settings);
-    if let Err(error) = crate::library_catalog::save_folder_snapshot(
-        &app_handle,
-        &path,
-        true,
-        enable_xmp_sync,
-        &result_list,
-    ) {
-        eprintln!("Failed to update library catalog for {path}: {error}");
-    }
-    Ok(result_list)
+    finish_listing(&path, true, tasks, generation, &settings, &app_handle)
 }
 
 #[tauri::command]
@@ -2118,14 +2144,7 @@ pub fn get_album_images(
                     source_path.clone(),
                     sidecar_path.clone(),
                 );
-                ImageFileMetadata {
-                    is_edited: false,
-                    tags: None,
-                    rating: 0,
-                    is_raw: crate::formats::is_raw_file(&source_path),
-                    copy_name_suffix: None,
-                    xmp_stack: None,
-                }
+                pending_image_metadata(&source_path)
             } else {
                 resolve_image_metadata(
                     &source_path,
@@ -2148,6 +2167,7 @@ pub fn get_album_images(
                 rating: metadata.rating,
                 is_cloud_placeholder,
                 xmp_stack: metadata.xmp_stack,
+                metadata_pending: metadata.pending,
             })
         })
         .collect();
@@ -2967,6 +2987,31 @@ fn generate_single_thumbnail_and_cache(
     app_handle: &AppHandle,
     settings: &AppSettings,
 ) -> Option<(String, u8, bool)> {
+    generate_single_thumbnail_and_cache_with(
+        path_str,
+        thumb_cache_dir,
+        gpu_context,
+        preloaded_image,
+        force_regenerate,
+        app_handle,
+        settings,
+        || {},
+    )
+}
+
+/// As `generate_single_thumbnail_and_cache`, running `before_render` only when the
+/// thumbnail must actually be rendered (not on a cache hit or for a cloud placeholder).
+#[allow(clippy::too_many_arguments)]
+fn generate_single_thumbnail_and_cache_with(
+    path_str: &str,
+    thumb_cache_dir: &Path,
+    gpu_context: Option<&GpuContext>,
+    preloaded_image: Option<&DynamicImage>,
+    force_regenerate: bool,
+    app_handle: &AppHandle,
+    settings: &AppSettings,
+    before_render: impl FnOnce(),
+) -> Option<(String, u8, bool)> {
     let (source_path, sidecar_path) = parse_virtual_path(path_str);
 
     let (rating, is_edited, adjustments_bytes) = if is_cloud_placeholder(&sidecar_path) {
@@ -3007,6 +3052,7 @@ fn generate_single_thumbnail_and_cache(
         return None;
     }
 
+    before_render();
     let target_width = settings.thumbnail_resolution.unwrap_or(720);
 
     // Every adjusted thumbnail must use the same GPU adjustment pipeline as
@@ -3111,12 +3157,15 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                     crate::gpu_processing::get_or_init_gpu_context(&state, &app_clone).ok();
 
                 if let Ok(cache_dir) = get_thumb_cache_dir(&app_clone) {
-                    if manager_clone.rotational_disk.load(Ordering::Relaxed) {
-                        let _io_permit = manager_clone.io_gate.lock().unwrap();
-                        prefetch_source_file(&path_to_process);
-                    }
-
-                    let result = generate_single_thumbnail_and_cache(
+                    // Prefetch only for a real render: on Linux it reads the whole
+                    // source, which a valid cached thumbnail does not need.
+                    let prefetch_on_render = || {
+                        if manager_clone.rotational_disk.load(Ordering::Relaxed) {
+                            let _io_permit = manager_clone.io_gate.lock().unwrap();
+                            prefetch_source_file(&path_to_process);
+                        }
+                    };
+                    let result = generate_single_thumbnail_and_cache_with(
                         &path_to_process,
                         &cache_dir,
                         gpu_context.as_ref(),
@@ -3124,6 +3173,7 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                         false,
                         &app_clone,
                         &worker_settings,
+                        prefetch_on_render,
                     );
 
                     let may_publish = foreground_generation.is_some_and(|generation| {
@@ -3194,6 +3244,12 @@ pub fn update_thumbnail_queue(
         .register_active_paths(unique_paths.iter().cloned());
 
     queue.retain(|p| !seen.contains(p));
+    // A path a worker is already rendering publishes when it finishes; queuing it
+    // again would only be skipped and counted as extra progress.
+    {
+        let processing = state.thumbnail_manager.processing_now.lock().unwrap();
+        unique_paths.retain(|path| !processing.contains(path));
+    }
 
     while queue.len() + unique_paths.len() > 500 {
         queue.pop_front();

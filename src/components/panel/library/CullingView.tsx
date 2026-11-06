@@ -32,6 +32,7 @@ import { USER_TAG_PREFIX, formatKeyword, parseKeywordInput } from '../../../util
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
 import { getDisplayFilename } from '../../../utils/outputNaming';
 import { lightsOutTarget } from '../../../utils/lightsOut';
+import { CLOUD_THUMBNAIL_RETRY_MS } from '../../../hooks/useThumbnails';
 
 // Corner radius of a compared photo (`rounded-lg`), so Lights Out lights exactly its shape.
 const CULLING_PREVIEW_RADIUS = 8;
@@ -947,17 +948,20 @@ const Row = React.memo(
     const image: ImageFile = imageList[index];
     const isSelected = multiSelectedPaths.includes(image.path);
 
+    // Keyed by path, not the image object, which every image-list update replaces.
+    const imagePath = image?.path;
+    const isCloudPlaceholder = Boolean(image?.is_cloud_placeholder);
     useEffect(() => {
-      if (!image || !queueThumbnailRequest) return;
-      queueThumbnailRequest(image.path);
+      if (!imagePath || !queueThumbnailRequest) return;
+      queueThumbnailRequest(imagePath);
 
-      if (image.is_cloud_placeholder) {
+      if (isCloudPlaceholder) {
         const interval = setInterval(() => {
-          queueThumbnailRequest(image.path);
-        }, 5000);
+          queueThumbnailRequest(imagePath);
+        }, CLOUD_THUMBNAIL_RETRY_MS);
         return () => clearInterval(interval);
       }
-    }, [image, queueThumbnailRequest]);
+    }, [imagePath, isCloudPlaceholder, queueThumbnailRequest]);
 
     return (
       <div style={style} className="p-2 box-border">

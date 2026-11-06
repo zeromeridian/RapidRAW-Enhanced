@@ -237,16 +237,31 @@ pub fn record_thumbnail(
         .map_err(|error| error.to_string())
 }
 
+// Off the main thread: waiting for the catalog lock or parsing a large snapshot
+// must not block other IPC while a folder opens.
 #[tauri::command]
-pub fn load_catalog_folder(
+pub async fn load_catalog_folder(
     path: String,
     recursive: bool,
     xmp_sync: bool,
     app_handle: AppHandle,
 ) -> Result<Option<CatalogFolderSnapshot>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        load_catalog_folder_sync(&path, recursive, xmp_sync, &app_handle)
+    })
+    .await
+    .map_err(|error| format!("Catalog folder task failed: {error}"))?
+}
+
+fn load_catalog_folder_sync(
+    path: &str,
+    recursive: bool,
+    xmp_sync: bool,
+    app_handle: &AppHandle,
+) -> Result<Option<CatalogFolderSnapshot>, String> {
     let _operation = CATALOG_OPERATION_LOCK.lock().unwrap();
-    let connection = open(&app_handle)?;
-    let key = cache_key(&path, recursive, xmp_sync);
+    let connection = open(app_handle)?;
+    let key = cache_key(path, recursive, xmp_sync);
     let stored = connection
         .query_row(
             "SELECT images_json, updated_at FROM folder_snapshots WHERE cache_key=?1",

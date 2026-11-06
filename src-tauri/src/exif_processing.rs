@@ -237,16 +237,19 @@ pub fn has_descriptive_exif(exif: &HashMap<String, String>) -> bool {
     })
 }
 
-fn add_raw_dimensions(exif: &mut HashMap<String, String>, file_bytes: &[u8]) {
+/// Whether `exif` records a positive pixel width and height.
+pub fn has_pixel_dimensions(exif: &HashMap<String, String>) -> bool {
     let has_dimension = |keys: &[&str]| {
         keys.iter().any(|key| {
             exif.get(*key)
                 .is_some_and(|value| value.parse::<usize>().is_ok_and(|dimension| dimension > 0))
         })
     };
-    let has_width = has_dimension(&EXIF_WIDTH_KEYS);
-    let has_height = has_dimension(&EXIF_HEIGHT_KEYS);
-    if has_width && has_height {
+    has_dimension(&EXIF_WIDTH_KEYS) && has_dimension(&EXIF_HEIGHT_KEYS)
+}
+
+fn add_raw_dimensions(exif: &mut HashMap<String, String>, file_bytes: &[u8]) {
+    if has_pixel_dimensions(exif) {
         return;
     }
 
@@ -1415,11 +1418,15 @@ pub fn read_exif_data(path: &str, file_bytes: &[u8]) -> HashMap<String, String> 
     let has_sidecar_exif = sidecar_exif.is_some();
     let mut exif_map = sidecar_exif.unwrap_or_else(|| read_exif_data_from_bytes(path, file_bytes));
 
-    if is_raw_file(path) {
+    let mut added_dimensions = false;
+    if is_raw_file(path) && !has_pixel_dimensions(&exif_map) {
         add_raw_dimensions(&mut exif_map, file_bytes);
+        added_dimensions = has_pixel_dimensions(&exif_map);
     }
 
-    if !has_sidecar_exif && has_descriptive_exif(&exif_map) {
+    // Cache new EXIF, and RAW dimensions found by the decoder, so the file need not
+    // be parsed again on the next listing.
+    if (!has_sidecar_exif || added_dimensions) && has_descriptive_exif(&exif_map) {
         let mut metadata = load_primary_metadata(source_path);
         metadata.exif = Some(exif_map.clone());
         let _ = save_primary_metadata(source_path, &metadata);

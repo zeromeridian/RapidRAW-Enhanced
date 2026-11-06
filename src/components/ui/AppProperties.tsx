@@ -422,6 +422,8 @@ export interface ImageFile {
   is_raw: boolean;
   group_id: string | null;
   xmpStack?: XmpStackMetadata | null;
+  /** Rating, edit state, tags, and stack are placeholders until `image-metadata-loaded` arrives. */
+  metadataPending?: boolean;
 }
 
 export interface Option {
