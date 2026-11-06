@@ -21,7 +21,22 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useAiMasking } from '../../hooks/useAiMasking';
-import { lightsOutClip, normalizeLightsOutBorderWidth } from '../../utils/lightsOut';
+import {
+  isPhotoHeld,
+  PHOTO_SWAP_FADE_IN_MS,
+  PHOTO_SWAP_FADE_OUT_MS,
+  PhotoRect,
+  usePhotoSwap,
+} from '../../hooks/usePhotoSwap';
+import {
+  lightsOutClip,
+  lightsOutColor,
+  lightsOutOpacity,
+  lightsOutTarget,
+  normalizeLightsOutBorderWidth,
+  normalizeLightsOutDimLevel,
+  normalizeLightsOutScreenColor,
+} from '../../utils/lightsOut';
 
 const parseRgb = (rgbStr: string): [number, number, number, number] => {
   const match = rgbStr.match(/[\d.]+/g);
@@ -32,6 +47,7 @@ const parseRgb = (rgbStr: string): [number, number, number, number] => {
 };
 
 const NEUTRAL_GREY_RGB: [number, number, number, number] = [128 / 255, 128 / 255, 128 / 255, 1.0];
+const NEUTRAL_GREY_CSS = '#808080';
 
 const checkCropValid = (pixelCrop: Partial<Crop>, imageW: number, imageH: number, rotation: number) => {
   if (pixelCrop.x === undefined || pixelCrop.y === undefined || !pixelCrop.width || !pixelCrop.height) {
@@ -67,6 +83,8 @@ interface WgpuRenderState {
   nativePreviewVisible: boolean;
   isReady: boolean;
   hasRenderedFirstFrame: boolean;
+  /** Keep the previous photo on the display while the next one renders. */
+  holdFrame: boolean;
   isCropping: boolean;
   uncroppedAdjustedPreviewUrl: string | null;
   showOriginal: boolean;
@@ -318,6 +336,27 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   );
   const imageRenderSizeRef = useRef(imageRenderSize);
   imageRenderSizeRef.current = imageRenderSize;
+
+  const isNativePhotoShown =
+    appSettings?.useWgpuRenderer !== false && !!selectedImage?.isReady && hasRenderedFirstFrame;
+  const canHoldPhoto = appSettings?.useWgpuRenderer !== false && !(isCropping && uncroppedAdjustedPreviewUrl);
+  const photoRect = useMemo<PhotoRect | null>(() => {
+    if (imageRenderSize.width <= 0 || imageRenderSize.height <= 0) return null;
+    const { positionX, positionY, scale } = transformState;
+    return {
+      left: positionX + imageRenderSize.offsetX * scale,
+      top: positionY + imageRenderSize.offsetY * scale,
+      width: imageRenderSize.width * scale,
+      height: imageRenderSize.height * scale,
+    };
+  }, [imageRenderSize, transformState]);
+  const { heldRect, phase: photoSwapPhase } = usePhotoSwap(
+    selectedImage?.path ?? null,
+    isNativePhotoShown,
+    canHoldPhoto,
+    photoRect,
+  );
+  const isPreviousPhotoHeld = isPhotoHeld(photoSwapPhase);
 
   const transformConfig = useMemo(() => {
     if (!selectedImage || !imageRenderSize.scale || !originalSize) {
@@ -1125,6 +1164,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     nativePreviewVisible: true,
     isReady: selectedImage?.isReady ?? false,
     hasRenderedFirstFrame,
+    holdFrame: isPreviousPhotoHeld,
     isCropping,
     uncroppedAdjustedPreviewUrl,
     showOriginal,
@@ -1145,6 +1185,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       nativePreviewVisible,
       isReady: selectedImage?.isReady ?? false,
       hasRenderedFirstFrame,
+      holdFrame: isPreviousPhotoHeld,
       isCropping,
       uncroppedAdjustedPreviewUrl,
       showOriginal,
@@ -1156,6 +1197,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     appSettings?.editorNeutralGreyBg,
     selectedImage?.isReady,
     hasRenderedFirstFrame,
+    isPreviousPhotoHeld,
     isCropping,
     uncroppedAdjustedPreviewUrl,
     showOriginal,
@@ -1201,35 +1243,47 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       const irs = imageRenderSizeRef.current;
       const hasValidImageGeometry = irs.width > 0 && irs.height > 0;
 
-      if (state.useWgpuRenderer === false || !state.isReady || !state.hasRenderedFirstFrame) {
-        const hiddenTransform = `${windowWidth},${windowHeight},-999999,-999999,1,1,${clipX},${clipY},${clipW},${clipH},${state.nativePreviewVisible},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
+      // Sends the display transform when it differs from the last one sent.
+      const sendTransform = (
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        pixelated: boolean,
+        holdFrame: boolean,
+      ) => {
+        const transform = `${windowWidth},${windowHeight},${x},${y},${width},${height},${clipX},${clipY},${clipW},${clipH},${state.nativePreviewVisible},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')},${holdFrame}`;
+        if (lastWgpuTransformRef.current === transform || isInvoking) return;
+        lastWgpuTransformRef.current = transform;
+        isInvoking = true;
+        invoke('update_wgpu_transform', {
+          payload: {
+            windowWidth,
+            windowHeight,
+            x,
+            y,
+            width,
+            height,
+            clipX,
+            clipY,
+            clipWidth: clipW,
+            clipHeight: clipH,
+            visible: state.nativePreviewVisible,
+            bgPrimary: state.bgPrimary || [0, 0, 0, 1],
+            bgSecondary: state.bgSecondary || [0, 0, 0, 1],
+            pixelated,
+            holdFrame,
+          },
+        })
+          .catch((err) => console.warn('WGPU Sync Error:', err))
+          .finally(() => {
+            isInvoking = false;
+          });
+      };
 
-        if (lastWgpuTransformRef.current !== hiddenTransform && !isInvoking) {
-          lastWgpuTransformRef.current = hiddenTransform;
-          isInvoking = true;
-          invoke('update_wgpu_transform', {
-            payload: {
-              windowWidth,
-              windowHeight,
-              x: -999999,
-              y: -999999,
-              width: 1,
-              height: 1,
-              clipX,
-              clipY,
-              clipWidth: clipW,
-              clipHeight: clipH,
-              visible: state.nativePreviewVisible,
-              bgPrimary: state.bgPrimary || [0, 0, 0, 1],
-              bgSecondary: state.bgSecondary || [0, 0, 0, 1],
-              pixelated: false,
-            },
-          })
-            .catch(() => {})
-            .finally(() => {
-              isInvoking = false;
-            });
-        }
+      if (state.holdFrame || state.useWgpuRenderer === false || !state.isReady || !state.hasRenderedFirstFrame) {
+        // A held frame stays where it is; otherwise the display is moved out of sight.
+        sendTransform(-999999, -999999, 1, 1, false, state.holdFrame);
         if (isEffectActive) {
           wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
         }
@@ -1272,37 +1326,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         screenH = Math.max(screenH, 1);
       }
 
-      const currentTransform = `${windowWidth},${windowHeight},${screenX},${screenY},${screenW},${screenH},${clipX},${clipY},${clipW},${clipH},${state.nativePreviewVisible},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
-
-      if (lastWgpuTransformRef.current !== currentTransform && !isInvoking) {
-        lastWgpuTransformRef.current = currentTransform;
-        isInvoking = true;
-
-        const isZoomedIn = scale >= maxScaleRef.current - 0.5;
-
-        invoke('update_wgpu_transform', {
-          payload: {
-            windowWidth,
-            windowHeight,
-            x: screenX,
-            y: screenY,
-            width: screenW,
-            height: screenH,
-            clipX,
-            clipY,
-            clipWidth: clipW,
-            clipHeight: clipH,
-            visible: state.nativePreviewVisible,
-            bgPrimary: state.bgPrimary || [0, 0, 0, 1],
-            bgSecondary: state.bgSecondary || [0, 0, 0, 1],
-            pixelated: isZoomedIn,
-          },
-        })
-          .catch((err) => console.warn('WGPU Sync Error:', err))
-          .finally(() => {
-            isInvoking = false;
-          });
-      }
+      sendTransform(screenX, screenY, screenW, screenH, scale >= maxScaleRef.current - 0.5, false);
 
       if (isEffectActive) {
         wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
@@ -2014,6 +2038,18 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const isWgpuActive = useNativePreview && appSettings?.useWgpuRenderer !== false && hasRenderedFirstFrame;
   const hasRenderedAnyPreview = hasRenderedFirstFrame || !!finalPreviewUrl;
 
+  // While photos swap, the stage is covered by its own background, and the photo's place by what surrounds the
+  // photo on screen: the background seen through the Lights Out layer. The covered place stays lit while the
+  // previous photo is held, so Lights Out shows it there.
+  const editorBackground = appSettings?.editorNeutralGreyBg ? NEUTRAL_GREY_CSS : 'var(--app-bg-secondary)';
+  const photoCoverColor =
+    lightsOutMode === 'off'
+      ? editorBackground
+      : `color-mix(in srgb, ${lightsOutColor(lightsOutMode, normalizeLightsOutScreenColor(appSettings?.lightsOutScreenColor))} ${
+          lightsOutOpacity(lightsOutMode, normalizeLightsOutDimLevel(appSettings?.lightsOutDimLevel)) * 100
+        }%, ${editorBackground})`;
+  const photoCoverRect = photoSwapPhase === 'fadingIn' ? (photoRect ?? heldRect) : heldRect;
+
   return (
     <div
       className={clsx(
@@ -2057,7 +2093,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
           'flex-1 relative overflow-hidden touch-none',
           isFullScreen ? 'rounded-none' : 'rounded-lg',
           appSettings?.useWgpuRenderer !== false && !isFullScreen && 'ring-[9999px] ring-bg-secondary',
-          !isWgpuActive && (appSettings?.editorNeutralGreyBg ? 'bg-[#808080]' : 'bg-bg-secondary'),
+          !isWgpuActive &&
+            !isPreviousPhotoHeld &&
+            (appSettings?.editorNeutralGreyBg ? 'bg-[#808080]' : 'bg-bg-secondary'),
         )}
         style={{ cursor: cursorStyle }}
         onContextMenu={onContextMenu}
@@ -2122,6 +2160,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
             onSelectMask={(id) => setEditor({ activeMaskId: id })}
             onStraighten={handleStraighten}
             selectedImage={selectedImage}
+            isPhotoHeld={isPreviousPhotoHeld}
+            showLoadingThumbnail={lightsOutMode === 'off'}
             setCrop={handleCropChange}
             setIsMaskHovered={setIsMaskHovered}
             setIsMaskTouchInteracting={setIsMaskTouchInteracting}
@@ -2143,6 +2183,26 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
           />
           {isGuidedPerspectiveActive && <GuidedPerspectiveOverlay imageRenderSize={imageRenderSize} />}
         </div>
+
+        {photoSwapPhase !== 'idle' && (
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundColor: editorBackground,
+              opacity: photoSwapPhase === 'fadingOut' ? 1 : 0,
+              transition: `opacity ${photoSwapPhase === 'fadingIn' ? PHOTO_SWAP_FADE_IN_MS : PHOTO_SWAP_FADE_OUT_MS}ms ease-in-out`,
+            }}
+          >
+            {photoCoverRect && (
+              <div
+                className="absolute"
+                style={{ ...photoCoverRect, backgroundColor: photoCoverColor }}
+                {...lightsOutTarget(isPreviousPhotoHeld, 0, photoSwapPhase === 'held')}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

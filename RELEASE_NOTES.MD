@@ -5,6 +5,29 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.30.10-fix-lo — 2026-11-06
+
+### Develop
+
+- Stepping to another photo keeps the current photo on screen until the next
+  one is fully rendered, then switches with a short fade. There is no blank
+  screen and no unedited preview in between.
+
+### Lights Out
+
+- The **Lights Out border** fades out and in with the photo when you step
+  to another one.
+- Lights Dim and Lights Out use less processing power while the screen is
+  idle.
+
+## 1.30.9-fix-lo — 2026-11-06
+
+### Lights Out
+
+- In Develop with **Lights Dim** or **Lights Out**, stepping to another photo
+  no longer shows an unedited, low-resolution preview first: the photo
+  appears once it is fully rendered with all its edits.
+
 ## 1.30.8-feature-lights-out — 2026-11-06
 
 ### Lights Out

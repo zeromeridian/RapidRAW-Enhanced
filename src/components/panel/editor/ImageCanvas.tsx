@@ -102,6 +102,8 @@ interface ImageCanvasProps {
   isCropping: boolean;
   isMaskControlHovered: boolean;
   isMasking: boolean;
+  /** The native display still shows the previous photo; this one is neither shown nor lit until it takes over. */
+  isPhotoHeld: boolean;
   isSliderDragging: boolean;
   isStraightenActive: boolean;
   isRotationActive?: boolean;
@@ -119,6 +121,8 @@ interface ImageCanvasProps {
   onRotationDragEnd(rotation: number): void;
   onStraighten(val: number): void;
   selectedImage: SelectedImage;
+  /** Whether the library thumbnail stands in for the photo until its final render is ready. */
+  showLoadingThumbnail: boolean;
   setCrop(crop: Crop, perfentCrop: PercentCrop): void;
   setIsMaskHovered(isHovered: boolean): void;
   setIsMaskTouchInteracting(isInteracting: boolean): void;
@@ -1217,6 +1221,7 @@ const ImageCanvas = memo(
     isCropping,
     isMaskControlHovered,
     isMasking,
+    isPhotoHeld,
     isSliderDragging,
     isStraightenActive,
     isRotationActive,
@@ -1234,6 +1239,7 @@ const ImageCanvas = memo(
     onRotationDragEnd,
     onStraighten,
     selectedImage,
+    showLoadingThumbnail,
     setCrop,
     setIsMaskHovered,
     setIsMaskTouchInteracting,
@@ -1301,6 +1307,9 @@ const ImageCanvas = memo(
 
     const isWgpuActive =
       useNativePreview && appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
+    // Without the thumbnail stand-in, nothing is shown or lit until the photo's final render is ready.
+    const isPhotoShown = !isPhotoHeld && (showLoadingThumbnail || isWgpuActive || !!finalPreviewUrl);
+    const canShowSource = (src: string) => !isPhotoHeld && (showLoadingThumbnail || src !== selectedImage.thumbnailUrl);
     const { t } = useTranslation();
     const osPlatform = useOsPlatform();
     const modifierKey = osPlatform === 'macos' ? 'Cmd' : 'Ctrl';
@@ -2955,7 +2964,7 @@ const ImageCanvas = memo(
             <div className="absolute inset-0 w-full h-full">
               <svg
                 className="pointer-events-none"
-                {...lightsOutTarget(hasRenderSize && !isCropViewVisible, 0, true)}
+                {...lightsOutTarget(isPhotoShown && hasRenderSize && !isCropViewVisible, 0, true)}
                 viewBox={thumbnailSize ? `0 0 ${thumbnailSize.width} ${thumbnailSize.height}` : undefined}
                 style={
                   hasRenderSize
@@ -2982,10 +2991,10 @@ const ImageCanvas = memo(
                     fill="none"
                     height={thumbnailSize.height}
                     width={thumbnailSize.width}
-                    {...lightsOutTarget(!isCropViewVisible, 0, true)}
+                    {...lightsOutTarget(isPhotoShown && !isCropViewVisible, 0, true)}
                   />
                 )}
-                {displayState.base && !isWgpuActive && (
+                {displayState.base && canShowSource(displayState.base) && !isWgpuActive && (
                   <image
                     href={displayState.base}
                     x="0"
@@ -2996,7 +3005,7 @@ const ImageCanvas = memo(
                   />
                 )}
 
-                {displayState.fade && !isWgpuActive && (
+                {displayState.fade && canShowSource(displayState.fade) && !isWgpuActive && (
                   <image
                     href={displayState.fade}
                     x="0"

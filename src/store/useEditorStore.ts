@@ -3,6 +3,7 @@ import { Adjustments, INITIAL_ADJUSTMENTS, MaskContainer, AiPatch } from '../uti
 import { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
 import { ChannelConfig } from '../components/adjustments/Curves';
 import { ImageDimensions } from '../hooks/useImageRenderSize';
+import type { PhotoSwapPhase } from '../hooks/usePhotoSwap';
 import { ToolType } from '../components/panel/right/Masks';
 import { OverlayMode } from '../components/panel/right/CropPanel';
 
@@ -78,6 +79,7 @@ interface EditorState {
   aiDenoiseProgress: Record<string, number>;
   isAIConnectorConnected: boolean;
   hasRenderedFirstFrame: boolean;
+  photoSwapPhase: PhotoSwapPhase;
   patchesSentToBackend: Set<string>;
 
   // Clipboard
@@ -146,6 +148,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   aiDenoiseProgress: {},
   isMaskControlHovered: false,
   hasRenderedFirstFrame: false,
+  photoSwapPhase: 'idle',
   patchesSentToBackend: new Set<string>(),
 
   setEditor: (updater) => set((state) => (typeof updater === 'function' ? updater(state) : updater)),
