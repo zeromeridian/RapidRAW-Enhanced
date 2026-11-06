@@ -5,6 +5,13 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.29.2-fix-top-bar — 2026-11-05
+
+### Library and Develop
+
+- **Quick Filter** and **Select by** in the top bar now start at the left,
+  in line with the rating stars in the bottom toolbar.
+
 ## 1.29.1-fix-top-bar — 2026-11-05
 
 ### Develop
@@ -12,6 +19,12 @@ description.
 - **Open in** is now also available when you right-click the image you are
   editing, so you can send it to Photoshop, Photo Craft, or another external
   editor without going back to the Library.
+
+### Library and Develop
+
+- **Quick Filter** and **Select by** moved from the bottom toolbar to the top
+  bar, right-aligned with the main view. Both stay open while the window is
+  wide enough and fold back into their buttons only when space runs out.
 
 ## 1.29.0-fix-geometry — 2026-11-04
 

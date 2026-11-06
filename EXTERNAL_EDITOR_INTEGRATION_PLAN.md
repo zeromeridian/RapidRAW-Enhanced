@@ -166,8 +166,8 @@ The steps implement the phases under "Strategy". Each one ships on its own.
      the image being edited in Develop now also shows **Open in**. The
      menu is built once by `buildOpenInOption` in `useAppContextMenus.ts`
      and shared by the thumbnail and editor-canvas menus; Original File is
-     disabled for a RAW in both. Not built yet (owner: no build); not run
-     in the app.
+     disabled for a RAW in both. Built in `1.29.1-fix-top-bar` (with the
+     top-bar filter move); not run in the app.
 5. **Step 5: RAW integration** (Phase 3): deferred. Document and test the
    `--edit` exit codes first.
 

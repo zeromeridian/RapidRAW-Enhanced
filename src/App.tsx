@@ -6,7 +6,7 @@ import { ClerkProvider } from '@clerk/react';
 import { ToastContainer, toast, Slide } from 'react-toastify';
 import clsx from 'clsx';
 
-import TitleBar from './window/TitleBar';
+import TitleBar, { useIsTitleBarShown } from './window/TitleBar';
 import FolderTree from './components/panel/FolderTree';
 import SettingsPanel from './components/panel/SettingsPanel';
 import ExportPanel from './components/panel/right/ExportPanel';
@@ -273,6 +273,7 @@ function App() {
   });
 
   const isAndroid = osPlatform === 'android';
+  const isTitleBarShown = useIsTitleBarShown();
   const isPortraitViewport = viewportSize.width > 0 && viewportSize.height > viewportSize.width;
   const isCompactPortrait =
     viewportSize.width > 0 && viewportSize.width <= COMPACT_EDITOR_MAX_WIDTH && isPortraitViewport;
@@ -791,7 +792,7 @@ function App() {
             isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
           )}
         >
-          {appSettings?.decorations || (!isWindowFullScreen && <TitleBar />)}
+          {isTitleBarShown && <TitleBar />}
         </div>
         <div
           className={clsx(
