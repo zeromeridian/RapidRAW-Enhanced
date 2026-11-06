@@ -44,7 +44,9 @@ import {
   ExternalEditFormat,
   ExternalEditor,
   Invokes,
+  LIGHTS_OUT_BORDER_WIDTHS,
   LIGHTS_OUT_DIM_LEVELS,
+  LightsOutBorderWidth,
   LightsOutDimLevel,
   LightsOutScreenColor,
   PanelDensity,
@@ -60,9 +62,13 @@ import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
 import { open } from '@tauri-apps/plugin-shell';
-import BlackFrameSettingsControl from '../settings/BlackFrameSettingsControl';
 import { formatBytes } from '../../utils/formatBytes';
-import { normalizeLightsOutDimLevel, normalizeLightsOutScreenColor } from '../../utils/lightsOut';
+import {
+  normalizeLightsOutBorderColor,
+  normalizeLightsOutBorderWidth,
+  normalizeLightsOutDimLevel,
+  normalizeLightsOutScreenColor,
+} from '../../utils/lightsOut';
 
 interface ConfirmModalState {
   confirmText: string;
@@ -744,6 +750,15 @@ export default function SettingsPanel({
       Object.values(LightsOutScreenColor).map((color) => ({
         value: color,
         label: t(`settings.general.lightsOutScreenColors.${color}`),
+      })),
+    [t],
+  );
+
+  const lightsOutBorderWidthOptions = useMemo<OptionItem<LightsOutBorderWidth>[]>(
+    () =>
+      LIGHTS_OUT_BORDER_WIDTHS.map((width) => ({
+        value: width,
+        label: width === 0 ? t('settings.general.lightsOutBorderNone') : `${width} px`,
       })),
     [t],
   );
@@ -1625,11 +1640,34 @@ export default function SettingsPanel({
                       </SettingItem>
 
                       <SettingItem
-                        label={t('settings.general.blackFrame')}
-                        description={t('settings.general.blackFrameDesc')}
+                        label={t('settings.general.lightsOutBorderWidth')}
+                        description={t('settings.general.lightsOutBorderWidthDesc')}
                       >
-                        <BlackFrameSettingsControl appSettings={appSettings} onSettingsChange={onSettingsChange} />
+                        <Dropdown
+                          onChange={(value: LightsOutBorderWidth) =>
+                            onSettingsChange({ ...appSettings, lightsOutBorderWidth: value })
+                          }
+                          options={lightsOutBorderWidthOptions}
+                          value={normalizeLightsOutBorderWidth(appSettings?.lightsOutBorderWidth)}
+                          triggerClassName="bg-bg-primary"
+                        />
                       </SettingItem>
+
+                      {normalizeLightsOutBorderWidth(appSettings?.lightsOutBorderWidth) > 0 && (
+                        <SettingItem
+                          label={t('settings.general.lightsOutBorderColor')}
+                          description={t('settings.general.lightsOutBorderColorDesc')}
+                        >
+                          <Dropdown
+                            onChange={(value: LightsOutScreenColor) =>
+                              onSettingsChange({ ...appSettings, lightsOutBorderColor: value })
+                            }
+                            options={lightsOutScreenColorOptions}
+                            value={normalizeLightsOutBorderColor(appSettings?.lightsOutBorderColor)}
+                            triggerClassName="bg-bg-primary"
+                          />
+                        </SettingItem>
+                      )}
 
                       {osPlatform === 'linux' && (
                         <SettingItem

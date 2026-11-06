@@ -6,10 +6,13 @@ import { Invokes } from './AppProperties';
 import { LightsOutMode, useUIStore } from '../../store/useUIStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import {
-  buildLightsOutPath,
+  buildLightsOutPaths,
   LIGHTS_OUT_DEACTIVATED_EVENT,
   LIGHTS_OUT_FADE_MS,
+  LIGHTS_OUT_SCREEN_COLORS,
   lightsOutColor,
+  normalizeLightsOutBorderColor,
+  normalizeLightsOutBorderWidth,
   normalizeLightsOutDimLevel,
   normalizeLightsOutScreenColor,
 } from '../../utils/lightsOut';
@@ -25,9 +28,12 @@ export default function LightsOutVeil() {
   const lightsOutMode = useUIStore((s) => s.lightsOutMode);
   const dimLevel = useSettingsStore((s) => normalizeLightsOutDimLevel(s.appSettings?.lightsOutDimLevel));
   const screenColor = useSettingsStore((s) => normalizeLightsOutScreenColor(s.appSettings?.lightsOutScreenColor));
+  const borderColor = useSettingsStore((s) => normalizeLightsOutBorderColor(s.appSettings?.lightsOutBorderColor));
+  const borderWidth = useSettingsStore((s) => normalizeLightsOutBorderWidth(s.appSettings?.lightsOutBorderWidth));
   const isOut = lightsOutMode === 'out';
   const opacity = lightsOutMode === 'off' ? 0 : isOut ? 1 : dimLevel / 100;
   const pathRef = useRef<SVGPathElement>(null);
+  const borderPathRef = useRef<SVGPathElement>(null);
   // The last active mode keeps its colour while the layer fades out.
   const [shownMode, setShownMode] = useState<Exclude<LightsOutMode, 'off'>>('dim');
   const [isTracking, setIsTracking] = useState(false);
@@ -59,18 +65,21 @@ export default function LightsOutVeil() {
     };
   }, []);
 
+  // The border belongs to full Lights Out only.
+  const shownBorderWidth = shownMode === 'out' ? borderWidth : 0;
+
   useEffect(() => {
     const path = pathRef.current;
-    if (!isTracking || !path) return;
+    const borderPath = borderPathRef.current;
+    if (!isTracking || !path || !borderPath) return;
 
     let frame = 0;
-    let lastPath = '';
+    let last = { veil: '', border: '' };
     const track = () => {
-      const nextPath = buildLightsOutPath();
-      if (nextPath !== lastPath) {
-        lastPath = nextPath;
-        path.setAttribute('d', nextPath);
-      }
+      const next = buildLightsOutPaths(shownBorderWidth);
+      if (next.veil !== last.veil) path.setAttribute('d', next.veil);
+      if (next.border !== last.border) borderPath.setAttribute('d', next.border);
+      last = next;
       frame = requestAnimationFrame(track);
     };
     track();
@@ -78,10 +87,12 @@ export default function LightsOutVeil() {
     return () => {
       cancelAnimationFrame(frame);
       path.removeAttribute('d');
+      borderPath.removeAttribute('d');
     };
-  }, [isTracking]);
+  }, [isTracking, shownBorderWidth]);
 
   const fill = lightsOutColor(shownMode, screenColor);
+  const pointerEvents = isOut ? 'fill' : 'none';
 
   return (
     <svg
@@ -91,9 +102,15 @@ export default function LightsOutVeil() {
     >
       <path
         fillRule="evenodd"
-        pointerEvents={isOut ? 'fill' : 'none'}
+        pointerEvents={pointerEvents}
         ref={pathRef}
         style={{ fill, transition: `fill ${LIGHTS_OUT_FADE_MS}ms ease-in-out` }}
+      />
+      <path
+        fill={LIGHTS_OUT_SCREEN_COLORS[borderColor]}
+        fillRule="evenodd"
+        pointerEvents={pointerEvents}
+        ref={borderPathRef}
       />
     </svg>
   );

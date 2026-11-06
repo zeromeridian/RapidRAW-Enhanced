@@ -27,9 +27,8 @@ details are in `RELEASE_NOTES.MD`.
   compared photos stay lit. Dim keeps the interface usable; Lights Out blocks
   clicks outside the photo. Settings → General sets the **Lights Dim level**
   (50/70/80/90 %), the **Lights Out screen color** (black, three greys, white),
-  and the **Lights Out frame**: a minimum distance between the photo and the
-  window edges at Fit zoom (presets, percent or pixels, locked or separate
-  sides), which shows when the panels are hidden.
+  and an optional **Lights Out border** around the photo (1–32 px, same
+  colors; Fit zoom leaves room for it).
 - Customizable bottom toolbar shared by Library and Develop, with Productivity,
   Copy, Stacking, Flags, and direct color-label controls.
 - **Quick Filter** and **Select by** sit in the title bar, left-aligned with
