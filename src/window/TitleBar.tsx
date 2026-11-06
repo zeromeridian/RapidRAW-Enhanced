@@ -1,7 +1,29 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { platform } from '@tauri-apps/plugin-os';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, Square, X } from 'lucide-react';
+import { LibraryFilterControls } from '../components/panel/LibraryFilterControls';
+import { useSettingsStore } from '../store/useSettingsStore';
+import { useUIStore } from '../store/useUIStore';
+
+// The title bar's own inset from the window edge (`px-2`) and the padding the main pane keeps
+// between its edge and its content (the BottomBar's `px-3`).
+const TITLE_BAR_INSET = 8;
+const MAIN_PANE_CONTENT_PADDING = 12;
+// Inset of the 18 px icon inside the controls' 32 px toggle, so the first icon lines up with the
+// BottomBar's first control (the rating stars) rather than the button's invisible edge.
+const TOGGLE_ICON_INSET = 7;
+// Space always kept after the title, and before the window controls so the window can still be dragged.
+const MIN_TITLE_GAP = 16;
+const MIN_DRAG_WIDTH = 48;
+
+/** Whether the custom title bar is rendered (not with native decorations, in fullscreen, or on Android). */
+export function useIsTitleBarShown() {
+  const decorations = useSettingsStore((state) => Boolean(state.appSettings?.decorations));
+  const osPlatform = useSettingsStore((state) => state.osPlatform);
+  const isWindowFullScreen = useUIStore((state) => state.isWindowFullScreen);
+  return !decorations && !isWindowFullScreen && osPlatform !== 'android';
+}
 
 const RestoreDownIcon = ({ size = 14, className = '' }) => (
   <svg
@@ -25,6 +47,24 @@ export default function TitleBar() {
   const [isMaximized, setIsMaximized] = useState(false);
 
   const appWindow = getCurrentWindow();
+  const mainPaneBounds = useUIStore((state) => state.mainPaneBounds);
+  const toolbarVisibility = useSettingsStore((state) => state.appSettings?.bottomToolbarVisibility);
+  const titleRef = useRef<HTMLDivElement>(null);
+  const windowControlsRef = useRef<HTMLDivElement>(null);
+  const [titleWidth, setTitleWidth] = useState(0);
+  const [windowControlsWidth, setWindowControlsWidth] = useState(0);
+  const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
+
+  useLayoutEffect(() => {
+    setTitleWidth(titleRef.current?.offsetWidth ?? 0);
+    setWindowControlsWidth(windowControlsRef.current?.offsetWidth ?? 0);
+  }, [osPlatform]);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const getPlatform = async () => {
@@ -87,6 +127,20 @@ export default function TitleBar() {
     return null;
   }
   const outerDragProps = isLinux ? {} : { 'data-tauri-drag-region': 'true' };
+  // Filter controls start at the main pane's content edge, like the BottomBar's own controls below, and
+  // must end within the pane, clear of the title and the window controls (title-bar coordinates).
+  const filterControlsStart = mainPaneBounds
+    ? Math.max(
+        mainPaneBounds.left + MAIN_PANE_CONTENT_PADDING - TOGGLE_ICON_INSET - TITLE_BAR_INSET,
+        titleWidth + MIN_TITLE_GAP,
+      )
+    : 0;
+  const filterControlsEnd = mainPaneBounds
+    ? Math.min(
+        mainPaneBounds.right - MAIN_PANE_CONTENT_PADDING - TITLE_BAR_INSET,
+        windowWidth - 2 * TITLE_BAR_INSET - windowControlsWidth - MIN_DRAG_WIDTH,
+      )
+    : 0;
 
   return (
     <div className="relative pt-2 px-2 w-full z-50 bg-transparent" {...outerDragProps}>
@@ -94,7 +148,7 @@ export default function TitleBar() {
         className="h-10 bg-bg-secondary flex justify-between items-center select-none rounded-lg overflow-hidden"
         {...outerDragProps}
       >
-        <div className="flex items-center h-full">
+        <div ref={titleRef} className="flex items-center h-full">
           {isMac && (
             <div className="flex items-center h-full px-4 space-x-2 z-10">
               <button
@@ -118,8 +172,19 @@ export default function TitleBar() {
             <p className="text-sm font-semibold text-text-secondary pointer-events-none">ThisIsRAW</p>
           </div>
         </div>
+        {mainPaneBounds && (
+          <div
+            className="flex items-center h-full min-w-0 z-10"
+            style={{ marginLeft: filterControlsStart - titleWidth }}
+          >
+            <LibraryFilterControls
+              availableWidth={filterControlsEnd - filterControlsStart}
+              isItemVisible={(id) => toolbarVisibility?.[id] !== false}
+            />
+          </div>
+        )}
         <div data-tauri-drag-region className="flex-1 h-full" />
-        <div className="flex items-center h-full z-10">
+        <div ref={windowControlsRef} className="flex items-center h-full z-10">
           {isLinux && (
             <div className="flex items-center gap-2 pr-2 h-full">
               <button

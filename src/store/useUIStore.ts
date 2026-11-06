@@ -108,6 +108,9 @@ interface UIState {
   isWindowFullScreen: boolean;
   isInstantTransition: boolean;
   isLayoutReady: boolean;
+  // Horizontal extent of the main pane in window pixels, published by the mounted BottomBar so the
+  // title bar can align its controls with the pane; null when no BottomBar is shown.
+  mainPaneBounds: { left: number; right: number } | null;
   uiVisibility: UiVisibility;
   isLibraryExportPanelVisible: boolean;
   isSettingsOpen: boolean;
@@ -179,6 +182,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   isWindowFullScreen: false,
   isInstantTransition: false,
   isLayoutReady: false,
+  mainPaneBounds: null,
   uiVisibility: { folderTree: true, filmstrip: true, quickFilter: false, editorExif: true },
   isLibraryExportPanelVisible: false,
   isSettingsOpen: false,

@@ -39,8 +39,12 @@ details are in `RELEASE_NOTES.MD`.
   Out cycling and Escape
   restoration bypass stale focus held by chrome hidden in Black mode.
 - Customizable bottom toolbar shared by Library and Develop, with Productivity,
-  Copy, Stacking, Flags, direct color-label controls, and a visually distinct
-  expandable **Select by** control. Select by replaces the current selection
+  Copy, Stacking, Flags, and direct color-label controls.
+- **Quick Filter** and **Select by** sit in the title bar, left-aligned with
+  the bottom toolbar's controls in the main pane below, in Library and Develop. Both stay fully expanded while
+  the window is wide enough and collapse to click-to-open icons only when it
+  is too narrow; with native window decorations or in fullscreen they remain
+  in the bottom toolbar. Select by replaces the current selection
   using any rating, DNG/other-RAW/non-RAW, edit-status, color-label, or flag criterion
   without changing active filters. It follows the Quick Filter inline design,
   exposes match counts in tooltips, and provides an in-place clear-selection
@@ -76,7 +80,7 @@ details are in `RELEASE_NOTES.MD`.
 - Rejected, Selected, Deferred, and Unflagged states with keyboard shortcuts,
   thumbnail badges, rejected-image dimming, filtering, and rejected-file
   deletion for the currently loaded folder view.
-- Unified bottom **Quick Filter** controls for unrated and rating thresholds,
+- Unified **Quick Filter** controls for unrated and rating thresholds,
   RAW/non-RAW files, edited/original status, color labels, and flags, with an
   in-place clear-all action and a persistent active-filter indicator. Rating
   filters and rating-based selection provide explicit **up to (≤)** and **and
