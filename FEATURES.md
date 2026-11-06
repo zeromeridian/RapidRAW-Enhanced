@@ -22,13 +22,17 @@ details are in `RELEASE_NOTES.MD`.
   including the menu bar, Dock, and notification banners on macOS (not on Wayland, where only the app
   window darkens). Lights Out turns off when the window loses focus, for
   example when switching apps. In Develop only the photo being edited
-  stays lit; in the Library Grid or List every thumbnail stays lit unless two
+  stays lit, and a newly opened photo appears only once its final render is
+  ready; in the Library Grid or List every thumbnail stays lit unless two
   or more photos are selected, in which case only those do; in Culling the
   compared photos stay lit. Dim keeps the interface usable; Lights Out blocks
   clicks outside the photo. Settings → General sets the **Lights Dim level**
   (50/70/80/90 %), the **Lights Out screen color** (black, three greys, white),
   and an optional **Lights Out border** around the photo in Develop (1–128 px, same
   colors; Fit zoom leaves room for it).
+- Develop keeps the current photo on screen while the next one renders and
+  then switches with a short fade, so stepping never shows a blank stage or an
+  unedited preview (GPU renderer).
 - Customizable bottom toolbar shared by Library and Develop, with Productivity,
   Copy, Stacking, Flags, and direct color-label controls.
 - **Quick Filter** and **Select by** sit in the title bar, left-aligned with

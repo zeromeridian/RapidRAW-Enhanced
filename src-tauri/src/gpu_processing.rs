@@ -68,10 +68,16 @@ pub struct WgpuDisplay {
     pub latest_transform: DisplayTransform,
     pub current_bind_group: Option<wgpu::BindGroup>,
     pub is_visible: bool,
+    /// Keeps the last presented frame on screen: while set, nothing is presented, so a new photo can finish
+    /// rendering behind the previous one and appear only once the frontend has moved the display to it.
+    pub hold_frame: bool,
 }
 
 impl WgpuDisplay {
     pub fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        if self.hold_frame {
+            return;
+        }
         let output = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(tex)
             | wgpu::CurrentSurfaceTexture::Suboptimal(tex) => tex,
@@ -428,6 +434,7 @@ pub fn get_or_init_gpu_context(
             sampler,
             current_bind_group: None,
             is_visible: true,
+            hold_frame: false,
         })
     } else {
         None

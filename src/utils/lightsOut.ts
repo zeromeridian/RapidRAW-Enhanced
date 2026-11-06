@@ -35,6 +35,10 @@ export const LIGHTS_OUT_SCREEN_COLORS: Record<LightsOutScreenColor, string> = {
 export const lightsOutColor = (mode: Exclude<LightsOutMode, 'off'>, screenColor: LightsOutScreenColor) =>
   mode === 'out' ? LIGHTS_OUT_SCREEN_COLORS[screenColor] : LIGHTS_OUT_SCREEN_COLORS[LightsOutScreenColor.Black];
 
+/** How opaque the Lights Out layer is: 0 when off, the dim level in Lights Dim, fully opaque in Lights Out. */
+export const lightsOutOpacity = (mode: LightsOutMode, dimLevel: LightsOutDimLevel) =>
+  mode === 'off' ? 0 : mode === 'out' ? 1 : dimLevel / 100;
+
 export const normalizeLightsOutDimLevel = (value?: number | null): LightsOutDimLevel =>
   LIGHTS_OUT_DIM_LEVELS.find((level) => level === value) ?? DEFAULT_LIGHTS_OUT_DIM_LEVEL;
 

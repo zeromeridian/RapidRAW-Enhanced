@@ -176,6 +176,9 @@ pub struct WgpuTransformPayload {
     pub bg_secondary: [f32; 4],
     pub pixelated: bool,
     pub visible: bool,
+    /// Keep showing the last frame and ignore this transform; see `WgpuDisplay::hold_frame`.
+    #[serde(default)]
+    pub hold_frame: bool,
 }
 
 type TransformedPreview = (Arc<DynamicImage>, f32, (f32, f32));
@@ -422,6 +425,10 @@ async fn update_wgpu_transform(
     tokio::task::spawn_blocking(move || {
         let mut display_lock = context.display.lock().unwrap();
         if let Some(display) = display_lock.as_mut() {
+            display.hold_frame = payload.hold_frame;
+            if payload.hold_frame {
+                return;
+            }
             display.latest_transform.rect = [payload.x, payload.y, payload.width, payload.height];
             display.latest_transform.clip = [
                 payload.clip_x,

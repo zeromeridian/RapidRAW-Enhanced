@@ -60,6 +60,7 @@ import { ALBUM_VIEW_PREFIX, KEYWORD_VIEW_PREFIX } from './utils/libraryViews';
 
 import ImageProcessingManager from './components/managers/ImageProcessingManager';
 import ImageLoaderManager from './components/managers/ImageLoaderManager';
+import { isPhotoHeld } from './hooks/usePhotoSwap';
 
 const CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA'; // local dev key
 
@@ -145,16 +146,23 @@ function App() {
     })),
   );
 
-  const { selectedImage, activeMaskContainerId, activeAiPatchContainerId, hasRenderedFirstFrame, setEditor } =
-    useEditorStore(
-      useShallow((state) => ({
-        selectedImage: state.selectedImage,
-        activeMaskContainerId: state.activeMaskContainerId,
-        activeAiPatchContainerId: state.activeAiPatchContainerId,
-        hasRenderedFirstFrame: state.hasRenderedFirstFrame,
-        setEditor: state.setEditor,
-      })),
-    );
+  const {
+    selectedImage,
+    activeMaskContainerId,
+    activeAiPatchContainerId,
+    hasRenderedFirstFrame,
+    photoSwapPhase,
+    setEditor,
+  } = useEditorStore(
+    useShallow((state) => ({
+      selectedImage: state.selectedImage,
+      activeMaskContainerId: state.activeMaskContainerId,
+      activeAiPatchContainerId: state.activeAiPatchContainerId,
+      hasRenderedFirstFrame: state.hasRenderedFirstFrame,
+      photoSwapPhase: state.photoSwapPhase,
+      setEditor: state.setEditor,
+    })),
+  );
 
   const { exportState, setExportState } = useProcessStore(
     useShallow((state) => ({
@@ -716,7 +724,10 @@ function App() {
   };
 
   const shouldHideFolderTree = isAndroid;
-  const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
+  // A photo held on the native display while the next one renders must stay visible through the window too.
+  const isWgpuActive =
+    (appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame) ||
+    isPhotoHeld(photoSwapPhase);
   // Lights Out squares the window so its corners darken with the screen covers.
   const useMacWindowShell =
     osPlatform === 'macos' && !appSettings?.decorations && !isWindowFullScreen && !isFullScreen && !isLightsOut;
