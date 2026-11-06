@@ -15,6 +15,7 @@ import {
 import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
 import { AppSettings, BrushSettings, Panel, SelectedImage } from '../../ui/AppProperties';
 import { RenderSize } from '../../../hooks/useImageRenderSize';
+import { useImageNaturalSize } from '../../../hooks/useImageNaturalSize';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import { useTranslation } from 'react-i18next';
 import type { OverlayMode } from '../right/CropPanel';
@@ -94,6 +95,8 @@ interface ImageCanvasProps {
   crop: Crop | null;
   finalPreviewUrl: string | null;
   handleCropComplete(c: Crop, cp: PercentCrop): void;
+  /** Space `imageRenderSize` keeps free around the fitted image; also applied before that size is known. */
+  imageFitInset: number;
   imageRenderSize: RenderSize;
   isAiEditing: boolean;
   isCropping: boolean;
@@ -1207,6 +1210,7 @@ const ImageCanvas = memo(
     crop,
     finalPreviewUrl,
     handleCropComplete,
+    imageFitInset,
     imageRenderSize,
     interactivePatch,
     isAiEditing,
@@ -1285,6 +1289,10 @@ const ImageCanvas = memo(
     });
     const [isFadingIn, setIsFadingIn] = useState(false);
     const prevImageIdentityRef = useRef(selectedImage.thumbnailUrl);
+    const hasRenderSize = imageRenderSize.width > 0 && imageRenderSize.height > 0;
+    // Until the image's own size is known, the thumbnail's size frames the lit area in Lights Out, so the hole
+    // matches the fitted thumbnail instead of the whole stage.
+    const thumbnailSize = useImageNaturalSize(hasRenderSize ? null : selectedImage.thumbnailUrl);
 
     const [baseTool, setBaseTool] = useState<ToolType>(brushSettings?.tool ?? ToolType.Brush);
     const [isAltPressed, setIsAltPressed] = useState(false);
@@ -2947,9 +2955,10 @@ const ImageCanvas = memo(
             <div className="absolute inset-0 w-full h-full">
               <svg
                 className="pointer-events-none"
-                {...lightsOutTarget(!isCropViewVisible)}
+                {...lightsOutTarget(hasRenderSize && !isCropViewVisible)}
+                viewBox={thumbnailSize ? `0 0 ${thumbnailSize.width} ${thumbnailSize.height}` : undefined}
                 style={
-                  imageRenderSize.width > 0 && imageRenderSize.height > 0
+                  hasRenderSize
                     ? {
                         position: 'absolute',
                         left: `${imageRenderSize.offsetX}px`,
@@ -2960,14 +2969,22 @@ const ImageCanvas = memo(
                       }
                     : {
                         position: 'absolute',
-                        inset: '0px',
-                        width: '100%',
-                        height: '100%',
+                        inset: `${imageFitInset}px`,
+                        width: `calc(100% - ${2 * imageFitInset}px)`,
+                        height: `calc(100% - ${2 * imageFitInset}px)`,
                         overflow: 'visible',
                       }
                 }
-                preserveAspectRatio={imageRenderSize.width > 0 && imageRenderSize.height > 0 ? 'none' : 'xMidYMid meet'}
+                preserveAspectRatio={hasRenderSize ? 'none' : 'xMidYMid meet'}
               >
+                {thumbnailSize && (
+                  <rect
+                    fill="none"
+                    height={thumbnailSize.height}
+                    width={thumbnailSize.width}
+                    {...lightsOutTarget(!isCropViewVisible)}
+                  />
+                )}
                 {displayState.base && !isWgpuActive && (
                   <image
                     href={displayState.base}

@@ -5,6 +5,20 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.30.6-feature-lights-out — 2026-11-06
+
+### Lights Out
+
+- The **Lights Out border** now appears on all sides at once when you step
+  to a photo that is still loading.
+
+## 1.30.5-feature-lights-out — 2026-11-06
+
+### Lights Out
+
+- Stepping to the next photo in Lights Out no longer shows gray bars beside
+  it while it loads: the darkness fits the photo from the first moment.
+
 ## 1.30.4-feature-lights-out — 2026-11-06
 
 ### Lights Out
