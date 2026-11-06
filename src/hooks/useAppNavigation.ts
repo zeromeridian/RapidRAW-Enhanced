@@ -25,51 +25,86 @@ interface CatalogFolderSnapshot {
   updatedAt: number;
 }
 
-const FOLDER_EXIF_CACHE_MAX_ENTRIES = 12;
-const FOLDER_EXIF_CACHE_MAX_IMAGES = 100_000;
+const FOLDER_LISTING_CACHE_MAX_ENTRIES = 12;
+const FOLDER_LISTING_CACHE_MAX_IMAGES = 100_000;
+// A clicked folder with nothing cached shows its loading state after this delay rather than
+// leaving the previous folder's photos on screen; the catalog usually answers sooner.
+const FOLDER_LOADING_VIEW_DELAY_MS = 150;
 
-type ExifData = Record<string, string>;
-type FolderExifCache = Map<string, Map<string, ExifData>>;
+/** The last image list shown for each recently visited folder, newest last. */
+type FolderListingCache = Map<string, ImageFile[]>;
 
-const getFolderExifCacheKey = (path: string, libraryViewMode: LibraryViewMode | undefined, xmpSync: boolean) =>
+/** The folder listing currently shown in the Library, if it is a folder (not an album or keyword view). */
+interface CommittedListing {
+  key: string;
+  path: string;
+  recursive: boolean;
+}
+
+const getFolderListingCacheKey = (path: string, libraryViewMode: LibraryViewMode | undefined, xmpSync: boolean) =>
   `${libraryViewMode ?? LibraryViewMode.Flat}|${xmpSync ? 'xmp' : 'sidecar'}|${path}`;
 
-const trimFolderExifCache = (cache: FolderExifCache) => {
-  let cachedImageCount = Array.from(cache.values()).reduce((count, images) => count + images.size, 0);
-  while (cache.size > FOLDER_EXIF_CACHE_MAX_ENTRIES || cachedImageCount > FOLDER_EXIF_CACHE_MAX_IMAGES) {
+const storeFolderListing = (cache: FolderListingCache, key: string, images: ImageFile[]) => {
+  cache.delete(key);
+  cache.set(key, images);
+  let cachedImageCount = Array.from(cache.values()).reduce((count, entry) => count + entry.length, 0);
+  while (cache.size > FOLDER_LISTING_CACHE_MAX_ENTRIES || cachedImageCount > FOLDER_LISTING_CACHE_MAX_IMAGES) {
     const oldestKey = cache.keys().next().value;
-    if (!oldestKey) return;
-    cachedImageCount -= cache.get(oldestKey)?.size ?? 0;
+    if (oldestKey === undefined) return;
+    cachedImageCount -= cache.get(oldestKey)?.length ?? 0;
     cache.delete(oldestKey);
   }
 };
 
-const getFolderExifCacheEntry = (cache: FolderExifCache, key: string) => {
-  const entry = cache.get(key);
-  if (!entry) return null;
-  cache.delete(key);
-  cache.set(key, entry);
-  return entry;
+const takeFolderListing = (cache: FolderListingCache, key: string) => {
+  const images = cache.get(key);
+  if (!images) return null;
+  storeFolderListing(cache, key, images);
+  return images;
 };
 
-const mergeCachedExif = (images: ImageFile[], cache: FolderExifCache, key: string) => {
-  const cachedExif = getFolderExifCacheEntry(cache, key);
-  if (!cachedExif) return images;
-  return images.map((image) =>
-    image.exif || !cachedExif.has(image.path) ? image : { ...image, exif: cachedExif.get(image.path)! },
-  );
-};
+/** Whether `path` is `folder` or lies inside it (image paths may carry a `?vc=` suffix). */
+const isPathWithin = (path: string, folder: string) =>
+  path === folder || (path.startsWith(folder) && (/[\\/]$/.test(folder) || ['/', '\\'].includes(path[folder.length])));
 
-const cacheExifUpdates = (cache: FolderExifCache, key: string, exifUpdates: Record<string, ExifData>) => {
-  let entry = getFolderExifCacheEntry(cache, key);
-  if (!entry) {
-    entry = new Map();
-    cache.set(key, entry);
-  }
-  Object.entries(exifUpdates).forEach(([imagePath, exif]) => {
-    if (Object.keys(exif).length > 0) entry.set(imagePath, exif);
+const ratingsOf = (images: ImageFile[]) => {
+  const ratings: Record<string, number> = {};
+  images.forEach((image) => {
+    if (image.rating !== undefined) ratings[image.path] = image.rating;
   });
-  trimFolderExifCache(cache);
+  return ratings;
+};
+
+/** The images with ratings changed since listing (kept in `imageRatings`) written back. */
+const withRatings = (images: ImageFile[], ratings: Record<string, number>) =>
+  images.map((image) => {
+    const rating = ratings[image.path];
+    return rating === undefined || rating === image.rating ? image : { ...image, rating };
+  });
+
+/**
+ * Keeps what is already known about each image where a fresh listing has only placeholders:
+ * EXIF (listings never read it) and, while the metadata workers are still resolving an image,
+ * its rating, edit state, tags, and stack.
+ */
+const mergeKnownImageState = (files: ImageFile[], known: ImageFile[]) => {
+  if (known.length === 0) return files;
+  const knownByPath = new Map(known.map((image) => [image.path, image]));
+  return files.map((file) => {
+    const previous = knownByPath.get(file.path);
+    if (!previous) return file;
+    const exif = file.exif ?? previous.exif;
+    if (!file.metadataPending) return exif === file.exif ? file : { ...file, exif };
+    return {
+      ...file,
+      exif,
+      rating: previous.rating,
+      is_edited: previous.is_edited,
+      tags: previous.tags,
+      xmpStack: previous.xmpStack,
+      metadataPending: previous.metadataPending,
+    };
+  });
 };
 
 const mergeImportedXmpStacks = (images: ImageFile[]) => {
@@ -97,7 +132,8 @@ export interface AppNavigationProps {
 
 export function useAppNavigation({ refs }: AppNavigationProps) {
   const folderLoadGenerationRef = useRef(0);
-  const folderExifCacheRef = useRef<FolderExifCache>(new Map());
+  const folderListingCacheRef = useRef<FolderListingCache>(new Map());
+  const committedListingRef = useRef<CommittedListing | null>(null);
   const {
     transformWrapperRef,
     preloadedDataRef,
@@ -110,7 +146,18 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
     prevAdjustmentsRef,
   } = refs;
 
+  /** Remembers the folder being left, with everything learned while it was shown. */
+  const rememberCommittedListing = useCallback(() => {
+    const committed = committedListingRef.current;
+    const { imageList, imageRatings } = useLibraryStore.getState();
+    if (committed && imageList.length > 0) {
+      storeFolderListing(folderListingCacheRef.current, committed.key, withRatings(imageList, imageRatings));
+    }
+  }, []);
+
   const handleGoHome = useCallback(() => {
+    rememberCommittedListing();
+    committedListingRef.current = null;
     useLibraryStore.getState().setLibrary({
       rootPaths: [],
       currentFolderPath: null,
@@ -125,7 +172,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       expandedFolders: new Set(),
     });
     useUIStore.getState().setUI({ isLibraryExportPanelVisible: false });
-  }, []);
+  }, [rememberCommittedListing]);
 
   const handleBackToLibrary = useCallback(() => {
     const { selectedImage, resetHistory, setEditor } = useEditorStore.getState();
@@ -352,25 +399,32 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         useLibraryStore.getState().pushNavHistory({ type: 'folder', path });
       }
       const folderLoadGeneration = ++folderLoadGenerationRef.current;
+      const isCurrentLoad = () => folderLoadGenerationRef.current === folderLoadGeneration;
       const { appSettings, handleSettingsChange } = useSettingsStore.getState();
       const { pinnedFolders } = appSettings || { pinnedFolders: [] };
       const { setLibrary, sortCriteria } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
       const { selectedImage, resetHistory, setEditor } = useEditorStore.getState();
       const libraryViewMode = appSettings?.libraryViewMode;
-      const folderExifCacheKey = getFolderExifCacheKey(
-        path ?? '',
-        libraryViewMode,
-        appSettings?.enableXmpSync ?? false,
-      );
+      const isRecursive = libraryViewMode === LibraryViewMode.Recursive;
+      const destination: CommittedListing | null = path
+        ? {
+            key: getFolderListingCacheKey(path, libraryViewMode, appSettings?.enableXmpSync ?? false),
+            path,
+            recursive: isRecursive,
+          }
+        : null;
 
+      rememberCommittedListing();
+      const previousListing = committedListingRef.current;
+      const isRefresh = Boolean(destination && previousListing?.key === destination.key);
+
+      setLibrary({ isViewLoading: true, pendingFolderPath: path });
       if (!preserveEditor) {
-        setLibrary({ isViewLoading: true, pendingFolderPath: path });
         setUI({ activeView: 'library' });
-      } else {
-        setLibrary({ isViewLoading: true, pendingFolderPath: path });
       }
 
+      let loadingViewTimer: number | undefined;
       try {
         const { rootPaths, expandedFolders: currentExpandedFolders } = useLibraryStore.getState();
         let newExpandedFolders = new Set(currentExpandedFolders);
@@ -382,10 +436,8 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
           }
         } else if (path && expandParents) {
           const allRoots = [...(rootPaths || []), ...(pinnedFolders || [])].filter(Boolean) as string[];
-          const isInsideRoot = (r: string) =>
-            path === r || (path.startsWith(r) && (/[\\/]$/.test(r) || ['/', '\\'].includes(path[r.length])));
           const relevantRoot = allRoots
-            .filter(isInsideRoot)
+            .filter((root) => isPathWithin(path, root))
             .reduce<string | undefined>((best, r) => (!best || r.length > best.length ? r : best), undefined);
 
           if (relevantRoot) {
@@ -409,19 +461,24 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
           expandedFolders: newExpandedFolders,
         });
 
-        let destinationCommitted = false;
-        const commitImages = (imageList: ImageFile[], ratings: Record<string, number>) => {
+        // A refresh keeps the shown list, scroll, and selection until the new listing arrives.
+        let destinationCommitted = isRefresh;
+        const commitImages = (
+          imageList: ImageFile[],
+          ratings: Record<string, number>,
+          { stillLoading = false }: { stillLoading?: boolean } = {},
+        ) => {
           if (!preserveEditor && !destinationCommitted) {
             useLibraryStore.getState().setSearchCriteria({ tags: [], text: '', mode: 'OR' });
           }
           setLibrary({
             currentFolderPath: path,
-            pendingFolderPath: null,
+            pendingFolderPath: stillLoading ? path : null,
             imageList,
             imageRatings: ratings,
             activeAlbumId: null,
             activeKeyword: null,
-            isViewLoading: false,
+            isViewLoading: stillLoading,
             ...(destinationCommitted
               ? {}
               : {
@@ -429,46 +486,52 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
                   ...(preserveEditor ? {} : { multiSelectedPaths: [], libraryActivePath: null }),
                 }),
           });
+          committedListingRef.current = destination;
           destinationCommitted = true;
         };
 
-        if (path && !preloadedImages) {
-          const snapshot = await invoke<CatalogFolderSnapshot | null>(Invokes.LoadCatalogFolder, {
-            path,
-            recursive: libraryViewMode === LibraryViewMode.Recursive,
-            xmpSync: appSettings?.enableXmpSync ?? false,
-          }).catch((error) => {
-            console.warn('Library catalog could not be read; using filesystem scan:', error);
-            return null;
-          });
-          if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
-          if (snapshot) {
-            mergeImportedXmpStacks(snapshot.images);
-            cacheExifUpdates(
-              folderExifCacheRef.current,
-              folderExifCacheKey,
-              Object.fromEntries(
-                snapshot.images.flatMap((image): [string, ExifData][] =>
-                  image.exif ? [[image.path, image.exif]] : [],
-                ),
-              ),
-            );
-            const restoredThumbnails = Object.fromEntries(
-              Object.entries(snapshot.thumbnails).map(([imagePath, thumbnailPath]) => [
-                imagePath,
-                convertFileSrc(thumbnailPath.replace(/\\/g, '/')),
-              ]),
-            );
-            if (Object.keys(restoredThumbnails).length > 0) {
-              useProcessStore.getState().setProcess((state) => ({
-                thumbnails: { ...state.thumbnails, ...restoredThumbnails },
-              }));
-            }
-            const cachedRatings: Record<string, number> = {};
-            snapshot.images.forEach((image) => {
-              if (image.rating !== undefined) cachedRatings[image.path] = image.rating;
+        if (destination && !preloadedImages && !isRefresh) {
+          // Show the destination at once from what is already known: its last listing this
+          // session, or, in Recursive mode, its part of an ancestor's listing.
+          const knownImages =
+            takeFolderListing(folderListingCacheRef.current, destination.key) ??
+            (isRecursive && previousListing?.recursive && isPathWithin(destination.path, previousListing.path)
+              ? (folderListingCacheRef.current.get(previousListing.key) ?? []).filter((image) =>
+                  isPathWithin(image.path, destination.path),
+                )
+              : null);
+
+          if (knownImages) {
+            commitImages(knownImages, ratingsOf(knownImages), { stillLoading: true });
+          } else {
+            loadingViewTimer = window.setTimeout(() => {
+              if (isCurrentLoad() && !destinationCommitted) commitImages([], {}, { stillLoading: true });
+            }, FOLDER_LOADING_VIEW_DELAY_MS);
+
+            const snapshot = await invoke<CatalogFolderSnapshot | null>(Invokes.LoadCatalogFolder, {
+              path,
+              recursive: isRecursive,
+              xmpSync: appSettings?.enableXmpSync ?? false,
+            }).catch((error) => {
+              console.warn('Library catalog could not be read; using filesystem scan:', error);
+              return null;
             });
-            commitImages(snapshot.images, cachedRatings);
+            if (!isCurrentLoad()) return;
+            if (snapshot) {
+              mergeImportedXmpStacks(snapshot.images);
+              const restoredThumbnails = Object.fromEntries(
+                Object.entries(snapshot.thumbnails).map(([imagePath, thumbnailPath]) => [
+                  imagePath,
+                  convertFileSrc(thumbnailPath.replace(/\\/g, '/')),
+                ]),
+              );
+              if (Object.keys(restoredThumbnails).length > 0) {
+                useProcessStore.getState().setProcess((state) => ({
+                  thumbnails: { ...state.thumbnails, ...restoredThumbnails },
+                }));
+              }
+              commitImages(snapshot.images, ratingsOf(snapshot.images), { stillLoading: true });
+            }
           }
         }
 
@@ -481,8 +544,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
           useEditorStore.getState().patchesSentToBackend.clear();
         }
 
-        const command =
-          libraryViewMode === LibraryViewMode.Recursive ? Invokes.ListImagesRecursive : Invokes.ListImagesInDir;
+        const command = isRecursive ? Invokes.ListImagesRecursive : Invokes.ListImagesInDir;
 
         let files: ImageFile[];
         if (preloadedImages) {
@@ -490,37 +552,32 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         } else {
           files = await invoke(command, { path });
         }
-        if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
+        if (!isCurrentLoad()) return;
         mergeImportedXmpStacks(files);
-        files = mergeCachedExif(files, folderExifCacheRef.current, folderExifCacheKey);
+        if (destinationCommitted) {
+          const { imageList, imageRatings } = useLibraryStore.getState();
+          files = mergeKnownImageState(files, withRatings(imageList, imageRatings));
+        }
 
-        const initialRatings: Record<string, number> = {};
-        files.forEach((f) => {
-          if (f.rating !== undefined) {
-            initialRatings[f.path] = f.rating;
-          }
-        });
+        const initialRatings = ratingsOf(files);
         const exifSortKeys = ['date_taken', 'iso', 'shutter_speed', 'aperture', 'focal_length'];
         const isExifSortActive = exifSortKeys.includes(sortCriteria.key);
+        // EXIF already known (from this session or the catalog) is not read again.
+        const pathsWithoutExif = files.filter((image) => !image.exif).map((image) => image.path);
 
-        if (files.length > 0) {
-          const paths = files.map((f: ImageFile) => f.path);
-
+        if (pathsWithoutExif.length > 0) {
           if (isExifSortActive) {
-            commitImages(files, initialRatings);
-            setLibrary({ isViewLoading: true, pendingFolderPath: path });
-            const exifDataMap: Record<string, any> = await invoke(Invokes.ReadExifForPaths, { paths });
-            if (
-              folderLoadGenerationRef.current !== folderLoadGeneration ||
-              useLibraryStore.getState().currentFolderPath !== path
-            ) {
+            commitImages(files, initialRatings, { stillLoading: true });
+            const exifDataMap: Record<string, any> = await invoke(Invokes.ReadExifForPaths, {
+              paths: pathsWithoutExif,
+            });
+            if (!isCurrentLoad() || useLibraryStore.getState().currentFolderPath !== path) {
               return;
             }
             const finalImageList = files.map((image) => ({
               ...image,
               exif: exifDataMap[image.path] || image.exif || null,
             }));
-            cacheExifUpdates(folderExifCacheRef.current, folderExifCacheKey, exifDataMap);
             commitImages(finalImageList, initialRatings);
           } else {
             commitImages(files, initialRatings);
@@ -528,15 +585,12 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
               const batchSize = 200;
               const stateUpdateBatchSize = 1_000;
               let pendingExifData: Record<string, Record<string, string>> = {};
-              for (let offset = 0; offset < paths.length; offset += batchSize) {
-                if (
-                  folderLoadGenerationRef.current !== folderLoadGeneration ||
-                  useLibraryStore.getState().currentFolderPath !== path
-                ) {
+              for (let offset = 0; offset < pathsWithoutExif.length; offset += batchSize) {
+                if (!isCurrentLoad() || useLibraryStore.getState().currentFolderPath !== path) {
                   return;
                 }
 
-                const batchPaths = paths.slice(offset, offset + batchSize);
+                const batchPaths = pathsWithoutExif.slice(offset, offset + batchSize);
                 try {
                   await new Promise<void>((resolve) => {
                     if ('requestIdleCallback' in window) {
@@ -548,19 +602,15 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
                   const exifDataMap: Record<string, Record<string, string>> = await invoke(Invokes.ReadExifForPaths, {
                     paths: batchPaths,
                   });
-                  if (
-                    folderLoadGenerationRef.current !== folderLoadGeneration ||
-                    useLibraryStore.getState().currentFolderPath !== path
-                  ) {
+                  if (!isCurrentLoad() || useLibraryStore.getState().currentFolderPath !== path) {
                     return;
                   }
                   Object.assign(pendingExifData, exifDataMap);
 
-                  const isLastBatch = offset + batchSize >= paths.length;
+                  const isLastBatch = offset + batchSize >= pathsWithoutExif.length;
                   if (Object.keys(pendingExifData).length >= stateUpdateBatchSize || isLastBatch) {
                     const exifUpdates = pendingExifData;
                     pendingExifData = {};
-                    cacheExifUpdates(folderExifCacheRef.current, folderExifCacheKey, exifUpdates);
                     setLibrary((state) => ({
                       imageList: state.imageList.map((image) =>
                         exifUpdates[image.path] ? { ...image, exif: exifUpdates[image.path] } : image,
@@ -584,17 +634,19 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
           });
         }
       } catch (err) {
-        if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
+        // A newer navigation supersedes this one (the backend then also stops this listing).
+        if (!isCurrentLoad()) return;
         console.error('Failed to load folder contents:', err);
         toast.error('Failed to load images from the selected folder.');
         setLibrary({ pendingFolderPath: null });
       } finally {
-        if (folderLoadGenerationRef.current === folderLoadGeneration) {
+        window.clearTimeout(loadingViewTimer);
+        if (isCurrentLoad()) {
           useLibraryStore.getState().setLibrary({ isViewLoading: false, pendingFolderPath: null });
         }
       }
     },
-    [refs],
+    [refs, rememberCommittedListing],
   );
 
   // Lists images from anywhere in the library, for album and keyword views.
@@ -608,6 +660,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
       const folderLoadGeneration = ++folderLoadGenerationRef.current;
       const { setLibrary } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
+      rememberCommittedListing();
 
       if (!preserveEditor) {
         globalImageCache.clear();
@@ -625,14 +678,10 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         if (folderLoadGenerationRef.current !== folderLoadGeneration) return;
         mergeImportedXmpStacks(files);
 
-        const initialRatings: Record<string, number> = {};
-        files.forEach((f) => {
-          if (f.rating !== undefined) initialRatings[f.path] = f.rating;
-        });
-
+        committedListingRef.current = null;
         setLibrary({
           imageList: files,
-          imageRatings: initialRatings,
+          imageRatings: ratingsOf(files),
           currentFolderPath: viewPath,
           pendingFolderPath: null,
           ...collection,
@@ -652,7 +701,7 @@ export function useAppNavigation({ refs }: AppNavigationProps) {
         }
       }
     },
-    [],
+    [rememberCommittedListing],
   );
 
   const handleSelectAlbum = useCallback(

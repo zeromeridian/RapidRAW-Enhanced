@@ -25,11 +25,14 @@ import { getImageFlag, ImageFlag } from '../../../utils/imageFlags';
 import ImageFlagBadge from '../../ui/ImageFlagBadge';
 import { writeLibraryDragPayload } from '../../../utils/libraryDragDrop';
 import { lightsOutTarget } from '../../../utils/lightsOut';
+import { CLOUD_THUMBNAIL_RETRY_MS } from '../../../hooks/useThumbnails';
 
 type StackDropEdge = 'before' | 'after';
 
 let draggedStackPath: string | null = null;
 const STACK_DRAG_TYPE = 'application/x-thisisraw-stack';
+// Joins a row's image paths into one effect dependency; NUL cannot occur in a file path.
+const PATH_KEY_SEPARATOR = '\u0000';
 
 const STACK_SPINE_POSITION_CLASSES: Record<StackMemberPosition, string> = {
   only: 'top-2 bottom-2 rounded-full',
@@ -1119,24 +1122,29 @@ const RowComponent = ({
     draggedStackPath = null;
   }, []);
 
+  // Rows are rebuilt on every image-list update (metadata and EXIF batches), so request by
+  // path set rather than row identity; otherwise each update re-sends the visible thumbnails.
+  const rowImages: ImageFile[] = row?.type === 'images' ? row.images : [];
+  const rowPathsKey = rowImages.map((img) => img.path).join(PATH_KEY_SEPARATOR);
+  const cloudPathsKey = rowImages
+    .filter((img) => img.is_cloud_placeholder)
+    .map((img) => img.path)
+    .join(PATH_KEY_SEPARATOR);
+
   useEffect(() => {
-    if (!row || row.type !== 'images') return;
+    if (!rowPathsKey) return;
+    rowPathsKey.split(PATH_KEY_SEPARATOR).forEach((path) => queueThumbnailRequest(path));
+  }, [rowPathsKey, queueThumbnailRequest]);
 
-    row.images.forEach((img: ImageFile) => {
-      queueThumbnailRequest(img.path);
-    });
-
-    const cloudPaths = row.images
-      .filter((img: ImageFile) => img.is_cloud_placeholder)
-      .map((img: ImageFile) => img.path);
-    if (cloudPaths.length === 0) return;
-
+  useEffect(() => {
+    if (!cloudPathsKey) return;
+    const cloudPaths = cloudPathsKey.split(PATH_KEY_SEPARATOR);
     const interval = setInterval(() => {
-      cloudPaths.forEach((path: string) => queueThumbnailRequest(path));
-    }, 5000);
+      cloudPaths.forEach((path) => queueThumbnailRequest(path));
+    }, CLOUD_THUMBNAIL_RETRY_MS);
 
     return () => clearInterval(interval);
-  }, [row, queueThumbnailRequest]);
+  }, [cloudPathsKey, queueThumbnailRequest]);
 
   if (row.type === 'footer') return null;
   const shiftedStyle = {

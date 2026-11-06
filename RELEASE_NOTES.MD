@@ -5,6 +5,34 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.30.12-fix-library-scan — 2026-11-06
+
+### Library
+
+- Clicking a folder switches to it at once, even while another folder is
+  still loading. The folder is selected in the folder list right away, and
+  the previous folder's photos no longer stay on screen.
+- Folders you opened earlier in the session appear instantly. In Recursive
+  mode, a subfolder of the folder you are viewing appears instantly too.
+- Ratings, keywords, and EXIF of a folder you return to no longer reset and
+  load again; only changes are picked up.
+- Leaving a folder stops scanning it, so the folder you open next loads
+  faster.
+- EXIF that ThisIsRAW has already read is not read from the photos again.
+
+## 1.30.11-fix-library-scan — 2026-11-06
+
+### Library
+
+- Opening a folder no longer scans it twice. The second scan, which also
+  re-read the folder's metadata and EXIF from the start, is gone, so large
+  folders and folders with subfolders open faster.
+- Thumbnails that are already loading are no longer requested again each
+  time ratings or EXIF arrive, and the thumbnail progress count stays
+  accurate.
+- On hard disks, thumbnails that are already cached no longer read the
+  original photo again.
+
 ## 1.30.10-fix-lo — 2026-11-06
 
 ### Develop

@@ -220,6 +220,8 @@ pub struct AppState {
     pub denoise_result: Arc<Mutex<Option<DynamicImage>>>,
     pub indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
     pub indexing_generation: AtomicUsize,
+    /// Bumped by every folder listing; older listings and their EXIF reads stop.
+    pub library_scan_generation: AtomicUsize,
     pub lut_cache: Mutex<HashMap<String, Arc<Lut>>>,
     pub initial_file_path: Mutex<Option<String>>,
     pub pending_edit_session: Mutex<Option<ExternalEditSession>>,

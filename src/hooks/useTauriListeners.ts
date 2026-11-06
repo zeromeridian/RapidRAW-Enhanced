@@ -128,6 +128,7 @@ export function useTauriListeners({
               tags: metadata?.tags ?? img.tags,
               rating: metadata?.rating ?? img.rating,
               xmpStack: metadata ? metadata.xmpStack : img.xmpStack,
+              metadataPending: metadata ? false : img.metadataPending,
             };
           }),
         }));
@@ -275,8 +276,9 @@ export function useTauriListeners({
             indexingJobId: null,
             indexingProgress: { current: 0, total: 0 },
           });
+          // Reload only when indexing wrote new tags; a no-op run (AI tagging off) would list the folder twice.
           const currentPath = useLibraryStore.getState().currentFolderPath;
-          if (currentPath && (!indexedPath || currentPath === indexedPath)) {
+          if (event.payload?.changedCount > 0 && currentPath && (!indexedPath || currentPath === indexedPath)) {
             refs.current.refreshImageList();
           }
         }
