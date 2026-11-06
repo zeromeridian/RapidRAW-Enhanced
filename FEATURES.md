@@ -15,29 +15,18 @@ details are in `RELEASE_NOTES.MD`.
   sidecar files. Drag a folder onto another folder to move its complete tree;
   hold Command on macOS or Ctrl on Windows/Linux to copy a folder tree instead.
   Transfers prevent same-parent, self/descendant, and name-collision drops.
-- Lightroom-style **Lights Out** viewing across Library and Develop, with
-  session-only Normal, Dim, and Black states; forward/reverse configurable
-  shortcuts; Escape-first restoration; a full-brightness photograph while Dim
-  darkens only surrounding application chrome; and a distraction-free Develop
-  Black state that removes application chrome from layout so the photograph
-  uses all available space and forces both the web and native GPU surrounds to
-  true black. On macOS Black, the native Develop GPU surface remains the sole
-  image renderer while four non-interactive 95%-black panels cover only the
-  area around the transformed image; transparent Black-mode WebView layers
-  prevent the browser from masking that surface. This preserves the exact live
-  Develop image through the transition without a cached web preview, renderer
-  swap, resolution change, or flash; normal macOS and Windows retain native
-  presentation. Black
-  automatically enters fullscreen (using focus-preserving simple fullscreen
-  on macOS) and restores the prior window/fullscreen state on exit. Normal and Dim retain the complete
-  interface. General Settings provides a persistent configurable Black-mode
-  frame with presets, percentage or pixel units, locked or independent sides,
-  precise values, live preview, and reset; Fit reserves the chosen four-sided
-  margins through the established renderer geometry path; previous/next
-  navigation invalidates the outgoing preview immediately and keeps those
-  margins in place from the new photograph's first visible frame. Active Lights
-  Out cycling and Escape
-  restoration bypass stale focus held by chrome hidden in Black mode.
+- Lightroom-style **Lights Out** in Library and Develop: **L** cycles Normal →
+  Lights Dim → Lights Out (**Shift+L** backward, both configurable; Escape
+  restores Normal first). One fading layer darkens everything except the
+  photo without changing the layout: in Develop only the photo being edited
+  stays lit; in the Library Grid or List every thumbnail stays lit unless two
+  or more photos are selected, in which case only those do; in Culling the
+  compared photos stay lit. Dim keeps the interface usable; Lights Out blocks
+  clicks outside the photo. Settings → General sets the **Lights Dim level**
+  (50/70/80/90 %), the **Lights Out screen color** (black, three greys, white),
+  and the **Lights Out frame**: a minimum distance between the photo and the
+  window edges at Fit zoom (presets, percent or pixels, locked or separate
+  sides), which shows when the panels are hidden.
 - Customizable bottom toolbar shared by Library and Develop, with Productivity,
   Copy, Stacking, Flags, and direct color-label controls.
 - **Quick Filter** and **Select by** sit in the title bar, left-aligned with

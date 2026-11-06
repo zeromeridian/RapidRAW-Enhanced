@@ -15,7 +15,11 @@ export interface RenderSize {
   width: number;
 }
 
-export interface RenderInsets {
+/**
+ * The minimum distance between the fitted image and the window edges. Percent values are of the window's short
+ * edge. A side only takes effect where the container reaches closer to that window edge than the frame.
+ */
+export interface WindowFrame {
   unit: 'percent' | 'pixels';
   top: number;
   right: number;
@@ -41,7 +45,7 @@ interface RenderSizeState {
 export const useImageRenderSize = (
   containerRef: React.RefObject<HTMLElement | null>,
   imageDimensions: ImageDimensions | null,
-  insets?: RenderInsets,
+  windowFrame?: WindowFrame,
   imageKey?: string,
 ) => {
   const imgWidth = imageDimensions?.width;
@@ -50,11 +54,11 @@ export const useImageRenderSize = (
     imageKey ?? '',
     imgWidth ?? 0,
     imgHeight ?? 0,
-    insets?.unit ?? 'none',
-    insets?.top ?? 0,
-    insets?.right ?? 0,
-    insets?.bottom ?? 0,
-    insets?.left ?? 0,
+    windowFrame?.unit ?? 'none',
+    windowFrame?.top ?? 0,
+    windowFrame?.right ?? 0,
+    windowFrame?.bottom ?? 0,
+    windowFrame?.left ?? 0,
   ].join(':');
   const [renderState, setRenderState] = useState<RenderSizeState>({ key: '', size: DEFAULT_SIZE });
 
@@ -68,11 +72,13 @@ export const useImageRenderSize = (
 
     const updateSize = () => {
       const { clientWidth: containerWidth, clientHeight: containerHeight } = container;
-      const insetScale = insets?.unit === 'percent' ? Math.min(containerWidth, containerHeight) / 100 : 1;
-      const insetTop = Math.max(0, (insets?.top ?? 0) * insetScale);
-      const insetRight = Math.max(0, (insets?.right ?? 0) * insetScale);
-      const insetBottom = Math.max(0, (insets?.bottom ?? 0) * insetScale);
-      const insetLeft = Math.max(0, (insets?.left ?? 0) * insetScale);
+      const bounds = container.getBoundingClientRect();
+      const { innerWidth: windowWidth, innerHeight: windowHeight } = window;
+      const frameScale = windowFrame?.unit === 'percent' ? Math.min(windowWidth, windowHeight) / 100 : 1;
+      const insetTop = Math.max(0, (windowFrame?.top ?? 0) * frameScale - bounds.top);
+      const insetRight = Math.max(0, (windowFrame?.right ?? 0) * frameScale - (windowWidth - bounds.right));
+      const insetBottom = Math.max(0, (windowFrame?.bottom ?? 0) * frameScale - (windowHeight - bounds.bottom));
+      const insetLeft = Math.max(0, (windowFrame?.left ?? 0) * frameScale - bounds.left);
       const availableWidth = Math.max(1, containerWidth - insetLeft - insetRight);
       const availableHeight = Math.max(1, containerHeight - insetTop - insetBottom);
       const imageAspectRatio = imgWidth / imgHeight;
@@ -103,17 +109,22 @@ export const useImageRenderSize = (
     });
 
     resizeObserver.observe(container);
+    // The frame depends on the container's place in the window, which can change without a resize.
+    if (windowFrame?.unit) window.addEventListener('resize', updateSize);
 
-    return () => resizeObserver.disconnect();
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateSize);
+    };
   }, [
     containerRef,
     imgWidth,
     imgHeight,
-    insets?.unit,
-    insets?.top,
-    insets?.right,
-    insets?.bottom,
-    insets?.left,
+    windowFrame?.unit,
+    windowFrame?.top,
+    windowFrame?.right,
+    windowFrame?.bottom,
+    windowFrame?.left,
     renderKey,
   ]);
 

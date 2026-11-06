@@ -31,6 +31,10 @@ import { isImageFlagTag } from '../../../utils/imageFlags';
 import { USER_TAG_PREFIX, formatKeyword, parseKeywordInput } from '../../../utils/keywords';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
 import { getDisplayFilename } from '../../../utils/outputNaming';
+import { lightsOutTarget } from '../../../utils/lightsOut';
+
+// Corner radius of a compared photo (`rounded-lg`), so Lights Out lights exactly its shape.
+const CULLING_PREVIEW_RADIUS = 8;
 
 interface SyncViewport {
   isActive: boolean;
@@ -479,6 +483,7 @@ function CullingPreview({
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setHoveredCullingPath(image.path)}
       onMouseLeave={() => setHoveredCullingPath(null)}
+      {...lightsOutTarget(true, CULLING_PREVIEW_RADIUS)}
       className={clsx(
         'relative flex items-center justify-center w-full h-full overflow-hidden group bg-bg-primary rounded-lg shadow-sm border border-border-color/10 cursor-grab active:cursor-grabbing select-none',
         isFullWidth && 'col-span-2',

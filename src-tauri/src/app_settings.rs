@@ -712,6 +712,10 @@ pub struct AppSettings {
     #[serde(default)]
     pub black_frame: BlackFrameSettings,
     #[serde(default)]
+    pub lights_out_dim_level: Option<u8>,
+    #[serde(default)]
+    pub lights_out_screen_color: Option<String>,
+    #[serde(default)]
     pub external_editors: Vec<ExternalEditor>,
 }
 
@@ -845,6 +849,8 @@ impl Default for AppSettings {
             right_panel_width: None,
             catalog_directory: None,
             black_frame: BlackFrameSettings::default(),
+            lights_out_dim_level: None,
+            lights_out_screen_color: None,
             external_editors: Vec::new(),
         }
     }

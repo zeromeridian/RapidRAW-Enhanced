@@ -44,6 +44,9 @@ import {
   ExternalEditFormat,
   ExternalEditor,
   Invokes,
+  LIGHTS_OUT_DIM_LEVELS,
+  LightsOutDimLevel,
+  LightsOutScreenColor,
   PanelDensity,
 } from '../ui/AppProperties';
 import {
@@ -59,6 +62,7 @@ import { useOsPlatform } from '../../hooks/useOsPlatform';
 import { open } from '@tauri-apps/plugin-shell';
 import BlackFrameSettingsControl from '../settings/BlackFrameSettingsControl';
 import { formatBytes } from '../../utils/formatBytes';
+import { normalizeLightsOutDimLevel, normalizeLightsOutScreenColor } from '../../utils/lightsOut';
 
 interface ConfirmModalState {
   confirmText: string;
@@ -727,6 +731,20 @@ export default function SettingsPanel({
       { value: PanelDensity.Compact, label: t('settings.general.panelDensityCompact') },
       { value: PanelDensity.Comfortable, label: t('settings.general.panelDensityComfortable') },
     ],
+    [t],
+  );
+
+  const lightsOutDimLevelOptions = useMemo<OptionItem<LightsOutDimLevel>[]>(
+    () => LIGHTS_OUT_DIM_LEVELS.map((level) => ({ value: level, label: `${level}%` })),
+    [],
+  );
+
+  const lightsOutScreenColorOptions = useMemo<OptionItem<LightsOutScreenColor>[]>(
+    () =>
+      Object.values(LightsOutScreenColor).map((color) => ({
+        value: color,
+        label: t(`settings.general.lightsOutScreenColors.${color}`),
+      })),
     [t],
   );
 
@@ -1574,6 +1592,34 @@ export default function SettingsPanel({
                           onChange={(value: PanelDensity) => onSettingsChange({ ...appSettings, panelDensity: value })}
                           options={panelDensityOptions}
                           value={appSettings?.panelDensity || DEFAULT_PANEL_DENSITY}
+                          triggerClassName="bg-bg-primary"
+                        />
+                      </SettingItem>
+
+                      <SettingItem
+                        label={t('settings.general.lightsOutDimLevel')}
+                        description={t('settings.general.lightsOutDimLevelDesc')}
+                      >
+                        <Dropdown
+                          onChange={(value: LightsOutDimLevel) =>
+                            onSettingsChange({ ...appSettings, lightsOutDimLevel: value })
+                          }
+                          options={lightsOutDimLevelOptions}
+                          value={normalizeLightsOutDimLevel(appSettings?.lightsOutDimLevel)}
+                          triggerClassName="bg-bg-primary"
+                        />
+                      </SettingItem>
+
+                      <SettingItem
+                        label={t('settings.general.lightsOutScreenColor')}
+                        description={t('settings.general.lightsOutScreenColorDesc')}
+                      >
+                        <Dropdown
+                          onChange={(value: LightsOutScreenColor) =>
+                            onSettingsChange({ ...appSettings, lightsOutScreenColor: value })
+                          }
+                          options={lightsOutScreenColorOptions}
+                          value={normalizeLightsOutScreenColor(appSettings?.lightsOutScreenColor)}
                           triggerClassName="bg-bg-primary"
                         />
                       </SettingItem>

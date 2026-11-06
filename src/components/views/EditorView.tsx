@@ -208,7 +208,7 @@ export default function EditorView({
   const editorBottomBarNode = (
     <div
       className={clsx(
-        'lights-out-chrome flex flex-col w-full shrink-0',
+        'flex flex-col w-full shrink-0',
         isFullScreen ? 'overflow-hidden' : 'relative z-30 overflow-visible',
         !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
       )}
@@ -278,7 +278,7 @@ export default function EditorView({
       </div>
       <div
         className={clsx(
-          'lights-out-chrome compact-sidebar flex overflow-hidden shrink-0',
+          'compact-sidebar flex overflow-hidden shrink-0',
           isCompactPortrait ? 'flex-col bg-bg-secondary rounded-lg' : 'h-full bg-transparent',
           !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
         )}

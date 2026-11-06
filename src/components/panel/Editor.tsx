@@ -21,6 +21,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useAiMasking } from '../../hooks/useAiMasking';
+import { lightsOutClip } from '../../utils/lightsOut';
 import { normalizeBlackFrame } from '../../utils/lightsOutFrame';
 
 const parseRgb = (rgbStr: string): [number, number, number, number] => {
@@ -79,39 +80,6 @@ interface EditorProps {
   onContextMenu(event: any): void;
   onImageSelect?(path: string, event?: any): void;
   transformWrapperRef: any;
-}
-
-function LightsOutOverlay({
-  imageRenderSize,
-  transformState,
-}: {
-  imageRenderSize: RenderSize;
-  transformState: { scale: number; positionX: number; positionY: number };
-}) {
-  const { containerWidth, containerHeight, offsetX, offsetY, width, height } = imageRenderSize;
-  if (!containerWidth || !containerHeight || !width || !height) return null;
-
-  const imageLeft = transformState.positionX + offsetX * transformState.scale;
-  const imageTop = transformState.positionY + offsetY * transformState.scale;
-  const imageRight = imageLeft + width * transformState.scale;
-  const imageBottom = imageTop + height * transformState.scale;
-  const left = Math.max(0, Math.min(containerWidth, imageLeft));
-  const top = Math.max(0, Math.min(containerHeight, imageTop));
-  const right = Math.max(left, Math.min(containerWidth, imageRight));
-  const bottom = Math.max(top, Math.min(containerHeight, imageBottom));
-  const overlayStyle = { backgroundColor: 'rgba(0, 0, 0, 0.95)' };
-
-  return (
-    <div className="absolute inset-0 z-30 pointer-events-none" aria-hidden="true">
-      <div className="absolute top-0 left-0 w-full" style={{ ...overlayStyle, height: top }} />
-      <div className="absolute bottom-0 left-0 w-full" style={{ ...overlayStyle, height: containerHeight - bottom }} />
-      <div className="absolute left-0" style={{ ...overlayStyle, top, width: left, height: bottom - top }} />
-      <div
-        className="absolute right-0"
-        style={{ ...overlayStyle, top, width: containerWidth - right, height: bottom - top }}
-      />
-    </div>
-  );
 }
 
 export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, transformWrapperRef }: EditorProps) {
@@ -340,11 +308,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     return null;
   }, [selectedImage, adjustments.crop, adjustments.orientationSteps, isGuidedPerspectiveActive]);
 
-  const blackFrame = useMemo(
-    () => (lightsOutMode === 'black' ? normalizeBlackFrame(appSettings?.blackFrame) : undefined),
+  const lightsOutFrame = useMemo(
+    () => (lightsOutMode === 'out' ? normalizeBlackFrame(appSettings?.blackFrame) : undefined),
     [appSettings?.blackFrame, lightsOutMode],
   );
-  const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions, blackFrame, selectedImage?.path);
+  const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions, lightsOutFrame, selectedImage?.path);
   const imageRenderSizeRef = useRef(imageRenderSize);
   imageRenderSizeRef.current = imageRenderSize;
 
@@ -1165,14 +1133,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     const rootStyle = getComputedStyle(document.documentElement);
     const bgPrimaryStr = rootStyle.getPropertyValue('--app-bg-primary') || 'rgb(24, 24, 24)';
     const bgSecondaryStr = rootStyle.getPropertyValue('--app-bg-secondary') || 'rgb(35, 35, 35)';
-    const isLightsOutBlack = lightsOutMode === 'black';
     const nativePreviewVisible = true;
-    const bgPrimary: [number, number, number, number] = isLightsOutBlack ? [0, 0, 0, 1] : parseRgb(bgPrimaryStr);
-    const bgSecondary: [number, number, number, number] = isLightsOutBlack
-      ? [0, 0, 0, 1]
-      : appSettings?.editorNeutralGreyBg
-        ? NEUTRAL_GREY_RGB
-        : parseRgb(bgSecondaryStr);
+    const bgPrimary = parseRgb(bgPrimaryStr);
+    const bgSecondary = appSettings?.editorNeutralGreyBg ? NEUTRAL_GREY_RGB : parseRgb(bgSecondaryStr);
 
     wgpuStateRef.current = {
       useWgpuRenderer: appSettings?.useWgpuRenderer,
@@ -1193,8 +1156,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
     isCropping,
     uncroppedAdjustedPreviewUrl,
     showOriginal,
-    lightsOutMode,
-    osPlatform,
     appSettings?.theme,
     finalPreviewUrl,
   ]);
@@ -2048,7 +2009,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
 
   const useNativePreview = true;
   const isWgpuActive = useNativePreview && appSettings?.useWgpuRenderer !== false && hasRenderedFirstFrame;
-  const showLightsOutOverlay = osPlatform === 'macos' && lightsOutMode === 'black' && isWgpuActive;
   const hasRenderedAnyPreview = hasRenderedFirstFrame || !!finalPreviewUrl;
 
   return (
@@ -2064,7 +2024,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       {hasRenderedAnyPreview && <div className="hidden" data-bench-id="editor-first-frame" />}
       <div
         className={clsx(
-          'lights-out-chrome shrink-0 relative z-10',
+          'shrink-0 relative z-10',
           !isInstantTransition && 'transition-all duration-300 ease-in-out',
           isFullScreen ? 'max-h-0 opacity-0 m-0' : 'max-h-25 opacity-100',
           toolbarOverflowVisible ? 'overflow-visible' : 'overflow-hidden',
@@ -2091,15 +2051,15 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
 
       <div
         className={clsx(
-          'lights-out-stage flex-1 relative overflow-hidden touch-none',
+          'flex-1 relative overflow-hidden touch-none',
           isFullScreen ? 'rounded-none' : 'rounded-lg',
           appSettings?.useWgpuRenderer !== false && !isFullScreen && 'ring-[9999px] ring-bg-secondary',
-          !isWgpuActive &&
-            (appSettings?.editorNeutralGreyBg && lightsOutMode !== 'black' ? 'bg-[#808080]' : 'bg-bg-secondary'),
+          !isWgpuActive && (appSettings?.editorNeutralGreyBg ? 'bg-[#808080]' : 'bg-bg-secondary'),
         )}
         style={{ cursor: cursorStyle }}
         onContextMenu={onContextMenu}
         ref={imageContainerRef}
+        {...lightsOutClip}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -2163,7 +2123,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
             setIsMaskTouchInteracting={setIsMaskTouchInteracting}
             showOriginal={showOriginal}
             transformedOriginalUrl={transformedOriginalUrl}
-            requireRenderSize={lightsOutMode === 'black'}
             useNativePreview={useNativePreview}
             uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
             updateSubMask={updateSubMaskLocal}
@@ -2180,7 +2139,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
           />
           {isGuidedPerspectiveActive && <GuidedPerspectiveOverlay imageRenderSize={imageRenderSize} />}
         </div>
-        {showLightsOutOverlay && <LightsOutOverlay imageRenderSize={imageRenderSize} transformState={transformState} />}
       </div>
     </div>
   );
