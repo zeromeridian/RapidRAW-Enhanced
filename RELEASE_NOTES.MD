@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.30.13-dev-rr-gap — 2026-11-07
+
+### Library
+
+- Folders of RAW photos on network drives, NAS, and USB disks open much
+  faster. ThisIsRAW now reads only the start of each photo for its EXIF and
+  embedded preview instead of the whole file.
+- Reading EXIF for a large folder no longer slows down thumbnails and
+  Develop while it runs.
+
 ## 1.30.12-fix-library-scan — 2026-11-06
 
 ### Library

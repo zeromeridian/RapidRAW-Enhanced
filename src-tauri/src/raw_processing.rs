@@ -7,10 +7,60 @@ use rawler::{
     rawimage::{RawImage, RawPhotometricInterpretation},
     rawsource::RawSource,
 };
+use std::cell::Cell;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
 };
+
+thread_local! {
+    static READING_PREFIX: Cell<bool> = const { Cell::new(false) };
+    static PREFIX_WARNED: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Whether this thread is trying a file prefix in `read_from_prefix`; the
+/// panic hook stays silent then, since the whole file is tried next.
+pub fn is_reading_prefix() -> bool {
+    READING_PREFIX.with(Cell::get)
+}
+
+/// Log filter: drops rawler records while a prefix is tried, and remembers a
+/// warning so that prefix is rejected (rawler warns about tags a prefix cuts off).
+pub fn swallow_prefix_log(metadata: &log::Metadata) -> bool {
+    if !metadata.target().starts_with("rawler") || !is_reading_prefix() {
+        return false;
+    }
+    if metadata.level() <= log::Level::Warn {
+        PREFIX_WARNED.with(|warned| warned.set(true));
+    }
+    true
+}
+
+/// rawler copies the whole buffer it gets, so `read` gets growing prefixes
+/// (256 KiB, x4, up to 16 MiB) first: RAW metadata and previews are usually
+/// near the start. A prefix counts only if `read` returns a value without
+/// panicking or rawler warning; otherwise the whole file is read. The bool
+/// tells `read` whether it got the whole file.
+pub fn read_from_prefix<T>(
+    file_bytes: &[u8],
+    read: impl Fn(&[u8], bool) -> Option<T>,
+) -> Option<T> {
+    let mut len = 256 * 1024;
+    while len < file_bytes.len() && len <= 16 * 1024 * 1024 {
+        READING_PREFIX.with(|reading| reading.set(true));
+        PREFIX_WARNED.with(|warned| warned.set(false));
+        let found = catch_unwind(AssertUnwindSafe(|| read(&file_bytes[..len], false)));
+        READING_PREFIX.with(|reading| reading.set(false));
+        if let Ok(Some(found)) = found
+            && !PREFIX_WARNED.with(Cell::get)
+        {
+            return Some(found);
+        }
+        len *= 4;
+    }
+    read(file_bytes, true)
+}
 
 pub fn develop_raw_image(
     file_bytes: &[u8],
@@ -254,4 +304,70 @@ pub fn get_fast_demosaic_scale_factor(
         }
     }
     1.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const KIB: usize = 1024;
+
+    #[test]
+    fn prefixes_grow_until_read_succeeds_then_the_whole_file_is_read() {
+        let bytes = vec![0u8; 20 * KIB * KIB];
+        let seen = std::cell::RefCell::new(Vec::new());
+        let read = |prefix: &[u8], whole_file: bool| {
+            seen.borrow_mut().push((prefix.len(), whole_file));
+            (prefix.len() >= KIB * KIB).then_some(prefix.len())
+        };
+        assert_eq!(read_from_prefix(&bytes, read), Some(KIB * KIB));
+        assert_eq!(*seen.borrow(), [(256 * KIB, false), (KIB * KIB, false)]);
+
+        seen.borrow_mut().clear();
+        let never = |prefix: &[u8], whole_file: bool| {
+            seen.borrow_mut().push((prefix.len(), whole_file));
+            whole_file.then_some(prefix.len())
+        };
+        assert_eq!(read_from_prefix(&bytes, never), Some(bytes.len()));
+        assert_eq!(
+            *seen.borrow(),
+            [
+                (256 * KIB, false),
+                (KIB * KIB, false),
+                (4 * KIB * KIB, false),
+                (16 * KIB * KIB, false),
+                (bytes.len(), true)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_prefix_that_panics_or_makes_rawler_warn_is_rejected() {
+        let bytes = vec![0u8; 2 * KIB * KIB];
+        let panics_first = |prefix: &[u8], _| {
+            assert!(is_reading_prefix() || prefix.len() == bytes.len());
+            if prefix.len() == 256 * KIB {
+                panic!("cut-off prefix");
+            }
+            Some(prefix.len())
+        };
+        assert_eq!(read_from_prefix(&bytes, panics_first), Some(KIB * KIB));
+        assert!(!is_reading_prefix());
+
+        let rawler_warning = log::Metadata::builder()
+            .target("rawler::decoders")
+            .level(log::Level::Warn)
+            .build();
+        let warns_on_prefixes = |prefix: &[u8], whole_file: bool| {
+            if !whole_file {
+                assert!(swallow_prefix_log(&rawler_warning));
+            }
+            Some(prefix.len())
+        };
+        assert_eq!(
+            read_from_prefix(&bytes, warns_on_prefixes),
+            Some(bytes.len())
+        );
+        assert!(!swallow_prefix_log(&rawler_warning));
+    }
 }
