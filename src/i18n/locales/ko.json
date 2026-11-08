@@ -790,6 +790,7 @@
       "tooltips": {
         "adjust": "조정",
         "crop": "자르기",
+        "develop": "현상",
         "export": "내보내기",
         "info": "정보",
         "inpaint": "인페인팅",

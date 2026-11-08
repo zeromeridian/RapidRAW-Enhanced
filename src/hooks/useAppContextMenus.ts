@@ -646,15 +646,17 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           });
       };
 
+      // Develop exports only the photo being edited, so several photos are exported from the Library.
       const onExportClick = () => {
-        if (selectedImage) {
+        if (selectedImage && finalSelection.length <= 1) {
           if (selectedImage.path !== path) {
             props.handleImageSelect(path);
           }
           setLibrary({ multiSelectedPaths: finalSelection });
           setRightPanel(Panel.Export);
         } else {
-          setLibrary({ multiSelectedPaths: finalSelection });
+          if (selectedImage) props.handleBackToLibrary();
+          setLibrary({ multiSelectedPaths: finalSelection, libraryActivePath: path });
           setUI({ isLibraryExportPanelVisible: true });
         }
       };

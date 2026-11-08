@@ -3,8 +3,7 @@ import { platform } from '@tauri-apps/plugin-os';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, Square, X } from 'lucide-react';
 import { LibraryFilterControls } from '../components/panel/LibraryFilterControls';
-import { LibraryPanelToggles } from '../components/panel/LibraryPanelToggles';
-import { useEditorStore } from '../store/useEditorStore';
+import { SidePanelToggles } from '../components/panel/SidePanelToggles';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 
@@ -19,12 +18,13 @@ const TOGGLE_ICON_INSET = 7;
 const MIN_TITLE_GAP = 16;
 const MIN_DRAG_WIDTH = 48;
 
-/** Whether the custom title bar is rendered (not with native decorations, in fullscreen, or on Android). */
+/**
+ * Whether the app's top bar is rendered: everywhere but Android, also under native decorations and in
+ * fullscreen (without its window buttons there), so its controls never move.
+ */
 export function useIsTitleBarShown() {
-  const decorations = useSettingsStore((state) => Boolean(state.appSettings?.decorations));
   const osPlatform = useSettingsStore((state) => state.osPlatform);
-  const isWindowFullScreen = useUIStore((state) => state.isWindowFullScreen);
-  return !decorations && !isWindowFullScreen && osPlatform !== 'android';
+  return osPlatform !== 'android';
 }
 
 const RestoreDownIcon = ({ size = 14, className = '' }) => (
@@ -51,8 +51,10 @@ export default function TitleBar() {
   const appWindow = getCurrentWindow();
   const mainPaneBounds = useUIStore((state) => state.mainPaneBounds);
   const toolbarVisibility = useSettingsStore((state) => state.appSettings?.bottomToolbarVisibility);
-  const hasSelectedImage = useEditorStore((state) => Boolean(state.selectedImage));
-  const isLibraryGridShown = useUIStore((state) => state.activeView === 'library') && !hasSelectedImage;
+  // The system draws the window buttons with native decorations, and fullscreen has none.
+  const hasNativeDecorations = useSettingsStore((state) => Boolean(state.appSettings?.decorations));
+  const isWindowFullScreen = useUIStore((state) => state.isWindowFullScreen);
+  const showWindowControls = !hasNativeDecorations && !isWindowFullScreen;
   const titleRef = useRef<HTMLDivElement>(null);
   const windowControlsRef = useRef<HTMLDivElement>(null);
   const panelTogglesRef = useRef<HTMLDivElement>(null);
@@ -64,10 +66,11 @@ export default function TitleBar() {
   useLayoutEffect(() => {
     setTitleWidth(titleRef.current?.offsetWidth ?? 0);
     setWindowControlsWidth(windowControlsRef.current?.offsetWidth ?? 0);
-  }, [osPlatform]);
+  }, [osPlatform, showWindowControls]);
 
-  // The panel toggles' labels follow the language and toolbar settings, so their width is measured.
-  const showPanelToggles = Boolean(mainPaneBounds) && isLibraryGridShown;
+  // Shown with the main pane in Library and Develop. Their labels follow the language and toolbar
+  // settings, so their width is measured.
+  const showPanelToggles = Boolean(mainPaneBounds);
   useLayoutEffect(() => {
     const element = panelTogglesRef.current;
     if (!element) {
@@ -168,7 +171,7 @@ export default function TitleBar() {
         {...outerDragProps}
       >
         <div ref={titleRef} className="flex items-center h-full">
-          {isMac && (
+          {isMac && showWindowControls && (
             <div className="flex items-center h-full px-4 space-x-2 z-10">
               <button
                 aria-label="Close window"
@@ -187,7 +190,10 @@ export default function TitleBar() {
               />
             </div>
           )}
-          <div data-tauri-drag-region className={`flex items-center h-full ${isMac ? '' : 'px-4'}`}>
+          <div
+            data-tauri-drag-region
+            className={`flex items-center h-full ${isMac && showWindowControls ? '' : 'px-4'}`}
+          >
             <p className="text-sm font-semibold text-text-secondary pointer-events-none">ThisIsRAW</p>
           </div>
         </div>
@@ -205,11 +211,11 @@ export default function TitleBar() {
         <div data-tauri-drag-region className="flex-1 h-full" />
         {showPanelToggles && (
           <div ref={panelTogglesRef} className="flex items-center h-full pr-1 z-10">
-            <LibraryPanelToggles isItemVisible={(id) => toolbarVisibility?.[id] !== false} />
+            <SidePanelToggles isItemVisible={(id) => toolbarVisibility?.[id] !== false} />
           </div>
         )}
         <div ref={windowControlsRef} className="flex items-center h-full z-10">
-          {isLinux && (
+          {isLinux && showWindowControls && (
             <div className="flex items-center gap-2 pr-2 h-full">
               <button
                 aria-label="Minimize window"
@@ -239,11 +245,13 @@ export default function TitleBar() {
             </div>
           )}
 
-          {isWindows && <div data-tauri-drag-region className="w-36 shrink-0 h-full pointer-events-none" />}
+          {isWindows && showWindowControls && (
+            <div data-tauri-drag-region className="w-36 shrink-0 h-full pointer-events-none" />
+          )}
         </div>
       </div>
 
-      {isWindows && (
+      {isWindows && showWindowControls && (
         <div className="absolute top-0 right-0 flex h-12 z-20">
           <button aria-label="Minimize window" className="relative w-12 group outline-none" onClick={handleMinimize}>
             <div className="absolute bottom-0 left-0 w-12 h-10 flex justify-center items-center group-hover:bg-white/10 group-active:bg-white/20 transition-colors duration-150">

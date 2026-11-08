@@ -790,6 +790,7 @@
       "tooltips": {
         "adjust": "補正",
         "crop": "切り抜き",
+        "develop": "現像",
         "export": "書き出し",
         "info": "情報",
         "inpaint": "インペイント",

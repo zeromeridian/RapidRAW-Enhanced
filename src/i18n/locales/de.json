@@ -792,6 +792,7 @@
       "tooltips": {
         "adjust": "Anpassen",
         "crop": "Zuschnitt",
+        "develop": "Entwickeln",
         "export": "Exportieren",
         "info": "Info",
         "inpaint": "Reparieren",

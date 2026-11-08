@@ -37,15 +37,20 @@ details are in `RELEASE_NOTES.MD`.
   Copy, Stacking, Flags, and direct color-label controls.
 - Lightroom-style **Metadata** panel next to the Library grid: file
   information, camera details, editable author and copyright, rating and
-  labels, GPS map, and the full EXIF of the active photo. Labelled
-  **Metadata**, **Tagging**, and **Export** switches at the right of the title
-  bar show one Library right panel at a time and highlight the open one (in
-  the bottom toolbar with native window decorations or in fullscreen).
+  labels, GPS map, and the full EXIF of the active photo.
+- Labelled **Info**, **Tagging**, **Export**, and **Develop** switches at the
+  top right of the top bar, always shown in Library and Develop, with the
+  open panel highlighted. Library: one right panel at a time; Develop opens
+  the active photo. Develop: Info, Tagging, and Export show that panel for
+  the edited photo only, and Develop returns to the last editing tool; the
+  vertical tool strip keeps only the editing tools. The top bar also stays in
+  fullscreen and with native window decorations (without its window
+  buttons).
 - **Quick Filter** and **Select by** sit in the title bar, left-aligned with
   the bottom toolbar's controls in the main pane below, in Library and Develop. Both stay fully expanded while
   the window is wide enough and collapse to click-to-open icons only when it
-  is too narrow; with native window decorations or in fullscreen they remain
-  in the bottom toolbar. Select by replaces the current selection
+  is too narrow; only on Android, which has no top bar, they remain in the
+  bottom toolbar. Select by replaces the current selection
   using any rating, DNG/other-RAW/non-RAW, edit-status, color-label, or flag criterion
   without changing active filters. It follows the Quick Filter inline design,
   exposes match counts in tooltips, and provides an in-place clear-selection

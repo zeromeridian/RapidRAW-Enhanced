@@ -36,9 +36,11 @@ export default function TaggingPanel({ onClose }: TaggingPanelProps) {
   const imageList = useLibraryStore((state) => state.imageList);
   const libraryActivePath = useLibraryStore((state) => state.libraryActivePath);
   const activePath = selectedImage?.path ?? libraryActivePath ?? multiSelectedPaths[0] ?? null;
+  // Develop tags only the photo being edited; the Library tags its whole selection.
+  const isEditing = Boolean(selectedImage);
   const targetPaths = useMemo(
-    () => (multiSelectedPaths.length > 0 ? multiSelectedPaths : activePath ? [activePath] : []),
-    [multiSelectedPaths, activePath],
+    () => (isEditing || multiSelectedPaths.length === 0 ? (activePath ? [activePath] : []) : multiSelectedPaths),
+    [isEditing, multiSelectedPaths, activePath],
   );
   const { handleSetTag } = useLibraryActions();
 

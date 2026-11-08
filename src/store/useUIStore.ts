@@ -42,6 +42,14 @@ export type LightsOutMode = 'off' | 'dim' | 'out';
 /** Right panels next to the Library grid. */
 export type LibraryPanel = 'metadata' | 'tagging' | 'export';
 
+/** Develop's right panels that the top bar switches to; every other Develop panel is an editing tool. */
+export const DEVELOP_PANEL_BY_LIBRARY_PANEL: Record<LibraryPanel, Panel> = {
+  metadata: Panel.Metadata,
+  tagging: Panel.Tagging,
+  export: Panel.Export,
+};
+const isEditingPanel = (panel: Panel) => !Object.values(DEVELOP_PANEL_BY_LIBRARY_PANEL).includes(panel);
+
 /**
  * The Library right panel that is shown. Export is opened per task and covers the others; Metadata
  * or Tagging stays open, also across restarts, until hidden, and only next to the grid.
@@ -157,6 +165,8 @@ interface UIState {
   // Right Panel
   activeRightPanel: Panel | null;
   renderedRightPanel: Panel | null;
+  // The editing tool (Adjustments, Crop, Masks, ...) last shown in Develop, reopened by the Develop switch.
+  lastEditingPanel: Panel;
   slideDirection: number;
   collapsibleSectionsState: CollapsibleSectionsState;
 
@@ -244,6 +254,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   activeRightPanel: Panel.Adjustments,
   renderedRightPanel: Panel.Adjustments,
+  lastEditingPanel: Panel.Adjustments,
   slideDirection: 1,
   collapsibleSectionsState: { basic: true, color: false, curves: true, details: false, effects: false },
 
@@ -326,6 +337,7 @@ export const useUIStore = create<UIState>((set, get) => ({
         slideDirection: newIndex > currentIndex ? 1 : -1,
         activeRightPanel: panelId,
         renderedRightPanel: panelId,
+        ...(panelId && isEditingPanel(panelId) && { lastEditingPanel: panelId }),
       });
     }
   },

@@ -842,6 +842,7 @@
       "tooltips": {
         "adjust": "Adjust",
         "crop": "Crop",
+        "develop": "Develop",
         "export": "Export",
         "geometry": "Geometry",
         "info": "Info",

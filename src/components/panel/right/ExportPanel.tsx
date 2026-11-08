@@ -395,13 +395,8 @@ export default function ExportPanel({
   const isCancelling = status === Status.Cancelling;
   const isLibraryContext = !!onClose;
 
-  const pathsToExport = isLibraryContext
-    ? multiSelectedPaths
-    : multiSelectedPaths.length > 0
-      ? multiSelectedPaths
-      : selectedImage
-        ? [selectedImage.path]
-        : [];
+  // Develop exports only the photo being edited; the Library exports its selection.
+  const pathsToExport = isLibraryContext ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
   const numImages = pathsToExport.length;
 
   useEffect(() => {
