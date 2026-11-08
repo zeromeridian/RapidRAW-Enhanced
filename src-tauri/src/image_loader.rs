@@ -29,6 +29,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 use std::time::Instant;
+use tauri::Manager;
 
 #[derive(serde::Serialize)]
 pub struct LoadImageResult {
@@ -376,9 +377,7 @@ pub fn load_image_with_orientation(
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<DynamicImage> {
     let check_cancel = || -> Result<()> {
-        if let Some((tracker, generation)) = &cancel_token
-            && tracker.load(Ordering::SeqCst) != *generation
-        {
+        if is_cancelled(&cancel_token) {
             return Err(anyhow!("Load cancelled"));
         }
         Ok(())
@@ -766,6 +765,44 @@ pub fn is_image_cached(
         .contains(&source_path.to_string_lossy(), &fingerprint)
 }
 
+fn is_cancelled(cancel_token: &Option<(Arc<AtomicUsize>, usize)>) -> bool {
+    cancel_token
+        .as_ref()
+        .is_some_and(|(tracker, generation)| tracker.load(Ordering::SeqCst) != *generation)
+}
+
+/// Decodes a source file at full size for Develop, with its EXIF.
+pub fn decode_pristine(
+    path: &str,
+    settings: &AppSettings,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+) -> Result<(DynamicImage, HashMap<String, String>), String> {
+    if is_cancelled(&cancel_token) {
+        return Err("Load cancelled".to_string());
+    }
+    let decode = |bytes: &[u8]| {
+        if is_cancelled(&cancel_token) {
+            return Err("Load cancelled".to_string());
+        }
+        let img = load_base_image_from_bytes(bytes, path, false, settings, cancel_token.clone())
+            .map_err(|e| e.to_string())?;
+        Ok((img, exif_processing::read_exif_data(path, bytes)))
+    };
+    match read_file_mapped(Path::new(path)) {
+        Ok(mmap) => decode(&mmap),
+        Err(e) => {
+            log::warn!(
+                "Failed to memory-map file '{}': {}. Falling back to standard read.",
+                path,
+                e
+            );
+            let bytes = fs::read(path)
+                .map_err(|io_err| format!("Fallback read failed for {}: {}", path, io_err))?;
+            decode(&bytes)
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn load_image(
     path: String,
@@ -773,8 +810,7 @@ pub async fn load_image(
     app_handle: tauri::AppHandle,
 ) -> Result<LoadImageResult, String> {
     let my_generation = state.load_image_generation.fetch_add(1, Ordering::SeqCst) + 1;
-    let generation_tracker = state.load_image_generation.clone();
-    let cancel_token = Some((generation_tracker.clone(), my_generation));
+    let cancel_token = Some((state.load_image_generation.clone(), my_generation));
 
     {
         *state.original_image.lock().unwrap() = None;
@@ -801,6 +837,23 @@ pub async fn load_image(
 
     let path_clone = source_path_str.clone();
 
+    // A photo the preloader is decoding is finished there and then read from the cache.
+    if state.image_preloader.begin_load(&source_path_str) {
+        let preload_handle = app_handle.clone();
+        let preload_path = source_path_str.clone();
+        tokio::task::spawn_blocking(move || {
+            preload_handle
+                .state::<AppState>()
+                .image_preloader
+                .wait_until_decoded(&preload_path);
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+        if state.load_image_generation.load(Ordering::SeqCst) != my_generation {
+            return Err("Load cancelled".to_string());
+        }
+    }
+
     // Taken before decoding so a file rewritten mid-decode is a miss next time.
     let fingerprint = DecodeFingerprint::for_file(&source_path, &settings);
     let cached_data = fingerprint.as_ref().and_then(|fp| {
@@ -822,55 +875,7 @@ pub async fn load_image(
         }
 
         let (pristine_img, exif_data_loaded) = tokio::task::spawn_blocking(move || {
-            if generation_tracker.load(Ordering::SeqCst) != my_generation {
-                return Err("Load cancelled".to_string());
-            }
-
-            let result: Result<(DynamicImage, HashMap<String, String>), String> =
-                (|| match read_file_mapped(Path::new(&path_clone)) {
-                    Ok(mmap) => {
-                        if generation_tracker.load(Ordering::SeqCst) != my_generation {
-                            return Err("Load cancelled".to_string());
-                        }
-
-                        let img = load_base_image_from_bytes(
-                            &mmap,
-                            &path_clone,
-                            false,
-                            &settings,
-                            cancel_token.clone(),
-                        )
-                        .map_err(|e| e.to_string())?;
-                        let exif = exif_processing::read_exif_data(&path_clone, &mmap);
-                        Ok((img, exif))
-                    }
-                    Err(e) => {
-                        log::warn!(
-                            "Failed to memory-map file '{}': {}. Falling back to standard read.",
-                            path_clone,
-                            e
-                        );
-                        let bytes = fs::read(&path_clone).map_err(|io_err| {
-                            format!("Fallback read failed for {}: {}", path_clone, io_err)
-                        })?;
-
-                        if generation_tracker.load(Ordering::SeqCst) != my_generation {
-                            return Err("Load cancelled".to_string());
-                        }
-
-                        let img = load_base_image_from_bytes(
-                            &bytes,
-                            &path_clone,
-                            false,
-                            &settings,
-                            cancel_token.clone(),
-                        )
-                        .map_err(|e| e.to_string())?;
-                        let exif = exif_processing::read_exif_data(&path_clone, &bytes);
-                        Ok((img, exif))
-                    }
-                })();
-            result
+            decode_pristine(&path_clone, &settings, cancel_token)
         })
         .await
         .map_err(|e| e.to_string())??;

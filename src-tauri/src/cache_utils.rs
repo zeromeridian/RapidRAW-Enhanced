@@ -287,6 +287,10 @@ impl DecodedImageCache {
         }
     }
 
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
     pub fn contains(&self, path: &str, fingerprint: &DecodeFingerprint) -> bool {
         self.items
             .iter()

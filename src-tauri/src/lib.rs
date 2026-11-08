@@ -30,6 +30,7 @@ mod guided_perspective;
 mod hdr_deghosting;
 mod identifier_migration;
 mod image_loader;
+mod image_preload;
 mod image_processing;
 mod inpainting;
 mod keyword_index;
@@ -2260,6 +2261,7 @@ pub fn run() {
             }
 
             start_preview_worker(app_handle.clone());
+            image_preload::start_preload_worker(app_handle.clone());
             start_analytics_worker(app_handle.clone());
             file_management::start_thumbnail_workers(app_handle.clone());
             file_management::start_metadata_workers(app_handle.clone());
@@ -2463,6 +2465,7 @@ pub fn run() {
             effects_cache: Mutex::new(None),
             full_transformed_cache: Mutex::new(None),
             decoded_image_cache: Mutex::new(DecodedImageCache::new(5)),
+            image_preloader: Default::default(),
             thumbnail_manager: ThumbnailManager::new(),
             metadata_manager: MetadataManager::new(),
             disks_cache: Mutex::new(None),
@@ -2518,6 +2521,7 @@ pub fn run() {
             denoising::save_denoised_image,
             image_loader::load_image,
             image_loader::is_image_cached,
+            image_preload::preload_images,
             panorama_stitching::stitch_panorama,
             panorama_stitching::save_panorama,
             export_processing::export_images,

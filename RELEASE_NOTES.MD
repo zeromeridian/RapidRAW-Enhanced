@@ -5,6 +5,15 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.30.16-dev-rr-gap — 2026-11-08
+
+### Develop
+
+- The next and previous photo are prepared in the background while you edit,
+  so stepping to them in Develop no longer waits for the photo to load.
+  The preparation runs at low priority, stops when you move on, and stays
+  within the photo cache size set in Settings.
+
 ## 1.30.15-dev-rr-gap — 2026-11-07
 
 ### Develop
