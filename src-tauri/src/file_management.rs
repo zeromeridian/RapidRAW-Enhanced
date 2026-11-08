@@ -1469,6 +1469,40 @@ mod output_naming_tests {
             None
         ));
     }
+
+    #[test]
+    fn embedded_jpeg_beyond_the_exif_prefix_is_sliced_from_the_file() {
+        let jpeg_offset = 500_000;
+        let jpeg = [0xff, 0xd8, 0xff, 0xd9];
+        let mut bytes = crate::exif_processing::test_tiff::little_endian(
+            1024 * 1024,
+            8,
+            &[
+                (0x0201, 4, 1, jpeg_offset as u32),
+                (0x0202, 4, 1, jpeg.len() as u32),
+            ],
+        );
+        bytes[jpeg_offset..jpeg_offset + jpeg.len()].copy_from_slice(&jpeg);
+
+        let exif = crate::exif_processing::read_exif(&bytes).unwrap();
+        assert!(exif.buf().len() < jpeg_offset);
+        assert_eq!(
+            super::find_embedded_jpeg(&exif, &bytes, exif::In::PRIMARY),
+            Some(&jpeg[..])
+        );
+    }
+}
+
+fn exif_read_pool() -> Option<&'static rayon::ThreadPool> {
+    static POOL: std::sync::OnceLock<Option<rayon::ThreadPool>> = std::sync::OnceLock::new();
+    POOL.get_or_init(|| {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(rayon::current_num_threads())
+            .thread_name(|index| format!("exif-read-{index}"))
+            .build()
+            .ok()
+    })
+    .as_ref()
 }
 
 #[tauri::command]
@@ -1483,40 +1517,49 @@ pub async fn read_exif_for_paths(
         .load(Ordering::Acquire);
     tauri::async_runtime::spawn_blocking(move || {
         let state = app_handle.state::<crate::AppState>();
-        let exif_data: HashMap<String, HashMap<String, String>> = paths
-            .par_iter()
-            .filter_map(|virtual_path| {
-                if !is_library_scan_current(&state, generation) {
-                    return None;
-                }
-                let (source_path, _) = parse_virtual_path(virtual_path);
-                let source_path_str = source_path.to_string_lossy().to_string();
+        let read_all = || {
+            paths
+                .par_iter()
+                .filter_map(|virtual_path| {
+                    if !is_library_scan_current(&state, generation) {
+                        return None;
+                    }
+                    let (source_path, _) = parse_virtual_path(virtual_path);
+                    let source_path_str = source_path.to_string_lossy().to_string();
 
-                // EXIF cached in the sidecar needs no access to the image file.
-                let cached =
-                    crate::exif_processing::read_sidecar_exif(&source_path).filter(|exif| {
-                        !is_raw_file(&source_path_str)
-                            || crate::exif_processing::has_pixel_dimensions(exif)
-                    });
-                let map = if let Some(exif) = cached {
-                    exif
-                } else if is_cloud_placeholder(&source_path) {
-                    HashMap::new()
-                } else if let Ok(mmap) = read_file_mapped(&source_path) {
-                    crate::exif_processing::read_exif_data(&source_path_str, &mmap)
-                } else if let Ok(bytes) = fs::read(&source_path) {
-                    crate::exif_processing::read_exif_data(&source_path_str, &bytes)
-                } else {
-                    HashMap::new()
-                };
+                    // EXIF cached in the sidecar needs no access to the image file.
+                    let cached =
+                        crate::exif_processing::read_sidecar_exif(&source_path).filter(|exif| {
+                            !is_raw_file(&source_path_str)
+                                || crate::exif_processing::has_pixel_dimensions(exif)
+                        });
+                    let map = if let Some(exif) = cached {
+                        exif
+                    } else if is_cloud_placeholder(&source_path) {
+                        HashMap::new()
+                    } else if let Ok(mmap) = read_file_mapped(&source_path) {
+                        crate::exif_processing::read_exif_data(&source_path_str, &mmap)
+                    } else if let Ok(bytes) = fs::read(&source_path) {
+                        crate::exif_processing::read_exif_data(&source_path_str, &bytes)
+                    } else {
+                        HashMap::new()
+                    };
 
-                if map.is_empty() {
-                    None
-                } else {
-                    Some((virtual_path.clone(), map))
-                }
-            })
-            .collect();
+                    if map.is_empty() {
+                        None
+                    } else {
+                        Some((virtual_path.clone(), map))
+                    }
+                })
+                .collect::<HashMap<String, HashMap<String, String>>>()
+        };
+
+        // Not the global pool: reads that block on a network share would stall
+        // thumbnails and Develop there.
+        let exif_data = match exif_read_pool() {
+            Some(pool) => pool.install(read_all),
+            None => read_all(),
+        };
 
         Ok(exif_data)
     })
@@ -2561,7 +2604,11 @@ pub fn read_file_mapped(path: &Path) -> Result<Mmap, ReadFileError> {
     Ok(mmap)
 }
 
-fn find_embedded_jpeg(exif: &exif::Exif, ifd: exif::In) -> Option<&[u8]> {
+fn find_embedded_jpeg<'a>(
+    exif: &'a exif::Exif,
+    file_bytes: &'a [u8],
+    ifd: exif::In,
+) -> Option<&'a [u8]> {
     let offset = exif
         .get_field(exif::Tag::JPEGInterchangeFormat, ifd)?
         .value
@@ -2570,7 +2617,13 @@ fn find_embedded_jpeg(exif: &exif::Exif, ifd: exif::In) -> Option<&[u8]> {
         .get_field(exif::Tag::JPEGInterchangeFormatLength, ifd)?
         .value
         .get_uint(0)? as usize;
-    exif.buf().get(offset..offset + len)
+    // `read_exif` may keep only the start of a TIFF file; its offsets point into the file.
+    let tiff = if exif_processing::is_tiff(file_bytes) {
+        file_bytes
+    } else {
+        exif.buf()
+    };
+    tiff.get(offset..offset.checked_add(len)?)
 }
 
 fn apply_exif_orientation(img: DynamicImage, orientation: u32) -> DynamicImage {
@@ -2590,10 +2643,10 @@ fn try_load_embedded_raw_preview(source_path: &Path, target_res: u32) -> Option<
     let mmap = read_file_mapped(source_path).ok()?;
     let exif = exif_processing::read_exif(&mmap)?;
 
-    let (jpeg_bytes, ifd) = find_embedded_jpeg(&exif, exif::In::PRIMARY)
+    let (jpeg_bytes, ifd) = find_embedded_jpeg(&exif, &mmap, exif::In::PRIMARY)
         .map(|b| (b, exif::In::PRIMARY))
         .or_else(|| {
-            find_embedded_jpeg(&exif, exif::In::THUMBNAIL).map(|b| (b, exif::In::THUMBNAIL))
+            find_embedded_jpeg(&exif, &mmap, exif::In::THUMBNAIL).map(|b| (b, exif::In::THUMBNAIL))
         })?;
 
     let img = image::load_from_memory_with_format(jpeg_bytes, image::ImageFormat::Jpeg).ok()?;

@@ -1811,7 +1811,12 @@ fn setup_logging(app_handle: &tauri::AppHandle) {
                 message
             ))
         })
-        .level(level)
+        // rawler warnings must reach the filter even below the chosen level: they
+        // tell `read_from_prefix` that a prefix cut off metadata.
+        .level(level.max(log::LevelFilter::Warn))
+        .filter(move |metadata| {
+            !raw_processing::swallow_prefix_log(metadata) && metadata.level() <= level
+        })
         .chain(std::io::stderr());
 
     if let Some(file) = log_file {
@@ -1828,6 +1833,9 @@ fn setup_logging(app_handle: &tauri::AppHandle) {
     }
 
     panic::set_hook(Box::new(|info| {
+        if raw_processing::is_reading_prefix() {
+            return;
+        }
         let message = if let Some(s) = info.payload().downcast_ref::<&'static str>() {
             s.to_string()
         } else if let Some(s) = info.payload().downcast_ref::<String>() {

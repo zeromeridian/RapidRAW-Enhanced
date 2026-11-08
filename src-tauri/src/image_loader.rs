@@ -12,7 +12,7 @@ use crate::image_processing::{
 use crate::mask_generation::{MaskDefinition, SubMask, generate_mask_bitmap};
 use anyhow::{Context, Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
-use exif::{Reader as ExifReader, Tag};
+use exif::Tag;
 use image::{DynamicImage, GenericImageView, ImageReader, imageops};
 use rawler::Orientation;
 use rayon::prelude::*;
@@ -336,14 +336,11 @@ fn embedded_preview_fallback(bytes: &[u8], path: &str) -> Option<DynamicImage> {
         .ok()?,
     };
 
-    let orientation = ExifReader::new()
-        .read_from_container(&mut Cursor::new(bytes))
-        .ok()
-        .and_then(|exif| {
-            exif.get_field(Tag::Orientation, exif::In::PRIMARY)?
-                .value
-                .get_uint(0)
-        });
+    let orientation = exif_processing::read_exif(bytes).and_then(|exif| {
+        exif.get_field(Tag::Orientation, exif::In::PRIMARY)?
+            .value
+            .get_uint(0)
+    });
 
     Some(match orientation {
         Some(o) if o > 1 => apply_orientation(img, Orientation::from_u16(o as u16)),
@@ -387,8 +384,7 @@ pub fn load_image_with_orientation(
         Ok(())
     };
 
-    let cursor = Cursor::new(bytes);
-    let mut reader = ImageReader::new(cursor.clone())
+    let mut reader = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()
         .context("Failed to guess image format")?;
 
@@ -399,21 +395,16 @@ pub fn load_image_with_orientation(
     let image = reader.decode().context("Failed to decode image")?;
     check_cancel()?;
 
-    let oriented_image = {
-        let exif_reader = ExifReader::new();
-        if let Ok(exif) = exif_reader.read_from_container(&mut cursor.clone()) {
-            if let Some(orientation) = exif
-                .get_field(Tag::Orientation, exif::In::PRIMARY)
-                .and_then(|f| f.value.get_uint(0))
-            {
-                check_cancel()?;
-                apply_orientation(image, Orientation::from_u16(orientation as u16))
-            } else {
-                image
-            }
-        } else {
-            image
-        }
+    let orientation = exif_processing::read_exif(bytes).and_then(|exif| {
+        exif.get_field(Tag::Orientation, exif::In::PRIMARY)?
+            .value
+            .get_uint(0)
+    });
+    let oriented_image = if let Some(orientation) = orientation {
+        check_cancel()?;
+        apply_orientation(image, Orientation::from_u16(orientation as u16))
+    } else {
+        image
     };
 
     Ok(DynamicImage::ImageRgb32F(oriented_image.to_rgb32f()))
