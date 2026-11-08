@@ -10,7 +10,9 @@
         "agx": "AgX",
         "agxDesc": "Filmähnliches Tonemapping",
         "basic": "Standard",
-        "basicDesc": "Standard-Tonemapping"
+        "basicDesc": "Standard-Tonemapping",
+        "natural": "Natürlich",
+        "naturalDesc": "Natürliches Tonemapping mit weichen Lichtern"
       },
       "reset": "Zurücksetzen",
       "shadows": "Tiefen",
@@ -1952,7 +1954,8 @@
         "title": "Bildvorverarbeitung",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "Standard"
+          "basic": "Standard",
+          "natural": "Natürlich"
         },
         "tonemapperOverride": "Globaler Tonemapper-Override",
         "tonemapperOverrideDesc": "Erzwingt einen spezifischen Tonemapper global für alle Bilder."

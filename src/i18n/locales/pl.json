@@ -10,7 +10,9 @@
         "agx": "AgX",
         "agxDesc": "Mapowanie tonów w stylu filmowym",
         "basic": "Podstawowe",
-        "basicDesc": "Standardowe mapowanie tonów"
+        "basicDesc": "Standardowe mapowanie tonów",
+        "natural": "Naturalne",
+        "naturalDesc": "Naturalne mapowanie tonów z miękkimi światłami"
       },
       "reset": "Resetuj",
       "shadows": "Cienie",
@@ -2044,7 +2046,8 @@
         "title": "Wstępne przetwarzanie obrazu",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "Podstawowe"
+          "basic": "Podstawowe",
+          "natural": "Naturalne"
         },
         "tonemapperOverride": "Globalne nadpisywanie mapowania tonów",
         "tonemapperOverrideDesc": "Wymusza konkretne mapowanie tonów globalnie dla wszystkich obrazów, ukrywając pole wyboru mapera z panelu edycji."

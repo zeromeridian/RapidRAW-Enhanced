@@ -623,8 +623,17 @@ enum RenderedPixels {
     U16(Vec<u16>),
 }
 
+/// The image-processing shader with the constants it shares with Rust.
+pub(crate) fn image_shader_source() -> String {
+    format!(
+        "{}\n{}",
+        crate::tone_mapping::natural_wgsl_constants(),
+        include_str!("shaders/shader.wgsl")
+    )
+}
+
 fn high_precision_shader_source() -> String {
-    include_str!("shaders/shader.wgsl").replace("rgba8unorm, write>", "rgba16float, write>")
+    image_shader_source().replace("rgba8unorm, write>", "rgba16float, write>")
 }
 
 const FLARE_MAP_SIZE: u32 = 512;
@@ -815,7 +824,7 @@ impl GpuPipelines {
 
         let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Image Processing Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/shader.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(image_shader_source().into()),
         });
 
         let mut bind_group_layout_entries = vec![

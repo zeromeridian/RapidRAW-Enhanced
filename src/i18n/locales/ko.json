@@ -10,7 +10,9 @@
         "agx": "AgX",
         "agxDesc": "필름 같은 톤 매핑",
         "basic": "기본",
-        "basicDesc": "표준 톤 매핑"
+        "basicDesc": "표준 톤 매핑",
+        "natural": "자연",
+        "naturalDesc": "부드러운 하이라이트의 자연스러운 톤 매핑"
       },
       "reset": "초기화",
       "shadows": "섀도우",
@@ -1950,7 +1952,8 @@
         "title": "이미지 전처리",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "기본"
+          "basic": "기본",
+          "natural": "자연"
         },
         "tonemapperOverride": "전역 톤매퍼 재정의",
         "tonemapperOverrideDesc": "모든 이미지에 특정 톤매퍼를 전역으로 강제 적용하고, 조정 패널에서 톤매퍼 전환을 숨깁니다."

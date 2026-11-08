@@ -5,6 +5,34 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.34.0-fix-demosaic — 2026-11-08
+
+### Develop
+
+- New **Natural** tone mapper next to Basic and AgX. It renders RAW photos
+  close to Lightroom Classic's Adobe Standard profile, for every camera:
+  more open shadows, and bright skies and highlights that roll off into
+  white instead of clipping early, which leaves more room for the
+  Highlights, Whites, and Blacks sliders. Colours keep their hue as they
+  brighten.
+- Natural adds back the exposure a RAW file asks for: the DNG baseline
+  exposure, and the exposure the camera held back in highlight-protection
+  modes (Fujifilm DR200/DR400, Canon Highlight Tone Priority and Auto
+  Lighting Optimizer, Nikon Active D-Lighting and HLG, OM/Olympus
+  gradation, Pentax dynamic range expansion).
+- RAW photos without edits now open in Natural, and Reset returns a RAW
+  photo to Natural. Photos you have already edited keep their tone mapper
+  and look exactly as before. Non-RAW images look the same in Natural and
+  Basic.
+- Natural is also available in Settings → Global Tonemapper Override.
+- Natural edits need ThisIsRAW 1.34.0 or newer: older versions show them
+  as Basic.
+
+### Library
+
+- Thumbnails keep the same highlight detail as the editor, so bright skies
+  in thumbnails match what Develop shows.
+
 ## 1.33.0-dev-rr-gap — 2026-11-08
 
 ### Develop

@@ -335,7 +335,7 @@ export interface Adjustments {
   structure: number;
   temperature: number;
   tint: number;
-  toneMapper: 'agx' | 'basic';
+  toneMapper: ToneMapper;
   transformAutoMode: 'auto' | 'level' | 'vertical' | 'guided' | null;
   transformAutoStrength: number;
   transformDistortion: number;
@@ -356,6 +356,8 @@ export interface Adjustments {
 }
 
 export type GuideOrientation = 'vertical' | 'horizontal';
+
+export type ToneMapper = 'agx' | 'basic' | 'natural';
 
 /**
  * A Guided Perspective line in normalized coordinates of the unoriented,
@@ -841,6 +843,19 @@ export const normalizeGuidedPerspective = (loaded?: Partial<GuidedPerspective>):
     autoCrop: loaded?.autoCrop ?? true,
   };
 };
+
+/**
+ * Tone mapper for an image without edits (mirrors `default_tone_mapper` in
+ * `tone_mapping.rs`). Saved edits without a `toneMapper` stay Basic, which is
+ * why `INITIAL_ADJUSTMENTS` keeps Basic.
+ */
+export const getDefaultToneMapper = (isRaw: boolean): ToneMapper => (isRaw ? 'natural' : 'basic');
+
+/** Adjustments of an unedited image, as after a reset. */
+export const getInitialAdjustments = (isRaw: boolean): Adjustments => ({
+  ...INITIAL_ADJUSTMENTS,
+  toneMapper: getDefaultToneMapper(isRaw),
+});
 
 /** Whether Guided Perspective has enough guides to correct the image. */
 export const hasGuidedPerspective = (guided: GuidedPerspective) => guided.enabled && guided.lines.length >= 2;

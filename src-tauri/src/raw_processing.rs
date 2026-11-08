@@ -180,11 +180,9 @@ fn develop_internal(
 
     let safe_highlight_compression = highlight_compression.max(1.01);
 
-    let clamp_limit = if fast_demosaic {
-        1.0
-    } else {
-        safe_highlight_compression
-    };
+    // Fast (thumbnail) decodes keep the same highlight headroom as full
+    // decodes, so thumbnails match the editor in bright highlights.
+    let clamp_limit = safe_highlight_compression;
 
     check_cancel()?;
 

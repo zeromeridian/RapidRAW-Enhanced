@@ -10,7 +10,9 @@
         "agx": "AgX",
         "agxDesc": "Tonemapping stile pellicola",
         "basic": "Base",
-        "basicDesc": "Tonemapping Standard"
+        "basicDesc": "Tonemapping Standard",
+        "natural": "Naturale",
+        "naturalDesc": "Tonemapping naturale con alte luci morbide"
       },
       "reset": "Ripristina",
       "shadows": "Ombre",
@@ -1998,7 +2000,8 @@
         "title": "Pre-elaborazione Immagine",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "Base"
+          "basic": "Base",
+          "natural": "Naturale"
         },
         "tonemapperOverride": "Sovrascrittura Tonemapper Globale",
         "tonemapperOverrideDesc": "Forza un tonemapper specifico globalmente per tutte le immagini, nascondendo il selettore del tonemapper dal pannello delle regolazioni."

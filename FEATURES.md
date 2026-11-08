@@ -152,6 +152,16 @@ details are in `RELEASE_NOTES.MD`.
 
 ## Develop
 
+- **Natural** tone mapper (Basic → Tone Mapper, next to Basic and AgX), the
+  default for RAW photos without edits: a Lightroom Classic Adobe
+  Standard-like rendering for every camera, with open shadows and highlights
+  that roll off into white instead of clipping early, keeping hue. It adds
+  back the exposure a RAW file asks for (DNG baseline exposure and the
+  camera's highlight-protection modes, such as Fujifilm DR200/DR400, Canon
+  Highlight Tone Priority, Nikon Active D-Lighting, and OM/Olympus
+  gradation). Non-RAW images render as in Basic. Existing edits keep their
+  tone mapper; Reset returns a RAW to Natural. Also available in the Global
+  Tonemapper Override.
 - Lightroom-style **Auto Sync**: with several images selected, each edit made
   in Develop is applied to every selected image. Only the changed control is
   synced (one Color Mixer channel, for example), and the Copy & Paste Settings
