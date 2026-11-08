@@ -168,7 +168,7 @@ export const createImageStack = (stacks: ImageStack[], paths: string[], coverPat
  * Capture time in seconds, from EXIF `DateTimeOriginal`. The backend normalizes it to
  * `YYYY-MM-DD HH:MM:SS`; unparsed values keep the raw EXIF `YYYY:MM:DD HH:MM:SS`.
  */
-const getCaptureTime = (image: ImageFile): number | null => {
+export const getCaptureTime = (image: ImageFile): number | null => {
   const match = image.exif?.DateTimeOriginal?.match(/^(\d{4})[-:](\d{2})[-:](\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
   if (!match) return null;
   const [year, month, day, hours, minutes, seconds] = match.slice(1).map(Number);

@@ -5,6 +5,14 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.34.3-dev-info-sort — 2026-11-08
+
+### Library
+
+- Sorting by Date Taken now keeps RAW+JPEG pairs together. JPEGs, TIFFs,
+  and other non-RAW photos were sorted after all RAW photos from the same
+  year, even when they were taken at the same moment.
+
 ## 1.34.2-fix-demosaic — 2026-11-08
 
 ### Develop
