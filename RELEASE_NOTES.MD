@@ -5,6 +5,17 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.30.15-dev-rr-gap — 2026-11-07
+
+### Develop
+
+- Zooming in, opening a portrait after landscape photos, and exporting at
+  full size no longer pause while the graphics card prepares its shaders
+  again.
+- Slider changes show up faster where previews are sent as JPEG (Linux, and
+  macOS or Windows with the GPU renderer turned off), and full-size
+  previews load faster.
+
 ## 1.30.14-dev-rr-gap — 2026-11-07
 
 ### Library

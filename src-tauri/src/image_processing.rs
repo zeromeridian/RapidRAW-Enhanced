@@ -2773,6 +2773,16 @@ pub struct GpuContext {
     pub queue: Arc<wgpu::Queue>,
     pub limits: wgpu::Limits,
     pub display: Arc<std::sync::Mutex<Option<WgpuDisplay>>>,
+    /// Built on first use and shared by every `GpuProcessor` of this context.
+    pub pipelines: Arc<std::sync::OnceLock<Arc<crate::gpu_processing::GpuPipelines>>>,
+}
+
+impl GpuContext {
+    pub fn pipelines(&self) -> Arc<crate::gpu_processing::GpuPipelines> {
+        self.pipelines
+            .get_or_init(|| Arc::new(crate::gpu_processing::GpuPipelines::new(&self.device)))
+            .clone()
+    }
 }
 
 #[inline(always)]
