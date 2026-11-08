@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import debounce from 'lodash.debounce';
 import { Adjustments, INITIAL_ADJUSTMENTS, MaskContainer, AiPatch } from '../utils/adjustments';
 import { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
 import { ChannelConfig } from '../components/adjustments/Curves';
@@ -161,23 +162,27 @@ export const useEditorStore = create<EditorState>((set) => ({
       return { history: newHistory, historyIndex: newHistory.length - 1 };
     }),
 
-  undo: () =>
+  undo: () => {
+    debouncedSetHistory.flush();
     set((state) => {
       if (state.historyIndex > 0) {
         const newIndex = state.historyIndex - 1;
         return { historyIndex: newIndex, adjustments: state.history[newIndex] };
       }
       return state;
-    }),
+    });
+  },
 
-  redo: () =>
+  redo: () => {
+    debouncedSetHistory.flush();
     set((state) => {
       if (state.historyIndex < state.history.length - 1) {
         const newIndex = state.historyIndex + 1;
         return { historyIndex: newIndex, adjustments: state.history[newIndex] };
       }
       return state;
-    }),
+    });
+  },
 
   resetHistory: (initialState) =>
     set({
@@ -186,11 +191,25 @@ export const useEditorStore = create<EditorState>((set) => ({
       adjustments: initialState,
     }),
 
-  goToHistoryIndex: (index) =>
+  goToHistoryIndex: (index) => {
+    debouncedSetHistory.flush();
     set((state) => {
       if (index >= 0 && index < state.history.length) {
         return { historyIndex: index, adjustments: state.history[index] };
       }
       return state;
-    }),
+    });
+  },
 }));
+
+/**
+ * Records an edit in the undo history once it settles. Undo, redo, and history jumps flush it
+ * first, so an edit made just before them is recorded instead of skipped.
+ */
+export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
+  useEditorStore.getState().pushHistory(newAdj);
+}, 500);
+
+/** Whether undo has something to restore: an earlier entry, or an edit not yet recorded. */
+export const canUndoEdit = (state: Pick<EditorState, 'adjustments' | 'history' | 'historyIndex'>) =>
+  state.historyIndex > 0 || state.adjustments !== state.history[state.historyIndex];

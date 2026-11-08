@@ -7,9 +7,9 @@ import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { Invokes } from '../components/ui/AppProperties';
+import { Invokes, LibraryViewMode } from '../components/ui/AppProperties';
 import { Status } from '../components/ui/ExportImportProperties';
-import { isCollectionView } from '../utils/libraryViews';
+import { isCollectionView, isPathWithin } from '../utils/libraryViews';
 
 export function useFileOperations(
   refreshImageList: () => Promise<void>,
@@ -188,6 +188,13 @@ export function useFileOperations(
           }
           if (currentFolderPath && isInRenamedFolder(currentFolderPath)) {
             setLibrary({ currentFolderPath: renamePath(currentFolderPath) });
+          } else if (
+            currentFolderPath &&
+            isPathWithin(oldPath, currentFolderPath) &&
+            appSettings?.libraryViewMode === LibraryViewMode.Recursive
+          ) {
+            // The recursive view of a parent folder still lists the old paths.
+            await refreshImageList();
           }
 
           const currentPins = appSettings?.pinnedFolders || [];
@@ -207,7 +214,7 @@ export function useFileOperations(
         }
       }
     },
-    [refreshAllFolderTrees],
+    [refreshAllFolderTrees, refreshImageList],
   );
 
   const handleSaveRename = useCallback(

@@ -307,7 +307,10 @@ details are in `RELEASE_NOTES.MD`.
   and AI keywords stay distinguishable between ThisIsRAW installations.
   XMP that Lightroom Classic embeds in JPEG, TIFF, DNG, and PNG files is read
   too (never written): when a folder opens it is imported again only after
-  the file changes, and it wins over an older sidecar.
+  the file changes, and it wins over an older sidecar. As in Lightroom
+  Classic, the XMP belongs to the original photo only: virtual copies keep
+  their rating, label, keywords, and flag in their own `.tirdata` and never
+  read or write the XMP.
 - Recursive **Read XMP from Folder** action that treats XMP as authoritative
   for matching images, recognizes basename and full-filename sidecars and
   embedded XMP, reports the imported-image count, and refreshes the currently

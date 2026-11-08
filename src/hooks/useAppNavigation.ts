@@ -17,7 +17,7 @@ import { computeSortedLibrary } from './useSortedLibrary';
 import { mergeXmpImageStacks } from '../utils/imageStacks';
 import { createProvisionalFolderTrees, mergeRefreshedFolderTrees } from '../utils/folderTreeCache';
 import { USER_TAG_PREFIX, formatKeyword } from '../utils/keywords';
-import { ALBUM_VIEW_PREFIX, KEYWORD_VIEW_PREFIX } from '../utils/libraryViews';
+import { ALBUM_VIEW_PREFIX, KEYWORD_VIEW_PREFIX, isPathWithin } from '../utils/libraryViews';
 
 interface CatalogFolderSnapshot {
   images: ImageFile[];
@@ -62,10 +62,6 @@ const takeFolderListing = (cache: FolderListingCache, key: string) => {
   storeFolderListing(cache, key, images);
   return images;
 };
-
-/** Whether `path` is `folder` or lies inside it (image paths may carry a `?vc=` suffix). */
-const isPathWithin = (path: string, folder: string) =>
-  path === folder || (path.startsWith(folder) && (/[\\/]$/.test(folder) || ['/', '\\'].includes(path[folder.length])));
 
 const ratingsOf = (images: ImageFile[]) => {
   const ratings: Record<string, number> = {};

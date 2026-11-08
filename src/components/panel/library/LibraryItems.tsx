@@ -26,6 +26,7 @@ import ImageFlagBadge from '../../ui/ImageFlagBadge';
 import { writeLibraryDragPayload } from '../../../utils/libraryDragDrop';
 import { lightsOutTarget } from '../../../utils/lightsOut';
 import { CLOUD_THUMBNAIL_RETRY_MS } from '../../../hooks/useThumbnails';
+import { useCtrlClickMenuGuard } from '../../../hooks/useCtrlClickMenuGuard';
 
 type StackDropEdge = 'before' | 'after';
 
@@ -119,6 +120,7 @@ const ThumbnailComponent = ({
   onFileDragStart,
 }: any) => {
   const { t } = useTranslation();
+  const ctrlClickMenuGuard = useCtrlClickMenuGuard((e) => onImageClick(path, e));
   const data = useProcessStore((s) => s.thumbnails[path]);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
   const displayEditIcon = useSettingsStore((s) => s.appSettings?.displayEditIcon ?? true);
@@ -246,6 +248,7 @@ const ThumbnailComponent = ({
       )}
       data-bench-id="thumbnail"
       draggable
+      {...ctrlClickMenuGuard}
       onClick={(e: any) => {
         e.stopPropagation();
         onImageClick(path, e);
@@ -656,6 +659,7 @@ const ListItemComponent = ({
   onFileDragStart,
 }: any) => {
   const { t } = useTranslation();
+  const ctrlClickMenuGuard = useCtrlClickMenuGuard((e) => onImageClick(path, e));
   const data = useProcessStore((s) => s.thumbnails[path]);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
 
@@ -793,6 +797,7 @@ const ListItemComponent = ({
         isStackDragging && 'opacity-50',
       )}
       draggable
+      {...ctrlClickMenuGuard}
       onClick={(e: any) => {
         e.stopPropagation();
         onImageClick(path, e);

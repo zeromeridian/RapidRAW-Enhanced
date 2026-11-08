@@ -3,7 +3,7 @@ import { toast } from 'react-toastify';
 import { ImageFile, Panel, ExifOverlay, LibraryDisplayMode, stepBrushSize } from '../components/ui/AppProperties';
 import i18n from 'i18next';
 import { KEYBIND_DEFINITIONS, getEffectiveCombo, normalizeCombo } from '../utils/keyboardUtils';
-import { useEditorStore } from '../store/useEditorStore';
+import { canUndoEdit, useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
@@ -18,6 +18,8 @@ import {
 } from './useLibraryActions';
 import { ImageFlag } from '../utils/imageFlags';
 import { KEYWORD_SET_SIZE, getActiveKeywordSet, getKeywordSets } from '../utils/keywords';
+
+const NON_TEXT_INPUT_TYPES = new Set(['checkbox', 'radio', 'range', 'button', 'submit', 'reset', 'color', 'file']);
 
 interface KeyboardShortcutsProps {
   sortedImageList: Array<ImageFile>;
@@ -40,7 +42,7 @@ export const useKeyboardShortcuts = ({
   handleToggleFullScreen,
   handleZoomChange,
 }: KeyboardShortcutsProps) => {
-  const { handleRotate, handleCopyAdjustments, handlePasteAdjustments } = useEditorActions();
+  const { handleRotate, handleCopyAdjustments, handlePasteAdjustments, setAdjustments } = useEditorActions();
   const { handleRate, handleSetColorLabel, handleSetFlag, handleToggleKeyword } = useLibraryActions();
 
   const sortedListRef = useRef(sortedImageList);
@@ -383,7 +385,7 @@ export const useKeyboardShortcuts = ({
         },
       },
       undo: {
-        shouldFire: (s: any) => !!s.editor.selectedImage && s.editor.historyIndex > 0,
+        shouldFire: (s: any) => !!s.editor.selectedImage && canUndoEdit(s.editor),
         execute: (e: any, s: any) => {
           e.preventDefault();
           s.editor.undo();
@@ -671,24 +673,19 @@ export const useKeyboardShortcuts = ({
         },
         execute: (e: KeyboardEvent, s: any) => {
           e.preventDefault();
+          // setAdjustments records the deletion in the undo history.
           if (s.editor.activeMaskContainerId) {
-            s.editor.setEditor((state: any) => ({
-              adjustments: {
-                ...state.adjustments,
-                masks: state.adjustments.masks.filter((c: any) => c.id !== s.editor.activeMaskContainerId),
-              },
-              activeMaskContainerId: null,
-              activeMaskId: null,
+            setAdjustments((prev) => ({
+              ...prev,
+              masks: prev.masks.filter((c) => c.id !== s.editor.activeMaskContainerId),
             }));
+            s.editor.setEditor({ activeMaskContainerId: null, activeMaskId: null });
           } else if (s.editor.activeAiPatchContainerId) {
-            s.editor.setEditor((state: any) => ({
-              adjustments: {
-                ...state.adjustments,
-                aiPatches: state.adjustments.aiPatches.filter((c: any) => c.id !== s.editor.activeAiPatchContainerId),
-              },
-              activeAiPatchContainerId: null,
-              activeAiSubMaskId: null,
+            setAdjustments((prev) => ({
+              ...prev,
+              aiPatches: prev.aiPatches.filter((c) => c.id !== s.editor.activeAiPatchContainerId),
             }));
+            s.editor.setEditor({ activeAiPatchContainerId: null, activeAiSubMaskId: null });
           }
         },
       },
@@ -770,9 +767,16 @@ export const useKeyboardShortcuts = ({
         return;
       }
 
-      const isInputFocused =
-        document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA';
-      if (isInputFocused) return;
+      // Keys typed into a text field stay there, also when the field blurs itself on Enter
+      // (`event.target` is still the field). A focused slider keeps its arrow keys; it blurs
+      // itself for the global shortcut keys (`Slider`). Checkboxes and buttons never block.
+      const target = event.target;
+      const isTyping =
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLInputElement && !NON_TEXT_INPUT_TYPES.has(target.type));
+      const focused = document.activeElement;
+      const isSliderFocused = focused instanceof HTMLInputElement && focused.type === 'range';
+      if (isTyping || isSliderFocused) return;
 
       for (const builtin of builtinShortcuts) {
         if (builtin.match(event, state)) {
@@ -805,6 +809,7 @@ export const useKeyboardShortcuts = ({
     handleRotate,
     handleCopyAdjustments,
     handlePasteAdjustments,
+    setAdjustments,
     handleRate,
     handleSetColorLabel,
     handleSetFlag,

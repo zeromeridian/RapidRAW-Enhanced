@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI32, Ordering};
 use tauri::Emitter;
 
@@ -156,6 +156,32 @@ pub fn parse_launch_args(args: &[String]) -> LaunchRequest {
     }
 }
 
+/// Resolves relative paths of a GUI open request against `cwd`, the caller's
+/// working directory: the app's own directory differs once it is launched,
+/// and a forwarded second launch has its own. Absolute paths and headless
+/// exports are unchanged.
+pub fn resolve_gui_launch_paths(request: LaunchRequest, cwd: &Path) -> LaunchRequest {
+    let resolve = |path: String| {
+        if path.is_empty() || Path::new(&path).is_absolute() || !cwd.is_absolute() {
+            return path;
+        }
+        let joined = cwd.join(&path);
+        std::path::absolute(&joined)
+            .unwrap_or(joined)
+            .to_string_lossy()
+            .into_owned()
+    };
+    match request {
+        LaunchRequest::OpenFile(path) => LaunchRequest::OpenFile(resolve(path)),
+        LaunchRequest::EditSession(mut session) => {
+            session.source = resolve(session.source);
+            session.output = resolve(session.output);
+            LaunchRequest::EditSession(session)
+        }
+        other => other,
+    }
+}
+
 fn handle_file_open(app_handle: &tauri::AppHandle, path: PathBuf) {
     if let Some(path_str) = path.to_str()
         && let Err(e) = app_handle.emit("open-with-file", path_str)
@@ -203,5 +229,37 @@ mod exit_code_tests {
     fn success_and_window_close_exit_zero() {
         assert_eq!(resolve_exit_code(Some(0), 0), 0);
         assert_eq!(resolve_exit_code(None, 0), 0);
+    }
+}
+
+#[cfg(test)]
+mod launch_path_tests {
+    use super::{LaunchRequest, resolve_gui_launch_paths};
+
+    #[test]
+    fn relative_gui_paths_resolve_against_the_callers_directory() {
+        let cwd = std::env::temp_dir();
+        let LaunchRequest::OpenFile(path) =
+            resolve_gui_launch_paths(LaunchRequest::OpenFile("photo.jpg".into()), &cwd)
+        else {
+            panic!("expected an open request");
+        };
+        assert_eq!(std::path::PathBuf::from(path), cwd.join("photo.jpg"));
+
+        let absolute = cwd.join("other.jpg").to_string_lossy().into_owned();
+        let LaunchRequest::OpenFile(path) =
+            resolve_gui_launch_paths(LaunchRequest::OpenFile(absolute.clone()), &cwd)
+        else {
+            panic!("expected an open request");
+        };
+        assert_eq!(path, absolute);
+
+        let LaunchRequest::OpenFile(path) = resolve_gui_launch_paths(
+            LaunchRequest::OpenFile("photo.jpg".into()),
+            std::path::Path::new("relative"),
+        ) else {
+            panic!("expected an open request");
+        };
+        assert_eq!(path, "photo.jpg");
     }
 }

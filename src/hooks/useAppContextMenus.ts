@@ -50,7 +50,7 @@ import {
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 import { useContextMenu } from '../context/ContextMenuContext';
-import { useEditorStore } from '../store/useEditorStore';
+import { canUndoEdit, useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useUIStore } from '../store/useUIStore';
@@ -67,6 +67,7 @@ import {
   ExternalEditFormat,
   EXTERNAL_EDIT_FORMATS,
   EXTERNAL_EDIT_FORMAT_LABELS,
+  LibraryViewMode,
 } from '../components/ui/AppProperties';
 import { Status } from '../components/ui/ExportImportProperties';
 import { Color, COLOR_LABELS, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
@@ -82,7 +83,7 @@ import {
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { findImageStack, toggleImageStack, unstackImagePaths } from '../utils/imageStacks';
 import { autoStackCreatedImages } from '../utils/autoStacking';
-import { isCollectionView } from '../utils/libraryViews';
+import { isCollectionView, isPathWithin } from '../utils/libraryViews';
 import { getEnabledCopySuffix } from '../utils/outputNaming';
 import { isImageFlagTag } from '../utils/imageFlags';
 import { USER_TAG_PREFIX } from '../utils/keywords';
@@ -291,14 +292,15 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       event.preventDefault();
       event.stopPropagation();
 
+      const editorState = useEditorStore.getState();
       const { selectedImage, history, historyIndex, undo, redo, resetHistory, copiedAdjustments, setEditor } =
-        useEditorStore.getState();
+        editorState;
       const { appSettings } = useSettingsStore.getState();
       const { setRightPanel, setUI } = useUIStore.getState();
 
       if (!selectedImage) return;
 
-      const canUndo = historyIndex > 0;
+      const canUndo = canUndoEdit(editorState);
       const canRedo = historyIndex < history.length - 1;
       const commonTags = getCommonTags([selectedImage.path]);
 
@@ -1275,6 +1277,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     if (appSettings) {
                       handleSettingsChange({ ...appSettings, lastFolderState: null } as any);
                     }
+                  } else if (
+                    currentFolderPath &&
+                    isPathWithin(targetPath, currentFolderPath) &&
+                    useSettingsStore.getState().appSettings?.libraryViewMode === LibraryViewMode.Recursive
+                  ) {
+                    // The recursive view of a parent folder still lists the deleted images.
+                    props.refreshImageList();
                   }
 
                   props.refreshAllFolderTrees();
