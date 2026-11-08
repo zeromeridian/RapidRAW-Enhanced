@@ -11,7 +11,13 @@ import EffectsPanel from '../../adjustments/Effects';
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import Waveform from '../editor/Waveform';
 import Resizer from '../../ui/Resizer';
-import { Adjustments, SectionVisibility, INITIAL_ADJUSTMENTS, ADJUSTMENT_SECTIONS } from '../../../utils/adjustments';
+import {
+  Adjustments,
+  SectionVisibility,
+  INITIAL_ADJUSTMENTS,
+  ADJUSTMENT_SECTIONS,
+  getInitialAdjustments,
+} from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
 import PanelHeader from '../../ui/PanelHeader';
@@ -106,13 +112,14 @@ export default function Controls() {
   };
 
   const handleResetAdjustments = () => {
+    const initialAdjustments = getInitialAdjustments(selectedImage?.isRaw ?? false);
     setAdjustments(
       (prev: Adjustments) => ({
         ...prev,
         ...Object.keys(ADJUSTMENT_SECTIONS)
           .flatMap((s) => ADJUSTMENT_SECTIONS[s])
           .reduce((acc: any, key: string) => {
-            acc[key] = INITIAL_ADJUSTMENTS[key as keyof Adjustments];
+            acc[key] = initialAdjustments[key as keyof Adjustments];
             return acc;
           }, {}),
         sectionVisibility: { ...INITIAL_ADJUSTMENTS.sectionVisibility },
@@ -170,9 +177,10 @@ export default function Controls() {
     };
 
     const handleReset = () => {
+      const initialAdjustments = getInitialAdjustments(selectedImage?.isRaw ?? false);
       const resetValues: any = {};
       for (const key of sectionKeys) {
-        resetValues[key] = JSON.parse(JSON.stringify(INITIAL_ADJUSTMENTS[key as keyof Adjustments]));
+        resetValues[key] = JSON.parse(JSON.stringify(initialAdjustments[key as keyof Adjustments]));
       }
       setAdjustments((prev: Adjustments) => ({
         ...prev,

@@ -39,6 +39,11 @@ const ToneMapperSwitch = ({
   const toneMapperOptions = useMemo<{ id: ToneMapper; label: string; title: string }[]>(
     () => [
       {
+        id: 'natural',
+        label: t('adjustments.basic.mappers.natural'),
+        title: t('adjustments.basic.mappers.naturalDesc'),
+      },
+      {
         id: 'basic',
         label: t('adjustments.basic.mappers.basic'),
         title: t('adjustments.basic.mappers.basicDesc'),
@@ -47,11 +52,6 @@ const ToneMapperSwitch = ({
         id: 'agx',
         label: t('adjustments.basic.mappers.agx'),
         title: t('adjustments.basic.mappers.agxDesc'),
-      },
-      {
-        id: 'natural',
-        label: t('adjustments.basic.mappers.natural'),
-        title: t('adjustments.basic.mappers.naturalDesc'),
       },
     ],
     [t],

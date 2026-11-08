@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.34.2-fix-demosaic — 2026-11-08
+
+### Develop
+
+- Natural is now the first option in the Tone Mapper switch (Natural,
+  Basic, AgX).
+- Natural's tuning is preliminary: it is tuned to the shape of Adobe's
+  default tone curve and has not yet been measured against Lightroom
+  Classic reference exports (still to be provided). How bright Natural
+  renders may change once those measurements are made.
+
+## 1.34.1-fix-demosaic — 2026-11-08
+
+### Develop
+
+- Reset Adjustments and the Basic section's Reset now return a RAW photo
+  to the Natural tone mapper, like the other Reset commands.
+
 ## 1.34.0-fix-demosaic — 2026-11-08
 
 ### Develop
