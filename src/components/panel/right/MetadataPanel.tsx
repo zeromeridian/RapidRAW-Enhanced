@@ -268,7 +268,14 @@ export default function MetadataPanel({ onClose }: MetadataPanelProps) {
   const tags = selectedImage ? imageList.find((img) => img.path === selectedImage.path)?.tags || [] : [];
   const liveThumbnailUrl = selectedImage ? thumbnails[selectedImage.path] : undefined;
 
-  const targetPaths = multiSelectedPaths?.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
+  // Develop changes only the photo being edited; the Library changes its whole selection.
+  const targetPaths = editorImage
+    ? [editorImage.path]
+    : multiSelectedPaths?.length > 0
+      ? multiSelectedPaths
+      : selectedImage
+        ? [selectedImage.path]
+        : [];
 
   const { cameraGridSettings, lensSetting, gpsData, otherExifEntries } = useMemo(() => {
     const exif = selectedImage?.exif || {};

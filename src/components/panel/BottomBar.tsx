@@ -63,7 +63,7 @@ import { GroupBadgeInfo } from '../../utils/imageGrouping';
 import { getImageFlag, getRejectedPathsForLoadedFolder, ImageFlag } from '../../utils/imageFlags';
 import { ImageFlagIcon } from '../ui/ImageFlagBadge';
 import { LibraryFilterControls } from './LibraryFilterControls';
-import { LibraryPanelToggles } from './LibraryPanelToggles';
+import { SidePanelToggles } from './SidePanelToggles';
 import { useIsTitleBarShown } from '../../window/TitleBar';
 
 interface BottomBarProps {
@@ -355,9 +355,10 @@ export default function BottomBar({
     { id: 'autoStack', label: t('contextMenus.thumbnail.autoStackByCaptureTime') },
     { id: 'quickFilter', label: t('ui.bottomBar.tooltips.quickFilter') },
     { id: 'selectBy', label: t('ui.bottomBar.selectBy.title', 'Select by') },
-    { id: 'metadata', label: t('editor.metadata.title') },
-    { id: 'tagging', label: t('editor.tagging.title') },
-    { id: 'export', label: t('ui.bottomBar.tooltips.export') },
+    { id: 'metadata', label: t('editor.switcher.tooltips.info') },
+    { id: 'tagging', label: t('editor.switcher.tooltips.tagging') },
+    { id: 'export', label: t('editor.switcher.tooltips.export') },
+    { id: 'develop', label: t('editor.switcher.tooltips.develop') },
     { id: 'thumbnailSize', label: t('library.header.viewOptions.thumbnailSize') },
     { id: 'zoom', label: t('ui.bottomBar.zoomLabel') },
     { id: 'filmstrip', label: t('ui.bottomBar.tooltips.collapseFilmstrip') },
@@ -1063,8 +1064,8 @@ export default function BottomBar({
                 </div>
               </div>
             )}
-            {/* Shown in the title bar when there is one. */}
-            {!isTitleBarShown && <LibraryPanelToggles isItemVisible={isToolbarItemVisible} />}
+            {/* Shown in the top bar when there is one (everywhere but Android). */}
+            {!isTitleBarShown && <SidePanelToggles isItemVisible={isToolbarItemVisible} />}
           </div>
         ) : showZoomControls ? (
           <div className="flex items-center gap-4">

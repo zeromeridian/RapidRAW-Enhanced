@@ -790,6 +790,7 @@
       "tooltips": {
         "adjust": "调整",
         "crop": "裁剪",
+        "develop": "修改照片",
         "export": "导出",
         "info": "信息",
         "inpaint": "修复",

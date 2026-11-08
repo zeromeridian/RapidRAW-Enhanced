@@ -840,6 +840,7 @@
       "tooltips": {
         "adjust": "Dopasuj",
         "crop": "Kadruj",
+        "develop": "Wywoływanie",
         "export": "Eksportuj",
         "info": "Informacje",
         "inpaint": "Inpaint",

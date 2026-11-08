@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '../../ui/AppProperties';
+import { useIsTitleBarShown } from '../../../window/TitleBar';
 
 interface PanelOptions {
   icon: LucideIcon;
@@ -28,8 +29,7 @@ interface RightPanelSwitcherProps {
   layout?: 'horizontal' | 'vertical';
 }
 
-const panelGroups: Array<Array<PanelOptions>> = [
-  [{ id: Panel.Metadata, icon: Info, title: 'editor.switcher.tooltips.info' }],
+const editingPanelGroups: Array<Array<PanelOptions>> = [
   [
     { id: Panel.Adjustments, icon: SlidersHorizontal, title: 'editor.switcher.tooltips.adjust' },
     { id: Panel.Crop, icon: Crop, title: 'editor.switcher.tooltips.crop' },
@@ -38,9 +38,15 @@ const panelGroups: Array<Array<PanelOptions>> = [
     { id: Panel.Masks, icon: Layers, title: 'editor.switcher.tooltips.masks' },
     { id: Panel.Ai, icon: Paintbrush, title: 'editor.switcher.tooltips.inpaint' },
   ],
+  [{ id: Panel.Presets, icon: SwatchBook, title: 'editor.switcher.tooltips.presets' }],
+];
+
+// Info, Tagging, and Export are top-bar switches; only without the top bar (Android) are they here.
+const panelGroupsWithoutTopBar: Array<Array<PanelOptions>> = [
+  [{ id: Panel.Metadata, icon: Info, title: 'editor.switcher.tooltips.info' }],
+  ...editingPanelGroups,
   [
     { id: Panel.Tagging, icon: Tag, title: 'editor.switcher.tooltips.tagging' },
-    { id: Panel.Presets, icon: SwatchBook, title: 'editor.switcher.tooltips.presets' },
     { id: Panel.Export, icon: FileInput, title: 'editor.switcher.tooltips.export' },
   ],
 ];
@@ -53,6 +59,7 @@ export default function RightPanelSwitcher({
 }: RightPanelSwitcherProps) {
   const { t } = useTranslation();
   const isHorizontal = layout === 'horizontal';
+  const panelGroups = useIsTitleBarShown() ? editingPanelGroups : panelGroupsWithoutTopBar;
 
   return (
     <LayoutGroup id="right-panel-switcher">

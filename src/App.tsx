@@ -266,7 +266,7 @@ function App() {
       effectiveRatio = adjustments.aspectRatio;
     }
     const desiredImageHeight = viewportSize.width / effectiveRatio;
-    const topUiEstimation = !appSettings?.decorations && !isWindowFullScreen ? 110 : 60;
+    const topUiEstimation = isTitleBarShown ? 110 : 60;
     const totalDesiredTopHeight = desiredImageHeight + topUiEstimation;
     const calculatedBottomHeight = Math.round(viewportSize.height - totalDesiredTopHeight);
     return Math.max(halfScreenHeight, calculatedBottomHeight);

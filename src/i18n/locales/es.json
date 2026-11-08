@@ -816,6 +816,7 @@
       "tooltips": {
         "adjust": "Ajustar",
         "crop": "Recortar",
+        "develop": "Revelar",
         "export": "Exportar",
         "info": "Info",
         "inpaint": "Inpainting",

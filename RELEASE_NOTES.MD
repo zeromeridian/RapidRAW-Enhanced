@@ -5,6 +5,29 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.36.0-dev-info-sort — 2026-11-08
+
+### Library and Develop
+
+- Four switches at the top right are always there, in the Library and in
+  Develop: **Info**, **Tagging**, **Export**, and **Develop**. The open
+  one is highlighted.
+- In Develop, Info, Tagging, and Export show that panel for the photo you
+  are editing, which stays on screen. Develop returns to the editing tool
+  you used last. The tool strip on the right now holds only the editing
+  tools.
+- In the Library, **Develop** opens the active photo, like double-clicking
+  it.
+- The top bar now stays in fullscreen and with native window decorations,
+  so the switches, Quick Filter, and Select by never move.
+
+### Develop
+
+- Info, Tagging, and Export in Develop now change and export only the
+  photo being edited, even when several filmstrip photos are selected.
+- Choosing **Export** in the filmstrip's right-click menu with several
+  photos selected opens them in the Library's Export panel.
+
 ## 1.35.0-dev-info-sort — 2026-11-08
 
 ### Library
