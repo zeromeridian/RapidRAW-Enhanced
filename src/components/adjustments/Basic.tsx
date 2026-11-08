@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import Slider from '../ui/Slider';
-import { Adjustments, BasicAdjustment } from '../../utils/adjustments';
+import { Adjustments, BasicAdjustment, ToneMapper, getDefaultToneMapper } from '../../utils/adjustments';
+import { useEditorStore } from '../../store/useEditorStore';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -14,8 +15,9 @@ interface BasicAdjustmentsProps {
 }
 
 interface ToneMapperSwitchProps {
-  selectedMapper: string;
-  onMapperChange: (mapper: string) => void;
+  selectedMapper: ToneMapper;
+  defaultMapper: ToneMapper;
+  onMapperChange: (mapper: ToneMapper) => void;
   evShiftValue: number;
   onEvShiftChange: (value: number) => void;
   onDragStateChange?: (isDragging: boolean) => void;
@@ -23,6 +25,7 @@ interface ToneMapperSwitchProps {
 
 const ToneMapperSwitch = ({
   selectedMapper,
+  defaultMapper,
   onMapperChange,
   evShiftValue,
   onEvShiftChange,
@@ -33,7 +36,7 @@ const ToneMapperSwitch = ({
   const isInitialAnimation = useRef(true);
   const [isLabelHovered, setIsLabelHovered] = useState(false);
 
-  const toneMapperOptions = useMemo(
+  const toneMapperOptions = useMemo<{ id: ToneMapper; label: string; title: string }[]>(
     () => [
       {
         id: 'basic',
@@ -45,12 +48,17 @@ const ToneMapperSwitch = ({
         label: t('adjustments.basic.mappers.agx'),
         title: t('adjustments.basic.mappers.agxDesc'),
       },
+      {
+        id: 'natural',
+        label: t('adjustments.basic.mappers.natural'),
+        title: t('adjustments.basic.mappers.naturalDesc'),
+      },
     ],
     [t],
   );
 
   const handleReset = () => {
-    onMapperChange('basic');
+    onMapperChange(defaultMapper);
     onEvShiftChange(0);
   };
 
@@ -63,12 +71,7 @@ const ToneMapperSwitch = ({
     const targetWidth = `${widthPercent}%`;
 
     if (isInitialAnimation.current) {
-      let initialX;
-      if (selectedMapper === 'agx') {
-        initialX = `${toneMapperOptions.length * 100}%`;
-      } else {
-        initialX = '-25%';
-      }
+      const initialX = safeIndex > 0 ? `${toneMapperOptions.length * 100}%` : '-25%';
 
       setBubbleStyle({
         x: [initialX, targetX],
@@ -169,14 +172,15 @@ export default function BasicAdjustments({
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: numericValue }));
   };
 
-  const handleToneMapperChange = (mapper: string) => {
+  const handleToneMapperChange = (mapper: ToneMapper) => {
     setAdjustments((prev: Partial<Adjustments>) => ({
       ...prev,
-      toneMapper: mapper as 'basic' | 'agx',
+      toneMapper: mapper,
     }));
   };
 
   const hideTonemapper = isForMask || appSettings?.tonemapperOverrideEnabled;
+  const isRaw = useEditorStore((state) => state.selectedImage?.isRaw ?? false);
 
   return (
     <div>
@@ -193,7 +197,8 @@ export default function BasicAdjustments({
         />
       ) : (
         <ToneMapperSwitch
-          selectedMapper={adjustments.toneMapper || 'agx'}
+          selectedMapper={adjustments.toneMapper || 'basic'}
+          defaultMapper={getDefaultToneMapper(isRaw)}
           onMapperChange={handleToneMapperChange}
           evShiftValue={adjustments.exposure}
           onEvShiftChange={(value) => handleAdjustmentChange(BasicAdjustment.Exposure, value)}

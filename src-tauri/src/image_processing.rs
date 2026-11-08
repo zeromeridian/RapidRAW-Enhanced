@@ -1624,7 +1624,9 @@ pub struct GlobalAdjustments {
     pub has_lut: u32,
     pub lut_intensity: f32,
     pub tonemapper_mode: u32,
-    _pad_lut2: f32,
+    /// Per-file exposure compensation (EV) of Natural RAW renders; set by
+    /// `baseline_exposure::apply_natural_exposure`, 0 otherwise.
+    pub natural_exposure_ev: f32,
     _pad_lut3: f32,
     _pad_lut4: f32,
     _pad_lut5: f32,
@@ -1925,7 +1927,7 @@ fn convert_points_to_aligned(frontend_points: Vec<serde_json::Value>) -> [Point;
     aligned_points
 }
 
-const WP_D65: Vec2 = Vec2::new(0.3127, 0.3290);
+pub(crate) const WP_D65: Vec2 = Vec2::new(0.3127, 0.3290);
 const PRIMARIES_SRGB: [Vec2; 3] = [
     Vec2::new(0.64, 0.33),
     Vec2::new(0.30, 0.60),
@@ -1945,7 +1947,7 @@ fn xy_to_xyz(xy: Vec2) -> Vec3 {
     }
 }
 
-fn primaries_to_xyz_matrix(primaries: &[Vec2; 3], white_point: Vec2) -> Mat3 {
+pub(crate) fn primaries_to_xyz_matrix(primaries: &[Vec2; 3], white_point: Vec2) -> Mat3 {
     let r_xyz = xy_to_xyz(primaries[0]);
     let g_xyz = xy_to_xyz(primaries[1]);
     let b_xyz = xy_to_xyz(primaries[2]);
@@ -1974,8 +1976,13 @@ fn mat3_to_gpu_mat3(m: Mat3) -> GpuMat3 {
     }
 }
 
+/// Linear pipeline RGB (sRGB primaries, D65) to XYZ.
+pub(crate) fn pipeline_rgb_to_xyz_matrix() -> Mat3 {
+    primaries_to_xyz_matrix(&PRIMARIES_SRGB, WP_D65)
+}
+
 fn calculate_agx_matrices_glam() -> (Mat3, Mat3) {
-    let pipe_work_profile_to_xyz = primaries_to_xyz_matrix(&PRIMARIES_SRGB, WP_D65);
+    let pipe_work_profile_to_xyz = pipeline_rgb_to_xyz_matrix();
     let base_profile_to_xyz = primaries_to_xyz_matrix(&PRIMARIES_REC2020, WP_D65);
     let xyz_to_base_profile = base_profile_to_xyz.inverse();
     let pipe_to_base = xyz_to_base_profile * pipe_work_profile_to_xyz;
@@ -2027,14 +2034,17 @@ pub fn resolve_tonemapper_override(settings: &crate::AppSettings, is_raw: bool) 
         return None;
     }
     let tm = if is_raw {
-        settings.default_raw_tonemapper.as_deref().unwrap_or("agx")
+        settings
+            .default_raw_tonemapper
+            .as_deref()
+            .unwrap_or(crate::tone_mapping::TONE_MAPPER_AGX)
     } else {
         settings
             .default_non_raw_tonemapper
             .as_deref()
-            .unwrap_or("basic")
+            .unwrap_or(crate::tone_mapping::TONE_MAPPER_BASIC)
     };
-    Some(if tm == "agx" { 1 } else { 0 })
+    Some(crate::tone_mapping::tone_mapper_mode(tm))
 }
 
 pub fn resolve_tonemapper_override_from_handle(
@@ -2225,9 +2235,16 @@ pub fn is_image_edited(
         return true;
     }
 
+    // Both the unedited default tone mapper and the legacy default (Basic,
+    // stored as no `toneMapper` key) count as unedited.
+    let default_tone_mapper = crate::tone_mapping::default_tone_mapper(is_raw);
+    let unedited = if adj.get("toneMapper").and_then(Value::as_str) == Some(default_tone_mapper) {
+        serde_json::json!({ "toneMapper": default_tone_mapper })
+    } else {
+        serde_json::json!({})
+    };
     let current_adj = get_all_adjustments_from_json(adj, is_raw, tonemapper_override);
-    let default_adj =
-        get_all_adjustments_from_json(&serde_json::json!({}), is_raw, tonemapper_override);
+    let default_adj = get_all_adjustments_from_json(&unedited, is_raw, tonemapper_override);
 
     bytemuck::bytes_of(&current_adj) != bytemuck::bytes_of(&default_adj)
 }
@@ -2336,7 +2353,16 @@ fn get_global_adjustments_from_json(
         ColorCalibrationSettings::default()
     };
 
-    let tone_mapper = js_adjustments["toneMapper"].as_str().unwrap_or("basic");
+    // `null` means the image has no saved edits, so it gets the default for
+    // unedited images; saved edits without a `toneMapper` key stay Basic.
+    let tone_mapper =
+        js_adjustments["toneMapper"]
+            .as_str()
+            .unwrap_or(if js_adjustments.is_null() {
+                crate::tone_mapping::default_tone_mapper(is_raw)
+            } else {
+                crate::tone_mapping::TONE_MAPPER_BASIC
+            });
     let motion_blur_amount = get_val("effects", "motionBlurAmount", SCALES.motion_blur, None);
     let (pipe_to_rendering, rendering_to_pipe) = calculate_agx_matrices();
 
@@ -2447,8 +2473,8 @@ fn get_global_adjustments_from_json(
         lut_intensity,
 
         tonemapper_mode: tonemapper_override
-            .unwrap_or_else(|| if tone_mapper == "agx" { 1 } else { 0 }),
-        _pad_lut2: 0.0,
+            .unwrap_or_else(|| crate::tone_mapping::tone_mapper_mode(tone_mapper)),
+        natural_exposure_ev: 0.0,
         _pad_lut3: 0.0,
         _pad_lut4: 0.0,
         _pad_lut5: 0.0,
@@ -3865,9 +3891,9 @@ mod tests {
 
     #[test]
     fn image_processing_shader_parses_and_validates() {
-        let shader = include_str!("shaders/shader.wgsl");
-        let module =
-            wgpu::naga::front::wgsl::parse_str(shader).expect("image-processing WGSL should parse");
+        let shader = crate::gpu_processing::image_shader_source();
+        let module = wgpu::naga::front::wgsl::parse_str(&shader)
+            .expect("image-processing WGSL should parse");
         let mut validator = wgpu::naga::valid::Validator::new(
             wgpu::naga::valid::ValidationFlags::all(),
             wgpu::naga::valid::Capabilities::all(),
@@ -3879,8 +3905,9 @@ mod tests {
 
     #[test]
     fn shader_adjustment_structs_match_rust_layout() {
-        let module = wgpu::naga::front::wgsl::parse_str(include_str!("shaders/shader.wgsl"))
-            .expect("image-processing WGSL should parse");
+        let module =
+            wgpu::naga::front::wgsl::parse_str(&crate::gpu_processing::image_shader_source())
+                .expect("image-processing WGSL should parse");
         let shader_size = |name: &str| {
             module
                 .types

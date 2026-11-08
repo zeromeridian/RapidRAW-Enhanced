@@ -70,7 +70,7 @@ import {
   LibraryViewMode,
 } from '../components/ui/AppProperties';
 import { Status } from '../components/ui/ExportImportProperties';
-import { Color, COLOR_LABELS, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
+import { Color, COLOR_LABELS, getInitialAdjustments, normalizeLoadedAdjustments } from '../utils/adjustments';
 import TaggingSubMenu from '../context/TaggingSubMenu';
 import { debouncedSave, useEditorActions } from './useEditorActions';
 import {
@@ -440,12 +440,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               onClick: () => {
                 const originalAspectRatio =
                   selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
-                resetHistory({
-                  ...INITIAL_ADJUSTMENTS,
+                const resetData = {
+                  ...getInitialAdjustments(selectedImage.isRaw),
                   aspectRatio: originalAspectRatio,
                   aiPatches: [],
-                });
-                setEditor({ adjustments: { ...INITIAL_ADJUSTMENTS, aspectRatio: originalAspectRatio, aiPatches: [] } });
+                };
+                resetHistory(resetData);
+                setEditor({ adjustments: resetData });
               },
             },
           ],

@@ -13,6 +13,7 @@ mod ai_processing;
 mod android_integration;
 mod app_settings;
 mod app_state;
+mod baseline_exposure;
 mod cache_utils;
 mod culling;
 mod denoising;
@@ -52,6 +53,7 @@ mod raw_processing;
 mod relight;
 mod tagging;
 mod tagging_utils;
+mod tone_mapping;
 mod window_customizer;
 
 use std::collections::{HashMap, hash_map::DefaultHasher};
@@ -618,7 +620,9 @@ fn process_preview_job(
 
     let is_raw = loaded_image.is_raw;
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
-    let final_adjustments = get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
+    let mut final_adjustments =
+        get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
+    crate::baseline_exposure::apply_natural_exposure(&mut final_adjustments, &loaded_image.path);
     let lut_path = adjustments_clone["lutPath"].as_str();
     let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
 
@@ -952,8 +956,9 @@ fn generate_uncropped_preview(
             .collect();
 
         let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
-        let uncropped_adjustments =
+        let mut uncropped_adjustments =
             get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
+        crate::baseline_exposure::apply_natural_exposure(&mut uncropped_adjustments, &path);
         let lut_path = adjustments_clone["lutPath"].as_str();
         let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
 
@@ -1128,8 +1133,12 @@ async fn preview_geometry_transform(
             }
 
             let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
-            let all_adjustments =
+            let mut all_adjustments =
                 get_all_adjustments_from_json(&temp_adjustments, is_raw, tm_override);
+            crate::baseline_exposure::apply_natural_exposure(
+                &mut all_adjustments,
+                &loaded_image_path,
+            );
             let lut_path = temp_adjustments["lutPath"].as_str();
             let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
             let mask_bitmaps = Vec::new();
@@ -1312,7 +1321,8 @@ fn generate_preset_preview(
         .collect();
 
     let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
-    let all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
+    let mut all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
+    crate::baseline_exposure::apply_natural_exposure(&mut all_adjustments, &loaded_image.path);
     let lut_path = js_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
 
@@ -1460,8 +1470,9 @@ async fn generate_all_community_previews(
                 .collect();
 
             let tm_override = resolve_tonemapper_override_from_handle(&app_handle, *is_raw);
-            let all_adjustments =
+            let mut all_adjustments =
                 get_all_adjustments_from_json(&scaled_adjustments, *is_raw, tm_override);
+            crate::baseline_exposure::apply_natural_exposure(&mut all_adjustments, &image_paths[i]);
             let lut_path = js_adjustments["lutPath"].as_str();
             let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
 
@@ -1743,7 +1754,9 @@ async fn generate_preview_for_path(
             .collect();
 
         let tm_override = resolve_tonemapper_override(&settings, is_raw);
-        let all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
+        let mut all_adjustments =
+            get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
+        crate::baseline_exposure::apply_natural_exposure(&mut all_adjustments, &path);
         let lut_path = js_adjustments["lutPath"].as_str();
         let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
         let unique_hash = calculate_full_job_hash(&source_path_str, &js_adjustments);

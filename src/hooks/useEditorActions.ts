@@ -11,6 +11,7 @@ import { useProcessStore } from '../store/useProcessStore';
 import {
   Adjustments,
   INITIAL_ADJUSTMENTS,
+  getInitialAdjustments,
   COPYABLE_ADJUSTMENT_KEYS,
   CROP_GEOMETRY_KEYS,
   PasteMode,
@@ -173,7 +174,7 @@ export function useEditorActions() {
 
   const handleResetAdjustments = useCallback(
     (paths?: string[]) => {
-      const { multiSelectedPaths, libraryActivePath, setLibrary } = useLibraryStore.getState();
+      const { multiSelectedPaths, libraryActivePath, imageList, setLibrary } = useLibraryStore.getState();
       const { selectedImage, resetHistory } = useEditorStore.getState();
       const pathsToReset = paths || multiSelectedPaths;
       if (pathsToReset.length === 0) return;
@@ -183,12 +184,14 @@ export function useEditorActions() {
 
       invoke(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset })
         .then(() => {
-          if (libraryActivePath && pathsToReset.includes(libraryActivePath))
-            setLibrary({ libraryActiveAdjustments: { ...INITIAL_ADJUSTMENTS } });
+          if (libraryActivePath && pathsToReset.includes(libraryActivePath)) {
+            const isRaw = imageList.find((image) => image.path === libraryActivePath)?.is_raw ?? false;
+            setLibrary({ libraryActiveAdjustments: getInitialAdjustments(isRaw) });
+          }
           if (selectedImage && pathsToReset.includes(selectedImage.path)) {
             const aspect =
               selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
-            const resetData = { ...INITIAL_ADJUSTMENTS, aspectRatio: aspect, aiPatches: [] };
+            const resetData = { ...getInitialAdjustments(selectedImage.isRaw), aspectRatio: aspect, aiPatches: [] };
             resetHistory(resetData);
             setEditor({ adjustments: resetData });
           }

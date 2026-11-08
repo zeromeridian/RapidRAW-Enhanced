@@ -1116,6 +1116,39 @@ mod output_naming_tests {
     }
 
     #[test]
+    fn natural_tone_mapper_round_trips_through_xmp() {
+        let folder = tempfile::tempdir().unwrap();
+        let image = folder.path().join("sky.orf");
+        fs::write(&image, []).unwrap();
+        fs::write(
+            image.with_extension("xmp"),
+            "<rdf:Description>\n</rdf:Description>",
+        )
+        .unwrap();
+
+        let source = ImageMetadata {
+            adjustments: serde_json::json!({ "toneMapper": "natural", "exposure": 0.4 }),
+            ..ImageMetadata::default()
+        };
+        sync_metadata_to_xmp(&image, &source, false);
+
+        let mut imported = ImageMetadata::default();
+        assert!(sync_metadata_from_xmp(&image, &mut imported, true));
+        assert_eq!(imported.adjustments["toneMapper"], "natural");
+        assert_eq!(imported.adjustments["exposure"], 0.4);
+        assert_eq!(
+            crate::image_processing::get_all_adjustments_from_json(
+                &imported.adjustments,
+                true,
+                None
+            )
+            .global
+            .tonemapper_mode,
+            crate::tone_mapping::TONE_MAPPER_MODE_NATURAL
+        );
+    }
+
+    #[test]
     fn guided_geometry_lines_and_solution_round_trip_through_xmp() {
         let folder = tempfile::tempdir().unwrap();
         let image = folder.path().join("guided.raw");
@@ -1485,6 +1518,58 @@ mod output_naming_tests {
         adjustments["lensCorrectionMode"] = serde_json::json!("manual");
         assert!(crate::image_processing::is_image_edited(
             &adjustments,
+            true,
+            None
+        ));
+    }
+
+    #[test]
+    fn unedited_raws_default_to_natural_and_saved_edits_keep_their_tone_mapper() {
+        use crate::image_processing::{get_all_adjustments_from_json, is_image_edited};
+        use crate::tone_mapping::{
+            TONE_MAPPER_MODE_AGX, TONE_MAPPER_MODE_BASIC, TONE_MAPPER_MODE_NATURAL,
+        };
+        let mode = |adjustments: serde_json::Value, is_raw: bool| {
+            get_all_adjustments_from_json(&adjustments, is_raw, None)
+                .global
+                .tonemapper_mode
+        };
+
+        // No saved edits: RAW renders Natural, other images Basic.
+        assert_eq!(
+            mode(serde_json::Value::Null, true),
+            TONE_MAPPER_MODE_NATURAL
+        );
+        assert_eq!(mode(serde_json::Value::Null, false), TONE_MAPPER_MODE_BASIC);
+        // Saved edits without a tone mapper keep rendering as Basic.
+        assert_eq!(
+            mode(serde_json::json!({ "exposure": 0.5 }), true),
+            TONE_MAPPER_MODE_BASIC
+        );
+        assert_eq!(
+            mode(serde_json::json!({ "toneMapper": "agx" }), true),
+            TONE_MAPPER_MODE_AGX
+        );
+
+        // Neither the new default nor the legacy default counts as an edit.
+        assert!(!is_image_edited(
+            &serde_json::json!({ "toneMapper": "natural" }),
+            true,
+            None
+        ));
+        assert!(!is_image_edited(
+            &serde_json::json!({ "toneMapper": "basic" }),
+            true,
+            None
+        ));
+        assert!(!is_image_edited(&serde_json::json!({}), true, None));
+        assert!(is_image_edited(
+            &serde_json::json!({ "toneMapper": "agx" }),
+            true,
+            None
+        ));
+        assert!(is_image_edited(
+            &serde_json::json!({ "toneMapper": "natural", "exposure": 0.5 }),
             true,
             None
         ));
@@ -2950,7 +3035,9 @@ pub fn generate_thumbnail_data(
             .collect();
 
         let tm_override = crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
-        let gpu_adjustments = get_all_adjustments_from_json(&meta.adjustments, is_raw, tm_override);
+        let mut gpu_adjustments =
+            get_all_adjustments_from_json(&meta.adjustments, is_raw, tm_override);
+        crate::baseline_exposure::apply_natural_exposure(&mut gpu_adjustments, path_str);
         let lut_path = meta.adjustments["lutPath"].as_str();
         let lut = lut_path.and_then(|p| {
             let mut cache = state.lut_cache.lock().unwrap();
@@ -3017,21 +3104,29 @@ pub fn generate_thumbnail_data(
     };
 
     if adjustments.is_null() {
-        let default_tm = if is_raw {
-            settings.default_raw_tonemapper.as_deref().unwrap_or("agx")
-        } else {
-            settings
-                .default_non_raw_tonemapper
-                .as_deref()
-                .unwrap_or("basic")
-        };
-        if default_tm == "agx" {
-            if !is_raw {
-                final_image = crate::image_processing::apply_srgb_to_linear(final_image);
+        let tone_mapper_mode = crate::image_processing::resolve_tonemapper_override(
+            &settings, is_raw,
+        )
+        .unwrap_or_else(|| {
+            crate::tone_mapping::tone_mapper_mode(crate::tone_mapping::default_tone_mapper(is_raw))
+        });
+        match tone_mapper_mode {
+            crate::tone_mapping::TONE_MAPPER_MODE_AGX => {
+                if !is_raw {
+                    final_image = crate::image_processing::apply_srgb_to_linear(final_image);
+                }
+                crate::image_processing::apply_cpu_agx_tonemap(&mut final_image);
             }
-            crate::image_processing::apply_cpu_agx_tonemap(&mut final_image);
-        } else if is_raw {
-            apply_cpu_default_raw_processing(&mut final_image);
+            crate::tone_mapping::TONE_MAPPER_MODE_NATURAL if is_raw => {
+                crate::tone_mapping::apply_cpu_natural_tonemap(
+                    &mut final_image,
+                    crate::baseline_exposure::natural_exposure_ev(path_str),
+                );
+            }
+            crate::tone_mapping::TONE_MAPPER_MODE_BASIC if is_raw => {
+                apply_cpu_default_raw_processing(&mut final_image);
+            }
+            _ => {}
         }
     }
 
@@ -4739,13 +4834,17 @@ pub async fn reset_adjustments_for_paths(
         let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
         paths.par_iter().for_each(|path| {
-            let (_, sidecar_path) = parse_virtual_path(path);
+            let (source_path, sidecar_path) = parse_virtual_path(path);
 
             let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
             // Reset unlinks the lens profile; the explicit manual mode keeps
-            // `apply_default_lens_profile` from linking it again.
-            existing_metadata.adjustments = serde_json::json!({ "lensCorrectionMode": "manual" });
+            // `apply_default_lens_profile` from linking it again. The tone
+            // mapper goes back to the default for unedited images.
+            existing_metadata.adjustments = serde_json::json!({
+                "lensCorrectionMode": "manual",
+                "toneMapper": crate::tone_mapping::default_tone_mapper(is_raw_file(&source_path)),
+            });
 
             if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
                 let _ = std::fs::write(&sidecar_path, json_string);
@@ -4995,6 +5094,10 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
         let _ = fs::write(&sidecar_path, json);
     }
 
+    crate::tone_mapping::apply_default_tone_mapper(
+        &mut metadata.adjustments,
+        is_raw_file(&source_path),
+    );
     apply_default_lens_profile(
         &mut metadata.adjustments,
         &metadata.exif,
