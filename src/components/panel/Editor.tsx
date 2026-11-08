@@ -11,6 +11,7 @@ import { calculateCenteredCrop, rotateCropCenter } from '../../utils/cropUtils';
 import EditorToolbar from './editor/EditorToolbar';
 import GuidedPerspectiveOverlay from './editor/GuidedPerspectiveOverlay';
 import ImageCanvas from './editor/ImageCanvas';
+import SpeedEditOverlay from './editor/overlays/SpeedEditOverlay';
 import { Mask, SubMask } from './right/Masks';
 import { Panel, TransformState, Invokes } from '../ui/AppProperties';
 import Text from '../ui/Text';
@@ -2197,6 +2198,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
             )}
           </div>
         )}
+        <SpeedEditOverlay />
       </div>
     </div>
   );

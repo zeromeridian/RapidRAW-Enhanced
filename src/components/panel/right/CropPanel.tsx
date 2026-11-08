@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import { Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { Adjustments, INITIAL_ADJUSTMENTS, SPEED_EDIT_ROTATION } from '../../../utils/adjustments';
 import clsx from 'clsx';
 import { CustomAspectRatio, Orientation } from '../../ui/AppProperties';
 import { motion } from 'framer-motion';
@@ -727,6 +727,7 @@ export default function CropPanel() {
                   defaultValue={0}
                   suffix="°"
                   onChange={handleFineRotationChange}
+                  speedEditId={SPEED_EDIT_ROTATION}
                   onDragStateChange={handleDragStateChange}
                 />
               </div>

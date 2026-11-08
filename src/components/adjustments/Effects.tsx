@@ -860,6 +860,7 @@ export default function EffectsPanel({
             max={100}
             min={-100}
             onChange={(e: any) => handleAdjustmentChange(Effect.VignetteAmount, e.target.value)}
+            speedEditId={Effect.VignetteAmount}
             step={1}
             value={adjustments.vignetteAmount}
             onDragStateChange={onDragStateChange}

@@ -176,6 +176,21 @@ interface UIState {
   cycleLightsOut: (direction?: 1 | -1) => void;
 }
 
+/** Whether a modal dialog owns the keyboard. */
+export const isModalOpen = (ui: UIState) =>
+  ui.isCreateFolderModalOpen ||
+  ui.isRenameFolderModalOpen ||
+  ui.isRenameFileModalOpen ||
+  ui.isImportModalOpen ||
+  ui.isCopyPasteSettingsModalOpen ||
+  ui.confirmModalState.isOpen ||
+  ui.panoramaModalState.isOpen ||
+  ui.cullingModalState.isOpen ||
+  ui.collageModalState.isOpen ||
+  ui.lightroomImportModalState.isOpen ||
+  ui.denoiseModalState.isOpen ||
+  ui.negativeModalState.isOpen;
+
 export const useUIStore = create<UIState>((set, get) => ({
   activeView: 'library',
   isFullScreen: false,

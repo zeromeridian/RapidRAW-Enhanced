@@ -511,6 +511,7 @@ export default function ColorPanel({
           max={100}
           min={-100}
           onChange={(e: any) => handleAdjustmentChange(ColorAdjustment.Temperature, e.target.value)}
+          speedEditId={ColorAdjustment.Temperature}
           step={1}
           value={adjustments.temperature || 0}
           trackClassName="temperature-gradient-track"
@@ -521,6 +522,7 @@ export default function ColorPanel({
           max={100}
           min={-100}
           onChange={(e: any) => handleAdjustmentChange(ColorAdjustment.Tint, e.target.value)}
+          speedEditId={ColorAdjustment.Tint}
           step={1}
           value={adjustments.tint || 0}
           trackClassName="tint-gradient-track"
@@ -537,6 +539,7 @@ export default function ColorPanel({
           max={100}
           min={-100}
           onChange={(e: any) => handleAdjustmentChange(ColorAdjustment.Vibrance, e.target.value)}
+          speedEditId={ColorAdjustment.Vibrance}
           step={1}
           value={adjustments.vibrance || 0}
           onDragStateChange={onDragStateChange}
@@ -546,6 +549,7 @@ export default function ColorPanel({
           max={100}
           min={-100}
           onChange={(e: any) => handleAdjustmentChange(ColorAdjustment.Saturation, e.target.value)}
+          speedEditId={ColorAdjustment.Saturation}
           step={1}
           value={adjustments.saturation || 0}
           onDragStateChange={onDragStateChange}

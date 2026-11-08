@@ -851,6 +851,10 @@
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
       }
+    },
+    "speedEdit": {
+      "copied": "<0>{{label}}</0> <1>{{value}}</1> copiado",
+      "pasted": "<0>{{label}}</0> <1>{{value}}</1> pegado"
     }
   },
   "export": {
@@ -1626,6 +1630,27 @@
       "pressKey": "Presiona una tecla... (Esc para borrar)",
       "resetDefaults": "Restablecer todo a los valores predeterminados",
       "speed": "Velocidad",
+      "speedEdit": {
+        "adjustments": "Ajustes",
+        "gestures": {
+          "doubleClick": "Doble clic para restablecer",
+          "drag": "Arrastra en el lienzo para ajustar",
+          "fine": "Mayús para afinar"
+        },
+        "keys": {
+          "hold": "Pulsar / Mantener",
+          "previousImage": "Imagen ant.",
+          "nextImage": "Imagen sig.",
+          "reset": "Restablecer",
+          "previousAdjustment": "Deslizador ant.",
+          "nextAdjustment": "Deslizador sig.",
+          "copy": "Copiar",
+          "paste": "Pegar",
+          "stepDown": "−1 paso",
+          "stepUp": "+1 paso"
+        },
+        "title": "Edición rápida"
+      },
       "title": "Controles del ratón",
       "zoom": "Multiplicador de velocidad de zoom",
       "zoomDesc": "Ajusta qué tan rápido se acerca y aleja el lienzo al usar la rueda de desplazamiento o el gesto de pellizcar.",

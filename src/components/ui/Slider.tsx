@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GLOBAL_KEYS } from './AppProperties';
+import { useEditorStore } from '../../store/useEditorStore';
+import { SPEED_EDIT_ADJUSTMENTS } from '../../utils/adjustments';
 
 export type SliderChangeEvent =
   | React.ChangeEvent<HTMLInputElement>
@@ -18,6 +20,7 @@ interface SliderProps {
   min: number;
   onChange(event: SliderChangeEvent): void;
   onDragStateChange?(state: boolean): void;
+  speedEditId?: string;
   step: number;
   value: number;
   trackClassName?: string;
@@ -25,12 +28,30 @@ interface SliderProps {
   suffix?: string;
 }
 
+/** The last-used slider, which Speed Edit drives from the canvas and keyboard. */
+export interface SpeedEditTarget {
+  label: string | null;
+  value: number;
+  defaultValue: number;
+  min: number;
+  max: number;
+  step: number;
+  format(value: number): string;
+  snap(value: number): number;
+  onChange(value: number): void;
+  onDragStateChange(isDragging: boolean): void;
+}
+
 const DOUBLE_CLICK_THRESHOLD_MS = 300;
-const FINE_ADJUSTMENT_MULTIPLIER = 0.2;
+export const FINE_ADJUSTMENT_MULTIPLIER = 0.2;
 const TOUCH_DRAG_THRESHOLD_PX = 10;
 const TOUCH_THUMB_HIT_RADIUS_PX = 24;
 
-const hasFineAdjustmentModifier = (event: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent) =>
+const speedEditTargets = new WeakMap<Element, RefObject<SpeedEditTarget | null>>();
+
+export const getSpeedEditTarget = (element: Element) => speedEditTargets.get(element) ?? null;
+
+export const hasFineAdjustmentModifier = (event: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent) =>
   'shiftKey' in event && (event.shiftKey || event.altKey);
 
 const Slider = ({
@@ -41,6 +62,7 @@ const Slider = ({
   min,
   onChange,
   onDragStateChange = () => {},
+  speedEditId,
   step = 1,
   value,
   trackClassName,
@@ -110,6 +132,39 @@ const Slider = ({
   onDragStateChangeRef.current = onDragStateChange;
   snapToStepRef.current = snapToStep;
   rangeRef.current = { min, max };
+
+  const numericValue = isNaN(Number(value)) ? 0 : Number(value);
+  const formatValue = (val: number) => (decimalPlaces > 0 && val === 0 ? '0' : val.toFixed(decimalPlaces));
+
+  const speedEditLabel = SPEED_EDIT_ADJUSTMENTS.find((adjustment) => adjustment.id === speedEditId)?.label;
+  const speedEditTargetRef = useRef<SpeedEditTarget | null>(null);
+  speedEditTargetRef.current = disabled
+    ? null
+    : {
+        label: speedEditLabel ? t(speedEditLabel) : typeof label === 'string' ? label : null,
+        value: numericValue,
+        defaultValue,
+        min,
+        max,
+        step,
+        format: (val) => `${formatValue(val)}${suffix}`,
+        snap: snapToStep,
+        onChange: (val) => onChangeRef.current({ target: { value: val } }),
+        onDragStateChange: (isDraggingNext) => onDragStateChangeRef.current(isDraggingNext),
+      };
+
+  const claimSpeedEdit = useCallback(
+    () => useEditorStore.getState().setEditor({ speedEditTarget: speedEditTargetRef }),
+    [],
+  );
+
+  useEffect(() => {
+    if (containerRef.current) speedEditTargets.set(containerRef.current, speedEditTargetRef);
+    return () => {
+      const { speedEditTarget, setEditor } = useEditorStore.getState();
+      if (speedEditTarget === speedEditTargetRef) setEditor({ speedEditTarget: null });
+    };
+  }, []);
 
   const emitPendingChange = useCallback(() => {
     changeFrameRef.current = undefined;
@@ -185,6 +240,7 @@ const Slider = ({
       }
 
       event.preventDefault();
+      claimSpeedEdit();
       const direction = -Math.sign(event.deltaY || event.deltaX);
       const newValue = value + direction * step;
       const roundedNewValue = parseFloat(newValue.toFixed(decimalPlaces));
@@ -216,7 +272,7 @@ const Slider = ({
     return () => {
       sliderElement.removeEventListener('wheel', handleWheel);
     };
-  }, [disabled, value, min, max, step, onChange, decimalPlaces]);
+  }, [disabled, value, min, max, step, onChange, decimalPlaces, claimSpeedEdit]);
 
   // Handle Dragging
   useEffect(() => {
@@ -552,12 +608,12 @@ const Slider = ({
     }
   };
 
-  const numericValue = isNaN(Number(value)) ? 0 : Number(value);
-
   return (
     <div
       className={`group mb-2 compact:mb-0.5 compact:grid compact:grid-cols-[minmax(0,6.5rem)_minmax(0,1fr)_3rem] compact:items-center compact:gap-x-2 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       ref={containerRef}
+      data-speed-edit-id={speedEditId}
+      onPointerDownCapture={disabled ? undefined : claimSpeedEdit}
     >
       <div className="flex justify-between items-center mb-1 compact:contents">
         <div
@@ -608,7 +664,7 @@ const Slider = ({
               onDoubleClick={disabled ? undefined : handleReset}
               data-tooltip={disabled ? undefined : t('ui.slider.clickToEdit')}
             >
-              {decimalPlaces > 0 && numericValue === 0 ? '0' : numericValue.toFixed(decimalPlaces)}
+              {formatValue(numericValue)}
               {suffix && <span className="text-[10px] align-top inline-block mt-0.5 ml-0.5">{suffix}</span>}
             </span>
           )}

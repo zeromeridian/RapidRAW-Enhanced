@@ -851,6 +851,10 @@
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
       }
+    },
+    "speedEdit": {
+      "copied": "<0>{{label}}</0> <1>{{value}}</1> copiado",
+      "pasted": "<0>{{label}}</0> <1>{{value}}</1> colado"
     }
   },
   "export": {
@@ -1626,6 +1630,27 @@
       "pressKey": "Pressione uma tecla... (Esc para limpar)",
       "resetDefaults": "Redefinir Tudo para Padrões",
       "speed": "Velocidade",
+      "speedEdit": {
+        "adjustments": "Ajustes",
+        "gestures": {
+          "doubleClick": "Clique duplo para redefinir",
+          "drag": "Arraste na tela para ajustar",
+          "fine": "Shift para ajuste fino"
+        },
+        "keys": {
+          "hold": "Tocar / Segurar",
+          "previousImage": "Imagem ant.",
+          "nextImage": "Próxima imagem",
+          "reset": "Redefinir",
+          "previousAdjustment": "Controle ant.",
+          "nextAdjustment": "Próximo controle",
+          "copy": "Copiar",
+          "paste": "Colar",
+          "stepDown": "−1 passo",
+          "stepUp": "+1 passo"
+        },
+        "title": "Edição rápida"
+      },
       "title": "Controles do Mouse",
       "zoom": "Multiplicador de Velocidade de Zoom",
       "zoomDesc": "Ajuste a rapidez com que a tela aumenta e diminui o zoom ao usar a roda de rolagem ou o gesto de pinça.",

@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { ImageFile, Panel, ExifOverlay, LibraryDisplayMode, stepBrushSize } from '../components/ui/AppProperties';
 import i18n from 'i18next';
-import { KEYBIND_DEFINITIONS, getEffectiveCombo, normalizeCombo } from '../utils/keyboardUtils';
+import { KEYBIND_DEFINITIONS, getEffectiveCombo, isTextEntryTarget, normalizeCombo } from '../utils/keyboardUtils';
 import { canUndoEdit, useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { useUIStore } from '../store/useUIStore';
+import { isModalOpen, useUIStore } from '../store/useUIStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { toggleAutoSync, useEditorActions } from './useEditorActions';
 import {
@@ -19,7 +19,8 @@ import {
 import { ImageFlag } from '../utils/imageFlags';
 import { KEYWORD_SET_SIZE, getActiveKeywordSet, getKeywordSets } from '../utils/keywords';
 
-const NON_TEXT_INPUT_TYPES = new Set(['checkbox', 'radio', 'range', 'button', 'submit', 'reset', 'color', 'file']);
+/** While Speed Edit is on, Q and E step to the previous and next photo. */
+const SPEED_EDIT_IMAGE_DIRECTIONS: Record<string, number> = { KeyQ: -1, KeyE: 1 };
 
 interface KeyboardShortcutsProps {
   sortedImageList: Array<ImageFile>;
@@ -81,6 +82,14 @@ export const useKeyboardShortcuts = ({
         comboMap.set(effective.join('+'), def.action);
       }
     }
+
+    // Steps through the visible photos the way Develop navigation does, wrapping at the ends.
+    const selectAdjacentImage = (s: ReturnType<typeof getStoreState>, direction: number) => {
+      const list = sortedListRef.current;
+      const currentIndex = list.findIndex((img) => img.path === s.editor.selectedImage!.path);
+      if (currentIndex === -1) return;
+      handleImageSelect(list[(currentIndex + direction + list.length) % list.length].path);
+    };
 
     const isBrushPanelActive = (s: ReturnType<typeof getStoreState>) =>
       !!s.editor.selectedImage &&
@@ -261,20 +270,14 @@ export const useKeyboardShortcuts = ({
         shouldFire: (s: any) => !!s.editor.selectedImage,
         execute: (e: any, s: any) => {
           e.preventDefault();
-          const currentIndex = sortedListRef.current.findIndex((img) => img.path === s.editor.selectedImage!.path);
-          if (currentIndex === -1) return;
-          let nextIndex = currentIndex - 1 < 0 ? sortedListRef.current.length - 1 : currentIndex - 1;
-          handleImageSelect(sortedListRef.current[nextIndex].path);
+          selectAdjacentImage(s, -1);
         },
       },
       preview_next: {
         shouldFire: (s: any) => !!s.editor.selectedImage,
         execute: (e: any, s: any) => {
           e.preventDefault();
-          const currentIndex = sortedListRef.current.findIndex((img) => img.path === s.editor.selectedImage!.path);
-          if (currentIndex === -1) return;
-          let nextIndex = currentIndex + 1 >= sortedListRef.current.length ? 0 : currentIndex + 1;
-          handleImageSelect(sortedListRef.current[nextIndex].path);
+          selectAdjacentImage(s, 1);
         },
       },
       zoom_in_step: {
@@ -650,6 +653,18 @@ export const useKeyboardShortcuts = ({
 
     const builtinShortcuts = [
       {
+        match: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) =>
+          s.editor.isSpeedEditActive &&
+          !!s.editor.selectedImage &&
+          !e.ctrlKey &&
+          !e.metaKey &&
+          e.code in SPEED_EDIT_IMAGE_DIRECTIONS,
+        execute: (e: KeyboardEvent, s: ReturnType<typeof getStoreState>) => {
+          e.preventDefault();
+          selectAdjacentImage(s, SPEED_EDIT_IMAGE_DIRECTIONS[e.code]);
+        },
+      },
+      {
         match: (e: KeyboardEvent) => e.code === 'Escape',
         execute: (e: KeyboardEvent, s: any) => {
           e.preventDefault();
@@ -743,21 +758,7 @@ export const useKeyboardShortcuts = ({
         }
       }
 
-      const isModalOpen =
-        state.ui.isCreateFolderModalOpen ||
-        state.ui.isRenameFolderModalOpen ||
-        state.ui.isRenameFileModalOpen ||
-        state.ui.isImportModalOpen ||
-        state.ui.isCopyPasteSettingsModalOpen ||
-        state.ui.confirmModalState.isOpen ||
-        state.ui.panoramaModalState.isOpen ||
-        state.ui.cullingModalState.isOpen ||
-        state.ui.collageModalState.isOpen ||
-        state.ui.lightroomImportModalState.isOpen ||
-        state.ui.denoiseModalState.isOpen ||
-        state.ui.negativeModalState.isOpen;
-
-      if (isModalOpen) return;
+      if (isModalOpen(state.ui)) return;
 
       if (state.ui.isSettingsOpen) {
         if (event.code === 'Escape') {
@@ -770,10 +771,7 @@ export const useKeyboardShortcuts = ({
       // Keys typed into a text field stay there, also when the field blurs itself on Enter
       // (`event.target` is still the field). A focused slider keeps its arrow keys; it blurs
       // itself for the global shortcut keys (`Slider`). Checkboxes and buttons never block.
-      const target = event.target;
-      const isTyping =
-        target instanceof HTMLTextAreaElement ||
-        (target instanceof HTMLInputElement && !NON_TEXT_INPUT_TYPES.has(target.type));
+      const isTyping = isTextEntryTarget(event.target);
       const focused = document.activeElement;
       const isSliderFocused = focused instanceof HTMLInputElement && focused.type === 'range';
       if (isTyping || isSliderFocused) return;

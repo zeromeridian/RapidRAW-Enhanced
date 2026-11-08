@@ -407,6 +407,13 @@ export function getEffectiveCombo(definition: KeybindDefinition, keybinds?: Reco
   return userCombo && userCombo.length > 0 ? userCombo : definition.defaultCombo;
 }
 
+const NON_TEXT_INPUT_TYPES = new Set(['checkbox', 'radio', 'range', 'button', 'submit', 'reset', 'color', 'file']);
+
+/** Whether keys sent to `target` are typed into a text field rather than meant as shortcuts. */
+export const isTextEntryTarget = (target: EventTarget | null) =>
+  target instanceof HTMLTextAreaElement ||
+  (target instanceof HTMLInputElement && !NON_TEXT_INPUT_TYPES.has(target.type));
+
 export function normalizeCombo(event: KeyboardEvent, osPlatform?: string): string[] {
   const isMacDelete = osPlatform === 'macos' && event.code === 'Backspace' && (event.ctrlKey || event.metaKey);
   const parts: string[] = [];

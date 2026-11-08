@@ -825,6 +825,10 @@
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
       }
+    },
+    "speedEdit": {
+      "copied": "<0>{{label}}</0> <1>{{value}}</1> をコピーしました",
+      "pasted": "<0>{{label}}</0> <1>{{value}}</1> を貼り付けました"
     }
   },
   "export": {
@@ -1581,6 +1585,27 @@
       "pressKey": "キーを押してください... (Escでクリア)",
       "resetDefaults": "すべてデフォルトに戻す",
       "speed": "速度",
+      "speedEdit": {
+        "adjustments": "調整項目",
+        "gestures": {
+          "doubleClick": "ダブルクリックでリセット",
+          "drag": "キャンバス上でドラッグして調整",
+          "fine": "Shift で微調整"
+        },
+        "keys": {
+          "hold": "タップ / 長押し",
+          "previousImage": "前の画像",
+          "nextImage": "次の画像",
+          "reset": "リセット",
+          "previousAdjustment": "前のスライダー",
+          "nextAdjustment": "次のスライダー",
+          "copy": "コピー",
+          "paste": "ペースト",
+          "stepDown": "−1 ステップ",
+          "stepUp": "+1 ステップ"
+        },
+        "title": "クイック編集"
+      },
       "title": "マウス操作設定",
       "zoom": "ズーム速度の倍率",
       "zoomDesc": "スクロールホイールやピンチジェスチャを使用したときのズーム速度を調整します。",
