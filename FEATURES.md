@@ -35,6 +35,12 @@ details are in `RELEASE_NOTES.MD`.
   unedited preview (GPU renderer).
 - Customizable bottom toolbar shared by Library and Develop, with Productivity,
   Copy, Stacking, Flags, and direct color-label controls.
+- Lightroom-style **Metadata** panel next to the Library grid: file
+  information, camera details, editable author and copyright, rating and
+  labels, GPS map, and the full EXIF of the active photo. Labelled
+  **Metadata**, **Tagging**, and **Export** switches at the right of the title
+  bar show one Library right panel at a time and highlight the open one (in
+  the bottom toolbar with native window decorations or in fullscreen).
 - **Quick Filter** and **Select by** sit in the title bar, left-aligned with
   the bottom toolbar's controls in the main pane below, in Library and Develop. Both stay fully expanded while
   the window is wide enough and collapse to click-to-open icons only when it

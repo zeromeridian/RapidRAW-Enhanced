@@ -5,10 +5,18 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
-## 1.34.3-dev-info-sort — 2026-11-08
+## 1.35.0-dev-info-sort — 2026-11-08
 
 ### Library
 
+- New **Metadata** panel next to the Library grid, like Lightroom Classic:
+  file information, camera details, author and copyright, rating and
+  labels, the GPS map, and the full EXIF of the active photo, without
+  opening it in Develop.
+- The **Metadata**, **Tagging**, and **Export** panel buttons moved to the
+  right of the title bar. They now show their names, and the open panel's
+  button is highlighted. With native window decorations or in fullscreen
+  they stay in the bottom toolbar.
 - Sorting by Date Taken now keeps RAW+JPEG pairs together. JPEGs, TIFFs,
   and other non-RAW photos were sorted after all RAW photos from the same
   year, even when they were taken at the same moment.

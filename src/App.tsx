@@ -11,6 +11,7 @@ import FolderTree from './components/panel/FolderTree';
 import SettingsPanel from './components/panel/SettingsPanel';
 import ExportPanel from './components/panel/right/ExportPanel';
 import TaggingPanel from './components/panel/right/TaggingPanel';
+import MetadataPanel from './components/panel/right/MetadataPanel';
 import Resizer from './components/ui/Resizer';
 import GlobalTooltip from './components/ui/GlobalTooltip';
 import LightsOutVeil from './components/ui/LightsOutVeil';
@@ -21,7 +22,7 @@ import LibraryView from './components/views/LibraryView';
 
 import { ContextMenuProvider } from './context/ContextMenuContext';
 import { useSettingsStore } from './store/useSettingsStore';
-import { useUIStore } from './store/useUIStore';
+import { getLibraryPanel, useUIStore } from './store/useUIStore';
 import { useLibraryStore } from './store/useLibraryStore';
 import { useEditorStore } from './store/useEditorStore';
 import { useProcessStore } from './store/useProcessStore';
@@ -117,6 +118,7 @@ function App() {
     isLightsOut,
     setUI,
     setRightPanel,
+    toggleLibraryPanel,
   } = useUIStore(
     useShallow((state) => ({
       isFullScreen: state.isFullScreen,
@@ -134,6 +136,7 @@ function App() {
       isLightsOut: state.lightsOutMode !== 'off',
       setUI: state.setUI,
       setRightPanel: state.setRightPanel,
+      toggleLibraryPanel: state.toggleLibraryPanel,
     })),
   );
 
@@ -343,13 +346,8 @@ function App() {
   const { displayList: sortedImageList, badges: groupBadgeInfo } = useSortedLibrary();
   useImagePreloader(sortedImageList);
 
-  // Export is opened per task; the Tagging panel stays open, also across restarts, until hidden.
   const isLibraryGridShown = activeView === 'library' && !selectedImage;
-  const libraryRightPanel = isLibraryExportPanelVisible
-    ? 'export'
-    : isLibraryGridShown && uiVisibility.libraryTagging
-      ? 'tagging'
-      : null;
+  const libraryRightPanel = getLibraryPanel({ isLibraryExportPanelVisible, uiVisibility }, isLibraryGridShown);
 
   const handleLibraryRefresh = useCallback(async () => {
     if (currentFolderPath) {
@@ -861,17 +859,18 @@ function App() {
               )}
               style={{ width: libraryRightPanel && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
             >
+              {libraryRightPanel === 'metadata' && (
+                <div className="h-full bg-bg-secondary rounded-lg">
+                  <MetadataPanel onClose={() => toggleLibraryPanel('metadata')} />
+                </div>
+              )}
               {libraryRightPanel === 'tagging' && (
                 <div className="h-full bg-bg-secondary rounded-lg">
-                  <TaggingPanel
-                    onClose={() =>
-                      setUI((state) => ({ uiVisibility: { ...state.uiVisibility, libraryTagging: false } }))
-                    }
-                  />
+                  <TaggingPanel onClose={() => toggleLibraryPanel('tagging')} />
                 </div>
               )}
               {/* Kept mounted so the export settings survive switching panels. */}
-              <div className={clsx('h-full', libraryRightPanel === 'tagging' && 'hidden')}>
+              <div className={clsx('h-full', libraryRightPanel !== 'export' && 'hidden')}>
                 <ExportPanel
                   exportState={exportState}
                   multiSelectedPaths={multiSelectedPaths}

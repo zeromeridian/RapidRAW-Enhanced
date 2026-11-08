@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Check, ChevronDown, ChevronRight, Plus, Star, Tag, X, User } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Info, Plus, Star, Tag, X, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
-import { Invokes } from '../../ui/AppProperties';
+import { Invokes, SelectedImage } from '../../ui/AppProperties';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import Text from '../../ui/Text';
 import PanelHeader from '../../ui/PanelHeader';
@@ -16,6 +16,7 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { getDisplayFilename } from '../../../utils/outputNaming';
+import { getImageDimensions } from '../../../utils/imageDimensions';
 import { isImageFlagTag } from '../../../utils/imageFlags';
 import { USER_TAG_PREFIX, formatKeyword, getActiveKeywordSet, parseKeywordInput } from '../../../utils/keywords';
 
@@ -231,13 +232,21 @@ const KEY_CAMERA_SETTINGS_MAP: CameraSettings = {
   },
 };
 
-export default function MetadataPanel() {
+// The photo whose metadata is shown; a Library photo has no loaded preview, so its thumbnail is optional.
+type MetadataImage = Pick<SelectedImage, 'exif' | 'height' | 'path' | 'width'> & { thumbnailUrl?: string };
+
+interface MetadataPanelProps {
+  onClose?(): void;
+}
+
+export default function MetadataPanel({ onClose }: MetadataPanelProps) {
   const { t } = useTranslation();
   const [isOrganizationExpanded, setIsOrganizationExpanded] = useState(false);
   const [isAuthorExpanded, setIsAuthorExpanded] = useState(false);
   const [tagInputValue, setTagInputValue] = useState('');
   const [isTagInputFocused, setIsTagInputFocused] = useState(false);
-  const selectedImage = useEditorStore((s) => s.selectedImage);
+  const editorImage = useEditorStore((s) => s.selectedImage);
+  const libraryActivePath = useLibraryStore((s) => s.libraryActivePath);
   const multiSelectedPaths = useLibraryStore((s) => s.multiSelectedPaths);
   const imageList = useLibraryStore((s) => s.imageList);
   const imageRatings = useLibraryStore((s) => s.imageRatings);
@@ -245,6 +254,15 @@ export default function MetadataPanel() {
   const thumbnails = useProcessStore((s) => s.thumbnails);
 
   const { handleRate, handleSetColorLabel, handleTagsChanged, handleUpdateExif } = useLibraryActions();
+
+  // In Develop the photo being edited; next to the Library grid the active photo, sized from its EXIF.
+  const selectedImage = useMemo((): MetadataImage | null => {
+    if (editorImage) return editorImage;
+    const image = imageList.find((img) => img.path === libraryActivePath);
+    if (!image) return null;
+    const dimensions = getImageDimensions(image.exif);
+    return { path: image.path, exif: image.exif, width: dimensions?.width ?? 0, height: dimensions?.height ?? 0 };
+  }, [editorImage, imageList, libraryActivePath]);
 
   const rating = selectedImage ? imageRatings[selectedImage.path] || 0 : 0;
   const tags = selectedImage ? imageList.find((img) => img.path === selectedImage.path)?.tags || [] : [];
@@ -384,7 +402,21 @@ export default function MetadataPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <PanelHeader title={t('editor.metadata.title')} />
+      <PanelHeader
+        icon={onClose && <Info size={18} />}
+        title={t('editor.metadata.title')}
+        actions={
+          onClose && (
+            <button
+              className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
+              onClick={onClose}
+              type="button"
+            >
+              <X size={18} />
+            </button>
+          )
+        }
+      />
       <div className="grow overflow-y-auto p-4 compact:p-2.5 custom-scrollbar">
         {selectedImage ? (
           <div className="flex flex-col gap-6 compact:gap-3">

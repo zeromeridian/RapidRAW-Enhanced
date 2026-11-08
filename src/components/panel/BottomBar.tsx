@@ -10,7 +10,6 @@ import {
   Copy,
   CopyPlus,
   Film,
-  FileInput,
   Grip,
   Images,
   LayoutTemplate,
@@ -20,7 +19,6 @@ import {
   SlidersHorizontal,
   SquaresUnite,
   Star,
-  Tag,
   Trash2,
   Ungroup,
   Users,
@@ -65,6 +63,7 @@ import { GroupBadgeInfo } from '../../utils/imageGrouping';
 import { getImageFlag, getRejectedPathsForLoadedFolder, ImageFlag } from '../../utils/imageFlags';
 import { ImageFlagIcon } from '../ui/ImageFlagBadge';
 import { LibraryFilterControls } from './LibraryFilterControls';
+import { LibraryPanelToggles } from './LibraryPanelToggles';
 import { useIsTitleBarShown } from '../../window/TitleBar';
 
 interface BottomBarProps {
@@ -73,7 +72,6 @@ interface BottomBarProps {
   imageRatings?: Record<string, number> | null;
   isCopied: boolean;
   isCopyDisabled: boolean;
-  isExportDisabled?: boolean;
   isFilmstripVisible?: boolean;
   isLibraryView?: boolean;
   isLoading?: boolean;
@@ -86,8 +84,6 @@ interface BottomBarProps {
   onClearSelection?(): void;
   onContextMenu?(event: any, path: string): void;
   onCopy(): void;
-  onExportClick?(): void;
-  onTaggingClick?(): void;
   onDeleteRejected?(paths: string[]): void;
   onFlag(flag: ImageFlag): void;
   onSetColorLabel(color: string | null, paths?: string[]): Promise<void>;
@@ -174,7 +170,6 @@ export default function BottomBar({
   imageRatings,
   isCopied,
   isCopyDisabled,
-  isExportDisabled,
   isFilmstripVisible,
   isLibraryView = false,
   isLoading = false,
@@ -187,8 +182,6 @@ export default function BottomBar({
   onClearSelection,
   onContextMenu,
   onCopy,
-  onExportClick,
-  onTaggingClick,
   onDeleteRejected,
   onFlag,
   onSetColorLabel,
@@ -362,6 +355,7 @@ export default function BottomBar({
     { id: 'autoStack', label: t('contextMenus.thumbnail.autoStackByCaptureTime') },
     { id: 'quickFilter', label: t('ui.bottomBar.tooltips.quickFilter') },
     { id: 'selectBy', label: t('ui.bottomBar.selectBy.title', 'Select by') },
+    { id: 'metadata', label: t('editor.metadata.title') },
     { id: 'tagging', label: t('editor.tagging.title') },
     { id: 'export', label: t('ui.bottomBar.tooltips.export') },
     { id: 'thumbnailSize', label: t('library.header.viewOptions.thumbnailSize') },
@@ -1069,25 +1063,8 @@ export default function BottomBar({
                 </div>
               </div>
             )}
-            {onTaggingClick && isToolbarItemVisible('tagging') && (
-              <button
-                className={productivityButtonClass}
-                onClick={onTaggingClick}
-                data-tooltip={t('editor.tagging.title')}
-              >
-                <Tag size={18} />
-              </button>
-            )}
-            {isToolbarItemVisible('export') && (
-              <button
-                className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
-                disabled={isExportDisabled}
-                onClick={onExportClick}
-                data-tooltip={t('ui.bottomBar.tooltips.export')}
-              >
-                <FileInput size={18} />
-              </button>
-            )}
+            {/* Shown in the title bar when there is one. */}
+            {!isTitleBarShown && <LibraryPanelToggles isItemVisible={isToolbarItemVisible} />}
           </div>
         ) : showZoomControls ? (
           <div className="flex items-center gap-4">

@@ -3,6 +3,8 @@ import { platform } from '@tauri-apps/plugin-os';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, Square, X } from 'lucide-react';
 import { LibraryFilterControls } from '../components/panel/LibraryFilterControls';
+import { LibraryPanelToggles } from '../components/panel/LibraryPanelToggles';
+import { useEditorStore } from '../store/useEditorStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 
@@ -49,8 +51,12 @@ export default function TitleBar() {
   const appWindow = getCurrentWindow();
   const mainPaneBounds = useUIStore((state) => state.mainPaneBounds);
   const toolbarVisibility = useSettingsStore((state) => state.appSettings?.bottomToolbarVisibility);
+  const hasSelectedImage = useEditorStore((state) => Boolean(state.selectedImage));
+  const isLibraryGridShown = useUIStore((state) => state.activeView === 'library') && !hasSelectedImage;
   const titleRef = useRef<HTMLDivElement>(null);
   const windowControlsRef = useRef<HTMLDivElement>(null);
+  const panelTogglesRef = useRef<HTMLDivElement>(null);
+  const [panelTogglesWidth, setPanelTogglesWidth] = useState(0);
   const [titleWidth, setTitleWidth] = useState(0);
   const [windowControlsWidth, setWindowControlsWidth] = useState(0);
   const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
@@ -59,6 +65,19 @@ export default function TitleBar() {
     setTitleWidth(titleRef.current?.offsetWidth ?? 0);
     setWindowControlsWidth(windowControlsRef.current?.offsetWidth ?? 0);
   }, [osPlatform]);
+
+  // The panel toggles' labels follow the language and toolbar settings, so their width is measured.
+  const showPanelToggles = Boolean(mainPaneBounds) && isLibraryGridShown;
+  useLayoutEffect(() => {
+    const element = panelTogglesRef.current;
+    if (!element) {
+      setPanelTogglesWidth(0);
+      return;
+    }
+    const observer = new ResizeObserver(() => setPanelTogglesWidth(element.offsetWidth));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [showPanelToggles, osPlatform]);
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -138,7 +157,7 @@ export default function TitleBar() {
   const filterControlsEnd = mainPaneBounds
     ? Math.min(
         mainPaneBounds.right - MAIN_PANE_CONTENT_PADDING - TITLE_BAR_INSET,
-        windowWidth - 2 * TITLE_BAR_INSET - windowControlsWidth - MIN_DRAG_WIDTH,
+        windowWidth - 2 * TITLE_BAR_INSET - windowControlsWidth - panelTogglesWidth - MIN_DRAG_WIDTH,
       )
     : 0;
 
@@ -184,6 +203,11 @@ export default function TitleBar() {
           </div>
         )}
         <div data-tauri-drag-region className="flex-1 h-full" />
+        {showPanelToggles && (
+          <div ref={panelTogglesRef} className="flex items-center h-full pr-1 z-10">
+            <LibraryPanelToggles isItemVisible={(id) => toolbarVisibility?.[id] !== false} />
+          </div>
+        )}
         <div ref={windowControlsRef} className="flex items-center h-full z-10">
           {isLinux && (
             <div className="flex items-center gap-2 pr-2 h-full">
