@@ -124,17 +124,17 @@ fn pending_image_metadata(image_path: &Path) -> ImageFileMetadata {
     }
 }
 
+/// `read_xmp` is false for virtual copies, which never read the image's XMP.
 fn resolve_image_metadata(
     image_path: &Path,
     sidecar_path: &Path,
-    enable_xmp_sync: bool,
-    include_app_xmp: bool,
+    read_xmp: bool,
     settings: &AppSettings,
 ) -> ImageFileMetadata {
     let mut metadata = crate::exif_processing::load_sidecar(sidecar_path);
 
-    if enable_xmp_sync
-        && sync_metadata_from_xmp(image_path, &mut metadata, include_app_xmp, false)
+    if read_xmp
+        && sync_metadata_from_xmp(image_path, &mut metadata, false)
         && let Ok(json) = serde_json::to_string_pretty(&metadata)
     {
         let _ = fs::write(sidecar_path, json);
@@ -260,8 +260,7 @@ pub fn start_metadata_workers(app_handle: tauri::AppHandle) {
                 let metadata = resolve_image_metadata(
                     &item.image_path,
                     &item.sidecar_path,
-                    enable_xmp_sync,
-                    !item.virtual_path.contains("?vc="),
+                    enable_xmp_sync && !item.virtual_path.contains("?vc="),
                     &settings,
                 );
 
@@ -553,6 +552,32 @@ pub(crate) fn parse_sidecar_filename(file_name: &str) -> Option<(String, Option<
     Some((base.to_string(), None))
 }
 
+/// `dir/stem.ext`, or `dir/stem_N.ext` with the first free N, for a generated
+/// image (HDR, panorama, collage). A name is free only without a file, a
+/// `.tirdata` sidecar (also of a virtual copy), or an XMP, so a new result
+/// neither replaces an earlier one nor inherits its stale edits.
+pub fn unique_output_path(dir: &Path, stem: &str, extension: &str) -> PathBuf {
+    let sidecar_sources: HashSet<String> = fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+        .filter_map(|name| parse_sidecar_filename(&name.to_lowercase()).map(|(source, _)| source))
+        .collect();
+    (0_u64..)
+        .map(|counter| match counter {
+            0 => format!("{stem}.{extension}"),
+            _ => format!("{stem}_{counter}.{extension}"),
+        })
+        .map(|name| (dir.join(&name), name))
+        .find(|(path, name)| {
+            !path.exists()
+                && !sidecar_sources.contains(&name.to_lowercase())
+                && resolve_xmp_path(path).is_none()
+        })
+        .map(|(path, _)| path)
+        .expect("an unbounded counter always finds a free name")
+}
+
 /// True for `<image_filename>.tirdata` and its virtual-copy sidecars, but not for the sidecar of
 /// another image whose name merely starts with `image_filename` (e.g. `IMG.CR2.jpg.tirdata`).
 fn is_sidecar_of(sidecar_filename: &str, image_filename: &str) -> bool {
@@ -743,7 +768,7 @@ mod output_naming_tests {
         assert_eq!(merged.tags.as_deref().unwrap(), ["user:keep".to_string()]);
 
         let mut imported = ImageMetadata::default();
-        assert!(sync_metadata_from_xmp(&image, &mut imported, true, true));
+        assert!(sync_metadata_from_xmp(&image, &mut imported, true));
         assert_eq!(imported.adjustments["exposure"], 2.5);
         assert_eq!(imported.adjustments["contrast"], 12.0);
         assert_eq!(imported.adjustments["saturation"], 18.0);
@@ -767,7 +792,7 @@ mod output_naming_tests {
             ..ImageMetadata::default()
         };
 
-        sync_metadata_to_xmp(&image, &local, true, true);
+        sync_metadata_to_xmp(&image, &local, true);
         let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
         let encoded = extract_app_xmp_value(&xmp, "Adjustments").unwrap();
         let portable: Value =
@@ -782,17 +807,12 @@ mod output_naming_tests {
         assert_eq!(portable["fogEnabled"], true);
 
         let mut other_device = ImageMetadata::default();
-        assert!(sync_metadata_from_xmp(
-            &image,
-            &mut other_device,
-            true,
-            true
-        ));
+        assert!(sync_metadata_from_xmp(&image, &mut other_device, true));
         assert!(other_device.adjustments.get("relightNormalMap").is_none());
         assert_eq!(other_device.adjustments["relightLights"], lights);
 
         let mut same_device = local.clone();
-        sync_metadata_from_xmp(&image, &mut same_device, true, true);
+        sync_metadata_from_xmp(&image, &mut same_device, true);
         for key in ["relightNormalMap", "fogDepthMap", "lensBlurDepthMap"] {
             assert_eq!(same_device.adjustments[key], local.adjustments[key]);
         }
@@ -859,8 +879,8 @@ mod output_naming_tests {
         };
 
         // The second write replaces the existing subject bag, where "$0" used to expand.
-        sync_metadata_to_xmp(&image, &metadata, true, false);
-        sync_metadata_to_xmp(&image, &metadata, true, false);
+        sync_metadata_to_xmp(&image, &metadata, true);
+        sync_metadata_to_xmp(&image, &metadata, true);
         let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
         assert!(xmp.contains("<rdf:li>R&amp;D</rdf:li>"));
         assert!(xmp.contains("<rdf:li>&lt;draft&gt;</rdf:li>"));
@@ -869,7 +889,7 @@ mod output_naming_tests {
         assert_eq!(xmp.matches("<lr:hierarchicalSubject").count(), 1);
 
         let mut imported = ImageMetadata::default();
-        sync_metadata_from_xmp(&image, &mut imported, false, true);
+        sync_metadata_from_xmp(&image, &mut imported, true);
         assert_eq!(imported.tags, Some(tags));
     }
 
@@ -884,7 +904,7 @@ mod output_naming_tests {
             ..ImageMetadata::default()
         };
 
-        sync_metadata_to_xmp(&image, &metadata, true, true);
+        sync_metadata_to_xmp(&image, &metadata, true);
         let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
         assert_eq!(
             extract_xmp_bag(&xmp, DC_SUBJECT),
@@ -896,13 +916,13 @@ mod output_naming_tests {
         );
 
         let mut imported = ImageMetadata::default();
-        sync_metadata_from_xmp(&image, &mut imported, true, true);
+        sync_metadata_from_xmp(&image, &mut imported, true);
         let mut imported_tags = imported.tags.unwrap();
         imported_tags.sort();
         assert_eq!(imported_tags, ["sky", "user:places|germany|berlin"]);
 
         // Removing every keyword removes both keyword bags.
-        sync_metadata_to_xmp(&image, &ImageMetadata::default(), true, true);
+        sync_metadata_to_xmp(&image, &ImageMetadata::default(), true);
         let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
         assert!(!xmp.contains("<dc:subject"));
         assert!(!xmp.contains("<lr:hierarchicalSubject"));
@@ -939,19 +959,19 @@ mod output_naming_tests {
         write_jpeg("Places|Lake");
         set_modified(1_000);
         let mut metadata = ImageMetadata::default();
-        assert!(sync_metadata_from_xmp(&image, &mut metadata, true, false));
+        assert!(sync_metadata_from_xmp(&image, &mut metadata, false));
         assert_eq!(metadata.tags.clone().unwrap(), ["user:Places|Lake"]);
         assert_eq!(metadata.embedded_xmp_modified, Some(1_000_000_000_000));
 
         // Removed in ThisIsRAW: the unchanged file does not bring it back.
         metadata.tags = None;
-        assert!(!sync_metadata_from_xmp(&image, &mut metadata, true, false));
+        assert!(!sync_metadata_from_xmp(&image, &mut metadata, false));
         assert_eq!(metadata.tags, None);
 
         // Lightroom rewrites the file: its keywords are imported again.
         write_jpeg("Places|Forest");
         set_modified(2_000);
-        assert!(sync_metadata_from_xmp(&image, &mut metadata, true, false));
+        assert!(sync_metadata_from_xmp(&image, &mut metadata, false));
         assert_eq!(metadata.tags.clone().unwrap(), ["user:Places|Forest"]);
 
         // A sidecar XMP takes precedence over the embedded packet.
@@ -960,13 +980,13 @@ mod output_naming_tests {
             r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:subject><rdf:Bag><rdf:li>sidecar</rdf:li></rdf:Bag></dc:subject></rdf:Description></rdf:RDF></x:xmpmeta>"#,
         )
         .unwrap();
-        sync_metadata_from_xmp(&image, &mut metadata, true, true);
+        sync_metadata_from_xmp(&image, &mut metadata, true);
         assert_eq!(metadata.tags.clone().unwrap(), ["user:sidecar"]);
 
         // ... until Lightroom rewrites the image after that sidecar.
         write_jpeg("Places|Meadow");
         set_modified(4_000_000_000);
-        assert!(sync_metadata_from_xmp(&image, &mut metadata, true, false));
+        assert!(sync_metadata_from_xmp(&image, &mut metadata, false));
         assert_eq!(
             metadata.tags.clone().unwrap(),
             ["user:sidecar", "user:Places|Meadow"]
@@ -1015,18 +1035,18 @@ mod output_naming_tests {
             ]),
             ..ImageMetadata::default()
         };
-        assert!(sync_metadata_from_xmp(&image, &mut metadata, true, false));
+        assert!(sync_metadata_from_xmp(&image, &mut metadata, false));
         assert_eq!(
             metadata.tags.clone().unwrap(),
             ["user:Places|Germany|Berlin", "user:sunset"]
         );
 
-        sync_metadata_to_xmp(&image, &metadata, false, true);
+        sync_metadata_to_xmp(&image, &metadata, false);
         let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
         assert_eq!(xmp.matches("<lr:hierarchicalSubject").count(), 1);
         assert_eq!(xmp.matches("<dc:subject>").count(), 1);
         let mut reread = ImageMetadata::default();
-        sync_metadata_from_xmp(&image, &mut reread, true, true);
+        sync_metadata_from_xmp(&image, &mut reread, true);
         assert_eq!(reread.tags, metadata.tags);
     }
 
@@ -1074,7 +1094,7 @@ mod output_naming_tests {
             }),
             ..ImageMetadata::default()
         };
-        sync_metadata_to_xmp(&image, &source, false, true);
+        sync_metadata_to_xmp(&image, &source, false);
 
         let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
         assert_eq!(
@@ -1087,7 +1107,7 @@ mod output_naming_tests {
         );
 
         let mut imported = ImageMetadata::default();
-        assert!(sync_metadata_from_xmp(&image, &mut imported, true, true));
+        assert!(sync_metadata_from_xmp(&image, &mut imported, true));
         assert_eq!(imported.adjustments["transformAutoMode"], "auto");
         assert_eq!(imported.adjustments["transformRotate"], -1.25);
         assert_eq!(imported.adjustments["transformVertical"], 18.5);
@@ -1124,7 +1144,7 @@ mod output_naming_tests {
             }),
             ..ImageMetadata::default()
         };
-        sync_metadata_to_xmp(&image, &source, false, true);
+        sync_metadata_to_xmp(&image, &source, false);
 
         let xmp = fs::read_to_string(image.with_extension("xmp")).unwrap();
         assert_eq!(
@@ -1137,7 +1157,7 @@ mod output_naming_tests {
         );
 
         let mut imported = ImageMetadata::default();
-        assert!(sync_metadata_from_xmp(&image, &mut imported, true, true));
+        assert!(sync_metadata_from_xmp(&image, &mut imported, true));
         assert_eq!(imported.adjustments, source.adjustments);
     }
 
@@ -1161,10 +1181,10 @@ mod output_naming_tests {
             }),
             ..ImageMetadata::default()
         };
-        sync_metadata_to_xmp(&image, &source, false, true);
+        sync_metadata_to_xmp(&image, &source, false);
 
         let mut imported = ImageMetadata::default();
-        assert!(sync_metadata_from_xmp(&image, &mut imported, true, true));
+        assert!(sync_metadata_from_xmp(&image, &mut imported, true));
         assert_eq!(imported.adjustments["masks"], source.adjustments["masks"]);
     }
 
@@ -1214,10 +1234,10 @@ mod output_naming_tests {
             }),
             ..ImageMetadata::default()
         };
-        sync_metadata_to_xmp(&image, &source, true, true);
+        sync_metadata_to_xmp(&image, &source, true);
 
         let mut imported = ImageMetadata::default();
-        assert!(sync_metadata_from_xmp(&image, &mut imported, true, true));
+        assert!(sync_metadata_from_xmp(&image, &mut imported, true));
         assert_eq!(imported.adjustments["masks"], source.adjustments["masks"]);
     }
 
@@ -1468,6 +1488,26 @@ mod output_naming_tests {
             true,
             None
         ));
+    }
+
+    #[test]
+    fn generated_outputs_skip_existing_files_and_stale_sidecars() {
+        let folder = tempfile::tempdir().unwrap();
+        let dir = folder.path();
+        assert_eq!(
+            super::unique_output_path(dir, "IMG_1_Hdr", "tiff"),
+            dir.join("IMG_1_Hdr.tiff")
+        );
+
+        fs::write(dir.join("IMG_1_Hdr.tiff"), []).unwrap();
+        // A deleted earlier result whose edits were left behind.
+        fs::write(dir.join("IMG_1_Hdr_1.tiff.tirdata"), "{}").unwrap();
+        fs::write(dir.join("IMG_1_Hdr_2.tiff.0a1b2c.tirdata"), "{}").unwrap();
+        fs::write(dir.join("IMG_1_Hdr_3.xmp"), "").unwrap();
+        assert_eq!(
+            super::unique_output_path(dir, "IMG_1_Hdr", "tiff"),
+            dir.join("IMG_1_Hdr_4.tiff")
+        );
     }
 
     #[test]
@@ -1742,8 +1782,7 @@ fn list_image_entries(
             resolve_image_metadata(
                 &path_buf,
                 &sidecar_path,
-                enable_xmp_sync,
-                !is_virtual_copy,
+                enable_xmp_sync && !is_virtual_copy,
                 settings,
             )
         };
@@ -2014,7 +2053,7 @@ pub fn save_albums(mut tree: Vec<AlbumItem>, app_handle: AppHandle) -> Result<()
     let path = get_albums_path(&app_handle)?;
     sort_album_tree(&mut tree);
     let json_string = serde_json::to_string_pretty(&tree).map_err(|e| e.to_string())?;
-    fs::write(path, json_string).map_err(|e| e.to_string())
+    write_file_atomically(&path, json_string.as_bytes())
 }
 
 #[tauri::command]
@@ -2192,8 +2231,7 @@ pub fn get_album_images(
                 resolve_image_metadata(
                     &source_path,
                     &sidecar_path,
-                    enable_xmp_sync,
-                    !is_virtual_copy,
+                    enable_xmp_sync && !is_virtual_copy,
                     &settings,
                 )
             };
@@ -4130,14 +4168,10 @@ pub fn save_metadata_and_update_thumbnail(
 
     if let Ok(settings) = load_settings(app_handle.clone())
         && settings.enable_xmp_sync.unwrap_or(false)
+        && !path.contains("?vc=")
     {
         let create_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
-        sync_metadata_to_xmp(
-            &source_path,
-            &metadata,
-            create_if_missing,
-            !path.contains("?vc="),
-        );
+        sync_metadata_to_xmp(&source_path, &metadata, create_if_missing);
     }
 
     let loaded_image_lock = state.original_image.lock().unwrap();
@@ -4319,13 +4353,8 @@ pub async fn apply_adjustments_to_paths(
                     let _ = std::fs::write(&sidecar_path, json_string);
                 }
 
-                if enable_xmp_sync {
-                    sync_metadata_to_xmp(
-                        &source_path,
-                        &existing_metadata,
-                        create_xmp_if_missing,
-                        !path.contains("?vc="),
-                    );
+                if enable_xmp_sync && !path.contains("?vc=") {
+                    sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
                 }
 
                 (
@@ -4531,12 +4560,11 @@ fn apply_preset_adjustments_to_path(
     fs::write(&sidecar_path, json_string)
         .map_err(|error| format!("Failed to write {}: {error}", sidecar_path.display()))?;
 
-    if settings.enable_xmp_sync.unwrap_or(false) {
+    if settings.enable_xmp_sync.unwrap_or(false) && !path.contains("?vc=") {
         sync_metadata_to_xmp(
             &source_path,
             &existing_metadata,
             settings.create_xmp_if_missing.unwrap_or(false),
-            !path.contains("?vc="),
         );
     }
     Ok(())
@@ -4723,14 +4751,9 @@ pub async fn reset_adjustments_for_paths(
                 let _ = std::fs::write(&sidecar_path, json_string);
             }
 
-            if enable_xmp_sync {
+            if enable_xmp_sync && !path.contains("?vc=") {
                 let source_path = parse_virtual_path(path).0;
-                sync_metadata_to_xmp(
-                    &source_path,
-                    &existing_metadata,
-                    create_xmp_if_missing,
-                    !path.contains("?vc="),
-                );
+                sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
             }
         });
 
@@ -4854,13 +4877,8 @@ pub async fn apply_auto_adjustments_to_paths(
                     let _ = std::fs::write(&sidecar_path, json_string);
                 }
 
-                if enable_xmp_sync {
-                    sync_metadata_to_xmp(
-                        &source_path,
-                        &existing_metadata,
-                        create_xmp_if_missing,
-                        !path.contains("?vc="),
-                    );
+                if enable_xmp_sync && !path.contains("?vc=") {
+                    sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
                 }
                 Ok(image)
             })()
@@ -4922,14 +4940,9 @@ pub fn set_color_label_for_paths(
             let _ = std::fs::write(&sidecar_path, json_string);
         }
 
-        if enable_xmp_sync {
+        if enable_xmp_sync && !path.contains("?vc=") {
             let source_path = parse_virtual_path(path).0;
-            sync_metadata_to_xmp(
-                &source_path,
-                &metadata,
-                create_xmp_if_missing,
-                !path.contains("?vc="),
-            );
+            sync_metadata_to_xmp(&source_path, &metadata, create_xmp_if_missing);
         }
     });
 
@@ -4957,14 +4970,9 @@ pub fn set_rating_for_paths(
             let _ = std::fs::write(&sidecar_path, json_string);
         }
 
-        if enable_xmp_sync {
+        if enable_xmp_sync && !path.contains("?vc=") {
             let source_path = parse_virtual_path(path).0;
-            sync_metadata_to_xmp(
-                &source_path,
-                &metadata,
-                create_xmp_if_missing,
-                !path.contains("?vc="),
-            );
+            sync_metadata_to_xmp(&source_path, &metadata, create_xmp_if_missing);
         }
     });
 
@@ -4980,7 +4988,8 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
     let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
     if enable_xmp_sync
-        && sync_metadata_from_xmp(&source_path, &mut metadata, !path.contains("?vc="), false)
+        && !path.contains("?vc=")
+        && sync_metadata_from_xmp(&source_path, &mut metadata, false)
         && let Ok(json) = serde_json::to_string_pretty(&metadata)
     {
         let _ = fs::write(&sidecar_path, json);
@@ -5025,7 +5034,7 @@ pub fn load_presets(app_handle: AppHandle) -> Result<Vec<PresetItem>, String> {
 pub fn save_presets(presets: Vec<PresetItem>, app_handle: AppHandle) -> Result<(), String> {
     let path = get_presets_path(&app_handle)?;
     let json_string = serde_json::to_string_pretty(&presets).map_err(|e| e.to_string())?;
-    fs::write(path, json_string).map_err(|e| e.to_string())
+    write_file_atomically(&path, json_string.as_bytes())
 }
 
 fn get_internal_library_root_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -6182,7 +6191,7 @@ fn write_image_stacks_to_xmp(
             .map_err(|error| format!("Failed to serialize stack metadata for {path}: {error}"))?;
         fs::write(&sidecar_path, json)
             .map_err(|error| format!("Failed to save stack metadata for {path}: {error}"))?;
-        sync_metadata_to_xmp(&source_path, &metadata, create_xmp_if_missing, true);
+        sync_metadata_to_xmp(&source_path, &metadata, create_xmp_if_missing);
         Ok(())
     })
 }
@@ -6428,7 +6437,7 @@ pub fn read_xmp_from_folder(path: String) -> Result<usize, String> {
             let Some(content) = read_image_xmp(image_path, &mut metadata, true) else {
                 return Ok(imported);
             };
-            apply_xmp(&content, &mut metadata, true, true);
+            apply_xmp(&content, &mut metadata, true);
             let json = serde_json::to_string_pretty(&metadata).map_err(|error| {
                 format!(
                     "Could not serialize XMP metadata for {}: {error}",
@@ -6448,15 +6457,17 @@ pub fn read_xmp_from_folder(path: String) -> Result<usize, String> {
     imported.try_reduce(|| 0, |left, right| Ok(left + right))
 }
 
+/// Imports an image's XMP into its metadata. The XMP belongs to the physical
+/// image, so virtual copies never read it (as in Lightroom Classic); callers
+/// skip paths containing `?vc=`.
 pub fn sync_metadata_from_xmp(
     source_path: &Path,
     metadata: &mut ImageMetadata,
-    include_app_fields: bool,
     force: bool,
 ) -> bool {
     let previous_stamp = metadata.embedded_xmp_modified;
     let changed = read_image_xmp(source_path, metadata, force)
-        .is_some_and(|content| apply_xmp(&content, metadata, include_app_fields, force));
+        .is_some_and(|content| apply_xmp(&content, metadata, force));
     changed || metadata.embedded_xmp_modified != previous_stamp
 }
 
@@ -6492,12 +6503,7 @@ fn read_image_xmp(source_path: &Path, metadata: &mut ImageMetadata, force: bool)
     }
 }
 
-fn apply_xmp(
-    content: &str,
-    metadata: &mut ImageMetadata,
-    include_app_fields: bool,
-    force: bool,
-) -> bool {
+fn apply_xmp(content: &str, metadata: &mut ImageMetadata, force: bool) -> bool {
     let mut changed = false;
 
     let xmp_rating = extract_xmp_rating(content).unwrap_or(0);
@@ -6514,9 +6520,7 @@ fn apply_xmp(
 
     let xmp_label = extract_xmp_label(content);
     let (xmp_tags, xmp_subject) = extract_xmp_keyword_tags(content);
-    let xmp_flag = include_app_fields
-        .then(|| extract_app_xmp_value(content, "Flag"))
-        .flatten();
+    let xmp_flag = extract_app_xmp_value(content, "Flag");
 
     let mut current_tags = if force {
         Vec::new()
@@ -6556,73 +6560,70 @@ fn apply_xmp(
         changed = true;
     }
 
-    if include_app_fields {
-        if let Some(encoded_adjustments) = extract_app_xmp_value(content, "Adjustments")
-            && let Ok(bytes) = general_purpose::STANDARD.decode(encoded_adjustments)
-            && let Ok(mut imported_adjustments) = serde_json::from_slice::<Value>(&bytes)
-            && imported_adjustments.is_object()
-            && (force || metadata.adjustments.is_null())
-        {
-            restore_local_only_adjustments(&mut imported_adjustments, &metadata.adjustments);
-            if metadata.adjustments != imported_adjustments {
-                metadata.adjustments = imported_adjustments;
-                changed = true;
-            }
-        }
-
-        let xmp_stack = extract_xmp_stack(content);
-        if metadata.xmp_stack != xmp_stack {
-            metadata.xmp_stack = xmp_stack;
+    if let Some(encoded_adjustments) = extract_app_xmp_value(content, "Adjustments")
+        && let Ok(bytes) = general_purpose::STANDARD.decode(encoded_adjustments)
+        && let Ok(mut imported_adjustments) = serde_json::from_slice::<Value>(&bytes)
+        && imported_adjustments.is_object()
+        && (force || metadata.adjustments.is_null())
+    {
+        restore_local_only_adjustments(&mut imported_adjustments, &metadata.adjustments);
+        if metadata.adjustments != imported_adjustments {
+            metadata.adjustments = imported_adjustments;
             changed = true;
         }
+    }
 
-        let should_import_auto_geometry = force
-            || metadata
-                .adjustments
-                .get("transformAutoMode")
-                .and_then(Value::as_str)
-                .is_none();
-        let mut imported_auto_geometry = false;
-        let xmp_auto_mode = extract_app_xmp_value(content, "AutoGeometryMode")
-            .filter(|mode| matches!(mode.as_str(), "auto" | "level" | "vertical" | "guided"));
-        if let Some(mode) = xmp_auto_mode
-            && should_import_auto_geometry
-        {
-            imported_auto_geometry = true;
-            changed |= set_adjustment_value(metadata, "transformAutoMode", serde_json::json!(mode));
-            let rotate = extract_app_xmp_value(content, "TransformRotate")
-                .and_then(|value| value.parse::<f64>().ok())
-                .unwrap_or(0.0);
-            let vertical = extract_app_xmp_value(content, "TransformVertical")
-                .and_then(|value| value.parse::<f64>().ok())
-                .unwrap_or(0.0);
-            let horizontal = extract_app_xmp_value(content, "TransformHorizontal")
-                .and_then(|value| value.parse::<f64>().ok())
-                .unwrap_or(0.0);
-            changed |= set_adjustment_value(metadata, "transformRotate", serde_json::json!(rotate));
-            changed |=
-                set_adjustment_value(metadata, "transformVertical", serde_json::json!(vertical));
-            changed |= set_adjustment_value(
-                metadata,
-                "transformHorizontal",
-                serde_json::json!(horizontal),
-            );
-        } else if force {
-            changed |= set_adjustment_value(metadata, "transformAutoMode", serde_json::Value::Null);
-        }
+    let xmp_stack = extract_xmp_stack(content);
+    if metadata.xmp_stack != xmp_stack {
+        metadata.xmp_stack = xmp_stack;
+        changed = true;
+    }
 
-        if let Some(constrain_crop) = extract_app_xmp_value(content, "ConstrainCrop")
-            .and_then(|value| value.parse::<bool>().ok())
-            && (force
-                || imported_auto_geometry
-                || metadata.adjustments.get("transformConstrainCrop").is_none())
-        {
-            changed |= set_adjustment_value(
-                metadata,
-                "transformConstrainCrop",
-                serde_json::json!(constrain_crop),
-            );
-        }
+    let should_import_auto_geometry = force
+        || metadata
+            .adjustments
+            .get("transformAutoMode")
+            .and_then(Value::as_str)
+            .is_none();
+    let mut imported_auto_geometry = false;
+    let xmp_auto_mode = extract_app_xmp_value(content, "AutoGeometryMode")
+        .filter(|mode| matches!(mode.as_str(), "auto" | "level" | "vertical" | "guided"));
+    if let Some(mode) = xmp_auto_mode
+        && should_import_auto_geometry
+    {
+        imported_auto_geometry = true;
+        changed |= set_adjustment_value(metadata, "transformAutoMode", serde_json::json!(mode));
+        let rotate = extract_app_xmp_value(content, "TransformRotate")
+            .and_then(|value| value.parse::<f64>().ok())
+            .unwrap_or(0.0);
+        let vertical = extract_app_xmp_value(content, "TransformVertical")
+            .and_then(|value| value.parse::<f64>().ok())
+            .unwrap_or(0.0);
+        let horizontal = extract_app_xmp_value(content, "TransformHorizontal")
+            .and_then(|value| value.parse::<f64>().ok())
+            .unwrap_or(0.0);
+        changed |= set_adjustment_value(metadata, "transformRotate", serde_json::json!(rotate));
+        changed |= set_adjustment_value(metadata, "transformVertical", serde_json::json!(vertical));
+        changed |= set_adjustment_value(
+            metadata,
+            "transformHorizontal",
+            serde_json::json!(horizontal),
+        );
+    } else if force {
+        changed |= set_adjustment_value(metadata, "transformAutoMode", serde_json::Value::Null);
+    }
+
+    if let Some(constrain_crop) =
+        extract_app_xmp_value(content, "ConstrainCrop").and_then(|value| value.parse::<bool>().ok())
+        && (force
+            || imported_auto_geometry
+            || metadata.adjustments.get("transformConstrainCrop").is_none())
+    {
+        changed |= set_adjustment_value(
+            metadata,
+            "transformConstrainCrop",
+            serde_json::json!(constrain_crop),
+        );
     }
 
     changed
@@ -6683,12 +6684,10 @@ pub(crate) fn copy_file_atomically(source: &Path, destination: &Path) -> Result<
     })
 }
 
-pub fn sync_metadata_to_xmp(
-    source_path: &Path,
-    metadata: &ImageMetadata,
-    create_if_missing: bool,
-    include_app_fields: bool,
-) {
+/// Writes an image's metadata to its XMP. The XMP belongs to the physical
+/// image, so a virtual copy must never overwrite it; callers skip paths
+/// containing `?vc=`.
+pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create_if_missing: bool) {
     let xmp_path = source_path.with_extension("xmp");
     let xmp_path_upper = source_path.with_extension("XMP");
 
@@ -6787,82 +6786,79 @@ pub fn sync_metadata_to_xmp(
             content = re_label_tag.replace_all(&content, "").to_string();
         }
 
-        if include_app_fields {
-            let adjustments_json =
-                serde_json::to_vec(&portable_xmp_adjustments(&metadata.adjustments))
-                    .unwrap_or_default();
-            let encoded_adjustments = general_purpose::STANDARD.encode(adjustments_json);
-            set_app_xmp_value(&mut content, "AdjustmentsVersion", Some("1"));
-            set_app_xmp_value(&mut content, "Adjustments", Some(&encoded_adjustments));
+        let adjustments_json = serde_json::to_vec(&portable_xmp_adjustments(&metadata.adjustments))
+            .unwrap_or_default();
+        let encoded_adjustments = general_purpose::STANDARD.encode(adjustments_json);
+        set_app_xmp_value(&mut content, "AdjustmentsVersion", Some("1"));
+        set_app_xmp_value(&mut content, "Adjustments", Some(&encoded_adjustments));
 
+        set_app_xmp_value(
+            &mut content,
+            "Flag",
+            Some(flag.as_deref().unwrap_or("unflagged")),
+        );
+
+        if let Some(stack) = &metadata.xmp_stack {
+            set_app_xmp_value(&mut content, "StackId", Some(&stack.id));
+            set_app_xmp_value(&mut content, "StackOrder", Some(&stack.order.to_string()));
             set_app_xmp_value(
                 &mut content,
-                "Flag",
-                Some(flag.as_deref().unwrap_or("unflagged")),
+                "StackCover",
+                Some(if stack.is_cover { "true" } else { "false" }),
             );
-
-            if let Some(stack) = &metadata.xmp_stack {
-                set_app_xmp_value(&mut content, "StackId", Some(&stack.id));
-                set_app_xmp_value(&mut content, "StackOrder", Some(&stack.order.to_string()));
-                set_app_xmp_value(
-                    &mut content,
-                    "StackCover",
-                    Some(if stack.is_cover { "true" } else { "false" }),
-                );
-                set_app_xmp_value(
-                    &mut content,
-                    "StackCollapsed",
-                    Some(if stack.collapsed { "true" } else { "false" }),
-                );
-            } else {
-                set_app_xmp_value(&mut content, "StackId", None);
-                set_app_xmp_value(&mut content, "StackOrder", None);
-                set_app_xmp_value(&mut content, "StackCover", None);
-                set_app_xmp_value(&mut content, "StackCollapsed", None);
-            }
-
-            let auto_mode = metadata
-                .adjustments
-                .get("transformAutoMode")
-                .and_then(Value::as_str)
-                .filter(|mode| matches!(*mode, "auto" | "level" | "vertical" | "guided"));
-            set_app_xmp_value(&mut content, "AutoGeometryMode", auto_mode);
-            if auto_mode.is_some() {
-                let rotate = metadata
-                    .adjustments
-                    .get("transformRotate")
-                    .and_then(Value::as_f64)
-                    .unwrap_or(0.0)
-                    .to_string();
-                let vertical = metadata
-                    .adjustments
-                    .get("transformVertical")
-                    .and_then(Value::as_f64)
-                    .unwrap_or(0.0)
-                    .to_string();
-                let horizontal = metadata
-                    .adjustments
-                    .get("transformHorizontal")
-                    .and_then(Value::as_f64)
-                    .unwrap_or(0.0)
-                    .to_string();
-                set_app_xmp_value(&mut content, "TransformRotate", Some(&rotate));
-                set_app_xmp_value(&mut content, "TransformVertical", Some(&vertical));
-                set_app_xmp_value(&mut content, "TransformHorizontal", Some(&horizontal));
-            } else {
-                set_app_xmp_value(&mut content, "TransformRotate", None);
-                set_app_xmp_value(&mut content, "TransformVertical", None);
-                set_app_xmp_value(&mut content, "TransformHorizontal", None);
-            }
-
-            let constrain_crop = metadata
-                .adjustments
-                .get("transformConstrainCrop")
-                .and_then(Value::as_bool)
-                .unwrap_or(false)
-                .to_string();
-            set_app_xmp_value(&mut content, "ConstrainCrop", Some(&constrain_crop));
+            set_app_xmp_value(
+                &mut content,
+                "StackCollapsed",
+                Some(if stack.collapsed { "true" } else { "false" }),
+            );
+        } else {
+            set_app_xmp_value(&mut content, "StackId", None);
+            set_app_xmp_value(&mut content, "StackOrder", None);
+            set_app_xmp_value(&mut content, "StackCover", None);
+            set_app_xmp_value(&mut content, "StackCollapsed", None);
         }
+
+        let auto_mode = metadata
+            .adjustments
+            .get("transformAutoMode")
+            .and_then(Value::as_str)
+            .filter(|mode| matches!(*mode, "auto" | "level" | "vertical" | "guided"));
+        set_app_xmp_value(&mut content, "AutoGeometryMode", auto_mode);
+        if auto_mode.is_some() {
+            let rotate = metadata
+                .adjustments
+                .get("transformRotate")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0)
+                .to_string();
+            let vertical = metadata
+                .adjustments
+                .get("transformVertical")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0)
+                .to_string();
+            let horizontal = metadata
+                .adjustments
+                .get("transformHorizontal")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0)
+                .to_string();
+            set_app_xmp_value(&mut content, "TransformRotate", Some(&rotate));
+            set_app_xmp_value(&mut content, "TransformVertical", Some(&vertical));
+            set_app_xmp_value(&mut content, "TransformHorizontal", Some(&horizontal));
+        } else {
+            set_app_xmp_value(&mut content, "TransformRotate", None);
+            set_app_xmp_value(&mut content, "TransformVertical", None);
+            set_app_xmp_value(&mut content, "TransformHorizontal", None);
+        }
+
+        let constrain_crop = metadata
+            .adjustments
+            .get("transformConstrainCrop")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+            .to_string();
+        set_app_xmp_value(&mut content, "ConstrainCrop", Some(&constrain_crop));
 
         let keywords = XmpKeywords::from_tags(&normal_tags);
         set_xmp_bag(&mut content, DC_SUBJECT, None, &keywords.subject);
@@ -6872,10 +6868,8 @@ pub fn sync_metadata_to_xmp(
             Some(LIGHTROOM_XMP_NAMESPACE),
             &keywords.hierarchical,
         );
-        if include_app_fields {
-            let ai_keywords = serde_json::to_string(&keywords.ai).unwrap_or_default();
-            set_app_xmp_value(&mut content, "AiKeywords", Some(&ai_keywords));
-        }
+        let ai_keywords = serde_json::to_string(&keywords.ai).unwrap_or_default();
+        set_app_xmp_value(&mut content, "AiKeywords", Some(&ai_keywords));
 
         let _ = fs::write(&xmp_file, content);
     }

@@ -5,3 +5,7 @@ export const KEYWORD_VIEW_PREFIX = 'Keyword: ';
 /** True for album and keyword views, which have no folder to import or paste into. */
 export const isCollectionView = (folderPath: string | null | undefined) =>
   !!folderPath && (folderPath.startsWith(ALBUM_VIEW_PREFIX) || folderPath.startsWith(KEYWORD_VIEW_PREFIX));
+
+/** Whether `path` is `folder` or lies inside it (image paths may carry a `?vc=` suffix). */
+export const isPathWithin = (path: string, folder: string) =>
+  path === folder || (path.startsWith(folder) && (/[\\/]$/.test(folder) || ['/', '\\'].includes(path[folder.length])));

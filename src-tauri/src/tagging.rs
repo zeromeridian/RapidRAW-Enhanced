@@ -783,7 +783,6 @@ fn modify_tags_for_paths(
                     &source_path,
                     &metadata,
                     create_xmp_if_missing,
-                    true,
                 );
             }
             Ok((path.clone(), metadata.tags))

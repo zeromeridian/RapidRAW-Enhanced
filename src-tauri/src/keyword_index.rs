@@ -109,8 +109,8 @@ fn read_entry(
     stamp: String,
 ) -> KeywordIndexEntry {
     let mut metadata = crate::exif_processing::load_sidecar(sidecar_path);
-    if enable_xmp_sync {
-        sync_metadata_from_xmp(source_path, &mut metadata, !is_virtual_copy, false);
+    if enable_xmp_sync && !is_virtual_copy {
+        sync_metadata_from_xmp(source_path, &mut metadata, false);
     }
 
     let image_path = match metadata

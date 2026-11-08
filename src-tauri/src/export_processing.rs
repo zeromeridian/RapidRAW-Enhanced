@@ -1257,14 +1257,17 @@ fn encode_image_to_bytes(
             let has_alpha = image.color().has_alpha();
 
             let jxl_data = if jpeg_quality == 100 {
+                // Tree learning peaks near 300 B/px (about 10 GB for 36 MP) and is
+                // about 15x slower; without it, files are about 50% larger.
+                let config = LosslessConfig::new().with_tree_learning(false);
                 if has_alpha {
                     let rgba = image.to_rgba8();
-                    LosslessConfig::new()
+                    config
                         .encode(rgba.as_raw(), width, height, PixelLayout::Rgba8)
                         .map_err(|e| format!("Failed to encode lossless JXL: {}", e))?
                 } else {
                     let rgb = image.to_rgb8();
-                    LosslessConfig::new()
+                    config
                         .encode(rgb.as_raw(), width, height, PixelLayout::Rgb8)
                         .map_err(|e| format!("Failed to encode lossless JXL: {}", e))?
                 }
@@ -1735,7 +1738,7 @@ pub(crate) async fn export_images_impl(
 
                 let is_current_edit = match &adjustments_mode {
                     ExportAdjustmentsMode::UseSidecars { active_path, .. } => {
-                        Some(&source_path_str) == active_path.as_ref()
+                        Some(&image_path_str) == active_path.as_ref()
                     }
                     ExportAdjustmentsMode::GlobalOverride(_) => false,
                 };
@@ -2235,7 +2238,7 @@ pub async fn estimate_export_sizes(
     let source_path_str = source_path.to_string_lossy().to_string();
 
     let context = get_or_init_gpu_context(&state, &app_handle)?;
-    let is_current_edit = Some(&source_path_str) == current_edit_path.as_ref();
+    let is_current_edit = Some(first_path) == current_edit_path.as_ref();
     let is_raw = is_raw_file(&source_path_str);
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
 

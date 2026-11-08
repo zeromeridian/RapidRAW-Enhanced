@@ -7,6 +7,7 @@ import { HueSatLum } from '../../utils/adjustments';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import Text from './Text';
+import { useCtrlClickMenuGuard } from '../../hooks/useCtrlClickMenuGuard';
 import { TextColors, TextVariants } from '../../types/typography';
 
 interface ColorWheelProps {
@@ -36,6 +37,8 @@ const ColorWheel = ({
   const [isSliderDragging, setIsSliderDragging] = useState(false);
   const [isLabelHovered, setIsLabelHovered] = useState(false);
   const modifierState = useRef({ ctrl: false, shift: false });
+  // Ctrl-drag fine-adjusts the wheel; on macOS it would also open the context menu.
+  const ctrlClickMenuGuard = useCtrlClickMenuGuard();
   const instanceId = useId().replace(/:/g, '');
 
   const isDragging = isWheelDragging || isSliderDragging;
@@ -223,6 +226,7 @@ const ColorWheel = ({
           <div
             className="absolute inset-0 cursor-pointer"
             onDoubleClick={handleReset}
+            {...ctrlClickMenuGuard}
             onMouseDownCapture={handleDragStart}
             onTouchStartCapture={handleDragStart}
           >

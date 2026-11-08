@@ -5,6 +5,53 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.30.14-dev-rr-gap — 2026-11-07
+
+### Library
+
+- Virtual copies no longer change the original photo's XMP. Their rating,
+  color label, and keywords stay with the copy, and opening a copy no longer
+  takes over the original's XMP values, as in Lightroom Classic.
+- On macOS, Ctrl+click on a thumbnail in the grid, list, or filmstrip now
+  adds it to or removes it from the selection, like Cmd+click, instead of
+  opening the context menu. Right-click still opens the menu.
+- Renaming or deleting a subfolder while viewing its parent in Recursive mode
+  no longer leaves the old photos in the grid.
+- Culling with "Group similar" turned on now also reports blurry photos, and
+  culling works for virtual copies.
+
+### Develop
+
+- Undo right after an edit no longer skips that edit, and the first edit can
+  be undone at once.
+- Deleting a mask or AI patch with the Delete key can now be undone.
+- Opening Crop after switching photos or pasting settings no longer moves or
+  shrinks the saved crop.
+- Pressing Enter in a slider's number field no longer opens or switches the
+  photo. Keyboard shortcuts work again after clicking a checkbox.
+- Ctrl-dragging a color wheel on macOS no longer opens the context menu.
+
+### Merge and export
+
+- HDR merge now works with virtual copies.
+- A new HDR, panorama, or collage no longer overwrites an earlier one from
+  the same photos or inherits its old edits; it gets a numbered name.
+- Exporting a virtual copy together with its original now uses each photo's
+  own edits.
+- Photos too large for the graphics card now report an error instead of
+  exporting without edits.
+- Lossless JPEG XL export needs far less memory and time; the files are
+  somewhat larger.
+- The export panel stays visible while a padding or border value is
+  invalid, so it can be corrected, and Enter confirms these number fields.
+- LUT files whose names contain ".." can be loaded.
+
+### General
+
+- Settings, presets, and albums are saved safely: an interrupted save can no
+  longer leave them empty or truncated.
+- Opening a photo from the command line with a relative path now works.
+
 ## 1.30.13-dev-rr-gap — 2026-11-07
 
 ### Library

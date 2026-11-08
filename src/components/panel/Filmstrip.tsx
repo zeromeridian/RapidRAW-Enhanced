@@ -14,6 +14,7 @@ import { GroupBadgeInfo } from '../../utils/imageGrouping';
 import { StackVisualCue } from './library/LibraryItems';
 import { getImageFlag, ImageFlag } from '../../utils/imageFlags';
 import ImageFlagBadge from '../ui/ImageFlagBadge';
+import { useCtrlClickMenuGuard } from '../../hooks/useCtrlClickMenuGuard';
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;
@@ -105,6 +106,7 @@ const FilmstripThumbnail = memo(
 
     const truncatedTitle =
       filename.length > 40 ? filename.substring(0, 20) + '...' + filename.substring(filename.length - 17) : filename;
+    const ctrlClickMenuGuard = useCtrlClickMenuGuard((e) => onImageSelect?.(path, e));
 
     useEffect(() => {
       if (thumbnailAspectRatio === ThumbnailAspectRatio.Contain && thumbData) {
@@ -176,6 +178,7 @@ const FilmstripThumbnail = memo(
           'h-full w-full rounded-md overflow-hidden cursor-pointer shrink-0 group relative transition-all duration-150 bg-surface',
           ringClass,
         )}
+        {...ctrlClickMenuGuard}
         onClick={(e: any) => {
           e.stopPropagation();
           onImageSelect?.(path, e);

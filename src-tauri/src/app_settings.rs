@@ -911,7 +911,7 @@ pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
     settings_modified |= migrate_keyword_sets(&mut settings);
 
     if settings_modified && let Ok(json_string) = serde_json::to_string_pretty(&settings) {
-        let _ = fs::write(&path, json_string);
+        let _ = crate::file_management::write_file_atomically(&path, json_string.as_bytes());
     }
 
     Ok(settings)
@@ -924,7 +924,7 @@ pub fn save_settings(settings: AppSettings, app_handle: AppHandle) -> Result<(),
         .ok();
     let path = get_settings_path(&app_handle)?;
     let json_string = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
-    fs::write(path, json_string).map_err(|e| e.to_string())?;
+    crate::file_management::write_file_atomically(&path, json_string.as_bytes())?;
 
     let state = app_handle.state::<AppState>();
     let cache_size = settings.image_cache_size.unwrap_or(5) as usize;
