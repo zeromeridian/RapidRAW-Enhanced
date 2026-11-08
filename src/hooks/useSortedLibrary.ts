@@ -3,7 +3,7 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { SortDirection, ImageFile, GroupingMode } from '../components/ui/AppProperties';
 import { buildImageGroups, GroupBadgeInfo, GroupId } from '../utils/imageGrouping';
-import { applyImageStacks } from '../utils/imageStacks';
+import { applyImageStacks, getCaptureTime } from '../utils/imageStacks';
 import { getImageFlag } from '../utils/imageFlags';
 import { matchesLibraryFilter } from '../utils/libraryFilters';
 import { hasKeywordOrChild } from '../utils/keywords';
@@ -182,9 +182,11 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
 
     switch (key) {
       case 'date_taken': {
-        const dateA = a.exif?.DateTimeOriginal || '';
-        const dateB = b.exif?.DateTimeOriginal || '';
-        if (dateA !== dateB) comparison = dateA < dateB ? -1 : 1;
+        // Compare parsed times: RAW dates are normalized to `YYYY-MM-DD`, other formats keep
+        // EXIF's `YYYY:MM:DD`, so comparing the strings would split RAW+JPEG pairs.
+        const timeA = getCaptureTime(a) ?? -Infinity;
+        const timeB = getCaptureTime(b) ?? -Infinity;
+        if (timeA !== timeB) comparison = timeA < timeB ? -1 : 1;
         else comparison = a.modified - b.modified;
         break;
       }
