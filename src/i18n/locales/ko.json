@@ -825,6 +825,10 @@
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
       }
+    },
+    "speedEdit": {
+      "copied": "<0>{{label}}</0> <1>{{value}}</1> 복사됨",
+      "pasted": "<0>{{label}}</0> <1>{{value}}</1> 붙여넣음"
     }
   },
   "export": {
@@ -1581,6 +1585,27 @@
       "pressKey": "키를 누르세요... (Esc로 지우기)",
       "resetDefaults": "모두 기본값으로 초기화",
       "speed": "속도",
+      "speedEdit": {
+        "adjustments": "조정 항목",
+        "gestures": {
+          "doubleClick": "더블클릭하여 초기화",
+          "drag": "캔버스에서 드래그하여 조정",
+          "fine": "Shift로 미세 조정"
+        },
+        "keys": {
+          "hold": "탭 / 길게 누르기",
+          "previousImage": "이전 이미지",
+          "nextImage": "다음 이미지",
+          "reset": "초기화",
+          "previousAdjustment": "이전 슬라이더",
+          "nextAdjustment": "다음 슬라이더",
+          "copy": "복사",
+          "paste": "붙여넣기",
+          "stepDown": "−1 단계",
+          "stepUp": "+1 단계"
+        },
+        "title": "빠른 편집"
+      },
       "title": "마우스 컨트롤",
       "zoom": "확대/축소 속도 배율",
       "zoomDesc": "스크롤 휠이나 핀치 제스처를 사용할 때 캔버스가 확대/축소되는 속도를 조정합니다.",

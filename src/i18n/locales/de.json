@@ -827,6 +827,10 @@
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
       }
+    },
+    "speedEdit": {
+      "copied": "<0>{{label}}</0> <1>{{value}}</1> kopiert",
+      "pasted": "<0>{{label}}</0> <1>{{value}}</1> eingefügt"
     }
   },
   "export": {
@@ -1583,6 +1587,27 @@
       "pressKey": "Taste drücken... (Esc zum Löschen)",
       "resetDefaults": "Alles auf Standard zurücksetzen",
       "speed": "Geschwindigkeit",
+      "speedEdit": {
+        "adjustments": "Anpassungen",
+        "gestures": {
+          "doubleClick": "Doppelklick zum Zurücksetzen",
+          "drag": "Auf der Leinwand ziehen zum Anpassen",
+          "fine": "Umschalt für fein"
+        },
+        "keys": {
+          "hold": "Tippen / Halten",
+          "previousImage": "Vorh. Bild",
+          "nextImage": "Nächstes Bild",
+          "reset": "Zurücksetzen",
+          "previousAdjustment": "Vorh. Regler",
+          "nextAdjustment": "Nächster Regler",
+          "copy": "Kopieren",
+          "paste": "Einfügen",
+          "stepDown": "−1 Schritt",
+          "stepUp": "+1 Schritt"
+        },
+        "title": "Schnellbearbeitung"
+      },
       "title": "Maussteuerung",
       "zoom": "Zoom-Geschwindigkeitsfaktor",
       "zoomDesc": "Passen Sie an, wie schnell das Bild beim Scrollen oder Kneifen zoomt.",

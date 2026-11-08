@@ -875,6 +875,10 @@
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
       }
+    },
+    "speedEdit": {
+      "copied": "Скопировано: <0>{{label}}</0> <1>{{value}}</1>",
+      "pasted": "Вставлено: <0>{{label}}</0> <1>{{value}}</1>"
     }
   },
   "export": {
@@ -1669,6 +1673,27 @@
       "pressKey": "Нажмите клавишу... (Esc для очистки)",
       "resetDefaults": "Сбросить настройки управления",
       "speed": "Скорость",
+      "speedEdit": {
+        "adjustments": "Параметры",
+        "gestures": {
+          "doubleClick": "Двойной щелчок — сброс",
+          "drag": "Тяните по холсту для настройки",
+          "fine": "Shift — точно"
+        },
+        "keys": {
+          "hold": "Нажать / Держать",
+          "previousImage": "Пред. снимок",
+          "nextImage": "След. снимок",
+          "reset": "Сброс",
+          "previousAdjustment": "Пред. ползунок",
+          "nextAdjustment": "След. ползунок",
+          "copy": "Копировать",
+          "paste": "Вставить",
+          "stepDown": "−1 шаг",
+          "stepUp": "+1 шаг"
+        },
+        "title": "Быстрая правка"
+      },
       "title": "Управление мышью",
       "zoom": "Чувствительность масштабирования",
       "zoomDesc": "Настройте скорость масштабирования холста при использовании колеса мыши или жестов тачпада.",

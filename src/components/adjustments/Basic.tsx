@@ -143,6 +143,7 @@ const ToneMapperSwitch = ({
             max={5}
             min={-5}
             onChange={(e: any) => onEvShiftChange(parseFloat(e.target.value))}
+            speedEditId={BasicAdjustment.Exposure}
             step={0.01}
             value={evShiftValue}
             trackClassName="bg-surface"
@@ -185,6 +186,7 @@ export default function BasicAdjustments({
           max={5}
           min={-5}
           onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Exposure, e.target.value)}
+          speedEditId={BasicAdjustment.Exposure}
           step={0.01}
           value={adjustments.exposure}
           onDragStateChange={onDragStateChange}
@@ -212,6 +214,7 @@ export default function BasicAdjustments({
         max={100}
         min={-100}
         onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Contrast, e.target.value)}
+        speedEditId={BasicAdjustment.Contrast}
         step={1}
         value={adjustments.contrast}
         onDragStateChange={onDragStateChange}
@@ -221,6 +224,7 @@ export default function BasicAdjustments({
         max={100}
         min={-100}
         onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Highlights, e.target.value)}
+        speedEditId={BasicAdjustment.Highlights}
         step={1}
         value={adjustments.highlights}
         onDragStateChange={onDragStateChange}
@@ -230,6 +234,7 @@ export default function BasicAdjustments({
         max={100}
         min={-100}
         onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Shadows, e.target.value)}
+        speedEditId={BasicAdjustment.Shadows}
         step={1}
         value={adjustments.shadows}
         onDragStateChange={onDragStateChange}
@@ -239,6 +244,7 @@ export default function BasicAdjustments({
         max={100}
         min={-100}
         onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Whites, e.target.value)}
+        speedEditId={BasicAdjustment.Whites}
         step={1}
         value={adjustments.whites}
         onDragStateChange={onDragStateChange}
@@ -248,6 +254,7 @@ export default function BasicAdjustments({
         max={100}
         min={-100}
         onChange={(e: any) => handleAdjustmentChange(BasicAdjustment.Blacks, e.target.value)}
+        speedEditId={BasicAdjustment.Blacks}
         step={1}
         value={adjustments.blacks}
         onDragStateChange={onDragStateChange}

@@ -1,3 +1,4 @@
+import { RefObject } from 'react';
 import { create } from 'zustand';
 import debounce from 'lodash.debounce';
 import { Adjustments, INITIAL_ADJUSTMENTS, MaskContainer, AiPatch } from '../utils/adjustments';
@@ -7,6 +8,7 @@ import { ImageDimensions } from '../hooks/useImageRenderSize';
 import type { PhotoSwapPhase } from '../hooks/usePhotoSwap';
 import { ToolType } from '../components/panel/right/Masks';
 import { OverlayMode } from '../components/panel/right/CropPanel';
+import type { SpeedEditTarget } from '../components/ui/Slider';
 
 export interface InteractivePatch {
   url: string;
@@ -52,6 +54,8 @@ interface EditorState {
 
   // Interaction State
   isSliderDragging: boolean;
+  speedEditTarget: RefObject<SpeedEditTarget | null> | null;
+  isSpeedEditActive: boolean;
   zoom: number;
   displaySize: ImageDimensions;
   previewSize: ImageDimensions;
@@ -116,6 +120,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   waveformHeight: 220,
 
   isSliderDragging: false,
+  speedEditTarget: null,
+  isSpeedEditActive: false,
   interactivePatch: null,
   activeMaskContainerId: null,
   activeMaskId: null,

@@ -615,6 +615,9 @@ pub struct AppSettings {
     pub zoom_speed_multiplier: Option<f32>,
     #[serde(default)]
     pub keybinds: HashMap<String, Vec<String>>,
+    /// Sliders that Speed Edit cycles through; `None` uses the frontend's default list.
+    #[serde(default)]
+    pub speed_edit_adjustments: Option<Vec<String>>,
     #[serde(default)]
     pub thumbnail_worker_threads: Option<u32>,
     #[serde(default)]
@@ -786,6 +789,7 @@ impl Default for AppSettings {
             zoom_photo_to_pixel_click: Some(false),
             zoom_speed_multiplier: Some(1.0),
             keybinds: HashMap::new(),
+            speed_edit_adjustments: None,
             #[cfg(target_os = "android")]
             thumbnail_worker_threads: Some(2),
             #[cfg(not(target_os = "android"))]
@@ -1015,5 +1019,16 @@ mod tests {
 
         let restored = serde_json::to_value(&settings).expect("settings should serialize");
         assert_eq!(restored["filterCriteria"], filter);
+    }
+
+    #[test]
+    fn speed_edit_adjustments_round_trip_through_settings() {
+        let adjustments = json!(["exposure", "rotation"]);
+        let settings: AppSettings =
+            serde_json::from_value(json!({ "speedEditAdjustments": adjustments.clone() }))
+                .expect("settings with Speed Edit adjustments should deserialize");
+
+        let restored = serde_json::to_value(&settings).expect("settings should serialize");
+        assert_eq!(restored["speedEditAdjustments"], adjustments);
     }
 }

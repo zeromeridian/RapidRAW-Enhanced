@@ -825,6 +825,10 @@
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
       }
+    },
+    "speedEdit": {
+      "copied": "已複製 <0>{{label}}</0> <1>{{value}}</1>",
+      "pasted": "已貼上 <0>{{label}}</0> <1>{{value}}</1>"
     }
   },
   "export": {
@@ -1581,6 +1585,27 @@
       "pressKey": "按下按鍵...（Esc 清除）",
       "resetDefaults": "全部重置為預設值",
       "speed": "速度",
+      "speedEdit": {
+        "adjustments": "調整項目",
+        "gestures": {
+          "doubleClick": "按兩下重設",
+          "drag": "在畫布上拖曳調整",
+          "fine": "按 Shift 精細調整"
+        },
+        "keys": {
+          "hold": "單擊 / 按住",
+          "previousImage": "上一張",
+          "nextImage": "下一張",
+          "reset": "重設",
+          "previousAdjustment": "上一個滑桿",
+          "nextAdjustment": "下一個滑桿",
+          "copy": "複製",
+          "paste": "貼上",
+          "stepDown": "−1 步",
+          "stepUp": "+1 步"
+        },
+        "title": "快速編輯"
+      },
       "title": "滑鼠控制",
       "zoom": "縮放速度倍率",
       "zoomDesc": "調整使用滾輪或捏合手勢時畫布縮放的速度。",

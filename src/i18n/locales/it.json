@@ -851,6 +851,10 @@
         "removeGuide": "Remove guide",
         "verticalGuide": "Vertical Guide {{number}}"
       }
+    },
+    "speedEdit": {
+      "copied": "<0>{{label}}</0> <1>{{value}}</1> copiato",
+      "pasted": "<0>{{label}}</0> <1>{{value}}</1> incollato"
     }
   },
   "export": {
@@ -1626,6 +1630,27 @@
       "pressKey": "Premi un tasto... (Esc per cancellare)",
       "resetDefaults": "Ripristina Tutto ai Valori Predefiniti",
       "speed": "Velocità",
+      "speedEdit": {
+        "adjustments": "Regolazioni",
+        "gestures": {
+          "doubleClick": "Doppio clic per reimpostare",
+          "drag": "Trascina sulla tela per regolare",
+          "fine": "Maiusc per precisione"
+        },
+        "keys": {
+          "hold": "Premi / Tieni",
+          "previousImage": "Immagine prec.",
+          "nextImage": "Immagine succ.",
+          "reset": "Reimposta",
+          "previousAdjustment": "Cursore prec.",
+          "nextAdjustment": "Cursore succ.",
+          "copy": "Copia",
+          "paste": "Incolla",
+          "stepDown": "−1 passo",
+          "stepUp": "+1 passo"
+        },
+        "title": "Modifica rapida"
+      },
       "title": "Controlli Mouse",
       "zoom": "Moltiplicatore Velocità Zoom",
       "zoomDesc": "Regola la velocità dello zoom dell'area di lavoro quando utilizzi la rotellina di scorrimento o il gesto del pizzico.",

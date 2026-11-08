@@ -161,6 +161,11 @@ details are in `RELEASE_NOTES.MD`.
 - Crop now opens in unrestricted **Free** aspect ratio for new images; the
   source ratio remains available as an explicit preset. Custom aspect ratios
   can be saved as presets.
+- **Speed Edit**: hold W (or tap it to keep it on) and drag anywhere on the
+  photo to change the last-used slider; Shift drags finely and a double-click
+  resets. A and D switch between the sliders chosen in Settings → Controls,
+  the arrow keys nudge, R resets, C and V copy and paste a value, and Q and E
+  change photos. A small display at the pointer shows the slider and value.
 - Optional neutral grey editor canvas and click-to-100% zoom.
 - Single-row photo information bar in Develop (file name, resolution, and
   capture details); clicking it hides or shows the capture details, and the

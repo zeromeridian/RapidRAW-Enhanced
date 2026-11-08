@@ -5,6 +5,21 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.31.0-dev-rr-gap — 2026-11-08
+
+### Develop
+
+- New **Speed Edit**: hold W, or tap it to keep it on, and drag anywhere on
+  the photo to change the slider you used last. Drag right or up to raise
+  it, hold Shift for fine steps, and double-click to reset it. A small
+  display next to the pointer shows the slider and its value.
+- While Speed Edit is on, A and D switch to the previous or next slider, the
+  arrow keys change the value one step, R resets it, C and V copy and paste
+  a value between sliders, Q and E go to the previous or next photo, and Esc
+  turns Speed Edit off.
+- Choose which sliders A and D switch between in Settings → Controls →
+  Speed Edit, which also shows every Speed Edit key.
+
 ## 1.30.16-dev-rr-gap — 2026-11-08
 
 ### Develop
