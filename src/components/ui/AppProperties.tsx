@@ -96,6 +96,7 @@ export enum Invokes {
   GetCatalogLocation = 'get_catalog_location',
   MoveLibraryCatalog = 'move_library_catalog',
   LoadImage = 'load_image',
+  PreloadImages = 'preload_images',
   LoadMetadata = 'load_metadata',
   LoadPresets = 'load_presets',
   LoadSettings = 'load_settings',

@@ -34,6 +34,7 @@ import { useTauriListeners } from './hooks/useTauriListeners';
 import { useFileOperations } from './hooks/useFileOperations';
 import { useAppContextMenus } from './hooks/useAppContextMenus';
 import { useSortedLibrary } from './hooks/useSortedLibrary';
+import { useImagePreloader } from './hooks/useImagePreloader';
 import { useAppNavigation } from './hooks/useAppNavigation';
 import { useExternalEditSession } from './hooks/useExternalEditSession';
 import ExternalEditBar from './components/ui/ExternalEditBar';
@@ -340,6 +341,7 @@ function App() {
   }, [handleSelectKeyword]);
 
   const { displayList: sortedImageList, badges: groupBadgeInfo } = useSortedLibrary();
+  useImagePreloader(sortedImageList);
 
   // Export is opened per task; the Tagging panel stays open, also across restarts, until hidden.
   const isLibraryGridShown = activeView === 'library' && !selectedImage;
