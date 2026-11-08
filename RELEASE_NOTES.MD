@@ -5,6 +5,33 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.33.0-dev-rr-gap — 2026-11-08
+
+### Develop
+
+- In Crop, Enter keeps your crop and returns to Adjustments.
+- In Crop, Escape now undoes this crop session: the crop, aspect ratio,
+  straightening, rotation, and flips go back to how they were when you
+  opened Crop, and you return to Adjustments. Undo brings the discarded crop
+  back. Perspective and other Geometry settings are not affected.
+- Escape also works right after you used a slider, without clicking
+  elsewhere first.
+
+## 1.32.0-dev-rr-gap — 2026-11-08
+
+### Develop
+
+- The edit history (right-click Undo or Redo) now names each step clearly:
+  the controls you changed with their new values, the mask and its changed
+  setting, the HSL colour, the curve channel, and the crop ratio.
+- Applying a preset, Paste Adjustments, Auto Adjust, and the Reset button in
+  the Adjustments panel each get their own history step under their own
+  name, so one Undo takes back exactly that action.
+- History names stay correct after undoing and making a new edit, and in
+  long sessions past 50 steps.
+- The history list is wider, wraps long names onto two lines, shows the
+  full name on hover, and stays inside the window.
+
 ## 1.31.0-dev-rr-gap — 2026-11-08
 
 ### Develop

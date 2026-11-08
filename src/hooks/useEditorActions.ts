@@ -2,20 +2,23 @@ import { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import debounce from 'lodash.debounce';
 import { toast } from 'react-toastify';
+import { useTranslation } from 'react-i18next';
 import { useEditorStore, debouncedSetHistory } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
+import { useUIStore } from '../store/useUIStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useProcessStore } from '../store/useProcessStore';
 import {
   Adjustments,
   INITIAL_ADJUSTMENTS,
   COPYABLE_ADJUSTMENT_KEYS,
+  CROP_GEOMETRY_KEYS,
   PasteMode,
   LensAdjustment,
   normalizeLoadedAdjustments,
 } from '../utils/adjustments';
 import { calculateCenteredCrop } from '../utils/cropUtils';
-import { Invokes } from '../components/ui/AppProperties';
+import { Invokes, Panel } from '../components/ui/AppProperties';
 import { globalImageCache } from '../utils/ImageLRUCache';
 
 export { debouncedSetHistory };
@@ -38,17 +41,49 @@ export const toggleAutoSync = () => {
   });
 };
 
+/** Keeps the crop and leaves the Crop panel (Enter in Crop). */
+export const applyCrop = () => {
+  useEditorStore.getState().setEditor({ isStraightenActive: false, liveRotation: null });
+  useUIStore.getState().setRightPanel(Panel.Adjustments);
+};
+
+/**
+ * Leaves the Crop panel and restores its values from when it was opened (Escape in Crop), as one
+ * undoable step. The panel closes first so no render sees the restored values while cropping.
+ */
+export const cancelCrop = () => {
+  const { cropSessionSnapshot, selectedImage, adjustments, setEditor } = useEditorStore.getState();
+  applyCrop();
+  if (!cropSessionSnapshot || cropSessionSnapshot.path !== (selectedImage?.path ?? null)) return;
+  const { geometry } = cropSessionSnapshot;
+  const hasChanged = CROP_GEOMETRY_KEYS.some(
+    (key) => JSON.stringify(adjustments[key]) !== JSON.stringify(geometry[key]),
+  );
+  if (!hasChanged) return;
+  debouncedSetHistory.flush();
+  setEditor((state) => {
+    const restored = { ...state.adjustments, ...geometry };
+    debouncedSetHistory(restored);
+    return { adjustments: restored };
+  });
+  debouncedSetHistory.flush();
+};
+
 export function useEditorActions() {
+  const { t } = useTranslation();
   const setEditor = useEditorStore((s) => s.setEditor);
 
   const setAdjustments = useCallback(
-    (value: Partial<Adjustments> | ((prev: Adjustments) => Adjustments)) => {
+    (value: Partial<Adjustments> | ((prev: Adjustments) => Adjustments), label?: string) => {
+      // A labelled action gets its own history step instead of merging with pending slider edits.
+      if (label) debouncedSetHistory.flush();
       setEditor((state) => {
         const prev = state.adjustments;
         const newAdjustments = typeof value === 'function' ? value(prev) : { ...prev, ...value };
-        debouncedSetHistory(newAdjustments);
+        debouncedSetHistory(newAdjustments, label);
         return { adjustments: newAdjustments };
       });
+      if (label) debouncedSetHistory.flush();
     },
     [setEditor],
   );
@@ -81,15 +116,18 @@ export function useEditorActions() {
     if (!selectedImage?.isReady) return;
     try {
       const autoAdjustments: Adjustments = await invoke(Invokes.CalculateAutoAdjustments);
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        ...autoAdjustments,
-        sectionVisibility: { ...prev.sectionVisibility, ...autoAdjustments.sectionVisibility },
-      }));
+      setAdjustments(
+        (prev: Adjustments) => ({
+          ...prev,
+          ...autoAdjustments,
+          sectionVisibility: { ...prev.sectionVisibility, ...autoAdjustments.sectionVisibility },
+        }),
+        t('contextMenus.editor.autoAdjust'),
+      );
     } catch (err) {
       toast.error(`Failed to apply auto adjustments: ${err}`);
     }
-  }, [setAdjustments]);
+  }, [setAdjustments, t]);
 
   const handleLutSelect = useCallback(
     async (path: string) => {
@@ -240,21 +278,38 @@ export function useEditorActions() {
 
       pathsToUpdate.forEach((p) => globalImageCache.delete(p));
 
-      if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
-        setAdjustments({ ...adjustments, ...adjustmentsToApply });
+      const pastesIntoEditor = !!selectedImage && pathsToUpdate.includes(selectedImage.path);
+      const pasted: Adjustments = { ...adjustments, ...adjustmentsToApply };
+      if (pastesIntoEditor) {
+        setAdjustments(() => pasted, t('contextMenus.editor.pasteAdjustments'));
       }
 
       invoke(Invokes.ApplyAdjustmentsToPaths, { paths: pathsToUpdate, adjustments: adjustmentsToApply })
         .then(() => {
-          if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
+          if (pastesIntoEditor && selectedImage) {
             invoke('load_metadata', { path: selectedImage.path }).then((meta: any) => {
               if (meta.adjustments) {
-                setAdjustments((prev: any) => ({
-                  ...prev,
+                const lens: Partial<Adjustments> = {
                   lensMaker: meta.adjustments.lensMaker,
                   lensModel: meta.adjustments.lensModel,
                   lensDistortionParams: meta.adjustments.lensDistortionParams,
-                }));
+                };
+                const { adjustments: current, history, historyIndex } = useEditorStore.getState();
+                const lensChanged = (Object.keys(lens) as (keyof Adjustments)[]).some(
+                  (key) => JSON.stringify(current[key]) !== JSON.stringify(lens[key]),
+                );
+                if (!lensChanged) return;
+                // The backend resolves the lens profile for this image; while the paste is still the
+                // current step, it belongs to that step instead of becoming a step of its own.
+                if (current === pasted && history[historyIndex] === pasted) {
+                  const amended = { ...pasted, ...lens };
+                  setEditor((state) => ({
+                    adjustments: amended,
+                    history: state.history.map((step, i) => (i === state.historyIndex ? amended : step)),
+                  }));
+                } else {
+                  setAdjustments(lens);
+                }
               }
             });
           }
@@ -263,7 +318,7 @@ export function useEditorActions() {
 
       setProcess({ isPasted: true });
     },
-    [setAdjustments],
+    [setAdjustments, setEditor, t],
   );
 
   const handleZoomChange = useCallback((zoomValue: number, fitToWindow: boolean = false) => {
