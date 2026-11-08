@@ -79,16 +79,6 @@ export default function LibraryView({
       setUI: state.setUI,
     })),
   );
-  // Shows the Tagging panel in place of an open Export panel, or hides it; the choice is remembered.
-  const toggleTaggingPanel = () =>
-    setUI((state) => ({
-      isLibraryExportPanelVisible: false,
-      uiVisibility: {
-        ...state.uiVisibility,
-        libraryTagging: state.isLibraryExportPanelVisible || !state.uiVisibility.libraryTagging,
-      },
-    }));
-
   const {
     rootPaths,
     currentFolderPath,
@@ -192,7 +182,6 @@ export default function LibraryView({
             imageRatings={imageRatings}
             isCopied={isCopied}
             isCopyDisabled={multiSelectedPaths.length === 0}
-            isExportDisabled={multiSelectedPaths.length === 0}
             isLibraryView={true}
             isPasted={isPasted}
             isPasteDisabled={useEditorStore.getState().copiedAdjustments === null || multiSelectedPaths.length === 0}
@@ -200,10 +189,6 @@ export default function LibraryView({
             isResetDisabled={multiSelectedPaths.length === 0}
             multiSelectedPaths={multiSelectedPaths}
             onCopy={handleCopyAdjustments}
-            onExportClick={() =>
-              setUI((state) => ({ isLibraryExportPanelVisible: !state.isLibraryExportPanelVisible }))
-            }
-            onTaggingClick={toggleTaggingPanel}
             onDeleteRejected={handleDeleteRejected}
             onFlag={handleSetFlag}
             onSetColorLabel={handleSetColorLabel}

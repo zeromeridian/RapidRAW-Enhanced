@@ -25,6 +25,7 @@ import { getImageFlag, ImageFlag } from '../../../utils/imageFlags';
 import ImageFlagBadge from '../../ui/ImageFlagBadge';
 import { writeLibraryDragPayload } from '../../../utils/libraryDragDrop';
 import { lightsOutTarget } from '../../../utils/lightsOut';
+import { getImageDimensions } from '../../../utils/imageDimensions';
 import { CLOUD_THUMBNAIL_RETRY_MS } from '../../../hooks/useThumbnails';
 import { useCtrlClickMenuGuard } from '../../../hooks/useCtrlClickMenuGuard';
 
@@ -45,22 +46,6 @@ const STACK_SPINE_POSITION_CLASSES: Record<StackMemberPosition, string> = {
 const STACK_ACCENT_COLOR = '#f97316';
 // Corner radius of a grid thumbnail (`rounded-md`), so Lights Out lights exactly its shape.
 const THUMBNAIL_RADIUS = 6;
-
-const getImageDimensions = (exif: Record<string, string> | null | undefined) => {
-  if (!exif) return null;
-
-  const parseDimension = (keys: string[]) => {
-    for (const key of keys) {
-      const value = Number.parseInt(exif[key] ?? '', 10);
-      if (Number.isFinite(value) && value > 0) return value;
-    }
-    return null;
-  };
-
-  const width = parseDimension(['PixelXDimension', 'ExifImageWidth', 'ImageWidth']);
-  const height = parseDimension(['PixelYDimension', 'ExifImageHeight', 'ImageLength']);
-  return width && height ? { width, height } : null;
-};
 
 export const StackVisualCue = ({ info }: { info?: StackVisualInfo }) => {
   if (!info) return null;

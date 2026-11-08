@@ -39,6 +39,23 @@ export interface CollapsibleSectionsState {
 
 export type LightsOutMode = 'off' | 'dim' | 'out';
 
+/** Right panels next to the Library grid. */
+export type LibraryPanel = 'metadata' | 'tagging' | 'export';
+
+/**
+ * The Library right panel that is shown. Export is opened per task and covers the others; Metadata
+ * or Tagging stays open, also across restarts, until hidden, and only next to the grid.
+ */
+export const getLibraryPanel = (
+  ui: Pick<UIState, 'isLibraryExportPanelVisible' | 'uiVisibility'>,
+  isLibraryGridShown: boolean,
+): LibraryPanel | null => {
+  if (ui.isLibraryExportPanelVisible) return 'export';
+  if (!isLibraryGridShown) return null;
+  if (ui.uiVisibility.libraryMetadata) return 'metadata';
+  return ui.uiVisibility.libraryTagging ? 'tagging' : null;
+};
+
 export interface ConfirmModalState {
   confirmText?: string;
   confirmVariant?: string;
@@ -175,6 +192,8 @@ interface UIState {
   // Actions
   setUI: (updater: Partial<UIState> | ((state: UIState) => Partial<UIState>)) => void;
   setRightPanel: (panel: Panel | null) => void;
+  // Shows a Library right panel in place of the one shown, or hides it when it is the one shown.
+  toggleLibraryPanel: (panel: LibraryPanel) => void;
   customEscapeHandler: (() => void) | null;
   setCustomEscapeHandler: (handler: (() => void) | null) => void;
   imageSelectHandler: ((path: string) => void) | null;
@@ -280,6 +299,20 @@ export const useUIStore = create<UIState>((set, get) => ({
   captureTimeStackModalState: { isOpen: false, targetPaths: [] },
 
   setUI: (updater) => set((state) => (typeof updater === 'function' ? updater(state) : updater)),
+
+  toggleLibraryPanel: (panel) =>
+    set((state) => {
+      const isShown = getLibraryPanel(state, true) === panel;
+      if (panel === 'export') return { isLibraryExportPanelVisible: !isShown };
+      return {
+        isLibraryExportPanelVisible: false,
+        uiVisibility: {
+          ...state.uiVisibility,
+          libraryMetadata: panel === 'metadata' && !isShown,
+          libraryTagging: panel === 'tagging' && !isShown,
+        },
+      };
+    }),
 
   setRightPanel: (panelId) => {
     const current = get().activeRightPanel;

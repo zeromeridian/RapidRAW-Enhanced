@@ -529,7 +529,8 @@ export interface UiVisibility {
   filmstrip: boolean;
   quickFilter?: boolean;
   editorExif?: boolean;
-  // The Tagging panel next to the library grid
+  // The Metadata or Tagging panel next to the library grid (at most one is set)
+  libraryMetadata?: boolean;
   libraryTagging?: boolean;
 }
 
