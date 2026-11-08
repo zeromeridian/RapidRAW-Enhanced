@@ -1,7 +1,14 @@
 import { RefObject } from 'react';
 import { create } from 'zustand';
 import debounce from 'lodash.debounce';
-import { Adjustments, INITIAL_ADJUSTMENTS, MaskContainer, AiPatch } from '../utils/adjustments';
+import {
+  Adjustments,
+  INITIAL_ADJUSTMENTS,
+  MaskContainer,
+  AiPatch,
+  CropGeometry,
+  pickCropGeometry,
+} from '../utils/adjustments';
 import { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
 import { ChannelConfig } from '../components/adjustments/Curves';
 import { ImageDimensions } from '../hooks/useImageRenderSize';
@@ -9,6 +16,10 @@ import type { PhotoSwapPhase } from '../hooks/usePhotoSwap';
 import { ToolType } from '../components/panel/right/Masks';
 import { OverlayMode } from '../components/panel/right/CropPanel';
 import type { SpeedEditTarget } from '../components/ui/Slider';
+import { describeHistoryChange } from '../utils/editHistory';
+
+/** Undo history keeps at most this many steps; the oldest is dropped first. */
+const MAX_HISTORY_STEPS = 50;
 
 export interface InteractivePatch {
   url: string;
@@ -35,6 +46,8 @@ interface EditorState {
 
   // History State
   history: Adjustments[];
+  /** One readable name per history step, recorded when it is pushed; the initial step is ''. */
+  historyLabels: string[];
   historyIndex: number;
 
   // Previews & Overlays
@@ -71,6 +84,8 @@ interface EditorState {
   isRelightPickerActive: boolean;
   activeRelightLightId: string | null;
   liveRotation: number | null;
+  /** The Crop panel's values when it was opened (null outside Crop); Escape restores them. */
+  cropSessionSnapshot: { path: string | null; geometry: CropGeometry } | null;
   brushSettings: BrushSettings | null;
 
   // Masks & AI
@@ -94,7 +109,7 @@ interface EditorState {
 
   // Actions
   setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
-  pushHistory: (newAdjustments: Adjustments) => void;
+  pushHistory: (newAdjustments: Adjustments, label?: string) => void;
   undo: () => void;
   redo: () => void;
   resetHistory: (initialState: Adjustments) => void;
@@ -107,6 +122,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   previewOverride: null,
   isGuidedPerspectiveActive: false,
   history: [INITIAL_ADJUSTMENTS],
+  historyLabels: [''],
   historyIndex: 0,
 
   finalPreviewUrl: null,
@@ -143,6 +159,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   isRelightPickerActive: false,
   activeRelightLightId: null,
   liveRotation: null,
+  cropSessionSnapshot: null,
 
   copiedSectionAdjustments: null,
   copiedMask: null,
@@ -160,12 +177,17 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   setEditor: (updater) => set((state) => (typeof updater === 'function' ? updater(state) : updater)),
 
-  pushHistory: (newAdj) =>
+  pushHistory: (newAdj, label) =>
     set((state) => {
       const newHistory = state.history.slice(0, state.historyIndex + 1);
+      const newLabels = state.historyLabels.slice(0, state.historyIndex + 1);
+      newLabels.push(label || describeHistoryChange(state.history[state.historyIndex], newAdj));
       newHistory.push(newAdj);
-      if (newHistory.length > 50) newHistory.shift();
-      return { history: newHistory, historyIndex: newHistory.length - 1 };
+      if (newHistory.length > MAX_HISTORY_STEPS) {
+        newHistory.shift();
+        newLabels.shift();
+      }
+      return { history: newHistory, historyLabels: newLabels, historyIndex: newHistory.length - 1 };
     }),
 
   undo: () => {
@@ -191,11 +213,21 @@ export const useEditorStore = create<EditorState>((set) => ({
   },
 
   resetHistory: (initialState) =>
-    set({
+    set((state) => ({
       history: [initialState],
+      historyLabels: [''],
       historyIndex: 0,
       adjustments: initialState,
-    }),
+      // A photo loaded while Crop is open starts a new crop session from its own values.
+      ...(state.cropSessionSnapshot
+        ? {
+            cropSessionSnapshot: {
+              path: state.selectedImage?.path ?? null,
+              geometry: pickCropGeometry(initialState),
+            },
+          }
+        : {}),
+    })),
 
   goToHistoryIndex: (index) => {
     debouncedSetHistory.flush();
@@ -212,8 +244,8 @@ export const useEditorStore = create<EditorState>((set) => ({
  * Records an edit in the undo history once it settles. Undo, redo, and history jumps flush it
  * first, so an edit made just before them is recorded instead of skipped.
  */
-export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
-  useEditorStore.getState().pushHistory(newAdj);
+export const debouncedSetHistory = debounce((newAdj: Adjustments, label?: string) => {
+  useEditorStore.getState().pushHistory(newAdj, label);
 }, 500);
 
 /** Whether undo has something to restore: an earlier entry, or an edit not yet recorded. */

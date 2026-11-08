@@ -113,6 +113,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const adjustments = useEditorStore((s) => s.adjustments);
   const isGuidedPerspectiveActive = useEditorStore((s) => s.isGuidedPerspectiveActive);
   const adjustmentsHistory = useEditorStore((s) => s.history);
+  const adjustmentsHistoryLabels = useEditorStore((s) => s.historyLabels);
   const adjustmentsHistoryIndex = useEditorStore((s) => s.historyIndex);
   const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
   const uncroppedAdjustedPreviewUrl = useEditorStore((s) => s.uncroppedAdjustedPreviewUrl);
@@ -2077,7 +2078,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
           onUndo={undo}
           selectedImage={selectedImage}
           showOriginal={showOriginal}
-          adjustmentsHistory={adjustmentsHistory}
+          adjustmentsHistoryLabels={adjustmentsHistoryLabels}
           adjustmentsHistoryIndex={adjustmentsHistoryIndex}
           goToAdjustmentsHistoryIndex={goToHistoryIndex}
         />

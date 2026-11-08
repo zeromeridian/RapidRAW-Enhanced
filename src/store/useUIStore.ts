@@ -1,5 +1,20 @@
 import { create } from 'zustand';
 import { ImageFile, LibraryViewMode, Panel, UiVisibility, CullingSuggestions } from '../components/ui/AppProperties';
+import { pickCropGeometry } from '../utils/adjustments';
+import { useEditorStore } from './useEditorStore';
+
+/** Opening Crop records its values for Escape to restore; leaving Crop forgets them. */
+const updateCropSession = (current: Panel | null, next: Panel | null) => {
+  if (next === current) return;
+  const { selectedImage, adjustments, setEditor } = useEditorStore.getState();
+  if (next === Panel.Crop) {
+    setEditor({
+      cropSessionSnapshot: { path: selectedImage?.path ?? null, geometry: pickCropGeometry(adjustments) },
+    });
+  } else if (current === Panel.Crop) {
+    setEditor({ cropSessionSnapshot: null });
+  }
+};
 
 const RIGHT_PANEL_ORDER = [
   Panel.Metadata,
@@ -268,6 +283,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   setRightPanel: (panelId) => {
     const current = get().activeRightPanel;
+    updateCropSession(current, panelId === current ? null : panelId);
     if (panelId === current) {
       set({ activeRightPanel: null });
     } else {

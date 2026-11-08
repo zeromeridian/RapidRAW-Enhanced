@@ -28,6 +28,7 @@ export const GLOBAL_KEYS = [
   '4',
   '5',
   'Enter',
+  'Escape',
 ];
 export const OPTION_SEPARATOR = 'separator';
 

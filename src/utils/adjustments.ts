@@ -1159,6 +1159,21 @@ export const COPYABLE_ADJUSTMENT_KEYS: string[] = Object.values(ADJUSTMENT_GROUP
   .flat()
   .flatMap((group) => group.keys);
 
+/** The values the Crop panel edits; Escape in Crop restores them as they were when Crop opened. */
+export const CROP_GEOMETRY_KEYS = [
+  'crop',
+  'aspectRatio',
+  'rotation',
+  'orientationSteps',
+  'flipHorizontal',
+  'flipVertical',
+] as const satisfies ReadonlyArray<keyof Adjustments>;
+
+export type CropGeometry = Pick<Adjustments, (typeof CROP_GEOMETRY_KEYS)[number]>;
+
+export const pickCropGeometry = (adjustments: Adjustments): CropGeometry =>
+  Object.fromEntries(CROP_GEOMETRY_KEYS.map((key) => [key, structuredClone(adjustments[key])])) as CropGeometry;
+
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
