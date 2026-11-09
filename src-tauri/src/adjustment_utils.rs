@@ -134,7 +134,7 @@ pub fn apply_spatial_transformations<'a>(
     let flipped_image = apply_flip(coarse_rotated_image, flip_horizontal, flip_vertical);
     let rotated_image = apply_rotation(flipped_image, rotation_degrees);
 
-    let crop_data: Option<Crop> = serde_json::from_value(adjustments["crop"].clone()).ok();
+    let crop_data: Option<Crop> = serde::Deserialize::deserialize(&adjustments["crop"]).ok();
     let crop_json = serde_json::to_value(crop_data).unwrap_or(serde_json::Value::Null);
     let cropped_image = apply_crop(rotated_image, &crop_json);
 

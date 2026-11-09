@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import { Mask, SubMaskMode, formatMaskTypeName } from '../components/panel/right/Masks';
+import { Mask, SubMask, SubMaskMode, formatMaskTypeName } from '../components/panel/right/Masks';
+import { AiPatch, MaskContainer } from './adjustments';
 import { ImageDimensions } from '../hooks/useImageRenderSize';
 
 export const createSubMask = (
@@ -51,4 +52,60 @@ export const createSubMask = (
     default:
       return { ...common, parameters: {} };
   }
+};
+
+const SUB_MASK_DATA_KEYS = ['mask_data_base64', 'maskDataBase64'] as const;
+
+/**
+ * Drops the embedded bitmaps of sub-masks whose ids are in `sentIds` (the backend restores
+ * them from its cache) and records in `newlySentIds` the ones this payload sends first.
+ * Copies only the sub-masks it changes; the input is never modified.
+ */
+export const stripSentSubMasks = (subMasks: SubMask[], sentIds: Set<string>, newlySentIds?: Set<string>): SubMask[] =>
+  subMasks.map((subMask) => {
+    if (!subMask?.id || !subMask.parameters) return subMask;
+    const dataKeys = SUB_MASK_DATA_KEYS.filter((key) => subMask.parameters[key] != null);
+    if (dataKeys.length === 0) return subMask;
+    if (!sentIds.has(subMask.id)) {
+      newlySentIds?.add(subMask.id);
+      return subMask;
+    }
+    const parameters = { ...subMask.parameters };
+    dataKeys.forEach((key) => (parameters[key] = null));
+    return { ...subMask, parameters };
+  });
+
+/**
+ * The adjustments to send to the backend: mask and AI patch bitmaps it already holds are
+ * left out, copying only the objects that change (the bitmaps can be megabytes, and this
+ * runs for every preview frame).
+ */
+export const stripSentMaskData = <T extends { masks?: MaskContainer[]; aiPatches?: AiPatch[] }>(
+  adjustments: T,
+  sentIds: Set<string>,
+  newlySentIds?: Set<string>,
+): T => {
+  const stripContainer = <C extends { subMasks: SubMask[] }>(container: C): C =>
+    Array.isArray(container?.subMasks)
+      ? { ...container, subMasks: stripSentSubMasks(container.subMasks, sentIds, newlySentIds) }
+      : container;
+
+  const payload = { ...adjustments };
+  if (Array.isArray(adjustments.masks)) {
+    payload.masks = adjustments.masks.map(stripContainer);
+  }
+  if (Array.isArray(adjustments.aiPatches)) {
+    payload.aiPatches = adjustments.aiPatches.map((patch) => {
+      let next = patch;
+      if (patch?.id && patch.patchData && !patch.isLoading) {
+        if (sentIds.has(patch.id)) {
+          next = { ...patch, patchData: null };
+        } else {
+          newlySentIds?.add(patch.id);
+        }
+      }
+      return stripContainer(next);
+    });
+  }
+  return payload;
 };

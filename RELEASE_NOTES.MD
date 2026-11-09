@@ -5,6 +5,21 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.38.3-fix-perf — 2026-11-09
+
+### Performance
+
+- Editing photos with brush or AI masks is lighter: mask images the app
+  already has are no longer copied and sent again for every preview and
+  mask overlay, and masks are recognized from the cache without being
+  re-encoded each time.
+
+### Fixes
+
+- Settings changed in quick succession are now always saved in the order
+  you made them. Before, a change made while image stacks were being
+  written to XMP could be overwritten on disk by the older settings.
+
 ## 1.38.2-fix-perf — 2026-11-09
 
 ### Performance

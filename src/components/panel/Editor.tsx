@@ -8,6 +8,7 @@ import { toast } from 'react-toastify';
 import { ImageDimensions, RenderSize, useImageRenderSize } from '../../hooks/useImageRenderSize';
 import { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import { calculateCenteredCrop, rotateCropCenter } from '../../utils/cropUtils';
+import { stripSentMaskData, stripSentSubMasks } from '../../utils/maskUtils';
 import EditorToolbar from './editor/EditorToolbar';
 import GuidedPerspectiveOverlay from './editor/GuidedPerspectiveOverlay';
 import ImageCanvas from './editor/ImageCanvas';
@@ -1074,26 +1075,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
 
       const { patchesSentToBackend } = useEditorStore.getState();
 
-      const stripSubMasks = (subMasks: any[]) => {
-        if (!Array.isArray(subMasks)) return;
-        subMasks.forEach((sm) => {
-          if (sm.id && sm.parameters && patchesSentToBackend.has(sm.id)) {
-            if (sm.parameters.mask_data_base64 !== undefined) sm.parameters.mask_data_base64 = null;
-            if (sm.parameters.maskDataBase64 !== undefined) sm.parameters.maskDataBase64 = null;
-          }
-        });
-      };
-
-      const strippedAdjustments = structuredClone(jsAdjustments);
-      if (strippedAdjustments.masks) {
-        strippedAdjustments.masks.forEach((m: any) => stripSubMasks(m.subMasks));
-      }
-      if (strippedAdjustments.aiPatches) {
-        strippedAdjustments.aiPatches.forEach((p: any) => stripSubMasks(p.subMasks));
-      }
-
-      const strippedMaskDef = structuredClone(maskDef);
-      stripSubMasks(strippedMaskDef.subMasks);
+      const strippedAdjustments = stripSentMaskData(jsAdjustments, patchesSentToBackend);
+      const strippedMaskDef = Array.isArray(maskDef.subMasks)
+        ? { ...maskDef, subMasks: stripSentSubMasks(maskDef.subMasks, patchesSentToBackend) }
+        : maskDef;
 
       const dataUrl: string = await invoke(Invokes.GenerateMaskOverlay, {
         cropOffset,

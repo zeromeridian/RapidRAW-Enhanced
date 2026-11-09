@@ -95,7 +95,7 @@ impl GuidedPerspective {
     pub fn from_adjustments(adjustments: &serde_json::Value) -> Self {
         adjustments
             .get("guidedPerspective")
-            .and_then(|value| serde_json::from_value(value.clone()).ok())
+            .and_then(|value| serde::Deserialize::deserialize(value).ok())
             .unwrap_or_default()
     }
 

@@ -1046,7 +1046,7 @@ fn process_image_for_export_pipeline(
 
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
         .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .and_then(|m| serde::Deserialize::deserialize(m).ok())
         .unwrap_or_default();
 
     let warped_image = resolve_warped_image_for_masks(state, js_adjustments, &mask_definitions);
@@ -1432,7 +1432,7 @@ fn export_masks_for_image(
     let (img_w, img_h) = transformed_image.dimensions();
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
         .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .and_then(|m| serde::Deserialize::deserialize(m).ok())
         .unwrap_or_default();
 
     let warped_image = resolve_warped_image_for_masks(state, js_adjustments, &mask_definitions);
@@ -2288,7 +2288,7 @@ pub async fn estimate_export_sizes(
         let (img_w, img_h) = preview_image.dimensions();
         let mask_definitions: Vec<MaskDefinition> = adjustments_clone
             .get("masks")
-            .and_then(|m| serde_json::from_value(m.clone()).ok())
+            .and_then(|m| serde::Deserialize::deserialize(m).ok())
             .unwrap_or_default();
 
         let scaled_crop_offset = (
@@ -2423,7 +2423,7 @@ pub async fn estimate_export_sizes(
 
         let mask_definitions: Vec<MaskDefinition> = js_adjustments
             .get("masks")
-            .and_then(|m| serde_json::from_value(m.clone()).ok())
+            .and_then(|m| serde::Deserialize::deserialize(m).ok())
             .unwrap_or_default();
         let scaled_crop_offset = (
             unscaled_crop_offset.0 * gpu_scale,
