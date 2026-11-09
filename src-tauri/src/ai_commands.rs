@@ -14,7 +14,7 @@ use crate::ai_processing::{
     generate_image_embeddings, get_or_init_ai_models, run_birefnet_model, run_depth_anything_model,
     run_esam3_decoder, run_esam3_image_encoder, run_esam3_zoomed_decoder, run_sam_decoder,
 };
-use crate::app_settings::load_settings;
+use crate::app_settings::settings_snapshot;
 use crate::app_state::AppState;
 use crate::cache_utils::GEOMETRY_KEYS;
 use crate::get_cached_full_warped_image;
@@ -563,8 +563,10 @@ pub async fn precompute_ai_subject_mask(
 
 #[tauri::command]
 pub async fn check_ai_connector_status(app_handle: tauri::AppHandle) {
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let is_connected = if let Some(address) = settings.ai_connector_address {
+    let address = settings_snapshot(&app_handle)
+        .ok()
+        .and_then(|settings| settings.ai_connector_address.clone());
+    let is_connected = if let Some(address) = address {
         ai_connector::check_status(&address).await.unwrap_or(false)
     } else {
         false

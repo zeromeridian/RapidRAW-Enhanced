@@ -487,7 +487,7 @@ fn process_preview_job(
     crate::ai_denoise::ensure_generated(app_handle, &loaded_image, &adjustments_clone);
 
     let new_transform_hash = calculate_transform_hash(&adjustments_clone);
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = app_settings::settings_snapshot(app_handle).unwrap_or_default();
     let live_quality = settings.live_preview_quality.as_deref().unwrap_or("high");
 
     let default_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
@@ -2445,6 +2445,7 @@ pub fn run() {
             Ok(())
         })
         .manage(AppState {
+            settings: Mutex::new(None),
             window_setup_complete: AtomicBool::new(false),
             gpu_crash_flag_path: Mutex::new(None),
             original_image: Mutex::new(None),

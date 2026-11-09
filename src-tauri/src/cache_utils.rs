@@ -219,10 +219,26 @@ pub fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
     hasher.finish()
 }
 
+/// Streams written bytes into a hasher, so large JSON is hashed without building its text.
+struct HashWriter<'a, H: Hasher>(&'a mut H);
+
+impl<H: Hasher> std::io::Write for HashWriter<'_, H> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.write(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// In-memory render cache key; never persisted, so its value may change between builds.
 pub fn calculate_full_job_hash(path: &str, adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
     path.hash(&mut hasher);
-    adjustments.to_string().hash(&mut hasher);
+    // Writing a `Value` cannot fail.
+    let _ = serde_json::to_writer(HashWriter(&mut hasher), adjustments);
     hasher.finish()
 }
 
@@ -384,6 +400,18 @@ pub fn clear_session_caches(state: tauri::State<AppState>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn full_job_hash_follows_path_and_every_adjustment() {
+        let adjustments = serde_json::json!({ "exposure": 0.5, "masks": [{ "id": "a" }] });
+        let base = calculate_full_job_hash("a.raw", &adjustments);
+
+        assert_eq!(base, calculate_full_job_hash("a.raw", &adjustments.clone()));
+        assert_ne!(base, calculate_full_job_hash("b.raw", &adjustments));
+        let mut changed = adjustments.clone();
+        changed["masks"][0]["id"] = serde_json::json!("b");
+        assert_ne!(base, calculate_full_job_hash("a.raw", &changed));
+    }
 
     fn fingerprint(len: u64) -> DecodeFingerprint {
         DecodeFingerprint {

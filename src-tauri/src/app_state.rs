@@ -207,6 +207,8 @@ impl MetadataManager {
 pub type TransformedImageCache = (u64, Arc<DynamicImage>, f32, (f32, f32));
 
 pub struct AppState {
+    /// `settings.json` as last loaded or saved; see `app_settings::settings_snapshot`.
+    pub settings: Mutex<Option<Arc<crate::app_settings::AppSettings>>>,
     pub window_setup_complete: AtomicBool,
     pub gpu_crash_flag_path: Mutex<Option<PathBuf>>,
     pub original_image: Mutex<Option<LoadedImage>>,

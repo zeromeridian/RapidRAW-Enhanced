@@ -281,14 +281,10 @@ export function useImageProcessing(
                   }
                 }, 250);
               }
-              return { finalPreviewUrl: url };
-            });
-
-            setEditor((state) => {
               if (state.interactivePatch && state.interactivePatch.url) {
                 setTimeout(() => URL.revokeObjectURL(state.interactivePatch.url), 500);
               }
-              return { interactivePatch: null };
+              return { finalPreviewUrl: url, interactivePatch: null };
             });
           }
         }
