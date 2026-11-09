@@ -14,6 +14,7 @@ mod android_integration;
 mod app_settings;
 mod app_state;
 mod baseline_exposure;
+mod blocking_command;
 mod cache_utils;
 mod culling;
 mod denoising;
@@ -63,8 +64,6 @@ use std::io::Cursor;
 use std::io::Write;
 use std::panic;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::mpsc::{self, Receiver, Sender};
-use std::thread;
 
 use std::borrow::Cow;
 use std::sync::{Arc, Mutex};
@@ -97,11 +96,10 @@ use crate::formats::is_raw_file;
 use crate::hdr_deghosting::{align_hdr_frames, assert_uniform_dimensions, load_hdr_frames};
 use crate::image_loader::{load_and_composite, prepare_base_image};
 use crate::image_processing::{
-    Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_cpu_default_raw_processing,
-    apply_flip, apply_geometry_warp, apply_linear_to_srgb, build_full_source_image,
-    downscale_f32_image, get_all_adjustments_from_json, get_or_init_gpu_context,
-    process_and_get_dynamic_image, resolve_tonemapper_override,
-    resolve_tonemapper_override_from_handle, warp_image_geometry,
+    Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_flip, apply_geometry_warp,
+    apply_linear_to_srgb, build_full_source_image, downscale_f32_image,
+    get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
+    resolve_tonemapper_override, resolve_tonemapper_override_from_handle, warp_image_geometry,
 };
 use crate::mask_generation::{
     MaskDefinition, generate_mask_bitmap, get_cached_or_generate_mask,
@@ -752,15 +750,10 @@ fn process_preview_job(
 
 fn start_analytics_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
-    let (tx, rx): (Sender<AnalyticsJob>, Receiver<AnalyticsJob>) = mpsc::channel();
-    *state.analytics_worker_tx.lock().unwrap() = Some(tx);
-
-    std::thread::spawn(move || {
-        while let Ok(mut job) = rx.recv() {
-            while let Ok(latest) = rx.try_recv() {
-                job = latest;
-            }
-
+    let worker_handle = app_handle.clone();
+    *state.analytics_worker_tx.lock().unwrap() = Some(blocking_command::spawn_latest_job_worker(
+        move |job: AnalyticsJob| {
+            let app_handle = &worker_handle;
             let histogram_data =
                 image_processing::calculate_histogram_from_image(&job.image, job.clipping_overlay)
                     .ok();
@@ -785,27 +778,21 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
                     }),
                 );
             }
-        }
-    });
+        },
+    ));
 }
 
 fn start_preview_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
-    let (tx, rx): (Sender<PreviewJob>, Receiver<PreviewJob>) = mpsc::channel();
-
-    *state.preview_worker_tx.lock().unwrap() = Some(tx);
-
-    std::thread::spawn(move || {
-        while let Ok(mut job) = rx.recv() {
-            while let Ok(latest_job) = rx.try_recv() {
-                job = latest_job;
-            }
-
+    let worker_handle = app_handle.clone();
+    *state.preview_worker_tx.lock().unwrap() = Some(blocking_command::spawn_latest_job_worker(
+        move |job: PreviewJob| {
+            let app_handle = &worker_handle;
             let state = app_handle.state::<AppState>();
             let responder = job.responder;
             let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 process_preview_job(
-                    &app_handle,
+                    app_handle,
                     state,
                     job.adjustments,
                     job.is_interactive,
@@ -825,8 +812,22 @@ fn start_preview_worker(app_handle: tauri::AppHandle) {
                     log::error!("Preview worker error: {}", e);
                 }
             }
-        }
-    });
+        },
+    ));
+}
+
+fn start_uncropped_preview_worker(app_handle: tauri::AppHandle) {
+    let state = app_handle.state::<AppState>();
+    let worker_handle = app_handle.clone();
+    *state.uncropped_preview_worker_tx.lock().unwrap() = Some(
+        blocking_command::spawn_latest_job_worker(move |job: UncroppedPreviewJob| {
+            // A panic must not end the worker, or Crop would get no further previews.
+            let render = || render_uncropped_preview(&worker_handle, job);
+            if panic::catch_unwind(panic::AssertUnwindSafe(render)).is_err() {
+                log::error!("Uncropped preview rendering panicked");
+            }
+        }),
+    );
 }
 
 #[derive(serde::Deserialize)]
@@ -882,8 +883,8 @@ fn generate_uncropped_preview(
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let context = get_or_init_gpu_context(&state, &app_handle)?;
-    let mut adjustments_clone = js_adjustments.clone();
-    hydrate_adjustments(&state, &mut adjustments_clone);
+    let mut adjustments = js_adjustments;
+    hydrate_adjustments(&state, &mut adjustments);
 
     let loaded_image = state
         .original_image
@@ -892,128 +893,156 @@ fn generate_uncropped_preview(
         .clone()
         .ok_or("No original image loaded")?;
 
-    thread::spawn(move || {
-        let state = app_handle.state::<AppState>();
-        let path = loaded_image.path.clone();
-        let is_raw = loaded_image.is_raw;
-        let unique_hash = calculate_full_job_hash(&path, &adjustments_clone);
-        let patched_image =
-            prepare_base_image(&loaded_image.image, &loaded_image.path, &adjustments_clone)
-                .unwrap_or_else(|e| {
-                    eprintln!("Failed to prepare base image for uncropped preview: {}", e);
-                    Cow::Borrowed(loaded_image.image.as_ref())
-                });
+    // Crop sends one per change; the worker renders only the newest (they used to pile up).
+    let tx_guard = state.uncropped_preview_worker_tx.lock().unwrap();
+    let worker_tx = tx_guard
+        .as_ref()
+        .ok_or("Uncropped preview worker not running")?;
+    worker_tx
+        .send(UncroppedPreviewJob {
+            adjustments,
+            loaded_image,
+            context,
+        })
+        .map_err(|e| format!("Failed to send to uncropped preview worker: {}", e))
+}
 
-        let warped_image = apply_geometry_warp(patched_image, &adjustments_clone);
-        let blurred_image =
-            crate::adjustment_utils::apply_spatial_effects(warped_image, &adjustments_clone);
-        let orientation_steps = adjustments_clone["orientationSteps"].as_u64().unwrap_or(0) as u8;
-        let coarse_rotated_image = apply_coarse_rotation(blurred_image, orientation_steps);
+fn render_uncropped_preview(app_handle: &tauri::AppHandle, job: UncroppedPreviewJob) {
+    let UncroppedPreviewJob {
+        adjustments: adjustments_clone,
+        loaded_image,
+        context,
+    } = job;
+    let state = app_handle.state::<AppState>();
+    let path = loaded_image.path.clone();
+    let is_raw = loaded_image.is_raw;
+    let unique_hash = calculate_full_job_hash(&path, &adjustments_clone);
+    let patched_image =
+        prepare_base_image(&loaded_image.image, &loaded_image.path, &adjustments_clone)
+            .unwrap_or_else(|e| {
+                eprintln!("Failed to prepare base image for uncropped preview: {}", e);
+                Cow::Borrowed(loaded_image.image.as_ref())
+            });
 
-        let flip_horizontal = adjustments_clone["flipHorizontal"]
-            .as_bool()
-            .unwrap_or(false);
-        let flip_vertical = adjustments_clone["flipVertical"].as_bool().unwrap_or(false);
+    let warped_image = apply_geometry_warp(patched_image, &adjustments_clone);
+    let blurred_image =
+        crate::adjustment_utils::apply_spatial_effects(warped_image, &adjustments_clone);
+    let orientation_steps = adjustments_clone["orientationSteps"].as_u64().unwrap_or(0) as u8;
+    let coarse_rotated_image = apply_coarse_rotation(blurred_image, orientation_steps);
 
-        let flipped_image =
-            apply_flip(coarse_rotated_image, flip_horizontal, flip_vertical).into_owned();
+    let flip_horizontal = adjustments_clone["flipHorizontal"]
+        .as_bool()
+        .unwrap_or(false);
+    let flip_vertical = adjustments_clone["flipVertical"].as_bool().unwrap_or(false);
 
-        let settings = load_settings(app_handle.clone()).unwrap_or_default();
-        let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
+    let flipped_image =
+        apply_flip(coarse_rotated_image, flip_horizontal, flip_vertical).into_owned();
 
-        let (rotated_w, rotated_h) = flipped_image.dimensions();
+    let settings = app_settings::settings_snapshot(app_handle).unwrap_or_default();
+    let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
 
-        let (processing_base, scale_for_gpu) = if rotated_w > preview_dim || rotated_h > preview_dim
-        {
-            let base = downscale_f32_image(&flipped_image, preview_dim, preview_dim);
-            let scale = if rotated_w > 0 {
-                base.width() as f32 / rotated_w as f32
-            } else {
-                1.0
-            };
-            (base, scale)
+    let (rotated_w, rotated_h) = flipped_image.dimensions();
+
+    let (processing_base, scale_for_gpu) = if rotated_w > preview_dim || rotated_h > preview_dim {
+        let base = downscale_f32_image(&flipped_image, preview_dim, preview_dim);
+        let scale = if rotated_w > 0 {
+            base.width() as f32 / rotated_w as f32
         } else {
-            (flipped_image.clone(), 1.0)
+            1.0
         };
+        (base, scale)
+    } else {
+        (flipped_image, 1.0)
+    };
 
-        let (preview_width, preview_height) = processing_base.dimensions();
+    let (preview_width, preview_height) = processing_base.dimensions();
 
-        let mask_definitions: Vec<MaskDefinition> = adjustments_clone
-            .get("masks")
-            .and_then(|m| serde_json::from_value(m.clone()).ok())
-            .unwrap_or_default();
+    let mask_definitions: Vec<MaskDefinition> = adjustments_clone
+        .get("masks")
+        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .unwrap_or_default();
 
-        let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-            .iter()
-            .filter_map(|def| {
-                get_cached_or_generate_mask(
-                    &state,
-                    def,
-                    preview_width,
-                    preview_height,
-                    scale_for_gpu,
-                    (0.0, 0.0),
-                    &adjustments_clone,
-                )
-            })
-            .collect();
+    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
+        .iter()
+        .filter_map(|def| {
+            get_cached_or_generate_mask(
+                &state,
+                def,
+                preview_width,
+                preview_height,
+                scale_for_gpu,
+                (0.0, 0.0),
+                &adjustments_clone,
+            )
+        })
+        .collect();
 
-        let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
-        let mut uncropped_adjustments =
-            get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
-        crate::baseline_exposure::apply_natural_exposure(&mut uncropped_adjustments, &path);
-        let lut_path = adjustments_clone["lutPath"].as_str();
-        let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
+    let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
+    let mut uncropped_adjustments =
+        get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
+    crate::baseline_exposure::apply_natural_exposure(&mut uncropped_adjustments, &path);
+    let lut_path = adjustments_clone["lutPath"].as_str();
+    let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
 
-        if let Ok(processed_image) = process_and_get_dynamic_image(
-            &context,
-            &state,
-            &processing_base,
-            unique_hash,
-            RenderRequest {
-                adjustments: uncropped_adjustments,
-                mask_bitmaps: &mask_bitmaps,
-                lut,
-                roi: None,
-            },
-            "generate_uncropped_preview",
-        ) {
-            let (width, height) = processed_image.dimensions();
-            let rgb_pixels = processed_image.to_rgb8().into_vec();
-            match Encoder::new(Preset::BaselineFastest)
-                .quality(80)
-                .encode_rgb(&rgb_pixels, width, height)
-            {
-                Ok(bytes) => {
-                    let base64_str = general_purpose::STANDARD.encode(&bytes);
-                    let data_url = format!("data:image/jpeg;base64,{}", base64_str);
-                    let _ = app_handle.emit("preview-update-uncropped", data_url);
-                }
-                Err(e) => {
-                    log::error!("Failed to encode uncropped preview with mozjpeg-rs: {}", e);
-                }
+    if let Ok(processed_image) = process_and_get_dynamic_image(
+        &context,
+        &state,
+        &processing_base,
+        unique_hash,
+        RenderRequest {
+            adjustments: uncropped_adjustments,
+            mask_bitmaps: &mask_bitmaps,
+            lut,
+            roi: None,
+        },
+        "generate_uncropped_preview",
+    ) {
+        let (width, height) = processed_image.dimensions();
+        let rgb_pixels = processed_image.to_rgb8().into_vec();
+        match Encoder::new(Preset::BaselineFastest)
+            .quality(80)
+            .encode_rgb(&rgb_pixels, width, height)
+        {
+            Ok(bytes) => {
+                let base64_str = general_purpose::STANDARD.encode(&bytes);
+                let data_url = format!("data:image/jpeg;base64,{}", base64_str);
+                let _ = app_handle.emit("preview-update-uncropped", data_url);
+            }
+            Err(e) => {
+                log::error!("Failed to encode uncropped preview with mozjpeg-rs: {}", e);
             }
         }
-    });
-
-    Ok(())
+    }
 }
 
 #[tauri::command]
-fn generate_original_transformed_preview(
+async fn generate_original_transformed_preview(
     js_adjustments: serde_json::Value,
     target_resolution: Option<u32>,
-    state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
+    blocking_command::run_blocking(move || {
+        generate_original_transformed_preview_blocking(
+            js_adjustments,
+            target_resolution,
+            &app_handle,
+        )
+    })
+    .await
+}
+
+fn generate_original_transformed_preview_blocking(
+    mut adjustments_clone: serde_json::Value,
+    target_resolution: Option<u32>,
+    app_handle: &tauri::AppHandle,
+) -> Result<String, String> {
+    let state = app_handle.state::<AppState>();
     let loaded_image = state
         .original_image
         .lock()
         .unwrap()
         .clone()
         .ok_or("No original image loaded")?;
-
-    let mut adjustments_clone = js_adjustments.clone();
 
     if let Some(obj) = adjustments_clone.as_object_mut() {
         obj.insert(
@@ -1024,15 +1053,12 @@ fn generate_original_transformed_preview(
 
     hydrate_adjustments(&state, &mut adjustments_clone);
 
-    let mut image_for_preview = loaded_image.image.as_ref().clone();
-    if loaded_image.is_raw {
-        apply_cpu_default_raw_processing(&mut image_for_preview);
-    }
+    let image_for_preview = build_full_source_image(&loaded_image.image, loaded_image.is_raw);
 
     let (transformed_full_res, _unscaled_crop_offset) =
-        apply_all_transformations(Cow::Borrowed(&image_for_preview), &adjustments_clone);
+        apply_all_transformations(image_for_preview, &adjustments_clone);
 
-    let settings = load_settings(app_handle).unwrap_or_default();
+    let settings = app_settings::settings_snapshot(app_handle).unwrap_or_default();
     let default_dim = settings.editor_preview_resolution.unwrap_or(1920);
     let preview_dim = target_resolution.unwrap_or(default_dim);
 
@@ -1275,12 +1301,22 @@ pub fn get_original_image(
 }
 
 #[tauri::command]
-fn generate_preset_preview(
+async fn generate_preset_preview(
     js_adjustments: serde_json::Value,
-    state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
-    let context = get_or_init_gpu_context(&state, &app_handle)?;
+    blocking_command::run_blocking(move || {
+        generate_preset_preview_blocking(js_adjustments, &app_handle)
+    })
+    .await
+}
+
+fn generate_preset_preview_blocking(
+    js_adjustments: serde_json::Value,
+    app_handle: &tauri::AppHandle,
+) -> Result<Response, String> {
+    let state = app_handle.state::<AppState>();
+    let context = get_or_init_gpu_context(&state, app_handle)?;
 
     let loaded_image = state
         .original_image
@@ -1323,7 +1359,7 @@ fn generate_preset_preview(
         })
         .collect();
 
-    let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
+    let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
     let mut all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
     crate::baseline_exposure::apply_natural_exposure(&mut all_adjustments, &loaded_image.path);
     let lut_path = js_adjustments["lutPath"].as_str();
@@ -2279,6 +2315,7 @@ pub fn run() {
             start_preview_worker(app_handle.clone());
             image_preload::start_preload_worker(app_handle.clone());
             start_analytics_worker(app_handle.clone());
+            start_uncropped_preview_worker(app_handle.clone());
             file_management::start_thumbnail_workers(app_handle.clone());
             file_management::start_metadata_workers(app_handle.clone());
             jxl_oxide::integration::register_image_decoding_hook();
@@ -2446,6 +2483,7 @@ pub fn run() {
         })
         .manage(AppState {
             settings: Mutex::new(None),
+            file_command_order: TokioMutex::new(()),
             window_setup_complete: AtomicBool::new(false),
             gpu_crash_flag_path: Mutex::new(None),
             original_image: Mutex::new(None),
@@ -2470,6 +2508,7 @@ pub fn run() {
             thumbnail_progress: Mutex::new(ThumbnailProgressTracker { total: 0, completed: 0 }),
             preview_worker_tx: Mutex::new(None),
             analytics_worker_tx: Mutex::new(None),
+            uncropped_preview_worker_tx: Mutex::new(None),
             mask_cache: Mutex::new(HashMap::new()),
             patch_cache: Mutex::new(HashMap::new()),
             geometry_cache: Mutex::new(HashMap::new()),

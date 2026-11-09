@@ -137,7 +137,7 @@ fn resolve_image_metadata(
         && sync_metadata_from_xmp(image_path, &mut metadata, false)
         && let Ok(json) = serde_json::to_string_pretty(&metadata)
     {
-        let _ = fs::write(sidecar_path, json);
+        let _ = write_metadata_file(sidecar_path, &json);
     }
 
     let is_raw = crate::formats::is_raw_file(image_path);
@@ -591,9 +591,9 @@ mod output_naming_tests {
         collect_preset_batch_folder_paths, compute_thumbnail_cache_hash,
         ensure_transfer_destination_free, extract_app_xmp_value, extract_xmp_bag,
         extract_xmp_stack, find_all_associated_files, generate_filename_from_template,
-        import_rapidraw_sidecars, is_sidecar_of, parse_sidecar_filename, parse_virtual_path,
-        read_xmp_from_folder, sanitize_filename_suffix, set_app_xmp_value, sync_metadata_from_xmp,
-        sync_metadata_to_xmp,
+        import_rapidraw_sidecars_blocking, is_sidecar_of, parse_sidecar_filename,
+        parse_virtual_path, read_xmp_from_folder_blocking, sanitize_filename_suffix,
+        set_app_xmp_value, sync_metadata_from_xmp, sync_metadata_to_xmp,
     };
     use crate::app_settings::AppSettings;
     use crate::image_processing::ImageMetadata;
@@ -661,7 +661,8 @@ mod output_naming_tests {
         fs::write(&invalid_sidecar, "not json").unwrap();
         fs::write(&rapidraw_exif, "legacy").unwrap();
 
-        let first = import_rapidraw_sidecars(folder.path().to_string_lossy().into_owned()).unwrap();
+        let first = import_rapidraw_sidecars_blocking(folder.path().to_string_lossy().into_owned())
+            .unwrap();
         assert_eq!(first.imported, 1);
         assert_eq!(first.skipped, 0);
         assert_eq!(first.invalid, 1);
@@ -678,7 +679,8 @@ mod output_naming_tests {
         .unwrap();
         fs::write(&rapidraw_sidecar, &changed_json).unwrap();
         let second =
-            import_rapidraw_sidecars(folder.path().to_string_lossy().into_owned()).unwrap();
+            import_rapidraw_sidecars_blocking(folder.path().to_string_lossy().into_owned())
+                .unwrap();
         assert_eq!(second.imported, 0);
         assert_eq!(second.skipped, 1);
         assert_eq!(second.invalid, 1);
@@ -1313,7 +1315,7 @@ mod output_naming_tests {
         .unwrap();
 
         let files_read =
-            read_xmp_from_folder(folder.path().to_string_lossy().into_owned()).unwrap();
+            read_xmp_from_folder_blocking(folder.path().to_string_lossy().into_owned()).unwrap();
         assert_eq!(files_read, 2);
 
         let imported = crate::exif_processing::load_sidecar(&sidecar);
@@ -1728,7 +1730,7 @@ pub async fn update_exif_fields(
 
             final_metadata.exif = Some(exif_data);
             if let Ok(json) = serde_json::to_string_pretty(&final_metadata) {
-                let _ = std::fs::write(&primary_path, json);
+                let _ = write_metadata_file(&primary_path, &json);
             }
         });
         Ok(())
@@ -3799,7 +3801,23 @@ pub fn create_folder(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn rename_folder(path: String, new_name: String, app_handle: AppHandle) -> Result<(), String> {
+pub async fn rename_folder(
+    path: String,
+    new_name: String,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let order_handle = app_handle.clone();
+    crate::blocking_command::run_in_file_order(&order_handle, move || {
+        rename_folder_blocking(path, new_name, app_handle)
+    })
+    .await
+}
+
+fn rename_folder_blocking(
+    path: String,
+    new_name: String,
+    app_handle: AppHandle,
+) -> Result<(), String> {
     let p = Path::new(&path);
     if !p.is_dir() {
         return Err("Path is not a directory.".to_string());
@@ -3902,7 +3920,21 @@ fn copy_folder_tree(source: &Path, destination: &Path) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn copy_folders(source_paths: Vec<String>, destination_folder: String) -> Result<(), String> {
+pub async fn copy_folders(
+    source_paths: Vec<String>,
+    destination_folder: String,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    crate::blocking_command::run_in_file_order(&app_handle, move || {
+        copy_folders_blocking(source_paths, destination_folder)
+    })
+    .await
+}
+
+fn copy_folders_blocking(
+    source_paths: Vec<String>,
+    destination_folder: String,
+) -> Result<(), String> {
     let sources = normalize_folder_sources(source_paths)?;
     let destination = fs::canonicalize(destination_folder).map_err(|error| error.to_string())?;
     validate_folder_destination(&sources, &destination)?;
@@ -3970,7 +4002,20 @@ pub fn delete_folder(path: String, app_handle: AppHandle) -> Result<(), String> 
 }
 
 #[tauri::command]
-pub fn duplicate_file(
+pub async fn duplicate_file(
+    path: String,
+    target_album_id: Option<String>,
+    copy_name_suffix: Option<String>,
+    app_handle: AppHandle,
+) -> Result<String, String> {
+    let order_handle = app_handle.clone();
+    crate::blocking_command::run_in_file_order(&order_handle, move || {
+        duplicate_file_blocking(path, target_album_id, copy_name_suffix, app_handle)
+    })
+    .await
+}
+
+fn duplicate_file_blocking(
     path: String,
     target_album_id: Option<String>,
     copy_name_suffix: Option<String>,
@@ -4066,7 +4111,21 @@ fn find_all_associated_files(source_image_path: &Path) -> Result<Vec<PathBuf>, S
 }
 
 #[tauri::command]
-pub fn copy_files(source_paths: Vec<String>, destination_folder: String) -> Result<(), String> {
+pub async fn copy_files(
+    source_paths: Vec<String>,
+    destination_folder: String,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    crate::blocking_command::run_in_file_order(&app_handle, move || {
+        copy_files_blocking(source_paths, destination_folder)
+    })
+    .await
+}
+
+fn copy_files_blocking(
+    source_paths: Vec<String>,
+    destination_folder: String,
+) -> Result<(), String> {
     let dest_path = Path::new(&destination_folder);
     if !dest_path.is_dir() {
         return Err(format!(
@@ -4236,7 +4295,25 @@ pub fn move_files(
 }
 
 #[tauri::command]
-pub fn save_metadata_and_update_thumbnail(
+pub async fn save_metadata_and_update_thumbnail(
+    path: String,
+    adjustments: Value,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let order_handle = app_handle.clone();
+    crate::blocking_command::run_in_file_order(&order_handle, move || {
+        let state_handle = app_handle.clone();
+        save_metadata_and_update_thumbnail_blocking(
+            path,
+            adjustments,
+            app_handle,
+            state_handle.state(),
+        )
+    })
+    .await
+}
+
+fn save_metadata_and_update_thumbnail_blocking(
     path: String,
     adjustments: Value,
     app_handle: AppHandle,
@@ -4259,7 +4336,7 @@ pub fn save_metadata_and_update_thumbnail(
     metadata.adjustments = final_adjustments;
 
     let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
-    std::fs::write(&sidecar_path, json_string).map_err(|e| e.to_string())?;
+    write_metadata_file(&sidecar_path, &json_string)?;
 
     if let Ok(settings) = load_settings(app_handle.clone())
         && settings.enable_xmp_sync.unwrap_or(false)
@@ -4445,7 +4522,7 @@ pub async fn apply_adjustments_to_paths(
                 existing_metadata.adjustments = new_adjustments;
 
                 if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
-                    let _ = std::fs::write(&sidecar_path, json_string);
+                    let _ = write_metadata_file(&sidecar_path, &json_string);
                 }
 
                 if enable_xmp_sync && !path.contains("?vc=") {
@@ -4652,8 +4729,7 @@ fn apply_preset_adjustments_to_path(
     );
     let json_string =
         serde_json::to_string_pretty(&existing_metadata).map_err(|error| error.to_string())?;
-    fs::write(&sidecar_path, json_string)
-        .map_err(|error| format!("Failed to write {}: {error}", sidecar_path.display()))?;
+    write_metadata_file(&sidecar_path, &json_string)?;
 
     if settings.enable_xmp_sync.unwrap_or(false) && !path.contains("?vc=") {
         sync_metadata_to_xmp(
@@ -4847,7 +4923,7 @@ pub async fn reset_adjustments_for_paths(
             });
 
             if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
-                let _ = std::fs::write(&sidecar_path, json_string);
+                let _ = write_metadata_file(&sidecar_path, &json_string);
             }
 
             if enable_xmp_sync && !path.contains("?vc=") {
@@ -4973,7 +5049,7 @@ pub async fn apply_auto_adjustments_to_paths(
                 }
 
                 if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
-                    let _ = std::fs::write(&sidecar_path, json_string);
+                    let _ = write_metadata_file(&sidecar_path, &json_string);
                 }
 
                 if enable_xmp_sync && !path.contains("?vc=") {
@@ -5006,7 +5082,19 @@ pub async fn apply_auto_adjustments_to_paths(
 }
 
 #[tauri::command]
-pub fn set_color_label_for_paths(
+pub async fn set_color_label_for_paths(
+    paths: Vec<String>,
+    color: Option<String>,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let order_handle = app_handle.clone();
+    crate::blocking_command::run_in_file_order(&order_handle, move || {
+        set_color_label_for_paths_blocking(paths, color, app_handle)
+    })
+    .await
+}
+
+fn set_color_label_for_paths_blocking(
     paths: Vec<String>,
     color: Option<String>,
     app_handle: AppHandle,
@@ -5036,7 +5124,7 @@ pub fn set_color_label_for_paths(
         }
 
         if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
-            let _ = std::fs::write(&sidecar_path, json_string);
+            let _ = write_metadata_file(&sidecar_path, &json_string);
         }
 
         if enable_xmp_sync && !path.contains("?vc=") {
@@ -5049,7 +5137,19 @@ pub fn set_color_label_for_paths(
 }
 
 #[tauri::command]
-pub fn set_rating_for_paths(
+pub async fn set_rating_for_paths(
+    paths: Vec<String>,
+    rating: u8,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let order_handle = app_handle.clone();
+    crate::blocking_command::run_in_file_order(&order_handle, move || {
+        set_rating_for_paths_blocking(paths, rating, app_handle)
+    })
+    .await
+}
+
+fn set_rating_for_paths_blocking(
     paths: Vec<String>,
     rating: u8,
     app_handle: AppHandle,
@@ -5066,7 +5166,7 @@ pub fn set_rating_for_paths(
         metadata.rating = rating;
 
         if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
-            let _ = std::fs::write(&sidecar_path, json_string);
+            let _ = write_metadata_file(&sidecar_path, &json_string);
         }
 
         if enable_xmp_sync && !path.contains("?vc=") {
@@ -5079,7 +5179,15 @@ pub fn set_rating_for_paths(
 }
 
 #[tauri::command]
-pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadata, String> {
+pub async fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadata, String> {
+    let order_handle = app_handle.clone();
+    crate::blocking_command::run_in_file_order(&order_handle, move || {
+        load_metadata_blocking(path, app_handle)
+    })
+    .await
+}
+
+fn load_metadata_blocking(path: String, app_handle: AppHandle) -> Result<ImageMetadata, String> {
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
@@ -5091,7 +5199,7 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
         && sync_metadata_from_xmp(&source_path, &mut metadata, false)
         && let Ok(json) = serde_json::to_string_pretty(&metadata)
     {
-        let _ = fs::write(&sidecar_path, json);
+        let _ = write_metadata_file(&sidecar_path, &json);
     }
 
     crate::tone_mapping::apply_default_tone_mapper(
@@ -5389,7 +5497,14 @@ pub fn save_community_preset(
 }
 
 #[tauri::command]
-pub fn clear_all_sidecars(root_path: String) -> Result<usize, String> {
+pub async fn clear_all_sidecars(root_path: String, app_handle: AppHandle) -> Result<usize, String> {
+    crate::blocking_command::run_in_file_order(&app_handle, move || {
+        clear_all_sidecars_blocking(root_path)
+    })
+    .await
+}
+
+fn clear_all_sidecars_blocking(root_path: String) -> Result<usize, String> {
     if !Path::new(&root_path).exists() {
         return Err(format!("Root path does not exist: {}", root_path));
     }
@@ -5424,7 +5539,17 @@ pub struct SidecarImportResult {
 }
 
 #[tauri::command]
-pub fn import_rapidraw_sidecars(root_path: String) -> Result<SidecarImportResult, String> {
+pub async fn import_rapidraw_sidecars(
+    root_path: String,
+    app_handle: AppHandle,
+) -> Result<SidecarImportResult, String> {
+    crate::blocking_command::run_in_file_order(&app_handle, move || {
+        import_rapidraw_sidecars_blocking(root_path)
+    })
+    .await
+}
+
+fn import_rapidraw_sidecars_blocking(root_path: String) -> Result<SidecarImportResult, String> {
     let root = Path::new(&root_path);
     if !root.is_dir() {
         return Err(format!("Root path is not a directory: {root_path}"));
@@ -5493,7 +5618,11 @@ pub fn import_rapidraw_sidecars(root_path: String) -> Result<SidecarImportResult
 }
 
 #[tauri::command]
-pub fn clear_thumbnail_cache(app_handle: AppHandle) -> Result<(), String> {
+pub async fn clear_thumbnail_cache(app_handle: AppHandle) -> Result<(), String> {
+    crate::blocking_command::run_blocking(move || clear_thumbnail_cache_blocking(app_handle)).await
+}
+
+fn clear_thumbnail_cache_blocking(app_handle: AppHandle) -> Result<(), String> {
     let cache_dir = app_handle
         .path()
         .app_cache_dir()
@@ -6058,7 +6187,19 @@ pub fn generate_filename_from_template(
 }
 
 #[tauri::command]
-pub fn rename_files(
+pub async fn rename_files(
+    paths: Vec<String>,
+    name_template: String,
+    app_handle: AppHandle,
+) -> Result<Vec<String>, String> {
+    let order_handle = app_handle.clone();
+    crate::blocking_command::run_in_file_order(&order_handle, move || {
+        rename_files_blocking(paths, name_template, app_handle)
+    })
+    .await
+}
+
+fn rename_files_blocking(
     paths: Vec<String>,
     name_template: String,
     app_handle: AppHandle,
@@ -6174,7 +6315,25 @@ pub fn rename_files(
 }
 
 #[tauri::command]
-pub fn create_virtual_copy(
+pub async fn create_virtual_copy(
+    source_virtual_path: String,
+    target_album_id: Option<String>,
+    copy_name_suffix: Option<String>,
+    app_handle: AppHandle,
+) -> Result<String, String> {
+    let order_handle = app_handle.clone();
+    crate::blocking_command::run_in_file_order(&order_handle, move || {
+        create_virtual_copy_blocking(
+            source_virtual_path,
+            target_album_id,
+            copy_name_suffix,
+            app_handle,
+        )
+    })
+    .await
+}
+
+fn create_virtual_copy_blocking(
     source_virtual_path: String,
     target_album_id: Option<String>,
     copy_name_suffix: Option<String>,
@@ -6197,8 +6356,7 @@ pub fn create_virtual_copy(
     };
     metadata.copy_name_suffix = configured_suffix.clone();
     let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
-    fs::write(new_sidecar_path, json_string)
-        .map_err(|e| format!("Failed to write virtual copy sidecar: {}", e))?;
+    write_metadata_file(&new_sidecar_path, &json_string)?;
 
     if let Some(suffix) = configured_suffix {
         new_virtual_path.push_str("&name=");
@@ -6292,8 +6450,7 @@ fn write_image_stacks_to_xmp(
 
         let json = serde_json::to_string_pretty(&metadata)
             .map_err(|error| format!("Failed to serialize stack metadata for {path}: {error}"))?;
-        fs::write(&sidecar_path, json)
-            .map_err(|error| format!("Failed to save stack metadata for {path}: {error}"))?;
+        write_metadata_file(&sidecar_path, &json)?;
         sync_metadata_to_xmp(&source_path, &metadata, create_xmp_if_missing);
         Ok(())
     })
@@ -6516,7 +6673,14 @@ pub fn resolve_xmp_path(image_path: &Path) -> Option<PathBuf> {
 }
 
 #[tauri::command]
-pub fn read_xmp_from_folder(path: String) -> Result<usize, String> {
+pub async fn read_xmp_from_folder(path: String, app_handle: AppHandle) -> Result<usize, String> {
+    crate::blocking_command::run_in_file_order(&app_handle, move || {
+        read_xmp_from_folder_blocking(path)
+    })
+    .await
+}
+
+fn read_xmp_from_folder_blocking(path: String) -> Result<usize, String> {
     let folder = Path::new(&path);
     if !folder.is_dir() {
         return Err(format!("Folder does not exist: {}", folder.display()));
@@ -6547,12 +6711,7 @@ pub fn read_xmp_from_folder(path: String) -> Result<usize, String> {
                     image_path.display()
                 )
             })?;
-            fs::write(&sidecar_path, json).map_err(|error| {
-                format!(
-                    "Could not save XMP metadata for {}: {error}",
-                    image_path.display()
-                )
-            })?;
+            write_metadata_file(&sidecar_path, &json)?;
             Ok::<usize, String>(imported + 1)
         },
     );
@@ -6781,6 +6940,12 @@ pub(crate) fn write_file_atomically(path: &Path, bytes: &[u8]) -> Result<(), Str
     replace_file_atomically(path, |file| file.write_all(bytes))
 }
 
+/// Replaces a `.tirdata` sidecar or an XMP file atomically, so a crash or full disk
+/// mid-write cannot truncate it. Failures are logged; callers decide whether to report them.
+pub(crate) fn write_metadata_file(path: &Path, contents: &str) -> Result<(), String> {
+    write_file_atomically(path, contents.as_bytes()).inspect_err(|error| log::warn!("{error}"))
+}
+
 pub(crate) fn copy_file_atomically(source: &Path, destination: &Path) -> Result<(), String> {
     replace_file_atomically(destination, |file| {
         std::io::copy(&mut fs::File::open(source)?, file).map(|_| ())
@@ -6815,8 +6980,7 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
   </rdf:Description>
  </rdf:RDF>
 </x:xmpmeta>"#;
-        if let Err(e) = fs::write(&xmp_path, skeleton) {
-            log::error!("Failed to create skeleton XMP: {}", e);
+        if write_metadata_file(&xmp_path, skeleton).is_err() {
             return;
         }
         actual_xmp = Some(xmp_path);
@@ -6974,6 +7138,6 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
         let ai_keywords = serde_json::to_string(&keywords.ai).unwrap_or_default();
         set_app_xmp_value(&mut content, "AiKeywords", Some(&ai_keywords));
 
-        let _ = fs::write(&xmp_file, content);
+        let _ = write_metadata_file(&xmp_file, &content);
     }
 }

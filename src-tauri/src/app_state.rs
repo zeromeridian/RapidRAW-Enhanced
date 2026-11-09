@@ -72,6 +72,13 @@ pub struct PreviewJob {
     pub responder: tokio::sync::oneshot::Sender<Vec<u8>>,
 }
 
+/// Crop's uncropped preview of `loaded_image`, the photo open when it was requested.
+pub struct UncroppedPreviewJob {
+    pub adjustments: serde_json::Value,
+    pub loaded_image: LoadedImage,
+    pub context: GpuContext,
+}
+
 pub struct AnalyticsJob {
     pub path: String,
     pub image: Arc<DynamicImage>,
@@ -209,6 +216,8 @@ pub type TransformedImageCache = (u64, Arc<DynamicImage>, f32, (f32, f32));
 pub struct AppState {
     /// `settings.json` as last loaded or saved; see `app_settings::settings_snapshot`.
     pub settings: Mutex<Option<Arc<crate::app_settings::AppSettings>>>,
+    /// Fair (FIFO) turn for file commands; see `blocking_command::run_in_file_order`.
+    pub file_command_order: TokioMutex<()>,
     pub window_setup_complete: AtomicBool,
     pub gpu_crash_flag_path: Mutex<Option<PathBuf>>,
     pub original_image: Mutex<Option<LoadedImage>>,
@@ -234,6 +243,7 @@ pub struct AppState {
     pub thumbnail_progress: Mutex<ThumbnailProgressTracker>,
     pub preview_worker_tx: Mutex<Option<Sender<PreviewJob>>>,
     pub analytics_worker_tx: Mutex<Option<Sender<AnalyticsJob>>>,
+    pub uncropped_preview_worker_tx: Mutex<Option<Sender<UncroppedPreviewJob>>>,
     pub mask_cache: Mutex<HashMap<u64, GrayImage>>,
     pub patch_cache: Mutex<HashMap<String, serde_json::Value>>,
     pub geometry_cache: Mutex<HashMap<u64, DynamicImage>>,
