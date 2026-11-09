@@ -285,8 +285,9 @@ details are in `RELEASE_NOTES.MD`.
   Flares, Gaussian Blur, Motion Blur, and Grain in addition to the existing
   tonal, color, detail, curve, glow, and halation adjustments. The mask
   editor offers no Vignette; a mask that already has one keeps its controls.
-- **Glow** has a colour (Hue and Saturation) and **Halation** a Hue, set in
-  Effects → Creative; mask glow and halation use the same colours.
+- Effects has separate **Glow**, **Halation**, and **Light Flares** sections.
+  Glow has a colour (Hue and Saturation) and Halation a Hue; mask glow and
+  halation use the same colours.
 - Mask overlays can be hidden without disabling the selected mask through a
   dedicated Masking-panel control or configurable `O` shortcut.
 - Brush and Flow masks preview their adjustments live while painting, with

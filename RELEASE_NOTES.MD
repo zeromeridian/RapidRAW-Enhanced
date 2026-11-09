@@ -5,6 +5,21 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.37.2-fix-tweaks — 2026-11-09
+
+### Develop
+
+- Effects no longer has a **Creative** group. **Glow**, **Halation**, and
+  **Light Flares** each have their own section with a heading, like Fog and
+  LUT, and their strength slider is called **Amount**.
+
+## 1.37.1-fix-tweaks — 2026-11-09
+
+### Develop
+
+- In Effects → Creative, **Glow**, **Halation**, and **Light Flares** are
+  now spaced apart, so each effect's colour sliders are easy to tell apart.
+
 ## 1.37.0-fix-tweaks — 2026-11-09
 
 ### Develop
