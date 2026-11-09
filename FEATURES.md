@@ -285,6 +285,9 @@ details are in `RELEASE_NOTES.MD`.
   Flares, Gaussian Blur, Motion Blur, and Grain in addition to the existing
   tonal, color, detail, curve, glow, and halation adjustments. The mask
   editor offers no Vignette; a mask that already has one keeps its controls.
+- Lightroom-style **clipping indicators** in the histogram's top corners:
+  grey when nothing clips, white when every channel clips, and the clipped
+  channels' colour otherwise; clicking one toggles the clipping warning.
 - Effects has separate **Glow**, **Halation**, and **Light Flares** sections.
   Glow has a colour (Hue and Saturation) and Halation a Hue; mask glow and
   halation use the same colours.

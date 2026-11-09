@@ -643,6 +643,7 @@ fn process_preview_job(
                 path: loaded_image.path.clone(),
                 compute_waveform,
                 active_waveform_channel: channel_filter,
+                clipping_overlay: final_adjustments.global.show_clipping != 0,
                 sender: tx,
             })
     } else {
@@ -760,7 +761,9 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
                 job = latest;
             }
 
-            let histogram_data = image_processing::calculate_histogram_from_image(&job.image).ok();
+            let histogram_data =
+                image_processing::calculate_histogram_from_image(&job.image, job.clipping_overlay)
+                    .ok();
 
             let waveform_data = if job.compute_waveform {
                 image_processing::calculate_waveform_from_image(
