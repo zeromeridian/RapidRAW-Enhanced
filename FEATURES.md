@@ -184,8 +184,9 @@ details are in `RELEASE_NOTES.MD`.
   also toggles it.
 - Crop now opens in unrestricted **Free** aspect ratio for new images; the
   source ratio remains available as an explicit preset. Custom aspect ratios
-  can be saved as presets. In Crop, Enter keeps the crop and Escape restores
-  the crop, ratio, rotation, and flips from when Crop was opened (undoable).
+  can be saved as presets. In Crop, Enter or a double-click inside the crop
+  frame keeps the crop and Escape restores the crop, ratio, rotation, and
+  flips from when Crop was opened (undoable).
 - **Speed Edit**: hold W (or tap it to keep it on) and drag anywhere on the
   photo to change the last-used slider; Shift drags finely and a double-click
   resets. A and D switch between the sliders chosen in Settings → Controls,
@@ -281,8 +282,11 @@ details are in `RELEASE_NOTES.MD`.
   sets the blur length relative to the image size; the direction is set with
   a compass dial (Shift snaps to 15°) or a typed angle from −90° to 90°.
 - Local masks support Black & White conversion, Color Calibration, Light
-  Flares, Gaussian Blur, Motion Blur, Vignette, and Grain in addition to the
-  existing tonal, color, detail, curve, glow, and halation adjustments.
+  Flares, Gaussian Blur, Motion Blur, and Grain in addition to the existing
+  tonal, color, detail, curve, glow, and halation adjustments. The mask
+  editor offers no Vignette; a mask that already has one keeps its controls.
+- **Glow** has a colour (Hue and Saturation) and **Halation** a Hue, set in
+  Effects → Creative; mask glow and halation use the same colours.
 - Mask overlays can be hidden without disabling the selected mask through a
   dedicated Masking-panel control or configurable `O` shortcut.
 - Brush and Flow masks preview their adjustments live while painting, with
@@ -301,8 +305,8 @@ details are in `RELEASE_NOTES.MD`.
   XMP; the image-derived normal map stays local and can be regenerated on
   another device.
 - **Fog** in Effects adds depth-aware atmospheric haze from an AI depth map,
-  with amount, start, density, ground fog, variation, glow, temperature, and
-  tint.
+  with amount, start, feather (a soft fade-in at the start distance), density,
+  ground fog, variation, glow, temperature, and tint.
 - Non-destructive **AI Denoise** in Details, with Amount and Detail. Each
   image is denoised once in the background, and the result is cached on disk
   (4 GB limit, clearable in Settings). Exports always include it, and

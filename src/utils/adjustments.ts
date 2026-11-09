@@ -113,6 +113,7 @@ export enum Effect {
   FogDepthMap = 'fogDepthMap',
   FogAmount = 'fogAmount',
   FogStart = 'fogStart',
+  FogFeather = 'fogFeather',
   FogDensity = 'fogDensity',
   FogHeight = 'fogHeight',
   FogVariation = 'fogVariation',
@@ -168,9 +169,17 @@ export const getRelightLightColor = (light: RelightLight): string => {
   return `rgb(${rgb.map((c) => Math.round((c / peak) * 255)).join(', ')})`;
 };
 
+/** Built-in halation colour (degrees); mirrors `DEFAULT_HALATION_HUE` in `image_processing.rs`. */
+export const DEFAULT_HALATION_HUE = 10;
+/** Glow colour hue (degrees) before one is chosen; mirrors `DEFAULT_GLOW_HUE` in `image_processing.rs`. */
+export const DEFAULT_GLOW_HUE = 35;
+
 export enum CreativeAdjustment {
   GlowAmount = 'glowAmount',
+  GlowHue = 'glowHue',
+  GlowSaturation = 'glowSaturation',
   HalationAmount = 'halationAmount',
+  HalationHue = 'halationHue',
   FlareAmount = 'flareAmount',
 }
 
@@ -262,6 +271,7 @@ export interface Adjustments {
   fogDensity: number;
   fogDepthMap: string | null;
   fogEnabled: boolean;
+  fogFeather: number;
   fogGlow: number;
   fogHeight: number;
   fogStart: number;
@@ -269,11 +279,14 @@ export interface Adjustments {
   fogTint: number;
   fogVariation: number;
   glowAmount: number;
+  glowHue: number;
+  glowSaturation: number;
   grainAmount: number;
   grainRoughness: number;
   grainSize: number;
   guidedPerspective: GuidedPerspective;
   halationAmount: number;
+  halationHue: number;
   highlights: number;
   hsl: Hsl;
   hue: number;
@@ -700,6 +713,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   fogDensity: 50,
   fogDepthMap: null,
   fogEnabled: false,
+  fogFeather: 0,
   fogGlow: 25,
   fogHeight: 0,
   fogStart: 0,
@@ -707,11 +721,14 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   fogTint: 0,
   fogVariation: 25,
   glowAmount: 0,
+  glowHue: DEFAULT_GLOW_HUE,
+  glowSaturation: 0,
   grainAmount: 0,
   grainRoughness: 50,
   grainSize: 25,
   guidedPerspective: { enabled: false, lines: [], autoCrop: true },
   halationAmount: 0,
+  halationHue: DEFAULT_HALATION_HUE,
   highlights: 0,
   hsl: {
     aquas: { hue: 0, saturation: 0, luminance: 0 },
@@ -935,6 +952,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     fogDensity: loadedAdjustments.fogDensity ?? INITIAL_ADJUSTMENTS.fogDensity,
     fogDepthMap: loadedAdjustments.fogDepthMap ?? INITIAL_ADJUSTMENTS.fogDepthMap,
     fogEnabled: loadedAdjustments.fogEnabled ?? INITIAL_ADJUSTMENTS.fogEnabled,
+    fogFeather: loadedAdjustments.fogFeather ?? INITIAL_ADJUSTMENTS.fogFeather,
     fogGlow: loadedAdjustments.fogGlow ?? INITIAL_ADJUSTMENTS.fogGlow,
     fogHeight: loadedAdjustments.fogHeight ?? INITIAL_ADJUSTMENTS.fogHeight,
     fogStart: loadedAdjustments.fogStart ?? INITIAL_ADJUSTMENTS.fogStart,
@@ -942,7 +960,10 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     fogTint: loadedAdjustments.fogTint ?? INITIAL_ADJUSTMENTS.fogTint,
     fogVariation: loadedAdjustments.fogVariation ?? INITIAL_ADJUSTMENTS.fogVariation,
     glowAmount: loadedAdjustments.glowAmount ?? INITIAL_ADJUSTMENTS.glowAmount,
+    glowHue: loadedAdjustments.glowHue ?? INITIAL_ADJUSTMENTS.glowHue,
+    glowSaturation: loadedAdjustments.glowSaturation ?? INITIAL_ADJUSTMENTS.glowSaturation,
     halationAmount: loadedAdjustments.halationAmount ?? INITIAL_ADJUSTMENTS.halationAmount,
+    halationHue: loadedAdjustments.halationHue ?? INITIAL_ADJUSTMENTS.halationHue,
     lensBlurAmount: loadedAdjustments.lensBlurAmount ?? INITIAL_ADJUSTMENTS.lensBlurAmount,
     lensBlurDiffusion: loadedAdjustments.lensBlurDiffusion ?? INITIAL_ADJUSTMENTS.lensBlurDiffusion,
     lensBlurShape: loadedAdjustments.lensBlurShape ?? INITIAL_ADJUSTMENTS.lensBlurShape,
@@ -1088,7 +1109,14 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     { label: 'modals.copyPaste.groups.grain', keys: [Effect.GrainAmount, Effect.GrainRoughness, Effect.GrainSize] },
     {
       label: 'modals.copyPaste.groups.halationGlow',
-      keys: [CreativeAdjustment.GlowAmount, CreativeAdjustment.HalationAmount, CreativeAdjustment.FlareAmount],
+      keys: [
+        CreativeAdjustment.GlowAmount,
+        CreativeAdjustment.GlowHue,
+        CreativeAdjustment.GlowSaturation,
+        CreativeAdjustment.HalationAmount,
+        CreativeAdjustment.HalationHue,
+        CreativeAdjustment.FlareAmount,
+      ],
     },
     { label: 'modals.copyPaste.groups.motionBlur', keys: [Effect.MotionBlurAmount, Effect.MotionBlurAngle] },
     {
@@ -1269,7 +1297,10 @@ export const ADJUSTMENT_SECTIONS: Sections = {
   ],
   effects: [
     CreativeAdjustment.GlowAmount,
+    CreativeAdjustment.GlowHue,
+    CreativeAdjustment.GlowSaturation,
     CreativeAdjustment.HalationAmount,
+    CreativeAdjustment.HalationHue,
     CreativeAdjustment.FlareAmount,
     Effect.MotionBlurAmount,
     Effect.MotionBlurAngle,
@@ -1302,6 +1333,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     Effect.FogEnabled,
     Effect.FogAmount,
     Effect.FogStart,
+    Effect.FogFeather,
     Effect.FogDensity,
     Effect.FogHeight,
     Effect.FogVariation,

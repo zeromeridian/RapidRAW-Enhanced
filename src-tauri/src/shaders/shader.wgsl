@@ -66,7 +66,7 @@ struct GlobalAdjustments {
     chromatic_aberration_blue_yellow: f32,
     show_clipping: u32,
     is_raw_image: u32,
-    _pad_ca1: f32,
+    halation_hue_shift: f32,
 
     has_lut: u32,
     lut_intensity: f32,
@@ -118,8 +118,8 @@ struct GlobalAdjustments {
 
     motion_blur_amount: f32,
     motion_blur_angle: f32,
-    _pad_motion1: f32,
-    _pad_motion2: f32,
+    glow_hue: f32,
+    glow_saturation: f32,
 }
 
 struct MaskAdjustments {
@@ -1535,12 +1535,24 @@ fn sample_lut_tetrahedral(uv: vec3<f32>) -> vec3<f32> {
     return res;
 }
 
+// Rotates a colour's hue by `shift` degrees at the same saturation and luminance,
+// so a tint keeps its strength whatever hue it is turned to.
+fn rotate_hue(color: vec3<f32>, shift: f32) -> vec3<f32> {
+    if (shift == 0.0) { return color; }
+    let hsv = rgb_to_hsv(color);
+    var h = (hsv.x + shift) % 360.0;
+    if (h < 0.0) { h += 360.0; }
+    let rotated = hsv_to_rgb(vec3<f32>(h, hsv.y, hsv.z));
+    return rotated * (get_luma(color) / max(get_luma(rotated), 0.0001));
+}
+
 fn apply_glow_bloom(
     color: vec3<f32>,
     blurred_color_input_space: vec3<f32>,
     amount: f32,
     is_raw: u32,
-    exp: f32, bright: f32, con: f32, wh: f32
+    exp: f32, bright: f32, con: f32, wh: f32,
+    glow_hue: f32, glow_saturation: f32
 ) -> vec3<f32> {
     if (amount <= 0.0) {
         return color;
@@ -1590,6 +1602,12 @@ fn apply_glow_bloom(
     } else {
         bloom_color = vec3<f32>(1.0, 0.99, 0.98);
     }
+    // Colour: move the glow toward the chosen hue at the same brightness.
+    if (glow_saturation > 0.0) {
+        let target_rgb = hsv_to_rgb(vec3<f32>(glow_hue % 360.0, 1.0, 1.0));
+        let target_color = target_rgb / max(get_luma(target_rgb), 0.0001) * get_luma(max(bloom_color, vec3<f32>(0.0)));
+        bloom_color = mix(bloom_color, target_color, clamp(glow_saturation, 0.0, 1.0));
+    }
 
     let luma_factor = pow(linear_luma, 0.6);
 
@@ -1610,7 +1628,8 @@ fn apply_halation(
     blurred_color_input_space: vec3<f32>,
     amount: f32,
     is_raw: u32,
-    exp: f32, bright: f32, con: f32, wh: f32
+    exp: f32, bright: f32, con: f32, wh: f32,
+    hue_shift: f32
 ) -> vec3<f32> {
     if (amount <= 0.0) { return color; }
 
@@ -1642,8 +1661,8 @@ fn apply_halation(
     let range = max(1.5 - luma_cutoff, 0.1);
     let halation_mask = smoothstep(0.0, range * 0.6, excess);
 
-    let halation_core = vec3<f32>(1.0, 0.15, 0.03);
-    let halation_fringe = vec3<f32>(1.0, 0.32, 0.10);
+    let halation_core = rotate_hue(vec3<f32>(1.0, 0.15, 0.03), hue_shift);
+    let halation_fringe = rotate_hue(vec3<f32>(1.0, 0.32, 0.10), hue_shift);
 
     let intensity_blend = smoothstep(0.0, 0.7, halation_mask);
     let halation_tint = mix(halation_fringe, halation_core, intensity_blend);
@@ -1843,13 +1862,15 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     if (t_glow > 0.0) {
         processed_rgb = apply_glow_bloom(
             processed_rgb, structure_blurred, t_glow, is_raw,
-            t_exposure, t_brightness, t_contrast, t_whites
+            t_exposure, t_brightness, t_contrast, t_whites,
+            adjustments.global.glow_hue, adjustments.global.glow_saturation
         );
     }
     if (t_halation > 0.0) {
         processed_rgb = apply_halation(
             processed_rgb, clarity_blurred, t_halation, is_raw,
-            t_exposure, t_brightness, t_contrast, t_whites
+            t_exposure, t_brightness, t_contrast, t_whites,
+            adjustments.global.halation_hue_shift
         );
     }
     if (t_flare > 0.0) {
