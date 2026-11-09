@@ -2853,7 +2853,8 @@ pub fn generate_thumbnail_data(
 
         let base_cache_hash = crate::cache_utils::calculate_thumbnail_base_hash(&meta.adjustments);
 
-        let crop_data: Option<Crop> = serde_json::from_value(meta.adjustments["crop"].clone()).ok();
+        let crop_data: Option<Crop> =
+            serde::Deserialize::deserialize(&meta.adjustments["crop"]).ok();
 
         let cached_base: Option<(DynamicImage, f32)> = {
             let cache = state.thumbnail_geometry_cache.lock().unwrap();
@@ -3015,7 +3016,7 @@ pub fn generate_thumbnail_data(
         let mask_definitions: Vec<MaskDefinition> = meta
             .adjustments
             .get("masks")
-            .and_then(|m| serde_json::from_value(m.clone()).ok())
+            .and_then(|m| serde::Deserialize::deserialize(m).ok())
             .unwrap_or_else(Vec::new);
 
         let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions

@@ -19,6 +19,9 @@ interface SettingsState {
   handleSettingsChange: (newSettings: AppSettings) => Promise<void>;
 }
 
+/** The last queued settings save; see `handleSettingsChange`. */
+let settingsSaveQueue: Promise<void> = Promise.resolve();
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   appSettings: null,
   theme: DEFAULT_THEME_ID,
@@ -55,16 +58,22 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const { searchCriteria: _searchCriteria, ...settingsToSave } = newSettings as any;
     set({ appSettings: newSettings });
 
-    try {
-      if (affectedStackPaths.length > 0) {
-        await invoke(Invokes.SyncImageStacksToXmp, {
-          stacks: nextStacks,
-          affectedPaths: affectedStackPaths,
-        });
+    // Saves run one after another: otherwise a save waiting for the XMP stack sync could
+    // land after a later save and put the older settings back on disk.
+    const save = settingsSaveQueue.then(async () => {
+      try {
+        if (affectedStackPaths.length > 0) {
+          await invoke(Invokes.SyncImageStacksToXmp, {
+            stacks: nextStacks,
+            affectedPaths: affectedStackPaths,
+          });
+        }
+        await invoke(Invokes.SaveSettings, { settings: settingsToSave });
+      } catch (err) {
+        console.error('Failed to save settings:', err);
       }
-      await invoke(Invokes.SaveSettings, { settings: settingsToSave });
-    } catch (err) {
-      console.error('Failed to save settings:', err);
-    }
+    });
+    settingsSaveQueue = save;
+    await save;
   },
 }));

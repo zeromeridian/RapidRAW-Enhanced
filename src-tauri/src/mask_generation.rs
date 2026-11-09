@@ -547,7 +547,7 @@ fn generate_radial_bitmap(
     crop_offset: (f32, f32),
 ) -> GrayImage {
     let params: RadialMaskParameters =
-        serde_json::from_value(params_value.clone()).unwrap_or_default();
+        serde::Deserialize::deserialize(params_value).unwrap_or_default();
     let mut mask = GrayImage::new(width, height);
 
     let center_x = (params.center_x as f32 * scale - crop_offset.0) as i32;
@@ -591,7 +591,7 @@ fn generate_linear_bitmap(
     crop_offset: (f32, f32),
 ) -> GrayImage {
     let params: LinearMaskParameters =
-        serde_json::from_value(params_value.clone()).unwrap_or_default();
+        serde::Deserialize::deserialize(params_value).unwrap_or_default();
     let mut mask = GrayImage::new(width, height);
 
     let start_x = params.start_x as f32 * scale - crop_offset.0;
@@ -645,7 +645,7 @@ fn generate_brush_bitmap(
     crop_offset: (f32, f32),
 ) -> GrayImage {
     let params: BrushMaskParameters =
-        serde_json::from_value(params_value.clone()).unwrap_or_default();
+        serde::Deserialize::deserialize(params_value).unwrap_or_default();
     let mut final_mask = GrayImage::new(width, height);
 
     for line in &params.lines {
@@ -712,7 +712,7 @@ fn generate_flow_bitmap(
     crop_offset: (f32, f32),
 ) -> GrayImage {
     let params: FlowMaskParameters =
-        serde_json::from_value(params_value.clone()).unwrap_or_default();
+        serde::Deserialize::deserialize(params_value).unwrap_or_default();
     let mut final_mask = GrayImage::new(width, height);
 
     for line in &params.lines {
@@ -878,9 +878,9 @@ fn generate_ai_sky_bitmap(
     scale: f32,
     crop_offset: (f32, f32),
 ) -> Option<GrayImage> {
-    let params: AiSkyMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    let params: AiSkyMaskParameters = serde::Deserialize::deserialize(params_value).ok()?;
     let grow_feather: GrowFeatherParameters =
-        serde_json::from_value(params_value.clone()).unwrap_or_default();
+        serde::Deserialize::deserialize(params_value).unwrap_or_default();
     let data_url = params.mask_data_base64?;
 
     let tf = TransformParams {
@@ -913,9 +913,9 @@ fn generate_ai_depth_bitmap(
     scale: f32,
     crop_offset: (f32, f32),
 ) -> Option<GrayImage> {
-    let params: AiDepthMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    let params: AiDepthMaskParameters = serde::Deserialize::deserialize(params_value).ok()?;
     let grow_feather: GrowFeatherParameters =
-        serde_json::from_value(params_value.clone()).unwrap_or_default();
+        serde::Deserialize::deserialize(params_value).unwrap_or_default();
     let data_url = params.mask_data_base64?;
 
     let tf = TransformParams {
@@ -977,9 +977,9 @@ fn generate_ai_foreground_bitmap(
     scale: f32,
     crop_offset: (f32, f32),
 ) -> Option<GrayImage> {
-    let params: AiForegroundMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    let params: AiForegroundMaskParameters = serde::Deserialize::deserialize(params_value).ok()?;
     let grow_feather: GrowFeatherParameters =
-        serde_json::from_value(params_value.clone()).unwrap_or_default();
+        serde::Deserialize::deserialize(params_value).unwrap_or_default();
     let data_url = params.mask_data_base64?;
 
     let tf = TransformParams {
@@ -1012,9 +1012,9 @@ fn generate_ai_subject_bitmap(
     scale: f32,
     crop_offset: (f32, f32),
 ) -> Option<GrayImage> {
-    let params: AiSubjectMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    let params: AiSubjectMaskParameters = serde::Deserialize::deserialize(params_value).ok()?;
     let grow_feather: GrowFeatherParameters =
-        serde_json::from_value(params_value.clone()).unwrap_or_default();
+        serde::Deserialize::deserialize(params_value).unwrap_or_default();
     let data_url = params.mask_data_base64?;
 
     let tf = TransformParams {
@@ -1048,7 +1048,7 @@ fn generate_color_bitmap(
     crop_offset: (f32, f32),
     warped_image: Option<&image::DynamicImage>,
 ) -> Option<GrayImage> {
-    let params: ParametricMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    let params: ParametricMaskParameters = serde::Deserialize::deserialize(params_value).ok()?;
     let warped = warped_image?;
     let (full_w, full_h) = warped.dimensions();
 
@@ -1149,7 +1149,7 @@ fn generate_luminance_bitmap(
     crop_offset: (f32, f32),
     warped_image: Option<&image::DynamicImage>,
 ) -> Option<GrayImage> {
-    let params: ParametricMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    let params: ParametricMaskParameters = serde::Deserialize::deserialize(params_value).ok()?;
     let warped = warped_image?;
     let (full_w, full_h) = warped.dimensions();
 
@@ -1484,6 +1484,42 @@ pub fn resolve_warped_image_for_masks(
     }
 }
 
+/// Identifies a mask bitmap rendered at a given size and placement.
+fn mask_cache_key(
+    def: &MaskDefinition,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+) -> u64 {
+    let mut hasher = DefaultHasher::new();
+
+    // Everything but the mask's adjustments, which do not shape its bitmap. Destructured,
+    // so a new field cannot be left out of the key unnoticed.
+    let MaskDefinition {
+        id,
+        name,
+        visible,
+        invert,
+        opacity,
+        blend_mode,
+        adjustments: _,
+        sub_masks,
+    } = def;
+    crate::cache_utils::hash_json(
+        &(id, name, visible, invert, opacity, blend_mode, sub_masks),
+        &mut hasher,
+    );
+
+    width.hash(&mut hasher);
+    height.hash(&mut hasher);
+    scale.to_bits().hash(&mut hasher);
+    crop_offset.0.to_bits().hash(&mut hasher);
+    crop_offset.1.to_bits().hash(&mut hasher);
+
+    hasher.finish()
+}
+
 pub fn get_cached_or_generate_mask(
     state: &tauri::State<AppState>,
     def: &MaskDefinition,
@@ -1493,20 +1529,7 @@ pub fn get_cached_or_generate_mask(
     crop_offset: (f32, f32),
     adjustments: &serde_json::Value,
 ) -> Option<GrayImage> {
-    let mut hasher = DefaultHasher::new();
-
-    let mut def_for_hash = def.clone();
-    def_for_hash.adjustments = serde_json::Value::Null;
-    let def_json = serde_json::to_string(&def_for_hash).unwrap_or_default();
-    def_json.hash(&mut hasher);
-
-    width.hash(&mut hasher);
-    height.hash(&mut hasher);
-    scale.to_bits().hash(&mut hasher);
-    crop_offset.0.to_bits().hash(&mut hasher);
-    crop_offset.1.to_bits().hash(&mut hasher);
-
-    let key = hasher.finish();
+    let key = mask_cache_key(def, width, height, scale, crop_offset);
 
     {
         let cache = state.mask_cache.lock().unwrap();
@@ -1536,4 +1559,54 @@ pub fn get_cached_or_generate_mask(
     }
 
     generated
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MaskDefinition, mask_cache_key};
+    use serde_json::json;
+
+    fn mask(adjustments: serde_json::Value, brush_data: &str) -> MaskDefinition {
+        serde_json::from_value(json!({
+            "id": "m1",
+            "name": "Mask",
+            "visible": true,
+            "invert": false,
+            "adjustments": adjustments,
+            "subMasks": [{
+                "id": "s1",
+                "type": "brush",
+                "visible": true,
+                "mode": "additive",
+                "parameters": { "maskDataBase64": brush_data },
+            }],
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn mask_cache_key_ignores_adjustments_but_follows_the_bitmap_and_size() {
+        let base = mask_cache_key(
+            &mask(json!({ "exposure": 0 }), "AAAA"),
+            100,
+            50,
+            1.0,
+            (0.0, 0.0),
+        );
+
+        let other_adjustments = mask(json!({ "exposure": 2 }), "AAAA");
+        assert_eq!(
+            base,
+            mask_cache_key(&other_adjustments, 100, 50, 1.0, (0.0, 0.0))
+        );
+
+        let other_bitmap = mask(json!({ "exposure": 0 }), "BBBB");
+        assert_ne!(
+            base,
+            mask_cache_key(&other_bitmap, 100, 50, 1.0, (0.0, 0.0))
+        );
+        let same = mask(json!({ "exposure": 0 }), "AAAA");
+        assert_ne!(base, mask_cache_key(&same, 200, 50, 1.0, (0.0, 0.0)));
+        assert_ne!(base, mask_cache_key(&same, 100, 50, 1.0, (1.0, 0.0)));
+    }
 }

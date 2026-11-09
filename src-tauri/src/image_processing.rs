@@ -2767,7 +2767,7 @@ pub fn get_all_adjustments_from_json(
 
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
         .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .and_then(|m| serde::Deserialize::deserialize(m).ok())
         .unwrap_or_default();
 
     for (i, mask_def) in mask_definitions

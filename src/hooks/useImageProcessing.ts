@@ -9,10 +9,15 @@ import { Adjustments, COPYABLE_ADJUSTMENT_KEYS, getAdjustmentChanges } from '../
 import { Invokes, Panel } from '../components/ui/AppProperties';
 import { debouncedSave } from './useEditorActions';
 import { globalImageCache } from '../utils/ImageLRUCache';
+import { stripSentMaskData } from '../utils/maskUtils';
 
 const INTERACTIVE_ANALYTICS_MIN_INTERVAL_MS = 250;
 const INTERACTIVE_ANALYTICS_MAX_INTERVAL_MS = 1000;
 const INTERACTIVE_ANALYTICS_RENDER_COST_MULTIPLIER = 4;
+
+/** The unedited photo with the edit's geometry (the Before view), as a JPEG data URL. */
+const fetchOriginalPreview = (adjustments: Adjustments, targetResolution: number): Promise<string> =>
+  invoke(Invokes.GenerateOriginalTransformedPreview, { jsAdjustments: adjustments, targetResolution });
 
 export function useImageProcessing(
   transformWrapperRef: any,
@@ -157,50 +162,9 @@ export function useImageProcessing(
       if (!currentPath) return;
       const renderStartedAt = performance.now();
 
-      const payload = structuredClone(currentAdjustments);
       const { patchesSentToBackend } = useEditorStore.getState();
       const newlySentPatches = new Set<string>();
-
-      const processSubMasks = (subMasks: any[]) => {
-        if (!Array.isArray(subMasks)) return;
-        subMasks.forEach((sm: any) => {
-          if (sm.id && sm.parameters) {
-            const keys = ['mask_data_base64', 'maskDataBase64'];
-            let foundMaskData = false;
-
-            for (const key of keys) {
-              if (sm.parameters[key] !== undefined && sm.parameters[key] !== null) {
-                foundMaskData = true;
-                if (patchesSentToBackend.has(sm.id)) {
-                  sm.parameters[key] = null;
-                }
-              }
-            }
-            if (foundMaskData && !patchesSentToBackend.has(sm.id)) {
-              newlySentPatches.add(sm.id);
-            }
-          }
-        });
-      };
-
-      if (payload.aiPatches && Array.isArray(payload.aiPatches)) {
-        payload.aiPatches.forEach((p: any) => {
-          if (p.id && p.patchData && !p.isLoading) {
-            if (patchesSentToBackend.has(p.id)) {
-              p.patchData = null;
-            } else {
-              newlySentPatches.add(p.id);
-            }
-          }
-          if (p.subMasks) processSubMasks(p.subMasks);
-        });
-      }
-
-      if (payload.masks && Array.isArray(payload.masks)) {
-        payload.masks.forEach((container: any) => {
-          if (container.subMasks) processSubMasks(container.subMasks);
-        });
-      }
+      const payload = stripSentMaskData(currentAdjustments, patchesSentToBackend, newlySentPatches);
 
       const jobId = ++previewJobIdRef.current;
       const roi = calculateROI();
@@ -410,12 +374,9 @@ export function useImageProcessing(
       debounce(async (currentAdjustments: Adjustments, targetRes: number) => {
         if (targetRes > currentOriginalResRef.current) {
           try {
-            const base64Data: string = await invoke('generate_original_transformed_preview', {
-              jsAdjustments: currentAdjustments,
-              targetResolution: targetRes,
-            });
+            const dataUrl = await fetchOriginalPreview(currentAdjustments, targetRes);
             currentOriginalResRef.current = targetRes;
-            setEditor({ transformedOriginalUrl: base64Data });
+            setEditor({ transformedOriginalUrl: dataUrl });
           } catch (e) {
             console.error('Failed to generate hi-fi original preview:', e);
           }
@@ -556,13 +517,10 @@ export function useImageProcessing(
       if (showOriginal && selectedImage?.path && !transformedOriginalUrl) {
         try {
           const targetRes = calculateTargetRes();
-          const base64Data: string = await invoke('generate_original_transformed_preview', {
-            jsAdjustments: adjustments,
-            targetResolution: targetRes,
-          });
+          const dataUrl = await fetchOriginalPreview(adjustments, targetRes);
           if (isEffectActive) {
             currentOriginalResRef.current = targetRes;
-            setEditor({ transformedOriginalUrl: base64Data });
+            setEditor({ transformedOriginalUrl: dataUrl });
           }
         } catch (e) {
           if (isEffectActive) {

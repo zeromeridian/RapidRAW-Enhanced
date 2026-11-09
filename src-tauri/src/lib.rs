@@ -272,7 +272,7 @@ fn compute_transformed_preview(
         (warped_w as f64, warped_h as f64)
     };
 
-    let crop: Option<Crop> = serde_json::from_value(adjustments["crop"].clone()).ok();
+    let crop: Option<Crop> = serde::Deserialize::deserialize(&adjustments["crop"]).ok();
     let (full_w, full_h) = crop
         .as_ref()
         .and_then(|c| {
@@ -593,7 +593,7 @@ fn process_preview_job(
 
     let mask_definitions: Vec<MaskDefinition> = adjustments_clone
         .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .and_then(|m| serde::Deserialize::deserialize(m).ok())
         .unwrap_or_default();
 
     let scaled_crop_offset = (
@@ -959,7 +959,7 @@ fn render_uncropped_preview(app_handle: &tauri::AppHandle, job: UncroppedPreview
 
     let mask_definitions: Vec<MaskDefinition> = adjustments_clone
         .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .and_then(|m| serde::Deserialize::deserialize(m).ok())
         .unwrap_or_default();
 
     let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
@@ -1336,7 +1336,7 @@ fn generate_preset_preview_blocking(
 
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
         .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .and_then(|m| serde::Deserialize::deserialize(m).ok())
         .unwrap_or_default();
 
     let scaled_crop_offset = (
@@ -1482,7 +1482,7 @@ async fn generate_all_community_previews(
 
             let mask_definitions: Vec<MaskDefinition> = scaled_adjustments
                 .get("masks")
-                .and_then(|m| serde_json::from_value(m.clone()).ok())
+                .and_then(|m| serde::Deserialize::deserialize(m).ok())
                 .unwrap_or_else(Vec::new);
 
             let unscaled_crop_offset = js_adjustments
@@ -1773,7 +1773,7 @@ async fn generate_preview_for_path(
         let (img_w, img_h) = transformed_image.dimensions();
         let mask_definitions: Vec<MaskDefinition> = js_adjustments
             .get("masks")
-            .and_then(|m| serde_json::from_value(m.clone()).ok())
+            .and_then(|m| serde::Deserialize::deserialize(m).ok())
             .unwrap_or_default();
 
         let warped_image =

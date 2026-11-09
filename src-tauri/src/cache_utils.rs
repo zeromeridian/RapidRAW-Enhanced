@@ -233,12 +233,18 @@ impl<H: Hasher> std::io::Write for HashWriter<'_, H> {
     }
 }
 
+/// Feeds `value`'s compact JSON into `hasher` without building the text, so embedded
+/// bitmaps are hashed without being copied.
+pub fn hash_json<T: serde::Serialize + ?Sized>(value: &T, hasher: &mut impl Hasher) {
+    // Serializing plain data into a writer that never fails cannot fail.
+    let _ = serde_json::to_writer(HashWriter(hasher), value);
+}
+
 /// In-memory render cache key; never persisted, so its value may change between builds.
 pub fn calculate_full_job_hash(path: &str, adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
     path.hash(&mut hasher);
-    // Writing a `Value` cannot fail.
-    let _ = serde_json::to_writer(HashWriter(&mut hasher), adjustments);
+    hash_json(adjustments, &mut hasher);
     hasher.finish()
 }
 
