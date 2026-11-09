@@ -5,6 +5,16 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.38.1-fix-perf — 2026-11-09
+
+### Performance
+
+- Previews update with less overhead while you move a slider: settings are
+  no longer read from disk for every preview, and each finished preview
+  updates the screen once instead of twice.
+- The AI connector is only checked when an address is set, and a newly
+  entered address is checked right away instead of within 10 seconds.
+
 ## 1.38.0-fix-tweaks — 2026-11-09
 
 ### Develop

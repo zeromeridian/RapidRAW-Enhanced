@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -855,9 +856,29 @@ pub fn get_settings_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
     Ok(settings_dir.join("settings.json"))
 }
 
+/// The current settings without copying them. They are read from disk and migrated once,
+/// then served from memory; `save_settings` replaces them.
+pub fn settings_snapshot(app_handle: &AppHandle) -> Result<Arc<AppSettings>, String> {
+    let Some(state) = app_handle.try_state::<AppState>() else {
+        return read_settings_from_disk(app_handle).map(Arc::new);
+    };
+    // Held while reading, so concurrent first readers do not migrate the file twice.
+    let mut cached = state.settings.lock().unwrap();
+    if let Some(settings) = cached.as_ref() {
+        return Ok(Arc::clone(settings));
+    }
+    let settings = Arc::new(read_settings_from_disk(app_handle)?);
+    *cached = Some(Arc::clone(&settings));
+    Ok(settings)
+}
+
 #[tauri::command]
 pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
-    let path = get_settings_path(&app_handle)?;
+    settings_snapshot(&app_handle).map(|settings| (*settings).clone())
+}
+
+fn read_settings_from_disk(app_handle: &AppHandle) -> Result<AppSettings, String> {
+    let path = get_settings_path(app_handle)?;
 
     let mut settings: AppSettings = if path.exists() {
         let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
@@ -866,6 +887,18 @@ pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
         AppSettings::default()
     };
 
+    if migrate_settings(&mut settings)
+        && let Ok(json_string) = serde_json::to_string_pretty(&settings)
+    {
+        let _ = crate::file_management::write_file_atomically(&path, json_string.as_bytes());
+    }
+
+    Ok(settings)
+}
+
+/// Brings settings written by an older version up to date; true when anything changed.
+/// Idempotent, so it also normalizes every saved document.
+fn migrate_settings(settings: &mut AppSettings) -> bool {
     let all_current_keys = all_available_adjustments();
     let default_included = default_included_adjustments();
     let mut settings_modified = false;
@@ -915,20 +948,18 @@ pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
         }
     }
 
-    settings_modified |= migrate_keyword_sets(&mut settings);
+    settings_modified |= migrate_keyword_sets(settings);
 
-    if settings_modified && let Ok(json_string) = serde_json::to_string_pretty(&settings) {
-        let _ = crate::file_management::write_file_atomically(&path, json_string.as_bytes());
-    }
-
-    Ok(settings)
+    settings_modified
 }
 
 #[tauri::command]
-pub fn save_settings(settings: AppSettings, app_handle: AppHandle) -> Result<(), String> {
-    let previous_gpu_acceleration = load_settings(app_handle.clone())
+pub fn save_settings(mut settings: AppSettings, app_handle: AppHandle) -> Result<(), String> {
+    let previous_gpu_acceleration = settings_snapshot(&app_handle)
         .map(|previous| previous.ai_gpu_acceleration)
         .ok();
+    // Saved settings used to be migrated by the next read from disk; the cache skips that read.
+    migrate_settings(&mut settings);
     let path = get_settings_path(&app_handle)?;
     let json_string = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
     crate::file_management::write_file_atomically(&path, json_string.as_bytes())?;
@@ -944,13 +975,29 @@ pub fn save_settings(settings: AppSettings, app_handle: AppHandle) -> Result<(),
     if previous_gpu_acceleration != Some(settings.ai_gpu_acceleration) {
         crate::ai_processing::reset_ai_sessions(&state.ai_state);
     }
+    *state.settings.lock().unwrap() = Some(Arc::new(settings));
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{AppSettings, KEYWORD_SET_SIZE, migrate_keyword_sets};
+    use super::{AppSettings, KEYWORD_SET_SIZE, migrate_keyword_sets, migrate_settings};
     use serde_json::json;
+
+    #[test]
+    fn migrated_settings_stay_unchanged_when_migrated_again() {
+        let mut settings: AppSettings = serde_json::from_value(json!({
+            "lastRootPath": "/photos",
+            "taggingShortcuts": ["a", "b"],
+        }))
+        .unwrap();
+
+        assert!(migrate_settings(&mut settings));
+        let migrated = serde_json::to_value(&settings).unwrap();
+        assert!(!migrate_settings(&mut settings));
+        assert_eq!(serde_json::to_value(&settings).unwrap(), migrated);
+        assert_eq!(settings.root_folders, vec!["/photos".to_string()]);
+    }
 
     #[test]
     fn tagging_shortcuts_become_keyword_sets_once() {

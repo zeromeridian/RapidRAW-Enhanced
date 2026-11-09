@@ -545,7 +545,13 @@ function App() {
     }
   }, [activeRightPanel, activeMaskContainerId, activeAiPatchContainerId, setEditor]);
 
+  const aiConnectorAddress = appSettings?.aiConnectorAddress;
   useEffect(() => {
+    // Without an address the backend always reports "not connected", so there is nothing to poll.
+    if (!aiConnectorAddress) {
+      setEditor({ isAIConnectorConnected: false });
+      return;
+    }
     const unlisten = listen('ai-connector-status-update', (event: any) => {
       setEditor({ isAIConnectorConnected: event.payload.connected });
     });
@@ -555,7 +561,7 @@ function App() {
       clearInterval(interval);
       unlisten.then((f) => f());
     };
-  }, [setEditor]);
+  }, [aiConnectorAddress, setEditor]);
 
   const createResizeHandler = (stateKey: string, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
