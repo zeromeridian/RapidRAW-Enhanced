@@ -320,11 +320,10 @@ export default function EffectsPanel({
     <div className="space-y-4 compact:space-y-2">
       <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
         <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
-          {t('adjustments.effects.creative')}
+          {t('adjustments.effects.glow')}
         </Text>
-
         <Slider
-          label={t('adjustments.effects.glow')}
+          label={t('adjustments.effects.amount')}
           max={100}
           min={0}
           onChange={(e: any) => handleAdjustmentChange(CreativeAdjustment.GlowAmount, e.target.value)}
@@ -360,9 +359,14 @@ export default function EffectsPanel({
             />
           </>
         )}
+      </div>
 
+      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+        <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
+          {t('adjustments.effects.halation')}
+        </Text>
         <Slider
-          label={t('adjustments.effects.halation')}
+          label={t('adjustments.effects.amount')}
           max={100}
           min={0}
           onChange={(e: any) => handleAdjustmentChange(CreativeAdjustment.HalationAmount, e.target.value)}
@@ -383,9 +387,14 @@ export default function EffectsPanel({
             onDragStateChange={onDragStateChange}
           />
         )}
+      </div>
 
+      <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
+        <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
+          {t('adjustments.effects.lightFlares')}
+        </Text>
         <Slider
-          label={t('adjustments.effects.lightFlares')}
+          label={t('adjustments.effects.amount')}
           max={100}
           min={0}
           onChange={(e: any) => handleAdjustmentChange(CreativeAdjustment.FlareAmount, e.target.value)}

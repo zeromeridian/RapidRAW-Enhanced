@@ -138,7 +138,6 @@
       "bokehOctagonal": "Octagonal",
       "bokehRing": "Bubble (Ring)",
       "bokehShape": "Bokeh Shape",
-      "creative": "Creative",
       "depthMapMissing": "The depth map for this image is not stored in XMP and needs to be generated on this device.",
       "feather": "Feather",
       "fog": "Fog",
