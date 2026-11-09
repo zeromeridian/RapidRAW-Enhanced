@@ -295,8 +295,8 @@
     },
     "thumbnail": {
       "openIn": "Open in",
-      "previewLightroomEdits_one": "Preview Lightroom Edits",
-      "previewLightroomEdits_other": "Preview Lightroom Edits for {{count}} Images",
+      "importLightroomEdits_one": "Import Lightroom Edits",
+      "importLightroomEdits_other": "Import Lightroom Edits for {{count}} Images",
       "addToAlbum": "앨범에 추가",
       "autoAdjust_one": "이미지 자동 조정",
       "autoAdjust_other": "이미지 자동 조정",

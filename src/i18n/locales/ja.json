@@ -295,8 +295,8 @@
     },
     "thumbnail": {
       "openIn": "Open in",
-      "previewLightroomEdits_one": "Preview Lightroom Edits",
-      "previewLightroomEdits_other": "Preview Lightroom Edits for {{count}} Images",
+      "importLightroomEdits_one": "Import Lightroom Edits",
+      "importLightroomEdits_other": "Import Lightroom Edits for {{count}} Images",
       "addToAlbum": "アルバムに追加",
       "autoAdjust_one": "画像を自動補正",
       "autoAdjust_other": "画像を自動補正",

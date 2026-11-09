@@ -117,8 +117,11 @@ details are in `RELEASE_NOTES.MD`.
   copies separate from RapidRAW. Settings provides an explicit non-destructive
   importer for compatible `.rrdata` files that never overwrites existing
   `.tirdata` data or alters the RapidRAW originals.
-- Non-destructive Lightroom Classic XMP translation preview for selected
-  physical images. Each image's detailed proposed mappings and confidence are
+- **Import Lightroom Edits**: non-destructive Lightroom Classic XMP
+  translation preview for selected physical images. RAW photos are switched
+  to the Natural tone mapper (Lightroom's settings are made on top of Adobe
+  Standard), shown as its own reviewed change, and Lightroom Exposure is
+  converted to the same number of stops. Each image's detailed proposed mappings and confidence are
   available from a collapsed review disclosure,
   leaves `.tirdata` and Lightroom XMP untouched until explicit approval, then
   merges only approved supported fields while preserving ThisIsRAW-only edits.

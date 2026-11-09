@@ -295,8 +295,8 @@
     },
     "thumbnail": {
       "openIn": "Open in",
-      "previewLightroomEdits_one": "Preview Lightroom Edits",
-      "previewLightroomEdits_other": "Preview Lightroom Edits for {{count}} Images",
+      "importLightroomEdits_one": "Import Lightroom Edits",
+      "importLightroomEdits_other": "Import Lightroom Edits for {{count}} Images",
       "addToAlbum": "添加到相册",
       "autoAdjust_one": "自动调整图像",
       "autoAdjust_other": "自动调整图像",
