@@ -5,6 +5,25 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.38.2-fix-perf — 2026-11-09
+
+### Performance
+
+- The window no longer freezes while ThisIsRAW saves your edits, draws a
+  mask overlay, renders the Before view or preset previews, runs Auto
+  Adjust, or rates, labels, renames, copies, or duplicates photos. That
+  work now runs in the background, still in the order you started it.
+- Showing the Before view uses less memory on large RAW files.
+- Adjusting the photo in Crop no longer starts a new background render for
+  every change; only the latest one is drawn, so older frames can no longer
+  flash up.
+
+### Reliability
+
+- Edit sidecars (`.tirdata`) and XMP files are now replaced in one step, so
+  a crash, power loss, or full disk while saving can no longer leave them
+  cut off.
+
 ## 1.38.1-fix-perf — 2026-11-09
 
 ### Performance

@@ -1268,6 +1268,11 @@ pub fn inverse_transform_point(
 }
 
 pub fn apply_cpu_default_raw_processing(image: &mut DynamicImage) {
+    *image = cpu_default_raw_processed(image);
+}
+
+/// The default RAW curve applied to a new copy, so a shared image need not be cloned first.
+fn cpu_default_raw_processed(image: &DynamicImage) -> DynamicImage {
     let mut f32_image = image.to_rgb32f();
 
     const GAMMA: f32 = 2.38;
@@ -1288,15 +1293,15 @@ pub fn apply_cpu_default_raw_processing(image: &mut DynamicImage) {
         pixel_chunk[2] = b_contrast.clamp(0.0, 1.0);
     });
 
-    *image = DynamicImage::ImageRgb32F(f32_image);
+    DynamicImage::ImageRgb32F(f32_image)
 }
 
 pub fn build_full_source_image(base_image: &DynamicImage, is_raw: bool) -> Cow<'_, DynamicImage> {
-    let mut image = Cow::Borrowed(base_image);
     if is_raw {
-        apply_cpu_default_raw_processing(image.to_mut());
+        Cow::Owned(cpu_default_raw_processed(base_image))
+    } else {
+        Cow::Borrowed(base_image)
     }
-    image
 }
 
 pub fn apply_srgb_to_linear(mut image: DynamicImage) -> DynamicImage {
@@ -3786,8 +3791,8 @@ pub fn auto_results_to_json(results: &AutoAdjustmentResults) -> serde_json::Valu
 }
 
 #[tauri::command]
-pub fn calculate_auto_adjustments(
-    state: tauri::State<AppState>,
+pub async fn calculate_auto_adjustments(
+    state: tauri::State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
     let original_image = state
         .original_image
@@ -3798,9 +3803,12 @@ pub fn calculate_auto_adjustments(
         .image
         .clone();
 
-    let results = perform_auto_analysis(&original_image);
-
-    Ok(auto_results_to_json(&results))
+    crate::blocking_command::run_blocking(move || {
+        Ok(auto_results_to_json(&perform_auto_analysis(
+            &original_image,
+        )))
+    })
+    .await
 }
 
 #[cfg(test)]

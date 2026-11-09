@@ -683,7 +683,11 @@ pub async fn start_background_indexing(
                                     metadata.tags = Some(final_tags);
 
                                     if let Ok(json_string) = serde_json::to_string_pretty(&metadata)
-                                        && fs::write(sidecar_path, json_string).is_ok()
+                                        && crate::file_management::write_metadata_file(
+                                            &sidecar_path,
+                                            &json_string,
+                                        )
+                                        .is_ok()
                                     {
                                         changed_count_inner.fetch_add(1, Ordering::Relaxed);
                                     }
@@ -757,7 +761,7 @@ fn modify_tags_for_path(
     }
 
     let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
-    fs::write(sidecar_path, json_string).map_err(|e| e.to_string())?;
+    crate::file_management::write_metadata_file(&sidecar_path, &json_string)?;
     Ok(metadata)
 }
 

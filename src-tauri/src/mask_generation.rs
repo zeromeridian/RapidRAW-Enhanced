@@ -11,6 +11,7 @@ use std::f32::consts::PI;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::sync::Arc; // Required for parallel rasterization
+use tauri::Manager;
 
 use crate::app_state::AppState;
 use crate::get_cached_full_warped_image;
@@ -1392,7 +1393,30 @@ pub fn generate_mask_bitmap(
 }
 
 #[tauri::command]
-pub fn generate_mask_overlay(
+pub async fn generate_mask_overlay(
+    mask_def: serde_json::Value,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+    js_adjustments: Option<serde_json::Value>,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    crate::blocking_command::run_blocking(move || {
+        generate_mask_overlay_blocking(
+            mask_def,
+            width,
+            height,
+            scale,
+            crop_offset,
+            js_adjustments,
+            app_handle.state::<AppState>(),
+        )
+    })
+    .await
+}
+
+fn generate_mask_overlay_blocking(
     mut mask_def: serde_json::Value,
     width: u32,
     height: u32,
