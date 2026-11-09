@@ -2145,6 +2145,7 @@ fn process_and_get_dynamic_image_inner(
                             image: std::sync::Arc::new(dynamic_img),
                             compute_waveform: analytics.compute_waveform,
                             active_waveform_channel: analytics.active_waveform_channel,
+                            clipping_overlay: analytics.clipping_overlay,
                         });
                     }
                 }
@@ -2162,6 +2163,7 @@ fn process_and_get_dynamic_image_inner(
                             image: std::sync::Arc::new(dynamic_img),
                             compute_waveform: analytics.compute_waveform,
                             active_waveform_channel: analytics.active_waveform_channel,
+                            clipping_overlay: analytics.clipping_overlay,
                         });
                     }
                 });

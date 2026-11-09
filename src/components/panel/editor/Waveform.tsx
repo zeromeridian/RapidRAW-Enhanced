@@ -103,6 +103,55 @@ const HistogramView = ({ histogram }: { histogram: any }) => {
   );
 };
 
+type ClippedChannels = [boolean, boolean, boolean];
+
+/** Red, green, blue: whether any pixel is clipped (computed before the histogram is smoothed). */
+interface HistogramClipping {
+  shadowClipping?: ClippedChannels;
+  highlightClipping?: ClippedChannels;
+}
+
+// Like Lightroom Classic: white when every channel clips, the clipped channels' colour when only some do.
+const clippedChannelsColor = ([r, g, b]: ClippedChannels) => `rgb(${r ? 255 : 70}, ${g ? 255 : 70}, ${b ? 255 : 70})`;
+
+const ClippingIndicator = ({
+  side,
+  channels,
+  isWarningShown,
+  onToggle,
+  tooltip,
+}: {
+  side: 'shadows' | 'highlights';
+  channels: ClippedChannels;
+  isWarningShown: boolean;
+  onToggle?: () => void;
+  tooltip: string;
+}) => {
+  const clipsAll = channels.every(Boolean);
+  const clipsSome = channels.some(Boolean);
+  const points = side === 'shadows' ? '0,0 10,0 0,10' : '0,0 10,0 10,10';
+
+  return (
+    <button
+      aria-pressed={isWarningShown}
+      className={`absolute top-1 z-20 flex h-4 w-4 items-center justify-center rounded-sm ${
+        side === 'shadows' ? 'left-1' : 'right-1'
+      } ${isWarningShown ? 'ring-1 ring-accent' : ''}`}
+      data-tooltip={tooltip}
+      disabled={!onToggle}
+      onClick={onToggle}
+      type="button"
+    >
+      <svg
+        viewBox="0 0 10 10"
+        className={`h-2.5 w-2.5 ${clipsAll ? 'text-text-primary' : clipsSome ? '' : 'text-text-secondary opacity-40'}`}
+      >
+        <polygon points={points} fill={clipsSome && !clipsAll ? clippedChannelsColor(channels) : 'currentColor'} />
+      </svg>
+    </button>
+  );
+};
+
 const FakeHistogramLoader = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -465,6 +514,7 @@ export default function Waveform({
   const isHistogram = displayMode === DisplayMode.Histogram;
   const isVectorscope = displayMode === DisplayMode.Vectorscope;
   const isReady = isHistogram ? !!(histogram && histogram.red) : !!waveformData;
+  const clipping: HistogramClipping | undefined = histogram ?? undefined;
   const hadDataOnMount = useRef(isReady);
   const width = waveformData?.width || 256;
   const height = waveformData?.height || 256;
@@ -586,6 +636,23 @@ export default function Waveform({
           ) : null}
         </AnimatePresence>
       </div>
+
+      {isHistogram && isReady && (
+        <>
+          {(['shadows', 'highlights'] as const).map((side) => (
+            <ClippingIndicator
+              key={side}
+              side={side}
+              channels={
+                (side === 'shadows' ? clipping?.shadowClipping : clipping?.highlightClipping) ?? [false, false, false]
+              }
+              isWarningShown={!!showClipping}
+              onToggle={onToggleClipping}
+              tooltip={showClipping ? t('ui.waveform.tooltips.hideClipping') : t('ui.waveform.tooltips.showClipping')}
+            />
+          ))}
+        </>
+      )}
 
       <AnimatePresence>
         {isHovered && (

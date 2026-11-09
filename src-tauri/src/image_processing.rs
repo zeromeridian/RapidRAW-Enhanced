@@ -3053,70 +3053,113 @@ pub struct HistogramData {
     green: Vec<f32>,
     blue: Vec<f32>,
     luma: Vec<f32>,
+    /// Red, green, blue: whether any pixel is clipped to black (0) or white (255),
+    /// for the histogram's clipping indicators. Read from the counts before
+    /// smoothing, so a single clipped pixel counts.
+    #[serde(rename = "shadowClipping")]
+    shadow_clipping: [bool; 3],
+    #[serde(rename = "highlightClipping")]
+    highlight_clipping: [bool; 3],
 }
 
-pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramData, String> {
-    let init_hist = || ([0u32; 256], [0u32; 256], [0u32; 256], [0u32; 256]);
+/// Colours the shader paints over clipped pixels when the clipping warning is on.
+const HIGHLIGHT_WARNING_RGB: [usize; 3] = [255, 0, 0];
+const SHADOW_WARNING_RGB: [usize; 3] = [0, 0, 255];
 
-    let reduce_hist = |mut a: ([u32; 256], [u32; 256], [u32; 256], [u32; 256]),
-                       b: ([u32; 256], [u32; 256], [u32; 256], [u32; 256])| {
-        for i in 0..256 {
-            a.0[i] += b.0[i];
-            a.1[i] += b.1[i];
-            a.2[i] += b.2[i];
-            a.3[i] += b.3[i];
+#[derive(Clone, Copy)]
+struct HistogramCounts {
+    /// Red, green, blue, luma.
+    bins: [[u32; 256]; 4],
+    highlight_warnings: u32,
+    shadow_warnings: u32,
+}
+
+impl HistogramCounts {
+    fn new() -> Self {
+        Self {
+            bins: [[0; 256]; 4],
+            highlight_warnings: 0,
+            shadow_warnings: 0,
         }
-        a
+    }
+
+    /// Adds one 8-bit pixel. With the clipping warning on, a warning-coloured
+    /// pixel stands for a clipped pixel whose real colour is unknown: it is
+    /// counted as clipped in every channel and left out of the histogram.
+    fn add(&mut self, rgb: [usize; 3], clipping_overlay: bool) {
+        if clipping_overlay && rgb == HIGHLIGHT_WARNING_RGB {
+            self.highlight_warnings += 1;
+            return;
+        }
+        if clipping_overlay && rgb == SHADOW_WARNING_RGB {
+            self.shadow_warnings += 1;
+            return;
+        }
+        let [r, g, b] = rgb;
+        self.bins[0][r] += 1;
+        self.bins[1][g] += 1;
+        self.bins[2][b] += 1;
+        let luma = (r * 218 + g * 732 + b * 74) >> 10;
+        self.bins[3][luma.min(255)] += 1;
+    }
+
+    fn merge(mut self, other: Self) -> Self {
+        for (bins, other_bins) in self.bins.iter_mut().zip(other.bins.iter()) {
+            for (count, other_count) in bins.iter_mut().zip(other_bins.iter()) {
+                *count += other_count;
+            }
+        }
+        self.highlight_warnings += other.highlight_warnings;
+        self.shadow_warnings += other.shadow_warnings;
+        self
+    }
+
+    fn clipping(&self) -> ([bool; 3], [bool; 3]) {
+        let channel_clipped =
+            |bin: usize, warnings: u32| [0, 1, 2].map(|c| warnings > 0 || self.bins[c][bin] > 0);
+        (
+            channel_clipped(0, self.shadow_warnings),
+            channel_clipped(255, self.highlight_warnings),
+        )
+    }
+}
+
+pub fn calculate_histogram_from_image(
+    image: &DynamicImage,
+    clipping_overlay: bool,
+) -> Result<HistogramData, String> {
+    let counts = match image {
+        DynamicImage::ImageRgb32F(f32_img) => f32_img
+            .as_raw()
+            .par_chunks(30_000)
+            .fold(HistogramCounts::new, |mut acc, chunk| {
+                for pixel in chunk.chunks_exact(3).step_by(2) {
+                    let rgb = [0, 1, 2].map(|c| (pixel[c].clamp(0.0, 1.0) * 255.0) as usize);
+                    acc.add(rgb, clipping_overlay);
+                }
+                acc
+            })
+            .reduce(HistogramCounts::new, HistogramCounts::merge),
+        _ => image
+            .to_rgb8()
+            .as_raw()
+            .par_chunks(30_000)
+            .fold(HistogramCounts::new, |mut acc, chunk| {
+                for pixel in chunk.chunks_exact(3).step_by(2) {
+                    acc.add(
+                        [pixel[0] as usize, pixel[1] as usize, pixel[2] as usize],
+                        clipping_overlay,
+                    );
+                }
+                acc
+            })
+            .reduce(HistogramCounts::new, HistogramCounts::merge),
     };
 
-    let (r_c, g_c, b_c, l_c) = match image {
-        DynamicImage::ImageRgb32F(f32_img) => {
-            let raw = f32_img.as_raw();
-            raw.par_chunks(30_000)
-                .fold(init_hist, |mut acc, chunk| {
-                    for pixel in chunk.chunks_exact(3).step_by(2) {
-                        let r = (pixel[0].clamp(0.0, 1.0) * 255.0) as usize;
-                        let g = (pixel[1].clamp(0.0, 1.0) * 255.0) as usize;
-                        let b = (pixel[2].clamp(0.0, 1.0) * 255.0) as usize;
-
-                        acc.0[r] += 1;
-                        acc.1[g] += 1;
-                        acc.2[b] += 1;
-
-                        let luma = (r * 218 + g * 732 + b * 74) >> 10;
-                        acc.3[luma.min(255)] += 1;
-                    }
-                    acc
-                })
-                .reduce(init_hist, reduce_hist)
-        }
-        _ => {
-            let rgb = image.to_rgb8();
-            let raw = rgb.as_raw();
-            raw.par_chunks(30_000)
-                .fold(init_hist, |mut acc, chunk| {
-                    for pixel in chunk.chunks_exact(3).step_by(2) {
-                        let r = pixel[0] as usize;
-                        let g = pixel[1] as usize;
-                        let b = pixel[2] as usize;
-
-                        acc.0[r] += 1;
-                        acc.1[g] += 1;
-                        acc.2[b] += 1;
-
-                        let luma = (r * 218 + g * 732 + b * 74) >> 10;
-                        acc.3[luma.min(255)] += 1;
-                    }
-                    acc
-                })
-                .reduce(init_hist, reduce_hist)
-        }
-    };
-
-    let mut red: Vec<f32> = r_c.into_iter().map(|c| c as f32).collect();
-    let mut green: Vec<f32> = g_c.into_iter().map(|c| c as f32).collect();
-    let mut blue: Vec<f32> = b_c.into_iter().map(|c| c as f32).collect();
-    let mut luma: Vec<f32> = l_c.into_iter().map(|c| c as f32).collect();
+    let (shadow_clipping, highlight_clipping) = counts.clipping();
+    let [mut red, mut green, mut blue, mut luma] = counts
+        .bins
+        .map(|bins| bins.into_iter().map(|c| c as f32).collect::<Vec<f32>>());
 
     let smoothing_sigma = 2.0;
     apply_gaussian_smoothing(&mut red, smoothing_sigma);
@@ -3134,6 +3177,8 @@ pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramD
         green,
         blue,
         luma,
+        shadow_clipping,
+        highlight_clipping,
     })
 }
 
@@ -3762,7 +3807,7 @@ pub fn calculate_auto_adjustments(
 mod tests {
     use super::{
         AllAdjustments, DEFAULT_GLOW_HUE, GeometryParams, GlobalAdjustments, MaskAdjustments,
-        build_transform_matrix, compute_transform_constrain_scale,
+        build_transform_matrix, calculate_histogram_from_image, compute_transform_constrain_scale,
         get_global_adjustments_from_json, get_mask_adjustments_from_json, transform_covers_output,
         warp_image_geometry,
     };
@@ -3902,6 +3947,32 @@ mod tests {
         assert_eq!(adjustments.gaussian_blur_amount, 0.0);
         assert_eq!(adjustments.motion_blur_amount, 0.0);
         assert_eq!(adjustments.motion_blur_angle, 0.0);
+    }
+
+    #[test]
+    fn histogram_reports_clipped_channels() {
+        let mut image = Rgb32FImage::new(4, 1);
+        image.put_pixel(0, 0, Rgb([1.0, 0.5, 0.5]));
+        image.put_pixel(2, 0, Rgb([0.5, 0.5, 0.0]));
+        let histogram =
+            calculate_histogram_from_image(&DynamicImage::ImageRgb32F(image), false).unwrap();
+        assert_eq!(histogram.highlight_clipping, [true, false, false]);
+        assert_eq!(histogram.shadow_clipping, [false, false, true]);
+    }
+
+    #[test]
+    fn histogram_treats_clipping_warning_pixels_as_clipped() {
+        let mut image = Rgb32FImage::from_pixel(4, 1, Rgb([0.5, 0.5, 0.5]));
+        image.put_pixel(0, 0, Rgb([1.0, 0.0, 0.0]));
+        let image = DynamicImage::ImageRgb32F(image);
+
+        let with_warning = calculate_histogram_from_image(&image, true).unwrap();
+        assert_eq!(with_warning.highlight_clipping, [true; 3]);
+        assert_eq!(with_warning.shadow_clipping, [false; 3]);
+
+        let without_warning = calculate_histogram_from_image(&image, false).unwrap();
+        assert_eq!(without_warning.highlight_clipping, [true, false, false]);
+        assert_eq!(without_warning.shadow_clipping, [false, true, true]);
     }
 
     #[test]

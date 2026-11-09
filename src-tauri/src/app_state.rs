@@ -77,12 +77,15 @@ pub struct AnalyticsJob {
     pub image: Arc<DynamicImage>,
     pub compute_waveform: bool,
     pub active_waveform_channel: Option<String>,
+    /// The image carries the clipping-warning overlay (see `HistogramData`).
+    pub clipping_overlay: bool,
 }
 
 pub struct AnalyticsConfig {
     pub path: String,
     pub compute_waveform: bool,
     pub active_waveform_channel: Option<String>,
+    pub clipping_overlay: bool,
     pub sender: Sender<AnalyticsJob>,
 }
 

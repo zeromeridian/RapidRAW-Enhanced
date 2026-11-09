@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.38.0-fix-tweaks — 2026-11-09
+
+### Develop
+
+- The histogram now has **clipping indicators** in its top corners, like
+  Lightroom Classic: the left one for shadows, the right one for highlights.
+  They stay grey while nothing clips, turn white when all colours clip, and
+  show the colour of the clipped channels otherwise (for example red when
+  only red highlights clip). Click one to turn the clipping warning on the
+  photo on or off.
+- The histogram is no longer distorted by the red and blue clipping warning
+  while it is shown.
+
 ## 1.37.2-fix-tweaks — 2026-11-09
 
 ### Develop
