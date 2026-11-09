@@ -13,6 +13,8 @@ import {
   Adjustments,
   Effect,
   CreativeAdjustment,
+  DEFAULT_GLOW_HUE,
+  DEFAULT_HALATION_HUE,
   RelightLight,
   createRelightLight,
   getRelightLightColor,
@@ -330,6 +332,34 @@ export default function EffectsPanel({
           value={adjustments.glowAmount}
           onDragStateChange={onDragStateChange}
         />
+        {/* Glow and halation colours are global; mask glow and halation use them too. */}
+        {!isForMask && (
+          <>
+            <Slider
+              defaultValue={DEFAULT_GLOW_HUE}
+              label={t('adjustments.color.hue')}
+              max={360}
+              min={0}
+              onChange={(e: SliderChangeEvent) => handleAdjustmentChange(CreativeAdjustment.GlowHue, e.target.value)}
+              step={1}
+              value={adjustments.glowHue ?? DEFAULT_GLOW_HUE}
+              trackClassName="hue-range-track"
+              onDragStateChange={onDragStateChange}
+            />
+            <Slider
+              label={t('adjustments.color.saturation')}
+              max={100}
+              min={0}
+              onChange={(e: SliderChangeEvent) =>
+                handleAdjustmentChange(CreativeAdjustment.GlowSaturation, e.target.value)
+              }
+              step={1}
+              value={adjustments.glowSaturation ?? 0}
+              onDragStateChange={onDragStateChange}
+              fillOrigin="min"
+            />
+          </>
+        )}
 
         <Slider
           label={t('adjustments.effects.halation')}
@@ -340,6 +370,19 @@ export default function EffectsPanel({
           value={adjustments.halationAmount}
           onDragStateChange={onDragStateChange}
         />
+        {!isForMask && (
+          <Slider
+            defaultValue={DEFAULT_HALATION_HUE}
+            label={t('adjustments.color.hue')}
+            max={360}
+            min={0}
+            onChange={(e: SliderChangeEvent) => handleAdjustmentChange(CreativeAdjustment.HalationHue, e.target.value)}
+            step={1}
+            value={adjustments.halationHue ?? DEFAULT_HALATION_HUE}
+            trackClassName="hue-range-track"
+            onDragStateChange={onDragStateChange}
+          />
+        )}
 
         <Slider
           label={t('adjustments.effects.lightFlares')}
@@ -710,6 +753,17 @@ export default function EffectsPanel({
               fillOrigin="min"
             />
             <Slider
+              label={t('adjustments.effects.feather')}
+              max={100}
+              min={0}
+              defaultValue={0}
+              onChange={(e: SliderChangeEvent) => handleAdjustmentChange(Effect.FogFeather, e.target.value)}
+              step={1}
+              value={adjustments.fogFeather ?? 0}
+              onDragStateChange={onDragStateChange}
+              fillOrigin="min"
+            />
+            <Slider
               label={t('adjustments.effects.fogDensity')}
               max={100}
               min={0}
@@ -850,7 +904,8 @@ export default function EffectsPanel({
         </div>
       </div>
 
-      {adjustmentVisibility.vignette !== false && (
+      {/* Masks offer no vignette; an older mask that has one keeps the controls to change or remove it. */}
+      {adjustmentVisibility.vignette !== false && (!isForMask || !!adjustments.vignetteAmount) && (
         <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md">
           <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
             {t('adjustments.effects.vignette')}

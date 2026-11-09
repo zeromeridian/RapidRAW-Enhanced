@@ -1619,7 +1619,8 @@ pub struct GlobalAdjustments {
     pub chromatic_aberration_blue_yellow: f32,
     pub show_clipping: u32,
     pub is_raw_image: u32,
-    _pad_ca1: f32,
+    /// Degrees the halation colour is rotated from its built-in red-orange.
+    pub halation_hue_shift: f32,
 
     pub has_lut: u32,
     pub lut_intensity: f32,
@@ -1673,8 +1674,9 @@ pub struct GlobalAdjustments {
 
     pub motion_blur_amount: f32,
     pub motion_blur_angle: f32,
-    _pad_motion1: f32,
-    _pad_motion2: f32,
+    /// Glow colour hue in degrees and how far the glow moves toward it (0–1).
+    pub glow_hue: f32,
+    pub glow_saturation: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
@@ -1807,6 +1809,13 @@ struct AdjustmentScales {
     flares: f32,
     motion_blur: f32,
 }
+
+/// Built-in halation colour (red-orange, degrees). `halationHue` rotates the
+/// halation tint away from it; the frontend's default mirrors it.
+pub const DEFAULT_HALATION_HUE: f64 = 10.0;
+/// Hue the Glow colour starts at (warm gold); it has no effect until
+/// `glowSaturation` is raised. The frontend's default mirrors it.
+pub const DEFAULT_GLOW_HUE: f64 = 35.0;
 
 /// Stored `exposure` (EV Shift) value per stop: the shader applies
 /// `2^(exposure / EV_SHIFT_SCALE)`, so a stored 1.0 is 1.25 stops.
@@ -2471,7 +2480,8 @@ fn get_global_adjustments_from_json(
             0
         },
         is_raw_image: if is_raw { 1 } else { 0 },
-        _pad_ca1: 0.0,
+        halation_hue_shift: get_val("effects", "halationHue", 1.0, Some(DEFAULT_HALATION_HUE))
+            - DEFAULT_HALATION_HUE as f32,
 
         has_lut,
         lut_intensity,
@@ -2561,8 +2571,8 @@ fn get_global_adjustments_from_json(
             motion_blur_amount,
             get_val("effects", "motionBlurAngle", 1.0, None),
         ),
-        _pad_motion1: 0.0,
-        _pad_motion2: 0.0,
+        glow_hue: get_val("effects", "glowHue", 1.0, Some(DEFAULT_GLOW_HUE)),
+        glow_saturation: get_val("effects", "glowSaturation", 100.0, None),
     }
 }
 
@@ -3751,9 +3761,10 @@ pub fn calculate_auto_adjustments(
 #[cfg(test)]
 mod tests {
     use super::{
-        AllAdjustments, GeometryParams, GlobalAdjustments, MaskAdjustments, build_transform_matrix,
-        compute_transform_constrain_scale, get_global_adjustments_from_json,
-        get_mask_adjustments_from_json, transform_covers_output, warp_image_geometry,
+        AllAdjustments, DEFAULT_GLOW_HUE, GeometryParams, GlobalAdjustments, MaskAdjustments,
+        build_transform_matrix, compute_transform_constrain_scale,
+        get_global_adjustments_from_json, get_mask_adjustments_from_json, transform_covers_output,
+        warp_image_geometry,
     };
     use image::{DynamicImage, Rgb, Rgb32FImage};
     use serde_json::json;
@@ -3891,6 +3902,23 @@ mod tests {
         assert_eq!(adjustments.gaussian_blur_amount, 0.0);
         assert_eq!(adjustments.motion_blur_amount, 0.0);
         assert_eq!(adjustments.motion_blur_angle, 0.0);
+    }
+
+    #[test]
+    fn glow_and_halation_colours_default_to_the_built_in_look() {
+        let legacy = get_global_adjustments_from_json(&json!({ "glowAmount": 40 }), true, None);
+        assert_eq!(legacy.halation_hue_shift, 0.0);
+        assert_eq!(legacy.glow_saturation, 0.0);
+        assert_eq!(legacy.glow_hue, DEFAULT_GLOW_HUE as f32);
+
+        let coloured = get_global_adjustments_from_json(
+            &json!({ "glowHue": 200, "glowSaturation": 60, "halationHue": 130 }),
+            true,
+            None,
+        );
+        assert_eq!(coloured.glow_hue, 200.0);
+        assert!((coloured.glow_saturation - 0.6).abs() < 1e-6);
+        assert_eq!(coloured.halation_hue_shift, 120.0);
     }
 
     #[test]

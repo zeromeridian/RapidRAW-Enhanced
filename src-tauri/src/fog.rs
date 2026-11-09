@@ -9,6 +9,7 @@ pub const FOG_DEPTH_MAP_KEY: &str = "fogDepthMap";
 pub const FOG_KEYS: &[&str] = &[
     "fogAmount",
     "fogStart",
+    "fogFeather",
     "fogDensity",
     "fogHeight",
     "fogVariation",
@@ -17,6 +18,20 @@ pub const FOG_KEYS: &[&str] = &[
     "fogTint",
     FOG_DEPTH_MAP_KEY,
 ];
+
+/// How far past `start` the fog has risen: `max(0, x)` with the corner at 0
+/// rounded over `±knee`, so the fog fades in instead of starting abruptly.
+/// With `knee` 0 it is the plain ramp older edits render with.
+#[inline(always)]
+fn feathered_onset(x: f32, knee: f32) -> f32 {
+    if x >= knee {
+        x
+    } else if x <= -knee {
+        0.0
+    } else {
+        (x + knee) * (x + knee) / (4.0 * knee)
+    }
+}
 
 #[inline(always)]
 fn fog_hash(x: i32, y: i32) -> f32 {
@@ -107,6 +122,8 @@ pub fn apply_fog<'a>(
         return image;
     }
     let start = get("fogStart", 0.0).min(0.99);
+    // Half-width of the rounded onset, in the same 0–1 distance as `start`.
+    let knee = get("fogFeather", 0.0) * 0.5;
     let density = 0.5 + get("fogDensity", 50.0) * 7.5;
     let height = get("fogHeight", 0.0) * 6.0;
     let variation = get("fogVariation", 25.0);
@@ -265,7 +282,7 @@ pub fn apply_fog<'a>(
                     .guided(&model, relight_luma(row[i], row[i + 1], row[i + 2]))
                     .clamp(0.0, 1.0);
                 let distance = (1.0 / (d + near) - z_near) / z_range;
-                let t = ((distance - start) / (1.0 - start)).clamp(0.0, 1.0);
+                let t = (feathered_onset(distance - start, knee) / (1.0 - start)).clamp(0.0, 1.0);
 
                 let up = 1.0 - to_display(u, v).1;
                 let patches =
@@ -292,4 +309,32 @@ pub fn apply_fog<'a>(
     log::info!("fog ({}x{}) took {:.2?}", w, h, start_time.elapsed());
 
     Cow::Owned(DynamicImage::ImageRgb32F(out))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::feathered_onset;
+
+    #[test]
+    fn feathered_onset_without_feather_is_the_plain_ramp() {
+        for x in [-0.5f32, -0.01, 0.0, 0.01, 0.3, 1.0] {
+            assert_eq!(feathered_onset(x, 0.0), x.max(0.0));
+        }
+    }
+
+    #[test]
+    fn feathered_onset_rounds_the_corner_and_rejoins_the_ramp() {
+        let knee = 0.2;
+        assert_eq!(feathered_onset(-0.2, knee), 0.0);
+        assert!(feathered_onset(-0.1, knee) > 0.0);
+        assert!((feathered_onset(0.0, knee) - 0.05).abs() < 1e-6);
+        assert_eq!(feathered_onset(0.2, knee), 0.2);
+        assert_eq!(feathered_onset(0.5, knee), 0.5);
+        let mut previous = 0.0;
+        for i in 0..=40 {
+            let value = feathered_onset(-0.2 + i as f32 * 0.01, knee);
+            assert!(value >= previous);
+            previous = value;
+        }
+    }
 }

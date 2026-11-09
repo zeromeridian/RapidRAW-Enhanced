@@ -25,6 +25,7 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { orientNormalizedPoint, rotatePoint, unorientNormalizedPoint } from '../../../utils/cropUtils';
 import { lightsOutTarget } from '../../../utils/lightsOut';
+import { applyCrop } from '../../../hooks/useEditorActions';
 
 interface CursorPreview {
   visible: boolean;
@@ -2795,6 +2796,20 @@ const ImageCanvas = memo(
       return `rotate(${rotation}deg)`;
     }, [adjustments.rotation, liveRotation]);
 
+    // Double-clicking inside the crop frame accepts the crop like Enter (as in Lightroom Classic).
+    // The frame's edges, corner handles and rotate button keep their own gestures.
+    const handleCropDoubleClick = useCallback(
+      (event: React.MouseEvent<HTMLDivElement>) => {
+        if (event.button !== 0 || isStraightenActive) return;
+        const target = event.target as HTMLElement;
+        if (!target.closest('.ReactCrop__crop-selection')) return;
+        if (target.closest('button, .ReactCrop__drag-handle, .ReactCrop__drag-bar')) return;
+        event.preventDefault();
+        applyCrop();
+      },
+      [isStraightenActive],
+    );
+
     const getRotationDragAngle = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
       const cropFrame = event.currentTarget.closest('.ReactCrop__crop-selection');
       if (!cropFrame) return null;
@@ -3301,6 +3316,7 @@ const ImageCanvas = memo(
           {cropPreviewUrl && uncroppedImageRenderSize && (
             <div
               {...lightsOutTarget(isCropViewVisible, 0, true)}
+              onDoubleClick={handleCropDoubleClick}
               style={{
                 height: uncroppedImageRenderSize.height,
                 position: 'relative',

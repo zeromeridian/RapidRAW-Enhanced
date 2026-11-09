@@ -283,7 +283,7 @@ export default function Controls() {
         )}
       </AnimatePresence>
 
-      <div className="grow overflow-y-scroll p-4 compact:p-0 flex flex-col gap-2 compact:gap-1.5">
+      <div className="grow overflow-y-scroll p-4 compact:p-0 flex flex-col gap-2 compact:gap-2.5">
         {Object.keys(ADJUSTMENT_SECTIONS).map((sectionName: string) => {
           const SectionComponent: any = {
             basic: BasicAdjustments,

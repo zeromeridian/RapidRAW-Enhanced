@@ -5,6 +5,24 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.37.0-fix-tweaks — 2026-11-09
+
+### Develop
+
+- **Crop:** double-click inside the crop frame to keep the crop and close
+  Crop, like pressing Enter (as in Lightroom Classic).
+- **Glow** now has a colour: **Hue** and **Saturation** below the Glow
+  slider. At Saturation 0 the glow keeps the photo's own colours, as before.
+- **Halation** now has a **Hue**. It starts at the familiar red-orange.
+- **Fog** has a new **Feather** setting that fades the fog in gently where it
+  starts, instead of a hard edge when Start is above 0.
+- The mask editor no longer offers **Vignette**. Masks that already use one
+  keep the controls so you can change or remove it.
+- With Compact panel density, the Adjustments sections (Basic, Curves,
+  Color, and so on) have a little more room between them.
+- Glow and halation colours and Fog Feather need ThisIsRAW 1.37.0 or newer;
+  older versions show those photos with the default glow, halation, and fog.
+
 ## 1.36.1-fix-tweaks — 2026-11-09
 
 ### Library and Develop
