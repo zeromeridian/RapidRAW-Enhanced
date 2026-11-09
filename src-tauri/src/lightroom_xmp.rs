@@ -9,10 +9,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::file_management::{parse_virtual_path, resolve_xmp_path, write_file_atomically};
-use crate::image_processing::ImageMetadata;
+use crate::formats::is_raw_file;
+use crate::image_processing::{EV_SHIFT_SCALE, ImageMetadata};
 use crate::preset_converter::{
     convert_lightroom_absolute_temperature, convert_lightroom_absolute_tint,
 };
+use crate::tone_mapping::TONE_MAPPER_NATURAL;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -366,14 +368,37 @@ fn add_curve(
     );
 }
 
-fn translate(parsed: &ParsedXmp, current: &Value) -> Translation {
+fn translate(parsed: &ParsedXmp, current: &Value, is_raw: bool) -> Translation {
     let mut translation = Translation {
         patch: json!({}),
         ..Translation::default()
     };
 
+    // Lightroom's settings are made on top of a profile's rendering; on RAW
+    // files Natural is the tone mapper that approximates Adobe Standard.
+    // Non-RAW images render the same in Natural and Basic, so they keep theirs.
+    let renders_natural = is_raw && parsed.settings.scalars.contains_key("ProcessVersion");
+    if renders_natural {
+        add_change(
+            &mut translation,
+            current,
+            "ProcessVersion",
+            &["toneMapper"],
+            json!(TONE_MAPPER_NATURAL),
+            "approximate",
+        );
+    }
+
     for (source, target, min, max, scale, confidence) in [
-        ("Exposure2012", "exposure", -5.0, 5.0, 1.0, "approximate"),
+        // Lightroom's Exposure is in stops; EV Shift is scaled.
+        (
+            "Exposure2012",
+            "exposure",
+            -5.0,
+            5.0,
+            EV_SHIFT_SCALE,
+            "approximate",
+        ),
         ("Contrast2012", "contrast", -100.0, 100.0, 1.0, "close"),
         ("Highlights2012", "highlights", -100.0, 100.0, 1.0, "close"),
         ("Shadows2012", "shadows", -100.0, 100.0, 1.0, "close"),
@@ -628,7 +653,11 @@ fn translate(parsed: &ParsedXmp, current: &Value) -> Translation {
     for (field, warning) in [
         (
             "CameraProfile",
-            "The Lightroom camera profile cannot be reproduced exactly.",
+            if renders_natural {
+                "The Lightroom camera profile cannot be reproduced exactly; the Natural tone mapper approximates Adobe Standard."
+            } else {
+                "The Lightroom camera profile cannot be reproduced exactly."
+            },
         ),
         (
             "LensProfileEnable",
@@ -748,7 +777,7 @@ fn build_preview(path: String) -> LightroomImportPreview {
             };
         }
     };
-    let translation = translate(&parsed, &metadata.adjustments);
+    let translation = translate(&parsed, &metadata.adjustments, is_raw_file(&source_path));
     let process_version = parsed.settings.scalars.get("ProcessVersion").cloned();
     let error = if translation.changes.is_empty() {
         Some(
@@ -813,7 +842,7 @@ pub fn apply_approved_lightroom_xmp_edits(
                 approval.path
             ));
         }
-        let translation = translate(&parsed, &metadata.adjustments);
+        let translation = translate(&parsed, &metadata.adjustments, is_raw_file(&source_path));
         if translation.changes.is_empty() {
             skipped += 1;
             continue;
@@ -840,7 +869,7 @@ mod tests {
         preview_lightroom_xmp_edits, translate,
     };
     use crate::image_processing::ImageMetadata;
-    use serde_json::json;
+    use serde_json::{Value, json};
     use std::fs;
 
     const SAMPLE_XMP: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -872,11 +901,12 @@ mod tests {
             "masks": [{"id": "keep-me"}],
             "hsl": {"reds": {"hue": 0, "saturation": 7, "luminance": 0}}
         });
-        let translation = translate(&parsed, &current);
+        let translation = translate(&parsed, &current, false);
         let mut merged = current.clone();
         merge_patch(&mut merged, &translation.patch);
 
-        assert_eq!(merged["exposure"], json!(1.25));
+        // +1.25 stops in Lightroom is EV Shift 1.0 (1.25 stops).
+        assert_eq!(merged["exposure"], json!(1.0));
         assert_eq!(merged["contrast"], json!(12.0));
         assert_eq!(merged["hsl"]["reds"]["hue"], json!(-8.0));
         assert_eq!(merged["hsl"]["reds"]["saturation"], json!(7));
@@ -924,7 +954,7 @@ mod tests {
     #[test]
     fn profile_parameters_do_not_override_user_settings() {
         let parsed = parse_xmp(PROFILE_XMP).unwrap();
-        let translation = translate(&parsed, &json!({}));
+        let translation = translate(&parsed, &json!({}), false);
         let mut merged = json!({});
         merge_patch(&mut merged, &translation.patch);
 
@@ -946,9 +976,32 @@ mod tests {
     }
 
     #[test]
+    fn raw_imports_switch_to_natural_and_non_raw_keep_their_tone_mapper() {
+        let parsed = parse_xmp(SAMPLE_XMP).unwrap();
+
+        let unedited_raw = translate(&parsed, &Value::Null, true);
+        assert_eq!(unedited_raw.patch["toneMapper"], json!("natural"));
+
+        let agx_raw = translate(&parsed, &json!({"toneMapper": "agx"}), true);
+        let change = agx_raw
+            .changes
+            .iter()
+            .find(|change| change.target == "toneMapper")
+            .unwrap();
+        assert_eq!(change.previous, json!("agx"));
+        assert_eq!(change.proposed, json!("natural"));
+
+        let natural_raw = translate(&parsed, &json!({"toneMapper": "natural"}), true);
+        assert!(natural_raw.patch.get("toneMapper").is_none());
+
+        let jpeg = translate(&parsed, &Value::Null, false);
+        assert!(jpeg.patch.get("toneMapper").is_none());
+    }
+
+    #[test]
     fn curve_points_are_sorted_and_unique() {
         let parsed = parse_xmp(PROFILE_XMP).unwrap();
-        let translation = translate(&parsed, &json!({}));
+        let translation = translate(&parsed, &json!({}), false);
 
         assert_eq!(
             translation.patch["curves"]["red"],
@@ -989,8 +1042,9 @@ mod tests {
         assert_eq!(result.applied_paths, vec![image.to_string_lossy()]);
 
         let updated: ImageMetadata = serde_json::from_slice(&fs::read(&sidecar).unwrap()).unwrap();
-        assert_eq!(updated.adjustments["exposure"], json!(1.25));
+        assert_eq!(updated.adjustments["exposure"], json!(1.0));
         assert_eq!(updated.adjustments["masks"][0]["id"], json!("preserved"));
+        assert_eq!(updated.adjustments["toneMapper"], json!("natural"));
         assert_eq!(fs::read(&xmp).unwrap(), original_xmp);
     }
 }

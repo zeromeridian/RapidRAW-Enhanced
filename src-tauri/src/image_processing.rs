@@ -1808,8 +1808,12 @@ struct AdjustmentScales {
     motion_blur: f32,
 }
 
+/// Stored `exposure` (EV Shift) value per stop: the shader applies
+/// `2^(exposure / EV_SHIFT_SCALE)`, so a stored 1.0 is 1.25 stops.
+pub const EV_SHIFT_SCALE: f64 = 0.8;
+
 const SCALES: AdjustmentScales = AdjustmentScales {
-    exposure: 0.8,
+    exposure: EV_SHIFT_SCALE as f32,
     brightness: 0.8,
     contrast: 100.0,
     highlights: 120.0,

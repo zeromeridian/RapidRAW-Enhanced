@@ -300,9 +300,9 @@
     },
     "thumbnail": {
       "openIn": "Abrir em",
-      "previewLightroomEdits_one": "Preview Lightroom Edits",
-      "previewLightroomEdits_many": "Preview Lightroom Edits for {{count}} Images",
-      "previewLightroomEdits_other": "Preview Lightroom Edits for {{count}} Images",
+      "importLightroomEdits_one": "Import Lightroom Edits",
+      "importLightroomEdits_many": "Import Lightroom Edits for {{count}} Images",
+      "importLightroomEdits_other": "Import Lightroom Edits for {{count}} Images",
       "addToAlbum": "Adicionar ao Álbum",
       "autoAdjust_many": "Ajustar Imagens Automaticamente",
       "autoAdjust_one": "Ajustar Imagem Automaticamente",

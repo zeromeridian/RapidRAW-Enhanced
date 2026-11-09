@@ -5,6 +5,19 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.36.1-fix-tweaks — 2026-11-09
+
+### Library and Develop
+
+- **Preview Lightroom Edits** is now called **Import Lightroom Edits**.
+- Importing Lightroom edits onto a RAW photo now switches it to the
+  **Natural** tone mapper, which matches Lightroom's Adobe Standard rendering
+  that those edits were made on. Before, a RAW photo without ThisIsRAW edits
+  turned to Basic. The switch is listed in the review like any other change.
+  Run the import again on photos imported earlier to move them to Natural.
+- Imported Lightroom **Exposure** now gives the same number of stops in
+  ThisIsRAW. It was 25 % too strong before.
+
 ## 1.36.0-dev-info-sort — 2026-11-08
 
 ### Library and Develop

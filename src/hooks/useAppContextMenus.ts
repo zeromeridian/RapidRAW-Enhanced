@@ -328,7 +328,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           disabled: copiedAdjustments === null,
         },
         {
-          label: t('contextMenus.thumbnail.previewLightroomEdits', { count: 1 }),
+          label: t('contextMenus.thumbnail.importLightroomEdits', { count: 1 }),
           icon: FileSearch,
           onClick: () => {
             debouncedSave.flush();
@@ -736,7 +736,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         {
           disabled: finalSelection.length === 0,
           icon: FileSearch,
-          label: t('contextMenus.thumbnail.previewLightroomEdits', { count: selectionCount }),
+          label: t('contextMenus.thumbnail.importLightroomEdits', { count: selectionCount }),
           onClick: () => {
             debouncedSave.flush();
             setUI({ lightroomImportModalState: { isOpen: true, targetPaths: finalSelection } });
