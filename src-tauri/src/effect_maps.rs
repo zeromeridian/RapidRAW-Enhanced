@@ -2,7 +2,9 @@ use crate::cache_utils::GEOMETRY_KEYS;
 use crate::image_processing::{
     GeometryParams, get_geometry_params_from_json, is_geometry_identity, warp_image_geometry,
 };
+use crate::relight::RELIGHT_NORMAL_MAP_KEY;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use image::imageops::{FilterType, resize, thumbnail};
 use image::{DynamicImage, GrayImage, Luma, Rgb, Rgb32FImage, Rgba, RgbaImage};
 use rayon::prelude::*;
 use std::collections::hash_map::DefaultHasher;
@@ -94,6 +96,91 @@ pub fn resolve_rgba_map(data_url: &str, adjustments: &serde_json::Value) -> Opti
             }))
         },
     )
+}
+
+/// The small colour + depth (and, for Relight, normal) grid behind the 3D depth view.
+///
+/// `map_key` names an effect map in `adjustments`; `map_data` is a depth mask's own map instead.
+/// Layout (little endian): width, height, has-normals as `u32`, then one RGBA texel per cell
+/// (colour, nearness 0–255 in alpha), then for Relight one RGBA texel per cell of the normal map.
+pub fn build_depth_preview(
+    image: &DynamicImage,
+    is_raw: bool,
+    adjustments: &serde_json::Value,
+    map_key: Option<&str>,
+    map_data: Option<&str>,
+    max_size: u32,
+) -> Option<Vec<u8>> {
+    let data_url = match map_data {
+        Some(data) => data,
+        None => adjustments[map_key?].as_str()?,
+    };
+    if data_url.is_empty() {
+        return None;
+    }
+    let with_normals = map_data.is_none() && map_key == Some(RELIGHT_NORMAL_MAP_KEY);
+
+    let fit = |(mw, mh): (u32, u32)| {
+        let scale = (max_size as f32 / mw.max(mh) as f32).min(1.0);
+        (
+            ((mw as f32 * scale).round() as u32).max(2),
+            ((mh as f32 * scale).round() as u32).max(2),
+        )
+    };
+    let (map, (w, h)) = if map_data.is_some() {
+        let decoded = decode_data_url(data_url)?;
+        let depth = if is_source_space_map(data_url) {
+            warp_effect_map(&decoded, adjustments)
+        } else {
+            decoded
+        }
+        .into_luma8();
+        let (w, h) = fit(depth.dimensions());
+        (DynamicImage::ImageLuma8(thumbnail(&depth, w, h)), (w, h))
+    } else if with_normals {
+        let normals = resolve_rgba_map(data_url, adjustments)?;
+        let (w, h) = fit(normals.dimensions());
+        (
+            DynamicImage::ImageRgba8(resize(&*normals, w, h, FilterType::Triangle)),
+            (w, h),
+        )
+    } else {
+        let depth = resolve_luma_map(data_url, adjustments)?;
+        let (w, h) = fit(depth.dimensions());
+        (
+            DynamicImage::ImageLuma8(resize(&*depth, w, h, FilterType::Triangle)),
+            (w, h),
+        )
+    };
+
+    // Downscale first: the RAW curve and the warp then run on a few thousand pixels.
+    let sampled = image.resize_exact(w * 2, h * 2, FilterType::Nearest);
+    let source = crate::image_processing::build_full_source_image(&sampled, is_raw);
+    let color = warp_effect_map(&source, adjustments)
+        .resize_exact(w, h, FilterType::Triangle)
+        .into_rgb8();
+
+    let mut out = Vec::with_capacity(12 + (w * h) as usize * if with_normals { 8 } else { 4 });
+    for value in [w, h, with_normals as u32] {
+        out.extend_from_slice(&value.to_le_bytes());
+    }
+    match &map {
+        DynamicImage::ImageRgba8(normals) => {
+            // The normal map's alpha is distance; the grid stores nearness like a depth map.
+            for (c, n) in color.pixels().zip(normals.pixels()) {
+                out.extend_from_slice(&[c[0], c[1], c[2], 255 - n[3]]);
+            }
+            for n in normals.pixels() {
+                out.extend_from_slice(&[n[0], n[1], n[2], 255]);
+            }
+        }
+        _ => {
+            for (c, d) in color.pixels().zip(map.to_luma8().pixels()) {
+                out.extend_from_slice(&[c[0], c[1], c[2], d[0]]);
+            }
+        }
+    }
+    Some(out)
 }
 
 fn effect_map_geometry_params(adjustments: &serde_json::Value) -> GeometryParams {
@@ -207,7 +294,63 @@ fn cached_map<T>(
 
 #[cfg(test)]
 mod tests {
-    use super::rotate_normal;
+    use super::{build_depth_preview, encode_source_space_map, rotate_normal};
+    use image::{DynamicImage, GrayImage, Luma, Rgb, RgbImage, Rgba, RgbaImage};
+
+    fn header(bytes: &[u8]) -> [u32; 3] {
+        [0, 1, 2].map(|i| u32::from_le_bytes(bytes[i * 4..i * 4 + 4].try_into().unwrap()))
+    }
+
+    #[test]
+    fn depth_preview_packs_colour_with_nearness_and_fits_the_size() {
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(64, 32, Rgb([200, 100, 50])));
+        let depth = GrayImage::from_fn(32, 16, |x, _| Luma([if x < 16 { 40 } else { 220 }]));
+        let map = encode_source_space_map(&DynamicImage::ImageLuma8(depth)).unwrap();
+        let adjustments = serde_json::json!({ "fogDepthMap": map });
+
+        let bytes = build_depth_preview(&image, false, &adjustments, Some("fogDepthMap"), None, 16)
+            .unwrap();
+        assert_eq!(header(&bytes), [16, 8, 0]);
+        assert_eq!(bytes.len(), 12 + 16 * 8 * 4);
+        let texel = |x: usize, y: usize| &bytes[12 + (y * 16 + x) * 4..12 + (y * 16 + x) * 4 + 4];
+        assert_eq!(texel(0, 0), [200, 100, 50, 40]);
+        assert_eq!(texel(15, 7), [200, 100, 50, 220]);
+
+        // A depth mask sends its own map; an empty or missing map gives nothing.
+        let mask = serde_json::json!({});
+        let own = encode_source_space_map(&DynamicImage::ImageLuma8(GrayImage::new(8, 4))).unwrap();
+        assert_eq!(
+            header(&build_depth_preview(&image, false, &mask, None, Some(&own), 16).unwrap()),
+            [8, 4, 0]
+        );
+        assert!(build_depth_preview(&image, false, &mask, Some("fogDepthMap"), None, 16).is_none());
+        assert!(build_depth_preview(&image, false, &mask, None, Some(""), 16).is_none());
+    }
+
+    #[test]
+    fn relight_preview_appends_normals_and_turns_distance_into_nearness() {
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(8, 8, Rgb([10, 20, 30])));
+        let normals = RgbaImage::from_pixel(8, 8, Rgba([128, 64, 255, 200]));
+        let map = encode_source_space_map(&DynamicImage::ImageRgba8(normals)).unwrap();
+        let adjustments = serde_json::json!({ "relightNormalMap": map });
+
+        let bytes = build_depth_preview(
+            &image,
+            false,
+            &adjustments,
+            Some("relightNormalMap"),
+            None,
+            64,
+        )
+        .unwrap();
+        assert_eq!(header(&bytes), [8, 8, 1]);
+        assert_eq!(bytes.len(), 12 + 8 * 8 * 8);
+        assert_eq!(&bytes[12..16], [10, 20, 30, 255 - 200]);
+        assert_eq!(
+            &bytes[12 + 8 * 8 * 4..12 + 8 * 8 * 4 + 4],
+            [128, 64, 255, 255]
+        );
+    }
 
     #[test]
     fn rotate_normal_turns_encoded_vectors_in_image_space() {

@@ -157,6 +157,22 @@
       "motionBlur": "モーションブラー",
       "motionBlurAngle": "角度",
       "motionBlurDirection": "方向（ドラッグ、Shiftで15°単位）",
+      "motionBlurHighlights": "ハイライト",
+      "motionBlurType": "種類",
+      "motionBlurTypes": {
+        "linear": "直線",
+        "zoom": "ズーム",
+        "spin": "回転",
+        "smooth": "なめらか"
+      },
+      "motionBlurLayer": "動き",
+      "motionBlurLayers": {
+        "auto": "自動",
+        "panning": "流し撮り",
+        "subject": "被写体の動き",
+        "uniform": "均一"
+      },
+      "motionBlurDepth": "奥行き",
       "relight": "リライト",
       "relightAddLight": "ライトを追加",
       "relightAmbient": "環境光",

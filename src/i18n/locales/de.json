@@ -157,6 +157,22 @@
       "motionBlur": "Bewegungsunschärfe",
       "motionBlurAngle": "Winkel",
       "motionBlurDirection": "Richtung (ziehen; Umschalt rastet in 15°-Schritten ein)",
+      "motionBlurHighlights": "Lichter",
+      "motionBlurType": "Typ",
+      "motionBlurTypes": {
+        "linear": "Linear",
+        "zoom": "Zoom",
+        "spin": "Drehung",
+        "smooth": "Weich"
+      },
+      "motionBlurLayer": "Bewegung",
+      "motionBlurLayers": {
+        "auto": "Automatisch",
+        "panning": "Mitziehen",
+        "subject": "Bewegtes Motiv",
+        "uniform": "Gleichmäßig"
+      },
+      "motionBlurDepth": "Tiefe",
       "relight": "Neu beleuchten",
       "relightAddLight": "Licht hinzufügen",
       "relightAmbient": "Umgebungslicht",

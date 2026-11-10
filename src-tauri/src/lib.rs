@@ -44,6 +44,7 @@ mod lightroom_xmp;
 mod lights_out_cover;
 mod lut_processing;
 mod mask_generation;
+mod motion_blur;
 mod multi_exposure;
 mod negative_conversion;
 mod panorama_stitching;
@@ -659,6 +660,12 @@ fn process_preview_job(
                 mask_bitmaps: &mask_bitmaps,
                 lut,
                 roi: pixel_roi,
+                motion_blur: crate::motion_blur::MotionBlurs::new(
+                    &adjustments_clone,
+                    (preview_width, preview_height),
+                    scaled_crop_offset,
+                    crate::motion_blur::render_extent(&loaded_image.image, effective_scale),
+                ),
             },
             "apply_adjustments",
             use_wgpu_renderer,
@@ -994,6 +1001,12 @@ fn render_uncropped_preview(app_handle: &tauri::AppHandle, job: UncroppedPreview
             mask_bitmaps: &mask_bitmaps,
             lut,
             roi: None,
+            motion_blur: crate::motion_blur::MotionBlurs::new(
+                &adjustments_clone,
+                (preview_width, preview_height),
+                (0.0, 0.0),
+                crate::motion_blur::render_extent(&loaded_image.image, scale_for_gpu),
+            ),
         },
         "generate_uncropped_preview",
     ) {
@@ -1182,6 +1195,7 @@ async fn preview_geometry_transform(
                     mask_bitmaps: &mask_bitmaps,
                     lut,
                     roi: None,
+                    motion_blur: Default::default(),
                 },
                 "preview_geometry_transform_base_gen",
             )?;
@@ -1375,6 +1389,12 @@ fn generate_preset_preview_blocking(
             mask_bitmaps: &mask_bitmaps,
             lut,
             roi: None,
+            motion_blur: crate::motion_blur::MotionBlurs::new(
+                &js_adjustments,
+                (img_w, img_h),
+                scaled_crop_offset,
+                crate::motion_blur::render_extent(&loaded_image.image, scale_for_gpu),
+            ),
         },
         "generate_preset_preview",
     )?;
@@ -1527,6 +1547,12 @@ async fn generate_all_community_previews(
                     mask_bitmaps: &mask_bitmaps,
                     lut,
                     roi: None,
+                    motion_blur: crate::motion_blur::MotionBlurs::new(
+                        &scaled_adjustments,
+                        (img_w, img_h),
+                        actual_scaled_crop_offset,
+                        crate::motion_blur::render_extent(base_image, 1.0),
+                    ),
                 },
                 "generate_all_community_previews",
             )?;
@@ -1810,6 +1836,12 @@ async fn generate_preview_for_path(
                 mask_bitmaps: &mask_bitmaps,
                 lut,
                 roi: None,
+                motion_blur: crate::motion_blur::MotionBlurs::new(
+                    &js_adjustments,
+                    (img_w, img_h),
+                    unscaled_crop_offset,
+                    crate::motion_blur::render_extent(&base_image, 1.0),
+                ),
             },
             "generate_preview_for_path",
         )?;
@@ -2568,6 +2600,7 @@ pub fn run() {
             ai_commands::test_ai_connector_connection,
             ai_commands::generate_full_image_depth_map,
             ai_commands::generate_relight_normal_map,
+            ai_commands::get_depth_preview,
             ai_denoise::get_ai_denoise_cache_size,
             ai_denoise::clear_ai_denoise_cache,
             inpainting::invoke_generative_replace_with_mask_def,

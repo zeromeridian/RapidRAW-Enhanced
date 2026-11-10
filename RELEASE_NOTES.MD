@@ -5,6 +5,73 @@ The newest release appears first. Entries contain only concise, user-facing
 changes so each version can be copied directly into a GitHub Release
 description.
 
+## 1.40.0-dev-rr-gap — 2026-11-10
+
+### Develop
+
+- **Motion Blur** has a new engine (from RapidRAW 1.6.9):
+  - **Type:** Linear, Zoom and Spin, plus Smooth in masks.
+  - **Highlights:** bright lights keep their brightness as they streak,
+    like a real long exposure.
+  - The photo's grain is restored over blurred areas, so they no longer
+    look smooth next to sharp ones.
+  - **Motion** (in AI subject masks): Moving Subject, Panning, Uniform or
+    Auto. The subject and the background are separated, so the blur no
+    longer leaves halos around the subject.
+  - **Depth:** near objects streak more than distant ones, using an AI
+    depth map, with its own 3D view.
+  - Long blurs stay smooth at any length.
+  - The direction dial and typed angle stay as before.
+- Photos that already use Motion Blur look different: above an Amount of
+  about 20 the new blur is longer, and it brightens highlights by default.
+  Adjust Amount or Highlights to taste.
+
+## 1.39.0-dev-rr-gap — 2026-11-10
+
+### Develop
+
+- New **3D depth view** in Lens Blur, Relight, Fog and AI depth masks (from
+  RapidRAW 1.6.9). It shows the photo as a 3D scene built from its depth
+  map, with the effect applied:
+  - **Lens Blur:** the in-focus range and its fades as planes in depth.
+    Drag a plane to move it, drag the range to shift it, or click a spot in
+    the scene to focus there.
+  - **Fog:** the fog over the scene, including its start, feather, density,
+    ground fog and colour. Drag the start plane, or click a spot to start
+    the fog there.
+  - **Relight:** the lights in the scene with their colour, falloff, cone,
+    softness and shine. Drag the selected light freely or along one axis,
+    including in depth.
+  - **AI depth masks:** the selected depth band. Drag its planes like Lens
+    Blur's.
+  - Drag the background to turn the view, Ctrl/Cmd+scroll to zoom,
+    Ctrl/Cmd+drag to pan, and double-click to switch between the default
+    and a side view.
+- The 3D view is a preview of the settings: edits render exactly as before.
+
+### Fixes
+
+- Choosing a Relight light type from its list no longer turns off placing
+  lights on the photo.
+- Lens Blur's depth range shows the fade the photo is actually rendered
+  with for edits that never changed it (15, not 20).
+
+## 1.38.11-dev-rr-gap — 2026-11-10
+
+### Fixes
+
+- Sorting by file name now puts numbers in order: `IMG_2` comes before
+  `IMG_10`, and a folder of numbered frames no longer sorts as 1, 10, 11, 2.
+- OM System and Olympus ORF files could open with the wrong white balance,
+  black level, or crop. They now read these values from the right part of
+  the file.
+- Updated RAW decoder (from RapidRAW 1.6.9): support for the OM SYSTEM PEN,
+  Sony A7R VI and RX10 V, Panasonic DC-L10, and Leica SL3-P; correct colours
+  for the Olympus E-M1X; correct white balance for the Canon EOS-1D and
+  1Ds; correct orientation for Fujifilm SuperCCD cameras; fixed black levels
+  for some Panasonic RW2 and linear DNG files; fixed crops of Canon mRAW and
+  sRAW files; and fixes for some lossless-JPEG-compressed DNGs.
+
 ## 1.38.10-fix-perf — 2026-11-10
 
 ### Fixes

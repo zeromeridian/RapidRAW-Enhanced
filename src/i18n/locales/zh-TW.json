@@ -157,6 +157,22 @@
       "motionBlur": "動態模糊",
       "motionBlurAngle": "角度",
       "motionBlurDirection": "方向（拖曳；按住 Shift 以 15° 為間隔）",
+      "motionBlurHighlights": "亮部",
+      "motionBlurType": "類型",
+      "motionBlurTypes": {
+        "linear": "線性",
+        "zoom": "縮放",
+        "spin": "旋轉",
+        "smooth": "平滑"
+      },
+      "motionBlurLayer": "運動",
+      "motionBlurLayers": {
+        "auto": "自動",
+        "panning": "追焦",
+        "subject": "移動主體",
+        "uniform": "均勻"
+      },
+      "motionBlurDepth": "深度",
       "relight": "重新打光",
       "relightAddLight": "新增燈光",
       "relightAmbient": "環境光",

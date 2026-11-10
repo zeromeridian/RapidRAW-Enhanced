@@ -52,6 +52,7 @@ import EffectsPanel from '../../adjustments/Effects';
 import Waveform from '../editor/Waveform';
 import Resizer from '../../ui/Resizer';
 import { DepthRangePicker } from '../../ui/DepthRangePicker';
+import DepthScope from '../../ui/depthScope/DepthScope';
 
 import {
   Mask,
@@ -1916,6 +1917,21 @@ function SettingsPanel({
                     <span>{aiModelDownloadStatus}</span>
                   </div>
                 </Text>
+              )}
+
+              {activeSubMask.type === Mask.AiDepth && activeSubMask.parameters?.maskDataBase64 && (
+                <DepthScope
+                  mapData={activeSubMask.parameters.maskDataBase64}
+                  scene={{
+                    kind: 'depthMask',
+                    minDepth: activeSubMask.parameters?.minDepth ?? 0,
+                    maxDepth: activeSubMask.parameters?.maxDepth ?? 100,
+                    minFade: activeSubMask.parameters?.minFade ?? 15,
+                    maxFade: activeSubMask.parameters?.maxFade ?? 15,
+                  }}
+                  onChange={handleSubMaskParametersChange}
+                  onDragStateChange={onDragStateChange}
+                />
               )}
 
               {activeSubMask.type === Mask.AiDepth && (

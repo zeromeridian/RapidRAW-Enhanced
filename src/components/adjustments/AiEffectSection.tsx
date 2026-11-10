@@ -21,6 +21,74 @@ interface AiEffectSectionProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
 }
 
+type EffectMapStatusProps = Pick<
+  AiEffectSectionProps,
+  | 'enabled'
+  | 'isGenerating'
+  | 'generatingLabel'
+  | 'generationProgress'
+  | 'isMapMissing'
+  | 'mapMissingLabel'
+  | 'generateMapLabel'
+  | 'onGenerateMap'
+  | 'children'
+>;
+
+/**
+ * The controls of an effect that needs an AI map: a progress line while the map is generated,
+ * a prompt to generate it when the effect is on without one (e.g. after a paste), else `children`.
+ */
+export function EffectMapStatus({
+  enabled,
+  isGenerating,
+  generatingLabel,
+  generationProgress,
+  isMapMissing = false,
+  mapMissingLabel,
+  generateMapLabel,
+  onGenerateMap,
+  children,
+}: EffectMapStatusProps) {
+  const { t } = useTranslation();
+  const aiModelDownloadStatus = useProcessStore((state) => state.aiModelDownloadStatus);
+  const progressDetail =
+    aiModelDownloadStatus || (generationProgress !== undefined ? `${Math.round(generationProgress * 100)}%` : null);
+
+  if (isGenerating) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-1 p-4 text-text-secondary text-center">
+        <div className="flex items-center gap-2">
+          <Loader2 size={16} className="animate-spin shrink-0" />
+          <Text variant={TextVariants.label}>
+            {aiModelDownloadStatus ? t('editor.masks.settings.aiModelDownloading') : generatingLabel}
+          </Text>
+        </div>
+        {progressDetail && (
+          <Text variant={TextVariants.small} className="text-accent">
+            {progressDetail}
+          </Text>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {enabled && isMapMissing && onGenerateMap && (
+        <div className="flex flex-col gap-2 p-3 rounded-md bg-bg-primary">
+          <Text variant={TextVariants.small} className="text-text-secondary">
+            {mapMissingLabel}
+          </Text>
+          <Button className="bg-surface" onClick={onGenerateMap}>
+            {generateMapLabel}
+          </Button>
+        </div>
+      )}
+      {children}
+    </>
+  );
+}
+
 /** A toggled adjustment section whose result depends on an AI model run. */
 export default function AiEffectSection({
   title,
@@ -36,11 +104,6 @@ export default function AiEffectSection({
   children,
   ...props
 }: AiEffectSectionProps) {
-  const { t } = useTranslation();
-  const aiModelDownloadStatus = useProcessStore((state) => state.aiModelDownloadStatus);
-  const progressDetail =
-    aiModelDownloadStatus || (generationProgress !== undefined ? `${Math.round(generationProgress * 100)}%` : null);
-
   return (
     <div className="p-2 compact:p-1.5 bg-bg-tertiary rounded-md" {...props}>
       <Text variant={TextVariants.heading} className="mb-2 compact:mb-1 compact:text-sm">
@@ -56,35 +119,18 @@ export default function AiEffectSection({
       >
         <div className="overflow-hidden">
           <div className="space-y-4 compact:space-y-2 pt-4 compact:pt-2 pb-1">
-            {isGenerating ? (
-              <div className="flex flex-col items-center justify-center gap-1 p-4 text-text-secondary text-center">
-                <div className="flex items-center gap-2">
-                  <Loader2 size={16} className="animate-spin shrink-0" />
-                  <Text variant={TextVariants.label}>
-                    {aiModelDownloadStatus ? t('editor.masks.settings.aiModelDownloading') : generatingLabel}
-                  </Text>
-                </div>
-                {progressDetail && (
-                  <Text variant={TextVariants.small} className="text-accent">
-                    {progressDetail}
-                  </Text>
-                )}
-              </div>
-            ) : (
-              <>
-                {enabled && isMapMissing && onGenerateMap && (
-                  <div className="flex flex-col gap-2 p-3 rounded-md bg-bg-primary">
-                    <Text variant={TextVariants.small} className="text-text-secondary">
-                      {mapMissingLabel}
-                    </Text>
-                    <Button className="bg-surface" onClick={onGenerateMap}>
-                      {generateMapLabel}
-                    </Button>
-                  </div>
-                )}
-                {children}
-              </>
-            )}
+            <EffectMapStatus
+              enabled={enabled}
+              isGenerating={isGenerating}
+              generatingLabel={generatingLabel}
+              generationProgress={generationProgress}
+              isMapMissing={isMapMissing}
+              mapMissingLabel={mapMissingLabel}
+              generateMapLabel={generateMapLabel}
+              onGenerateMap={onGenerateMap}
+            >
+              {children}
+            </EffectMapStatus>
           </div>
         </div>
       </div>

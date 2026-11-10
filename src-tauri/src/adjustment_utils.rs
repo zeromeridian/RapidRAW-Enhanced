@@ -90,19 +90,22 @@ pub fn hydrate_adjustments(state: &tauri::State<AppState>, adjustments: &mut ser
     }
 }
 
+/// Whether an adjustment section is shown (a hidden section's controls do not render).
+pub fn is_section_visible(adjustments: &serde_json::Value, section: &str) -> bool {
+    adjustments
+        .get("sectionVisibility")
+        .and_then(|v| v.get(section))
+        .and_then(|s| s.as_bool())
+        .unwrap_or(true)
+}
+
 /// Whether a toggled feature is on and its adjustment section is visible.
 pub fn is_section_feature_enabled(
     adjustments: &serde_json::Value,
     section: &str,
     enabled_key: &str,
 ) -> bool {
-    let section_visible = adjustments
-        .get("sectionVisibility")
-        .and_then(|v| v.get(section))
-        .and_then(|s| s.as_bool())
-        .unwrap_or(true);
-
-    section_visible && adjustments[enabled_key].as_bool().unwrap_or(false)
+    is_section_visible(adjustments, section) && adjustments[enabled_key].as_bool().unwrap_or(false)
 }
 
 pub fn is_effect_enabled(adjustments: &serde_json::Value, enabled_key: &str) -> bool {

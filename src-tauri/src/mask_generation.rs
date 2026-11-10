@@ -790,6 +790,20 @@ fn generate_ai_bitmap_from_full_mask(
     full_mask_image: &GrayImage,
     tf: &TransformParams,
 ) -> GrayImage {
+    transform_full_mask(full_mask_image, tf, false)
+}
+
+/// Maps a full-image map (such as a depth map) into the render frame like an AI mask, but
+/// output pixels outside the source take the nearest edge value instead of 0.
+pub fn generate_edge_clamped_bitmap(full_map: &GrayImage, tf: &TransformParams) -> GrayImage {
+    transform_full_mask(full_map, tf, true)
+}
+
+fn transform_full_mask(
+    full_mask_image: &GrayImage,
+    tf: &TransformParams,
+    clamp_edges: bool,
+) -> GrayImage {
     let (full_mask_w, full_mask_h) = full_mask_image.dimensions();
     let mut final_mask = GrayImage::new(tf.width, tf.height);
 
@@ -844,13 +858,15 @@ fn generate_ai_bitmap_from_full_mask(
             let x_src = x_unrotated_coarse / tf.scale;
             let y_src = y_unrotated_coarse / tf.scale;
 
-            if x_src >= 0.0
-                && x_src < full_mask_w as f32
-                && y_src >= 0.0
-                && y_src < full_mask_h as f32
+            if clamp_edges
+                || (x_src >= 0.0
+                    && x_src < full_mask_w as f32
+                    && y_src >= 0.0
+                    && y_src < full_mask_h as f32)
             {
-                let pixel = full_mask_image.get_pixel(x_src as u32, y_src as u32);
-                final_mask.put_pixel(x_out, y_out, *pixel);
+                let x = (x_src.max(0.0) as u32).min(full_mask_w - 1);
+                let y = (y_src.max(0.0) as u32).min(full_mask_h - 1);
+                final_mask.put_pixel(x_out, y_out, *full_mask_image.get_pixel(x, y));
             }
         }
     }

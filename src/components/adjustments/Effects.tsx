@@ -15,6 +15,12 @@ import {
   CreativeAdjustment,
   DEFAULT_GLOW_HUE,
   DEFAULT_HALATION_HUE,
+  DEFAULT_MOTION_BLUR_DEPTH,
+  DEFAULT_MOTION_BLUR_HIGHLIGHTS,
+  EffectMapKey,
+  MotionBlurLayer,
+  MotionBlurType,
+  LENS_BLUR_RANGE_DEFAULTS,
   RelightLight,
   createRelightLight,
   getRelightLightColor,
@@ -27,8 +33,11 @@ import { AppSettings } from '../ui/AppProperties';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 import { DepthRangePicker } from '../ui/DepthRangePicker';
-import AiEffectSection from './AiEffectSection';
+import AiEffectSection, { EffectMapStatus } from './AiEffectSection';
+import DepthScope from '../ui/depthScope/DepthScope';
+import { ScenePatch } from '../ui/depthScope/scene';
 import { useEditorStore } from '../../store/useEditorStore';
+import { useEditorActions } from '../../hooks/useEditorActions';
 import { useContextMenu } from '../../context/ContextMenuContext';
 
 interface EffectsPanelProps {
@@ -152,10 +161,11 @@ const BokehShapeSwitch = ({ selectedShape, onShapeChange }: BokehShapeSwitchProp
   );
 };
 
-type EffectMapKey = 'lensBlurDepthMap' | 'relightNormalMap' | 'fogDepthMap';
+/** The maps of the AI effect sections (Motion Blur's depth map is shared with masks, below). */
+type SectionMapKey = Exclude<EffectMapKey, 'motionBlurDepthMap'>;
 
 const EFFECT_MAPS: Record<
-  EffectMapKey,
+  SectionMapKey,
   { command: string; enabledKey: 'lensBlurEnabled' | 'relightEnabled' | 'fogEnabled'; errorLabel: string }
 > = {
   lensBlurDepthMap: {
@@ -182,9 +192,12 @@ export default function EffectsPanel({
   const isRelightPickerActive = useEditorStore((state) => state.isRelightPickerActive);
   const activeRelightLightId = useEditorStore((state) => state.activeRelightLightId);
   const setEditor = useEditorStore((state) => state.setEditor);
+  // Motion Blur's depth map belongs to the photo, also when a mask's blur uses it.
+  const motionBlurDepthMap = useEditorStore((state) => state.adjustments.motionBlurDepthMap);
+  const { setAdjustments: setImageAdjustments } = useEditorActions();
   const { showContextMenu } = useContextMenu();
 
-  const handleGenerateEffectMap = async (mapKey: EffectMapKey) => {
+  const handleGenerateEffectMap = async (mapKey: SectionMapKey) => {
     const { command, enabledKey, errorLabel } = EFFECT_MAPS[mapKey];
     setGeneratingMaps((prev) => ({ ...prev, [mapKey]: true }));
     try {
@@ -203,6 +216,32 @@ export default function EffectsPanel({
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: numericValue }));
   };
 
+  const handleGenerateMotionBlurDepthMap = async () => {
+    setGeneratingMaps((prev) => ({ ...prev, motionBlurDepthMap: true }));
+    try {
+      const b64: string = await invoke('generate_full_image_depth_map');
+      setImageAdjustments((prev: Adjustments) => ({ ...prev, motionBlurDepthMap: b64 }));
+    } catch (e) {
+      toast.error(`Failed to generate depth map: ${e}`);
+      setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, motionBlurDepthEnabled: false }));
+    } finally {
+      setGeneratingMaps((prev) => ({ ...prev, motionBlurDepthMap: false }));
+    }
+  };
+
+  const handleMotionBlurDepthToggle = (enabled: boolean) => {
+    handleAdjustmentChange(Effect.MotionBlurDepthEnabled, enabled);
+    if (enabled && !motionBlurDepthMap) {
+      handleGenerateMotionBlurDepthMap();
+    }
+  };
+
+  const motionBlurType: MotionBlurType = adjustments.motionBlurType ?? 'linear';
+
+  const handleScenePatch = (patch: ScenePatch) => {
+    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, ...patch }));
+  };
+
   const handleLutIntensityChange = (intensity: number) => {
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, lutIntensity: intensity }));
   };
@@ -218,7 +257,7 @@ export default function EffectsPanel({
     }));
   };
 
-  const handleSpatialEffectToggle = (mapKey: EffectMapKey) => (enabled: boolean) => {
+  const handleSpatialEffectToggle = (mapKey: SectionMapKey) => (enabled: boolean) => {
     handleAdjustmentChange(EFFECT_MAPS[mapKey].enabledKey, enabled);
     if (enabled && !adjustments[mapKey]) {
       handleGenerateEffectMap(mapKey);
@@ -256,14 +295,16 @@ export default function EffectsPanel({
     activateLight(light.id);
   };
 
-  const handleLightChange = (key: keyof RelightLight, value: number | string) => {
+  const handleLightPatch = (patch: Partial<RelightLight>) => {
     setAdjustments((prev: Partial<Adjustments>) => ({
       ...prev,
       relightLights: (prev.relightLights || []).map((light: RelightLight) =>
-        light.id === activeRelightLightId ? { ...light, [key]: value } : light,
+        light.id === activeRelightLightId ? { ...light, ...patch } : light,
       ),
     }));
   };
+
+  const handleLightChange = (key: keyof RelightLight, value: number | string) => handleLightPatch({ [key]: value });
 
   const handleLightSliderChange = (key: keyof RelightLight) => (e: SliderChangeEvent) =>
     handleLightChange(key, parseInt(String(e.target.value), 10));
@@ -417,6 +458,22 @@ export default function EffectsPanel({
             generateMapLabel={t('adjustments.effects.generateDepthMap')}
             onGenerateMap={() => handleGenerateEffectMap('lensBlurDepthMap')}
           >
+            {adjustments.lensBlurEnabled && (
+              <DepthScope
+                mapKey="lensBlurDepthMap"
+                scene={{
+                  kind: 'lensBlur',
+                  minDepth: adjustments.lensBlurMinDepth ?? LENS_BLUR_RANGE_DEFAULTS.minDepth,
+                  maxDepth: adjustments.lensBlurMaxDepth ?? LENS_BLUR_RANGE_DEFAULTS.maxDepth,
+                  minFade: adjustments.lensBlurMinFade ?? LENS_BLUR_RANGE_DEFAULTS.minFade,
+                  maxFade: adjustments.lensBlurMaxFade ?? LENS_BLUR_RANGE_DEFAULTS.maxFade,
+                  amount: adjustments.lensBlurAmount ?? 50,
+                }}
+                onChange={handleScenePatch}
+                onDragStateChange={onDragStateChange}
+              />
+            )}
+
             <Slider
               label={t('adjustments.effects.amount')}
               max={100}
@@ -448,10 +505,10 @@ export default function EffectsPanel({
             />
 
             <DepthRangePicker
-              minDepth={100 - (adjustments.lensBlurMaxDepth ?? 100)}
-              maxDepth={100 - (adjustments.lensBlurMinDepth ?? 20)}
-              minFade={adjustments.lensBlurMaxFade ?? 20}
-              maxFade={adjustments.lensBlurMinFade ?? 20}
+              minDepth={100 - (adjustments.lensBlurMaxDepth ?? LENS_BLUR_RANGE_DEFAULTS.maxDepth)}
+              maxDepth={100 - (adjustments.lensBlurMinDepth ?? LENS_BLUR_RANGE_DEFAULTS.minDepth)}
+              minFade={adjustments.lensBlurMaxFade ?? LENS_BLUR_RANGE_DEFAULTS.maxFade}
+              maxFade={adjustments.lensBlurMinFade ?? LENS_BLUR_RANGE_DEFAULTS.minFade}
               defaultMinDepth={0}
               defaultMaxDepth={80}
               defaultMinFade={20}
@@ -481,6 +538,22 @@ export default function EffectsPanel({
             onGenerateMap={() => handleGenerateEffectMap('relightNormalMap')}
             data-relight-lights
           >
+            {adjustments.relightEnabled && (
+              <DepthScope
+                mapKey="relightNormalMap"
+                scene={{
+                  kind: 'relight',
+                  lights: relightLights,
+                  activeId: activeLight?.id ?? null,
+                  ambient: adjustments.relightAmbient ?? 0,
+                  softness: adjustments.relightSoftness ?? 25,
+                  shine: adjustments.relightShine ?? 0,
+                }}
+                onChange={handleLightPatch}
+                onDragStateChange={onDragStateChange}
+              />
+            )}
+
             <Slider
               label={t('adjustments.effects.relightAmbient')}
               max={100}
@@ -739,6 +812,24 @@ export default function EffectsPanel({
             generateMapLabel={t('adjustments.effects.generateDepthMap')}
             onGenerateMap={() => handleGenerateEffectMap('fogDepthMap')}
           >
+            {adjustments.fogEnabled && (
+              <DepthScope
+                mapKey="fogDepthMap"
+                scene={{
+                  kind: 'fog',
+                  amount: adjustments.fogAmount ?? 50,
+                  start: adjustments.fogStart ?? 0,
+                  feather: adjustments.fogFeather ?? 0,
+                  density: adjustments.fogDensity ?? 50,
+                  height: adjustments.fogHeight ?? 0,
+                  temperature: adjustments.fogTemperature ?? 0,
+                  tint: adjustments.fogTint ?? 0,
+                }}
+                onChange={handleScenePatch}
+                onDragStateChange={onDragStateChange}
+              />
+            )}
+
             <Slider
               label={t('adjustments.effects.amount')}
               max={100}
@@ -890,27 +981,122 @@ export default function EffectsPanel({
           onDragStateChange={onDragStateChange}
           fillOrigin="min"
         />
-        <div className="flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <Slider
-              label={t('adjustments.effects.motionBlurAngle')}
-              max={90}
-              min={-90}
-              defaultValue={0}
-              onChange={(e: SliderChangeEvent) => handleAdjustmentChange(Effect.MotionBlurAngle, e.target.value)}
-              step={1}
-              suffix="°"
-              value={adjustments.motionBlurAngle ?? 0}
+        {motionBlurType === 'linear' && (
+          <div className="flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <Slider
+                label={t('adjustments.effects.motionBlurAngle')}
+                max={90}
+                min={-90}
+                defaultValue={0}
+                onChange={(e: SliderChangeEvent) => handleAdjustmentChange(Effect.MotionBlurAngle, e.target.value)}
+                step={1}
+                suffix="°"
+                value={adjustments.motionBlurAngle ?? 0}
+                onDragStateChange={onDragStateChange}
+              />
+            </div>
+            <AngleDial
+              label={t('adjustments.effects.motionBlurDirection')}
+              onChange={(angle: number) => handleAdjustmentChange(Effect.MotionBlurAngle, angle)}
               onDragStateChange={onDragStateChange}
+              value={adjustments.motionBlurAngle ?? 0}
             />
           </div>
-          <AngleDial
-            label={t('adjustments.effects.motionBlurDirection')}
-            onChange={(angle: number) => handleAdjustmentChange(Effect.MotionBlurAngle, angle)}
-            onDragStateChange={onDragStateChange}
-            value={adjustments.motionBlurAngle ?? 0}
+        )}
+        <Slider
+          label={t('adjustments.effects.motionBlurHighlights')}
+          max={100}
+          min={0}
+          defaultValue={DEFAULT_MOTION_BLUR_HIGHLIGHTS}
+          onChange={(e: SliderChangeEvent) => handleAdjustmentChange(Effect.MotionBlurHighlights, e.target.value)}
+          step={1}
+          value={adjustments.motionBlurHighlights ?? DEFAULT_MOTION_BLUR_HIGHLIGHTS}
+          onDragStateChange={onDragStateChange}
+          fillOrigin="min"
+        />
+        <div className="mb-2">
+          <Text variant={TextVariants.label} className="mb-2 block">
+            {t('adjustments.effects.motionBlurType')}
+          </Text>
+          <Dropdown<MotionBlurType>
+            options={[
+              { label: t('adjustments.effects.motionBlurTypes.linear'), value: 'linear' },
+              { label: t('adjustments.effects.motionBlurTypes.zoom'), value: 'zoom' },
+              { label: t('adjustments.effects.motionBlurTypes.spin'), value: 'spin' },
+              ...(isForMask
+                ? [{ label: t('adjustments.effects.motionBlurTypes.smooth'), value: 'smooth' as const }]
+                : []),
+            ]}
+            value={motionBlurType}
+            onChange={(value) =>
+              setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [Effect.MotionBlurType]: value }))
+            }
           />
         </div>
+        {isForMask && motionBlurType !== 'spin' && motionBlurType !== 'smooth' && (
+          <div className="mb-2">
+            <Text variant={TextVariants.label} className="mb-2 block">
+              {t('adjustments.effects.motionBlurLayer')}
+            </Text>
+            <Dropdown<MotionBlurLayer>
+              options={[
+                { label: t('adjustments.effects.motionBlurLayers.auto'), value: 'auto' },
+                { label: t('adjustments.effects.motionBlurLayers.subject'), value: 'subject' },
+                { label: t('adjustments.effects.motionBlurLayers.panning'), value: 'panning' },
+                { label: t('adjustments.effects.motionBlurLayers.uniform'), value: 'uniform' },
+              ]}
+              value={adjustments.motionBlurLayer ?? 'auto'}
+              onChange={(value) =>
+                setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [Effect.MotionBlurLayer]: value }))
+              }
+            />
+          </div>
+        )}
+        {motionBlurType !== 'spin' && (
+          <>
+            <Switch
+              label={t('adjustments.effects.motionBlurDepth')}
+              checked={!!adjustments.motionBlurDepthEnabled}
+              onChange={handleMotionBlurDepthToggle}
+            />
+            {adjustments.motionBlurDepthEnabled && (
+              <div className="mt-2 space-y-2">
+                <EffectMapStatus
+                  enabled
+                  isGenerating={!!generatingMaps.motionBlurDepthMap}
+                  generatingLabel={t('editor.ai.generatingDepthMap')}
+                  isMapMissing={!motionBlurDepthMap}
+                  mapMissingLabel={t('adjustments.effects.depthMapMissing')}
+                  generateMapLabel={t('adjustments.effects.generateDepthMap')}
+                  onGenerateMap={handleGenerateMotionBlurDepthMap}
+                >
+                  <DepthScope
+                    mapKey="motionBlurDepthMap"
+                    scene={{
+                      kind: 'motion',
+                      amount: adjustments.motionBlurAmount ?? 0,
+                      parallax: adjustments.motionBlurDepth ?? DEFAULT_MOTION_BLUR_DEPTH,
+                      angle: adjustments.motionBlurAngle ?? 0,
+                      radial: motionBlurType === 'zoom',
+                    }}
+                  />
+                  <Slider
+                    label={t('adjustments.effects.amount')}
+                    max={100}
+                    min={0}
+                    defaultValue={DEFAULT_MOTION_BLUR_DEPTH}
+                    onChange={(e: SliderChangeEvent) => handleAdjustmentChange(Effect.MotionBlurDepth, e.target.value)}
+                    step={1}
+                    value={adjustments.motionBlurDepth ?? DEFAULT_MOTION_BLUR_DEPTH}
+                    onDragStateChange={onDragStateChange}
+                    fillOrigin="min"
+                  />
+                </EffectMapStatus>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Masks offer no vignette; an older mask that has one keeps the controls to change or remove it. */}

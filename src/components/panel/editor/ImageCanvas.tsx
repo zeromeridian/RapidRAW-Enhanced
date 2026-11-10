@@ -1641,7 +1641,7 @@ const ImageCanvas = memo(
 
       const handlePointerDown = (e: PointerEvent) => {
         const target = e.target as HTMLElement;
-        if (target.closest('.konvajs-content') || target.closest('[data-relight-lights]')) return;
+        if (target.closest('.konvajs-content, [data-relight-lights], [data-dropdown-menu]')) return;
         setEditor({ isRelightPickerActive: false });
       };
 

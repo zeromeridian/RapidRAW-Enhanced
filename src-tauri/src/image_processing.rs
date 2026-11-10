@@ -1677,8 +1677,10 @@ pub struct GlobalAdjustments {
     pub flare_amount: f32,
     pub sharpness_threshold: f32,
 
-    pub motion_blur_amount: f32,
-    pub motion_blur_angle: f32,
+    /// Formerly TIR's in-shader motion blur; motion blur now runs before the main shader
+    /// (`motion_blur.rs`).
+    _pad_motion_blur1: f32,
+    _pad_motion_blur2: f32,
     /// Glow colour hue in degrees and how far the glow moves toward it (0–1).
     pub glow_hue: f32,
     pub glow_saturation: f32,
@@ -1722,8 +1724,8 @@ pub struct MaskAdjustments {
     pub grain_size: f32,
     pub grain_roughness: f32,
     pub gaussian_blur_amount: f32,
-    pub motion_blur_amount: f32,
-    pub motion_blur_angle: f32,
+    _pad_motion_blur1: f32,
+    _pad_motion_blur2: f32,
 
     pub hue: f32,
     pub color_grading_shadows: ColorGradeSettings,
@@ -1812,7 +1814,6 @@ struct AdjustmentScales {
     glow: f32,
     halation: f32,
     flares: f32,
-    motion_blur: f32,
 }
 
 /// Built-in halation colour (red-orange, degrees). `halationHue` rotates the
@@ -1873,18 +1874,7 @@ const SCALES: AdjustmentScales = AdjustmentScales {
     glow: 100.0,
     halation: 100.0,
     flares: 100.0,
-    motion_blur: 100.0,
 };
-
-/// The blur direction only matters while the blur has a length, so an angle
-/// without an amount stays neutral and does not mark the image as edited.
-fn motion_blur_angle_radians(amount: f32, angle_degrees: f32) -> f32 {
-    if amount > 0.0 {
-        angle_degrees.to_radians()
-    } else {
-        0.0
-    }
-}
 
 fn parse_hsl_adjustments(js_hsl: &serde_json::Value) -> [HslColor; 8] {
     let mut hsl_array = [HslColor::default(); 8];
@@ -2203,6 +2193,10 @@ pub fn is_image_edited(
     {
         return true;
     }
+    // Motion blur runs before the main shader, so the uniform comparison below cannot see it.
+    if crate::motion_blur::is_active(adj) {
+        return true;
+    }
 
     if let Some(crop_val) = adj.get("crop")
         && !crop_val.is_null()
@@ -2381,7 +2375,6 @@ fn get_global_adjustments_from_json(
             } else {
                 crate::tone_mapping::TONE_MAPPER_BASIC
             });
-    let motion_blur_amount = get_val("effects", "motionBlurAmount", SCALES.motion_blur, None);
     let (pipe_to_rendering, rendering_to_pipe) = calculate_agx_matrices();
 
     let (has_lut, lut_intensity) = if is_visible("effects") {
@@ -2571,11 +2564,8 @@ fn get_global_adjustments_from_json(
             Some(15.0),
         ),
 
-        motion_blur_amount,
-        motion_blur_angle: motion_blur_angle_radians(
-            motion_blur_amount,
-            get_val("effects", "motionBlurAngle", 1.0, None),
-        ),
+        _pad_motion_blur1: 0.0,
+        _pad_motion_blur2: 0.0,
         glow_hue: get_val("effects", "glowHue", 1.0, Some(DEFAULT_GLOW_HUE)),
         glow_saturation: get_val("effects", "glowSaturation", 100.0, None),
     }
@@ -2624,7 +2614,6 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         Vec::new()
     };
     let cg_obj = adj.get("colorGrading").cloned().unwrap_or_default();
-    let motion_blur_amount = get_val("effects", "motionBlurAmount", SCALES.motion_blur);
 
     MaskAdjustments {
         exposure: get_val("basic", "exposure", SCALES.exposure),
@@ -2673,11 +2662,8 @@ fn get_mask_adjustments_from_json(adj: &serde_json::Value) -> MaskAdjustments {
         grain_roughness: adj["grainRoughness"].as_f64().unwrap_or(50.0) as f32
             / SCALES.grain_roughness,
         gaussian_blur_amount: get_val("effects", "gaussianBlurAmount", 100.0),
-        motion_blur_amount,
-        motion_blur_angle: motion_blur_angle_radians(
-            motion_blur_amount,
-            get_val("effects", "motionBlurAngle", 1.0),
-        ),
+        _pad_motion_blur1: 0.0,
+        _pad_motion_blur2: 0.0,
 
         hue: get_val("color", "hue", 1.0),
         color_grading_shadows: if is_visible("color") {
@@ -3907,9 +3893,7 @@ mod tests {
             "grainAmount": 80,
             "grainSize": 25,
             "grainRoughness": 50,
-            "gaussianBlurAmount": 65,
-            "motionBlurAmount": 40,
-            "motionBlurAngle": 90
+            "gaussianBlurAmount": 65
         }));
 
         assert_eq!(adjustments.monochrome, 1);
@@ -3925,8 +3909,6 @@ mod tests {
         assert!((adjustments.grain_size - 0.5).abs() < f32::EPSILON);
         assert!((adjustments.grain_roughness - 0.5).abs() < f32::EPSILON);
         assert!((adjustments.gaussian_blur_amount - 0.65).abs() < f32::EPSILON);
-        assert!((adjustments.motion_blur_amount - 0.4).abs() < f32::EPSILON);
-        assert!((adjustments.motion_blur_angle - std::f32::consts::FRAC_PI_2).abs() < 1e-6);
         assert_eq!(size_of::<MaskAdjustments>() % 16, 0);
     }
 
@@ -3953,8 +3935,6 @@ mod tests {
         assert_eq!(adjustments.vignette_amount, 0.0);
         assert_eq!(adjustments.grain_amount, 0.0);
         assert_eq!(adjustments.gaussian_blur_amount, 0.0);
-        assert_eq!(adjustments.motion_blur_amount, 0.0);
-        assert_eq!(adjustments.motion_blur_angle, 0.0);
     }
 
     #[test]
